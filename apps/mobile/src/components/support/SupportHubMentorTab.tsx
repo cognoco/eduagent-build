@@ -226,7 +226,11 @@ export function SupportHubMentorTab({
               : t('supportHub.mentor.subtitle')}
           </Text>
         </View>
-        {!activePersonScope ? (
+        {/* Persistent header affordance for the populated hub. When there are
+            no person scopes, the cold-start empty state below owns the single
+            "Start supporting" CTA — rendering both would give two controls the
+            same accessibility label. */}
+        {!activePersonScope && personScopes.length > 0 ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('supportHub.mentor.addSupporterLabel')}

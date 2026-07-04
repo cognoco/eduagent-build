@@ -93,13 +93,18 @@ export function SupportHubSubjectsTab({
         )}
       </View>
 
-      <SupportPersonPickerSheet
-        visible={isPickerVisible}
-        eligiblePersons={eligiblePersons}
-        onSelectPerson={handleSelectPerson}
-        onAddChild={handleAddChild}
-        onClose={() => setIsPickerVisible(false)}
-      />
+      {/* Only the empty state (personScopes.length === 0) exposes a trigger
+          that opens the picker, so only mount the sheet in that state (matches
+          SupportHubMentorTab). */}
+      {personScopes.length === 0 ? (
+        <SupportPersonPickerSheet
+          visible={isPickerVisible}
+          eligiblePersons={eligiblePersons}
+          onSelectPerson={handleSelectPerson}
+          onAddChild={handleAddChild}
+          onClose={() => setIsPickerVisible(false)}
+        />
+      ) : null}
     </ScrollView>
   );
 }

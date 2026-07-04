@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import type { EligibleManagedPerson } from '../../hooks/use-eligible-supportees';
+import { ProfileContext, type Profile } from '../../lib/profile';
+import { createTestProfile } from '../../test-utils/app-hook-test-utils';
 import type { SubjectIndexItem } from '../../hooks/use-subjects-index';
 
 const mockPush = jest.fn();
@@ -10,7 +11,6 @@ let mockSubjectsIndex: {
   isError: boolean;
   refetch: jest.Mock;
 };
-let mockEligiblePersons: EligibleManagedPerson[] = [];
 let mockScopeContext: {
   activeScope:
     | { kind: 'me' }
@@ -48,13 +48,10 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  // gc1-allow: route orchestration test pins the eligible-person list directly; the hook's own computation is covered in use-eligible-supportees.test.ts
-  '../../hooks/use-eligible-supportees',
-  () => ({
-    useEligibleManagedPersons: () => mockEligiblePersons,
-  }),
-);
+// WI-1393: useEligibleManagedPersons is intentionally NOT mocked — the two
+// WI-1393 tests below drive it with real linked-child profiles seeded through
+// ProfileContext.Provider (its own computation is covered in
+// use-eligible-supportees.test.ts), mirroring mentor.test.tsx.
 
 jest.mock('../../hooks/use-library-search', () => ({
   ...jest.requireActual('../../hooks/use-library-search'),
@@ -122,6 +119,42 @@ jest.mock(
 
 const SubjectsScreen = require('./subjects').default;
 
+const OWNER: Profile = createTestProfile({
+  id: 'owner-1',
+  accountId: 'account-1',
+  displayName: 'Parent',
+  isOwner: true,
+});
+
+const LIAM: Profile = createTestProfile({
+  id: 'child-new',
+  accountId: 'account-1',
+  displayName: 'Liam',
+  isOwner: false,
+});
+
+function renderWithProfiles(
+  profiles: Profile[],
+  activeProfile: Profile,
+): ReturnType<typeof render> {
+  return render(
+    <ProfileContext.Provider
+      value={{
+        profiles,
+        activeProfile,
+        isExplicitProxyMode: false,
+        switchProfile: jest.fn(),
+        isLoading: false,
+        profileLoadError: null,
+        profileWasRemoved: false,
+        acknowledgeProfileRemoval: jest.fn(),
+      }}
+    >
+      <SubjectsScreen />
+    </ProfileContext.Provider>,
+  );
+}
+
 const SUBJECTS: SubjectIndexItem[] = [
   {
     subjectId: '550e8400-e29b-41d4-a716-446655440000',
@@ -145,7 +178,6 @@ describe('SubjectsScreen', () => {
       isError: false,
       refetch: jest.fn(),
     };
-    mockEligiblePersons = [];
     mockScopeContext = {
       activeScope: { kind: 'me' },
       availableScopes: [
@@ -225,13 +257,14 @@ describe('SubjectsScreen', () => {
   // WI-1393 A3: the Subjects empty-state anchor reaches /(app)/link/new with
   // a supporteePersonId when an eligible managed person exists.
   it('[WI-1393] pushes /(app)/link/new with supporteePersonId when the Subjects picker selects an eligible person', () => {
+    // Real useEligibleManagedPersons: Liam is a linked child with no scope in
+    // availableScopes (only Emma is), so he is the sole eligible person.
     mockScopeContext = {
       ...mockScopeContext,
       activeScope: { kind: 'supporter-hub' },
     };
-    mockEligiblePersons = [{ id: 'child-new', displayName: 'Liam' }];
 
-    render(<SubjectsScreen />);
+    renderWithProfiles([OWNER, LIAM], OWNER);
 
     fireEvent.press(
       screen.getByTestId('support-hub-subjects-eligible-child-new'),
@@ -250,13 +283,14 @@ describe('SubjectsScreen', () => {
   // WI-1393 AC2: zero eligible managed persons must degrade to add-a-child,
   // never a param-less push to /(app)/link/new.
   it('[WI-1393] degrades to add-a-child when there are zero eligible managed persons', () => {
+    // Real useEligibleManagedPersons: owner has no linked children → no
+    // eligible managed persons.
     mockScopeContext = {
       ...mockScopeContext,
       activeScope: { kind: 'supporter-hub' },
     };
-    mockEligiblePersons = [];
 
-    render(<SubjectsScreen />);
+    renderWithProfiles([OWNER], OWNER);
 
     fireEvent.press(
       screen.getByTestId('support-hub-subjects-add-child-fallback'),
