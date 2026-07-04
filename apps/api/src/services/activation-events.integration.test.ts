@@ -9,7 +9,7 @@
  *     onConflictDoNothing, even across two separate calls
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { activationEvents } from '@eduagent/database';
 import { createIntegrationDb } from '../../../../tests/integration/helpers';
 import {
@@ -98,6 +98,44 @@ describe('Integration: recordActivationEvent', () => {
     ).rejects.toThrow();
 
     await cleanupDedupeKey(dedupeKey);
+  });
+});
+
+describe('activation_events RLS policy [WI-1504 / ASSUMP-F14]', () => {
+  // The production role (neondb_owner) has BYPASSRLS, so the policy cannot be
+  // exercised by an INSERT here (and SET ROLE to the non-bypass app_user is
+  // denied on this managed instance). Instead we assert the deployed policy's
+  // SHAPE straight from the catalog: RLS enabled + the nullable clause present.
+  // This runs in CI's integration lane against a freshly-migrated DB, so it is
+  // a genuine RED-GREEN on migration 0131 landing the `profile_id IS NULL`
+  // clause — the exact clause that lets pre-account (NULL-profile) rows through
+  // once RLS is enforced under app_user in a future S-06 phase. It goes RED if
+  // someone reverts activation_events to the bare sibling
+  // `profile_id = current_setting(...)` policy (which would block those writes).
+  it('has ROW LEVEL SECURITY enabled on the table', async () => {
+    const res = (await db.execute(
+      sql`SELECT relrowsecurity FROM pg_class WHERE relname = 'activation_events'`,
+    )) as unknown as { rows: Array<{ relrowsecurity: boolean }> };
+    expect(res.rows[0]?.relrowsecurity).toBe(true);
+  });
+
+  it('has a profile-isolation policy whose USING and WITH CHECK admit NULL profile_id', async () => {
+    const res = (await db.execute(
+      sql`SELECT qual, with_check FROM pg_policies
+          WHERE schemaname = 'public'
+            AND tablename = 'activation_events'
+            AND policyname = 'activation_events_profile_isolation'`,
+    )) as unknown as {
+      rows: Array<{ qual: string | null; with_check: string | null }>;
+    };
+    expect(res.rows).toHaveLength(1);
+    const { qual, with_check } = res.rows[0]!;
+    // Both the read (USING) and write (WITH CHECK) predicates must admit
+    // NULL-profile rows AND scope non-null rows to the active profile.
+    expect(qual).toMatch(/profile_id\s+IS\s+NULL/i);
+    expect(qual).toMatch(/current_setting\('app\.current_profile_id'/i);
+    expect(with_check).toMatch(/profile_id\s+IS\s+NULL/i);
+    expect(with_check).toMatch(/current_setting\('app\.current_profile_id'/i);
   });
 });
 
