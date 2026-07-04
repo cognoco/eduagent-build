@@ -12,12 +12,10 @@
 //   4. login (clerk_user_id + verified email + person_id)
 //   5. UPDATE person SET login_id = login.id   (reverse circular wire)
 //   6. membership (roles = {admin, learner})
-//   7. pre-repoint legacy anchors (accounts/profiles) for retained FKs
-//   8. subscription (plus trial, trial_ends_at = computeTrialEndDate, payer)
-//   9. subscription_payers (primary)
-//   10. pre-repoint legacy subscription anchor for quota satellites
-//   11. pre-repoint owner profile_quota_usage row
-//   12. quota_pools
+//   7. subscription (plus trial, trial_ends_at = computeTrialEndDate, payer)
+//   8. subscription_payers (primary)
+//   9. owner profile_quota_usage row
+//   10. quota_pools
 //
 // Idempotency is fenced by login.clerk_user_id UNIQUE; the 23505 catch
 // DISCRIMINATES by constraint name (pinned from the 0108 migration):
@@ -27,19 +25,16 @@
 // ---------------------------------------------------------------------------
 
 import { createHash } from 'crypto';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
-  accounts,
   login,
   membership,
   organization,
   person,
   profileQuotaUsage,
-  profiles,
   quotaPools,
   subscription,
   subscriptionPayers,
-  subscriptions as legacySubscriptions,
   type Database,
 } from '@eduagent/database';
 import { ConflictError, BadRequestError } from '../../errors';
@@ -62,26 +57,6 @@ const logger = createLogger();
 // re-open BUG-411.
 const LOGIN_CLERK_UNIQUE = 'login_clerk_user_id_unique';
 const LOGIN_EMAIL_UNIQUE = 'login_email_unique';
-// Process-local cache for legacy table existence probes (pre-M-DROP bridge).
-// Hazard: a probe returning true in a long-lived Worker process survives M-DROP
-// and could attempt a dual-write after the table is gone (createIdentityGraph
-// consults tableExists() at the call sites below).
-// DECOMMISSION CONTRACT (no automatic enforcement — operator-owned):
-//   1. M-DROP is carried by migration 0118 (WI-586, identity tables) + 0119
-//      (WI-805, subscriptions/enums).
-//   2. Redeploy (restart) this service BEFORE applying M-DROP so no live process
-//      holds a stale `true`. Redeploy is the PRIMARY mitigation.
-//   3. clearLegacyTableCache() below is the test/belt-and-suspenders hook.
-//   4. Remove this cache + clearLegacyTableCache() + all tableExists() call
-//      sites when the bridge is deleted post-M-DROP (WI-779 terminal removal).
-const legacyTableExistsCache = new Map<string, boolean>();
-
-// Decommission/test hook: clears the process-local probe cache so a redeploy is
-// not the only way to drop a stale `true`. Redeploy-before-M-DROP (above) stays
-// the primary mitigation; this makes the contract explicit and testable.
-export function clearLegacyTableCache(): void {
-  legacyTableExistsCache.clear();
-}
 
 /**
  * Reverse jurisdiction map: the profile-create `location` input
@@ -138,24 +113,6 @@ function toDateString(dt: Date): string {
 /** One-way SHA-256 of an email, safe for logs/Sentry (mirrors account.ts). */
 function hashEmail(email: string): string {
   return createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
-}
-
-/** True iff `public.<table>` exists. Used only for pre-repoint legacy FK anchors. */
-async function tableExists(
-  db: Database,
-  table: 'accounts' | 'profiles' | 'subscriptions' | 'profile_quota_usage',
-): Promise<boolean> {
-  const cached = legacyTableExistsCache.get(table);
-  if (cached !== undefined) return cached;
-  const raw = (await db.execute(
-    sql`SELECT to_regclass(${`public.${table}`}) AS reg`,
-  )) as unknown;
-  const rows = Array.isArray(raw)
-    ? (raw as Array<{ reg: string | null }>)
-    : ((raw as { rows?: Array<{ reg: string | null }> }).rows ?? []);
-  const exists = rows[0]?.reg != null;
-  legacyTableExistsCache.set(table, exists);
-  return exists;
 }
 
 /**
@@ -356,38 +313,7 @@ export async function createIdentityGraph(
         roles: ['admin', 'learner'],
       });
 
-      // (7) Pre-M-REPOINT bridge: retained learning/quota satellites still have
-      // FKs to legacy accounts/profiles/subscriptions in the committed schema.
-      // Keep ids aligned with the v2 graph so flag-on CI can exercise real
-      // onboarding before the convergence FK re-point. Remove with M-DROP.
-      const legacyAccountsPresent = await tableExists(txDb, 'accounts');
-      if (legacyAccountsPresent) {
-        await txDb.insert(accounts).values({
-          id: orgRow.id,
-          clerkUserId: input.clerkUserId,
-          email: input.verifiedEmail,
-          timezone: input.timezone ?? null,
-        });
-        if (await tableExists(txDb, 'profiles')) {
-          await txDb.insert(profiles).values({
-            id: personRow.id,
-            accountId: orgRow.id,
-            displayName: input.displayName,
-            avatarUrl: input.avatarUrl ?? null,
-            birthYear: input.birthYear,
-            // [WI-367] Mirror full-date precision onto the legacy bridge row.
-            birthMonth: input.birthMonth ?? null,
-            birthDay: input.birthDay ?? null,
-            location: input.location ?? null,
-            isOwner: true,
-            hasPremiumLlm: false,
-            conversationLanguage: input.conversationLanguage ?? 'en',
-            pronouns: input.pronouns ?? null,
-          });
-        }
-      }
-
-      // (8) subscription — FR108 14-day plus trial, end-of-day in the org tz.
+      // (7) subscription — FR108 14-day plus trial, end-of-day in the org tz.
       const trialEndsAt = computeTrialEndDate(new Date(), orgRow.timezone);
       const [subRow] = await txDb
         .insert(subscription)
@@ -401,58 +327,35 @@ export async function createIdentityGraph(
         .returning();
       if (!subRow) throw new Error('subscription insert did not return a row');
 
-      // (9) subscription_payers — primary
+      // (8) subscription_payers — primary
       await txDb.insert(subscriptionPayers).values({
         subscriptionId: subRow.id,
         personId: personRow.id,
         role: 'primary',
       });
 
-      // (10) Pre-M-REPOINT bridge for quota_pools.subscription_id, whose FK
-      // still targets legacy subscriptions(id) until WI-586 re-points it. The
-      // v2 subscription remains authoritative; this row is only the FK parent.
-      //
-      // Deployment sequencing: this table-existence probe is process-local
-      // cached. Remove/redeploy the bridge before applying M-DROP in any
-      // long-lived process so stale "present" cache entries cannot write after
-      // the table has been dropped.
       const plusTier = getTierConfig('plus');
       const cycleResetAt = new Date();
       cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
-      if (legacyAccountsPresent && (await tableExists(txDb, 'subscriptions'))) {
-        await txDb.insert(legacySubscriptions).values({
-          id: subRow.id,
-          accountId: orgRow.id,
-          tier: 'plus',
-          status: 'trial',
-          trialEndsAt,
-        });
 
-        // (11) Pre-M-REPOINT owner quota-usage bridge. The metering v2 path
-        // lazily creates this satellite when it is absent; during integration
-        // tests that emits an operational lazy-provisioned event and leaves
-        // first-request quota snapshots undefined. Owner bootstrap should leave
-        // the plus-trial quota graph complete up front.
-        if (
-          (await tableExists(txDb, 'profiles')) &&
-          (await tableExists(txDb, 'profile_quota_usage'))
-        ) {
-          await txDb.insert(profileQuotaUsage).values({
-            subscriptionId: subRow.id,
-            profileId: personRow.id,
-            role: 'owner',
-            monthlyLimit: plusTier.ownerMonthlyQuota ?? plusTier.monthlyQuota,
-            usedThisMonth: 0,
-            dailyLimit: plusTier.ownerDailyQuota ?? plusTier.dailyLimit,
-            usedToday: 0,
-            cycleResetAt,
-          });
-        }
-      }
+      // (9) owner profile_quota_usage — written unconditionally against the v2
+      // graph (profile_quota_usage.profile_id references person.id after the
+      // 0129 FK re-point, so this has no dependency on the legacy profiles
+      // table). Leaving the plus-trial quota graph complete up front means the
+      // metering path never has to lazily provision the owner satellite.
+      await txDb.insert(profileQuotaUsage).values({
+        subscriptionId: subRow.id,
+        profileId: personRow.id,
+        role: 'owner',
+        monthlyLimit: plusTier.ownerMonthlyQuota ?? plusTier.monthlyQuota,
+        usedThisMonth: 0,
+        dailyLimit: plusTier.ownerDailyQuota ?? plusTier.dailyLimit,
+        usedToday: 0,
+        cycleResetAt,
+      });
 
-      // (12) quota_pools — same cycle-reset convention as legacy
-      // createSubscription. This row keys on subRow.id and is store-agnostic
-      // once the pre-repoint legacy parent above exists.
+      // (10) quota_pools — same cycle-reset convention as legacy
+      // createSubscription. This row keys on subRow.id and is store-agnostic.
       await txDb.insert(quotaPools).values({
         subscriptionId: subRow.id,
         monthlyLimit: plusTier.monthlyQuota,

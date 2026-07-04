@@ -11,11 +11,13 @@
 // loser's 23505 to a bare rethrow and GREEN with the constraint-discriminating
 // catch.
 //
-// SEQUENCING NOTE (real finding from the integration DB): before M-REPOINT
-// the learning/quota satellites still carry FKs to legacy `profiles` /
-// `subscriptions`. The bootstrap therefore writes id-aligned legacy anchors
-// alongside the v2 graph while those FKs exist. These tests pin that bridge so
-// the flag-on CI lane can exercise real HTTP onboarding before convergence.
+// [WI-1398] The bootstrap no longer dual-writes legacy `accounts`/`profiles`/
+// `subscriptions` anchors — the 0129 FK re-point moved the retained quota/learning
+// satellites onto the v2 graph, so createIdentityGraph writes only the v2 tables.
+// The owner `profile_quota_usage` row is now written unconditionally (see the
+// unconditional assertion below). The legacy-anchor assertions were retired
+// under the preservation gate (docs/_archive/retired-code.md). The cleanup
+// helper's best-effort legacy deletes are kept (harmless no-ops tables-absent).
 // The pure-unit guards (calendar, jurisdiction) always run.
 // ---------------------------------------------------------------------------
 
@@ -30,12 +32,10 @@ import {
   membership,
   organization,
   person,
-  profiles,
   profileQuotaUsage,
   subscription,
   subscriptionPayers,
   quotaPools,
-  subscriptions as legacySubscriptions,
   type Database,
 } from '@eduagent/database';
 import { ConflictError } from '../../errors';
@@ -214,46 +214,22 @@ async function cleanupByClerk(
     });
     expect(pool).toBeTruthy();
 
-    // Pre-M-REPOINT bridge: id-aligned legacy anchors exist only to satisfy
-    // still-legacy FK parents for profiles/subjects/quota satellites.
-    if (await tableExists(db, 'accounts')) {
-      const legacyAccount = await db.query.accounts.findFirst({
-        where: eq(accounts.id, graph.organizationId),
-      });
-      expect(legacyAccount?.clerkUserId).toBe(clerkUserId);
-      expect(legacyAccount?.email).toBe(email);
-    }
+    // [WI-1398] The legacy accounts/profiles/subscriptions dual-write assertions
+    // that stood here were retired: createIdentityGraph no longer dual-writes the
+    // legacy tables (0129 FK re-point discharged the pre-repoint bridge). See
+    // docs/_archive/retired-code.md ("WI-1398 — identity-graph.integration.test.ts")
+    // and tag retired/wi-1398-legacy-dual-write-assertions.
 
-    if (await tableExists(db, 'profiles')) {
-      const legacyProfile = await db.query.profiles.findFirst({
-        where: eq(profiles.id, graph.personId),
-      });
-      expect(legacyProfile?.accountId).toBe(graph.organizationId);
-      expect(legacyProfile?.isOwner).toBe(true);
-    }
-
-    if (
-      (await tableExists(db, 'accounts')) &&
-      (await tableExists(db, 'subscriptions'))
-    ) {
-      const legacySubscription = await db.query.subscriptions.findFirst({
-        where: eq(legacySubscriptions.id, subRow!.id),
-      });
-      expect(legacySubscription?.accountId).toBe(graph.organizationId);
-    }
-
-    if (
-      (await tableExists(db, 'profiles')) &&
-      (await tableExists(db, 'profile_quota_usage'))
-    ) {
-      const ownerUsage = await db.query.profileQuotaUsage.findFirst({
-        where: eq(profileQuotaUsage.subscriptionId, subRow!.id),
-      });
-      expect(ownerUsage?.profileId).toBe(graph.personId);
-      expect(ownerUsage?.role).toBe('owner');
-      expect(ownerUsage?.usedThisMonth).toBe(0);
-      expect(ownerUsage?.usedToday).toBe(0);
-    }
+    // Owner profile_quota_usage is now written UNCONDITIONALLY at bootstrap
+    // (profile_quota_usage.profile_id → person.id post-0129), closing the
+    // owner-quota tables-absent gap. Assert it always exists — no tableExists gate.
+    const ownerUsage = await db.query.profileQuotaUsage.findFirst({
+      where: eq(profileQuotaUsage.subscriptionId, subRow!.id),
+    });
+    expect(ownerUsage?.profileId).toBe(graph.personId);
+    expect(ownerUsage?.role).toBe('owner');
+    expect(ownerUsage?.usedThisMonth).toBe(0);
+    expect(ownerUsage?.usedToday).toBe(0);
   });
 
   it('is idempotent on a repeated clerk id (login_clerk_user_id_unique replay)', async () => {
