@@ -182,6 +182,7 @@ type Bindings = {
   CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
   CHALLENGE_ROUND_GRADER_ENABLED?: string;
   JUDGE_FRAMEWORK_ENABLED?: string;
+  JUDGE_ENFORCEMENT_ENABLED?: string;
   LLM_ROUTING_V2_ENABLED?: string;
   MODE_NAV_V2_ENABLED?: string;
   // Two-stage convergence freeze gate (maintenance.ts). Default 'false'.

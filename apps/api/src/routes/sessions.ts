@@ -99,6 +99,7 @@ import {
   isMemoryFactsReadEnabled,
   isMemoryFactsRelevanceEnabled,
   isJudgeFrameworkEnabled,
+  isJudgeEnforcementEnabled,
 } from '../config';
 import { FILING_CONFIG } from '../config/filing';
 
@@ -248,6 +249,7 @@ type SessionRouteEnv = {
     REVIEW_CALLBACK_OPENER_ENABLED?: string;
     CHALLENGE_ROUND_GRADER_ENABLED?: string;
     JUDGE_FRAMEWORK_ENABLED?: string;
+    JUDGE_ENFORCEMENT_ENABLED?: string;
     MEMORY_FACTS_READ_ENABLED?: string;
     MEMORY_FACTS_RELEVANCE_RETRIEVAL?: string;
     IDEMPOTENCY_KV?: KVNamespace;
@@ -593,6 +595,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const judgeFrameworkEnabled = isJudgeFrameworkEnabled(
         c.env.JUDGE_FRAMEWORK_ENABLED,
       );
+      const judgeEnforcementEnabled = isJudgeEnforcementEnabled(
+        c.env.JUDGE_ENFORCEMENT_ENABLED,
+      );
 
       try {
         const result = await processMessage(
@@ -612,6 +617,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             challengeRoundRuntimeEnabled,
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
+            judgeEnforcementEnabled,
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
               c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
             ),
@@ -787,6 +793,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const judgeFrameworkEnabled = isJudgeFrameworkEnabled(
         c.env.JUDGE_FRAMEWORK_ENABLED,
       );
+      const judgeEnforcementEnabled = isJudgeEnforcementEnabled(
+        c.env.JUDGE_ENFORCEMENT_ENABLED,
+      );
 
       try {
         const { stream, onComplete } = await streamMessage(
@@ -806,6 +815,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             challengeRoundRuntimeEnabled,
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
+            judgeEnforcementEnabled,
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
               c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
             ),
@@ -880,6 +890,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     challengeRoundRuntimeEnabled,
                     reviewCallbackOpenerEnabled,
                     judgeFrameworkEnabled,
+                    judgeEnforcementEnabled,
                   },
                 );
                 const eventType = chunkCount === 0 ? 'chunk' : 'replace';
@@ -1212,6 +1223,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 challengeRoundRuntimeEnabled,
                 reviewCallbackOpenerEnabled,
                 judgeFrameworkEnabled,
+                judgeEnforcementEnabled,
               },
             );
             return streamSSEUtf8(c, async (sseStream) => {
