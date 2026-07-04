@@ -1,5 +1,4 @@
 import type { Database } from '@eduagent/database';
-import { dataExportSchema } from '@eduagent/schemas';
 import { generateExport, serializeDates } from './export';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -450,13 +449,13 @@ describe('generateExport', () => {
     expect(new Date(result.exportedAt).toISOString()).toBe(result.exportedAt);
   });
 
-  it('validates against the dataExportSchema', async () => {
-    const db = createMockDb();
-    const result = await generateExport(db, 'account-1');
-    const parsed = dataExportSchema.safeParse(result);
-
-    expect(parsed.success).toBe(true);
-  });
+  // [WI-1364] Retired: 'validates against the dataExportSchema' — it validated
+  // the standalone generateExport output against the FULL export schema, but the
+  // gutted learning-only output carries intentionally-empty identity/billing
+  // placeholders (account.email = '') that are completed + validated by the v2
+  // caller (export-v2, which has its own schema-conformance coverage). Per-row
+  // learning-data schema conformance is still enforced at the source (each row
+  // runs through `<schema>.parse(...)`) and exercised by the GDPR-tables test.
 
   it('returns empty arrays for a new account (no profiles)', async () => {
     const db = createMockDb({ profiles: [], consents: [] });
@@ -476,37 +475,12 @@ describe('generateExport', () => {
     expect(first.consentStates).toEqual(second.consentStates);
   });
 
-  it('returns a valid account email', async () => {
-    const db = createMockDb();
-    const result = await generateExport(db, 'account-1');
-
-    expect(result.account.email).toContain('@');
-  });
-
-  it('includes profiles with mapped dates', async () => {
-    const profileRow = mockProfileRow('p1', 'Alice');
-    const db = createMockDb({ profiles: [profileRow] });
-    const result = await generateExport(db, 'account-1');
-
-    expect(result.profiles).toHaveLength(1);
-    expect(result.profiles[0]!.displayName).toBe('Alice');
-    expect(result.profiles[0]!.birthYear).toBe(1990);
-    expect(result.profiles[0]!.createdAt).toBe('2025-01-15T10:00:00.000Z');
-  });
-
-  it('includes consent states with mapped dates', async () => {
-    const profileRow = mockProfileRow('p1', 'Alice');
-    const consentRow = mockConsentRow('p1');
-    const db = createMockDb({ profiles: [profileRow], consents: [consentRow] });
-    const result = await generateExport(db, 'account-1');
-
-    expect(result.consentStates).toHaveLength(1);
-    expect(result.consentStates[0]!.consentType).toBe('GDPR');
-    expect(result.consentStates[0]!.status).toBe('CONSENTED');
-    expect(result.consentStates[0]!.requestedAt).toBe(
-      '2025-01-15T10:00:00.000Z',
-    );
-  });
+  // [WI-1364] Retired: 'returns a valid account email', 'includes profiles with
+  // mapped dates', 'includes consent states with mapped dates' — these asserted
+  // the legacy identity reads (accounts / profiles / consent_states) that were
+  // dead code and are now removed. The v2 export twin (export-v2.ts) owns and
+  // overrides those sections; generateExport returns empty placeholders (covered
+  // by the [WI-809] learningOnlyProfileIds branch block below).
 
   it('includes GDPR Article 15 tables when data is present', async () => {
     const profileRow = mockProfileRow('p1', 'Alice');
@@ -559,7 +533,9 @@ describe('generateExport', () => {
       parkingLotItems: [parkingRow],
     });
 
-    const result = await generateExport(db, 'account-1');
+    const result = await generateExport(db, 'account-1', {
+      learningOnlyProfileIds: ['p1'],
+    });
 
     expect(result.subjects).toHaveLength(1);
     expect(result.curricula).toHaveLength(1);
@@ -604,7 +580,9 @@ describe('generateExport', () => {
       sessionEvents: eventRows,
     });
 
-    const result = await generateExport(db, 'account-1');
+    const result = await generateExport(db, 'account-1', {
+      learningOnlyProfileIds: ['p1'],
+    });
 
     expect(result.sessionEvents).toBeDefined();
     const events = result.sessionEvents as Record<string, unknown>[];
@@ -639,7 +617,9 @@ describe('generateExport', () => {
       sessionEmbeddings: embeddingRows,
     });
 
-    const result = await generateExport(db, 'account-1');
+    const result = await generateExport(db, 'account-1', {
+      learningOnlyProfileIds: ['p1'],
+    });
 
     expect(result.sessionEmbeddings).toHaveLength(1);
     const [embedding] = result.sessionEmbeddings as Record<string, unknown>[];
@@ -666,7 +646,9 @@ describe('generateExport', () => {
       sessionEmbeddings: embeddingRows,
     });
 
-    const result = await generateExport(db, 'account-1');
+    const result = await generateExport(db, 'account-1', {
+      learningOnlyProfileIds: ['p1'],
+    });
 
     const [embedding] = result.sessionEmbeddings as Record<string, unknown>[];
     expect(embedding!['content']).toBe(
@@ -694,7 +676,9 @@ describe('generateExport', () => {
       sessionEmbeddings: embeddingRows,
     });
 
-    const result = await generateExport(db, 'account-1');
+    const result = await generateExport(db, 'account-1', {
+      learningOnlyProfileIds: ['p1'],
+    });
 
     const [embedding] = result.sessionEmbeddings as Record<string, unknown>[];
     expect(embedding!['content']).toBe(`${learnerJson}\n\nVisible reply.`);
@@ -720,7 +704,9 @@ describe('generateExport', () => {
       sessionEmbeddings: embeddingRows,
     });
 
-    const result = await generateExport(db, 'account-1');
+    const result = await generateExport(db, 'account-1', {
+      learningOnlyProfileIds: ['p1'],
+    });
 
     const [embedding] = result.sessionEmbeddings as Record<string, unknown>[];
     expect(embedding!['content']).toBe(
@@ -770,7 +756,9 @@ describe('generateExport', () => {
         subjects: [subjectRow],
       });
 
-      const result = await generateExport(db, 'account-1');
+      const result = await generateExport(db, 'account-1', {
+        learningOnlyProfileIds: ['p1'],
+      });
 
       expect(result.subjects).toHaveLength(1);
       const exported = (result.subjects as Record<string, unknown>[])[0]!;
@@ -794,7 +782,9 @@ describe('generateExport', () => {
         learningSessions: [sessionRow],
       });
 
-      const result = await generateExport(db, 'account-1');
+      const result = await generateExport(db, 'account-1', {
+        learningOnlyProfileIds: ['p1'],
+      });
 
       const sessions = result.learningSessions as Record<string, unknown>[];
       expect(sessions).toHaveLength(1);
@@ -804,51 +794,12 @@ describe('generateExport', () => {
       expect(sessions[0]!['endedAt']).toBe('2025-04-15T09:00:00.000Z');
     });
 
-    it('dataExportSchema.parse succeeds on export with Date-carrying raw subscriptions row', async () => {
-      // subscriptions are account-scoped (not profile-scoped), so they are
-      // always queried regardless of profileIds — ideal for a Date-serialisation
-      // schema-parse test that doesn't depend on profileSchema.
-      const date = new Date('2025-05-01T00:00:00.000Z');
-      // [WI-978] Row must match the tightened dataExportSubscriptionRowSchema:
-      // real column names (`tier`/`status`) and valid UUIDs for id/accountId.
-      const subUuid = 'a1b2c3d4-e5f6-4789-a012-b3c4d5e6f701';
-      const acctUuid = 'a1b2c3d4-e5f6-4789-a012-b3c4d5e6f702';
-      const subscriptionRow = {
-        id: subUuid,
-        accountId: acctUuid,
-        stripeCustomerId: null,
-        stripeSubscriptionId: null,
-        tier: 'plus',
-        status: 'active',
-        trialEndsAt: null,
-        currentPeriodStart: null,
-        currentPeriodEnd: null,
-        cancelledAt: null,
-        lastStripeEventTimestamp: null,
-        lastStripeEventId: null,
-        revenuecatOriginalAppUserId: null,
-        lastRevenuecatEventId: null,
-        lastRevenuecatEventTimestampMs: null,
-        createdAt: date,
-        updatedAt: date,
-      };
-      const db = createMockDb({
-        profiles: [],
-        subscriptions: [subscriptionRow as unknown as Record<string, unknown>],
-      });
-
-      const result = await generateExport(db, 'account-1');
-      // Without BUG-413 fix, Date objects would pass through as-is.
-      // With the fix, the serialized row has ISO string dates.
-      const subs = result.subscriptions as Record<string, unknown>[];
-      expect(subs).toHaveLength(1);
-      expect(typeof subs[0]!['createdAt']).toBe('string');
-      expect(subs[0]!['createdAt']).toBe('2025-05-01T00:00:00.000Z');
-
-      // Schema parse must also succeed — no raw Date objects in the payload.
-      const parsed = dataExportSchema.safeParse(result);
-      expect(parsed.success).toBe(true);
-    });
+    // [WI-1364] Retired: 'dataExportSchema.parse succeeds on export with
+    // Date-carrying raw subscriptions row' — it seeded a legacy `subscriptions`
+    // row and asserted it surfaced, but the legacy subscriptions read is now
+    // removed (v2 export-v2.ts owns billing). The serializeDates-on-Date-rows
+    // coverage it provided is preserved by the serializeDates unit tests above
+    // and the subjects / learningSessions Date-serialisation tests.
   });
 
   it('returns empty arrays for GDPR tables when no profiles exist', async () => {
@@ -897,7 +848,9 @@ describe('generateExport', () => {
       mentorActivityLedger: [ledgerRow],
     });
 
-    const result = await generateExport(db, 'account-1');
+    const result = await generateExport(db, 'account-1', {
+      learningOnlyProfileIds: ['p1'],
+    });
 
     expect(result.mentorActivityLedger).toHaveLength(1);
     const exported = (
@@ -929,7 +882,9 @@ describe('generateExport', () => {
       mentorActivityLedger: [ledgerRow],
     });
 
-    await generateExport(db, 'account-1');
+    await generateExport(db, 'account-1', {
+      learningOnlyProfileIds: ['p1'],
+    });
 
     const mockDb = db as unknown as {
       query: {
@@ -973,8 +928,9 @@ describe('generateExport', () => {
 // ---------------------------------------------------------------------------
 
 describe('generateExport — [WI-809] learningOnlyProfileIds branch', () => {
-  it('skips the four dropped-identity reads AND the legacy billing chain; keeps learning reads keyed on the passed ids', async () => {
-    // Seed the identity tables too — a correct learningOnly path must NOT touch them.
+  it('returns empty identity/billing placeholders + the learning-data half keyed on the passed ids', async () => {
+    // Seed the identity tables too — a correct learningOnly path must NOT touch
+    // them (structurally guaranteed post-WI-1364: those reads no longer exist).
     const db = createMockDb({
       account: mockAccountRow(),
       profiles: [mockProfileRow('person-1', 'Charge One')],
@@ -994,13 +950,11 @@ describe('generateExport — [WI-809] learningOnlyProfileIds branch', () => {
         query: Record<string, { findMany?: jest.Mock; findFirst?: jest.Mock }>;
       }
     ).query;
-    // The four dropped-identity reads are SKIPPED flag-on (would 500 post-drop).
-    expect(q.accounts!.findFirst!).not.toHaveBeenCalled();
-    expect(q.profiles!.findMany!).not.toHaveBeenCalled();
-    expect(q.consentStates!.findMany!).not.toHaveBeenCalled();
-    expect(q.familyLinks!.findMany!).not.toHaveBeenCalled();
-
-    // Identity sections are empty placeholders (the v2 caller overrides them).
+    // [WI-1364] Identity + billing sections are empty placeholders the v2 caller
+    // (export-v2) overrides. The legacy accounts / profiles / consent_states /
+    // family_links / subscriptions reads that used to run flag-off are now
+    // removed, so asserting they are "not called" would be vacuous — pin the
+    // OUTPUT shape instead.
     expect(result.account).toEqual({
       email: '',
       createdAt: expect.any(String),
@@ -1008,35 +962,19 @@ describe('generateExport — [WI-809] learningOnlyProfileIds branch', () => {
     expect(result.profiles).toEqual([]);
     expect(result.consentStates).toEqual([]);
     expect(result.familyLinks).toEqual([]);
+    expect(result.subscriptions).toEqual([]);
+    expect(result.quotaPools).toEqual([]);
+    expect(result.topUpCredits).toEqual([]);
 
     // The learning-data half STILL runs, keyed on the passed ids.
     expect(q.subjects!.findMany!).toHaveBeenCalled();
     expect(result.subjects).toHaveLength(1);
-    // [WI-805] The legacy billing chain (subscriptions → quota/top-ups) is now
-    // ALSO skipped on the learning-only path: the v2 export twin overrides
-    // billing from the v2 `subscription` chain, so the legacy `subscriptions`
-    // read (dropped by 0119) must not run — it would 500 post-drop.
-    expect(q.subscriptions!.findMany!).not.toHaveBeenCalled();
-    expect(result.subscriptions).toEqual([]);
-    expect(result.quotaPools).toEqual([]);
-    expect(result.topUpCredits).toEqual([]);
   });
 
-  it('[non-vacuous] WITHOUT learningOnlyProfileIds the four dropped-identity reads DO run', async () => {
-    const db = createMockDb({
-      profiles: [mockProfileRow('person-1', 'Charge One')],
-    });
-
-    await generateExport(db, 'account-1');
-
-    const q = (
-      db as unknown as {
-        query: Record<string, { findMany?: jest.Mock; findFirst?: jest.Mock }>;
-      }
-    ).query;
-    expect(q.accounts!.findFirst!).toHaveBeenCalled();
-    expect(q.profiles!.findMany!).toHaveBeenCalled();
-    expect(q.consentStates!.findMany!).toHaveBeenCalled();
-    expect(q.familyLinks!.findMany!).toHaveBeenCalled();
-  });
+  // [WI-1364] Retired the '[non-vacuous] WITHOUT learningOnlyProfileIds the four
+  // dropped-identity reads DO run' pair-test: it asserted the legacy identity
+  // reads execute on the flag-off path, which was dead code and is now removed.
+  // With the branches gone, the surviving test above no longer asserts their
+  // absence (that would be vacuous) — it pins the OUTPUT (empty placeholders +
+  // learning-data present) instead.
 });
