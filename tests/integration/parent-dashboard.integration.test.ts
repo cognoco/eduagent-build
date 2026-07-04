@@ -17,12 +17,7 @@
  * 7. GET /v1/dashboard — 401 without auth
  */
 
-import {
-  consentGrant,
-  guardianship,
-  learningSessions,
-  membership,
-} from '@eduagent/database';
+import { consentGrant, learningSessions, membership } from '@eduagent/database';
 import { eq } from 'drizzle-orm';
 
 import {
@@ -31,7 +26,6 @@ import {
   createIntegrationDb,
 } from './helpers';
 import {
-  ensureV2ProfileAnchorForTest,
   resolveAccountId,
   seedDirectChildProfileForTest,
   seedFamilyLinkForTest,
@@ -69,27 +63,6 @@ async function createProfile(
   return body.profile.id as string;
 }
 
-async function createSubjectForProfile(
-  userId: string,
-  email: string,
-  profileId: string,
-  subjectName: string,
-): Promise<string> {
-  const res = await app.request(
-    '/v1/subjects',
-    {
-      method: 'POST',
-      headers: buildAuthHeaders({ sub: userId, email }, profileId),
-      body: JSON.stringify({ name: subjectName }),
-    },
-    TEST_ENV,
-  );
-
-  expect(res.status).toBe(201);
-  const body = await res.json();
-  return body.subject.id as string;
-}
-
 beforeEach(async () => {
   await cleanupAccounts({
     emails: [PARENT_EMAIL, CHILD_EMAIL],
@@ -105,62 +78,8 @@ afterAll(async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Helpers: seed family link + sessions via direct DB
+// Helpers: sessions via direct DB
 // ---------------------------------------------------------------------------
-
-async function seedFamilyLink(
-  parentProfileId: string,
-  childProfileId: string,
-): Promise<void> {
-  const db = createIntegrationDb();
-
-  // [WI-1524] Legacy `family_links` insert dropped — its `profiles` parent
-  // rows no longer exist post-WI-1398 dual-write removal, so the insert
-  // FK-violates (family_links_parent_profile_id_profiles_id_fk) whenever the
-  // table is present. The v2 guardianship edge below is the sole, real
-  // anchor now.
-  //
-  // [WI-1145] Seed the v2 guardianship edge + child cross-org membership
-  // unconditionally. This file creates profiles through routes, but the
-  // flag-off main lane may only have the legacy profile rows, so repair the v2
-  // anchors and memberships here before inserting v2 relationship edges.
-  const parentAccountId = await resolveAccountId(db, parentProfileId);
-  if (!parentAccountId) {
-    throw new Error(
-      `seedFamilyLink: parent account missing for ${parentProfileId}`,
-    );
-  }
-  await ensureV2ProfileAnchorForTest(db, {
-    profileId: parentProfileId,
-    accountId: parentAccountId,
-  });
-  await ensureV2ProfileAnchorForTest(db, { profileId: childProfileId });
-
-  await db
-    .insert(membership)
-    .values({
-      personId: parentProfileId,
-      organizationId: parentAccountId,
-      roles: ['admin'],
-    })
-    .onConflictDoNothing();
-
-  await db
-    .insert(guardianship)
-    .values({
-      guardianPersonId: parentProfileId,
-      chargePersonId: childProfileId,
-    })
-    .onConflictDoNothing();
-  await db
-    .insert(membership)
-    .values({
-      personId: childProfileId,
-      organizationId: parentAccountId,
-      roles: ['learner'],
-    })
-    .onConflictDoNothing();
-}
 
 async function seedSession(
   profileId: string,
@@ -297,13 +216,19 @@ describe('Integration: GET /v1/dashboard/children/:profileId', () => {
       'Test Parent',
       1985,
     );
-    const childProfileId = await createProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      'Test Child',
-      2004,
-    );
-    await seedFamilyLink(parentProfileId, childProfileId);
+    const db = createIntegrationDb();
+    const parentAccountId = await resolveAccountId(db, parentProfileId);
+    if (!parentAccountId) {
+      throw new Error(`parent account missing for ${parentProfileId}`);
+    }
+    const child = await seedDirectChildProfileForTest({
+      parentProfileId,
+      accountId: parentAccountId,
+      displayName: 'Test Child',
+      birthYear: 2004,
+    });
+    const childProfileId = child.id;
+    await seedFamilyLinkForTest({ parentProfileId, childProfileId });
 
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}`,
@@ -363,25 +288,26 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
       'Test Parent',
       1985,
     );
-    const childProfileId = await createProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      'Test Child',
-      2004,
-    );
+    const db = createIntegrationDb();
+    const parentAccountId = await resolveAccountId(db, parentProfileId);
+    if (!parentAccountId) {
+      throw new Error(`parent account missing for ${parentProfileId}`);
+    }
+    const child = await seedDirectChildProfileForTest({
+      parentProfileId,
+      accountId: parentAccountId,
+      displayName: 'Test Child',
+      birthYear: 2004,
+    });
+    const childProfileId = child.id;
+    await seedFamilyLinkForTest({ parentProfileId, childProfileId });
 
-    const subjectId = await createSubjectForProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      childProfileId,
-      'Science',
-    );
+    const subject = await seedSubjectForTest(childProfileId, 'Science');
 
-    const sessionId = await seedSession(childProfileId, subjectId, {
+    const sessionId = await seedSession(childProfileId, subject.id, {
       exchangeCount: 8,
       wallClockSeconds: 1800,
     });
-    await seedFamilyLink(parentProfileId, childProfileId);
 
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/sessions`,
@@ -457,24 +383,25 @@ describe('Parent Visibility break tests', () => {
       'Test Parent',
       1985,
     );
-    const childProfileId = await createProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      'Test Child',
-      2004,
-    );
+    const db = createIntegrationDb();
+    const parentAccountId = await resolveAccountId(db, parentProfileId);
+    if (!parentAccountId) {
+      throw new Error(`parent account missing for ${parentProfileId}`);
+    }
+    const child = await seedDirectChildProfileForTest({
+      parentProfileId,
+      accountId: parentAccountId,
+      displayName: 'Test Child',
+      birthYear: 2004,
+    });
+    const childProfileId = child.id;
+    await seedFamilyLinkForTest({ parentProfileId, childProfileId });
 
-    const subjectId = await createSubjectForProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      childProfileId,
-      'Science',
-    );
+    const subject = await seedSubjectForTest(childProfileId, 'Science');
 
-    const sessionId = await seedSession(childProfileId, subjectId, {
+    const sessionId = await seedSession(childProfileId, subject.id, {
       exchangeCount: 2,
     });
-    await seedFamilyLink(parentProfileId, childProfileId);
 
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/sessions/${sessionId}/transcript`,
@@ -530,13 +457,19 @@ describe('Parent Visibility functional tests', () => {
       'Test Parent',
       1985,
     );
-    const childProfileId = await createProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      'Test Child',
-      2004,
-    );
-    await seedFamilyLink(parentProfileId, childProfileId);
+    const db = createIntegrationDb();
+    const parentAccountId = await resolveAccountId(db, parentProfileId);
+    if (!parentAccountId) {
+      throw new Error(`parent account missing for ${parentProfileId}`);
+    }
+    const child = await seedDirectChildProfileForTest({
+      parentProfileId,
+      accountId: parentAccountId,
+      displayName: 'Test Child',
+      birthYear: 2004,
+    });
+    const childProfileId = child.id;
+    await seedFamilyLinkForTest({ parentProfileId, childProfileId });
 
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/memory`,
@@ -563,21 +496,22 @@ describe('Parent Visibility functional tests', () => {
       'Test Parent',
       1985,
     );
-    const childProfileId = await createProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      'Test Child',
-      2004,
-    );
+    const db = createIntegrationDb();
+    const parentAccountId = await resolveAccountId(db, parentProfileId);
+    if (!parentAccountId) {
+      throw new Error(`parent account missing for ${parentProfileId}`);
+    }
+    const managedChild = await seedDirectChildProfileForTest({
+      parentProfileId,
+      accountId: parentAccountId,
+      displayName: 'Test Child',
+      birthYear: 2004,
+    });
+    const childProfileId = managedChild.id;
+    await seedFamilyLinkForTest({ parentProfileId, childProfileId });
 
-    const subjectId = await createSubjectForProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      childProfileId,
-      'Mathematics',
-    );
-    await seedSession(childProfileId, subjectId);
-    await seedFamilyLink(parentProfileId, childProfileId);
+    const subject = await seedSubjectForTest(childProfileId, 'Mathematics');
+    await seedSession(childProfileId, subject.id);
 
     const res = await app.request(
       '/v1/dashboard',
@@ -606,23 +540,24 @@ describe('Parent Visibility functional tests', () => {
       'Test Parent',
       1985,
     );
-    const childProfileId = await createProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      'Test Child',
-      2004,
-    );
+    const db = createIntegrationDb();
+    const parentAccountId = await resolveAccountId(db, parentProfileId);
+    if (!parentAccountId) {
+      throw new Error(`parent account missing for ${parentProfileId}`);
+    }
+    const child = await seedDirectChildProfileForTest({
+      parentProfileId,
+      accountId: parentAccountId,
+      displayName: 'Test Child',
+      birthYear: 2004,
+    });
+    const childProfileId = child.id;
+    await seedFamilyLinkForTest({ parentProfileId, childProfileId });
 
-    const subjectId = await createSubjectForProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      childProfileId,
-      'Science',
-    );
-    const sessionId = await seedSession(childProfileId, subjectId, {
+    const subject = await seedSubjectForTest(childProfileId, 'Science');
+    const sessionId = await seedSession(childProfileId, subject.id, {
       exchangeCount: 5,
     });
-    await seedFamilyLink(parentProfileId, childProfileId);
 
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/sessions/${sessionId}`,
@@ -656,13 +591,19 @@ describe('Integration: GET /v1/dashboard/children/:profileId/progress-summary', 
       'Test Parent',
       1985,
     );
-    const childProfileId = await createProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      'Test Child',
-      2004,
-    );
-    await seedFamilyLink(parentProfileId, childProfileId);
+    const db = createIntegrationDb();
+    const parentAccountId = await resolveAccountId(db, parentProfileId);
+    if (!parentAccountId) {
+      throw new Error(`parent account missing for ${parentProfileId}`);
+    }
+    const child = await seedDirectChildProfileForTest({
+      parentProfileId,
+      accountId: parentAccountId,
+      displayName: 'Test Child',
+      birthYear: 2004,
+    });
+    const childProfileId = child.id;
+    await seedFamilyLinkForTest({ parentProfileId, childProfileId });
 
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/progress-summary`,
@@ -724,15 +665,19 @@ describe('Integration: GET /v1/dashboard/children/:profileId/progress-summary', 
       'Test Parent',
       1985,
     );
-    const childProfileId = await createProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      'Test Child',
-      2004,
-    );
-    await seedFamilyLink(parentProfileId, childProfileId);
-
     const db = createIntegrationDb();
+    const parentAccountId = await resolveAccountId(db, parentProfileId);
+    if (!parentAccountId) {
+      throw new Error(`parent account missing for ${parentProfileId}`);
+    }
+    const child = await seedDirectChildProfileForTest({
+      parentProfileId,
+      accountId: parentAccountId,
+      displayName: 'Test Child',
+      birthYear: 2004,
+    });
+    const childProfileId = child.id;
+    await seedFamilyLinkForTest({ parentProfileId, childProfileId });
 
     // [WI-1524] Legacy `consent_states` insert dropped — its `profiles`
     // parent row no longer exists post-WI-1398 dual-write removal, so the
@@ -742,8 +687,8 @@ describe('Integration: GET /v1/dashboard/children/:profileId/progress-summary', 
     //
     // [WI-1145] Seed the v2 consentGrant (withdrawn) unconditionally — the
     // collapsed dashboard consent read resolves via consent_grant on the
-    // flag-off main lane. Child membership exists (route-created +
-    // cross-org membership seeded in seedFamilyLink).
+    // flag-off main lane. Child membership exists (seeded directly into the
+    // parent's org by seedDirectChildProfileForTest — WI-1582).
     const childMemberships = await db.query.membership.findMany({
       where: eq(membership.personId, childProfileId),
       columns: { organizationId: true },
