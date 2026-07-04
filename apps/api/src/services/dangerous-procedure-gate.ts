@@ -25,11 +25,15 @@
 // Passive single-mention description ("morphine is extracted from opium in
 // pharmaceutical labs") carries no actionable procedure and does not fire.
 //
-// SCOPE: enforcement is applied to under-18-routed traffic at the call sites
-// (the detector itself is age-agnostic and pure, for testability). Every branch
-// below is exercised by a co-located test in dangerous-procedure-gate.test.ts,
-// including NEGATIVE assertions proving it does not fire on legitimate
-// harm-education replies.
+// SCOPE (MMT-ADR-0030): minors get the FULL gate (all controlled/dangerous
+// items); adults get a NARROW catastrophic subset ONLY — CBRN weapons +
+// explosive-device construction — so adult latitude for general chemistry,
+// pharmacology, energetics education, and weapons history is preserved. The
+// detectors are age-agnostic and pure (for testability); `isMinor` selects the
+// width in applyDangerousProcedureGate. Every branch below is exercised by a
+// co-located test in dangerous-procedure-gate.test.ts, including NEGATIVE
+// assertions proving it does not fire on legitimate harm-education replies nor
+// over-block legitimate adult queries.
 // ---------------------------------------------------------------------------
 
 /** Marker recorded in the persisted model field when the gate fires. */
@@ -48,6 +52,32 @@ const DANGEROUS_ITEM_TERMS =
   'firearm|\\bgun\\b|\\bpistol\\b|\\brifle\\b|silencer|suppressor)';
 
 const DANGEROUS_ITEM_RE = new RegExp(DANGEROUS_ITEM_TERMS, 'i');
+
+// [WI-1351] Catastrophic subset — the ONLY dangerous-item categories the gate
+// enforces for ADULTS (MMT-ADR-0030). Deliberately NARROW: CBRN weapon agents
+// (chemical / biological / radiological / nuclear) and explosive-device
+// construction ONLY. Everything else in DANGEROUS_ITEM_TERMS — drugs,
+// firearms, general poisons (arsenic, strychnine, cyanide as toxicology) — is
+// intentionally EXCLUDED here: adult latitude for general chemistry,
+// pharmacology, energetics education, and weapons history stays OPEN, and the
+// how-to structure requirement (below) means passive/educational prose never
+// trips even on the included terms. Widening this subset is an operator ruling,
+// never an engineering call.
+const CATASTROPHIC_ITEM_TERMS =
+  '(' +
+  // Explosive devices + high explosives used to build them
+  '\\bbomb\\b|\\bied\\b|\\bc-?4\\b|\\brdx\\b|\\bpetn\\b|\\bhmx\\b|\\btatp\\b|\\banfo\\b|' +
+  'detonators?|blasting caps?|explosive devices?|\\bexplosives?\\b|' +
+  '\\btnt\\b|dynamite|nitroglycerin|thermite|' +
+  // Chemical weapons
+  'sarin|\\bvx\\b|tabun|soman|nerve agents?|mustard (?:gas|agent)|phosgene|chemical weapons?|' +
+  // Biological weapons
+  'ricin|anthrax|botulinum|bioweapons?|biological weapons?|' +
+  // Radiological / nuclear weapons
+  'nuclear (?:weapons?|devices?|bombs?)|radiological (?:weapons?|dispersal)|weapons?-grade' +
+  ')';
+
+const CATASTROPHIC_ITEM_RE = new RegExp(CATASTROPHIC_ITEM_TERMS, 'i');
 
 // Actionable production / extraction / synthesis / refine / cultivate /
 // acquire / dose / consume verbs — AC#1 vocabulary plus the concrete bench,
@@ -228,10 +258,10 @@ function countNumberedListItems(text: string): number {
  * enumerated step structure nor an imperative/second-person action, so it does
  * not fire — protecting the legitimate harm-education must_answer commitment.
  */
-export function detectDangerousProcedureLeak(reply: string): boolean {
+function detectProcedureLeak(reply: string, itemRe: RegExp): boolean {
   if (!reply) return false;
   const text = reply.replace(/\s+/g, ' ').trim();
-  if (!DANGEROUS_ITEM_RE.test(text)) return false;
+  if (!itemRe.test(text)) return false;
 
   // (A) enumerated how-to steps naming a production/recipe verb.
   const hasStepStructure =
@@ -240,6 +270,21 @@ export function detectDangerousProcedureLeak(reply: string): boolean {
 
   // (B) imperative / second-person production action (prose how-to).
   return SECOND_PERSON_ACTION_RE.test(text) || IMPERATIVE_START_RE.test(text);
+}
+
+export function detectDangerousProcedureLeak(reply: string): boolean {
+  return detectProcedureLeak(reply, DANGEROUS_ITEM_RE);
+}
+
+/**
+ * [WI-1351] Catastrophic-subset variant of {@link detectDangerousProcedureLeak}:
+ * identical how-to structure logic, but the item vocabulary is narrowed to the
+ * CBRN-weapon + explosive-device-construction categories only (MMT-ADR-0030).
+ * This is the detector applied to ADULT traffic — drugs, firearms, and general
+ * poisons are deliberately outside its vocabulary, preserving adult latitude.
+ */
+export function detectCatastrophicProcedureLeak(reply: string): boolean {
+  return detectProcedureLeak(reply, CATASTROPHIC_ITEM_RE);
 }
 
 /**
@@ -262,18 +307,30 @@ export function dangerousProcedureRefusalResponse(): string {
 }
 
 /**
- * Apply the gate to a learner-visible tutor reply. Age-scoped by the caller:
- * enforcement runs only for minors (`isMinor: true`). Returns the original
- * reply unchanged when the learner is an adult or no leak is detected; returns
- * the safe refusal with `blocked: true` on a hit.
+ * Apply the gate to a learner-visible tutor reply. Age-scoped by the caller via
+ * `isMinor`, with two enforcement widths (MMT-ADR-0030):
+ *
+ *  - **Minors** (`isMinor: true`): the FULL dangerous-procedure gate — every
+ *    controlled/dangerous item (drugs, weapons, poisons, CBRN, explosives). The
+ *    catastrophic subset is unioned in so minor protection is always a superset
+ *    of adult protection (a minor can never slip a CBRN how-to an adult would be
+ *    blocked from).
+ *  - **Adults** (`isMinor: false`): the NARROW catastrophic subset ONLY — CBRN
+ *    weapons + explosive-device construction. All other adult latitude (general
+ *    chemistry, pharmacology, energetics education, weapons history, and the
+ *    non-catastrophic drug/weapon how-to the minor gate blocks) stays OPEN.
+ *
+ * Returns the original reply unchanged when no in-scope leak is detected;
+ * returns the safe refusal with `blocked: true` on a hit.
  */
 export function applyDangerousProcedureGate(
   reply: string,
   opts: { isMinor: boolean },
 ): { response: string; blocked: boolean } {
-  if (!opts.isMinor) return { response: reply, blocked: false };
-  if (!detectDangerousProcedureLeak(reply)) {
-    return { response: reply, blocked: false };
-  }
+  const leaked = opts.isMinor
+    ? detectDangerousProcedureLeak(reply) ||
+      detectCatastrophicProcedureLeak(reply)
+    : detectCatastrophicProcedureLeak(reply);
+  if (!leaked) return { response: reply, blocked: false };
   return { response: dangerousProcedureRefusalResponse(), blocked: true };
 }
