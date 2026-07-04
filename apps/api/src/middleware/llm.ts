@@ -7,6 +7,8 @@ import {
   registerProvider,
   _clearProviders,
   setLlmRoutingV2Enabled,
+  setLlmKillSwitchActive,
+  setLlmEnvironment,
 } from '../services/llm';
 import { createGeminiProvider } from '../services/llm/providers/gemini';
 import { createOpenAIProvider } from '../services/llm/providers/openai';
@@ -15,6 +17,7 @@ import { createCerebrasProvider } from '../services/llm/providers/cerebras';
 import { createMistralProvider } from '../services/llm/providers/mistral';
 import { isLlmRoutingV2Enabled } from '../config';
 import { createLogger } from '../services/logger';
+import { readLlmKillSwitch } from '../services/kv';
 
 const logger = createLogger();
 
@@ -27,6 +30,9 @@ type LLMEnv = {
     MISTRAL_API_KEY?: string;
     LLM_ROUTING_V2_ENABLED?: string;
     ENVIRONMENT?: string;
+    // WI-1505 — reused for the aggregate LLM kill switch (key
+    // `llm:kill-switch`); no new KV namespace/binding needed.
+    SUBSCRIPTION_KV?: KVNamespace;
   };
 };
 
@@ -70,6 +76,21 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
   // key set is unchanged). Default-off until LLM_ROUTING_V2_ENABLED=true in
   // Doppler (MMT-ADR-0016 §1.5 cutover).
   setLlmRoutingV2Enabled(isLlmRoutingV2Enabled(c.env?.LLM_ROUTING_V2_ENABLED));
+
+  // WI-1505 — environment tag for the aggregate volume metric (observability
+  // only; does not affect routing).
+  setLlmEnvironment(c.env?.ENVIRONMENT ?? 'development');
+
+  // WI-1505 — aggregate LLM traffic kill switch: a genuine per-request KV
+  // read (not a Doppler/env var), so an operator's KV write takes effect on
+  // the very next request with no redeploy. No SUBSCRIPTION_KV binding (some
+  // test/dev environments) fails OPEN — traffic continues rather than being
+  // silently blocked by an infra gap.
+  if (c.env?.SUBSCRIPTION_KV) {
+    setLlmKillSwitchActive(await readLlmKillSwitch(c.env.SUBSCRIPTION_KV));
+  } else {
+    setLlmKillSwitchActive(false);
+  }
 
   const currentHash = envHash({
     GEMINI_API_KEY: c.env?.GEMINI_API_KEY,
@@ -166,4 +187,7 @@ export function resetLlmMiddleware(): void {
   _clearProviders();
   // Reset the V2 flag so a test that flipped it on cannot leak into the next.
   setLlmRoutingV2Enabled(false);
+  // WI-1505 — reset the kill switch so a test that flipped it on cannot leak
+  // into the next.
+  setLlmKillSwitchActive(false);
 }

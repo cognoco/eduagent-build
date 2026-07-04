@@ -14,6 +14,8 @@ export {
   ANTHROPIC_SONNET_MODEL,
   getOpenAIAdvancedModel,
   setLlmRoutingV2Enabled,
+  setLlmKillSwitchActive,
+  setLlmEnvironment,
 } from './router';
 export { parseConversationLanguage } from './conversation-language';
 // Test-only helpers (createMockProvider, mockProvider, getFallbackConfigForTest,

@@ -14,6 +14,8 @@ export {
   getModelConfigForTest,
   _setOpenAIAdvancedModelForTesting,
   _getLlmRoutingV2Enabled,
+  _getLlmKillSwitchActive,
+  _resetVolumeCounters,
 } from './router';
 
 export {
