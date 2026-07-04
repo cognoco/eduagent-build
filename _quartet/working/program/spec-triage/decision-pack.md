@@ -102,7 +102,7 @@ WI-1494 (RLS umbrella — superseded by plan's own parked banner), WI-1495 (voca
 - [x] Phase 0 — register
 - [x] Phase 1 — 27 disposition sheets
 - [x] Phase 2 — this pack
-- [ ] Phase 3 — Zuzka + operator ruling session (over §3 + §4)
+- [~] Phase 3 — OPEN 2026-07-04 as an async Notion ballot (child page of PGM-1: "Phase-3 ballot — spec-triage product rulings"); Zuzka rules inline, Jørn co-signs ⚠ items (calendar/spend/architecture/gate-ledger). Pre-cleared operator rulings: RLS=app-layer for launch; coverage-debt lane created (orion, non-gating, WI-1401-1414 minus 1400/1406); G1/G2 created as WI-1555/WI-1556 (Quarantine); WI-1506 beta = PUBLIC-launch gate (store tracks ungated); WS-29 hold lifted; WI-1393 = FINISH (WS-33, accepted).
 - [ ] Phase 4 — execute fates (§2) + MVP delta → PGM-1 roadmap
 
 ## 3b. Addendum (2026-07-03 ~21:20Z): Execution-Candidate batch (12 items)
