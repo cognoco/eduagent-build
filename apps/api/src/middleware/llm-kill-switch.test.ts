@@ -64,6 +64,7 @@ import {
   routeAndCall,
   routeAndStream,
   registerProvider,
+  setLlmEnvironment,
   _clearProviders,
   _resetCircuits,
   CircuitOpenError,
@@ -72,6 +73,9 @@ import {
   createMockProvider,
   _resetVolumeCounters,
 } from '../services/llm/test-utils';
+// Real production constant — assert against the actual threshold, never a
+// hardcoded guess, so a threshold change forces the test to track it.
+import { LLM_DAILY_VOLUME_ALERT_THRESHOLD } from '../services/llm/router';
 import { writeLlmKillSwitch, LLM_KILL_SWITCH_KEY } from '../services/kv';
 
 function createMockContext(env: Record<string, unknown>) {
@@ -142,9 +146,16 @@ describe('LLM kill switch (WI-1505)', () => {
     await writeLlmKillSwitch(kv, true);
     await simulateRequest(kv); // next request re-reads KV, no redeploy
 
-    await expect(
-      routeAndStream([{ role: 'user', content: 'hello' }]),
-    ).rejects.toThrow(CircuitOpenError);
+    let caught: unknown;
+    try {
+      await routeAndStream([{ role: 'user', content: 'hello' }]);
+    } catch (err) {
+      caught = err;
+    }
+    // Not just any CircuitOpenError — specifically the kill-switch one, so a
+    // real provider circuit-trip can't masquerade as switch coverage.
+    expect(caught).toBeInstanceOf(CircuitOpenError);
+    expect((caught as CircuitOpenError).provider).toBe('kill-switch');
   });
 
   it('(c) switch OFF again — traffic resumes on the next request', async () => {
@@ -185,4 +196,113 @@ describe('LLM kill switch (WI-1505)', () => {
     );
     expect((caught as CircuitOpenError).provider).toBe('kill-switch');
   });
+});
+
+// ---------------------------------------------------------------------------
+// WI-1505 — Aggregate LLM volume-alert observability.
+//
+// Drives the REAL recordVolumeMetric via REAL routeAndCall (mock provider
+// registered through real registerProvider — no internal jest.mock, GC1). The
+// per-isolate counter emits ONE structured `logger.warn` line
+// (`event: llm.volume.daily_threshold_exceeded`) when a (provider, environment)
+// pair crosses LLM_DAILY_VOLUME_ALERT_THRESHOLD within a UTC day. logger.warn
+// writes `console.warn(JSON.stringify({ ..., context }))` (services/logger.ts),
+// so we spy on console.warn and count/inspect the alert line.
+// ---------------------------------------------------------------------------
+describe('LLM aggregate volume alert (WI-1505)', () => {
+  let warnSpy: jest.SpyInstance;
+  let logSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    // resetLlmMiddleware() clears providers, the V2 flag, AND the kill-switch
+    // flag — the latter matters because the kill-switch suite above leaves it
+    // ON; without this reset every routeAndCall here would throw
+    // CircuitOpenError instead of succeeding.
+    resetLlmMiddleware();
+    _resetCircuits();
+    _resetVolumeCounters();
+    setLlmEnvironment('test');
+    registerProvider(createMockProvider('gemini'));
+    // Silence + capture structured log output. Mock console.log too so the
+    // multi-thousand-call loops don't spew logStopReason JSON and stay fast.
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    logSpy.mockRestore();
+    jest.useRealTimers();
+  });
+
+  /** Count only the volume-alert warn lines (ignore any other warns). */
+  function volumeAlertCount(): number {
+    return warnSpy.mock.calls.filter((c) =>
+      String(c[0]).includes('llm.volume.daily_threshold_exceeded'),
+    ).length;
+  }
+
+  /** Drive N successful routeAndCall invocations (each increments the counter). */
+  async function drive(n: number): Promise<void> {
+    for (let i = 0; i < n; i++) {
+      await routeAndCall([{ role: 'user', content: 'x' }]);
+    }
+  }
+
+  it('(vol-a) fires the threshold warn EXACTLY ONCE per isolate/day/(provider, environment)', async () => {
+    await drive(LLM_DAILY_VOLUME_ALERT_THRESHOLD - 1);
+    expect(volumeAlertCount()).toBe(0); // one below threshold → no alert yet
+
+    await drive(1); // crosses the >= threshold
+    expect(volumeAlertCount()).toBe(1);
+
+    // Inspect the single alert line's shape (message + structured context).
+    const alertCall = warnSpy.mock.calls.find((c) =>
+      String(c[0]).includes('llm.volume.daily_threshold_exceeded'),
+    );
+    const entry = JSON.parse(String(alertCall![0]));
+    expect(entry.level).toBe('warn');
+    expect(entry.message).toBe('llm.volume.daily_threshold_exceeded');
+    expect(entry.context).toMatchObject({
+      event: 'llm.volume.daily_threshold_exceeded',
+      surface: 'llm_volume_alert',
+      provider: 'gemini',
+      environment: 'test',
+      threshold: LLM_DAILY_VOLUME_ALERT_THRESHOLD,
+      count: LLM_DAILY_VOLUME_ALERT_THRESHOLD,
+    });
+
+    // Further calls the SAME day must NOT re-alert (the `alerted` latch).
+    await drive(5);
+    expect(volumeAlertCount()).toBe(1);
+  }, 30000);
+
+  it('(vol-b) resets the counter on UTC-day rollover and re-alerts the next day', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-07-04T08:00:00.000Z'));
+
+    await drive(LLM_DAILY_VOLUME_ALERT_THRESHOLD);
+    expect(volumeAlertCount()).toBe(1);
+
+    // Advance to the next UTC day. The (provider, environment) counter's
+    // utcDate no longer matches, so the next call resets it to count=1 (well
+    // below threshold → no immediate alert)...
+    jest.setSystemTime(new Date('2026-07-05T08:00:00.000Z'));
+    await drive(1);
+    expect(volumeAlertCount()).toBe(1);
+
+    // ...and crossing the fresh day's threshold re-alerts.
+    await drive(LLM_DAILY_VOLUME_ALERT_THRESHOLD - 1);
+    expect(volumeAlertCount()).toBe(2);
+  }, 60000);
+
+  it('(vol-c) _resetVolumeCounters() clears all state so the threshold re-alerts', async () => {
+    await drive(LLM_DAILY_VOLUME_ALERT_THRESHOLD);
+    expect(volumeAlertCount()).toBe(1);
+
+    _resetVolumeCounters();
+
+    await drive(LLM_DAILY_VOLUME_ALERT_THRESHOLD);
+    expect(volumeAlertCount()).toBe(2);
+  }, 60000);
 });
