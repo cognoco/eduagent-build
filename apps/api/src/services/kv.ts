@@ -118,10 +118,10 @@ export async function readSubscriptionStatus(
 // ---------------------------------------------------------------------------
 // WI-1505 — Aggregate LLM traffic kill switch
 //
-// Per-request KV read at the routeAndCall/routeAndStream choke point
-// (services/llm/router.ts) so an operator can stop or degrade learner-facing
-// LLM traffic on the NEXT request without a mobile release or a Worker
-// redeploy. Reuses SUBSCRIPTION_KV (no new namespace/binding needed) — see
+// Per-request KV read at the LLM router choke point (services/llm/router.ts)
+// so an operator can stop or degrade learner-facing LLM traffic on the NEXT
+// request without a mobile release or a Worker redeploy. Reuses
+// SUBSCRIPTION_KV (no new namespace/binding needed) — see
 // docs/runbooks/llm-kill-switch.md for the operator flip procedure.
 // ---------------------------------------------------------------------------
 

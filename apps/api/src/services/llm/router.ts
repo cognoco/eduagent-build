@@ -15,7 +15,6 @@ import type { AgeBracket, ConversationLanguage } from '@eduagent/schemas';
 import { SafetyFilterError } from '../../errors';
 import type { LLMTier } from '../subscription';
 import { createLogger } from '../logger';
-import { captureMessage } from '../sentry';
 import {
   resolveExchangeRouter,
   resolveJudgeConfig,
@@ -472,8 +471,9 @@ function checkLlmKillSwitch(): void {
 // `recordVolumeMetric` below is a SECONDARY, best-effort in-process signal:
 // Cloudflare Workers isolates are ephemeral and do not share memory, so this
 // counter is per-isolate, not a globally accurate daily total. It exists so a
-// single hot isolate that blows past the threshold gets an immediate Sentry
-// warning without waiting on the external pipeline. See
+// single hot isolate that blows past the threshold emits an immediate
+// structured `llm.volume.daily_threshold_exceeded` warning line (queryable by
+// the external log/metrics pipeline) without waiting on the aggregate sum. See
 // docs/runbooks/llm-kill-switch.md for the alerting recipe and threshold
 // rationale.
 // ---------------------------------------------------------------------------
@@ -508,18 +508,23 @@ function recordVolumeMetric(provider: string): void {
   counter.count += 1;
   if (counter.count >= LLM_DAILY_VOLUME_ALERT_THRESHOLD && !counter.alerted) {
     counter.alerted = true;
-    captureMessage('llm.volume.daily_threshold_exceeded', {
-      level: 'warning',
-      tags: {
-        surface: 'llm_volume_alert',
-        provider,
-        environment: llmEnvironment,
-      },
-      extra: {
-        count: counter.count,
-        threshold: LLM_DAILY_VOLUME_ALERT_THRESHOLD,
-        utcDate: today,
-      },
+    // Structured, queryable alert line — an external log/metrics pipeline
+    // trips the daily threshold alert on `event:llm.volume.daily_threshold_exceeded`
+    // grouped by (provider, environment). Emitted via the router's own logger
+    // (not a Sentry `captureMessage`) deliberately: this is the LLM hot path
+    // and coupling it to services/sentry drags the Sentry module into the LLM
+    // router's transitive graph (it broke the @sentry/cloudflare mock wiring in
+    // subject-management.integration.test.ts). The structured log is the same
+    // metric-emission channel logStopReason uses and satisfies the guardrail's
+    // "metric emission is fine" requirement.
+    logger.warn('llm.volume.daily_threshold_exceeded', {
+      event: 'llm.volume.daily_threshold_exceeded',
+      surface: 'llm_volume_alert',
+      provider,
+      environment: llmEnvironment,
+      count: counter.count,
+      threshold: LLM_DAILY_VOLUME_ALERT_THRESHOLD,
+      utc_date: today,
     });
   }
 }
