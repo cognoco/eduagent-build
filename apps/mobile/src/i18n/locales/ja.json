@@ -4235,7 +4235,8 @@
         "mastery": "習熟度",
         "effort": "努力",
         "observable_engagement": "取り組み"
-      }
+      },
+      "addSupporterLabel": "サポートを開始"
     },
     "subjects": {
       "title": "科目",
@@ -4249,7 +4250,8 @@
       "bookCount": "{{count}}冊のブック",
       "bookCount_other": "{{count}}冊のブック",
       "errorTitle": "科目を読み込めませんでした",
-      "errorMessage": "しばらくしてからもう一度お試しください。"
+      "errorMessage": "しばらくしてからもう一度お試しください。",
+      "addSupporterLabel": "サポートを開始"
     },
     "journal": {
       "title": "ジャーナル",
@@ -4258,6 +4260,15 @@
       "personPlaceholderTitle": "共有できる更新はまだありません",
       "emptyMessage": "{{name}} がセッションまたはレポートを完了すると、あなたと共有された更新がここに表示されます。",
       "personPlaceholderMessage": "プライベートなチャット、メモ、メンターの記憶はここには表示されません。"
+    },
+    "picker": {
+      "title": "学習者を選択",
+      "subtitle": "サポートを開始したい学習者を選んでください。",
+      "optionHint": "{{name}}さんのサポートを開始",
+      "emptyTitle": "学習者がまだいません",
+      "emptyDescription": "まずアカウントにお子様を追加してください。その後、サポートを開始できます。",
+      "addChildAction": "お子様を追加",
+      "closeLabel": "閉じる"
     }
   },
   "visibility": {

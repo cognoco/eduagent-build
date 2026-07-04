@@ -27,10 +27,18 @@ import {
 } from '../../components/mentor';
 import { SupportHubMentorTab } from '../../components/support';
 import { ErrorFallback } from '../../components/common';
+import {
+  useEligibleManagedPersons,
+  type EligibleManagedPerson,
+} from '../../hooks/use-eligible-supportees';
 import { useNowFeed, useNowOverflow } from '../../hooks/use-now-feed';
 import { useSubjectsIndex } from '../../hooks/use-subjects-index';
 import { matchBarIntent } from '../../lib/bar-intent-match';
 import { hasFirstRealState } from '../../lib/first-real-state';
+import {
+  pushAddChildForSupport,
+  pushLinkNewForManagedPerson,
+} from '../../lib/navigation';
 import { pushNowDeepLink } from '../../lib/now-deep-link';
 import { useScopeContext } from '../../lib/scope-context';
 import { isSchoolDayEvening } from '../../lib/school-day-evening';
@@ -369,6 +377,7 @@ function LearnerMentorScreen(): React.ReactElement {
 export default function MentorScreen(): React.ReactElement {
   const { activeScope, availableScopes, setActiveScope } = useScopeContext();
   const router = useRouter();
+  const eligiblePersons = useEligibleManagedPersons();
   const personScopes = availableScopes.filter(
     (scope) => scope.kind === 'person',
   );
@@ -383,6 +392,9 @@ export default function MentorScreen(): React.ReactElement {
     openScopedRoute(scope, '/(app)/subjects');
   const openScopedJournal = (scope: (typeof personScopes)[number]): void =>
     openScopedRoute(scope, '/(app)/journal');
+  const handleSelectEligiblePerson = (person: EligibleManagedPerson): void =>
+    pushLinkNewForManagedPerson(router, person);
+  const handleAddChildFallback = (): void => pushAddChildForSupport(router);
 
   if (activeScope.kind === 'supporter-hub') {
     return (
@@ -391,6 +403,9 @@ export default function MentorScreen(): React.ReactElement {
         onOpenPersonScope={setActiveScope}
         onOpenSubjects={openScopedSubjects}
         onOpenJournal={openScopedJournal}
+        eligiblePersons={eligiblePersons}
+        onSelectEligiblePerson={handleSelectEligiblePerson}
+        onAddChildFallback={handleAddChildFallback}
       />
     );
   }

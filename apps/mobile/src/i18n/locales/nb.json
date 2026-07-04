@@ -4235,7 +4235,8 @@
         "mastery": "Mestring",
         "effort": "Innsats",
         "observable_engagement": "Engasjement"
-      }
+      },
+      "addSupporterLabel": "Begynn å støtte"
     },
     "subjects": {
       "title": "Fag",
@@ -4249,7 +4250,8 @@
       "bookCount": "{{count}} bok",
       "bookCount_other": "{{count}} bøker",
       "errorTitle": "Kunne ikke laste inn fag",
-      "errorMessage": "Prøv igjen om et øyeblikk."
+      "errorMessage": "Prøv igjen om et øyeblikk.",
+      "addSupporterLabel": "Begynn å støtte"
     },
     "journal": {
       "title": "Logg",
@@ -4258,6 +4260,15 @@
       "personPlaceholderTitle": "Ingen delbare oppdateringer ennå",
       "emptyMessage": "Når {{name}} fullfører en økt eller rapport, vises oppdateringer som deles med deg her.",
       "personPlaceholderMessage": "Private chatter, notater og mentor-minne vises ikke her."
+    },
+    "picker": {
+      "title": "Velg en elev",
+      "subtitle": "Velg hvem du vil starte en støttekobling med.",
+      "optionHint": "Start en støttekobling med {{name}}",
+      "emptyTitle": "Ingen elever tilgjengelig ennå",
+      "emptyDescription": "Legg til et barn i kontoen din først, og kom så tilbake for å begynne å støtte dem.",
+      "addChildAction": "Legg til et barn",
+      "closeLabel": "Lukk"
     }
   },
   "visibility": {

@@ -3985,6 +3985,7 @@
       "actionMentor": "Mentor view",
       "actionSubjects": "Subjects",
       "actionJournal": "Journal",
+      "addSupporterLabel": "Start supporting",
       "factKind": {
         "mastery": "Mastery",
         "effort": "Effort",
@@ -4003,7 +4004,8 @@
       "bookCount": "{{count}} book",
       "bookCount_other": "{{count}} books",
       "errorTitle": "Couldn't load subjects",
-      "errorMessage": "Try again in a moment."
+      "errorMessage": "Try again in a moment.",
+      "addSupporterLabel": "Start supporting"
     },
     "journal": {
       "title": "Journal",
@@ -4012,6 +4014,15 @@
       "personPlaceholderTitle": "No shareable updates yet",
       "emptyMessage": "When {{name}} finishes a session or report, updates shared with you will appear here.",
       "personPlaceholderMessage": "Private chats, notes, and mentor memory are not shown here."
+    },
+    "picker": {
+      "title": "Choose a learner",
+      "subtitle": "Pick who you'd like to start a support link with.",
+      "optionHint": "Start a support link with {{name}}",
+      "emptyTitle": "No learners available yet",
+      "emptyDescription": "Add a child to your account first, then come back to start supporting them.",
+      "addChildAction": "Add a child",
+      "closeLabel": "Close"
     }
   },
   "visibility": {

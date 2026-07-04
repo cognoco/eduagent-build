@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -8,6 +9,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { ScopeDescriptor, SharedRecord } from '@eduagent/schemas';
 
+import type { EligibleManagedPerson } from '../../hooks/use-eligible-supportees';
+import { SupportPersonPickerSheet } from './SupportPersonPickerSheet';
 import { useSharedRecord } from './use-shared-record';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
@@ -18,6 +21,12 @@ interface SupportHubMentorTabProps {
   onOpenPersonScope?: (scope: PersonScope) => void;
   onOpenSubjects?: (scope: PersonScope) => void;
   onOpenJournal?: (scope: PersonScope) => void;
+  /** WI-1393 — managed persons without an existing visibility contract. */
+  eligiblePersons?: readonly EligibleManagedPerson[];
+  /** WI-1393 — navigates to `/(app)/link/new` with the selected person. */
+  onSelectEligiblePerson?: (person: EligibleManagedPerson) => void;
+  /** WI-1393 — 0-eligible degrade: guides the owner to add a child first. */
+  onAddChildFallback?: () => void;
 }
 
 function hasShareableFacts(record?: SharedRecord): boolean {
@@ -176,13 +185,27 @@ export function SupportHubMentorTab({
   onOpenPersonScope,
   onOpenSubjects,
   onOpenJournal,
+  eligiblePersons = [],
+  onSelectEligiblePerson,
+  onAddChildFallback,
 }: SupportHubMentorTabProps): React.ReactElement {
   const { t } = useTranslation();
+  const [isPickerVisible, setIsPickerVisible] = useState(false);
   const title = activePersonScope
     ? t('supportHub.mentor.personTitle', {
         name: activePersonScope.displayName,
       })
     : t('supportHub.mentor.title');
+
+  const handleSelectPerson = (person: EligibleManagedPerson): void => {
+    setIsPickerVisible(false);
+    onSelectEligiblePerson?.(person);
+  };
+
+  const handleAddChild = (): void => {
+    setIsPickerVisible(false);
+    onAddChildFallback?.();
+  };
 
   return (
     <ScrollView
@@ -192,12 +215,35 @@ export function SupportHubMentorTab({
       className="flex-1 bg-background"
       contentContainerClassName="px-5 py-4"
     >
-      <Text className="text-h2 font-semibold text-text-primary">{title}</Text>
-      <Text className="mt-1 text-body-sm text-text-secondary">
-        {activePersonScope
-          ? t('supportHub.mentor.personSubtitle')
-          : t('supportHub.mentor.subtitle')}
-      </Text>
+      <View className="flex-row items-start justify-between gap-3">
+        <View className="flex-1">
+          <Text className="text-h2 font-semibold text-text-primary">
+            {title}
+          </Text>
+          <Text className="mt-1 text-body-sm text-text-secondary">
+            {activePersonScope
+              ? t('supportHub.mentor.personSubtitle')
+              : t('supportHub.mentor.subtitle')}
+          </Text>
+        </View>
+        {/* Persistent header affordance for the populated hub. When there are
+            no person scopes, the cold-start empty state below owns the single
+            "Start supporting" CTA — rendering both would give two controls the
+            same accessibility label. */}
+        {!activePersonScope && personScopes.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('supportHub.mentor.addSupporterLabel')}
+            onPress={() => setIsPickerVisible(true)}
+            className="rounded-card border border-border bg-background px-3 py-2"
+            testID="support-hub-mentor-add-supporter"
+          >
+            <Text className="text-label font-semibold text-text-primary">
+              {t('supportHub.mentor.addSupporterLabel')}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       <View className="mt-4 gap-3">
         {personScopes.length === 0 ? (
@@ -205,6 +251,19 @@ export function SupportHubMentorTab({
             <Text className="text-body text-text-secondary">
               {t('supportHub.mentor.empty')}
             </Text>
+            {!activePersonScope ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('supportHub.mentor.addSupporterLabel')}
+                onPress={() => setIsPickerVisible(true)}
+                className="mt-3 min-h-[44px] items-center justify-center rounded-button bg-primary px-4 py-3"
+                testID="support-hub-mentor-empty-add"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  {t('supportHub.mentor.addSupporterLabel')}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : (
           personScopes.map((scope) => (
@@ -218,6 +277,16 @@ export function SupportHubMentorTab({
           ))
         )}
       </View>
+
+      {!activePersonScope ? (
+        <SupportPersonPickerSheet
+          visible={isPickerVisible}
+          eligiblePersons={eligiblePersons}
+          onSelectPerson={handleSelectPerson}
+          onAddChild={handleAddChild}
+          onClose={() => setIsPickerVisible(false)}
+        />
+      ) : null}
     </ScrollView>
   );
 }

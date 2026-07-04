@@ -9,7 +9,15 @@ import {
   SupportHubSubjectsTab,
 } from '../../components/support';
 import { SubjectsBrowse } from '../../components/subjects/SubjectsBrowse';
+import {
+  useEligibleManagedPersons,
+  type EligibleManagedPerson,
+} from '../../hooks/use-eligible-supportees';
 import { useSubjectsIndex } from '../../hooks/use-subjects-index';
+import {
+  pushAddChildForSupport,
+  pushLinkNewForManagedPerson,
+} from '../../lib/navigation';
 import { useScopeContext } from '../../lib/scope-context';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
 
@@ -18,6 +26,7 @@ export default function SubjectsScreen(): React.ReactElement {
   const router = useRouter();
   const { activeScope, availableScopes, setActiveScope } = useScopeContext();
   const subjectsIndex = useSubjectsIndex();
+  const eligiblePersons = useEligibleManagedPersons();
 
   // Navigation handlers wired to search results from cross-entity library search.
   // Mirror the pattern used by library.tsx for consistency.
@@ -65,12 +74,19 @@ export default function SubjectsScreen(): React.ReactElement {
   );
 
   if (activeScope.kind === 'supporter-hub') {
+    const handleSelectEligiblePerson = (person: EligibleManagedPerson): void =>
+      pushLinkNewForManagedPerson(router, person);
+    const handleAddChildFallback = (): void => pushAddChildForSupport(router);
+
     return (
       <SupportHubSubjectsTab
         personScopes={availableScopes.filter(
           (scope) => scope.kind === 'person',
         )}
         onOpenPersonScope={setActiveScope}
+        eligiblePersons={eligiblePersons}
+        onSelectEligiblePerson={handleSelectEligiblePerson}
+        onAddChildFallback={handleAddChildFallback}
       />
     );
   }

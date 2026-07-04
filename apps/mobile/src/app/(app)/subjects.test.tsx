@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
+import { ProfileContext, type Profile } from '../../lib/profile';
+import { createTestProfile } from '../../test-utils/app-hook-test-utils';
 import type { SubjectIndexItem } from '../../hooks/use-subjects-index';
 
 const mockPush = jest.fn();
@@ -46,6 +48,11 @@ jest.mock(
   }),
 );
 
+// WI-1393: useEligibleManagedPersons is intentionally NOT mocked — the two
+// WI-1393 tests below drive it with real linked-child profiles seeded through
+// ProfileContext.Provider (its own computation is covered in
+// use-eligible-supportees.test.ts), mirroring mentor.test.tsx.
+
 jest.mock('../../hooks/use-library-search', () => ({
   ...jest.requireActual('../../hooks/use-library-search'),
   useLibrarySearch: () => ({
@@ -60,17 +67,41 @@ jest.mock('../../hooks/use-library-search', () => ({
 jest.mock(
   '../../components/support' /* gc1-allow: route branch test asserts delegation without coupling to support surface layout */,
   () => {
-    const { Text, View } = require('react-native');
+    const { Pressable, Text, View } = require('react-native');
     return {
       SupportHubSubjectsTab: ({
         personScopes,
+        eligiblePersons,
+        onSelectEligiblePerson,
+        onAddChildFallback,
       }: {
         personScopes: Array<{ personId: string; displayName: string }>;
+        eligiblePersons?: Array<{ id: string; displayName: string }>;
+        onSelectEligiblePerson?: (person: {
+          id: string;
+          displayName: string;
+        }) => void;
+        onAddChildFallback?: () => void;
       }) => (
         <View testID="support-hub-subjects-tab">
           {personScopes.map((scope) => (
             <Text key={scope.personId}>{scope.displayName}</Text>
           ))}
+          {(eligiblePersons ?? []).map((person) => (
+            <Pressable
+              key={person.id}
+              testID={`support-hub-subjects-eligible-${person.id}`}
+              onPress={() => onSelectEligiblePerson?.(person)}
+            >
+              <Text>{person.displayName}</Text>
+            </Pressable>
+          ))}
+          <Pressable
+            testID="support-hub-subjects-add-child-fallback"
+            onPress={() => onAddChildFallback?.()}
+          >
+            <Text>Add a child</Text>
+          </Pressable>
         </View>
       ),
       PersonScopeStructuralSubjects: ({
@@ -87,6 +118,42 @@ jest.mock(
 );
 
 const SubjectsScreen = require('./subjects').default;
+
+const OWNER: Profile = createTestProfile({
+  id: 'owner-1',
+  accountId: 'account-1',
+  displayName: 'Parent',
+  isOwner: true,
+});
+
+const LIAM: Profile = createTestProfile({
+  id: 'child-new',
+  accountId: 'account-1',
+  displayName: 'Liam',
+  isOwner: false,
+});
+
+function renderWithProfiles(
+  profiles: Profile[],
+  activeProfile: Profile,
+): ReturnType<typeof render> {
+  return render(
+    <ProfileContext.Provider
+      value={{
+        profiles,
+        activeProfile,
+        isExplicitProxyMode: false,
+        switchProfile: jest.fn(),
+        isLoading: false,
+        profileLoadError: null,
+        profileWasRemoved: false,
+        acknowledgeProfileRemoval: jest.fn(),
+      }}
+    >
+      <SubjectsScreen />
+    </ProfileContext.Provider>,
+  );
+}
 
 const SUBJECTS: SubjectIndexItem[] = [
   {
@@ -185,5 +252,56 @@ describe('SubjectsScreen', () => {
     screen.getByTestId('person-scope-structural-subjects');
     screen.getByText('Emma');
     expect(screen.queryByText('Notes')).toBeNull();
+  });
+
+  // WI-1393 A3: the Subjects empty-state anchor reaches /(app)/link/new with
+  // a supporteePersonId when an eligible managed person exists.
+  it('[WI-1393] pushes /(app)/link/new with supporteePersonId when the Subjects picker selects an eligible person', () => {
+    // Real useEligibleManagedPersons: Liam is a linked child with no scope in
+    // availableScopes (only Emma is), so he is the sole eligible person.
+    mockScopeContext = {
+      ...mockScopeContext,
+      activeScope: { kind: 'supporter-hub' },
+    };
+
+    renderWithProfiles([OWNER, LIAM], OWNER);
+
+    fireEvent.press(
+      screen.getByTestId('support-hub-subjects-eligible-child-new'),
+    );
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/link/new',
+      params: {
+        supporteePersonId: 'child-new',
+        supporteeName: 'Liam',
+        relation: 'parent',
+      },
+    });
+  });
+
+  // WI-1393 AC2: zero eligible managed persons must degrade to add-a-child,
+  // never a param-less push to /(app)/link/new.
+  it('[WI-1393] degrades to add-a-child when there are zero eligible managed persons', () => {
+    // Real useEligibleManagedPersons: owner has no linked children → no
+    // eligible managed persons.
+    mockScopeContext = {
+      ...mockScopeContext,
+      activeScope: { kind: 'supporter-hub' },
+    };
+
+    renderWithProfiles([OWNER], OWNER);
+
+    fireEvent.press(
+      screen.getByTestId('support-hub-subjects-add-child-fallback'),
+    );
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    });
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(app)/link/new' }),
+    );
   });
 });
