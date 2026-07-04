@@ -665,12 +665,15 @@ export async function updateProfileV2(
 // ---------------------------------------------------------------------------
 
 /**
- * [WI-1139] Reconstructed shape of the now-removed legacy `profiles` table row
- * (`profiles.$inferSelect`). loadProfileRowByIdV2 preserves this byte-identical
- * return shape so downstream consumers (session-cache.ts's CachedProfileRow)
- * cannot tell which store answered.
+ * [WI-1139] Reconstructed shape of the removed legacy `profiles` table row
+ * (formerly `profiles.$inferSelect`, physically dropped by migration 0132 —
+ * WI-1306). loadProfileRowByIdV2 preserves this byte-identical return shape
+ * so downstream consumers (session-cache.ts's CachedProfileRow, derived via
+ * `Awaited<ReturnType<typeof loadProfileRowByIdV2>>`) cannot tell which store
+ * answered. Not exported — no importer needs the named type; consumers infer
+ * it from loadProfileRowByIdV2's return type instead.
  */
-export interface LegacyProfileRow {
+interface LegacyProfileRow {
   id: string;
   accountId: string;
   displayName: string;

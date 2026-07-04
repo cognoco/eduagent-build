@@ -10,7 +10,9 @@
  * Owner-scoped tables:   the RLS USING predicate references `owner_profile_id`.
  * Person-model tables:   explicit manifest entries only. Do not blanket-scan
  *                         `person_id`; not every person FK is an RLS boundary.
- * Special tables (family_links): OR across both FK columns — see RLS_TABLE_META.
+ * OR-scoped tables:       OR across two FK columns — see RLS_TABLE_META.
+ *                         (No current member; legacy `family_links`, the only
+ *                         prior one, dropped by migration 0132 — WI-1306.)
  *
  * Tables with RLS ENABLED but no USING policy yet (cannot appear in
  * ALL_RLS_TABLES — the integration test would fail). See EXPLICITLY_EXCLUDED_TABLES
@@ -51,7 +53,8 @@ export const PROFILE_SCOPED_TABLES: readonly string[] = [
   'retention_cards',
   'needs_deepening_topics',
   'teaching_preferences',
-  'consent_states',
+  // [WI-1306] Legacy `consent_states` dropped by migration 0132 (M2a physical
+  // drop); consent_request (CHARGE_SCOPED_TABLES below) is its v2 successor.
   'subjects',
   'curriculum_adaptations',
   'learning_sessions',
@@ -131,7 +134,9 @@ export const OWNER_SCOPED_TABLES: readonly string[] = [
  * MMT-ADR-0020 / §1.2a). The charge person is the isolation anchor; because
  * person.id = profiles.id by the deterministic reseed, the
  * app.current_profile_id GUC value carries over unchanged. consent_request's
- * `consent_request_charge_isolation` policy mirrors `consent_states_profile_isolation`.
+ * `consent_request_charge_isolation` policy mirrors the legacy
+ * `consent_states_profile_isolation` policy, dropped alongside `consent_states`
+ * by migration 0132 (WI-1306).
  *
  * This explicit list is the post-cutover boundary for person-model RLS coverage:
  * a table joins this manifest only when its policy predicate is known.
@@ -141,10 +146,12 @@ export const CHARGE_SCOPED_TABLES: readonly string[] = [
 ] as const;
 
 /**
- * family_links uses OR across parent_profile_id and child_profile_id —
- * listed separately so callers can handle its special predicate.
+ * Tables using OR across two FK columns — listed separately so callers can
+ * handle the special predicate. [WI-1306] Legacy `family_links` (the only
+ * prior member) dropped by migration 0132 (M2a physical drop); empty until a
+ * future or-scoped table is added.
  */
-export const OR_SCOPED_TABLES: readonly string[] = ['family_links'] as const;
+export const OR_SCOPED_TABLES: readonly string[] = [] as const;
 
 /**
  * Tables with RLS ENABLED but intentionally excluded from ALL_RLS_TABLES because
@@ -209,8 +216,4 @@ export const RLS_TABLE_META: Record<string, RlsTableMeta> = {
       },
     ]),
   ),
-  family_links: {
-    predicateColumn: 'or-fk-cols',
-    policyType: 'or-both-fk-cols',
-  },
 };

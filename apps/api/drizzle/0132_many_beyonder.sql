@@ -1,0 +1,62 @@
+-- =============================================================================
+-- M2a — the physical DROP. WI-1306, journal-promoting the terminal freeze-only
+-- drafts (apps/api/drizzle/_freeze-only/0118_m_drop.sql +
+-- 0119_m_subscriptions_drop.sql) into a single committed migration, so
+-- drizzle-kit migrate builds the real (non-phantom) prod schema in every
+-- environment instead of relying on an out-of-band manual drop.
+--
+-- Consolidates BOTH frozen drafts into one statement: 0118 dropped 4 identity
+-- tables + 3 enums (subscriptions was deliberately RETAINED there, carved out
+-- to WI-805/0119 as a coupled billing-subsystem slice); 0119 later dropped
+-- `subscriptions` + its 2 enums once the billing readers went v2-only. WI-1139
+-- (legacy Drizzle schema-def removal) already deleted the TypeScript defs for
+-- all 5 tables; this migration is the deferred physical DROP those defs
+-- pointed at, gated on the same catalog-driven precondition the frozen files
+-- specified.
+--
+-- PRECONDITION — SATISFIED BY THE APPLIED 0129_m_repoint (catalog-driven,
+-- completeness-asserted), NOT the frozen 0117_m_repoint.sql draft. 0117 is
+-- fully superseded: 0129 is 0117's re-derivation (WI-1128), using
+-- to_regclass() gating instead of hard ::regclass casts so it is a clean
+-- no-op wherever the legacy tables are already gone, and it re-points every
+-- live FK off accounts/profiles/subscriptions onto organization/person/
+-- subscription while asserting (at run time, against the live catalog) that
+-- no other live table still holds an unmapped FK into the legacy parents. Do
+-- NOT promote 0117 — it is a draft artifact only; 0129 is the migration of
+-- record. Verified directly against a scratch Postgres carrying the full
+-- committed chain: zero live (non-legacy) rows in pg_constraint reference any
+-- of the 5 tables below.
+--
+-- NO CASCADE — a single multi-table DROP TABLE statement resolves the
+-- intra-legacy FKs among these 5 tables as a set (family_links/consent_states/
+-- subscriptions -> profiles/accounts) without needing CASCADE. If any live
+-- (non-legacy) table still held an un-repointed FK into one of these 5 —
+-- meaning 0129 had NOT actually run, or a repoint regressed — this statement
+-- fails LOUD on the dangling dependency rather than silently cascading a
+-- delete into unrelated data. IF EXISTS makes a rehearsal re-run a clean
+-- no-op; it is not a substitute for the precondition above.
+--
+-- The 5 tables: consent_states, family_links, profiles, accounts, subscriptions
+-- The 5 orphaned enum types (legacy-only; verified zero column dependents
+-- outside the 5 tables above, against the same scratch Postgres):
+--   consent_status, consent_type, location_type,
+--   subscription_status, subscription_tier
+--
+-- ## Rollback
+-- IMPOSSIBLE in place. Once these tables drop, the legacy system-of-record
+-- rows are gone — there is no reverse migration that reconstitutes them.
+-- Recovery is ONLY a Neon PITR (point-in-time recovery) rewind of the whole
+-- branch to a pre-drop marker taken immediately before this migration applies
+-- to a real environment. Data loss scope: every row in consent_states,
+-- family_links, profiles, accounts, and subscriptions as of the drop moment —
+-- by this point in the cutover these are legacy shadow copies of the v2
+-- person/organization/subscription graph (already the system of record for
+-- live traffic), but any legacy-only historical field never migrated to v2
+-- is lost for good. Do NOT apply this migration to staging/production without
+-- an operator-confirmed GO and a fresh snapshot immediately prior (two-key
+-- merge gate, WI-1306).
+-- =============================================================================
+
+DROP TABLE IF EXISTS consent_states, family_links, profiles, accounts, subscriptions;
+
+DROP TYPE IF EXISTS consent_status, consent_type, location_type, subscription_status, subscription_tier;

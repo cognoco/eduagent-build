@@ -72,13 +72,6 @@ describe('database-rls-coverage manifest', () => {
       expect(meta!.predicateColumn).toBe('charge_person_id');
     }
   });
-
-  it('family_links metadata declares both columns in its predicate', () => {
-    const meta = RLS_TABLE_META['family_links'];
-    expect(meta).toBeDefined();
-    // family_links uses an OR policy: parent_profile_id OR child_profile_id
-    expect(meta!.policyType).toBe('or-both-fk-cols');
-  });
 });
 
 /**
