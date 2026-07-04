@@ -105,6 +105,11 @@ export const PROFILE_SCOPED_TABLES: readonly string[] = [
   // that were deferred pending CONCEPT_CAPTURE_ENABLED flip.
   'concepts',
   'concept_mastery',
+  // Added migration 0131 (WI-1504): activation_events_profile_isolation policy.
+  // profile_id is NULLABLE (pre-account app_opened/signup_started rows), so the
+  // policy is `profile_id IS NULL OR profile_id = current_setting(...)` — the
+  // NULL-admitting variant of the standard profile_id predicate.
+  'activation_events',
 ] as const;
 
 /**

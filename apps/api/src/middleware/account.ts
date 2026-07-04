@@ -56,6 +56,9 @@ export type AccountEnv = {
  *   - GET  /v1/billing/status      → free-tier defaults
  *   - GET  /v1/subscription/status → free-tier defaults
  *   - GET  /v1/consent/my-status   → null consent status
+ *   - POST /v1/activation-events   → [WI-1504] app_opened / signup_started
+ *     fire before the identity graph exists; the write is profileId-nullable
+ *     (see packages/database/src/schema/activation-events.ts)
  * Matched against the post-basePath path (includes /v1), like auth.ts.
  */
 interface PreGraphRoute {
@@ -68,6 +71,7 @@ const PRE_GRAPH_ALLOWLIST: readonly PreGraphRoute[] = [
   { method: 'GET', path: '/v1/billing/status' },
   { method: 'GET', path: '/v1/subscription/status' },
   { method: 'GET', path: '/v1/consent/my-status' },
+  { method: 'POST', path: '/v1/activation-events' },
 ];
 
 function isPreGraphAllowed(method: string, path: string): boolean {

@@ -82,3 +82,6 @@ export * from './feedback';
 
 // Notifications & Nudges
 export * from './notifications';
+
+// Launch activation instrumentation (WI-1504)
+export * from './activation-events';

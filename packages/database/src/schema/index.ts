@@ -29,3 +29,4 @@ export * from './challenge-round-cooldowns';
 export * from './concept-mastery';
 export * from './supporter-feed';
 export * from './visibility-contract';
+export * from './activation-events';

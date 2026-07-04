@@ -39,6 +39,11 @@ import { notFound, apiError, SubjectNotFoundError } from '../errors';
 import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { withProfile } from '../route-utils/route-context';
+import {
+  recordActivationEvent,
+  deriveActivationProfileShape,
+} from '../services/activation-events';
+import { safeWrite } from '../services/safe-non-core';
 
 type SubjectRouteEnv = {
   Bindings: {
@@ -117,6 +122,25 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
           subjectProfileMeta?.conversationLanguage,
         ),
       });
+      // WI-1504: launch activation instrumentation. occurrenceKey is
+      // deliberately omitted — this event should record the FIRST subject
+      // (or first-curriculum-lesson) a profile starts, not every subject
+      // creation, so the default profile-scoped dedupeKey (no occurrence
+      // suffix) lets onConflictDoNothing keep only the earliest row.
+      await safeWrite(
+        () =>
+          recordActivationEvent(db, {
+            eventType: 'first_subject_or_lesson_started',
+            profileId,
+            profileShape: subjectProfileMeta
+              ? deriveActivationProfileShape(subjectProfileMeta)
+              : null,
+            route: 'POST /subjects',
+            metadata: { subjectId: result.subject.id },
+          }),
+        'subjects.create.first_subject_or_lesson_started',
+        { profileId },
+      );
       return c.json(
         createSubjectWithStructureResponseSchema.parse(result),
         201,
