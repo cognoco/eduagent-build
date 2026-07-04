@@ -71,7 +71,13 @@ PGM-1 rulings queue; WI-1328 already carries an Option-A ruling in its comments.
 - Cross-lane (edge): coordinate with orchestrator:ramtop on the edge WI's Cosmo comments.
 
 ## Current position
-_Updated 2026-07-03 ~16:50Z by shepherd (session eb4593fb)._
+_Updated 2026-07-04 ~19:21Z by shepherd (session c25d4c51)._
+
+> ### LATEST (2026-07-04 ~19:21Z) — post-compaction resume, MERGE-GO executing
+> **WI-1504: CLOSED/Done.** AC5 re-scoped→WI-1588 in the Acceptance Criteria prop (RE-SCOPED marker verified); re-scope note added to completion summary Caveats; re-completed Executing→Reviewing (Fixed In squash `19739dd4`); review --disposition done → **Reviewing→Closed** (CI gate PASS: required checks green for 19739dd4). Comment 3938bce9-1f7c-810c-b382-001d742f5f6e.
+> **WI-1588 confirmed CAPTURED:** page `3938bce9-1f7c-81f6-8067-daee7de1ffe0` — "LAUNCH-BLOCKING: verify activation instrumentation (WI-1504) + LLM kill-switch (WI-1505) end-to-end vs a real migrated Neon DB + KV in a staging/prod-profile build".
+> **WI-1505 / #1900:** re-run 28716187835 (the flaky mobile `session/index.test.tsx [WI-859]` job = "main" job) IN FLIGHT; watcher **bu72c0dvz** (until run status=completed). ORION guardrail lr-inbox-062: GREEN→merge #1900 squash→`execute.ts complete WI-1505-artifacts success --fixed-in <#1900-squash-url>` (summary pre-validated). RED-AGAIN→STOP, check if session/index.test.tsx is red on main independently, report, NO 2nd re-run, never weaken test.
+> **STILL TODO:** (A) #1900 per re-run result; (C) note deploy-time-AC re-scope pattern in docs/pre-launch-checklist.md; (D) report ORION (lr-out-083): re-run result + #1900 SHA/root-cause + WI-1588 id + both WIs final stage.
 
 > ### RESUME SNAPSHOT (read first on resume/post-compaction)
 > **Monitors DIE on session end — RECONCILE FIRST** (`clacks/monitor-hygiene.md`): re-arm both per
