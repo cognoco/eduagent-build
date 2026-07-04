@@ -76,7 +76,7 @@ WI-1494 (RLS umbrella — superseded by plan's own parked banner), WI-1495 (voca
 ## 4. Ruling queues
 
 **ZUZKA (product) — 7 questions:**
-1. WI-1393: finish (build supporter-link entry in V2) or hide (cut new-supporter onboarding from MVP)? Recommend finish — supporter scope is in the north star.
+1. ~~WI-1393~~ RULED 2026-07-04: **FINISH** — assigned to WS-33 (orion) with ship-path priority; ruling on the item.
 2. WI-1457 trial preview lesson: never built; honest substitute funnel works. Recommend OUT — confirm.
 3. Correctness-chain (WI-1443→1444→1445): one epic, MVP slot or fast-follow? Recommend fast-follow.
 4. Continuity T4 (WI-1483 recap next-topic): journal carries no nextTopicTitle — re-spec or kill?
