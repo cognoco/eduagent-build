@@ -34,12 +34,30 @@ import {
   resolveConsentStatus,
 } from './consent-status-v2';
 import { getGuardianPersonIds } from './guardianship';
-import { isLocalHour9ForTimezone } from '../solo-progress-reports';
 
 type SelfReportWindow = {
   start: Date;
   endExclusive: Date;
 };
+
+// [WI-1139] Inlined from the now-deleted legacy `services/solo-progress-reports.ts`
+// (this v2 module was its only remaining caller).
+export function isLocalHour9ForTimezone(
+  timezone: string | null,
+  nowUtc: Date,
+): boolean {
+  if (!timezone) return nowUtc.getUTCHours() === 9;
+  try {
+    const localTimeStr = nowUtc.toLocaleString('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      hour12: false,
+    });
+    return parseInt(localTimeStr, 10) === 9;
+  } catch {
+    return nowUtc.getUTCHours() === 9;
+  }
+}
 
 /**
  * v2 `listEligibleSelfReportProfileIds`. Returns the self-managed, age-eligible,

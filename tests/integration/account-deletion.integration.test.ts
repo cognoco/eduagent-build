@@ -19,7 +19,6 @@
 
 import { eq, sql } from 'drizzle-orm';
 import {
-  accounts,
   assessments,
   bookmarks,
   byokWaitlist,
@@ -54,7 +53,6 @@ import {
   milestones,
   monthlyReports,
   weeklyReports,
-  profiles,
   quizMasteryItems,
   quizMissedItems,
   quizRounds,
@@ -113,11 +111,29 @@ async function loadDeletionState(accountId: string): Promise<{
   });
   // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); gate on
   // table existence — the v2 `organization` row above is the real anchor.
+  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL select.
   const acctRow = (await legacyIdentityTableExistsForTest(db, 'accounts'))
-    ? await db.query.accounts.findFirst({
-        where: eq(accounts.id, accountId),
-        columns: { deletionScheduledAt: true, deletionCancelledAt: true },
-      })
+    ? await (async () => {
+        const raw = (await db.execute(sql`
+          SELECT deletion_scheduled_at AS "deletionScheduledAt",
+                 deletion_cancelled_at AS "deletionCancelledAt"
+          FROM accounts WHERE id = ${accountId}
+        `)) as unknown;
+        const rows = Array.isArray(raw)
+          ? (raw as Array<{
+              deletionScheduledAt: Date | null;
+              deletionCancelledAt: Date | null;
+            }>)
+          : ((
+              raw as {
+                rows?: Array<{
+                  deletionScheduledAt: Date | null;
+                  deletionCancelledAt: Date | null;
+                }>;
+              }
+            ).rows ?? []);
+        return rows[0];
+      })()
     : undefined;
   if (!orgRow && !acctRow) return null;
   return {
@@ -185,10 +201,14 @@ async function createOwnerProfileRecord(): Promise<{
     );
   }
 
-  const row = await db.query.profiles.findFirst({
-    where: eq(profiles.id, profileId),
-    columns: { accountId: true },
-  });
+  // [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL select.
+  const raw = (await db.execute(sql`
+    SELECT account_id AS "accountId" FROM profiles WHERE id = ${profileId}
+  `)) as unknown;
+  const rows = Array.isArray(raw)
+    ? (raw as Array<{ accountId: string }>)
+    : ((raw as { rows?: Array<{ accountId: string }> }).rows ?? []);
+  const row = rows[0];
 
   if (!row) {
     throw new Error(

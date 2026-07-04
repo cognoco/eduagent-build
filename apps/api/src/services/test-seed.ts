@@ -21,15 +21,6 @@ import {
   consentGrant,
   consentRequest,
   subscription,
-  // Legacy identity parents — written CONDITIONALLY (only when the table still
-  // exists) so seeded children whose FKs target the legacy parents resolve on a
-  // committed-migration DB (CI: localhost:5432/tests runs every migration fresh,
-  // so legacy tables + their FKs are PRESENT; the staging m-repoint.sql FK
-  // re-point is a staging-manual step, NOT a committed migration). Post-DROP
-  // staging drops these tables → the writes self-inert. See writeLegacyParents.
-  accounts as legacyAccounts,
-  profiles as legacyProfiles,
-  subscriptions as legacySubscriptions,
   learningProfiles,
   subjects,
   curricula,
@@ -589,6 +580,14 @@ async function tableExists(db: Database, table: string): Promise<boolean> {
   return exists;
 }
 
+// [WI-1139] The legacy `accounts`/`profiles`/`subscriptions` Drizzle table
+// defs were removed (physical DB drop is a separate step, WI-1306/M2a) — the
+// three legacy-parent writers below switch from typed `db.insert(table)` calls
+// to raw parameterized SQL so they can keep writing the legacy-FK-satisfying
+// rows on a still-legacy-chain DB (e.g. CI) without the removed schema
+// exports. Behavior (including the self-inerting `tableExists()` gate) is
+// unchanged.
+
 /** Write the legacy `accounts` row (id = accountId) when the table exists. */
 async function writeLegacyAccountIfPresent(
   db: Database,
@@ -597,11 +596,9 @@ async function writeLegacyAccountIfPresent(
   clerkUserId: string,
 ): Promise<void> {
   if (!(await tableExists(db, 'accounts'))) return;
-  await db.insert(legacyAccounts).values({
-    id: accountId,
-    clerkUserId,
-    email,
-  });
+  await db.execute(
+    sql`INSERT INTO accounts (id, clerk_user_id, email) VALUES (${accountId}, ${clerkUserId}, ${email})`,
+  );
 }
 
 /** Write the legacy `profiles` row (id = profileId) when the table exists. */
@@ -612,13 +609,9 @@ async function writeLegacyProfileIfPresent(
   opts: { displayName: string; birthYear: number; isOwner: boolean },
 ): Promise<void> {
   if (!(await tableExists(db, 'profiles'))) return;
-  await db.insert(legacyProfiles).values({
-    id: profileId,
-    accountId,
-    displayName: opts.displayName,
-    birthYear: opts.birthYear,
-    isOwner: opts.isOwner,
-  });
+  await db.execute(
+    sql`INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner) VALUES (${profileId}, ${accountId}, ${opts.displayName}, ${opts.birthYear}, ${opts.isOwner})`,
+  );
 }
 
 /**
@@ -650,15 +643,9 @@ async function insertSubscriptionWithLegacy(
 ): Promise<void> {
   await db.insert(subscription).values(values);
   if (!(await tableExists(db, 'subscriptions'))) return;
-  await db.insert(legacySubscriptions).values({
-    id: values.id,
-    accountId: values.organizationId,
-    tier: values.planTier,
-    status: values.status,
-    trialEndsAt: values.trialEndsAt ?? null,
-    currentPeriodStart: values.periodStartAt ?? null,
-    currentPeriodEnd: values.periodEndAt ?? null,
-  });
+  await db.execute(
+    sql`INSERT INTO subscriptions (id, account_id, tier, status, trial_ends_at, current_period_start, current_period_end) VALUES (${values.id}, ${values.organizationId}, ${values.planTier}, ${values.status}, ${values.trialEndsAt ?? null}, ${values.periodStartAt ?? null}, ${values.periodEndAt ?? null})`,
+  );
 }
 
 async function createBaseAccount(
@@ -5933,7 +5920,14 @@ async function deleteOrganizationGraph(
   // accounts→subscriptions→quota), so one delete reclaims the whole legacy
   // subtree. Self-inerting post-DROP (table gone → skip).
   if (await tableExists(db, 'accounts')) {
-    await db.delete(legacyAccounts).where(inArray(legacyAccounts.id, orgIds));
+    // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete keyed
+    // on the same orgIds, same self-inerting gate.
+    await db.execute(sql`
+      DELETE FROM accounts WHERE id IN (${sql.join(
+        orgIds.map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )})
+    `);
   }
 
   // 1. Collect all person IDs (owners + managed children) across these orgs.

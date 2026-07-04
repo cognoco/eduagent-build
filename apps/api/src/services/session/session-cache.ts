@@ -2,7 +2,7 @@
 // Session Static Context Cache — in-process LRU cache for per-session data
 // ---------------------------------------------------------------------------
 
-import { type profiles, type Database } from '@eduagent/database';
+import { type Database } from '@eduagent/database';
 import type { LearningSession } from '@eduagent/schemas';
 import { getSubject } from '../subject';
 import { loadProfileRowByIdV2 } from '../identity-v2/profile-v2';
@@ -20,7 +20,7 @@ import {
 // Types
 // ---------------------------------------------------------------------------
 
-type CachedProfileRow = typeof profiles.$inferSelect | null;
+type CachedProfileRow = Awaited<ReturnType<typeof loadProfileRowByIdV2>>;
 type CachedSubject = Awaited<ReturnType<typeof getSubject>>;
 
 // BUG-70: Extended cache to include session-scoped supplementary lookups

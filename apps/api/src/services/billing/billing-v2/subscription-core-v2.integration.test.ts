@@ -31,18 +31,16 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
   generateUUIDv7,
-  accounts,
   organization,
   person,
   login,
   membership,
   subscription,
-  subscriptions,
   quotaPools,
   type Database,
 } from '@eduagent/database';
@@ -76,9 +74,10 @@ const RUN = !!process.env.DATABASE_URL;
           .delete(subscription)
           .where(eq(subscription.id, subId))
           .catch(() => undefined);
+        // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL
+        // delete, same best-effort cleanup as before.
         await db
-          .delete(subscriptions)
-          .where(eq(subscriptions.id, subId))
+          .execute(sql`DELETE FROM subscriptions WHERE id = ${subId}`)
           .catch(() => undefined);
       }
       for (const clerkId of createdClerkIds) {
@@ -100,10 +99,11 @@ const RUN = !!process.env.DATABASE_URL;
             .catch(() => undefined);
         }
       }
+      // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete,
+      // same best-effort cleanup as before.
       for (const acctId of createdAccountIds) {
         await db
-          .delete(accounts)
-          .where(eq(accounts.id, acctId))
+          .execute(sql`DELETE FROM accounts WHERE id = ${acctId}`)
           .catch(() => undefined);
       }
       for (const orgId of createdOrgIds) {
@@ -164,12 +164,13 @@ const RUN = !!process.env.DATABASE_URL;
       // after M-REPOINT, `subscriptions.accountId` targets `organization`
       // directly (see below), so this mirror (same id as the org, the
       // "reseed identity contract") is a no-op there instead of hard-failing.
+      // [WI-1139] Legacy `accounts`/`subscriptions` Drizzle defs removed —
+      // raw SQL inserts, same conditional seed as before.
       if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-        await db.insert(accounts).values({
-          id: org!.id,
-          clerkUserId: `${clerkUserId}_legacy`,
-          email: `legacy_${email}`,
-        });
+        await db.execute(sql`
+          INSERT INTO accounts (id, clerk_user_id, email)
+          VALUES (${org!.id}, ${`${clerkUserId}_legacy`}, ${`legacy_${email}`})
+        `);
         createdAccountIds.push(org!.id);
       }
 
@@ -177,13 +178,10 @@ const RUN = !!process.env.DATABASE_URL;
       seededSubIds.push(subId);
 
       if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-        await db.insert(subscriptions).values({
-          id: subId,
-          accountId: org!.id,
-          tier: 'family',
-          status: 'active',
-          stripeSubscriptionId: `${opts.stripeSubscriptionId}_legacy`,
-        });
+        await db.execute(sql`
+          INSERT INTO subscriptions (id, account_id, tier, status, stripe_subscription_id)
+          VALUES (${subId}, ${org!.id}, 'family', 'active', ${`${opts.stripeSubscriptionId}_legacy`})
+        `);
       }
 
       await db.insert(subscription).values({

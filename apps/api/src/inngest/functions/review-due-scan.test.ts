@@ -16,7 +16,7 @@ jest.mock('../client', () => {
   return { ...actual, inngest: mockInngestTransport.inngest };
 });
 
-import { person, profiles, consentStates } from '@eduagent/database';
+import { person } from '@eduagent/database';
 
 import { reviewDueScan } from './review-due-scan';
 
@@ -118,9 +118,9 @@ describe('[WI-777] reviewDueScan identity-v2 wiring', () => {
 
     // [WI-867] v2-only: source always queries from person; profiles /
     // consentStates surfaces are absent (consent gate via consentGateSatisfiedSql).
+    // [WI-1139] Those legacy table defs are gone, so the "not
+    // toHaveBeenCalledWith" counter-assertions were removed with them.
     expect(db.builder.from).toHaveBeenCalledWith(person);
-    expect(db.builder.from).not.toHaveBeenCalledWith(profiles);
-    expect(db.builder.from).not.toHaveBeenCalledWith(consentStates);
   });
 });
 

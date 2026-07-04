@@ -16,10 +16,8 @@ import { eq, sql } from 'drizzle-orm';
 import {
   conceptMastery,
   concepts,
-  profiles,
   subjects,
   subscription as subscriptionV2,
-  subscriptions,
 } from '@eduagent/database';
 
 import {
@@ -112,11 +110,13 @@ async function seedFamilySubscription(profileId: string) {
 
   // Account creation auto-provisions a 'plus' trial subscription,
   // so we UPDATE the existing row to 'family' tier instead of inserting.
+  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL update,
+  // same conditional behavior as before.
   if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db
-      .update(subscriptions)
-      .set({ tier: 'family', status: 'active' })
-      .where(eq(subscriptions.accountId, accountId));
+    await db.execute(sql`
+      UPDATE subscriptions SET tier = 'family', status = 'active'
+      WHERE account_id = ${accountId}
+    `);
   }
 
   // [WI-1145] Update the v2 subscription unconditionally (dual-store consistency) —

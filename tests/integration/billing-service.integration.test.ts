@@ -5,25 +5,20 @@
  * This suite targets the mock-heavy quota, top-up, and RevenueCat paths.
  */
 
-import { asc, eq, inArray } from 'drizzle-orm';
+import { asc, eq, inArray, sql } from 'drizzle-orm';
 import {
-  accounts,
   generateUUIDv7,
   membership,
   organization,
   person,
   profileQuotaUsage,
-  profiles,
   quotaPools,
   subscription as subscriptionV2Table,
-  subscriptions,
   topUpCredits,
 } from '@eduagent/database';
 
 import {
-  createSubscription,
   decrementQuota,
-  ensureFreeSubscription,
   getTopUpCreditsRemaining,
 } from '../../apps/api/src/services/billing';
 // [WI-1239 / 779-strip] purchaseTopUpCredits, activateSubscriptionFromRevenuecat,
@@ -114,8 +109,18 @@ async function cleanupOrgAccounts() {
   // `subscriptions` row (same id as the org) cascades away via the
   // M-REPOINT'd account_id->organization FK when the org itself is deleted
   // above.
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.delete(accounts).where(inArray(accounts.id, orgIds));
+  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete, same
+  // conditional cleanup as before.
+  if (
+    (await legacyIdentityTableExistsForTest(db, 'accounts')) &&
+    orgIds.length > 0
+  ) {
+    await db.execute(
+      sql`DELETE FROM accounts WHERE id IN (${sql.join(
+        orgIds.map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )})`,
+    );
   }
 }
 
@@ -212,12 +217,13 @@ async function seedAccount(index: number) {
   // M-REPOINT, `subscriptions.accountId` targets `organization` directly, so
   // this mirror (same id as the org, the "reseed identity contract") is a
   // no-op there instead of hard-failing.
+  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL insert, same
+  // conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.insert(accounts).values({
-      id: org!.id,
-      clerkUserId: account.clerkUserId,
-      email: account.email,
-    });
+    await db.execute(sql`
+      INSERT INTO accounts (id, clerk_user_id, email)
+      VALUES (${org!.id}, ${account.clerkUserId}, ${account.email})
+    `);
   }
   return org!;
 }
@@ -229,14 +235,13 @@ async function seedOwnerProfile(accountId: string, displayName: string) {
   // (post-M-DROP) — callers always follow up with seedV2Counterpart, which
   // creates the v2 `person` row under this SAME id.
   const id = generateUUIDv7();
+  // [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL insert, same
+  // conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-    await db.insert(profiles).values({
-      id,
-      accountId,
-      displayName,
-      birthYear: 1990,
-      isOwner: true,
-    });
+    await db.execute(sql`
+      INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner)
+      VALUES (${id}, ${accountId}, ${displayName}, 1990, true)
+    `);
   }
   return { id };
 }
@@ -303,21 +308,23 @@ async function seedSubscriptionWithQuota(input: {
   // comment here; createSubscription/ensureFreeSubscription (tested below)
   // are transitively dead (see docs/_archive/retired-code.md), so this
   // anchor self-inerts once the table is dropped.
+  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
+  // same conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.insert(subscriptions).values({
-      id: subscriptionV2Row!.id,
-      accountId: input.accountId,
-      tier: input.tier,
-      status: input.status ?? 'active',
-      currentPeriodStart:
-        input.currentPeriodStart ?? new Date('2026-04-01T00:00:00.000Z'),
-      currentPeriodEnd:
-        input.currentPeriodEnd ?? new Date('2026-05-01T00:00:00.000Z'),
-      trialEndsAt: input.trialEndsAt ?? null,
-      lastRevenuecatEventId: input.lastRevenuecatEventId ?? null,
-      lastRevenuecatEventTimestampMs:
-        input.lastRevenuecatEventTimestampMs ?? null,
-    });
+    await db.execute(sql`
+      INSERT INTO subscriptions (
+        id, account_id, tier, status, current_period_start, current_period_end,
+        trial_ends_at, last_revenuecat_event_id, last_revenuecat_event_timestamp_ms
+      )
+      VALUES (
+        ${subscriptionV2Row!.id}, ${input.accountId}, ${input.tier}, ${input.status ?? 'active'},
+        ${(input.currentPeriodStart ?? new Date('2026-04-01T00:00:00.000Z')).toISOString()}::timestamptz,
+        ${(input.currentPeriodEnd ?? new Date('2026-05-01T00:00:00.000Z')).toISOString()}::timestamptz,
+        ${input.trialEndsAt ? input.trialEndsAt.toISOString() : null},
+        ${input.lastRevenuecatEventId ?? null},
+        ${input.lastRevenuecatEventTimestampMs ?? null}
+      )
+    `);
   }
 
   const [quotaPool] = await db
@@ -404,13 +411,6 @@ async function loadProfileQuotaUsage(
   });
 }
 
-async function loadSubscriptionByAccountId(accountId: string) {
-  const db = createIntegrationDb();
-  return db.query.subscriptions.findFirst({
-    where: eq(subscriptions.accountId, accountId),
-  });
-}
-
 async function loadV2SubscriptionById(subscriptionId: string) {
   const db = createIntegrationDb();
   return db.query.subscription.findFirst({
@@ -452,86 +452,13 @@ afterAll(async () => {
 });
 
 describe('Integration: billing service', () => {
-  // [WI-1128] Both legacy-store tests below exercise orphaned dead code that
-  // cannot pass in EITHER lane post-0129: quota_pools' FK now targets v2
-  // `subscription`, but the legacy path inserts a legacy id. Skip both until the
-  // WI-1139 dead-sweep deletes them. Conditional callee — repo lint bans a bare
-  // `.skip()`.
-  const SKIP_LEGACY_STORE_TESTS = true;
-
-  // WI-1128 quarantine: subject fn `createSubscription` is orphaned dead code
-  // in apps/api/src/services/billing/subscription-core.ts (reachable only via
-  // findOrCreateAccount / createProfileWithLimitCheck, both zero live callers
-  // — verified: grepped every apps/+packages/ call site of both names, only
-  // their own definitions and comments remain). Fails post-0130/0129-repoint
-  // (quota_pools insert targets the legacy subscription id, but its FK now
-  // targets v2 `subscription`). Deletion + un-skip = WI-1139 dead-sweep.
-  (SKIP_LEGACY_STORE_TESTS ? it.skip : it)(
-    'creates a real plus subscription and matching quota pool',
-    async () => {
-      const account = await seedAccount(0);
-
-      const created = await createSubscription(
-        createIntegrationDb(),
-        account.id,
-        'plus',
-        700,
-        {
-          status: 'trial',
-          stripeCustomerId: 'cus_real_suite',
-          stripeSubscriptionId: 'sub_real_suite',
-        },
-      );
-
-      const savedSubscription = await loadSubscriptionByAccountId(account.id);
-      const savedQuotaPool = await loadQuotaPool(created.id);
-
-      expect(created.accountId).toBe(account.id);
-      expect(created.tier).toBe('plus');
-      expect(created.status).toBe('trial');
-      expect(savedSubscription!.stripeCustomerId).toBe('cus_real_suite');
-      expect(savedSubscription!.stripeSubscriptionId).toBe('sub_real_suite');
-      expect(savedQuotaPool!.monthlyLimit).toBe(700);
-      expect(savedQuotaPool!.usedThisMonth).toBe(0);
-      expect(savedQuotaPool!.dailyLimit).toBeNull();
-    },
-  );
-
-  // WI-1128 quarantine: subject fn `ensureFreeSubscription` (legacy, not the
-  // -V2 twin) is orphaned dead code in apps/api/src/services/billing/
-  // subscription-core.ts (reachable only via findOrCreateAccount /
-  // createProfileWithLimitCheck, both zero live callers — verified: grepped
-  // every apps/+packages/ call site of both names, only their own
-  // definitions and comments remain; revenuecat-webhook.ts:323's
-  // handlers.ensureFreeSubscription resolves to ensureFreeSubscriptionV2 via
-  // dispatch.ts's always-v2 seam, not this fn). Fails post-0130/0129-repoint
-  // (quota_pools insert targets the legacy subscription id, but its FK now
-  // targets v2 `subscription`). Deletion + un-skip = WI-1139 dead-sweep.
-  (SKIP_LEGACY_STORE_TESTS ? it.skip : it)(
-    'provisions a free subscription only once with ensureFreeSubscription',
-    async () => {
-      const account = await seedAccount(1);
-      const db = createIntegrationDb();
-
-      const first = await ensureFreeSubscription(db, account.id);
-      const second = await ensureFreeSubscription(db, account.id);
-
-      const savedSubscription = await loadSubscriptionByAccountId(account.id);
-      const savedQuotaPool = await loadQuotaPool(first.id);
-      const allSubscriptions = await db.query.subscriptions.findMany({
-        where: eq(subscriptions.accountId, account.id),
-      });
-
-      expect(first.id).toBe(second.id);
-      expect(savedSubscription!.tier).toBe('free');
-      expect(savedSubscription!.status).toBe('active');
-      expect(savedQuotaPool!.monthlyLimit).toBe(
-        getTierConfig('free').monthlyQuota,
-      );
-      expect(savedQuotaPool!.dailyLimit).toBe(getTierConfig('free').dailyLimit);
-      expect(allSubscriptions).toHaveLength(1);
-    },
-  );
+  // [WI-1139] The two legacy-store tests previously quarantined here
+  // (createSubscription / ensureFreeSubscription) exercised orphaned dead
+  // code — both subject fns were already removed from
+  // apps/api/src/services/billing/subscription-core.ts (zero live callers)
+  // and the legacy `subscriptions` table def is now removed too. Deleted per
+  // the WI-1128 quarantine comment's own "deletion + un-skip = WI-1139
+  // dead-sweep" disposition. See docs/_archive/retired-code.md.
 
   it('decrements monthly quota against the real quota pool row', async () => {
     const account = await seedAccount(2);

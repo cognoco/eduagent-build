@@ -25,9 +25,8 @@
  *      → no errors, no spurious data, retention/deepening steps skipped
  */
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import {
-  familyLinks,
   guardianship,
   generateUUIDv7,
   subjects,
@@ -293,11 +292,13 @@ async function seedParentLink(childProfileId: string) {
     isOwner: true,
   });
 
+  // [WI-1139] Legacy `family_links` Drizzle def removed — raw SQL insert,
+  // same conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
-    await db.insert(familyLinks).values({
-      parentProfileId: profileId,
-      childProfileId,
-    });
+    await db.execute(sql`
+      INSERT INTO family_links (id, parent_profile_id, child_profile_id)
+      VALUES (${generateUUIDv7()}, ${profileId}, ${childProfileId})
+    `);
   }
 
   await db.insert(guardianship).values({

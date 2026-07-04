@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   assessments,
   consentGrant,
@@ -16,12 +16,10 @@ import {
   organization,
   parkingLotItems,
   person,
-  profiles,
   retentionCards,
   sessionSummaries,
   streaks,
   subjects,
-  subscriptions,
   subscription as subscriptionV2,
   teachingPreferences,
   topicNotes,
@@ -37,6 +35,21 @@ import { createIntegrationDb } from './helpers';
 import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 const TEST_CONSENT_PURPOSE = 'platform_use';
+
+// [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL lookup for the
+// one column (`account_id`) the two fallback sites below need.
+async function findLegacyProfileAccountId(
+  db: Database,
+  profileId: string,
+): Promise<string | undefined> {
+  const raw = (await db.execute(sql`
+    SELECT account_id AS "accountId" FROM profiles WHERE id = ${profileId}
+  `)) as unknown;
+  const rows = Array.isArray(raw)
+    ? (raw as Array<{ accountId: string }>)
+    : ((raw as { rows?: Array<{ accountId: string }> }).rows ?? []);
+  return rows[0]?.accountId;
+}
 
 function consentTypeToBasis(consentType: 'GDPR' | 'COPPA') {
   return consentType === 'COPPA'
@@ -58,16 +71,33 @@ export async function ensureV2ProfileAnchorForTest(
   // read is only a best-effort default-backfill for callers that omit
   // displayName/birthYear/location/accountId, so skip it (fall through to the
   // literal fallbacks below) when the table is gone instead of hard-failing.
+  // [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL select.
   const legacyProfile = (await legacyIdentityTableExistsForTest(db, 'profiles'))
-    ? await db.query.profiles.findFirst({
-        where: eq(profiles.id, input.profileId),
-        columns: {
-          accountId: true,
-          displayName: true,
-          birthYear: true,
-          location: true,
-        },
-      })
+    ? await (async () => {
+        const raw = (await db.execute(sql`
+          SELECT account_id AS "accountId", display_name AS "displayName",
+                 birth_year AS "birthYear", location
+          FROM profiles WHERE id = ${input.profileId}
+        `)) as unknown;
+        const rows = Array.isArray(raw)
+          ? (raw as Array<{
+              accountId: string;
+              displayName: string;
+              birthYear: number;
+              location: string | null;
+            }>)
+          : ((
+              raw as {
+                rows?: Array<{
+                  accountId: string;
+                  displayName: string;
+                  birthYear: number;
+                  location: string | null;
+                }>;
+              }
+            ).rows ?? []);
+        return rows[0];
+      })()
     : undefined;
   const accountId = input.accountId ?? legacyProfile?.accountId;
 
@@ -224,16 +254,13 @@ export async function createProfileViaRoute(input: {
       `createProfileViaRoute: profile ${apiProfile.id} not found in v2 (membership) store after create, and legacy 'profiles' is unavailable to fall back to`,
     );
   }
-  const row = await db.query.profiles.findFirst({
-    where: eq(profiles.id, apiProfile.id),
-    columns: { accountId: true },
-  });
-  if (!row) {
+  const legacyAccountId = await findLegacyProfileAccountId(db, apiProfile.id);
+  if (!legacyAccountId) {
     throw new Error(
       `createProfileViaRoute: profile ${apiProfile.id} not found in v2 (membership) or legacy (profiles) store after create`,
     );
   }
-  return { ...apiProfile, accountId: row.accountId };
+  return { ...apiProfile, accountId: legacyAccountId };
 }
 
 export async function seedDirectChildProfileForTest(input: {
@@ -413,10 +440,12 @@ export async function setSubscriptionTierForProfile(
     throw new Error(`Account not found for tier seed: ${profileId}`);
   }
 
-  await db
-    .update(subscriptions)
-    .set({ tier, status, updatedAt: new Date() })
-    .where(eq(subscriptions.accountId, accountId));
+  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL update,
+  // same unconditional behavior as before.
+  await db.execute(sql`
+    UPDATE subscriptions SET tier = ${tier}, status = ${status}, updated_at = now()
+    WHERE account_id = ${accountId}
+  `);
 
   await db
     .update(subscriptionV2)
@@ -442,11 +471,7 @@ export async function resolveAccountId(
   if (!(await legacyIdentityTableExistsForTest(db, 'profiles'))) {
     return undefined;
   }
-  const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, profileId),
-    columns: { accountId: true },
-  });
-  return profile?.accountId;
+  return findLegacyProfileAccountId(db, profileId);
 }
 
 export async function seedSubject(

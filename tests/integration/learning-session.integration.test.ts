@@ -10,9 +10,8 @@
  * - LLM provider — via shared provider fixture (real routeAndCall dispatch)
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
-  accounts,
   login,
   membership,
   subjects,
@@ -24,7 +23,6 @@ import {
   profileQuotaUsage,
   sessionEvents,
   sessionSummaries,
-  subscriptions,
   subscription as subscriptionV2,
 } from '@eduagent/database';
 import type { SessionType } from '@eduagent/schemas';
@@ -110,12 +108,16 @@ async function loadAccount(): Promise<{ id: string } | undefined> {
     if (membershipRow) return { id: membershipRow.organizationId };
   }
 
+  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL select.
   if (!(await legacyIdentityTableExistsForTest(db, 'accounts')))
     return undefined;
-  return db.query.accounts.findFirst({
-    where: eq(accounts.clerkUserId, AUTH_USER_ID),
-    columns: { id: true },
-  });
+  const raw = (await db.execute(sql`
+    SELECT id FROM accounts WHERE clerk_user_id = ${AUTH_USER_ID}
+  `)) as unknown;
+  const rows = Array.isArray(raw)
+    ? (raw as Array<{ id: string }>)
+    : ((raw as { rows?: Array<{ id: string }> }).rows ?? []);
+  return rows[0];
 }
 
 async function seedSubject(
@@ -252,14 +254,20 @@ async function loadSubscriptionAndQuota(profileId: string) {
   // [WI-1145] Resolve the subscription v2-first — the owner bootstrap writes
   // subscription-v2 unconditionally post-WI-867 collapse (legacy `subscriptions`
   // empty on the flag-off main lane). Only `.id` is consumed downstream.
+  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL select.
   const legacySub = (await legacyIdentityTableExistsForTest(
     db,
     'subscriptions',
   ))
-    ? await db.query.subscriptions.findFirst({
-        where: eq(subscriptions.accountId, account!.id),
-        columns: { id: true },
-      })
+    ? await (async () => {
+        const raw = (await db.execute(sql`
+          SELECT id FROM subscriptions WHERE account_id = ${account!.id}
+        `)) as unknown;
+        const rows = Array.isArray(raw)
+          ? (raw as Array<{ id: string }>)
+          : ((raw as { rows?: Array<{ id: string }> }).rows ?? []);
+        return rows[0] ?? null;
+      })()
     : null;
   const [v2Sub] = legacySub
     ? []

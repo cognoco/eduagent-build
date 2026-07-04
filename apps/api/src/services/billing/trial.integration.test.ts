@@ -16,15 +16,13 @@
  * (none touched by these helpers).
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import {
-  accounts,
   membership,
   organization,
   person,
   quotaPools,
   subscription as subscriptionV2Table,
-  subscriptions,
   createDatabase,
   type Database,
 } from '@eduagent/database';
@@ -82,12 +80,13 @@ async function seedAccount(index: number) {
   // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); after
   // M-REPOINT, `subscriptions.accountId` targets `organization` directly, so
   // this mirror (same id as the org) is a no-op there instead of hard-failing.
+  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL insert, same
+  // conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.insert(accounts).values({
-      id: org!.id,
-      clerkUserId: account.clerkUserId,
-      email: account.email,
-    });
+    await db.execute(sql`
+      INSERT INTO accounts (id, clerk_user_id, email)
+      VALUES (${org!.id}, ${account.clerkUserId}, ${account.email})
+    `);
   }
   return org!;
 }
@@ -147,15 +146,13 @@ async function seedSubscriptionWithQuota(input: {
     'active',
   );
 
+  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
+  // same conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.insert(subscriptions).values({
-      id: subV2Id,
-      accountId: input.accountId,
-      tier,
-      status: 'active',
-      currentPeriodStart: new Date('2026-04-01T00:00:00.000Z'),
-      currentPeriodEnd: new Date('2026-05-01T00:00:00.000Z'),
-    });
+    await db.execute(sql`
+      INSERT INTO subscriptions (id, account_id, tier, status, current_period_start, current_period_end)
+      VALUES (${subV2Id}, ${input.accountId}, ${tier}, 'active', '2026-04-01T00:00:00.000Z'::timestamptz, '2026-05-01T00:00:00.000Z'::timestamptz)
+    `);
   }
 
   const [quotaPool] = await db
@@ -211,8 +208,18 @@ async function cleanupTestAccounts() {
   // `subscriptions` row (same id as the org) cascades away via the
   // M-REPOINT'd account_id->organization FK when the org itself is deleted
   // above.
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.delete(accounts).where(inArray(accounts.id, orgIds));
+  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete, same
+  // conditional cleanup as before.
+  if (
+    (await legacyIdentityTableExistsForTest(db, 'accounts')) &&
+    orgIds.length > 0
+  ) {
+    await db.execute(
+      sql`DELETE FROM accounts WHERE id IN (${sql.join(
+        orgIds.map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )})`,
+    );
   }
 }
 

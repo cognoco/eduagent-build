@@ -1,6 +1,5 @@
 import { and, eq } from 'drizzle-orm';
 import type { Database } from './client';
-import { profiles } from './schema/index';
 import type { ScopedWhere } from './repository._shared';
 import { createSessionRepository } from './repository.session';
 import { createProfileRepository } from './repository.profile';
@@ -18,10 +17,10 @@ import { createQuizRepository } from './repository.quiz';
 /**
  * Profile-scoped repository factory. The namespaces are decomposed into
  * `repository.<domain>.ts` sub-factories (WI-1089); this shell owns the
- * profile-scoping predicate (`scopedWhere`, closing over `profileId`), the
- * top-level `getProfile` read, and assembles the sub-factories into the single
- * returned object. The returned shape — and therefore the `ScopedRepository`
- * type — is unchanged from the pre-decomposition monolith.
+ * profile-scoping predicate (`scopedWhere`, closing over `profileId`) and
+ * assembles the sub-factories into the single returned object. [WI-1139]
+ * The top-level `getProfile` read (legacy `profiles` table) was removed —
+ * dead, no production callers remained.
  */
 export function createScopedRepository(db: Database, profileId: string) {
   if (!profileId || profileId.trim() === '') {
@@ -37,12 +36,6 @@ export function createScopedRepository(db: Database, profileId: string) {
   return {
     profileId,
     db,
-
-    async getProfile() {
-      return db.query.profiles.findFirst({
-        where: eq(profiles.id, profileId),
-      });
-    },
 
     ...createSessionRepository(db, profileId, scopedWhere),
     ...createProfileRepository(db, profileId, scopedWhere),

@@ -204,6 +204,46 @@ const COPPA = 'coppa_parental_consent';
       expect(req?.guardianEmail).toBe('parent@example.com');
     });
 
+    // [WI-1139] requestConsentV2 atomicity — when a caller composes the
+    // consentRequest write with another statement inside one transaction, a
+    // later FK violation must roll back the whole transaction, including the
+    // consentRequest row requestConsentV2 already wrote. This proves
+    // requestConsentV2 does its insert against the passed-in db/tx handle
+    // (no side-channel connection that would commit independently).
+    it('[BUG-atomicity] a guardianship FK violation later in the same tx rolls back the requestConsentV2 write', async () => {
+      const orgId = await seedOrg();
+      const childId = await seedPerson(orgId);
+      const nonExistentPersonId = generateUUIDv7();
+
+      await expect(
+        db.transaction(async (tx) => {
+          await requestConsentV2(tx as unknown as Database, {
+            chargePersonId: childId,
+            organizationId: orgId,
+            consentType: 'GDPR',
+            guardianEmail: 'parent@example.com',
+            childName: 'Kid',
+            appUrl: 'https://api.test',
+          });
+          // guardianPersonId FKs person.id — this row does not exist, so the
+          // INSERT violates the FK and the transaction aborts.
+          await tx.insert(guardianship).values({
+            guardianPersonId: nonExistentPersonId,
+            chargePersonId: childId,
+          });
+        }),
+      ).rejects.toThrow();
+
+      const req = await db.query.consentRequest.findFirst({
+        where: eq(consentRequest.chargePersonId, childId),
+      });
+      expect(req).toBeUndefined();
+      const edge = await db.query.guardianship.findFirst({
+        where: eq(guardianship.chargePersonId, childId),
+      });
+      expect(edge).toBeUndefined();
+    });
+
     it('processConsentResponseV2(approve) writes a grant and back-links it; NO guardianship edge created (inv 14)', async () => {
       const orgId = await seedOrg();
       const childId = await seedPerson(orgId);

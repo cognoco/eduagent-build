@@ -35,7 +35,6 @@ type RouteMeteringFixtureOptions = {
   profileRole?: ProfileQuotaRole;
   topUpCreditsRemaining?: number;
   notificationLogCount?: number;
-  ownsProfile?: boolean;
 };
 
 type FixtureState = Required<
@@ -45,14 +44,12 @@ type FixtureState = Required<
     | 'profileRole'
     | 'topUpCreditsRemaining'
     | 'notificationLogCount'
-    | 'ownsProfile'
   >
 > & {
   dailyLimit: number | null;
   profileRole: ProfileQuotaRole;
   topUpCreditsRemaining: number;
   notificationLogCount: number;
-  ownsProfile: boolean;
 };
 
 function buildDefaultState(options: RouteMeteringFixtureOptions): FixtureState {
@@ -70,7 +67,6 @@ function buildDefaultState(options: RouteMeteringFixtureOptions): FixtureState {
     profileRole: options.profileRole ?? 'owner',
     topUpCreditsRemaining: options.topUpCreditsRemaining ?? 0,
     notificationLogCount: options.notificationLogCount ?? 0,
-    ownsProfile: options.ownsProfile ?? true,
   };
 }
 
@@ -172,12 +168,6 @@ export function createRouteMeteringFixture(
     const resolveRows = async () => {
       if (selectedTable === actualDb.topUpCredits) {
         return [{ total: state.topUpCreditsRemaining }];
-      }
-
-      if (selectedTable === actualDb.profiles) {
-        return state.ownsProfile
-          ? [{ id: state.profileId, isOwner: state.profileRole === 'owner' }]
-          : [];
       }
 
       if (selectedTable === actualDb.notificationLog) {
@@ -413,9 +403,6 @@ export function createRouteMeteringFixture(
     },
     setNotificationLogCount(count: number) {
       state.notificationLogCount = count;
-    },
-    setOwnsProfile(ownsProfile: boolean) {
-      state.ownsProfile = ownsProfile;
     },
     state,
   };

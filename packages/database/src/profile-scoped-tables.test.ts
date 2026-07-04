@@ -10,7 +10,6 @@ describe('getProfileScopedTables', () => {
     expect(tables).toEqual(
       expect.arrayContaining([
         'subjects',
-        'family_links',
         'nudges',
         'feedback_retry_queue',
         'mentor_activity_ledger',

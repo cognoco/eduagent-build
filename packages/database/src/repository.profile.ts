@@ -15,7 +15,6 @@ import {
   vocabularyRetentionCards,
   dictationModeEnum,
   dictationResults,
-  consentStates,
   celebrationEvents,
   mentorActivityLedger,
 } from './schema/index';
@@ -172,20 +171,6 @@ export function createProfileRepository(
       async findFirst(extraWhere?: SQL) {
         return db.query.curriculumAdaptations.findFirst({
           where: scopedWhere(curriculumAdaptations, extraWhere),
-        });
-      },
-    },
-
-    consentStates: {
-      async findMany(extraWhere?: SQL) {
-        return db.query.consentStates.findMany({
-          where: scopedWhere(consentStates, extraWhere),
-        });
-      },
-      async findFirst(extraWhere?: SQL, orderBy?: SQL | SQL[]) {
-        return db.query.consentStates.findFirst({
-          where: scopedWhere(consentStates, extraWhere),
-          ...(orderBy ? { orderBy } : {}),
         });
       },
     },

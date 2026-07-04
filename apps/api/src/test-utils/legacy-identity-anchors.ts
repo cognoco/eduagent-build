@@ -1,19 +1,26 @@
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import {
-  accounts,
   generateUUIDv7,
   guardianship,
   login,
   membership,
   organization,
   person,
-  profiles,
   subscription as subscriptionTable,
   subscriptionPayers,
-  subscriptions,
   type Database,
 } from '@eduagent/database';
 
+// [WI-1139] The legacy `accounts`/`profiles`/`family_links`/`consent_states`/
+// `subscriptions` Drizzle table defs were removed from @eduagent/database
+// (physical DB drop is a separate step, WI-1306/M2a) — the four anchor/seed
+// helpers below can no longer construct typed inserts/deletes against those
+// tables, so they use raw parameterized SQL instead. `tableExists()` still
+// does a real Postgres catalog check (unchanged): on a still-legacy-chain DB
+// (e.g. CI, pre-WI-1306/M2a) the tables are physically present and these
+// helpers keep writing/deleting the legacy rows that seeded children still
+// FK to; once the tables are actually dropped, the check flips to false and
+// every call site here self-inerts, exactly as before.
 const tableExistsCache = new Map<string, boolean>();
 
 type LegacyIdentityTableName =
@@ -23,7 +30,10 @@ type LegacyIdentityTableName =
   | 'consent_states'
   | 'subscriptions';
 
-async function tableExists(db: Database, table: LegacyIdentityTableName) {
+async function tableExists(
+  db: Database,
+  table: LegacyIdentityTableName,
+): Promise<boolean> {
   const cached = tableExistsCache.get(table);
   if (cached !== undefined) return cached;
 
@@ -60,27 +70,29 @@ export async function ensureLegacyProfileAnchorForTest(
   const accountId = input.accountId ?? input.profileId;
 
   if (await tableExists(db, 'accounts')) {
-    await db
-      .insert(accounts)
-      .values({
-        id: accountId,
-        clerkUserId: input.clerkUserId ?? `clerk_legacy_anchor_${accountId}`,
-        email: input.email ?? `legacy-anchor-${accountId}@test.local`,
-      })
-      .onConflictDoNothing();
+    await db.execute(sql`
+      INSERT INTO accounts (id, clerk_user_id, email)
+      VALUES (
+        ${accountId},
+        ${input.clerkUserId ?? `clerk_legacy_anchor_${accountId}`},
+        ${input.email ?? `legacy-anchor-${accountId}@test.local`}
+      )
+      ON CONFLICT (id) DO NOTHING
+    `);
   }
 
   if (await tableExists(db, 'profiles')) {
-    await db
-      .insert(profiles)
-      .values({
-        id: input.profileId,
-        accountId,
-        displayName: input.displayName ?? 'Test Learner',
-        birthYear: input.birthYear ?? 2005,
-        isOwner: input.isOwner ?? false,
-      })
-      .onConflictDoNothing();
+    await db.execute(sql`
+      INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner)
+      VALUES (
+        ${input.profileId},
+        ${accountId},
+        ${input.displayName ?? 'Test Learner'},
+        ${input.birthYear ?? 2005},
+        ${input.isOwner ?? false}
+      )
+      ON CONFLICT (id) DO NOTHING
+    `);
   }
 }
 
@@ -99,19 +111,23 @@ export async function ensureLegacySubscriptionAnchorForTest(
 ): Promise<void> {
   if (!(await tableExists(db, 'subscriptions'))) return;
 
-  await db
-    .insert(subscriptions)
-    .values({
-      id: input.subscriptionId,
-      accountId: input.accountId,
-      stripeCustomerId: input.stripeCustomerId ?? null,
-      stripeSubscriptionId: input.stripeSubscriptionId ?? null,
-      tier: input.tier ?? 'free',
-      status: input.status ?? 'active',
-      currentPeriodStart: input.currentPeriodStart ?? null,
-      currentPeriodEnd: input.currentPeriodEnd ?? null,
-    })
-    .onConflictDoNothing();
+  await db.execute(sql`
+    INSERT INTO subscriptions (
+      id, account_id, stripe_customer_id, stripe_subscription_id,
+      tier, status, current_period_start, current_period_end
+    )
+    VALUES (
+      ${input.subscriptionId},
+      ${input.accountId},
+      ${input.stripeCustomerId ?? null},
+      ${input.stripeSubscriptionId ?? null},
+      ${input.tier ?? 'free'},
+      ${input.status ?? 'active'},
+      ${input.currentPeriodStart ?? null},
+      ${input.currentPeriodEnd ?? null}
+    )
+    ON CONFLICT (id) DO NOTHING
+  `);
 }
 
 export async function deleteLegacyAccountsForTest(
@@ -121,7 +137,12 @@ export async function deleteLegacyAccountsForTest(
   if (accountIds.length === 0) return;
   if (!(await tableExists(db, 'accounts'))) return;
 
-  await db.delete(accounts).where(inArray(accounts.id, accountIds));
+  await db.execute(
+    sql`DELETE FROM accounts WHERE id IN (${sql.join(
+      accountIds.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    )})`,
+  );
 }
 
 export async function ensureV2IdentityForLegacyProfileTest(

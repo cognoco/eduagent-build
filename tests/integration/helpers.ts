@@ -1,6 +1,5 @@
 import { inArray, sql } from 'drizzle-orm';
 import {
-  accounts,
   consentGrant,
   consentRequest,
   createDatabase,
@@ -35,6 +34,58 @@ async function tableExists(
   const exists = rows[0]?.reg != null;
   tableExistsCache.set(table, exists);
   return exists;
+}
+
+// [WI-1139] The legacy `accounts` Drizzle table def was removed from
+// @eduagent/database (physical DB drop is a separate step, WI-1306/M2a), so
+// the accounts-table reads/deletes below use raw parameterized SQL instead
+// of a typed `db.query.accounts`/`db.delete(accounts)` call. Same
+// tableExists()-gated, self-inerting behavior as before.
+function toRowsArray<T>(raw: unknown): T[] {
+  return Array.isArray(raw)
+    ? (raw as T[])
+    : ((raw as { rows?: T[] }).rows ?? []);
+}
+
+async function findLegacyAccountIdsByEmail(
+  db: ReturnType<typeof createIntegrationDb>,
+  emails: string[],
+): Promise<string[]> {
+  if (emails.length === 0) return [];
+  const raw = (await db.execute(
+    sql`SELECT id FROM accounts WHERE email IN (${sql.join(
+      emails.map((e) => sql`${e}`),
+      sql`, `,
+    )})`,
+  )) as unknown;
+  return toRowsArray<{ id: string }>(raw).map((row) => row.id);
+}
+
+async function findLegacyAccountIdsByClerkUserId(
+  db: ReturnType<typeof createIntegrationDb>,
+  clerkUserIds: string[],
+): Promise<string[]> {
+  if (clerkUserIds.length === 0) return [];
+  const raw = (await db.execute(
+    sql`SELECT id FROM accounts WHERE clerk_user_id IN (${sql.join(
+      clerkUserIds.map((c) => sql`${c}`),
+      sql`, `,
+    )})`,
+  )) as unknown;
+  return toRowsArray<{ id: string }>(raw).map((row) => row.id);
+}
+
+async function deleteLegacyAccountsByIds(
+  db: ReturnType<typeof createIntegrationDb>,
+  ids: string[],
+): Promise<void> {
+  if (ids.length === 0) return;
+  await db.execute(
+    sql`DELETE FROM accounts WHERE id IN (${sql.join(
+      ids.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    )})`,
+  );
 }
 
 type IntegrationEnvOverrides = Partial<{
@@ -131,20 +182,16 @@ export async function cleanupAccounts(input: {
       }
       const legacyIds = new Set<string>();
       if (input.emails && input.emails.length > 0) {
-        const rows = await db.query.accounts.findMany({
-          where: inArray(accounts.email, input.emails),
-        });
-        rows.forEach((row) => legacyIds.add(row.id));
+        (await findLegacyAccountIdsByEmail(db, input.emails)).forEach((id) =>
+          legacyIds.add(id),
+        );
       }
       if (input.clerkUserIds && input.clerkUserIds.length > 0) {
-        const rows = await db.query.accounts.findMany({
-          where: inArray(accounts.clerkUserId, input.clerkUserIds),
-        });
-        rows.forEach((row) => legacyIds.add(row.id));
+        (
+          await findLegacyAccountIdsByClerkUserId(db, input.clerkUserIds)
+        ).forEach((id) => legacyIds.add(id));
       }
-      if (legacyIds.size > 0) {
-        await db.delete(accounts).where(inArray(accounts.id, [...legacyIds]));
-      }
+      await deleteLegacyAccountsByIds(db, [...legacyIds]);
       return;
     }
 
@@ -232,22 +279,16 @@ export async function cleanupAccounts(input: {
     if (await tableExists(db, 'accounts')) {
       const legacyAccountIds = new Set<string>();
       if (input.emails && input.emails.length > 0) {
-        const rows = await db.query.accounts.findMany({
-          where: inArray(accounts.email, input.emails),
-        });
-        rows.forEach((row) => legacyAccountIds.add(row.id));
+        (await findLegacyAccountIdsByEmail(db, input.emails)).forEach((id) =>
+          legacyAccountIds.add(id),
+        );
       }
       if (input.clerkUserIds && input.clerkUserIds.length > 0) {
-        const rows = await db.query.accounts.findMany({
-          where: inArray(accounts.clerkUserId, input.clerkUserIds),
-        });
-        rows.forEach((row) => legacyAccountIds.add(row.id));
+        (
+          await findLegacyAccountIdsByClerkUserId(db, input.clerkUserIds)
+        ).forEach((id) => legacyAccountIds.add(id));
       }
-      if (legacyAccountIds.size > 0) {
-        await db
-          .delete(accounts)
-          .where(inArray(accounts.id, [...legacyAccountIds]));
-      }
+      await deleteLegacyAccountsByIds(db, [...legacyAccountIds]);
     }
     return;
   }

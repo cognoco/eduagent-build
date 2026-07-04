@@ -45,10 +45,9 @@ jest.mock('../../inngest/client', () => {
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { and, eq, like } from 'drizzle-orm';
+import { and, eq, like, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   assessments,
   createDatabase,
   curricula,
@@ -477,10 +476,12 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
       });
     }
     // Cascade-delete test accounts; related rows follow FK ON DELETE CASCADE.
+    // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete, same
+    // conditional cleanup as before.
     if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-      await db
-        .delete(accounts)
-        .where(like(accounts.clerkUserId, `clerk_grader_integ_${RUN_ID}%`));
+      await db.execute(
+        sql`DELETE FROM accounts WHERE clerk_user_id LIKE ${`clerk_grader_integ_${RUN_ID}%`}`,
+      );
     }
     // Unregister only our providers — leave the shared registry intact for
     // other suites in this worker.

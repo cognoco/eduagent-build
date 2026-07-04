@@ -9,14 +9,13 @@
  * - Inngest event HTTP API — via fetch interceptor
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
   generateUUIDv7,
   login,
   membership,
   organization,
   person,
-  subscriptions,
   quotaPools,
   subscription as subscriptionV2,
 } from '@eduagent/database';
@@ -197,15 +196,18 @@ async function seedSubscriptionForAccount(input: {
         ? new Date(input.lastStripeEventTimestamp)
         : null;
 
+  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
+  // same conditional seed as before.
   if (await legacyIdentityTableExistsForTest(input.db, 'subscriptions')) {
-    await input.db.insert(subscriptions).values({
-      id: subscriptionId,
-      accountId: input.account.id,
-      stripeSubscriptionId,
-      tier,
-      status,
-      lastStripeEventTimestamp,
-    });
+    await input.db.execute(sql`
+      INSERT INTO subscriptions (
+        id, account_id, stripe_subscription_id, tier, status, last_stripe_event_timestamp
+      )
+      VALUES (
+        ${subscriptionId}, ${input.account.id}, ${stripeSubscriptionId ?? null},
+        ${tier}, ${status}, ${lastStripeEventTimestamp ? lastStripeEventTimestamp.toISOString() : null}
+      )
+    `);
   }
 
   if (!input.ownerPersonId) {

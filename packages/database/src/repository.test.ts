@@ -1,6 +1,5 @@
 import { eq, and, sql } from 'drizzle-orm';
 import {
-  profiles,
   learningSessions,
   subjects,
   assessments,
@@ -15,7 +14,6 @@ import {
   teachingPreferences,
   curriculumAdaptations,
   onboardingDrafts,
-  consentStates,
   notificationPreferences,
   learningModes,
   sessionEmbeddings,
@@ -55,10 +53,6 @@ function createMockDb() {
 
 const TEST_PROFILE_ID = '01933b3c-0000-7000-8000-000000000001';
 
-// ---------------------------------------------------------------------------
-// getProfile (backward compatibility)
-// ---------------------------------------------------------------------------
-
 describe('createScopedRepository', () => {
   it('exposes profileId and db', () => {
     const { db } = createMockDb();
@@ -66,19 +60,6 @@ describe('createScopedRepository', () => {
 
     expect(repo.profileId).toBe(TEST_PROFILE_ID);
     expect(repo.db).toBe(db);
-  });
-
-  describe('getProfile', () => {
-    it('queries profiles by id', async () => {
-      const { db, findFirst } = createMockDb();
-      const repo = createScopedRepository(db, TEST_PROFILE_ID);
-
-      await repo.getProfile();
-
-      expect(findFirst).toHaveBeenCalledWith({
-        where: eq(profiles.id, TEST_PROFILE_ID),
-      });
-    });
   });
 
   // ---------------------------------------------------------------------------
@@ -96,7 +77,6 @@ describe('createScopedRepository', () => {
     ['teachingPreferences', teachingPreferences],
     ['curriculumAdaptations', curriculumAdaptations],
     ['onboardingDrafts', onboardingDrafts],
-    ['consentStates', consentStates],
     ['notificationPreferences', notificationPreferences],
     ['learningModes', learningModes],
     ['sessionEmbeddings', sessionEmbeddings],
@@ -135,7 +115,6 @@ describe('createScopedRepository', () => {
     ['teachingPreferences', teachingPreferences],
     ['curriculumAdaptations', curriculumAdaptations],
     ['onboardingDrafts', onboardingDrafts],
-    ['consentStates', consentStates],
     ['notificationPreferences', notificationPreferences],
     ['learningModes', learningModes],
     ['sessionEmbeddings', sessionEmbeddings],
@@ -176,7 +155,6 @@ describe('createScopedRepository', () => {
     ['teachingPreferences', teachingPreferences],
     ['curriculumAdaptations', curriculumAdaptations],
     ['onboardingDrafts', onboardingDrafts],
-    ['consentStates', consentStates],
     ['notificationPreferences', notificationPreferences],
     ['learningModes', learningModes],
     ['sessionEmbeddings', sessionEmbeddings],
@@ -395,25 +373,6 @@ describe('createScopedRepository', () => {
     });
   });
 
-  describe('consentStates.findFirst ordering', () => {
-    it('preserves orderBy while auto-injecting profileId', async () => {
-      const { db, findFirst } = createMockDb();
-      const repo = createScopedRepository(db, TEST_PROFILE_ID);
-      const extraCondition = sql`1 = 1`;
-      const orderBy = sql`${consentStates.requestedAt} DESC`;
-
-      await repo.consentStates.findFirst(extraCondition, orderBy);
-
-      expect(findFirst).toHaveBeenCalledWith({
-        where: and(
-          eq(consentStates.profileId, TEST_PROFILE_ID),
-          extraCondition,
-        ),
-        orderBy,
-      });
-    });
-  });
-
   // ---------------------------------------------------------------------------
   // Shape: verify all namespaces are present
   // ---------------------------------------------------------------------------
@@ -437,7 +396,6 @@ describe('createScopedRepository', () => {
       expect(repo).toHaveProperty('teachingPreferences');
       expect(repo).toHaveProperty('curriculumAdaptations');
       expect(repo).toHaveProperty('onboardingDrafts');
-      expect(repo).toHaveProperty('consentStates');
       expect(repo).toHaveProperty('notificationPreferences');
       expect(repo).toHaveProperty('learningModes');
       expect(repo).toHaveProperty('sessionEmbeddings');
@@ -856,7 +814,11 @@ describe('quizRounds.findByIdForUpdate', () => {
 
   it('returns the first row when a matching round exists', async () => {
     const roundId = 'round-1';
-    const mockRow = { id: roundId, profileId: TEST_PROFILE_ID, status: 'active' };
+    const mockRow = {
+      id: roundId,
+      profileId: TEST_PROFILE_ID,
+      status: 'active',
+    };
     const { db } = makeSelectChain([mockRow]);
     const repo = createScopedRepository(db, TEST_PROFILE_ID);
 

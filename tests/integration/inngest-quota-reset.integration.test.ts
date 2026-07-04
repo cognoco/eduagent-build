@@ -5,16 +5,14 @@
  * Daily and monthly reset logic stays real.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
-  accounts,
   generateUUIDv7,
   membership,
   person,
   profileQuotaUsage,
   quotaPools,
   subscription as subscriptionV2,
-  subscriptions,
 } from '@eduagent/database';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
@@ -39,8 +37,13 @@ async function seedAccount(clerkUserId: string, email: string) {
   // [WI-1128] `accounts` is dropped (post-M-DROP); gate the raw legacy
   // insert on table existence — the v2 identity graph below is the real
   // anchor post-drop.
+  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL insert, same
+  // conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.insert(accounts).values({ id: accountId, clerkUserId, email });
+    await db.execute(sql`
+      INSERT INTO accounts (id, clerk_user_id, email)
+      VALUES (${accountId}, ${clerkUserId}, ${email})
+    `);
   }
 
   // [WI-867] v2 identity always seeded (flag collapsed to v2-only).
@@ -70,15 +73,13 @@ async function seedSubscriptionWithQuota(input: {
   const db = createIntegrationDb();
   const subscriptionId = generateUUIDv7();
 
+  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
+  // same conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.insert(subscriptions).values({
-      id: subscriptionId,
-      accountId: input.accountId,
-      tier: input.tier,
-      status: 'active',
-      currentPeriodStart: new Date('2026-04-01T00:00:00.000Z'),
-      currentPeriodEnd: new Date('2026-05-01T00:00:00.000Z'),
-    });
+    await db.execute(sql`
+      INSERT INTO subscriptions (id, account_id, tier, status, current_period_start, current_period_end)
+      VALUES (${subscriptionId}, ${input.accountId}, ${input.tier}, 'active', '2026-04-01T00:00:00.000Z'::timestamptz, '2026-05-01T00:00:00.000Z'::timestamptz)
+    `);
   }
 
   // [WI-867] v2 subscription always seeded (flag collapsed to v2-only).

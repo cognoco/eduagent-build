@@ -27,7 +27,6 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
   generateUUIDv7,
-  accounts,
   login,
   membership,
   organization,
@@ -94,8 +93,10 @@ async function cleanupByClerk(
         .where(eq(subscriptionPayers.subscriptionId, sub.id));
     }
     await db.delete(subscription).where(eq(subscription.organizationId, orgId));
+    // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete, same
+    // tableExists()-gated, self-inerting behavior as before.
     if (await tableExists(db, 'accounts')) {
-      await db.delete(accounts).where(eq(accounts.id, orgId));
+      await db.execute(sql`DELETE FROM accounts WHERE id = ${orgId}`);
     }
   }
   await db.delete(membership).where(eq(membership.personId, personId));
