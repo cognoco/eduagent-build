@@ -6,5 +6,9 @@
   {
     "tag": "0128_lively_kylun",
     "reason": "779-strip pulled-forward slice: catalog-gate the ALTER TABLE profiles statements (WI-367 birth-date columns) so they no-op when `profiles` is absent, instead of aborting `drizzle-kit migrate`. person.birth_date already covers v2; no v2-side addition needed. Never applied to staging/prod prior to this edit. Operator-authorized ic-362 (deploy-unblock)."
+  },
+  {
+    "tag": "0130_membership_person_unique",
+    "reason": "WI-1565 (P1 staging deploy blocker): prepend a PREFLIGHT DEDUP (keep newest membership per person_id, tiebreak id DESC) before the CREATE UNIQUE INDEX so the index applies where staging seed rows created duplicate person_id memberships. A forward migration numbered after 0130 cannot fix it — fail-fast `drizzle-kit migrate` aborts on 0130 before any later migration, and post-apply the index already forbids dupes. Verified UNAPPLIED on staging AND prod prior to this edit (index absent + 0130 hash absent from __drizzle_migrations on both), so BUG-886 re-run-drift is inapplicable; mirrors the ic-362 edit-while-unapplied precedent (0124/0128). Operator-authorized via bug-lane orch-130 (2026-07-04), ref outbox bug-lane-1783158041 (deploy-unblock)."
   }
 ]
