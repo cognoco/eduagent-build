@@ -79,6 +79,11 @@ describe('HelpScreen', () => {
     getByTestId('more-row-report-problem');
   });
 
+  it('renders the shake-to-report discovery hint', () => {
+    const { getByTestId } = render(<HelpScreen />);
+    getByTestId('more-help-shake-hint');
+  });
+
   it('opens support email link when help row pressed', async () => {
     const { getByTestId } = render(<HelpScreen />);
     await act(async () => {

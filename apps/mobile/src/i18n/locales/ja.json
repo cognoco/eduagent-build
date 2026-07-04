@@ -519,7 +519,8 @@
     "help": {
       "contactSupportTitle": "サポートに連絡",
       "contactSupportMessage": "アカウントに関するヘルプは、support@mentomate.appまでメールでお問い合わせください。",
-      "helpAndFeedback": "ヘルプとフィードバック"
+      "helpAndFeedback": "ヘルプとフィードバック",
+      "shakeToReportHint": "モバイルでは、いつでもスマホを振って問題を報告できます。"
     },
     "errors": {
       "tryAgain": "もう一度お試しください。",

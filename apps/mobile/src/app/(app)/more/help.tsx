@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Linking, ScrollView, View } from 'react-native';
+import { Linking, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useFeedbackContext } from '../../../components/feedback/FeedbackProvider';
 import {
@@ -43,6 +43,12 @@ export default function HelpScreen(): React.ReactElement {
           onPress={openFeedback}
           testID="more-row-report-problem"
         />
+        <Text
+          className="mt-3 px-1 text-body-sm text-text-muted"
+          testID="more-help-shake-hint"
+        >
+          {t('more.help.shakeToReportHint')}
+        </Text>
       </ScrollView>
     </View>
   );
