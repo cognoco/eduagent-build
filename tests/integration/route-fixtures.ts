@@ -441,11 +441,14 @@ export async function setSubscriptionTierForProfile(
   }
 
   // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL update,
-  // same unconditional behavior as before.
-  await db.execute(sql`
-    UPDATE subscriptions SET tier = ${tier}, status = ${status}, updated_at = now()
-    WHERE account_id = ${accountId}
-  `);
+  // gated behind tableExists so this no-ops once the table is dropped
+  // (WI-1306), matching the accounts/profiles legacy-anchor helpers.
+  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+    await db.execute(sql`
+      UPDATE subscriptions SET tier = ${tier}, status = ${status}, updated_at = now()
+      WHERE account_id = ${accountId}
+    `);
+  }
 
   await db
     .update(subscriptionV2)
