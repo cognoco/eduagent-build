@@ -55,3 +55,9 @@ to DoR, bundle into WPs by sub-thread, then execute.
 - **2026-07-02** — Lane provisioned + PARKED by ORION. WS-34 resolved: "Platform Hardening", On hold,
   14 WIs, Tier-3 deferrable. Not folded into mobile-ux-nav (14 WIs = full lane, context-longevity).
   Held pending higher-tier lanes + Ramtop overlap deconfliction. Channel created; no watchers armed.
+- **2026-07-02 (inbound)** — Two design-system items being re-homed here from WS-33 per ORION ruling
+  (WI-1248 mis-refined + blocked on a Button API change): **WI-1248** (Button-consistency sweep, ~95
+  files / 9 areas / 5 judgment classes — decompose at future refinement, NOT now) and a **new
+  Button-API WI** the WS-33 shepherd is capturing ("Button.tsx lacks style/className override + danger
+  variant"; WI-1248 blocked-by it). Both wait here until WS-34 activates. Re-home executed by the WS-33
+  shepherd; verify their Workstream=WS-34 when WS-34 is next audited.

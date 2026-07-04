@@ -1,22 +1,24 @@
 {
   "lane": "mobile-ux-nav",
   "role": "shepherd",
-  "updated": "2026-07-02",
-  "phase": "prime-and-hold",
+  "updated": "2026-07-04T19:22Z (WI-1393 MERGED to main; builder finalizing → Reviewing)",
+  "phase": "WI-1393 (PUBLISH-BLOCKER) MERGED — Gate-1 CLEARED + merge-hold LIFTED via ORION (muxnav-inbox-058). PR #1907 squash-merged 19:20:36Z, squash SHA 077caef4d4e1221900b443b2f1c4c3986a5b147f (= origin/main tip). Builder a78fd137c48dc2127 resumed to /cosmo:execute complete --fixed-in 077caef4 (Executing → Reviewing, 4-section summary, Fixed In). AWAITING builder complete-report + Cosmo Stage=Reviewing. On Reviewing: WI-1393 done (Reviewing = agent-terminal, no self-close). Option-2 = WI-1580 (Captured, later triage). 2 CONSIDERs folded into completion Follow-ups (no separate WI). WI-904 operator-held, untouched. Beat -51 posted.",
   "monitors": [
     {
       "target": "_quartet/working/lanes/mobile-ux-nav/_state/inbox.jsonl",
-      "purpose": "catch operator release directive / rulings while holding (primary path during hold)",
+      "purpose": "catch ORION directives/rulings/acks (primary async channel)",
       "command": "tail -n0 -F _quartet/working/lanes/mobile-ux-nav/_state/inbox.jsonl",
       "persistent": true,
-      "task-id": "b3n3onft1"
+      "task-id": "b5weju1cx",
+      "note": "live at checkpoint; dies on session end — re-arm + reconcile on resume"
     },
     {
       "target": "Cosmo Stage — WS-33 'Mobile UX & Navigation' work items",
       "purpose": "catch reviewer verdicts (Reviewing->Closed done / Reviewing->Executing rework) + any Stage/State transition",
       "command": "bash _quartet/clacks/orch-stage-monitor.sh 3918bce9-1f7c-81ae-97c1-d15ad8951beb 180",
       "persistent": true,
-      "task-id": "bvjzn5ovy"
+      "task-id": "bsf4nldc9",
+      "note": "live at checkpoint; baseline 19:21Z = WI-1393 Executing, WI-1580 Captured, 9 priors Closed, WI-904 Backlog. Dies on session end — re-arm + reconcile on resume."
     }
   ]
 }

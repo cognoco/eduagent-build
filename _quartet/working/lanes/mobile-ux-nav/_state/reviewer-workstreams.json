@@ -16,5 +16,17 @@
     "slug": "platform-hardening",
     "id": "3918bce9-1f7c-8142-9b75-dfcafbc94d65",
     "overrides": {}
+  },
+  {
+    "name": "Four Strands Language Learning",
+    "slug": "four-strands",
+    "id": "3928bce9-1f7c-8154-a2e0-df5ec1d71bf9",
+    "overrides": {}
+  },
+  {
+    "name": "Launch Readiness",
+    "slug": "launch-readiness",
+    "id": "3928bce9-1f7c-8179-b62e-e4c252a53747",
+    "overrides": {}
   }
 ]

@@ -43,3 +43,375 @@
 [2026-07-02T19:15:59.1699523Z] change Mobile UX & Navigation WI-1142: Stage Executing->Reviewing; State Active->Active; Resolution ->
 [2026-07-02T19:15:59.1742550Z] change Mobile UX & Navigation WI-1248: Stage Ready->Executing; State Active->Active; Resolution ->
 [2026-07-02T19:16:00.1227843Z] poll complete; rows=28; nextPollSeconds=600
+[2026-07-03T06:07:54.8492350Z] change Mobile UX & Navigation WI-1208: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T06:07:54.8588457Z] change Mobile UX & Navigation WI-1283: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T06:07:56.0878167Z] poll complete; rows=31; nextPollSeconds=600
+[2026-07-03T06:17:56.5693205Z] change Mobile UX & Navigation WI-1208: Stage Reviewing->Closed; State Active->; Resolution ->Done
+[2026-07-03T06:17:56.5860296Z] change Mobile UX & Navigation WI-1283: Stage Reviewing->Reviewing; State Active->Awaiting Info; Resolution ->
+[2026-07-03T06:17:57.7200929Z] poll complete; rows=31; nextPollSeconds=600
+[2026-07-03T06:20:28.6603431Z] starting Cosmo status poller; pollSeconds=600; workstreams=Mobile UX & Navigation, Safety & Eval, Platform Hardening, Four Strands Language Learning
+[2026-07-03T06:20:31.3859146Z] baseline Four Strands Language Learning WI-1319: Stage=Executing; State=Active; Resolution=
+[2026-07-03T06:20:31.4150714Z] poll complete; rows=32; nextPollSeconds=600
+[2026-07-03T06:30:31.8937548Z] change Mobile UX & Navigation WI-904: Stage Executing->Backlog; State Active->Active; Resolution ->
+[2026-07-03T06:30:31.9023739Z] change Mobile UX & Navigation WI-1283: Stage Reviewing->Closed; State Awaiting Info->; Resolution ->Done
+[2026-07-03T06:30:33.5832177Z] baseline Four Strands Language Learning WI-1320: Stage=Closed; State=; Resolution=Cancelled
+[2026-07-03T06:30:33.5962341Z] baseline Four Strands Language Learning WI-1321: Stage=Closed; State=; Resolution=Cancelled
+[2026-07-03T06:30:33.6064196Z] baseline Four Strands Language Learning WI-1322: Stage=Closed; State=; Resolution=Cancelled
+[2026-07-03T06:30:33.6169751Z] baseline Four Strands Language Learning WI-1323: Stage=Closed; State=; Resolution=Cancelled
+[2026-07-03T06:30:33.6430927Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T06:40:35.6987340Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T06:50:37.4500414Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T07:00:39.2720777Z] change Four Strands Language Learning WI-1319: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T07:00:39.2883292Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T07:10:40.3407275Z] change Safety & Eval WI-1155: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T07:10:41.5202523Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T07:20:42.4596872Z] change Safety & Eval WI-1155: Stage Reviewing->Executing; State Active->Active; Resolution ->
+[2026-07-03T07:20:43.3937600Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T07:30:45.3181655Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T07:40:47.4377414Z] change Four Strands Language Learning WI-1319: Stage Reviewing->Executing; State Active->Active; Resolution ->
+[2026-07-03T07:40:47.4614159Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T07:50:50.7550187Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T08:00:52.6336702Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T08:10:55.1759395Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T08:20:57.4816337Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T08:31:03.0626893Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T08:41:04.8138313Z] change Four Strands Language Learning WI-1319: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T08:41:04.8287057Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T08:51:06.9287867Z] change Four Strands Language Learning WI-1319: Stage Reviewing->Closed; State Active->; Resolution ->Done
+[2026-07-03T08:51:06.9354325Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T09:01:09.7780898Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T09:11:11.6308351Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T09:21:13.6742163Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T09:31:16.4266779Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T09:41:18.4779926Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T09:51:19.3665886Z] change Safety & Eval WI-1154: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T09:51:19.3763677Z] change Safety & Eval WI-1155: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T09:51:20.4077367Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T10:01:20.8949829Z] change Mobile UX & Navigation WI-1317: Stage Captured->Ready; State Active->Active; Resolution ->
+[2026-07-03T10:01:21.3548027Z] change Safety & Eval WI-1154: Stage Reviewing->Closed; State Active->; Resolution ->Done
+[2026-07-03T10:01:22.9480415Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T10:11:24.1225877Z] change Safety & Eval WI-1155: Stage Reviewing->Closed; State Active->; Resolution ->Done
+[2026-07-03T10:11:25.0565848Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T10:21:28.0990153Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T10:31:30.4702904Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T10:41:31.7958979Z] change Mobile UX & Navigation WI-1317: Stage Ready->Executing; State Active->Active; Resolution ->
+[2026-07-03T10:41:33.2415529Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T10:51:35.8937094Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T11:01:36.4662283Z] change Mobile UX & Navigation WI-1184: Stage Refining->Closed; State Active->; Resolution ->Cancelled
+[2026-07-03T11:01:38.8363662Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T11:11:40.1159839Z] change Safety & Eval WI-1285: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T11:11:40.1339736Z] change Safety & Eval WI-1316: Stage Captured->Ready; State Active->Active; Resolution ->
+[2026-07-03T11:11:41.0438318Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T11:21:42.0247074Z] change Safety & Eval WI-1285: Stage Backlog->Ready; State Active->Active; Resolution ->
+[2026-07-03T11:21:42.0357704Z] change Safety & Eval WI-1316: Stage Ready->Executing; State Active->Active; Resolution ->
+[2026-07-03T11:21:42.9287887Z] poll complete; rows=36; nextPollSeconds=600
+[2026-07-03T11:31:44.0256525Z] change Safety & Eval WI-1285: Stage Ready->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T11:31:44.0455395Z] baseline Safety & Eval WI-1348: Stage=Captured; State=Active; Resolution=
+[2026-07-03T11:31:44.0630131Z] baseline Safety & Eval WI-1349: Stage=Captured; State=Active; Resolution=
+[2026-07-03T11:31:44.0782239Z] baseline Safety & Eval WI-1350: Stage=Captured; State=Active; Resolution=
+[2026-07-03T11:31:44.0986760Z] baseline Safety & Eval WI-1351: Stage=Captured; State=Active; Resolution=
+[2026-07-03T11:31:44.1163625Z] baseline Safety & Eval WI-1352: Stage=Captured; State=Active; Resolution=
+[2026-07-03T11:31:44.1326510Z] baseline Safety & Eval WI-1353: Stage=Captured; State=Active; Resolution=
+[2026-07-03T11:31:45.2477412Z] poll complete; rows=42; nextPollSeconds=600
+[2026-07-03T11:41:48.6340332Z] change Safety & Eval WI-1316: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T11:41:48.6373031Z] change Safety & Eval WI-1348: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T11:41:48.6497531Z] change Safety & Eval WI-1349: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T11:41:48.6650252Z] change Safety & Eval WI-1350: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T11:41:48.6776847Z] change Safety & Eval WI-1351: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T11:41:48.6940173Z] change Safety & Eval WI-1352: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T11:41:48.7068525Z] change Safety & Eval WI-1353: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T11:41:49.8081096Z] poll complete; rows=42; nextPollSeconds=600
+[2026-07-03T11:51:51.1457647Z] change Safety & Eval WI-1348: Stage Backlog->Executing; State Active->Active; Resolution ->
+[2026-07-03T11:51:51.1667321Z] change Safety & Eval WI-1349: Stage Backlog->Executing; State Active->Active; Resolution ->
+[2026-07-03T11:51:54.3054043Z] poll complete; rows=42; nextPollSeconds=600
+[2026-07-03T12:01:54.7980455Z] change Mobile UX & Navigation WI-1317: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T12:01:55.5225157Z] change Safety & Eval WI-1285: Stage Reviewing->Closed; State Active->; Resolution ->Done
+[2026-07-03T12:01:56.5429492Z] poll complete; rows=42; nextPollSeconds=600
+[2026-07-03T12:11:57.0247611Z] change Mobile UX & Navigation WI-1317: Stage Reviewing->Closed; State Active->; Resolution ->Done
+[2026-07-03T12:11:57.4708798Z] change Safety & Eval WI-1316: Stage Reviewing->Reviewing; State Active->Awaiting Info; Resolution ->
+[2026-07-03T12:11:58.3499998Z] poll complete; rows=42; nextPollSeconds=600
+[2026-07-03T12:22:00.4415443Z] poll complete; rows=42; nextPollSeconds=600
+[2026-07-03T12:32:02.6626410Z] poll complete; rows=42; nextPollSeconds=600
+[2026-07-03T12:42:05.2106242Z] poll complete; rows=42; nextPollSeconds=600
+[2026-07-03T12:52:06.2728289Z] change Safety & Eval WI-1349: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T12:52:07.2519573Z] poll complete; rows=42; nextPollSeconds=600
+[2026-07-03T13:02:09.0163290Z] poll complete; rows=42; nextPollSeconds=600
+[2026-07-03T13:12:12.3729691Z] poll complete; rows=42; nextPollSeconds=600
+[2026-07-03T13:22:13.3922619Z] change Safety & Eval WI-1349: Stage Reviewing->Closed; State Active->; Resolution ->Done
+[2026-07-03T13:22:14.3846681Z] poll complete; rows=42; nextPollSeconds=600
+[2026-07-03T13:32:15.4082569Z] change Safety & Eval WI-1348: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T13:32:16.6009532Z] poll complete; rows=42; nextPollSeconds=600
+[2026-07-03T13:42:17.4975356Z] change Safety & Eval WI-1350: Stage Backlog->Ready; State Active->Active; Resolution ->
+[2026-07-03T13:42:17.5008136Z] change Safety & Eval WI-1352: Stage Backlog->Ready; State Active->Active; Resolution ->
+[2026-07-03T13:42:17.5170483Z] baseline Safety & Eval WI-1358: Stage=Captured; State=Active; Resolution=
+[2026-07-03T13:42:17.5315145Z] baseline Safety & Eval WI-1359: Stage=Captured; State=Active; Resolution=
+[2026-07-03T13:42:17.5454215Z] baseline Safety & Eval WI-1360: Stage=Captured; State=Active; Resolution=
+[2026-07-03T13:42:17.5594585Z] baseline Safety & Eval WI-1361: Stage=Captured; State=Active; Resolution=
+[2026-07-03T13:42:18.6402373Z] poll complete; rows=46; nextPollSeconds=600
+[2026-07-03T13:52:20.4958640Z] change Safety & Eval WI-1348: Stage Reviewing->Closed; State Active->; Resolution ->Done
+[2026-07-03T13:52:20.4982537Z] change Safety & Eval WI-1350: Stage Ready->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T13:52:20.5091405Z] change Safety & Eval WI-1352: Stage Ready->Closed; State Active->; Resolution ->Done
+[2026-07-03T13:52:20.5196059Z] baseline Safety & Eval WI-1365: Stage=Captured; State=Active; Resolution=
+[2026-07-03T13:52:21.3948804Z] poll complete; rows=47; nextPollSeconds=600
+[2026-07-03T14:02:23.0780420Z] change Safety & Eval WI-1350: Stage Reviewing->Closed; State Active->; Resolution ->Done
+[2026-07-03T14:02:23.0900275Z] change Safety & Eval WI-1351: Stage Backlog->Refining; State Active->Active; Resolution ->
+[2026-07-03T14:02:24.6886496Z] poll complete; rows=47; nextPollSeconds=600
+[2026-07-03T14:04:23.0260548Z] starting Cosmo status poller; pollSeconds=600; workstreams=Mobile UX & Navigation, Safety & Eval, Platform Hardening, Four Strands Language Learning, Launch Readiness
+[2026-07-03T14:04:25.8567850Z] baseline Launch Readiness WI-617: Stage=Ready; State=Active; Resolution=
+[2026-07-03T14:04:25.8753454Z] baseline Launch Readiness WI-1310: Stage=Captured; State=Active; Resolution=
+[2026-07-03T14:04:25.8919355Z] baseline Launch Readiness WI-1328: Stage=Captured; State=Active; Resolution=
+[2026-07-03T14:04:25.9081360Z] baseline Launch Readiness WI-1335: Stage=Captured; State=Active; Resolution=
+[2026-07-03T14:04:25.9236811Z] baseline Launch Readiness WI-1336: Stage=Captured; State=Active; Resolution=
+[2026-07-03T14:04:25.9394843Z] baseline Launch Readiness WI-1337: Stage=Captured; State=Active; Resolution=
+[2026-07-03T14:04:25.9519574Z] baseline Launch Readiness WI-1338: Stage=Captured; State=Active; Resolution=
+[2026-07-03T14:04:25.9634337Z] baseline Launch Readiness WI-1339: Stage=Captured; State=Active; Resolution=
+[2026-07-03T14:04:25.9762598Z] baseline Launch Readiness WI-1340: Stage=Captured; State=Active; Resolution=
+[2026-07-03T14:04:25.9889663Z] baseline Launch Readiness WI-1341: Stage=Captured; State=Active; Resolution=
+[2026-07-03T14:04:26.0154711Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T14:14:27.2834688Z] change Safety & Eval WI-1358: Stage Captured->Refining; State Active->Active; Resolution ->
+[2026-07-03T14:14:29.7529080Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T14:24:31.6381045Z] change Safety & Eval WI-1353: Stage Backlog->Ready; State Active->Active; Resolution ->
+[2026-07-03T14:24:31.6557791Z] change Safety & Eval WI-1360: Stage Captured->Ready; State Active->Active; Resolution ->
+[2026-07-03T14:24:33.0791419Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T14:34:34.7055822Z] change Safety & Eval WI-1353: Stage Ready->Executing; State Active->Active; Resolution ->
+[2026-07-03T14:34:34.7089952Z] change Safety & Eval WI-1360: Stage Ready->Executing; State Active->Active; Resolution ->
+[2026-07-03T14:34:37.8652103Z] change Launch Readiness WI-1336: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T14:34:37.8744797Z] change Launch Readiness WI-1338: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T14:34:37.8863403Z] change Launch Readiness WI-1339: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T14:34:37.9000752Z] change Launch Readiness WI-1340: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T14:34:37.9187251Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T14:44:40.6049233Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T14:54:41.5376148Z] change Safety & Eval WI-1353: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T14:54:43.0130450Z] change Launch Readiness WI-1336: Stage Backlog->Executing; State Active->Active; Resolution ->
+[2026-07-03T14:54:43.0267868Z] change Launch Readiness WI-1338: Stage Backlog->Ready; State Active->Active; Resolution ->
+[2026-07-03T14:54:43.0357084Z] change Launch Readiness WI-1339: Stage Backlog->Ready; State Active->Active; Resolution ->
+[2026-07-03T14:54:43.0452095Z] change Launch Readiness WI-1340: Stage Backlog->Executing; State Active->Active; Resolution ->
+[2026-07-03T14:54:43.0600014Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T15:04:44.2413172Z] change Safety & Eval WI-1353: Stage Reviewing->Closed; State Active->; Resolution ->Done
+[2026-07-03T15:04:44.2650181Z] change Safety & Eval WI-1360: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T15:04:46.3999737Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T15:14:47.5052832Z] change Safety & Eval WI-1359: Stage Captured->Executing; State Active->Active; Resolution ->
+[2026-07-03T15:14:49.7788383Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T15:24:52.3033195Z] change Safety & Eval WI-1360: Stage Reviewing->Closed; State Active->; Resolution ->Done
+[2026-07-03T15:24:53.7025625Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T15:34:55.9795649Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T15:44:58.4157456Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T15:55:07.1898686Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T16:05:08.1907412Z] change Safety & Eval WI-1361: Stage Captured->Ready; State Active->Active; Resolution ->
+[2026-07-03T16:05:09.7253936Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T16:15:11.5183236Z] change Safety & Eval WI-1359: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T16:15:11.5209238Z] change Safety & Eval WI-1361: Stage Ready->Executing; State Active->Active; Resolution ->
+[2026-07-03T16:15:13.0023457Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T16:25:14.0231106Z] change Safety & Eval WI-1359: Stage Reviewing->Closed; State Active->; Resolution ->Done
+[2026-07-03T16:25:15.3994163Z] change Launch Readiness WI-1328: Stage Captured->Ready; State Active->Active; Resolution ->
+[2026-07-03T16:25:15.4157225Z] change Launch Readiness WI-1335: Stage Captured->Ready; State Active->Active; Resolution ->
+[2026-07-03T16:25:15.4272407Z] change Launch Readiness WI-1337: Stage Captured->Ready; State Active->Active; Resolution ->
+[2026-07-03T16:25:15.4390373Z] change Launch Readiness WI-1341: Stage Captured->Ready; State Active->Active; Resolution ->
+[2026-07-03T16:25:15.4538520Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T16:35:17.9940164Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T16:45:20.2101227Z] change Launch Readiness WI-1339: Stage Ready->Closed; State Active->; Resolution ->Done
+[2026-07-03T16:45:20.2238961Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T16:55:21.1585275Z] change Safety & Eval WI-1361: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-03T16:55:23.2212853Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T17:05:24.7825728Z] change Safety & Eval WI-1361: Stage Reviewing->Closed; State Active->; Resolution ->Done
+[2026-07-03T17:05:26.8195429Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T17:15:29.0642648Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T17:25:31.5046141Z] poll complete; rows=57; nextPollSeconds=600
+[2026-07-03T17:29:52.6156537Z] starting Cosmo status poller; pollSeconds=600; workstreams=Mobile UX & Navigation, Safety & Eval, Platform Hardening, Four Strands Language Learning, Launch Readiness
+[2026-07-03T17:29:54.1986606Z] baseline Safety & Eval WI-1376: Stage=Captured; State=Active; Resolution=
+[2026-07-03T17:29:54.2143649Z] baseline Safety & Eval WI-1377: Stage=Captured; State=Active; Resolution=
+[2026-07-03T17:29:57.1759221Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T17:39:58.1319261Z] change Safety & Eval WI-1316: Stage Reviewing->Executing; State Awaiting Info->Awaiting Info; Resolution ->
+[2026-07-03T17:39:58.1474639Z] change Safety & Eval WI-1376: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T17:39:59.5838087Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T17:50:03.4682081Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T18:00:06.8409495Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T18:10:10.5446553Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T18:20:12.8728744Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T18:30:15.0292328Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T18:40:17.6692244Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T18:50:20.1467944Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T19:00:23.2836520Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T19:10:25.7137895Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T19:20:28.1016785Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T19:30:30.6956403Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T19:40:32.8338886Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T19:50:35.3832577Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T20:00:39.1413350Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T20:10:42.4416123Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T20:20:45.2241626Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T20:30:49.1515671Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T20:40:51.9683396Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T20:50:54.2659405Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T21:00:56.8289728Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T21:10:59.3308824Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T21:21:01.9712754Z] poll complete; rows=59; nextPollSeconds=600
+[2026-07-03T21:31:06.3515265Z] baseline Launch Readiness WI-1500: Stage=Captured; State=Active; Resolution=
+[2026-07-03T21:31:06.3612057Z] baseline Launch Readiness WI-1503: Stage=Captured; State=Active; Resolution=
+[2026-07-03T21:31:06.3690628Z] baseline Launch Readiness WI-1504: Stage=Captured; State=Active; Resolution=
+[2026-07-03T21:31:06.3767469Z] baseline Launch Readiness WI-1505: Stage=Captured; State=Active; Resolution=
+[2026-07-03T21:31:06.3864282Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T21:41:08.6988230Z] change Launch Readiness WI-1500: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T21:41:08.7164654Z] change Launch Readiness WI-1503: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T21:41:08.7250772Z] change Launch Readiness WI-1504: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T21:41:08.7339232Z] change Launch Readiness WI-1505: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-03T21:41:08.7452582Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T21:51:10.8603559Z] change Launch Readiness WI-1500: Stage Backlog->Ready; State Active->Active; Resolution ->
+[2026-07-03T21:51:10.8699671Z] change Launch Readiness WI-1503: Stage Backlog->Ready; State Active->Active; Resolution ->
+[2026-07-03T21:51:10.8778286Z] change Launch Readiness WI-1504: Stage Backlog->Executing; State Active->Active; Resolution ->
+[2026-07-03T21:51:10.8846846Z] change Launch Readiness WI-1505: Stage Backlog->Executing; State Active->Active; Resolution ->
+[2026-07-03T21:51:10.8933506Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T22:01:15.9589503Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T22:11:20.5513128Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T22:21:22.9775113Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T22:31:25.1504046Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T22:41:27.4471106Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T22:51:29.6083327Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T23:01:33.1153881Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T23:11:36.7592104Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T23:21:38.9247666Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T23:31:41.4142496Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T23:41:44.1088248Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-03T23:51:46.5191532Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T00:01:49.0785869Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T00:11:52.3197705Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T00:21:54.5815826Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T00:31:56.6481080Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T00:41:58.7436147Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T00:52:02.3132286Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T01:02:05.7781688Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T01:12:09.9521289Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T01:22:12.2925989Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T01:32:14.4723762Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T01:42:16.7325072Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T01:52:18.9434774Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T02:02:22.7055129Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T02:12:24.8894953Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T02:22:26.9928936Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T02:32:30.0549484Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T02:42:32.2477718Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T02:52:35.3168357Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T03:02:38.5415993Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T03:12:40.9547845Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T03:22:43.1681225Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T03:32:45.9290274Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T03:42:48.1492986Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T03:52:50.4312301Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T04:02:52.9804512Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T04:12:55.8580172Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T04:22:58.8023407Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T04:33:01.2289376Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T04:43:05.2284493Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T04:53:07.9841473Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T05:03:12.2224237Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T05:13:14.4928101Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T05:23:16.7208098Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T05:33:18.8606782Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T05:43:21.8965747Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T05:53:24.7866880Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T06:03:27.5074768Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T06:13:29.6773247Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T06:23:31.9717403Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T06:33:34.1744229Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T06:43:36.5832929Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T06:53:39.6257921Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T07:03:41.9298411Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T07:13:51.0168501Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T07:23:55.4607610Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T07:33:57.8157837Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T07:44:00.8585398Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T07:54:04.5674669Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T08:04:07.8037525Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T08:14:10.6879383Z] poll complete; rows=63; nextPollSeconds=600
+[2026-07-04T08:24:11.1634598Z] baseline Mobile UX & Navigation WI-1393: Stage=Captured; State=Active; Resolution=
+[2026-07-04T08:24:13.0313909Z] poll complete; rows=64; nextPollSeconds=600
+[2026-07-04T08:34:14.9252982Z] baseline Four Strands Language Learning WI-1394: Stage=Backlog; State=Active; Resolution=
+[2026-07-04T08:34:14.9363025Z] baseline Four Strands Language Learning WI-1492: Stage=Backlog; State=Active; Resolution=
+[2026-07-04T08:34:14.9429791Z] baseline Four Strands Language Learning WI-1493: Stage=Backlog; State=Active; Resolution=
+[2026-07-04T08:34:14.9502952Z] baseline Four Strands Language Learning WI-1547: Stage=Backlog; State=Active; Resolution=
+[2026-07-04T08:34:14.9569972Z] baseline Four Strands Language Learning WI-1548: Stage=Backlog; State=Active; Resolution=
+[2026-07-04T08:34:14.9638072Z] baseline Four Strands Language Learning WI-1549: Stage=Backlog; State=Active; Resolution=
+[2026-07-04T08:34:14.9704303Z] baseline Four Strands Language Learning WI-1550: Stage=Backlog; State=Active; Resolution=
+[2026-07-04T08:34:14.9767898Z] baseline Four Strands Language Learning WI-1551: Stage=Backlog; State=Active; Resolution=
+[2026-07-04T08:34:14.9841665Z] baseline Four Strands Language Learning WI-1552: Stage=Backlog; State=Active; Resolution=
+[2026-07-04T08:34:14.9905758Z] baseline Four Strands Language Learning WI-1553: Stage=Backlog; State=Active; Resolution=
+[2026-07-04T08:34:14.9971415Z] baseline Four Strands Language Learning WI-1554: Stage=Backlog; State=Active; Resolution=
+[2026-07-04T08:34:15.7116282Z] poll complete; rows=75; nextPollSeconds=600
+[2026-07-04T08:44:17.9898076Z] baseline Launch Readiness WI-1506: Stage=Captured; State=Active; Resolution=
+[2026-07-04T08:44:18.0008884Z] poll complete; rows=76; nextPollSeconds=600
+[2026-07-04T08:54:20.6508052Z] change Launch Readiness WI-1506: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-04T08:54:20.6639517Z] poll complete; rows=76; nextPollSeconds=600
+[2026-07-04T09:04:23.0903770Z] poll complete; rows=76; nextPollSeconds=600
+[2026-07-04T09:14:25.5522696Z] poll complete; rows=76; nextPollSeconds=600
+[2026-07-04T09:24:28.0468945Z] poll complete; rows=76; nextPollSeconds=600
+[2026-07-04T09:34:30.4750297Z] baseline Launch Readiness WI-1566: Stage=Captured; State=Active; Resolution=
+[2026-07-04T09:34:30.4867223Z] poll complete; rows=77; nextPollSeconds=600
+[2026-07-04T09:44:33.9488728Z] poll complete; rows=77; nextPollSeconds=600
+[2026-07-04T09:54:36.4582655Z] poll complete; rows=77; nextPollSeconds=600
+[2026-07-04T10:04:38.7874875Z] poll complete; rows=77; nextPollSeconds=600
+[2026-07-04T10:14:41.9440020Z] poll complete; rows=77; nextPollSeconds=600
+[2026-07-04T10:24:42.4119771Z] change Mobile UX & Navigation WI-1393: Stage Captured->Backlog; State Active->Active; Resolution ->
+[2026-07-04T10:24:44.2509097Z] poll complete; rows=77; nextPollSeconds=600
+[2026-07-04T10:34:44.6787005Z] change Mobile UX & Navigation WI-1393: Stage Backlog->Ready; State Active->Active; Resolution ->
+[2026-07-04T10:34:47.2569815Z] baseline Launch Readiness WI-1570: Stage=Captured; State=Active; Resolution=
+[2026-07-04T10:34:47.2727698Z] poll complete; rows=78; nextPollSeconds=600
+[2026-07-04T10:44:50.3175893Z] poll complete; rows=78; nextPollSeconds=600
+[2026-07-04T10:54:52.6361876Z] poll complete; rows=78; nextPollSeconds=600
+[2026-07-04T11:04:55.0548096Z] baseline Launch Readiness WI-1574: Stage=Captured; State=Active; Resolution=
+[2026-07-04T11:04:55.0652690Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T11:14:57.3837914Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T11:24:59.7042947Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T11:35:02.7101974Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T11:45:05.9816952Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T11:55:08.2429391Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T12:05:11.6592092Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T12:15:13.8985701Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T12:25:16.0978621Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T12:35:18.5502326Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T12:45:21.1232740Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T12:55:23.4086429Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T13:05:25.9080012Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T13:15:28.3506458Z] poll complete; rows=79; nextPollSeconds=600
+[2026-07-04T13:25:31.2615283Z] baseline Launch Readiness WI-1575: Stage=Captured; State=Active; Resolution=
+[2026-07-04T13:25:31.2720556Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T13:35:33.8408683Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T13:45:36.1869077Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T13:55:38.9502369Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T14:05:42.0477903Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T14:15:44.4285046Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T14:25:47.1557478Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T14:35:49.4283039Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T14:45:51.6031159Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T14:55:54.1914457Z] change Launch Readiness WI-1506: Stage Backlog->Ready; State Active->Active; Resolution ->
+[2026-07-04T14:55:54.2058217Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T15:05:57.7138554Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T15:16:00.0580485Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T15:26:03.7059116Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T15:36:05.9602135Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T15:46:08.4941282Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T15:56:10.9162958Z] poll complete; rows=80; nextPollSeconds=600
+[2026-07-04T16:06:11.3811077Z] change Mobile UX & Navigation WI-1393: Stage Ready->Executing; State Active->Active; Resolution ->
+[2026-07-04T16:06:11.3895044Z] baseline Mobile UX & Navigation WI-1580: Stage=Captured; State=Active; Resolution=
+[2026-07-04T16:06:13.5635165Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T16:16:15.9409236Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T16:26:19.1371156Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T16:36:21.4217003Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T16:46:28.8472184Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T16:56:31.6145820Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T17:06:34.0215924Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T17:16:38.1494816Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T17:26:40.6427499Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T17:36:43.3362777Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T17:46:45.7859633Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T17:56:49.4642297Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T18:06:51.8220439Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T18:16:54.6065322Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T18:26:57.5341686Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T18:36:59.9596566Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T18:47:02.6126423Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T18:57:04.9823575Z] change Launch Readiness WI-1504: Stage Executing->Reviewing; State Active->Active; Resolution ->
+[2026-07-04T18:57:05.0013789Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T19:07:08.6583925Z] change Launch Readiness WI-1504: Stage Reviewing->Executing; State Active->Active; Resolution ->
+[2026-07-04T19:07:08.6763998Z] poll complete; rows=81; nextPollSeconds=600
+[2026-07-04T19:17:11.4608625Z] baseline Launch Readiness WI-1588: Stage=Captured; State=Active; Resolution=
+[2026-07-04T19:17:11.4756219Z] poll complete; rows=82; nextPollSeconds=600
