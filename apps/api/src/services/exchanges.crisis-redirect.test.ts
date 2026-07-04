@@ -52,6 +52,7 @@ jest.mock('@sentry/cloudflare', () => ({
 }));
 
 let warnSpy: jest.SpyInstance;
+let errorSpy: jest.SpyInstance;
 
 beforeEach(() => {
   mockInngestSend.mockClear();
@@ -59,13 +60,16 @@ beforeEach(() => {
   mockCaptureException.mockClear();
   for (const k of Object.keys(alarmTags)) delete alarmTags[k];
   for (const k of Object.keys(alarmExtras)) delete alarmExtras[k];
-  // logger.warn writes a JSON line via console.warn — spy so we can assert the
-  // reliable server-side log fired (and carries no disclosure content).
+  // logger.warn / logger.error write JSON lines via console — spy so we can
+  // assert the reliable server-side log fired (and, in the alarm-throw case,
+  // that the escalation logger.error fired — the silent-recovery guard).
   warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
 });
 
 afterEach(() => {
   warnSpy.mockRestore();
+  errorSpy.mockRestore();
 });
 
 function envelope(signals: Record<string, unknown>): string {
@@ -293,6 +297,14 @@ describe('emitCrisisRedirectEvent — operator alarm + telemetry hardening (WI-1
     expect(mockInngestSend).toHaveBeenCalledTimes(1);
     expect(mockInngestSend.mock.calls[0][0].name).toBe(
       'app/safety.crisis_redirect_fired',
+    );
+
+    // The alarm failure is ESCALATED (logger.error), not silently swallowed —
+    // this is the silent-recovery guard on the safety path. A regression that
+    // drops the catch-branch escalation must fail here.
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0][0]).toEqual(
+      expect.stringContaining('safety.crisis_redirect_alarm_failed'),
     );
   });
 });
