@@ -5,6 +5,43 @@ and how to recover it. Append newest-first.
 
 ---
 
+## WI-1398 — identity-graph.integration.test.ts legacy dual-write assertions (2026-07-04)
+
+Retired the three legacy-side assertion blocks in the `creates the full graph in
+one transaction (owner, plus trial)` test: the `tableExists('accounts')` → legacy
+`accounts` row check, the `tableExists('profiles')` → legacy `profiles` row check,
+and the `tableExists('accounts') && tableExists('subscriptions')` → legacy
+`subscriptions` row check. Their premise is gone: WI-1398 removed the
+`tableExists`-gated legacy dual-write arms from `createIdentityGraph`
+(`services/identity-v2/identity-graph.ts`), so the bootstrap no longer writes those
+legacy rows even while the tables physically exist (pre-WI-1306). With the
+dual-write deleted, the assertions would read `undefined` and fail tables-present.
+
+Safe because all legacy readers are dead or removed (WI-1364 landed the prod
+dead-reader sweep) and the corpus no longer requires legacy rows (WI-1347 proved
+tables-absent green). The `quota_pools.subscription_id` and
+`profile_quota_usage.profile_id` FKs were repointed onto the v2 graph by
+`0129_m_repoint`, so the v2-native writes stand alone.
+
+The sibling owner `profile_quota_usage` assertion was NOT retired — it was
+**un-gated** (the `tableExists('profiles') && tableExists('profile_quota_usage')`
+guard removed) to assert unconditionally, matching the source un-gate that closes
+the owner-quota tables-absent gap (WI-1306). The BUG-411 guard, idempotency, and
+calendar/jurisdiction unit tests are unchanged.
+
+The unused `profiles` and `subscriptions as legacySubscriptions` imports were
+dropped; `accounts` stays (the cleanup helper's best-effort legacy delete still
+references it, a harmless no-op tables-absent).
+
+**Recovery:** annotated tag `retired/wi-1398-legacy-dual-write-assertions` points
+at the pre-removal commit on branch `WI-1398`. Retrieve with:
+
+```
+git show retired/wi-1398-legacy-dual-write-assertions:apps/api/src/services/identity-v2/identity-graph.integration.test.ts
+```
+
+---
+
 ## WI-1364 — dead legacy identity/billing prod readers (2026-07-03)
 
 Dead-code sweep of the production service functions that still read/wrote the
