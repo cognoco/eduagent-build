@@ -24,7 +24,6 @@ import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
-  isIdentityV2Enabled,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 
@@ -265,32 +264,30 @@ async function loadAccount() {
 }
 
 async function loadSubscription(accountId: string) {
+  // [WI-1524] Read v2 unconditionally — the legacy-read branch this replaced
+  // depended on createIdentityGraph's legacy `subscriptions` dual-write
+  // (removed in WI-1398), so it always resolved undefined on the flag-off
+  // main lane once tables were present but the dual-write was gone. Billing
+  // routes read v2-only post-WI-867 collapse regardless of flag state (see
+  // seedSubscription's WI-1145 comment above), so this test helper now
+  // matches production read behavior instead of branching on flag/table state.
   const db = createIntegrationDb();
-  if (
-    isIdentityV2Enabled() ||
-    !(await legacyIdentityTableExistsForTest(db, 'subscriptions'))
-  ) {
-    const row = await db.query.subscription.findFirst({
-      where: eq(subscriptionV2.organizationId, accountId),
-    });
-    if (!row) return undefined;
-    return {
-      id: row.id,
-      accountId: row.organizationId,
-      tier: row.planTier,
-      status: row.status,
-      stripeCustomerId: row.stripeCustomerId,
-      stripeSubscriptionId: row.stripeSubscriptionId,
-      trialEndsAt: row.trialEndsAt,
-      currentPeriodStart: row.periodStartAt,
-      currentPeriodEnd: row.periodEndAt,
-      cancelledAt: row.cancelledAt,
-    };
-  }
-
-  return db.query.subscriptions.findFirst({
-    where: eq(subscriptions.accountId, accountId),
+  const row = await db.query.subscription.findFirst({
+    where: eq(subscriptionV2.organizationId, accountId),
   });
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    accountId: row.organizationId,
+    tier: row.planTier,
+    status: row.status,
+    stripeCustomerId: row.stripeCustomerId,
+    stripeSubscriptionId: row.stripeSubscriptionId,
+    trialEndsAt: row.trialEndsAt,
+    currentPeriodStart: row.periodStartAt,
+    currentPeriodEnd: row.periodEndAt,
+    cancelledAt: row.cancelledAt,
+  };
 }
 
 async function loadQuotaPool(subscriptionId: string) {

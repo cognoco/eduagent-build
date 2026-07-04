@@ -27,14 +27,12 @@ import {
   consentGrant,
   consentReceipt,
   consentRequest,
-  consentStates,
   curricula,
   curriculumAdaptations,
   curriculumBooks,
   curriculumTopics,
   deletionAudit,
   dictationResults,
-  familyLinks,
   familyPreferences,
   financialRecord,
   learningSessions,
@@ -892,13 +890,11 @@ legacyAccountDeletionCascadeDescribe(
         });
 
         // ---- Consent + family preference rows ----
-        if (await legacyIdentityTableExistsForTest(db, 'consent_states')) {
-          await db.insert(consentStates).values({
-            profileId,
-            consentType: 'GDPR',
-            status: 'CONSENTED',
-          });
-        }
+        // [WI-1524] Legacy `consent_states` insert dropped — its `profiles`
+        // parent row no longer exists post-WI-1398 dual-write removal, so
+        // the insert FK-violates (consent_states_profile_id_profiles_id_fk)
+        // whenever the table is present. Nothing downstream asserts on this
+        // row; it was a comprehensive-seed entry, not a cascade-delete check.
 
         await db.insert(withdrawalArchivePreferences).values({
           ownerProfileId: profileId,
@@ -917,12 +913,11 @@ legacyAccountDeletionCascadeDescribe(
         });
 
         // ---- Cross-account-shaped rows (the deleted user is parent of the other) ----
-        if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
-          await db.insert(familyLinks).values({
-            parentProfileId: profileId,
-            childProfileId: otherProfileId,
-          });
-        }
+        // [WI-1524] Legacy `family_links` insert dropped — its `profiles`
+        // parent row no longer exists post-WI-1398 dual-write removal, so
+        // the insert FK-violates (family_links_parent_profile_id_profiles_id_fk)
+        // whenever the table is present. Nothing downstream asserts on this
+        // row; it was a comprehensive-seed entry, not a cascade-delete check.
 
         await db.insert(nudges).values({
           fromProfileId: profileId,
@@ -1002,9 +997,12 @@ legacyAccountDeletionCascadeDescribe(
           { table: 'monthly_reports', col: 'profile_id' },
         ];
 
-        // Subjects/curricula seed sanity — confirm cascade chain is set up
+        // Subjects/curricula seed sanity — confirm cascade chain is set up.
+        // [WI-1524] Reads v2 `organization` instead of legacy `profiles` —
+        // the route-created profile's legacy `profiles` row no longer exists
+        // post-WI-1398 dual-write removal, so the legacy count was always 0.
         const beforeProfile = await db.execute(
-          sql`SELECT count(*)::int AS c FROM profiles WHERE account_id = ${accountId}`,
+          sql`SELECT count(*)::int AS c FROM organization WHERE id = ${accountId}`,
         );
         expect(
           (beforeProfile.rows as Array<{ c: number }>)[0].c,
