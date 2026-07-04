@@ -126,6 +126,7 @@ export async function ensureLegacySubscriptionAnchorForTest(
       ${input.currentPeriodStart ?? null},
       ${input.currentPeriodEnd ?? null}
     )
+    ON CONFLICT (id) DO NOTHING
   `);
 }
 
