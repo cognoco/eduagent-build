@@ -10,8 +10,12 @@
 
 import { parseExchangeEnvelope, emitCrisisRedirectEvent } from './exchanges';
 
-// Inngest dispatch surface — external boundary, mocked so tests can assert
-// escalation without a real Inngest client (same pattern as account.test.ts).
+// Inngest dispatch surface — the external Inngest boundary (a real dispatch
+// here would fire a network send), kept in the sanctioned `jest.requireActual`
+// + targeted-override form (spreads the real module, overrides only
+// `inngest.send`; canonical pattern per archive-cleanup.test.ts). Not a GC1/GC6
+// burn-down candidate: external-boundary mock, already in the target form —
+// same pattern as account.test.ts.
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
 jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
@@ -267,5 +271,28 @@ describe('emitCrisisRedirectEvent — operator alarm + telemetry hardening (WI-1
     // The Sentry sink is a warning-level operator ALARM, not a notification —
     // captureMessage is the only Sentry call; nothing routes to a recipient.
     expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('a Sentry-SDK throw does not abort the path — telemetry still publishes', async () => {
+    // The three sinks are independent: if the operator-alarm SDK throws, the
+    // function must still resolve AND still publish the Inngest telemetry event
+    // (observability on the highest-stakes path must never be all-or-nothing).
+    mockCaptureMessage.mockImplementationOnce(() => {
+      throw new Error('Sentry SDK crashed');
+    });
+
+    await expect(
+      emitCrisisRedirectEvent({
+        sessionId: 'sess-123',
+        profileId: 'prof-456',
+        flow: 'exchange.process',
+      }),
+    ).resolves.toBeUndefined();
+
+    // Telemetry event still fired despite the alarm throwing.
+    expect(mockInngestSend).toHaveBeenCalledTimes(1);
+    expect(mockInngestSend.mock.calls[0][0].name).toBe(
+      'app/safety.crisis_redirect_fired',
+    );
   });
 });

@@ -113,21 +113,34 @@ export async function emitCrisisRedirectEvent(context: {
   // (2) Structured operator ALARM (the telemetry carve-out's teeth). A queryable
   // Sentry message at 'warning' level surfaces in the operator console with
   // alerting + 24h volume checks — a real operator-facing alarm, not a silent
-  // fire-and-forget event with no handler. captureMessage is a synchronous,
-  // non-throwing SDK call (graceful no-op when no DSN), so it needs no safeSend
-  // wrapper. Metadata + profileId-scoped pointers ONLY — no disclosure content.
-  captureMessage('safety.crisis_redirect_fired', {
-    level: 'warning',
-    profileId: context.profileId,
-    tags: { surface: 'safety.crisis_redirect', flow: context.flow },
-    extra: {
-      eventId,
-      sessionId: context.sessionId,
-      provider: context.provider,
-      model: context.model,
-      timestamp,
-    },
-  });
+  // fire-and-forget event with no handler. captureMessage is a synchronous SDK
+  // call (graceful no-op when no DSN). It is guarded so a Sentry-SDK throw can
+  // never abort this highest-stakes path or block the (3) Inngest telemetry
+  // publish below — the three sinks are independent. A guard failure is
+  // escalated via logger.error (not swallowed silently — safety-path rule).
+  // Metadata + profileId-scoped pointers ONLY — no disclosure content.
+  try {
+    captureMessage('safety.crisis_redirect_fired', {
+      level: 'warning',
+      profileId: context.profileId,
+      tags: { surface: 'safety.crisis_redirect', flow: context.flow },
+      extra: {
+        eventId,
+        sessionId: context.sessionId,
+        provider: context.provider,
+        model: context.model,
+        timestamp,
+      },
+    });
+  } catch (alarmErr) {
+    logger.error('safety.crisis_redirect_alarm_failed', {
+      event_id: eventId,
+      flow: context.flow,
+      session_id: context.sessionId,
+      profile_id: context.profileId,
+      error: alarmErr instanceof Error ? alarmErr.message : String(alarmErr),
+    });
+  }
 
   // (3) Queryable telemetry event for ops dashboards ("crisis redirects per
   // week"). Pure observability → safeSend (failure captured in Sentry, never
