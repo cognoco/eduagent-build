@@ -8,15 +8,12 @@
  * Each test seeds its own data and cleans up in beforeEach / afterAll.
  */
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
-  accounts,
   organization,
   person,
   membership,
   subscription as subscriptionV2Table,
-  subscriptions,
-  profiles,
   profileQuotaUsage,
   quotaPools,
   topUpCredits,
@@ -87,12 +84,13 @@ async function seedOrganization(index: number) {
   // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); after
   // M-REPOINT, `subscriptions.accountId` targets `organization` directly, so
   // this seed is a no-op there instead of hard-failing.
+  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL insert, same
+  // conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.insert(accounts).values({
-      id: row!.id,
-      clerkUserId: `${ORG_NAMES[index]}-clerk`,
-      email: `${ORG_NAMES[index]}@integration.test`,
-    });
+    await db.execute(sql`
+      INSERT INTO accounts (id, clerk_user_id, email)
+      VALUES (${row!.id}, ${`${ORG_NAMES[index]}-clerk`}, ${`${ORG_NAMES[index]}@integration.test`})
+    `);
   }
   return row!;
 }
@@ -149,13 +147,13 @@ async function seedSubscriptionWithQuota(input: {
   // table under the SAME id — an id-aligned anchor only; quota_pools' FK now
   // targets v2 `subscription` (repointed by 0129 M-REPOINT), so this is a
   // no-op once the legacy table is dropped.
+  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
+  // same conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.insert(subscriptions).values({
-      id: subscription!.id,
-      accountId: input.organizationId,
-      tier,
-      status: input.status ?? 'active',
-    });
+    await db.execute(sql`
+      INSERT INTO subscriptions (id, account_id, tier, status)
+      VALUES (${subscription!.id}, ${input.organizationId}, ${tier}, ${input.status ?? 'active'})
+    `);
   }
 
   const [quotaPool] = await db
@@ -223,14 +221,13 @@ async function seedPerson(input: {
   // [WI-1128] Legacy `profiles` may already be dropped (post-M-DROP); after
   // M-REPOINT, `profile_quota_usage.profileId` targets `person` directly, so
   // this seed is a no-op there instead of hard-failing.
+  // [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL insert, same
+  // conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-    await db.insert(profiles).values({
-      id: row!.id,
-      accountId: input.organizationId,
-      displayName: input.displayName,
-      birthYear: input.isOwner ? 1990 : 2016,
-      isOwner: input.isOwner,
-    });
+    await db.execute(sql`
+      INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner)
+      VALUES (${row!.id}, ${input.organizationId}, ${input.displayName}, ${input.isOwner ? 1990 : 2016}, ${input.isOwner})
+    `);
   }
   return row!;
 }
@@ -320,8 +317,18 @@ async function cleanupTestAccounts() {
   // top_up_credits/usage_events.
   // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); skip
   // the cleanup there instead of hard-failing.
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.delete(accounts).where(inArray(accounts.id, orgIds));
+  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete, same
+  // conditional cleanup as before.
+  if (
+    (await legacyIdentityTableExistsForTest(db, 'accounts')) &&
+    orgIds.length > 0
+  ) {
+    await db.execute(
+      sql`DELETE FROM accounts WHERE id IN (${sql.join(
+        orgIds.map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )})`,
+    );
   }
 }
 

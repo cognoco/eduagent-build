@@ -28,7 +28,6 @@ import {
   curriculumBooks,
   curriculumTopics,
   curricula,
-  familyLinks,
   generateUUIDv7,
   guardianship,
   learningSessions,
@@ -49,7 +48,7 @@ import {
   sessionSummaries,
   type Database,
 } from '@eduagent/database';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import * as config from '../../config';
 import * as sentry from '../../services/sentry';
@@ -1205,11 +1204,13 @@ describe('session-completed integration', () => {
     // — without the familyLinks edge the legacy lookup returns no_parent_link
     // and no push fires. Mirrors the dual-seed in weekly-progress-push's
     // seedFamilyLink helper.
+    // [WI-1139] Legacy `family_links` Drizzle def removed — raw SQL insert,
+    // same conditional seed as before.
     if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
-      await db.insert(familyLinks).values({
-        parentProfileId,
-        childProfileId: profileId,
-      });
+      await db.execute(sql`
+        INSERT INTO family_links (id, parent_profile_id, child_profile_id)
+        VALUES (${generateUUIDv7()}, ${parentProfileId}, ${profileId})
+      `);
     }
     await db.insert(guardianship).values({
       guardianPersonId: parentProfileId,

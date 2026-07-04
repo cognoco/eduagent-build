@@ -14,9 +14,8 @@
  * - Sentry (captureException)
  */
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import {
-  profiles,
   person,
   subjects,
   curricula,
@@ -479,11 +478,12 @@ describe('Integration: Review Session Calibration Pipeline', () => {
     // Set conversation language to Norwegian — both stores (v2 person is the
     // live read post-collapse; legacy profiles gated for the flag-off lane).
     const db = createIntegrationDb();
+    // [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL update, same
+    // conditional behavior as before.
     if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-      await db
-        .update(profiles)
-        .set({ conversationLanguage: 'nb' })
-        .where(eq(profiles.id, profileId));
+      await db.execute(sql`
+        UPDATE profiles SET conversation_language = 'nb' WHERE id = ${profileId}
+      `);
     }
     await db
       .update(person)

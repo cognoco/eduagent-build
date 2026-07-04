@@ -18,8 +18,8 @@
  * 4. POST /account/security-event rejects an unknown / server-only event type.
  */
 
-import { eq } from 'drizzle-orm';
-import { membership, profiles } from '@eduagent/database';
+import { eq, sql } from 'drizzle-orm';
+import { membership } from '@eduagent/database';
 
 import {
   buildIntegrationEnv,
@@ -70,11 +70,17 @@ async function createOwnerProfile(): Promise<string> {
     columns: { personId: true },
   });
   if (!membershipRow) {
+    // [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL select.
     const row = (await legacyIdentityTableExistsForTest(db, 'profiles'))
-      ? await db.query.profiles.findFirst({
-          where: eq(profiles.id, profileId),
-          columns: { accountId: true },
-        })
+      ? await (async () => {
+          const raw = (await db.execute(sql`
+            SELECT account_id AS "accountId" FROM profiles WHERE id = ${profileId}
+          `)) as unknown;
+          const rows = Array.isArray(raw)
+            ? (raw as Array<{ accountId: string }>)
+            : ((raw as { rows?: Array<{ accountId: string }> }).rows ?? []);
+          return rows[0];
+        })()
       : undefined;
     if (!row) {
       throw new Error(

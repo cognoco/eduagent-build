@@ -11,18 +11,15 @@ import { resolve } from 'path';
 import { eq, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   generateUUIDv7,
   login,
   membership,
   organization,
   person,
-  profiles,
   profileQuotaUsage,
   quotaPools,
   subscription,
-  subscriptions,
   topUpCredits,
   type Database,
 } from '@eduagent/database';
@@ -105,9 +102,10 @@ function stripeSub(input: {
           .delete(subscription)
           .where(eq(subscription.id, subId))
           .catch(() => undefined);
+        // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL
+        // delete, same best-effort cleanup as before.
         await db
-          .delete(subscriptions)
-          .where(eq(subscriptions.id, subId))
+          .execute(sql`DELETE FROM subscriptions WHERE id = ${subId}`)
           .catch(() => undefined);
       }
 
@@ -132,10 +130,11 @@ function stripeSub(input: {
       }
 
       if (await legacyTablesExist(db)) {
+        // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete,
+        // same best-effort cleanup as before.
         for (const acctId of createdAccountIds) {
           await db
-            .delete(accounts)
-            .where(eq(accounts.id, acctId))
+            .execute(sql`DELETE FROM accounts WHERE id = ${acctId}`)
             .catch(() => undefined);
         }
       }
@@ -195,36 +194,30 @@ function stripeSub(input: {
       const subId = generateUUIDv7();
       seededSubIds.push(subId);
 
+      // [WI-1139] Legacy `accounts`/`profiles`/`subscriptions` Drizzle defs
+      // removed — raw SQL inserts, same conditional seed as before.
       if (await legacyTablesExist(db)) {
-        const [acct] = await db
-          .insert(accounts)
-          .values({
-            clerkUserId: `${clerkUserId}_legacy`,
-            email: `legacy_${email}`,
-          })
-          .returning();
-        createdAccountIds.push(acct!.id);
+        const acctId = generateUUIDv7();
+        await db.execute(sql`
+          INSERT INTO accounts (id, clerk_user_id, email)
+          VALUES (${acctId}, ${`${clerkUserId}_legacy`}, ${`legacy_${email}`})
+        `);
+        createdAccountIds.push(acctId);
 
-        await db.insert(profiles).values({
-          id: personRow!.id,
-          accountId: acct!.id,
-          displayName: 'Owner',
-          birthYear: 1990,
-          isOwner: true,
-        });
+        await db.execute(sql`
+          INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner)
+          VALUES (${personRow!.id}, ${acctId}, 'Owner', 1990, true)
+        `);
 
         // [WI-1128] Legacy `subscriptions.account_id` FK was repointed by
         // migration 0129 from accounts(id) to organization(id) — the
         // legacy `accounts` row itself is still seeded (profiles.account_id
         // is unrepointed, on the drop list), but this insert must target
         // the v2 organization id, not the legacy account's own id.
-        await db.insert(subscriptions).values({
-          id: subId,
-          accountId: org!.id,
-          tier: input.tier,
-          status: 'active',
-          stripeSubscriptionId: `${input.stripeSubscriptionId}_legacy`,
-        });
+        await db.execute(sql`
+          INSERT INTO subscriptions (id, account_id, tier, status, stripe_subscription_id)
+          VALUES (${subId}, ${org!.id}, ${input.tier}, 'active', ${`${input.stripeSubscriptionId}_legacy`})
+        `);
       }
 
       await db.insert(subscription).values({

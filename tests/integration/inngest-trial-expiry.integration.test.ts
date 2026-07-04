@@ -9,7 +9,7 @@
  * - Expo Push API (mockExpoPush)
  */
 
-import { and, eq, gte, inArray, lte } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import {
   generateUUIDv7,
   login,
@@ -19,7 +19,6 @@ import {
   person,
   quotaPools,
   subscription as subscriptionV2,
-  subscriptions,
 } from '@eduagent/database';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
@@ -112,16 +111,19 @@ async function seedSubscriptionWithQuota(input: {
   // [WI-1347] Legacy `subscriptions` may already be dropped; quota_pools no
   // longer FKs to it (repointed onto v2 `subscription` by 0129 M-REPOINT), so
   // this dual-write is an id-aligned anchor only — a no-op post-drop.
+  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
+  // same conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.insert(subscriptions).values({
-      id: subscriptionId,
-      accountId: input.accountId,
-      tier: input.tier,
-      status: input.status,
-      trialEndsAt: input.trialEndsAt,
-      currentPeriodStart: new Date('2026-04-01T00:00:00.000Z'),
-      currentPeriodEnd: new Date('2026-05-01T00:00:00.000Z'),
-    });
+    await db.execute(sql`
+      INSERT INTO subscriptions (
+        id, account_id, tier, status, trial_ends_at, current_period_start, current_period_end
+      )
+      VALUES (
+        ${subscriptionId}, ${input.accountId}, ${input.tier}, ${input.status},
+        ${input.trialEndsAt.toISOString()}::timestamptz,
+        '2026-04-01T00:00:00.000Z'::timestamptz, '2026-05-01T00:00:00.000Z'::timestamptz
+      )
+    `);
   }
 
   // [WI-867] v2 subscription row — always seeded (flag collapsed to v2-only).
@@ -316,20 +318,22 @@ beforeEach(async () => {
     EXTENDED_USER_ID,
     WARNING_USER_ID,
   ]);
+  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL delete,
+  // same conditional cleanup as before.
   if (
     orphanCandidateOrgIds.length > 0 &&
     (await legacyIdentityTableExistsForTest(db, 'subscriptions'))
   ) {
-    await db
-      .delete(subscriptions)
-      .where(
-        and(
-          inArray(subscriptions.accountId, orphanCandidateOrgIds),
-          eq(subscriptions.status, 'expired'),
-          gte(subscriptions.trialEndsAt, dayStart),
-          lte(subscriptions.trialEndsAt, dayEnd),
-        ),
-      );
+    await db.execute(sql`
+      DELETE FROM subscriptions
+      WHERE account_id IN (${sql.join(
+        orphanCandidateOrgIds.map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )})
+        AND status = 'expired'
+        AND trial_ends_at >= ${dayStart.toISOString()}::timestamptz
+        AND trial_ends_at <= ${dayEnd.toISOString()}::timestamptz
+    `);
   }
 });
 

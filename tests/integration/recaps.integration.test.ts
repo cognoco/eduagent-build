@@ -29,7 +29,6 @@
 // ---------------------------------------------------------------------------
 
 import {
-  accounts,
   createDatabase,
   curricula,
   curriculumBooks,
@@ -41,11 +40,10 @@ import {
   membership,
   organization,
   person,
-  profiles,
   subjects,
   subscription as subscriptionV2,
 } from '@eduagent/database';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 
 import { app } from '../../apps/api/src/index';
 import { buildAuthHeaders } from './test-keys';
@@ -191,19 +189,17 @@ async function seedV2Family(db: Db): Promise<{
   // graph under flag-on, so these rows never change behavior. [WI-1128]
   // No-op post-M-DROP (legacy tables gone; subjects/learningSessions FK directly
   // to person).
+  // [WI-1139] Legacy `accounts`/`profiles` Drizzle defs removed — raw SQL
+  // inserts, same conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.insert(accounts).values({
-      id: accountId,
-      clerkUserId: `wi821-acct-${accountId.slice(0, 8)}`,
-      email: `wi821-acct-${accountId.slice(0, 8)}@integration.test`,
-    });
-    await db.insert(profiles).values({
-      id: childId,
-      accountId,
-      displayName: 'WI821-Child',
-      birthYear: 2013,
-      isOwner: false,
-    });
+    await db.execute(sql`
+      INSERT INTO accounts (id, clerk_user_id, email)
+      VALUES (${accountId}, ${`wi821-acct-${accountId.slice(0, 8)}`}, ${`wi821-acct-${accountId.slice(0, 8)}@integration.test`})
+    `);
+    await db.execute(sql`
+      INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner)
+      VALUES (${childId}, ${accountId}, 'WI821-Child', 2013, false)
+    `);
   }
 
   // 2. Learning tree for child (needed for listRecapsForParent to return data)
@@ -290,8 +286,10 @@ async function teardownV2Family(
   await deleteLearningTree(db, [childId]);
   // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); gate on
   // table existence — the v2 person/organization deletes below are the real teardown.
+  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete, same
+  // conditional cleanup as before.
   if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.delete(accounts).where(eq(accounts.id, accountId)); // cascades child profile
+    await db.execute(sql`DELETE FROM accounts WHERE id = ${accountId}`); // cascades child profile
   }
   await db
     .delete(subscriptionV2)

@@ -23,9 +23,9 @@
  */
 
 import { resolve } from 'path';
+import { sql } from 'drizzle-orm';
 import {
   createDatabase,
-  familyLinks,
   generateUUIDv7,
   guardianship,
   monthlyReports,
@@ -304,11 +304,13 @@ describeIfDb(
         isOwner: false,
       });
 
+      // [WI-1139] Legacy `family_links` Drizzle def removed — raw SQL
+      // insert, same conditional seed as before.
       if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
-        await db.insert(familyLinks).values({
-          parentProfileId: profileAId,
-          childProfileId: childProfileCId,
-        });
+        await db.execute(sql`
+          INSERT INTO family_links (id, parent_profile_id, child_profile_id)
+          VALUES (${generateUUIDv7()}, ${profileAId}, ${childProfileCId})
+        `);
       }
 
       await db

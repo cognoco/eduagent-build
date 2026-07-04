@@ -24,7 +24,7 @@
  */
 
 import { resolve } from 'path';
-import { inArray } from 'drizzle-orm';
+import { inArray, sql } from 'drizzle-orm';
 import {
   createDatabase,
   curricula,
@@ -35,7 +35,6 @@ import {
   membership,
   organization,
   person,
-  profiles,
   retentionCards,
   sessionEvents,
   subjects,
@@ -192,8 +191,18 @@ afterAll(async () => {
       .delete(learningSessions)
       .where(inArray(learningSessions.profileId, profileIds));
     await db.delete(subjects).where(inArray(subjects.profileId, profileIds));
-    if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-      await db.delete(profiles).where(inArray(profiles.id, profileIds));
+    // [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL delete, same
+    // conditional cleanup as before.
+    if (
+      (await legacyIdentityTableExistsForTest(db, 'profiles')) &&
+      profileIds.length > 0
+    ) {
+      await db.execute(
+        sql`DELETE FROM profiles WHERE id IN (${sql.join(
+          profileIds.map((id) => sql`${id}::uuid`),
+          sql`, `,
+        )})`,
+      );
     }
   }
   // Tear down the v2 identity graph (membership, login, person, organization).

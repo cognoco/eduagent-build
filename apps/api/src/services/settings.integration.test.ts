@@ -16,7 +16,7 @@
  * No mocks of internal services or database.
  */
 
-import { eq, inArray, and, count, gte } from 'drizzle-orm';
+import { eq, inArray, and, count, gte, sql } from 'drizzle-orm';
 import {
   guardianship,
   organization,
@@ -24,7 +24,6 @@ import {
   login,
   membership,
   generateUUIDv7,
-  familyLinks,
   notificationLog,
   createDatabase,
 } from '@eduagent/database';
@@ -337,11 +336,13 @@ async function seedCelebrationFixture() {
   });
 
   // Link child only to parent A (legacy table — kept for legacy-path callers).
+  // [WI-1139] Legacy `family_links` Drizzle def removed — raw SQL insert,
+  // same conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
-    await db.insert(familyLinks).values({
-      parentProfileId: profileAId,
-      childProfileId,
-    });
+    await db.execute(sql`
+      INSERT INTO family_links (id, parent_profile_id, child_profile_id)
+      VALUES (${generateUUIDv7()}, ${profileAId}, ${childProfileId})
+    `);
   }
 
   // [WI-867] v2 identity rows — assertParentAccess now reads guardianship.

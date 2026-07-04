@@ -14,8 +14,7 @@
  * Real:   JWT verification, Database, consent service, notification service plumbing
  */
 
-import { consentStates } from '@eduagent/database';
-import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import {
   buildIntegrationEnv,
   cleanupAccounts,
@@ -140,10 +139,12 @@ describe('Integration: Consent email delivery', () => {
 
     // Clean up consent state from previous test so the insert isn't a resend
     const db = createIntegrationDb();
+    // [WI-1139] Legacy `consent_states` Drizzle def removed — raw SQL
+    // delete, same conditional cleanup as before.
     if (await legacyIdentityTableExistsForTest(db, 'consent_states')) {
-      await db
-        .delete(consentStates)
-        .where(eq(consentStates.profileId, childProfileId));
+      await db.execute(
+        sql`DELETE FROM consent_states WHERE profile_id = ${childProfileId}`,
+      );
     }
 
     const res = await app.request(

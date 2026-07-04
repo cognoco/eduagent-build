@@ -21,11 +21,10 @@
  * snapshot — so only the survivor identity + subscription are seeded.
  */
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   generateUUIDv7,
   subscription as subscriptionTable,
-  subscriptions,
   quotaPools,
   topUpCredits,
   webhookIdempotencyKeys,
@@ -186,10 +185,18 @@ async function cleanup() {
     // Remove the legacy `subscriptions` parent rows createSubscriptionV2 writes
     // when the pre-cutover legacy tables still exist (CI), before the accounts
     // rows they FK to. Table-guarded → no-op on the identity-only stg DB.
-    if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-      await db
-        .delete(subscriptions)
-        .where(inArray(subscriptions.accountId, orgIds));
+    // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL delete,
+    // same table-guarded behavior as before.
+    if (
+      (await legacyIdentityTableExistsForTest(db, 'subscriptions')) &&
+      orgIds.length > 0
+    ) {
+      await db.execute(
+        sql`DELETE FROM subscriptions WHERE account_id IN (${sql.join(
+          orgIds.map((id) => sql`${id}::uuid`),
+          sql`, `,
+        )})`,
+      );
     }
     // Removes the v2 subscription rows (by organization) AND the v2 identities.
     await deleteV2IdentitiesForTest(db, {

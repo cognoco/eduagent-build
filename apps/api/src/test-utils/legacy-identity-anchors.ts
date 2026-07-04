@@ -1,4 +1,4 @@
-import { and, eq, inArray, or } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import {
   generateUUIDv7,
   guardianship,
@@ -12,12 +12,17 @@ import {
 } from '@eduagent/database';
 
 // [WI-1139] The legacy `accounts`/`profiles`/`family_links`/`consent_states`/
-// `subscriptions` Drizzle table defs were removed (physical DB drop is a
-// separate step, WI-1306). The four anchor/seed helpers below can no longer
-// construct typed inserts/deletes against those tables, so they are now
-// permanent no-ops — every caller already treated their effect as
-// best-effort (the runtime `tableExists()` gate meant a suite never assumed
-// the legacy row was actually written).
+// `subscriptions` Drizzle table defs were removed from @eduagent/database
+// (physical DB drop is a separate step, WI-1306/M2a) — the four anchor/seed
+// helpers below can no longer construct typed inserts/deletes against those
+// tables, so they use raw parameterized SQL instead. `tableExists()` still
+// does a real Postgres catalog check (unchanged): on a still-legacy-chain DB
+// (e.g. CI, pre-WI-1306/M2a) the tables are physically present and these
+// helpers keep writing/deleting the legacy rows that seeded children still
+// FK to; once the tables are actually dropped, the check flips to false and
+// every call site here self-inerts, exactly as before.
+const tableExistsCache = new Map<string, boolean>();
+
 type LegacyIdentityTableName =
   | 'accounts'
   | 'profiles'
@@ -25,16 +30,34 @@ type LegacyIdentityTableName =
   | 'consent_states'
   | 'subscriptions';
 
-export async function legacyIdentityTableExistsForTest(
-  _db: Database,
-  _table: LegacyIdentityTableName,
+async function tableExists(
+  db: Database,
+  table: LegacyIdentityTableName,
 ): Promise<boolean> {
-  return false;
+  const cached = tableExistsCache.get(table);
+  if (cached !== undefined) return cached;
+
+  const raw = (await db.execute(
+    sql`SELECT to_regclass(${`public.${table}`}) AS reg`,
+  )) as unknown;
+  const rows = Array.isArray(raw)
+    ? (raw as Array<{ reg: string | null }>)
+    : ((raw as { rows?: Array<{ reg: string | null }> }).rows ?? []);
+  const exists = rows[0]?.reg != null;
+  tableExistsCache.set(table, exists);
+  return exists;
+}
+
+export async function legacyIdentityTableExistsForTest(
+  db: Database,
+  table: LegacyIdentityTableName,
+): Promise<boolean> {
+  return tableExists(db, table);
 }
 
 export async function ensureLegacyProfileAnchorForTest(
-  _db: Database,
-  _input: {
+  db: Database,
+  input: {
     profileId: string;
     accountId?: string;
     displayName?: string;
@@ -44,12 +67,38 @@ export async function ensureLegacyProfileAnchorForTest(
     clerkUserId?: string;
   },
 ): Promise<void> {
-  // no-op — legacy `accounts`/`profiles` defs removed.
+  const accountId = input.accountId ?? input.profileId;
+
+  if (await tableExists(db, 'accounts')) {
+    await db.execute(sql`
+      INSERT INTO accounts (id, clerk_user_id, email)
+      VALUES (
+        ${accountId},
+        ${input.clerkUserId ?? `clerk_legacy_anchor_${accountId}`},
+        ${input.email ?? `legacy-anchor-${accountId}@test.local`}
+      )
+      ON CONFLICT (id) DO NOTHING
+    `);
+  }
+
+  if (await tableExists(db, 'profiles')) {
+    await db.execute(sql`
+      INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner)
+      VALUES (
+        ${input.profileId},
+        ${accountId},
+        ${input.displayName ?? 'Test Learner'},
+        ${input.birthYear ?? 2005},
+        ${input.isOwner ?? false}
+      )
+      ON CONFLICT (id) DO NOTHING
+    `);
+  }
 }
 
 export async function ensureLegacySubscriptionAnchorForTest(
-  _db: Database,
-  _input: {
+  db: Database,
+  input: {
     subscriptionId: string;
     accountId: string;
     tier?: 'free' | 'plus' | 'family' | 'pro';
@@ -60,14 +109,39 @@ export async function ensureLegacySubscriptionAnchorForTest(
     currentPeriodEnd?: Date | null;
   },
 ): Promise<void> {
-  // no-op — legacy `subscriptions` def removed.
+  if (!(await tableExists(db, 'subscriptions'))) return;
+
+  await db.execute(sql`
+    INSERT INTO subscriptions (
+      id, account_id, stripe_customer_id, stripe_subscription_id,
+      tier, status, current_period_start, current_period_end
+    )
+    VALUES (
+      ${input.subscriptionId},
+      ${input.accountId},
+      ${input.stripeCustomerId ?? null},
+      ${input.stripeSubscriptionId ?? null},
+      ${input.tier ?? 'free'},
+      ${input.status ?? 'active'},
+      ${input.currentPeriodStart ?? null},
+      ${input.currentPeriodEnd ?? null}
+    )
+  `);
 }
 
 export async function deleteLegacyAccountsForTest(
-  _db: Database,
-  _accountIds: string[],
+  db: Database,
+  accountIds: string[],
 ): Promise<void> {
-  // no-op — legacy `accounts` def removed.
+  if (accountIds.length === 0) return;
+  if (!(await tableExists(db, 'accounts'))) return;
+
+  await db.execute(
+    sql`DELETE FROM accounts WHERE id IN (${sql.join(
+      accountIds.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    )})`,
+  );
 }
 
 export async function ensureV2IdentityForLegacyProfileTest(

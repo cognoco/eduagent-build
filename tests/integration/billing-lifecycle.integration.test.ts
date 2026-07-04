@@ -9,7 +9,7 @@
  * - Stripe SDK wrapper
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
   generateUUIDv7,
   login,
@@ -17,8 +17,37 @@ import {
   profileQuotaUsage,
   quotaPools,
   subscription as subscriptionV2,
-  subscriptions,
+  type Database,
 } from '@eduagent/database';
+
+// [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL helper for
+// the one column (`stripe_customer_id`, `cancelled_at`) the two flag-off
+// fallback assertions below need.
+async function findLegacySubscriptionByAccountId(
+  db: Database,
+  accountId: string,
+): Promise<
+  { stripeCustomerId: string | null; cancelledAt: Date | null } | undefined
+> {
+  const raw = (await db.execute(sql`
+    SELECT stripe_customer_id AS "stripeCustomerId", cancelled_at AS "cancelledAt"
+    FROM subscriptions WHERE account_id = ${accountId}
+  `)) as unknown;
+  const rows = Array.isArray(raw)
+    ? (raw as Array<{
+        stripeCustomerId: string | null;
+        cancelledAt: Date | null;
+      }>)
+    : ((
+        raw as {
+          rows?: Array<{
+            stripeCustomerId: string | null;
+            cancelledAt: Date | null;
+          }>;
+        }
+      ).rows ?? []);
+  return rows[0];
+}
 
 import {
   buildIntegrationEnv,
@@ -163,18 +192,22 @@ async function seedSubscription(
   const tier = overrides?.tier ?? 'plus';
   const subId = generateUUIDv7();
 
+  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
+  // same conditional seed as before.
   if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.insert(subscriptions).values({
-      id: subId,
-      accountId,
-      tier,
-      status: overrides?.status ?? 'active',
-      stripeCustomerId: overrides?.stripeCustomerId ?? 'cus_existing',
-      stripeSubscriptionId: overrides?.stripeSubscriptionId ?? 'sub_existing',
-      currentPeriodStart: new Date('2026-04-01T00:00:00.000Z'),
-      currentPeriodEnd:
-        overrides?.currentPeriodEnd ?? new Date('2026-05-01T00:00:00.000Z'),
-    });
+    await db.execute(sql`
+      INSERT INTO subscriptions (
+        id, account_id, tier, status, stripe_customer_id, stripe_subscription_id,
+        current_period_start, current_period_end
+      )
+      VALUES (
+        ${subId}, ${accountId}, ${tier}, ${overrides?.status ?? 'active'},
+        ${overrides?.stripeCustomerId ?? 'cus_existing'},
+        ${overrides?.stripeSubscriptionId ?? 'sub_existing'},
+        '2026-04-01T00:00:00.000Z'::timestamptz,
+        ${(overrides?.currentPeriodEnd ?? new Date('2026-05-01T00:00:00.000Z')).toISOString()}::timestamptz
+      )
+    `);
   }
 
   // [WI-1145] Seed the v2 subscription UNCONDITIONALLY (was gated on
@@ -460,9 +493,7 @@ describe('Integration: billing lifecycle routes', () => {
       checkoutDb,
       'subscriptions',
     ))
-      ? await checkoutDb.query.subscriptions.findFirst({
-          where: eq(subscriptions.accountId, account.id),
-        })
+      ? await findLegacySubscriptionByAccountId(checkoutDb, account.id)
       : undefined;
     expect(
       v2Checkout?.stripeCustomerId === 'cus_checkout' ||
@@ -515,9 +546,7 @@ describe('Integration: billing lifecycle routes', () => {
       cancelDb,
       'subscriptions',
     ))
-      ? await cancelDb.query.subscriptions.findFirst({
-          where: eq(subscriptions.accountId, account.id),
-        })
+      ? await findLegacySubscriptionByAccountId(cancelDb, account.id)
       : undefined;
     expect((v2Cancel?.cancelledAt ?? legacyCancel?.cancelledAt) != null).toBe(
       true,
