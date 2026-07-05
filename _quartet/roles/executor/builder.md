@@ -9,6 +9,10 @@ quality bar, process awareness, DoD, report-back boundary, Clacks-blind, tiering
 `roles/executor/executor-protocol.md` — read that first. The Work Item's substance lives in
 Cosmo, the lane's `execution-tracker.md`, and the lane plan.
 
+**Binding note.** This is the builder ceremony for any runtime binding. Claude Code and Codex
+builders both bind the same executor contract; the harness-specific worktree, PR, and session
+launch mechanics live in the binding, not in this type definition.
+
 **Precedence:** Cosmo lifecycle rules (AGENTS.md + `/cosmo:execute`) > this doc > general habits.
 
 ---
@@ -17,7 +21,9 @@ Cosmo, the lane's `execution-tracker.md`, and the lane plan.
 
 **Phase 0 — Claim.** Read and follow `/cosmo:execute`. Claim the WI *before any
 implementation*: fetch the WI + artifacts, then `claim --claimant <your-id>`. Never start
-unclaimed.
+unclaimed. **Verify the claim landed with a non-empty `Claim Expires`** (direct REST/MCP read,
+not the CLI's own success message) — an empty expiry defeats the shepherd's claim-TTL liveness
+checker (`library/liveness-checker.md`) and must be flagged, not silently carried forward.
 
 **GATE-0 — Premise verify (before any fix).** For any directed "fix this live error" WI, first
 confirm the premise **reproduces on current `origin/main`** — trace each cited read up to its entry
@@ -58,6 +64,24 @@ high-stakes diff you **may** escalate to a cross-model **auditor** (`roles/execu
 e.g. Codex) for stronger independence — not required. Fix valid findings, re-run. **Max 3
 iterations** — if findings persist after 3 rounds, stop and escalate the residuals to the shepherd
 instead of spinning.
+
+**The verdict must be a synchronous Agent-tool return, consumed in the same turn.** "Fresh
+session, never a fork" and "synchronous return" are complementary, not competing — spawn the
+reviewer via the **Agent tool** (a non-fork sub-agent call) and read its verdict from that call's
+own return value before doing anything else. That single primitive gives you both the independent
+read and a delivery you cannot lose. **Never** spawn the reviewer as an async peer/teammate (e.g.
+a `SendMessage`-based teammate, or an Agent-tool call with `run_in_background: true`) whose
+verdict is meant to arrive as a later message — a message that lands after your turn has already
+ended has nowhere to land. **Failure mode this forecloses
+(WI-1217):** a builder ran Phase-4 as an async peer that replied APPROVE via `SendMessage`; the
+executor's turn had already ended, delivery failed, and the verdict orphaned to the shepherd —
+stalling the executor in a re-review loop it could never resolve on its own. If a verdict doesn't
+come back as the Agent call's return value inside this turn, treat that as a signal something is
+wrong — don't wait on an inbox message for it.
+
+**Self-referential adoption note.** This ceremony change, once landed, adopts at the next session
+boundary — never hot-swapped into a running session (same adoption discipline as the
+WI-1357/WI-1368 protocol-hardening set).
 
 **Phase 5 — PR & CI.** Open the PR (one PR per WP) with `gh pr create`. Monitor `gh pr checks`
 and automated reviews until they settle, per the repo PR Review & CI Protocol. Triage findings:

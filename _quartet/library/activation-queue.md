@@ -5,6 +5,14 @@ of which Initiative activates when. Lives with the roster (`working/program/`); 
 maintains it. Defined separately from the roster because it answers a different question: the
 roster is *what exists*, the queue is *what fires next, and on what condition*.
 
+> **PM-role note (WI-1370, filed not reconciled).** "The orchestrator maintains it" is correct
+> today — the orchestrator is the program-role-of-today (`planning-rules.md` §2.5) and no PM-role
+> holder is live yet. This ownership framing is revisited at PM-role adoption (the PM references,
+> not owns, this artifact per `roles/program-manager-protocol.md`'s operational-surface section —
+> resolving owned-vs-referenced here is the adoption-time sweep's job, not this note's). Owner:
+> WS-26 lane. Target: at PM-role adoption — tied to the WI-1357 orchestrator-hardening wave or the
+> first live PM session, whichever lands first. Do not reconcile before adoption.
+
 **Role:** the queue is **gate-ordered, not date-ordered** (`planning-rules.md` §6.2). Each entry is
 a condition on a named event, never a calendar position.
 

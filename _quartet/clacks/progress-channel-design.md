@@ -40,6 +40,14 @@ orchestrator targets exactly one shepherd). Provisioned by the orchestrator at *
 The orchestrator maintains a **derived central roll-up** (the program roster / dashboard) by
 aggregating outboxes — "central" is a read view, **never** the write target.
 
+> **PM-role note (WI-1370, filed not reconciled).** "The orchestrator maintains" the roll-up is
+> correct today — the orchestrator is the program-role-of-today (`planning-rules.md` §2.5) and no
+> PM-role holder is live yet. This ownership framing is revisited at PM-role adoption
+> (`roles/program-manager-protocol.md`'s roster-ownership clause covers the roster; dashboard
+> remains PM-referenced, not owned). Owner: WS-26 lane. Target: at PM-role adoption — tied to the
+> WI-1357 orchestrator-hardening wave or the first live PM session, whichever lands first. Do not
+> reconcile before adoption.
+
 *Why per-shepherd over one central file:* single-writer correctness (no reliance on atomic
 `O_APPEND` discipline across heterogeneous agents), no central git merge hotspot, clean
 bidirectional addressing (each shepherd reads only its own inbox), self-contained lifecycle, and it
@@ -111,3 +119,8 @@ agent = an addressable endpoint with an in/out queue).
   orchestrator subscribes the same way. **Shepherd↔executor stays native-by-design** — executors
   report to their shepherd; the shepherd aggregates and emits upward; executors never touch this
   channel (Clacks-blind).
+
+**Binding note.** This document defines the runtime-neutral Clacks channel. Claude Code, Codex, or
+another harness can host either side if its binding supplies the same mailbox and monitor semantics.
+Watcher runtime state belongs under `.cosmo-watch/` or the declared gitignored runtime dir, never as
+in-place edits to `_quartet/clacks/*`.

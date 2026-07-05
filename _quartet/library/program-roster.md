@@ -5,6 +5,13 @@ orchestrator maintains. The roster is a board of **Initiative rows** + a pointer
 queue (`library/activation-queue.md`). This file defines the shape; the live instance lives at
 `working/program/program-roster.md`.
 
+> **PM-role note (WI-1370, filed not reconciled).** "The orchestrator maintains" is correct today —
+> the orchestrator is the program-role-of-today (`planning-rules.md` §2.5) and no PM-role holder is
+> live yet. Roster-maintenance ownership moves to the PM at PM-role adoption
+> (`roles/program-manager-protocol.md`'s roster-ownership clause). Owner: WS-26 lane. Target: at
+> PM-role adoption — tied to the WI-1357 orchestrator-hardening wave or the first live PM session,
+> whichever lands first. Do not reconcile before adoption.
+
 **Role:** the roster is the program's **standing hypothesis** (`planning-rules.md` §3.1) — the
 inventory of Initiatives and their state. It is a board of rows and pointers, **not** a home for
 delivery detail (that lives in each lane's tracker) or live WI state (that lives in Cosmo).

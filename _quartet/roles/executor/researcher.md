@@ -8,6 +8,9 @@ the same rails and differed only in framing.)
 Carries *ceremony only*. The shared rails (goal-loop, quality bar, process awareness, DoD,
 report-back boundary, Clacks-blind, tiering) live in `roles/executor/executor-protocol.md`.
 
+**Binding note.** This is the runtime-neutral researcher ceremony. A Claude Code, Codex, or other
+harness researcher binds the same read-only contract with its own launch/isolation mechanics.
+
 **Precedence:** operator rulings > this doc > habits.
 
 ---

@@ -56,7 +56,7 @@ worker to do the review. The watcher automates by hand what `reviewer-protocol.m
 - **Clacks-blind** — a sub-agent reports only to its spawner and never writes channel files.
 - **Lane** — colloquial for an active Initiative's workstream + its shepherd + its working artifacts.
 - **Asset** — the persistent deliverable an Initiative realizes within a Domain. The Initiative is
-  the effort; the Asset is what survives it. Canon: Nexus NEX-ADR-0001 (initiative-workspace pattern; lives in the Nexus repo, not here).
+  the effort; the Asset is what survives it. Canon: `docs/adr/NEX-ADR-0001-initiative-workspace-pattern.md`.
 - **Effort** — Work Item t-shirt size (`XS` / `S` / `M` / `L` / `XL`), mandatory before `Ready`;
   it signals complexity/uncertainty and is decoupled from `Altitude`.
 - **Monitor manifest / reconcile** — the discipline that keeps watchers trustworthy across session

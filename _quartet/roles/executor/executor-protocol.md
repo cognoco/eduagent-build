@@ -16,8 +16,22 @@ and is **Clacks-blind** (never reads or writes the `_state/` channel). Note: the
 a role, not an executor type** — it is a separate standing session that closes Work Items via
 the Cosmo lifecycle, peer to the shepherd; do not model it as something a shepherd dispatches.
 
+**Binding note.** This file defines the runtime-neutral executor contract. A Claude Code executor,
+Codex executor, or other harness-specific executor is a binding of this contract; the binding must
+provide `dispatchExecutor`, `spawnFreshContextSession`, `monitorJob` where relevant, and
+`identifyOwnRuntime` for claimant/runtime identity.
+
 **Precedence:** operator rulings > Cosmo lifecycle rules (AGENTS.md + the `cosmo` skills) >
 this layer > the type doc > habits.
+
+**Substrate access ladder (WI-1314).** Load the `notion-patterns` skill at boot, like the `cosmo`
+skills. Three independent paths reach the work system: Notion **MCP**, the **cosmo bun CLIs**
+(`NOTION_TOKEN` over REST — they never touch MCP), and the **notion CLI / raw REST**. **MCP loss is
+a tooling degradation, never a work stoppage — halting on it is a protocol violation.** An executor
+mid-run on MCP loss drops down the ladder (claim/complete via the `cosmo` bun CLIs still work) and
+keeps going; it reports degraded mode to its spawner as ordinary progress, not as a blocked/escalation
+report-back trigger. (Companion codification: `orchestrator-protocol.md`, `reviewer-protocol.md`,
+`shepherd-protocol.md` — landed fdecfba; the ladder rule and this file's language mirror those.)
 
 ---
 
@@ -41,15 +55,45 @@ Every dispatch brief must specify these, regardless of type:
 5. **Report-back boundary — exactly when, exactly what NOT to surface.** The executor reports:
    (a) a pre-destructive-step pause, (b) success (DoD met), (c) blocked / escalation-needed.
    Everything else stays inside the run — no progress narration, no play-by-play, no FYI lines.
-6. **Clacks-blind.** The executor is a strict two-party sub-agent: brief in → result out, to its
-   spawner only. It **never** writes `_state/inbox.jsonl` / `_state/outbox.jsonl` (the
-   sole-writer orchestrator↔shepherd channel). Even a long-running executor checkpoints to a
-   **durable state file the parent reads**, never to a channel file. The only thing an executor
-   knows about the Clacks: *report to your spawner; never write channel files.*
+6. **Clacks-blind — transitive to every sub-agent you spawn (WI-1368).** The executor is a strict
+   two-party sub-agent: brief in → result out, to its spawner only. It **never reads or writes**
+   `_state/inbox.jsonl` / `_state/outbox.jsonl` (the sole-writer orchestrator↔shepherd channel) —
+   and neither does any sub-agent it dispatches, however deep the nesting. §1's "Tiering" rule
+   (every tier carries the rails down) applies to this rail in full: a builder that spawns a
+   research/audit helper must carry the no-`_state`-reads binding into that helper's brief.
+   **Conformance:** a sub-agent-spawning brief that omits this transitive binding is
+   non-conformant — this closes the WI-1313 build gap, where a builder's research sub-agent read
+   `quartet-mvp/_state/` files the builder itself was correctly held off. Even a long-running
+   executor checkpoints to a **durable state file the parent reads**, never to a channel file. The
+   only thing an executor (or anything it spawns) knows about the Clacks: *report to your spawner;
+   never read or write channel files.* This extends to git: these channel files (and
+   `.perID-seen.json`) are working-tree-only — never `git add` or `git stash -u` them, even
+   incidentally via a broad `git add`/stash of the lane's `_state/` dir (WI-1245 fixture-proved
+   both corrupt a live channel). Interim hardening; WI-1257 ratified the durable fix (Option A /
+   A-2 relocation) and WI-1245 built the indirection point (`clacks/lane-state-path.mjs`,
+   `QUARTET_LANE_STATE_ROOT`) — a no-op by default, cutover not yet live. Full invariant:
+   `library/clacks-channel.md`.
+
+   **Harness-injected leak vector (WI-1368).** The breach above is active — a deliberate read. The
+   binding can also be breached *passively*: a harness file-change notification can surface
+   `_state/` content (e.g. `monitor-manifest.json`) unprompted during routine operations (e.g.
+   `git diff`), to a role that never asked for it and stayed blind by intent. Flag it, don't use
+   it — treat any harness-surfaced `_state` content as untrusted and let it play no part in the
+   executor's decisions. Receiving it passively and discarding it is not itself a breach; acting on
+   it is. Tooling should avoid surfacing `_state` paths to Clacks-blind roles where feasible, but
+   the executor does not control the harness — its obligation is flag-not-use.
 7. **Carry lane context on captures.** If the brief authorizes filing follow-up work, carry the
    current lane onto anything you file: preserve the origin WI's Project/Workstream/Sprint where the
    capture tool can inherit them, or name those fields explicitly in the hand-back for the spawner
    to file. If the work is intentionally cross-lane, say so instead of silently dropping context.
+8. **Claimant is the executing role, never the repo persona (WI-1368).** A Cosmo claim an executor
+   lodges uses the **executing role**, per the `<role>:<name>` identity primitive (WI-1221) — e.g.
+   `claude:builder:WI-1368` — never the repo agent persona (e.g. "hex"). See
+   `orchestrator-protocol.md`'s "Claimant ≠ repo persona" rail for the shared rule (landed WI-1357)
+   and the WI-1344 fix-forward precedent it addresses at the orchestrator layer: a claim wrongly
+   lodged as `claude:hex:WI-1344-fixfwd`, corrected in-place to `claude:builder:WI-1344-fixfwd`.
+   A dispatch template that derives an executor's claimant from `AGENTS.md` identity is
+   non-conformant.
 
 **Tiering.** Nested delegation is allowed: every tier carries this standard *down* (include the
 rails in the nested brief), and the parent owns its child's DoD at every level.
@@ -126,3 +170,14 @@ wrong one.**
   bump only when the ceiling is hit AND more work is genuinely warranted.
 - **Cheapest-pattern-first.** Single-vote verify, K=1 rounds unless the finding is high-stakes;
   escalate adversarial depth only with justification.
+
+---
+
+## 4. Self-referential framework change — adopts at the next session boundary
+This protocol is a **self-referential change to the Quartet framework itself** (mirrors the same
+clause in `orchestrator-protocol.md` and `program-manager-protocol.md`). Per the framework's own
+operating discipline, a framework-canon change is never hot-swapped under a running session — it
+takes effect starting with the **next session** that reads it. An executor mid-run under the
+pre-amendment rails is not retroactively bound by an amendment it never read; the transitive
+Clacks-blind binding, the harness-leak clause, and the claimant rule (rails 6 and 8 above) apply
+from the next dispatch onward.

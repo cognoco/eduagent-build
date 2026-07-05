@@ -9,12 +9,24 @@ and amendments are historical; read it for structure, not content.
 pointers → wave-specific context → an "amendments" block (lessons the protocol didn't yet carry) →
 report-back boundaries. The brief *points*; it does not re-derive process.
 
+**Binding note.** This example was launched from a Claude Code-era flow, but the brief shape is
+runtime-neutral. A Codex or other harness executor receives the same rails with binding-specific
+launch/worktree mechanics.
+
 > **Sourcing + genericization.** This is a real instance from the **eduagent-build** dogfood. Two
 > mechanical edits were applied so the folder stays portable: the repo root is abstracted to
 > `<repo root>`, and the prompt's original lane `executor-protocol` citation is mapped to its current
 > home — the builder type doc `roles/executor/builder.md` (plus the shared layer
 > `roles/executor/executor-protocol.md`). Otherwise the prompt is as-dispatched; read it for the
 > brief *shape*, not the content.
+
+> **Post-hoc annotation (WI-1269, not part of the verbatim prompt).** This brief's "amendments"
+> block doesn't need its own Phase-4 wording — `roles/executor/builder.md` now mandates it
+> directly: the adversarial-review verdict must be a synchronous Agent-tool return, consumed in
+> the same executor turn, never an async `SendMessage` peer whose delivery can fail after the turn
+> ends (the WI-1217 orphaned-verdict failure mode). A future dispatch brief following this shape
+> inherits that rule from the type doc; it does not need to restate it as a wave-specific
+> amendment.
 
 ---
 

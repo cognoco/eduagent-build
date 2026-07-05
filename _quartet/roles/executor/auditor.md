@@ -9,6 +9,9 @@ so the check is genuinely independent, not a runtime grading its own output.
 Mutates nothing. Carries *ceremony only*; the shared rails live in
 `roles/executor/executor-protocol.md`.
 
+**Binding note.** This is the runtime-neutral auditor ceremony. The estate default uses Codex for
+independence, but Codex is a binding of the auditor contract, not the contract itself.
+
 **Precedence:** operator rulings > this doc > habits.
 
 ---
