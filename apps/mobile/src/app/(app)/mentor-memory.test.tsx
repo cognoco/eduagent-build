@@ -65,6 +65,9 @@ const mockFetch = createRoutedMockFetch({
     message: 'Saved',
     fieldsUpdated: [],
   }),
+  'learner-profile/consent': () => ({ success: true }),
+  'learner-profile/injection': () => ({ success: true }),
+  'learner-profile/all': () => ({ success: true }),
   'onboarding/interests/context': () => ({ success: true }),
   'learner-profile': () => ({ profile: mockProfileData }),
 });
@@ -474,6 +477,116 @@ describe('MentorMemoryScreen — catch blocks use formatApiError not generic cop
     expect(alertMessage).not.toBe('Please try again.');
     // formatApiError for SUBJECT_INACTIVE maps to the friendly paused message
     expect(alertMessage).toMatch(/paused|archived|resume/i);
+  });
+});
+
+describe('MentorMemoryScreen — self privacy writes [WI-1407]', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockActiveRole = 'owner';
+    mockIsParentProxy = false;
+    mockModeNavV1Enabled = false;
+    mockCanEnterResult = true;
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [],
+      memoryConsentStatus: 'pending',
+      memoryInjectionEnabled: false,
+    };
+  });
+
+  afterEach(() => {
+    mockActiveRole = 'owner';
+    mockProfileData = { ...mockProfileBase, interests: [] };
+  });
+
+  it('[WI-1407] grants self memory consent without childProfileId', async () => {
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    await screen.findByTestId('memory-consent-grant');
+    mockFetch.mockClear();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('memory-consent-grant'));
+    });
+
+    const calls = fetchCallsMatching(mockFetch, 'learner-profile/consent');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).not.toContain('/test-profile-id/');
+    expect(extractJsonBody(calls[0]?.init)).toEqual({ consent: 'granted' });
+  });
+
+  it('[WI-1407] declines self memory consent without childProfileId', async () => {
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    await screen.findByTestId('memory-consent-decline');
+    mockFetch.mockClear();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('memory-consent-decline'));
+    });
+
+    const calls = fetchCallsMatching(mockFetch, 'learner-profile/consent');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).not.toContain('/test-profile-id/');
+    expect(extractJsonBody(calls[0]?.init)).toEqual({ consent: 'declined' });
+  });
+
+  it('[WI-1407] toggles self memory injection with the new value', async () => {
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [],
+      memoryConsentStatus: 'granted',
+      memoryInjectionEnabled: true,
+    };
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    const switchEl = await screen.findByLabelText('Use saved notes in lessons');
+    mockFetch.mockClear();
+
+    await act(async () => {
+      fireEvent(switchEl, 'valueChange', false);
+    });
+
+    const calls = fetchCallsMatching(mockFetch, 'learner-profile/injection');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).not.toContain('/test-profile-id/');
+    expect(extractJsonBody(calls[0]?.init)).toEqual({
+      memoryInjectionEnabled: false,
+    });
+  });
+
+  it('[WI-1407] confirms clear-all through the self memory endpoint', async () => {
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [],
+      memoryConsentStatus: 'granted',
+    };
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    const clearButton = await screen.findByLabelText(
+      'Clear mentor memory for Test Learner',
+    );
+    fireEvent.press(clearButton);
+
+    expect(mockPlatformAlert).toHaveBeenCalledTimes(1);
+    const buttons = mockPlatformAlert.mock.calls[0][2] as Array<{
+      text?: string;
+      style?: string;
+      onPress?: () => void;
+    }>;
+    mockFetch.mockClear();
+
+    await act(async () => {
+      buttons.find((button) => button.style === 'destructive')?.onPress?.();
+    });
+
+    const calls = fetchCallsMatching(mockFetch, 'learner-profile/all');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).not.toContain('/test-profile-id/');
+    expect(extractJsonBody(calls[0]?.init)).toBeUndefined();
   });
 });
 
