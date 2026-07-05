@@ -6,11 +6,16 @@ import {
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
+  learningSessions,
   mentorActivityLedger,
+  parkingLotItems,
   retentionCards,
   subjects,
+  supportership,
   type Database,
 } from '@eduagent/database';
+import { inArray, or } from 'drizzle-orm';
+import { ERROR_CODES, ForbiddenError } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 import { nowRoutes } from './now';
@@ -55,6 +60,14 @@ function makeApp(db: Database, profileId: string) {
     await next();
   });
   app.route('/v1', nowRoutes);
+  // Mirrors the global onError handler in src/index.ts for the typed
+  // service errors this suite exercises (ForbiddenError -> 403).
+  app.onError((err, c) => {
+    if (err instanceof ForbiddenError) {
+      return c.json({ code: ERROR_CODES.FORBIDDEN, message: err.message }, 403);
+    }
+    throw err;
+  });
   return app;
 }
 
@@ -156,6 +169,17 @@ async function seedRetentionDue(
 }
 
 async function cleanup(database: Database): Promise<void> {
+  if (seededProfileIds.length > 0) {
+    // supportership FKs to person are ON DELETE RESTRICT — clear edges first.
+    await database
+      .delete(supportership)
+      .where(
+        or(
+          inArray(supportership.supporterPersonId, seededProfileIds),
+          inArray(supportership.supporteePersonId, seededProfileIds),
+        ),
+      );
+  }
   await deleteV2IdentitiesForTest(database, {
     accountIds: seededAccountIds,
     profileIds: seededProfileIds,
@@ -282,5 +306,105 @@ describe('Integration: now routes', () => {
       true,
     );
     expect(body.overflowCount).toBe(1);
+  });
+
+  it('excludes parked_item and ledger_moment kinds from the supporter person-scope feed', async () => {
+    const supporterId = await seedProfile(db, 'supporter');
+    const supporteeId = await seedProfile(db, 'supportee');
+
+    await db.insert(supportership).values({
+      supporterPersonId: supporterId,
+      supporteePersonId: supporteeId,
+    });
+
+    // Permitted kind for supporter visibility: a due retention card.
+    await seedRetentionDue(
+      db,
+      supporteeId,
+      'supportee-retention',
+      new Date('2020-01-01T00:00:00.000Z'),
+    );
+
+    // Excluded kinds: a parked item (via a real session) + an unsurfaced
+    // ledger moment, both owned by the supportee.
+    const topic = await seedTopic(db, supporteeId, 'supportee-parked');
+    const [session] = await db
+      .insert(learningSessions)
+      .values({ profileId: supporteeId, subjectId: topic.subjectId })
+      .returning();
+    await db.insert(parkingLotItems).values({
+      sessionId: session!.id,
+      profileId: supporteeId,
+      question: 'supportee-parked-question',
+    });
+    await db.insert(mentorActivityLedger).values({
+      profileId: supporteeId,
+      actorJob: 'test',
+      kind: 'milestone_reached',
+      params: {
+        marker: 'supportee-ledger-marker',
+        milestoneId: 'milestone-supportee',
+        milestoneType: 'session_count',
+        threshold: 1,
+      },
+    });
+
+    const supporterApp = makeApp(db, supporterId);
+    const feedRes = await supporterApp.request(
+      `/v1/now?scope=person&personId=${supporteeId}`,
+    );
+
+    expect(feedRes.status).toBe(200);
+    const feedBody = (await feedRes.json()) as {
+      cards: Array<{ kind: string }>;
+    };
+    const kinds = feedBody.cards.map((card) => card.kind);
+    expect(kinds).toContain('retention_due');
+    expect(kinds).not.toContain('parked_item');
+    expect(kinds).not.toContain('ledger_moment');
+    expect(JSON.stringify(feedBody)).not.toContain('supportee-parked-question');
+    expect(JSON.stringify(feedBody)).not.toContain('supportee-ledger-marker');
+
+    const overflowRes = await supporterApp.request(
+      `/v1/now/overflow?scope=person&personId=${supporteeId}`,
+    );
+    expect(overflowRes.status).toBe(200);
+    const overflowText = JSON.stringify(await overflowRes.json());
+    expect(overflowText).not.toContain('parked_item');
+    expect(overflowText).not.toContain('ledger_moment');
+
+    // Non-vacuity control: the supportee's own self feed DOES surface both
+    // seeded kinds (parked_item in the cards; ledger_moment ranks last and
+    // lands in the overflow).
+    const selfApp = makeApp(db, supporteeId);
+    const selfRes = await selfApp.request('/v1/now?scope=self');
+    expect(selfRes.status).toBe(200);
+    const selfBody = (await selfRes.json()) as {
+      cards: Array<{ kind: string }>;
+      overflowCount: number;
+    };
+    expect(selfBody.cards.map((card) => card.kind)).toContain('parked_item');
+    expect(selfBody.overflowCount).toBe(1);
+    const selfOverflowRes = await selfApp.request(
+      '/v1/now/overflow?scope=self',
+    );
+    expect(selfOverflowRes.status).toBe(200);
+    expect(JSON.stringify(await selfOverflowRes.json())).toContain(
+      'supportee-ledger-marker',
+    );
+  });
+
+  it('returns 403 for a person-scope request with no supportership edge', async () => {
+    const outsiderId = await seedProfile(db, 'outsider');
+    const targetId = await seedProfile(db, 'target');
+
+    const res = await makeApp(db, outsiderId).request(
+      `/v1/now?scope=person&personId=${targetId}`,
+    );
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code: string; message: string };
+    expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
+    expect(body.message).toBe('You do not have access to this person.');
   });
 });
