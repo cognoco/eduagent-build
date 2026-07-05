@@ -123,14 +123,43 @@ named verification first) · **REPAIR** (metadata broken).
 | 1543 | Executing | P2 | RECONCILE CLAIM (F-F) | codex Brain binding; claim touched today during "fleet down" |
 | 1544 | Captured | P2 | REFINE→FIRST-WAVE if Codex pilot approved | Codex end-to-end lifecycle smoke — the gate for the operator's Codex-delivery idea |
 
-## Recommended hand-back package (order matters)
+## Codex second-opinion pass (2026-07-05) — verdict + PM adjudication
 
-1. **Re-finalize wave** (sanctioned already): 1634, 1630, 1629 (+PM independent close), 1605,
-   1356 (merge #61), 1297 (re-claim). Pure completion, no new build.
-2. **Repairs/verifications** (minutes each): 1600 stage repair; 1525 vs 1631/1632 comparison;
-   1282/1284/1295 vs codex-default verdict; 1543 claim reconcile; priorities for 1236/1229.
-3. **First-wave dispatch** (new build, ~7 items): 1635, 1264 (P1-bump), 851, 1296, 1369
-   (P2-bump), 1225, 1159, 1526 (refine→ready→dispatch).
-4. **Refine queue** for the wave after: 1609, 1607, 1604, 1614 (drill design), 1518/1515
-   (WP re-scope), 1594, 1638, 1263 (spike), 850 (overlap check).
+Full review in `CODEX-VERDICT.md` (codex exec, read-only, against this file + the raw
+62-item JSON slice). **Verdict: CONCUR-WITH-AMENDMENTS** — 7 amendments, adjudicated:
+
+1. *No closes from the slice alone (1525, 1282/1284/1295)* — **ACCEPT**; consistent with the
+   audit's own CLOSE?-means-verify-first framing. Closes are NOT pre-authorized; the named
+   comparisons (vs 1631/1632, vs codex-default judge) are mandatory and are judgment work,
+   not "minutes each" — step-2 estimate corrected.
+2. *WI-1296 before the re-finalize wave* — **ACCEPT, genuine catch.** Re-finalizing bounced
+   items while completion-summary append→replace is unfixed risks reproducing the exact
+   re-bounce loop the wave is meant to clear. 1296 becomes step 0.
+3. *1635/1526 not dispatch-ready per Cosmo fields* — **PARTIAL.** Codex's slice predates the
+   OPQ-18 ruling; WI-1635 IS unblocked in reality. But the repair rider stands: fix its Cosmo
+   fields (State Blocked→Active, empty description, title's "do not dispatch") BEFORE dispatch.
+   1526 confirmed as refine→ready→dispatch, never straight execution.
+4. *Metadata/content repairs for 1594, 1609, 1614, 1370* — **ACCEPT**; added to step 2
+   (state="-" on seven items; 1370 is a contentless Captured — audit missed it).
+5. *Promote 1609 + 1236 after repair* — **ACCEPT.** Machine-readable HOLD (1609) before broad
+   finalize/liveness activity; monitor-arming (1236) before flow-stewardship prose.
+6. *1614 = scheduled P1 drill, not refine backlog* — **ACCEPT.**
+7. *Unclaimed-Executing items (1634/1630/1629/1605) cited as WI-1312 evidence* — **ACCEPT**;
+   they are the zombie-Executing class exhibit, not just cleanup.
+
+## Recommended hand-back package (REVISED post-Codex; order matters)
+
+0. **WI-1296 alone first** — summary append→replace; gates the wave below (amendment 2).
+1. **Re-finalize wave** (after 1296 lands): 1634, 1630, 1629 (+PM independent close), 1605,
+   1356 (merge #61), 1297 (re-claim). Pure completion, no new build. Each unclaimed-Executing
+   item is logged as WI-1312 evidence in passing.
+2. **Repairs/verifications** (mixed effort — field repairs are minutes, the verifications are
+   judgment work): 1600 stage repair; 1635 field repair (State→Active, description, title);
+   state fields on 1594/1609/1614; content for 1370; priorities 1236/1229; 1543 claim
+   reconcile; THEN 1525 vs 1631/1632 comparison and 1282/1284/1295 vs codex-default verdict.
+3. **First-wave dispatch**: 1264 (P1-bump), 851, 1369 (P2-bump), 1225, 1159; plus 1635, 1236,
+   1609 once their step-2 repairs land; 1526 refine→ready→dispatch.
+4. **Refine queue** for the wave after: 1607, 1604, 1614 (scheduled drill, per amendment 6),
+   1518/1515 (WP re-scope), 1594, 1638, 1263 (spike), 850 (overlap check), 1544 (Codex-pilot
+   gate — promote if the pilot is approved).
 5. Everything else KEEP/PARK as tabled.
