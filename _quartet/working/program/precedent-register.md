@@ -23,3 +23,9 @@ writer. Format: `date — question class — ruling — who decides next time`.
   logged-on user session (auto-logon accepted), `wt.exe … claude --resume`; macOS/Linux = detached
   tmux hosting `claude --resume`; recovery unproven until validated against a real rate-limit
   death — orchestrator executes, no re-ask.
+- 2026-07-05 — orchestrator remit (WS-quiet incident) — pipeline custodian, not dispatcher:
+  accountability spans every stage (triage / refine / dispatch / unstick / Gate-2 close) of every
+  assigned workstream, shepherd-less lanes included (drive activation, don't ignore); empty Ready =
+  refill signal; shepherd "exhausted" reports are audited, not relayed; sweep caps disclosed with
+  their numbers; token/model discipline governs how work runs, never whether available work is
+  done — full duty spec on WI-1526 — orchestrator.
