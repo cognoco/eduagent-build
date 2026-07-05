@@ -17,6 +17,7 @@ skills. Three independent paths reach the work system: Notion **MCP**, the **cos
 (`NOTION_TOKEN` over REST — they never touch MCP), and the **notion CLI / raw REST**. **MCP loss is
 a tooling degradation, never a work stoppage — halting on it is a protocol violation.** Drop down
 the ladder and keep reviewing; prove the MCP-independent path with one cheap REST call at boot.
+Codex-hosted reviewers resolve their runtime mechanics through `roles/runtime-bindings/codex.md`.
 
 ## The one invariant — reviewer ≠ executor
 The reviewer is a **SEPARATE session in a SEPARATE runtime from the executors** (in this estate

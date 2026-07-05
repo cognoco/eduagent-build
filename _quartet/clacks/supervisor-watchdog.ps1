@@ -138,7 +138,13 @@ function Process-Heartbeat([string]$path) {
     }
 
     Write-Output "[$($now.ToString('o'))] RESPAWN $($hb.session_id)  -  attempt $attempt : $($hb.relaunch_command)"
-    Start-Process -FilePath "powershell.exe" -ArgumentList @("-NoProfile", "-Command", $hb.relaunch_command) -WindowStyle Hidden | Out-Null
+    # OPQ-14: relaunch must land in a visible window in the logged-on user session (Option-B
+    # interactive resume), never hidden or dropped into session 0 - so the window-style override
+    # used to force this hidden has been removed below. This is only half the fix: it depends on
+    # the Scheduled Task itself running with an Interactive logon principal
+    # (register-supervisor-watchdog-task.ps1), which is what actually keeps the task off session 0
+    # in the first place.
+    Start-Process -FilePath "powershell.exe" -ArgumentList @("-NoProfile", "-Command", $hb.relaunch_command) | Out-Null
 
     $backoffMin = Backoff-Minutes $attempt
     $newState = [pscustomobject]@{

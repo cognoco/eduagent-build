@@ -19,6 +19,7 @@
 param(
     [string]$TaskName = "Nexus Supervisor Watchdog",
     [string]$RepoRoot = "C:\.tools\Nexus",
+    [string]$UserId = "$env:USERDOMAIN\$env:USERNAME",
     [string[]]$HeartbeatPath = @(
         "C:\.tools\Nexus\_quartet\working\program\heartbeat.json"
         # add one path per supervised lane/program session, e.g.:
@@ -40,6 +41,11 @@ $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $argumentL
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 10) -RepetitionDuration ([TimeSpan]::MaxValue)
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew
 
-Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Description "WI-1563: non-agent poll of supervised-session heartbeats; resume-relaunches only after a confirmed dead process AND a confirmed-reset token window." -Force
+# OPQ-14: run only when the user is logged on (Interactive), not SYSTEM/S4U - a relaunch spawned
+# from a session-0 task cannot reach the logged-on desktop for the Option-B visible-terminal
+# resume. Auto-logon is the accepted posture for keeping this task alive across reboots.
+$principal = New-ScheduledTaskPrincipal -UserId $UserId -LogonType Interactive -RunLevel Limited
+
+Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description "WI-1563: non-agent poll of supervised-session heartbeats; resume-relaunches only after a confirmed dead process AND a confirmed-reset token window." -Force
 
 Write-Output "Registered scheduled task '$TaskName' polling every 10 min: $argumentList"

@@ -19,7 +19,8 @@ the Cosmo lifecycle, peer to the shepherd; do not model it as something a shephe
 **Binding note.** This file defines the runtime-neutral executor contract. A Claude Code executor,
 Codex executor, or other harness-specific executor is a binding of this contract; the binding must
 provide `dispatchExecutor`, `spawnFreshContextSession`, `monitorJob` where relevant, and
-`identifyOwnRuntime` for claimant/runtime identity.
+`identifyOwnRuntime` for claimant/runtime identity. The concrete Codex binding is
+`roles/runtime-bindings/codex.md`.
 
 **Precedence:** operator rulings > Cosmo lifecycle rules (AGENTS.md + the `cosmo` skills) >
 this layer > the type doc > habits.

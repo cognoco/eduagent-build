@@ -1,0 +1,75 @@
+{
+  "binding": "codex",
+  "version": 1,
+  "qualityInvariant": {
+    "reviewerRuntimeMustDifferFromExecutor": true,
+    "identitySource": "identifyOwnRuntime"
+  },
+  "primitives": {
+    "identifyOwnRuntime": {
+      "runtime": "codex",
+      "claimantPattern": "codex:<role>:<scope>",
+      "workspacePattern": "<repo>@<branch-or-worktree>",
+      "notes": "The claimant string is the durable runtime identity. Role sessions must not infer runtime from repo persona names."
+    },
+    "dispatchExecutor": {
+      "mode": "codex-exec",
+      "commandTemplate": [
+        "codex",
+        "exec",
+        "--cd",
+        "<dedicated-worktree>",
+        "-s",
+        "workspace-write",
+        "<brief-file>"
+      ],
+      "workspaceIsolation": "dedicated worktree from origin/main for write-capable executors",
+      "handoff": "brief file or stdin; executor reports only to the spawning role",
+      "notes": "Do not use inherited-context subagents for executor work. The brief must carry the shared executor rails."
+    },
+    "monitorJob": {
+      "mode": "external-process-plus-manifest",
+      "runtimeDir": ".cosmo-watch/<role-or-lane>/",
+      "stageWatcherTemplate": [
+        "node",
+        "<repo>/.cosmo-watch/<role-or-lane>/cosmo-stage-watch.mjs",
+        "<repo>",
+        "<log-path>",
+        "<state-path>"
+      ],
+      "mailboxWatcherTemplate": [
+        "pwsh",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "<repo>/.cosmo-watch/<role-or-lane>/inbox-watch.ps1",
+        "-RepoRoot",
+        "<repo>",
+        "-InboxPath",
+        "<inbox-jsonl>",
+        "-LogPath",
+        "<log-path>",
+        "-StatePath",
+        "<state-path>"
+      ],
+      "manifestRequired": true,
+      "wakeSemantics": "durable notification: watcher records event in log/state; Codex role reconciles manifest and reads deltas at resume/status/checkpoint boundaries",
+      "notes": "Codex has no in-harness Monitor primitive in this binding. Never patch tracked _quartet/clacks tooling to create a live watcher instance."
+    },
+    "spawnFreshContextSession": {
+      "mode": "fresh-codex-session",
+      "reviewCommandTemplate": [
+        "codex",
+        "exec",
+        "--cd",
+        "<read-only-or-throwaway-worktree>",
+        "-s",
+        "read-only",
+        "<review-brief-file>"
+      ],
+      "longRunningRoleLaunch": "operator-pasted kickoff into a new Codex session, using the same role protocol and this binding",
+      "notes": "Fresh means no inherited transcript. For long-running roles, the operator starts the session; for bounded checks, codex exec is acceptable."
+    }
+  }
+}

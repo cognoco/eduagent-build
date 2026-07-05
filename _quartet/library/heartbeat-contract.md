@@ -41,7 +41,7 @@ matters.
   "pid": 41232,
   "last_alive": "2026-07-04T19:32:00Z",
   "window_resets_at": "2026-07-05T00:32:00Z",
-  "relaunch_command": "claude --resume orchestrator-ramtop-20260704T1900Z -p \"Resume per _quartet/roles/orchestrator-protocol.md orient-on-resume.\""
+  "relaunch_command": "wt.exe new-tab -- claude --resume orchestrator-ramtop-20260704T1900Z"
 }
 ```
 
@@ -55,6 +55,17 @@ matters.
 | `last_alive` | ISO-8601 UTC — set on every heartbeat write |
 | `window_resets_at` | ISO-8601 UTC — see *Window-reset field* below |
 | `relaunch_command` | the exact command the watchdog runs verbatim to resume this session |
+
+`relaunch_command` **must** be an Option-B interactive-resume command — never `claude -p` /
+`--print` / any other headless invocation (OPQ-14, operator ruling: headless mode does not run
+under the operator's subscription plan). The writer (`clacks/heartbeat-writer.ts`, WI-1615) emits
+the per-OS form:
+
+- **Windows** — `wt.exe new-tab -- claude --resume <session_id>` (opens a visible tab in the
+  logged-on user's own Windows Terminal session — never hidden, never session-0).
+- **macOS/Linux** — a detached tmux session hosting the resume, e.g.
+  `tmux new-session -d -s <name> "claude --resume <session_id>"` (an operator attaches later with
+  `tmux attach -t <name>`).
 
 ## Write cadence — wall-clock, not turn-bound
 
@@ -114,5 +125,7 @@ different trust boundary without re-examining this assumption.
   `monitor-manifest.json` / `inbox.jsonl` / `outbox.jsonl`.
 - `clacks/lease.ts` — source of the reused 2-minute wall-clock heartbeat cadence and the
   "plain timer, no session/compaction dependency" shape.
-- Relates: WI-1602 (adaptive cadence over this contract, out of scope here), WI-1607 (folded into
-  this WI's resume-relaunch + window-gate requirement).
+- `clacks/heartbeat-writer.ts` (WI-1615) — the writer: produces this file, on the interval
+  `clacks/heartbeat-cadence.ts` (WI-1602) decides, per the directory convention above.
+- Relates: WI-1602 (adaptive cadence over this contract), WI-1607 (folded into this WI's
+  resume-relaunch + window-gate requirement).

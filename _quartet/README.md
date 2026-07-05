@@ -38,6 +38,7 @@ _quartet/
       executor-protocol.md   shared rails + type selector + spawn economics
       builder.md  researcher.md  auditor.md  general.md
     kickoffs/          paste-able launchers (orchestrator / shepherd / reviewer)
+    runtime-bindings/  concrete harness bindings (e.g. Codex)
   library/             ── LIBRARY (definitions, not live content)
     program-roster.md  execution-tracker.md  clacks-channel.md  dashboard.md  activation-queue.md
   clacks/              ── the comms layer: design + tooling
@@ -81,7 +82,8 @@ Current estate bindings:
 - Claude Code commonly hosts shepherd/orchestrator/executor sessions.
 - Codex commonly hosts the independent reviewer/auditor runtime.
 
-Future Codex Brain work binds four primitives, without changing the role protocols:
+The Codex Brain binding lives at `roles/runtime-bindings/codex.md` and binds four primitives
+without changing the role protocols:
 
 | Primitive | Contract |
 |---|---|
@@ -90,5 +92,5 @@ Future Codex Brain work binds four primitives, without changing the role protoco
 | `spawnFreshContextSession` | Start a fresh, non-forked session for review/audit or long-running role work. |
 | `identifyOwnRuntime` | Report the role runtime and claimant identity so reviewer != executor can be enforced operationally. |
 
-`reviewer != executor` remains the quality invariant. The primitive map is the spec for a later
-Codex Brain binding; it does not require building that binding here.
+`reviewer != executor` remains the quality invariant. The primitive map is the portable contract;
+`roles/runtime-bindings/codex.md` is this estate's first concrete Codex binding.

@@ -63,6 +63,8 @@ harness may host the role if the binding supplies `monitorJob`, `dispatchExecuto
 Session model + model tiering: `planning-rules.md` §2.5–2.7. Shepherd + reviewer are
 **operator-launched** (§2.5) — you author the kickoffs; the operator spawns the sessions. **Never
 spawn a shepherd/reviewer as your own subagent** (it would collapse the altitude separation).
+Codex-hosted orchestrators resolve their harness mechanics through
+`roles/runtime-bindings/codex.md`.
 
 ## Standing responsibilities
 - **Program tracking** — keep the roster, the dashboard, any program backlog, `planning-rules.md`

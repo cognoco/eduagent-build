@@ -19,7 +19,8 @@ and keep working; report degraded mode as a `decision` line, not a `blocked`. At
 MCP-independent path with one cheap REST call before dispatching anything.
 
 > **Paths** are relative to the `_quartet/` root. The shepherd is **operator-launched** from
-> `roles/kickoffs/shepherd-kickoff-template.md`.
+> `roles/kickoffs/shepherd-kickoff-template.md`. Codex-hosted shepherds resolve their
+> dispatch/session/monitor mechanics through `roles/runtime-bindings/codex.md`.
 
 ---
 
@@ -162,13 +163,36 @@ compaction, reboot, and freeze; use this name, not a new coinage.
   owns the review watcher, polls all workstreams for `Stage=Reviewing`, and runs `/cosmo:review`
   (+ `/cosmo:qa`). It is **not you** and will **not** notify you of its verdict.
 
-## Dispatch — model & effort
-Dispatch executors on **the standard tier, standard effort** by default (reserve the top tier for
-your own adjudication). Escalate a *specific* WI to the top tier only when its difficulty is in
-the *reasoning* — subtle concurrency/atomicity, non-obvious security correctness, or a plan-phase
-that surfaces a real design decision; run that WI's plan-phase on the top tier and let a standard
-executor implement once the approach is locked. Severity alone is not the trigger. Your lane
-tracker names any known escalations.
+## Dispatch — model & effort (WI-1627)
+**Delegate down; never do delegable work in-seat.** Mechanical/search/read/format/summarize work
+is dispatched to a **haiku** executor; implementation/codegen/test-writing/standard-review work is
+dispatched to a **sonnet** executor. The shepherd seat itself is reserved for adjudication,
+sequencing, and safety-critical judgment **only** — if you catch yourself about to search, read,
+format, summarize, implement, or write tests in-seat, that is delegable work and it goes to a
+dispatched executor instead, full stop.
+
+**Every executor dispatch carries an explicit `--model` and `--effort` — never inherited from the
+session default.** Tier by the shape of the work, not by habit:
+
+| Tier | Effort | Work |
+|---|---|---|
+| `haiku` | low | search, read, format, mechanical edits, summarize |
+| `sonnet` | standard | implementation, codegen, tests, standard review |
+| `opus` | high | plan-phase design decisions or safety-critical correctness reasoning — only |
+
+**Opus-justify rule.** An `opus`/high-effort dispatch requires a one-line justification recorded in
+the dispatch record. The trigger is difficulty *in the reasoning* — subtle concurrency/atomicity,
+non-obvious security correctness, or a plan-phase that surfaces a real design decision — **not**
+severity: a P0 bug fix that's mechanical still goes to `sonnet`; a low-severity item demanding
+genuine architectural judgment can justify `opus`. Run that WI's plan-phase on `opus` and let a
+`sonnet` executor implement once the approach is locked. Your lane tracker names any known
+escalations.
+
+**Runtime-model verification is not a dispatch-time duty.** Confirming an executor actually ran on
+its tagged model is **fleet token telemetry** — an orchestrator-owned check (per-model
+output-token aggregation across session transcripts), not a per-dispatch duty of the seat doing the
+dispatching. Your own explicit `--model` override, made at dispatch time, is your seat's own
+reliable compliance signal from your own seat; you do not need to independently re-verify it.
 
 ## The review loop — two mandatory gates: green-PR-to-merge, then Cosmo-Close-to-graduate
 There are **two** gates, in order, and **both** are mandatory. **Gate 1 — a green PR is the hard

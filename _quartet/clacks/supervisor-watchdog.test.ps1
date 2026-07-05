@@ -111,6 +111,16 @@ $state = Get-Content "$scratch\respawn\supervisor-recovery-state.json" -Raw | Co
 Assert-True ($state.attempt_count -eq 0) "backoff attempt_count reset after heartbeat resumed"
 
 # ---------------------------------------------------------------------------
+Write-Output "Case 6: OPQ-14 compliance  -  watchdog spawn is not hidden, task registration uses an Interactive principal"
+$watchdogSource = Get-Content $watchdog -Raw
+Assert-True (-not ($watchdogSource -match '-WindowStyle\s+Hidden')) "watchdog relaunch spawn does not force -WindowStyle Hidden"
+
+$registerScript = Join-Path $PSScriptRoot "register-supervisor-watchdog-task.ps1"
+$registerSource = Get-Content $registerScript -Raw
+Assert-True ($registerSource -match 'New-ScheduledTaskPrincipal[^\r\n]*-LogonType\s+Interactive') "registration builds a principal with -LogonType Interactive"
+Assert-True ($registerSource -match 'Register-ScheduledTask[^\r\n]*-Principal\s+\$principal') "registration wires the Interactive principal into Register-ScheduledTask"
+
+# ---------------------------------------------------------------------------
 Remove-Item $scratch -Recurse -Force -ErrorAction SilentlyContinue
 
 if ($failures -gt 0) {
