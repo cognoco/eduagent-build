@@ -50,7 +50,7 @@ named verification first) · **REPAIR** (metadata broken).
 | 1284 | Reviewing | P2 | CLOSE? | F-B: same; API-key-precedence may still matter for codex? verify |
 | 1282 | Reviewing | P2 | CLOSE? | F-B: same (`which` ENOENT) |
 | 1515 | Ready | P2 | REFINE | WP coherence broken (F-D); re-scope after 1356 finalizes, 1318 unblocks |
-| 1296 | Ready | P2 | FIRST-WAVE | summary append→replace; kills the rework re-bounce loop |
+| 1296 | Ready | P2 | CLOSE? → Overtaken | **PM-verified already fixed** (2026-07-05): WI-1243's commit 10aadb7 (07-02 09:56Z) replaces summaries on re-complete, incl. old-format ones; tests T1243.a/T1346.c pass 31/31. WI captured 9h after the fix by a stale plugin clone (OPQ-17 class). Evidence on the WI; close via normal gate |
 | 1236 | Ready | — | REFINE | set Priority (suggest P2); orchestrator-boot monitor arming — pairs with relaunch discipline |
 | 1635 | Captured | P1 | FIRST-WAVE | Executed-By stamping — UNBLOCKED (OPQ-18 ruled; schema half done by PM) |
 | 1525 | Captured | P2 | CLOSE? | F-A: overtaken by WI-1631/1632 |
@@ -149,16 +149,22 @@ Full review in `CODEX-VERDICT.md` (codex exec, read-only, against this file + th
 
 ## Recommended hand-back package (REVISED post-Codex; order matters)
 
-0. **WI-1296 alone first** — summary append→replace; gates the wave below (amendment 2).
-1. **Re-finalize wave** (after 1296 lands): 1634, 1630, 1629 (+PM independent close), 1605,
-   1356 (merge #61), 1297 (re-claim). Pure completion, no new build. Each unclaimed-Executing
-   item is logged as WI-1312 evidence in passing.
+0. **Plugin-clone refresh on every host first** (replaces the 1296-first step — PM verified
+   2026-07-05 that WI-1296 was already fixed by WI-1243, commit 10aadb7): `git -C
+   ~/.claude/plugins/marketplaces/zdx-marketplace pull --ff-only` + `/reload-plugins` per the
+   OPQ-17 workaround. Codex's amendment-2 risk (re-bounce loop during the wave) is real but
+   the defense is running the FIXED tool, not new code. WI-1296 itself → close as Overtaken
+   via the normal gate.
+1. **Re-finalize wave** (after step 0 on the executing host): 1634, 1630, 1629 (+PM
+   independent close), 1605, 1356 (merge #61), 1297 (re-claim). Pure completion, no new
+   build. Each unclaimed-Executing item is logged as WI-1312 evidence in passing.
 2. **Repairs/verifications** (mixed effort — field repairs are minutes, the verifications are
    judgment work): 1600 stage repair; 1635 field repair (State→Active, description, title);
    state fields on 1594/1609/1614; content for 1370; priorities 1236/1229; 1543 claim
    reconcile; THEN 1525 vs 1631/1632 comparison and 1282/1284/1295 vs codex-default verdict.
-3. **First-wave dispatch**: 1264 (P1-bump), 851, 1369 (P2-bump), 1225, 1159; plus 1635, 1236,
-   1609 once their step-2 repairs land; 1526 refine→ready→dispatch.
+3. **First-wave dispatch** (1296 removed — already fixed): 1264 (P1-bump), 851, 1369
+   (P2-bump), 1225, 1159; plus 1635, 1236, 1609 once their step-2 repairs land; 1526
+   refine→ready→dispatch.
 4. **Refine queue** for the wave after: 1607, 1604, 1614 (scheduled drill, per amendment 6),
    1518/1515 (WP re-scope), 1594, 1638, 1263 (spike), 850 (overlap check), 1544 (Codex-pilot
    gate — promote if the pilot is approved).
