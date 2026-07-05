@@ -28,6 +28,8 @@ Your own last checkpoint is `../CHECKPOINT-2026-07-04.md` — this packet supers
   migration-apply + WI-1570 + WI-1503.
 
 ## First acts, in order
+0. **Plugin cache check (OPQ-17, P0)** — see README. Your machine is very likely pinned
+   at cosmo 0.6.32 like the other two were; fix BEFORE any /cosmo:* command.
 1. `[orch-ack]` on your WS rows: relaunched, canon @ nexus@92c9715, honest ENEs.
 2. Reconcile WI-1393 / WI-1504 / WI-1505 lifecycle (completes → Reviewing) per above.
 3. **WS-31 safety-eval respawn** (with operator): drain `se-054..059`;

@@ -13,8 +13,12 @@ Sequencing: **ramtop first** → stable a few hours → orion.
   shepherd-protocol, program-manager-protocol) + `_quartet/clacks/monitor-hygiene.md`.
 - Precedent register: `_quartet/working/program/precedent-register.md` (this repo, main) —
   READ IT before filing anything to the operator.
-- zdx-core plugin: re-pull before first lifecycle command (WI-1601 sweep fix + reviewer
-  fixes landed while you were down).
+- Plugins (OPQ-17, P0): the installed plugin cache was silently pinned at cosmo 0.6.32
+  on at least two machines — all merged lifecycle fixes were runtime-inert (dedup dead,
+  `claude -p` still invoked). **Ramtop is fixed** (cosmo 0.6.40 + zdx-core 1.0.2, 07-05).
+  **Any other machine: verify `~/.claude/plugins/cache/zdx-marketplace/cosmo/` tops out
+  at ≥0.6.40 BEFORE the first lifecycle command**; if stale, pull the marketplace clone
+  (`~/.claude/plugins/marketplaces/zdx-marketplace`) then disable/enable the plugin.
 
 **What changed while the fleet was down (retro Tier A — all landed):**
 1. **Fleet-state protocol** (WI-1599/1564): PAUSE / DRAIN / SHUTDOWN are distinct tiers;
