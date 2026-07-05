@@ -5,6 +5,48 @@ and how to recover it. Append newest-first.
 
 ---
 
+## WI-1306 — M2a physical DROP of the 5 legacy identity/billing tables (2026-07-05)
+
+Journal-promoted the two terminal freeze-only drafts
+(`apps/api/drizzle/_freeze-only/0118_m_drop.sql` + `0119_m_subscriptions_drop.sql`)
+into a single committed forward migration, `apps/api/drizzle/0132_many_beyonder.sql`:
+`DROP TABLE IF EXISTS consent_states, family_links, profiles, accounts,
+subscriptions;` (no CASCADE — a single multi-table statement resolves the
+intra-legacy FKs among the 5 as a set) followed by `DROP TYPE IF EXISTS
+consent_status, consent_type, location_type, subscription_status,
+subscription_tier;`. This is the physical payoff of WI-1139's definition-only
+removal — the Postgres tables/enums are now actually gone wherever the
+migration chain is applied. IMPOSSIBLE to roll back in place; see the
+migration's own `## Rollback` section for the Neon PITR recovery procedure.
+
+Precondition: the applied `0129_m_repoint` (not the frozen `0117_m_repoint.sql`
+draft, which it fully supersedes) already re-pointed every live FK off the
+legacy parents and asserted completeness at run time. Verified directly against
+a scratch Postgres carrying the full committed chain: zero rows in
+`pg_constraint` reference any of the 5 tables from outside the set, and zero
+real-table columns (`pg_class.relkind = 'r'`) use any of the 5 enum types
+outside the 5 tables — both re-confirmed empty immediately before authoring
+0132.
+
+Retired alongside the physical drop (both cannot survive tables-absent):
+- `tests/integration/identity-reseed.integration.test.ts` — deleted. Covered
+  migration 0109's reseed-from-legacy DO block via a rolled-back transaction
+  against the legacy tables; those tables are now gone in every environment
+  the migration chain reaches.
+- `family_links` / `consent_states` removed from the
+  `database-rls-coverage.ts` manifest (`PROFILE_SCOPED_TABLES`,
+  `OR_SCOPED_TABLES`, `RLS_TABLE_META`); the dedicated
+  `family_links policy predicate references both...` integration test and the
+  `family_links metadata declares both columns...` unit test deleted (both
+  asserted directly on the now-dropped table/its policies).
+
+Recovery: the deleted test files and manifest entries are visible in this
+commit's parent (`git show <this-commit>^:tests/integration/identity-reseed.integration.test.ts`,
+etc.); the dropped tables/enums themselves are recoverable ONLY via Neon PITR
+per the migration's Rollback section — there is no forward-only undo.
+
+---
+
 ## WI-1139 — legacy schema defs + dead prod/test chain (2026-07-04)
 
 Deleted the 5 legacy identity/billing Drizzle table defs from

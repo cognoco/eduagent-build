@@ -5,7 +5,8 @@
  *   1. Every table in ALL_RLS_TABLES has at least one policy in pg_policies.
  *   2. The policy predicate (qual column in pg_policies) references the correct
  *      column — `profile_id` for profile-scoped tables, `owner_profile_id` for
- *      owner-scoped tables, and both FK columns for family_links.
+ *      owner-scoped tables. (Legacy `family_links`'s dedicated both-FK-columns
+ *      check was retired alongside the table by migration 0132 — WI-1306.)
  *
  * A policy scoped to `user_id` instead of `profile_id` on a covered table
  * would pass a simple existence check but fail here, catching the bug before
@@ -109,34 +110,6 @@ describe('Integration: RLS policy coverage (H8)', () => {
         passes: true,
       });
     }
-  });
-
-  it('family_links policy predicate references both parent_profile_id and child_profile_id', async () => {
-    const db = createIntegrationDb();
-
-    const rows = await db.execute<{ qual: string | null }>(
-      sql`
-        SELECT qual FROM pg_policies
-        WHERE schemaname = 'public' AND tablename = 'family_links'
-      `,
-    );
-
-    expect(rows.rows.length).toBeGreaterThan(0);
-
-    // At least one policy should reference BOTH FK columns via an OR predicate
-    const hasBothColumns = rows.rows.some(
-      (r) =>
-        r.qual?.includes('parent_profile_id') &&
-        r.qual?.includes('child_profile_id'),
-    );
-
-    expect({
-      table: 'family_links',
-      qualContainsBothFkCols: hasBothColumns,
-    }).toEqual({
-      table: 'family_links',
-      qualContainsBothFkCols: true,
-    });
   });
 
   // [WI-794] GUC-key drift guard.
