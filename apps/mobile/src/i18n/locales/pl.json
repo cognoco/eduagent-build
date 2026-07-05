@@ -552,7 +552,8 @@
     "help": {
       "contactSupportTitle": "Kontakt z pomocą",
       "contactSupportMessage": "Napisz na adres support@mentomate.app, aby uzyskać pomoc dotyczącą konta.",
-      "helpAndFeedback": "Pomoc i opinie"
+      "helpAndFeedback": "Pomoc i opinie",
+      "shakeToReportHint": "Na urządzeniu mobilnym możesz też w dowolnej chwili potrząsnąć telefonem, aby zgłosić problem."
     },
     "errors": {
       "tryAgain": "Spróbuj ponownie.",

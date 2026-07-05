@@ -556,7 +556,8 @@
     "help": {
       "helpAndFeedback": "Help & feedback",
       "contactSupportTitle": "Contact support",
-      "contactSupportMessage": "Email support@mentomate.app for help with your account."
+      "contactSupportMessage": "Email support@mentomate.app for help with your account.",
+      "shakeToReportHint": "On mobile, you can also shake your phone anytime to report a problem."
     },
     "sections": {
       "settings": "Settings"

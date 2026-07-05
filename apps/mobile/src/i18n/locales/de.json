@@ -523,7 +523,8 @@
     "help": {
       "contactSupportTitle": "Support kontaktieren",
       "contactSupportMessage": "Sende eine E-Mail an support@mentomate.app für Hilfe mit deinem Konto.",
-      "helpAndFeedback": "Hilfe & Feedback"
+      "helpAndFeedback": "Hilfe & Feedback",
+      "shakeToReportHint": "Auf dem Handy kannst du dein Gerät auch jederzeit schütteln, um ein Problem zu melden."
     },
     "errors": {
       "tryAgain": "Bitte versuche es erneut.",

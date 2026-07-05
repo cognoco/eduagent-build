@@ -546,7 +546,8 @@
     "help": {
       "contactSupportTitle": "Contatar o suporte",
       "contactSupportMessage": "Envie um e-mail para support@mentomate.app para obter ajuda com sua conta.",
-      "helpAndFeedback": "Ajuda e feedback"
+      "helpAndFeedback": "Ajuda e feedback",
+      "shakeToReportHint": "No telemóvel, também pode abanar o telemóvel a qualquer momento para comunicar um problema."
     },
     "errors": {
       "tryAgain": "Tente novamente.",

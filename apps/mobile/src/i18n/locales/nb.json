@@ -519,7 +519,8 @@
     "help": {
       "contactSupportTitle": "Kontakt kundestøtte",
       "contactSupportMessage": "Send e-post til support@mentomate.app for hjelp med kontoen din.",
-      "helpAndFeedback": "Hjelp og tilbakemeldinger"
+      "helpAndFeedback": "Hjelp og tilbakemeldinger",
+      "shakeToReportHint": "På mobil kan du også riste telefonen når som helst for å rapportere et problem."
     },
     "errors": {
       "tryAgain": "Prøv igjen.",
