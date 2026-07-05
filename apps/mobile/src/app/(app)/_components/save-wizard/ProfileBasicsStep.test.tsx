@@ -101,6 +101,44 @@ describe('ProfileBasicsStep', () => {
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
 
+  it('[WI-1407] blocks child save when the parent birth year is under 18', () => {
+    const onComplete = jest.fn();
+
+    render(
+      <ProfileBasicsStep
+        target="child"
+        previewState={basePreviewState}
+        onComplete={onComplete}
+        onExitWizard={jest.fn()}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-name'),
+      'Teen Parent',
+    );
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-birth-year'),
+      String(new Date().getFullYear() - 16),
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Kid');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-child-birth-year'),
+      '2014',
+    );
+
+    expect(screen.getByTestId('save-basics-adult-required')).toBeTruthy();
+
+    const continueButton = screen.getByTestId('save-basics-continue');
+    expect(continueButton.props.accessibilityState?.disabled).toBe(true);
+
+    fireEvent.press(continueButton);
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
   // [WI-824] ACCOUNT-05/35: a 402 PROFILE_LIMIT_EXCEEDED during child profile
   // creation must surface an upgrade alert + "See plans" CTA → /subscription,
   // NOT an inline error banner. Mirror of the pattern already tested for
