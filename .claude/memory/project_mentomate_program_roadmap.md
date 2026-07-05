@@ -10,6 +10,40 @@ metadata:
   originSessionId: 21c2badf-43d7-4e6a-ac7e-909be767a3fc
 ---
 
+## Evening session 2026-07-05 (~15:00–19:00Z) — OPQ rulings + audit (READ FIRST)
+
+- **OPQ-16 GO** → WI-1374/1601 closed Done by PM (independent hand), row Folded-back, relayed.
+  Tail: WI-1629 harness fix needs ONE PM independent close when re-finalized (pre-authorized).
+- **OPQ-17 APPROVED** (4-point): skill path sanctioned; clone-pull duty into WI-1563 supervisor +
+  wake tripwire = upstream-bug workaround (claude-code #73673/#72616, PM +1'd), retire on upstream
+  fix; Ramtop remediated (cosmo 0.6.46 via /reload-plugins after clone un-wedge); Surface directed.
+- **OPQ-18 = A** → PM added `Executed By` (rich_text) to WI schema; WI-1635 stamping = WS-23; Folded-back.
+- **OPQ-19 (WI-1245 cutover) RULED + GO**: D1=A (flat QUARTET_LANE_STATE_ROOT; working-tree-only
+  invariant RATIFIED; collision tripwire; lane-move ceremony=rsync over tailnet), D2=A (gitignore +
+  WI-1199-D1 same window, surface-if-bigger), D3=A + INSTANTIATE-THEN-RUN rider (canonical scripts
+  in git; running instances/pid/logs NEVER tracked, never execute from inside a git tree). Row Closed.
+  **Runbook NOW PUSHED**: nexus main `plans/WI-1245-clacks-cutover-runbook.md` (18:55Z). NEXT ACT:
+  PM executes RAMTOP-side cutover from it; ZDX machine cuts over post-reboot; orion at relaunch;
+  WI-1245 finalizes after all 3 hosts.
+- **OPQ-1 R1 PASS** (Zuzka, Galaxy S10e): WS-28 gate CLEAR; riders WI-1640 (/ready crash) +
+  WI-1641 (prod secrets drift) filed; prod worker was hard-down (missing 2 secrets), synced mid-run.
+  OPQ-5 annotated possibly-overtaken. Ramtop packet updated (3c6a5eb).
+- **WI-1526** carries the operator-ratified 7-point orchestrator duty spec (pipeline custodian, not
+  dispatcher); precedent-register entry added (8e044c9). WI-1263 refined → portable lane-state
+  substrate (Postgres lean; cloud-executor forcing function).
+- **ZDX backlog audit** (operator-ordered gate before hand-back, PM + Codex 2nd opinion):
+  `_quartet/working/program/zdx-backlog-audit-2026-07-05/AUDIT.md` DRAFTED — 62 items dispositioned,
+  8 cross-cutting findings (F-A..F-H: 1525 overtaken by 1631/1632; Reviewing trio 1282/1284/1295
+  maybe mooted by codex-default; 1600 stage-less; cross-WS WP incoherence 1515/1518; empty stubs;
+  1543 live claim during downtime; prio gaps 1236/1229; zdx-marketplace has NO CI → 1264 P1-bump).
+  **PENDING: Codex adversarial pass, then hand to operator.** Slice data in scratchpad
+  zdx-audit-slice.json. NOTHING enters ZDX pipeline until operator hand-back.
+- ZDX orch reboot pending; relay directive sent (runbook push ✓ → reboot → clone un-wedge →
+  own cutover → [orch-status]). Watcher bjsbd8o2b + 2h cron f298c32b still armed.
+- Codex-pilot thinking: pilot = Codex builder in ONE self-contained lane (Coverage Debt best),
+  Claude orchestrator retained; gates: fleet stable post-relaunch + sanctioned Codex lifecycle
+  path WI + WI-1635; WS-43 WI-1544 = the smoke gate.
+
 ## AFK autonomous window 2026-07-05 (~12:00–13:00Z) — what happened
 
 Operator AFK; standing order = monitor ZDX Tier-A + execute Phase-E prep autonomously.
