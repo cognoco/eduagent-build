@@ -16,9 +16,14 @@ containment lanes; orion owns WS-31/33/39 + Coverage Debt — never touch those.
 ## Park/resume state per lane
 
 **WS-28 V2 finalization**
-- Still gated on the operator-side **R1 device re-run** (update group `c46e0177`, Galaxy
-  S10e) — Open in the Operator Queue (P0, Zuzka). Kickoff for the next milestone was
-  declared ready-on-R1 before the drain.
+- **R1 device re-run PASSED** (Zuzka, 2026-07-05 17:40Z, Galaxy S10e, group `c46e0177`;
+  ruling on OQ row OPQ-1): both prior defects fixed, full smoke green against production
+  (real sign-up → curriculum gen → session → streamed chat). The gate is CLEAR — fire the
+  next-milestone kickoff you declared ready-on-R1.
+- Riders from the run, both filed: **WI-1640** (one-time white-screen crash on `/ready`
+  when the mentor-birth animation completes; recovers on restart) — triage into WS-28 or
+  bug lane; **WI-1641** (prod worker secrets drift: Doppler-only additions never reach
+  the worker; took prod hard-down until mid-run sync) — launch-relevant, likely WS-39.
 - WI-1307 was Executing at drain — verify its worktree/branch state before resuming.
 
 **Bug Lane**
