@@ -1,15 +1,23 @@
 # Reviewer Protocol
 
-**What this is.** The standard process scaffold for the **autonomous reviewer** of a Cosmo
-workstream — the session that takes Work Items from `Stage=Reviewing` to a disposition (done /
-rework / human). Carries *process only*. Sibling to `roles/shepherd-protocol.md`, the executor
-layer (`roles/executor/`), and `roles/orchestrator-protocol.md` — one of the four role-scaffolds
-of the **Quartet**. The reviewer is context-agnostic and signals only through Cosmo Stage — it
-does **not** read the **Clacks** (the orchestrator↔shepherd comms layer). To spawn a reviewer for
-a specific workstream, paste `roles/kickoffs/reviewer-kickoff-template.md` (it points here).
+**What this is.** The standard process scaffold for the **autonomous reviewer** of a **mutable set**
+of Cosmo Workstreams (`planning-rules.md` §1.5 — never 1:1) — the session that takes Work Items
+from `Stage=Reviewing` to a disposition (done / rework / human). Carries *process only*. Sibling to
+`roles/shepherd-protocol.md`, the executor layer (`roles/executor/`), and
+`roles/orchestrator-protocol.md` — one of the four role-scaffolds of the **Quartet**. The reviewer
+is context-agnostic and signals only through Cosmo Stage — it does **not** read the **Clacks** (the
+orchestrator↔shepherd comms layer). To spawn a reviewer for an initial workstream set, paste
+`roles/kickoffs/reviewer-kickoff-template.md` (it points here).
 
 **Precedence:** operator rulings > Cosmo lifecycle rules (AGENTS.md + the `cosmo` skills) > this
 protocol > habits.
+
+**Substrate access ladder (WI-1314).** Load the `notion-patterns` skill at boot, like the `cosmo`
+skills. Three independent paths reach the work system: Notion **MCP**, the **cosmo bun CLIs**
+(`NOTION_TOKEN` over REST — they never touch MCP), and the **notion CLI / raw REST**. **MCP loss is
+a tooling degradation, never a work stoppage — halting on it is a protocol violation.** Drop down
+the ladder and keep reviewing; prove the MCP-independent path with one cheap REST call at boot.
+Codex-hosted reviewers resolve their runtime mechanics through `roles/runtime-bindings/codex.md`.
 
 ## The one invariant — reviewer ≠ executor
 The reviewer is a **SEPARATE session in a SEPARATE runtime from the executors** (in this estate
@@ -20,8 +28,35 @@ convenience — a runtime reviewing its own output is not an independent check. 
 cross-model discipline the **auditor** executor type applies — `roles/executor/auditor.md` — wired
 permanently into the Cosmo lifecycle.)
 
-## Your job — the loop (one workstream only)
-1. Poll Cosmo Work Items by `Workstream` relation (~60s). Detect items newly at `Stage=Reviewing`.
+**Binding note.** This is the runtime-neutral reviewer protocol. Codex is the current estate
+reviewer binding; another runtime may bind it only if it preserves reviewer != executor and the
+Cosmo review/QA lifecycle.
+
+## Scope — a mutable workstream set, not 1:1 (WI-1229)
+Your polled scope is a **list** of Cosmo Workstreams, sourced from your watcher's config
+(`COSMO_WATCH_CONFIG` — `clacks/review-watcher.ts`), never a single hard-bound workstream — the
+kickoff names your **initial** set, not a permanent one. That set is **mutable at runtime**: the
+**operator** (never the shepherd — reviewer ≠ executor holds for scope changes too) can add or
+retire a workstream from your live scope. This is a bounded addition to the existing list-config
+surface, not a new lease/ownership model: the per-workstream lease (`clacks/lease.ts` agenda B3)
+already keys off whichever workstreams are in your config at a given moment, so growing or
+shrinking the list changes what you poll, never how you hold a lease on each entry. The current
+watcher reads its config once at boot — until a live-reload path lands, treat an operator's
+add/retire instruction as requiring a fresh watcher process on the updated config, and say so
+rather than silently ignoring it or pretending a hot-reload happened.
+
+**Adoption timing.** Like the rest of `_quartet/roles/**`, this section binds a reviewer session at
+its next session boundary — it is never hot-swapped into a session already running.
+
+**Watcher runtime instances (WI-1417).** The standing watcher is launched from tracked
+code/templates, but its live config, logs, review outputs, and de-dupe state live under
+`.cosmo-watch/` or the declared program runtime dir. Do not patch `_quartet/clacks/*` in place to
+create a live watcher variant. At the next reviewer session boundary, reconcile any useful local
+watcher deltas into explicit Work Items and discard the rest.
+
+## Your job — the loop (a mutable workstream set)
+1. Poll Cosmo Work Items by `Workstream` relation, across your whole configured set (~60s). Detect
+   items newly at `Stage=Reviewing`.
 2. **De-dupe by transition key**, not WI id, so rework cycles re-trigger.
 3. For each, run `/cosmo:review` **for real** (not `--check`), gathering `/cosmo:qa` evidence.
 4. Disposition: **done** (DoD passes) · **rework** (precise note — exactly what failed + where) ·

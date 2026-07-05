@@ -24,6 +24,31 @@ Items DB id) · `COSMO_WATCH_CONFIG` (path to the workstream JSON). Optional: `C
 (default 60000), `COSMO_WATCH_OUTDIR` (durable state dir — point at `working/program/`, **not**
 `/tmp`).
 
+**Runtime instance rule (WI-1417).** Launch watchers from tracked templates, but put runtime
+instances under a gitignored directory such as `.cosmo-watch/` (or a program-specific equivalent).
+Per-launch config, logs, review outputs, and de-dupe state belong there. Never patch
+`_quartet/clacks/*` in place to create a live watcher variant; useful deltas become Work Items and
+land through the normal lifecycle.
+
+## Substrate access ladder — MCP loss is degraded mode, never a stoppage (WI-1314)
+
+Three independent paths reach the work system, in preference order: Notion **MCP** (convenience
+layer) → the **cosmo bun CLIs** (`fetch`/`claim`/`create`/`complete`/`triage`/`refine`/`review`/`qa`
+.ts, all authenticate via `NOTION_TOKEN` over REST and never touch MCP) → the **notion CLI / raw
+REST API** (same token). Losing the MCP server does not remove the other two — it is a tooling
+degradation, and every role protocol (`orchestrator-protocol.md`, `shepherd-protocol.md`,
+`reviewer-protocol.md`, `roles/executor/executor-protocol.md`) now states the invariant: **halting a
+lane on MCP loss is a protocol violation.** Drop down the ladder, report degraded mode as a
+`decision` line (never `blocked`), and keep working.
+
+**Reviewer polling path is already MCP-independent.** `clacks/review-watcher.ts` authenticates with
+`NOTION_TOKEN` and calls `https://api.notion.com/v1/...` directly (`fetch(...)`, see the file's REST
+helper) — it never depends on the MCP server, so a shepherd/reviewer citing "verdict-poll skipped,
+MCP down" is describing a false constraint, not the watcher's actual dependency.
+
+**Root cause of the MCP-equals-Notion conflation:** see `findings.md` → *MCP-equals-Notion
+conflation — root cause (WI-1314)*.
+
 ## Estate bindings (swap per deployment)
 Doppler (secrets), Codex (reviewer/auditor runtime), the repo commit skill, `zdx-config.yaml` (DB
 discovery). These are this estate's specifics, not part of the standard — substitute the equivalents
@@ -31,19 +56,27 @@ when relocating `_quartet/`.
 
 ## External work this depends on
 
-Quartet's forward-dependencies — the Cosmo work-system / planning-layer capabilities it consumes —
-are **owned and tracked live in Cosmo under the ZDX Productization program** (`INI-25` in the
-Initiatives DB) → its workstreams ("Cosmo improvements", "NEX/ZDX improvements") → work items.
-**Check Cosmo there for current status; do not mirror it here** (one-fact-one-home,
-`planning-rules.md` §1.4). That program is owned by a separate orchestrator.
+### Reviewer-leg productization — LANDED (the four blockers, settled 2026-06-29)
+Quartet **consumes** the Cosmo reviewer mechanism; it does not reimplement it. The "Cosmo
+improvements" workstream (project: ZDX-Marketplace) delivered the contract Quartet's reviewer leg
+assumes:
+- **WI-888** (reviewer reads only the latest completion summary; parser-robust; re-finalize clearable) — Closed/Done.
+- **WI-889** (`execute complete` authors Fixed In; DoD hard-requires non-empty) — Closed/Done.
+- **WI-890** (watcher de-dupe / stale-replay) — Closed **superseded**: both concerns already resolved in `clacks/review-watcher.ts` (transition-key de-dupe). No external fix needed.
+- **WI-891** (reviewer respects advisory/continue-on-error red lanes in closure-verification) — Closed/Done.
 
-Two durable facts a Quartet orchestrator can rely on:
-- The **planning layer is live** — the Initiatives DB, the Workstream records, and the
-  Initiative→Workstream→Work-Item relations exist and are in use (this repo's program runs on them).
-- The **reviewer-leg contract** Quartet's reviewer consumes — completion-summary shape, `Fixed In`
-  authored by `execute complete`, advisory/continue-on-error red handling — **landed** (mid-2026).
-  Keep completion summaries parser-clean per the finalization runbook.
+These pin the reviewer **input** (completion-summary shape), the executor→complete **handoff**
+(`builder.md` Phase-7), and the **greenness** definition (shepherd green-PR gate). Keep the
+completion-summary parser-clean per the finalization runbook (folded to the cosmo/zdx skill docs via
+**WI-887**, Ready).
 
-Write Quartet contracts against **stable primitives** — Work Item, Workstream, Stage, State,
-Execution Path, claim, reviewer disposition, evidence. Source of truth on terminology is the current
-ZDX standard, not this folder.
+### NEX/ZDX ontology — LANDED (terminology source of truth)
+The "NEX/ZDX improvements" workstream landed the current work-system primitives: **WI-835**
+(two-layer planning/execution ontology + childless WP), **WI-838** (Planning DB:
+Initiative/Epic/Story), **WI-839** (planning→execution relations), **WI-852** (the `Asset` noun),
+and **WI-834** (`Effort`). Quartet contracts should now use the current ZDX standard directly:
+Initiatives use `INI-NN`; childless WPs are legal when the WP carries its own AC; `Effort` is a
+Work Item t-shirt size mandatory at DoR; an Initiative realizes an Asset.
+
+Source of truth on terminology is `zdx/standard/` plus
+`zdx/adr/ZDX-ADR-0010-two-layer-planning-execution-ontology.md`, not this folder.

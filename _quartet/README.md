@@ -38,6 +38,7 @@ _quartet/
       executor-protocol.md   shared rails + type selector + spawn economics
       builder.md  researcher.md  auditor.md  general.md
     kickoffs/          paste-able launchers (orchestrator / shepherd / reviewer)
+    runtime-bindings/  concrete harness bindings (e.g. Codex)
   library/             ── LIBRARY (definitions, not live content)
     program-roster.md  execution-tracker.md  clacks-channel.md  dashboard.md  activation-queue.md
   clacks/              ── the comms layer: design + tooling
@@ -45,7 +46,6 @@ _quartet/
   examples/            worked references (e.g. a real executor dispatch brief)
   working/             ── WORKING STATE (live instances; relocation TBD)
     program/  lanes/
-  _quartet-wip/        ── META (NOT machinery): artifacts from building/auditing Quartet — audit.md, quartet-findings.md, repo-findings.md
 ```
 
 ## Bootstrap — "recreate its operational self"
@@ -73,3 +73,24 @@ All cross-references in this folder are relative to the `_quartet/` root (e.g.
 A few specifics are this estate's bindings, not part of the standard — they are called out where
 they appear: secrets via **Doppler**, the cross-model reviewer/auditor runtime is **Codex**, and
 the commit flow goes through the repo's commit skill. Swap these for the target deployment.
+
+## Runtime binding seams
+Quartet is runtime-agnostic at the role-protocol layer. Concrete Claude Code, Codex, or other
+harness behavior is a **binding** of the same role contract, not the contract itself.
+
+Current estate bindings:
+- Claude Code commonly hosts shepherd/orchestrator/executor sessions.
+- Codex commonly hosts the independent reviewer/auditor runtime.
+
+The Codex Brain binding lives at `roles/runtime-bindings/codex.md` and binds four primitives
+without changing the role protocols:
+
+| Primitive | Contract |
+|---|---|
+| `dispatchExecutor` | Start an executor in the spawner's native runtime with a bounded brief, claim identity, and workspace isolation. |
+| `monitorJob` | Observe a Clacks or Cosmo-Stage signal and wake the owning role without treating silence as success. |
+| `spawnFreshContextSession` | Start a fresh, non-forked session for review/audit or long-running role work. |
+| `identifyOwnRuntime` | Report the role runtime and claimant identity so reviewer != executor can be enforced operationally. |
+
+`reviewer != executor` remains the quality invariant. The primitive map is the portable contract;
+`roles/runtime-bindings/codex.md` is this estate's first concrete Codex binding.

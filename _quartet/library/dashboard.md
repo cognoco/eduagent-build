@@ -8,6 +8,15 @@ live instance lives at `working/program/dashboard.html`.
 Cosmo at every umbrella touch. It holds no authoritative fact of its own — on any disagreement, the
 roster and Cosmo win. It states this about itself.
 
+> **PM-role note (WI-1370, filed not reconciled).** This file names no actor, but the umbrella
+> touch that regenerates the dashboard is currently the orchestrator's ("Program tracking" in
+> `roles/orchestrator-protocol.md`) — the orchestrator is the program-role-of-today
+> (`planning-rules.md` §2.5) and no PM-role holder is live yet. Who performs the regeneration touch
+> is revisited at PM-role adoption (the PM references, not owns, this artifact per
+> `roles/program-manager-protocol.md`'s operational-surface section). Owner: WS-26 lane. Target: at
+> PM-role adoption — tied to the WI-1357 orchestrator-hardening wave or the first live PM session,
+> whichever lands first. Do not reconcile before adoption.
+
 ## What it shows
 A board / gate-rail / field-guide over **Initiatives × bundles × gates**:
 - **Board** — every Initiative row with its `Status`, outcome, owner.

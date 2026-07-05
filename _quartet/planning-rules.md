@@ -39,7 +39,7 @@ Sub-item**.
 
 An Initiative realizes an **Asset**: the persistent deliverable that survives the effort and
 graduates to its productionized home. Use Initiative for the effort, Asset for the deliverable
-(canon: Nexus NEX-ADR-0001, initiative-workspace pattern).
+(NEX-ADR-0001).
 
 *That hierarchy is the **work** breakdown; the **execution roles** that drive it are the
 **Quartet** — orchestrator / shepherd / executor / reviewer (scaffolds: `roles/`) — coordinating
@@ -56,6 +56,19 @@ The `Activate-when` field is the highest-value capture (the one thing Cosmo cann
 
 1.4 **Pointers, never copies.** Every fact lives in exactly one home; every other artifact points.
 Moving a fact's home is allowed (it remains one home); duplicating it is not.
+
+1.5 **Lane ≠ 1:1 Workstream.** A **lane** is a shepherd's span of control: one shepherd drives
+**1..n related Cosmo Workstreams** as a single lane — never assume 1:1. This is a distinct
+cardinality from 1.1's Initiative→Workstream relation: a lane is the *shepherd's* unit, a
+Workstream is the *substrate's* unit, and the two may diverge. Scope grows **organically at
+runtime**, not only at activation — the orchestrator widens a shepherd's lane via a Clacks
+directive, and the operator widens a reviewer's scope directly (`roles/shepherd-protocol.md`,
+`roles/reviewer-protocol.md`). The lease substrate already supports a multi-workstream shepherd
+without a new mechanism: per-Workstream keying (`clacks/lease.ts`, agenda B3 — one lease per
+Workstream page id, no separate "lanes held" list) plus one `Owner` name reused across multiple
+Workstream rows (agenda A3's `Lease *` properties) is sufficient today. A **reviewer**'s scope is
+likewise a workstream **set**, and that set is **mutable** at runtime — distinct from, and looser
+than, a shepherd's lane.
 
 ## 2. The delivery pattern (per active Initiative)
 
@@ -78,12 +91,26 @@ slicing is pure transcription. `Effort` is the Work Item t-shirt size (`XS` / `S
 `XL`) and is mandatory before `Ready` under the current ZDX DoR. A field the plan omits becomes a
 judgment call at slice time — record the derivation rule used.
 
-2.5 **Session model — one session per altitude.** A **program session** (orchestrator) steers the
-roster / queue / gates; a **shepherd session** per executing Initiative runs its day-to-day; and
-**executor agents** build/do individual WPs in isolation. Do not collapse altitudes: the program
-session never shepherds WP-level detail, and a shepherd never reaches into another Initiative — the
-two talk only in boundary events (§5.2). Standing orchestration *daemons* are banned; shepherds are
-interactive sessions.
+2.5 **Session model — one session per altitude.** Above the program session sits a
+**program-manager (PM) session** (`roles/program-manager-protocol.md`) — the roadmap altitude: it
+owns the roadmap (sequence, critical path, gate ledger, operator-rulings queue) and the lane roster
+(`library/program-roster.md`), manages capacity (host loading, shared-checkout hazards) and
+cross-lane interdependencies, and escalates to the operator only at gates and forks. A **program
+session** (orchestrator) steers the roster / queue / gates day to day; a **shepherd session** per
+executing Initiative runs its day-to-day; and **executor agents** build/do individual WPs in
+isolation. Do not collapse altitudes: the PM session never steers a single lane's day-to-day, the
+program session never shepherds WP-level detail, and a shepherd never reaches into another
+Initiative — adjacent altitudes talk only in boundary events (§5.2) or, for the PM, at gates and
+forks. Standing orchestration *daemons* are banned; shepherds are interactive sessions.
+
+The PM does not replace or re-charter the orchestrator — `roles/orchestrator-protocol.md`'s
+day-to-day lane-activation, lane-graduation, and Progress-channel duties are unchanged by this
+altitude's introduction. The PM adds a coordinating layer above the existing four-role Quartet
+(orchestrator / shepherd / executor / reviewer, §1.1); it is not a fifth Quartet role. Program-level
+liveness (a PM checking lane/orchestrator liveness) inherits the exact three-step shape
+`library/liveness-checker.md` already defines for L1 (orchestrator↔shepherd) and L2
+(shepherd↔executor) — see `roles/program-manager-protocol.md` for the applied mechanism; it is not a
+parallel design.
 
 **Shepherd and reviewer sessions are operator-launched — by design, not convenience.** The program
 session **prepares** the thin kickoff brief (§2.6) and hands it to the operator; **the operator
@@ -119,6 +146,30 @@ every Work Item `Closed`/`Done` — perform the close ceremony, in order:
 A Workstream stays `Open` only while work remains: a legitimately **reopened** lane (a fast-follow
 wave, or a deferred tier still pending) is correctly `Open` — only a *fully* graduated one is
 `Closed`.
+
+2.9 **Standing lanes have no close ceremony (F10).** Some lanes are never finite — an
+**Operations**/**Bug** lane exists to absorb ongoing, unbounded intake and has no outcome that
+"completes." §2.8's close ceremony is written for a finite Initiative and **never fires** for a
+standing lane; reading a standing lane's quiet backlog as an overdue graduation is a category
+error, not a health signal. A standing lane substitutes two mechanics for graduation:
+- **Checkpoint cadence, not a close date.** The tracker records a periodic checkpoint (operator-set
+  cadence; default at each session boundary) — backlog health, open-WI count, anything
+  resurfaced/parked — the same evidence §2.8 uses for a finite close, but recorded as a rolling
+  snapshot, never a terminal one. A standing lane's Workstream `Status` stays `Open` indefinitely by
+  design; it is never evidence of lane health on its own — the checkpoint is.
+- **Operator-gated quiescent-window relocation, not graduation.** A standing lane is never torn
+  down mid-flight. When it must move (re-platform its tracker, fold into a successor lane, change
+  owning Workstream), the move happens only inside an operator-declared **quiescent window** (no
+  in-flight claims, no open `Stage=Executing` WI) and names a **cutover owner** — the unit that
+  makes the relocation the system's new live state and owns convergence of the old lane's residual
+  state (the single-live-store invariant; no partial per-workstream activation of the new home).
+  This reuses the same owner-naming discipline a replace/rewrite plan applies at its cutover
+  (§7.2's moot-by-refactor is the adjacent but distinct case: work superseded by construction, not a
+  lane relocating wholesale), scoped here to relocating a standing lane rather than a full rewrite.
+
+**Adoption timing.** §1.5 and §2.9 above are rules amendments: like the rest of `_quartet/roles/**`,
+they bind a session at its **next session boundary** — never hot-swapped into an orchestrator,
+shepherd, or reviewer session already running.
 
 ## 3. Planning method — reconcile-and-route
 

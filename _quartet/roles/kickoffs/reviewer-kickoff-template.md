@@ -23,6 +23,10 @@ Cosmo Work Items DB: «WORK-ITEMS-DB-ID» (from repo-root zdx-config.yaml → .z
 
 Run the loop for THIS workstream ONLY (poll ~60s by Workstream relation; de-dupe by transition key; /cosmo:review for real + /cosmo:qa; disposition done/rework/human). Keep logs/outputs isolated; do not modify or stop any other watcher.
 
+Runtime instance rule: launch from the tracked watcher template, but put live config, logs, review
+outputs, and de-dupe state under .cosmo-watch/ or a declared gitignored runtime dir. Do not patch
+_quartet/clacks/* in place to create a live watcher variant.
+
 Policy for this workstream:
 - Landing branch: «main | «feature-branch»».
 - WP-child rule: «standard | waive missing-WP-child formality (dogfood — approved for this workstream only)».
