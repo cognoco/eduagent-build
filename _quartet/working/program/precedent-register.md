@@ -16,3 +16,10 @@ writer. Format: `date — question class — ruling — who decides next time`.
   orchestrator adjudicates and amends; not an operator matter — orchestrator.
 - 2026-07-05 — fleet-wide directives — require a positive ack by the named deadline; silence past it
   is treated as non-receipt, not compliance — PM probes, then operator relay.
+- 2026-07-05 — headless `claude -p` in fleet tooling — VETOED fleet-wide: print mode will not run on
+  the Max subscription (requires API credits); no watchdog/script/monitor may depend on it — design
+  for interactive `--resume` (tmux on Unix, logged-on user session on Windows) — everyone.
+- 2026-07-05 — session-recovery execution model (OPQ-14) — Option B per-OS: Windows = watchdog in
+  logged-on user session (auto-logon accepted), `wt.exe … claude --resume`; macOS/Linux = detached
+  tmux hosting `claude --resume`; recovery unproven until validated against a real rate-limit
+  death — orchestrator executes, no re-ask.
