@@ -50,7 +50,7 @@ named verification first) · **REPAIR** (metadata broken).
 | 1284 | Reviewing | P2 | CLOSE? | F-B: same; API-key-precedence may still matter for codex? verify |
 | 1282 | Reviewing | P2 | CLOSE? | F-B: same (`which` ENOENT) |
 | 1515 | Ready | P2 | REFINE | WP coherence broken (F-D); re-scope after 1356 finalizes, 1318 unblocks |
-| 1296 | Ready | P2 | CLOSE? → Overtaken | **PM-verified already fixed** (2026-07-05): WI-1243's commit 10aadb7 (07-02 09:56Z) replaces summaries on re-complete, incl. old-format ones; tests T1243.a/T1346.c pass 31/31. WI captured 9h after the fix by a stale plugin clone (OPQ-17 class). Evidence on the WI; close via normal gate |
+| 1296 | Closed | P2 | CLOSED (Duplicate→WI-1243, operator-ordered 07-05) | **PM-verified already fixed** (2026-07-05): WI-1243's commit 10aadb7 (07-02 09:56Z) replaces summaries on re-complete, incl. old-format ones; tests T1243.a/T1346.c pass 31/31. WI captured 9h after the fix by a stale plugin clone (OPQ-17 class). Evidence on the WI; close via normal gate |
 | 1236 | Ready | — | REFINE | set Priority (suggest P2); orchestrator-boot monitor arming — pairs with relaunch discipline |
 | 1635 | Captured | P1 | FIRST-WAVE | Executed-By stamping — UNBLOCKED (OPQ-18 ruled; schema half done by PM) |
 | 1525 | Captured | P2 | CLOSE? | F-A: overtaken by WI-1631/1632 |
@@ -153,8 +153,8 @@ Full review in `CODEX-VERDICT.md` (codex exec, read-only, against this file + th
    2026-07-05 that WI-1296 was already fixed by WI-1243, commit 10aadb7): `git -C
    ~/.claude/plugins/marketplaces/zdx-marketplace pull --ff-only` + `/reload-plugins` per the
    OPQ-17 workaround. Codex's amendment-2 risk (re-bounce loop during the wave) is real but
-   the defense is running the FIXED tool, not new code. WI-1296 itself → close as Overtaken
-   via the normal gate.
+   the defense is running the FIXED tool, not new code. WI-1296 CLOSED as Duplicate of
+   WI-1243 (operator-ordered, 2026-07-05).
 1. **Re-finalize wave** (after step 0 on the executing host): 1634, 1630, 1629 (+PM
    independent close), 1605, 1356 (merge #61), 1297 (re-claim). Pure completion, no new
    build. Each unclaimed-Executing item is logged as WI-1312 evidence in passing.
