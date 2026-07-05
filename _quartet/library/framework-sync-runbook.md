@@ -96,5 +96,18 @@ commit path).
 - **Shared consumer checkout.** The consumer working tree carries concurrent sessions' dirty files;
   the sync commit must stage only the synced paths (own-work scope), never `git add -A`.
 
+**Round-2 addendum (same day):**
+- **Canonical moved mid-pass.** A `git pull` on canonical between the rsync and the consumer commit
+  brought new framework files (heartbeat modules, watchdog `.sh`/launchd variants, runtime bindings) —
+  a second rsync + commit round was needed. The eventual script must re-diff after any canonical pull,
+  or pin the pass to a canonical SHA.
+- **Consumer `eslint --fix` rewrites synced code on commit.** The consumer's lint-staged auto-fixed
+  formatting (quote style, wrapping) in every synced `.ts`/`.js`, silently forking the committed copies
+  from canonical. Resolution: port the mechanical fixes upstream (`4a89c36`, `acc2808`) so canonical
+  stays byte-identical with consumer commits. Standing rule until tooling exists: after a consumer sync
+  commit, diff committed-vs-canonical and upstream any autofix delta; also canonical framework code
+  should be authored to the strictest consumer's lint (one real error — an unannotated empty `catch` —
+  was fixed upstream in `5c700dd`).
+
 **Outcome:** consumer framework now matches canonical except the held `review-watcher.ts`;
 unidirectional rule (I2) preserved; #1882 backport is the flagged reconciliation work.
