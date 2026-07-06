@@ -176,6 +176,92 @@
   These three + attended-only jointly explain the observed throughput: attended hours were
   throttled by pause-points and over-serialization; unattended hours were zero by construction.
 
+- **2026-07-06 · WI-1405 landed after a 3-round gate; two process findings.** PR #1940 (billing v2
+  coverage, +1.4k lines) merged `093dffc28` at 09:54Z after: round 1 (valid: adversarial-fixture
+  comment, require→import, e2e context), round 2 (valid: type errors the import fix EXPOSED + gc1
+  annotation; shepherd's local verify lacked tsc — checklist corrected, shepherd adopted it), round
+  3 (INVALID: reviewer demanded conversion to the requireActual+targeted-override form the mock
+  already had, contradicting its own round-2 premise — adjudicated at Gate-1 with source evidence,
+  landed over it). Findings: (a) *shepherd equated check-green with review-clean* at first signal —
+  the AGENTS.md "check colour ≠ verdict" trap; Gate-1 caught it; candidate protocol line for the
+  shepherd runbook. (b) *Advisory-review churn*: round-to-round contradiction on a factual premise —
+  evidence for the review-gate quality family (WI-770/WI-1516 lineage); log-only for now, capture if
+  it recurs. Also positive: parallel dispatch live (WI-1401 PR #1941 opened while 1405 gated) and
+  fix turnarounds of 3-50 min per round.
+
+- **2026-07-06 · WI-1401 landed; advisory-review false-blocking pattern RECURRED → captured
+  WI-1650.** PR #1941 (Maestro coverage reconciliation) merged `25cb08871` at 11:00Z, all checks
+  green, review triage: the SHOULD-FIX was a **hallucinated rename** (pulls API shows all 8 files
+  status=modified), both CONSIDERs already satisfied by documented conventions (CHILD_PROFILE_ID
+  seed-injection pattern; `blocked` tag registered in CONVENTIONS.md). Two factually-false blocking
+  findings in one day (#1940 round-3 premise error, #1941 rename) = recurrence per the earlier
+  log-only disposition → **captured WI-1650** (Bug, P3, Related WI-770/1511/1405/1401): ground
+  verdict-relevant claims in cited diff hunks / validate against the PR files API. Backlog-check:
+  review-gate family (WI-770/1511/1516/1197) covers greenness/no-op/envelope, nothing on reviewer
+  factual reliability. Codex-specific: no (repo CI review workflow).
+
+- **2026-07-06 · WI-1401 reworked on device evidence; reviewer caught a vacuous-green CI gate;
+  autonomy handoff.** (a) Reviewer bounced WI-1401 (~12 min): AC6 requires emulator execution of the
+  3 repaired parent flows; static evidence + honest not-run disclosure ≠ substitute. VALID — the
+  "tests must exercise real behavior" invariant holding at the device layer. Rework routed:
+  shepherd attempts the emulator leg per `.agents/skills/e2e`; if truly blocked, PARK (don't gate
+  the pipe), batch the device leg later (cvdebt-inbox-019). (b) In the same verdict the reviewer
+  proved the push-triggered Maestro CI job is **vacuous-green** (run 28787489102: 2/2 selected
+  flows FAILED, job SUCCESS — `MAESTRO_EXIT` lost across line-split shells) and flow selection
+  never includes subdirectory flows. Reviewer filed WI-1651 + WI-1652; ORION's parallel capture
+  WI-1653 duplicate-closed against 1651 (dedup judge missed the near-identical title — another
+  WI-1284-family datapoint). Strongest reviewer datapoint of the pilot: it distrusted a green
+  check, dug into the run, and found the gate defect. (c) Operator granted the shepherd autonomous
+  rolling-pipe execution (coverage-debt-017); supervision consolidated on ORION; F35 + liveness +
+  Ready-spot-checks unchanged. (d) Routing hygiene: reviewer's WI-1651/1652 landed IN WS-44 (same
+  origin-inheritance class as ORION's WI-1650 slip) — cleared pre-triage with audit notes.
+  Pattern (3 instances in one day): **capture-time Workstream inheritance/defaulting mis-homes
+  cross-lane items** — candidate protocol/tooling note; watch for a 4th instance before capturing.
+
+- **2026-07-06 · First autonomous-mode defect: no-delta re-complete after a rework verdict —
+  caught by the reviewer in 9 minutes.** Four minutes into the operator-granted rolling-pipe mode,
+  the shepherd re-ran `complete` on WI-1401 (11:50-52Z) with NO delta — same Fixed In, no new
+  commit, summary still admitting no device run — right after the 11:46Z rework verdict. Almost
+  certainly a stale-state race (the bounce landed while the shepherd was composing its autonomy
+  handoff message), not deliberate evidence-faking. Reviewer re-bounced at 11:58Z naming the
+  no-delta explicitly; ORION had already sent an urgent A/B directive (cvdebt-inbox-020) demanding
+  an honest account + a loop fix: **after any rework verdict, re-read current Stage + latest
+  verdict BEFORE any complete; rework re-enters the work queue, never the finalize queue.**
+  Defense-in-depth verdict: shepherd loop-hygiene gap (Codex-relevant: fast multi-item mode with
+  no event stream makes stale reads likelier), reviewer gate = the working backstop. Candidate
+  protocol line for shepherd runbook + Codex binding; capture if it recurs post-directive.
+  **RESOLVED 12:31Z:** shepherd answered A (stale state, not deliberate) and adopted the loop fix
+  verbatim — re-read Stage + latest verdict before any re-complete; complete only with cited
+  evidence per rework ask. Incident closed as loop-hygiene, not integrity (cvdebt-inbox-022).
+
+- **2026-07-06 · Clacks channel assessment (operator-requested, ~12:50Z).** After ~25 inbox / 22
+  outbox messages spanning sign-of-life, the full F35 land handshake (PR# → hold → orch-land →
+  squash-SHA → complete), multi-round review-fix directives, a product ruling, the no-delta
+  incident probe/answer, and the autonomy handoff: **Clacks-the-transport works; Clacks-as-a-
+  conversation is bottlenecked by the attended-only shepherd.** Single-writer held throughout, the
+  envelope validator passed on every write, messages read and acted on in order, directives
+  absorbed as durable behavior after one message (pre-complete verdict check; parallel dispatch).
+  **Working well:** F35 handshake now mechanical (5 PRs through it); escalations honest+specific
+  (WI-1413 product hold, builder-never-started report); rulings/directives land as standing
+  practice. **Friction, by severity:**
+  1. **One-directional under load (Codex attended-only, dominant).** Delivery is fine, but the
+     shepherd reads its inbox only on its own turns — directives queue until it looks. 8h overnight
+     gap (dangerous case); benign minutes-long land-SHA lag (today). Channel's event-driven premise
+     only half-holds; hourly liveness cron compensates but does not fix. Ties to WI-1647 /
+     attended-only findings. THE structural limitation.
+  2. **Monitor-side truncation.** Every outbox line arrives truncated (`…`) in the notification →
+     orchestrator must re-read the full line from disk before acting, on the critical path of every
+     handshake. Papercut, but constant.
+  3. **Timestamp skew.** Shepherd lines occasionally carry local-time or off-UTC stamps (e.g.
+     "~22:20Z/00:20 local") → must reconcile against the Cosmo stage monitor rather than trust the
+     channel clock. Not breaking yet; would corrupt a liveness check if it worsens.
+  4. **No delivery/read receipt.** Cannot distinguish "read + working" from "hasn't looked" without
+     checking Cosmo stage or awaiting the next outbox line; combined with (1), silence is genuinely
+     ambiguous — the exact hazard the liveness protocol names.
+  Disposition: friction (1) already tracked (attended-only cluster). (2)-(4) are Clacks-tooling
+  candidates — backlog-check the Quartet MVP "Clacks schema/enforcement" items (WI-1230) before
+  capturing; log-only for now, capture if they cost real time as the fleet scales.
+
 ## Harvest queue (findings awaiting backlog-check → WI capture)
 
 - **Attended-only Codex shepherd** — CONFIRMED first-party (coverage-debt-006). Backlog-check done
