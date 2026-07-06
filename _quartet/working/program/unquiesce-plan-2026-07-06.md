@@ -9,12 +9,32 @@ priority; end state = both programs relaunched on fixed foundations.
 > not a committed program. Commitment is only ever the next 1-2 L1 steps (see COMMITTED NOW);
 > everything else is horizon/indicative and expected to change — plenty of unknown unknowns.
 
+## Shape: program-of-programs (operator-ruled 2026-07-06)
+
+Two programs (MentoMate, ZDX) are in the same state — quiesced, each needing a Fable-grade
+audit, each with audit-proof known-work that can dispatch in parallel — over a shared enabling
+layer (substrate, charters, liveness) both should-depend on. PM (fable) orchestrates all of it.
+
+- **Two parallel Fable audits, different machines, NO stagger** (contention was the only reason
+  to stagger; separate machines/auth removes it): Audit A = MentoMate app (ramtop, eduagent
+  repo); Audit B = Nexus/ZDX/Cosmo/Quartet system (Lancre/other, nexus repo). Fan-out readers
+  (Opus/Sonnet); Fable spent on synthesis + judgment. Operator-spawned from PM-written briefs so
+  they outlive PM context. Report to PM over the substrate (lanes `audit-mentomate`,
+  `audit-system`).
+- **Known-work dispatches today, audit-independent**: limited ZDX hand-back (steps 0-2 +
+  pain-ratified builds) via a Quartet team; MentoMate pipeline stays MANUAL (WS-44 → WS-33 →
+  feed more if it drains) — NOT under a Quartet team, operator hand-guided.
+- **Enabling layer lands DURING the window** (substrate rollout, charters, liveness) so both
+  roadmaps arrive to an already-upgraded assembly line.
+- **Post-window**: PM synthesizes both audits → two roadmaps → operator rulings → full unquiesce.
+
 ## COMMITTED NOW (the only binding part)
 
-1. **MentoMate deep app audit** (track 9) — PERISHABLE: uses the Fable/Max window (~24h from
-   2026-07-06 afternoon). Starts on operator scope-nod.
-2. **Charters + ZDX audit redo** (tracks 2 + 6) — next after (or interleaved where the Fable
-   window doesn't need the capacity).
+1. **Launch both Fable audits** (tracks 9 + 11) — PERISHABLE Fable/Max window (~24h from
+   2026-07-06 afternoon). PM writes briefs → operator nod → spawn.
+2. **Prepare + dispatch immediate ZDX known-work** (track 6-limited) — restructure workstreams
+   (OQ lanes?), spin a Quartet team on the audit-proof slice.
+3. Charters (track 2) — PM drafts in the gaps; gate ZDX new-build.
 
 Everything below the line is the map.
 
@@ -108,6 +128,15 @@ Everything below the line is the map.
 - [ ] Operator scope-nod on the audit dimensions above (before launch)
 - [ ] MentoMate scoping finalization — OPQ-15 (7 walkthrough rulings, Zuzka) + any sibling
       scope rulings; operator-side, PM folds results into the roadmap
+
+## 11. Nexus/ZDX/Cosmo/Quartet system audit (Audit B, Fable window — COMMITTED)
+
+- [ ] PM writes brief: architecture (Nexus control-plane, repo/workspace layout), Cosmo/ZDX
+      data model + lifecycle completeness, Quartet role/protocol/substrate design, tooling debt
+      (marketplace CI, plugin-cache class), token economics, the top-down-lifecycle gap (track 10)
+- [ ] Operator nod → spawn on Lancre/other machine (nexus repo)
+- [ ] Deliverable: system-improvement roadmap, items Cosmo-grain — folds into the ZDX
+      finish-line roadmap (track 6) and re-prioritizes the pain-point work
 
 ## 10. Top-down lifecycle (PRD→Epic→…→WI) — genuine gap
 
