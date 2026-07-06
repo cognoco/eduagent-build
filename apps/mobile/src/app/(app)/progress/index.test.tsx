@@ -1,4 +1,10 @@
-import { act, render, screen, waitFor } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import { RefreshControl } from 'react-native';
 
 import ProgressScreen from './index';
@@ -16,9 +22,10 @@ jest.mock('react-i18next', () => ({
 
 const mockPush = jest.fn();
 const mockRouterReplace = jest.fn();
+let mockSearchParams: Record<string, string | undefined> = {};
 
 jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => mockSearchParams,
   useRouter: () => ({
     back: jest.fn(),
     replace: mockRouterReplace,
@@ -76,7 +83,7 @@ jest.mock(
   '../../../lib/analytics' /* gc1-allow: analytics emits network/native telemetry; stub captures calls */,
   () => ({
     track: jest.fn(),
-    hashProfileId: (id: string) => `hash-${id}`,
+    hashProfileId: (id: string) => Promise.resolve(`hash-${id}`),
     bucketAccountAge: () => 'new',
   }),
 );
@@ -94,19 +101,17 @@ jest.mock(
   '../../../lib/profile' /* gc1-allow: useProfile requires the ProfileContext provider tree; stub pins the active profile */,
   () => ({
     useProfile: () => ({
-      activeProfile: {
-        id: 'profile-1',
-        createdAt: '2026-01-01T00:00:00Z',
-      },
+      activeProfile: mockActiveProfile,
     }),
-    useLinkedChildren: () => [],
+    useLinkedChildren: () => mockLinkedChildren,
   }),
 );
 
+let mockAppContextMode: 'study' | 'family' = 'study';
 jest.mock(
   '../../../lib/app-context' /* gc1-allow: app-context requires the full provider tree; stub pins study mode */,
   () => ({
-    useAppContext: () => ({ mode: 'study' }),
+    useAppContext: () => ({ mode: mockAppContextMode }),
   }),
 );
 
@@ -159,17 +164,77 @@ const EMPTY_INVENTORY = {
   subjects: [],
 };
 
+const LANGUAGE_INVENTORY = {
+  global: {
+    topicsMastered: 1,
+    topicsAttempted: 1,
+    topicsExplored: 1,
+    vocabularyTotal: 7,
+    vocabularyMastered: 3,
+    totalSessions: 2,
+    totalActiveMinutes: 11,
+    totalWallClockMinutes: 12,
+    currentStreak: 4,
+    weeklyDeltaTopicsMastered: 0,
+    weeklyDeltaVocabularyTotal: 0,
+    weeklyDeltaTopicsExplored: 0,
+  },
+  subjects: [
+    {
+      subjectId: 'subject-language',
+      name: 'French',
+      pedagogyMode: 'four_strands',
+      topics: {
+        mastered: 1,
+        inProgress: 0,
+        explored: 1,
+        notStarted: 0,
+        total: 1,
+      },
+      topicsMastered: 1,
+      topicsAttempted: 1,
+      progressPercentage: 100,
+      currentStreak: 4,
+    },
+  ],
+};
+
+let mockActiveProfile = {
+  id: 'profile-1',
+  createdAt: '2026-01-01T00:00:00Z',
+  displayName: 'Owner',
+};
+let mockLinkedChildren: Array<{ id: string; displayName: string }> = [];
+let mockOwnInventory = EMPTY_INVENTORY;
+let mockChildInventory: unknown = undefined;
+const mockUseChildInventory = jest.fn();
+const mockUseProfileSessions = jest.fn();
+const mockUseProfileReports = jest.fn();
+const mockUseProfileWeeklyReports = jest.fn();
+
 jest.mock(
   '../../../hooks/use-progress' /* gc1-allow: hooks need QueryClientProvider + API client; unit-test boundary */,
   () => ({
-    useProgressInventory: () => queryStub(EMPTY_INVENTORY),
-    useChildInventory: () => queryStub(undefined),
+    useProgressInventory: () => queryStub(mockOwnInventory),
+    useChildInventory: (...args: unknown[]) => {
+      mockUseChildInventory(...args);
+      return queryStub(mockChildInventory);
+    },
     useChildProgressSummary: () => queryStub(undefined),
     useOverallProgress: () => queryStub(undefined),
     useLearningResumeTarget: () => queryStub(undefined),
-    useProfileSessions: () => queryStub([]),
-    useProfileReports: () => queryStub([]),
-    useProfileWeeklyReports: () => queryStub([]),
+    useProfileSessions: (...args: unknown[]) => {
+      mockUseProfileSessions(...args);
+      return queryStub([]);
+    },
+    useProfileReports: (...args: unknown[]) => {
+      mockUseProfileReports(...args);
+      return queryStub([]);
+    },
+    useProfileWeeklyReports: (...args: unknown[]) => {
+      mockUseProfileWeeklyReports(...args);
+      return queryStub([]);
+    },
     useRefreshProgressSnapshot: () => ({
       mutateAsync: mockRefreshSnapshot,
       isPending: false,
@@ -187,9 +252,11 @@ jest.mock(
 jest.mock(
   '../../../hooks/use-active-profile-role' /* gc1-allow: hook depends on the profile provider tree; stub pins owner role */,
   () => ({
-    useActiveProfileRole: () => 'owner',
+    useActiveProfileRole: () => mockActiveProfileRole,
   }),
 );
+
+let mockActiveProfileRole: 'owner' | 'child' | 'impersonated-child' = 'owner';
 
 const mockUseNavigationContract = jest.fn(() => ({
   effectiveAppContext: 'study',
@@ -211,6 +278,25 @@ jest.mock(
 describe('ProgressScreen refresh error handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
+    mockAppContextMode = 'study';
+    mockActiveProfileRole = 'owner';
+    mockActiveProfile = {
+      id: 'profile-1',
+      createdAt: '2026-01-01T00:00:00Z',
+      displayName: 'Owner',
+    };
+    mockLinkedChildren = [];
+    mockOwnInventory = EMPTY_INVENTORY;
+    mockChildInventory = undefined;
+    mockUseNavigationContract.mockReturnValue({
+      effectiveAppContext: 'study',
+      isParentProxy: false,
+      gates: {
+        progressScope: 'self',
+        showProgressProfilePicker: false,
+      },
+    });
     mockRefreshSnapshot.mockResolvedValue(undefined);
   });
 
@@ -239,5 +325,61 @@ describe('ProgressScreen refresh error handling', () => {
       );
     });
     expect(mockFormatApiError).toHaveBeenCalledWith(refreshError);
+  });
+
+  it('honors requestedProfileId by loading linked-child inventory and profile-scoped lists', async () => {
+    mockSearchParams = { profileId: 'child-1' };
+    mockAppContextMode = 'family';
+    mockLinkedChildren = [{ id: 'child-1', displayName: 'Ari' }];
+    mockChildInventory = LANGUAGE_INVENTORY;
+
+    render(<ProgressScreen />);
+
+    await waitFor(() => {
+      screen.getByText('progress.pageTitleProfile');
+    });
+
+    expect(mockUseChildInventory).toHaveBeenCalledWith('child-1', {
+      enabled: true,
+    });
+    expect(mockUseProfileSessions).toHaveBeenCalledWith('child-1');
+    expect(mockUseProfileReports).toHaveBeenCalledWith('child-1');
+    expect(mockUseProfileWeeklyReports).toHaveBeenCalledWith('child-1');
+  });
+
+  it('routes parent-proxy empty-state CTA to the child curriculum, not the adult library', async () => {
+    mockActiveProfileRole = 'impersonated-child';
+    mockActiveProfile = {
+      id: 'child-1',
+      createdAt: '2026-01-01T00:00:00Z',
+      displayName: 'Ari',
+    };
+
+    render(<ProgressScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('progress-start-learning');
+    });
+    fireEvent.press(screen.getByTestId('progress-start-learning'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]/curriculum',
+      params: { profileId: 'child-1' },
+    });
+    expect(mockPush).not.toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('renders vocabulary stats read-only when viewing a linked child profile', async () => {
+    mockSearchParams = { profileId: 'child-1' };
+    mockAppContextMode = 'family';
+    mockLinkedChildren = [{ id: 'child-1', displayName: 'Ari' }];
+    mockChildInventory = LANGUAGE_INVENTORY;
+
+    render(<ProgressScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('progress-vocab-stat-readonly');
+    });
+    expect(screen.queryByTestId('progress-vocab-stat')).toBeNull();
   });
 });

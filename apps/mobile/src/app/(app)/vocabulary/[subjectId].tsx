@@ -13,6 +13,7 @@ import {
   useVocabulary,
   useDeleteVocabulary,
 } from '../../../hooks/use-vocabulary';
+import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
@@ -64,11 +65,13 @@ function VocabularyRow({
   item,
   onDelete,
   isDeleting,
+  canDelete,
   colors,
 }: {
   item: Vocabulary;
   onDelete: (id: string) => void;
   isDeleting: boolean;
+  canDelete: boolean;
   colors: ReturnType<typeof useThemeColors>;
 }) {
   const { t } = useTranslation();
@@ -99,26 +102,28 @@ function VocabularyRow({
           <CefrBadge level={item.cefrLevel} />
         </View>
       </View>
-      <Pressable
-        onPress={() => onDelete(item.id)}
-        disabled={isDeleting}
-        className="p-2 min-w-[44px] min-h-[44px] items-center justify-center"
-        accessibilityRole="button"
-        accessibilityLabel={t('vocabulary.deleteAccessibilityLabel', {
-          term: item.term,
-        })}
-        testID={`vocab-delete-${item.id}`}
-      >
-        {isDeleting ? (
-          <ActivityIndicator
-            size="small"
-            color={colors.muted}
-            accessibilityLabel={t('common.loading')}
-          />
-        ) : (
-          <Ionicons name="trash-outline" size={20} color={colors.muted} />
-        )}
-      </Pressable>
+      {canDelete ? (
+        <Pressable
+          onPress={() => onDelete(item.id)}
+          disabled={isDeleting}
+          className="p-2 min-w-[44px] min-h-[44px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel={t('vocabulary.deleteAccessibilityLabel', {
+            term: item.term,
+          })}
+          testID={`vocab-delete-${item.id}`}
+        >
+          {isDeleting ? (
+            <ActivityIndicator
+              size="small"
+              color={colors.muted}
+              accessibilityLabel={t('common.loading')}
+            />
+          ) : (
+            <Ionicons name="trash-outline" size={20} color={colors.muted} />
+          )}
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -128,6 +133,8 @@ export default function VocabularyListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const activeProfileRole = useActiveProfileRole();
+  const canDelete = activeProfileRole !== 'impersonated-child';
   const { subjectId: rawSubjectId } = useLocalSearchParams<{
     subjectId: string | string[];
   }>();
@@ -145,6 +152,7 @@ export default function VocabularyListScreen() {
     t('vocabulary.fallbackTitle');
 
   const handleDelete = (vocabularyId: string) => {
+    if (!canDelete) return;
     platformAlert(
       t('vocabulary.deleteDialog.title'),
       t('vocabulary.deleteDialog.message'),
@@ -290,6 +298,7 @@ export default function VocabularyListScreen() {
                 deleteVocabulary.variables === item.id
               }
               colors={colors}
+              canDelete={canDelete}
             />
           )}
           getItemLayout={(_data, index) => ({

@@ -1,4 +1,6 @@
 import { render, screen } from '@testing-library/react-native';
+import { ProfileContext, type ProfileContextValue } from '../../../lib/profile';
+import { createTestProfile } from '../../../test-utils/app-hook-test-utils';
 
 jest.mock(
   'react-i18next',
@@ -65,6 +67,37 @@ jest.mock(
 
 const VocabularyListScreen = require('./[subjectId]').default;
 
+const ownerProfile = createTestProfile({
+  id: 'owner-profile',
+  isOwner: true,
+  displayName: 'Owner',
+});
+const childProfile = createTestProfile({
+  id: 'child-profile',
+  isOwner: false,
+  displayName: 'Child',
+});
+
+function renderVocabularyScreen(profileContext?: Partial<ProfileContextValue>) {
+  const value: ProfileContextValue = {
+    profiles: [ownerProfile, childProfile],
+    activeProfile: ownerProfile,
+    isExplicitProxyMode: false,
+    switchProfile: async () => ({ success: true }),
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
+    ...profileContext,
+  };
+
+  return render(
+    <ProfileContext.Provider value={value}>
+      <VocabularyListScreen />
+    </ProfileContext.Provider>,
+  );
+}
+
 describe('VocabularyListScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -78,7 +111,7 @@ describe('VocabularyListScreen', () => {
   });
 
   it('renders the subject name when subjectId is a plain string', () => {
-    render(<VocabularyListScreen />);
+    renderVocabularyScreen();
     expect(screen.queryByTestId('vocabulary-no-subject')).toBeNull();
   });
 
@@ -90,10 +123,56 @@ describe('VocabularyListScreen', () => {
       subjectId: ['subject-1', 'subject-2'],
     });
 
-    render(<VocabularyListScreen />);
+    renderVocabularyScreen();
 
     // With the fix: first element extracted → useVocabulary receives 'subject-1'.
     expect(typeof capturedVocabularySubjectId).toBe('string');
     expect(capturedVocabularySubjectId).toBe('subject-1');
+  });
+
+  it('shows delete affordances for owner self-view', () => {
+    mockUseVocabulary.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: [
+        {
+          id: 'vocab-1',
+          term: 'bonjour',
+          translation: 'hello',
+          type: 'word',
+          cefrLevel: 'A1',
+          mastered: false,
+        },
+      ],
+    });
+
+    renderVocabularyScreen();
+
+    screen.getByTestId('vocab-delete-vocab-1');
+  });
+
+  it('hides delete affordances while parent-proxy is viewing a child vocabulary list', () => {
+    mockUseVocabulary.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: [
+        {
+          id: 'vocab-1',
+          term: 'bonjour',
+          translation: 'hello',
+          type: 'word',
+          cefrLevel: 'A1',
+          mastered: false,
+        },
+      ],
+    });
+
+    renderVocabularyScreen({
+      activeProfile: childProfile,
+      isExplicitProxyMode: true,
+    });
+
+    screen.getByTestId('vocab-item-vocab-1');
+    expect(screen.queryByTestId('vocab-delete-vocab-1')).toBeNull();
   });
 });

@@ -1,6 +1,11 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import * as Sentry from '@sentry/react-native';
+import {
+  ProfileContext,
+  type ProfileContextValue,
+} from '../../../../../lib/profile';
+import { createTestProfile } from '../../../../../test-utils/app-hook-test-utils';
 import BookScreen from './[bookId]';
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -244,6 +249,37 @@ function makeRetentionQuery(overrides: Partial<any> = {}) {
   };
 }
 
+const ownerProfile = createTestProfile({
+  id: 'owner-profile',
+  isOwner: true,
+  displayName: 'Owner',
+});
+const childProfile = createTestProfile({
+  id: 'child-profile',
+  isOwner: false,
+  displayName: 'Child',
+});
+
+function renderBookScreen(profileContext?: Partial<ProfileContextValue>) {
+  const value: ProfileContextValue = {
+    profiles: [ownerProfile, childProfile],
+    activeProfile: ownerProfile,
+    isExplicitProxyMode: false,
+    switchProfile: async () => ({ success: true }),
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
+    ...profileContext,
+  };
+
+  return render(
+    <ProfileContext.Provider value={value}>
+      <BookScreen />
+    </ProfileContext.Provider>,
+  );
+}
+
 describe('BookScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -468,6 +504,38 @@ describe('BookScreen', () => {
     getByTestId('note-note-1');
     getByText('Plants use chlorophyll to capture light.');
     getByText('+ Add a note');
+  });
+
+  it('hides destructive and note write affordances in parent-proxy view', () => {
+    mockUseBookNotes.mockReturnValue(
+      makeNotesQuery({
+        data: {
+          notes: [
+            {
+              id: 'note-1',
+              topicId: 'topic-1',
+              sessionId: null,
+              content: 'Plants use chlorophyll to capture light.',
+              createdAt: '2026-05-17T10:00:00.000Z',
+              updatedAt: '2026-05-17T10:00:00.000Z',
+            },
+          ],
+        },
+      }),
+    );
+
+    const { getByTestId, queryByTestId, queryByText } = renderBookScreen({
+      activeProfile: childProfile,
+      isExplicitProxyMode: true,
+    });
+
+    expect(queryByTestId('book-delete-button')).toBeNull();
+
+    fireEvent.press(getByTestId('book-notes-strip'));
+
+    getByTestId('note-note-1');
+    expect(queryByTestId('note-note-1-menu')).toBeNull();
+    expect(queryByText('+ Add a note')).toBeNull();
   });
 
   it('derives header progress from retention topics', () => {
