@@ -1,7 +1,9 @@
-# Flow N11: Library — Navigation and Retention Indicators
+# Flow N11: Library — Navigation
 # Validates: user can view the Library with subject shelves and navigate
-# back to home screen.
-# Tags: nightly, retention
+# back to home screen. This is not retention-pill coverage; Library v3 shelves
+# expose shelf status/review chips, while retention-pill coverage lives in the
+# dedicated retention topic/book flows.
+# Tags: pr-blocking, nightly, library, navigation
 #
 # Journey: UX Journey 2 (Retention overview)
 # Epics: Epic 3 (FR43, FR48)
@@ -22,7 +24,8 @@ appId: com.mentomate.app
 tags:
   - pr-blocking
   - nightly
-  - retention
+  - library
+  - navigation
 ---
 # 1. Seed & sign in with retention-due scenario
 - runFlow:
