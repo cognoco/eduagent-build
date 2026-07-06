@@ -1,6 +1,6 @@
 # Flow P3: Parent Consent Management — Withdraw and Restore
-# Validates: parent can withdraw consent (GDPR) and cancel deletion during
-# the 7-day grace period from the child detail screen.
+# Validates: parent can withdraw consent (GDPR), sees the current withdrawn
+# empty-state gate from the child detail screen, and can restore consent.
 # Tags: nightly, parent, consent, gdpr
 #
 # Journey: UX Journey 4 (Parent Oversight)
@@ -11,11 +11,12 @@
 # Key testIDs (from child/[profileId]/index.tsx):
 #   consent-section            — consent management section container
 #   withdraw-consent-button    — triggers Alert.alert confirmation dialog
-#   grace-period-banner        — shown after consent is withdrawn
-#   cancel-deletion-button     — restores consent during grace period
+#   consent-withdrawn-empty-state — screen-level withdrawn gate after revoke
+#   consent-withdrawn-request-cta — restores consent from the withdrawn gate
 #
-# NOTE: Consent withdrawal triggers an Inngest 7-day grace period job.
-# In E2E we only validate the UI flow (withdraw → banner → restore).
+# NOTE: Consent withdrawal triggers an Inngest 7-day grace period job. The child
+# detail screen now short-circuits to a screen-level withdrawn gate; the
+# grace-period-banner remains a lower-level component state covered by unit tests.
 #
 # Session 25 (2026-03-25): PASS — all assertions verified.
 #   Fixes applied: BUG-70 (inngest.send try-catch), double-tap removed,
@@ -99,32 +100,34 @@ tags:
     text: "WITHDRAW"
     optional: true  # justified: Android OEM skins expose destructive button in all caps; alternative to "Withdraw" above
 
-# 12. Wait for grace period banner to appear (consent is now WITHDRAWN)
+# 12. Wait for screen-level withdrawn gate to appear (consent is now WITHDRAWN)
 - extendedWaitUntil:
     visible:
-      id: "grace-period-banner"
+      id: "consent-withdrawn-empty-state"
     timeout: 10000
 
-# 13. Verify deletion pending text
+# 13. Verify restore CTA is present
 - assertVisible:
-    text: "Deletion pending"
+    id: "consent-withdrawn-request-cta"
 
-# 14. Verify cancel deletion button is present
-- assertVisible:
-    id: "cancel-deletion-button"
+# 14. Screenshot: withdrawn gate with restore option
+- takeScreenshot: consent-mgmt-03-withdrawn-empty-state
 
-# 15. Screenshot: grace period banner with cancel option
-- takeScreenshot: consent-mgmt-03-grace-period-banner
-
-# 16. Tap cancel deletion to restore consent
+# 15. Tap restore CTA to restore consent
 - tapOn:
-    id: "cancel-deletion-button"
+    id: "consent-withdrawn-request-cta"
 
-# 17. Wait for consent to be restored — grace period banner should disappear
-#     and the withdraw consent button should reappear
+# 16. Wait for consent to be restored and child detail to render again
 - extendedWaitUntil:
     visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+# 17. Scroll back to consent section and verify withdraw button is available again
+- scrollUntilVisible:
+    element:
       id: "withdraw-consent-button"
+    direction: DOWN
     timeout: 10000
 
 # 18. Screenshot: consent restored, withdraw button visible again

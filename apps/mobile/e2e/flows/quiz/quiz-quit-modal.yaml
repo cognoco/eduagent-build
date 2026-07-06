@@ -1,7 +1,7 @@
 # Flow QUIZ-05: Mid-round quit modal
 # Validates:
 #   Arm A — tap close → backdrop appears → tap cancel → round still active
-#   Arm B — tap close → tap confirm → returns to quiz index
+#   Arm B — answered round → tap close → Save & Finish → results screen
 # Tags: nightly, quiz
 #
 # Journey: UX Journey 3 (Practice & Reinforcement)
@@ -13,7 +13,8 @@
 #   - apps/mobile/src/app/(app)/quiz/launch.tsx (quiz-challenge-start, quiz-launch-loading)
 #   - apps/mobile/src/app/(app)/quiz/play.tsx
 #       (quiz-play-screen, quiz-play-quit, quiz-quit-modal-backdrop,
-#        quiz-quit-cancel, quiz-quit-confirm, quiz-option-0, quiz-index-screen)
+#        quiz-quit-cancel, quiz-quit-save, quiz-option-0)
+#   - apps/mobile/src/app/(app)/quiz/results.tsx (quiz-results-screen)
 #
 # [BUG-892] Quit confirmation uses an in-app Modal (not Alert.alert/window.confirm)
 # so this test exercises the real quit path on both mobile and web.
@@ -126,7 +127,7 @@ tags:
 
 - takeScreenshot: quit-04-round-still-active
 
-# ── Arm B: tap close → confirm → returns to quiz index ──
+# ── Arm B: tap close → Save & Finish → partial result is saved ──
 - tapOn:
     id: "quiz-play-quit"
 
@@ -136,11 +137,11 @@ tags:
     timeout: 5000
 
 - tapOn:
-    id: "quiz-quit-confirm"
+    id: "quiz-quit-save"
 
 - extendedWaitUntil:
     visible:
-      id: "quiz-index-screen"
-    timeout: 10000
+      id: "quiz-results-screen"
+    timeout: 20000
 
-- takeScreenshot: quit-05-returned-to-index
+- takeScreenshot: quit-05-save-and-finish-results

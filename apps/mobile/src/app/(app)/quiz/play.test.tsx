@@ -27,9 +27,13 @@ jest.mock('react-native-safe-area-context', () => ({
 
 jest.mock('expo-haptics', () => ({
   notificationAsync: jest.fn().mockResolvedValue(undefined),
+  impactAsync: jest.fn().mockResolvedValue(undefined),
   NotificationFeedbackType: {
     Success: 'success',
     Error: 'error',
+  },
+  ImpactFeedbackStyle: {
+    Light: 'light',
   },
 }));
 
@@ -51,8 +55,17 @@ jest.mock(
   '../../../components/quiz/GuessWhoQuestion' /* gc1-allow: GuessWhoQuestion uses native ColorScheme via useThemeColors */,
   () => ({
     GuessWhoQuestion: ({
+      onCheckAnswer,
       onResolved,
     }: {
+      onCheckAnswer: (
+        answerGiven: string,
+        options: {
+          answerMode: 'free_text' | 'multiple_choice';
+          finalAttempt: boolean;
+          cluesUsed: number;
+        },
+      ) => Promise<boolean>;
       onResolved: (result: {
         correct: boolean;
         answerGiven: string;
@@ -62,27 +75,65 @@ jest.mock(
     }) => {
       const { Pressable, Text } = require('react-native');
       return (
-        <Pressable
-          onPress={() => {
-            onResolved({
-              correct: true,
-              answerGiven: 'Nikola Tesla',
-              cluesUsed: 3,
-              answerMode: 'free_text',
-            });
-            if (mockGuessWhoResolveTwice) {
+        <>
+          <Pressable
+            onPress={() => {
               onResolved({
                 correct: true,
                 answerGiven: 'Nikola Tesla',
                 cluesUsed: 3,
                 answerMode: 'free_text',
               });
-            }
-          }}
-          testID="guess-who-resolve-correct"
-        >
-          <Text>Resolve Guess Who</Text>
-        </Pressable>
+              if (mockGuessWhoResolveTwice) {
+                onResolved({
+                  correct: true,
+                  answerGiven: 'Nikola Tesla',
+                  cluesUsed: 3,
+                  answerMode: 'free_text',
+                });
+              }
+            }}
+            testID="guess-who-resolve-correct"
+          >
+            <Text>Resolve Guess Who</Text>
+          </Pressable>
+          <Pressable
+            onPress={async () => {
+              const correct = await onCheckAnswer('Thomas Edison', {
+                answerMode: 'free_text',
+                finalAttempt: true,
+                cluesUsed: 3,
+              });
+              onResolved({
+                correct,
+                answerGiven: 'Thomas Edison',
+                cluesUsed: 3,
+                answerMode: 'free_text',
+              });
+            }}
+            testID="guess-who-resolve-final-wrong"
+          >
+            <Text>Resolve wrong final Guess Who</Text>
+          </Pressable>
+          <Pressable
+            onPress={async () => {
+              await onCheckAnswer('[skipped]', {
+                answerMode: 'free_text',
+                finalAttempt: true,
+                cluesUsed: 3,
+              });
+              onResolved({
+                correct: false,
+                answerGiven: '[skipped]',
+                cluesUsed: 3,
+                answerMode: 'free_text',
+              });
+            }}
+            testID="guess-who-resolve-final-skip"
+          >
+            <Text>Skip final Guess Who</Text>
+          </Pressable>
+        </>
       );
     },
   }),
@@ -673,6 +724,89 @@ describe('QuizPlayScreen — Guess Who finish autosave', () => {
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz/results');
     });
+  });
+
+  it('checks and saves a wrong final free-text Guess Who attempt with answer metadata', async () => {
+    mockCheckAnswer.mockResolvedValueOnce({
+      correct: false,
+      correctAnswer: 'Nikola Tesla',
+    });
+
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('guess-who-resolve-final-wrong'));
+
+    await waitFor(() => {
+      expect(mockCheckAnswer).toHaveBeenCalledWith({
+        roundId: 'round-guess-who',
+        questionIndex: 0,
+        answerGiven: 'Thomas Edison',
+        answerMode: 'free_text',
+        finalAttempt: true,
+        cluesUsed: 3,
+      });
+    });
+    await waitFor(() => {
+      screen.getByText(/The answer was/);
+    });
+    expect(mockCompleteRoundMutate).toHaveBeenCalledWith(
+      {
+        roundId: 'round-guess-who',
+        results: [
+          expect.objectContaining({
+            questionIndex: 0,
+            correct: false,
+            answerGiven: 'Thomas Edison',
+            cluesUsed: 3,
+            answerMode: 'free_text',
+          }),
+        ],
+      },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      }),
+    );
+  });
+
+  it('checks and saves a final Guess Who skip with answer metadata', async () => {
+    mockCheckAnswer.mockResolvedValueOnce({
+      correct: false,
+      correctAnswer: 'Nikola Tesla',
+    });
+
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('guess-who-resolve-final-skip'));
+
+    await waitFor(() => {
+      expect(mockCheckAnswer).toHaveBeenCalledWith({
+        roundId: 'round-guess-who',
+        questionIndex: 0,
+        answerGiven: '[skipped]',
+        answerMode: 'free_text',
+        finalAttempt: true,
+        cluesUsed: 3,
+      });
+    });
+    expect(mockCompleteRoundMutate).toHaveBeenCalledWith(
+      {
+        roundId: 'round-guess-who',
+        results: [
+          expect.objectContaining({
+            questionIndex: 0,
+            correct: false,
+            answerGiven: '[skipped]',
+            cluesUsed: 3,
+            answerMode: 'free_text',
+          }),
+        ],
+      },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      }),
+    );
   });
 
   it('[BREAK/WI-282] does not submit duplicate results when Guess Who resolves twice', async () => {
@@ -1656,6 +1790,62 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
             questionIndex: 0,
             correct: true,
             answerGiven: 'Bratislava',
+          }),
+        ],
+      },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      }),
+    );
+  });
+
+  it('persists disputed=true when saving a disputed non-final wrong answer', async () => {
+    mockRound = {
+      id: 'round-disputed-save',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+    mockCheckAnswer.mockResolvedValueOnce({
+      correct: false,
+      correctAnswer: 'Bratislava',
+    });
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-1'));
+    await waitFor(() => screen.getByTestId('quiz-dispute-button'));
+
+    fireEvent.press(screen.getByTestId('quiz-dispute-button'));
+    fireEvent.press(screen.getByTestId('quiz-play-quit'));
+    screen.getByText('End this round?');
+    fireEvent.press(screen.getByTestId('quiz-quit-save'));
+
+    expect(mockCompleteRoundMutate).toHaveBeenCalledWith(
+      {
+        roundId: 'round-disputed-save',
+        results: [
+          expect.objectContaining({
+            questionIndex: 0,
+            correct: false,
+            answerGiven: 'Prague',
+            disputed: true,
           }),
         ],
       },

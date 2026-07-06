@@ -33,9 +33,10 @@ tags:
 - assertVisible:
     id: 'parent-home-screen'
 
-# home.parent.tonight.titleEvening = "Conversation starters" (en.json:166)
+# Multi-child parent home renders the family summary panel instead of the
+# removed Conversation starters heading.
 - assertVisible:
-    text: 'Conversation starters'
+    id: 'parent-home-family-summary'
 
 - assertVisible:
     text: 'Children'
