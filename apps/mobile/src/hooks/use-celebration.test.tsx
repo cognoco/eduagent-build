@@ -189,6 +189,72 @@ describe('useCelebration — queue prop', () => {
     expect(result.current.CelebrationOverlay).not.toBeNull();
   });
 
+  it('dedupes same-profile rerenders but replays queue keys after a profile switch without unmount', async () => {
+    const firstEntry = makeEntry('polar_star', 'polar_star', {
+      queuedAt: '2026-01-01T00:00:00.000Z',
+      detail: 'profile-scoped celebration',
+    });
+    const secondEntry = makeEntry('twin_stars', 'twin_stars', {
+      queuedAt: '2026-01-01T00:00:00.000Z',
+      detail: 'profile-scoped second celebration',
+    });
+    const queue = [firstEntry, secondEntry];
+    const onAllComplete = jest.fn();
+
+    const { result, rerender } = renderHook(
+      ({
+        profileId,
+        queue,
+      }: {
+        profileId: string;
+        queue: PendingCelebration[];
+      }) =>
+        useCelebration({
+          profileId,
+          queue,
+          celebrationLevel: 'all',
+          onAllComplete,
+        }),
+      { initialProps: { profileId: 'profile-A', queue } },
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(collectText(result.current.CelebrationOverlay)).toContain(
+      'profile-scoped celebration',
+    );
+
+    await act(async () => {
+      completeActiveCelebration(result.current.CelebrationOverlay);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(collectText(result.current.CelebrationOverlay)).toContain(
+      'profile-scoped second celebration',
+    );
+
+    await act(async () => {
+      completeActiveCelebration(result.current.CelebrationOverlay);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(result.current.CelebrationOverlay).toBeNull();
+
+    rerender({ profileId: 'profile-A', queue });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(result.current.CelebrationOverlay).toBeNull();
+
+    rerender({ profileId: 'profile-B', queue });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(collectText(result.current.CelebrationOverlay)).toContain(
+      'profile-scoped celebration',
+    );
+  });
+
   it('caps queue at 2 celebrations per batch (MAX_TOASTS_PER_BATCH)', async () => {
     const batchTime = '2026-01-01T10:00:00.000Z';
     const entries: PendingCelebration[] = [

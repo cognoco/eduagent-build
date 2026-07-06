@@ -7,6 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import * as Speech from 'expo-speech';
+import type { SpeechOptions } from 'expo-speech';
 import { useTranslation } from 'react-i18next';
 import {
   computeChunkPauseMs,
@@ -483,6 +484,35 @@ describe('useDictationPlayback', () => {
       'First sentence.',
       expect.objectContaining({ language: 'en' }),
     );
+  });
+
+  it('[WI-1412] resets non-paused playback to idle when Speech.speak reports an error', async () => {
+    let capturedOnError: SpeechOptions['onError'];
+    mockSpeak.mockImplementation((_text, options) => {
+      capturedOnError = options?.onError;
+    });
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: TEST_SENTENCES,
+        pace: 'slow',
+        punctuationReadAloud: false,
+        language: 'en',
+      }),
+    );
+
+    await startPlayback(result);
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+
+    expect(result.current.state).toBe('speaking');
+
+    act(() => {
+      capturedOnError?.(new Error('tts failed'));
+    });
+
+    expect(result.current.state).toBe('idle');
   });
 
   it('speaks long sentences in chunks', async () => {

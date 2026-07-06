@@ -42,6 +42,9 @@ jest.mock('react-i18next', () => ({
       if (key === 'quiz.history.rowLabel') {
         return `${params?.label} ${params?.theme}`;
       }
+      if (key === 'quiz.history.activityLabels.capitals') return 'Capitals';
+      if (key === 'quiz.history.activityLabels.guessWho') return 'Guess Who';
+      if (key === 'quiz.history.activityLabels.vocabulary') return 'Vocabulary';
       return key;
     },
   }),
@@ -76,6 +79,7 @@ const RECENT_ROUNDS_ROUTE = '/quiz/rounds/recent';
 
 const ROUND_GUESS_ID = 'cc0e8400-e29b-41d4-a716-446655440001';
 const ROUND_BOUNDARY_ID = 'cc0e8400-e29b-41d4-a716-446655440002';
+const ROUND_VOCAB_ID = 'cc0e8400-e29b-41d4-a716-446655440003';
 
 const recentRounds = [
   {
@@ -155,6 +159,32 @@ describe('QuizHistoryScreen', () => {
       pathname: '/(app)/quiz/[roundId]',
       params: { roundId: ROUND_GUESS_ID },
     });
+  });
+
+  it('labels vocabulary rounds with a supported language prefix', async () => {
+    mount({
+      [RECENT_ROUNDS_ROUTE]: [
+        {
+          id: ROUND_VOCAB_ID,
+          activityType: 'vocabulary',
+          theme: 'Italian Animals',
+          score: 3,
+          total: 5,
+          xpEarned: 60,
+          completedAt: '2026-04-29T12:00:00.000Z',
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      screen.getByTestId(`quiz-history-row-${ROUND_VOCAB_ID}`);
+    });
+
+    screen.getByText('Vocabulary: Italian');
+    expect(
+      screen.getByTestId(`quiz-history-row-${ROUND_VOCAB_ID}`).props
+        .accessibilityLabel,
+    ).toContain('Vocabulary: Italian');
   });
 
   it('shows loading state', () => {
