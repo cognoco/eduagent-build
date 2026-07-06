@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
+  StyleSheet,
   Text,
   TextInput,
   View,
@@ -45,6 +46,8 @@ import { RewardBurst } from '../../../components/common/RewardBurst';
 import { dismissToQuizIndex, rewardVariantForActivity } from './_quiz-utils';
 
 type AnswerState = 'unanswered' | 'checking' | 'correct' | 'wrong';
+
+const CORRECT_REWARD_LAYER_Z_INDEX = 20;
 
 interface SubmitRoundOptions {
   results?: QuestionResult[];
@@ -379,6 +382,7 @@ export default function QuizPlayScreen(): React.ReactElement {
         setShowContinueHint(true);
       }, 4000);
       if (result.correct) {
+        setCorrectCelebrationKey(Date.now());
         hapticSuccess();
       } else {
         hapticError();
@@ -765,15 +769,6 @@ export default function QuizPlayScreen(): React.ReactElement {
       style={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 20 }}
       testID="quiz-play-screen"
     >
-      {correctCelebrationKey != null ? (
-        <RewardBurst
-          key={correctCelebrationKey}
-          variant={rewardVariantForActivity(activityType)}
-          intensity="answer"
-          testID="quiz-correct-reward-burst"
-          onComplete={() => setCorrectCelebrationKey(null)}
-        />
-      ) : null}
       <View className="mb-6 flex-row items-center justify-between px-5">
         <Pressable
           onPress={handleQuit}
@@ -1168,6 +1163,24 @@ export default function QuizPlayScreen(): React.ReactElement {
         </View>
       ) : null}
 
+      {correctCelebrationKey != null ? (
+        <View
+          pointerEvents="none"
+          style={styles.correctRewardLayer}
+          testID="quiz-correct-reward-layer"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <RewardBurst
+            key={correctCelebrationKey}
+            variant={rewardVariantForActivity(activityType)}
+            intensity="answer"
+            testID="quiz-correct-reward-burst"
+            onComplete={() => setCorrectCelebrationKey(null)}
+          />
+        </View>
+      ) : null}
+
       {/* [BUG-892] Quit confirmation rendered as an in-app Modal so web does
           not hit window.confirm via Alert.alert mapping (which freezes the
           renderer). Mirrors the BUG-553 withdraw-consent pattern. */}
@@ -1248,3 +1261,11 @@ export default function QuizPlayScreen(): React.ReactElement {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  correctRewardLayer: {
+    ...StyleSheet.absoluteFillObject,
+    elevation: CORRECT_REWARD_LAYER_Z_INDEX,
+    zIndex: CORRECT_REWARD_LAYER_Z_INDEX,
+  },
+});
