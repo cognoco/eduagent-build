@@ -2,8 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import AccountScreen from './index';
 
-const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
-const mockGoBackOrReplace = jest.fn();
+const mockRouter = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  canGoBack: jest.fn(() => false),
+};
 
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
@@ -28,17 +32,10 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  // gc1-allow: route wrapper test captures goBackOrReplace fallback without native navigation context
-  '../../../lib/navigation',
-  () => ({
-    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-  }),
-);
-
 describe('AccountScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRouter.canGoBack.mockReturnValue(false);
   });
 
   it('mounts the account admin sheet', () => {
@@ -53,6 +50,18 @@ describe('AccountScreen', () => {
 
     fireEvent.press(screen.getByTestId('account-back'));
 
-    expect(mockGoBackOrReplace).toHaveBeenCalledWith(mockRouter, '/(app)/home');
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/home');
+    expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+
+  it('uses native back when the router can go back', () => {
+    mockRouter.canGoBack.mockReturnValue(true);
+
+    render(<AccountScreen />);
+
+    fireEvent.press(screen.getByTestId('account-back'));
+
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 });
