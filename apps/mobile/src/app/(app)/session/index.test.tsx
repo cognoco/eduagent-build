@@ -3,6 +3,7 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { QuotaExceededError } from '../../../lib/api-client';
 import {
   fetchCallsMatching,
   extractJsonBody,
@@ -2454,7 +2455,6 @@ describe('voice mode persistence', () => {
   });
 
   it('shows QuotaExceededCard and disables input when stream returns 402', async () => {
-    const { QuotaExceededError } = require('../../../lib/api-client');
     const details = {
       tier: 'free' as const,
       reason: 'monthly' as const,
@@ -2487,7 +2487,6 @@ describe('voice mode persistence', () => {
   });
 
   it('renders child quota actions and disables input when sessionIsOwner is false', async () => {
-    const { QuotaExceededError } = require('../../../lib/api-client');
     const details = {
       tier: 'plus' as const,
       effectiveAccessTier: 'plus' as const,

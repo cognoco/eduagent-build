@@ -202,6 +202,7 @@ function makeMeteredApp(input: {
       consentStatus: 'CONSENTED',
       hasPremiumLlm: false,
       conversationLanguage: 'en',
+      // intentional: proves metering reads quota role from DB membership, not from profileMeta — do not change to match the profileId's actual isOwner
       isOwner: true,
       resolvedVia: 'explicit-header',
     });

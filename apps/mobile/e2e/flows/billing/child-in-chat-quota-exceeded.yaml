@@ -3,6 +3,9 @@
 # gets the structured in-chat quota card with notify-parent/home actions and no
 # owner upgrade/top-up action. Device execution is intentionally deferred to the
 # e2e lane; keep this tagged verify-at-e2e-run until run on a configured device.
+# The seed signs in with the parent Clerk login, but the seed result returns
+# profileId=childProfileId so seed-and-run exports the exhausted child as the
+# active profile; the mandatory learner-screen wait below verifies that context.
 appId: com.mentomate.app
 tags:
   - nightly
