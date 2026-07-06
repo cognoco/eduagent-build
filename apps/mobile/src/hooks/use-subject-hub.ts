@@ -25,6 +25,7 @@ import {
 } from '../lib/query-timeout';
 import { computeUpNextTopic } from '../lib/up-next-topic';
 import { useBooks } from './use-books';
+import { useNavigationContract } from './use-navigation-contract';
 import { useLearningResumeTarget } from './use-progress';
 import { useRetentionTopics } from './use-retention';
 import { useSubjectNotes, type SubjectHubNote } from './use-subject-notes';
@@ -77,6 +78,7 @@ interface BuildSubjectHubDataInput {
   retentionTopics: readonly SubjectHubRetentionTopic[];
   resumeTarget: LearningResumeTarget | null | undefined;
   notes: readonly SubjectHubNote[];
+  canStudy?: boolean;
   now?: Date;
 }
 
@@ -283,6 +285,7 @@ export function buildSubjectHubData({
   retentionTopics,
   resumeTarget,
   notes,
+  canStudy = true,
   now = new Date(),
 }: BuildSubjectHubDataInput): SubjectHubDataWithResume {
   const topics = bookDetails
@@ -379,7 +382,7 @@ export function buildSubjectHubData({
       chapters.length >= SEARCH_CHAPTER_THRESHOLD ||
       topics.length >= SEARCH_TOPIC_THRESHOLD,
     notes: [...notes],
-    canStudy: true,
+    canStudy,
   };
 }
 
@@ -419,6 +422,7 @@ export function useSubjectHub(subjectId: string | undefined): {
 } {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const navigationContract = useNavigationContract();
   const subjectsQuery = useSubjects({ enabled: !!subjectId });
   const curriculumStatus = subjectId
     ? (subjectsQuery.data?.find((subject) => subject.id === subjectId)
@@ -517,12 +521,14 @@ export function useSubjectHub(subjectId: string | undefined): {
         []) as SubjectHubRetentionTopic[],
       resumeTarget: resumeTargetQuery.data,
       notes: notesQuery.notes,
+      canStudy: navigationContract.gates.showLearningActions,
     });
   }, [
     bookDetailQueries,
     bookSessionQueries,
     books,
     generatedBooks,
+    navigationContract.gates.showLearningActions,
     notesQuery.notes,
     retentionQuery.data?.topics,
     resumeTargetQuery.data,

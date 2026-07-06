@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import {
   createScreenWrapper,
   createTestProfile,
@@ -93,5 +93,44 @@ describe('ReadyScreen', () => {
 
     expect(queryByText('Starting with …')).toBeNull();
     getByText('Your first topic is ready');
+  });
+
+  it('forwards existing session, topic, and raw input params when the primary CTA is pressed', () => {
+    mockParams = {
+      subject: 'Marine biology',
+      subjectId: 'subject-1',
+      sessionId: 'session-1',
+      topicId: 'topic-1',
+      topicName: 'Coral reefs',
+      rawInput: 'help me understand reefs',
+    };
+    const activeProfile = createTestProfile({
+      id: 'profile-1',
+      displayName: 'Ari',
+      isOwner: true,
+      birthYear: 2014,
+    });
+    const { wrapper } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
+    const { getByTestId } = render(<ReadyScreen />, {
+      wrapper,
+    });
+
+    fireEvent.press(getByTestId('ready-start'));
+
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: 'subject-1',
+        subjectName: 'Marine biology',
+        sessionId: 'session-1',
+        topicId: 'topic-1',
+        topicName: 'Coral reefs',
+        rawInput: 'help me understand reefs',
+      },
+    });
   });
 });

@@ -1288,4 +1288,47 @@ describe('SubjectHubRoute — manage entry (WI-1119)', () => {
 
     expect(screen.queryByTestId('subject-hub-manage')).toBeNull();
   });
+
+  it('renders proxy subject hub read-only while preserving structural content and existing notes', async () => {
+    mockFetch.setRoute('/notes', {
+      notes: [
+        {
+          id: 'aa0e8400-e29b-41d4-a716-446655440077',
+          topicId: TOPIC_ID,
+          topicTitle: 'Greetings',
+          bookId: BOOK_ID,
+          bookTitle: 'Spanish 1',
+          subjectId: SUBJECT_ID,
+          subjectName: 'Spanish',
+          sessionId: null,
+          content: 'Remember hola.',
+          origin: 'self',
+          createdAt: '2026-06-29T00:00:00.000Z',
+          updatedAt: '2026-06-29T00:00:00.000Z',
+        },
+      ],
+      nextCursor: null,
+    });
+
+    render(<SubjectHubRoute />, { wrapper: proxyWrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-screen');
+    });
+
+    screen.getByText('Spanish');
+    expect(screen.getAllByText('Greetings').length).toBeGreaterThan(0);
+    screen.getByText('Remember hola.');
+    expect(screen.queryByTestId('subject-hub-next-up-action')).toBeNull();
+    expect(screen.queryByTestId('subject-hub-notes-input')).toBeNull();
+
+    fireEvent.press(screen.getByTestId(`subject-hub-topic-${TOPIC_ID}`));
+
+    screen.getByTestId('subject-hub-topic-sheet');
+    screen.getByText('Say hello.');
+    expect(screen.getAllByText('Remember hola.').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Study')).toBeNull();
+    expect(screen.queryByText('Review')).toBeNull();
+    expect(screen.queryByTestId('subject-hub-notes-input')).toBeNull();
+  });
 });
