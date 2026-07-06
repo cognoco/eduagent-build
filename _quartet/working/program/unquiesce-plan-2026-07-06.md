@@ -5,6 +5,21 @@ quiescence-window work; checkboxes updated as things land. Context: four operato
 (role accountability, clacks reliability, reviewer invisibility, Codex token economics) set
 priority; end state = both programs relaunched on fixed foundations.
 
+> **Planning mode (operator-ruled 2026-07-06): ROLLING.** This document is a straw-man MAP,
+> not a committed program. Commitment is only ever the next 1-2 L1 steps (see COMMITTED NOW);
+> everything else is horizon/indicative and expected to change — plenty of unknown unknowns.
+
+## COMMITTED NOW (the only binding part)
+
+1. **MentoMate deep app audit** (track 9) — PERISHABLE: uses the Fable/Max window (~24h from
+   2026-07-06 afternoon). Starts on operator scope-nod.
+2. **Charters + ZDX audit redo** (tracks 2 + 6) — next after (or interleaved where the Fable
+   window doesn't need the capacity).
+
+Everything below the line is the map.
+
+---
+
 ## 1. Substrate (WI-1263) — Supabase bus + blessed client
 
 - [x] Operator ruling: Option B (Supabase) — 2026-07-06
@@ -81,6 +96,27 @@ priority; end state = both programs relaunched on fixed foundations.
       `QUARTET_LANE_STATE_ROOT` set (joins the WI-1245/1263 acceptance set)
 - [ ] Decide Lancre's first workload (candidate: multi-agent execution host at full-force
       relaunch)
+
+## 9. MentoMate product front (added 2026-07-06 — operator: "UQ is all assembly line, little product")
+
+- [ ] **Deep app audit (Fable window, ~24h — COMMITTED)**: architecture layering (routes/
+      services/schemas/Inngest vs documented rules), data model + migration debt, feature
+      surface vs PRD (complete/dead/half-wired), LLM pipeline (quality/routing/cost),
+      safety/compliance posture, performance hotspots, test economy. Deliverable: on-paper
+      optimization roadmap, items pre-shaped to Cosmo grain — restart dispatch picks ONLY
+      work expected to survive this audit's triage
+- [ ] Operator scope-nod on the audit dimensions above (before launch)
+- [ ] MentoMate scoping finalization — OPQ-15 (7 walkthrough rulings, Zuzka) + any sibling
+      scope rulings; operator-side, PM folds results into the roadmap
+
+## 10. Top-down lifecycle (PRD→Epic→…→WI) — genuine gap
+
+- [ ] Backlog-check for prior art (Altitude prop / WP / WS exist as nouns; no top-down verbs)
+- [ ] Capture WI: define the top-down equivalents of /capture→/review — decomposition
+      (PRD→Epic→Feature→WI with linkage), coverage tracing (every PRD clause → items),
+      re-decomposition on scope change
+- [ ] Note: the app-audit deliverable (track 9) is the first artifact this process should
+      ingest — design them together
 
 ## Parked / riding along
 
