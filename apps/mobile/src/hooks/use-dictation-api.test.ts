@@ -1,10 +1,16 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createQueryWrapper,
+} from '../test-utils/app-hook-test-utils';
 import { setActiveProfileId, setProxyMode } from '../lib/api-client';
 import {
   usePrepareHomework,
   useGenerateDictation,
+  useReviewDictation,
+  useRecordDictationResult,
+  useDictationHistory,
   DICTATION_MUTATION_TIMEOUT_MS,
   DICTATION_REVIEW_TIMEOUT_MS,
 } from './use-dictation-api';
@@ -20,6 +26,12 @@ let queryClient: QueryClient;
 
 function createWrapper() {
   const w = createQueryWrapper();
+  queryClient = w.queryClient;
+  return w.wrapper;
+}
+
+function createProfileWrapper() {
+  const w = createHookWrapper();
   queryClient = w.queryClient;
   return w.wrapper;
 }
@@ -224,5 +236,189 @@ describe('useGenerateDictation', () => {
     });
 
     expect(result.current.error?.message).toBe('Generation failed');
+  });
+});
+
+describe('useReviewDictation', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    queryClient?.clear();
+  });
+
+  it('posts review input to /dictation/review with the review timeout AbortSignal', async () => {
+    jest.useFakeTimers();
+    let resolveFetch: (response: Response) => void = () => undefined;
+    mockFetch.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+
+    const { result } = renderHook(() => useReviewDictation(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({
+        imageBase64: 'base64-image',
+        imageMimeType: 'image/jpeg',
+        language: 'en',
+        sentences: [
+          {
+            text: 'The cat sat.',
+            withPunctuation: 'The cat sat period',
+            wordCount: 3,
+          },
+        ],
+      });
+    });
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/dictation/review');
+    expect(JSON.parse(init.body as string)).toEqual({
+      imageBase64: 'base64-image',
+      imageMimeType: 'image/jpeg',
+      language: 'en',
+      sentences: [
+        {
+          text: 'The cat sat.',
+          withPunctuation: 'The cat sat period',
+          wordCount: 3,
+        },
+      ],
+    });
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+
+    const signal = init.signal as AbortSignal;
+    act(() => {
+      jest.advanceTimersByTime(DICTATION_REVIEW_TIMEOUT_MS - 1);
+    });
+    expect(signal.aborted).toBe(false);
+
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(signal.aborted).toBe(true);
+
+    await act(async () => {
+      resolveFetch(
+        new Response(
+          JSON.stringify({
+            totalSentences: 1,
+            correctCount: 1,
+            mistakes: [],
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(result.current.data?.correctCount).toBe(1);
+  });
+});
+
+describe('useRecordDictationResult', () => {
+  beforeEach(() => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 204 }));
+  });
+
+  afterEach(() => {
+    queryClient?.clear();
+  });
+
+  it("posts the result and invalidates the active profile's dictation history", async () => {
+    const wrapper = createProfileWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+    const input = {
+      localDate: '2026-07-06',
+      sentenceCount: 1,
+      mistakeCount: 0,
+      mode: 'surprise' as const,
+      reviewed: true,
+      subjectId: '11111111-1111-4111-8111-111111111111',
+      sentences: ['The cat sat.'],
+    };
+
+    const { result } = renderHook(() => useRecordDictationResult(), {
+      wrapper,
+    });
+
+    await act(async () => {
+      result.current.mutate(input);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/dictation/result');
+    expect(JSON.parse(init.body as string)).toEqual(input);
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['dictation-history', 'test-profile-id'],
+    });
+  });
+});
+
+describe('useDictationHistory', () => {
+  beforeEach(() => {
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          entries: [
+            {
+              id: '22222222-2222-4222-8222-222222222222',
+              profileId: 'test-profile-id',
+              completionKey: '33333333-3333-4333-8333-333333333333',
+              date: '2026-07-06',
+              sentenceCount: 1,
+              mistakeCount: 0,
+              mode: 'surprise',
+              reviewed: true,
+              sentences: ['The cat sat.'],
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+  });
+
+  afterEach(() => {
+    queryClient?.clear();
+  });
+
+  it('fetches /dictation/history and selects entries under a profile-scoped key', async () => {
+    const wrapper = createProfileWrapper();
+
+    const { result } = renderHook(() => useDictationHistory(), {
+      wrapper,
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data).toEqual([
+      expect.objectContaining({
+        id: '22222222-2222-4222-8222-222222222222',
+        sentences: ['The cat sat.'],
+      }),
+    ]);
+    expect(queryClient.getQueryData(['dictation-history', 'test-profile-id']))
+      .toEqual(result.current.data);
+
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/dictation/history');
+    expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 });

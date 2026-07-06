@@ -1,0 +1,116 @@
+# Flow: Homework Gallery Picker
+# Validates: homework camera screen -> gallery-button -> native image
+# picker selection -> photo preview -> Use this -> OCR processing/result path.
+# Tags: nightly, homework
+#
+# Journey: UX Journey 2 (Homework phase — gallery capture)
+# Prerequisite: Seeded user with completed learning session + subject
+#               (scenario: homework-ready) and a test JPEG planted in the
+#               emulator gallery.
+#
+# Run with:
+#   ./e2e/scripts/seed-and-run-dictation-review.sh \
+#     homework-ready \
+#     e2e/flows/homework/gallery-picker.yaml
+#
+# The wrapper is shared with dictation review because it already plants a JPEG
+# into /sdcard/Pictures and triggers MediaScanner before running Maestro. This
+# flow uses the production homework gallery button, not the camera capture or
+# manual-entry paths.
+#
+# testIDs verified against source:
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (home-action-homework)
+#   - apps/mobile/src/app/(app)/homework/camera.tsx (gallery-button,
+#     photo-preview, camera-use-this-button, camera-cancel-ocr,
+#     result-text-input, retry-button)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - homework
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "homework-ready"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+- takeScreenshot: homework-gallery-01-home
+
+- tapOn:
+    id: "home-action-homework"
+
+# Camera permission can appear before the viewfinder controls are available.
+- tapOn:
+    id: "grant-permission-button"
+    optional: true  # justified: camera permission prompt only appears on first use or after permission reset
+
+- extendedWaitUntil:
+    visible:
+      id: "gallery-button"
+    timeout: 15000
+
+- takeScreenshot: homework-gallery-02-before-picker
+
+- tapOn:
+    id: "gallery-button"
+
+# Native picker layouts vary by Android version/gallery provider. The planted
+# JPEG may surface by filename, or the picker may need a generic first-tile tap.
+- extendedWaitUntil:
+    visible:
+      text: "dictation-test-image"
+    timeout: 10000
+    optional: true  # justified: system image picker may not expose the planted filename as selectable text on every Android version
+
+- tapOn:
+    text: "dictation-test-image"
+    optional: true  # justified: filename selector is preferred when exposed, but Android picker UIs vary
+
+- tapOn:
+    index: 0
+    text: "Photos"
+    optional: true  # justified: fallback first-tile/Photos selector for system picker variants that hide filenames
+
+# Required: reaching preview proves an image was selected from the gallery.
+- extendedWaitUntil:
+    visible:
+      id: "photo-preview"
+    timeout: 15000
+
+- assertVisible:
+    id: "camera-use-this-button"
+
+- takeScreenshot: homework-gallery-03-preview
+
+- tapOn:
+    id: "camera-use-this-button"
+
+# Required: Use this moved the gallery image into OCR processing.
+- extendedWaitUntil:
+    visible:
+      id: "camera-cancel-ocr"
+    timeout: 10000
+
+- takeScreenshot: homework-gallery-04-processing
+
+# OCR outcome depends on emulator image content and live OCR availability.
+# Either result or retry/error is acceptable after the gallery path has
+# already reached processing.
+- extendedWaitUntil:
+    visible:
+      id: "result-text-input"
+    timeout: 30000
+    optional: true  # justified: gallery OCR may succeed on a planted readable JPEG
+
+- extendedWaitUntil:
+    visible:
+      id: "retry-button"
+    timeout: 5000
+    optional: true  # justified: alternate OCR failure branch when the planted JPEG cannot be read by the OCR backend
+
+- takeScreenshot: homework-gallery-05-ocr-outcome
