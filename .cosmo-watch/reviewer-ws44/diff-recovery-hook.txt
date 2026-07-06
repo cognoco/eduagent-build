@@ -1,0 +1,236 @@
+commit a8728be4454c19acbdfea90f136541d6624022ae
+Author: Zuzana Kopečná <zuzana.kopecna@zwizzly.com>
+Date:   Mon Jul 6 17:14:44 2026 +0200
+
+    fix(mobile): cover session resilience seams [WI-1408] (#1948)
+
+diff --git a/apps/mobile/src/app/(app)/session/_hooks/use-session-recovery.test.ts b/apps/mobile/src/app/(app)/session/_hooks/use-session-recovery.test.ts
+new file mode 100644
+index 000000000..80aa9ef76
+--- /dev/null
++++ b/apps/mobile/src/app/(app)/session/_hooks/use-session-recovery.test.ts
+@@ -0,0 +1,224 @@
++import { act, renderHook, waitFor } from '@testing-library/react-native';
++import * as ExpoSecureStore from 'expo-secure-store';
++import { AppState, type AppStateStatus } from 'react-native';
++
++import {
++  INITIAL_MILESTONE_TRACKER_STATE,
++  type MilestoneTrackerState,
++} from '../../../../hooks/use-milestone-tracker';
++import { writeSessionRecoveryMarker } from '../../../../lib/session-recovery';
++import { useSessionRecovery } from './use-session-recovery';
++
++const secureStore = jest.mocked(ExpoSecureStore);
++
++type AppStateListener = (nextState: AppStateStatus) => void;
++
++const trackerState: MilestoneTrackerState = {
++  ...INITIAL_MILESTONE_TRACKER_STATE,
++  consecutiveLowRung: 2,
++  longMessageCount: 1,
++  awaitingPersistence: true,
++  previousRung: 4,
++  milestonesReached: ['polar_star'],
++};
++
++function renderRecoveryHook(
++  overrides: Partial<Parameters<typeof useSessionRecovery>[0]> = {},
++) {
++  const hydrate = jest.fn();
++  const hasHydratedRecoveryRef = { current: false };
++
++  const result = renderHook(() =>
++    useSessionRecovery({
++      activeProfileId: 'profile-1',
++      activeSessionId: 'session-1',
++      routeSessionId: 'session-1',
++      effectiveMode: 'learning',
++      effectiveSubjectId: 'subject-1',
++      effectiveSubjectName: 'Physics',
++      topicId: 'topic-1',
++      topicName: 'Velocity',
++      trackerState,
++      liveTranscriptMilestones: undefined,
++      hydrate,
++      hasHydratedRecoveryRef,
++      ...overrides,
++    }),
++  );
++
++  return { ...result, hydrate, hasHydratedRecoveryRef };
++}
++
++describe('useSessionRecovery', () => {
++  let appStateListener: AppStateListener | null = null;
++  let removeAppStateListener: jest.Mock;
++
++  beforeEach(() => {
++    jest.clearAllMocks();
++    appStateListener = null;
++    removeAppStateListener = jest.fn();
++    jest
++      .spyOn(AppState, 'addEventListener')
++      .mockImplementation((_eventName, listener) => {
++        appStateListener = listener as AppStateListener;
++        return { remove: removeAppStateListener };
++      });
++  });
++
++  afterEach(() => {
++    jest.restoreAllMocks();
++  });
++
++  it('reads the profile-scoped SecureStore marker and hydrates matching-session milestone state', async () => {
++    await writeSessionRecoveryMarker(
++      {
++        sessionId: 'session-1',
++        profileId: 'profile-1',
++        milestoneTracker: {
++          consecutiveLowRung: 3,
++          longMessageCount: 2,
++          awaitingPersistence: false,
++          previousRung: 2,
++          milestonesReached: ['polar_star', 'comet'],
++        },
++        updatedAt: '2026-07-06T12:00:00.000Z',
++      },
++      'profile-1',
++    );
++    secureStore.getItemAsync.mockClear();
++
++    const { hydrate, hasHydratedRecoveryRef } = renderRecoveryHook();
++
++    await waitFor(() => {
++      expect(secureStore.getItemAsync).toHaveBeenCalledWith(
++        'session-recovery-marker-profile-1',
++      );
++      expect(hydrate).toHaveBeenCalledWith({
++        consecutiveLowRung: 3,
++        longMessageCount: 2,
++        awaitingPersistence: false,
++        previousRung: 2,
++        milestonesReached: ['polar_star', 'comet'],
++      });
++    });
++    expect(hasHydratedRecoveryRef.current).toBe(true);
++  });
++
++  it('uses transcript milestones when the marker belongs to a different session', async () => {
++    await writeSessionRecoveryMarker(
++      {
++        sessionId: 'other-session',
++        profileId: 'profile-1',
++        milestoneTracker: {
++          ...INITIAL_MILESTONE_TRACKER_STATE,
++          milestonesReached: ['deep_diver'],
++        },
++        updatedAt: '2026-07-06T12:00:00.000Z',
++      },
++      'profile-1',
++    );
++    secureStore.getItemAsync.mockClear();
++
++    const { hydrate } = renderRecoveryHook({
++      liveTranscriptMilestones: ['polar_star', 'comet'],
++    });
++
++    await waitFor(() => {
++      expect(secureStore.getItemAsync).toHaveBeenCalledWith(
++        'session-recovery-marker-profile-1',
++      );
++      expect(hydrate).toHaveBeenCalledWith({
++        ...INITIAL_MILESTONE_TRACKER_STATE,
++        milestonesReached: ['polar_star', 'comet'],
++      });
++    });
++  });
++
++  it('does not hydrate from a nonmatching marker when no transcript milestones exist', async () => {
++    await writeSessionRecoveryMarker(
++      {
++        sessionId: 'other-session',
++        profileId: 'profile-1',
++        milestoneTracker: {
++          ...INITIAL_MILESTONE_TRACKER_STATE,
++          milestonesReached: ['deep_diver'],
++        },
++        updatedAt: '2026-07-06T12:00:00.000Z',
++      },
++      'profile-1',
++    );
++    secureStore.getItemAsync.mockClear();
++
++    const { hydrate } = renderRecoveryHook();
++
++    await waitFor(() => {
++      expect(secureStore.getItemAsync).toHaveBeenCalledWith(
++        'session-recovery-marker-profile-1',
++      );
++    });
++    expect(hydrate).not.toHaveBeenCalled();
++  });
++
++  it('writes the current session marker when AppState moves to background', async () => {
++    renderRecoveryHook();
++
++    expect(appStateListener).not.toBeNull();
++    act(() => {
++      appStateListener?.('background');
++    });
++
++    await waitFor(() => {
++      expect(secureStore.setItemAsync).toHaveBeenCalledWith(
++        'session-recovery-marker-profile-1',
++        expect.any(String),
++      );
++    });
++
++    const [, rawMarker] = secureStore.setItemAsync.mock.calls.at(-1) ?? [];
++    expect(JSON.parse(String(rawMarker))).toEqual({
++      sessionId: 'session-1',
++      profileId: 'profile-1',
++      subjectId: 'subject-1',
++      subjectName: 'Physics',
++      topicId: 'topic-1',
++      topicName: 'Velocity',
++      mode: 'learning',
++      milestoneTracker: trackerState,
++      updatedAt: expect.any(String),
++    });
++  });
++
++  it('silently skips recovery when SecureStore marker read fails', async () => {
++    secureStore.getItemAsync.mockRejectedValueOnce(
++      new Error('SecureStore unavailable'),
++    );
++
++    const { hydrate } = renderRecoveryHook();
++
++    await waitFor(() => {
++      expect(secureStore.getItemAsync).toHaveBeenCalledWith(
++        'session-recovery-marker-profile-1',
++      );
++    });
++    expect(hydrate).not.toHaveBeenCalled();
++  });
++
++  it('silently ignores SecureStore marker write failures on background', async () => {
++    secureStore.setItemAsync.mockRejectedValueOnce(
++      new Error('SecureStore write failed'),
++    );
++
++    renderRecoveryHook();
++
++    act(() => {
++      appStateListener?.('background');
++    });
++
++    await waitFor(() => {
++      expect(secureStore.setItemAsync).toHaveBeenCalledWith(
++        'session-recovery-marker-profile-1',
++        expect.any(String),
++      );
++    });
++  });
++});

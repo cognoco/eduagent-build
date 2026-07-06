@@ -70,3 +70,22 @@ Proposed fix: Codex binding should define timeout reconciliation: check report f
 
 Severity for lane throughput: Medium. Without this rule, the shepherd may duplicate work or abandon successful executor runs.
 
+## 2026-07-06 — Nested Codex exec cannot finish linked-worktree commit/PR/report leg
+
+What happened / observed: The WI-1405 builder successfully edited and verified code inside `.worktrees/WI-1405`, but could not run the final delivery mechanics. `git add` failed because the executor could not create `.git/worktrees/WI-1405/index.lock` in the parent repository metadata, `gh` failed through the same `127.0.0.1:9` proxy refusal seen in Notion probes, and writing the expected parent `.cosmo-watch/coverage-debt/WI-1405-builder-report.md` path returned access denied. The builder wrote a fallback report inside the worktree; the shepherd shell had to copy the report, commit, push, open the PR, and record `execute pr-opened`.
+
+Scope: Codex runtime-specific linked-worktree sandbox boundary and network/proxy limitation.
+
+Proposed fix: Either grant nested executor sandbox access to the parent repo `.git/worktrees/*` metadata, GitHub network/proxy, and the shepherd-owned watch directory, or make the runtime binding explicit that builders stop after implementation/verification and the shepherd shell always owns commit/push/PR/report reconciliation.
+
+Severity for lane throughput: Medium-high. Implementation can proceed, but every executor delivery requires a shepherd reconciliation step.
+
+## 2026-07-06 — Codex dedup judge returned prose instead of JSON
+
+What happened / observed: `triage.ts --check WI-1654 --dedup --judge-provider codex` failed because the Codex judge returned conversational text instead of the JSON verdict payload required by the dedup harness. The work item was still triaged without dedup because orchestrator-captured provenance made duplicate risk low.
+
+Scope: Codex runtime-specific judge adapter / prompt-contract gap.
+
+Proposed fix: Add JSON-mode enforcement or a stricter Codex adapter for the dedup judge path. The triage tool should also make optional dedup failures recoverable when the caller explicitly chooses to proceed without duplicate automation.
+
+Severity for lane throughput: Medium. Optional dedup can block Captured-to-Backlog flow if treated as mandatory.

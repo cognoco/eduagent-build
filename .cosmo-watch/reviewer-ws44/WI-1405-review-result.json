@@ -1,0 +1,70 @@
+{
+  "wi_id": "WI-1405",
+  "page_id": "3928bce9-1f7c-81b6-b8a4-cb22ca26208f",
+  "altitude": "Item",
+  "type": "Task",
+  "stage_before": "Reviewing",
+  "stage_after": "Closed",
+  "disposition": "done",
+  "dod": {
+    "mechanical": [],
+    "manual": [
+      {
+        "rule_id": "dod.1.ac_met",
+        "check": "Every Acceptance Criterion is verified, with evidence cited in the completion summary (not just 'done')."
+      },
+      {
+        "rule_id": "dod.2.local_validation",
+        "check": "Local validation passes — lint, type-check, tests (project's standard set)."
+      },
+      {
+        "rule_id": "dod.3.ci_green",
+        "check": "Landing checks pass for the path used — PR path: all required CI checks green on the merged commit; direct-commit path (no-CI repo / meta-tooling): the project's local validation set is green, output cited (the other path is N/A by construction)."
+      },
+      {
+        "rule_id": "dod.4.pr_merged",
+        "check": "The change has LANDED on the base branch (not 'looks done') — PR path: PR merged; direct-commit path: committed to the base branch AND deployment confirmed (e.g. synced / symlinked)."
+      },
+      {
+        "rule_id": "dod.closure_verification",
+        "check": "The original symptom is gone, verified via the source artifact (re-test / re-run scanner) — not merely 'PR merged'."
+      },
+      {
+        "rule_id": "dod.cross_cutting_sweep",
+        "check": "If the fix has 3+ sibling occurrences: all swept + forward guard installed, OR a deferred sweep is documented (tracked WI, owner, target, remaining sites)."
+      }
+    ],
+    "mechanicalOk": true
+  },
+  "recommended": "needs-confirmation",
+  "applied": true,
+  "comment_id": "3958bce9-1f7c-8177-b3de-001db9674a01",
+  "ci_gate": {
+    "outcome": "pass",
+    "kind": "commit-url",
+    "verdict": {
+      "ok": true,
+      "blocking": [],
+      "tolerated": [],
+      "flaked": []
+    },
+    "reason": "Required CI checks green for 093dffc2893a4040429effd0005903762affce14."
+  },
+  "envelope": {
+    "schema": "quartet.review_result.v1",
+    "wi": "WI-1405",
+    "workstream": "WS-44",
+    "reviewerRuntime": "claude-code",
+    "disposition": "approve",
+    "evidence": [],
+    "commandsRun": [],
+    "cosmoMutations": [
+      "Stage: Reviewing -> Closed",
+      "Comment posted (3958bce9-1f7c-8177-b3de-001db9674a01)"
+    ],
+    "overridesApplied": [],
+    "findings": [],
+    "followUps": [],
+    "timestamp": "2026-07-06T11:05:24.485Z"
+  }
+}

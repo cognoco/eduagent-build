@@ -1,0 +1,1415 @@
+[2026-07-05T20:19:58.723Z] starting WS-44 reviewer watcher; dataSource=36fd1119-9955-4684-8bfe-deb145e6a21f; config=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\workstreams.json; outDir=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44; backfillReviewing=true; launchedTransitions=0
+[2026-07-05T20:19:59.220Z] baseline [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; pollMs=60000; runtime=claude-code; actor=claude-code:reviewer-ws44
+[2026-07-05T20:21:00.823Z] poll 2: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:22:01.810Z] poll 3: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:23:02.230Z] poll 4: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:24:02.874Z] poll 5: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:25:03.930Z] poll 6: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:26:04.951Z] poll 7: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:27:05.382Z] poll 8: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:28:05.833Z] poll 9: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:29:06.407Z] poll 10: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:30:06.860Z] poll 11: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:31:07.280Z] poll 12: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:32:07.709Z] poll 13: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:33:08.115Z] poll 14: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:34:08.652Z] poll 15: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:35:09.109Z] poll 16: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:36:09.582Z] poll 17: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:37:10.205Z] poll 18: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:38:10.820Z] poll 19: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:39:11.213Z] poll 20: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:40:11.839Z] poll 21: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:41:13.072Z] poll 22: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:42:13.760Z] poll 23: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:43:14.896Z] poll 24: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:44:15.392Z] poll 25: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:45:16.938Z] poll 26: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:46:17.365Z] poll 27: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:47:17.798Z] poll 28: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:48:18.319Z] poll 29: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:49:18.890Z] poll 30: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:50:20.064Z] poll 31: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:51:20.572Z] poll 32: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:52:21.042Z] poll 33: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:53:21.476Z] poll 34: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:54:22.017Z] poll 35: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:55:23.327Z] poll 36: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:56:23.906Z] poll 37: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:57:24.327Z] poll 38: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:58:25.558Z] poll 39: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T20:59:26.660Z] poll 40: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:00:27.243Z] poll 41: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:01:27.661Z] poll 42: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:02:28.148Z] poll 43: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:03:28.581Z] poll 44: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:04:29.026Z] poll 45: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:05:29.501Z] poll 46: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:06:30.491Z] poll 47: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:07:31.645Z] poll 48: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:08:32.117Z] poll 49: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:09:33.230Z] poll 50: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:10:33.952Z] poll 51: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:11:34.494Z] poll 52: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:12:34.902Z] poll 53: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:13:35.321Z] poll 54: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:14:36.346Z] poll 55: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:15:36.748Z] poll 56: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:16:37.170Z] poll 57: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:17:37.556Z] poll 58: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:18:37.974Z] poll 59: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:19:38.386Z] poll 60: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:20:39.382Z] poll 61: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:21:39.792Z] poll 62: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:22:40.429Z] poll 63: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:23:41.574Z] poll 64: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:24:42.134Z] transition WI-1407: Executing -> Reviewing (Consent/profile gate coverage gaps (save-wizard adult gate + mentor-memory screen-wiring privacy writes))
+[2026-07-05T21:24:42.137Z] trigger WI-1407: launching Claude Code review; key=Executing->Reviewing@2026-07-05T21:24:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1407.coverage-debt.2026-07-05T21-24-42-136Z.final.md
+[2026-07-05T21:24:42.163Z] poll 65: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1407]; running=Coverage Debt (test-coverage burn-down)::WI-1407:3756
+[2026-07-05T21:25:42.617Z] poll 66: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1407]; running=Coverage Debt (test-coverage burn-down)::WI-1407:3756
+[2026-07-05T21:26:43.675Z] poll 67: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1407]; running=Coverage Debt (test-coverage burn-down)::WI-1407:3756
+[2026-07-05T21:27:44.085Z] poll 68: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1407]; running=Coverage Debt (test-coverage burn-down)::WI-1407:3756
+[2026-07-05T21:28:44.504Z] poll 69: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1407]; running=Coverage Debt (test-coverage burn-down)::WI-1407:3756
+[2026-07-05T21:29:44.917Z] poll 70: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1407]; running=Coverage Debt (test-coverage burn-down)::WI-1407:3756
+[2026-07-05T21:30:45.560Z] poll 71: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=Coverage Debt (test-coverage burn-down)::WI-1407:3756
+[2026-07-05T21:31:28.982Z] Claude Code review WI-1407 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1407.coverage-debt.2026-07-05T21-24-42-136Z.final.md
+[2026-07-05T21:31:46.046Z] poll 72: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:32:46.506Z] poll 73: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:33:46.901Z] poll 74: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:34:47.305Z] poll 75: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:35:47.749Z] poll 76: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:36:48.213Z] poll 77: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:37:48.618Z] poll 78: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:38:50.296Z] poll 79: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:39:51.820Z] poll 80: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:40:52.233Z] poll 81: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:41:52.660Z] poll 82: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:42:53.046Z] poll 83: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:43:53.485Z] poll 84: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:44:53.909Z] poll 85: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:45:54.383Z] poll 86: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:46:55.661Z] poll 87: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:47:56.066Z] poll 88: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:48:56.668Z] poll 89: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:49:57.064Z] poll 90: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:50:58.088Z] poll 91: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:51:58.493Z] poll 92: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:52:58.896Z] poll 93: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T21:53:59.316Z] transition WI-1407: Executing -> Reviewing (Consent/profile gate coverage gaps (save-wizard adult gate + mentor-memory screen-wiring privacy writes))
+[2026-07-05T21:53:59.320Z] trigger WI-1407: launching Claude Code review; key=Executing->Reviewing@2026-07-05T21:53:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1407.coverage-debt.2026-07-05T21-53-59-318Z.final.md
+[2026-07-05T21:53:59.500Z] poll 94: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1407]; running=Coverage Debt (test-coverage burn-down)::WI-1407:42676
+[2026-07-05T21:54:59.948Z] poll 95: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1407]; running=Coverage Debt (test-coverage burn-down)::WI-1407:42676
+[2026-07-05T21:56:00.854Z] poll 96: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1407]; running=Coverage Debt (test-coverage burn-down)::WI-1407:42676
+[2026-07-05T21:57:01.496Z] poll 97: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1407]; running=Coverage Debt (test-coverage burn-down)::WI-1407:42676
+[2026-07-05T21:58:01.945Z] poll 98: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1407]; running=Coverage Debt (test-coverage burn-down)::WI-1407:42676
+[2026-07-05T21:59:02.353Z] poll 99: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=Coverage Debt (test-coverage burn-down)::WI-1407:42676
+[2026-07-05T21:59:35.278Z] Claude Code review WI-1407 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1407.coverage-debt.2026-07-05T21-53-59-318Z.final.md
+[2026-07-05T22:00:11.051Z] poll 100: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:01:11.504Z] poll 101: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:02:12.678Z] poll 102: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:03:13.095Z] poll 103: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:04:13.548Z] poll 104: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:05:13.977Z] poll 105: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:06:14.405Z] poll 106: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:07:14.851Z] poll 107: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:08:15.285Z] poll 108: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:09:15.751Z] poll 109: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:10:16.253Z] poll 110: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:11:16.791Z] poll 111: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:12:17.230Z] poll 112: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:13:18.295Z] poll 113: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:14:18.747Z] poll 114: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:15:19.295Z] poll 115: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:16:19.739Z] poll 116: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:17:20.182Z] poll 117: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:18:23.073Z] poll 118: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:19:23.543Z] poll 119: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:20:24.527Z] poll 120: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:21:24.950Z] poll 121: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:22:25.351Z] poll 122: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:23:25.764Z] poll 123: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:24:27.124Z] poll 124: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:25:27.575Z] poll 125: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:26:28.008Z] poll 126: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:27:28.436Z] poll 127: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:28:28.843Z] poll 128: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:29:29.319Z] poll 129: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:30:29.861Z] poll 130: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:31:30.342Z] poll 131: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:32:31.593Z] poll 132: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:33:32.025Z] poll 133: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:34:32.457Z] poll 134: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:35:33.793Z] poll 135: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:36:34.369Z] poll 136: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:37:34.994Z] poll 137: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:38:35.420Z] poll 138: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:39:35.916Z] poll 139: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:40:36.397Z] poll 140: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:41:36.910Z] poll 141: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:42:37.524Z] poll 142: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:43:37.963Z] poll 143: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:44:39.215Z] poll 144: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:45:39.639Z] poll 145: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:46:40.101Z] poll 146: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:47:40.570Z] poll 147: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:48:41.070Z] poll 148: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:49:41.490Z] poll 149: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:50:42.597Z] poll 150: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:51:43.062Z] poll 151: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:52:44.380Z] poll 152: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:53:44.841Z] poll 153: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:54:45.283Z] poll 154: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:55:46.338Z] poll 155: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:56:46.781Z] poll 156: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:57:47.190Z] poll 157: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:58:47.757Z] poll 158: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T22:59:48.186Z] poll 159: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:00:48.651Z] poll 160: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:01:49.269Z] poll 161: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:02:49.726Z] poll 162: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:03:50.773Z] poll 163: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:04:51.262Z] poll 164: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:05:52.385Z] poll 165: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:06:53.484Z] poll 166: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:07:53.946Z] poll 167: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:08:54.541Z] poll 168: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:09:55.246Z] poll 169: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:10:55.700Z] poll 170: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:11:56.873Z] poll 171: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:12:57.710Z] poll 172: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:13:58.149Z] poll 173: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:14:58.611Z] poll 174: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:15:59.298Z] poll 175: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:16:59.758Z] poll 176: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:18:00.925Z] poll 177: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:19:01.442Z] poll 178: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:20:02.284Z] poll 179: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:21:03.528Z] poll 180: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:22:04.633Z] poll 181: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:23:05.694Z] poll 182: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:24:06.176Z] poll 183: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:25:06.601Z] poll 184: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:26:07.027Z] poll 185: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:27:07.448Z] poll 186: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:28:09.722Z] poll 187: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:29:10.342Z] poll 188: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:30:10.786Z] poll 189: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:31:11.237Z] poll 190: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:32:11.753Z] poll 191: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:33:12.943Z] poll 192: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:34:13.360Z] poll 193: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:35:13.820Z] poll 194: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:36:14.917Z] poll 195: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:37:15.338Z] poll 196: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:38:15.754Z] poll 197: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:39:16.877Z] poll 198: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:40:17.388Z] poll 199: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:41:17.784Z] poll 200: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:42:20.982Z] poll 201: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:43:21.509Z] poll 202: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:44:21.935Z] poll 203: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:45:23.145Z] poll 204: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:46:23.577Z] poll 205: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:47:24.026Z] poll 206: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:48:24.456Z] poll 207: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:49:24.891Z] poll 208: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:50:26.178Z] poll 209: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:51:26.586Z] poll 210: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:52:27.037Z] poll 211: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:53:27.451Z] poll 212: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:54:27.907Z] poll 213: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:55:28.341Z] poll 214: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:56:28.852Z] poll 215: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:57:29.275Z] poll 216: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:58:29.987Z] poll 217: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-05T23:59:30.423Z] poll 218: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:00:30.939Z] poll 219: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:01:31.392Z] poll 220: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:02:31.817Z] poll 221: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:03:32.408Z] poll 222: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:04:32.843Z] poll 223: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:05:33.692Z] poll 224: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:06:34.315Z] poll 225: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:07:34.747Z] poll 226: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:08:35.253Z] poll 227: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:09:35.661Z] poll 228: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:10:36.132Z] poll 229: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:11:36.616Z] poll 230: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:12:37.130Z] poll 231: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:13:37.546Z] poll 232: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:14:38.421Z] poll 233: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:15:38.857Z] poll 234: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:16:39.346Z] poll 235: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:17:39.928Z] poll 236: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:18:40.370Z] poll 237: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:19:40.787Z] poll 238: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:20:41.234Z] poll 239: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:21:42.461Z] poll 240: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:22:42.975Z] poll 241: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:23:43.438Z] poll 242: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:24:43.858Z] poll 243: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:25:44.290Z] poll 244: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:26:44.708Z] poll 245: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:27:45.160Z] poll 246: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:28:45.587Z] poll 247: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:29:46.817Z] poll 248: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:30:47.257Z] poll 249: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:31:47.753Z] poll 250: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:32:48.176Z] poll 251: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:33:48.650Z] poll 252: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:34:49.262Z] poll 253: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:35:49.775Z] poll 254: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:36:50.925Z] poll 255: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:37:52.207Z] poll 256: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:38:53.655Z] poll 257: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:39:54.111Z] poll 258: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:40:54.617Z] poll 259: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:41:55.427Z] poll 260: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:42:56.739Z] poll 261: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:43:57.287Z] poll 262: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:44:57.752Z] poll 263: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:45:58.211Z] poll 264: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:46:58.623Z] poll 265: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:47:59.083Z] poll 266: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:48:59.535Z] poll 267: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:49:59.938Z] poll 268: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:51:00.512Z] poll 269: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:52:01.031Z] poll 270: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:53:01.656Z] poll 271: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:54:02.071Z] poll 272: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:55:02.625Z] poll 273: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:56:03.081Z] poll 274: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:57:03.591Z] poll 275: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:58:04.037Z] poll 276: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T00:59:04.518Z] poll 277: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:00:05.406Z] poll 278: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:01:07.000Z] poll 279: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:02:07.439Z] poll 280: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:03:07.868Z] poll 281: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:04:08.325Z] poll 282: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:05:08.716Z] poll 283: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:06:09.353Z] poll 284: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:07:11.685Z] poll 285: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:08:12.089Z] poll 286: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:09:12.552Z] poll 287: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:10:13.014Z] poll 288: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:11:13.473Z] poll 289: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:12:13.902Z] poll 290: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:13:14.326Z] poll 291: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:14:15.015Z] poll 292: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:15:15.485Z] poll 293: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:16:15.932Z] poll 294: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:17:16.411Z] poll 295: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:18:16.864Z] poll 296: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:19:17.341Z] poll 297: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:20:17.775Z] poll 298: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:21:18.285Z] poll 299: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:22:18.763Z] poll 300: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:23:19.208Z] poll 301: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:24:19.638Z] poll 302: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:25:20.071Z] poll 303: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:26:21.280Z] poll 304: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:27:21.709Z] poll 305: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:28:22.125Z] poll 306: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:29:23.544Z] poll 307: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:30:24.113Z] poll 308: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:31:25.283Z] poll 309: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:32:25.726Z] poll 310: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:33:26.940Z] poll 311: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:34:27.348Z] poll 312: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:35:27.831Z] poll 313: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:36:28.438Z] poll 314: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:37:28.868Z] poll 315: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:38:29.357Z] poll 316: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:39:29.850Z] poll 317: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:40:30.374Z] poll 318: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:41:31.034Z] poll 319: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:42:31.826Z] poll 320: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:43:32.232Z] poll 321: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:44:32.677Z] poll 322: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:45:33.236Z] poll 323: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:46:33.660Z] poll 324: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:47:34.129Z] poll 325: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:48:34.568Z] poll 326: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:49:35.448Z] poll 327: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:50:35.962Z] poll 328: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:51:36.368Z] poll 329: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:52:36.862Z] poll 330: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:53:37.326Z] poll 331: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:54:38.379Z] poll 332: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:55:39.023Z] poll 333: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:56:40.135Z] poll 334: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:57:40.728Z] poll 335: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:58:41.620Z] poll 336: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T01:59:42.156Z] poll 337: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:00:42.635Z] poll 338: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:01:43.080Z] poll 339: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:02:43.490Z] poll 340: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:03:43.945Z] poll 341: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:04:44.461Z] poll 342: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:05:46.667Z] poll 343: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:06:47.108Z] poll 344: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:07:47.547Z] poll 345: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:08:49.159Z] poll 346: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:09:49.604Z] poll 347: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:10:50.043Z] poll 348: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:11:50.500Z] poll 349: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:12:55.373Z] poll 350: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:13:55.796Z] poll 351: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:14:56.203Z] poll 352: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:15:56.650Z] poll 353: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:16:57.114Z] poll 354: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:17:57.554Z] poll 355: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:18:59.567Z] poll 356: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:20:00.021Z] poll 357: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:21:00.528Z] poll 358: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:22:01.006Z] poll 359: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:23:01.489Z] poll 360: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:24:01.997Z] poll 361: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:25:02.492Z] poll 362: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:26:02.993Z] poll 363: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:27:03.645Z] poll 364: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:28:04.072Z] poll 365: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:29:04.538Z] poll 366: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:30:05.003Z] poll 367: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:31:05.508Z] poll 368: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:32:05.979Z] poll 369: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:33:06.466Z] poll 370: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:34:08.002Z] poll 371: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:35:08.494Z] poll 372: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:36:09.590Z] poll 373: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:37:11.032Z] poll 374: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:38:11.559Z] poll 375: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:39:12.135Z] poll 376: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:40:12.627Z] poll 377: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:41:13.092Z] poll 378: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:42:13.605Z] poll 379: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:43:14.102Z] poll 380: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:44:14.577Z] poll 381: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:45:15.076Z] poll 382: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:46:16.284Z] poll 383: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:47:17.601Z] poll 384: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:48:18.121Z] poll 385: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:49:20.119Z] poll 386: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:50:20.620Z] poll 387: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:51:21.018Z] poll 388: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:52:21.560Z] poll 389: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:53:21.961Z] poll 390: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:54:22.392Z] poll 391: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:55:22.868Z] poll 392: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:56:23.358Z] poll 393: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:57:23.943Z] poll 394: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:58:24.448Z] poll 395: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T02:59:24.938Z] poll 396: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:00:25.446Z] poll 397: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:01:25.956Z] poll 398: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:02:26.428Z] poll 399: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:03:26.874Z] poll 400: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:04:27.298Z] poll 401: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:05:27.712Z] poll 402: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:06:28.152Z] poll 403: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:07:28.625Z] poll 404: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:08:29.128Z] poll 405: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:09:29.544Z] poll 406: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:10:30.013Z] poll 407: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:11:30.590Z] poll 408: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:12:30.994Z] poll 409: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:13:31.433Z] poll 410: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:14:31.842Z] poll 411: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:15:32.259Z] poll 412: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:16:32.730Z] poll 413: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:17:33.125Z] poll 414: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:18:33.608Z] poll 415: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:19:34.107Z] poll 416: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:20:34.593Z] poll 417: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:21:35.058Z] poll 418: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:22:35.540Z] poll 419: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:23:36.020Z] poll 420: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:24:37.213Z] poll 421: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:25:38.413Z] poll 422: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:26:38.868Z] poll 423: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:27:39.315Z] poll 424: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:28:39.798Z] poll 425: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:29:40.241Z] poll 426: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:30:40.718Z] poll 427: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:31:41.227Z] poll 428: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:32:41.699Z] poll 429: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:33:42.152Z] poll 430: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:34:42.644Z] poll 431: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:35:43.107Z] poll 432: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:36:43.710Z] poll 433: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:37:44.177Z] poll 434: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:38:44.756Z] poll 435: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:39:45.217Z] poll 436: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:40:45.627Z] poll 437: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:41:46.041Z] poll 438: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:42:46.486Z] poll 439: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:43:46.928Z] poll 440: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:44:47.350Z] poll 441: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:45:47.793Z] poll 442: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:46:48.268Z] poll 443: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:47:49.429Z] poll 444: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:48:50.013Z] poll 445: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:49:52.158Z] poll 446: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:50:52.610Z] poll 447: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:51:53.040Z] poll 448: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:52:53.462Z] poll 449: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:53:53.933Z] poll 450: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:54:54.512Z] poll 451: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:55:56.031Z] poll 452: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:56:56.446Z] poll 453: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:57:58.322Z] poll 454: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:58:58.741Z] poll 455: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T03:59:59.211Z] poll 456: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:00:59.672Z] poll 457: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:02:00.111Z] poll 458: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:03:00.568Z] poll 459: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:04:01.288Z] poll 460: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:05:02.186Z] poll 461: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:06:02.620Z] poll 462: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:07:03.047Z] poll 463: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:08:04.135Z] poll 464: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:09:05.745Z] poll 465: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:10:06.222Z] poll 466: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:11:07.307Z] poll 467: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:12:07.814Z] poll 468: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:13:08.277Z] poll 469: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:14:08.825Z] poll 470: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:15:09.244Z] poll 471: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:16:09.702Z] poll 472: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:17:10.868Z] poll 473: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:18:11.356Z] poll 474: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:19:11.794Z] poll 475: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:20:12.225Z] poll 476: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:21:12.700Z] poll 477: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:22:13.154Z] poll 478: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:23:13.601Z] poll 479: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:24:14.275Z] poll 480: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:25:14.706Z] poll 481: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:26:15.220Z] poll 482: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:27:15.670Z] poll 483: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:28:16.095Z] poll 484: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:29:16.731Z] poll 485: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:30:17.768Z] poll 486: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:31:18.259Z] poll 487: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:32:18.812Z] poll 488: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:33:19.347Z] poll 489: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:34:19.827Z] poll 490: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:35:20.318Z] poll 491: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:36:20.814Z] poll 492: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:37:21.274Z] poll 493: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:38:22.023Z] poll 494: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:39:29.110Z] poll 495: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:40:29.564Z] poll 496: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:41:30.037Z] poll 497: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:42:30.491Z] poll 498: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:43:31.011Z] poll 499: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:44:31.521Z] poll 500: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:45:31.962Z] poll 501: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:46:33.265Z] poll 502: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:47:33.897Z] poll 503: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:48:34.378Z] poll 504: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:49:34.829Z] poll 505: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:50:35.258Z] poll 506: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:51:35.728Z] poll 507: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:52:36.904Z] poll 508: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:53:37.352Z] poll 509: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:54:38.595Z] poll 510: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:55:39.025Z] poll 511: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:56:44.251Z] poll 512: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:57:45.137Z] poll 513: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:58:45.600Z] poll 514: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T04:59:46.040Z] poll 515: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:00:46.590Z] poll 516: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:01:47.021Z] poll 517: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:02:47.461Z] poll 518: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:03:50.850Z] poll 519: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:04:51.571Z] poll 520: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:05:52.037Z] poll 521: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:06:53.275Z] poll 522: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:07:53.746Z] poll 523: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:08:55.049Z] poll 524: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:09:55.590Z] poll 525: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:10:56.090Z] poll 526: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:11:56.563Z] poll 527: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:12:56.999Z] poll 528: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:13:58.028Z] poll 529: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:14:58.545Z] poll 530: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:15:59.336Z] poll 531: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:17:00.634Z] poll 532: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:18:01.310Z] poll 533: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:19:01.838Z] poll 534: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:20:02.311Z] poll 535: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:21:04.112Z] poll 536: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:22:04.602Z] poll 537: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:23:05.022Z] poll 538: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:24:05.510Z] poll 539: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:25:05.991Z] poll 540: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:26:06.461Z] poll 541: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:27:06.923Z] poll 542: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:28:07.417Z] poll 543: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:29:07.855Z] poll 544: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:30:08.386Z] poll 545: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:31:08.875Z] poll 546: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:32:09.800Z] poll 547: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:33:10.231Z] poll 548: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:34:10.685Z] poll 549: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:35:12.082Z] poll 550: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:36:12.540Z] poll 551: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:37:12.994Z] poll 552: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:38:13.454Z] poll 553: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:39:13.878Z] poll 554: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:40:14.410Z] poll 555: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:41:15.050Z] poll 556: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:42:15.486Z] poll 557: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:43:15.985Z] poll 558: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:44:16.438Z] poll 559: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:45:17.646Z] poll 560: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:46:18.059Z] poll 561: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:47:19.364Z] poll 562: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:48:19.808Z] poll 563: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:49:20.320Z] poll 564: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:50:21.525Z] poll 565: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:51:22.811Z] poll 566: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:52:23.244Z] poll 567: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:53:23.671Z] poll 568: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:54:24.146Z] poll 569: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:55:24.575Z] poll 570: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:56:25.051Z] poll 571: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:57:25.499Z] poll 572: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:58:25.966Z] poll 573: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T05:59:26.406Z] poll 574: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:00:26.826Z] poll 575: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:01:27.331Z] poll 576: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:02:28.213Z] poll 577: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:03:28.720Z] poll 578: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:04:29.191Z] poll 579: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:05:29.611Z] poll 580: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:06:30.059Z] poll 581: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:07:30.492Z] poll 582: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:08:30.975Z] poll 583: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:09:31.367Z] poll 584: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:10:31.854Z] poll 585: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:11:32.298Z] poll 586: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:12:32.726Z] poll 587: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:13:33.167Z] poll 588: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:14:33.694Z] poll 589: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:15:34.137Z] poll 590: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:16:34.588Z] poll 591: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:17:35.209Z] poll 592: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:18:35.787Z] poll 593: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:19:49.601Z] poll 594: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:20:50.333Z] poll 595: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:21:50.753Z] poll 596: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:22:51.317Z] poll 597: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:23:52.035Z] poll 598: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:24:52.467Z] poll 599: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:25:52.899Z] poll 600: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:26:53.333Z] poll 601: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:27:53.794Z] poll 602: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:28:54.247Z] poll 603: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:29:54.671Z] poll 604: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:30:55.159Z] poll 605: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:31:55.645Z] poll 606: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:32:56.335Z] poll 607: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:33:56.716Z] poll 608: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:34:57.190Z] poll 609: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:35:57.789Z] poll 610: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:36:58.265Z] poll 611: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:37:58.978Z] poll 612: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:38:59.398Z] poll 613: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:39:59.870Z] poll 614: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:41:00.446Z] poll 615: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:42:01.234Z] poll 616: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:43:01.755Z] poll 617: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:44:04.723Z] poll 618: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:45:05.347Z] poll 619: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:46:06.739Z] poll 620: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:47:07.568Z] poll 621: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:48:08.050Z] poll 622: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:49:08.646Z] poll 623: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:50:09.203Z] poll 624: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:51:09.769Z] poll 625: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:52:10.455Z] poll 626: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:53:11.400Z] poll 627: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:54:11.905Z] poll 628: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:55:12.377Z] poll 629: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:56:13.018Z] poll 630: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:57:13.539Z] poll 631: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:58:14.021Z] poll 632: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T06:59:14.860Z] poll 633: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:00:15.648Z] poll 634: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:01:16.094Z] poll 635: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:02:16.669Z] poll 636: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:03:17.311Z] poll 637: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:04:18.011Z] poll 638: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:05:20.209Z] poll 639: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:06:20.741Z] poll 640: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:07:21.160Z] poll 641: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:08:21.601Z] poll 642: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:09:22.166Z] poll 643: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:10:23.560Z] poll 644: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:11:24.602Z] poll 645: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:12:25.265Z] poll 646: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:13:26.349Z] poll 647: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:14:26.842Z] poll 648: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:15:27.272Z] poll 649: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:16:27.782Z] poll 650: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:17:28.237Z] poll 651: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:18:28.656Z] poll 652: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:19:29.162Z] poll 653: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:20:29.648Z] poll 654: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:21:30.103Z] poll 655: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:22:31.486Z] poll 656: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:23:32.047Z] poll 657: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:24:33.350Z] poll 658: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:25:33.885Z] poll 659: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:26:34.389Z] poll 660: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:27:34.803Z] poll 661: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:28:35.218Z] poll 662: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:29:35.792Z] poll 663: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:30:36.266Z] poll 664: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:31:36.707Z] poll 665: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:32:37.186Z] poll 666: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:33:37.681Z] poll 667: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:34:38.324Z] poll 668: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:35:38.763Z] poll 669: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:36:40.145Z] poll 670: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:37:40.679Z] poll 671: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:38:41.080Z] poll 672: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:39:41.517Z] poll 673: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:40:42.016Z] poll 674: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:41:42.675Z] poll 675: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:42:44.554Z] poll 676: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:43:45.110Z] poll 677: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:44:45.648Z] poll 678: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:45:46.163Z] poll 679: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:46:46.731Z] poll 680: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:47:47.204Z] poll 681: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:48:47.641Z] poll 682: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:49:48.741Z] poll 683: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:50:49.150Z] poll 684: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:51:49.618Z] poll 685: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:52:50.072Z] poll 686: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:53:50.546Z] poll 687: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:54:51.043Z] poll 688: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:55:52.448Z] poll 689: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:56:52.951Z] poll 690: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:57:53.500Z] poll 691: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:58:54.265Z] poll 692: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T07:59:54.794Z] poll 693: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:00:55.261Z] poll 694: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:01:55.812Z] poll 695: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:02:57.324Z] poll 696: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:03:57.853Z] poll 697: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:04:59.490Z] poll 698: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:06:00.778Z] poll 699: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:07:01.772Z] poll 700: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:08:02.235Z] poll 701: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:09:02.772Z] poll 702: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:10:03.232Z] poll 703: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:11:03.677Z] poll 704: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:12:04.110Z] poll 705: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:13:04.569Z] poll 706: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:14:05.022Z] poll 707: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:15:05.522Z] poll 708: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:16:05.964Z] poll 709: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:17:06.429Z] poll 710: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:18:06.849Z] poll 711: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:19:07.253Z] poll 712: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:20:07.716Z] poll 713: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:21:08.206Z] poll 714: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:22:08.643Z] poll 715: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:23:09.094Z] poll 716: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:24:09.615Z] poll 717: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:25:10.033Z] poll 718: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:26:10.443Z] poll 719: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:27:11.004Z] poll 720: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:28:11.543Z] poll 721: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:29:12.050Z] poll 722: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:30:13.393Z] poll 723: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:31:13.914Z] poll 724: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:32:14.423Z] poll 725: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:33:15.157Z] poll 726: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:34:15.684Z] poll 727: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:35:16.176Z] poll 728: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:36:16.665Z] poll 729: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:37:17.267Z] poll 730: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:38:17.775Z] poll 731: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:39:18.310Z] poll 732: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:40:18.847Z] poll 733: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:41:19.362Z] poll 734: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:42:20.035Z] poll 735: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:43:20.599Z] poll 736: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:44:21.084Z] poll 737: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:45:22.170Z] poll 738: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:46:22.822Z] poll 739: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:47:24.168Z] poll 740: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:48:24.687Z] poll 741: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:49:25.236Z] poll 742: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:50:25.758Z] poll 743: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:51:26.303Z] poll 744: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:52:26.788Z] poll 745: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:53:28.010Z] poll 746: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:54:29.305Z] poll 747: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:55:29.763Z] poll 748: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:56:31.065Z] poll 749: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:57:32.282Z] poll 750: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:58:33.672Z] poll 751: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T08:59:35.111Z] poll 752: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:00:35.797Z] poll 753: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:01:36.240Z] poll 754: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:02:36.652Z] poll 755: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:03:37.087Z] poll 756: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:04:37.545Z] poll 757: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:05:38.089Z] poll 758: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:06:38.514Z] poll 759: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:07:38.994Z] poll 760: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:08:39.397Z] poll 761: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:09:39.835Z] poll 762: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:10:40.257Z] poll 763: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:11:40.736Z] poll 764: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:12:41.350Z] poll 765: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:13:41.828Z] poll 766: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:14:42.312Z] poll 767: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:15:43.353Z] poll 768: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:16:43.838Z] poll 769: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:17:44.344Z] poll 770: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:18:44.802Z] poll 771: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:19:45.284Z] poll 772: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:20:45.720Z] poll 773: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:21:46.186Z] poll 774: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:22:51.859Z] poll 775: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:23:52.344Z] poll 776: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:24:52.782Z] poll 777: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:25:53.219Z] poll 778: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:26:53.637Z] poll 779: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:27:54.078Z] poll 780: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:28:54.491Z] poll 781: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:29:54.934Z] poll 782: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:30:55.410Z] poll 783: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:31:55.845Z] poll 784: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:32:56.352Z] poll 785: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:33:56.759Z] poll 786: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:34:57.171Z] poll 787: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:35:57.603Z] poll 788: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:36:59.281Z] poll 789: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:37:59.952Z] poll 790: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:39:00.677Z] poll 791: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:40:02.013Z] poll 792: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:41:03.126Z] poll 793: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:42:03.689Z] poll 794: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:43:04.203Z] poll 795: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:44:04.611Z] poll 796: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:45:05.894Z] poll 797: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:46:07.083Z] poll 798: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:47:07.502Z] poll 799: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:48:07.978Z] poll 800: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:49:08.426Z] poll 801: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:50:08.950Z] poll 802: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:51:10.705Z] poll 803: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:52:11.131Z] poll 804: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:53:11.678Z] poll 805: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:54:12.176Z] poll 806: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:55:12.593Z] poll 807: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:56:13.103Z] poll 808: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:57:13.564Z] poll 809: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:58:14.046Z] poll 810: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T09:59:14.485Z] poll 811: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:00:14.955Z] poll 812: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:01:15.436Z] poll 813: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:02:15.884Z] poll 814: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:03:19.424Z] poll 815: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:04:19.889Z] poll 816: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:05:20.332Z] poll 817: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:06:20.794Z] poll 818: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:07:21.242Z] poll 819: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:08:22.524Z] poll 820: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:09:23.016Z] poll 821: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:10:24.421Z] poll 822: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:11:25.309Z] poll 823: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:12:25.766Z] poll 824: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:13:26.235Z] poll 825: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:14:26.744Z] poll 826: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:15:27.267Z] poll 827: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:16:27.719Z] poll 828: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:17:28.254Z] poll 829: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:18:28.735Z] poll 830: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:19:29.191Z] poll 831: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:20:29.695Z] poll 832: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:21:30.149Z] poll 833: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:22:31.406Z] poll 834: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:23:31.852Z] poll 835: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:24:32.274Z] poll 836: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:25:32.759Z] poll 837: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:26:33.215Z] poll 838: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:27:33.641Z] poll 839: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:28:34.061Z] poll 840: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:29:34.546Z] poll 841: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:30:36.373Z] poll 842: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:31:36.876Z] poll 843: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:32:37.380Z] poll 844: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:33:37.860Z] poll 845: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:34:38.322Z] poll 846: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:35:38.851Z] poll 847: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:36:39.371Z] poll 848: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:37:39.849Z] poll 849: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:38:40.416Z] poll 850: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:39:40.885Z] poll 851: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:40:41.397Z] poll 852: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:41:41.962Z] poll 853: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:42:42.433Z] poll 854: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:43:42.887Z] poll 855: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:44:43.357Z] poll 856: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:45:43.837Z] poll 857: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:46:44.315Z] poll 858: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:47:44.795Z] poll 859: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:48:45.335Z] poll 860: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:49:46.018Z] poll 861: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:50:46.446Z] poll 862: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:51:47.785Z] poll 863: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:52:49.121Z] poll 864: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:53:49.582Z] poll 865: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T10:54:50.096Z] transition WI-1405: Executing -> Reviewing (Billing v2 live-path + child-facing + top-up test coverage gaps)
+[2026-07-06T10:54:50.099Z] trigger WI-1405: launching Claude Code review; key=Executing->Reviewing@2026-07-06T10:54:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1405.coverage-debt.2026-07-06T10-54-50-098Z.final.md
+[2026-07-06T10:54:50.127Z] poll 866: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1405]; running=Coverage Debt (test-coverage burn-down)::WI-1405:26500
+[2026-07-06T10:55:50.601Z] poll 867: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1405]; running=Coverage Debt (test-coverage burn-down)::WI-1405:26500
+[2026-07-06T10:56:51.055Z] poll 868: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1405]; running=Coverage Debt (test-coverage burn-down)::WI-1405:26500
+[2026-07-06T10:57:51.536Z] poll 869: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1405]; running=Coverage Debt (test-coverage burn-down)::WI-1405:26500
+[2026-07-06T10:58:52.229Z] poll 870: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1405]; running=Coverage Debt (test-coverage burn-down)::WI-1405:26500
+[2026-07-06T10:59:52.645Z] poll 871: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1405]; running=Coverage Debt (test-coverage burn-down)::WI-1405:26500
+[2026-07-06T11:00:53.082Z] poll 872: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1405]; running=Coverage Debt (test-coverage burn-down)::WI-1405:26500
+[2026-07-06T11:01:53.590Z] poll 873: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1405]; running=Coverage Debt (test-coverage burn-down)::WI-1405:26500
+[2026-07-06T11:02:54.340Z] poll 874: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1405]; running=Coverage Debt (test-coverage burn-down)::WI-1405:26500
+[2026-07-06T11:03:54.764Z] poll 875: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1405]; running=Coverage Debt (test-coverage burn-down)::WI-1405:26500
+[2026-07-06T11:04:55.290Z] poll 876: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1405]; running=Coverage Debt (test-coverage burn-down)::WI-1405:26500
+[2026-07-06T11:05:55.787Z] poll 877: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=Coverage Debt (test-coverage burn-down)::WI-1405:26500
+[2026-07-06T11:06:02.189Z] Claude Code review WI-1405 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1405.coverage-debt.2026-07-06T10-54-50-098Z.final.md
+[2026-07-06T11:06:56.238Z] poll 878: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:07:57.002Z] poll 879: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:08:57.466Z] poll 880: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:09:57.958Z] poll 881: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:10:58.399Z] poll 882: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:11:58.851Z] poll 883: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:12:59.321Z] poll 884: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:13:59.871Z] poll 885: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:15:00.421Z] poll 886: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:16:00.885Z] poll 887: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:17:01.380Z] poll 888: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:18:01.902Z] poll 889: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:19:02.471Z] poll 890: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:20:03.861Z] poll 891: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:21:04.306Z] poll 892: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:22:05.540Z] poll 893: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:23:06.110Z] poll 894: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:24:06.580Z] poll 895: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:25:07.003Z] poll 896: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:26:07.474Z] poll 897: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:27:07.989Z] poll 898: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:28:08.450Z] poll 899: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:29:08.847Z] poll 900: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:30:09.383Z] poll 901: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:31:09.833Z] poll 902: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:32:10.544Z] poll 903: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:33:10.963Z] poll 904: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:34:11.451Z] transition WI-1401: Executing -> Reviewing (Retire or fix stale + placeholder e2e yamls reporting false coverage)
+[2026-07-06T11:34:11.453Z] trigger WI-1401: launching Claude Code review; key=Executing->Reviewing@2026-07-06T11:33:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1401.coverage-debt.2026-07-06T11-34-11-452Z.final.md
+[2026-07-06T11:34:11.558Z] poll 905: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:35:12.059Z] poll 906: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:36:12.536Z] poll 907: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:37:12.958Z] poll 908: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:38:13.382Z] poll 909: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:39:13.844Z] poll 910: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:40:14.264Z] poll 911: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:41:15.502Z] poll 912: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:42:15.911Z] poll 913: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:43:16.348Z] poll 914: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:44:16.804Z] poll 915: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:45:17.361Z] poll 916: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:46:17.824Z] poll 917: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:47:18.348Z] poll 918: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:48:18.820Z] poll 919: [Coverage Debt (test-coverage burn-down): 16 items, Reviewing=none]; running=Coverage Debt (test-coverage burn-down)::WI-1401:48592
+[2026-07-06T11:48:30.998Z] Claude Code review WI-1401 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1401.coverage-debt.2026-07-06T11-34-11-452Z.final.md
+[2026-07-06T11:49:19.414Z] poll 920: [Coverage Debt (test-coverage burn-down): 16 items, Reviewing=none]; running=none
+[2026-07-06T11:50:20.252Z] poll 921: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T11:51:20.752Z] transition WI-1401: Executing -> Reviewing (Retire or fix stale + placeholder e2e yamls reporting false coverage)
+[2026-07-06T11:51:20.754Z] trigger WI-1401: launching Claude Code review; key=Executing->Reviewing@2026-07-06T11:50:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1401.coverage-debt.2026-07-06T11-51-20-753Z.final.md
+[2026-07-06T11:51:20.783Z] poll 922: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:58076
+[2026-07-06T11:52:21.467Z] poll 923: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:58076
+[2026-07-06T11:53:21.897Z] poll 924: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:58076
+[2026-07-06T11:54:22.319Z] poll 925: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:58076
+[2026-07-06T11:55:24.137Z] poll 926: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:58076
+[2026-07-06T11:56:25.061Z] poll 927: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:58076
+[2026-07-06T11:57:25.548Z] poll 928: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:58076
+[2026-07-06T11:58:26.070Z] poll 929: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1401]; running=Coverage Debt (test-coverage burn-down)::WI-1401:58076
+[2026-07-06T11:59:07.834Z] Claude Code review WI-1401 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1401.coverage-debt.2026-07-06T11-51-20-753Z.final.md
+[2026-07-06T11:59:26.614Z] poll 930: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:00:27.086Z] poll 931: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:01:27.723Z] poll 932: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:02:29.018Z] poll 933: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:03:29.687Z] poll 934: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:04:30.229Z] poll 935: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:05:30.756Z] poll 936: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:06:31.860Z] poll 937: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:07:34.360Z] poll 938: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:08:34.841Z] poll 939: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:09:35.277Z] poll 940: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:10:35.940Z] poll 941: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:11:36.395Z] poll 942: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:12:36.862Z] poll 943: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:13:37.451Z] poll 944: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:14:37.963Z] poll 945: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:15:38.448Z] poll 946: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:16:39.808Z] poll 947: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:17:40.255Z] poll 948: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:18:40.740Z] poll 949: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:19:41.214Z] poll 950: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:20:41.733Z] poll 951: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:21:42.186Z] poll 952: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:22:43.564Z] poll 953: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:23:44.125Z] poll 954: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:24:44.586Z] poll 955: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:25:45.178Z] poll 956: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:26:45.804Z] poll 957: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:27:46.639Z] poll 958: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:28:47.175Z] poll 959: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:29:47.642Z] poll 960: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:30:48.230Z] poll 961: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:31:48.721Z] poll 962: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:32:49.226Z] poll 963: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:33:49.666Z] poll 964: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:34:50.114Z] poll 965: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:35:50.683Z] poll 966: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:36:51.153Z] poll 967: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:37:51.582Z] poll 968: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:38:52.047Z] poll 969: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:39:52.523Z] poll 970: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:40:53.013Z] poll 971: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:41:53.496Z] poll 972: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:42:54.040Z] poll 973: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:43:54.532Z] poll 974: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:44:55.024Z] poll 975: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:45:55.520Z] poll 976: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:46:55.985Z] poll 977: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:47:56.711Z] poll 978: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:48:57.225Z] poll 979: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:49:57.687Z] poll 980: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:50:58.246Z] poll 981: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:51:58.760Z] poll 982: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:52:59.393Z] poll 983: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:53:59.898Z] poll 984: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:55:00.377Z] poll 985: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:56:00.943Z] poll 986: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:57:01.561Z] poll 987: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:58:02.024Z] poll 988: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T12:59:02.489Z] poll 989: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:00:03.212Z] poll 990: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:01:03.709Z] poll 991: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:02:04.277Z] poll 992: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:03:05.688Z] transition WI-1411: Executing -> Reviewing (Practice/Quiz test coverage gaps (recitation mode, GuessWho skip/wrong, dispute payload, discovery + save-and-finish e2e))
+[2026-07-06T13:03:05.690Z] trigger WI-1411: launching Claude Code review; key=Executing->Reviewing@2026-07-06T13:02:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1411.coverage-debt.2026-07-06T13-03-05-689Z.final.md
+[2026-07-06T13:03:05.711Z] poll 993: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1411]; running=Coverage Debt (test-coverage burn-down)::WI-1411:25476
+[2026-07-06T13:04:06.221Z] poll 994: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1411]; running=Coverage Debt (test-coverage burn-down)::WI-1411:25476
+[2026-07-06T13:05:07.571Z] poll 995: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1411]; running=Coverage Debt (test-coverage burn-down)::WI-1411:25476
+[2026-07-06T13:06:08.077Z] poll 996: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1411]; running=Coverage Debt (test-coverage burn-down)::WI-1411:25476
+[2026-07-06T13:07:08.530Z] poll 997: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1411]; running=Coverage Debt (test-coverage burn-down)::WI-1411:25476
+[2026-07-06T13:08:09.232Z] poll 998: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=WI-1411]; running=Coverage Debt (test-coverage burn-down)::WI-1411:25476
+[2026-07-06T13:09:09.667Z] poll 999: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=Coverage Debt (test-coverage burn-down)::WI-1411:25476
+[2026-07-06T13:10:10.138Z] poll 1000: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=Coverage Debt (test-coverage burn-down)::WI-1411:25476
+[2026-07-06T13:10:38.688Z] Claude Code review WI-1411 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1411.coverage-debt.2026-07-06T13-03-05-689Z.final.md
+[2026-07-06T13:11:11.351Z] poll 1001: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:12:11.871Z] poll 1002: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:13:12.314Z] poll 1003: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:14:12.939Z] poll 1004: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:15:13.381Z] poll 1005: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:16:14.862Z] poll 1006: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:17:15.282Z] poll 1007: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:18:15.851Z] poll 1008: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:19:16.357Z] poll 1009: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:20:16.809Z] poll 1010: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:21:17.314Z] poll 1011: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:22:18.218Z] poll 1012: [Coverage Debt (test-coverage burn-down): 14 items, Reviewing=none]; running=none
+[2026-07-06T13:23:18.663Z] poll 1013: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:24:19.127Z] poll 1014: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:25:19.569Z] transition WI-1412: Executing -> Reviewing (Dictation/Homework test coverage gaps (TTS-reset regression, dictation API hooks, attach-failure hook, gallery e2e))
+[2026-07-06T13:25:19.570Z] trigger WI-1412: launching Claude Code review; key=Executing->Reviewing@2026-07-06T13:24:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1412.coverage-debt.2026-07-06T13-25-19-570Z.final.md
+[2026-07-06T13:25:19.702Z] poll 1015: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1412]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892
+[2026-07-06T13:26:20.330Z] poll 1016: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1412]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892
+[2026-07-06T13:27:21.672Z] poll 1017: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1412]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892
+[2026-07-06T13:28:22.255Z] transition WI-1414: Executing -> Reviewing (Mobile cross-cutting seam coverage gaps (celebration dedup per-profile, FeedbackProvider, profile-scope drift, idempotency))
+[2026-07-06T13:28:22.257Z] trigger WI-1414: launching Claude Code review; key=Executing->Reviewing@2026-07-06T13:27:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1414.coverage-debt.2026-07-06T13-28-22-256Z.final.md
+[2026-07-06T13:28:22.285Z] poll 1018: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1412, WI-1414]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892, Coverage Debt (test-coverage burn-down)::WI-1414:52052
+[2026-07-06T13:29:22.896Z] poll 1019: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1412, WI-1414]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892, Coverage Debt (test-coverage burn-down)::WI-1414:52052
+[2026-07-06T13:30:23.407Z] poll 1020: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1412, WI-1414]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892, Coverage Debt (test-coverage burn-down)::WI-1414:52052
+[2026-07-06T13:31:25.328Z] poll 1021: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1412, WI-1414]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892, Coverage Debt (test-coverage burn-down)::WI-1414:52052
+[2026-07-06T13:32:25.882Z] poll 1022: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1412, WI-1414]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892, Coverage Debt (test-coverage burn-down)::WI-1414:52052
+[2026-07-06T13:33:26.384Z] poll 1023: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1412, WI-1414]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892, Coverage Debt (test-coverage burn-down)::WI-1414:52052
+[2026-07-06T13:34:26.854Z] poll 1024: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1412, WI-1414]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892, Coverage Debt (test-coverage burn-down)::WI-1414:52052
+[2026-07-06T13:35:27.369Z] poll 1025: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1412]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892, Coverage Debt (test-coverage burn-down)::WI-1414:52052
+[2026-07-06T13:35:47.146Z] Claude Code review WI-1414 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1414.coverage-debt.2026-07-06T13-28-22-256Z.final.md
+[2026-07-06T13:36:27.886Z] poll 1026: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1412]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892
+[2026-07-06T13:37:28.358Z] poll 1027: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1412]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892
+[2026-07-06T13:38:29.819Z] poll 1028: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=Coverage Debt (test-coverage burn-down)::WI-1412:73892
+[2026-07-06T13:39:09.115Z] Claude Code review WI-1412 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1412.coverage-debt.2026-07-06T13-25-19-570Z.final.md
+[2026-07-06T13:39:30.397Z] poll 1029: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:40:30.913Z] poll 1030: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:41:31.389Z] poll 1031: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:42:31.849Z] poll 1032: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:43:32.489Z] poll 1033: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:44:33.179Z] poll 1034: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:45:33.695Z] poll 1035: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:46:34.231Z] poll 1036: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:47:35.645Z] poll 1037: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:48:36.208Z] poll 1038: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:49:36.672Z] poll 1039: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:50:37.214Z] poll 1040: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:51:37.708Z] poll 1041: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:52:38.183Z] poll 1042: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:53:38.676Z] poll 1043: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:54:40.036Z] poll 1044: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:55:40.708Z] poll 1045: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:56:41.474Z] poll 1046: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:57:41.954Z] poll 1047: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:58:42.432Z] poll 1048: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T13:59:42.935Z] poll 1049: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:00:43.472Z] poll 1050: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:01:43.992Z] poll 1051: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:02:44.576Z] poll 1052: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:03:45.096Z] poll 1053: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:04:45.977Z] poll 1054: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:05:46.486Z] poll 1055: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:06:46.918Z] poll 1056: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:07:48.104Z] poll 1057: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:08:48.582Z] poll 1058: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:09:49.385Z] poll 1059: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:10:49.884Z] poll 1060: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:11:50.406Z] poll 1061: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:12:50.937Z] poll 1062: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:13:51.411Z] poll 1063: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:14:52.009Z] poll 1064: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:15:52.522Z] poll 1065: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:16:53.929Z] poll 1066: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:17:54.479Z] poll 1067: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:18:55.001Z] poll 1068: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:19:55.498Z] poll 1069: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:20:56.019Z] poll 1070: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:21:56.522Z] poll 1071: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:22:57.785Z] poll 1072: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:23:58.365Z] poll 1073: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:24:59.657Z] poll 1074: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:26:00.180Z] poll 1075: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:27:02.262Z] poll 1076: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:28:02.786Z] poll 1077: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:29:03.543Z] poll 1078: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:30:04.902Z] poll 1079: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:31:05.753Z] poll 1080: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:32:06.223Z] poll 1081: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:33:06.741Z] poll 1082: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:34:07.300Z] poll 1083: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:35:07.944Z] poll 1084: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:36:08.520Z] poll 1085: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:37:09.029Z] poll 1086: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:38:09.537Z] poll 1087: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:39:11.158Z] poll 1088: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:40:11.959Z] poll 1089: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:41:12.545Z] poll 1090: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:42:13.075Z] poll 1091: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:43:13.604Z] poll 1092: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:44:15.348Z] poll 1093: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:45:16.808Z] poll 1094: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:46:17.518Z] poll 1095: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:47:18.254Z] poll 1096: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:48:18.932Z] poll 1097: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:49:19.645Z] poll 1098: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:50:20.351Z] poll 1099: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:51:20.860Z] poll 1100: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:52:22.539Z] poll 1101: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:53:23.840Z] poll 1102: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:54:24.348Z] poll 1103: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:55:25.025Z] poll 1104: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:56:25.546Z] poll 1105: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:57:26.059Z] poll 1106: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:58:26.511Z] poll 1107: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T14:59:27.028Z] poll 1108: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:00:27.560Z] poll 1109: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:01:28.148Z] poll 1110: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:02:28.647Z] poll 1111: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:03:29.129Z] poll 1112: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:04:29.685Z] poll 1113: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:05:30.160Z] poll 1114: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:06:31.484Z] poll 1115: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:07:32.025Z] poll 1116: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:08:32.533Z] poll 1117: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:09:32.994Z] poll 1118: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:10:33.434Z] poll 1119: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:11:34.010Z] poll 1120: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:12:34.581Z] poll 1121: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:13:35.112Z] poll 1122: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:14:36.399Z] poll 1123: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:15:36.899Z] poll 1124: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:16:37.372Z] poll 1125: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:17:37.857Z] poll 1126: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:18:38.335Z] poll 1127: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:19:38.911Z] poll 1128: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:20:39.419Z] poll 1129: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:21:40.718Z] poll 1130: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:22:42.019Z] poll 1131: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:23:42.631Z] poll 1132: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:24:43.057Z] poll 1133: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:25:43.580Z] poll 1134: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:26:44.117Z] poll 1135: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:27:44.584Z] poll 1136: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:28:47.431Z] poll 1137: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:29:47.890Z] poll 1138: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:30:48.534Z] poll 1139: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:31:48.996Z] poll 1140: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:32:49.513Z] poll 1141: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:33:50.000Z] poll 1142: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:34:50.455Z] poll 1143: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:35:50.978Z] poll 1144: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:36:53.018Z] poll 1145: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:37:53.663Z] poll 1146: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:38:54.204Z] poll 1147: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:39:54.681Z] poll 1148: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:40:55.290Z] poll 1149: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:41:55.768Z] poll 1150: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:42:56.378Z] poll 1151: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:43:57.249Z] poll 1152: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:44:57.755Z] poll 1153: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:45:58.224Z] poll 1154: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:46:58.669Z] poll 1155: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:47:59.134Z] poll 1156: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:48:59.601Z] poll 1157: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:50:00.171Z] poll 1158: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:51:00.704Z] poll 1159: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:52:01.160Z] poll 1160: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:53:01.802Z] poll 1161: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:54:02.317Z] poll 1162: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:55:02.798Z] poll 1163: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:56:04.227Z] poll 1164: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:57:04.757Z] poll 1165: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:58:05.992Z] poll 1166: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T15:59:06.474Z] poll 1167: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:00:06.930Z] poll 1168: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:01:07.436Z] poll 1169: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:02:07.947Z] poll 1170: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:03:08.437Z] poll 1171: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:04:08.949Z] poll 1172: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:05:09.613Z] poll 1173: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:06:10.059Z] poll 1174: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:07:10.632Z] poll 1175: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:08:11.789Z] poll 1176: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:09:12.294Z] poll 1177: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:10:12.751Z] poll 1178: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:11:14.543Z] poll 1179: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:12:16.568Z] poll 1180: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:13:17.804Z] poll 1181: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:14:18.353Z] poll 1182: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:15:18.836Z] poll 1183: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:16:19.323Z] poll 1184: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:17:19.837Z] poll 1185: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:18:20.313Z] poll 1186: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:19:20.746Z] poll 1187: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:20:21.419Z] poll 1188: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:21:21.936Z] poll 1189: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:22:22.375Z] poll 1190: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:23:22.874Z] poll 1191: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:24:24.076Z] poll 1192: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:25:26.962Z] poll 1193: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:26:27.423Z] poll 1194: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:27:27.996Z] poll 1195: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:28:28.515Z] poll 1196: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:29:29.052Z] poll 1197: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:30:29.582Z] poll 1198: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:31:30.032Z] poll 1199: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:32:30.521Z] poll 1200: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:33:31.053Z] poll 1201: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:34:31.636Z] poll 1202: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:35:32.131Z] poll 1203: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:36:32.544Z] poll 1204: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:37:33.057Z] poll 1205: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:38:33.592Z] poll 1206: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:39:34.090Z] poll 1207: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:40:34.579Z] poll 1208: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:41:35.124Z] poll 1209: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:42:35.821Z] poll 1210: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:43:36.355Z] poll 1211: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:44:36.862Z] poll 1212: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:45:38.091Z] poll 1213: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:46:39.395Z] poll 1214: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T16:47:40.913Z] transition WI-1404: Executing -> Reviewing (S5 visibility HTTP route-boundary test missing (routes/visibility.ts 6 endpoints))
+[2026-07-06T16:47:40.915Z] trigger WI-1404: launching Claude Code review; key=Executing->Reviewing@2026-07-06T16:47:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1404.coverage-debt.2026-07-06T16-47-40-913Z.final.md
+[2026-07-06T16:47:40.943Z] poll 1215: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1404]; running=Coverage Debt (test-coverage burn-down)::WI-1404:39224
+[2026-07-06T16:48:42.312Z] transition WI-1403: Executing -> Reviewing (S4 /now supporter artifact-exclusion negative test missing)
+[2026-07-06T16:48:42.314Z] trigger WI-1403: launching Claude Code review; key=Executing->Reviewing@2026-07-06T16:47:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1403.coverage-debt.2026-07-06T16-48-42-314Z.final.md
+[2026-07-06T16:48:42.379Z] transition WI-1408: Executing -> Reviewing (Learning session resilience coverage gaps (crash-recovery hook + reflection-bonus display + TTS/challenge e2e))
+[2026-07-06T16:48:42.381Z] trigger WI-1408: launching Claude Code review; key=Executing->Reviewing@2026-07-06T16:48:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1408.coverage-debt.2026-07-06T16-48-42-380Z.final.md
+[2026-07-06T16:48:42.416Z] transition WI-1413: Executing -> Reviewing (S3 avatar-admin parity coverage — sheet omits + doesn't test rare rows before S6 More-tab deletion)
+[2026-07-06T16:48:42.417Z] trigger WI-1413: launching Claude Code review; key=Executing->Reviewing@2026-07-06T16:48:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1413.coverage-debt.2026-07-06T16-48-42-416Z.final.md
+[2026-07-06T16:48:42.453Z] poll 1216: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1403, WI-1404, WI-1408, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1404:39224, Coverage Debt (test-coverage burn-down)::WI-1403:76016, Coverage Debt (test-coverage burn-down)::WI-1408:12128, Coverage Debt (test-coverage burn-down)::WI-1413:22276
+[2026-07-06T16:49:43.107Z] transition WI-1401: Executing -> Reviewing (Retire or fix stale + placeholder e2e yamls reporting false coverage)
+[2026-07-06T16:49:43.109Z] trigger WI-1401: launching Claude Code review; key=Executing->Reviewing@2026-07-06T16:48:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1401.coverage-debt.2026-07-06T16-49-43-108Z.final.md
+[2026-07-06T16:49:43.139Z] poll 1217: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1401, WI-1403, WI-1404, WI-1408, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1404:39224, Coverage Debt (test-coverage burn-down)::WI-1403:76016, Coverage Debt (test-coverage burn-down)::WI-1408:12128, Coverage Debt (test-coverage burn-down)::WI-1413:22276, Coverage Debt (test-coverage burn-down)::WI-1401:74496
+[2026-07-06T16:50:43.651Z] poll 1218: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1401, WI-1403, WI-1404, WI-1408, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1404:39224, Coverage Debt (test-coverage burn-down)::WI-1403:76016, Coverage Debt (test-coverage burn-down)::WI-1408:12128, Coverage Debt (test-coverage burn-down)::WI-1413:22276, Coverage Debt (test-coverage burn-down)::WI-1401:74496
+[2026-07-06T16:51:44.327Z] poll 1219: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1401, WI-1403, WI-1404, WI-1408, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1404:39224, Coverage Debt (test-coverage burn-down)::WI-1403:76016, Coverage Debt (test-coverage burn-down)::WI-1408:12128, Coverage Debt (test-coverage burn-down)::WI-1413:22276, Coverage Debt (test-coverage burn-down)::WI-1401:74496
+[2026-07-06T16:52:46.366Z] poll 1220: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1401, WI-1404, WI-1408, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1404:39224, Coverage Debt (test-coverage burn-down)::WI-1403:76016, Coverage Debt (test-coverage burn-down)::WI-1408:12128, Coverage Debt (test-coverage burn-down)::WI-1413:22276, Coverage Debt (test-coverage burn-down)::WI-1401:74496
+[2026-07-06T16:53:19.444Z] Claude Code review WI-1403 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1403.coverage-debt.2026-07-06T16-48-42-314Z.final.md
+[2026-07-06T16:53:48.709Z] poll 1221: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1401, WI-1404, WI-1408, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1404:39224, Coverage Debt (test-coverage burn-down)::WI-1408:12128, Coverage Debt (test-coverage burn-down)::WI-1413:22276, Coverage Debt (test-coverage burn-down)::WI-1401:74496
+[2026-07-06T16:54:50.327Z] poll 1222: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1401, WI-1404, WI-1408, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1404:39224, Coverage Debt (test-coverage burn-down)::WI-1408:12128, Coverage Debt (test-coverage burn-down)::WI-1413:22276, Coverage Debt (test-coverage burn-down)::WI-1401:74496
+[2026-07-06T16:55:50.899Z] poll 1223: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1401, WI-1404, WI-1408, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1404:39224, Coverage Debt (test-coverage burn-down)::WI-1408:12128, Coverage Debt (test-coverage burn-down)::WI-1413:22276, Coverage Debt (test-coverage burn-down)::WI-1401:74496
+[2026-07-06T16:56:51.390Z] poll 1224: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1401, WI-1404, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1404:39224, Coverage Debt (test-coverage burn-down)::WI-1408:12128, Coverage Debt (test-coverage burn-down)::WI-1413:22276, Coverage Debt (test-coverage burn-down)::WI-1401:74496
+[2026-07-06T16:57:09.771Z] Claude Code review WI-1408 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1408.coverage-debt.2026-07-06T16-48-42-380Z.final.md
+[2026-07-06T16:57:35.586Z] Claude Code review WI-1404 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1404.coverage-debt.2026-07-06T16-47-40-913Z.final.md
+[2026-07-06T16:57:52.103Z] poll 1225: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1413:22276, Coverage Debt (test-coverage burn-down)::WI-1401:74496
+[2026-07-06T16:57:55.478Z] Claude Code review WI-1401 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1401.coverage-debt.2026-07-06T16-49-43-108Z.final.md
+[2026-07-06T16:58:54.116Z] poll 1226: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1413:22276
+[2026-07-06T16:59:55.578Z] poll 1227: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=Coverage Debt (test-coverage burn-down)::WI-1413:22276
+[2026-07-06T17:00:06.707Z] Claude Code review WI-1413 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1413.coverage-debt.2026-07-06T16-48-42-416Z.final.md
+[2026-07-06T17:00:56.316Z] poll 1228: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:01:56.881Z] poll 1229: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:02:57.445Z] poll 1230: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:03:58.480Z] poll 1231: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:04:58.953Z] poll 1232: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:05:59.432Z] poll 1233: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:07:00.239Z] poll 1234: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:08:01.009Z] poll 1235: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:09:01.605Z] poll 1236: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:10:02.724Z] poll 1237: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:11:04.146Z] poll 1238: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:12:04.675Z] poll 1239: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:13:05.229Z] poll 1240: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:14:05.732Z] poll 1241: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:15:06.187Z] poll 1242: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:16:06.651Z] poll 1243: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:17:07.172Z] poll 1244: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:18:07.640Z] poll 1245: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:19:08.269Z] poll 1246: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:20:09.851Z] poll 1247: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:21:10.458Z] poll 1248: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:22:10.945Z] poll 1249: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:23:11.713Z] poll 1250: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:24:12.177Z] poll 1251: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:25:12.613Z] poll 1252: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:26:13.060Z] poll 1253: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:27:13.495Z] poll 1254: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:28:14.059Z] poll 1255: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:29:14.710Z] poll 1256: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:30:15.162Z] poll 1257: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:31:15.753Z] poll 1258: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:32:16.188Z] poll 1259: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:33:16.651Z] transition WI-1410: Executing -> Reviewing (Library/progress write-gating + data-isolation test coverage gaps)
+[2026-07-06T17:33:16.653Z] trigger WI-1410: launching Claude Code review; key=Executing->Reviewing@2026-07-06T17:33:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1410.coverage-debt.2026-07-06T17-33-16-652Z.final.md
+[2026-07-06T17:33:16.674Z] transition WI-1654: Executing -> Reviewing (family-v2 listFamilyMembersV2 has no ORDER BY — integration test asserts exact row order → intermittent CI flake)
+[2026-07-06T17:33:16.676Z] trigger WI-1654: launching Claude Code review; key=Executing->Reviewing@2026-07-06T17:33:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1654.coverage-debt.2026-07-06T17-33-16-675Z.final.md
+[2026-07-06T17:33:16.697Z] poll 1260: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1410, WI-1654]; running=Coverage Debt (test-coverage burn-down)::WI-1410:77644, Coverage Debt (test-coverage burn-down)::WI-1654:55348
+[2026-07-06T17:34:17.203Z] poll 1261: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1410, WI-1654]; running=Coverage Debt (test-coverage burn-down)::WI-1410:77644, Coverage Debt (test-coverage burn-down)::WI-1654:55348
+[2026-07-06T17:35:17.704Z] poll 1262: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1410, WI-1654]; running=Coverage Debt (test-coverage burn-down)::WI-1410:77644, Coverage Debt (test-coverage burn-down)::WI-1654:55348
+[2026-07-06T17:36:18.196Z] poll 1263: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1410, WI-1654]; running=Coverage Debt (test-coverage burn-down)::WI-1410:77644, Coverage Debt (test-coverage burn-down)::WI-1654:55348
+[2026-07-06T17:37:18.688Z] poll 1264: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1410]; running=Coverage Debt (test-coverage burn-down)::WI-1410:77644, Coverage Debt (test-coverage burn-down)::WI-1654:55348
+[2026-07-06T17:38:05.057Z] Claude Code review WI-1654 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1654.coverage-debt.2026-07-06T17-33-16-675Z.final.md
+[2026-07-06T17:38:19.237Z] poll 1265: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1410]; running=Coverage Debt (test-coverage burn-down)::WI-1410:77644
+[2026-07-06T17:39:19.736Z] poll 1266: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1410]; running=Coverage Debt (test-coverage burn-down)::WI-1410:77644
+[2026-07-06T17:40:20.249Z] poll 1267: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1410]; running=Coverage Debt (test-coverage burn-down)::WI-1410:77644
+[2026-07-06T17:41:23.315Z] poll 1268: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1410]; running=Coverage Debt (test-coverage burn-down)::WI-1410:77644
+[2026-07-06T17:42:23.770Z] poll 1269: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1410]; running=Coverage Debt (test-coverage burn-down)::WI-1410:77644
+[2026-07-06T17:43:12.436Z] Claude Code review WI-1410 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1410.coverage-debt.2026-07-06T17-33-16-652Z.final.md
+[2026-07-06T17:43:24.259Z] poll 1270: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:44:24.766Z] poll 1271: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:45:25.310Z] poll 1272: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:46:25.846Z] poll 1273: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:47:26.296Z] poll 1274: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:48:26.765Z] poll 1275: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:49:27.240Z] poll 1276: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:50:27.708Z] poll 1277: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T17:51:28.148Z] transition WI-1409: Executing -> Reviewing (S2 subject hub + assessment test coverage gaps (canStudy gate, assessment guard + result UI, /ready CTA))
+[2026-07-06T17:51:28.150Z] trigger WI-1409: launching Claude Code review; key=Executing->Reviewing@2026-07-06T17:50:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1409.coverage-debt.2026-07-06T17-51-28-149Z.final.md
+[2026-07-06T17:51:28.187Z] transition WI-1413: Executing -> Reviewing (S3 avatar-admin parity coverage — sheet omits + doesn't test rare rows before S6 More-tab deletion)
+[2026-07-06T17:51:28.188Z] trigger WI-1413: launching Claude Code review; key=Executing->Reviewing@2026-07-06T17:51:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1413.coverage-debt.2026-07-06T17-51-28-188Z.final.md
+[2026-07-06T17:51:28.217Z] poll 1278: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1409, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1409:13412, Coverage Debt (test-coverage burn-down)::WI-1413:42360
+[2026-07-06T17:52:28.862Z] poll 1279: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1409, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1409:13412, Coverage Debt (test-coverage burn-down)::WI-1413:42360
+[2026-07-06T17:53:29.382Z] poll 1280: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1409, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1409:13412, Coverage Debt (test-coverage burn-down)::WI-1413:42360
+[2026-07-06T17:54:29.864Z] poll 1281: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1409, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1409:13412, Coverage Debt (test-coverage burn-down)::WI-1413:42360
+[2026-07-06T17:55:30.375Z] poll 1282: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1409, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1409:13412, Coverage Debt (test-coverage burn-down)::WI-1413:42360
+[2026-07-06T17:56:30.815Z] poll 1283: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1409, WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1409:13412, Coverage Debt (test-coverage burn-down)::WI-1413:42360
+[2026-07-06T17:57:32.375Z] poll 1284: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1409:13412, Coverage Debt (test-coverage burn-down)::WI-1413:42360
+[2026-07-06T17:57:42.502Z] Claude Code review WI-1409 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1409.coverage-debt.2026-07-06T17-51-28-149Z.final.md
+[2026-07-06T17:58:33.982Z] poll 1285: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1413:42360
+[2026-07-06T17:59:34.458Z] poll 1286: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1413:42360
+[2026-07-06T18:00:34.940Z] poll 1287: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1413:42360
+[2026-07-06T18:01:35.409Z] poll 1288: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1413]; running=Coverage Debt (test-coverage burn-down)::WI-1413:42360
+[2026-07-06T18:02:35.880Z] poll 1289: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=Coverage Debt (test-coverage burn-down)::WI-1413:42360
+[2026-07-06T18:02:37.053Z] Claude Code review WI-1413 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1413.coverage-debt.2026-07-06T17-51-28-188Z.final.md
+[2026-07-06T18:03:36.302Z] poll 1290: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:04:36.802Z] poll 1291: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:05:37.245Z] poll 1292: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:06:37.712Z] poll 1293: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:07:39.212Z] poll 1294: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:08:39.703Z] poll 1295: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:09:40.260Z] poll 1296: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:10:40.781Z] poll 1297: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:11:41.310Z] poll 1298: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:12:41.854Z] poll 1299: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:13:42.397Z] poll 1300: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:14:42.972Z] poll 1301: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:15:43.430Z] poll 1302: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:16:43.869Z] poll 1303: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:17:44.382Z] poll 1304: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:18:44.851Z] poll 1305: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:19:45.550Z] poll 1306: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:20:46.044Z] poll 1307: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:21:46.501Z] poll 1308: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:22:46.964Z] poll 1309: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:23:47.405Z] poll 1310: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:24:47.901Z] poll 1311: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:25:48.372Z] poll 1312: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:26:48.896Z] poll 1313: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:27:49.360Z] poll 1314: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:28:49.826Z] poll 1315: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:29:50.359Z] poll 1316: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:30:50.941Z] poll 1317: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:31:51.572Z] poll 1318: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:32:52.042Z] poll 1319: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:33:52.543Z] poll 1320: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:34:53.006Z] poll 1321: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:35:53.541Z] poll 1322: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:36:54.107Z] poll 1323: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:37:54.731Z] poll 1324: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:38:55.179Z] poll 1325: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:39:55.771Z] poll 1326: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:40:56.234Z] poll 1327: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:41:56.729Z] poll 1328: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:42:57.260Z] poll 1329: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:43:57.689Z] poll 1330: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:44:58.458Z] poll 1331: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:45:58.927Z] poll 1332: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:46:59.352Z] poll 1333: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:47:59.881Z] poll 1334: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:49:00.447Z] transition WI-1402: Executing -> Reviewing (S0 /now route test coverage gaps (/now/overflow + 4 of 6 candidate kinds + person/supporter scopes))
+[2026-07-06T18:49:00.449Z] trigger WI-1402: launching Claude Code review; key=Executing->Reviewing@2026-07-06T18:48:00.000Z; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1402.coverage-debt.2026-07-06T18-49-00-448Z.final.md
+[2026-07-06T18:49:00.584Z] poll 1335: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1402]; running=Coverage Debt (test-coverage burn-down)::WI-1402:41508
+[2026-07-06T18:50:01.234Z] poll 1336: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1402]; running=Coverage Debt (test-coverage burn-down)::WI-1402:41508
+[2026-07-06T18:51:01.845Z] poll 1337: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1402]; running=Coverage Debt (test-coverage burn-down)::WI-1402:41508
+[2026-07-06T18:52:02.378Z] poll 1338: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1402]; running=Coverage Debt (test-coverage burn-down)::WI-1402:41508
+[2026-07-06T18:53:04.514Z] poll 1339: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1402]; running=Coverage Debt (test-coverage burn-down)::WI-1402:41508
+[2026-07-06T18:54:05.497Z] poll 1340: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1402]; running=Coverage Debt (test-coverage burn-down)::WI-1402:41508
+[2026-07-06T18:55:06.010Z] poll 1341: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1402]; running=Coverage Debt (test-coverage burn-down)::WI-1402:41508
+[2026-07-06T18:56:06.609Z] poll 1342: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=WI-1402]; running=Coverage Debt (test-coverage burn-down)::WI-1402:41508
+[2026-07-06T18:57:07.205Z] poll 1343: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=Coverage Debt (test-coverage burn-down)::WI-1402:41508
+[2026-07-06T18:57:37.776Z] Claude Code review WI-1402 exited code=0; final=C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-watch\reviewer-ws44\reviews\WI-1402.coverage-debt.2026-07-06T18-49-00-448Z.final.md
+[2026-07-06T18:58:07.774Z] poll 1344: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T18:59:08.284Z] poll 1345: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:00:08.856Z] poll 1346: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:01:09.326Z] poll 1347: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:02:09.865Z] poll 1348: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:03:10.441Z] poll 1349: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:04:10.974Z] poll 1350: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:05:11.730Z] poll 1351: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:06:12.489Z] poll 1352: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:07:13.008Z] poll 1353: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:08:13.508Z] poll 1354: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:09:13.971Z] poll 1355: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:10:14.467Z] poll 1356: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:11:15.030Z] poll 1357: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:12:16.195Z] poll 1358: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:13:17.251Z] poll 1359: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none
+[2026-07-06T19:14:17.735Z] poll 1360: [Coverage Debt (test-coverage burn-down): 15 items, Reviewing=none]; running=none

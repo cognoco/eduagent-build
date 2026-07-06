@@ -1,0 +1,200 @@
+{
+  "Coverage Debt (test-coverage burn-down)::WI-1407::Executing->Reviewing@2026-07-05T21:24:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1407",
+    "key": "Executing->Reviewing@2026-07-05T21:24:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1407.coverage-debt.2026-07-05T21-24-42-136Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1407.coverage-debt.2026-07-05T21-24-42-136Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1407.coverage-debt.2026-07-05T21-24-42-136Z.stderr.log",
+    "startedAt": "2026-07-05T21:24:42.162Z",
+    "pid": 3756
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1407::Executing->Reviewing@2026-07-05T21:53:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1407",
+    "key": "Executing->Reviewing@2026-07-05T21:53:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1407.coverage-debt.2026-07-05T21-53-59-318Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1407.coverage-debt.2026-07-05T21-53-59-318Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1407.coverage-debt.2026-07-05T21-53-59-318Z.stderr.log",
+    "startedAt": "2026-07-05T21:53:59.498Z",
+    "pid": 42676
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1405::Executing->Reviewing@2026-07-06T10:54:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1405",
+    "key": "Executing->Reviewing@2026-07-06T10:54:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1405.coverage-debt.2026-07-06T10-54-50-098Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1405.coverage-debt.2026-07-06T10-54-50-098Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1405.coverage-debt.2026-07-06T10-54-50-098Z.stderr.log",
+    "startedAt": "2026-07-06T10:54:50.126Z",
+    "pid": 26500
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1401::Executing->Reviewing@2026-07-06T11:33:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1401",
+    "key": "Executing->Reviewing@2026-07-06T11:33:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1401.coverage-debt.2026-07-06T11-34-11-452Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1401.coverage-debt.2026-07-06T11-34-11-452Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1401.coverage-debt.2026-07-06T11-34-11-452Z.stderr.log",
+    "startedAt": "2026-07-06T11:34:11.557Z",
+    "pid": 48592
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1401::Executing->Reviewing@2026-07-06T11:50:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1401",
+    "key": "Executing->Reviewing@2026-07-06T11:50:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1401.coverage-debt.2026-07-06T11-51-20-753Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1401.coverage-debt.2026-07-06T11-51-20-753Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1401.coverage-debt.2026-07-06T11-51-20-753Z.stderr.log",
+    "startedAt": "2026-07-06T11:51:20.782Z",
+    "pid": 58076
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1411::Executing->Reviewing@2026-07-06T13:02:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1411",
+    "key": "Executing->Reviewing@2026-07-06T13:02:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1411.coverage-debt.2026-07-06T13-03-05-689Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1411.coverage-debt.2026-07-06T13-03-05-689Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1411.coverage-debt.2026-07-06T13-03-05-689Z.stderr.log",
+    "startedAt": "2026-07-06T13:03:05.710Z",
+    "pid": 25476
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1412::Executing->Reviewing@2026-07-06T13:24:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1412",
+    "key": "Executing->Reviewing@2026-07-06T13:24:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1412.coverage-debt.2026-07-06T13-25-19-570Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1412.coverage-debt.2026-07-06T13-25-19-570Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1412.coverage-debt.2026-07-06T13-25-19-570Z.stderr.log",
+    "startedAt": "2026-07-06T13:25:19.701Z",
+    "pid": 73892
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1414::Executing->Reviewing@2026-07-06T13:27:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1414",
+    "key": "Executing->Reviewing@2026-07-06T13:27:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1414.coverage-debt.2026-07-06T13-28-22-256Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1414.coverage-debt.2026-07-06T13-28-22-256Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1414.coverage-debt.2026-07-06T13-28-22-256Z.stderr.log",
+    "startedAt": "2026-07-06T13:28:22.284Z",
+    "pid": 52052
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1404::Executing->Reviewing@2026-07-06T16:47:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1404",
+    "key": "Executing->Reviewing@2026-07-06T16:47:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1404.coverage-debt.2026-07-06T16-47-40-913Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1404.coverage-debt.2026-07-06T16-47-40-913Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1404.coverage-debt.2026-07-06T16-47-40-913Z.stderr.log",
+    "startedAt": "2026-07-06T16:47:40.942Z",
+    "pid": 39224
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1403::Executing->Reviewing@2026-07-06T16:47:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1403",
+    "key": "Executing->Reviewing@2026-07-06T16:47:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1403.coverage-debt.2026-07-06T16-48-42-314Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1403.coverage-debt.2026-07-06T16-48-42-314Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1403.coverage-debt.2026-07-06T16-48-42-314Z.stderr.log",
+    "startedAt": "2026-07-06T16:48:42.378Z",
+    "pid": 76016
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1408::Executing->Reviewing@2026-07-06T16:48:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1408",
+    "key": "Executing->Reviewing@2026-07-06T16:48:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1408.coverage-debt.2026-07-06T16-48-42-380Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1408.coverage-debt.2026-07-06T16-48-42-380Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1408.coverage-debt.2026-07-06T16-48-42-380Z.stderr.log",
+    "startedAt": "2026-07-06T16:48:42.414Z",
+    "pid": 12128
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1413::Executing->Reviewing@2026-07-06T16:48:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1413",
+    "key": "Executing->Reviewing@2026-07-06T16:48:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1413.coverage-debt.2026-07-06T16-48-42-416Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1413.coverage-debt.2026-07-06T16-48-42-416Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1413.coverage-debt.2026-07-06T16-48-42-416Z.stderr.log",
+    "startedAt": "2026-07-06T16:48:42.453Z",
+    "pid": 22276
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1401::Executing->Reviewing@2026-07-06T16:48:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1401",
+    "key": "Executing->Reviewing@2026-07-06T16:48:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1401.coverage-debt.2026-07-06T16-49-43-108Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1401.coverage-debt.2026-07-06T16-49-43-108Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1401.coverage-debt.2026-07-06T16-49-43-108Z.stderr.log",
+    "startedAt": "2026-07-06T16:49:43.138Z",
+    "pid": 74496
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1410::Executing->Reviewing@2026-07-06T17:33:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1410",
+    "key": "Executing->Reviewing@2026-07-06T17:33:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1410.coverage-debt.2026-07-06T17-33-16-652Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1410.coverage-debt.2026-07-06T17-33-16-652Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1410.coverage-debt.2026-07-06T17-33-16-652Z.stderr.log",
+    "startedAt": "2026-07-06T17:33:16.673Z",
+    "pid": 77644
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1654::Executing->Reviewing@2026-07-06T17:33:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1654",
+    "key": "Executing->Reviewing@2026-07-06T17:33:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1654.coverage-debt.2026-07-06T17-33-16-675Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1654.coverage-debt.2026-07-06T17-33-16-675Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1654.coverage-debt.2026-07-06T17-33-16-675Z.stderr.log",
+    "startedAt": "2026-07-06T17:33:16.697Z",
+    "pid": 55348
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1409::Executing->Reviewing@2026-07-06T17:50:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1409",
+    "key": "Executing->Reviewing@2026-07-06T17:50:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1409.coverage-debt.2026-07-06T17-51-28-149Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1409.coverage-debt.2026-07-06T17-51-28-149Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1409.coverage-debt.2026-07-06T17-51-28-149Z.stderr.log",
+    "startedAt": "2026-07-06T17:51:28.186Z",
+    "pid": 13412
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1413::Executing->Reviewing@2026-07-06T17:51:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1413",
+    "key": "Executing->Reviewing@2026-07-06T17:51:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1413.coverage-debt.2026-07-06T17-51-28-188Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1413.coverage-debt.2026-07-06T17-51-28-188Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1413.coverage-debt.2026-07-06T17-51-28-188Z.stderr.log",
+    "startedAt": "2026-07-06T17:51:28.216Z",
+    "pid": 42360
+  },
+  "Coverage Debt (test-coverage burn-down)::WI-1402::Executing->Reviewing@2026-07-06T18:48:00.000Z": {
+    "runtime": "claude-code",
+    "workstream": "Coverage Debt (test-coverage burn-down)",
+    "wi": "WI-1402",
+    "key": "Executing->Reviewing@2026-07-06T18:48:00.000Z",
+    "prompt": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\prompts\\WI-1402.coverage-debt.2026-07-06T18-49-00-448Z.prompt.txt",
+    "final": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1402.coverage-debt.2026-07-06T18-49-00-448Z.final.md",
+    "stderr": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews\\WI-1402.coverage-debt.2026-07-06T18-49-00-448Z.stderr.log",
+    "startedAt": "2026-07-06T18:49:00.583Z",
+    "pid": 41508
+  }
+}

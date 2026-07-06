@@ -1,0 +1,199 @@
+25cb08871 fix(e2e): reconcile stale Maestro coverage [WI-1401] (#1941) (53 minutes ago) <crowka>
+.../e2e/flows/parent/consent-management.yaml       | 43 ++++++++++++----------
+ .../e2e/flows/parent/multi-child-dashboard.yaml    |  5 ++-
+ apps/mobile/e2e/flows/parent/parent-dashboard.yaml |  4 +-
+ .../flows/post-auth-comprehensive-devclient.yaml   |  6 ++-
+ apps/mobile/e2e/flows/retention/library.yaml       | 11 ++++--
+ docs/flows/mentor-flow-access-inventory.md         |  2 +-
+ docs/flows/mobile-app-flow-inventory.md            | 10 ++---
+ docs/flows/plans/flow-revision-plan-2026-06-17.md  |  2 +-
+ 8 files changed, 46 insertions(+), 37 deletions(-)
+
+apps/mobile/e2e/flows/parent/consent-management.yaml
+  @@ -1,6 +1,6 @@
+  -# Validates: parent can withdraw consent (GDPR) and cancel deletion during
+  -# the 7-day grace period from the child detail screen.
+  +# Validates: parent can withdraw consent (GDPR), sees the current withdrawn
+  +# empty-state gate from the child detail screen, and can restore consent.
+   # Tags: nightly, parent, consent, gdpr
+   #
+   # Journey: UX Journey 4 (Parent Oversight)
+  @@ -11,11 +11,12 @@
+  -#   grace-period-banner        — shown after consent is withdrawn
+  -#   cancel-deletion-button     — restores consent during grace period
+  +#   consent-withdrawn-empty-state — screen-level withdrawn gate after revoke
+  +#   consent-withdrawn-request-cta — restores consent from the withdrawn gate
+   #
+  -# NOTE: Consent withdrawal triggers an Inngest 7-day grace period job.
+  -# In E2E we only validate the UI flow (withdraw → banner → restore).
+  +# NOTE: Consent withdrawal triggers an Inngest 7-day grace period job. The child
+  +# detail screen now short-circuits to a screen-level withdrawn gate; the
+  +# grace-period-banner remains a lower-level component state covered by unit tests.
+   #
+   # Session 25 (2026-03-25): PASS — all assertions verified.
+   #   Fixes applied: BUG-70 (inngest.send try-catch), double-tap removed,
+  @@ -99,32 +100,34 @@ tags:
+  -# 12. Wait for grace period banner to appear (consent is now WITHDRAWN)
+  +# 12. Wait for screen-level withdrawn gate to appear (consent is now WITHDRAWN)
+   - extendedWaitUntil:
+       visible:
+  -      id: "grace-period-banner"
+  +      id: "consent-withdrawn-empty-state"
+       timeout: 10000
+   
+  -# 13. Verify deletion pending text
+  +# 13. Verify restore CTA is present
+   - assertVisible:
+  -    text: "Deletion pending"
+  +    id: "consent-withdrawn-request-cta"
+   
+  -# 14. Verify cancel deletion button is present
+  -- assertVisible:
+  -    id: "cancel-deletion-button"
+  -
+  -# 15. Screenshot: grace period banner with cancel option
+  -- takeScreenshot: consent-mgmt-03-grace-period-banner
+  +# 14. Screenshot: withdrawn gate with restore option
+  +- takeScreenshot: consent-mgmt-03-withdrawn-empty-state
+   
+  -# 16. Tap cancel deletion to restore consent
+  +# 15. Tap restore CTA to restore consent
+   - tapOn:
+  -    id: "cancel-deletion-button"
+  +    id: "consent-withdrawn-request-cta"
+   
+  -# 17. Wait for consent to be restored — grace period banner should disappear
+  -#     and the withdraw consent button should reappear
+  +# 16. Wait for consent to be restored and child detail to render again
+   - extendedWaitUntil:
+       visible:
+  +      id: "child-detail-scroll"
+  +    timeout: 10000
+  +
+  +# 17. Scroll back to consent section and verify withdraw button is available again
+  +- scrollUntilVisible:
+  +    element:
+         id: "withdraw-consent-button"
+  +    direction: DOWN
+       timeout: 10000
+   
+   # 18. Screenshot: consent restored, withdraw button visible again
+  +23 -20
+
+apps/mobile/e2e/flows/parent/multi-child-dashboard.yaml
+  @@ -33,9 +33,10 @@ tags:
+  -# home.parent.tonight.titleEvening = "Conversation starters" (en.json:166)
+  +# Multi-child parent home renders the family summary panel instead of the
+  +# removed Conversation starters heading.
+   - assertVisible:
+  -    text: 'Conversation starters'
+  +    id: 'parent-home-family-summary'
+   
+   - assertVisible:
+       text: 'Children'
+  +3 -2
+
+apps/mobile/e2e/flows/parent/parent-dashboard.yaml
+  @@ -39,11 +39,11 @@ tags:
+  -# ── Visual integrity: parent Home heading ──────────────────────────────
+  +# ── Visual integrity: parent Home current card structure ───────────────
+   - assertVisible:
+       id: 'parent-home-screen'
+   - assertVisible:
+  -    text: 'Tonight'
+  +    id: 'parent-home-child-starter-${CHILD_PROFILE_ID}'
+   - assertVisible:
+       text: 'Children'
+   
+  +2 -2
+
+apps/mobile/e2e/flows/post-auth-comprehensive-devclient.yaml
+  @@ -12,8 +12,9 @@
+  -# This file is preserved pending M1-COMPREHENSIVE rewrite. Do not delete until a
+  -# native-Maestro equivalent of registry-smoke.spec.ts exists.
+  +# Parked flow: tag stays `blocked` so this file is not counted as live Maestro
+  +# coverage pending M1-COMPREHENSIVE. Do not delete until a native-Maestro
+  +# equivalent of registry-smoke.spec.ts exists.
+   #
+   # Post-Auth Comprehensive E2E — dev-client variant
+   # Signs in with seeded test user, then tests all major post-auth screens.
+  @@ -25,6 +26,7 @@
+  +  - blocked
+     - devclient
+     - post-auth
+     - comprehensive
+  +4 -2
+
+apps/mobile/e2e/flows/retention/library.yaml
+  @@ -1,7 +1,9 @@
+  -# Flow N11: Library — Navigation and Retention Indicators
+  +# Flow N11: Library — Navigation
+   # Validates: user can view the Library with subject shelves and navigate
+  -# back to home screen.
+  -# Tags: nightly, retention
+  +# back to home screen. This is not retention-pill coverage; Library v3 shelves
+  +# expose shelf status/review chips, while retention-pill coverage lives in the
+  +# dedicated retention topic/book flows.
+  +# Tags: pr-blocking, nightly, library, navigation
+   #
+   # Journey: UX Journey 2 (Retention overview)
+   # Epics: Epic 3 (FR43, FR48)
+  @@ -22,7 +24,8 @@ appId: com.mentomate.app
+  -  - retention
+  +  - library
+  +  - navigation
+   ---
+   # 1. Seed & sign in with retention-due scenario
+   - runFlow:
+  +7 -4
+
+docs/flows/mentor-flow-access-inventory.md
+  @@ -32,7 +32,7 @@ Flag reality (build-time, `feature-flags.ts:30-31`): **production build ships `M
+  -| ACCOUNT-25, ACCOUNT-41 | Owner with linked child only | GDPR consent management: child detail `?mode=settings` → `ConsentManagementSection`. Withdraw (destructive confirm) → `PUT /consent/:childId/revoke` → WITHDRAWN + 7-day deletion grace; restore (`410` if grace expired). WITHDRAWN child detail short-circuits to `consent-withdrawn-empty-state` + restore CTA; `grace-period-banner` shows days remaining; home shows per-child `WithdrawalCountdownBanner` with one-tap Reverse. E2E `parent/consent-management.yaml`. |
+  +| ACCOUNT-25, ACCOUNT-41 | Owner with linked child only | GDPR consent management: child detail `?mode=settings` → `ConsentManagementSection`. Withdraw (destructive confirm) → `PUT /consent/:childId/revoke` → WITHDRAWN + 7-day deletion grace; restore (`410` if grace expired). WITHDRAWN child detail short-circuits to `consent-withdrawn-empty-state` + restore CTA; lower-level `grace-period-banner` is unit-covered; home shows per-child `WithdrawalCountdownBanner` with one-tap Reverse. E2E `parent/consent-management.yaml` covers withdraw → empty-state → restore. |
+   | ACCOUNT-27 | Parent OUTSIDE the app | Consent approve/deny is **server-web only**: email link → `GET /v1/consent-page` → server-rendered pages; denial cascade-DELETES the child profile. No mobile route. Mobile JSON twin dormant. |
+   | ACCOUNT-38 | 18+ adult sharing account with ≥1 minor | Consent-gate profile-switch escape (confirms destination by name); the gated child cannot escape. |
+   | ACCOUNT-16, ACCOUNT-50, ACCOUNT-51, ACCOUNT-52 | Owner only (client IDOR guard + server `assertOwnerAndParentAccess` + consent-visibility gate WI-264) | Child mentor memory (parent-managed): toggles, tell-the-mentor (LLM parse), item delete, "Export memory summary" (share sheet / web .txt), correction escape hatch (`[parent_correction]` → tell endpoint). Consent-withdrawn child → whole screen replaced by dead-end gate + Back; reads hard-denied pre-render. Entry: child settings `mentor-memory-link`. |
+  +1 -1
+
+docs/flows/mobile-app-flow-inventory.md
+  @@ -98,7 +98,7 @@ Consent gate facts (shared): gates key purely on `activeProfile.consentStatus`,
+  -| ACCOUNT-25 | Parent consent management: withdraw (destructive confirm) / restore; WITHDRAWN child detail short-circuits to `consent-withdrawn-empty-state` + restore CTA; `grace-period-banner` with days remaining; parent home shows `WithdrawalCountdownBanner` | child detail `?mode=settings` `ConsentManagementSection` | owner only (server `assertOwnerProfile` ×3; client owner-enabled queries) | `PUT /consent/:childId/revoke` → WITHDRAWN + `safeSend` `app/consent.revoked` (7-day deletion); `PUT .../restore` (410 if grace expired) | `parent/consent-management.yaml` |
+  +| ACCOUNT-25 | Parent consent management: withdraw (destructive confirm) / restore; WITHDRAWN child detail short-circuits to `consent-withdrawn-empty-state` + restore CTA; lower-level `grace-period-banner` is covered by unit tests; parent home shows `WithdrawalCountdownBanner` | child detail `?mode=settings` `ConsentManagementSection` | owner only (server `assertOwnerProfile` ×3; client owner-enabled queries) | `PUT /consent/:childId/revoke` → WITHDRAWN + `safeSend` `app/consent.revoked` (7-day deletion); `PUT .../restore` (410 if grace expired) | `parent/consent-management.yaml` |
+   | ACCOUNT-26 | Regional consent variants — single **GDPR-everywhere** path; `'COPPA'` enum dormant (no live writer); mobile hardcodes `consentType='GDPR'`; ≤16 threshold conservative ("turning 16 this year" included); hard floor 11 [was: "COPPA-distinct path removed by 11+ floor" — direction right, detail wrong] | create-profile branches | by age | consent decision at profile creation | `consent/consent-coppa-under13.yaml`, `consent-gdpr-under16.yaml`, `consent-above-threshold.yaml` |
+   | ACCOUNT-27 | Parent consent deny confirmation — **server-web only**: `GET /v1/consent-page` → Deny link → server-rendered `deny-confirm` page → POST confirm; denial cascade-DELETES the child profile in a transaction; approval → CONSENTED; 30/hr/IP rate limit [was: "/consent deny path with a confirmation dialog"]. JSON twin `POST /consent/respond` is mobile-dormant | parent email link (no mobile route) | parent outside the app | `processConsentResponse` atomic transition | `consent/consent-deny-confirmation.yaml` is a PLACEHOLDER (smoke-launch only); real coverage = `consent-web.integration.test.ts` |
+   | ACCOUNT-28 | App language bottom sheet (7 `SUPPORTED_LANGUAGES`); flag `I18N_ENABLED` hardcoded true | `settings-app-language` on `/(app)/more/account` | any non-proxy incl. child | SecureStore + i18next; `useMentorLanguageSync` clamps → profile PATCH | `account/app-language-edit.yaml` |
+  @@ -176,7 +176,7 @@ Session/tutoring mechanics (classification, SSE streaming, exchange handling, cl
+  -| LEARN-08 | Library v3 subject-first shelf list. Chips = review-due / finished / status / urgency-boost + progress bar — NO worst-retention pill (that computation enriches SEARCH results only) [was: "retention pills"]; active/paused/archived sections; SectionList virtualization | Library tab + ~20 programmatic pushes | `canEnter('library')` = `!familyShape`; proxy explicitly ALLOWED read-only (`canWrite=!isParentProxy` hides Manage, shows `library-proxy-hint`); V1 family sup ✗ (redirect; recaps replaces) | reads: subjects (+active-only fallback), progress overview/inventory, `/library/books`, `/library/retention` | `learning/library-navigation.yaml`, `library/library-loading-timeout.yaml`, `retention/library.yaml` (premise may predate pill removal) |
+  +| LEARN-08 | Library v3 subject-first shelf list. Chips = review-due / finished / status / urgency-boost + progress bar — NO worst-retention pill (that computation enriches SEARCH results only) [was: "retention pills"]; active/paused/archived sections; SectionList virtualization | Library tab + ~20 programmatic pushes | `canEnter('library')` = `!familyShape`; proxy explicitly ALLOWED read-only (`canWrite=!isParentProxy` hides Manage, shows `library-proxy-hint`); V1 family sup ✗ (redirect; recaps replaces) | reads: subjects (+active-only fallback), progress overview/inventory, `/library/books`, `/library/retention` | `learning/library-navigation.yaml`, `library/library-loading-timeout.yaml`, `retention/library.yaml` (Library navigation only) |
+   | LEARN-09 | Subject shelf → book selection. BUG-920 empty-state split: suggestions-exist prompt vs still-being-built; suggested-book highlight by status priority; single-book auto-skip removed; filing overlay w/ 15s skip | library row, search, progress, practice, pick-book chains, session exit, book back | anyone reaching library incl. proxy (writes not proxy-gated client-side — see Gaps) | `GET books/suggestions`; suggestion tap → `POST /filing` + auto-push book | `learning/shelf-suggestion-to-book.yaml` + subject/pick-book yamls |
+   | LEARN-10 | Book detail + start learning: sticky CTA (resume-target → continue → up-next → newest started; only when active topics && !readOnly); topic rows are overview links — green CTA is the only chat entry; back replace-chains (BUG-636) | shelf BookCard, suggestion auto-push, search chain, pick-book chains, session-summary chain | anyone via library incl. proxy (see Gaps NEW-lib-7) | `GET book+topics`; auto `POST generate-topics` when ungenerated (LLM); sessions/notes/concept-mastery/retention/curriculum/resume reads; session start → Path 2 | `learning/book-detail.yaml`, `book-sticky-cta.yaml`, `book-topic-row-start.yaml`, `topic-back-to-book.yaml`, `session-summary-to-book.yaml` |
+   | LEARN-11 | Manage subject status + **archive-first delete** (PR #787): active→Pause/Archive, paused→Resume/Archive, archived→Restore then Delete; confirm enumerates books/started-topics/sessions + names mastery/SRS/streak loss; delete disabled until scope queries load. Server gap: `deleteSubject` does NOT enforce archived — client-only invariant [was: status changes only] | library Manage button (visible `subjects>0 && canWrite`) | any non-proxy incl. child (no isOwner gate); proxy blocked | `PATCH /subjects/:id` status; `DELETE /subjects/:id` (hard delete, no Inngest) | `learning/manage-subject-status.yaml` (delete path uncovered) |
+  @@ -184,7 +184,7 @@ Session/tutoring mechanics (classification, SSE streaming, exchange handling, cl
+  -| LEARN-16 | Retention review from library (library pill → topic detail → review session) | composite | as LEARN-12 | learning-path-flows.md Path 4 | `retention/retention-review.yaml`, `retention/library.yaml` |
+  +| LEARN-16 | Retention review from library (topic detail → review session) | composite | as LEARN-12 | learning-path-flows.md Path 4 | `retention/retention-review.yaml` |
+   | LEARN-17 | Progress overview tab. Dual-flag scope logic; guardian family mode: children picker (own profile excluded), child summary + nudge CTA → NudgeActionSheet, per-subject breakdown, child report routing (BUG-524 chain push); self view: stats chips, latest report, saved link + keep-learning (self-only); proxy: child-titled, empty-state CTA → child curriculum (B-600); `empty/awaiting/ready` machine; 15s timeout fallback [was: generic stats row] | Progress tab (all shapes incl. proxy) | solo/child self view; sup picker view; proxy reachable | `GET /progress/inventory`; `POST /progress/refresh` (self, mount + pull); sessions/reports/weekly/continue/overview reads | `progress/progress-analytics.yaml`, `resume-progress-global.yaml` |
+   | LEARN-18 | Subject progress detail. Home subject cards now open the shelf, not this report [was: single entry = home subject row]. Remaining entries are progress-context links. Hide-subject = archive (`PATCH status:'archived'`); vocab card, past conversations, resume CTA, CEFR card, EP15-C6 dead-end guards | progress-context subject links | active-profile-scoped; proxy read-only hint | inventory/subject-progress/continue reads; archive PATCH | `progress/progress-analytics.yaml`, `resume-progress-subject.yaml` |
+   | LEARN-19 | Streak display (`progress-streak-count` pill in stats chips) | progress overview | full progress view | none | `edge/streak-display.yaml` |
+  @@ -351,7 +351,7 @@ Quota model (verified `apps/api/src/services/subscription.ts:43-118`): free 100/
+  -| QA-02 | Post-auth comprehensive smoke | broad post-login sweep | — | — | `e2e/flows/post-auth-comprehensive-devclient.yaml` |
+  +| QA-02 | Post-auth comprehensive smoke | broad post-login sweep | — | — | `e2e/flows/post-auth-comprehensive-devclient.yaml` is parked with `blocked` pending M1-COMPREHENSIVE; Chrome `registry-smoke.spec.ts` is the current authoritative broad smoke |
+   | QA-03 | Chat classifier regression (easter/suggestion) | chat → create-subject | — | — | **Closure proof (WI-859, deterministic):** `apps/api/src/services/subject-classify.test.ts`, `apps/api/src/routes/subjects.test.ts`. Smoke/historical only: `regression/bug-233-chat-classifier-easter.yaml`. |
+   | QA-04 | Chat subject picker regression | chat → picker handoff | — | — | **Closure proof (WI-859, deterministic):** `apps/mobile/src/components/session/use-subject-classification.test.ts`, `apps/mobile/src/app/(app)/session/index.test.tsx`. Smoke/historical only: `regression/bug-234-chat-subject-picker.yaml`. |
+   | QA-05 | Return to chat after subject create | `returnTo=chat` | — | — | `regression/bug-236-subject-returns-to-chat.yaml` |
+  @@ -413,7 +413,7 @@ Known gating/correctness gaps found by the audit (verify against `docs/audience-
+  -| `retention/library.yaml` premise | Nightly flow predates retention-pill removal (LEARN-08) | Re-verify assertions |
+  +| `retention/library.yaml` premise | Resolved by WI-1401: flow is Library navigation coverage only, not retention-pill coverage | Keep retention-specific claims on `retention/retention-review.yaml` / topic flows |
+   
+   Orphaned / dormant surfaces (decide: wire, keep as seam, or delete): pronouns picker (SUBJECT-17), recall-test + remediation (LEARN-13/14), milestones list (LEARN-20), book `readOnly`/`autoStart` params (LEARN-38), session-revoked banner (AUTH-17), Interleaved Retrieval (LEARN-54), retry-curriculum endpoint (SUBJECT-21), self memory export endpoint (ACCOUNT-51), child-paywall subscription mode (BILLING-06), `guided-ratio` vocab (PARENT-09), dead auth params (`ssoNeedsSignIn`, `notice=reset_success`), `language-setup returnTo=settings` branch (SUBJECT-08), proxy shell itself (HOME-12).
+   
+  +5 -5
+
+docs/flows/plans/flow-revision-plan-2026-06-17.md
+  @@ -524,7 +524,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
+  -| QA-02 | Post-auth comprehensive smoke | ❌ | Fail — gated | WI-857 / WI-878 / WI-879 | ✅ 2026-06-29 | Manual-preview Chrome rerun got past the prior export stall: mentor-audit smoke ran 21 checks with 13 pass / 8 fail. Failures split between BRIDGE-04 entry surfaces (WI-878) and registry readiness drift against current Mentor/Family shells (WI-879). Manifest reconciled (WI-857, 2026-06-29): post-auth-comprehensive-devclient.yaml annotated with pointer to Chrome equivalent (`registry-smoke.spec.ts`, `--project=mentor-audit-registry-smoke`) and WI-878/WI-879 gate; YAML preserved pending M1-COMPREHENSIVE rewrite. QA-02 cannot close until WI-878 and WI-879 are resolved. |
+  +| QA-02 | Post-auth comprehensive smoke | ❌ | Fail — gated | WI-857 / WI-878 / WI-879 | ✅ 2026-07-06 | Manual-preview Chrome rerun got past the prior export stall: mentor-audit smoke ran 21 checks with 13 pass / 8 fail. Failures split between BRIDGE-04 entry surfaces (WI-878) and registry readiness drift against current Mentor/Family shells (WI-879). Manifest reconciled: post-auth-comprehensive-devclient.yaml carries `blocked` and points to Chrome equivalent (`registry-smoke.spec.ts`, `--project=mentor-audit-registry-smoke`) and WI-878/WI-879 gate; YAML preserved pending M1-COMPREHENSIVE rewrite and no longer counted as live Maestro coverage. QA-02 cannot close until WI-878 and WI-879 are resolved. |
+   | QA-03 | Chat classifier regression | ✅ | Pass | WI-859 | ✅ 2026-06-19 | Deterministic jest coverage replaces live-LLM evidence: route + service tests pin the classifier miss/suggestion shape (multi-candidate + `suggestedSubjectName` passthrough; proxy-mode 403 guard on classify/resolve). YAML flow is smoke/historical only. |
+   | QA-04 | Chat subject picker regression | ✅ | Pass | WI-859 | ✅ 2026-06-19 | Deterministic jest coverage forces the picker branch: hook tests cover single-subject auto-match, multi-candidate picker (learner picks the intended subject, no silent first-subject fallback), and resolve fallback; the session-screen integration test covers the no-enrolled-subjects create-new escape hatch. YAML flow is smoke/historical only. |
+   | QA-05 | Return to chat after subject create | ✅ | Pass | WI-860 | ✅ 2026-06-19 | Reconciled — already covered, no new test needed. `create-subject.test.tsx` [BUG-236] asserts `returnTo=chat` after creation routes to `/(app)/session` (freeform, NOT picker), and the no-`returnTo` default routes to `/(app)/pick-book/[subjectId]` (NOT session) — both branches, default behavior unchanged. |
+  +1 -1

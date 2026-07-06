@@ -1,0 +1,40 @@
+commit a8728be4454c19acbdfea90f136541d6624022ae
+Author: Zuzana Kopečná <zuzana.kopecna@zwizzly.com>
+Date:   Mon Jul 6 17:14:44 2026 +0200
+
+    fix(mobile): cover session resilience seams [WI-1408] (#1948)
+
+diff --git a/apps/mobile/src/hooks/use-text-to-speech.test.ts b/apps/mobile/src/hooks/use-text-to-speech.test.ts
+index 1010a3f4e..6220cf52d 100644
+--- a/apps/mobile/src/hooks/use-text-to-speech.test.ts
++++ b/apps/mobile/src/hooks/use-text-to-speech.test.ts
+@@ -286,4 +286,29 @@ describe('useTextToSpeech', () => {
+     });
+     expect(result.current.isPaused).toBe(false);
+   });
++
++  it('onError resets speaking and paused state so playback does not freeze', () => {
++    const { result } = renderHook(() => useTextToSpeech());
++
++    act(() => {
++      result.current.speak('Test');
++    });
++
++    const callArgs = mockSpeak.mock.calls[0][1];
++    act(() => {
++      callArgs.onStart();
++    });
++    act(() => {
++      result.current.pause();
++    });
++    expect(result.current.isSpeaking).toBe(true);
++    expect(result.current.isPaused).toBe(true);
++
++    act(() => {
++      callArgs.onError();
++    });
++
++    expect(result.current.isSpeaking).toBe(false);
++    expect(result.current.isPaused).toBe(false);
++  });
+ });

@@ -1,0 +1,18 @@
+{
+  "pageId": "3928bce9-1f7c-8116-836a-e2161c78c7a2",
+  "id": "WI-1408",
+  "name": "Learning session resilience coverage gaps (crash-recovery hook + reflection-bonus display + TTS/challenge e2e)",
+  "description": "WHY: The streaming engine is gold-standard tested, but crash-recovery (use-session-recovery hook) has zero coverage and its e2e is parked, and the new V2 session-summary reflection-bonus display has zero assertions. RISK: kill-app-mid-session -> resume is unverified anywhere; the reflection 1.5x bonus XP could render wrong. START: add a use-session-recovery unit test (marker read/AppState/stale-marker) and assert reflectionBonusXp/bonusXpEarned on the summary screen (mirror the FirstSessionWrapUpCard test).",
+  "acceptanceCriteria": "Done when use-session-recovery has focused hook coverage for SecureStore marker read, matching-session hydration, AppState background marker write, stale/nonmatching marker handling, and silent SecureStore failure behavior.\n\nSession summary coverage asserts the V2 reflection bonus display for reflectionBonusXp/bonusXpEarned in both submitted and persisted summary states, matching the existing FirstSessionWrapUpCard test style rather than snapshot-only coverage.\n\nuse-text-to-speech has a regression test for the native speech onError path resetting speaking state or surfacing the expected failure state without freezing playback.\n\nChallenge Round offer-to-accept-to-banner-to-drafted-note and crash-recovery e2e coverage are either added/updated as maintained Maestro flows or explicitly documented as verify-at-e2e-run with static validation and a local-infra reason if an emulator cannot be run in the executor environment.\n\nVerification includes the related mobile Jest tests for the touched hooks/screens, the Maestro/static validator for any e2e YAML changes, a device-run result or documented local-infra caveat for device-dependent assertions, mobile typecheck if TSX changes are made, and git diff --check.",
+  "riskImpact": "",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "ownerOf": "",
+  "bodyText": "Source: V2 test-coverage audit 2026-07-03 (15-subagent fan-out, main-agent verified). Code is ground truth; file:line cited.\nThe SSE/streaming engine is the gold-standard adversarially-tested surface; gaps cluster at crash-recovery and the new V2 wrap-up surface.\nuse-session-recovery.ts:52-127 (crash-recovery hydration hook: SecureStore marker read, AppState background write, stale-marker match, silent catch :77-79) has zero unit coverage; its e2e (resume-crash-recovery.yaml) is PARKED/blocked. Also flagged as CC-05d.\nsession-summary/[sessionId].tsx:370-373,1281-1311 reflectionBonusXp/bonusXpEarned display has zero assertions (NEW V2 wrap-up surface) — sibling FirstSessionWrapUpCard IS tested.\nuse-text-to-speech.ts:80 onError path untested (STT errors are well covered; TTS is the blind spot).\nChallenge Round offer->accept->banner->drafted-note journey has no e2e (unit coverage solid).\nDedup: None in index."
+}

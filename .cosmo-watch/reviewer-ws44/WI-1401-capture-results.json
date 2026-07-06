@@ -1,0 +1,42 @@
+[
+  {
+    "input_index": 0,
+    "status": "created",
+    "wi_id": "WI-1651",
+    "page_id": "3958bce9-1f7c-81e0-b395-f6cfd8518e0f",
+    "page_url": "https://www.notion.so/3958bce91f7c81e0b395f6cfd8518e0f",
+    "dedup": {
+      "candidates": [],
+      "action": "none"
+    },
+    "dor_diagnostics": [
+      {
+        "rule_id": "item.bug.regression_test",
+        "gap": "Bug/Incident AC does not mention a regression test",
+        "suggested_fix": "Add a regression-test requirement (DoR § Item): a test that fails without the fix and passes with it."
+      }
+    ],
+    "comment_id": "3958bce9-1f7c-81d0-b723-001df4aa2244",
+    "dedup_error": "judge did not return JSON: Understood. Send me the candidate work items, ideally with ID, title, description, acceptance criteria, and any linked evidence. I’ll judge whether they are duplicates, near-duplicates, related-but-di"
+  },
+  {
+    "input_index": 1,
+    "status": "created",
+    "wi_id": "WI-1652",
+    "page_id": "3958bce9-1f7c-8190-932e-dae5e49cd298",
+    "page_url": "https://www.notion.so/3958bce91f7c8190932edae5e49cd298",
+    "dedup": {
+      "candidates": [],
+      "action": "none"
+    },
+    "dor_diagnostics": [
+      {
+        "rule_id": "item.bug.regression_test",
+        "gap": "Bug/Incident AC does not mention a regression test",
+        "suggested_fix": "Add a regression-test requirement (DoR § Item): a test that fails without the fix and passes with it."
+      }
+    ],
+    "comment_id": "3958bce9-1f7c-8196-8a31-001dd771bb46",
+    "dedup_error": "judge did not return JSON: Ready. Send me the candidate work items and I’ll judge whether they’re duplicates, related-but-distinct, or independent."
+  }
+]

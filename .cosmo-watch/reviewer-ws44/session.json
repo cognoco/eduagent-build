@@ -1,0 +1,27 @@
+{
+  "session_id": "reviewer-ws44-claude-code-orion-20260705T201958Z",
+  "role": "reviewer",
+  "runtime": "claude-code",
+  "watcher_host": "codex-launched-process",
+  "workstream": {
+    "id": "WS-44",
+    "name": "Coverage Debt (test-coverage burn-down)",
+    "page_id": "3938bce9-1f7c-81ad-add6-f36bf7c317bc"
+  },
+  "repo": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build",
+  "poll_ms": 60000,
+  "launcher_pid": 56856,
+  "watcher_pid": 45112,
+  "actor": "claude-code:reviewer-ws44",
+  "log_path": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\logs\\reviewer-watcher.log",
+  "review_output_dir": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\reviews",
+  "config_path": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build\\.cosmo-watch\\reviewer-ws44\\workstreams.json",
+  "started_at": "2026-07-05T20:19:58Z",
+  "baseline": "14 WS-44 members; Reviewing=none at startup",
+  "notes": [
+    "WS-44 only; no other workstream scope.",
+    "Claude Code review jobs preserve reviewer != Codex shepherd/executor runtime.",
+    "No _quartet/clacks/* file modified.",
+    "Operator-directed Clacks ping was appended to coverage-debt outbox before watcher launch."
+  ]
+}

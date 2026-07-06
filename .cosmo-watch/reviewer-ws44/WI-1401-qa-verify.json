@@ -1,0 +1,37 @@
+{
+  "mode": "verify",
+  "wi_id": "WI-1401",
+  "page_id": "3928bce9-1f7c-81f4-8559-ef38df4f659e",
+  "stage": "Reviewing",
+  "repo": "C:\\Dev\\Projects\\Products\\Apps\\eduagent-build",
+  "disposition": "verified",
+  "verdicts": [
+    {
+      "claim": {
+        "kind": "commit",
+        "ref": "25cb0887142073f6ea8726e68a10dc89f426a590",
+        "text": "Fixed In cites commit 25cb0887142073f6ea8726e68a10dc89f426a590",
+        "source": "fixed_in"
+      },
+      "status": "verified",
+      "evidence": "commit 25cb0887142073f6ea8726e68a10dc89f426a590 exists in C:\\Dev\\Projects\\Products\\Apps\\eduagent-build"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "AC1: The five scoped Maestro YAMLs are each repaired or retired explicitly: parent/parent-dashboard.yaml, parent/multi-child-dashboard.yaml, post-auth-comprehensive-devclient.yaml, parent/consent-management.yaml, and retention/library.yaml. No scoped flow remains counted as live coverage while asserting removed copy/testIDs or a placeholder/deferred surface. AC2: Parent dashboard flows no longer assert the removed Tonight / Conversation starters copy; their required assertions target current parent-home behavior from ParentHomeScreen/en.json using stable testIDs or current copy, without weakening to a generic screen-visible check. AC3: post-auth-comprehensive-devclient.yaml is either rewritten against current post-auth surfaces or removed/demoted from live coverage with an in-repo rationale and inventory update. It must not hard-tap removed theme/persona controls such as switch-to-teen or the deleted (parent) route group. AC4: parent/consent-management.yaml no longer waits for grace-period-banner after withdrawal from the child detail screen. It asserts the current consent-withdrawn-empty-state/restore path or is retired in favor of named unit/API coverage, with any docs/inventory claim updated accordingly. AC5: retention/library.yaml is reconciled with current Library v3 behavior: either it is relabeled as Library navigation coverage, or it adds a real current retention signal assertion from the shelf/list/topic surface. Docs/inventory no longer claim retention-pill coverage that the YAML does not prove. AC6: Verification includes a grep/static check that the removed literals/testIDs from this WI are absent from live scoped YAML assertions, plus syntax validation and emulator execution for repaired Maestro flows. If a flow is retired instead of repaired, the replacemen t test or documented authoritative coverage is named in the completion summary.",
+        "text": "AC1: The five scoped Maestro YAMLs are each repaired or retired explicitly: parent/parent-dashboard.yaml, parent/multi-child-dashboard.yaml, post-auth-comprehensive-devclient.yaml, parent/consent-management.yaml, and retention/library.yaml. No scoped flow remains counted as live coverage while asserting removed copy/testIDs or a placeholder/deferred surface. AC2: Parent dashboard flows no longer assert the removed Tonight / Conversation starters copy; their required assertions target current parent-home behavior from ParentHomeScreen/en.json using stable testIDs or current copy, without weakening to a generic screen-visible check. AC3: post-auth-comprehensive-devclient.yaml is either rewritten against current post-auth surfaces or removed/demoted from live coverage with an in-repo rationale and inventory update. It must not hard-tap removed theme/persona controls such as switch-to-teen or the deleted (parent) route group. AC4: parent/consent-management.yaml no longer waits for grace-period-banner after withdrawal from the child detail screen. It asserts the current consent-withdrawn-empty-state/restore path or is retired in favor of named unit/API coverage, with any docs/inventory claim updated accordingly. AC5: retention/library.yaml is reconciled with current Library v3 behavior: either it is relabeled as Library navigation coverage, or it adds a real current retention signal assertion from the shelf/list/topic surface. Docs/inventory no longer claim retention-pill coverage that the YAML does not prove. AC6: Verification includes a grep/static check that the removed literals/testIDs from this WI are absent from live scoped YAML assertions, plus syntax validation and emulator execution for repaired Maestro flows. If a flow is retired instead of repaired, the replacemen t test or documented authoritative coverage is named in the completion summary.",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    }
+  ],
+  "counts": {
+    "verified": 1,
+    "failed": 0,
+    "cannot_verify": 0,
+    "needs_judgment": 1
+  },
+  "comment_id": null
+}

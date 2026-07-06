@@ -262,6 +262,42 @@
   candidates — backlog-check the Quartet MVP "Clacks schema/enforcement" items (WI-1230) before
   capturing; log-only for now, capture if they cost real time as the fleet scales.
 
+- **2026-07-06 · Coverage WI surfaced a REAL production bug — test-only boundary crossed without
+  pre-dispatch escalation (WI-1414 / PR #1946).** WI-1414 (scoped as mobile cross-cutting seam
+  coverage) shipped a PR that changes production code: `use-celebration.tsx` module-level refs
+  (`seenQueueKeysRef` / `shownFromCurrentBatchRef` / `lastBatchIdRef`) → per-profile `Map`s, plus
+  `profile.ts` adding `recaps` to `PROFILE_SCOPED_KEYS`, plus home/session `profileId` wiring. This
+  is a genuine **profile-isolation leak** — celebration/recaps state was shared across profiles
+  (family/minor data-separation, safety-adjacent). The fix is well-scoped and the new tests DO
+  assert isolation (profile-A → profile-B rerender). TWO issues: (a) PROCESS — the lane charter
+  requires product-code changes to escalate `needs-orchestrator` BEFORE dispatch; the shepherd
+  built it and surfaced it at PR instead. Corrected forward (cvdebt-inbox-026): coverage-WI-reveals-
+  a-bug → STOP, escalate, orchestrator re-scopes as Bug with proper AC. (b) EVIDENCE — a coverage
+  AC does not demand red-green-revert, but an isolation/safety fix does (repo canon); HELD PR #1946
+  for a red-green proof (revert the production hunks → isolation tests must fail → restore → pass).
+  Positive datapoint: the coverage audit is doing exactly what it should — finding real seam bugs,
+  not just adding green tests. Also this cycle: WI-1411 `complete` ran the new pre-complete verdict
+  check ("no newer rework directive") — the no-delta loop fix is now live behavior.
+
+- **2026-07-06 · Autonomous-mode delivery burst (12:16-13:25Z): 4 more lands + a bug find + 3 CI/
+  quality WIs.** With the pipe running 4-5 concurrent threads: WI-1411 (PR #1943, clean first-pass
+  APPROVED), WI-1412 (#1944, one type error → fixed), WI-1414 (#1946, the profile-isolation
+  production fix, red-green-proved), WI-1404 (#1942) landing after a GC1 round; WI-1405 earlier.
+  Findings captured (all backlog-checked, WS-44 cleared where cross-lane):
+  - **WI-1656** — GC1 Pattern-A checker false-positives on the type-generic `requireActual<T>(path)`
+    form (valid Pattern A rejected; forces the as-cast rewrite). CI-trust family (WI-1650/1651).
+  - **WI-1654** — `listFamilyMembersV2` has no ORDER BY but the WI-1405 integration test asserts
+    exact row order → latent flake that spuriously red'd PR #1945's Flag-ON (diagnosed via a
+    delegated subagent; unrelated to WI-1403's diff; re-ran the job). A flake **I helped land** via
+    WI-1405 — will intermittently red every future API PR until fixed. Kept in WS-44 (lane can fix;
+    ORDER BY is a billing-v2 production change → escalate-before-dispatch).
+  - **WI-1655** — WS-44 device-evidence batch (tracks the verify-at-e2e-run Maestro legs the
+    headless lane cannot run; WI-1401's 3 parent flows + 1408/1411/1412 legs). WS-44 cleared —
+    blocked on emulator availability, not lane-runnable. **Operator decision pending** (resourcing).
+  Process win: WI-1412 `complete` again ran the pre-complete verdict check ("no newer rework
+  directive") — the no-delta loop fix is durable across multiple items now. Gate tally today
+  (rough): ~10 valid findings fixed, ~5 invalid/flake adjudicated with evidence.
+
 ## Harvest queue (findings awaiting backlog-check → WI capture)
 
 - **Attended-only Codex shepherd** — CONFIRMED first-party (coverage-debt-006). Backlog-check done
@@ -296,3 +332,37 @@
   Disposition: **captured WI-1646** (Bug, P3, WS=Quartet MVP, Related: WI-1228/1267/1268; DoR gaps
   on regression-test AC + variants are expected for a framework-doc bug — triage/refine frames it).
   Codex-specific: yes.
+
+## 2026-07-06 ~17:00Z — Reviewer caught a GC1-escape misuse the ratchet structurally cannot (reviewer≠executor value)
+
+**Event:** Reviewer bounced WI-1413 (avatar-admin parity coverage) Reviewing→Executing (tag: rework) *after* it had landed clean to main (PR #1947, `98951bfe5`, all 4 required checks green). Defect: `account/index.test.tsx` added a new internal `jest.mock('../../../lib/navigation')` for `goBackOrReplace` behind a `// gc1-allow` escape — but `goBackOrReplace` (navigation.ts:87) is a pure fn (`canGoBack() ? back() : replace(fallback)`) with no native-context dependency, so the escape's "code genuinely cannot be exercised" precondition is false. Reviewer cited same-lane precedent WI-1404 (held to `jest.requireActual`) and prescribed the exact small fix.
+
+**Why it's a durable pilot finding (two signals):**
+1. **Reviewer earns its seat.** The GC1 ratchet (`scripts/check-gc1-pattern-a.ts`) is mechanical: a `// gc1-allow` annotation suppresses it unconditionally. The ratchet *cannot* evaluate whether the escaped code is genuinely un-exercisable — that requires reading the target fn and judging it. The independent reviewer did exactly that. This is the clearest evidence to date that reviewer≠executor is load-bearing, not ceremony: CI was fully green, yet the artifact violated lane canon.
+2. **Codex-executor quality pattern (watch, not yet confirmed).** The executor reached for `gc1-allow` on a pure function instead of `jest.requireActual` with targeted overrides. One occurrence. If it recurs, capture as a Codex-runtime-binding note: executors default to the mock-escape over wiring the real thing, and the lane's GC6 boy-scout bar should be surfaced in the executor brief. Not capturing yet — single instance.
+
+**Orchestrator action:** relayed reviewer rationale + prescribed fix to the attended-only shepherd (cvdebt-inbox-034); WI-1413 is a forward-fix cycle (already on main, cannot un-land). No new WI — this is in-lane rework, not a framework gap.
+
+## 2026-07-06 ~18:48Z — Shepherd swung from over-applying F35 to under-applying it (same root: imprecise gate boundary)
+
+**Event:** For WI-1402 (the lane's last item), the shepherd opened PR #1953 as a **draft** and ran `/cosmo:execute complete` — moving the WI to Reviewing with Fixed In = the un-landed branch-head `f9be078a` — and signaled `needs-orchestrator` all at ~18:48–18:49Z, i.e. it completed BEFORE the orchestrator's `[orch-land]`. F35 requires the shepherd to HOLD at Executing until the orchestrator returns the squash SHA, then re-point Fixed In and complete.
+
+**Why it's a durable pilot finding:** This is the exact mirror of the shepherd's own earlier finding ("F35 landing gate over-applied before execution," logged in its findings doc, where it wrongly treated F35 as a broad caution that blocked builds). Now it has under-applied the same gate — completing too early. Both errors share one root cause: **the shepherd does not hold a crisp model of F35's boundary — that it gates ONLY the `complete` step, neither earlier (build/PR proceed freely) nor later (complete must WAIT for `[orch-land]`).** A Codex-hosted shepherd oscillates around an imprecisely-specified gate. Fix for the runbook/runtime-binding: state F35 as a two-sided invariant with an explicit checklist — "PR open/build = no gate; `complete` = the ONLY gated action, and it waits for `[orch-land]`." A single positive+negative example pair would likely have prevented both swings.
+
+**Secondary process note:** the shepherd opened the PR as a draft, which caused CodeRabbit to skip review ("Review skipped: draft pull request"); the orchestrator had to `gh pr ready` before a full review would run. Runtime-binding candidate: builders/shepherd should open PRs ready-for-review (or the shepherd should mark ready before signaling `needs-orchestrator`), else the gate stalls on a skipped review.
+
+**Orchestrator handling:** last item, so driven forward rather than reverted — marked PR ready, gating checks + review, will squash-land and return the SHA (cvdebt-inbox-039); shepherd re-points Fixed In on `[orch-land]`. End-state converges. If the reviewer bounces the un-landed WI to Executing first, that is the reviewer correctly enforcing dod.4 (not-landed) and the recovery is identical.
+
+## 2026-07-06 ~19:07Z — Two-reviewer scope divergence on GC6 (pre-existing-mock documentation), resolved at land
+
+Context: WI-1402 (/now coverage, last WS-44 item), PR #1953.
+
+The Quartet lane reviewer (Claude Code, sanctioned reviewer) re-ran both suites, verified content GOOD, stated "no new internal mocks" + "no code changes needed", and bounced only for DoD-4 (not landed). Correct within its scope: no NEW internal mock was introduced.
+
+The CI advisory reviewer (claude-review bot) independently flagged a SHOULD_FIX the lane reviewer did not: GC6 boy-scout requires that editing a test file either removes pre-existing internal mocks OR documents a deferral in the commit message. now.test.ts carries a pre-existing gc1-allowed jest.mock('../services/now-feed'); the file was edited (new cases added) but neither the commit message nor PR body documented the GC6 deferral. gc1-allow (per-line GC1 escape) does NOT satisfy GC6's separate documentation obligation.
+
+Both correct — different scopes. The lane reviewer's DoD covers test-content-reality + landed-state; it does not check GC6 commit-message-documentation of a pre-existing mock. The CI reviewer covers exactly that. Neither is redundant — this is a structural coverage gap in the lane-reviewer DoD, not a reviewer miss.
+
+Finding: for a test-coverage lane the GC6 commit-message-documentation guard is a recurring blind spot (every test-file edit that leaves a pre-existing internal mock can trip it, and this lane edits test files by definition). Candidate improvement: add a lane-reviewer DoD line — "test-file edits that leave a pre-existing internal mock must show a GC6 deferral note in the commit/PR body." (Backlog-check before capturing; may already be implied by receiving-code-review skill.)
+
+Handling (orchestrator, F35 land): the substantive deferral judgment was already encoded in the file (gc1-allow reason: service has direct unit tests, and the real DB path is covered by now.integration.test.ts in the same PR). Removing the mock = wiring the real service into a unit test = out of a coverage PR's scope. Because F35 makes the orchestrator author the squash commit, I documented the GC6 deferral in the squash body — the canonical GC6 location (commit message on main) — avoiding a force-push + full checks re-run on the last lane item. This is a documentation echo of an already-sound judgment, not a new executor disposition. Contrast WI-1413, where the mock was genuinely misapplied and needed executor code removal (relayed to shepherd). Rule of thumb: the orchestrator may resolve a GC6-documentation-only SHOULD_FIX in the squash body when the underlying gc1-allow is already sound; a GC6 finding implying the mock itself is wrong must relay to the executor.
