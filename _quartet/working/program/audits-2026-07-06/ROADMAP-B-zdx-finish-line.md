@@ -45,7 +45,7 @@ WI-1263 v1 shipped (Option B). Live scope is a v1.1 WP. **B-01 carries the progr
 
 | Item | What | Grain | Eff |
 |------|------|-------|-----|
-| **B-01 ⚑** | Realtime published but nothing consumes it — the event-wake premise is unbuilt. **DECISION-GATE: event-driven wake subscriber vs attended-only staffing.** `claude -p` veto constrains the wake action to interactive-resume shapes | WI-1263 v1.1 "wake subscriber" | M |
+| **B-01 ✓RULED** | **(c) hybrid-sequenced (operator, 2026-07-06; substrate decision event 28).** Increment 1 TIGHT: one subscriber per host (Ramtop first); wake actions = per-lane activity-file touch + tmux `claude --resume` nudge (OPQ-14 shape); registers with existing L0 watchdog; success = poll cadence to ≥15-min fallback + <10s wake demo. **OUT of inc-1:** Codex self-wake (attended-only stands), multi-host, dispatch logic, schema changes, watcher retirement (B-03 governs). Inc-2 = Codex self-wake, after inc-1 proven | WI-1263 v1.1 "wake subscriber inc-1" | S-M |
 | B-03 | Retirement map — "retire all watchers" is **wrong as written**; substrate subsumes only mailboxes/heartbeats/decision-log. Cosmo-stage polling, lease state-machine, watchdog, review-spawn **must survive**. Write the map into the rollout plan | 1 design WI + 1 build WI | S+M |
 | B-05 | Substrate drops the file channel's typed envelope (level/type/ref) — port `validate-channel-envelope.js` semantics into `body` contract before migrating lanes | fold into lane-migration WI | S |
 | B-04 | v2 JWT minting/distribution tooling (mint script, Infisical `/quartet/roles/*`, rotation) — single-writer-as-policy is unscheduled without it | 1 WI | M |
@@ -110,7 +110,7 @@ Nouns provisioned, every verb missing, PRDs not clause-addressable. Design **wit
 
 ## DECISION surface for you (ZDX side)
 
-1. **B-01 wake mechanism vs attended-only staffing** — the substrate's whole justification; without wake it's a nicer transport with the same poll economics. Recommend building the subscriber (interactive-resume shape, per the `claude -p` veto). **Biggest open fork.**
+1. ~~B-01 wake mechanism~~ **RULED (c) hybrid-sequenced, 2026-07-06** — see Wave 3 row for the tight inc-1 scope. Downstream: B-24 binding writes "attended-only pending inc-2"; B-26 cadence = complement.
 2. **Charters ratification** (Wave 5) — gates all ZDX new-build; track-2 drafts land for your sign-off.
 3. **B-12 shared-checkout ADR** — rule before Lancre hosts multi-agent execution (cheap now, expensive after).
 4. **B-34 `claude -p` fallback** — fail-loud vs explicit exception ruling.
