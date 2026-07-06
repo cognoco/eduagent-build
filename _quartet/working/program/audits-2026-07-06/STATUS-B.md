@@ -1,0 +1,13 @@
+# Audit B status — fable:audit-system (Lancre)
+
+One line per status event. Mirror of the `audit-system` substrate lane (substrate IS working from Lancre — selftest PASS; this file is a git-visible trail per operator request, kept unpushed unless confirmed or substrate fails).
+
+- 2026-07-06T19:08Z — BOOT: /quartet secrets resolved, clacks selftest PASS (ev 10), heartbeat on audit-system (ev 11). Lancre cross-machine acceptance datapoint for WI-1263 track 1.
+- 2026-07-06T19:11Z — PLAN (ev 14): D1 zdx/standard data-model + top-down lifecycle gap · D2 quartet role/protocol queue-ownership · D3 substrate design + watcher retirement · D4 reviewer independence / WI-1645 · D5 codex token economics WS-43 · D6 tooling debt (marketplace CI WI-1264, OPQ-17, lifecycle regressions) · D7 nexus architecture (NEX-ADRs, secrets, workspace). Parallel subagent readers per dimension; Fable on synthesis. Deliverable FINDINGS-B.md, cross-checked vs zdx-backlog-audit-2026-07-05/AUDIT.md (62 items) + day-2 pilot doc.
+- 2026-07-06T19:13Z — Seven dimension readers launched (D1/D2 opus, D3-D7 sonnet), read-only.
+- 2026-07-06T19:14Z — DECISION (ev 17): operator directive claimed substrate unavailable here; contradicts observed PASS. Continuing substrate reporting per brief + maintaining this file; push only on confirmation or real substrate failure.
+- 2026-07-06T19:17Z — D3 COMPLETE (ev 19): watcher inventory (15 mechanisms), retirement map, doc-staleness + RLS-v2 + Realtime-consumer findings. Drafting into FINDINGS-B.
+- 2026-07-06T19:20Z — D4+D7 COMPLETE (ev 20): B-09..B-16 in FINDINGS-B. Reviewer has NO liveness layer (omission not contradiction); root-repo shared-checkout is folklore vs ZDX-ADR-0012; Linux secrets-helper port uncommitted on Lancre; no fleet version-skew signal.
+- 2026-07-06T19:23Z — D1+D5+D6 COMPLETE (ev 21): B-17..B-34. Validity-formula holes = both live incident classes (promote WI-1332/1312); non-deviable rules wrong vs schema; top-down = verbs+anchors gap; Codex binding absorbed 0/7 pilot findings; marketplace main unprotected; OPQ-17 reproduced live (checkout 8 behind, dedup broken now). Awaiting D2 → synthesis.
+- 2026-07-06T19:25Z — D2 COMPLETE: B-35..B-40. Liveness ladder prose-complete/arming-incomplete (canon self-admits ×3); queue muddle = shepherd-protocol L52 one entangled sentence + no lane WIP policy; charter split validated (keep the scar lines); 3 missing one-line invariants; rollout not mechanized.
+- 2026-07-06T19:27Z — AUDIT COMPLETE (ev 26): FINDINGS-B.md final — 40 findings, top-10 ranked, 13-item known-work shortlist (1-6 dispatch-ready), cross-check done (3 draft dispositions overtaken/upgraded). Lane events 10-27.
