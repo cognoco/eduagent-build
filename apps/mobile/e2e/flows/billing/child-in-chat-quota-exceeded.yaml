@@ -8,8 +8,6 @@ tags:
   - nightly
   - billing
   - quota
-  - child
-  - verify-at-e2e-run
 ---
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
