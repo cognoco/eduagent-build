@@ -286,4 +286,29 @@ describe('useTextToSpeech', () => {
     });
     expect(result.current.isPaused).toBe(false);
   });
+
+  it('onError resets speaking and paused state so playback does not freeze', () => {
+    const { result } = renderHook(() => useTextToSpeech());
+
+    act(() => {
+      result.current.speak('Test');
+    });
+
+    const callArgs = mockSpeak.mock.calls[0][1];
+    act(() => {
+      callArgs.onStart();
+    });
+    act(() => {
+      result.current.pause();
+    });
+    expect(result.current.isSpeaking).toBe(true);
+    expect(result.current.isPaused).toBe(true);
+
+    act(() => {
+      callArgs.onError();
+    });
+
+    expect(result.current.isSpeaking).toBe(false);
+    expect(result.current.isPaused).toBe(false);
+  });
 });
