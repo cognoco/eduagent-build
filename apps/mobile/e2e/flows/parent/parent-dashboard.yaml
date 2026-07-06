@@ -39,11 +39,11 @@ tags:
 - assertVisible:
     id: 'tab-more'
 
-# ── Visual integrity: parent Home heading ──────────────────────────────
+# ── Visual integrity: parent Home current card structure ───────────────
 - assertVisible:
     id: 'parent-home-screen'
 - assertVisible:
-    text: 'Tonight'
+    id: 'parent-home-child-starter-${CHILD_PROFILE_ID}'
 - assertVisible:
     text: 'Children'
 

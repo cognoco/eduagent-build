@@ -12,8 +12,9 @@
 #   for browser surfaces. QA-02 closure gated on:
 #     WI-878 — BRIDGE-04 entry surface failures in mentor-audit smoke
 #     WI-879 — registry/consent readiness drift against current Mentor/Family shells
-# This file is preserved pending M1-COMPREHENSIVE rewrite. Do not delete until a
-# native-Maestro equivalent of registry-smoke.spec.ts exists.
+# Parked flow: tag stays `blocked` so this file is not counted as live Maestro
+# coverage pending M1-COMPREHENSIVE. Do not delete until a native-Maestro
+# equivalent of registry-smoke.spec.ts exists.
 #
 # Post-Auth Comprehensive E2E — dev-client variant
 # Signs in with seeded test user, then tests all major post-auth screens.
@@ -25,6 +26,7 @@
 # Scenario: learning-active (has subject, session, topic)
 appId: com.mentomate.app
 tags:
+  - blocked
   - devclient
   - post-auth
   - comprehensive
