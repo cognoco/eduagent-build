@@ -19,7 +19,7 @@
 // legacy family.ts still runs in parallel — convergence tracked in WI-1239.
 // ---------------------------------------------------------------------------
 
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, or, sql } from 'drizzle-orm';
 import {
   person,
   membership,
@@ -155,6 +155,11 @@ export async function listFamilyMembersV2(
         eq(membership.organizationId, sub.organizationId),
         isNull(person.archivedAt),
       ),
+    )
+    .orderBy(
+      sql`CASE WHEN 'admin' = ANY(${membership.roles}) THEN 0 ELSE 1 END`,
+      asc(person.displayName),
+      asc(person.id),
     );
 
   return rows.map((r) => ({
