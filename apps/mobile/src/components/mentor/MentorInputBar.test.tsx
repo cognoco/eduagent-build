@@ -55,6 +55,55 @@ describe('MentorInputBar', () => {
     expect(onTranscript).not.toHaveBeenCalled();
   });
 
+  it('enables an accessible send affordance after typing and submits the trimmed prompt', () => {
+    const onSubmitText = jest.fn();
+    const { getByTestId } = render(
+      <MentorInputBar
+        onSubmitText={onSubmitText}
+        onOpenCamera={jest.fn()}
+        onOpenHomework={jest.fn()}
+        onTranscript={jest.fn()}
+      />,
+    );
+
+    const send = getByTestId('mentor-bar-send');
+    expect(send.props.accessibilityRole).toBe('button');
+    expect(send.props.accessibilityLabel).toBe('Send message');
+    expect(send.props.accessibilityState).toEqual({ disabled: true });
+
+    fireEvent.changeText(
+      getByTestId('mentor-bar-input'),
+      '  explain fractions ',
+    );
+
+    expect(getByTestId('mentor-bar-send').props.accessibilityState).toEqual({
+      disabled: false,
+    });
+    fireEvent.press(getByTestId('mentor-bar-send'));
+
+    expect(onSubmitText).toHaveBeenCalledWith('explain fractions');
+  });
+
+  it('does not submit blank typed prompts from the send affordance', () => {
+    const onSubmitText = jest.fn();
+    const { getByTestId } = render(
+      <MentorInputBar
+        onSubmitText={onSubmitText}
+        onOpenCamera={jest.fn()}
+        onOpenHomework={jest.fn()}
+        onTranscript={jest.fn()}
+      />,
+    );
+
+    fireEvent.changeText(getByTestId('mentor-bar-input'), '   ');
+    fireEvent.press(getByTestId('mentor-bar-send'));
+
+    expect(getByTestId('mentor-bar-send').props.accessibilityState).toEqual({
+      disabled: true,
+    });
+    expect(onSubmitText).not.toHaveBeenCalled();
+  });
+
   it('keeps the ask field tall enough for its wrapped placeholder', () => {
     const { getByTestId } = render(
       <MentorInputBar

@@ -1,8 +1,10 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import type { TranslateKey } from '../../i18n';
+import { useThemeColors } from '../../lib/theme';
 
 export interface ColdStartCardProps {
   onFill: (text: string) => void;
@@ -47,6 +49,7 @@ export function ColdStartCard({
   placeholderRotationIntervalMs = DEFAULT_PLACEHOLDER_ROTATION_MS,
 }: ColdStartCardProps) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const [value, setValue] = useState('');
   const [showHomeworkReply, setShowHomeworkReply] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -59,6 +62,7 @@ export function ColdStartCard({
   }, [placeholderRotationIntervalMs]);
 
   const placeholder = t(PLACEHOLDER_KEYS[placeholderIndex] as TranslateKey);
+  const hasText = value.trim().length > 0;
 
   const fill = (chip: (typeof CHIPS)[number]): void => {
     const text = t(chip.key);
@@ -84,16 +88,35 @@ export function ColdStartCard({
       <Text className="font-bold text-text-primary">
         {t('mentorHome.coldStart.caption')}
       </Text>
-      <TextInput
-        testID="cold-start-input"
-        accessibilityLabel={t(EQUAL_WEIGHT_TOKEN)}
-        value={value}
-        onChangeText={setValue}
-        onSubmitEditing={submit}
-        placeholder={placeholder}
-        className="mt-3 min-h-11 rounded-xl border border-border px-3 text-text-primary"
-        returnKeyType="send"
-      />
+      <View className="mt-3 flex-row items-center gap-2">
+        <TextInput
+          testID="cold-start-input"
+          accessibilityLabel={t(EQUAL_WEIGHT_TOKEN)}
+          value={value}
+          onChangeText={setValue}
+          onSubmitEditing={submit}
+          placeholder={placeholder}
+          className="min-h-11 min-w-0 flex-1 rounded-xl border border-border px-3 text-text-primary"
+          returnKeyType="send"
+        />
+        <Pressable
+          testID="cold-start-send"
+          accessibilityRole="button"
+          accessibilityLabel={t('session.chatShell.a11ySendMessage')}
+          accessibilityState={{ disabled: !hasText }}
+          disabled={!hasText}
+          onPress={submit}
+          className={`h-11 w-11 items-center justify-center rounded-xl ${
+            hasText ? 'bg-primary' : 'bg-surface-elevated'
+          }`}
+        >
+          <Ionicons
+            name="send"
+            size={18}
+            color={hasText ? colors.textInverse : colors.muted}
+          />
+        </Pressable>
+      </View>
       <Text className="mt-3 text-xs text-text-secondary">
         {t('mentorHome.coldStart.orJustType')}
       </Text>
