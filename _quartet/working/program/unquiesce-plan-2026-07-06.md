@@ -69,8 +69,23 @@ priority; end state = both programs relaunched on fixed foundations.
 - [ ] WI-1245 finalize (all machines cut over); WI-1263 v1 acceptance complete
 - [ ] Team-boot automation (WI-1649) — post-relaunch, kills the 20-min restart tax
 
+## 8. New execution capacity
+
+- [ ] **WI-1562 cloud-executor pilot** (claude.ai/code round-trip, 2-3 coverage WIs;
+      operator-ruled: driven FROM RAMTOP by PM) — time-boxed spike, schedule after
+      charters land so lifecycle discipline is testable against them
+- [x] Hetzner machine provisioned + on tailnet (**Lancre**, `ssh lancre`) — 2026-07-06
+- [ ] **WI-1639 Lancre setup to ZAF conventions**: cycle root password, secrets machinery
+      (estate-secrets), docs, agent/interactive slice isolation
+- [ ] Lancre onboarding to the substrate: resolve `/quartet` secrets, `clacks selftest`,
+      `QUARTET_LANE_STATE_ROOT` set (joins the WI-1245/1263 acceptance set)
+- [ ] Decide Lancre's first workload (candidate: multi-agent execution host at full-force
+      relaunch)
+
 ## Parked / riding along
 
+- **WS-33 Codex shepherd on orion** — operator-ruled next lane, hand-guided (NOT under PM
+  hat); kickoff by operator. Pin the V0/V1/V2 nav no-regress constraint in its kickoff.
 - OPQ-5 (Doppler prd secrets — one-line operator confirm), OPQ-15 (Zuzka rulings)
 - WI-1629 re-finalize → PM's one independent close (pre-authorized)
-- Codex pilot expansion beyond WS-44 — after WI-1544 gate + charters
+- Codex pilot expansion beyond WS-44/WS-33 — after WI-1544 gate + charters
