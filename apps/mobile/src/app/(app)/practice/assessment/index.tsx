@@ -1,6 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text } from 'react-native';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import {
+  Redirect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type {
   AssessmentEvaluation,
@@ -31,6 +36,7 @@ import { Button } from '../../../../components/common/Button';
 import { ErrorFallback } from '../../../../components/common/ErrorFallback';
 import { RewardBurst } from '../../../../components/common/RewardBurst';
 import { hapticSuccess } from '../../../../lib/haptics';
+import { useEntryGate } from '../../../../hooks/use-entry-gate';
 // [BUG-138 / BUG-227] Underscore-prefixed helpers so Expo Router does NOT
 // treat them as route files in /(app)/practice/assessment/. Per AGENTS.md
 // Repo-Specific Guardrails rule 16: any non-route helper file inside the
@@ -94,6 +100,7 @@ function buildAssessmentChatMessages(input: {
 export default function AssessmentScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const blocked = useEntryGate('practice');
   const {
     subjectId,
     topicId,
@@ -327,6 +334,10 @@ export default function AssessmentScreen() {
       hapticSuccess();
     }
   }, [passedAssessment]);
+
+  if (blocked) {
+    return <Redirect href="/(app)/home" />;
+  }
 
   if (!subjectId || !topicId) {
     return (

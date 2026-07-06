@@ -1,5 +1,13 @@
 import React from 'react';
-import { render, fireEvent, act } from '@testing-library/react-native';
+import {
+  render as rtlRender,
+  fireEvent,
+  act,
+} from '@testing-library/react-native';
+import {
+  createScreenWrapper,
+  createTestProfile,
+} from '../../../test-utils/screen-render';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -15,6 +23,10 @@ const mockReplace = jest.fn();
 let mockCanGoBack = true;
 
 jest.mock('expo-router', () => ({
+  Redirect: ({ href }: { href: string }) => {
+    const { Text } = require('react-native');
+    return <Text testID="redirect">{href}</Text>;
+  },
   useRouter: () => ({
     push: mockPush,
     back: mockBack,
@@ -137,6 +149,20 @@ jest.mock(
 const AssessmentPickerScreen = require('./assessment-picker')
   .default as React.ComponentType;
 
+function renderAssessmentPickerScreen() {
+  const owner = createTestProfile({
+    id: 'owner-profile',
+    isOwner: true,
+    birthYear: 1980,
+  });
+  const { wrapper } = createScreenWrapper({
+    activeProfile: owner,
+    profiles: [owner],
+  });
+
+  return rtlRender(<AssessmentPickerScreen />, { wrapper });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -156,12 +182,38 @@ describe('AssessmentPickerScreen', () => {
   });
 
   it('renders the picker screen', () => {
-    const { getByTestId } = render(<AssessmentPickerScreen />);
+    const { getByTestId } = renderAssessmentPickerScreen();
     getByTestId('assessment-picker-screen');
   });
 
+  it('redirects home when opened directly in parent-proxy mode', () => {
+    const parent = createTestProfile({
+      id: 'parent-profile',
+      isOwner: true,
+      birthYear: 1980,
+    });
+    const child = createTestProfile({
+      id: 'child-profile',
+      isOwner: false,
+      birthYear: 2014,
+    });
+    const { wrapper } = createScreenWrapper({
+      activeProfile: child,
+      profiles: [parent, child],
+      isExplicitProxyMode: true,
+    });
+
+    const { getByTestId, queryByTestId } = rtlRender(
+      <AssessmentPickerScreen />,
+      { wrapper },
+    );
+
+    expect(getByTestId('redirect').props.children).toBe('/(app)/home');
+    expect(queryByTestId('assessment-picker-screen')).toBeNull();
+  });
+
   it('navigates back when back button pressed', () => {
-    const { getByTestId } = render(<AssessmentPickerScreen />);
+    const { getByTestId } = renderAssessmentPickerScreen();
     fireEvent.press(getByTestId('assessment-picker-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(mockReplace).not.toHaveBeenCalled();
@@ -177,7 +229,7 @@ describe('AssessmentPickerScreen', () => {
     });
 
     it('replaces to practice index from header back button', () => {
-      const { getByTestId } = render(<AssessmentPickerScreen />);
+      const { getByTestId } = renderAssessmentPickerScreen();
       fireEvent.press(getByTestId('assessment-picker-back'));
       expect(mockBack).not.toHaveBeenCalled();
       expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
@@ -185,7 +237,7 @@ describe('AssessmentPickerScreen', () => {
 
     it('replaces to practice index from error fallback back button', () => {
       mockIsError = true;
-      const { getByTestId } = render(<AssessmentPickerScreen />);
+      const { getByTestId } = renderAssessmentPickerScreen();
       fireEvent.press(getByTestId('assessment-picker-error-back'));
       expect(mockBack).not.toHaveBeenCalled();
       expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
@@ -193,7 +245,7 @@ describe('AssessmentPickerScreen', () => {
 
     it('replaces to practice index from timeout fallback back button', () => {
       mockIsLoading = true;
-      const { getByTestId } = render(<AssessmentPickerScreen />);
+      const { getByTestId } = renderAssessmentPickerScreen();
       act(() => {
         jest.advanceTimersByTime(15_001);
       });
@@ -206,13 +258,13 @@ describe('AssessmentPickerScreen', () => {
   describe('loading state', () => {
     it('shows loading card while loading and timeout not reached', () => {
       mockIsLoading = true;
-      const { getByTestId } = render(<AssessmentPickerScreen />);
+      const { getByTestId } = renderAssessmentPickerScreen();
       getByTestId('assessment-picker-loading');
     });
 
     it('shows timeout fallback after 15 seconds of loading', () => {
       mockIsLoading = true;
-      const { getByTestId } = render(<AssessmentPickerScreen />);
+      const { getByTestId } = renderAssessmentPickerScreen();
       act(() => {
         jest.advanceTimersByTime(15_001);
       });
@@ -221,7 +273,7 @@ describe('AssessmentPickerScreen', () => {
 
     it('clears timeout flag when loading finishes', () => {
       mockIsLoading = true;
-      const { rerender, queryByTestId } = render(<AssessmentPickerScreen />);
+      const { rerender, queryByTestId } = renderAssessmentPickerScreen();
       act(() => {
         jest.advanceTimersByTime(14_000);
       });
@@ -235,7 +287,7 @@ describe('AssessmentPickerScreen', () => {
   describe('error state', () => {
     it('shows error fallback on API error', () => {
       mockIsError = true;
-      const { getByTestId } = render(<AssessmentPickerScreen />);
+      const { getByTestId } = renderAssessmentPickerScreen();
       getByTestId('assessment-picker-retry');
       getByTestId('assessment-picker-error-back');
     });
@@ -243,7 +295,7 @@ describe('AssessmentPickerScreen', () => {
     it('calls refetch when retry button pressed', async () => {
       mockIsError = true;
       mockRefetch.mockResolvedValueOnce(undefined);
-      const { getByTestId } = render(<AssessmentPickerScreen />);
+      const { getByTestId } = renderAssessmentPickerScreen();
       await act(async () => {
         fireEvent.press(getByTestId('assessment-picker-retry'));
         await Promise.resolve();
@@ -253,7 +305,7 @@ describe('AssessmentPickerScreen', () => {
 
     it('calls router.back when error back button pressed', () => {
       mockIsError = true;
-      const { getByTestId } = render(<AssessmentPickerScreen />);
+      const { getByTestId } = renderAssessmentPickerScreen();
       fireEvent.press(getByTestId('assessment-picker-error-back'));
       expect(mockBack).toHaveBeenCalledTimes(1);
     });
@@ -262,13 +314,13 @@ describe('AssessmentPickerScreen', () => {
   describe('empty state', () => {
     it('shows empty state when no topics available', () => {
       mockTopics = [];
-      const { getByTestId } = render(<AssessmentPickerScreen />);
+      const { getByTestId } = renderAssessmentPickerScreen();
       getByTestId('assessment-picker-empty');
     });
 
     it('navigates to library when browse button pressed', () => {
       mockTopics = [];
-      const { getByTestId } = render(<AssessmentPickerScreen />);
+      const { getByTestId } = renderAssessmentPickerScreen();
       fireEvent.press(getByTestId('assessment-picker-browse'));
       expect(mockPush).toHaveBeenCalledWith('/(app)/library');
     });
@@ -309,13 +361,13 @@ describe('AssessmentPickerScreen', () => {
     });
 
     it('renders topic cards for each eligible topic', () => {
-      const { getByTestId } = render(<AssessmentPickerScreen />);
+      const { getByTestId } = renderAssessmentPickerScreen();
       getByTestId('assessment-topic-topic-1');
       getByTestId('assessment-topic-topic-2');
     });
 
     it('navigates to assessment screen with correct params when topic pressed', () => {
-      const { getByTestId } = render(<AssessmentPickerScreen />);
+      const { getByTestId } = renderAssessmentPickerScreen();
       fireEvent.press(getByTestId('assessment-topic-topic-1'));
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({

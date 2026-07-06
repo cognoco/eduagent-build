@@ -1,6 +1,19 @@
 import React from 'react';
-import { render, fireEvent, act } from '@testing-library/react-native';
-import { ConsentRequiredError, QuotaExceededError } from '@eduagent/schemas';
+import {
+  render as rtlRender,
+  fireEvent,
+  act,
+} from '@testing-library/react-native';
+import {
+  ConsentRequiredError,
+  QuotaExceededError,
+  type AssessmentEvaluation,
+  type AssessmentStatus,
+} from '@eduagent/schemas';
+import {
+  createScreenWrapper,
+  createTestProfile,
+} from '../../../../test-utils/screen-render';
 
 // ---------------------------------------------------------------------------
 // Assessment start failure tests
@@ -15,6 +28,10 @@ const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
 
 jest.mock('expo-router', () => ({
+  Redirect: ({ href }: { href: string }) => {
+    const { Text } = require('react-native');
+    return <Text testID="redirect">{href}</Text>;
+  },
   useRouter: () => ({
     push: mockPush,
     replace: mockReplace,
@@ -258,6 +275,20 @@ jest.mock(
 
 const AssessmentScreen = require('./index').default as React.ComponentType;
 
+function renderAssessmentScreen() {
+  const owner = createTestProfile({
+    id: 'owner-profile',
+    isOwner: true,
+    birthYear: 1980,
+  });
+  const { wrapper } = createScreenWrapper({
+    activeProfile: owner,
+    profiles: [owner],
+  });
+
+  return rtlRender(<AssessmentScreen />, { wrapper });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -280,22 +311,49 @@ describe('AssessmentScreen — start failures and error states', () => {
     };
   });
 
+  describe('entry guard', () => {
+    it('redirects home when opened directly in parent-proxy mode', () => {
+      const parent = createTestProfile({
+        id: 'parent-profile',
+        isOwner: true,
+        birthYear: 1980,
+      });
+      const child = createTestProfile({
+        id: 'child-profile',
+        isOwner: false,
+        birthYear: 2014,
+      });
+      const { wrapper } = createScreenWrapper({
+        activeProfile: child,
+        profiles: [parent, child],
+        isExplicitProxyMode: true,
+      });
+
+      const { getByTestId, queryByTestId } = rtlRender(<AssessmentScreen />, {
+        wrapper,
+      });
+
+      expect(getByTestId('redirect').props.children).toBe('/(app)/home');
+      expect(queryByTestId('chat-shell')).toBeNull();
+    });
+  });
+
   describe('missing params guard', () => {
     it('renders missing-params fallback when subjectId is absent', () => {
       mockSearchParams = { topicId: 'topic-1' };
-      const { getByTestId } = render(<AssessmentScreen />);
+      const { getByTestId } = renderAssessmentScreen();
       getByTestId('assessment-go-back');
     });
 
     it('renders missing-params fallback when topicId is absent', () => {
       mockSearchParams = { subjectId: 'subject-1' };
-      const { getByTestId } = render(<AssessmentScreen />);
+      const { getByTestId } = renderAssessmentScreen();
       getByTestId('assessment-go-back');
     });
 
     it('go-back button calls goBackOrReplace to home', () => {
       mockSearchParams = {};
-      const { getByTestId } = render(<AssessmentScreen />);
+      const { getByTestId } = renderAssessmentScreen();
       fireEvent.press(getByTestId('assessment-go-back'));
       expect(mockGoBackOrReplace).toHaveBeenCalledWith(
         expect.anything(),
@@ -313,7 +371,7 @@ describe('AssessmentScreen — start failures and error states', () => {
         new Error('Network timeout'),
       );
 
-      const { getByTestId } = render(<AssessmentScreen />);
+      const { getByTestId } = renderAssessmentScreen();
       getByTestId('chat-shell');
 
       fireEvent.changeText(getByTestId('chat-input'), 'Hola');
@@ -346,7 +404,7 @@ describe('AssessmentScreen — start failures and error states', () => {
           status: 'in_progress',
         });
 
-      const { getByTestId } = render(<AssessmentScreen />);
+      const { getByTestId } = renderAssessmentScreen();
       fireEvent.changeText(getByTestId('chat-input'), 'Buenos días');
       await act(async () => {
         fireEvent.press(getByTestId('chat-send'));
@@ -376,7 +434,7 @@ describe('AssessmentScreen — start failures and error states', () => {
         new Error('Server error'),
       );
 
-      const { getByTestId } = render(<AssessmentScreen />);
+      const { getByTestId } = renderAssessmentScreen();
       fireEvent.changeText(getByTestId('chat-input'), 'Hola');
       await act(async () => {
         fireEvent.press(getByTestId('chat-send'));
@@ -398,7 +456,7 @@ describe('AssessmentScreen — start failures and error states', () => {
         new Error('Quota exhausted'),
       );
 
-      const { getByTestId } = render(<AssessmentScreen />);
+      const { getByTestId } = renderAssessmentScreen();
       fireEvent.changeText(getByTestId('chat-input'), 'I am ready');
       await act(async () => {
         fireEvent.press(getByTestId('chat-send'));
@@ -433,7 +491,7 @@ describe('AssessmentScreen — start failures and error states', () => {
         }),
       );
 
-      const { getByTestId, queryByTestId } = render(<AssessmentScreen />);
+      const { getByTestId, queryByTestId } = renderAssessmentScreen();
       fireEvent.changeText(getByTestId('chat-input'), 'I am ready');
       await act(async () => {
         fireEvent.press(getByTestId('chat-send'));
@@ -455,7 +513,7 @@ describe('AssessmentScreen — start failures and error states', () => {
         ),
       );
 
-      const { getByTestId, queryByTestId } = render(<AssessmentScreen />);
+      const { getByTestId, queryByTestId } = renderAssessmentScreen();
       fireEvent.changeText(getByTestId('chat-input'), 'I am ready');
       await act(async () => {
         fireEvent.press(getByTestId('chat-send'));
@@ -465,6 +523,138 @@ describe('AssessmentScreen — start failures and error states', () => {
 
       expect(queryByTestId('assessment-error-retry')).toBeNull();
       fireEvent.press(getByTestId('assessment-error-back'));
+
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/practice',
+      );
+    });
+  });
+
+  describe('terminal result UI', () => {
+    function terminalResponse(
+      status: AssessmentStatus,
+      overrides: Partial<AssessmentEvaluation> = {},
+    ) {
+      return {
+        evaluation: {
+          feedback: 'That is enough to finish this check.',
+          passed: status === 'passed',
+          shouldEscalateDepth: false,
+          masteryScore:
+            status === 'passed' ? 0.92 : status === 'borderline' ? 0.68 : 0.42,
+          qualityRating: status === 'failed_exhausted' ? 0 : 4,
+          weakAreas:
+            status === 'borderline'
+              ? ['Use greetings in context', 'Pick the right register']
+              : [],
+          ...overrides,
+        },
+        status,
+      };
+    }
+
+    async function submitTerminalAnswer(status: AssessmentStatus) {
+      mockCreateAssessmentMutateAsync.mockResolvedValueOnce({
+        assessment: { id: 'assessment-new-1' },
+      });
+      mockSubmitAnswerMutateAsync.mockResolvedValueOnce(
+        terminalResponse(status),
+      );
+
+      const view = renderAssessmentScreen();
+      fireEvent.changeText(view.getByTestId('chat-input'), 'Hola means hello');
+      await act(async () => {
+        fireEvent.press(view.getByTestId('chat-send'));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      return view;
+    }
+
+    it('renders passed result summary, done CTA, and celebration', async () => {
+      const { getByTestId, queryByTestId } =
+        await submitTerminalAnswer('passed');
+
+      getByTestId('assessment-result-card');
+      getByTestId('assessment-done');
+      getByTestId('assessment-pass-celebration');
+      getByTestId('assessment-quality-rating');
+      expect(queryByTestId('assessment-gap-fill')).toBeNull();
+
+      fireEvent.press(getByTestId('assessment-done'));
+
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/practice',
+      );
+    });
+
+    it('renders borderline gap-fill and decline-refresh actions', async () => {
+      mockDeclineRefreshMutateAsync.mockResolvedValueOnce({ ok: true });
+
+      const { getByTestId, queryByTestId } =
+        await submitTerminalAnswer('borderline');
+
+      getByTestId('assessment-result-card');
+      getByTestId('assessment-gap-fill');
+      getByTestId('assessment-decline-refresh');
+      getByTestId('assessment-quality-rating');
+      expect(queryByTestId('assessment-pass-celebration')).toBeNull();
+
+      fireEvent.press(getByTestId('assessment-gap-fill'));
+
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/session',
+          params: expect.objectContaining({
+            subjectId: 'subject-1',
+            topicId: 'topic-1',
+            mode: 'gap_fill',
+            gaps: JSON.stringify([
+              'Use greetings in context',
+              'Pick the right register',
+            ]),
+          }),
+        }),
+      );
+
+      await act(async () => {
+        fireEvent.press(getByTestId('assessment-decline-refresh'));
+        await Promise.resolve();
+      });
+
+      expect(mockDeclineRefreshMutateAsync).toHaveBeenCalledTimes(1);
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/practice',
+      );
+    });
+
+    it('renders failed_exhausted learning-session and not-now actions without celebration', async () => {
+      const { getByTestId, queryByTestId } =
+        await submitTerminalAnswer('failed_exhausted');
+
+      getByTestId('assessment-result-card');
+      getByTestId('assessment-start-session');
+      getByTestId('assessment-not-now');
+      expect(queryByTestId('assessment-quality-rating')).toBeNull();
+      expect(queryByTestId('assessment-pass-celebration')).toBeNull();
+
+      fireEvent.press(getByTestId('assessment-start-session'));
+
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/session',
+          params: {
+            subjectId: 'subject-1',
+            topicId: 'topic-1',
+            mode: 'learning',
+          },
+        }),
+      );
+
+      fireEvent.press(getByTestId('assessment-not-now'));
 
       expect(mockGoBackOrReplace).toHaveBeenCalledWith(
         expect.anything(),
