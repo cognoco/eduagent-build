@@ -1,0 +1,59 @@
+# Flow: Child In-Chat Quota Exceeded - verify child-safe 402 actions
+# Validates: a non-owner child profile that exhausts its per-profile v2 quota
+# gets the structured in-chat quota card with notify-parent/home actions and no
+# owner upgrade/top-up action. Device execution is intentionally deferred to the
+# e2e lane; keep this tagged verify-at-e2e-run until run on a configured device.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - billing
+  - quota
+  - child
+  - verify-at-e2e-run
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'child-quota-exceeded'
+      API_URL: ${API_URL}
+
+- tapOn:
+    text: "Let's Go"
+    optional: true # justified: PostApprovalLanding appears only after SecureStore wipe for consented children
+
+- extendedWaitUntil:
+    visible:
+      id: 'learner-screen'
+    timeout: 30000
+
+- tapOn:
+    id: 'home-coach-band-continue'
+    optional: true # justified: active session intent card is the preferred path, subject fallback below covers render timing
+
+- tapOn:
+    text: 'Mathematics'
+    optional: true # justified: fallback when the active-session card is not present
+
+- extendedWaitUntil:
+    visible:
+      id: 'chat-input'
+    timeout: 15000
+
+- tapOn:
+    id: 'chat-input'
+- inputText: 'Can you explain equations?'
+- pressKey: Enter
+
+- extendedWaitUntil:
+    visible:
+      id: 'quota-exceeded-card'
+    timeout: 30000
+
+- assertVisible:
+    id: 'quota-notify-parent-btn'
+- assertVisible:
+    id: 'quota-go-home-btn'
+- assertNotVisible:
+    id: 'quota-upgrade-btn'
+
+- takeScreenshot: child-quota-exceeded-chat

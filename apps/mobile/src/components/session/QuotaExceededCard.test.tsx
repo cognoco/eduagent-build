@@ -80,6 +80,20 @@ describe('QuotaExceededCard', () => {
     expect(screen.queryByTestId('quota-upgrade-btn')).toBeNull();
   });
 
+  it('child view: hides owner top-up actions even when details include credits', () => {
+    render(
+      <QuotaExceededCard
+        details={{ ...ownerDetails, topUpCreditsRemaining: 500 }}
+        isOwner={false}
+      />,
+    );
+
+    screen.getByTestId('quota-notify-parent-btn');
+    screen.getByTestId('quota-go-home-btn');
+    expect(screen.queryByTestId('quota-upgrade-btn')).toBeNull();
+    expect(screen.queryByTestId('quota-topup-btn')).toBeNull();
+  });
+
   it('daily limit variant: shows daily message', () => {
     const dailyDetails = { ...ownerDetails, reason: 'daily' as const };
     render(<QuotaExceededCard details={dailyDetails} isOwner={true} />);

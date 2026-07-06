@@ -248,14 +248,25 @@ const ACTIVE_PROFILE = createTestProfile({
   consentStatus: null,
 });
 
+const CHILD_PROFILE = createTestProfile({
+  id: 'profile-child-1',
+  accountId: 'test-account-id',
+  displayName: 'Child Learner',
+  isOwner: false,
+  hasPremiumLlm: false,
+  conversationLanguage: 'en',
+  pronouns: null,
+  consentStatus: null,
+});
+
 let activeRender: RenderScreenResult | null = null;
 
-function renderSessionScreen() {
+function renderSessionScreen(profile = ACTIVE_PROFILE) {
   // installGlobalFetch:false — the routed fetch is wired into lib/api-client's
   // useApiClient above; we still install it globally for raw-fetch callers, so
   // pass the same instance via routedFetch and let the harness install it.
   activeRender = renderScreen(<SessionScreen />, {
-    profile: ACTIVE_PROFILE,
+    profile,
     routedFetch: mockFetch,
   });
   return activeRender.result;
@@ -2473,5 +2484,42 @@ describe('voice mode persistence', () => {
       testScreen.getByTestId('quota-exceeded-card');
       testScreen.getByTestId('input-disabled-banner');
     });
+  });
+
+  it('renders child quota actions and disables input when sessionIsOwner is false', async () => {
+    const { QuotaExceededError } = require('../../../lib/api-client');
+    const details = {
+      tier: 'plus' as const,
+      effectiveAccessTier: 'plus' as const,
+      quotaModel: 'per-profile' as const,
+      profileRole: 'child' as const,
+      reason: 'monthly' as const,
+      monthlyLimit: 100,
+      usedThisMonth: 100,
+      dailyLimit: 10,
+      usedToday: 1,
+      topUpCreditsRemaining: 500,
+      upgradeOptions: [],
+    };
+    mockStream.mockRejectedValueOnce(
+      new QuotaExceededError('Quota exceeded', details),
+    );
+
+    const testScreen = renderSessionScreen(CHILD_PROFILE);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+
+    await waitFor(() => {
+      testScreen.getByTestId('quota-exceeded-card');
+      testScreen.getByTestId('input-disabled-banner');
+      testScreen.getByTestId('quota-notify-parent-btn');
+      testScreen.getByTestId('quota-go-home-btn');
+    });
+    expect(testScreen.queryByText('Upgrade plan')).toBeNull();
   });
 });

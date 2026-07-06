@@ -122,6 +122,7 @@ describe('VALID_SCENARIOS', () => {
       'consent-pending',
       'parent-multi-child',
       'daily-limit-reached',
+      'child-quota-exceeded',
       'language-learner',
       'language-subject-active',
       'parent-with-reports',
