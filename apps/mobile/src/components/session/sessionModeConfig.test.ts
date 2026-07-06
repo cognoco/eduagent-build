@@ -8,7 +8,7 @@ import {
 } from './sessionModeConfig';
 
 describe('getOpeningMessage', () => {
-  const modes = ['homework', 'learning', 'review', 'freeform'];
+  const modes = ['homework', 'learning', 'review', 'recitation', 'freeform'];
 
   it('uses recap-specific opening copy for relearn sessions', () => {
     const msg = getOpeningMessage(
@@ -137,6 +137,43 @@ describe('getOpeningMessage', () => {
       expect(config).not.toBe(getModeConfig('freeform'));
       expect(config.title).toBe('Gap Check');
       expect(config.subtitle).toBe('Close the gaps from your assessment');
+    });
+  });
+
+  describe('recitation mode chrome', () => {
+    it('uses dedicated config instead of freeform or review fallback', () => {
+      const config = getModeConfig('recitation');
+
+      expect(config).not.toBe(getModeConfig('freeform'));
+      expect(config).not.toBe(getModeConfig('review'));
+      expect(config).toMatchObject({
+        title: 'Recitation (Beta)',
+        subtitle: 'Recite from memory',
+        placeholder: 'Say or type the title...',
+        showTimer: false,
+        showQuestionCount: false,
+      });
+    });
+
+    it('uses recitation opening copy across cold-start tiers', () => {
+      expect(getOpeningMessage('recitation', 0)).toBe(
+        "Hi! I'll listen while you recite something from memory — a poem, song lyrics, anything. What would you like to recite?",
+      );
+      expect(getOpeningMessage('recitation', 1)).toBe(
+        'Ready for another recitation? What would you like to recite today?',
+      );
+      expect(getOpeningMessage('recitation', 3)).toBe(
+        'What are we reciting today?',
+      );
+      expect(getOpeningMessage('recitation', 5)).toBe(
+        SESSION_MODE_CONFIGS.recitation.openingMessage,
+      );
+      expect(getOpeningMessage('recitation', 5)).not.toBe(
+        SESSION_MODE_CONFIGS.freeform.openingMessage,
+      );
+      expect(getOpeningMessage('recitation', 5)).not.toBe(
+        SESSION_MODE_CONFIGS.review.openingMessage,
+      );
     });
   });
 
