@@ -46,6 +46,7 @@ import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
 import { platformAlert } from '../lib/platform-alert';
 import { errorHasCode } from '../components/session/session-types';
+import { requestMentorBornCeremony } from '../lib/mentor-born-ceremony';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -409,6 +410,9 @@ export default function CreateProfileScreen() {
       // (profiles.length > 0 && activeProfile === null stays true until the
       // switch completes).
       if (!needsConsentFlow && wantsFamily) {
+        if (isFirstProfileCreation) {
+          requestMentorBornCeremony('first-profile-created');
+        }
         // Parent's own profile is created — take them straight to the
         // add-a-child screen (skippable via its Cancel) instead of the learner
         // home. Navigate FIRST (same remount-ordering reason as below), then
@@ -418,6 +422,9 @@ export default function CreateProfileScreen() {
           params: { for: 'child' },
         });
       } else if (!needsConsentFlow) {
+        if (isFirstProfileCreation) {
+          requestMentorBornCeremony('first-profile-created');
+        }
         handleClose();
       }
 
@@ -484,6 +491,7 @@ export default function CreateProfileScreen() {
     displayName,
     birthDate,
     isParentAddingChild,
+    isFirstProfileCreation,
     // i18n Phase 1 — onSubmit branches on isAddingChild and reads i18n.language
     // to build the create-profile payload. Without these in deps, a route or
     // language change between mount and submit would send the stale value.

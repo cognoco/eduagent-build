@@ -9,6 +9,10 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
+import {
+  __resetMentorBornCeremonyForTests,
+  getMentorBornCeremonySnapshot,
+} from '../lib/mentor-born-ceremony';
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
@@ -169,6 +173,7 @@ describe('CreateProfileScreen', () => {
       isLoaded: true,
       isSignedIn: true,
     });
+    __resetMentorBornCeremonyForTests();
   });
 
   afterEach(() => {
@@ -406,6 +411,10 @@ describe('CreateProfileScreen', () => {
 
     await waitFor(() => {
       expect(mockBack).toHaveBeenCalled();
+    });
+    expect(getMentorBornCeremonySnapshot()).toMatchObject({
+      activeRequest: { reason: 'first-profile-created' },
+      requestCount: 1,
     });
   });
 
@@ -1312,6 +1321,7 @@ describe('CreateProfileScreen', () => {
       expect(mockSwitchProfile).not.toHaveBeenCalled();
       // Navigation back (handleClose) should fire
       expect(mockBack).toHaveBeenCalled();
+      expect(getMentorBornCeremonySnapshot().requestCount).toBe(0);
     });
 
     it('navigates home when parent adds child and no back history', async () => {
@@ -1639,6 +1649,10 @@ describe('CreateProfileScreen', () => {
         });
       });
       expect(mockSwitchProfile).toHaveBeenCalledWith('adult-id');
+      expect(getMentorBornCeremonySnapshot()).toMatchObject({
+        activeRequest: { reason: 'first-profile-created' },
+        requestCount: 1,
+      });
     });
 
     it('learner audience (adult): no PATCH, no add-child redirect, returns to home', async () => {
@@ -1665,6 +1679,10 @@ describe('CreateProfileScreen', () => {
       expect(mockReplace).not.toHaveBeenCalledWith({
         pathname: '/create-profile',
         params: { for: 'child' },
+      });
+      expect(getMentorBornCeremonySnapshot()).toMatchObject({
+        activeRequest: { reason: 'first-profile-created' },
+        requestCount: 1,
       });
     });
 
