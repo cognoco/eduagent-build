@@ -12,6 +12,10 @@ import { Comet, OrionsBelt, PolarStar, TwinStars } from '../components/common';
 import { resolveCelebrationLevelForAccommodation } from '../lib/celebration-level';
 
 type QueueEntry = PendingCelebration;
+type ProfileBatchState = {
+  batchId: string | null;
+  shown: number;
+};
 
 const CELEBRATION_REGISTRY: Record<
   CelebrationName,
@@ -78,6 +82,7 @@ function getQueueEntryKey(entry: QueueEntry): string {
 
 export function useCelebration(options?: {
   queue?: QueueEntry[];
+  profileId?: string | null;
   celebrationLevel?: CelebrationLevel;
   accommodationMode?: AccommodationMode;
   audience?: 'child' | 'adult';
@@ -90,9 +95,11 @@ export function useCelebration(options?: {
   const audience = options?.audience ?? 'child';
   const [activeEntry, setActiveEntry] = useState<QueueEntry | null>(null);
   const [pendingQueue, setPendingQueue] = useState<QueueEntry[]>([]);
-  const seenQueueKeysRef = useRef<Set<string>>(new Set());
-  const shownFromCurrentBatchRef = useRef(0);
-  const lastBatchIdRef = useRef<string | null>(null);
+  const seenQueueKeysByProfileRef = useRef<Map<string, Set<string>>>(new Map());
+  const batchStateByProfileRef = useRef<Map<string, ProfileBatchState>>(
+    new Map(),
+  );
+  const profileKey = options?.profileId ?? '__default__';
 
   // Keep a ref to the latest options so callbacks (e.g. onAllComplete) are
   // always current without re-creating flushNext on every render.
@@ -114,6 +121,16 @@ export function useCelebration(options?: {
 
   useEffect(() => {
     if (!options?.queue || options.queue.length === 0) return;
+    let seenQueueKeys = seenQueueKeysByProfileRef.current.get(profileKey);
+    if (!seenQueueKeys) {
+      seenQueueKeys = new Set();
+      seenQueueKeysByProfileRef.current.set(profileKey, seenQueueKeys);
+    }
+    let batchState = batchStateByProfileRef.current.get(profileKey);
+    if (!batchState) {
+      batchState = { batchId: null, shown: 0 };
+      batchStateByProfileRef.current.set(profileKey, batchState);
+    }
 
     // Batch identity: the max queuedAt across all entries. A fresh session
     // completion produces newer timestamps than the previous batch.
@@ -124,38 +141,37 @@ export function useCelebration(options?: {
         .slice(-1)[0] ?? null;
 
     // New batch — reset the per-batch cap counter
-    if (batchId !== lastBatchIdRef.current) {
-      shownFromCurrentBatchRef.current = 0;
-      lastBatchIdRef.current = batchId;
+    if (batchId !== batchState.batchId) {
+      batchState.shown = 0;
+      batchState.batchId = batchId;
     }
 
     const unseen = options.queue
       .map((entry) => ({ entry, key: getQueueEntryKey(entry) }))
       .filter(
         ({ entry, key }) =>
-          !seenQueueKeysRef.current.has(key) &&
-          filterByLevel(entry, celebrationLevel),
+          !seenQueueKeys.has(key) && filterByLevel(entry, celebrationLevel),
       );
 
     if (unseen.length === 0) return;
 
     // Throttle: at most 2 celebrations per batch
     const MAX_TOASTS_PER_BATCH = 2;
-    const remaining = MAX_TOASTS_PER_BATCH - shownFromCurrentBatchRef.current;
+    const remaining = MAX_TOASTS_PER_BATCH - batchState.shown;
     const toShow = unseen.slice(0, Math.max(0, remaining));
 
     if (toShow.length === 0) return;
 
-    shownFromCurrentBatchRef.current += toShow.length;
+    batchState.shown += toShow.length;
     for (const { key } of toShow) {
-      seenQueueKeysRef.current.add(key);
+      seenQueueKeys.add(key);
     }
 
     setPendingQueue((current) => [
       ...current,
       ...toShow.map(({ entry }) => entry),
     ]);
-  }, [celebrationLevel, options?.queue]);
+  }, [celebrationLevel, options?.queue, profileKey]);
 
   useEffect(() => {
     if (!activeEntry && pendingQueue.length > 0) {
