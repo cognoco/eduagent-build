@@ -212,6 +212,8 @@ let mockSessionSummaryData: {
   content: string;
   aiFeedback: string | null;
   status: 'pending' | 'submitted' | 'accepted' | 'skipped' | 'auto_closed';
+  baseXp?: number | null;
+  reflectionBonusXp?: number | null;
   purgedAt?: string | null;
 } | null = null;
 
@@ -771,6 +773,34 @@ describe('SessionSummaryScreen', () => {
     });
   });
 
+  it('shows submitted reflection bonus XP when the summary mutation returns it', async () => {
+    mockSubmitResult = {
+      summary: {
+        id: '880e8400-e29b-41d4-a716-446655440001',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'I learned about quadratic equations and how to solve them',
+        aiFeedback: 'Good summary.',
+        status: 'accepted',
+        baseXp: 12,
+        reflectionBonusXp: 6,
+      },
+    };
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('summary-input'),
+      'I learned about quadratic equations and how to solve them',
+    );
+    await pressAsync(screen.getByTestId('submit-summary-button'));
+
+    await waitFor(() => {
+      screen.getByTestId('summary-submitted');
+      screen.getByTestId('xp-bonus-earned');
+      screen.getByText('+6 bonus XP earned!');
+    });
+  });
+
   it('shows Continue button after submission', async () => {
     mockSubmitResult = {
       summary: {
@@ -1259,6 +1289,28 @@ describe('SessionSummaryScreen', () => {
       expect(screen.queryByTestId('summary-prompt-chips')).toBeNull();
       expect(screen.queryByTestId('submit-summary-button')).toBeNull();
       expect(screen.queryByTestId('skip-summary-button')).toBeNull();
+    });
+
+    it('renders persisted reflection bonus XP when a submitted summary already has it', async () => {
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440006',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content:
+          'I learned that quadratic equations can have two possible answers.',
+        aiFeedback: 'Good reflection.',
+        status: 'submitted',
+        baseXp: 12,
+        reflectionBonusXp: 6,
+      };
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('summary-submitted');
+        screen.getByTestId('xp-bonus-earned');
+        screen.getByText('+6 bonus XP earned!');
+      });
+      expect(screen.queryByTestId('summary-input')).toBeNull();
     });
 
     it('renders saved content when status is accepted (post-pipeline)', async () => {
