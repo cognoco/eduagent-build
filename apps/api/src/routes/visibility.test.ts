@@ -1,28 +1,34 @@
-jest.mock(
-  '../services/linking-ceremony' /* gc1-allow: route-boundary unit test - service internals have direct service/integration coverage; this file verifies zValidator/context gates stop before delegation */,
-  () => ({
-    initiateLink: jest.fn(),
-    acceptLink: jest.fn(),
-    findAcceptedContractForSupportee: jest.fn(),
-    getContractForVisibleLink: jest.fn(),
-    writeVisibilityAuditEvent: jest.fn(),
-  }),
-);
+jest.mock('../services/linking-ceremony', () => ({
+  ...jest.requireActual<typeof import('../services/linking-ceremony')>(
+    '../services/linking-ceremony',
+  ),
+  initiateLink: jest.fn(),
+  acceptLink: jest.fn(),
+  findAcceptedContractForSupportee: jest.fn(),
+  getContractForVisibleLink: jest.fn(),
+  writeVisibilityAuditEvent: jest.fn(),
+}));
 
-jest.mock(
-  '../services/supportership-revocation' /* gc1-allow: route-boundary unit test - service internals have direct service/integration coverage; this file verifies param/context gates stop before delegation */,
-  () => ({ requestSelfUnlink: jest.fn() }),
-);
+jest.mock('../services/supportership-revocation', () => ({
+  ...jest.requireActual<typeof import('../services/supportership-revocation')>(
+    '../services/supportership-revocation',
+  ),
+  requestSelfUnlink: jest.fn(),
+}));
 
-jest.mock(
-  '../services/supporter-report' /* gc1-allow: route-boundary unit test - service internals have direct service coverage; this file verifies report route validation gates stop before delegation */,
-  () => ({ buildAttentionReport: jest.fn() }),
-);
+jest.mock('../services/supporter-report', () => ({
+  ...jest.requireActual<typeof import('../services/supporter-report')>(
+    '../services/supporter-report',
+  ),
+  buildAttentionReport: jest.fn(),
+}));
 
-jest.mock(
-  '../services/shared-record-read-model' /* gc1-allow: route-boundary unit test - service internals have direct service coverage; this file verifies shared-record route validation gates stop before delegation */,
-  () => ({ readSharedRecordForSupportee: jest.fn() }),
-);
+jest.mock('../services/shared-record-read-model', () => ({
+  ...jest.requireActual<typeof import('../services/shared-record-read-model')>(
+    '../services/shared-record-read-model',
+  ),
+  readSharedRecordForSupportee: jest.fn(),
+}));
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
