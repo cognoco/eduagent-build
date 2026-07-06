@@ -799,6 +799,48 @@ describe('sessionCompleted', () => {
     expect(opts.idempotency).toBe('event.data.sessionId');
   });
 
+  it('[BUG-154] duplicate delivery for the same session keeps single-fire side effects single-fire', async () => {
+    mockRecordSessionActivity.mockResolvedValue({
+      currentStreak: 7,
+      longestStreak: 7,
+    });
+    const memoizedStepResults = new Map<string, unknown>();
+    const mockStep = {
+      run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
+        if (memoizedStepResults.has(name)) {
+          return memoizedStepResults.get(name);
+        }
+        const result = await fn();
+        memoizedStepResults.set(name, result);
+        return result;
+      }),
+      sendEvent: jest.fn().mockResolvedValue(undefined),
+      sleep: jest.fn(),
+      waitForEvent: jest.fn().mockResolvedValue(null),
+    };
+    const event = {
+      data: createEventData({ qualityRating: 4 }),
+      name: 'app/session.completed',
+    };
+    const handler = (sessionCompleted as any).fn;
+
+    await handler({ event, step: mockStep });
+    await handler({ event, step: mockStep });
+
+    expect(mockCreatePendingSessionSummary).toHaveBeenCalledTimes(1);
+    expect(mockPrecomputeCoachingCard).toHaveBeenCalledTimes(1);
+    expect(mockWriteCoachingCardCache).toHaveBeenCalledTimes(1);
+    expect(mockRecordSessionActivity).toHaveBeenCalledTimes(1);
+    expect(mockInsertSessionXpEntry).toHaveBeenCalledTimes(1);
+    expect(mockQueueCelebration).toHaveBeenCalledTimes(1);
+    expect(mockQueueCelebration).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      'comet',
+      'streak_7',
+    );
+  });
+
   it('does not wait for filing when the session was auto-closed', async () => {
     const { mockStep } = (await executeSteps(
       createEventData({ topicId: null, summaryStatus: 'auto_closed' }),
