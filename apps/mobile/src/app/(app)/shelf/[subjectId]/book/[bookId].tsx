@@ -258,6 +258,7 @@ export default function BookScreen() {
   });
   const { activeProfile } = useProfile();
   const activeProfileRole = useActiveProfileRole();
+  const canWrite = activeProfileRole !== 'impersonated-child';
   const proxyChildProfileId =
     activeProfileRole === 'impersonated-child' ? activeProfile?.id : undefined;
   const { t, i18n } = useTranslation();
@@ -332,7 +333,7 @@ export default function BookScreen() {
 
   const deleteBookWithConfirmation = useCallback(
     async (confirmStartedTopics: boolean) => {
-      if (!subjectId || !bookId) return;
+      if (!canWrite || !subjectId || !bookId) return;
       try {
         await deleteBookMutation.mutateAsync({ confirmStartedTopics });
         handleBookDeleted();
@@ -366,11 +367,11 @@ export default function BookScreen() {
         );
       }
     },
-    [bookId, deleteBookMutation, handleBookDeleted, subjectId, t],
+    [bookId, canWrite, deleteBookMutation, handleBookDeleted, subjectId, t],
   );
 
   const handleDeleteBookPress = useCallback(() => {
-    if (!subjectId || !bookId || deleteBookMutation.isPending) {
+    if (!canWrite || !subjectId || !bookId || deleteBookMutation.isPending) {
       return;
     }
     platformAlert(
@@ -390,6 +391,7 @@ export default function BookScreen() {
     );
   }, [
     bookId,
+    canWrite,
     deleteBookMutation.isPending,
     deleteBookWithConfirmation,
     subjectId,
@@ -1210,14 +1212,19 @@ export default function BookScreen() {
 
   // --- Note handlers ---
   const handleNoteAddPress = useCallback(() => {
+    if (!canWrite) return;
     setShowTopicPicker(true);
-  }, []);
+  }, [canWrite]);
 
-  const handleTopicPickerSelect = useCallback((topicId: string) => {
-    setSelectedTopicId(topicId);
-    setShowTopicPicker(false);
-    setShowNoteInput(true);
-  }, []);
+  const handleTopicPickerSelect = useCallback(
+    (topicId: string) => {
+      if (!canWrite) return;
+      setSelectedTopicId(topicId);
+      setShowTopicPicker(false);
+      setShowNoteInput(true);
+    },
+    [canWrite],
+  );
 
   const handleTopicPickerClose = useCallback(() => {
     setShowTopicPicker(false);
@@ -1225,7 +1232,7 @@ export default function BookScreen() {
 
   const handleNoteSave = useCallback(
     (content: string) => {
-      if (!selectedTopicId) return;
+      if (!canWrite || !selectedTopicId) return;
       createNote.mutate(
         { topicId: selectedTopicId, content },
         {
@@ -1242,7 +1249,7 @@ export default function BookScreen() {
         },
       );
     },
-    [selectedTopicId, createNote, t],
+    [canWrite, selectedTopicId, createNote, t],
   );
 
   const handleNoteInputCancel = useCallback(() => {
@@ -1252,7 +1259,7 @@ export default function BookScreen() {
 
   const handleNoteEditSave = useCallback(
     (content: string) => {
-      if (!editingNote) return;
+      if (!canWrite || !editingNote) return;
       updateNote.mutate(
         { noteId: editingNote.noteId, content },
         {
@@ -1266,7 +1273,7 @@ export default function BookScreen() {
         },
       );
     },
-    [editingNote, updateNote, t],
+    [canWrite, editingNote, updateNote, t],
   );
 
   const handleNoteEditCancel = useCallback(() => {
@@ -1281,6 +1288,7 @@ export default function BookScreen() {
 
   const handleNoteLongPress = useCallback(
     (noteId: string) => {
+      if (!canWrite) return;
       const note = notes.find((n) => n.id === noteId);
       if (!note) return;
       showNoteContextMenu({
@@ -1301,7 +1309,7 @@ export default function BookScreen() {
         },
       });
     },
-    [notes, deleteNoteById, t],
+    [canWrite, notes, deleteNoteById, t],
   );
 
   // --- Screen states ---
@@ -1568,25 +1576,27 @@ export default function BookScreen() {
             <Ionicons name="arrow-back" size={24} color={themeColors.accent} />
           </Pressable>
           <View className="flex-1" />
-          <Pressable
-            onPress={handleDeleteBookPress}
-            disabled={deleteBookMutation.isPending}
-            className="p-2 me-1"
-            accessibilityRole="button"
-            accessibilityLabel={t('library.book.a11yDeleteBook')}
-            accessibilityState={{ disabled: deleteBookMutation.isPending }}
-            testID="book-delete-button"
-          >
-            <Ionicons
-              name="trash-outline"
-              size={22}
-              color={
-                deleteBookMutation.isPending
-                  ? withOpacity(themeColors.danger, 0.45)
-                  : themeColors.danger
-              }
-            />
-          </Pressable>
+          {canWrite ? (
+            <Pressable
+              onPress={handleDeleteBookPress}
+              disabled={deleteBookMutation.isPending}
+              className="p-2 me-1"
+              accessibilityRole="button"
+              accessibilityLabel={t('library.book.a11yDeleteBook')}
+              accessibilityState={{ disabled: deleteBookMutation.isPending }}
+              testID="book-delete-button"
+            >
+              <Ionicons
+                name="trash-outline"
+                size={22}
+                color={
+                  deleteBookMutation.isPending
+                    ? withOpacity(themeColors.danger, 0.45)
+                    : themeColors.danger
+                }
+              />
+            </Pressable>
+          ) : null}
           <Pressable
             onPress={handleSubjectBookmarksPress}
             className="p-2 -me-2"
@@ -1715,7 +1725,7 @@ export default function BookScreen() {
                 </ShimmerSkeleton>
               ) : sortedNotes.length > 0 ? (
                 sortedNotes.map((note) => {
-                  if (editingNote?.noteId === note.id) {
+                  if (canWrite && editingNote?.noteId === note.id) {
                     return (
                       <View key={note.id} className="px-5 mb-2">
                         <NoteInput
@@ -1742,7 +1752,7 @@ export default function BookScreen() {
                       conceptSignal={
                         conceptSignalsQuery.data?.signals?.[note.topicId]
                       }
-                      onLongPress={handleNoteLongPress}
+                      onLongPress={canWrite ? handleNoteLongPress : undefined}
                       onSourcePress={
                         sourceSessionId
                           ? () =>
@@ -1764,7 +1774,7 @@ export default function BookScreen() {
                   {t('library.book.noNotesYet')}
                 </Text>
               )}
-              {showNoteInput && (
+              {canWrite && showNoteInput && (
                 <View className="px-5 mb-2" testID="book-note-input-container">
                   <NoteInput
                     saving={createNote.isPending}
@@ -1773,23 +1783,25 @@ export default function BookScreen() {
                   />
                 </View>
               )}
-              <Pressable
-                onPress={handleNoteAddPress}
-                className="mx-5 mt-1 flex-row items-center py-3"
-                testID="book-add-note"
-                accessibilityRole="button"
-                accessibilityLabel={
-                  sortedNotes.length === 0
-                    ? t('library.book.a11yAddFirstNote')
-                    : t('library.book.a11yAddNote')
-                }
-              >
-                <Text className="text-body-sm font-medium text-primary">
-                  {sortedNotes.length === 0
-                    ? t('library.book.addFirstNote')
-                    : t('library.book.addNote')}
-                </Text>
-              </Pressable>
+              {canWrite ? (
+                <Pressable
+                  onPress={handleNoteAddPress}
+                  className="mx-5 mt-1 flex-row items-center py-3"
+                  testID="book-add-note"
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    sortedNotes.length === 0
+                      ? t('library.book.a11yAddFirstNote')
+                      : t('library.book.a11yAddNote')
+                  }
+                >
+                  <Text className="text-body-sm font-medium text-primary">
+                    {sortedNotes.length === 0
+                      ? t('library.book.addFirstNote')
+                      : t('library.book.addNote')}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -2174,7 +2186,7 @@ export default function BookScreen() {
 
       {/* Topic picker for note add flow */}
       <TopicPickerSheet
-        visible={showTopicPicker}
+        visible={canWrite && showTopicPicker}
         topics={activeTopics.map((t) => ({
           topicId: t.id,
           name: t.title,

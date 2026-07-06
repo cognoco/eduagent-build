@@ -271,14 +271,18 @@ const profileContextValue: ProfileContextValue = {
   acknowledgeProfileRemoval: () => undefined,
 };
 
-function createWrapper() {
+function createWrapper(profileContext?: Partial<ProfileContextValue>) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
+  const value: ProfileContextValue = {
+    ...profileContextValue,
+    ...profileContext,
+  };
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <ProfileContext.Provider value={profileContextValue}>
+        <ProfileContext.Provider value={value}>
           {children}
         </ProfileContext.Provider>
       </QueryClientProvider>
@@ -771,6 +775,45 @@ describe('TopicDetailScreen rendering details', () => {
     fireEvent.press(screen.getByTestId('topic-notes-strip'));
     screen.getByText('My first note');
     screen.getByText('+ Add a note');
+  });
+
+  it('hides topic note write and delete affordances in parent-proxy view', async () => {
+    const proxyChildProfile = createTestProfile({
+      id: 'proxy-child-profile',
+      accountId: 'test-account-id',
+      displayName: 'Proxy Child',
+      isOwner: false,
+      birthYear: 2014,
+    });
+    setupRoutes({
+      notes: [
+        {
+          id: 'note-1',
+          topicId: 't1',
+          content: 'My first note',
+          sessionId: null,
+          createdAt: '2026-01-01T10:00:00.000Z',
+          updatedAt: '2026-01-01T10:00:00.000Z',
+        },
+      ],
+    });
+    const { Wrapper } = createWrapper({
+      profiles: [testProfile, proxyChildProfile],
+      activeProfile: proxyChildProfile,
+      isExplicitProxyMode: true,
+    });
+
+    render(<TopicDetailScreen />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByText('1 note saved for this topic');
+    });
+    fireEvent.press(screen.getByTestId('topic-notes-strip'));
+
+    screen.getByText('My first note');
+    expect(screen.queryByTestId('note-card-note-1-menu')).toBeNull();
+    expect(screen.queryByTestId('add-note-button')).toBeNull();
+    expect(screen.queryByText('+ Add a note')).toBeNull();
   });
 
   it('reveals saved chat bookmarks for this topic when the strip is opened', async () => {
