@@ -14,6 +14,8 @@
 |---|---|---|---|---|
 | [`dpia.md`](dpia.md) | A1 | Data Protection Impact Assessment — the master risk assessment. | DPO + counsel | **Yes** |
 | [`2026-07-06-eu-ai-act-high-risk-education-plan.md`](2026-07-06-eu-ai-act-high-risk-education-plan.md) | WI-1659 | EU AI Act education-AI classification memo and high-risk-readiness plan. | DPO + counsel | Yes for institutional/high-risk claim; no separate blocker for current B2C posture |
+| [`2026-07-06-eu-ai-act-technical-file-qms-skeleton.md`](2026-07-06-eu-ai-act-technical-file-qms-skeleton.md) | WI-1663 | EU AI Act technical-file and QMS skeleton for high-risk-readiness evidence. | DPO + counsel | Yes for high-risk claim or institutional deployment |
+| [`2026-07-06-school-institutional-ai-act-tripwire.md`](2026-07-06-school-institutional-ai-act-tripwire.md) | WI-1664 | Product/legal tripwire for school, LMS/SIS, formal assessment, proctoring, and institutional use. | DPO + counsel | Yes for institutional deployment or copy |
 | [`ropa.md`](ropa.md) | A3 | Record of Processing Activities (GDPR Art 30 register). | DPO | Yes |
 | [`breach-response-plan.md`](breach-response-plan.md) | A4 | 72-hour data-breach procedure (Datatilsynet). | DPO | Yes |
 | [`art9-special-category-decision.md`](art9-special-category-decision.md) | A23 | Decision: we do **not** process health/disability (Art 9) data. | DPO + counsel | Yes (gates DPIA weight) |

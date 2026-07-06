@@ -11,6 +11,7 @@ Status: repo-evidence draft for Apple App Privacy and Google Play Data Safety. D
 - [ ] Final third-party processor list is not confirmed against production configuration.
 - [ ] Final tracking/advertising answers require legal/admin review.
 - [ ] Final retention/deletion language must match the live privacy policy.
+- [ ] Store copy must remain consumer/family only: no school, classroom, LMS/SIS, formal-assessment, proctoring, or high-risk-compliance claims without DPO/counsel approval under [`../compliance/2026-07-06-school-institutional-ai-act-tripwire.md`](../compliance/2026-07-06-school-institutional-ai-act-tripwire.md).
 
 ## App Facts From Repo
 
@@ -107,4 +108,4 @@ Use these for drafting the store forms after legal review:
 - Camera/photo access is used only when the user chooses to capture or import homework.
 - Microphone access is used for voice-based learning; confirm whether raw audio is collected by any production service before store submission.
 - Mobile purchases use native IAP through RevenueCat; Stripe is dormant for future web.
-
+- Do not add school, classroom, LMS/SIS, formal-assessment, proctoring, or high-risk-compliance claims to store copy without DPO/counsel approval.

@@ -150,7 +150,7 @@ The consumer app may support a first learner profile on every tier, but subscrip
 
 Voice remains core learner UX. For child learners, raw audio is transient by default: capture only to transcribe/respond, do not retain raw child voice recordings, do not train models on them, and delete audio immediately after the request is handled. Text transcripts follow the normal session retention and consent rules. Do not infer emotions from voice, tone, face, camera, or behavioral biometrics.
 
-The consumer product must not ship features intended for school/district/institutional decisions: admission, placement, formal learning-outcome evaluation, proctoring, test-cheating detection, or institutional student monitoring. Emotion recognition in education/workplace contexts is prohibited territory. No school, district, tutor, coach, or classroom sales channel may launch until a separate institutional/tutor SKU is scoped with its own data model, contracts, compliance review, governance controls, and feature set.
+The consumer product must not ship features intended for school/district/institutional decisions: admission, placement, formal learning-outcome evaluation, proctoring, test-cheating detection, or institutional student monitoring. Emotion recognition in education/workplace contexts is prohibited territory. No school, district, tutor, coach, or classroom sales channel may launch until a separate institutional/tutor SKU is scoped with its own data model, contracts, compliance review, governance controls, and feature set. The operational gate lives in [`docs/compliance/2026-07-06-school-institutional-ai-act-tripwire.md`](compliance/2026-07-06-school-institutional-ai-act-tripwire.md).
 
 ## Starter Template Evaluation
 
