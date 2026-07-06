@@ -485,6 +485,35 @@ describe('useDictationPlayback', () => {
     );
   });
 
+  it('[WI-1412] resets non-paused playback to idle when Speech.speak reports an error', async () => {
+    let capturedOnError: (() => void) | undefined;
+    mockSpeak.mockImplementation((_text, options) => {
+      capturedOnError = options?.onError;
+    });
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: TEST_SENTENCES,
+        pace: 'slow',
+        punctuationReadAloud: false,
+        language: 'en',
+      }),
+    );
+
+    await startPlayback(result);
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+
+    expect(result.current.state).toBe('speaking');
+
+    act(() => {
+      capturedOnError?.();
+    });
+
+    expect(result.current.state).toBe('idle');
+  });
+
   it('speaks long sentences in chunks', async () => {
     // Don't auto-complete speech — we need to control onDone manually
     let capturedOnDone: (() => void) | undefined;
