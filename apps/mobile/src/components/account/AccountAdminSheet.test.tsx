@@ -92,11 +92,18 @@ describe('AccountAdminSheet', () => {
   it('shows owner-gated admin rows when the navigation contract allows them', () => {
     render(<AccountAdminSheet />);
 
+    screen.getByTestId('account-admin-learning-preferences');
+    screen.getByTestId('account-admin-mentor-memory');
+    screen.getByTestId('account-admin-mentor-language');
+    screen.getByTestId('account-admin-profile');
     screen.getByTestId('account-admin-security');
     screen.getByTestId('account-admin-subscription');
+    screen.getByTestId('account-admin-notifications');
     screen.getByTestId('account-admin-add-child');
     screen.getByTestId('account-admin-family-settings');
     screen.getByTestId('account-admin-privacy');
+    screen.getByTestId('account-admin-help');
+    screen.getByTestId('account-admin-sign-out');
   });
 
   it('hides owner-gated admin rows when the navigation contract denies them', () => {
@@ -116,17 +123,56 @@ describe('AccountAdminSheet', () => {
     expect(screen.queryByTestId('account-admin-subscription')).toBeNull();
     expect(screen.queryByTestId('account-admin-add-child')).toBeNull();
     expect(screen.queryByTestId('account-admin-family-settings')).toBeNull();
+    screen.getByTestId('account-admin-learning-preferences');
+    screen.getByTestId('account-admin-mentor-memory');
+    screen.getByTestId('account-admin-mentor-language');
+    screen.getByTestId('account-admin-profile');
+    screen.getByTestId('account-admin-notifications');
     screen.getByTestId('account-admin-privacy');
+    screen.getByTestId('account-admin-help');
+    screen.getByTestId('account-admin-sign-out');
   });
 
   it('routes account rows to existing admin screens', () => {
     render(<AccountAdminSheet />);
 
+    fireEvent.press(screen.getByTestId('account-admin-learning-preferences'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/more/accommodation');
+
+    fireEvent.press(screen.getByTestId('account-admin-mentor-memory'));
+    expect(mockPush).toHaveBeenCalledWith(
+      '/(app)/mentor-memory?returnTo=account',
+    );
+
+    fireEvent.press(screen.getByTestId('account-admin-mentor-language'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/more/account');
+
+    fireEvent.press(screen.getByTestId('account-admin-profile'));
+    expect(mockPush).toHaveBeenCalledWith('/profiles');
+
+    fireEvent.press(screen.getByTestId('account-admin-security'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/more/account');
+
     fireEvent.press(screen.getByTestId('account-admin-subscription'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
 
+    fireEvent.press(screen.getByTestId('account-admin-notifications'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/more/notifications');
+
+    fireEvent.press(screen.getByTestId('account-admin-add-child'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    });
+
+    fireEvent.press(screen.getByTestId('account-admin-family-settings'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/more');
+
     fireEvent.press(screen.getByTestId('account-admin-privacy'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/more/privacy');
+
+    fireEvent.press(screen.getByTestId('account-admin-help'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/more/help');
   });
 
   it('uses signOutWithCleanup for sign out', async () => {

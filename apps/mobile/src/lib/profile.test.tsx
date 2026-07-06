@@ -7,6 +7,7 @@ import {
   useProfile,
   useLinkedChildren,
   useHasLinkedChildren,
+  PROFILE_SCOPED_KEYS,
   type Profile,
 } from './profile';
 import {
@@ -14,6 +15,7 @@ import {
   setProxyMode,
 } from './api-client';
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
+import { queryKeys } from './query-keys';
 
 // ./secure-storage uses real implementation: expo-secure-store is globally mocked
 // in test-setup.ts with an in-memory store. We control behavior via ExpoSecureStore fns directly.
@@ -397,6 +399,68 @@ describe('ProfileProvider', () => {
     expect(
       queryClient.getQueryData(['profiles', 'clerk-user-test']),
     ).toBeTruthy();
+  });
+
+  it('keeps profile-scoped query key factory prefixes covered by PROFILE_SCOPED_KEYS', () => {
+    const profileScopedFactoryKeys: Array<readonly unknown[]> = [
+      queryKeys.progress.overview('study', 'owner-id'),
+      queryKeys.progress.subject('study', 'subject-1', 'owner-id'),
+      queryKeys.progress.resumeTarget('study', 'owner-id', {
+        subjectId: 'subject-1',
+      }),
+      queryKeys.dashboard.root('family', 'owner-id'),
+      queryKeys.dashboard.childDetail('family', 'child-id'),
+      queryKeys.sessions.detail('study', 'session-1', 'owner-id'),
+      queryKeys.sessions.transcript('study', 'session-1', 'owner-id'),
+      queryKeys.sessions.summary('study', 'session-1', 'owner-id'),
+      queryKeys.sessions.parkingLot('study', 'session-1', 'owner-id'),
+      queryKeys.recaps.list('family', 'owner-id', 'child-id'),
+      queryKeys.retention.topic('topic-1', 'owner-id'),
+      queryKeys.library.retention('owner-id'),
+      queryKeys.library.conceptMastery('owner-id', ['topic-1']),
+      queryKeys.languageProgress.subject('owner-id', 'subject-1'),
+      queryKeys.vocabulary.subject('owner-id', 'subject-1'),
+      queryKeys.resumeNudge.root('owner-id'),
+      queryKeys.subscription('owner-id'),
+      queryKeys.usage('owner-id'),
+      queryKeys.subscriptionFamily('owner-id'),
+      queryKeys.subscriptionStatus('owner-id'),
+      queryKeys.profiles.active('owner-id'),
+      queryKeys.settings.notifications('owner-id'),
+      queryKeys.settings.celebrationLevel('owner-id'),
+      queryKeys.settings.childCelebrationLevel('child-id', 'owner-id'),
+      queryKeys.onboarding.learnerProfile('owner-id'),
+      queryKeys.bookSessions('subject-1', 'book-1', 'owner-id'),
+      queryKeys.topicSessions('subject-1', 'topic-1', 'owner-id'),
+      queryKeys.subjectSessions('subject-1', 'owner-id'),
+    ];
+    const representativeScopedLiteralKeys: Array<readonly unknown[]> = [
+      ['subjects', 'owner-id'],
+      ['books', 'subject-1', 'owner-id'],
+      ['book', 'subject-1', 'book-1', 'owner-id'],
+      ['book-suggestions', 'subject-1'],
+      ['bookmarks', 'owner-id'],
+      ['session-bookmarks', 'owner-id', 'session-1'],
+      ['all-notes', 'owner-id'],
+      ['book-notes', 'book-1', 'owner-id'],
+      ['topic-notes', 'topic-1', 'owner-id'],
+      ['library-search', 'math', 'owner-id'],
+      ['quiz-recent', 'owner-id'],
+      ['quiz-stats', 'owner-id'],
+      ['topic-suggestions', 'subject-1', 'owner-id'],
+    ];
+    const scopedPrefixes = new Set(
+      [...profileScopedFactoryKeys, ...representativeScopedLiteralKeys].map(
+        (key) => String(key[0]),
+      ),
+    );
+
+    const profileScopedKeySet = new Set<string>(PROFILE_SCOPED_KEYS);
+    const missingPrefixes = [...scopedPrefixes]
+      .filter((prefix) => !profileScopedKeySet.has(prefix))
+      .sort();
+
+    expect(missingPrefixes).toEqual([]);
   });
 
   it('[BREAK / BUG-828] returns persistenceFailed when SecureStore write fails', async () => {

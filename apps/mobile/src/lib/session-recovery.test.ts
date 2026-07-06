@@ -1,5 +1,6 @@
 import * as SecureStore from './secure-storage';
 import {
+  isRecoveryMarkerFresh,
   readSessionRecoveryMarker,
   writeSessionRecoveryMarker,
 } from './session-recovery';
@@ -77,5 +78,39 @@ describe('session-recovery', () => {
     await expect(readSessionRecoveryMarker('profile-2')).resolves.toBeNull();
     expect(mockSet).not.toHaveBeenCalled();
     expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it('classifies markers inside the 30-minute recovery window as fresh', () => {
+    expect(
+      isRecoveryMarkerFresh(
+        {
+          sessionId: 'session-1',
+          profileId: 'profile-1',
+          updatedAt: '2026-07-06T12:00:00.000Z',
+        },
+        Date.parse('2026-07-06T12:29:59.000Z'),
+      ),
+    ).toBe(true);
+  });
+
+  it('classifies stale or invalid markers as not fresh', () => {
+    expect(
+      isRecoveryMarkerFresh(
+        {
+          sessionId: 'session-1',
+          profileId: 'profile-1',
+          updatedAt: '2026-07-06T12:00:00.000Z',
+        },
+        Date.parse('2026-07-06T12:30:00.000Z'),
+      ),
+    ).toBe(false);
+
+    expect(
+      isRecoveryMarkerFresh({
+        sessionId: 'session-1',
+        profileId: 'profile-1',
+        updatedAt: 'not-a-date',
+      }),
+    ).toBe(false);
   });
 });

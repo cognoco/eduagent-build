@@ -627,6 +627,7 @@ function SessionScreenInner() {
   const { imageBase64Ref, imageMimeTypeRef, imageAttachmentStatus } =
     useImageBase64(imageUri, imageMimeType);
   const { CelebrationOverlay, trigger } = useCelebration({
+    profileId: activeProfile?.id,
     celebrationLevel,
     accommodationMode: learnerProfile?.accommodationMode,
     audience: 'child',

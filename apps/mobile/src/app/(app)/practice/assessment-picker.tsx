@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, type Href } from 'expo-router';
+import { Redirect, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
+import { useEntryGate } from '../../../hooks/use-entry-gate';
 import { Button } from '../../../components/common/Button';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useThemeColors } from '../../../lib/theme';
@@ -25,6 +26,7 @@ export default function AssessmentPickerScreen(): React.ReactElement {
   const relativeDate = useRelativeDate();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const blocked = useEntryGate('practice');
   const {
     data: topics = [],
     isLoading,
@@ -136,6 +138,10 @@ export default function AssessmentPickerScreen(): React.ReactElement {
       </View>
     </View>
   );
+
+  if (blocked) {
+    return <Redirect href="/(app)/home" />;
+  }
 
   // Non-list states (error, loading, empty) remain in a ScrollView so insets
   // are respected and the header renders at the top.

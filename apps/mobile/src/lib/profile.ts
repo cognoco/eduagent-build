@@ -119,6 +119,7 @@ export const PROFILE_SCOPED_KEYS = [
   'consent',
   'subjects',
   'progress',
+  'recaps',
   'sessions',
   'session',
   'session-bookmarks',

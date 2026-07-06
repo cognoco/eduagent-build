@@ -28,6 +28,7 @@ export default function HomeScreen(): React.ReactElement {
   const isOwner = navigationContract.gates.sessionIsOwner;
   const { CelebrationOverlay } = useCelebration({
     queue: pendingCelebrations ?? [],
+    profileId: activeProfile?.id,
     celebrationLevel,
     accommodationMode: learnerProfile?.accommodationMode,
     audience: isOwner ? 'adult' : 'child',

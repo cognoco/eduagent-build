@@ -60,9 +60,8 @@ export default function SubjectHubRoute(): React.ReactElement {
   );
 
   // WI-1119: in-context subject management on the hub. Gate on proxy scope — a
-  // supporter-proxy session is read-only over the child's subjects, mirroring
-  // Library's `canWrite = !navigationContract.isParentProxy`. (canStudy is not
-  // used: buildSubjectHubData hardcodes it true, so it can't gate the proxy.)
+  // supporter-proxy session is read-only over the child's subjects. Study/note
+  // affordances are masked separately through the hub's `canStudy` flag.
   const navigationContract = useNavigationContract();
   const canManage = !navigationContract.isParentProxy;
   const [manageOpen, setManageOpen] = useState(false);

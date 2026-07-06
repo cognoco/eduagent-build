@@ -274,6 +274,7 @@ export default function TopicDetailScreen() {
   const relativeDate = useRelativeDate();
   const { activeProfile } = useProfile();
   const activeProfileRole = useActiveProfileRole();
+  const canWrite = activeProfileRole !== 'impersonated-child';
   const proxyChildProfileId =
     activeProfileRole === 'impersonated-child' ? activeProfile?.id : undefined;
   const {
@@ -548,7 +549,7 @@ export default function TopicDetailScreen() {
 
   // Note handlers
   const handleNoteCreate = (content: string) => {
-    if (!topicId) return;
+    if (!canWrite || !topicId) return;
     createNote(
       { topicId, content },
       { onSuccess: () => setNoteInputMode(null) },
@@ -556,7 +557,13 @@ export default function TopicDetailScreen() {
   };
 
   const handleNoteUpdate = (content: string) => {
-    if (typeof noteInputMode !== 'string' || noteInputMode === 'new') return;
+    if (
+      !canWrite ||
+      typeof noteInputMode !== 'string' ||
+      noteInputMode === 'new'
+    ) {
+      return;
+    }
     updateNote(
       { noteId: noteInputMode, content },
       { onSuccess: () => setNoteInputMode(null) },
@@ -564,6 +571,7 @@ export default function TopicDetailScreen() {
   };
 
   const handleNoteLongPress = (noteId: string) => {
+    if (!canWrite) return;
     const note = notesData?.notes.find((n) => n.id === noteId);
     if (!note) return;
     showNoteContextMenu({
@@ -919,7 +927,7 @@ export default function TopicDetailScreen() {
                         conceptSignal={
                           conceptSignalsQuery.data?.signals?.[note.topicId]
                         }
-                        onLongPress={handleNoteLongPress}
+                        onLongPress={canWrite ? handleNoteLongPress : undefined}
                         onSourcePress={
                           sourceSessionId
                             ? () => handleSessionPress(sourceSessionId)
@@ -937,7 +945,7 @@ export default function TopicDetailScreen() {
                   </Text>
                 )}
 
-                {noteInputMode !== null ? (
+                {canWrite && noteInputMode !== null ? (
                   <View className="mx-5 mt-2" testID="note-input-container">
                     <NoteInput
                       onSave={
@@ -952,7 +960,7 @@ export default function TopicDetailScreen() {
                       saving={creatingNote || updatingNote}
                     />
                   </View>
-                ) : (
+                ) : canWrite ? (
                   <Pressable
                     onPress={() => setNoteInputMode('new')}
                     className="mx-5 mt-1 py-3 flex-row items-center"
@@ -970,7 +978,7 @@ export default function TopicDetailScreen() {
                         : t('topic.addFirstNote')}
                     </Text>
                   </Pressable>
-                )}
+                ) : null}
               </View>
             ) : null}
 

@@ -5,6 +5,14 @@ containment lanes; orion owns WS-31/33/39 + Coverage Debt — never touch those.
 
 ## First acts, in order
 
+0. **Substrate selftest (WI-1263 v1, added 2026-07-06).** The Quartet cloud substrate is live
+   (Supabase, operator-ruled Option B). Resolve `QUARTET_SUBSTRATE_URL` + `QUARTET_SUBSTRATE_KEY`
+   from Infisical `zwizzly-global/prod//quartet` (via `estate-secrets read`), set
+   `QUARTET_ROLE=claude:ramtop-orchestrator`, then run the canonical client
+   (`_quartet/substrate/clacks.py` on branch `WI-1263-substrate-v1`, nexus repo — instantiate a
+   copy outside the git tree): `clacks selftest` → PASS, then `clacks heartbeat orch-ramtop`.
+   Your selftest from a second machine completes WI-1263 v1 cross-machine acceptance — report
+   the result on WI-1263.
 1. Post `[orch-ack]` on your WS rows (V2 finalization, Bug Lane, Compliance—Engineering,
    Identity Cutover): relaunched, canon @ nexus@92c9715, ENE reset to a real checkpoint.
 2. **WI-1306 (M2a legacy-table DROP) — finalize.** PR #1925 was merged BY THE OPERATOR

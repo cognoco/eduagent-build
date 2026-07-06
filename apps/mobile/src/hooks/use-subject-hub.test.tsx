@@ -224,4 +224,22 @@ describe('buildSubjectHubData', () => {
     expect(data.canStudy).toBe(true);
     expect(data.notes).toEqual(notes);
   });
+
+  it('preserves a masked read-only canStudy flag from the producer input', () => {
+    const data = buildSubjectHubData({
+      subjectId: SUBJECT_ID,
+      subjectName: 'Spanish',
+      books: [book()],
+      bookDetails: [bookWithTopics],
+      sessionsByBookId: new Map([[BOOK_ID, sessions]]),
+      retentionTopics: [],
+      resumeTarget,
+      notes,
+      canStudy: false,
+    });
+
+    expect(data.canStudy).toBe(false);
+    expect(data.chapters[0]?.topics[0]?.topic.title).toBe('Greetings');
+    expect(data.notes).toEqual(notes);
+  });
 });
