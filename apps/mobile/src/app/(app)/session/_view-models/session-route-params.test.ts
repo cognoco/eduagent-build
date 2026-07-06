@@ -22,6 +22,18 @@ describe('session-route-params', () => {
     });
   });
 
+  it('preserves recitation mode from the route instead of falling back to freeform', () => {
+    const params = getSessionRouteParams({
+      mode: 'recitation',
+      subjectId: 'subject-1',
+    });
+
+    expect(params).toMatchObject({
+      effectiveMode: 'recitation',
+      chatBackFallback: '/(app)/shelf/subject-1',
+    });
+  });
+
   it('parses gaps JSON, trims blank values, and caps at eight entries', () => {
     const gaps = [
       'one',
