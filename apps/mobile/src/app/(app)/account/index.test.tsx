@@ -17,15 +17,20 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 12, right: 0, bottom: 0, left: 0 }),
 }));
 
-jest.mock('../../../components/account/AccountAdminSheet', () => ({
-  AccountAdminSheet: () => {
-    const { Text } = require('react-native');
-    return <Text testID="mock-account-admin-sheet" />;
-  },
-}));
+jest.mock(
+  // gc1-allow: route wrapper test asserts mount boundary; AccountAdminSheet behavior has dedicated coverage
+  '../../../components/account/AccountAdminSheet',
+  () => ({
+    AccountAdminSheet: () => {
+      const { Text } = require('react-native');
+      return <Text testID="mock-account-admin-sheet" />;
+    },
+  }),
+);
 
 jest.mock(
-  '../../../lib/navigation' /* gc1-allow: route wrapper test captures goBackOrReplace fallback without native navigation context */,
+  // gc1-allow: route wrapper test captures goBackOrReplace fallback without native navigation context
+  '../../../lib/navigation',
   () => ({
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
   }),
