@@ -7,6 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import * as Speech from 'expo-speech';
+import type { SpeechOptions } from 'expo-speech';
 import { useTranslation } from 'react-i18next';
 import {
   computeChunkPauseMs,
@@ -486,7 +487,7 @@ describe('useDictationPlayback', () => {
   });
 
   it('[WI-1412] resets non-paused playback to idle when Speech.speak reports an error', async () => {
-    let capturedOnError: (() => void) | undefined;
+    let capturedOnError: SpeechOptions['onError'];
     mockSpeak.mockImplementation((_text, options) => {
       capturedOnError = options?.onError;
     });
@@ -508,7 +509,7 @@ describe('useDictationPlayback', () => {
     expect(result.current.state).toBe('speaking');
 
     act(() => {
-      capturedOnError?.();
+      capturedOnError?.(new Error('tts failed'));
     });
 
     expect(result.current.state).toBe('idle');
