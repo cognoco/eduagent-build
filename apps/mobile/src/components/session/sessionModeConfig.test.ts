@@ -156,6 +156,12 @@ describe('getOpeningMessage', () => {
     });
 
     it('uses recitation opening copy across cold-start tiers', () => {
+      const recitationConfig = SESSION_MODE_CONFIGS.recitation;
+      const reviewConfig = SESSION_MODE_CONFIGS.review;
+      if (!recitationConfig || !reviewConfig) {
+        throw new Error('Expected recitation and review configs to be present');
+      }
+
       expect(getOpeningMessage('recitation', 0)).toBe(
         "Hi! I'll listen while you recite something from memory — a poem, song lyrics, anything. What would you like to recite?",
       );
@@ -166,13 +172,13 @@ describe('getOpeningMessage', () => {
         'What are we reciting today?',
       );
       expect(getOpeningMessage('recitation', 5)).toBe(
-        SESSION_MODE_CONFIGS.recitation.openingMessage,
+        recitationConfig.openingMessage,
       );
       expect(getOpeningMessage('recitation', 5)).not.toBe(
         SESSION_MODE_CONFIGS.freeform.openingMessage,
       );
       expect(getOpeningMessage('recitation', 5)).not.toBe(
-        SESSION_MODE_CONFIGS.review.openingMessage,
+        reviewConfig.openingMessage,
       );
     });
   });
