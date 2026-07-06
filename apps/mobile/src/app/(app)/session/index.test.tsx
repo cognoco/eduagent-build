@@ -45,7 +45,7 @@ const getMockFeatureFlags = (): MockFeatureFlags =>
     }
   ).__sessionTestFeatureFlags;
 
-jest.mock('../../../lib/feature-flags', () => {
+jest.mock('../../../lib/feature-flags' /* gc1-allow: feature flag module boundary — suite mutates FEATURE_FLAGS via global test state */, () => {
   const featureFlags: MockFeatureFlags = {
     COACH_BAND_ENABLED: true,
     MIC_IN_PILL_ENABLED: true,
@@ -2457,7 +2457,11 @@ describe('voice mode persistence', () => {
   it('shows QuotaExceededCard and disables input when stream returns 402', async () => {
     const details = {
       tier: 'free' as const,
+      effectiveAccessTier: 'free' as const,
+      quotaModel: 'per-profile' as const,
+      profileRole: 'owner' as const,
       reason: 'monthly' as const,
+      resetsAt: '2026-05-27T01:00:00.000Z',
       monthlyLimit: 100,
       usedThisMonth: 100,
       dailyLimit: null,
@@ -2493,6 +2497,7 @@ describe('voice mode persistence', () => {
       quotaModel: 'per-profile' as const,
       profileRole: 'child' as const,
       reason: 'monthly' as const,
+      resetsAt: '2026-05-27T01:00:00.000Z',
       monthlyLimit: 100,
       usedThisMonth: 100,
       dailyLimit: 10,
