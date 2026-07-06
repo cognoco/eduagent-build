@@ -2163,6 +2163,72 @@ describe('SubscriptionScreen', () => {
 
       expect(mockMutateAsyncPurchase).toHaveBeenCalledTimes(1);
     });
+    it('enters polling after top-up purchase and confirms only when credits increase', async () => {
+      jest.useFakeTimers();
+      try {
+        setupPaidTierWithTopUp();
+        let purchaseResolved = false;
+        let postPurchaseUsageFetches = 0;
+        mockMutateAsyncPurchase.mockImplementation(async () => {
+          purchaseResolved = true;
+          return undefined;
+        });
+        mockFetch.setRoute('/usage', () => {
+          const topUpCreditsRemaining = !purchaseResolved
+            ? 25
+            : postPurchaseUsageFetches++ === 0
+              ? 25
+              : 525;
+          return new Response(
+            JSON.stringify({
+              usage: {
+                ...DEFAULT_USAGE,
+                topUpCreditsRemaining,
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        });
+
+        render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+        await waitFor(() => {
+          screen.getByTestId('top-up-button');
+        });
+        fireEvent.press(screen.getByTestId('top-up-button'));
+
+        await waitFor(() => {
+          screen.getByTestId('top-up-polling-cancel');
+        });
+        expect(Alert.alert).not.toHaveBeenCalled();
+
+        await act(async () => {
+          jest.advanceTimersByTime(2000);
+          await Promise.resolve();
+        });
+        expect(postPurchaseUsageFetches).toBe(1);
+        expect(Alert.alert).not.toHaveBeenCalled();
+        screen.getByTestId('top-up-polling-cancel');
+
+        await act(async () => {
+          jest.advanceTimersByTime(2000);
+          await Promise.resolve();
+        });
+
+        await waitFor(() => {
+          expect(Alert.alert).toHaveBeenCalledWith(
+            'Top-up',
+            '500 additional credits have been added!',
+            undefined,
+            undefined,
+          );
+        });
+        expect(postPurchaseUsageFetches).toBe(2);
+        expect(screen.queryByTestId('top-up-polling-cancel')).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
 
     it('shows network error alert on top-up network failure', async () => {
       setupPaidTierWithTopUp();

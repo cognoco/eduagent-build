@@ -94,6 +94,7 @@ export type SeedScenario =
   | 'consent-pending'
   | 'parent-multi-child'
   | 'daily-limit-reached'
+  | 'child-quota-exceeded'
   | 'language-learner'
   | 'language-subject-active'
   | 'parent-with-reports'
@@ -4278,6 +4279,120 @@ async function seedDailyLimitReached(
   };
 }
 
+async function seedChildQuotaExceeded(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const freeTier = getTierConfig('free');
+  const childMonthlyQuota = freeTier.childMonthlyQuota ?? freeTier.monthlyQuota;
+  const childDailyQuota = freeTier.childDailyQuota ?? freeTier.dailyLimit;
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const ownerProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Quota Parent',
+    birthYear: 1985,
+    isOwner: true,
+    email,
+    clerkUserId,
+    defaultAppContext: 'family',
+  });
+  const childProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Quota Child',
+    birthYear: CHILD_BIRTH_YEAR,
+    isOwner: false,
+  });
+
+  await db.insert(guardianship).values({
+    id: generateUUIDv7(),
+    guardianPersonId: ownerProfileId,
+    chargePersonId: childProfileId,
+  });
+  await db.insert(consentGrant).values({
+    id: generateUUIDv7(),
+    chargePersonId: childProfileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await insertSubscriptionWithLegacy(db, {
+    id: subscriptionId,
+    organizationId: accountId,
+    payerPersonId: ownerProfileId,
+    planTier: 'free',
+    status: 'active',
+    periodStartAt: new Date(),
+    periodEndAt: futureDate(30),
+  });
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: freeTier.monthlyQuota,
+    usedThisMonth: childMonthlyQuota,
+    dailyLimit: freeTier.dailyLimit,
+    usedToday: 1,
+    cycleResetAt: futureDate(30),
+  });
+  await db.insert(profileQuotaUsage).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    profileId: childProfileId,
+    role: 'child',
+    monthlyLimit: childMonthlyQuota,
+    usedThisMonth: childMonthlyQuota,
+    dailyLimit: childDailyQuota,
+    usedToday: 1,
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    childProfileId,
+    'Mathematics',
+  );
+  const topicId = topicIds[0];
+  if (!topicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
+
+  const sessionId = generateUUIDv7();
+  await db.insert(learningSessions).values({
+    id: sessionId,
+    profileId: childProfileId,
+    subjectId,
+    topicId,
+    sessionType: 'learning',
+    status: 'active',
+    exchangeCount: 1,
+  });
+  await db.insert(sessionEvents).values({
+    id: generateUUIDv7(),
+    sessionId,
+    profileId: childProfileId,
+    subjectId,
+    eventType: 'ai_response',
+    content: 'We were practicing algebra patterns.',
+  });
+
+  return {
+    scenario: 'child-quota-exceeded',
+    accountId,
+    profileId: childProfileId,
+    email,
+    password,
+    ids: {
+      subscriptionId,
+      ownerProfileId,
+      childProfileId,
+      subjectId,
+      sessionId,
+      topicId,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // review-empty — All caught up (totalOverdue === 0, nextUpcomingReviewAt set)
 // ---------------------------------------------------------------------------
@@ -5739,6 +5854,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'consent-pending': seedConsentPending,
   'parent-multi-child': seedParentMultiChild,
   'daily-limit-reached': seedDailyLimitReached,
+  'child-quota-exceeded': seedChildQuotaExceeded,
   'language-learner': seedLanguageLearner,
   'language-subject-active': seedLanguageSubjectActive,
   'parent-with-reports': seedParentWithReports,
