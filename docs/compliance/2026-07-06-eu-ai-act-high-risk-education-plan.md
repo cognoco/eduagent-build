@@ -1,8 +1,8 @@
 # EU AI Act Education-AI Compliance Plan
 
-**Work item:** WI-1659 (Produce EU AI Act high-risk education compliance plan)  
-**Date:** 2026-07-06  
-**Status:** Draft for DPO/counsel review. Not legal advice.  
+**Work item:** WI-1659 (Produce EU AI Act high-risk education compliance plan)
+**Date:** 2026-07-06
+**Status:** Draft for DPO/counsel review. Not legal advice.
 **Scope:** MentoMate consumer AI tutoring product for families, with explicit tripwires for any later school, tutoring-center, vocational-training, LMS, SIS, assessment, or public-sector deployment.
 
 ## Bottom line
