@@ -83,4 +83,79 @@ describe('now routes', () => {
       scope: 'supporter-hub',
     });
   });
+
+  it('returns 400 from overflow when person scope omits personId', async () => {
+    const res = await makeApp().request('/v1/now/overflow?scope=person');
+
+    expect(res.status).toBe(400);
+    expect(buildNowOverflow).not.toHaveBeenCalled();
+  });
+
+  it('passes personId through to buildNowOverflow and returns parsed overflow items', async () => {
+    jest.mocked(buildNowOverflow).mockResolvedValue({
+      scope: 'person',
+      items: [
+        {
+          kind: 'needs_deepening',
+          templateKey: 'now.needs_deepening.default',
+          params: {
+            topicId: CHILD_ID,
+          },
+          deepLink: {
+            route: 'subject.topic',
+            params: {
+              subjectId: CHILD_ID,
+              bookId: CHILD_ID,
+              topicId: CHILD_ID,
+            },
+            chain: ['library', 'subject', 'topic'],
+          },
+          scope: 'person',
+          personId: CHILD_ID,
+        },
+      ],
+    });
+
+    const res = await makeApp().request(
+      `/v1/now/overflow?scope=person&personId=${CHILD_ID}`,
+    );
+
+    expect(res.status).toBe(200);
+    expect(buildNowOverflow).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      {
+        scope: 'person',
+        personId: CHILD_ID,
+      },
+    );
+    await expect(res.json()).resolves.toMatchObject({
+      scope: 'person',
+      items: [
+        {
+          kind: 'needs_deepening',
+          scope: 'person',
+          personId: CHILD_ID,
+        },
+      ],
+    });
+  });
+
+  it('passes supporter-hub scope through to buildNowOverflow without personId', async () => {
+    jest.mocked(buildNowOverflow).mockResolvedValue({
+      scope: 'supporter-hub',
+      items: [],
+    });
+
+    const res = await makeApp().request('/v1/now/overflow?scope=supporter-hub');
+
+    expect(res.status).toBe(200);
+    expect(buildNowOverflow).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      {
+        scope: 'supporter-hub',
+      },
+    );
+  });
 });
