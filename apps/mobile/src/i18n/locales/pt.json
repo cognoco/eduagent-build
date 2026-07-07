@@ -3696,6 +3696,7 @@
     "parentAdultAgeError": "Contas de pais precisam da data de nascimento de um adulto. Insira seus próprios dados primeiro e depois adicione seu/sua filho(a).",
     "a11yCloseDatePicker": "Fechar seletor de data",
     "createdChildFamilyContextFailedBody": "O perfil de {{name}} está pronto, mas não conseguimos mudar para o modo Família automaticamente.",
+    "createdChildFamilyContextTerminalFailedBody": "O perfil de {{name}} está pronto, mas ainda não conseguimos mudar para o modo Família. Você pode mudar para o modo Família mais tarde em Mais > Conta.",
     "switchFamilyModeCta": "Mudar para o modo Família"
   },
   "clerkGate": {

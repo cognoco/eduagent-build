@@ -1667,7 +1667,7 @@ describe('CreateProfileScreen', () => {
       });
       expect(Alert.alert).toHaveBeenLastCalledWith(
         'Profile created',
-        "Lily's profile is ready, but we could not switch you to Family mode automatically.",
+        "Lily's profile is ready, but we still could not switch you to Family mode. You can switch to Family mode later from More > Account.",
         [{ text: 'Not now', style: 'cancel' }],
         undefined,
       );

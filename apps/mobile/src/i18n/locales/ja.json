@@ -3696,6 +3696,7 @@
     "parentAdultAgeError": "保護者アカウントには大人の生年月日が必要です。まずご自身の情報を入力し、その後でお子様を追加してください。",
     "a11yCloseDatePicker": "日付ピッカーを閉じる",
     "createdChildFamilyContextFailedBody": "{{name}}さんのプロフィールは準備できましたが、ファミリーモードへの自動切り替えができませんでした。",
+    "createdChildFamilyContextTerminalFailedBody": "{{name}}さんのプロフィールは準備できましたが、まだファミリーモードへ切り替えられませんでした。あとで「その他」>「アカウント」からファミリーモードへ切り替えられます。",
     "switchFamilyModeCta": "ファミリーモードに切り替える"
   },
   "clerkGate": {

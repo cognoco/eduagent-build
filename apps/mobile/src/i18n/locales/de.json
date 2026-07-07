@@ -3696,6 +3696,7 @@
     "parentAdultAgeError": "Elternkonten benötigen das Geburtsdatum eines Erwachsenen. Gib zuerst deine eigenen Daten ein und füge danach dein Kind hinzu.",
     "a11yCloseDatePicker": "Datumsauswahl schließen",
     "createdChildFamilyContextFailedBody": "Das Profil von {{name}} ist fertig, aber wir konnten nicht automatisch in den Familienmodus umschalten.",
+    "createdChildFamilyContextTerminalFailedBody": "Das Profil von {{name}} ist fertig, aber wir konnten immer noch nicht in den Familienmodus umschalten. Du kannst später über Mehr > Konto in den Familienmodus wechseln.",
     "switchFamilyModeCta": "In den Familienmodus wechseln"
   },
   "clerkGate": {

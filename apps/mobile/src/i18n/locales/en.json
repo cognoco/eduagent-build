@@ -3957,6 +3957,7 @@
     "createdTitle": "Profile created",
     "createdChildBody": "{{name}}'s profile is ready. You can open it from Family mode.",
     "createdChildFamilyContextFailedBody": "{{name}}'s profile is ready, but we could not switch you to Family mode automatically.",
+    "createdChildFamilyContextTerminalFailedBody": "{{name}}'s profile is ready, but we still could not switch you to Family mode. You can switch to Family mode later from More > Account.",
     "createdSwitchFailedBody": "We created the profile, but could not switch to it automatically. You can switch from the Profiles screen.",
     "switchFamilyModeCta": "Switch to Family mode",
     "upgradeRequiredTitle": "Upgrade required",

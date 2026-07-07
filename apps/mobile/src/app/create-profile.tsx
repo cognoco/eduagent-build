@@ -386,9 +386,14 @@ export default function CreateProfileScreen() {
 
         platformAlert(
           t('createProfile.createdTitle'),
-          t('createProfile.createdChildFamilyContextFailedBody', {
-            name: trimmedName,
-          }),
+          t(
+            retryAvailable
+              ? 'createProfile.createdChildFamilyContextFailedBody'
+              : 'createProfile.createdChildFamilyContextTerminalFailedBody',
+            {
+              name: trimmedName,
+            },
+          ),
           actions,
         );
       };
