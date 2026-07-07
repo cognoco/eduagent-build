@@ -8,6 +8,7 @@ type ConnectSectionVariant = 'prominent' | 'compact';
 interface ConnectSectionProps {
   onCreateChild: () => void;
   variant?: ConnectSectionVariant;
+  useFirstChildSetupTestID?: boolean;
 }
 
 interface ConnectActionProps {
@@ -91,6 +92,7 @@ function ConnectAction({
 export function ConnectSection({
   onCreateChild,
   variant = 'prominent',
+  useFirstChildSetupTestID = false,
 }: ConnectSectionProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -132,7 +134,11 @@ export function ConnectSection({
         title={t('home.connect.createChild.title')}
         subtitle={t('home.connect.createChild.subtitle')}
         onPress={onCreateChild}
-        testID="connect-create-child-action"
+        testID={
+          useFirstChildSetupTestID
+            ? 'home-family-setup-cta-button'
+            : 'connect-create-child-action'
+        }
       />
       <ConnectAction
         icon="link-outline"

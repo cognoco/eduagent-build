@@ -464,7 +464,7 @@ describe('ParentHomeScreen', () => {
     result.getByText('Invite someone to try MentoMate');
     result.getByText('Coming soon');
 
-    fireEvent.press(result.getByTestId('connect-create-child-action'));
+    fireEvent.press(result.getByTestId('home-family-setup-cta-button'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/create-profile',

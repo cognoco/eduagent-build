@@ -919,7 +919,10 @@ export function ParentHomeScreen({
 
         <View style={{ gap: 10 }}>
           {linkedChildren.length === 0 ? (
-            <ConnectSection onCreateChild={handleAddChild} />
+            <ConnectSection
+              onCreateChild={handleAddChild}
+              useFirstChildSetupTestID
+            />
           ) : null}
 
           {linkedChildren.map((child) => (
