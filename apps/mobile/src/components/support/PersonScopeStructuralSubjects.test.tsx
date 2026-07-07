@@ -206,6 +206,6 @@ describe('PersonScopeStructuralSubjects', () => {
     );
 
     expect(source).toMatch(/SubjectHubSurface/);
-    expect(source).not.toMatch(/<SubjectHub\\b/);
+    expect(source).not.toMatch(/<SubjectHub\b/);
   });
 });
