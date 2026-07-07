@@ -53,14 +53,14 @@ Everything below the line is the map.
 
 ## 2. Role charters + decision discipline (pain 1)
 
-- [ ] Draft 3 one-page charters: orchestrator, shepherd, reviewer
-      (ACCOUNTABLE-FOR outcomes / MANDATE default-act / MUST-ESCALATE exhaustive list)
-- [ ] Overlap rule + SLAs + escalation ladder written into charters
-- [ ] Decision-log convention documented (log-and-proceed; async ratification;
+- [x] Draft 3 one-page charters: orchestrator, shepherd, reviewer
+      (ACCOUNTABLE-FOR outcomes / MANDATE default-act / MUST-ESCALATE exhaustive list) — 2026-07-06
+- [x] Overlap rule + SLAs + escalation ladder written into charters (README shared conventions)
+- [x] Decision-log convention documented (log-and-proceed; async ratification;
       rejection → precedent-register entry)
-- [ ] Protocols thinned: accountability prose moved out, charter referenced
-- [ ] Operator review + ratification of charters
-- [ ] Kickoff packets updated: charter ack + first queue-health as boot gate
+- [ ] Protocols thinned: accountability prose moved out, charter referenced → WI-1670 (WS-45)
+- [x] Operator review + ratification of charters — RATIFIED 2026-07-07, WIP amended N=4 (substrate event 29)
+- [ ] Kickoff packets updated: charter ack + first queue-health as boot gate → WI-1670 (WS-45)
 
 ## 3. Clacks standardization + liveness (pain 2)
 
