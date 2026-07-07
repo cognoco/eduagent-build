@@ -262,6 +262,7 @@ describe('useCheckAnswer', () => {
     const mockCheckResponse = {
       correct: true,
       correctAnswer: 'fleeting',
+      capitalsFeedback: null,
       explanation: 'Ephemeral means fleeting or short-lived.',
     };
 
