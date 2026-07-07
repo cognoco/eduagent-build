@@ -10,7 +10,6 @@ import React, {
 } from 'react';
 import {
   Platform,
-  StyleSheet,
   UIManager,
   View,
   useColorScheme,
@@ -57,17 +56,13 @@ import { useNetworkStatus } from '../hooks/use-network-status';
 import { enableSentry, Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
 import { AnimatedSplash } from '../components/AnimatedSplash';
-import { MentorBirthAnimation } from '../components/common/MentorBirthAnimation';
+import { MentorBornCeremonyOverlay } from '../components/common/MentorBornCeremonyOverlay';
 import {
   createScopedPersister,
   getQueryCacheBuster,
 } from '../lib/query-persister';
 import { shouldReportQueryErrorToSentry } from '../lib/query-error-reporting';
 import { getSentryQueryKeyTag } from '../lib/sentry-query-key';
-import {
-  completeMentorBornCeremony,
-  useMentorBornCeremonyRequest,
-} from '../lib/mentor-born-ceremony';
 
 // BUG-417: Clerk's default tokenCache uses expo-secure-store directly,
 // which crashes on web. Use our secure-storage wrapper instead.
@@ -390,56 +385,6 @@ class SplashErrorBoundary extends React.Component<
   }
 }
 
-/** Thin error boundary so mentor-born animation crashes don't block the app. */
-class MentorBornErrorBoundary extends React.Component<
-  { children: React.ReactNode; onError: () => void },
-  { hasError: boolean }
-> {
-  override state = { hasError: false };
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  override componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error(
-      '[MentorBornCeremony] crashed:',
-      error.message,
-      info.componentStack,
-    );
-    Sentry.captureException(error, {
-      tags: { component: 'MentorBornCeremony' },
-    });
-    this.props.onError();
-  }
-  override render() {
-    return this.state.hasError ? null : this.props.children;
-  }
-}
-
-function MentorBornCeremonyOverlay() {
-  const request = useMentorBornCeremonyRequest();
-  const onComplete = useCallback(() => {
-    if (request) completeMentorBornCeremony(request.id);
-  }, [request]);
-
-  if (!request) return null;
-
-  return (
-    <View
-      pointerEvents="auto"
-      style={styles.mentorBornOverlay}
-      testID="mentor-born-ceremony-overlay"
-    >
-      <MentorBornErrorBoundary onError={onComplete}>
-        <MentorBirthAnimation
-          readyLabel={i18next.t('onboarding.mentorBirth.ready')}
-          onComplete={onComplete}
-          size={220}
-        />
-      </MentorBornErrorBoundary>
-    </View>
-  );
-}
-
 /**
  * [BUG-357] Identity-scoped persister wrapper.
  *
@@ -674,14 +619,3 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  mentorBornOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    backgroundColor: 'rgba(24, 24, 27, 0.96)',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    zIndex: 20,
-  },
-});

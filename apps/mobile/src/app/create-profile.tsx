@@ -410,9 +410,6 @@ export default function CreateProfileScreen() {
       // (profiles.length > 0 && activeProfile === null stays true until the
       // switch completes).
       if (!needsConsentFlow && wantsFamily) {
-        if (isFirstProfileCreation) {
-          requestMentorBornCeremony('first-profile-created');
-        }
         // Parent's own profile is created — take them straight to the
         // add-a-child screen (skippable via its Cancel) instead of the learner
         // home. Navigate FIRST (same remount-ordering reason as below), then
@@ -422,8 +419,11 @@ export default function CreateProfileScreen() {
           params: { for: 'child' },
         });
       } else if (!needsConsentFlow) {
-        if (isFirstProfileCreation) {
-          requestMentorBornCeremony('first-profile-created');
+        if (isFirstProfileCreation && !isAddingChild) {
+          requestMentorBornCeremony({
+            profileId: profile.id,
+            reason: 'first-profile-created',
+          });
         }
         handleClose();
       }

@@ -413,7 +413,10 @@ describe('CreateProfileScreen', () => {
       expect(mockBack).toHaveBeenCalled();
     });
     expect(getMentorBornCeremonySnapshot()).toMatchObject({
-      activeRequest: { reason: 'first-profile-created' },
+      activeRequest: {
+        profileId: 'new-id',
+        reason: 'first-profile-created',
+      },
       requestCount: 1,
     });
   });
@@ -1649,10 +1652,7 @@ describe('CreateProfileScreen', () => {
         });
       });
       expect(mockSwitchProfile).toHaveBeenCalledWith('adult-id');
-      expect(getMentorBornCeremonySnapshot()).toMatchObject({
-        activeRequest: { reason: 'first-profile-created' },
-        requestCount: 1,
-      });
+      expect(getMentorBornCeremonySnapshot().requestCount).toBe(0);
     });
 
     it('learner audience (adult): no PATCH, no add-child redirect, returns to home', async () => {
@@ -1681,7 +1681,10 @@ describe('CreateProfileScreen', () => {
         params: { for: 'child' },
       });
       expect(getMentorBornCeremonySnapshot()).toMatchObject({
-        activeRequest: { reason: 'first-profile-created' },
+        activeRequest: {
+          profileId: 'adult-id',
+          reason: 'first-profile-created',
+        },
         requestCount: 1,
       });
     });
