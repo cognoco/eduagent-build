@@ -8,12 +8,7 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import {
-  Platform,
-  UIManager,
-  View,
-  useColorScheme,
-} from 'react-native';
+import { Platform, UIManager, View, useColorScheme } from 'react-native';
 import * as SecureStore from '../lib/secure-storage';
 import { platformAlert } from '../lib/platform-alert';
 import { Stack } from 'expo-router';

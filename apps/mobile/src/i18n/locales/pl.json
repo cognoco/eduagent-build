@@ -284,11 +284,6 @@
       "proxySessionSummariesTitle": "Podsumowania sesji są w widoku rodzica",
       "proxySessionSummariesBody": "Notatki {{name}} pozostają prywatne, ale w profilu możesz zobaczyć bezpieczne dla rodzica podsumowania sesji.",
       "proxySessionSummariesCta": "Zobacz podsumowania sesji {{name}}",
-      "familySetup": {
-        "title": "Set up Family",
-        "subtitle": "Add a child profile so they can learn with their own mentor",
-        "cta": "Set up Family"
-      },
       "greeting": "Cześć, {{name}}!",
       "greetingNoName": "Cześć!",
       "myNotes": "Moje notatki",
@@ -327,8 +322,6 @@
         "noActivity": "{{memberNames}} · brak sesji w tym tygodniu",
         "attentionChild": "{{childName}} przydałaby się dziś zachęta",
         "profileLimit": "{{count}} z {{max}} profili użytych",
-        "addProfileAction": "Dodaj profil",
-        "addProfileAccessibilityLabel": "Dodaj profil rodzinny",
         "whoNeedsYouHeader": "Kto Cię dziś potrzebuje",
         "nameListWithMore_few": "{{names}} + {{count}} więcej",
         "nameListWithMore_many": "{{names}} + {{count}} więcej",
@@ -346,11 +339,6 @@
         "promptNextGoalWithTopic": "Chcecie wybrać jeden mały cel z {{topic}} na ten tydzień?",
         "promptRestartWithTopic": "Chcecie wybrać jeden mały cel z {{topic}} na ten tydzień?",
         "promptRestartEasierWithTopic": "Czy mamy ułatwić powrót do {{topic}}?"
-      },
-      "empty": {
-        "title": "Your family dashboard starts here",
-        "body": "Add your first child profile and this screen will turn into tonight prompts, weekly recaps, nudges, and progress cards.",
-        "cta": "Add your first child"
       },
       "childrenHeader": "Children",
       "familyManagementHeader": "Zarządzanie rodziną",
@@ -402,10 +390,6 @@
         "openLibrary": "Otwórz bibliotekę {{name}}",
         "close": "Zamknij"
       },
-      "addLearner": {
-        "title": "Dodaj ucznia",
-        "accessibilityLabel": "Dodaj ucznia do swojej rodziny"
-      },
       "childProfileLabel": "Profil {{name}}",
       "greetingFallbackName": "Cześć",
       "greetingNoName": "Cześć!"
@@ -430,6 +414,25 @@
     "intentCard": {
       "titleWithBadge": "{{title}}, {{count}} elementów",
       "opensActivityHint": "Otwiera tę aktywność"
+    },
+    "connect": {
+      "title": "Połącz",
+      "subtitleProminent": "Skonfiguruj naukę z osobami, które są dla Ciebie ważne.",
+      "subtitleCompact": "Dodaj kolejnego ucznia lub udostępnij MentoMate.",
+      "createChild": {
+        "title": "Dodaj profil dziecka",
+        "subtitle": "Stwórz bezpieczną przestrzeń do nauki dla swojego dziecka."
+      },
+      "linkExisting": {
+        "title": "Połącz z istniejącym uczniem",
+        "subtitle": "Dla ucznia, który już ma konto.",
+        "badge": "Wkrótce"
+      },
+      "invite": {
+        "title": "Zaproś kogoś do wypróbowania MentoMate",
+        "subtitle": "Udostępniasz tylko aplikację, bez danych o nauce."
+      },
+      "inviteMessage": "Wypróbuj MentoMate ze mną: pomoc w nauce dla całej rodziny."
     }
   },
   "nudge": {
