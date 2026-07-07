@@ -1621,7 +1621,7 @@ describe('CreateProfileScreen', () => {
       expect(mockSwitchProfile).not.toHaveBeenCalled();
     });
 
-    it('[WI-1611] shows the recovery path again when the family-mode retry also fails', async () => {
+    it('[WI-1677] stops offering family-mode retry after the retry also fails', async () => {
       jest.spyOn(console, 'warn').mockImplementation(() => undefined);
       mockFetch
         .mockResolvedValueOnce(
@@ -1668,12 +1668,7 @@ describe('CreateProfileScreen', () => {
       expect(Alert.alert).toHaveBeenLastCalledWith(
         'Profile created',
         "Lily's profile is ready, but we could not switch you to Family mode automatically.",
-        [
-          { text: 'Not now', style: 'cancel' },
-          expect.objectContaining({
-            text: 'Switch to Family mode',
-          }),
-        ],
+        [{ text: 'Not now', style: 'cancel' }],
         undefined,
       );
       const retryCall = mockFetch.mock.calls[2];
