@@ -9,8 +9,15 @@ queue under `working/program/`) and the current initiative handoff. Sibling to
 role-scaffolds) of the orchestration machinery. **To spawn a fresh orchestrator, paste
 `roles/kickoffs/orchestrator-kickoff.md`** (the thin launcher); it points here.
 
-**Precedence:** operator rulings > Cosmo lifecycle rules (AGENTS.md + the `cosmo` skills) +
-`planning-rules.md` (the planning rules) > this protocol > habits.
+> **Charter is the accountability spine (RATIFIED 2026-07-07).** Whether something is *your job* —
+> the outcomes you answer for, what you may decide without asking, and the exhaustive list of what
+> you must escalate — lives in **`roles/charters/CHARTER-orchestrator.md`**, not here. This protocol
+> is *mechanics only*: how to do the work the charter makes yours. Read the charter first and
+> banner-ack it at boot; where a line here conflicts with the charter, the **charter wins**.
+
+**Precedence:** operator rulings > **charter (`roles/charters/CHARTER-orchestrator.md`)** > Cosmo
+lifecycle rules (AGENTS.md + the `cosmo` skills) + `planning-rules.md` (the planning rules) > this
+protocol > habits.
 
 > **Paths in this folder.** Cross-references are relative to the `_quartet/` root (e.g.
 > `roles/shepherd-protocol.md`, `library/execution-tracker.md`, `clacks/progress-channel-design.md`).

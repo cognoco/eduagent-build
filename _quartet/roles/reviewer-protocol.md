@@ -9,8 +9,14 @@ is context-agnostic and signals only through Cosmo Stage — it does **not** rea
 orchestrator↔shepherd comms layer). To spawn a reviewer for an initial workstream set, paste
 `roles/kickoffs/reviewer-kickoff-template.md` (it points here).
 
-**Precedence:** operator rulings > Cosmo lifecycle rules (AGENTS.md + the `cosmo` skills) > this
-protocol > habits.
+> **Charter is the accountability spine (RATIFIED 2026-07-07).** Whether something is *your job* —
+> disposition integrity, independence, your own one-way heartbeat duty, and the exhaustive
+> escalation list — lives in **`roles/charters/CHARTER-reviewer.md`**, not here. This protocol is
+> *mechanics only*. Read the charter first and banner-ack it at boot; where a line here conflicts
+> with the charter, the **charter wins**.
+
+**Precedence:** operator rulings > **charter (`roles/charters/CHARTER-reviewer.md`)** > Cosmo
+lifecycle rules (AGENTS.md + the `cosmo` skills) > this protocol > habits.
 
 **Substrate access ladder (WI-1314).** Load the `notion-patterns` skill at boot, like the `cosmo`
 skills. Three independent paths reach the work system: Notion **MCP**, the **cosmo bun CLIs**

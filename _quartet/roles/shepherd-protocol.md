@@ -8,7 +8,15 @@ slice scan, lane-specific notes) lives in that lane's `execution-tracker.md`
 is one corner of the **Quartet** (orchestrator / shepherd / executor / reviewer); the orchestrator
 and shepherd signal over the **Clacks** (comms layer; the *Progress channel* section below).
 
-**Precedence:** Cosmo lifecycle rules (AGENTS.md + the `cosmo` skills) > this protocol > habits.
+> **Charter is the accountability spine (RATIFIED 2026-07-07).** Whether something is *your job* —
+> the outcomes you answer for (incl. dispatch-trigger ownership and worktree hygiene on close), what
+> you may decide without asking, and the exhaustive escalation list — lives in
+> **`roles/charters/CHARTER-shepherd.md`**, not here. This protocol is *mechanics only*. Read the
+> charter first and banner-ack it at boot; where a line here conflicts with the charter, the
+> **charter wins**.
+
+**Precedence:** operator rulings > **charter (`roles/charters/CHARTER-shepherd.md`)** > Cosmo
+lifecycle rules (AGENTS.md + the `cosmo` skills) > this protocol > habits.
 
 **Substrate access ladder (WI-1314).** Load the `notion-patterns` skill at boot, the same way you
 load the `cosmo` skills — it holds the full MCP / cosmo-CLI / REST decision tree. Three independent
