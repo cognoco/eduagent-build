@@ -612,7 +612,7 @@ function SessionScreenInner() {
     const profileId = activeProfile?.id;
     const sessionIdForEntry = routeSessionId ?? activeSessionId;
     if (!profileId || !sessionIdForEntry) return;
-    if (activeProfile?.isOwner !== false) return;
+    if (navigationContract.gates.sessionIsOwner) return;
     if (effectiveMode !== 'learning' || !isFirstSession) return;
     if (mentorBirthAttemptedProfilesRef.current.has(profileId)) return;
 
@@ -638,10 +638,10 @@ function SessionScreenInner() {
     };
   }, [
     activeProfile?.id,
-    activeProfile?.isOwner,
     activeSessionId,
     effectiveMode,
     isFirstSession,
+    navigationContract.gates.sessionIsOwner,
     routeSessionId,
   ]);
 
