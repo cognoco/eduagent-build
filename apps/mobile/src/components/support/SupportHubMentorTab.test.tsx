@@ -152,6 +152,8 @@ describe('SupportHubMentorTab', () => {
     screen.getByText('Practiced fractions');
     screen.getByText('Completed the review set.');
     screen.getByTestId('structural-fact-fact-1');
+    expect(screen.queryByText('Effort')).toBeNull();
+    expect(screen.queryByText('supportHub.mentor.factKind.effort')).toBeNull();
     expect(
       screen.queryByText('Private chats, notes, and mentor memory'),
     ).toBeNull();
