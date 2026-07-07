@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import type { ScopeDescriptor, SharedRecord } from '@eduagent/schemas';
 
 import type { EligibleManagedPerson } from '../../hooks/use-eligible-supportees';
+import { StructuralFactCard } from '../learning-surface';
 import { SupportPersonPickerSheet } from './SupportPersonPickerSheet';
 import { useSharedRecord } from './use-shared-record';
 
@@ -70,21 +71,24 @@ function SupportHubMentorPersonCard({
   const { t } = useTranslation();
   const query = useSharedRecord(scope);
   const facts = query.data?.supporterView.facts.slice(0, 2) ?? [];
+  const showHeaderSubtitle = query.isLoading || !hasShareableFacts(query.data);
 
   return (
     <View
-      className="rounded-card border border-border bg-surface p-4"
+      className="gap-3"
       testID={`support-hub-mentor-person-${scope.personId}`}
     >
-      <View className="flex-row items-start justify-between gap-3">
+      <View className="rounded-card border border-border bg-surface p-4">
         <View className="flex-1">
           <Text className="text-h3 font-semibold text-text-primary">
             {scope.displayName}
           </Text>
-          <Text className="mt-1 text-body-sm text-text-secondary">
-            {query.data?.supporterView.headline ??
-              t('supportHub.mentor.loadingHeadline')}
-          </Text>
+          {showHeaderSubtitle ? (
+            <Text className="mt-1 text-body-sm text-text-secondary">
+              {query.data?.supporterView.headline ??
+                t('supportHub.mentor.loadingHeadline')}
+            </Text>
+          ) : null}
         </View>
         {query.isLoading ? (
           <ActivityIndicator accessibilityLabel={t('common.loading')} />
@@ -92,7 +96,7 @@ function SupportHubMentorPersonCard({
       </View>
 
       {query.isError && !query.data ? (
-        <View className="mt-3 rounded-card border border-border bg-background p-3">
+        <View className="rounded-card border border-border bg-background p-3">
           <Text className="text-body-sm font-semibold text-text-primary">
             {t('supportHub.mentor.errorTitle')}
           </Text>
@@ -111,36 +115,20 @@ function SupportHubMentorPersonCard({
           </Pressable>
         </View>
       ) : hasShareableFacts(query.data) ? (
-        <View className="mt-3 gap-3">
-          <Text className="text-caption text-text-secondary">
-            {t('supportHub.mentor.structuralOnly')}
-          </Text>
-          {facts.map((fact) => (
-            <View
-              key={fact.id}
-              className="border-t border-border pt-3"
-              testID={`support-hub-mentor-fact-${fact.id}`}
-            >
-              <Text className="text-caption font-semibold uppercase text-text-secondary">
-                {fact.kind === 'mastery'
-                  ? t('supportHub.mentor.factKind.mastery')
-                  : fact.kind === 'effort'
-                    ? t('supportHub.mentor.factKind.effort')
-                    : t('supportHub.mentor.factKind.observable_engagement')}
-              </Text>
-              <Text className="mt-1 text-body font-semibold text-text-primary">
-                {fact.title}
-              </Text>
-              {fact.detail ? (
-                <Text className="mt-1 text-body-sm text-text-secondary">
-                  {fact.detail}
-                </Text>
-              ) : null}
-            </View>
-          ))}
-        </View>
+        <StructuralFactCard
+          headline={
+            query.data?.supporterView.headline ??
+            t('supportHub.mentor.loadingHeadline')
+          }
+          structuralOnlyLabel={t('supportHub.mentor.structuralOnly')}
+          facts={facts.map((fact) => ({
+            id: fact.id,
+            title: fact.title,
+            detail: fact.detail,
+          }))}
+        />
       ) : query.data ? (
-        <View className="mt-3 rounded-card border border-border bg-background p-3">
+        <View className="rounded-card border border-border bg-background p-3">
           <Text className="text-body-sm font-semibold text-text-primary">
             {t('supportHub.mentor.emptyCardTitle')}
           </Text>
@@ -152,7 +140,7 @@ function SupportHubMentorPersonCard({
         </View>
       ) : null}
 
-      <View className="mt-4 gap-2">
+      <View className="rounded-card border border-border bg-surface p-4 gap-2">
         <SupportHubActionButton
           label={t('supportHub.mentor.actionMentor')}
           onPress={() => onOpenPersonScope?.(scope)}

@@ -4240,11 +4240,6 @@
       "actionMentor": "Mentor-Ansicht",
       "actionSubjects": "Fächer",
       "actionJournal": "Journal",
-      "factKind": {
-        "mastery": "Beherrschung",
-        "effort": "Einsatz",
-        "observable_engagement": "Engagement"
-      },
       "addSupporterLabel": "Unterstützung starten"
     },
     "subjects": {

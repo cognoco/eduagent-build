@@ -151,6 +151,9 @@ describe('SupportHubMentorTab', () => {
 
     screen.getByText('Practiced fractions');
     screen.getByText('Completed the review set.');
+    screen.getByTestId('structural-fact-fact-1');
+    expect(screen.queryByText('Effort')).toBeNull();
+    expect(screen.queryByText('supportHub.mentor.factKind.effort')).toBeNull();
     expect(
       screen.queryByText('Private chats, notes, and mentor memory'),
     ).toBeNull();
@@ -216,7 +219,7 @@ describe('SupportHubMentorTab', () => {
       'When Emma has a shared session or report, it will show up here.',
     );
     expect(screen.queryByText('Practiced fractions')).toBeNull();
-    expect(screen.queryByTestId('support-hub-mentor-fact-fact-1')).toBeNull();
+    expect(screen.queryByTestId('structural-fact-fact-1')).toBeNull();
   });
 
   it('shows an error card and refetches when retry is pressed', async () => {

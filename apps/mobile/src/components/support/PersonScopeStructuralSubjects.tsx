@@ -16,8 +16,8 @@ import {
 } from '@eduagent/schemas';
 
 import { EmptyStateCard, ErrorFallback } from '../common';
+import { SubjectHubSurface } from '../learning-surface';
 import {
-  SubjectHub,
   shouldShowSearchFilter,
   type HubChapter,
   type HubNextUp,
@@ -210,7 +210,7 @@ export function PersonScopeStructuralSubjects({
             {t('supportHub.subjects.structuralOnly')}
           </Text>
         </View>
-        <SubjectHub data={selectedHubData} />
+        <SubjectHubSurface data={selectedHubData} mode="supporter-readonly" />
       </View>
     );
   }

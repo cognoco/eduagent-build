@@ -3994,12 +3994,7 @@
       "actionMentor": "Mentor view",
       "actionSubjects": "Subjects",
       "actionJournal": "Journal",
-      "addSupporterLabel": "Start supporting",
-      "factKind": {
-        "mastery": "Mastery",
-        "effort": "Effort",
-        "observable_engagement": "Engagement"
-      }
+      "addSupporterLabel": "Start supporting"
     },
     "subjects": {
       "title": "Subjects",

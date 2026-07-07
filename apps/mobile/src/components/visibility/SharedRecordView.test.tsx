@@ -49,6 +49,7 @@ describe('SharedRecordView', () => {
     screen.getByText('Emma has 1 shareable update.');
     screen.getByText('Structural facts only. No raw notes or chat text.');
     screen.getByText('Practiced fractions');
+    screen.getByTestId('structural-fact-fact-1');
     expect(screen.queryByText(/raw chat/i)).toBeNull();
   });
 

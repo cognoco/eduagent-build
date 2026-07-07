@@ -4240,11 +4240,6 @@
       "actionMentor": "Vista do mentor",
       "actionSubjects": "Disciplinas",
       "actionJournal": "Diário",
-      "factKind": {
-        "mastery": "Domínio",
-        "effort": "Esforço",
-        "observable_engagement": "Participação"
-      },
       "addSupporterLabel": "Começar a apoiar"
     },
     "subjects": {

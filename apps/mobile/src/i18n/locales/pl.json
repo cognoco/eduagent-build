@@ -4402,11 +4402,6 @@
       "actionMentor": "Widok mentora",
       "actionSubjects": "Przedmioty",
       "actionJournal": "Dziennik",
-      "factKind": {
-        "mastery": "Opanowanie",
-        "effort": "Wysiłek",
-        "observable_engagement": "Zaangażowanie"
-      },
       "addSupporterLabel": "Zacznij wspierać"
     },
     "subjects": {
