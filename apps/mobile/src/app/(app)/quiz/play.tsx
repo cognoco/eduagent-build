@@ -28,6 +28,7 @@ import type {
 } from '@eduagent/schemas';
 import { useCheckAnswer, useCompleteRound } from '../../../hooks/use-quiz';
 import { PolarStar } from '../../../components/common';
+import { LearningRewardMoment } from '../../../components/learning-surface';
 import { platformAlert } from '../../../lib/platform-alert';
 // platformAlert maps to window.confirm on web for 2-button prompts, which
 // blocks the renderer (BUG-892). For the quit-quiz confirmation we use a
@@ -768,6 +769,23 @@ export default function QuizPlayScreen(): React.ReactElement {
     question.type === 'guess_who'
       ? selectedAnswer || correctAnswer
       : selectedAnswer;
+  const correctRewardActivityLabel =
+    question.type === 'guess_who'
+      ? t('quiz.play.titleGuessWho')
+      : question.type === 'capitals'
+        ? t('quiz.play.titleCapitals')
+        : t('quiz.play.titleVocabulary');
+  const correctRewardHeadline =
+    question.type === 'guess_who'
+      ? t('quiz.play.foundThemClues', {
+          count: guessWhoCluesUsed,
+        })
+      : t('quiz.play.discoveredIt');
+  const correctRewardReinforcement = isFinalQuestion
+    ? roundAutoSaved
+      ? t('quiz.play.savedReady')
+      : t('quiz.play.savingResult')
+    : t('quiz.play.lockedIn');
   const showCapitalsFeedback =
     answerState === 'wrong' &&
     question.type === 'capitals' &&
@@ -974,33 +992,17 @@ export default function QuizPlayScreen(): React.ReactElement {
         {answerState !== 'unanswered' && answerState !== 'checking' ? (
           <View className="mt-6 px-5">
             {answerState === 'correct' ? (
-              <View className="mb-4 items-center">
-                <View className="-mb-8 -mt-10">
-                  <PolarStar testID="quiz-correct-celebration" />
-                </View>
-                <Text className="mt-3 text-center text-h3 font-bold text-success">
-                  {question.type === 'guess_who'
-                    ? t('quiz.play.foundThemClues', {
-                        count: guessWhoCluesUsed,
-                      })
-                    : t('quiz.play.discoveredIt')}
-                </Text>
-                {revealedAnswer ? (
-                  <Text
-                    className="mt-1 text-center text-h2 font-bold text-text-primary"
-                    testID="quiz-revealed-answer"
-                  >
-                    {revealedAnswer}
-                  </Text>
-                ) : null}
-                <Text className="mt-1 text-center text-body-sm text-text-secondary">
-                  {isFinalQuestion
-                    ? roundAutoSaved
-                      ? t('quiz.play.savedReady')
-                      : t('quiz.play.savingResult')
-                    : t('quiz.play.lockedIn')}
-                </Text>
-              </View>
+              <LearningRewardMoment
+                activityLabel={correctRewardActivityLabel}
+                headline={correctRewardHeadline}
+                answer={revealedAnswer}
+                fallbackAnswerLabel={t('quiz.play.correct')}
+                reinforcement={correctRewardReinforcement}
+                motif={<PolarStar testID="quiz-correct-celebration" />}
+                testID="quiz-reward-moment"
+                activityTestID="quiz-reward-activity"
+                answerTestID="quiz-revealed-answer"
+              />
             ) : question.type === 'guess_who' ? (
               <View className="mb-3">
                 <Text className="text-center text-h3 font-semibold text-text-primary">
