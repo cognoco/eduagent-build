@@ -173,7 +173,7 @@ export default function CreateProfileScreen() {
       setError(t('onboarding.createProfile.timeoutError'));
     }, PROFILE_CREATE_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [createPostPending]);
+  }, [createPostPending, t]);
 
   useEffect(() => {
     return () => {
@@ -516,6 +516,7 @@ export default function CreateProfileScreen() {
     }
   }, [
     activeProfileRole,
+    activeProfile?.id,
     isFirstProfileCreation,
     navigationContract.isParentProxy,
     canSubmit,

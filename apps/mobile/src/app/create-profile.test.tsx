@@ -13,6 +13,7 @@ import {
   __resetMentorBornCeremonyForTests,
   getMentorBornCeremonySnapshot,
 } from '../lib/mentor-born-ceremony';
+import { mentorBirthSeenKey } from '../lib/secure-store-keys';
 
 import {
   resolveNavigationContract,
@@ -153,6 +154,9 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 }
 
 const CreateProfileScreen = require('./create-profile').default;
+const expoSecureStoreMock = jest.requireMock('expo-secure-store') as {
+  __store: Map<string, string>;
+};
 
 describe('CreateProfileScreen', () => {
   beforeEach(() => {
@@ -1353,6 +1357,45 @@ describe('CreateProfileScreen', () => {
       // Navigation back (handleClose) should fire
       expect(mockBack).toHaveBeenCalled();
       expect(getMentorBornCeremonySnapshot().requestCount).toBe(0);
+    });
+
+    it('does not consume the child mentor-born latch when parent admin creates a child', async () => {
+      const patchedOwner: NavigationProfile = {
+        ...parentProfile,
+        defaultAppContext: 'family',
+        hasFamilyLinks: true,
+      };
+      mockFetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: childProfile }), {
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: patchedOwner }), {
+            status: 200,
+          }),
+        );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
+      });
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+
+      expect(
+        expoSecureStoreMock.__store.get(mentorBirthSeenKey(childProfile.id)),
+      ).toBeUndefined();
+      expect(screen.queryByTestId('mentor-birth-overlay')).toBeNull();
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
     });
 
     it('[WI-1611] persists family context on the active owner, not the returned child, when parent adds first child', async () => {

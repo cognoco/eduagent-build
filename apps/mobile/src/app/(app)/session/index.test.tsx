@@ -45,29 +45,32 @@ const getMockFeatureFlags = (): MockFeatureFlags =>
     }
   ).__sessionTestFeatureFlags;
 
-jest.mock('../../../lib/feature-flags' /* gc1-allow: feature flag module boundary — suite mutates FEATURE_FLAGS via global test state */, () => {
-  const featureFlags: MockFeatureFlags = {
-    COACH_BAND_ENABLED: true,
-    MIC_IN_PILL_ENABLED: true,
-    I18N_ENABLED: true,
-    PREVIEW_ONBOARDING_ENABLED: true,
-    PREVIEW_ENTRY_CTA_ENABLED: false,
-    MODE_NAV_V0_ENABLED: false,
-    MODE_NAV_V1_ENABLED: false,
-    MODE_NAV_V2_ENABLED: false,
-    ADULT_OWNER_GATE_ENABLED: true,
-  };
-  (
-    globalThis as typeof globalThis & {
-      __sessionTestFeatureFlags: MockFeatureFlags;
-    }
-  ).__sessionTestFeatureFlags = featureFlags;
+jest.mock(
+  '../../../lib/feature-flags' /* gc1-allow: feature flag module boundary — suite mutates FEATURE_FLAGS via global test state */,
+  () => {
+    const featureFlags: MockFeatureFlags = {
+      COACH_BAND_ENABLED: true,
+      MIC_IN_PILL_ENABLED: true,
+      I18N_ENABLED: true,
+      PREVIEW_ONBOARDING_ENABLED: true,
+      PREVIEW_ENTRY_CTA_ENABLED: false,
+      MODE_NAV_V0_ENABLED: false,
+      MODE_NAV_V1_ENABLED: false,
+      MODE_NAV_V2_ENABLED: false,
+      ADULT_OWNER_GATE_ENABLED: true,
+    };
+    (
+      globalThis as typeof globalThis & {
+        __sessionTestFeatureFlags: MockFeatureFlags;
+      }
+    ).__sessionTestFeatureFlags = featureFlags;
 
-  return {
-    ...jest.requireActual('../../../lib/feature-flags'),
-    FEATURE_FLAGS: featureFlags,
-  };
-});
+    return {
+      ...jest.requireActual('../../../lib/feature-flags'),
+      FEATURE_FLAGS: featureFlags,
+    };
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Boundary mocks (external / native runtime only)
@@ -711,6 +714,118 @@ describe('SessionScreen homework flow', () => {
     activeRender?.cleanup();
     activeRender = null;
     jest.useRealTimers();
+  });
+
+  describe('managed-child mentor birth moment', () => {
+    const childMentorBirthKey = 'mentorBirthSeen_profile-child-1';
+
+    function useLearningRouteParams() {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        mode: 'learning',
+        subjectId: 'subject-1',
+        subjectName: 'Math',
+        topicId: 'topic-1',
+        topicName: 'Topic 1',
+      });
+    }
+
+    it('auto-plays when a managed child first starts a learning session', async () => {
+      useLearningRouteParams();
+
+      const testScreen = renderSessionScreen(CHILD_PROFILE);
+      await flushAsyncWork();
+
+      fireEvent.press(testScreen.getByTestId('manual-send-button'));
+
+      await waitFor(() => {
+        expect(mockStartSession).toHaveBeenCalledWith(
+          expect.objectContaining({ sessionType: 'learning' }),
+        );
+      });
+      await waitFor(() => {
+        testScreen.getByTestId('mentor-birth-overlay');
+      });
+
+      testScreen.getByTestId('mentor-birth-animation');
+      expect(secureStore[childMentorBirthKey]).toBe('true');
+    }, 15000);
+
+    it('does not show or consume the child ceremony for an owner learning session', async () => {
+      useLearningRouteParams();
+
+      const testScreen = renderSessionScreen(ACTIVE_PROFILE);
+      await flushAsyncWork();
+
+      fireEvent.press(testScreen.getByTestId('manual-send-button'));
+
+      await waitFor(() => {
+        expect(mockStartSession).toHaveBeenCalledWith(
+          expect.objectContaining({ sessionType: 'learning' }),
+        );
+      });
+      expect(testScreen.queryByTestId('mentor-birth-overlay')).toBeNull();
+      expect(secureStore[childMentorBirthKey]).toBeUndefined();
+    }, 15000);
+
+    it('is idempotent per child profile across app restarts', async () => {
+      secureStore[childMentorBirthKey] = 'true';
+      useLearningRouteParams();
+
+      const testScreen = renderSessionScreen(CHILD_PROFILE);
+      await flushAsyncWork();
+
+      fireEvent.press(testScreen.getByTestId('manual-send-button'));
+
+      await waitFor(() => {
+        expect(mockStream).toHaveBeenCalledTimes(1);
+      });
+      expect(testScreen.queryByTestId('mentor-birth-overlay')).toBeNull();
+      expect(secureStore[childMentorBirthKey]).toBe('true');
+    }, 15000);
+
+    it('completes instantly under reduced motion and does not block the session stream', async () => {
+      const reanimated = require('react-native-reanimated');
+      const originalUseReducedMotion = reanimated.useReducedMotion;
+      reanimated.useReducedMotion = () => true;
+
+      try {
+        useLearningRouteParams();
+
+        const testScreen = renderSessionScreen(CHILD_PROFILE);
+        await flushAsyncWork();
+
+        fireEvent.press(testScreen.getByTestId('manual-send-button'));
+
+        await waitFor(() => {
+          expect(mockStream).toHaveBeenCalledTimes(1);
+        });
+        await waitFor(() => {
+          expect(secureStore[childMentorBirthKey]).toBe('true');
+        });
+        expect(testScreen.queryByTestId('mentor-birth-overlay')).toBeNull();
+      } finally {
+        reanimated.useReducedMotion = originalUseReducedMotion;
+      }
+    }, 15000);
+
+    it('clears the auto-play surface within the three-second cap', async () => {
+      useLearningRouteParams();
+
+      const testScreen = renderSessionScreen(CHILD_PROFILE);
+      await flushAsyncWork();
+
+      fireEvent.press(testScreen.getByTestId('manual-send-button'));
+
+      await waitFor(() => {
+        testScreen.getByTestId('mentor-birth-overlay');
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(3000);
+      });
+
+      expect(testScreen.queryByTestId('mentor-birth-overlay')).toBeNull();
+    }, 15000);
   });
 
   it('starts a fresh session route from the session-expired primary action', async () => {

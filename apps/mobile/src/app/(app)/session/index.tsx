@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { shouldShowBookLink } from '../../../lib/show-book-link';
@@ -105,6 +105,7 @@ import {
   MentorCelebration,
   RewardReceiptCard,
 } from '../../../components/mentor';
+import { MentorBirthAnimation } from '../../../components/common/MentorBirthAnimation';
 import { useTranslation } from 'react-i18next';
 import { track } from '../../../lib/analytics';
 import { Sentry } from '../../../lib/sentry';
@@ -125,6 +126,7 @@ import {
   getLearnerTurnCount,
 } from './_view-models/session-derived-state';
 import { getSessionRouteParams } from './_view-models/session-route-params';
+import { mentorBirthSeenKey } from '../../../lib/secure-store-keys';
 import type {
   ChallengeRoundOfferEvent,
   DraftedChallengeNoteEvent,
@@ -141,6 +143,8 @@ function isChallengeRoundInFlight(
     round?.state === 'drafting'
   );
 }
+
+const MENTOR_BIRTH_SESSION_TIME_SCALE = 0.35;
 
 interface FirstSessionWrapUpCardProps {
   value: string;
@@ -436,6 +440,7 @@ function SessionScreenInner() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
     routeSessionId ?? null,
   );
+  const [showMentorBirthMoment, setShowMentorBirthMoment] = useState(false);
   const [pendingClassification, setPendingClassification] = useState(false);
   const [classifyError, setClassifyError] = useState<string | null>(null);
   const [classifiedSubject, setClassifiedSubject] = useState<{
@@ -561,6 +566,7 @@ function SessionScreenInner() {
   } | null>(null);
   const challengeActionInFlightRef = useRef(false);
   const firstSessionWrapShownRef = useRef(false);
+  const mentorBirthAttemptedProfilesRef = useRef<Set<string>>(new Set());
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
   const activeSession = useSession(activeSessionId ?? '');
@@ -601,6 +607,43 @@ function SessionScreenInner() {
     hasResolvedActiveSessionRef.current = true;
     router.setParams({ sessionId: resumedSessionId });
   }, [activeSessionLookup.data?.sessionId, shouldLookupActiveSession, router]);
+
+  useEffect(() => {
+    const profileId = activeProfile?.id;
+    const sessionIdForEntry = routeSessionId ?? activeSessionId;
+    if (!profileId || !sessionIdForEntry) return;
+    if (navigationContract.gates.sessionIsOwner) return;
+    if (effectiveMode !== 'learning' || !isFirstSession) return;
+    if (mentorBirthAttemptedProfilesRef.current.has(profileId)) return;
+
+    mentorBirthAttemptedProfilesRef.current.add(profileId);
+    const key = mentorBirthSeenKey(profileId);
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const seen = await SecureStore.getItemAsync(key);
+        if (cancelled || seen === 'true') return;
+        await SecureStore.setItemAsync(key, 'true');
+        if (!cancelled) {
+          setShowMentorBirthMoment(true);
+        }
+      } catch (error) {
+        console.warn('[Session] Mentor birth latch unavailable:', error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeProfile?.id,
+    activeSessionId,
+    effectiveMode,
+    isFirstSession,
+    navigationContract.gates.sessionIsOwner,
+    routeSessionId,
+  ]);
 
   const { bookmarkState, handleToggleBookmark } = useBookmarkHandler({
     sessionId: activeSessionId ?? routeSessionId ?? undefined,
@@ -1617,6 +1660,15 @@ function SessionScreenInner() {
           </>
         }
       />
+      {showMentorBirthMoment ? (
+        <View testID="mentor-birth-overlay" style={styles.mentorBirthOverlay}>
+          <MentorBirthAnimation
+            readyLabel={t('onboarding.mentorBirth.ready')}
+            onComplete={() => setShowMentorBirthMoment(false)}
+            timeScale={MENTOR_BIRTH_SESSION_TIME_SCALE}
+          />
+        </View>
+      ) : null}
       {activeProfile?.id ? (
         <OutboxFailedBanner profileId={activeProfile.id} flow="session" />
       ) : null}
@@ -1649,3 +1701,14 @@ function SessionScreenInner() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  mentorBirthOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    zIndex: 20,
+  },
+});

@@ -101,6 +101,13 @@ export const guardianNotificationAskKey = (profileId: string): string =>
   sanitizeSecureStoreKey(`guardianNotificationAskShown_${profileId}`);
 
 /**
+ * Mentor-born ceremony shown flag (per managed child profile).
+ * Key: `mentorBirthSeen_<profileId>` (sanitized).
+ */
+export const mentorBirthSeenKey = (profileId: string): string =>
+  sanitizeSecureStoreKey(`mentorBirthSeen_${profileId}`);
+
+/**
  * Summary draft key prefix.
  * Full key: `summary-draft-<profileId>-<sessionId>`.
  * Multi-component key — sessionId cannot be enumerated at sign-out time.
