@@ -46,6 +46,7 @@ import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
 import { platformAlert } from '../lib/platform-alert';
 import { errorHasCode } from '../components/session/session-types';
+import { requestMentorBornCeremony } from '../lib/mentor-born-ceremony';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -341,29 +342,53 @@ export default function CreateProfileScreen() {
       setCreatePostPending(false);
 
       // Persist family context immediately after creation for a parent
-      // audience. The profile is created with defaultAppContext=null; setting
-      // it now means future sign-ins land the user in the correct mode the
-      // moment they add a child (family-mode UI activates as soon as
-      // familyCapable === true, which requires hasFamilyLinks === true).
-      // A learner audience leaves the default — no PATCH needed.
-      // Wrapped in a non-throwing try so a flaky PATCH never blocks the
-      // profile-created success path; the user can change mode later from
-      // More → Account.
-      if (wantsFamily) {
+      // audience. First-profile parent setup writes the newly-created owner.
+      // Parent-adds-child writes the already-active owner, not the returned
+      // child profile. A learner audience leaves the default — no PATCH needed.
+      const familyContextProfileId = isParentAddingChild
+        ? activeProfile?.id
+        : wantsFamily
+          ? profile.id
+          : null;
+      const persistFamilyContext = async (): Promise<boolean> => {
+        if (!familyContextProfileId) return true;
         try {
           await updateAppContext.mutateAsync({
-            profileId: profile.id,
+            profileId: familyContextProfileId,
             defaultAppContext: 'family',
           });
+          return true;
         } catch (intentErr) {
           if (__DEV__) {
             console.warn(
-              'Failed to persist family context on first profile setup; user can change later from More → Account.',
+              'Failed to persist family context after profile creation.',
               intentErr,
             );
           }
+          return false;
         }
-      }
+      };
+      const showFamilyContextRecoveryAlert = (): void => {
+        platformAlert(
+          t('createProfile.createdTitle'),
+          t('createProfile.createdChildFamilyContextFailedBody', {
+            name: trimmedName,
+          }),
+          [
+            { text: t('common.notNow'), style: 'cancel' },
+            {
+              text: t('createProfile.switchFamilyModeCta'),
+              onPress: () => {
+                void (async () => {
+                  const retryPersisted = await persistFamilyContext();
+                  if (!retryPersisted) showFamilyContextRecoveryAlert();
+                })();
+              },
+            },
+          ],
+        );
+      };
+      const familyContextPersisted = await persistFamilyContext();
 
       // BUG-239: When a parent adds a child, the API grants consent inline
       // (consentStatus === 'CONSENTED'). Do NOT redirect to the child consent
@@ -371,11 +396,18 @@ export default function CreateProfileScreen() {
       // parent on their own profile.
       if (isParentAddingChild) {
         handleClose();
-        // Show confirmation — parent stays on their own profile
-        platformAlert(
-          t('createProfile.createdTitle'),
-          t('createProfile.createdChildBody', { name: trimmedName }),
-        );
+        // Show confirmation — parent stays on their own profile. If the
+        // family-context PATCH failed, keep the successful child creation and
+        // give the parent an explicit retry path instead of silently landing
+        // back in Study context.
+        if (familyContextPersisted) {
+          platformAlert(
+            t('createProfile.createdTitle'),
+            t('createProfile.createdChildBody', { name: trimmedName }),
+          );
+        } else {
+          showFamilyContextRecoveryAlert();
+        }
         return;
       }
 
@@ -418,6 +450,12 @@ export default function CreateProfileScreen() {
           params: { for: 'child' },
         });
       } else if (!needsConsentFlow) {
+        if (isFirstProfileCreation && !isAddingChild) {
+          requestMentorBornCeremony({
+            profileId: profile.id,
+            reason: 'first-profile-created',
+          });
+        }
         handleClose();
       }
 
@@ -484,6 +522,7 @@ export default function CreateProfileScreen() {
     displayName,
     birthDate,
     isParentAddingChild,
+    isFirstProfileCreation,
     // i18n Phase 1 — onSubmit branches on isAddingChild and reads i18n.language
     // to build the create-profile payload. Without these in deps, a route or
     // language change between mount and submit would send the stale value.

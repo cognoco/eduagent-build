@@ -9,6 +9,15 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
+import {
+  __resetMentorBornCeremonyForTests,
+  getMentorBornCeremonySnapshot,
+} from '../lib/mentor-born-ceremony';
+
+import {
+  resolveNavigationContract,
+  type NavigationProfile,
+} from '../lib/navigation-contract';
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
@@ -169,6 +178,7 @@ describe('CreateProfileScreen', () => {
       isLoaded: true,
       isSignedIn: true,
     });
+    __resetMentorBornCeremonyForTests();
   });
 
   afterEach(() => {
@@ -406,6 +416,13 @@ describe('CreateProfileScreen', () => {
 
     await waitFor(() => {
       expect(mockBack).toHaveBeenCalled();
+    });
+    expect(getMentorBornCeremonySnapshot()).toMatchObject({
+      activeRequest: {
+        profileId: 'new-id',
+        reason: 'first-profile-created',
+      },
+      requestCount: 1,
     });
   });
 
@@ -1242,7 +1259,7 @@ describe('CreateProfileScreen', () => {
   });
 
   describe('parent adding child', () => {
-    const parentProfile = {
+    const parentProfile: NavigationProfile = {
       id: 'parent-id',
       accountId: 'a1',
       displayName: 'Mum',
@@ -1251,12 +1268,17 @@ describe('CreateProfileScreen', () => {
       location: null,
       isOwner: true,
       hasPremiumLlm: false,
+      defaultAppContext: null,
+      hasFamilyLinks: false,
+      conversationLanguage: 'en',
+      pronouns: null,
       consentStatus: null,
+      linkCreatedAt: null,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     };
 
-    const childProfile = {
+    const childProfile: NavigationProfile = {
       id: 'child-new',
       accountId: 'a1',
       displayName: 'Lily',
@@ -1265,7 +1287,12 @@ describe('CreateProfileScreen', () => {
       location: null,
       isOwner: false,
       hasPremiumLlm: false,
+      defaultAppContext: null,
+      hasFamilyLinks: true,
+      conversationLanguage: 'en',
+      pronouns: null,
       consentStatus: 'CONSENTED',
+      linkCreatedAt: '2026-02-16T00:00:00Z',
       createdAt: '2026-02-16T00:00:00Z',
       updatedAt: '2026-02-16T00:00:00Z',
     };
@@ -1279,11 +1306,24 @@ describe('CreateProfileScreen', () => {
     });
 
     it('[QA-08] shows confirmation alert and does NOT switch profile when parent adds child', async () => {
-      mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify({ profile: childProfile }), {
-          status: 200,
-        }),
-      );
+      mockFetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: childProfile }), {
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              profile: {
+                ...parentProfile,
+                defaultAppContext: 'family',
+                hasFamilyLinks: true,
+              },
+            }),
+            { status: 200 },
+          ),
+        );
 
       render(<CreateProfileScreen />, { wrapper: Wrapper });
 
@@ -1312,15 +1352,314 @@ describe('CreateProfileScreen', () => {
       expect(mockSwitchProfile).not.toHaveBeenCalled();
       // Navigation back (handleClose) should fire
       expect(mockBack).toHaveBeenCalled();
+      expect(getMentorBornCeremonySnapshot().requestCount).toBe(0);
+    });
+
+    it('[WI-1611] persists family context on the active owner, not the returned child, when parent adds first child', async () => {
+      const patchedOwner: NavigationProfile = {
+        ...parentProfile,
+        defaultAppContext: 'family',
+        hasFamilyLinks: true,
+      };
+      mockFetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: childProfile }), {
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: patchedOwner }), {
+            status: 200,
+          }),
+        );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
+      });
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+
+      const patchCall = mockFetch.mock.calls[1];
+      expect(String(patchCall?.[0])).toContain(
+        '/profiles/parent-id/app-context',
+      );
+      expect(String(patchCall?.[0])).not.toContain(
+        '/profiles/child-new/app-context',
+      );
+      const patchInit = patchCall?.[1] as RequestInit | undefined;
+      expect(patchInit?.method).toBe('PATCH');
+      const patchBody = JSON.parse(String(patchInit?.body)) as Record<
+        string,
+        unknown
+      >;
+      expect(patchBody.defaultAppContext).toBe('family');
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
+
+      const resolvedProfiles = [patchedOwner, childProfile];
+      const flagCases = [
+        {
+          flags: {
+            MODE_NAV_V0_ENABLED: false,
+            MODE_NAV_V1_ENABLED: false,
+          },
+          appContext: null,
+        },
+        {
+          flags: {
+            MODE_NAV_V0_ENABLED: true,
+            MODE_NAV_V1_ENABLED: false,
+          },
+          appContext: 'family' as const,
+        },
+        {
+          flags: {
+            MODE_NAV_V0_ENABLED: true,
+            MODE_NAV_V1_ENABLED: true,
+          },
+          appContext: null,
+        },
+      ];
+      for (const flagCase of flagCases) {
+        const contract = resolveNavigationContract({
+          activeProfile: patchedOwner,
+          appContext: flagCase.appContext,
+          flags: flagCase.flags,
+          isParentProxy: false,
+          profiles: resolvedProfiles,
+          role: 'owner',
+          subscription: {
+            status: 'ready',
+            tier: 'family',
+            effectiveAccessTier: 'family',
+            billingAccess: null,
+          },
+        });
+        expect(contract.home.screen).toBe('FamilyHome');
+      }
+    });
+
+    it('[WI-1611] keeps the owner active and updates owner family context when adding another child', async () => {
+      const existingChild: NavigationProfile = {
+        id: 'child-existing',
+        accountId: 'a1',
+        displayName: 'Max',
+        avatarUrl: null,
+        birthYear: birthDateAtMinimumAge().getFullYear(),
+        location: null,
+        isOwner: false,
+        hasPremiumLlm: false,
+        defaultAppContext: null,
+        hasFamilyLinks: true,
+        conversationLanguage: 'en',
+        pronouns: null,
+        consentStatus: 'CONSENTED',
+        linkCreatedAt: '2026-01-02T00:00:00Z',
+        createdAt: '2026-01-02T00:00:00Z',
+        updatedAt: '2026-01-02T00:00:00Z',
+      };
+      const familyOwner: NavigationProfile = {
+        ...parentProfile,
+        defaultAppContext: 'study',
+        hasFamilyLinks: true,
+      };
+      const patchedOwner: NavigationProfile = {
+        ...familyOwner,
+        defaultAppContext: 'family',
+      };
+      mockUseProfile.mockReturnValue({
+        switchProfile: mockSwitchProfile,
+        activeProfile: familyOwner,
+        profiles: [familyOwner, existingChild],
+      });
+      mockFetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: childProfile }), {
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: patchedOwner }), {
+            status: 200,
+          }),
+        );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
+      });
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+
+      expect(String(mockFetch.mock.calls[1]?.[0])).toContain(
+        '/profiles/parent-id/app-context',
+      );
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
+      expect(mockSwitchProfile).not.toHaveBeenCalledWith('child-new');
+    });
+
+    it('[WI-1611] preserves child creation and shows a family-mode recovery action when owner context PATCH fails', async () => {
+      jest.spyOn(console, 'warn').mockImplementationOnce(() => undefined);
+      mockFetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: childProfile }), {
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response('Patch failed', {
+            status: 403,
+            statusText: 'Forbidden',
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              profile: {
+                ...parentProfile,
+                defaultAppContext: 'family',
+                hasFamilyLinks: true,
+              },
+            }),
+            { status: 200 },
+          ),
+        );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
+      });
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'Profile created',
+          "Lily's profile is ready, but we could not switch you to Family mode automatically.",
+          [
+            { text: 'Not now', style: 'cancel' },
+            expect.objectContaining({
+              text: 'Switch to Family mode',
+            }),
+          ],
+          undefined,
+        );
+      });
+
+      const [, , buttons] = (Alert.alert as jest.Mock).mock.calls[0];
+      await act(async () => {
+        buttons[1].onPress();
+        await Promise.resolve();
+      });
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(3);
+      });
+      expect(String(mockFetch.mock.calls[2]?.[0])).toContain(
+        '/profiles/parent-id/app-context',
+      );
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
+    });
+
+    it('[WI-1611] shows the recovery path again when the family-mode retry also fails', async () => {
+      jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      mockFetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: childProfile }), {
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response('Patch failed', {
+            status: 503,
+            statusText: 'Service Unavailable',
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response('Retry failed', {
+            status: 503,
+            statusText: 'Service Unavailable',
+          }),
+        );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
+      });
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledTimes(1);
+      });
+
+      const [, , buttons] = (Alert.alert as jest.Mock).mock.calls[0];
+      await act(async () => {
+        buttons[1].onPress();
+        await Promise.resolve();
+      });
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledTimes(2);
+      });
+      expect(Alert.alert).toHaveBeenLastCalledWith(
+        'Profile created',
+        "Lily's profile is ready, but we could not switch you to Family mode automatically.",
+        [
+          { text: 'Not now', style: 'cancel' },
+          expect.objectContaining({
+            text: 'Switch to Family mode',
+          }),
+        ],
+        undefined,
+      );
+      const retryCall = mockFetch.mock.calls[2];
+      expect(String(retryCall?.[0])).toContain(
+        '/profiles/parent-id/app-context',
+      );
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
     });
 
     it('navigates home when parent adds child and no back history', async () => {
       mockCanGoBack.mockReturnValue(false);
-      mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify({ profile: childProfile }), {
-          status: 200,
-        }),
-      );
+      mockFetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: childProfile }), {
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              profile: {
+                ...parentProfile,
+                defaultAppContext: 'family',
+                hasFamilyLinks: true,
+              },
+            }),
+            { status: 200 },
+          ),
+        );
 
       render(<CreateProfileScreen />, { wrapper: Wrapper });
 
@@ -1639,6 +1978,7 @@ describe('CreateProfileScreen', () => {
         });
       });
       expect(mockSwitchProfile).toHaveBeenCalledWith('adult-id');
+      expect(getMentorBornCeremonySnapshot().requestCount).toBe(0);
     });
 
     it('learner audience (adult): no PATCH, no add-child redirect, returns to home', async () => {
@@ -1665,6 +2005,13 @@ describe('CreateProfileScreen', () => {
       expect(mockReplace).not.toHaveBeenCalledWith({
         pathname: '/create-profile',
         params: { for: 'child' },
+      });
+      expect(getMentorBornCeremonySnapshot()).toMatchObject({
+        activeRequest: {
+          profileId: 'adult-id',
+          reason: 'first-profile-created',
+        },
+        requestCount: 1,
       });
     });
 

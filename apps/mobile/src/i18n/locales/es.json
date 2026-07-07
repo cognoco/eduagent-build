@@ -3691,7 +3691,9 @@
     "seePlans": "Ver planes",
     "minimumAgeError": "Los estudiantes deben tener al menos {{age}} años. Elige una fecha de nacimiento anterior.",
     "parentAdultAgeError": "Las cuentas de padres necesitan la fecha de nacimiento de un adulto. Introduce primero tus propios datos y luego añade a tu hijo/a.",
-    "a11yCloseDatePicker": "Cerrar selector de fecha"
+    "a11yCloseDatePicker": "Cerrar selector de fecha",
+    "createdChildFamilyContextFailedBody": "El perfil de {{name}} está listo, pero no pudimos cambiarte al modo Familia automáticamente.",
+    "switchFamilyModeCta": "Cambiar a modo Familia"
   },
   "clerkGate": {
     "timeoutTitle": "Está tardando más de lo esperado",

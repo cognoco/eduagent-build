@@ -51,6 +51,7 @@ import { useNetworkStatus } from '../hooks/use-network-status';
 import { enableSentry, Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
 import { AnimatedSplash } from '../components/AnimatedSplash';
+import { MentorBornCeremonyOverlay } from '../components/common/MentorBornCeremonyOverlay';
 import {
   createScopedPersister,
   getQueryCacheBuster,
@@ -609,6 +610,7 @@ export default function RootLayout() {
           <AnimatedSplash onComplete={onAnimComplete} />
         </SplashErrorBoundary>
       )}
+      <MentorBornCeremonyOverlay />
     </GestureHandlerRootView>
   );
 }
