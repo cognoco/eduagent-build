@@ -3689,7 +3689,9 @@
     "seePlans": "Abos ansehen",
     "minimumAgeError": "Lernende müssen mindestens {{age}} Jahre alt sein. Bitte wähle ein früheres Geburtsdatum.",
     "parentAdultAgeError": "Elternkonten benötigen das Geburtsdatum eines Erwachsenen. Gib zuerst deine eigenen Daten ein und füge danach dein Kind hinzu.",
-    "a11yCloseDatePicker": "Datumsauswahl schließen"
+    "a11yCloseDatePicker": "Datumsauswahl schließen",
+    "createdChildFamilyContextFailedBody": "Das Profil von {{name}} ist fertig, aber wir konnten nicht automatisch in den Familienmodus umschalten.",
+    "switchFamilyModeCta": "In den Familienmodus wechseln"
   },
   "clerkGate": {
     "timeoutTitle": "Dauert länger als erwartet",
