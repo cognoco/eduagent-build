@@ -505,6 +505,34 @@ describe('JournalTabView', () => {
     });
   });
 
+  it('[WI-1678] keeps the Reports empty motif hidden while report queries are still loading', () => {
+    mockMonthlyReports = {
+      ...query([]),
+      isLoading: true,
+    };
+    mockWeeklyReports = query([]);
+
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-reports'));
+    screen.getByTestId('journal-reports-section');
+    expect(
+      screen.queryByTestId('journal-reports-empty-motif-lamp', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('journal-reports-empty-motif-pen', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('journal-reports-empty-motif-book', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
+  });
+
   it('exposes a transcription-only mic on the archive search line', () => {
     render(<JournalTabView />);
     fireEvent.press(screen.getByTestId('journal-tab-notes'));

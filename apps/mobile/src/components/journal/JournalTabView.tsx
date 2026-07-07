@@ -527,6 +527,7 @@ function JournalReportsSection(): React.ReactElement {
   const hasAnyReports =
     (monthlyReports.data?.length ?? 0) > 0 ||
     (weeklyReports.data?.length ?? 0) > 0;
+  const isSettled = !monthlyReports.isLoading && !weeklyReports.isLoading;
   const openLatestReport = () => {
     if (!latestReport) return;
     if (latestReport.kind === 'weekly') {
@@ -593,7 +594,7 @@ function JournalReportsSection(): React.ReactElement {
 
   return (
     <View testID="journal-reports-section">
-      {!hasAnyReports && !isError ? (
+      {isSettled && !hasAnyReports && !isError ? (
         <View className="items-center" pointerEvents="none">
           <PracticeReportsEmptyMotif testID="journal-reports-empty-motif" />
         </View>
