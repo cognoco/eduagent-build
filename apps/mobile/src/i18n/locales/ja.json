@@ -3692,7 +3692,9 @@
     "seePlans": "プランを見る",
     "minimumAgeError": "学習者は{{age}}歳以上である必要があります。より前の生年月日を選択してください。",
     "parentAdultAgeError": "保護者アカウントには大人の生年月日が必要です。まずご自身の情報を入力し、その後でお子様を追加してください。",
-    "a11yCloseDatePicker": "日付ピッカーを閉じる"
+    "a11yCloseDatePicker": "日付ピッカーを閉じる",
+    "createdChildFamilyContextFailedBody": "{{name}}さんのプロフィールは準備できましたが、ファミリーモードへの自動切り替えができませんでした。",
+    "switchFamilyModeCta": "ファミリーモードに切り替える"
   },
   "clerkGate": {
     "timeoutTitle": "予想以上に時間がかかっています",

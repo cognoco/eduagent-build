@@ -3692,7 +3692,9 @@
     "seePlans": "Se planer",
     "minimumAgeError": "Elever må være minst {{age}} år gamle. Velg en tidligere fødselsdato.",
     "parentAdultAgeError": "Foreldrekontoer trenger en voksen fødselsdato. Skriv inn dine egne detaljer først, og legg deretter til barnet ditt.",
-    "a11yCloseDatePicker": "Lukk datovelger"
+    "a11yCloseDatePicker": "Lukk datovelger",
+    "createdChildFamilyContextFailedBody": "{{name}}s profil er klar, men vi kunne ikke bytte deg til familiemodus automatisk.",
+    "switchFamilyModeCta": "Bytt til familiemodus"
   },
   "clerkGate": {
     "timeoutTitle": "Tar lengre tid enn forventet",
