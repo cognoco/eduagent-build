@@ -470,31 +470,36 @@ describe('LearnerScreen', () => {
     renderLearner();
 
     await waitFor(() => screen.getByTestId('home-connect-section'));
+    fireEvent.press(screen.getByTestId('connect-create-child-action'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/more');
   });
 
   it('marks Link existing learner coming soon and keeps Invite separate from support links', async () => {
     const shareSpy = jest
       .spyOn(Share, 'share')
       .mockResolvedValue({ action: Share.sharedAction } as never);
-    mockShowAddChild = true;
-    mockLinkedChildren = [];
-    renderLearner();
+    try {
+      mockShowAddChild = true;
+      mockLinkedChildren = [];
+      renderLearner();
 
-    await waitFor(() => screen.getByTestId('home-connect-section'));
-    const linkExisting = screen.getByTestId('connect-link-existing-action');
-    expect(linkExisting.props.accessibilityState).toEqual(
-      expect.objectContaining({ disabled: true }),
-    );
+      await waitFor(() => screen.getByTestId('home-connect-section'));
+      const linkExisting = screen.getByTestId('connect-link-existing-action');
+      expect(linkExisting.props.accessibilityState).toEqual(
+        expect.objectContaining({ disabled: true }),
+      );
 
-    fireEvent.press(linkExisting);
-    expect(mockPush).not.toHaveBeenCalled();
+      fireEvent.press(linkExisting);
+      expect(mockPush).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByTestId('connect-invite-action'));
-    expect(shareSpy).toHaveBeenCalledWith({
-      message: 'Try MentoMate with me: learning help for the whole family.',
-    });
-    expect(mockPush).not.toHaveBeenCalled();
-    shareSpy.mockRestore();
+      fireEvent.press(screen.getByTestId('connect-invite-action'));
+      expect(shareSpy).toHaveBeenCalledWith({
+        message: 'Try MentoMate with me: learning help for the whole family.',
+      });
+      expect(mockPush).not.toHaveBeenCalled();
+    } finally {
+      shareSpy.mockRestore();
+    }
   });
 
   it('keeps home actions available when the subject list fails to load', async () => {

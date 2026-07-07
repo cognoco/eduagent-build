@@ -921,7 +921,7 @@ export function ParentHomeScreen({
           {linkedChildren.length === 0 ? (
             <ConnectSection
               onCreateChild={handleAddChild}
-              useFirstChildSetupTestID
+              testID="home-family-setup-cta-button"
             />
           ) : null}
 

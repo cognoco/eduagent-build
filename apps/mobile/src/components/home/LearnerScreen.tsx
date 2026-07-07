@@ -134,9 +134,10 @@ export function LearnerScreen({
   });
   const hasFamilyPlan =
     subscriptionStatus?.tier === 'family' || subscriptionStatus?.tier === 'pro';
-  // [HOME-07 / WI-1610] Adult owner without children gets a one-click Connect
-  // entry. gates.showAddChild encodes adult owner / owner role / proxy checks;
-  // the family-plan fallback covers the brief period before V1 gate data lands.
+  // [HOME-07 / WI-1610] Adult owner without children gets a Connect entry.
+  // gates.showAddChild owns the direct add-child route. The family-plan fallback
+  // only covers the brief period before V1 gate data lands, so it keeps routing
+  // through More where the existing subscription/quota guard runs.
   const familyPlanConnectFallback =
     isAdultOwner(activeProfile) && hasFamilyPlan && !navigationProxy.active;
   const showConnectSection =
@@ -182,12 +183,21 @@ export function LearnerScreen({
     setCoachBandDismissed(true);
   }, []);
 
-  const openCreateChildProfile = useCallback(() => {
+  const openConnectChildAction = useCallback(() => {
+    if (!navigationContract.gates.showAddChild && familyPlanConnectFallback) {
+      router.push('/(app)/more' as Href);
+      return;
+    }
+
     router.push({
       pathname: '/create-profile',
       params: { for: 'child' },
     } as Href);
-  }, [router]);
+  }, [
+    familyPlanConnectFallback,
+    navigationContract.gates.showAddChild,
+    router,
+  ]);
 
   const openParentSessionSummaries = useCallback(async () => {
     if (!activeProfile || !navigationProxy.parentProfileId) return;
@@ -772,7 +782,7 @@ export function LearnerScreen({
 
         {showConnectSection && (
           <View className="px-5 mt-4">
-            <ConnectSection onCreateChild={openCreateChildProfile} />
+            <ConnectSection onCreateChild={openConnectChildAction} />
           </View>
         )}
 

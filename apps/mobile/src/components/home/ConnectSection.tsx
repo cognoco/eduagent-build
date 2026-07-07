@@ -8,7 +8,7 @@ type ConnectSectionVariant = 'prominent' | 'compact';
 interface ConnectSectionProps {
   onCreateChild: () => void;
   variant?: ConnectSectionVariant;
-  useFirstChildSetupTestID?: boolean;
+  testID?: string;
 }
 
 interface ConnectActionProps {
@@ -52,7 +52,9 @@ function ConnectAction({
         ...(Platform.OS === 'web' && !disabled ? { cursor: 'pointer' } : {}),
       }}
       accessibilityRole="button"
-      accessibilityLabel={`${title}. ${subtitle}`}
+      accessibilityLabel={
+        badge ? `${title}. ${badge}. ${subtitle}` : `${title}. ${subtitle}`
+      }
       accessibilityState={disabled ? { disabled: true } : undefined}
       testID={testID}
     >
@@ -92,10 +94,9 @@ function ConnectAction({
 export function ConnectSection({
   onCreateChild,
   variant = 'prominent',
-  useFirstChildSetupTestID = false,
+  testID = 'connect-create-child-action',
 }: ConnectSectionProps): React.ReactElement {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const isCompact = variant === 'compact';
 
   const inviteSomeone = (): void => {
@@ -107,10 +108,11 @@ export function ConnectSection({
   return (
     <View
       className={`rounded-card border ${
-        isCompact ? 'bg-surface px-4 py-4' : 'bg-primary-soft px-4 py-5'
+        isCompact
+          ? 'bg-surface border-border px-4 py-4'
+          : 'bg-primary-soft border-primary/40 px-4 py-5'
       }`}
       style={{
-        borderColor: isCompact ? colors.border : colors.primary + '40',
         gap: 12,
       }}
       testID="home-connect-section"
@@ -134,11 +136,7 @@ export function ConnectSection({
         title={t('home.connect.createChild.title')}
         subtitle={t('home.connect.createChild.subtitle')}
         onPress={onCreateChild}
-        testID={
-          useFirstChildSetupTestID
-            ? 'home-family-setup-cta-button'
-            : 'connect-create-child-action'
-        }
+        testID={testID}
       />
       <ConnectAction
         icon="link-outline"
