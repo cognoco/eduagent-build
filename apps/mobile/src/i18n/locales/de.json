@@ -1125,6 +1125,8 @@
       "readyForNext": "Bereit für die Nächste",
       "correct": "Richtig",
       "notQuite": "Nicht ganz",
+      "capitalsPickedCity": "Das ist {{city}}, die Hauptstadt von {{country}}.",
+      "capitalsCorrectCapital": "Die gesuchte Hauptstadt ist {{city}}.",
       "seeResults": "Ergebnisse ansehen",
       "oneMore": "Warte, nur noch eine!",
       "savingRound": "Deine Runde wird gespeichert ...",

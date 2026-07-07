@@ -6,9 +6,12 @@ import {
   type Database,
 } from '@eduagent/database';
 import type {
+  CapitalsAnswerFeedback,
+  CapitalsFeedbackFact,
   CelebrationName,
   CelebrationReason,
   CompleteRoundResponse,
+  QuestionCheckResponse,
   QuestionResult,
   QuizQuestion,
   ValidatedQuestionResult,
@@ -24,6 +27,11 @@ import { createVocabulary, reviewVocabulary } from '../vocabulary';
 import { QUIZ_CONFIG } from './config';
 import { applyQuizSm2, type MasterySm2Input } from './mastery-provider';
 import { computeCapitalsItemKey, computeGuessWhoItemKey } from './mastery-keys';
+import {
+  CAPITALS_BY_COUNTRY,
+  CAPITALS_DATA,
+  type CapitalEntry,
+} from './capitals-data';
 
 /**
  * [CR-2026-05-19-H9] Build the SM-2 input from an existing mastery row.
@@ -155,6 +163,48 @@ export function isAnswerCorrect(
   return false;
 }
 
+function normalizeCapitalLookup(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function findCapitalEntryByCity(answerGiven: string): CapitalEntry | undefined {
+  const normalized = normalizeCapitalLookup(answerGiven);
+  if (!normalized) return undefined;
+  return CAPITALS_DATA.find(
+    (entry) =>
+      normalizeCapitalLookup(entry.capital) === normalized ||
+      entry.acceptedAliases.some(
+        (alias) => normalizeCapitalLookup(alias) === normalized,
+      ),
+  );
+}
+
+function toCapitalsFeedbackFact(entry: CapitalEntry): CapitalsFeedbackFact {
+  return {
+    city: entry.capital,
+    country: entry.country,
+    fact: entry.funFact,
+  };
+}
+
+export function buildCapitalsAnswerFeedback(
+  question: QuizQuestion,
+  answerGiven: string,
+): CapitalsAnswerFeedback | undefined {
+  if (question.type !== 'capitals') return undefined;
+
+  const correctEntry = CAPITALS_BY_COUNTRY.get(
+    normalizeCapitalLookup(question.country),
+  );
+  if (!correctEntry) return undefined;
+
+  const pickedEntry = findCapitalEntryByCity(answerGiven);
+  return {
+    pickedCity: pickedEntry ? toCapitalsFeedbackFact(pickedEntry) : null,
+    correctCapital: toCapitalsFeedbackFact(correctEntry),
+  };
+}
+
 /**
  * [BUG-STALE-OPTIONS] Defense-in-depth: when answerMode is 'multiple_choice'
  * and the question type uses a fixed options list (capitals, vocabulary),
@@ -231,7 +281,7 @@ export async function checkQuizAnswerWithCorrect(
   answerMode?: NonNullable<QuestionResult['answerMode']>,
   finalAttempt?: boolean,
   cluesUsed?: number,
-): Promise<{ correct: boolean; correctAnswer?: string }> {
+): Promise<QuestionCheckResponse> {
   const repo = createScopedRepository(db, profileId);
   const round = await repo.quizRounds.findById(roundId);
   if (!round) throw new NotFoundError('Round');
@@ -257,6 +307,7 @@ export async function checkQuizAnswerWithCorrect(
     (r) => r.questionIndex === questionIndex,
   );
   if (indexResults.some(isFinalRecordedAttempt)) {
+    const capitalsFeedback = buildCapitalsAnswerFeedback(question, answerGiven);
     // [BUG-852/BREAK/WI-163] A final answer is already on record for this
     // question. Re-checking is idempotent: return post-submission feedback
     // WITHOUT appending another attempt. This bounds the jsonb `results` row
@@ -264,7 +315,12 @@ export async function checkQuizAnswerWithCorrect(
     // — the re-check can neither retro-score nor grow the row.
     return {
       correct,
-      ...(!correct ? { correctAnswer: question.correctAnswer } : {}),
+      capitalsFeedback: !correct ? (capitalsFeedback ?? null) : null,
+      ...(!correct
+        ? {
+            correctAnswer: question.correctAnswer,
+          }
+        : {}),
     };
   }
   if (indexResults.length >= QUIZ_CONFIG.maxProbeAttemptsPerQuestion) {
@@ -287,10 +343,15 @@ export async function checkQuizAnswerWithCorrect(
 
   await appendRecordedAttempt(db, profileId, roundId, attempt);
 
+  const capitalsFeedback = buildCapitalsAnswerFeedback(question, answerGiven);
   return {
     correct,
+    capitalsFeedback:
+      isFinalAttempt && !correct ? (capitalsFeedback ?? null) : null,
     ...(isFinalAttempt && !correct
-      ? { correctAnswer: question.correctAnswer }
+      ? {
+          correctAnswer: question.correctAnswer,
+        }
       : {}),
   };
 }

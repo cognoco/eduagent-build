@@ -1125,6 +1125,8 @@
       "readyForNext": "次へ進む",
       "correct": "正解",
       "notQuite": "不正解",
+      "capitalsPickedCity": "それは{{country}}の首都、{{city}}です。",
+      "capitalsCorrectCapital": "探している首都は{{city}}です。",
       "seeResults": "結果を見る",
       "oneMore": "待って、あと一問だけ！",
       "savingRound": "ラウンドを保存中...",

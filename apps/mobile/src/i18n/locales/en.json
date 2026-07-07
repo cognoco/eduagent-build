@@ -1129,6 +1129,8 @@
       "readyForNext": "Ready for the next one",
       "correct": "Correct",
       "notQuite": "Not quite",
+      "capitalsPickedCity": "That is {{city}}, the capital of {{country}}.",
+      "capitalsCorrectCapital": "The capital you want is {{city}}.",
       "seeResults": "See results",
       "oneMore": "Wait, just one more!",
       "savingRound": "Saving your round...",

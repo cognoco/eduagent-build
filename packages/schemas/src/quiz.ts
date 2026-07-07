@@ -176,9 +176,25 @@ export type QuestionCheckInput = z.infer<typeof questionCheckInputSchema>;
 
 // [F-Q-02/F-Q-07] Check response reveals correctAnswer on wrong submissions
 // so the client can highlight the right option and show the person's name.
+export const capitalsFeedbackFactSchema = z.object({
+  city: z.string(),
+  country: z.string(),
+  fact: z.string(),
+});
+export type CapitalsFeedbackFact = z.infer<typeof capitalsFeedbackFactSchema>;
+
+export const capitalsAnswerFeedbackSchema = z.object({
+  pickedCity: capitalsFeedbackFactSchema.nullable(),
+  correctCapital: capitalsFeedbackFactSchema,
+});
+export type CapitalsAnswerFeedback = z.infer<
+  typeof capitalsAnswerFeedbackSchema
+>;
+
 export const questionCheckResponseSchema = z.object({
   correct: z.boolean(),
   correctAnswer: z.string().optional(),
+  capitalsFeedback: capitalsAnswerFeedbackSchema.nullable(),
 });
 export type QuestionCheckResponse = z.infer<typeof questionCheckResponseSchema>;
 

@@ -1061,7 +1061,78 @@ describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', ()
     // row cannot be grown by replaying /check on a finalized question.
     expect(db.update as unknown as jest.Mock).not.toHaveBeenCalled();
     // ...but the caller still gets honest post-submission feedback.
-    expect(result).toEqual({ correct: false, correctAnswer: 'Paris' });
+    expect(result).toEqual({
+      correct: false,
+      correctAnswer: 'Paris',
+      capitalsFeedback: {
+        pickedCity: null,
+        correctCapital: {
+          city: 'Paris',
+          country: 'France',
+          fact: 'Paris was originally a Roman city called Lutetia.',
+        },
+      },
+    });
+  });
+
+  it('[WI-1624] returns picked-city context and correct-capital fact for a known picked Capitals city', async () => {
+    const round = makeRound([capitalsQuestion], []);
+    repoSpy = spyRepo(round);
+    const db = makeUpdateDb();
+
+    const result = await checkQuizAnswerWithCorrect(
+      db,
+      PROFILE_ID,
+      ROUND_ID,
+      0,
+      'Berlin',
+      'free_text',
+    );
+
+    expect(result).toEqual({
+      correct: false,
+      correctAnswer: 'Paris',
+      capitalsFeedback: {
+        pickedCity: {
+          city: 'Berlin',
+          country: 'Germany',
+          fact: 'Berlin has more bridges than Venice.',
+        },
+        correctCapital: {
+          city: 'Paris',
+          country: 'France',
+          fact: 'Paris was originally a Roman city called Lutetia.',
+        },
+      },
+    });
+  });
+
+  it('[WI-1624] degrades to correct-capital feedback when the picked city is not in CAPITALS_DATA', async () => {
+    const round = makeRound([capitalsQuestion], []);
+    repoSpy = spyRepo(round);
+    const db = makeUpdateDb();
+
+    const result = await checkQuizAnswerWithCorrect(
+      db,
+      PROFILE_ID,
+      ROUND_ID,
+      0,
+      'Lyon',
+      'multiple_choice',
+    );
+
+    expect(result).toEqual({
+      correct: false,
+      correctAnswer: 'Paris',
+      capitalsFeedback: {
+        pickedCity: null,
+        correctCapital: {
+          city: 'Paris',
+          country: 'France',
+          fact: 'Paris was originally a Roman city called Lutetia.',
+        },
+      },
+    });
   });
 
   it('[BREAK/a] is idempotent for a /check on an already-finalized guess_who index — a cluesUsed:0 replay is NOT appended', async () => {
@@ -1097,7 +1168,7 @@ describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', ()
     // The cluesUsed:0 "full XP" replay is never recorded — first-attempt-wins
     // keeps the original finalAttempt (cluesUsed:5, wrong) authoritative.
     expect(db.update as unknown as jest.Mock).not.toHaveBeenCalled();
-    expect(result).toEqual({ correct: true });
+    expect(result).toEqual({ correct: true, capitalsFeedback: null });
   });
 
   it('[BREAK/b] rejects probe (non-final) attempts beyond the per-question cap', async () => {
@@ -1149,7 +1220,7 @@ describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', ()
         false,
         1,
       ),
-    ).resolves.toEqual({ correct: false });
+    ).resolves.toEqual({ correct: false, capitalsFeedback: null });
   });
 
   it('[NEGATIVE] allows a probe attempt for one index when a DIFFERENT index is already final', async () => {
@@ -1180,7 +1251,7 @@ describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', ()
         false,
         1,
       ),
-    ).resolves.toEqual({ correct: false });
+    ).resolves.toEqual({ correct: false, capitalsFeedback: null });
   });
 });
 

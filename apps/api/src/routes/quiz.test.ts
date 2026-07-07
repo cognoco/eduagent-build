@@ -1018,8 +1018,58 @@ describe('Quiz routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body).toEqual({ correct: false, correctAnswer: 'Vienna' });
+      expect(body).toEqual({
+        correct: false,
+        correctAnswer: 'Vienna',
+        capitalsFeedback: {
+          pickedCity: null,
+          correctCapital: {
+            city: 'Vienna',
+            country: 'Austria',
+            fact: 'Vienna has been ranked the most livable city in the world multiple times.',
+          },
+        },
+      });
       expect((mockDb as any).update).toHaveBeenCalled();
+    });
+
+    it('[WI-1624] returns Capitals feedback metadata for a known picked city', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue(ACTIVE_ROUND);
+
+      const res = await app.request(
+        `/v1/quiz/rounds/${ROUND_ID_1}/check`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            questionIndex: 0,
+            answerGiven: 'Berlin',
+            answerMode: 'free_text',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({
+        correct: false,
+        correctAnswer: 'Vienna',
+        capitalsFeedback: {
+          pickedCity: {
+            city: 'Berlin',
+            country: 'Germany',
+            fact: 'Berlin has more bridges than Venice.',
+          },
+          correctCapital: {
+            city: 'Vienna',
+            country: 'Austria',
+            fact: 'Vienna has been ranked the most livable city in the world multiple times.',
+          },
+        },
+      });
     });
 
     it('[BREAK/WI-163] does not reveal correctAnswer for non-final Guess Who probes', async () => {
@@ -1045,7 +1095,7 @@ describe('Quiz routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body).toEqual({ correct: false });
+      expect(body).toEqual({ correct: false, capitalsFeedback: null });
       expect((mockDb as any).update).toHaveBeenCalled();
     });
 

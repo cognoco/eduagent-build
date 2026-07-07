@@ -21,6 +21,7 @@ import { useAnnounce } from '../../../hooks/use-announce';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
+  CapitalsAnswerFeedback,
   ClientQuizQuestion,
   CompleteRoundResponse,
   QuestionResult,
@@ -122,6 +123,8 @@ export default function QuizPlayScreen(): React.ReactElement {
   // [F-Q-02/F-Q-07] Server reveals correctAnswer on wrong submissions so the
   // client can highlight the right option and show the person's name.
   const [correctAnswer, setCorrectAnswer] = useState<string | null>(null);
+  const [capitalsFeedback, setCapitalsFeedback] =
+    useState<CapitalsAnswerFeedback | null>(null);
   const [showContinueHint, setShowContinueHint] = useState(false);
   // [BUG-928] elapsedMs is shown in the question header and also used for
   // analytics (timeMs in QuestionResult). Spec — docs/flows/learning-path-flows.md
@@ -179,6 +182,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     setAnswerState('unanswered');
     setSelectedAnswer(null);
     setCorrectAnswer(null);
+    setCapitalsFeedback(null);
     setShowContinueHint(false);
     setFreeTextAnswer('');
     setAnswerCheckFailed(false);
@@ -587,6 +591,7 @@ export default function QuizPlayScreen(): React.ReactElement {
         revealedCorrectAnswer = result.correctAnswer;
         setCorrectAnswer(result.correctAnswer);
       }
+      setCapitalsFeedback(!correct ? (result.capitalsFeedback ?? null) : null);
     } catch (err) {
       // [BUG-799] On check failure, assume wrong — server re-validates on
       // complete. But surface the network/server reason so the user knows
@@ -696,6 +701,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     setAnswerState('unanswered');
     setSelectedAnswer(null);
     setCorrectAnswer(null);
+    setCapitalsFeedback(null);
     setCorrectCelebrationKey(null);
     setShowContinueHint(false);
     setAnswerCheckFailed(false);
@@ -762,6 +768,12 @@ export default function QuizPlayScreen(): React.ReactElement {
     question.type === 'guess_who'
       ? selectedAnswer || correctAnswer
       : selectedAnswer;
+  const showCapitalsFeedback =
+    answerState === 'wrong' &&
+    question.type === 'capitals' &&
+    capitalsFeedback !== null;
+  const showQuestionFunFact =
+    Boolean(currentQuestion.funFact) && !showCapitalsFeedback;
   return (
     <View
       className="flex-1 bg-background"
@@ -1015,6 +1027,36 @@ export default function QuizPlayScreen(): React.ReactElement {
                   ? t('quiz.play.correct')
                   : t('quiz.play.notQuite')}
             </Text>
+            {showCapitalsFeedback ? (
+              <View
+                className="mt-4 gap-3 rounded-card bg-surface p-4"
+                testID="quiz-capitals-feedback"
+              >
+                {capitalsFeedback.pickedCity ? (
+                  <View className="gap-1">
+                    <Text className="text-body-sm font-semibold text-text-primary">
+                      {t('quiz.play.capitalsPickedCity', {
+                        city: capitalsFeedback.pickedCity.city,
+                        country: capitalsFeedback.pickedCity.country,
+                      })}
+                    </Text>
+                    <Text className="text-body-sm text-text-secondary">
+                      {capitalsFeedback.pickedCity.fact}
+                    </Text>
+                  </View>
+                ) : null}
+                <View className="gap-1">
+                  <Text className="text-body-sm font-semibold text-text-primary">
+                    {t('quiz.play.capitalsCorrectCapital', {
+                      city: capitalsFeedback.correctCapital.city,
+                    })}
+                  </Text>
+                  <Text className="text-body-sm text-text-secondary">
+                    {capitalsFeedback.correctCapital.fact}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
             {isFinalQuestion && roundAutoSaved ? (
               <View className="mt-4 gap-3">
                 <Pressable
@@ -1051,7 +1093,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                 {t('quiz.play.savingRound')}
               </Text>
             ) : null}
-            {currentQuestion.funFact ? (
+            {showQuestionFunFact ? (
               <View className="mt-4 rounded-card bg-surface p-4">
                 <Text className="text-body-sm text-text-secondary">
                   {currentQuestion.funFact}
