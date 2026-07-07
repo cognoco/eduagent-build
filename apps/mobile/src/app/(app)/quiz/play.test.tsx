@@ -2066,6 +2066,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
       correct: false,
       correctAnswer: 'Paris',
       capitalsFeedback: {
+        pickedCity: null,
         correctCapital: {
           city: 'Paris',
           country: 'France',
