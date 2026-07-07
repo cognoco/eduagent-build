@@ -263,8 +263,17 @@ function JournalMomentsStrip(): React.ReactElement {
         {t('journal.moments.title')}
       </Text>
       {moments.length === 0 ? (
-        <View className="rounded-card border border-border bg-surface p-4">
-          <Text className="text-body-sm text-text-secondary">
+        <View
+          testID="journal-moments-empty"
+          className="items-center rounded-card border border-border bg-surface p-4"
+        >
+          <View className="mb-3" pointerEvents="none">
+            <BookPageFlipAnimation
+              size={78}
+              testID="journal-moments-empty-book"
+            />
+          </View>
+          <Text className="text-center text-body-sm text-text-secondary">
             {t('journal.moments.empty')}
           </Text>
         </View>

@@ -448,6 +448,17 @@ describe('JournalTabView', () => {
   });
 
   it('uses the ruled animated motif for each Journal empty state', () => {
+    mockNowFeed = {
+      data: {
+        scope: 'self',
+        generatedAt: '2026-06-14T00:00:00.000Z',
+        overflowCount: 0,
+        cards: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    };
     mockRecaps = query([]);
     mockNotes = infiniteQuery({ notes: [] });
     mockBookmarks = infiniteQuery({ bookmarks: [] });
@@ -456,6 +467,11 @@ describe('JournalTabView', () => {
     mockWeeklyReports = query([]);
 
     render(<JournalTabView />);
+
+    screen.getByTestId('journal-moments-empty');
+    screen.getByTestId('journal-moments-empty-book', {
+      includeHiddenElements: true,
+    });
 
     screen.getByTestId('journal-recaps-empty-book', {
       includeHiddenElements: true,
