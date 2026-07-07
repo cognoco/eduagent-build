@@ -282,6 +282,10 @@ describe('QuizPlayScreen', () => {
         includeHiddenElements: true,
       });
     });
+    screen.getByTestId('quiz-reward-moment');
+    expect(screen.getByTestId('quiz-reward-activity').props.children).toBe(
+      'Capitals',
+    );
   });
 
   // [BUG-928] Path 7 spec: "Question header: '1 of 7' + dot indicators +
@@ -432,8 +436,14 @@ describe('QuizPlayScreen', () => {
         }),
       );
       expect(layer.props.pointerEvents).toBe('none');
+      expect(layer.props.accessibilityElementsHidden).toBe(true);
+      expect(layer.props.importantForAccessibility).toBe('no-hide-descendants');
       expect(layerStyle.zIndex).toBeGreaterThan(bodyStyle.zIndex ?? 0);
       expect(layerStyle.elevation).toBeGreaterThan(bodyStyle.elevation ?? 0);
+      screen.getByTestId('quiz-reward-moment');
+      expect(screen.getByTestId('quiz-reward-activity').props.children).toBe(
+        activityType === 'vocabulary' ? 'Vocabulary' : 'Capitals',
+      );
       screen.getByTestId('quiz-correct-celebration');
     },
   );
@@ -479,6 +489,10 @@ describe('QuizPlayScreen', () => {
           }),
         ).toBeNull();
       });
+      screen.getByTestId('quiz-reward-moment');
+      expect(screen.getByTestId('quiz-reward-activity').props.children).toBe(
+        'Capitals',
+      );
       screen.getByTestId('quiz-next-question');
       screen.getByText('Correct');
     } finally {
@@ -655,6 +669,7 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
     await waitFor(() => {
       screen.getByText('Correct');
     });
+    screen.getByTestId('quiz-reward-moment');
     screen.getByTestId('quiz-correct-celebration');
     screen.getByText('You discovered it!');
     expect(screen.getByTestId('quiz-revealed-answer').props.children).toBe(
@@ -843,6 +858,10 @@ describe('QuizPlayScreen — Guess Who finish autosave', () => {
     await waitFor(() => {
       screen.getByTestId('quiz-correct-celebration');
     });
+    screen.getByTestId('quiz-reward-moment');
+    expect(screen.getByTestId('quiz-reward-activity').props.children).toBe(
+      "Who's who",
+    );
     screen.getByText('You found them in 3 clues!');
     expect(mockCompleteRoundMutate).toHaveBeenCalledWith(
       {
