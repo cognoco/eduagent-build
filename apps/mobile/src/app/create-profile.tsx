@@ -368,24 +368,28 @@ export default function CreateProfileScreen() {
           return false;
         }
       };
-      const showFamilyContextRecoveryAlert = (): void => {
+      const showFamilyContextRecoveryAlert = (retryAvailable = true): void => {
+        const actions = retryAvailable
+          ? [
+              { text: t('common.notNow'), style: 'cancel' as const },
+              {
+                text: t('createProfile.switchFamilyModeCta'),
+                onPress: () => {
+                  void (async () => {
+                    const retryPersisted = await persistFamilyContext();
+                    if (!retryPersisted) showFamilyContextRecoveryAlert(false);
+                  })();
+                },
+              },
+            ]
+          : [{ text: t('common.notNow'), style: 'cancel' as const }];
+
         platformAlert(
           t('createProfile.createdTitle'),
           t('createProfile.createdChildFamilyContextFailedBody', {
             name: trimmedName,
           }),
-          [
-            { text: t('common.notNow'), style: 'cancel' },
-            {
-              text: t('createProfile.switchFamilyModeCta'),
-              onPress: () => {
-                void (async () => {
-                  const retryPersisted = await persistFamilyContext();
-                  if (!retryPersisted) showFamilyContextRecoveryAlert();
-                })();
-              },
-            },
-          ],
+          actions,
         );
       };
       const familyContextPersisted = await persistFamilyContext();
