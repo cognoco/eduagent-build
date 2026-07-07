@@ -3844,6 +3844,7 @@
     "parentAdultAgeError": "Konta rodziców wymagają daty urodzenia osoby dorosłej. Najpierw wpisz swoje dane, a potem dodaj dziecko.",
     "a11yCloseDatePicker": "Zamknij wybór daty",
     "createdChildFamilyContextFailedBody": "Profil {{name}} jest gotowy, ale nie udało nam się automatycznie przełączyć Cię na tryb rodzinny.",
+    "createdChildFamilyContextTerminalFailedBody": "Profil {{name}} jest gotowy, ale nadal nie udało nam się przełączyć Cię na tryb rodzinny. Możesz przełączyć się na tryb rodzinny później z Więcej > Konto.",
     "switchFamilyModeCta": "Przełącz na tryb rodzinny"
   },
   "clerkGate": {
