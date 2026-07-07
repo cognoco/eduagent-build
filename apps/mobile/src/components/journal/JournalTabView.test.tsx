@@ -447,6 +447,48 @@ describe('JournalTabView', () => {
     screen.getByTestId('journal-notes-empty');
   });
 
+  it('uses the ruled animated motif for each Journal empty state', () => {
+    mockRecaps = query([]);
+    mockNotes = infiniteQuery({ notes: [] });
+    mockBookmarks = infiniteQuery({ bookmarks: [] });
+    mockPracticeHistory = infiniteQuery({ items: [] });
+    mockMonthlyReports = query([]);
+    mockWeeklyReports = query([]);
+
+    render(<JournalTabView />);
+
+    screen.getByTestId('journal-recaps-empty-book', {
+      includeHiddenElements: true,
+    });
+
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+    screen.getByTestId('journal-notes-empty-pen', {
+      includeHiddenElements: true,
+    });
+
+    fireEvent.press(screen.getByTestId('journal-tab-practice'));
+    screen.getByTestId('journal-practice-empty-motif-lamp', {
+      includeHiddenElements: true,
+    });
+    screen.getByTestId('journal-practice-empty-motif-pen', {
+      includeHiddenElements: true,
+    });
+    screen.getByTestId('journal-practice-empty-motif-book', {
+      includeHiddenElements: true,
+    });
+
+    fireEvent.press(screen.getByTestId('journal-tab-reports'));
+    screen.getByTestId('journal-reports-empty-motif-lamp', {
+      includeHiddenElements: true,
+    });
+    screen.getByTestId('journal-reports-empty-motif-pen', {
+      includeHiddenElements: true,
+    });
+    screen.getByTestId('journal-reports-empty-motif-book', {
+      includeHiddenElements: true,
+    });
+  });
+
   it('exposes a transcription-only mic on the archive search line', () => {
     render(<JournalTabView />);
     fireEvent.press(screen.getByTestId('journal-tab-notes'));
