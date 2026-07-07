@@ -8,7 +8,12 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import { Platform, UIManager, View, useColorScheme } from 'react-native';
+import {
+  Platform,
+  UIManager,
+  View,
+  useColorScheme,
+} from 'react-native';
 import * as SecureStore from '../lib/secure-storage';
 import { platformAlert } from '../lib/platform-alert';
 import { Stack } from 'expo-router';
@@ -51,6 +56,7 @@ import { useNetworkStatus } from '../hooks/use-network-status';
 import { enableSentry, Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
 import { AnimatedSplash } from '../components/AnimatedSplash';
+import { MentorBornCeremonyOverlay } from '../components/common/MentorBornCeremonyOverlay';
 import {
   createScopedPersister,
   getQueryCacheBuster,
@@ -609,6 +615,7 @@ export default function RootLayout() {
           <AnimatedSplash onComplete={onAnimComplete} />
         </SplashErrorBoundary>
       )}
+      <MentorBornCeremonyOverlay />
     </GestureHandlerRootView>
   );
 }
