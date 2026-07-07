@@ -22,6 +22,50 @@ describe('ColdStartCard', () => {
     expect(onOpenCamera).not.toHaveBeenCalled();
   });
 
+  it('enables an accessible send affordance after typing and submits the trimmed prompt', () => {
+    const onSubmitText = jest.fn();
+    const { getByTestId } = render(
+      <ColdStartCard
+        onFill={jest.fn()}
+        onSubmitText={onSubmitText}
+        onOpenCamera={jest.fn()}
+      />,
+    );
+
+    const send = getByTestId('cold-start-send');
+    expect(send.props.accessibilityRole).toBe('button');
+    expect(send.props.accessibilityLabel).toBe('Send message');
+    expect(send.props.accessibilityState).toEqual({ disabled: true });
+
+    fireEvent.changeText(getByTestId('cold-start-input'), '  photosynthesis  ');
+
+    expect(getByTestId('cold-start-send').props.accessibilityState).toEqual({
+      disabled: false,
+    });
+    fireEvent.press(getByTestId('cold-start-send'));
+
+    expect(onSubmitText).toHaveBeenCalledWith('photosynthesis');
+  });
+
+  it('does not submit blank typed prompts from the send affordance', () => {
+    const onSubmitText = jest.fn();
+    const { getByTestId } = render(
+      <ColdStartCard
+        onFill={jest.fn()}
+        onSubmitText={onSubmitText}
+        onOpenCamera={jest.fn()}
+      />,
+    );
+
+    fireEvent.changeText(getByTestId('cold-start-input'), '   ');
+    fireEvent.press(getByTestId('cold-start-send'));
+
+    expect(getByTestId('cold-start-send').props.accessibilityState).toEqual({
+      disabled: true,
+    });
+    expect(onSubmitText).not.toHaveBeenCalled();
+  });
+
   it('uses the same equal-weight token for the input and all chips', () => {
     const { getByTestId } = render(
       <ColdStartCard
