@@ -382,7 +382,6 @@ export default function QuizPlayScreen(): React.ReactElement {
         setShowContinueHint(true);
       }, 4000);
       if (result.correct) {
-        setCorrectCelebrationKey(Date.now());
         hapticSuccess();
       } else {
         hapticError();

@@ -392,28 +392,6 @@ describe('QuizPlayScreen', () => {
       ],
       title: 'vocabulary',
     },
-    {
-      activityType: 'guess_who' as const,
-      pressCorrectAnswer: (): void =>
-        fireEvent.press(screen.getByTestId('guess-who-resolve-correct')),
-      questions: [
-        {
-          type: 'guess_who' as const,
-          answer: 'Nikola Tesla',
-          clues: ['Inventor', 'Worked with electricity', 'Born in Smiljan'],
-          options: ['Nikola Tesla', 'Thomas Edison'],
-          isLibraryItem: true,
-        },
-        {
-          type: 'guess_who' as const,
-          answer: 'Ada Lovelace',
-          clues: ['Mathematician', 'Early programmer', 'Worked with Babbage'],
-          options: ['Ada Lovelace', 'Grace Hopper'],
-          isLibraryItem: true,
-        },
-      ],
-      title: 'Guess Who',
-    },
   ])(
     'keeps the correct-answer reward burst above quiz body for $title',
     async ({ activityType, pressCorrectAnswer, questions }) => {
