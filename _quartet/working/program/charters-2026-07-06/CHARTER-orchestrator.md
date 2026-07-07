@@ -1,4 +1,4 @@
-# Orchestrator charter — DRAFT
+# Orchestrator charter — RATIFIED (operator, 2026-07-07)
 
 One per program. **Pipeline custodian, not dispatcher** (operator ruling 2026-07-05, WI-1526).
 Mechanics: `roles/orchestrator-protocol.md`.

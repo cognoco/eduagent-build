@@ -1,8 +1,9 @@
 # Quartet role charters — DRAFT for operator ratification
 
 **Drafted:** 2026-07-06 · PM (program-manager:fable) · UQ track 2, scoped by FINDINGS-B B-36/B-37/B-38.
-**Status: DRAFT.** Binds nothing until operator-ratified; then lands into `_quartet/roles/charters/`
-via a WI (change-control gate), protocols thinned in the same change-set.
+**Status: RATIFIED (operator, 2026-07-07; amendment: WIP N=4).** Binding at next session boundaries.
+Landing into `_quartet/roles/charters/` via a WI (change-control gate), protocols thinned in the
+same change-set.
 
 ## What a charter is (vs a protocol)
 

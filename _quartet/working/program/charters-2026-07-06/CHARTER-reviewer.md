@@ -1,4 +1,4 @@
-# Reviewer charter — DRAFT
+# Reviewer charter — RATIFIED (operator, 2026-07-07)
 
 One per workstream set (mutable, operator-adjusted). **Independent DoD gate.** Mechanics:
 `roles/reviewer-protocol.md`.

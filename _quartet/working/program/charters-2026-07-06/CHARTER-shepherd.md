@@ -1,4 +1,4 @@
-# Shepherd charter — DRAFT
+# Shepherd charter — RATIFIED (operator, 2026-07-07)
 
 One per lane (1..n workstreams). **Drives the lane; owns the dispatch trigger.** Mechanics:
 `roles/shepherd-protocol.md`.
@@ -9,7 +9,7 @@ One per lane (1..n workstreams). **Drives the lane; owns the dispatch trigger.**
    reaches Cosmo Close, or the lane is formally handed over. The set you have dispatched is the
    frontier, never the mandate.
 2. **Dispatch trigger + flow** *(NEW — resolves the B-36 muddle)* — **you own when Ready items
-   start.** Default policy: **dispatch all non-colliding Ready items up to WIP limit N=3
+   start.** Default policy: **dispatch all non-colliding Ready items up to WIP limit N=4
    concurrent executors per lane** (collision = same files/subsystem, or an explicit Blocked-by).
    A Ready item sitting undispatched while you have WIP headroom is YOUR defect, not the
    orchestrator's. The orchestrator holds gate/exception authority — it can pause, cap, or
