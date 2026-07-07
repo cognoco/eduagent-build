@@ -47,6 +47,7 @@ import {
 import { NudgeBanner } from '../nudge/NudgeBanner';
 import { CoachBand } from './CoachBand';
 import { ChildQuotaLine } from './ChildQuotaLine';
+import { ConnectSection } from './ConnectSection';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
 import { SubjectTile } from './SubjectTile';
 import type { TranslateKey } from '../../i18n';
@@ -133,16 +134,14 @@ export function LearnerScreen({
   });
   const hasFamilyPlan =
     subscriptionStatus?.tier === 'family' || subscriptionStatus?.tier === 'pro';
-  // [HOME-07] Adult owner without children has no Family setup entry on Home.
-  // Surface a Family setup CTA on the learner home when the contract permits
-  // adding a child (gates.showAddChild already encodes: isAdultOwner &&
-  // ownerRole && !isParentProxy &&, in V1, subscriptionReady) and no children
-  // are linked yet. Route to /(app)/more so the existing handleAddChild flow
-  // owns subscription/quota gating — never duplicate that logic here.
-  const familySetupFallback =
+  // [HOME-07 / WI-1610] Adult owner without children gets a Connect entry.
+  // gates.showAddChild owns the direct add-child route. The family-plan fallback
+  // only covers the brief period before V1 gate data lands, so it keeps routing
+  // through More where the existing subscription/quota guard runs.
+  const familyPlanConnectFallback =
     isAdultOwner(activeProfile) && hasFamilyPlan && !navigationProxy.active;
-  const showFamilySetupCta =
-    (navigationContract.gates.showAddChild || familySetupFallback) &&
+  const showConnectSection =
+    (navigationContract.gates.showAddChild || familyPlanConnectFallback) &&
     !hasLinkedChildren;
   const screenLoadingMotion = resolveLoadingMotionPreset({
     surface: 'screen',
@@ -183,6 +182,22 @@ export function LearnerScreen({
   const dismissCoachBand = useCallback(() => {
     setCoachBandDismissed(true);
   }, []);
+
+  const openConnectChildAction = useCallback(() => {
+    if (!navigationContract.gates.showAddChild && familyPlanConnectFallback) {
+      router.push('/(app)/more' as Href);
+      return;
+    }
+
+    router.push({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    } as Href);
+  }, [
+    familyPlanConnectFallback,
+    navigationContract.gates.showAddChild,
+    router,
+  ]);
 
   const openParentSessionSummaries = useCallback(async () => {
     if (!activeProfile || !navigationProxy.parentProfileId) return;
@@ -765,40 +780,9 @@ export function LearnerScreen({
           ) : null}
         </View>
 
-        {showFamilySetupCta && (
-          <View className="px-5 mt-4" testID="home-family-setup-cta">
-            <Pressable
-              onPress={() => router.push('/(app)/more' as Href)}
-              className="rounded-2xl border border-primary/40 bg-primary-soft px-4 py-4 flex-row items-center"
-              style={{ gap: 12 }}
-              accessibilityRole="button"
-              accessibilityLabel={t('home.learner.familySetup.cta')}
-              testID="home-family-setup-cta-button"
-            >
-              <View className="w-10 h-10 rounded-2xl bg-surface-elevated items-center justify-center">
-                <Ionicons
-                  name="people-outline"
-                  size={21}
-                  color={colors.primary}
-                />
-              </View>
-              <View className="flex-1">
-                <Text className="text-body font-bold text-text-primary">
-                  {t('home.learner.familySetup.title')}
-                </Text>
-                <Text
-                  className="text-body-sm text-text-secondary mt-0.5"
-                  numberOfLines={2}
-                >
-                  {t('home.learner.familySetup.subtitle')}
-                </Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={colors.textSecondary}
-              />
-            </Pressable>
+        {showConnectSection && (
+          <View className="px-5 mt-4">
+            <ConnectSection onCreateChild={openConnectChildAction} />
           </View>
         )}
 

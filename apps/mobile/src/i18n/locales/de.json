@@ -284,11 +284,6 @@
           "subtitle": "Starte ein Thema oder erstelle ein Fach"
         }
       },
-      "familySetup": {
-        "title": "Set up Family",
-        "subtitle": "Add a child profile so they can learn with their own mentor",
-        "cta": "Set up Family"
-      },
       "greeting": "Hey {{name}}!",
       "greetingNoName": "Hallo!",
       "myNotes": "Meine Notizen",
@@ -327,8 +322,6 @@
         "noActivity": "{{memberNames}} · keine Sitzungen diese Woche",
         "attentionChild": "{{childName}} könnte heute einen Anstoß gebrauchen",
         "profileLimit": "{{count}} von {{max}} Profilen verwendet",
-        "addProfileAction": "Profil hinzufügen",
-        "addProfileAccessibilityLabel": "Familienprofil hinzufügen",
         "whoNeedsYouHeader": "Wer braucht dich heute"
       },
       "transitionNoticeTitle": "Du begleitest jetzt {{childNames}}",
@@ -340,11 +333,6 @@
         "promptNextGoalWithTopic": "Wollen wir ein kleines Ziel für {{topic}} diese Woche wählen?",
         "promptRestartWithTopic": "Wollen wir ein kleines Ziel für {{topic}} diese Woche wählen?",
         "promptRestartEasierWithTopic": "Sollen wir {{topic}} leichter wieder starten?"
-      },
-      "empty": {
-        "title": "Your family dashboard starts here",
-        "body": "Add your first child profile and this screen will turn into tonight prompts, weekly recaps, nudges, and progress cards.",
-        "cta": "Add your first child"
       },
       "childrenHeader": "Children",
       "familyManagementHeader": "Familienverwaltung",
@@ -396,10 +384,6 @@
         "openLibrary": "Bibliothek von {{name}} öffnen",
         "close": "Schließen"
       },
-      "addLearner": {
-        "title": "Lernenden hinzufügen",
-        "accessibilityLabel": "Lernenden zu deiner Familie hinzufügen"
-      },
       "childProfileLabel": "{{name}}s Profil",
       "greetingFallbackName": "Hallo",
       "greetingNoName": "Hallo!"
@@ -424,6 +408,25 @@
     "intentCard": {
       "titleWithBadge": "{{title}}, {{count}} Elemente",
       "opensActivityHint": "Öffnet diese Aktivität"
+    },
+    "connect": {
+      "title": "Verbinden",
+      "subtitleProminent": "Richte das Lernen mit den Menschen ein, die dir wichtig sind.",
+      "subtitleCompact": "Füge einen weiteren Lernenden hinzu oder teile MentoMate.",
+      "createChild": {
+        "title": "Kinderprofil hinzufügen",
+        "subtitle": "Schaffe einen sicheren Lernbereich für dein Kind."
+      },
+      "linkExisting": {
+        "title": "Bestehenden Lernenden verknüpfen",
+        "subtitle": "Für einen Lernenden, der bereits ein Konto hat.",
+        "badge": "Demnächst"
+      },
+      "invite": {
+        "title": "Jemanden einladen, MentoMate auszuprobieren",
+        "subtitle": "Nur die App teilen; es werden keine Lerndaten geteilt."
+      },
+      "inviteMessage": "Probiere MentoMate mit mir aus: Lernhilfe für die ganze Familie."
     }
   },
   "family": {
