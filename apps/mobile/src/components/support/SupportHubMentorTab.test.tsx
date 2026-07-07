@@ -217,7 +217,7 @@ describe('SupportHubMentorTab', () => {
       'When Emma has a shared session or report, it will show up here.',
     );
     expect(screen.queryByText('Practiced fractions')).toBeNull();
-    expect(screen.queryByTestId('support-hub-mentor-fact-fact-1')).toBeNull();
+    expect(screen.queryByTestId('structural-fact-fact-1')).toBeNull();
   });
 
   it('shows an error card and refetches when retry is pressed', async () => {
