@@ -51,7 +51,11 @@ export function SharedRecordView({
   const appeal =
     record && onAppeal && !appealError
       ? appealPending
-        ? { state: 'pending' as const, testID: 'visibility-appeal-pending' }
+        ? {
+            state: 'pending' as const,
+            label: t('common.loading'),
+            testID: 'visibility-appeal-pending',
+          }
         : appealReport
           ? {
               state: 'resolved' as const,

@@ -248,6 +248,7 @@ type StructuralFactAppeal =
     }
   | {
       state: 'pending';
+      label: string;
       testID?: string;
     }
   | {
@@ -299,7 +300,10 @@ export function StructuralFactCard({
       {appeal ? (
         <View className="mt-4 border-t border-border pt-4">
           {appeal.state === 'pending' ? (
-            <ActivityIndicator testID={appeal.testID} />
+            <ActivityIndicator
+              accessibilityLabel={appeal.label}
+              testID={appeal.testID}
+            />
           ) : appeal.state === 'resolved' ? (
             <Text
               className="text-body-sm text-text-secondary"

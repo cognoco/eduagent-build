@@ -245,10 +245,15 @@ describe('Learning surface primitives', () => {
         headline="Emma has one shareable update."
         structuralOnlyLabel="Structural facts only."
         facts={[]}
-        appeal={{ state: 'pending', testID: 'fact-appeal-pending' }}
+        appeal={{
+          state: 'pending',
+          label: 'Loading',
+          testID: 'fact-appeal-pending',
+        }}
       />,
     );
     screen.getByTestId('fact-appeal-pending');
+    screen.getByLabelText('Loading');
   });
 
   it('makes SubjectHub study capability explicit and blocks readonly callbacks', () => {
