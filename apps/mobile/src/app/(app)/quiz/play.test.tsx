@@ -5,7 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 const mockReplace = jest.fn();
 const mockDismissTo = jest.fn();
@@ -342,6 +342,148 @@ describe('QuizPlayScreen', () => {
     await waitFor(() => {
       screen.getByText('France?');
     });
+  });
+
+  it.each([
+    {
+      activityType: 'capitals' as const,
+      pressCorrectAnswer: (): void =>
+        fireEvent.press(screen.getByTestId('quiz-option-0')),
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          funFact: 'Bratislava sits on the Danube.',
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+      title: 'capitals',
+    },
+    {
+      activityType: 'vocabulary' as const,
+      pressCorrectAnswer: (): void =>
+        fireEvent.press(screen.getByTestId('quiz-option-0')),
+      questions: [
+        {
+          type: 'vocabulary' as const,
+          term: 'el pajaro',
+          options: ['The bird', 'The worm', 'The feather', 'The animal'],
+          cefrLevel: 'A2',
+          isLibraryItem: false,
+          freeTextEligible: false,
+        },
+        {
+          type: 'vocabulary' as const,
+          term: 'la mesa',
+          options: ['The table', 'The chair', 'The window', 'The floor'],
+          cefrLevel: 'A1',
+          isLibraryItem: false,
+          freeTextEligible: false,
+        },
+      ],
+      title: 'vocabulary',
+    },
+  ])(
+    'keeps the correct-answer reward burst above quiz body for $title',
+    async ({ activityType, pressCorrectAnswer, questions }) => {
+      mockRound = {
+        id: `round-reward-layer-${activityType}`,
+        activityType,
+        theme: 'Celebration',
+        total: 2,
+        questions,
+      };
+      mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+
+      render(<QuizPlayScreen />);
+      pressCorrectAnswer();
+
+      await waitFor(() => {
+        screen.getByTestId('quiz-correct-reward-burst', {
+          includeHiddenElements: true,
+        });
+      });
+
+      const layer = screen.getByTestId('quiz-correct-reward-layer', {
+        includeHiddenElements: true,
+      });
+      const body = screen.getByTestId('quiz-play-body');
+      const layerStyle = StyleSheet.flatten(layer.props.style) ?? {};
+      const bodyStyle = StyleSheet.flatten(body.props.style) ?? {};
+
+      expect(layerStyle).toEqual(
+        expect.objectContaining({
+          bottom: 0,
+          elevation: expect.any(Number),
+          left: 0,
+          position: 'absolute',
+          right: 0,
+          top: 0,
+          zIndex: expect.any(Number),
+        }),
+      );
+      expect(layer.props.pointerEvents).toBe('none');
+      expect(layerStyle.zIndex).toBeGreaterThan(bodyStyle.zIndex ?? 0);
+      expect(layerStyle.elevation).toBeGreaterThan(bodyStyle.elevation ?? 0);
+      screen.getByTestId('quiz-correct-celebration');
+    },
+  );
+
+  it('removes the foreground reward layer immediately for reduced motion', async () => {
+    const reanimated = require('react-native-reanimated');
+    const original = reanimated.useReducedMotion;
+    reanimated.useReducedMotion = () => true;
+    mockRound = {
+      id: 'round-reward-layer-reduced-motion',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+
+    try {
+      render(<QuizPlayScreen />);
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('quiz-option-0'));
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId('quiz-correct-reward-layer', {
+            includeHiddenElements: true,
+          }),
+        ).toBeNull();
+      });
+      screen.getByTestId('quiz-next-question');
+      screen.getByText('Correct');
+    } finally {
+      reanimated.useReducedMotion = original;
+    }
   });
 });
 
