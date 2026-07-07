@@ -12,6 +12,7 @@ interface ButtonProps {
   size?: ButtonSize;
   disabled?: boolean;
   loading?: boolean;
+  accessibilityLabel?: string;
   testID?: string;
 }
 
@@ -51,6 +52,7 @@ export function Button({
   size = 'default',
   disabled = false,
   loading = false,
+  accessibilityLabel,
   testID,
 }: ButtonProps): React.JSX.Element {
   const { t } = useTranslation();
@@ -73,7 +75,9 @@ export function Button({
       // SR loading state lives on the Pressable — it is the accessible element,
       // so focusing the button while loading must surface the busy state, not
       // the (visually hidden to SR) inner ActivityIndicator label.
-      accessibilityLabel={loading ? t('common.loading') : label}
+      accessibilityLabel={
+        loading ? t('common.loading') : (accessibilityLabel ?? label)
+      }
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       testID={testID}
     >
