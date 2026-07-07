@@ -367,6 +367,26 @@ export default function CreateProfileScreen() {
           return false;
         }
       };
+      const showFamilyContextRecoveryAlert = (): void => {
+        platformAlert(
+          t('createProfile.createdTitle'),
+          t('createProfile.createdChildFamilyContextFailedBody', {
+            name: trimmedName,
+          }),
+          [
+            { text: t('common.notNow'), style: 'cancel' },
+            {
+              text: t('createProfile.switchFamilyModeCta'),
+              onPress: () => {
+                void (async () => {
+                  const retryPersisted = await persistFamilyContext();
+                  if (!retryPersisted) showFamilyContextRecoveryAlert();
+                })();
+              },
+            },
+          ],
+        );
+      };
       const familyContextPersisted = await persistFamilyContext();
 
       // BUG-239: When a parent adds a child, the API grants consent inline
@@ -385,21 +405,7 @@ export default function CreateProfileScreen() {
             t('createProfile.createdChildBody', { name: trimmedName }),
           );
         } else {
-          platformAlert(
-            t('createProfile.createdTitle'),
-            t('createProfile.createdChildFamilyContextFailedBody', {
-              name: trimmedName,
-            }),
-            [
-              { text: t('common.notNow'), style: 'cancel' },
-              {
-                text: t('createProfile.switchFamilyModeCta'),
-                onPress: () => {
-                  void persistFamilyContext();
-                },
-              },
-            ],
-          );
+          showFamilyContextRecoveryAlert();
         }
         return;
       }

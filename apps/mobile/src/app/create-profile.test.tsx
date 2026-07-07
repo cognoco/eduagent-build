@@ -1565,6 +1565,68 @@ describe('CreateProfileScreen', () => {
       expect(mockSwitchProfile).not.toHaveBeenCalled();
     });
 
+    it('[WI-1611] shows the recovery path again when the family-mode retry also fails', async () => {
+      jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      mockFetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: childProfile }), {
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response('Patch failed', {
+            status: 503,
+            statusText: 'Service Unavailable',
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response('Retry failed', {
+            status: 503,
+            statusText: 'Service Unavailable',
+          }),
+        );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
+      });
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledTimes(1);
+      });
+
+      const [, , buttons] = (Alert.alert as jest.Mock).mock.calls[0];
+      await act(async () => {
+        buttons[1].onPress();
+        await Promise.resolve();
+      });
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledTimes(2);
+      });
+      expect(Alert.alert).toHaveBeenLastCalledWith(
+        'Profile created',
+        "Lily's profile is ready, but we could not switch you to Family mode automatically.",
+        [
+          { text: 'Not now', style: 'cancel' },
+          expect.objectContaining({
+            text: 'Switch to Family mode',
+          }),
+        ],
+        undefined,
+      );
+      const retryCall = mockFetch.mock.calls[2];
+      expect(String(retryCall?.[0])).toContain(
+        '/profiles/parent-id/app-context',
+      );
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
+    });
+
     it('navigates home when parent adds child and no back history', async () => {
       mockCanGoBack.mockReturnValue(false);
       mockFetch
