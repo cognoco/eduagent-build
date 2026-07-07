@@ -9,10 +9,13 @@ import type {
   ReportPracticeActivityType,
 } from '@eduagent/schemas';
 
-import { ErrorFallback, TimeoutLoader } from '../common';
-import { BookPageFlipAnimation } from '../common/BookPageFlipAnimation';
-import { DeskLampAnimation } from '../common/DeskLampAnimation';
-import { MagicPenAnimation } from '../common/MagicPenAnimation';
+import {
+  BookPageFlipAnimation,
+  DeskLampAnimation,
+  ErrorFallback,
+  MagicPenAnimation,
+  TimeoutLoader,
+} from '../common';
 import { RecapsEmptyState } from '../recaps/RecapsEmptyState';
 import { VoiceRecordButton } from '../session/VoiceRecordButton';
 import { ReportsList } from '../progress/ReportsList';
@@ -584,7 +587,7 @@ function JournalReportsSection(): React.ReactElement {
 
   return (
     <View testID="journal-reports-section">
-      {!hasAnyReports && !isError ? (
+      {!hasAnyReports && !isLoading && !isError ? (
         <View className="items-center" pointerEvents="none">
           <PracticeReportsEmptyMotif testID="journal-reports-empty-motif" />
         </View>

@@ -489,6 +489,26 @@ describe('JournalTabView', () => {
     });
   });
 
+  it('does not show the Reports empty motif while reports are loading', () => {
+    mockMonthlyReports = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      refetch: jest.fn(),
+    } as typeof mockMonthlyReports;
+    mockWeeklyReports = query([]);
+
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-reports'));
+    screen.getByTestId('journal-reports-loading');
+    expect(
+      screen.queryByTestId('journal-reports-empty-motif', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull();
+  });
+
   it('exposes a transcription-only mic on the archive search line', () => {
     render(<JournalTabView />);
     fireEvent.press(screen.getByTestId('journal-tab-notes'));
