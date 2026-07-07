@@ -46,7 +46,7 @@ import {
 } from '../family/WithdrawalCountdownBanner';
 import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
 import { ParentTransitionNotice } from './ParentTransitionNotice';
-import { BaseCoachingCard } from '../coaching/BaseCoachingCard';
+import { ConnectSection } from './ConnectSection';
 import { LearnTogetherSheet } from '../family/LearnTogetherSheet';
 import {
   childProfileHref,
@@ -570,18 +570,10 @@ function FamilySummaryPanel({
   summary,
   rows,
   attentionHeader,
-  showAddProfile,
-  addProfileLabel,
-  addProfileAccessibilityLabel,
-  onAddProfile,
 }: {
   summary: string;
   rows: FamilySummaryRow[];
   attentionHeader: string | null;
-  showAddProfile: boolean;
-  addProfileLabel: string;
-  addProfileAccessibilityLabel: string;
-  onAddProfile: () => void;
 }): React.ReactElement {
   const colors = useThemeColors();
 
@@ -657,31 +649,6 @@ function FamilySummaryPanel({
           })}
         </View>
       ) : null}
-
-      {showAddProfile ? (
-        <Pressable
-          onPress={onAddProfile}
-          className="flex-row items-center bg-background border-t border-border px-4 py-3.5 rounded-b-card"
-          style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
-          accessibilityRole="button"
-          accessibilityLabel={addProfileAccessibilityLabel}
-          testID="parent-home-add-child"
-        >
-          <Ionicons
-            name="person-add-outline"
-            size={20}
-            color={colors.textSecondary}
-          />
-          <Text className="text-body font-semibold text-text-primary ms-3 flex-1">
-            {addProfileLabel}
-          </Text>
-          <Ionicons
-            name="chevron-forward"
-            size={18}
-            color={colors.textSecondary}
-          />
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -694,7 +661,6 @@ export function ParentHomeScreen({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colorScheme } = useTheme();
-  const colors = useThemeColors();
   const role = useActiveProfileRole();
   const linkedChildren = useLinkedChildren();
   const { data: dashboard } = useDashboard();
@@ -953,12 +919,9 @@ export function ParentHomeScreen({
 
         <View style={{ gap: 10 }}>
           {linkedChildren.length === 0 ? (
-            <BaseCoachingCard
-              headline={t('home.parent.empty.title')}
-              subtext={t('home.parent.empty.body')}
-              primaryLabel={t('home.parent.empty.cta')}
-              onPrimary={handleAddChild}
-              testID="add-first-child-screen"
+            <ConnectSection
+              onCreateChild={handleAddChild}
+              testID="home-family-setup-cta-button"
             />
           ) : null}
 
@@ -996,15 +959,13 @@ export function ParentHomeScreen({
                     ? t('home.parent.familySummary.whoNeedsYouHeader')
                     : null
                 }
-                showAddProfile={showAddChild}
-                addProfileLabel={t(
-                  'home.parent.familySummary.addProfileAction',
-                )}
-                addProfileAccessibilityLabel={t(
-                  'home.parent.familySummary.addProfileAccessibilityLabel',
-                )}
-                onAddProfile={handleAddChild}
               />
+              {showAddChild ? (
+                <ConnectSection
+                  onCreateChild={handleAddChild}
+                  variant="compact"
+                />
+              ) : null}
             </View>
           </>
         ) : linkedChildren.length === 1 ? (
@@ -1019,32 +980,10 @@ export function ParentHomeScreen({
               ) : null;
             })()}
             {showAddChild ? (
-              <Pressable
-                onPress={handleAddChild}
-                className="flex-row items-center bg-surface border border-border rounded-card px-4 py-3.5"
-                style={
-                  Platform.OS === 'web' ? { cursor: 'pointer' } : undefined
-                }
-                accessibilityRole="button"
-                accessibilityLabel={t(
-                  'home.parent.addLearner.accessibilityLabel',
-                )}
-                testID="parent-home-add-child"
-              >
-                <Ionicons
-                  name="person-add-outline"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-                <Text className="text-body font-semibold text-text-primary ms-3 flex-1">
-                  {t('home.parent.addLearner.title')}
-                </Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color={colors.textSecondary}
-                />
-              </Pressable>
+              <ConnectSection
+                onCreateChild={handleAddChild}
+                variant="compact"
+              />
             ) : null}
           </View>
         ) : null}

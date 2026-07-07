@@ -1,4 +1,5 @@
 import { fireEvent, waitFor } from '@testing-library/react-native';
+import { Share } from 'react-native';
 import type { DashboardData, Profile } from '@eduagent/schemas';
 import {
   cleanupScreen,
@@ -314,7 +315,12 @@ describe('ParentHomeScreen', () => {
     result.getByText('Children');
     result.getByText('Your family');
     result.getByTestId('parent-home-family-summary');
-    result.getByText('Add profile');
+    result.getByTestId('home-connect-section');
+    result.getByTestId('home-connect-section-compact');
+    result.getByText('Connect');
+    result.getByText('Add a child profile');
+    result.getByText('Link an existing learner');
+    result.getByText('Invite someone to try MentoMate');
     expect(result.queryByText('Continue your own learning')).toBeNull();
     expect(
       result.queryByText("Show them how it's done: start a quick session."),
@@ -446,17 +452,19 @@ describe('ParentHomeScreen', () => {
     expect(result.queryByText('You: Fractions in Math')).toBeNull();
   });
 
-  it('shows an add-first-child state when no children are linked', () => {
+  it('shows prominent Connect actions when no children are linked', () => {
     const { result } = mount([PARENT]);
 
-    result.getByTestId('add-first-child-screen');
+    result.getByTestId('home-connect-section');
+    expect(result.queryByTestId('home-connect-section-compact')).toBeNull();
     expect(result.queryByTestId('parent-transition-notice')).toBeNull();
-    result.getByText('Your family dashboard starts here');
-    result.getByText(
-      'Add your first child profile and this screen will turn into tonight prompts, weekly recaps, nudges, and progress cards.',
-    );
+    result.getByText('Connect');
+    result.getByText('Add a child profile');
+    result.getByText('Link an existing learner');
+    result.getByText('Invite someone to try MentoMate');
+    result.getByText('Coming soon');
 
-    fireEvent.press(result.getByTestId('add-first-child-screen-primary'));
+    fireEvent.press(result.getByTestId('home-family-setup-cta-button'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/create-profile',
@@ -464,19 +472,43 @@ describe('ParentHomeScreen', () => {
     });
   });
 
-  it('routes Free owners with linked children directly to add another child', async () => {
+  it('shows demoted Connect actions for linked children and routes add child directly', async () => {
     const { result } = mount([PARENT, CHILD_A], {
       subscriptionTier: 'free',
       family: { profileCount: 2, maxProfiles: 2 },
     });
     await waitForParentTransitionNotice(result);
 
-    fireEvent.press(result.getByTestId('parent-home-add-child'));
+    result.getByTestId('home-connect-section-compact');
+    fireEvent.press(result.getByTestId('connect-create-child-action'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/create-profile',
       params: { for: 'child' },
     });
+  });
+
+  it('keeps Link existing coming soon and Invite separate from support-link creation', async () => {
+    const shareSpy = jest
+      .spyOn(Share, 'share')
+      .mockResolvedValue({ action: Share.sharedAction } as never);
+    const { result } = mount([PARENT, CHILD_A]);
+    await waitForParentTransitionNotice(result);
+
+    const linkExisting = result.getByTestId('connect-link-existing-action');
+    expect(linkExisting.props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: true }),
+    );
+
+    fireEvent.press(linkExisting);
+    expect(mockPush).not.toHaveBeenCalled();
+
+    fireEvent.press(result.getByTestId('connect-invite-action'));
+    expect(shareSpy).toHaveBeenCalledWith({
+      message: 'Try MentoMate with me: learning help for the whole family.',
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+    shareSpy.mockRestore();
   });
 
   it('renders the mentor-briefing card body (headline, solid line, one starter) from dashboard data', async () => {
@@ -700,8 +732,8 @@ describe('ParentHomeScreen', () => {
     expect(
       result.queryByText('Quiet week — maybe suggest a quick session on Math?'),
     ).toBeNull();
-    // Add-learner row is present.
-    result.getByTestId('parent-home-add-child');
+    // Connect stays available, but demoted below the child-specific mentor slot.
+    result.getByTestId('home-connect-section-compact');
     // No parent-learning leak.
     expect(result.queryByText('You: Fractions in Math')).toBeNull();
   });
