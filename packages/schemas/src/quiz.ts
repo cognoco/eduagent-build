@@ -184,7 +184,7 @@ export const capitalsFeedbackFactSchema = z.object({
 export type CapitalsFeedbackFact = z.infer<typeof capitalsFeedbackFactSchema>;
 
 export const capitalsAnswerFeedbackSchema = z.object({
-  pickedCity: capitalsFeedbackFactSchema.optional(),
+  pickedCity: capitalsFeedbackFactSchema.nullable(),
   correctCapital: capitalsFeedbackFactSchema,
 });
 export type CapitalsAnswerFeedback = z.infer<
@@ -194,7 +194,7 @@ export type CapitalsAnswerFeedback = z.infer<
 export const questionCheckResponseSchema = z.object({
   correct: z.boolean(),
   correctAnswer: z.string().optional(),
-  capitalsFeedback: capitalsAnswerFeedbackSchema.optional(),
+  capitalsFeedback: capitalsAnswerFeedbackSchema.nullable(),
 });
 export type QuestionCheckResponse = z.infer<typeof questionCheckResponseSchema>;
 

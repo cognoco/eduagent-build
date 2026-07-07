@@ -336,6 +336,7 @@ describe('quiz schemas', () => {
         correct: false,
         correctAnswer: 'Paris',
         capitalsFeedback: {
+          pickedCity: null,
           correctCapital: {
             city: 'Paris',
             country: 'France',

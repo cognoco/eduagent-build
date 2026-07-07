@@ -200,7 +200,7 @@ export function buildCapitalsAnswerFeedback(
 
   const pickedEntry = findCapitalEntryByCity(answerGiven);
   return {
-    ...(pickedEntry ? { pickedCity: toCapitalsFeedbackFact(pickedEntry) } : {}),
+    pickedCity: pickedEntry ? toCapitalsFeedbackFact(pickedEntry) : null,
     correctCapital: toCapitalsFeedbackFact(correctEntry),
   };
 }
@@ -315,10 +315,10 @@ export async function checkQuizAnswerWithCorrect(
     // — the re-check can neither retro-score nor grow the row.
     return {
       correct,
+      capitalsFeedback: !correct ? (capitalsFeedback ?? null) : null,
       ...(!correct
         ? {
             correctAnswer: question.correctAnswer,
-            ...(capitalsFeedback ? { capitalsFeedback } : {}),
           }
         : {}),
     };
@@ -346,10 +346,11 @@ export async function checkQuizAnswerWithCorrect(
   const capitalsFeedback = buildCapitalsAnswerFeedback(question, answerGiven);
   return {
     correct,
+    capitalsFeedback:
+      isFinalAttempt && !correct ? (capitalsFeedback ?? null) : null,
     ...(isFinalAttempt && !correct
       ? {
           correctAnswer: question.correctAnswer,
-          ...(capitalsFeedback ? { capitalsFeedback } : {}),
         }
       : {}),
   };

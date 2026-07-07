@@ -1022,6 +1022,7 @@ describe('Quiz routes', () => {
         correct: false,
         correctAnswer: 'Vienna',
         capitalsFeedback: {
+          pickedCity: null,
           correctCapital: {
             city: 'Vienna',
             country: 'Austria',
@@ -1094,7 +1095,7 @@ describe('Quiz routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body).toEqual({ correct: false });
+      expect(body).toEqual({ correct: false, capitalsFeedback: null });
       expect((mockDb as any).update).toHaveBeenCalled();
     });
 

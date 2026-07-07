@@ -1065,6 +1065,7 @@ describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', ()
       correct: false,
       correctAnswer: 'Paris',
       capitalsFeedback: {
+        pickedCity: null,
         correctCapital: {
           city: 'Paris',
           country: 'France',
@@ -1124,6 +1125,7 @@ describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', ()
       correct: false,
       correctAnswer: 'Paris',
       capitalsFeedback: {
+        pickedCity: null,
         correctCapital: {
           city: 'Paris',
           country: 'France',
@@ -1166,7 +1168,7 @@ describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', ()
     // The cluesUsed:0 "full XP" replay is never recorded — first-attempt-wins
     // keeps the original finalAttempt (cluesUsed:5, wrong) authoritative.
     expect(db.update as unknown as jest.Mock).not.toHaveBeenCalled();
-    expect(result).toEqual({ correct: true });
+    expect(result).toEqual({ correct: true, capitalsFeedback: null });
   });
 
   it('[BREAK/b] rejects probe (non-final) attempts beyond the per-question cap', async () => {
@@ -1218,7 +1220,7 @@ describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', ()
         false,
         1,
       ),
-    ).resolves.toEqual({ correct: false });
+    ).resolves.toEqual({ correct: false, capitalsFeedback: null });
   });
 
   it('[NEGATIVE] allows a probe attempt for one index when a DIFFERENT index is already final', async () => {
@@ -1249,7 +1251,7 @@ describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', ()
         false,
         1,
       ),
-    ).resolves.toEqual({ correct: false });
+    ).resolves.toEqual({ correct: false, capitalsFeedback: null });
   });
 });
 
