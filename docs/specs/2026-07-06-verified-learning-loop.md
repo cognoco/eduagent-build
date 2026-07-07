@@ -9,6 +9,8 @@
 - `docs/specs/2026-06-03-review-relearn-findings-and-high-impact-todos.md` — RR-N register this spec maps onto WIs
 - `docs/_archive/plans/done/2026-05-30-topic-mastery-three-states.md` — shipped Untouched → Learning → Mastered model
 - `docs/plans/v2-plan/00-STATE-OF-PLAY.md` §5–§6 — the "knows-me" loop orientation
+- `docs/adr/MMT-ADR-0031-challenge-verification-and-sm2-are-complementary-mastery-axes.md` — proposed axes ruling for S4 / WI-1469
+- `docs/adr/MMT-ADR-0032-verified-learning-artifacts-require-source-and-verification-state.md` — proposed artifact provenance contract for S5a / S7
 
 ## Purpose
 
@@ -108,11 +110,11 @@ Live across all session paths. No changes needed for this loop.
 | S3a | Promote `needs_deepening_topics` `pending_review` → `active` (+ expiry) | weak-spot lifecycle; named flip blocker in `config.ts:154-155` | **WI-1446** (stranded promotion) | Captured |
 | S3b | Low-stakes per-concept re-prove for recovering strugglers | recovery path out of a failed Challenge (RR-7 lockout) | **WI-1465** | Captured |
 | S3c | Concept-targeted review: focus due-topic recall on open weak concepts | segment 4 uses segment 2's concept evidence | **WI-1454** | Captured |
-| S4 | Rule the SM-2-verified vs Challenge-verified relationship (write-side); complete at least a preflight ruling before S2 writes schedules | the axes ruling (RR-11); ADR-class | **WI-1469** | Captured |
-| S5a | Writable notes + freeform keep + evidence citation + explicit artifact source/verification taxonomy | Segment 3 learner-authored artifact + citation | felt-knowing-loop spec Flows 1–3 (must be promoted into concrete WIs before S7 starts, per STATE-OF-PLAY §6) | Specced, not execution-ready |
+| S4 | Rule the SM-2-verified vs Challenge-verified relationship (write-side); complete at least a preflight ruling before S2 writes schedules | the axes ruling (RR-11); ADR-class; proposed in MMT-ADR-0031 | **WI-1469** | Captured |
+| S5a | Writable notes + freeform keep + evidence citation + explicit artifact source/verification taxonomy | Segment 3 learner-authored artifact + citation; proposed in MMT-ADR-0032 | **WI-1703** (Define verified-artifact provenance contract) + **WI-1704** (Build evidence-links substrate) + felt-knowing-loop spec Flows 1–3 | Captured blockers now exist; still refine before execution |
 | S5b | Grade learner notes, marks UI, save-as-note | Segment 3 correctness | **WI-1491** (note-correctness T1–T13 umbrella; verify unparked post-baseline-reset) | Captured |
 | S6 | Visible review-promise Mentor card ("we'll check this again on …") | Segment 4 visible in Now at promise time, not only when due | **WI-1502** | Captured |
-| S7 | Parent proof consumes the verified artifact (recap/current-prod parent surface carries verified-topic + artifact reference + retention state, within retention rules) | Segment 5 | **WI-1665** (captured 2026-07-06 as incidental item under WI-1657) | Captured |
+| S7 | Parent proof consumes the verified artifact (recap/current-prod parent surface carries verified-topic + artifact reference + retention state, within retention rules) | Segment 5 | **WI-1705** (Choose production-visible parent proof surface) → **WI-1665** (captured 2026-07-06 as incidental item under WI-1657) | Captured; surface decision blocks implementation |
 | S8 | One end-to-end loop test/eval pack, scaffolded before the staging flag flip and expanded slice-by-slice: verified, partial, misconception, decay→retest, parent-visible proof | AC6 | **WI-1666** (captured 2026-07-06 as incidental item under WI-1657) | Captured |
 
 AC coverage: AC1 = this spec · AC2 = S1+S3b (explain-back gate; the never-lock rule bounds it — see walkthrough) · AC3 = S5a+S5b (+ the already-built Challenge note-draft path) · AC4 = S2+S3a+S3c+S6 · AC5 = S7 · AC6 = S8.
