@@ -4,11 +4,11 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { Button } from '../common/Button';
 import { ErrorFallback } from '../common/ErrorFallback';
 import { TimeoutLoader } from '../common/TimeoutLoader';
-import type {
-  HubNextUp,
-  SubjectHubData,
-} from '../subject-hub/_view-models/subject-hub-state';
-import { SubjectHub } from '../subject-hub/SubjectHub';
+import {
+  SubjectHub,
+  type HubNextUp,
+  type SubjectHubData,
+} from '../subject-hub';
 
 type SurfaceAudience = 'learner' | 'supporter';
 type SurfaceScopeKind = 'me' | 'supporter-hub' | 'person';
@@ -35,8 +35,6 @@ interface LearningSurfaceFrameProps {
 }
 
 export function LearningSurfaceFrame({
-  audience,
-  scopeKind,
   title,
   subtitle,
   topAction,
@@ -44,11 +42,7 @@ export function LearningSurfaceFrame({
   testID,
 }: LearningSurfaceFrameProps): ReactElement {
   return (
-    <View
-      className="flex-1 bg-background px-5 py-5"
-      testID={testID}
-      accessibilityLabel={`${audience}:${scopeKind}`}
-    >
+    <View className="flex-1 bg-background px-5 py-5" testID={testID}>
       {title || subtitle || topAction ? (
         <View className="mb-5 gap-3">
           <View className="gap-1">
@@ -174,11 +168,15 @@ function LearningStateCardBase({
         testID={testID}
         loadingLabel={title}
         loadingDescription={message}
-        primaryAction={{
-          label: primaryAction?.label ?? title,
-          onPress: primaryAction?.onPress ?? (() => undefined),
-          testID: primaryAction?.testID,
-        }}
+        primaryAction={
+          primaryAction
+            ? {
+                label: primaryAction.label,
+                onPress: primaryAction.onPress,
+                testID: primaryAction.testID,
+              }
+            : undefined
+        }
         secondaryAction={
           secondaryAction
             ? {

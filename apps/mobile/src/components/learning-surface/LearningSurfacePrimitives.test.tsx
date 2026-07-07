@@ -2,9 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import type { CurriculumTopic } from '@eduagent/schemas';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
-import type { SubjectHubData } from '../subject-hub/_view-models/subject-hub-state';
+import type { SubjectHubData } from '../subject-hub';
 import {
   LearningActionRow,
   LearningStateCard,
@@ -101,6 +101,7 @@ describe('Learning surface primitives', () => {
     );
 
     screen.getByTestId('surface-frame');
+    expect(screen.queryByLabelText('supporter:person')).toBeNull();
     screen.getByText('Learner record');
     screen.getByText('Shareable updates');
     screen.getByTestId('surface-empty');
@@ -208,6 +209,31 @@ describe('Learning surface primitives', () => {
     screen.getByTestId('state-error');
     fireEvent.press(screen.getByTestId('error-retry'));
     expect(retry).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not synthesize a loading timeout action when no primary action is provided', () => {
+    jest.useFakeTimers();
+
+    try {
+      render(
+        <LearningStateCard
+          state="loading"
+          title="Loading reports"
+          message="Checking for updates."
+          testID="state-loading"
+        />,
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(15_000);
+      });
+
+      expect(
+        screen.queryByRole('button', { name: 'Loading reports' }),
+      ).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('renders filtered structural facts and appeal states without raw artifacts', () => {

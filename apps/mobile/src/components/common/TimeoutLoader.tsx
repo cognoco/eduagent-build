@@ -19,8 +19,8 @@ interface TimeoutLoaderProps {
   title?: string;
   /** Message shown in the ErrorFallback after timeout. */
   message?: string;
-  /** Primary action for the ErrorFallback (e.g. Retry). */
-  primaryAction: TimeoutLoaderAction;
+  /** Optional primary action for the ErrorFallback (e.g. Retry). */
+  primaryAction?: TimeoutLoaderAction;
   /** Optional secondary action for the ErrorFallback (e.g. Go Back). */
   secondaryAction?: TimeoutLoaderAction;
   /** Optional label shown next to the spinner before timeout. */
