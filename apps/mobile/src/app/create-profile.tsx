@@ -172,7 +172,7 @@ export default function CreateProfileScreen() {
       setError(t('onboarding.createProfile.timeoutError'));
     }, PROFILE_CREATE_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [createPostPending]);
+  }, [createPostPending, t]);
 
   useEffect(() => {
     return () => {
@@ -341,29 +341,53 @@ export default function CreateProfileScreen() {
       setCreatePostPending(false);
 
       // Persist family context immediately after creation for a parent
-      // audience. The profile is created with defaultAppContext=null; setting
-      // it now means future sign-ins land the user in the correct mode the
-      // moment they add a child (family-mode UI activates as soon as
-      // familyCapable === true, which requires hasFamilyLinks === true).
-      // A learner audience leaves the default — no PATCH needed.
-      // Wrapped in a non-throwing try so a flaky PATCH never blocks the
-      // profile-created success path; the user can change mode later from
-      // More → Account.
-      if (wantsFamily) {
+      // audience. First-profile parent setup writes the newly-created owner.
+      // Parent-adds-child writes the already-active owner, not the returned
+      // child profile. A learner audience leaves the default — no PATCH needed.
+      const familyContextProfileId = isParentAddingChild
+        ? activeProfile?.id
+        : wantsFamily
+          ? profile.id
+          : null;
+      const persistFamilyContext = async (): Promise<boolean> => {
+        if (!familyContextProfileId) return true;
         try {
           await updateAppContext.mutateAsync({
-            profileId: profile.id,
+            profileId: familyContextProfileId,
             defaultAppContext: 'family',
           });
+          return true;
         } catch (intentErr) {
           if (__DEV__) {
             console.warn(
-              'Failed to persist family context on first profile setup; user can change later from More → Account.',
+              'Failed to persist family context after profile creation.',
               intentErr,
             );
           }
+          return false;
         }
-      }
+      };
+      const showFamilyContextRecoveryAlert = (): void => {
+        platformAlert(
+          t('createProfile.createdTitle'),
+          t('createProfile.createdChildFamilyContextFailedBody', {
+            name: trimmedName,
+          }),
+          [
+            { text: t('common.notNow'), style: 'cancel' },
+            {
+              text: t('createProfile.switchFamilyModeCta'),
+              onPress: () => {
+                void (async () => {
+                  const retryPersisted = await persistFamilyContext();
+                  if (!retryPersisted) showFamilyContextRecoveryAlert();
+                })();
+              },
+            },
+          ],
+        );
+      };
+      const familyContextPersisted = await persistFamilyContext();
 
       // BUG-239: When a parent adds a child, the API grants consent inline
       // (consentStatus === 'CONSENTED'). Do NOT redirect to the child consent
@@ -371,11 +395,18 @@ export default function CreateProfileScreen() {
       // parent on their own profile.
       if (isParentAddingChild) {
         handleClose();
-        // Show confirmation — parent stays on their own profile
-        platformAlert(
-          t('createProfile.createdTitle'),
-          t('createProfile.createdChildBody', { name: trimmedName }),
-        );
+        // Show confirmation — parent stays on their own profile. If the
+        // family-context PATCH failed, keep the successful child creation and
+        // give the parent an explicit retry path instead of silently landing
+        // back in Study context.
+        if (familyContextPersisted) {
+          platformAlert(
+            t('createProfile.createdTitle'),
+            t('createProfile.createdChildBody', { name: trimmedName }),
+          );
+        } else {
+          showFamilyContextRecoveryAlert();
+        }
         return;
       }
 
@@ -478,6 +509,7 @@ export default function CreateProfileScreen() {
     }
   }, [
     activeProfileRole,
+    activeProfile?.id,
     isFirstProfileCreation,
     navigationContract.isParentProxy,
     canSubmit,

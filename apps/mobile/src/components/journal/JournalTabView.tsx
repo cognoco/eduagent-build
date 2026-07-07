@@ -10,6 +10,9 @@ import type {
 } from '@eduagent/schemas';
 
 import { ErrorFallback, TimeoutLoader } from '../common';
+import { BookPageFlipAnimation } from '../common/BookPageFlipAnimation';
+import { DeskLampAnimation } from '../common/DeskLampAnimation';
+import { MagicPenAnimation } from '../common/MagicPenAnimation';
 import { RecapsEmptyState } from '../recaps/RecapsEmptyState';
 import { VoiceRecordButton } from '../session/VoiceRecordButton';
 import { ReportsList } from '../progress/ReportsList';
@@ -341,16 +344,49 @@ function JournalSegmentedControl({
 function EmptyState({
   testID,
   title,
+  illustration,
 }: {
   testID: string;
   title: string;
+  illustration?: React.ReactNode;
 }): React.ReactElement {
   return (
     <View
       testID={testID}
-      className="rounded-card border border-border bg-surface p-4"
+      className="items-center rounded-card border border-border bg-surface p-4"
     >
-      <Text className="text-body-sm text-text-secondary">{title}</Text>
+      {illustration ? (
+        <View className="mb-3" pointerEvents="none">
+          {illustration}
+        </View>
+      ) : null}
+      <Text className="text-center text-body-sm text-text-secondary">
+        {title}
+      </Text>
+    </View>
+  );
+}
+
+function PracticeReportsEmptyMotif({
+  testID,
+}: {
+  testID: string;
+}): React.ReactElement {
+  return (
+    <View
+      testID={testID}
+      className="h-[92px] w-[176px] items-center justify-center"
+      pointerEvents="none"
+    >
+      <View className="absolute left-0 top-3">
+        <DeskLampAnimation size={62} testID={`${testID}-lamp`} />
+      </View>
+      <View className="absolute left-[58px] top-4">
+        <MagicPenAnimation size={58} testID={`${testID}-pen`} />
+      </View>
+      <View className="absolute right-0 top-1">
+        <BookPageFlipAnimation size={66} testID={`${testID}-book`} />
+      </View>
     </View>
   );
 }
@@ -445,11 +481,16 @@ function JournalRecapsSection(): React.ReactElement {
   const rows = recaps.data ?? [];
   if (rows.length === 0) {
     return (
-      <RecapsEmptyState
-        testID="journal-recaps-empty"
-        ctaTestID="journal-recaps-empty-start-session"
-        onStart={() => router.push('/(app)/mentor' as Href)}
-      />
+      <View>
+        <View className="mb-3 items-center" pointerEvents="none">
+          <BookPageFlipAnimation size={86} testID="journal-recaps-empty-book" />
+        </View>
+        <RecapsEmptyState
+          testID="journal-recaps-empty"
+          ctaTestID="journal-recaps-empty-start-session"
+          onStart={() => router.push('/(app)/mentor' as Href)}
+        />
+      </View>
     );
   }
 
@@ -474,6 +515,9 @@ function JournalReportsSection(): React.ReactElement {
   // Auto-surface the most recent available report (weekly each week, monthly
   // each month) inline at the top — the same behavior as the V1 Progress tab.
   const latestReport = getLatestReport(weeklyReports.data, monthlyReports.data);
+  const hasAnyReports =
+    (monthlyReports.data?.length ?? 0) > 0 ||
+    (weeklyReports.data?.length ?? 0) > 0;
   const openLatestReport = () => {
     if (!latestReport) return;
     if (latestReport.kind === 'weekly') {
@@ -540,6 +584,11 @@ function JournalReportsSection(): React.ReactElement {
 
   return (
     <View testID="journal-reports-section">
+      {!hasAnyReports && !isError ? (
+        <View className="items-center" pointerEvents="none">
+          <PracticeReportsEmptyMotif testID="journal-reports-empty-motif" />
+        </View>
+      ) : null}
       <LatestReportCard
         latestReport={latestReport}
         isError={isError}
@@ -785,6 +834,9 @@ function JournalNotesArchive(): React.ReactElement {
               ? t('journal.notes.searchEmpty')
               : t('journal.notes.empty')
           }
+          illustration={
+            <MagicPenAnimation size={82} testID="journal-notes-empty-pen" />
+          }
         />
       ) : (
         visibleItems.map((item) => (
@@ -1023,6 +1075,9 @@ function JournalPracticeSection(): React.ReactElement {
           <EmptyState
             testID="journal-practice-empty"
             title={t('journal.practice.empty')}
+            illustration={
+              <PracticeReportsEmptyMotif testID="journal-practice-empty-motif" />
+            }
           />
         ) : (
           items.map((item) => (

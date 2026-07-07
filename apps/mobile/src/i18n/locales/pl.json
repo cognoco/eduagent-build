@@ -3837,7 +3837,9 @@
     "seePlans": "Zobacz plany",
     "minimumAgeError": "Uczący się muszą mieć co najmniej {{age}} lat. Wybierz wcześniejszą datę urodzenia.",
     "parentAdultAgeError": "Konta rodziców wymagają daty urodzenia osoby dorosłej. Najpierw wpisz swoje dane, a potem dodaj dziecko.",
-    "a11yCloseDatePicker": "Zamknij wybór daty"
+    "a11yCloseDatePicker": "Zamknij wybór daty",
+    "createdChildFamilyContextFailedBody": "Profil {{name}} jest gotowy, ale nie udało nam się automatycznie przełączyć Cię na tryb rodzinny.",
+    "switchFamilyModeCta": "Przełącz na tryb rodzinny"
   },
   "clerkGate": {
     "timeoutTitle": "Trwa to dłużej niż oczekiwano",
