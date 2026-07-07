@@ -29,3 +29,7 @@ writer. Format: `date — question class — ruling — who decides next time`.
   refill signal; shepherd "exhausted" reports are audited, not relayed; sweep caps disclosed with
   their numbers; token/model discipline governs how work runs, never whether available work is
   done — full duty spec on WI-1526 — orchestrator.
+- 2026-07-07 — claude -p veto, judge.ts carve-out — EXCEPTION granted (operator, B-34 ruling): cosmo
+  dedup judge may fall back to `claude --model claude-haiku-4-5 -p` when codex is absent from PATH
+  (auth via OAuth login, ANTHROPIC_API_KEY stripped). Scope: judge.ts ONLY; the fleet-wide veto stands
+  for watchdogs/scripts/monitors everywhere else — everyone.

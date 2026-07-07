@@ -113,7 +113,7 @@ Nouns provisioned, every verb missing, PRDs not clause-addressable. Design **wit
 1. ~~B-01 wake mechanism~~ **RULED (c) hybrid-sequenced, 2026-07-06** — see Wave 3 row for the tight inc-1 scope. Downstream: B-24 binding writes "attended-only pending inc-2"; B-26 cadence = complement.
 2. ~~Charters ratification~~ **RATIFIED (operator, 2026-07-07; WIP N=4)** — new-build gate OPEN; landing = WI-1670 (WS-45).
 3. ~~B-12 shared-checkout ADR~~ **RULED (a′) 2026-07-07** (event 31; WI-1671/1672 + WI-1670 addendum) — was: **B-12 shared-checkout ADR** — rule before Lancre hosts multi-agent execution (cheap now, expensive after).
-4. **B-34 `claude -p` fallback** — fail-loud vs explicit exception ruling.
+4. ~~B-34~~ **RULED (b) EXCEPTION 2026-07-07** (judge.ts-only carve-out; trio 1282/1284/1295 stays KEEP) — was: **B-34 `claude -p` fallback** — fail-loud vs explicit exception ruling.
 5. **v2 RLS apply timing** — after B-02 + B-04 land.
 
 Everything in Waves 1-2 and the riders executes without a ruling. Recommended attack order: Wave 1 (in flight) → Wave 2 arming (pays out while sessions can still die undetected) → the B-01 fork → charters.
