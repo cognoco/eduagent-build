@@ -4,14 +4,14 @@ import {
   __resetMentorBornCeremonyForTests,
   getMentorBornCeremonySnapshot,
   requestMentorBornCeremony,
-} from '../lib/mentor-born-ceremony';
+} from '../../lib/mentor-born-ceremony';
 
 process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ??= 'pk_test_mock';
 
 const {
   MENTOR_BORN_CEREMONY_CAP_MS,
   MentorBornCeremonyOverlay,
-} = require('../components/common/MentorBornCeremonyOverlay');
+} = require('./MentorBornCeremonyOverlay');
 
 describe('MentorBornCeremonyOverlay', () => {
   beforeEach(() => {

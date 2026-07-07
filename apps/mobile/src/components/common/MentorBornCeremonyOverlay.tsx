@@ -1,6 +1,6 @@
-import i18next from 'i18next';
 import React, { useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Sentry } from '../../lib/sentry';
 import {
   completeMentorBornCeremony,
@@ -37,6 +37,7 @@ class MentorBornErrorBoundary extends React.Component<
 
 export function MentorBornCeremonyOverlay() {
   const request = useMentorBornCeremonyRequest();
+  const { t } = useTranslation();
   const onComplete = useCallback(() => {
     if (request) completeMentorBornCeremony(request.id);
   }, [request]);
@@ -58,7 +59,7 @@ export function MentorBornCeremonyOverlay() {
     >
       <MentorBornErrorBoundary onError={onComplete}>
         <MentorBirthAnimation
-          readyLabel={i18next.t('onboarding.mentorBirth.ready')}
+          readyLabel={t('onboarding.mentorBirth.ready')}
           onComplete={onComplete}
           size={220}
         />
