@@ -28,6 +28,7 @@ import {
   parentHomeSeenKey,
   notificationFirstAskKey,
   guardianNotificationAskKey,
+  mentorBirthSeenKey,
 } from './secure-store-keys';
 
 // Per-profile key constructors. Each takes a profileId and returns the exact
@@ -78,6 +79,8 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   notificationFirstAskKey,
   // use-guardian-notification-ask.ts — one-shot parent-home notification primer flag.
   guardianNotificationAskKey,
+  // session/index.tsx — one-shot mentor-born ceremony for managed child learners.
+  mentorBirthSeenKey,
   // session-types.ts — getInputModeKey, sanitized
   (id) => sanitizeSecureStoreKey(`voice-input-mode-${id}`),
   // [CR-PR129-M6] (app)/_layout.tsx — ACCENT_STORE_PREFIX: accent preset per profile, sanitized.

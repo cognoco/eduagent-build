@@ -9,6 +9,7 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
+import { mentorBirthSeenKey } from '../lib/secure-store-keys';
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
@@ -144,6 +145,9 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 }
 
 const CreateProfileScreen = require('./create-profile').default;
+const expoSecureStoreMock = jest.requireMock('expo-secure-store') as {
+  __store: Map<string, string>;
+};
 
 describe('CreateProfileScreen', () => {
   beforeEach(() => {
@@ -1312,6 +1316,34 @@ describe('CreateProfileScreen', () => {
       expect(mockSwitchProfile).not.toHaveBeenCalled();
       // Navigation back (handleClose) should fire
       expect(mockBack).toHaveBeenCalled();
+    });
+
+    it('does not consume the child mentor-born latch when parent admin creates a child', async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ profile: childProfile }), {
+          status: 200,
+        }),
+      );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
+      });
+
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      expect(
+        expoSecureStoreMock.__store.get(mentorBirthSeenKey(childProfile.id)),
+      ).toBeUndefined();
+      expect(screen.queryByTestId('mentor-birth-overlay')).toBeNull();
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
     });
 
     it('navigates home when parent adds child and no back history', async () => {

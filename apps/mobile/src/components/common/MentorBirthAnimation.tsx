@@ -52,6 +52,7 @@ type MentorBirthAnimationProps = {
   onComplete?: () => void;
   size?: number;
   testID?: string;
+  timeScale?: number;
 };
 
 const LOGO_PATH = 'M26,166 C26,96 156,92 184,28';
@@ -73,8 +74,6 @@ export const MENTOR_BIRTH_TIMINGS = {
   touchReleaseDelay: 4200,
   completionDelay: 7100,
 } as const;
-
-const ANIMATION_TIME_SCALE = MENTOR_BIRTH_TIMINGS.timeScale;
 
 export const MENTOR_BIRTH_POKE_TENTACLE_SOURCE_INDICES = [
   532, 536, 543, 602, 624, 1006, 1011,
@@ -154,8 +153,8 @@ function lerp(from: number, to: number, t: number) {
   return from + (to - from) * t;
 }
 
-function time(ms: number) {
-  return Math.round(ms * ANIMATION_TIME_SCALE);
+function time(ms: number, scale: number) {
+  return Math.round(ms * scale);
 }
 
 function bounceEnvelope(progress: number) {
@@ -210,6 +209,7 @@ export function MentorBirthAnimation({
   onComplete,
   size = 260,
   testID = 'mentor-birth-animation',
+  timeScale = MENTOR_BIRTH_TIMINGS.timeScale,
 }: MentorBirthAnimationProps) {
   const reduceMotion = useReducedMotion();
   const scheme = useColorScheme();
@@ -337,99 +337,105 @@ export function MentorBirthAnimation({
     const pop = { damping: 5, stiffness: 190 };
 
     pathDraw.value = withDelay(
-      time(120),
-      withTiming(1, { duration: time(900), easing: ease }),
+      time(120, timeScale),
+      withTiming(1, { duration: time(900, timeScale), easing: ease }),
     );
-    studentR.value = withDelay(time(220), withSpring(15, spring));
-    mentorNodeR.value = withDelay(time(920), withSpring(18, spring));
+    studentR.value = withDelay(time(220, timeScale), withSpring(15, spring));
+    mentorNodeR.value = withDelay(time(920, timeScale), withSpring(18, spring));
 
     pathDust.value = withDelay(
-      time(1780),
-      withTiming(1, { duration: time(420), easing: sparkEase }),
+      time(1780, timeScale),
+      withTiming(1, { duration: time(420, timeScale), easing: sparkEase }),
     );
     studentOp.value = withDelay(
-      time(1880),
-      withTiming(0.2, { duration: time(360) }),
+      time(1880, timeScale),
+      withTiming(0.2, { duration: time(360, timeScale) }),
     );
 
-    dot1.value = withDelay(time(1120), withSpring(1, pop));
-    dot2.value = withDelay(time(1220), withSpring(1, pop));
-    dot3.value = withDelay(time(1320), withSpring(1, pop));
+    dot1.value = withDelay(time(1120, timeScale), withSpring(1, pop));
+    dot2.value = withDelay(time(1220, timeScale), withSpring(1, pop));
+    dot3.value = withDelay(time(1320, timeScale), withSpring(1, pop));
     dotGather.value = withDelay(
-      time(1840),
-      withTiming(1, { duration: time(620) }),
+      time(1840, timeScale),
+      withTiming(1, { duration: time(620, timeScale) }),
     );
-    orbit.value = withDelay(time(1960), withTiming(1, { duration: time(760) }));
+    orbit.value = withDelay(
+      time(1960, timeScale),
+      withTiming(1, { duration: time(760, timeScale) }),
+    );
     mentorNodeTravel.value = withDelay(
-      time(1840),
-      withTiming(1, { duration: time(560), easing: ease }),
+      time(1840, timeScale),
+      withTiming(1, { duration: time(560, timeScale), easing: ease }),
     );
 
     mentorNodeWobble.value = withDelay(
-      time(2260),
+      time(2260, timeScale),
       withSequence(
-        withTiming(1.12, { duration: time(140) }),
-        withTiming(0.94, { duration: time(120) }),
+        withTiming(1.12, { duration: time(140, timeScale) }),
+        withTiming(0.94, { duration: time(120, timeScale) }),
         withSpring(1, pop),
       ),
     );
-    bodyR.value = withDelay(time(2500), withSpring(BIRTH_MASCOT.r, pop));
+    bodyR.value = withDelay(
+      time(2500, timeScale),
+      withSpring(BIRTH_MASCOT.r, pop),
+    );
     armsOp.value = withDelay(
-      time(2800),
-      withTiming(1, { duration: time(480) }),
+      time(2800, timeScale),
+      withTiming(1, { duration: time(480, timeScale) }),
     );
     suckersOp.value = withDelay(
-      time(3220),
-      withTiming(1, { duration: time(280) }),
+      time(3220, timeScale),
+      withTiming(1, { duration: time(280, timeScale) }),
     );
     faceOp.value = withDelay(
-      time(3480),
+      time(3480, timeScale),
       withSequence(
-        withTiming(1, { duration: time(70) }),
-        withTiming(0.1, { duration: time(80) }),
-        withTiming(1, { duration: time(130) }),
+        withTiming(1, { duration: time(70, timeScale) }),
+        withTiming(0.1, { duration: time(80, timeScale) }),
+        withTiming(1, { duration: time(130, timeScale) }),
       ),
     );
-    beanieP.value = withDelay(time(3740), withSpring(1, pop));
-    catchP.value = withDelay(time(4020), withSpring(1, pop));
+    beanieP.value = withDelay(time(3740, timeScale), withSpring(1, pop));
+    catchP.value = withDelay(time(4020, timeScale), withSpring(1, pop));
     pokeP.value = withDelay(
-      time(MENTOR_BIRTH_TIMINGS.pokeStart),
+      time(MENTOR_BIRTH_TIMINGS.pokeStart, timeScale),
       withSequence(
         withTiming(1, {
-          duration: time(MENTOR_BIRTH_TIMINGS.pokeDrawDuration),
+          duration: time(MENTOR_BIRTH_TIMINGS.pokeDrawDuration, timeScale),
           easing: sparkEase,
         }),
         withTiming(0, {
-          duration: time(MENTOR_BIRTH_TIMINGS.pokeRetractDuration),
+          duration: time(MENTOR_BIRTH_TIMINGS.pokeRetractDuration, timeScale),
           easing: ease,
         }),
       ),
     );
     bounceP.value = withDelay(
-      time(MENTOR_BIRTH_TIMINGS.bounceStart),
+      time(MENTOR_BIRTH_TIMINGS.bounceStart, timeScale),
       withTiming(1, {
-        duration: time(MENTOR_BIRTH_TIMINGS.bounceDuration),
+        duration: time(MENTOR_BIRTH_TIMINGS.bounceDuration, timeScale),
         easing: ease,
       }),
     );
     copyOp.value = withDelay(
-      time(MENTOR_BIRTH_TIMINGS.copyStart),
-      withTiming(1, { duration: time(260) }),
+      time(MENTOR_BIRTH_TIMINGS.copyStart, timeScale),
+      withTiming(1, { duration: time(260, timeScale) }),
     );
     fade.value = withDelay(
-      time(MENTOR_BIRTH_TIMINGS.fadeDelay),
-      withTiming(1, { duration: time(1) }, (finished) => {
+      time(MENTOR_BIRTH_TIMINGS.fadeDelay, timeScale),
+      withTiming(1, { duration: time(1, timeScale) }, (finished) => {
         if (finished) runOnJS(done)();
       }),
     );
 
     const touchRelease = setTimeout(
       () => setAcceptsTouches(false),
-      time(MENTOR_BIRTH_TIMINGS.touchReleaseDelay),
+      time(MENTOR_BIRTH_TIMINGS.touchReleaseDelay, timeScale),
     );
     const completionWatchdog = setTimeout(
       () => done(),
-      time(MENTOR_BIRTH_TIMINGS.completionDelay),
+      time(MENTOR_BIRTH_TIMINGS.completionDelay, timeScale),
     );
 
     return () => {
@@ -462,6 +468,7 @@ export function MentorBirthAnimation({
     bounceP,
     copyOp,
     fade,
+    timeScale,
   ]);
 
   useEffect(() => {
