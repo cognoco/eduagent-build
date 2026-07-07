@@ -338,6 +338,9 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
           ...(result.correctAnswer
             ? { correctAnswer: result.correctAnswer }
             : {}),
+          ...(result.capitalsFeedback
+            ? { capitalsFeedback: result.capitalsFeedback }
+            : {}),
         }),
         200,
       );

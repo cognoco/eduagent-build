@@ -7,6 +7,7 @@ import {
   guessWhoLlmOutputSchema,
   guessWhoQuestionSchema,
   questionCheckInputSchema,
+  questionCheckResponseSchema,
   questionResultSchema,
   quizActivityTypeSchema,
   quizQuestionSchema,
@@ -305,6 +306,45 @@ describe('quiz schemas', () => {
           answerGiven: 'x'.repeat(1000),
         }).answerGiven,
       ).toHaveLength(1000);
+    });
+  });
+
+  describe('questionCheckResponseSchema', () => {
+    it('[WI-1624] accepts Capitals feedback with picked-city and correct-capital facts', () => {
+      const response = {
+        correct: false,
+        correctAnswer: 'Paris',
+        capitalsFeedback: {
+          pickedCity: {
+            city: 'Berlin',
+            country: 'Germany',
+            fact: 'Berlin has more bridges than Venice.',
+          },
+          correctCapital: {
+            city: 'Paris',
+            country: 'France',
+            fact: 'Paris was originally a Roman city called Lutetia.',
+          },
+        },
+      };
+
+      expect(questionCheckResponseSchema.parse(response)).toEqual(response);
+    });
+
+    it('[WI-1624] accepts Capitals feedback that degrades to the correct-capital fact only', () => {
+      const response = {
+        correct: false,
+        correctAnswer: 'Paris',
+        capitalsFeedback: {
+          correctCapital: {
+            city: 'Paris',
+            country: 'France',
+            fact: 'Paris was originally a Roman city called Lutetia.',
+          },
+        },
+      };
+
+      expect(questionCheckResponseSchema.parse(response)).toEqual(response);
     });
   });
 

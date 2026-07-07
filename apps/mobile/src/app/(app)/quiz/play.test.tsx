@@ -1997,4 +1997,153 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
       }),
     );
   });
+
+  it('[WI-1624] renders picked-city context plus the correct-capital fact for Capitals feedback', async () => {
+    mockRound = {
+      id: 'round-capitals-feedback-known',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 1,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Berlin', 'Madrid', 'Rome'],
+          funFact: 'Paris has been a capital for centuries.',
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+    mockCheckAnswer.mockResolvedValueOnce({
+      correct: false,
+      correctAnswer: 'Paris',
+      capitalsFeedback: {
+        pickedCity: {
+          city: 'Berlin',
+          country: 'Germany',
+          fact: 'Berlin has more bridges than Venice.',
+        },
+        correctCapital: {
+          city: 'Paris',
+          country: 'France',
+          fact: 'Paris was originally a Roman city called Lutetia.',
+        },
+      },
+    });
+
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByText('Berlin'));
+
+    await waitFor(() => {
+      screen.getByTestId('quiz-capitals-feedback');
+    });
+    screen.getByText('That is Berlin, the capital of Germany.');
+    screen.getByText('Berlin has more bridges than Venice.');
+    screen.getByText('The capital you want is Paris.');
+    screen.getByText('Paris was originally a Roman city called Lutetia.');
+  });
+
+  it('[WI-1624] degrades unknown picked-city Capitals feedback to the correct-capital fact only', async () => {
+    mockRound = {
+      id: 'round-capitals-feedback-unknown',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 1,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          funFact: 'Paris has been a capital for centuries.',
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+    mockCheckAnswer.mockResolvedValueOnce({
+      correct: false,
+      correctAnswer: 'Paris',
+      capitalsFeedback: {
+        correctCapital: {
+          city: 'Paris',
+          country: 'France',
+          fact: 'Paris was originally a Roman city called Lutetia.',
+        },
+      },
+    });
+
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByText('Lyon'));
+
+    await waitFor(() => {
+      screen.getByTestId('quiz-capitals-feedback');
+    });
+    expect(screen.queryByText(/That is Lyon/)).toBeNull();
+    screen.getByText('The capital you want is Paris.');
+    screen.getByText('Paris was originally a Roman city called Lutetia.');
+  });
+
+  it('[WI-1624] avoids banned wording in Capitals feedback copy', async () => {
+    mockRound = {
+      id: 'round-capitals-feedback-wording',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 1,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Berlin', 'Madrid', 'Rome'],
+          funFact: 'Paris has been a capital for centuries.',
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+    mockCheckAnswer.mockResolvedValueOnce({
+      correct: false,
+      correctAnswer: 'Paris',
+      capitalsFeedback: {
+        pickedCity: {
+          city: 'Berlin',
+          country: 'Germany',
+          fact: 'Berlin has more bridges than Venice.',
+        },
+        correctCapital: {
+          city: 'Paris',
+          country: 'France',
+          fact: 'Paris was originally a Roman city called Lutetia.',
+        },
+      },
+    });
+
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByText('Berlin'));
+
+    const feedback = await screen.findByTestId('quiz-capitals-feedback');
+    const collectText = (node: unknown): string => {
+      if (typeof node === 'string') return node;
+      if (
+        node &&
+        typeof node === 'object' &&
+        'props' in node &&
+        typeof (node as { props: { children?: unknown } }).props === 'object'
+      ) {
+        const children = (node as { props: { children?: unknown } }).props
+          .children;
+        return Array.isArray(children)
+          ? children.map(collectText).join(' ')
+          : collectText(children);
+      }
+      return '';
+    };
+
+    expect(collectText(feedback).toLowerCase()).not.toMatch(
+      /\b(wrong|failed|incorrect)\b/,
+    );
+  });
 });

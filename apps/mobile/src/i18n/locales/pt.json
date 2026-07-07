@@ -1149,6 +1149,8 @@
       "readyForNext": "Pronto para a próxima",
       "correct": "Correto",
       "notQuite": "Quase",
+      "capitalsPickedCity": "Essa é {{city}}, a capital de {{country}}.",
+      "capitalsCorrectCapital": "A capital que você procura é {{city}}.",
       "seeResults": "Ver resultados",
       "oneMore": "Espera, só mais uma!",
       "savingRound": "A guardar a tua ronda...",

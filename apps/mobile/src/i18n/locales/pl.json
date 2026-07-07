@@ -1161,6 +1161,8 @@
       "readyForNext": "Gotowy na następne",
       "correct": "Prawidłowo",
       "notQuite": "Niezupełnie",
+      "capitalsPickedCity": "To {{city}}, stolica państwa {{country}}.",
+      "capitalsCorrectCapital": "Szukana stolica to {{city}}.",
       "seeResults": "Zobacz wyniki",
       "oneMore": "Czekaj, jeszcze jedno!",
       "savingRound": "Zapisuję rundę...",

@@ -1122,6 +1122,8 @@
       "readyForNext": "Klar for neste",
       "correct": "Riktig",
       "notQuite": "Ikke helt",
+      "capitalsPickedCity": "Det er {{city}}, hovedstaden i {{country}}.",
+      "capitalsCorrectCapital": "Hovedstaden du ser etter er {{city}}.",
       "seeResults": "Se resultater",
       "oneMore": "Vent, bare én til!",
       "savingRound": "Lagrer runden din ...",
