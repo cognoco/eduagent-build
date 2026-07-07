@@ -4240,11 +4240,6 @@
       "actionMentor": "メンタービュー",
       "actionSubjects": "科目",
       "actionJournal": "ジャーナル",
-      "factKind": {
-        "mastery": "習熟度",
-        "effort": "努力",
-        "observable_engagement": "取り組み"
-      },
       "addSupporterLabel": "サポートを開始"
     },
     "subjects": {

@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 import {
   fireEvent,
   render,
@@ -194,5 +197,15 @@ describe('PersonScopeStructuralSubjects', () => {
 
     fireEvent.press(screen.getByTestId('person-scope-subject-hub-back'));
     screen.getByTestId(`person-scope-subject-${SUBJECT_ID}`);
+  });
+
+  it('routes the masked drill-in through the shared SubjectHubSurface primitive', () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, 'PersonScopeStructuralSubjects.tsx'),
+      'utf8',
+    );
+
+    expect(source).toMatch(/SubjectHubSurface/);
+    expect(source).not.toMatch(/<SubjectHub\\b/);
   });
 });

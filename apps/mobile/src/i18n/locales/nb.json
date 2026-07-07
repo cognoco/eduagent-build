@@ -4240,11 +4240,6 @@
       "actionMentor": "Mentorvisning",
       "actionSubjects": "Fag",
       "actionJournal": "Logg",
-      "factKind": {
-        "mastery": "Mestring",
-        "effort": "Innsats",
-        "observable_engagement": "Engasjement"
-      },
       "addSupporterLabel": "Begynn å støtte"
     },
     "subjects": {
