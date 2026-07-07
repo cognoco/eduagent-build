@@ -275,6 +275,25 @@
     "goToLibraryLabel": "Go to Library",
     "moreOptions": "More options",
     "moreOptionsLabel": "More options",
+    "connect": {
+      "title": "Connect",
+      "subtitleProminent": "Set up learning with the people who matter.",
+      "subtitleCompact": "Add another learner or share MentoMate.",
+      "createChild": {
+        "title": "Add a child profile",
+        "subtitle": "Create a safe learning space for your child."
+      },
+      "linkExisting": {
+        "title": "Link an existing learner",
+        "subtitle": "For a learner who already has an account.",
+        "badge": "Coming soon"
+      },
+      "invite": {
+        "title": "Invite someone to try MentoMate",
+        "subtitle": "Share the app only; no learning data is shared."
+      },
+      "inviteMessage": "Try MentoMate with me: learning help for the whole family."
+    },
     "learner": {
       "recommended": "Recommended",
       "intentHeading": "What do you need right now?",
@@ -305,11 +324,6 @@
           "title": "Learn something new",
           "subtitle": "Start a topic or build a subject"
         }
-      },
-      "familySetup": {
-        "title": "Set up Family",
-        "subtitle": "Add a child profile so they can learn with their own mentor",
-        "cta": "Set up Family"
       },
       "greeting": "Hey {{name}}!",
       "greetingNoName": "Hey there!",
@@ -348,11 +362,6 @@
         "promptRestartWithTopic": "Want to pick one small {{topic}} goal for this week?",
         "promptRestartEasierWithTopic": "Should we make {{topic}} easier to restart?"
       },
-      "empty": {
-        "title": "Your family dashboard starts here",
-        "body": "Add your first child profile and this screen will turn into tonight prompts, weekly recaps, nudges, and progress cards.",
-        "cta": "Add your first child"
-      },
       "childrenHeader": "Children",
       "familyManagementHeader": "Your family",
       "familySummary": {
@@ -366,9 +375,7 @@
         "noActivity": "{{memberNames}} · no sessions this week",
         "whoNeedsYouHeader": "Who needs you today",
         "attentionChild": "{{childName}} could use a nudge today",
-        "profileLimit": "{{count}} of {{max}} profiles used",
-        "addProfileAction": "Add profile",
-        "addProfileAccessibilityLabel": "Add a family profile"
+        "profileLimit": "{{count}} of {{max}} profiles used"
       },
       "transitionNoticeTitle": "You're now mentoring {{childNames}}",
       "childCard": {
@@ -418,10 +425,6 @@
         "emptyBody": "Nothing to add just yet. Browse {{name}}'s library to pick something to explore together.",
         "openLibrary": "Open {{name}}'s library",
         "close": "Close"
-      },
-      "addLearner": {
-        "title": "Add a learner",
-        "accessibilityLabel": "Add a learner to your family"
       },
       "childProfileLabel": "{{name}} profile",
       "greetingFallbackName": "there"

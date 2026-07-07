@@ -7,6 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import React from 'react';
+import { Share } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createRoutedMockFetch,
@@ -419,20 +420,29 @@ describe('LearnerScreen', () => {
     });
   });
 
-  // [HOME-07] Adult owner without linked children must see a Family setup
-  // entry on the learner home. Routes to More so the existing handleAddChild
-  // flow owns subscription/quota gating.
-  it('shows Family setup CTA when adult owner can add child and has no children', async () => {
+  // [HOME-07 / WI-1610] Adult owner without linked children must see a
+  // prominent Connect entry on learner Home, before any family/support link
+  // exists. Create child routes directly to the existing managed-child flow.
+  it('shows prominent Connect actions when adult owner can add child and has no children', async () => {
     mockShowAddChild = true;
     mockLinkedChildren = [];
     renderLearner();
 
-    await waitFor(() => screen.getByTestId('home-family-setup-cta-button'));
-    fireEvent.press(screen.getByTestId('home-family-setup-cta-button'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/more');
+    await waitFor(() => screen.getByTestId('home-connect-section'));
+    screen.getByText('Connect');
+    screen.getByText('Add a child profile');
+    screen.getByText('Link an existing learner');
+    screen.getByText('Invite someone to try MentoMate');
+    screen.getByText('Coming soon');
+
+    fireEvent.press(screen.getByTestId('connect-create-child-action'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    });
   });
 
-  it('hides Family setup CTA when owner already has linked children', async () => {
+  it('keeps Connect out of learner Home once children exist', async () => {
     mockShowAddChild = true;
     mockLinkedChildren = [
       { id: 'child-id', displayName: 'Emma', isOwner: false },
@@ -440,26 +450,51 @@ describe('LearnerScreen', () => {
     renderLearner();
 
     await waitFor(() => screen.getByTestId('learner-screen'));
-    expect(screen.queryByTestId('home-family-setup-cta-button')).toBeNull();
+    expect(screen.queryByTestId('home-connect-section')).toBeNull();
   });
 
-  it('hides Family setup CTA when gates.showAddChild is false', async () => {
+  it('hides Connect when gates.showAddChild is false', async () => {
     mockShowAddChild = false;
     mockSubscriptionTier = 'plus';
     mockLinkedChildren = [];
     renderLearner();
 
     await waitFor(() => screen.getByTestId('learner-screen'));
-    expect(screen.queryByTestId('home-family-setup-cta-button')).toBeNull();
+    expect(screen.queryByTestId('home-connect-section')).toBeNull();
   });
 
-  it('keeps Family setup CTA for a family-plan owner while the navigation gate catches up', async () => {
+  it('keeps Connect for a family-plan owner while the navigation gate catches up', async () => {
     mockShowAddChild = false;
     mockSubscriptionTier = 'family';
     mockLinkedChildren = [];
     renderLearner();
 
-    await waitFor(() => screen.getByTestId('home-family-setup-cta-button'));
+    await waitFor(() => screen.getByTestId('home-connect-section'));
+  });
+
+  it('marks Link existing learner coming soon and keeps Invite separate from support links', async () => {
+    const shareSpy = jest
+      .spyOn(Share, 'share')
+      .mockResolvedValue({ action: Share.sharedAction } as never);
+    mockShowAddChild = true;
+    mockLinkedChildren = [];
+    renderLearner();
+
+    await waitFor(() => screen.getByTestId('home-connect-section'));
+    const linkExisting = screen.getByTestId('connect-link-existing-action');
+    expect(linkExisting.props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: true }),
+    );
+
+    fireEvent.press(linkExisting);
+    expect(mockPush).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('connect-invite-action'));
+    expect(shareSpy).toHaveBeenCalledWith({
+      message: 'Try MentoMate with me: learning help for the whole family.',
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+    shareSpy.mockRestore();
   });
 
   it('keeps home actions available when the subject list fails to load', async () => {

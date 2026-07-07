@@ -284,11 +284,6 @@
       "proxySessionSummariesTitle": "セッション要約は保護者ビューにあります",
       "proxySessionSummariesBody": "{{name}}のメモは非公開のままですが、プロフィールから保護者向けのセッション要約を確認できます。",
       "proxySessionSummariesCta": "{{name}}のセッション要約を見る",
-      "familySetup": {
-        "title": "Set up Family",
-        "subtitle": "Add a child profile so they can learn with their own mentor",
-        "cta": "Set up Family"
-      },
       "greeting": "やあ、{{name}}さん！",
       "greetingNoName": "こんにちは！",
       "myNotes": "マイノート",
@@ -327,8 +322,6 @@
         "noActivity": "{{memberNames}} · 今週のセッションなし",
         "attentionChild": "{{childName}}さんには今日、少し働きかけが必要かもしれません",
         "profileLimit": "{{max}}プロフィール中{{count}}使用中",
-        "addProfileAction": "プロフィールを追加",
-        "addProfileAccessibilityLabel": "ファミリープロフィールを追加",
         "whoNeedsYouHeader": "今日のサポートが必要なのは？"
       },
       "transitionNoticeTitle": "{{childNames}}のメンターになりました",
@@ -340,11 +333,6 @@
         "promptNextGoalWithTopic": "今週の{{topic}}の小さな目標を1つ決める？",
         "promptRestartWithTopic": "今週の{{topic}}の小さな目標を1つ決める？",
         "promptRestartEasierWithTopic": "{{topic}}を再開しやすくしてみる？"
-      },
-      "empty": {
-        "title": "Your family dashboard starts here",
-        "body": "Add your first child profile and this screen will turn into tonight prompts, weekly recaps, nudges, and progress cards.",
-        "cta": "Add your first child"
       },
       "childrenHeader": "Children",
       "familyManagementHeader": "ファミリー管理",
@@ -396,10 +384,6 @@
         "openLibrary": "{{name}}さんのライブラリを開く",
         "close": "閉じる"
       },
-      "addLearner": {
-        "title": "学習者を追加",
-        "accessibilityLabel": "家族に学習者を追加する"
-      },
       "childProfileLabel": "{{name}}のプロフィール",
       "greetingFallbackName": "こんにちは",
       "greetingNoName": "こんにちは！"
@@ -424,6 +408,25 @@
     "intentCard": {
       "titleWithBadge": "{{title}}、{{count}}項目",
       "opensActivityHint": "このアクティビティを開きます"
+    },
+    "connect": {
+      "title": "つながる",
+      "subtitleProminent": "大切な人と一緒に学習を設定しましょう。",
+      "subtitleCompact": "学習者を追加、またはMentoMateを共有。",
+      "createChild": {
+        "title": "お子様用プロフィールを追加",
+        "subtitle": "お子様のための安全な学習スペースを作成。"
+      },
+      "linkExisting": {
+        "title": "既存の学習者と連携",
+        "subtitle": "すでにアカウントをお持ちの学習者向け。",
+        "badge": "近日公開"
+      },
+      "invite": {
+        "title": "誰かをMentoMateに招待する",
+        "subtitle": "アプリのみを共有します。学習データは共有されません。"
+      },
+      "inviteMessage": "私と一緒にMentoMateを試してみませんか？家族みんなの学習をサポートします。"
     }
   },
   "family": {

@@ -284,11 +284,6 @@
       "proxySessionSummariesTitle": "Øktoppsummeringer finnes i foreldrevisningen",
       "proxySessionSummariesBody": "Notatene til {{name}} forblir private, men du kan se foreldrevennlige øktoppsummeringer fra profilen.",
       "proxySessionSummariesCta": "Se øktoppsummeringene til {{name}}",
-      "familySetup": {
-        "title": "Set up Family",
-        "subtitle": "Add a child profile so they can learn with their own mentor",
-        "cta": "Set up Family"
-      },
       "greeting": "Hei {{name}}!",
       "greetingNoName": "Hei på deg!",
       "myNotes": "Mine notater",
@@ -327,8 +322,6 @@
         "noActivity": "{{memberNames}} · ingen økter denne uken",
         "attentionChild": "{{childName}} kan trenge et lite dytt i dag",
         "profileLimit": "{{count}} av {{max}} profiler brukt",
-        "addProfileAction": "Legg til profil",
-        "addProfileAccessibilityLabel": "Legg til familieprofil",
         "whoNeedsYouHeader": "Hvem trenger deg i dag"
       },
       "transitionNoticeTitle": "Du veileder nå {{childNames}}",
@@ -340,11 +333,6 @@
         "promptNextGoalWithTopic": "Vil dere velge ett lite {{topic}}-mål for denne uken?",
         "promptRestartWithTopic": "Vil dere velge ett lite {{topic}}-mål for denne uken?",
         "promptRestartEasierWithTopic": "Skal vi gjøre det lettere å starte med {{topic}} igjen?"
-      },
-      "empty": {
-        "title": "Your family dashboard starts here",
-        "body": "Add your first child profile and this screen will turn into tonight prompts, weekly recaps, nudges, and progress cards.",
-        "cta": "Add your first child"
       },
       "childrenHeader": "Children",
       "familyManagementHeader": "Familieadministrasjon",
@@ -396,10 +384,6 @@
         "openLibrary": "Åpne {{name}}s bibliotek",
         "close": "Lukk"
       },
-      "addLearner": {
-        "title": "Legg til elev",
-        "accessibilityLabel": "Legg til en elev i familien din"
-      },
       "childProfileLabel": "{{name}}s profil",
       "greetingFallbackName": "der",
       "greetingNoName": "Hei på deg!"
@@ -424,6 +408,25 @@
     "intentCard": {
       "titleWithBadge": "{{title}}, {{count}} elementer",
       "opensActivityHint": "Åpner denne aktiviteten"
+    },
+    "connect": {
+      "title": "Knytt kontakt",
+      "subtitleProminent": "Tilrettelegg for læring med de som betyr noe for deg.",
+      "subtitleCompact": "Legg til en annen elev eller del MentoMate.",
+      "createChild": {
+        "title": "Legg til en barneprofil",
+        "subtitle": "Skap et trygt læringsmiljø for barnet ditt."
+      },
+      "linkExisting": {
+        "title": "Koble til en eksisterende elev",
+        "subtitle": "For en elev som allerede har en konto.",
+        "badge": "Kommer snart"
+      },
+      "invite": {
+        "title": "Inviter noen til å prøve MentoMate",
+        "subtitle": "Del kun appen, ingen læringsdata deles."
+      },
+      "inviteMessage": "Prøv MentoMate med meg: læringshjelp for hele familien."
     }
   },
   "family": {
