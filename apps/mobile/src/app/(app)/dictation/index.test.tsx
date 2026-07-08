@@ -26,22 +26,19 @@ const mockGenerateMutateAsync = jest.fn();
 const mockGenerateReset = jest.fn();
 let mockGenerateIsPending = false;
 
-jest.mock(
-  '../../../hooks/use-dictation-api' /* gc1-allow: pattern-a conversion; wraps api-client fetch boundary — needs network stub in unit tests */,
-  () => ({
-    ...jest.requireActual('../../../hooks/use-dictation-api'),
-    useGenerateDictation: () => ({
-      mutateAsync: mockGenerateMutateAsync,
-      isPending: mockGenerateIsPending,
-      reset: mockGenerateReset,
-    }),
-    usePrepareHomework: () => ({
-      mutateAsync: jest.fn(),
-      isPending: false,
-      reset: jest.fn(),
-    }),
+jest.mock('../../../hooks/use-dictation-api', () => ({
+  ...jest.requireActual('../../../hooks/use-dictation-api'),
+  useGenerateDictation: () => ({
+    mutateAsync: mockGenerateMutateAsync,
+    isPending: mockGenerateIsPending,
+    reset: mockGenerateReset,
   }),
-);
+  usePrepareHomework: () => ({
+    mutateAsync: jest.fn(),
+    isPending: false,
+    reset: jest.fn(),
+  }),
+}));
 
 const mockSetData = jest.fn();
 
@@ -86,28 +83,25 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../../components/home/IntentCard' /* gc1-allow: pattern-a conversion; IntentCard uses native Pressable styling; mock provides testable Pressable substitute */,
-  () => ({
-    ...jest.requireActual('../../../components/home/IntentCard'),
-    IntentCard: ({
-      title,
-      onPress,
-      testID,
-    }: {
-      title: string;
-      onPress: () => void;
-      testID?: string;
-    }) => {
-      const { Pressable, Text } = jest.requireActual('react-native');
-      return (
-        <Pressable onPress={onPress} testID={testID ?? `intent-${title}`}>
-          <Text>{title}</Text>
-        </Pressable>
-      );
-    },
-  }),
-);
+jest.mock('../../../components/home/IntentCard', () => ({
+  ...jest.requireActual('../../../components/home/IntentCard'),
+  IntentCard: ({
+    title,
+    onPress,
+    testID,
+  }: {
+    title: string;
+    onPress: () => void;
+    testID?: string;
+  }) => {
+    const { Pressable, Text } = jest.requireActual('react-native');
+    return (
+      <Pressable onPress={onPress} testID={testID ?? `intent-${title}`}>
+        <Text>{title}</Text>
+      </Pressable>
+    );
+  },
+}));
 
 const DictationChoiceScreen = require('./index').default as React.ComponentType;
 

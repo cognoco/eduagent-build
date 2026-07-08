@@ -74,13 +74,10 @@ const mockFetch = createRoutedMockFetch({
 
 // use-active-profile-role is derived from useProfile + useParentProxy — no API calls.
 let mockActiveRole: 'owner' | 'child' | 'impersonated-child' | null = 'owner';
-jest.mock(
-  '../../hooks/use-active-profile-role' /* gc1-allow: pattern-a conversion; wiring full ProfileContext in a screen test would duplicate role-derivation coverage without adding signal */,
-  () => ({
-    ...jest.requireActual('../../hooks/use-active-profile-role'),
-    useActiveProfileRole: () => mockActiveRole,
-  }),
-);
+jest.mock('../../hooks/use-active-profile-role', () => ({
+  ...jest.requireActual('../../hooks/use-active-profile-role'),
+  useActiveProfileRole: () => mockActiveRole,
+}));
 
 // mockCanEnterResult controls what canEnter() returns per-test.
 // Default true so most tests exercise normal screen rendering.
@@ -121,13 +118,10 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../lib/platform-alert' /* gc1-allow: pattern-a conversion; Alert.alert is a React Native native UI boundary that cannot be driven in JSDOM */,
-  () => ({
-    ...jest.requireActual('../../lib/platform-alert'),
-    platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
-  }),
-);
+jest.mock('../../lib/platform-alert', () => ({
+  ...jest.requireActual('../../lib/platform-alert'),
+  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+}));
 
 jest.mock(
   '../../lib/sentry' /* gc1-allow: @sentry/react-native external boundary */,
@@ -140,30 +134,27 @@ jest.mock(
 // not the generic "Please try again." fallback.
 // Strategy: mock TellMentorInput to expose a testID-tagged submit button so
 // we can trigger onSubmit directly without depending on TellMentorInput internals.
-jest.mock(
-  '../../components/tell-mentor-input' /* gc1-allow: pattern-a conversion; exposes testID-tagged submit button to drive onSubmit directly without native keyboard dependency */,
-  () => ({
-    ...jest.requireActual('../../components/tell-mentor-input'),
-    TellMentorInput: ({
-      onSubmit,
-      onChangeText,
-    }: {
-      onSubmit: () => void;
-      onChangeText: (text: string) => void;
-    }) => {
-      const { Pressable, TextInput } = require('react-native');
-      return (
-        <>
-          <TextInput
-            testID="tell-mentor-text-input"
-            onChangeText={onChangeText}
-          />
-          <Pressable testID="tell-mentor-submit" onPress={onSubmit} />
-        </>
-      );
-    },
-  }),
-);
+jest.mock('../../components/tell-mentor-input', () => ({
+  ...jest.requireActual('../../components/tell-mentor-input'),
+  TellMentorInput: ({
+    onSubmit,
+    onChangeText,
+  }: {
+    onSubmit: () => void;
+    onChangeText: (text: string) => void;
+  }) => {
+    const { Pressable, TextInput } = require('react-native');
+    return (
+      <>
+        <TextInput
+          testID="tell-mentor-text-input"
+          onChangeText={onChangeText}
+        />
+        <Pressable testID="tell-mentor-submit" onPress={onSubmit} />
+      </>
+    );
+  },
+}));
 
 function makeWrapper() {
   const queryClient = new QueryClient({
