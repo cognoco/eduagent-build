@@ -29,6 +29,9 @@ import {
 } from '@eduagent/database';
 import { consentGateSatisfiedSql } from '../../services/identity-v2/consent-status-v2';
 
+const BATCH_SIZE = 500;
+const ELIGIBILITY_SCAN_LIMIT = BATCH_SIZE;
+
 export const dailyReminderScan = inngest.createFunction(
   { id: 'daily-reminder-scan', name: 'Daily reminder scan (hourly)' },
   { cron: '0 * * * *' }, // Hourly — filters by local 9 AM
@@ -79,7 +82,8 @@ export const dailyReminderScan = inngest.createFunction(
                 ),
             ),
           ),
-        );
+        )
+        .limit(ELIGIBILITY_SCAN_LIMIT);
       return results.map((r) => ({
         profileId: r.profileId,
         streakDays: r.currentStreak,
@@ -91,10 +95,10 @@ export const dailyReminderScan = inngest.createFunction(
     }
 
     // Step 2: Fan out — one event per eligible profile
-    const BATCH_SIZE = 500;
     let sentEvents = 0;
-    for (let i = 0; i < eligible.length; i += BATCH_SIZE) {
-      const chunk = eligible.slice(i, i + BATCH_SIZE);
+    const cappedEligible = eligible.slice(0, ELIGIBILITY_SCAN_LIMIT);
+    for (let i = 0; i < cappedEligible.length; i += BATCH_SIZE) {
+      const chunk = cappedEligible.slice(i, i + BATCH_SIZE);
       await step.sendEvent(
         `fan-out-${i}`,
         chunk.map((profile) => ({
@@ -110,7 +114,7 @@ export const dailyReminderScan = inngest.createFunction(
 
     return {
       status: 'completed',
-      eligibleCount: eligible.length,
+      eligibleCount: cappedEligible.length,
       sentEvents,
     };
   },

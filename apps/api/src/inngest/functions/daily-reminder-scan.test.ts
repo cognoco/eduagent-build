@@ -240,43 +240,42 @@ describe('dailyReminderScan', () => {
       expect(result.sentEvents).toBe(500);
     });
 
-    it('sends two step.sendEvent calls for 501 profiles (boundary + 1)', async () => {
+    it('caps a 501-profile scan to one 500-event fan-out', async () => {
       const profiles = makeProfiles(501);
       const { sendEventCalls, result } = await executeHandler(profiles);
 
-      expect(sendEventCalls).toHaveLength(2);
+      expect(sendEventCalls).toHaveLength(1);
       expect(sendEventCalls[0]!.name).toBe('fan-out-0');
-      expect(sendEventCalls[1]!.name).toBe('fan-out-500');
-      expect(result.sentEvents).toBe(501);
+      expect(sendEventCalls[0]!.payload as unknown[]).toHaveLength(500);
+      expect(result.sentEvents).toBe(500);
+      expect(result.eligibleCount).toBe(500);
     });
 
-    it('first chunk has 500 events and second chunk has the remainder', async () => {
+    it('drops profiles beyond the per-tick eligibility cap', async () => {
       const profiles = makeProfiles(503);
       const { sendEventCalls } = await executeHandler(profiles);
 
       const chunk1 = sendEventCalls[0]!.payload as unknown[];
-      const chunk2 = sendEventCalls[1]!.payload as unknown[];
       expect(chunk1).toHaveLength(500);
-      expect(chunk2).toHaveLength(3);
+      expect(sendEventCalls).toHaveLength(1);
     });
 
-    it('sends three step.sendEvent calls for 1001 profiles', async () => {
+    it('still sends only one capped batch for 1001 profiles', async () => {
       const profiles = makeProfiles(1001);
       const { sendEventCalls, result } = await executeHandler(profiles);
 
-      expect(sendEventCalls).toHaveLength(3);
+      expect(sendEventCalls).toHaveLength(1);
       expect(sendEventCalls[0]!.name).toBe('fan-out-0');
-      expect(sendEventCalls[1]!.name).toBe('fan-out-500');
-      expect(sendEventCalls[2]!.name).toBe('fan-out-1000');
-      expect(result.sentEvents).toBe(1001);
+      expect(sendEventCalls[0]!.payload as unknown[]).toHaveLength(500);
+      expect(result.sentEvents).toBe(500);
     });
 
-    it('fan-out step names are fan-out-{offset} (0, 500, 1000, ...)', async () => {
+    it('fan-out step names stay bounded to fan-out-0 under the cap', async () => {
       const profiles = makeProfiles(1100);
       const { sendEventCalls } = await executeHandler(profiles);
 
       const names = sendEventCalls.map((c) => c.name);
-      expect(names).toEqual(['fan-out-0', 'fan-out-500', 'fan-out-1000']);
+      expect(names).toEqual(['fan-out-0']);
     });
 
     it('does not use bare inngest.send — only memoized step.sendEvent', async () => {
@@ -307,12 +306,12 @@ describe('dailyReminderScan', () => {
       expect(result.eligibleCount).toBe(result.sentEvents);
     });
 
-    it('eligibleCount matches sentEvents for a multi-chunk run', async () => {
+    it('eligibleCount matches sentEvents for a capped over-limit run', async () => {
       const profiles = makeProfiles(750);
       const { result } = await executeHandler(profiles);
 
-      expect(result.eligibleCount).toBe(750);
-      expect(result.sentEvents).toBe(750);
+      expect(result.eligibleCount).toBe(500);
+      expect(result.sentEvents).toBe(500);
     });
   });
 
@@ -420,11 +419,10 @@ function buildChainableDb(
   rows: Array<{ profileId: string; currentStreak: number }>,
 ): { select: jest.Mock; builder: Record<string, jest.Mock> } {
   const builder: Record<string, jest.Mock> = {};
-  for (const method of ['from', 'innerJoin', 'leftJoin', 'orderBy', 'limit']) {
+  for (const method of ['from', 'innerJoin', 'leftJoin', 'orderBy', 'where']) {
     builder[method] = jest.fn().mockReturnValue(builder);
   }
-  // The scan awaits the builder after `.where(...)`; resolve the rows there.
-  builder['where'] = jest.fn().mockResolvedValue(rows);
+  builder['limit'] = jest.fn().mockResolvedValue(rows);
 
   return {
     select: jest.fn().mockReturnValue(builder),

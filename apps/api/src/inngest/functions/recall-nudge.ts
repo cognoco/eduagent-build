@@ -33,6 +33,9 @@ import {
 } from '@eduagent/database';
 import { consentGateSatisfiedSql } from '../../services/identity-v2/consent-status-v2';
 
+const BATCH_SIZE = 500;
+const ELIGIBILITY_SCAN_LIMIT = BATCH_SIZE;
+
 export const recallNudge = inngest.createFunction(
   { id: 'recall-nudge', name: 'Smart recall nudge (hourly)' },
   { cron: '0 * * * *' }, // Every hour — filters by local 8 AM
@@ -113,7 +116,8 @@ export const recallNudge = inngest.createFunction(
             ),
           ),
         )
-        .groupBy(person.id);
+        .groupBy(person.id)
+        .limit(ELIGIBILITY_SCAN_LIMIT);
       return results.map((r) => ({
         profileId: r.profileId,
         overdueCount: r.overdueCount,
@@ -127,10 +131,10 @@ export const recallNudge = inngest.createFunction(
 
     // Step 2: Fan out — one event per eligible profile for independent retries.
     // Batch in chunks of 500 to stay within Inngest sendEvent limits.
-    const BATCH_SIZE = 500;
     let sentEvents = 0;
-    for (let i = 0; i < eligible.length; i += BATCH_SIZE) {
-      const chunk = eligible.slice(i, i + BATCH_SIZE);
+    const cappedEligible = eligible.slice(0, ELIGIBILITY_SCAN_LIMIT);
+    for (let i = 0; i < cappedEligible.length; i += BATCH_SIZE) {
+      const chunk = cappedEligible.slice(i, i + BATCH_SIZE);
       await step.sendEvent(
         `fan-out-${i}`,
         chunk.map((profile) => ({
@@ -147,7 +151,7 @@ export const recallNudge = inngest.createFunction(
 
     return {
       status: 'completed',
-      eligibleCount: eligible.length,
+      eligibleCount: cappedEligible.length,
       sentEvents,
     };
   },
