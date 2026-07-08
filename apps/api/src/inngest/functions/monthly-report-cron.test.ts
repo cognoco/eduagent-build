@@ -383,6 +383,7 @@ jest.mock('../../services/notifications', () => {
 // [BUG-699-FOLLOWUP] 24h dedup gate. Default 0 so existing tests keep sending;
 // individual tests override to simulate a prior successful send (replay path).
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
+const mockLogNotification = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('../../services/settings', () => {
   const actual = jest.requireActual(
@@ -392,6 +393,7 @@ jest.mock('../../services/settings', () => {
     ...actual,
     getRecentNotificationCount: (...args: unknown[]) =>
       mockGetRecentNotificationCount(...args),
+    logNotification: (...args: unknown[]) => mockLogNotification(...args),
   };
 });
 
@@ -1639,6 +1641,65 @@ describe('monthlyReportGenerate', () => {
         PARENT_ID_XYZ,
         'monthly_report',
         24,
+      );
+    });
+
+    it('skips monthly email when push did not log and a recent monthly_report log exists', async () => {
+      mockGetRecentNotificationCount
+        .mockResolvedValueOnce(0) // push guard
+        .mockResolvedValueOnce(1); // email guard
+      mockSendPushNotification.mockResolvedValueOnce({
+        sent: false,
+        reason: 'no_push_token',
+      });
+      (
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
+      ).mockResolvedValue({
+        id: 'active-profile',
+        displayName: 'Emma',
+      });
+
+      await executeGenerateSteps(makeGenerateEvent());
+
+      expect(mockGetRecentNotificationCount).toHaveBeenNthCalledWith(
+        2,
+        expect.anything(),
+        PARENT_ID_1,
+        'monthly_report',
+        24,
+      );
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
+
+    it('writes notificationLog evidence after a monthly email sends', async () => {
+      mockGetRecentNotificationCount
+        .mockResolvedValueOnce(0) // push guard
+        .mockResolvedValueOnce(0); // email guard
+      mockSendPushNotification.mockResolvedValueOnce({
+        sent: false,
+        reason: 'no_push_token',
+      });
+      (
+        mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
+      ).mockResolvedValueOnce(null);
+      (mockMonthlyReportDb.query.person.findFirst as jest.Mock)
+        .mockResolvedValueOnce({ displayName: 'Emma' }) // generate: child
+        .mockResolvedValueOnce({ id: 'parent-001' }) // generate: isPersonLive(parent)
+        .mockResolvedValueOnce({ id: 'parent-001' }) // push: isPersonLive(parent)
+        .mockResolvedValueOnce({ id: 'child-001', displayName: 'Emma' }) // push: child rehydration
+        .mockResolvedValueOnce({ id: 'child-001', displayName: 'Emma' }); // email: child rehydration
+      (
+        mockMonthlyReportDb.query.login.findFirst as jest.Mock
+      ).mockResolvedValueOnce({ email: 'parent@example.test' });
+
+      await executeGenerateSteps(makeGenerateEvent());
+
+      expect(mockSendEmail).toHaveBeenCalled();
+      expect(mockLogNotification).toHaveBeenCalledWith(
+        expect.anything(),
+        PARENT_ID_1,
+        'monthly_report',
+        expect.stringContaining('email-'),
       );
     });
   });
