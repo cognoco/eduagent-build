@@ -777,6 +777,7 @@ describe('archive path — auto preference, age 14', () => {
       expect.objectContaining({
         ownerProfileId: 'owner-profile-001',
         type: 'consent_archived',
+        sourceId: 'consent-revocation:child-014:2026-05-01T00:00:01.000Z',
       }),
     );
   });
@@ -899,6 +900,7 @@ describe('[CR-2026-05-19-H19] multi-parent family — delete-notice owner resolu
       expect.objectContaining({
         ownerProfileId: 'owner-profile-001',
         type: 'consent_deleted',
+        sourceId: 'consent-revocation:child-001:2026-05-01T00:00:01.000Z',
       }),
     );
     // Make the wrong-owner assertion explicit so the test name is unambiguous.
@@ -998,7 +1000,11 @@ describe('memoized step-state PII break test [F-088]', () => {
     // pending-notice row by its opaque id, not from step state.
     expect(mockRecordPendingNotice).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ type: 'consent_deleted', childName: 'Liam' }),
+      expect.objectContaining({
+        type: 'consent_deleted',
+        childName: 'Liam',
+        sourceId: 'consent-revocation:child-001:2026-05-01T00:00:01.000Z',
+      }),
     );
     expect(mockGetPendingNoticeChildName).toHaveBeenCalledWith(
       expect.anything(),

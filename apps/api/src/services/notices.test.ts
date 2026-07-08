@@ -55,9 +55,49 @@ describe('recordPendingNotice', () => {
         ownerProfileId: 'owner-1',
         type: 'consent_deleted',
         childName: 'Ada',
+        sourceId: 'consent-revocation:child-1:2026-07-01T00:00:00.000Z',
       }),
     ).resolves.toBe('notice-existing');
 
     expect(findFirst).toHaveBeenCalledTimes(1);
+  });
+
+  it('includes a stable source id in the dedupe payload for same-name children', async () => {
+    const first = makeInsertDb([{ id: 'notice-first' }]);
+    const second = makeInsertDb([{ id: 'notice-second' }]);
+
+    await expect(
+      recordPendingNotice(first.db, {
+        ownerProfileId: 'owner-1',
+        type: 'consent_archived',
+        childName: 'Ada',
+        sourceId: 'consent-revocation:child-1:2026-07-01T00:00:00.000Z',
+      }),
+    ).resolves.toBe('notice-first');
+    await expect(
+      recordPendingNotice(second.db, {
+        ownerProfileId: 'owner-1',
+        type: 'consent_archived',
+        childName: 'Ada',
+        sourceId: 'consent-revocation:child-2:2026-07-01T00:00:00.000Z',
+      }),
+    ).resolves.toBe('notice-second');
+
+    expect(first.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payloadJson: {
+          childName: 'Ada',
+          sourceId: 'consent-revocation:child-1:2026-07-01T00:00:00.000Z',
+        },
+      }),
+    );
+    expect(second.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payloadJson: {
+          childName: 'Ada',
+          sourceId: 'consent-revocation:child-2:2026-07-01T00:00:00.000Z',
+        },
+      }),
+    );
   });
 });
