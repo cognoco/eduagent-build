@@ -1,6 +1,7 @@
 import * as SecureStore from './secure-storage';
 import { sanitizeSecureStoreKey } from './secure-storage';
 import type { MilestoneTrackerState } from '../hooks/use-milestone-tracker';
+import { Sentry } from './sentry';
 
 const RECOVERY_KEY = 'session-recovery-marker';
 export const RECOVERY_WINDOW_MS = 30 * 60 * 1000;
@@ -71,6 +72,14 @@ export async function readSessionRecoveryMarker(
     return parsed;
   } catch (err) {
     console.warn('[SessionRecovery] Failed to parse recovery marker:', err);
+    Sentry.captureException(err, {
+      tags: {
+        surface: 'session-recovery',
+        feature: 'session_recovery',
+        recovery_scope: 'read_parse',
+        ...(profileId ? { profileId } : {}),
+      },
+    });
     return null;
   }
 }

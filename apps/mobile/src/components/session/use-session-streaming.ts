@@ -27,6 +27,7 @@ import {
   buildHomeworkSessionMetadata,
   withProblemMode,
 } from '../homework/problem-cards';
+import { reportHomeworkMetadataSyncFailure } from './homework-metadata-telemetry';
 import {
   celebrationForReason,
   type useMilestoneTracker,
@@ -441,10 +442,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             currentProblemIndex,
           );
         } catch (err) {
-          console.warn(
-            '[Session] Homework metadata sync failed during ensureSession:',
-            err,
-          );
+          reportHomeworkMetadataSyncFailure('ensure_session', err, newId);
           // Keep the session alive even if homework metadata sync fails.
         }
       }
