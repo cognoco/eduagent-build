@@ -172,6 +172,7 @@ describe('hashProfileId — server-side hashing [WI-1046]', () => {
   });
 
   it('calls captureException when hash endpoint fails', async () => {
+    __TEST_ONLY__.resetUnkeyedWarning();
     const hashError = new Error('network down');
     const client = createHashClient({ reject: true, rejectError: hashError });
     jest.clearAllMocks();

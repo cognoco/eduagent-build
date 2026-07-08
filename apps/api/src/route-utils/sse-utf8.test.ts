@@ -50,12 +50,15 @@ describe('streamSSEUtf8', () => {
       }),
     );
 
-    await app.request('/stream');
+    try {
+      await app.request('/stream');
 
-    expect(captureExceptionSpy).toHaveBeenCalledWith(thrown, {
-      extra: { context: 'sse-utf8.callback.threw' },
-    });
-    captureExceptionSpy.mockRestore();
+      expect(captureExceptionSpy).toHaveBeenCalledWith(thrown, {
+        extra: { context: 'sse-utf8.callback.threw' },
+      });
+    } finally {
+      captureExceptionSpy.mockRestore();
+    }
   });
 
   it('still emits a JSON error frame when captureException throws', async () => {
