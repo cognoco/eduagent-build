@@ -51,6 +51,7 @@ import {
   withIdempotencyKey,
   type IdempotencyReplayBody,
 } from '../lib/api-client';
+import { shouldRetryApiError } from '../lib/api-errors';
 import { parseJson } from '../lib/parse-json';
 import { useProfile } from '../lib/profile';
 import { useAppContext } from '../lib/app-context';
@@ -645,11 +646,7 @@ export function useSessionTranscript(
     enabled: !!activeProfile && !!sessionId,
     // Don't retry client errors (404/403) — the session is gone, retrying
     // just delays the expired-session UI by several seconds.
-    retry: (failureCount, error) => {
-      const status = (error as { status?: number }).status;
-      if (status && status >= 400 && status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: shouldRetryApiError,
   });
 }
 
@@ -682,11 +679,7 @@ export function useSession(
     enabled: !!activeProfile && !!sessionId,
     refetchInterval: (query) =>
       computeFilingRefetchInterval(query.state.data?.filingStatus),
-    retry: (failureCount, error) => {
-      const status = (error as { status?: number }).status;
-      if (status && status >= 400 && status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: shouldRetryApiError,
   });
 }
 

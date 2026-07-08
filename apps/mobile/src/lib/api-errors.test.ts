@@ -20,9 +20,11 @@ import {
   RateLimitedError,
   ResourceGoneError,
   TimeoutError,
+  UnauthorizedError,
   UpstreamError,
   classifyFetchRejection,
   classifyPaymentRequired,
+  shouldRetryApiError,
 } from './api-errors';
 import { ForbiddenError, ConflictError } from './api-errors';
 import { createTimeoutSignal } from './query-timeout';
@@ -55,6 +57,24 @@ describe('NotFoundError', () => {
     const fake = new Error('Session not found');
     fake.name = 'NotFoundError';
     expect(fake).not.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('shouldRetryApiError', () => {
+  it('[WI-1420] does not retry NotFoundError client failures', () => {
+    expect(shouldRetryApiError(0, new NotFoundError('Session'))).toBe(false);
+  });
+
+  it('[WI-1420] does not retry UnauthorizedError client failures', () => {
+    expect(
+      shouldRetryApiError(0, new UnauthorizedError('session-expired')),
+    ).toBe(false);
+  });
+
+  it('retries transient non-HTTP failures up to the retry budget', () => {
+    expect(shouldRetryApiError(0, new NetworkError())).toBe(true);
+    expect(shouldRetryApiError(1, new NetworkError())).toBe(true);
+    expect(shouldRetryApiError(2, new NetworkError())).toBe(false);
   });
 });
 

@@ -11,6 +11,7 @@
  */
 
 import {
+  BadRequestError,
   ConflictError,
   ForbiddenError,
   NotFoundError,
@@ -18,6 +19,7 @@ import {
   RateLimitedError,
   ResourceGoneError,
   SafetyFilterError,
+  UnauthorizedError,
   UpstreamLlmError,
   VocabularyContextError,
   LlmStreamError,
@@ -44,6 +46,15 @@ const QUOTA_DETAILS: QuotaExceededDetails = {
 };
 
 describe('typed error classes [BUG-644]', () => {
+  it('[WI-1420] typed HTTP client errors carry numeric status for retry guards', () => {
+    expect(new BadRequestError('bad input').status).toBe(400);
+    expect(new UnauthorizedError('session-expired').status).toBe(401);
+    expect(new ForbiddenError().status).toBe(403);
+    expect(new NotFoundError('Profile').status).toBe(404);
+    expect(new ResourceGoneError().status).toBe(410);
+    expect(new RateLimitedError().status).toBe(429);
+  });
+
   it('NotFoundError carries the resource name in the message', () => {
     const err = new NotFoundError('Profile');
     expect(err).toBeInstanceOf(Error);

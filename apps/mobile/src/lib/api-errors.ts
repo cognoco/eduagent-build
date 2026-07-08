@@ -176,3 +176,14 @@ export function classifyPaymentRequired(args: {
     402,
   );
 }
+
+const MAX_API_ERROR_RETRIES = 2;
+
+export function shouldRetryApiError(
+  failureCount: number,
+  error: Error,
+): boolean {
+  const status = (error as { status?: number }).status;
+  if (status !== undefined && status >= 400 && status < 500) return false;
+  return failureCount < MAX_API_ERROR_RETRIES;
+}
