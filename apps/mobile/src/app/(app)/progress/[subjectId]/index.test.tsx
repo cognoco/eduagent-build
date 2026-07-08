@@ -95,6 +95,9 @@ jest.mock(
           'progress.subject.upNext': `Up next: ${opts?.level ?? ''} — ${
             opts?.title ?? ''
           }`,
+          'progress.subject.upNextLevelOnly': `Up next: ${opts?.level ?? ''}`,
+          'progress.subject.upNextTitleOnly': `Up next: ${opts?.title ?? ''}`,
+          'progress.subject.upNextNoDetails': 'Up next',
           'progress.subject.milestoneNoData':
             'Complete a session to start tracking your milestone progress.',
           'progress.subject.retentionTitle': 'Current retention',
@@ -124,6 +127,7 @@ jest.mock(
           'progress.subject.hideSubjectHint':
             'Hides this subject from your main student views. You can restore it from Library later.',
           'progress.subject.hideConfirmTitle': `Hide ${opts?.subject ?? ''}?`,
+          'progress.subject.hideConfirmTitleNoSubject': 'Hide this subject?',
           'progress.subject.hideConfirmMessage':
             'This will move the subject out of your main views. Your learning history stays saved, and you can restore it from Library.',
           'progress.subject.hideConfirmAction': 'Hide subject',
@@ -657,6 +661,20 @@ describe('ProgressSubjectScreen', () => {
       ).toHaveLength(0);
     });
 
+    it('uses the no-subject confirmation title when the subject name is blank', async () => {
+      mount({ subjects: [{ ...fullSubject, subjectName: '   ' }] });
+      const hide = await screen.findByTestId('progress-subject-hide');
+
+      fireEvent.press(hide);
+
+      expect(mockPlatformAlert).toHaveBeenCalledWith(
+        'Hide this subject?',
+        expect.any(String),
+        expect.any(Array),
+        { cancelable: true },
+      );
+    });
+
     it('archives the subject and returns to progress after confirmation', async () => {
       const { routedFetch } = mount();
       const hide = await screen.findByTestId('progress-subject-hide');
@@ -831,6 +849,18 @@ describe('ProgressSubjectScreen', () => {
         languageProgress: milestoneData,
       });
       await screen.findByText(/Up next: B1/);
+    });
+
+    it('uses the generic next milestone label when milestone details are blank', async () => {
+      mount({
+        subjects: [languageSubject],
+        languageProgress: {
+          ...milestoneData,
+          nextMilestone: { level: '   ', milestoneTitle: '   ' },
+        },
+      });
+      await screen.findByText('Up next');
+      expect(screen.queryByText(/Up next: /)).toBeNull();
     });
 
     it('shows "Complete a session" prompt when no milestone data yet', async () => {

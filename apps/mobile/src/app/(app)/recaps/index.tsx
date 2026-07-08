@@ -77,49 +77,66 @@ export default function RecapsScreen(): React.ReactElement {
           />
         ) : (
           <View className="gap-3">
-            {recapsQuery.data?.map((recap) => (
-              <Pressable
-                key={recap.recapId}
-                className="rounded-card border border-border bg-surface px-4 py-4"
-                accessibilityRole="button"
-                accessibilityLabel={t('recaps.openRecapLabel', {
-                  child: recap.childDisplayName,
-                  title:
-                    recap.topicTitle ?? recap.subjectName ?? recap.displayTitle,
-                })}
-                onPress={() => {
-                  router.push({
-                    pathname: '/(app)/recaps/[recapId]',
-                    params: {
-                      recapId: recap.recapId,
-                    },
-                  } as Href);
-                }}
-                testID={`recap-row-${recap.recapId}`}
-              >
-                <View className="flex-row items-start justify-between gap-3">
-                  <View className="flex-1">
-                    <Text className="text-body-sm font-semibold text-primary">
-                      {recap.childDisplayName}
-                    </Text>
-                    <Text className="text-body font-semibold text-text-primary mt-1">
-                      {recap.topicTitle ??
-                        recap.subjectName ??
-                        recap.displayTitle}
+            {recapsQuery.data?.map((recap) => {
+              const childName = recap.childDisplayName.trim();
+              const recapTitle = (
+                recap.topicTitle ??
+                recap.subjectName ??
+                recap.displayTitle
+              ).trim();
+              const accessibilityLabel =
+                childName && recapTitle
+                  ? t('recaps.openRecapLabel', {
+                      child: childName,
+                      title: recapTitle,
+                    })
+                  : childName
+                    ? t('recaps.openRecapLabelNoTitle', { child: childName })
+                    : recapTitle
+                      ? t('recaps.openRecapLabelNoChild', {
+                          title: recapTitle,
+                        })
+                      : t('recaps.openRecapLabelNoDetails');
+              return (
+                <Pressable
+                  key={recap.recapId}
+                  className="rounded-card border border-border bg-surface px-4 py-4"
+                  accessibilityRole="button"
+                  accessibilityLabel={accessibilityLabel}
+                  onPress={() => {
+                    router.push({
+                      pathname: '/(app)/recaps/[recapId]',
+                      params: {
+                        recapId: recap.recapId,
+                      },
+                    } as Href);
+                  }}
+                  testID={`recap-row-${recap.recapId}`}
+                >
+                  <View className="flex-row items-start justify-between gap-3">
+                    <View className="flex-1">
+                      <Text className="text-body-sm font-semibold text-primary">
+                        {recap.childDisplayName}
+                      </Text>
+                      <Text className="text-body font-semibold text-text-primary mt-1">
+                        {recap.topicTitle ??
+                          recap.subjectName ??
+                          recap.displayTitle}
+                      </Text>
+                    </View>
+                    <Text className="text-caption text-text-secondary">
+                      {formatRelativeDate(recap.startedAt)}
                     </Text>
                   </View>
-                  <Text className="text-caption text-text-secondary">
-                    {formatRelativeDate(recap.startedAt)}
+                  <Text className="text-body-sm text-text-secondary mt-3">
+                    {recap.narrative ??
+                      recap.displaySummary ??
+                      recap.highlight ??
+                      t('recaps.summaryPending')}
                   </Text>
-                </View>
-                <Text className="text-body-sm text-text-secondary mt-3">
-                  {recap.narrative ??
-                    recap.displaySummary ??
-                    recap.highlight ??
-                    t('recaps.summaryPending')}
-                </Text>
-              </Pressable>
-            ))}
+                </Pressable>
+              );
+            })}
           </View>
         )}
       </ScrollView>

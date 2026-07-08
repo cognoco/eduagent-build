@@ -34,15 +34,18 @@ function BookmarkRow({
   const { t } = useTranslation();
   const relativeDate = useRelativeDate();
   const [expanded, setExpanded] = useState(false);
+  const subjectName = bookmark.subjectName.trim();
 
   return (
     <Pressable
       onPress={() => setExpanded((prev) => !prev)}
       className="bg-surface rounded-card p-4 mb-3"
       accessibilityRole="button"
-      accessibilityLabel={t('progress.saved.bookmarkLabel', {
-        subject: bookmark.subjectName,
-      })}
+      accessibilityLabel={
+        subjectName
+          ? t('progress.saved.bookmarkLabel', { subject: subjectName })
+          : t('progress.saved.bookmarkLabelNoSubject')
+      }
       testID={`bookmark-row-${bookmark.id}`}
     >
       <View className="flex-row items-start justify-between">

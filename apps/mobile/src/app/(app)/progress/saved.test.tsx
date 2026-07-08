@@ -23,6 +23,7 @@ jest.mock('react-i18next', () => ({
         'progress.saved.dateDaysAgo': `${String(opts?.count ?? '')} days ago`,
         'progress.saved.dateWeeksAgo': `${String(opts?.count ?? '')} weeks ago`,
         'progress.saved.bookmarkLabel': `Bookmark from ${String(opts?.subject ?? '')}`,
+        'progress.saved.bookmarkLabelNoSubject': 'Bookmark',
         'progress.saved.removeBookmark': 'Remove bookmark',
         'progress.saved.tapToExpand': 'Tap to expand',
         'progress.saved.deleteTitle': 'Delete bookmark?',
@@ -355,6 +356,16 @@ describe('SavedBookmarksScreen', () => {
       mockHooks({ bookmarks: [BOOKMARK_1] });
       render(<SavedBookmarksScreen />);
       screen.getByText(/Spanish/);
+    });
+
+    it('uses the no-subject accessibility label when a bookmark subject is blank', () => {
+      mockHooks({
+        bookmarks: [{ ...BOOKMARK_1, subjectName: '   ' }],
+      });
+      render(<SavedBookmarksScreen />);
+
+      expect(screen.getByLabelText('Bookmark')).toBeTruthy();
+      expect(screen.queryByLabelText('Bookmark from')).toBeNull();
     });
 
     it('renders topic title alongside subject name when present', () => {

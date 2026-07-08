@@ -53,6 +53,26 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   const { t } = useTranslation();
   const navigationContract = useNavigationContract();
   const canWrite = !navigationContract.isParentProxy;
+  const formatMilestoneUpNext = (
+    level: string | null | undefined,
+    title: string | null | undefined,
+  ): string => {
+    const cleanLevel = level?.trim() ?? '';
+    const cleanTitle = title?.trim() ?? '';
+    if (cleanLevel && cleanTitle) {
+      return t('progress.subject.upNext', {
+        level: cleanLevel,
+        title: cleanTitle,
+      });
+    }
+    if (cleanLevel) {
+      return t('progress.subject.upNextLevelOnly', { level: cleanLevel });
+    }
+    if (cleanTitle) {
+      return t('progress.subject.upNextTitleOnly', { title: cleanTitle });
+    }
+    return t('progress.subject.upNextNoDetails');
+  };
   const role = useActiveProfileRole();
   const register = role === 'child' ? 'child' : 'adult';
   const router = useRouter();
@@ -143,10 +163,11 @@ export default function ProgressSubjectScreen(): React.ReactElement {
 
   const confirmHideSubject = (): void => {
     if (!subject || !canWrite) return;
+    const subjectName = subject.subjectName.trim();
     platformAlert(
-      t('progress.subject.hideConfirmTitle', {
-        subject: subject.subjectName,
-      }),
+      subjectName
+        ? t('progress.subject.hideConfirmTitle', { subject: subjectName })
+        : t('progress.subject.hideConfirmTitleNoSubject'),
       t('progress.subject.hideConfirmMessage'),
       [
         { text: t('common.cancel'), style: 'cancel' },
@@ -528,10 +549,10 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                     </View>
                     {languageProgress.nextMilestone && (
                       <Text className="text-caption text-text-muted mt-2">
-                        {t('progress.subject.upNext', {
-                          level: languageProgress.nextMilestone.level,
-                          title: languageProgress.nextMilestone.milestoneTitle,
-                        })}
+                        {formatMilestoneUpNext(
+                          languageProgress.nextMilestone.level,
+                          languageProgress.nextMilestone.milestoneTitle,
+                        )}
                       </Text>
                     )}
                   </>
