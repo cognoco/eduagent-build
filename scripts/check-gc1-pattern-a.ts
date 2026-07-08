@@ -66,24 +66,20 @@ export function isPatternA(
   const window = stagedLines.slice(startLine - 1, end).join('\n');
 
   const escapedSpec = specifier.replace(/[.+*?^$()[\]{}|\\]/g, '\\$&');
+  const requireActualWithSpecifier = String.raw`jest\.requireActual\s*(?:<\s*typeof\s+import\s*\(\s*['"\`]${escapedSpec}['"\`]\s*\)\s*>\s*)?\(\s*['"\`]${escapedSpec}['"\`]`;
   // Match `jest.requireActual('<spec>'` — leave the trailing `)` open so the
   // multi-line form `jest.requireActual(\n  '<spec>',\n) as typeof import(...)`
-  // still matches (trailing comma + type cast wrap the call).
-  const requireActualRe = new RegExp(
-    `jest\\.requireActual\\(\\s*['"\`]${escapedSpec}['"\`]`,
-  );
+  // still matches (trailing comma + type cast wrap the call). Also allow the
+  // TypeScript generic form `jest.requireActual<typeof import(...)>('<spec>')`.
+  const requireActualRe = new RegExp(requireActualWithSpecifier);
   if (!requireActualRe.test(window)) return false;
 
-  if (
-    new RegExp(
-      `\\.\\.\\.\\s*jest\\.requireActual\\(\\s*['"\`]${escapedSpec}`,
-    ).test(window)
-  ) {
+  if (new RegExp(`\\.\\.\\.\\s*${requireActualWithSpecifier}`).test(window)) {
     return true;
   }
 
   const namedAssignRe = new RegExp(
-    `(?:const|let|var)\\s+(\\w+)\\s*(?::[^=]+)?=\\s*jest\\.requireActual\\(\\s*['"\`]${escapedSpec}`,
+    `(?:const|let|var)\\s+(\\w+)\\s*(?::[^=]+)?=\\s*${requireActualWithSpecifier}`,
   );
   const m = window.match(namedAssignRe);
   if (m) {

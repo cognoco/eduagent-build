@@ -35,6 +35,16 @@ describe('isPatternA', () => {
     expect(isPatternA(lines, 1, './services/foo')).toBe(true);
   });
 
+  it('accepts inline spread with type-generic jest.requireActual', () => {
+    const lines = [
+      "jest.mock('./services/foo', () => ({",
+      "  ...jest.requireActual<typeof import('./services/foo')>('./services/foo'),",
+      '  bar: jest.fn(),',
+      '}));',
+    ];
+    expect(isPatternA(lines, 1, './services/foo')).toBe(true);
+  });
+
   it('accepts named-local spread', () => {
     const lines = [
       "jest.mock('../services/dashboard', () => {",
@@ -46,6 +56,33 @@ describe('isPatternA', () => {
       '});',
     ];
     expect(isPatternA(lines, 1, '../services/dashboard')).toBe(true);
+  });
+
+  it('accepts named-local spread with type-generic jest.requireActual', () => {
+    const lines = [
+      "jest.mock('../services/dashboard', () => {",
+      "  const actual = jest.requireActual<typeof import('../services/dashboard')>('../services/dashboard');",
+      '  return {',
+      '    ...actual,',
+      '    foo: jest.fn(),',
+      '  };',
+      '});',
+    ];
+    expect(isPatternA(lines, 1, '../services/dashboard')).toBe(true);
+  });
+
+  it('accepts named-local spread with multiline type-generic jest.requireActual', () => {
+    const lines = [
+      "jest.mock('../services/llm', () => {",
+      '  const actual = jest.requireActual<',
+      "    typeof import('../services/llm')",
+      '  >(',
+      "    '../services/llm',",
+      '  );',
+      '  return { ...actual, routeAndCall: jest.fn() };',
+      '});',
+    ];
+    expect(isPatternA(lines, 1, '../services/llm')).toBe(true);
   });
 
   it('accepts named-local spread with type annotation', () => {
@@ -76,6 +113,26 @@ describe('isPatternA', () => {
       "  const real = jest.requireActual('./services/foo');",
       '  return { bar: real.bar };',
       '});',
+    ];
+    expect(isPatternA(lines, 1, './services/foo')).toBe(false);
+  });
+
+  it('rejects type-generic requireActual of a different specifier', () => {
+    const lines = [
+      "jest.mock('./services/foo', () => ({",
+      "  ...jest.requireActual<typeof import('./services/bar')>('./services/bar'),",
+      '  baz: jest.fn(),',
+      '}));',
+    ];
+    expect(isPatternA(lines, 1, './services/foo')).toBe(false);
+  });
+
+  it('rejects type-generic requireActual of a different specifier even with a later matching greater-than expression', () => {
+    const lines = [
+      "jest.mock('./services/foo', () => ({",
+      "  ...jest.requireActual<typeof import('./services/bar')>('./services/bar'),",
+      "  marker: value > ('./services/foo'),",
+      '}));',
     ];
     expect(isPatternA(lines, 1, './services/foo')).toBe(false);
   });
@@ -201,6 +258,71 @@ describe('checkFile — integration', () => {
       "  ...jest.requireActual('./services/foo'),",
       '  bar: jest.fn(),',
       '}));',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
+  it('allows a type-generic Pattern A mock with no gc1-allow', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      "+jest.mock('./services/foo', () => ({",
+      "+  ...jest.requireActual<typeof import('./services/foo')>('./services/foo'),",
+      '+  bar: jest.fn(),',
+      '+}));',
+    ].join('\n');
+    const staged = [
+      "jest.mock('./services/foo', () => ({",
+      "  ...jest.requireActual<typeof import('./services/foo')>('./services/foo'),",
+      '  bar: jest.fn(),',
+      '}));',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
+  it('allows a named-local type-generic Pattern A mock with no gc1-allow', () => {
+    const diff = [
+      '@@ -0,0 +1,7 @@',
+      "+jest.mock('../services/dashboard', () => {",
+      "+  const actual = jest.requireActual<typeof import('../services/dashboard')>('../services/dashboard');",
+      '+  return {',
+      '+    ...actual,',
+      '+    foo: jest.fn(),',
+      '+  };',
+      '+});',
+    ].join('\n');
+    const staged = [
+      "jest.mock('../services/dashboard', () => {",
+      "  const actual = jest.requireActual<typeof import('../services/dashboard')>('../services/dashboard');",
+      '  return {',
+      '    ...actual,',
+      '    foo: jest.fn(),',
+      '  };',
+      '});',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
+  it('allows a multiline type-generic Pattern A mock with no gc1-allow', () => {
+    const diff = [
+      '@@ -0,0 +1,8 @@',
+      "+jest.mock('../services/llm', () => {",
+      '+  const actual = jest.requireActual<',
+      "+    typeof import('../services/llm')",
+      '+  >(',
+      "+    '../services/llm',",
+      '+  );',
+      '+  return { ...actual, routeAndCall: jest.fn() };',
+      '+});',
+    ].join('\n');
+    const staged = [
+      "jest.mock('../services/llm', () => {",
+      '  const actual = jest.requireActual<',
+      "    typeof import('../services/llm')",
+      '  >(',
+      "    '../services/llm',",
+      '  );',
+      '  return { ...actual, routeAndCall: jest.fn() };',
+      '});',
     ].join('\n');
     expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
   });
