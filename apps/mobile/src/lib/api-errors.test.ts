@@ -20,6 +20,7 @@ import {
   RateLimitedError,
   ResourceGoneError,
   TimeoutError,
+  UnauthorizedError,
   UpstreamError,
   classifyFetchRejection,
   classifyPaymentRequired,
@@ -62,6 +63,12 @@ describe('NotFoundError', () => {
 describe('shouldRetryApiError', () => {
   it('[WI-1420] does not retry NotFoundError client failures', () => {
     expect(shouldRetryApiError(0, new NotFoundError('Session'))).toBe(false);
+  });
+
+  it('[WI-1420] does not retry UnauthorizedError client failures', () => {
+    expect(
+      shouldRetryApiError(0, new UnauthorizedError('session-expired')),
+    ).toBe(false);
   });
 
   it('retries transient non-HTTP failures up to the retry budget', () => {
