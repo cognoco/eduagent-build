@@ -157,13 +157,13 @@ const READY_SUBSCRIPTION_STATUS = {
   },
 };
 
-function renderRecaps() {
+function renderRecaps(item = RECAP_LIST_ITEM) {
   // Route data is configured on the api-client's own mock fetch (the one hc()
   // was built with), NOT via renderScreen's `routes` option — that builds a
   // separate global fetch the hono client never uses. installGlobalFetch:false
   // avoids clobbering the api-client fetch.
   mockFetch.setRoute('/subscription/status', READY_SUBSCRIPTION_STATUS);
-  mockFetch.setRoute('/recaps', { recaps: [RECAP_LIST_ITEM] });
+  mockFetch.setRoute('/recaps', { recaps: [item] });
   return renderScreen(<RecapsScreen />, {
     profile: GUARDIAN,
     profiles: [GUARDIAN, LINKED_CHILD],
@@ -181,6 +181,23 @@ describe('RecapsScreen — row press navigation [BUG-772]', () => {
     try {
       await waitFor(() => {
         expect(result.getByTestId(`recap-row-${RECAP_ID}`)).toBeTruthy();
+      });
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('uses a generic row label when child and recap titles are blank', async () => {
+    const { result, cleanup } = renderRecaps({
+      ...RECAP_LIST_ITEM,
+      childDisplayName: '   ',
+      subjectName: '   ',
+      topicTitle: '   ',
+      displayTitle: '   ',
+    });
+    try {
+      await waitFor(() => {
+        expect(result.getByLabelText('Open recap')).toBeTruthy();
       });
     } finally {
       cleanup();

@@ -33,6 +33,7 @@ function SubjectVocabSection({
   const cefrEntries = sortCefrEntries(
     Object.entries(subject.vocabulary.byCefrLevel),
   );
+  const subjectName = subject.subjectName.trim();
 
   return (
     <Pressable
@@ -40,9 +41,13 @@ function SubjectVocabSection({
         router.push(`/(app)/vocabulary/${subject.subjectId}` as Href)
       }
       accessibilityRole="button"
-      accessibilityLabel={t('progress.vocabulary.viewSubjectLabel', {
-        subject: subject.subjectName,
-      })}
+      accessibilityLabel={
+        subjectName
+          ? t('progress.vocabulary.viewSubjectLabel', {
+              subject: subjectName,
+            })
+          : t('progress.vocabulary.viewSubjectLabelNoSubject')
+      }
       testID={`vocab-subject-${subject.subjectId}`}
       className="bg-surface rounded-card p-4 mt-4"
     >

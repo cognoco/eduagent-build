@@ -39,6 +39,7 @@ function LanguageVocabCard({
   const { t } = useTranslation();
   const vocabulary = useVocabulary(subjectId);
   const vocabCount = vocabulary.data?.length ?? 0;
+  const languageName = displayLanguage.trim();
   // While the count is loading, default to "starter" labelling — the
   // alternative (claiming personalisation we cannot prove yet) would lie
   // to brand-new language subjects until the round actually opens.
@@ -47,7 +48,9 @@ function LanguageVocabCard({
     isLoadingVocab || vocabCount < PERSONAL_VOCAB_QUIZ_THRESHOLD;
 
   const title = usingStarterWords
-    ? t('quiz.index.vocabBasicsTitle', { language: displayLanguage })
+    ? languageName
+      ? t('quiz.index.vocabBasicsTitle', { language: languageName })
+      : t('quiz.index.vocabBasicsTitleNoLanguage')
     : t('quiz.index.vocabPersonalisedTitle', { language: displayLanguage });
 
   // [BUG-891] When the learner has < threshold recorded words the round

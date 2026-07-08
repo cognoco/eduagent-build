@@ -40,6 +40,7 @@ jest.mock('react-i18next', () => ({
         'progress.vocabulary.viewSubjectLabel': `View ${
           opts?.subject ?? ''
         } vocabulary`,
+        'progress.vocabulary.viewSubjectLabelNoSubject': 'View vocabulary',
         'progress.vocabulary.viewAllLink': 'View all →',
         'progress.vocabulary.wordsSummary': `${opts?.total ?? ''} words — ${
           opts?.mastered ?? ''
@@ -156,6 +157,17 @@ describe('VocabularyBrowserScreen', () => {
     active.result.getByText('A1');
     active.result.getByText('6 words');
     active.result.getByTestId('vocab-browser-back');
+  });
+
+  it('uses the no-subject accessibility label when the subject name is blank', async () => {
+    active = renderScreen(<VocabularyBrowserScreen />, {
+      routes: inventoryRoute({
+        ...mockInventory,
+        subjects: [{ ...mockInventory.subjects[0], subjectName: '   ' }],
+      }),
+    });
+
+    await active.result.findByLabelText('View vocabulary');
   });
 
   it('shows empty state when no vocabulary but has language subject', async () => {
