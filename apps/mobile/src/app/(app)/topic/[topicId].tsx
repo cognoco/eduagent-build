@@ -47,7 +47,7 @@ import { useThemeColors } from '../../../lib/theme';
 import { formatSourceLine } from '../../../lib/format-note-source';
 import { deriveRetentionStatus } from '../../../lib/retention-utils';
 import { pushLearningResumeTarget } from '../../../lib/navigation';
-import { ErrorFallback } from '../../../components/common';
+import { TimeoutLoader } from '../../../components/common';
 import { ShimmerSkeleton } from '../../../components/common/ShimmerSkeleton';
 import { TopicHeader } from '../../../components/library/TopicHeader';
 import { InlineNoteCard } from '../../../components/library/InlineNoteCard';
@@ -293,7 +293,6 @@ export default function TopicDetailScreen() {
 
   // [H9] Attempt counter — incremented on Retry to force a new query key and a fresh network call.
   // Must be declared before useResolveTopicSubject so it can be passed as a key segment.
-  const [resolveTimedOut, setResolveTimedOut] = useState(false);
   const [resolveAttempt, setResolveAttempt] = useState(0);
 
   // [F-009] Resolve subjectId when deep-linked with topicId only
@@ -375,16 +374,7 @@ export default function TopicDetailScreen() {
   const [bookmarksExpanded, setBookmarksExpanded] = useState(false);
   const [sessionsExpanded, setSessionsExpanded] = useState(false);
 
-  // [H9] Timeout escape for the deep-link resolve spinner
   const isResolveSpinning = !!(needsResolve && resolveLoading);
-  useEffect(() => {
-    if (!isResolveSpinning) {
-      setResolveTimedOut(false);
-      return;
-    }
-    const t = setTimeout(() => setResolveTimedOut(true), 15_000);
-    return () => clearTimeout(t);
-  }, [isResolveSpinning, resolveAttempt]);
 
   const isCriticalLoading = progressLoading || retentionLoading;
   const retentionStatus = deriveRetentionStatus(retentionCard);
@@ -610,18 +600,17 @@ export default function TopicDetailScreen() {
   // ---------------------------------------------------------------------------
 
   if (needsResolve && resolveLoading) {
-    if (resolveTimedOut) {
-      return (
-        <ErrorFallback
-          variant="centered"
+    return (
+      <View className="flex-1 bg-background">
+        <TimeoutLoader
+          key={resolveAttempt}
+          isLoading={isResolveSpinning}
           title={t('topic.resolveTimeoutTitle')}
           message={t('topic.resolveTimeoutMessage')}
+          loadingLabel={t('common.loading')}
           primaryAction={{
             label: t('common.retry'),
-            onPress: () => {
-              setResolveTimedOut(false);
-              setResolveAttempt((n) => n + 1);
-            },
+            onPress: () => setResolveAttempt((n) => n + 1),
             testID: 'topic-resolve-timeout-retry',
           }}
           secondaryAction={{
@@ -629,16 +618,8 @@ export default function TopicDetailScreen() {
             onPress: handleTopicBack,
             testID: 'topic-resolve-timeout-library',
           }}
-          testID="topic-resolve-timeout"
-        />
-      );
-    }
-    return (
-      <View className="flex-1 bg-background items-center justify-center">
-        <ActivityIndicator
-          size="large"
-          color={colors.primary}
-          accessibilityLabel={t('common.loading')}
+          testID="topic-resolve-loading"
+          fallbackTestID="topic-resolve-timeout"
         />
       </View>
     );

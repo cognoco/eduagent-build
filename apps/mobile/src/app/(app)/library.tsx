@@ -18,6 +18,7 @@ import {
   BookPageFlipAnimation,
   BrandCelebration,
   ErrorFallback,
+  TimeoutLoader,
 } from '../../components/common';
 import { goBackOrReplace } from '../../lib/navigation';
 import { useAllBooks } from '../../hooks/use-all-books';
@@ -233,15 +234,6 @@ function LibraryScreenContent({
   const isSubjectsLoading =
     !hasSubjectData &&
     (subjectsQuery.isLoading || activeSubjectsFallbackQuery.isLoading);
-  const [subjectsLoadTimedOut, setSubjectsLoadTimedOut] = useState(false);
-  useEffect(() => {
-    if (!isSubjectsLoading) {
-      if (subjectsLoadTimedOut) setSubjectsLoadTimedOut(false);
-      return;
-    }
-    const t = setTimeout(() => setSubjectsLoadTimedOut(true), 15_000);
-    return () => clearTimeout(t);
-  }, [isSubjectsLoading, subjectsLoadTimedOut]);
 
   const updateSubject = useUpdateSubject();
   const deleteSubject = useDeleteSubject();
@@ -678,31 +670,29 @@ function LibraryScreenContent({
 
   const renderContent = (): React.ReactElement => {
     if (isSubjectsLoading) {
-      if (subjectsLoadTimedOut) {
-        return (
-          <ErrorFallback
-            variant="centered"
-            title={t('library.loadTimeout.title')}
-            message={t('library.loadTimeout.message')}
-            primaryAction={{
-              label: t('common.retry'),
-              onPress: () => {
-                void subjectsQuery.refetch();
-                void activeSubjectsFallbackQuery.refetch();
-                void progressQuery.refetch();
-              },
-              testID: 'library-load-timeout-retry',
-            }}
-            secondaryAction={{
-              label: t('common.goHome'),
-              onPress: () => goBackOrReplace(router, '/(app)/home'),
-              testID: 'library-load-timeout-home',
-            }}
-            testID="library-load-timeout"
-          />
-        );
-      }
-      return renderShimmerSkeleton();
+      return (
+        <TimeoutLoader
+          isLoading
+          title={t('library.loadTimeout.title')}
+          message={t('library.loadTimeout.message')}
+          primaryAction={{
+            label: t('common.retry'),
+            onPress: () => {
+              void subjectsQuery.refetch();
+              void activeSubjectsFallbackQuery.refetch();
+              void progressQuery.refetch();
+            },
+            testID: 'library-load-timeout-retry',
+          }}
+          secondaryAction={{
+            label: t('common.goHome'),
+            onPress: () => goBackOrReplace(router, '/(app)/home'),
+            testID: 'library-load-timeout-home',
+          }}
+          fallbackTestID="library-load-timeout"
+          loadingFallback={renderShimmerSkeleton()}
+        />
+      );
     }
 
     if (
@@ -712,37 +702,25 @@ function LibraryScreenContent({
       const libraryLoadError =
         subjectsQuery.error ?? activeSubjectsFallbackQuery.error;
       return (
-        <View
-          className="flex-1 items-center justify-center px-5 py-12"
-          testID="library-error"
-        >
-          <Text className="text-body text-text-secondary text-center mb-4">
-            {libraryLoadError
-              ? formatApiError(libraryLoadError)
-              : t('library.loadError.message')}
-          </Text>
-          <Pressable
-            onPress={handleRetry}
-            className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
-            accessibilityRole="button"
-            accessibilityLabel={t('common.retry')}
-            testID="library-retry-button"
-          >
-            <Text className="text-text-inverse text-body font-semibold">
-              {t('common.retry')}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => router.replace('/(app)/home' as Href)}
-            className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
-            accessibilityRole="button"
-            accessibilityLabel={t('common.goHome')}
-            testID="library-home-button"
-          >
-            <Text className="text-text-primary text-body font-semibold">
-              {t('common.goHome')}
-            </Text>
-          </Pressable>
+        <View className="py-12" testID="library-error">
+          <ErrorFallback
+            variant="card"
+            message={
+              libraryLoadError
+                ? formatApiError(libraryLoadError)
+                : t('library.loadError.message')
+            }
+            primaryAction={{
+              label: t('common.retry'),
+              onPress: handleRetry,
+              testID: 'library-retry-button',
+            }}
+            secondaryAction={{
+              label: t('common.goHome'),
+              onPress: () => router.replace('/(app)/home' as Href),
+              testID: 'library-home-button',
+            }}
+          />
         </View>
       );
     }

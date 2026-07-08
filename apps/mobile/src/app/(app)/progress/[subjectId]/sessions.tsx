@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ErrorFallback } from '../../../../components/common';
+import { ErrorFallback, TimeoutLoader } from '../../../../components/common';
 import { useSubjectSessions } from '../../../../hooks/use-subject-sessions';
 import { useProgressInventory } from '../../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../../lib/navigation';
@@ -31,17 +30,6 @@ export default function SubjectSessionsScreen(): React.ReactElement {
     (entry) => entry.subjectId === subjectId,
   );
   const sessions = sessionsQuery.data ?? [];
-  const [loadTimedOut, setLoadTimedOut] = useState(false);
-
-  useEffect(() => {
-    if (!sessionsQuery.isLoading) {
-      setLoadTimedOut(false);
-      return;
-    }
-    const timer = setTimeout(() => setLoadTimedOut(true), 15_000);
-    return () => clearTimeout(timer);
-  }, [sessionsQuery.isLoading]);
-
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <ScrollView
@@ -75,12 +63,15 @@ export default function SubjectSessionsScreen(): React.ReactElement {
           </View>
         </View>
 
-        {sessionsQuery.isLoading && loadTimedOut ? (
+        {sessionsQuery.isLoading ? (
           <View className="mt-6">
-            <ErrorFallback
+            <TimeoutLoader
+              isLoading
               variant="card"
               title={t('progress.subjectSessions.loadingTooLong')}
               message={t('progress.subjectSessions.loadingMessage')}
+              loadingLabel={t('progress.subjectSessions.loadingTooLong')}
+              loadingDescription={t('progress.subjectSessions.loadingMessage')}
               primaryAction={{
                 label: t('common.tryAgain'),
                 onPress: () => void sessionsQuery.refetch(),
@@ -95,17 +86,9 @@ export default function SubjectSessionsScreen(): React.ReactElement {
                   ),
                 testID: 'subject-sessions-timeout-back',
               }}
-              testID="subject-sessions-timeout"
+              testID="subject-sessions-loading"
+              fallbackTestID="subject-sessions-timeout"
             />
-          </View>
-        ) : sessionsQuery.isLoading ? (
-          <View className="mt-6" testID="subject-sessions-loading">
-            {[0, 1, 2].map((i) => (
-              <View
-                key={i}
-                className="bg-coaching-card rounded-card h-16 mb-3"
-              />
-            ))}
           </View>
         ) : sessionsQuery.isError && !sessionsQuery.data ? (
           <View className="mt-6">
