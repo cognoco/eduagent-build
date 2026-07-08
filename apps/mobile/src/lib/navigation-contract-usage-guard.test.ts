@@ -233,7 +233,7 @@ const V0_FALLBACK_FILES: readonly LegitimateRawNavigationGateFile[] = [
     },
   },
   {
-    file: 'apps/mobile/src/hooks/use-progress.ts',
+    file: 'apps/mobile/src/hooks/use-progress-scope.ts',
     category: 'v0-fallback',
     reason:
       'V0-fallback: progress data scope uses contract queryScope in V1 and legacy mode plus active-profile role in V0.',
