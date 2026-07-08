@@ -730,6 +730,43 @@ describe('resolveNavigationContract route predicates', () => {
     ]);
   });
 
+  it('keeps V2 root routes behind active-profile and proxy guards', () => {
+    const noProfileContract = resolveNavigationContract(
+      makeContext({
+        activeProfile: null,
+        flags: {
+          MODE_NAV_V2_ENABLED: true,
+        },
+      }),
+    );
+    const proxyContract = resolveNavigationContract(
+      makeContext({
+        activeProfile: familyAdult,
+        appContext: 'family',
+        flags: {
+          MODE_NAV_V2_ENABLED: true,
+        },
+        isParentProxy: true,
+        profiles: [familyAdult, child],
+      }),
+    );
+
+    expectRoutes(noProfileContract, [
+      { route: 'home', canEnter: true, isSurfaced: true },
+      { route: 'mentor', canEnter: false, isSurfaced: false },
+      { route: 'subjects', canEnter: false, isSurfaced: false },
+      { route: 'journal', canEnter: false, isSurfaced: false },
+    ]);
+    expectRoutes(proxyContract, [
+      { route: 'home', canEnter: true, isSurfaced: true },
+      { route: 'library', canEnter: true, isSurfaced: true },
+      { route: 'progress', canEnter: true, isSurfaced: true },
+      { route: 'mentor', canEnter: false, isSurfaced: false },
+      { route: 'subjects', canEnter: false, isSurfaced: false },
+      { route: 'journal', canEnter: false, isSurfaced: false },
+    ]);
+  });
+
   it('surfaces Family routes and keeps learning routes reachable only by bridge', () => {
     const contract = resolveNavigationContract(
       makeContext({

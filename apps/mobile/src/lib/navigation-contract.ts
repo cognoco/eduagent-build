@@ -456,13 +456,13 @@ export function resolveCanEnter(
   const visibleTabs = resolution.visibleTabs;
 
   return (route: RouteKey, params?: RouteParams): boolean => {
-    if (V2_ROUTES.has(route)) {
-      return context.flags.MODE_NAV_V2_ENABLED === true;
-    }
-
     if (!context.activeProfile) return route === 'home';
     if (context.isParentProxy) {
       return route === 'home' || route === 'library' || route === 'progress';
+    }
+
+    if (V2_ROUTES.has(route)) {
+      return context.flags.MODE_NAV_V2_ENABLED === true;
     }
 
     if (FAMILY_CHILD_ROUTES.has(route)) {
@@ -531,10 +531,6 @@ export function resolveIsSurfaced(
   return (route: RouteKey, params?: RouteParams): boolean => {
     if (!canEnter(route, params)) return false;
 
-    if (V2_ROUTES.has(route)) {
-      return context.flags.MODE_NAV_V2_ENABLED === true;
-    }
-
     if (LEARNING_ROUTES.has(route)) {
       return !familyShape && !context.isParentProxy;
     }
@@ -549,6 +545,10 @@ export function resolveIsSurfaced(
     }
 
     switch (route) {
+      case 'mentor':
+      case 'subjects':
+      case 'journal':
+        return true;
       case 'home':
       case 'progress':
         return true;
