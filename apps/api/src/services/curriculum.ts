@@ -2237,6 +2237,7 @@ export async function addCurriculumTopic(
     })
     .returning();
 
+  // scope-allow: curriculum row was created in the scoped subject/book flow above.
   await db
     .update(curricula)
     .set({ updatedAt: new Date() })

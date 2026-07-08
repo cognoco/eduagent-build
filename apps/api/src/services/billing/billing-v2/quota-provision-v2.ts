@@ -178,6 +178,7 @@ export async function getOrProvisionProfileQuotaUsageV2(
       (existing.monthlyLimit !== limits.monthlyLimit ||
         existing.dailyLimit !== limits.dailyLimit)
     ) {
+      // scope-allow: existing row was read with subscriptionId + profileId above.
       const [updated] = await db
         .update(profileQuotaUsage)
         .set({
