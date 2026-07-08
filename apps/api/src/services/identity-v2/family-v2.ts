@@ -38,6 +38,39 @@ import { ConsentNotAuthorizedError } from '../consent';
 /** The GDPR basis — every family/dashboard consent read is a GDPR decision. */
 const GDPR_BASIS = 'gdpr_parental_consent' as const;
 
+declare const familyV2ChildReadProofBrand: unique symbol;
+
+export type FamilyV2ChildReadProof = {
+  readonly [familyV2ChildReadProofBrand]: 'family-v2-child-read-proof';
+};
+
+export type FamilyV2ChildReadProofReason =
+  | {
+      kind: 'guardian-edge';
+      guardianPersonId: string;
+      chargePersonId: string;
+    }
+  | {
+      kind: 'guardian-child-enumeration';
+      guardianPersonId: string;
+      chargePersonIds: readonly string[];
+    }
+  | {
+      kind: 'internal-consent-gate';
+      caller:
+        | 'dashboard.getLatestConsentStatus'
+        | 'identity-v2.consent-v2.integration';
+    };
+
+const FAMILY_V2_CHILD_READ_PROOF = Object.freeze({}) as FamilyV2ChildReadProof;
+
+export function familyV2ChildReadProof(
+  reason: FamilyV2ChildReadProofReason,
+): FamilyV2ChildReadProof {
+  void reason;
+  return FAMILY_V2_CHILD_READ_PROOF;
+}
+
 /**
  * v2 `hasParentAccess`: the parent→child authority check via the active
  * guardianship edge. The family-access IDOR guard re-point.
@@ -72,6 +105,7 @@ export async function getChildPersonIdsForParentV2(
 export async function getChildGdprConsentStatusV2(
   db: Database,
   childPersonId: string,
+  _proof: FamilyV2ChildReadProof,
 ): Promise<{ status: ConsentStatus; withdrawnAt: Date | null } | null> {
   const organizationId = await resolveOrgId(db, childPersonId);
   if (!organizationId) return null;
@@ -96,6 +130,7 @@ export async function getChildrenGdprConsentStatusesV2(
   db: Database,
   organizationId: string,
   childPersonIds: readonly string[],
+  _proof: FamilyV2ChildReadProof,
 ): Promise<Map<string, { status: ConsentStatus; withdrawnAt: Date | null }>> {
   return resolveConsentStatusesForBasis(
     db,
@@ -125,7 +160,16 @@ export async function getChildConsentForParentV2(
   if (!(await isGuardianOf(db, guardianPersonId, childPersonId))) {
     throw new ConsentNotAuthorizedError('view');
   }
-  const consentRow = await getChildGdprConsentStatusV2(db, childPersonId);
+  const proof = familyV2ChildReadProof({
+    kind: 'guardian-edge',
+    guardianPersonId,
+    chargePersonId: childPersonId,
+  });
+  const consentRow = await getChildGdprConsentStatusV2(
+    db,
+    childPersonId,
+    proof,
+  );
   if (consentRow === null) return null;
   const { status } = consentRow;
 
@@ -150,7 +194,10 @@ export async function getChildConsentForParentV2(
   return { status, respondedAt, consentType: 'GDPR' };
 }
 
-/** The org a person belongs to (v1 single home org). Null when no membership. */
+/**
+ * @internal Family-v2 seam helper. Callers must already own the profile context
+ * (self/system event) or have scoped candidates through a guardian edge.
+ */
 export async function resolveOrgIdForPerson(
   db: Database,
   personId: string,
@@ -194,6 +241,10 @@ export async function getFirstActiveChildNameV2(
 }
 
 /**
+ * @internal Consent-revocation workflow helper. The event carries the child and
+ * fallback guardian context; route-style parent child reads must use
+ * getChildConsentForParentV2 instead.
+ *
  * v2 `getFamilyOwnerProfileId`: the org owner (admin membership) person id for a
  * child's home org — the consent-revocation notice recipient. The legacy version
  * resolved the owner via family_links → owner profile; v2 resolves via the

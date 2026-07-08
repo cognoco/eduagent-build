@@ -63,6 +63,7 @@ import {
   scheduleDeletionV2,
 } from './deletion-v2';
 import {
+  familyV2ChildReadProof,
   getChildGdprConsentStatusV2,
   getChildrenGdprConsentStatusesV2,
 } from './family-v2';
@@ -1148,15 +1149,22 @@ const COPPA = 'coppa_parental_consent';
 
       it('GREEN: the basis-explicit family/dashboard seam reports the GDPR status (CONSENTED), unmasked', async () => {
         const { orgId, childId } = await seedDualBasisNewerCoppa();
+        const proof = familyV2ChildReadProof({
+          kind: 'internal-consent-gate',
+          caller: 'identity-v2.consent-v2.integration',
+        });
         // Single-child seam (dashboard getLatestConsentStatus re-point).
         // [WI-826] getChildGdprConsentStatusV2 now returns { status, withdrawnAt }.
-        expect((await getChildGdprConsentStatusV2(db, childId))?.status).toBe(
-          'CONSENTED',
-        );
+        expect(
+          (await getChildGdprConsentStatusV2(db, childId, proof))?.status,
+        ).toBe('CONSENTED');
         // Batched seam (dashboard getChildrenForParent re-point).
-        const batch = await getChildrenGdprConsentStatusesV2(db, orgId, [
-          childId,
-        ]);
+        const batch = await getChildrenGdprConsentStatusesV2(
+          db,
+          orgId,
+          [childId],
+          proof,
+        );
         expect(batch.get(childId)?.status).toBe('CONSENTED');
       });
     });
