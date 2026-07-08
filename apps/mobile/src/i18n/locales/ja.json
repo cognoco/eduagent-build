@@ -1034,6 +1034,7 @@
       "vocabBasicsTitle": "{{language}}の基礎",
       "vocabBasicsTitleNoLanguage": "語彙の基礎",
       "vocabPersonalisedTitle": "語彙：{{language}}",
+      "vocabPersonalisedTitleNoLanguage": "語彙",
       "vocabStarterSubtitle": "標準の単語を収録 — {{threshold}}個の自分の単語を記録して、パーソナライズされたラウンドをアンロックしましょう",
       "vocabPlayedSubtitleDefault": "新しい単語やフレーズを練習しましょう",
       "challengeExplainerTitle": "チャレンジラウンド",

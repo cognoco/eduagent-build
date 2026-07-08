@@ -1034,6 +1034,7 @@
       "vocabBasicsTitle": "{{language}} grunnleggende",
       "vocabBasicsTitleNoLanguage": "Grunnleggende vokabular",
       "vocabPersonalisedTitle": "Vokabular: {{language}}",
+      "vocabPersonalisedTitleNoLanguage": "Vokabular",
       "vocabStarterSubtitle": "Standard startord – registrer {{threshold}} av dine egne for å låse opp personlige runder",
       "vocabPlayedSubtitleDefault": "Øv på nye ord og uttrykk",
       "challengeExplainerTitle": "Utfordringsrunder",

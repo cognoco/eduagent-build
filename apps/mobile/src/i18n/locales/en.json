@@ -1058,6 +1058,7 @@
       "vocabBasicsTitle": "{{language}} basics",
       "vocabBasicsTitleNoLanguage": "Vocabulary basics",
       "vocabPersonalisedTitle": "Vocabulary: {{language}}",
+      "vocabPersonalisedTitleNoLanguage": "Vocabulary",
       "vocabStarterSubtitle": "Stock starter words — record {{threshold}} of your own to unlock personalised rounds",
       "vocabPlayedSubtitleDefault": "Practice new words and phrases"
     },

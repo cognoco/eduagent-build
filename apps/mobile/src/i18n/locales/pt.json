@@ -1061,6 +1061,7 @@
       "vocabBasicsTitle": "Básico de {{language}}",
       "vocabBasicsTitleNoLanguage": "Vocabulário básico",
       "vocabPersonalisedTitle": "Vocabulário: {{language}}",
+      "vocabPersonalisedTitleNoLanguage": "Vocabulário",
       "vocabStarterSubtitle": "Palavras iniciais padrão — grave {{threshold}} das suas para desbloquear rodadas personalizadas",
       "vocabPlayedSubtitleDefault": "Pratique novas palavras e frases",
       "challengeExplainerTitle": "Rodadas de desafio",

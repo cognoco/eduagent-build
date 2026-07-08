@@ -1073,6 +1073,7 @@
       "vocabBasicsTitle": "Podstawy: {{language}}",
       "vocabBasicsTitleNoLanguage": "Podstawy słownictwa",
       "vocabPersonalisedTitle": "Słownictwo: {{language}}",
+      "vocabPersonalisedTitleNoLanguage": "Słownictwo",
       "vocabStarterSubtitle": "Zapas słów startowych — zapisz {{threshold}} własnych, aby odblokować spersonalizowane rundy",
       "vocabPlayedSubtitleDefault": "Ćwicz nowe słowa i zwroty",
       "challengeExplainerTitle": "Rundy z wyzwaniem",

@@ -36,6 +36,7 @@ jest.mock('react-i18next', () => {
     'quiz.index.vocabBasicsTitle': '{{language}} basics',
     'quiz.index.vocabBasicsTitleNoLanguage': 'Vocabulary basics',
     'quiz.index.vocabPersonalisedTitle': 'Vocabulary: {{language}}',
+    'quiz.index.vocabPersonalisedTitleNoLanguage': 'Vocabulary',
     'quiz.index.vocabStarterSubtitle':
       'Stock starter words — record {{threshold}} of your own to unlock personalised rounds',
     'quiz.index.vocabPlayedSubtitleDefault': 'Practice new words and phrases',
@@ -426,6 +427,28 @@ describe('QuizIndexScreen', () => {
         await waitFor(() => {
           screen.getByText('Vocabulary: Italian');
           expect(screen.queryByText('Italian basics')).toBeNull();
+        });
+      });
+
+      it('uses the no-language personalised title when vocab is ready but the language name is blank', async () => {
+        mockFetch.setRoute('/subjects', {
+          subjects: [
+            {
+              ...FRESH_ITALIAN_SUBJECT,
+              name: '   ',
+              languageCode: 'x-private',
+            },
+          ],
+        });
+        mockFetch.setRoute('/vocabulary', {
+          vocabulary: Array.from({ length: 5 }).map((_, i) => ({
+            id: `v-${i}`,
+          })),
+        });
+        render(<QuizIndexScreen />, { wrapper: Wrapper });
+        await waitFor(() => {
+          screen.getByText('Vocabulary');
+          expect(screen.queryByText('Vocabulary: ')).toBeNull();
         });
       });
 

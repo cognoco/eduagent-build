@@ -51,7 +51,9 @@ function LanguageVocabCard({
     ? languageName
       ? t('quiz.index.vocabBasicsTitle', { language: languageName })
       : t('quiz.index.vocabBasicsTitleNoLanguage')
-    : t('quiz.index.vocabPersonalisedTitle', { language: displayLanguage });
+    : languageName
+      ? t('quiz.index.vocabPersonalisedTitle', { language: languageName })
+      : t('quiz.index.vocabPersonalisedTitleNoLanguage');
 
   // [BUG-891] When the learner has < threshold recorded words the round
   // pulls from a stock seed list, not their own vocabulary. Say so — the

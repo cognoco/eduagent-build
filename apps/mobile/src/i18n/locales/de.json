@@ -1034,6 +1034,7 @@
       "vocabBasicsTitle": "{{language}}-Grundlagen",
       "vocabBasicsTitleNoLanguage": "Vokabel-Grundlagen",
       "vocabPersonalisedTitle": "Vokabeln: {{language}}",
+      "vocabPersonalisedTitleNoLanguage": "Vokabeln",
       "vocabStarterSubtitle": "Standard-Startwörter – zeichne {{threshold}} deiner eigenen auf, um personalisierte Runden freizuschalten",
       "vocabPlayedSubtitleDefault": "Übe neue Wörter und Sätze",
       "challengeExplainerTitle": "Herausforderungsrunden",
