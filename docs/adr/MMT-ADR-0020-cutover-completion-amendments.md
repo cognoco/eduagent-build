@@ -1,23 +1,24 @@
 # MMT-ADR-0020 — Cutover-completion amendments: consent-request workflow table + identity-model re-homes
 
-**Status:** Accepted · 2026-06-29 · **Scope:** Identity Foundation (application cutover — WP-CUT-A) · **Deciders:** Architect (jjoerg) + PM · **Amends:** MMT-ADR-0011 / MMT-ADR-0015 (data-model realization) · **Builds on:** MMT-ADR-0008 (guardianship), MMT-ADR-0002 (store-delegated Payer), MMT-ADR-0014 (router / premium routing)
+**Status:** Accepted · 2026-06-29 · **Scope:** Identity Foundation (application cutover to the ratified identity model) · **Deciders:** Architect (jjoerg) + PM · **Amends:** MMT-ADR-0011 / MMT-ADR-0015 (data-model realization) · **Builds on:** MMT-ADR-0008 (guardianship), MMT-ADR-0002 (store-delegated Payer), MMT-ADR-0014 (router / premium routing)
 
 ## Context
 
 The ratified 8-table model holds the identity graph and the append-only consent
-*event log* (`consent_grant`), but the application's WI-586 cutover inventory
-exposed three live surfaces with no home in it:
+*event log* (`consent_grant`), but the pre-cutover inventory of live application
+surfaces exposed three with no home in it:
 
 1. the consent-**REQUEST** workflow — pre-grant states
    (`PENDING` / `PARENTAL_CONSENT_REQUESTED`), parent-email contact, response
-   token + expiry, and the WI-374 abuse caps (`resend_count`,
-   `recipient_change_count`) — today carried by legacy `consent_states`;
+   token + expiry, and the anti-abuse caps (`resend_count`,
+   `recipient_change_count`) — then carried by legacy `consent_states`;
 2. the payment-store correlation / idempotency identifiers (Stripe
-   customer/subscription ids, Stripe/RevenueCat last-event fences per BUG-116 /
-   CR-2026-05-19-M11) — today on legacy `subscriptions`;
+   customer/subscription ids, Stripe/RevenueCat last-event fences — webhook
+   replay-protection introduced by earlier billing fixes) — then on legacy
+   `subscriptions`;
 3. person-level presentation/preference/lifecycle columns
    (`conversation_language`, `pronouns`, `avatar_url`, `default_app_context`,
-   `archived_at`) — today on legacy `profiles`.
+   `archived_at`) — then on legacy `profiles`.
 
 Dropping legacy without homes for these would re-open closed webhook races and
 orphan a live COPPA/GDPR workflow. This decision crosses the MMT-ADR-0000
@@ -32,9 +33,10 @@ ADR and lands lockstep with its `data-model.md` §2B canon edit.
 Keyed `(charge_person_id × purpose × organization_id × requested_basis)`
 (UNIQUE; the basis dimension preserves the legacy GDPR/COPPA dual-row
 coexistence — legacy uniqueness is `(profile_id, consent_type)` — and
-single-row recycling per basis preserves the WI-374 monotonic caps 1:1). States
-`pending | requested | approved | denied | expired`; token lifecycle and Bug
-#872 audit fields carried 1:1 from legacy. Approval writes a `consent_grant` row
+single-row recycling per basis preserves the monotonic anti-abuse resend/
+recipient-change caps 1:1). States
+`pending | requested | approved | denied | expired`; token lifecycle and
+audit fields carried 1:1 from legacy. Approval writes a `consent_grant` row
 and back-links it (`consent_grant_id`). Requests are operational state; grants
 remain the sole audit record. Approval never creates a guardianship edge
 (inv 14); withdrawal/restore are grant-layer events, never request states.
@@ -65,7 +67,8 @@ grant layer — inv 2 governs consent decisions, which this column is not).
 `birth_year_set_by` folds into `knowledge_assertions` provenance (one `'age'`
 assertion per person; `parent_reported` when set and ≠ self, else `self_report`
 — the `age_method` v1 vocabulary per data-model §2A.2; provisional confidence
-1.00 / 0.80 per OQ-9, DB-mastered thereafter). The assertion's `actor_id` is set
+1.00 for parent-reported / 0.80 for self-reported (operator-ruled at cutover),
+DB-mastered thereafter). The assertion's `actor_id` is set
 to the parent person **only when that person exists** in the reseeded graph
 (else NULL — the `parent_reported` provenance is preserved either way; the
 parent having left the system does not downgrade the method).
@@ -80,7 +83,7 @@ last_updated}` (a provenance-honest stub with no confidence invented); 0115 — 
 runs **after** 0109 at the convergence freeze and therefore masters the field —
 adopts the canonical cache shape `{method, confidence, last_updated}` (data-model
 §2A.2), mirroring the backfilled assertion's `method` (`self_report` /
-`parent_reported`) and OQ-9 `confidence` (0.80 / 1.00). The 0109 `source` key is
+`parent_reported`) and the ruled `confidence` (0.80 / 1.00). The 0109 `source` key is
 dropped (the provenance now lives in the `knowledge_assertions` row's `source`
 column, not the cache). This is an intentional, recorded supersession — not a
 silent overwrite.
@@ -91,10 +94,10 @@ silent overwrite.
    append-only audit log with mutable operational state; violates the
    computed-not-stamped posture (inv 2) and the grant log's regulator-facing
    purity.
-2. **Append-per-cycle `consent_request` rows.** Rejected — resets WI-374
-   counters per cycle, re-opening the email-bombing vector unless windowed sums
-   are added; single-row recycling reproduces the proven legacy cap semantics
-   exactly.
+2. **Append-per-cycle `consent_request` rows.** Rejected — resets the
+   anti-abuse counters per cycle, re-opening the email-bombing vector unless
+   windowed sums are added; single-row recycling reproduces the proven legacy
+   cap semantics exactly.
 3. **Store-correlation side table.** Rejected by operator ruling — additive
    columns; the identifiers are 1:1 with the subscription row and the
    partial-unique fences need the row anyway.
@@ -103,7 +106,8 @@ silent overwrite.
 
 ## Consequences
 
-- The legacy drop (WI-586) becomes possible without losing the consent
+- This decision removed the last blocker to retiring the legacy
+  `consent_states`/`subscriptions`/`profiles` tables without losing the consent
   workflow, webhook idempotency, or live preference data.
 - `consent_request` joins the RLS surface with its isolation policy shipping in
   the same migration (`charge_person_id`-anchored, mirroring
@@ -111,19 +115,19 @@ silent overwrite.
   new `charge_person_id` predicate class in `database-rls-coverage.ts`).
   Service-role consumers (public token-lookup, reminder-sweep) reach
   `consent_request` via the owner-role (`neondb_owner`) connection, which
-  bypasses RLS — matching today's `consent_states` posture (no named
-  service-role policy). A service-role policy exception is required only if/when
-  the `app_user` role-switch cut-over (migration 0027 Phase 2-4) lands, at which
-  point `consent_request` is swept with every other RLS table. The retain-tier
-  is unaffected (requests die with the person — no receipt obligation
-  pre-consent).
+  bypasses RLS — matching the legacy `consent_states` posture (no named
+  service-role policy). A service-role policy exception becomes necessary only
+  if service-role connections are ever removed from the RLS-bypass path, at
+  which point `consent_request` is swept with every other RLS table. The
+  retain-tier is unaffected (requests die with the person — no receipt
+  obligation pre-consent).
 - **Canon lockstep:** `docs/canon/identity/data-model.md` gains the §2B cutover
   amendments in the same change-set as this ADR.
 - The purpose vocabulary (`platform_use`) and lawful-basis values are finalized
   as DB-mastered data; future per-purpose consent (inv 27) extends rows, not
   schema.
-- **Additive and reversible:** CUT-A touches no legacy object; the migrations
-  are reversible by dropping the added objects. The readers/writers that
-  actually use these homes land flag-gated in WP-CUT-B (the `IDENTITY_V2_ENABLED`
-  seam), and the legacy tables stay the sole live store until the WI-586
-  convergence flip.
+- **Additive and reversible:** the schema amendments touched no legacy object;
+  the migrations were reversible by dropping the added objects. The
+  readers/writers using these homes were introduced behind a feature-flag seam
+  (`IDENTITY_V2_ENABLED`), with the legacy tables remaining the sole live store
+  until the cutover's convergence flip retired them.

@@ -27,7 +27,7 @@ A concept is unique within `(profileId, topicId, normalizedLabel)`. The topic is
 ## Consequences
 
 - **The migration is purely additive** — two new tables + one enum, no changes to shipped tables, trivially reversible (pre-launch the captured data is test-only and no shipped surface depends on it).
-- **Capture activation is flag-gated** (`CONCEPT_CAPTURE_ENABLED`): the writer lands behind the flag so the schema, reader, and UI can ship independently of turning capture on. Enabling it is an operational step, sequenced against the identity-cutover `profiles`→`person` FK repoint.
+- **Capture activation is flag-gated** (`CONCEPT_CAPTURE_ENABLED`): the writer sits behind the flag so the schema, reader, and UI can ship independently of turning capture on. Enabling capture is an operational step taken only once the identity data model the tables key against is stable in the target environment.
 - **The note star and tutor-correction-on-recall ride existing signal** — the star is derived from `concept_mastery` (presence-only), and the tutor correction is the already-stored `needs_deepening_topics.correction`. No grading of note text is introduced in v1.
 - **Identity/state are split into two tables** so the deferred trajectory feature can insert an append-only evaluation log between them without reshaping.
 - **`architecture.md` (Knowledge Retention) is amended in lockstep** to state that mastery is captured at concept grain additively while the scheduled spine remains topic-keyed.
@@ -46,4 +46,4 @@ A concept is unique within `(profileId, topicId, normalizedLabel)`. The topic is
 - **The concept trajectory** (append-only evaluation log + "March-vs-now" UI) — deferred; `concept_mastery` holds latest state only in v1.
 - **Note-text grading** (judging the learner's exact sentence vs. reusing the verdict) — out of scope; the star reuses the verdict.
 - **The relevance/connection nudge and the cross-subject connection graph** — separate slices.
-- **Exact table column types** — the spec (`docs/specs/2026-06-08-concept-capture-layer-design.md`) owns the schema detail.
+- **Exact table column types** — the physical schema in `packages/database/src/schema/` is the source of truth for column detail; this ADR fixes only the grain, namespacing, and identity/state split. (Original design detail: `docs/specs/2026-06-08-concept-capture-layer-design.md`, historical.)

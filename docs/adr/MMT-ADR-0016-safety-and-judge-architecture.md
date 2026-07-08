@@ -6,7 +6,7 @@
 
 Two cross-cutting decisions govern every production LLM call and are independent of *which* model fills any slot (that is register data). They were ratified during the Gemini-exit re-pick but are durable beyond it: they constrain the **safety mechanism** and the **evaluation ("judge") architecture** for all models, present and future. Both clear the significance gate — they select an approach, constrain other work, and move a quality attribute (safety) — and are therefore ADR-class, where the model picks are not.
 
-The terms **tutor** (the learner-facing prose-generating call) and **judge** (the post-generation evaluator that emits the structured response envelope) are glossed inline here; their formal canon definitions are tracked on the Phase-J / canon-authorship to-do.
+The terms **tutor** (the learner-facing prose-generating call) and **judge** (the post-generation evaluator that emits the structured response envelope) are glossed inline here; until canon defines them formally, these inline glosses govern.
 
 ## Decision
 
@@ -42,57 +42,55 @@ Safety is decided by **judgment of how a topic is handled**, not by token/keywor
 - **The routing mechanism** (3-param key, vetting/routing split, fail-closed, fallback tiers, separately-routable roles) — MMT-ADR-0014.
 - **The Gemini exclusion** — a compliance input recorded in the vetting trail; the routing supersession is MMT-ADR-0014.
 - **The judge's gating-mode thresholds per age** — operational tuning (envelope spec), not architecture.
-- **Formal definitions of `tutor` / `judge`** — Phase-J / canon-authorship to-do.
+- **Formal canon definitions of `tutor` / `judge`** — deferred canon authorship; the inline glosses above govern meanwhile.
 
 ## Amendment (2026-06-26) — Challenge-Round grader: first tutor→judge signal migration
 
-**Plan:** `docs/plans/2026-06-26-challenge-round-grader-judge.md` · **ADR:** this document (§2)
-
 ### What changed
 
-`challenge_round_evaluation` is the **first structured signal migrated from tutor-inline emission to judge-emitted**, realizing the §2 judge role stated above. The tutor (gpt-oss-120b @ Cerebras) proved unreliable at emitting this signal: it returns `[]` on every Challenge Round turn, so mastery silently never verifies on the V2 tutor path. Adding the field to the JSON template with explicit "you MUST include it" guidance did not fix it — a genuine model instruction-following gap, not a prompt-template bug (see memory `project_gptoss_drops_challenge_eval_signal`).
+`challenge_round_evaluation` is the **first structured signal migrated from tutor-inline emission to judge-emitted**, realizing the §2 judge role stated above. The then-active tutor model proved unreliable at emitting this signal — it returned `[]` on every Challenge Round turn, so mastery silently never verified on that tutor path. Strengthening the JSON template with explicit "you MUST include it" guidance did not fix it: a genuine model instruction-following gap, not a prompt-template bug.
 
-A dedicated grader service (`runChallengeRoundGrader`) now calls the judge to produce the evaluation array; the server deterministically injects `answerEventId` for every item in a turn. The downstream mastery gate (`decideMasteryAndReview`) is byte-identical — only the *source* of its input changes. Everything is behind `CHALLENGE_ROUND_GRADER_ENABLED` (default off).
+A dedicated grader service (`runChallengeRoundGrader`) calls the judge to produce the evaluation array; the server deterministically injects `answerEventId` for every item in a turn. The downstream mastery gate (`decideMasteryAndReview`) is byte-identical — only the *source* of its input changes. The grader is feature-flag-gated (`CHALLENGE_ROUND_GRADER_ENABLED`).
 
 ### The established pattern
 
-Migrating a structured signal from tutor-inline to judge-emitted is now the **established remediation pattern** for signals the tutor proves unreliable at. When a structured signal exhibits a silent-drop failure mode that prompt tightening cannot fix, the correct lever is a single-purpose judge call for that signal — not further prompt engineering on the tutor.
+Migrating a structured signal from tutor-inline to judge-emitted is the **established remediation pattern** for signals a tutor proves unreliable at. When a structured signal exhibits a silent-drop failure mode that prompt tightening cannot fix, the correct lever is a single-purpose judge call for that signal — not further prompt engineering on the tutor.
 
-### H4 progress: first tier/age-blind judge *capability* routing path
+### First tier/age-blind judge *capability* routing path
 
-This implementation advances open gate **H4** by adding the **first tier/age-blind judge *capability* routing path** (`capability: 'judge'` in `apps/api/src/services/llm/router.ts`, model constant `GRADER_MODEL = 'claude-sonnet-4-6'` non-reasoning, model-swappable pending the T10 bake-off).
+This migration added a **distinct `capability: 'judge'` routing branch that is explicitly tier/age-blind per §2** — it ignores tier, age, and region entirely (`apps/api/src/services/llm/router.ts`; the grader model is register data and model-swappable).
 
-**Correction of record:** this is NOT the first callable judge. `runSuitabilityJudge` (`policy-engine/judge-suitability.ts`) was already callable before this plan and routes to Sonnet 4.6 via `preferredProvider: 'anthropic'`. What this plan adds is a **distinct `capability: 'judge'` routing branch that is explicitly tier/age-blind per §2** — it ignores tier, age, and region entirely. The suitability judge will adopt the same capability path next, replacing its current ad-hoc `preferredProvider` approach.
+**Correction of record:** this was not the first callable judge — the suitability judge (`runSuitabilityJudge`, `policy-engine/judge-suitability.ts`) predates it, routed via an ad-hoc `preferredProvider`. The capability branch is the durable mechanism; judge callers are expected to converge on it.
 
 ### Vendor-independence: enforced, not coincidental
 
-§2 requires the judge to be vendor-independent of the tutor. The grader provider is resolved through `selectJudgeProvider(tutorVendor)` (`policy-engine/judge-suitability.ts:54`) — which returns `'openai'` when the active tutor is Anthropic, else `'anthropic'` — so §2 is **structurally enforced** rather than coincidentally satisfied. A future change to an Anthropic-hosted tutor cannot silently share the grader's vendor.
+§2 requires the judge to be vendor-independent of the tutor. The grader provider is resolved through `selectJudgeProvider(tutorVendor)` (`policy-engine/judge-suitability.ts`) — it returns a different vendor than the active tutor's — so §2 is **structurally enforced** rather than coincidentally satisfied. A tutor-vendor change cannot silently make tutor and grader share a vendor.
 
-### Cutover dependency
+### Standing coupling constraint
 
-The V2 cutover (`LLM_ROUTING_V2_ENABLED`) **must not flip on for minor traffic until `CHALLENGE_ROUND_GRADER_ENABLED=true`** is also set and validated on staging. Without the grader, mastery silently never verifies for any learner on the V2 tutor path — the flag-off behavior is fail-safe (empty evaluation → no mastery, no error), but it is a silent regression, not acceptable at cutover.
+Any tutor-routing path on which mastery verification depends **must not serve minor traffic without the grader enabled and validated**. Without the grader, mastery silently never verifies on that path — the flag-off behavior is fail-safe (empty evaluation → no mastery, no error), but it is a silent regression and unacceptable as a live posture.
 
-## Amendment (2026-07-04) — §3 phase-5 gating mode: violation-only enforcing minor output gate + fail-open-with-alarm
+## Amendment (2026-07-04) — Minor output gate: violation-only enforcement + fail-open-with-alarm
 
-**Design:** WI-1350 (Option A) · **Impl:** WI-1365 · **Operator ruling:** se-030 (verdict-threshold + unavailability forks, both coupled) · **ADR:** this document (§3 phase-5) · **Canon:** `docs/architecture.md` → "Policy-engine spine, router/vetting, safety & judge"
+**Operator-ruled 2026-07-04 (verdict-threshold and unavailability forks, coupled)** · **Canon:** `docs/architecture.md` → "Policy-engine spine, router/vetting, safety & judge"
 
 ### What changed
 
-The judge's **gating mode** — deferred as "phase-5 work, NOT resolved here" (`judge-profile.ts`) and named as the ADR-scoped open item in §2 / "What this ADR does not decide" — is now **decided for minors**. The suitability judge (`runSuitabilityJudge`, previously async / calibration-only / fail-OPEN, phase-4 increment-1) gains a **synchronous, fail-CLOSED-on-verdict ENFORCING output gate** for under-18 traffic. It backstops the router content-category refusals (harassment / hate / adult-sexual / civic — `router.ts`) that had **no deterministic backstop** (the increment-1 Gap B / Path X in §Consequences): the input tripwire covers only self-harm-method + sexual-minor, and the WI-1154 dangerous-procedure gate covers only operational how-to.
+The judge's **gating mode** — left open in §2 / "What this ADR does not decide" — is now **decided for minors**. The suitability judge (`runSuitabilityJudge`, previously async / calibration-only / fail-OPEN) gains a **synchronous, fail-CLOSED-on-verdict ENFORCING output gate** for under-18 traffic. It backstops the router content-category refusals (harassment / hate / adult-sexual / civic — `router.ts`) that previously had **no deterministic backstop**: the input tripwire covers only self-harm-method + sexual-minor, and the dangerous-procedure gate (MMT-ADR-0030) covers only operational how-to.
 
-The mechanism reuses the **proven WI-1154 synchronous output-gate seam** — the parsed reply post-envelope, minor-scoped (`computeAgeBracketFromDate`, fail-closed on unknown age), block-and-replace over the existing `sourceReplacement` retract rail — not a new path. New `applySuitabilityGate` / `runSuitabilityEnforcement` (`services/suitability-gate.ts`) are shaped after `applyDangerousProcedureGate`; a new `emitSuitabilityBlockedEvent` mirrors `emitDangerousProcedureBlockedEvent`.
+The mechanism reuses the **proven synchronous output-gate seam established by the dangerous-procedure gate** — the parsed reply post-envelope, minor-scoped (`computeAgeBracketFromDate`, fail-closed on unknown age), block-and-replace over the existing `sourceReplacement` retract rail — not a new path. `applySuitabilityGate` / `runSuitabilityEnforcement` (`services/suitability-gate.ts`) are shaped after `applyDangerousProcedureGate`; `emitSuitabilityBlockedEvent` mirrors `emitDangerousProcedureBlockedEvent`.
 
-### The ruled gating mode (operator ruling se-030)
+### The ruled gating mode
 
-- **Block ONLY on `overall === 'violation'`.** A `concern` NEVER blocks — it is observe/telemetry only. (Fork 1: violation-only \[ruled] vs also-concern.)
+- **Block ONLY on `overall === 'violation'`.** A `concern` NEVER blocks — it is observe/telemetry only. (Ruled: violation-only, not also-concern.)
 - **Category allowlist — NEVER block `over_blocking` / `topic_drift`.** Over-blocking is a hard failure equal to under-blocking (§1); an enforcing LLM judge would otherwise **become the over-blocker its own `over_blocking` flag detects**. A `violation` whose flags are exclusively allowlisted categories passes.
-- **Availability: fail-OPEN-with-alarm.** A judge that cannot render a verdict (route error / no JSON / invalid schema → `runSuitabilityJudge` returns null; or an unknown tutor vendor) **fails OPEN** — the reply passes unchanged — AND raises a structured operator alarm (`emitSuitabilityJudgeUnavailableEvent`; the silent-recovery ban on safety paths forbids a bare `console.warn`). Can't-judge is not evidence the reply is unsafe. **Fail-CLOSED is reserved for a concrete `violation`.** (Fork 2: fail-open-with-alarm \[ruled] vs fail-closed availability-cliff.)
+- **Availability: fail-OPEN-with-alarm.** A judge that cannot render a verdict (route error / no JSON / invalid schema → `runSuitabilityJudge` returns null; or an unknown tutor vendor) **fails OPEN** — the reply passes unchanged — AND raises a structured operator alarm (`emitSuitabilityJudgeUnavailableEvent`; the silent-recovery ban on safety paths forbids a bare `console.warn`). Can't-judge is not evidence the reply is unsafe. **Fail-CLOSED is reserved for a concrete `violation`.** (Ruled: fail-open-with-alarm, rejecting the fail-closed availability-cliff.)
 - **Minor-only.** The gate is scoped to under-18; adults are never judged by it.
 
-### Lands INERT behind a flag — no live threshold pre-launch
+### Standing activation precondition — no enforcement without calibration
 
-The whole mechanism is behind a new `JUDGE_ENFORCEMENT_ENABLED` flag, **default OFF**, and lands **inert** (the judge is never called when off or for adults, so first-token latency and per-turn cost are unaffected on the non-enforced paths). It **must not be flipped on** until the **calibration-gated enforcement threshold** is harvested from **real minor-traffic `judge.verdict` data** (the phase-4 calibration metric). Pre-launch we have no such data, so the flag stays off and **no live threshold is set**. This is the async→sync move the §2 judge role always implied, now scoped to the minor enforcement mode; the phase-4 calibration dispatch (`JUDGE_FRAMEWORK_ENABLED`) is unchanged and independent.
+The mechanism is feature-flag-gated (`JUDGE_ENFORCEMENT_ENABLED`) and inert while off: the judge is never called when off or for adults, so first-token latency and per-turn cost are unaffected on non-enforced paths. **Enforcement may only be activated once an enforcement threshold has been calibrated from real minor-traffic `judge.verdict` data** (the async calibration dispatch, `JUDGE_FRAMEWORK_ENABLED`, is the independent mechanism that gathers it). Activating enforcement without that calibration is prohibited — an uncalibrated enforcing judge is exactly the over-blocker §1 bans. This is the async→sync move the §2 judge role always implied, scoped to the minor enforcement mode.
 
 ### Latency / cost
 
-Enforcement is **+1 synchronous LLM round-trip per minor turn** when enabled (un-droppable — a blocking gate needs a verdict before it can block). Option A keeps **first-token latency intact** (the judge runs post-stream, over the already-streamed reply, and rides the `sourceReplacement` rail to retract/replace). Options B (regenerate-once-then-block, 2–3× latency/cost) and C (buffer-before-stream, first-token regression) were rejected for v1 (WI-1350).
+Enforcement is **+1 synchronous LLM round-trip per minor turn** when enabled (un-droppable — a blocking gate needs a verdict before it can block). The chosen shape keeps **first-token latency intact** (the judge runs post-stream, over the already-streamed reply, and rides the `sourceReplacement` rail to retract/replace). Rejected shapes: regenerate-once-then-block (2–3× latency/cost) and buffer-before-stream (first-token regression).

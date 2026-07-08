@@ -10,13 +10,21 @@ creates. · **Deciders:** Architect (jjoerg) + Claude · **Realizes:** the 8 Pha
 
 > **Placement.** Global L2 from birth; lockstep canon partner is
 > `docs/canon/identity/data-model.md` (the Phase-E deliverable).
+>
+> **Code key.** Two code families recur in this document, kept because they are
+> the ruled decisions' durable identifiers: **`D1`–`D8`** are the eight
+> identity-design decisions ruled 2026-06-04 (the full decision grid lives in
+> `data-model.md` §8); **`I-*`** codes (`I-C1`, `I-PB-B2b`, …) are structural
+> findings from the legal-counsel walkthrough of 2026-06-03, each glossed
+> inline at first use below. Neither family refers to work items or phases —
+> they are decision/finding IDs.
 
 ## Context
 
 - **All 8 Phase-E decisions ruled (D1–D8, 2026-06-04).** The full lockstep grid is in `data-model.md` §8.
 - **`domain-model.md` v1.1 (RATIFIED) carries the logical model; this ADR and its lockstep doc carry the physical realization.** The two are not redundant — one is the *what* (the entities, edges, invariants), the other is the *how* (tables, columns, FKs, indexes, retain-tier).
 - **Counsel walkthrough (`725e84694`, 2026-06-03) closed five structural findings the schema must satisfy by design:** `I-C1` (consent receipt must survive deletion — a *live* defect today), `I-C4` (consent must refresh at age transitions — also *live* today), `I-PB-B2b` (the direction-aware birth gate must retain the prior value + audit fact before relaxing protection), `I-D1` (consent must be org-scoped, not globally stamped), and `I-E3` (moved-country grace window must be enforceable).
-- **The legacy state cannot be evolved safely.** The current `consent_states` UNIQUE shape is the `I-D1` blocker; migration `0106` (`T1`) is the inert scaffolding; carrying either forward is the half-migration anti-pattern. The target is a fresh create-from-empty on the documented baseline (`MMT-ADR-0012`).
+- **The legacy state cannot be evolved safely.** The then-current `consent_states` UNIQUE shape was the `I-D1` blocker, and an earlier inert scaffolding migration (0106) sat unused; carrying either forward is the half-migration anti-pattern. The target is a fresh create-from-empty on the documented baseline (`MMT-ADR-0012`).
 - **Pre-launch, zero production data** — schema fidelity is the only cost; the only available product posture is "as designed, not as evolved."
 
 ## Decision
@@ -67,7 +75,7 @@ The Phase-E baseline creates **eight tables** (six active + two edge + the `cons
 - `organization_id` `uuid NOT NULL → organization.id ON DELETE CASCADE` *(replaces the `accounts.id` FK in the current `subscriptions` row).*
 - `plan_tier` `text NOT NULL` *(lookup into plan catalog; quota is derived from the plan, not stored).*
 - `status` `text NOT NULL` *(active / past_due / canceled — the store is the source of truth per `MMT-ADR-0002`; this is a cached read).*
-- `payer_person_id` `uuid NULL → person.id` *(D3 — access-inert snapshot, the local stored attribution; the E3 question "which Person under Family Sharing" populates this column later, not as a schema change).*
+- `payer_person_id` `uuid NULL → person.id` *(D3 — access-inert snapshot, the local stored attribution; the open product/counsel question of which Person is recorded under Family Sharing / Ask-to-Buy populates this column later, not as a schema change).*
 - `store_customer_ref` `text NULL` *(RevenueCat / store customer id; the link to the store; never authoritative on its own).*
 - `started_at` / `period_end` / `created_at` / `updated_at`.
 
@@ -80,7 +88,7 @@ The Phase-E baseline creates **eight tables** (six active + two edge + the `cons
 - `ward_person_id` `uuid NOT NULL → person.id ON DELETE CASCADE`.
 - `residence_jurisdiction` `text NOT NULL` *(the jurisdiction at the time the edge was created; per `I-PB-B2a`, the consent record snapshots its jurisdictional context).*
 - `granted_at` `timestamptz NOT NULL`, `revoked_at` `timestamptz NULL`.
-- `CHECK (guardian_person_id <> ward_person_id)` *(the F1-BT-a no-self-guardian guard; one of the invariants the schema makes structural).*
+- `CHECK (guardian_person_id <> ward_person_id)` *(the no-self-guardian guard; one of the invariants the schema makes structural).*
 - `UNIQUE (guardian_person_id, ward_person_id)` *where `revoked_at IS NULL`* *(a partial unique; re-granting after revoke is allowed only via a new row, preserving the append-only history of guardian links).*
 - Operate / manage / view powers are *not* columns on this edge. Per `ADR-0008` they are derived at query time: `guardian-link ∧ shared-org-membership ∧ charge-has-no-Login` — a single named resolver function in services (the successor to the buggy `getFamilyOwnerProfileId`).
 
@@ -121,7 +129,7 @@ The `resolveConsentRequirement(age × residence_jurisdiction × purpose)` functi
 - Idempotency: the per-person fan-out event carries an Inngest-native `idempotency_key = "personId+day"` (D7c) — no dedicated dedup table.
 - **Indexes** (D7a): `person(birth_date)`, `person(residence_jurisdiction)`, `person(last_activity_at)`. (Dormant accounts still age, so the sweep cannot be limited to recently-active.)
 - **`last_activity_at` is denormalized** (D7b) — one indexed column per person, written on activity, read at sweep time. No `max(session.created_at)` aggregate at sweep time.
-- **Consumers** (now broader than the original D7 grill): **(a) age-crossing** (the `I-PB-B2b` direction-aware gate fires here for the *up* direction and holds the more-protective state until it clears; the *down* direction is trust-instant per B2b); **(b) consent refresh at every age transition** (the `I-C4` fix — the sweep *owns* consent re-evaluation, not ad-hoc code); **(c) moved-country grace window maturation** (`I-E3` — suspend-to-browse-preview, with a grace period; the `residence_jurisdiction` change is the trigger and the residence-effective date is the maturation signal); **(d) dormancy notice + window** (`I-C3` — the inactivity-deletion notice + grace before any abandonment cleanup).
+- **Consumers** (broader than the original D7 scheduler review): **(a) age-crossing** (the `I-PB-B2b` direction-aware gate fires here for the *up* direction and holds the more-protective state until it clears; the *down* direction is trust-instant per B2b); **(b) consent refresh at every age transition** (the `I-C4` fix — the sweep *owns* consent re-evaluation, not ad-hoc code); **(c) moved-country grace window maturation** (`I-E3` — suspend-to-browse-preview, with a grace period; the `residence_jurisdiction` change is the trigger and the residence-effective date is the maturation signal); **(d) dormancy notice + window** (`I-C3` — the inactivity-deletion notice + grace before any abandonment cleanup).
 
 ### 5. Retention seam — the `person_retain` per-class retain-tier set
 
@@ -154,7 +162,7 @@ The deletion seam is **structural, not column-based.** Learning data and the `pe
 - **The unified daily sweep closes a live defect** (`I-C4` — consent was never refreshed at any age transition; the sweep is now the owner of consent re-evaluation).
 - **`I-PB-B2b` is satisfied by structure**: the `prior_value` + `audit_fact` fields on `consent_grant` (and the `deletion_audit` row at delete) make the direction-aware gate auditable.
 - **`I-D1` v1-stance is pre-wired**: `consent_grant` is org-scoped from birth (one home org in v1); the cross-org + controller-role feature is the gated addition, not a refactor.
-- **Every `isOwner` gate in the app rekeys to an `admin`-role check.** Tracked in the Phase-F handoff as a build-time sweep, not a schema change.
+- **Every `isOwner` gate in the app rekeys to an `admin`-role check.** An application-code sweep, not a schema change.
 - **`controller-role` is deferred entirely, not parked as a dormant column** — `D6e` slimmed. The clean baseline makes the later add a clean forward migration; a dormant column would have been the half-migration anti-pattern.
 - **Dormant accounts still age.** The sweep is per-person, not per-active, so the `I-C4` refresh and the `I-PB-B2b` direction gate fire even for accounts no one is using.
 - **`family_links` migrates into `guardianship`; `mentor` as a legacy role value is dissolved into Supportership**; the existing `accounts.isOwner` boolean is dropped.
@@ -166,17 +174,19 @@ The deletion seam is **structural, not column-based.** Learning data and the `pe
 3. **`is_owner` preserved as a denormalised cache.** Rejected — a column meaning two things is the inverse of the derived-admin-role pattern; the cache is always stale relative to the role truth.
 4. **Stamped `consent_status` column** (the `consent_states` shape, evolved). Rejected — by counsel ruling, by canon (consent is computed not stamped), and by the `I-D1` structural blocker.
 5. **Soft-delete only (`deleted_at` column).** Rejected — the `I-C1` finding verifies that this *is* the current defect, not a fix for it.
-6. **Single polymorphic `relationship` table for guardianship + supportership.** Rejected — the two edges differ in payload, in invariants, and in their governing ADRs; fusing them buys speculative flexibility for YAGNI complexity. (See D5 grill.)
+6. **Single polymorphic `relationship` table for guardianship + supportership.** Rejected — the two edges differ in payload, in invariants, and in their governing ADRs; fusing them buys speculative flexibility for YAGNI complexity. (Examined and rejected in the D5 edge-model review.)
 7. **Dormancy `max(session.created_at)` derived at sweep time.** Rejected — the dormancy check is a hot, repeated read; a denormalized column is the honest shape.
 8. **Dedicated `transition_run_log` for sweep idempotency.** Rejected — `MMT-ADR-0009` already specifies the `personId+day` Inngest-native key; a run-log table is only worth it if observability needs to query run history, which nothing here asks for (addable later).
 9. **Build the `controller-role` column now, no logic.** Rejected — a dormant column reads as "handled" to the next contributor (the half-migration pattern); YAGNI for v1's single-org world.
 
-## What this ADR does NOT do
+## What this ADR does NOT decide
 
-- Run the baseline migration. (Phase F.)
-- RLS rollout. (T3 obligation, Phase F.)
-- Fill the retention *values* on `person_retain`. (Counsel.)
-- Pick the VPC vendor. (Procurement, after legal requirements are clear.)
-- Resolve the **`inv 17` rephrase** (the `I-PB-B3a` architect call). The data model carries the consent gate per the ratified model; the rephrase is canon-language, not schema.
-- Settle the **"11" age-floor final product call** (now a tracked roadmap thread, gated on the store-rating/directed-to-children posture).
-- Add **`E3` — which Person is recorded as `payer_person_id` under Family Sharing / Ask-to-Buy.** The column is in place; the value is a Phase-F product + counsel call.
+This ADR fixes the physical schema only. Out of its scope, by design:
+
+- **Migration execution.** Running the baseline migration is separate execution work, not part of this design decision.
+- **Row-level-security rollout.** RLS policies over these tables are a separate decision-and-execution track.
+- **The retention *values* on `person_retain`.** The schema designs the seam; legal counsel supplies the retention periods.
+- **The VPC (verified-parental-consent) vendor choice.** A procurement decision, made after the legal requirements are clear.
+- **Canon-language rephrasing of the consent-gate invariant** (`inv 17` in the identity ontology). The data model carries the consent gate per the ratified model; the rephrase is canon wording, not schema.
+- **The final minimum-age product call** (whether the floor drops below 13) — a product decision gated on the store-rating / directed-to-children posture, not a schema question.
+- **Which Person is recorded as `payer_person_id` under Family Sharing / Ask-to-Buy.** The column is in place; the value is a product + counsel call.

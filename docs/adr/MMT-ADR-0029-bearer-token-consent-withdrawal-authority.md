@@ -16,7 +16,7 @@ The repo's two settled authority models both fail this actor by construction:
 
 A third constraint comes from the data: the 7-day approval token is **dead after approval** (`getChildNameByTokenV2` returns null once `responded_at` is stamped), so withdrawal needs its **own durable handle**, available indefinitely.
 
-This is a live exposure the moment public sign-up opens. P0 needs a withdrawal authority for an actor that is, by design, outside both authority models.
+This is a live GDPR exposure from the moment public sign-up opens: the system needs a withdrawal authority for an actor that is, by design, outside both authority models.
 
 ## Decision
 
@@ -26,7 +26,7 @@ The exception is fenced by hard constraints, so it does not erode either model:
 
 - **Scope of authority is withdraw/restore of exactly one charge's email-consent — nothing else.** The token never authorizes a read, an export, a profile mutation, or any operation on the child's learning data. It is not a session and confers no identity.
 - **It bypasses the edge-derived resolver only for this one actor.** Every credentialed/edged path continues to flow through `MMT-ADR-0008`'s single resolver unchanged; the token is an additive, parallel authority for the edge-less case, not a replacement.
-- **Stateless and non-expiring.** No DB column, no migration — P0 is deliberately disposable. Non-expiring because Art. 7(3) requires withdrawal "at any time." Wire format `cw1:${chargePersonId}:${organizationId}`, base64url payload + HMAC, **constant-time** verification (no signature oracle); any malformed / tampered / wrong-secret / unknown-version token verifies to `null`.
+- **Stateless and non-expiring.** No DB column, no migration — the mechanism is deliberately disposable, trading revocability for zero persistent surface, because it is an interim authority (see successor path below). Non-expiring because Art. 7(3) requires withdrawal "at any time." Wire format `cw1:${chargePersonId}:${organizationId}`, base64url payload + HMAC, **constant-time** verification (no signature oracle); any malformed / tampered / wrong-secret / unknown-version token verifies to `null`.
 - **The signing secret `CONSENT_WITHDRAWAL_TOKEN_SECRET` (≥32 chars) is production-required and fail-loud** — the feature cannot sign or verify without it, so a missing secret is a boot failure, not a silent degrade.
 - **Delivery home is a dedicated post-approval confirmation email** (the email a parent actually returns to), plus the approval landing page — never the pre-approval request email (archived once actioned).
 
@@ -35,7 +35,7 @@ The exception is fenced by hard constraints, so it does not erode either model:
 - **The Art. 7(3) gap closes** for the one actor neither prior model could serve, without inventing a fake edge or forcing account creation.
 - **A new, deliberately constrained security primitive exists**: a non-expiring, unauthenticated bearer credential with **no server-side revocation list**. The leak blast-radius is bounded and self-healing: a stranger who obtains the link could *pause* (or restore) this one child's account, recoverable within the 7-day deletion grace window — no data read, no cross-account reach. This is the contested property; it is accepted for P0 as low-harm against the live compliance exposure.
 - **Binding constraint on future work:** this token must **never** be generalized to any data-bearing or identity-conferring operation. Any future "act via emailed link" surface for an edged/credentialed actor flows through `MMT-ADR-0008`'s resolver, not this token.
-- **Explicit successor path:** the durable fix is a real in-app / account-based withdrawal for the consenting parent (the P1 `family-3` link-account work). When that lands, it **supersedes** this ADR and the bearer token can retire.
+- **Explicit successor path:** the durable fix is a real in-app / account-based withdrawal for the consenting parent (an invited/linked account that gives this actor a credential and an edge). Whichever ADR ratifies that mechanism **supersedes** this one, and the bearer token retires with it.
 - **Lockstep canon (on acceptance):** inv 23 gains a one-line exception noting the edge-less email-parent's withdrawal authority is a signed bearer token per this ADR.
 
 ## Alternatives considered
@@ -43,5 +43,5 @@ The exception is fenced by hard constraints, so it does not erode either model:
 1. **Expiring / short-TTL token.** Rejected — Art. 7(3) requires withdrawal "at any time"; an expired link re-creates the very dead-end (the spent approval token) this decision exists to fix.
 2. **DB-stored, revocable withdrawal handle (a column + lookup).** Rejected for P0 — adds a migration and state to a deliberately disposable feature. Revisit if the blast-radius assessment ever rises above low-harm (e.g. if the token were ever extended toward data access — which constraint above forbids).
 3. **Reuse the approval token.** Rejected — it is dead after approval by design (`getChildNameByTokenV2` → null on a responded request); withdrawal needs a durable, independent handle.
-4. **Require the parent to create an account to withdraw.** Rejected — withdrawal must be *as easy as giving*, and giving required no account; gating withdrawal behind sign-up is a direct Art. 7(3) violation. (This is the P1 *option*, not the P0 *requirement*.)
+4. **Require the parent to create an account to withdraw.** Rejected — withdrawal must be *as easy as giving*, and giving required no account; gating withdrawal behind sign-up is a direct Art. 7(3) violation. (An *optional* linked account remains the successor path above — offered, never required.)
 5. **Synthesize a guardianship edge for the email-parent so the existing resolver applies.** Rejected — there is no edge (no `person` row, no relationship fact); fabricating one to satisfy the resolver would corrupt `MMT-ADR-0008`'s global-edge model and store a relationship that legally isn't one. The honest model is "no edge → a scoped token authority," recorded as the exception this ADR makes.

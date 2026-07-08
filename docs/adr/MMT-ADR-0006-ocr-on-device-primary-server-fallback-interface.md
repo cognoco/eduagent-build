@@ -11,13 +11,13 @@ The homework-help flow is **camera → OCR → first AI response**, on a `<3s` c
 ## Decision
 
 - **Primary: ML Kit on-device OCR** — fast, no network dependency for the common case, keeps the critical path inside budget.
-- **Fallback: server-side OCR behind a swappable provider interface**, exposed at `/v1/ocr`. The fallback **provider** (Mathpix vs. Cloudflare Workers AI) is **deliberately deferred** — the *interface* is designed now, the *implementation/provider choice* is made when evaluating real homework content during the Homework Help epic.
+- **Fallback: server-side OCR behind a swappable provider interface**, exposed at `/v1/ocr`. The fallback **provider** (Mathpix vs. Cloudflare Workers AI) is **deliberately deferred** — the *interface* is designed now; the *provider choice* is made only when real homework-content accuracy/cost data exists to evaluate candidates against.
 - **No circuit breaker on OCR** — failures are per-image, not systemic; a single-request 5s timeout falls back immediately to manual text input (contrast with the LLM-provider circuit breaker).
 
 ## Consequences
 
 - `apps/api/src/services/ocr.ts` is a **swappable provider interface** (pure business logic, no Hono imports), so the deferred provider can be slotted in without touching call sites. Its header comment now cites `MMT-ADR-0006` (migrated from `ARCH-14`).
-- The provider decision (Mathpix vs. CF Workers AI) remains **open** and is owed by the Homework Help epic — when it lands it is a new ADR (or an amendment here), made against real-content accuracy/cost data.
+- The provider decision (Mathpix vs. CF Workers AI) remains **open** by design. Selecting it requires a new ADR (or an amendment here), made against real-content accuracy/cost data — not before that data exists.
 - On-device primary means the OCR result quality varies by device ML Kit capability; the server fallback + manual-text path are the recovery routes (no dead-end).
 
 ## Alternatives considered
