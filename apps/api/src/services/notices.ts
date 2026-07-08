@@ -36,18 +36,38 @@ export async function recordPendingNotice(
     childName: string;
   },
 ): Promise<string> {
+  const payloadJson = { childName: input.childName };
   const [row] = await db
     .insert(pendingNotices)
     .values({
       ownerProfileId: input.ownerProfileId,
       type: input.type,
-      payloadJson: { childName: input.childName },
+      payloadJson,
+    })
+    .onConflictDoNothing({
+      target: [
+        pendingNotices.ownerProfileId,
+        pendingNotices.type,
+        pendingNotices.payloadJson,
+      ],
     })
     .returning({ id: pendingNotices.id });
-  if (!row) {
-    throw new Error('pending_notices insert returned no row');
+  if (row) {
+    return row.id;
   }
-  return row.id;
+
+  const existing = await db.query.pendingNotices.findFirst({
+    where: and(
+      eq(pendingNotices.ownerProfileId, input.ownerProfileId),
+      eq(pendingNotices.type, input.type),
+      eq(pendingNotices.payloadJson, payloadJson),
+    ),
+    columns: { id: true },
+  });
+  if (!existing) {
+    throw new Error('pending_notices insert conflict returned no row');
+  }
+  return existing.id;
 }
 
 /**

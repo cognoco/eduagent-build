@@ -22,8 +22,27 @@ export async function createVisibilityNotice(
   const rows = await db
     .insert(supportVisibilityNotices)
     .values(input)
+    .onConflictDoNothing({
+      target: [
+        supportVisibilityNotices.supportershipId,
+        supportVisibilityNotices.noticeType,
+        supportVisibilityNotices.targetAudience,
+        supportVisibilityNotices.targetPersonId,
+        supportVisibilityNotices.payload,
+      ],
+    })
     .returning();
-  const row = rows[0];
+  const row =
+    rows[0] ??
+    (await db.query.supportVisibilityNotices.findFirst({
+      where: and(
+        eq(supportVisibilityNotices.supportershipId, input.supportershipId),
+        eq(supportVisibilityNotices.noticeType, input.noticeType),
+        eq(supportVisibilityNotices.targetAudience, input.targetAudience),
+        eq(supportVisibilityNotices.targetPersonId, input.targetPersonId),
+        eq(supportVisibilityNotices.payload, input.payload),
+      ),
+    }));
   if (!row) throw new Error('Visibility notice insert returned no row');
   const moment = mapNotice(row);
   if (!moment) {

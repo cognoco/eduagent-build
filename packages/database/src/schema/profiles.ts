@@ -6,6 +6,7 @@ import {
   pgEnum,
   index,
   jsonb,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { generateUUIDv7 } from '../utils/uuid';
 import { person } from './identity';
@@ -104,6 +105,11 @@ export const pendingNotices = pgTable(
     seenAt: timestamp('seen_at', { withTimezone: true }),
   },
   (table) => [
+    uniqueIndex('pending_notices_owner_type_payload_uq').on(
+      table.ownerProfileId,
+      table.type,
+      table.payloadJson,
+    ),
     index('pending_notices_owner_unseen_idx').on(
       table.ownerProfileId,
       table.seenAt,
