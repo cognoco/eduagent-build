@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Text, TextInput, Pressable, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 import { useUser, useReverification } from '@clerk/clerk-expo';
 
 import { assertOk } from '../lib/assert-ok';
@@ -12,6 +12,7 @@ import {
   withClerkTimeout,
 } from '../lib/clerk-timeout';
 import { useThemeColors } from '../lib/theme';
+import { Button } from './common/Button';
 
 interface EmailAddressResource {
   id: string;
@@ -233,20 +234,18 @@ export function ChangeEmail(): React.JSX.Element {
         value={email}
       />
 
-      <Pressable
+      <Button
         onPress={handleSendCode}
         disabled={isSendingCode || isVerifying || !!syncCandidate}
-        className="bg-primary rounded-card px-4 py-3 mt-3 items-center"
-        accessibilityLabel={t('changeEmail.sendCodeLabel')}
-        accessibilityRole="button"
-        testID="change-email-send-code"
-      >
-        <Text className="text-body font-semibold text-text-inverse">
-          {isSendingCode
+        label={
+          isSendingCode
             ? t('changeEmail.sendingCode')
-            : t('changeEmail.sendCodeButton')}
-        </Text>
-      </Pressable>
+            : t('changeEmail.sendCodeButton')
+        }
+        className="mt-3 rounded-card"
+        accessibilityLabel={t('changeEmail.sendCodeLabel')}
+        testID="change-email-send-code"
+      />
 
       {pendingEmail ? (
         <View className="mt-4">
@@ -264,35 +263,31 @@ export function ChangeEmail(): React.JSX.Element {
             value={code}
           />
           {syncCandidate ? (
-            <Pressable
+            <Button
               onPress={handleRetrySync}
               disabled={isVerifying}
-              className="bg-primary rounded-card px-4 py-3 mt-3 items-center"
-              accessibilityLabel={t('changeEmail.retrySyncLabel')}
-              accessibilityRole="button"
-              testID="change-email-retry-sync"
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                {isVerifying
+              label={
+                isVerifying
                   ? t('changeEmail.verifying')
-                  : t('changeEmail.retrySyncButton')}
-              </Text>
-            </Pressable>
+                  : t('changeEmail.retrySyncButton')
+              }
+              className="mt-3 rounded-card"
+              accessibilityLabel={t('changeEmail.retrySyncLabel')}
+              testID="change-email-retry-sync"
+            />
           ) : (
-            <Pressable
+            <Button
               onPress={handleVerify}
               disabled={isVerifying}
-              className="bg-primary rounded-card px-4 py-3 mt-3 items-center"
-              accessibilityLabel={t('changeEmail.verifyLabel')}
-              accessibilityRole="button"
-              testID="change-email-verify"
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                {isVerifying
+              label={
+                isVerifying
                   ? t('changeEmail.verifying')
-                  : t('changeEmail.verifyButton')}
-              </Text>
-            </Pressable>
+                  : t('changeEmail.verifyButton')
+              }
+              className="mt-3 rounded-card"
+              accessibilityLabel={t('changeEmail.verifyLabel')}
+              testID="change-email-verify"
+            />
           )}
         </View>
       ) : null}

@@ -1,5 +1,7 @@
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
+
+import { Button } from './common/Button';
 
 interface MemoryConsentPromptProps {
   childName?: string;
@@ -31,30 +33,23 @@ export function MemoryConsentPrompt({
         {description ?? t('memoryConsent.defaultDescription')}
       </Text>
       <View className="flex-row gap-2">
-        <Pressable
+        <Button
           onPress={onGrant}
           disabled={isPending}
-          className="flex-1 bg-primary rounded-button px-4 py-3 items-center"
-          accessibilityRole="button"
+          label={isPending ? t('common.saving') : t('memoryConsent.grant')}
+          className="flex-1"
           accessibilityLabel={t('memoryConsent.a11yEnable')}
           testID="memory-consent-grant"
-        >
-          <Text className="text-body font-semibold text-text-inverse">
-            {isPending ? t('common.saving') : t('memoryConsent.grant')}
-          </Text>
-        </Pressable>
-        <Pressable
+        />
+        <Button
+          variant="secondary"
           onPress={onDecline}
           disabled={isPending}
-          className="flex-1 bg-background rounded-button px-4 py-3 items-center border border-border"
-          accessibilityRole="button"
+          label={t('common.notNow')}
+          className="flex-1 border border-border bg-background"
           accessibilityLabel={t('memoryConsent.a11ySkip')}
           testID="memory-consent-decline"
-        >
-          <Text className="text-body font-semibold text-text-primary">
-            {t('common.notNow')}
-          </Text>
-        </Pressable>
+        />
       </View>
     </View>
   );
