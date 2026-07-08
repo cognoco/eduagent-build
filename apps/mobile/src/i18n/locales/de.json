@@ -163,7 +163,7 @@
       "yourDevice": "dein Gerät",
       "noAccountPrompt": "Kein Konto?",
       "newHere": "Neu hier?",
-      "tryMentomate": "MentoMate testen",
+      "tryMentomate": "MentoMate ausprobieren",
       "unsupportedSsoHint": "Wenn dieses Konto auch Google- oder Apple-Anmeldung verwendet, versuche es oben. Wenn das nicht funktioniert, kontaktiere den Support.",
       "unsupportedContactHint": "Kontaktiere den Support, wir helfen dir bei der Anmeldung. Erwähne: {{methods}}.",
       "strategyWebauthn": "einen Sicherheitsschlüssel oder Passkey",
