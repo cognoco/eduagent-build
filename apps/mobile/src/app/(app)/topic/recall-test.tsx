@@ -22,15 +22,13 @@ import { ErrorFallback } from '../../../components/common';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useEnsureStudyMode } from '../../../lib/use-mode-switch';
 
-const OPENING_MESSAGE: ChatMessage = {
-  id: 'ai-opening',
-  role: 'assistant',
-  content:
-    "What comes to mind about this topic? Just share what you remember \u2014 there's no wrong answer.",
-};
-
-const DONT_REMEMBER_FALLBACK_HINT =
-  "That's okay — let's see what you do remember. Here's a small hint: think about the main idea or first step tied to this topic. Does anything come back?";
+function createOpeningMessage(content: string): ChatMessage {
+  return {
+    id: 'ai-opening',
+    role: 'assistant',
+    content,
+  };
+}
 
 function deriveStatus(retentionStatus?: string): RetentionStatus {
   if (retentionStatus === 'strong') return 'strong';
@@ -73,7 +71,9 @@ export default function RecallTestScreen() {
     [ensureStudyMode, router],
   );
 
-  const [messages, setMessages] = useState<ChatMessage[]>([OPENING_MESSAGE]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
+    createOpeningMessage(t('topic.recallTest.openingMessage')),
+  ]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [inputDisabled, setInputDisabled] = useState(false);
   const [dontRememberCount, setDontRememberCount] = useState(0);
@@ -238,11 +238,11 @@ export default function RecallTestScreen() {
 
   const handleReviewRetest = useCallback(() => {
     // Reset state and try again
-    setMessages([OPENING_MESSAGE]);
+    setMessages([createOpeningMessage(t('topic.recallTest.openingMessage'))]);
     setInputDisabled(false);
     setDontRememberCount(0);
     setRemediationData(null);
-  }, []);
+  }, [t]);
 
   const handleRelearnTopic = useCallback(() => {
     if (!topicId) return;
@@ -297,7 +297,7 @@ export default function RecallTestScreen() {
             nextCount >= 2
           ) {
             cleanupRef.current = animateResponse(
-              "Thanks for saying that honestly. Let's switch to review so this feels doable again.",
+              t('topic.recallTest.dontRememberReviewPrompt'),
               setMessages,
               setIsStreaming,
               () => {
@@ -315,7 +315,7 @@ export default function RecallTestScreen() {
           }
 
           cleanupRef.current = animateResponse(
-            result.hint ?? DONT_REMEMBER_FALLBACK_HINT,
+            result.hint ?? t('topic.recallTest.dontRememberFallbackHint'),
             setMessages,
             setIsStreaming,
             releaseDontRememberBlock,

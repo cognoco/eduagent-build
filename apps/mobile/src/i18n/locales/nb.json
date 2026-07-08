@@ -1651,6 +1651,7 @@
       "missingMessage": "Vi kunne ikke laste dette emnet. Gå til biblioteket for å velge et.",
       "goToLibrary": "Gå til bibliotek",
       "successPrompt": "Gå tilbake til biblioteket ditt når du er klar.",
+      "openingMessage": "Hva kommer du på om dette emnet? Del det du husker — alt du kommer på hjelper oss i gang.",
       "successMessage": "Bra jobbet — du husker dette godt! Gå tilbake til biblioteket ditt når du er klar.",
       "partialResult": "God innsats! Tenk på nøkkelbegrepene og prøv å forklare igjen. Hva er det som skiller seg ut mest for deg?",
       "needsReview": "Nesten der — litt mer øvelse vil feste dette. La oss finne en bedre tilnærming for deg.",
@@ -1661,6 +1662,8 @@
       "timeoutMessage": "Svaret ditt tar lengre tid enn vanlig å sende. Sjekk forbindelsen og prøv igjen.",
       "dontRememberFirst": "Jeg husker ikke.",
       "dontRememberAgain": "Sitter fortsatt fast.",
+      "dontRememberFallbackHint": "Det går fint — la oss se hva du husker. Her er et lite hint: Tenk på hovedideen eller det første steget knyttet til dette emnet. Kommer noe tilbake?",
+      "dontRememberReviewPrompt": "Takk for at du sier det ærlig. La oss gå over til repetisjon, så dette føles overkommelig igjen.",
       "gradingUnavailableTitle": "Svaret ditt er mottatt.",
       "gradingUnavailableMessage": "Jeg kunne ikke sjekke det akkurat nå – svaret ditt er trygt. Prøv igjen, eller kom tilbake til det senere."
     },

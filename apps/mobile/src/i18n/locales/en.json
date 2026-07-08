@@ -1744,6 +1744,7 @@
       "missingMessage": "We couldn't load this topic. Head to the library to pick one.",
       "goToLibrary": "Go to Library",
       "successPrompt": "Head back to your Library whenever you're ready.",
+      "openingMessage": "What comes to mind about this topic? Just share what you remember — anything you recall helps us start.",
       "successMessage": "Great work — your memory of this is solid! Head back to your Library whenever you're ready.",
       "partialResult": "Good effort! Think about the key concepts and try explaining again. What stands out most to you?",
       "needsReview": "Almost there — a little more practice will lock this in. Let's find a better approach for you.",
@@ -1754,6 +1755,8 @@
       "timeoutMessage": "Your answer is taking longer than usual to send. Check your connection and try again.",
       "dontRememberFirst": "I don't remember.",
       "dontRememberAgain": "Still stuck.",
+      "dontRememberFallbackHint": "That's okay — let's see what you do remember. Here's a small hint: think about the main idea or first step tied to this topic. Does anything come back?",
+      "dontRememberReviewPrompt": "Thanks for saying that honestly. Let's switch to review so this feels doable again.",
       "gradingUnavailableTitle": "Got your answer.",
       "gradingUnavailableMessage": "I couldn't check it just now — your answer is safe. Try again, or come back to it later."
     },

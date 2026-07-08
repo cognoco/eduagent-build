@@ -1678,6 +1678,7 @@
       "missingMessage": "Não conseguimos carregar este tópico. Vá para a biblioteca para escolher um.",
       "goToLibrary": "Ir para a Biblioteca",
       "successPrompt": "Volte para sua Biblioteca quando estiver pronto.",
+      "openingMessage": "O que vem à sua mente sobre este tema? Compartilhe o que lembrar — qualquer lembrança ajuda a começar.",
       "successMessage": "Ótimo trabalho — sua memória sobre isso está ótima! Volte para sua Biblioteca quando estiver pronto.",
       "partialResult": "Bom esforço! Pense nos conceitos principais e tente explicar novamente. O que mais se destaca para você?",
       "needsReview": "Quase lá — um pouco mais de prática vai fixar isso. Vamos encontrar uma abordagem melhor para você.",
@@ -1688,6 +1689,8 @@
       "timeoutMessage": "A sua resposta está demorando mais que o normal para enviar. Verifique a conexão e tente novamente.",
       "dontRememberFirst": "Não me lembro.",
       "dontRememberAgain": "Ainda não sei.",
+      "dontRememberFallbackHint": "Tudo bem — vamos ver do que você se lembra. Aqui vai uma pequena dica: pense na ideia principal ou no primeiro passo ligado a este tema. Algo voltou?",
+      "dontRememberReviewPrompt": "Obrigado por dizer isso com sinceridade. Vamos passar para a revisão para que isso volte a parecer viável.",
       "gradingUnavailableTitle": "Resposta recebida.",
       "gradingUnavailableMessage": "Não consegui verificar agora, mas sua resposta está segura. Tente novamente ou volte mais tarde."
     },
