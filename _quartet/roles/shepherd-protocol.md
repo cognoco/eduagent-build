@@ -123,6 +123,10 @@ to anything.
 5. **Reconcile** — read your lane's `execution-tracker.md` and the repo `AGENTS.md` Cosmo rules,
    then run the boot reconcile query (WI-1156's B5 shape): Q1 = Workstreams where
    `Owner == my-name`; Q2 = WIs where Workstream ∈ my-lanes AND the in-flight state-predicate.
+   The census reads and asserts on both `Stage` and `State`: any non-terminal Work Item with
+   `State=Active` that is not actually progressing is a reconcile defect, not a quiet hold.
+   Evidence for a hold must be in the board state (`State=Blocked`, `State=Awaiting Info`, or
+   `State=Parked`) as well as any tracker or Clacks prose.
    Confirm the **separate reviewer session** already covers your workstream (see below) — do
    **not** wire, restart, or own the review watcher.
 6. **Begin lane execution.**
@@ -135,6 +139,17 @@ authoritative**. Reconcile by evidence and write the conclusion back to Cosmo �
 existing `/cosmo:qa` + `/cosmo:review` Cosmo↔Git verification, it is not a new adjudicator. A
 non-code / Notion-only WI has no Git artifact to check against — reconcile it via its Acceptance
 Criteria + completion summary instead.
+
+**No silent holds (WI-1684).** Holds are board state, not narrative state. If a WI is blocked by a
+dependency, wire the `Blocked by` edge and ensure `State=Blocked`; if it is deliberately deferred
+by sequencing, ensure `State=Parked`; if it is waiting on an operator/stakeholder answer now,
+ensure `State=Awaiting Info`. When the blocker, defer, or human-response hold clears, restore
+`State=Active` through the lifecycle surface that owns the transition. Known owned surfaces include
+the review human/resume path (`State=Awaiting Info` ↔ `State=Active`) and execute escalation
+completion (`State=Awaiting Info`); dependency and sequencing State writes must be performed only
+by an existing lifecycle owner or routed as a follow-up, never by inventing a broad shepherd-side
+State writer. Backfill precedent from 2026-07-07 WS-45: `WI-851=Blocked`,
+`WI-1681=Awaiting Info`, `WI-1670/WI-1671/WI-1672/WI-1674/WI-1675=Parked`.
 
 **Sign-of-life.** Event-driven only — boot, post-compaction, resume — riding the Clacks envelope
 (WI-1230) as a sanctioned outbox event that overrides the *no-chatter* bar (Progress channel,

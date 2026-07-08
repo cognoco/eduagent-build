@@ -271,6 +271,18 @@ The orchestrator↔shepherd channel is `working/lanes/<lane>/_state/{inbox,outbo
   judgment, never blind-executes.
 - **Lifecycle** (WI →Reviewing / →Closed) is **not** on this channel — derive it from the
   Cosmo-Stage monitor. The channel is **needs-a-brain only**; keep the roll-up current.
+- **State-backed holds (WI-1684).** When you or a shepherd create a durable hold on a Work Item,
+  the Cosmo `State` must carry the reason, not just Clacks prose. Setting a `Blocked by` edge also
+  sets `State=Blocked`; relaying a PM sequencing defer or other deliberate "not now" queue decision
+  sets `State=Parked`; an operator-sanctioned hold waiting on a human response sets
+  `State=Awaiting Info`. When the condition clears, restore `State=Active` through the lifecycle
+  surface that owns that transition. Tooling boundary: only add these writes to tools that already
+  own the relevant transition; do not invent an ad-hoc broad State writer from the orchestrator
+  seat.
+- **Backfill precedent (2026-07-07 WS-45).** The first program-wide State backfill used this
+  mapping: `WI-851=Blocked`, `WI-1681=Awaiting Info`, and
+  `WI-1670/WI-1671/WI-1672/WI-1674/WI-1675=Parked`. Use it as the canonical example for
+  dependency holds, human-response holds, and sequencing defers.
 - **Monitor hygiene:** maintain a manifest of your expected watchers and **reconcile** it at
   session-start / post-compact / post-resume — never blind-re-arm. See `clacks/monitor-hygiene.md`.
 - **Watcher runtime instances:** launch watchers from tracked templates but write live config,
