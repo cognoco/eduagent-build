@@ -521,6 +521,59 @@ export async function persistChallengeRoundState(
   }
 }
 
+// Exported for WI-1427 regression coverage. This is the single authoritative
+// question-counter claim for grader-on Challenge Round turns.
+export async function claimChallengeRoundQuestionAsked(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<ChallengeRoundSessionState | null> {
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .for('update')
+      .limit(1);
+
+    if (!current) return null;
+
+    const metadata = {
+      ...((current.metadata as Record<string, unknown> | null) ?? {}),
+    };
+    const parsed = challengeRoundSessionStateSchema.safeParse(
+      metadata['challengeRound'],
+    );
+    if (!parsed.success || parsed.data.state !== 'active') return null;
+
+    const persisted = parsed.data;
+    const questionsAsked = Math.min(
+      (persisted.questionsAsked ?? 0) + 1,
+      MAX_CHALLENGE_QUESTIONS,
+    );
+    const next = { ...persisted, questionsAsked };
+    metadata['challengeRound'] = next;
+
+    const [row] = await tx
+      .update(learningSessions)
+      .set({ metadata, updatedAt: new Date() })
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .returning({ id: learningSessions.id });
+
+    return row ? next : null;
+  });
+}
+
 function verdictFromEvaluations(
   evaluations: ChallengeRoundEvaluationItem[],
 ): ChallengeRoundVerdict {
@@ -1132,11 +1185,12 @@ async function applyChallengeRoundRuntimeSignals(
     // T9: track how many questions have actually been asked, independent of
     // whether the grader produced an evaluation (grader fail-open to [] never
     // fires `answer_complete`, so `questionIndex` would otherwise stall).
-    const questionsAsked = (current.questionsAsked ?? 0) + 1;
-    const currentWithCounter: ChallengeRoundSessionState = {
-      ...current,
-      questionsAsked,
-    };
+    const currentWithCounter = await claimChallengeRoundQuestionAsked(
+      db,
+      profileId,
+      session.id,
+    );
+    if (!currentWithCounter) return { challengeRound: current };
 
     // Derive age bracket from birth year already in context — no DB read.
     const ageBracket: AgeBracket = context.birthYear
