@@ -388,8 +388,8 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       await safeSend(
         () =>
           inngest.send({
-            // No consumer is required here; this makes Stripe response drift
-            // queryable while the request recovers inline with current time.
+            // Registered observer makes Stripe response drift queryable while
+            // the request recovers inline with current time.
             name: 'app/billing.missing_current_period_end',
             data: {
               profileId,
