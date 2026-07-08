@@ -106,6 +106,29 @@ describe('session-recovery', () => {
         profileId: 'profile-1',
       },
     });
+    expect(mockDelete).toHaveBeenCalledWith(
+      'session-recovery-marker-profile-1',
+    );
+  });
+
+  it('clears a corrupt legacy marker when the scoped marker is absent', async () => {
+    mockGet.mockImplementation(async (key: string) => {
+      if (key === 'session-recovery-marker-profile-1') return null;
+      if (key === 'session-recovery-marker') return '{not-json';
+      return null;
+    });
+
+    await expect(readSessionRecoveryMarker('profile-1')).resolves.toBeNull();
+
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(SyntaxError), {
+      tags: {
+        surface: 'session-recovery',
+        feature: 'session_recovery',
+        recovery_scope: 'read_parse',
+        profileId: 'profile-1',
+      },
+    });
+    expect(mockDelete).toHaveBeenCalledWith('session-recovery-marker');
   });
 
   it('classifies markers inside the 30-minute recovery window as fresh', () => {
