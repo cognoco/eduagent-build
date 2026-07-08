@@ -30,6 +30,9 @@ import { recordPracticeActivityEvent } from './practice-activity-events';
 import { buildAppHelpDirectReply, isAppHelpQuery } from './app-help-map';
 import { ConflictError, NotFoundError } from '../errors';
 import { findOwnedCurriculumTopic } from './curriculum-topic-ownership';
+import { mapEvaluateQualityToSm2 } from './evaluate';
+import { updateRetentionFromSession } from './retention-data';
+import { insertSessionXpEntry } from './xp';
 
 // [BUG-665 / S-5] Structured logger for parse-fallback observability. Sentry
 // covers production aggregation, but the structured logger surfaces the same
@@ -66,6 +69,12 @@ const ACKNOWLEDGEMENT_ONLY_PATTERN =
 
 const GREETING_TOPIC_PATTERN =
   /\b(greeting|greetings|hello|say hello|saying hello|introduc(?:e yourself|ing yourself|tions?)|meet people)\b/i;
+
+function countLearnerAnswers(
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+): number {
+  return history.filter((entry) => entry.role === 'user').length;
+}
 
 // ---------------------------------------------------------------------------
 // System prompts
@@ -418,6 +427,212 @@ export function buildAssessmentAppHelpEvaluation(
     masteryScore,
     qualityRating: 0,
     weakAreas: [],
+  };
+}
+
+export interface SubmitAssessmentAnswerResult {
+  kind: 'app_help' | 'evaluated';
+  evaluation: AssessmentEvaluation;
+  status: AssessmentStatus;
+  assessment: AssessmentRecord;
+  updatedAssessment: AssessmentRecord | null;
+}
+
+export interface SubmitAssessmentAnswerDependencies {
+  getAssessment: typeof getAssessment;
+  buildAssessmentAppHelpEvaluation: typeof buildAssessmentAppHelpEvaluation;
+  loadAssessmentTopicContext: typeof loadAssessmentTopicContext;
+  lockAssessmentForAnswerSubmission: typeof lockAssessmentForAnswerSubmission;
+  shouldEndAssessmentForReview: typeof shouldEndAssessmentForReview;
+  buildNeedsReviewEvaluation: typeof buildNeedsReviewEvaluation;
+  evaluateAssessmentAnswer: typeof evaluateAssessmentAnswer;
+  resolveAssessmentStatus: typeof resolveAssessmentStatus;
+  updateAssessment: typeof updateAssessment;
+  mapEvaluateQualityToSm2: typeof mapEvaluateQualityToSm2;
+  updateRetentionFromSession: typeof updateRetentionFromSession;
+  insertSessionXpEntry: typeof insertSessionXpEntry;
+  recordAssessmentCompletionActivity: typeof recordAssessmentCompletionActivity;
+  logger: Pick<ReturnType<typeof createLogger>, 'error'>;
+  captureException: typeof captureException;
+}
+
+const submitAssessmentAnswerDependencies: SubmitAssessmentAnswerDependencies = {
+  getAssessment,
+  buildAssessmentAppHelpEvaluation,
+  loadAssessmentTopicContext,
+  lockAssessmentForAnswerSubmission,
+  shouldEndAssessmentForReview,
+  buildNeedsReviewEvaluation,
+  evaluateAssessmentAnswer,
+  resolveAssessmentStatus,
+  updateAssessment,
+  mapEvaluateQualityToSm2,
+  updateRetentionFromSession,
+  insertSessionXpEntry,
+  recordAssessmentCompletionActivity,
+  logger: assessmentsLogger,
+  captureException,
+};
+
+export async function submitAssessmentAnswer(
+  db: Database,
+  profileId: string,
+  assessmentId: string,
+  answer: string,
+  options: {
+    conversationLanguage?: ConversationLanguage;
+    deps?: SubmitAssessmentAnswerDependencies;
+  } = {},
+): Promise<SubmitAssessmentAnswerResult | null> {
+  const deps = options.deps ?? submitAssessmentAnswerDependencies;
+  const assessment = await deps.getAssessment(db, profileId, assessmentId);
+  if (!assessment) return null;
+
+  const appHelpEvaluation = deps.buildAssessmentAppHelpEvaluation(
+    answer,
+    assessment.masteryScore ?? 0,
+  );
+  if (appHelpEvaluation) {
+    return {
+      kind: 'app_help',
+      assessment,
+      updatedAssessment: null,
+      evaluation: appHelpEvaluation,
+      status: assessment.status,
+    };
+  }
+
+  const topicContext = await deps.loadAssessmentTopicContext(
+    db,
+    assessment.topicId,
+    profileId,
+  );
+
+  const { snapshot, evaluation, updated, newStatus, forceReview } =
+    await db.transaction(async (tx) => {
+      const txDb = tx as unknown as Database;
+      const snapshot = await deps.lockAssessmentForAnswerSubmission(
+        txDb,
+        profileId,
+        assessmentId,
+      );
+
+      const forceReview = deps.shouldEndAssessmentForReview(
+        answer,
+        snapshot.exchangeHistory,
+      );
+      const evaluation = forceReview
+        ? deps.buildNeedsReviewEvaluation()
+        : await deps.evaluateAssessmentAnswer(
+            {
+              ...topicContext,
+              currentDepth: snapshot.verificationDepth,
+              exchangeHistory: snapshot.exchangeHistory,
+            },
+            answer,
+            {
+              assessmentStatus: snapshot.status,
+              conversationLanguage: options.conversationLanguage,
+            },
+          );
+
+      const updatedHistory = [
+        ...snapshot.exchangeHistory,
+        { role: 'user' as const, content: answer },
+        { role: 'assistant' as const, content: evaluation.feedback },
+      ];
+
+      const answerCount = countLearnerAnswers(updatedHistory);
+      const newStatus = deps.resolveAssessmentStatus({
+        evaluation,
+        answerCount,
+        forceReview,
+      });
+
+      const updated = await deps.updateAssessment(
+        txDb,
+        profileId,
+        assessmentId,
+        {
+          verificationDepth: evaluation.nextDepth ?? snapshot.verificationDepth,
+          status: newStatus,
+          masteryScore: evaluation.masteryScore,
+          qualityRating: evaluation.qualityRating,
+          exchangeHistory: updatedHistory,
+        },
+      );
+
+      if (
+        newStatus !== 'in_progress' &&
+        !forceReview &&
+        snapshot.topicId &&
+        snapshot.subjectId
+      ) {
+        const sm2Quality = deps.mapEvaluateQualityToSm2(
+          evaluation.passed,
+          Math.round(evaluation.masteryScore * 5),
+        );
+        const sessionTimestamp = updated?.updatedAt ?? new Date().toISOString();
+        await deps.updateRetentionFromSession(
+          txDb,
+          profileId,
+          snapshot.topicId,
+          sm2Quality,
+          sessionTimestamp,
+        );
+        if (newStatus === 'passed') {
+          await deps.insertSessionXpEntry(
+            txDb,
+            profileId,
+            snapshot.topicId,
+            snapshot.subjectId,
+          );
+        }
+      }
+
+      return { snapshot, evaluation, updated, newStatus, forceReview };
+    });
+
+  if (
+    newStatus !== 'in_progress' &&
+    !forceReview &&
+    snapshot.topicId &&
+    snapshot.subjectId
+  ) {
+    try {
+      await deps.recordAssessmentCompletionActivity(
+        db,
+        profileId,
+        updated ?? assessment,
+        newStatus,
+        evaluation,
+      );
+    } catch (err) {
+      deps.logger.error('[assessments] completion-activity write failed', {
+        event: 'assessments.completion_activity_failed',
+        assessmentId,
+        topicId: snapshot.topicId,
+        status: newStatus,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      deps.captureException(err, {
+        profileId,
+        requestPath: '/v1/assessments/:assessmentId/answer',
+        extra: {
+          assessmentId,
+          topicId: snapshot.topicId,
+          status: newStatus,
+        },
+      });
+    }
+  }
+
+  return {
+    kind: 'evaluated',
+    assessment,
+    updatedAssessment: updated,
+    evaluation,
+    status: newStatus,
   };
 }
 
