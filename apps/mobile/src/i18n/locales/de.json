@@ -1651,6 +1651,7 @@
       "missingMessage": "Wir konnten dieses Thema nicht laden. Gehe zur Bibliothek, um eines auszuwählen.",
       "goToLibrary": "Zur Bibliothek",
       "successPrompt": "Gehe zurück zu deiner Bibliothek, wann immer du bereit bist.",
+      "openingMessage": "Was fällt dir zu diesem Thema ein? Teile einfach, woran du dich erinnerst — alles, was dir einfällt, hilft uns beim Start.",
       "successMessage": "Super gemacht — du hast dir das wirklich gut gemerkt! Gehe zurück zu deiner Bibliothek, wann immer du bereit bist.",
       "partialResult": "Guter Einsatz! Denke an die wichtigsten Konzepte und versuche es nochmal zu erklären. Was fällt dir als Erstes auf?",
       "needsReview": "Fast geschafft — ein bisschen mehr Übung und du hast es drauf. Lass uns einen besseren Ansatz für dich finden.",
@@ -1661,6 +1662,8 @@
       "timeoutMessage": "Deine Antwort braucht ungewöhnlich lange. Prüfe deine Verbindung und versuche es noch einmal.",
       "dontRememberFirst": "Weiß ich nicht mehr.",
       "dontRememberAgain": "Stecke immer noch fest.",
+      "dontRememberFallbackHint": "Das ist okay — schauen wir, woran du dich erinnerst. Ein kleiner Hinweis: Denk an die Hauptidee oder den ersten Schritt zu diesem Thema. Kommt etwas zurück?",
+      "dontRememberReviewPrompt": "Danke, dass du das ehrlich sagst. Lass uns zur Wiederholung wechseln, damit es sich wieder machbar anfühlt.",
       "gradingUnavailableTitle": "Antwort erhalten.",
       "gradingUnavailableMessage": "Ich konnte deine Antwort gerade nicht überprüfen, aber sie ist sicher. Versuch es erneut oder komm später darauf zurück."
     },

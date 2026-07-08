@@ -1728,6 +1728,7 @@
       "missingMessage": "Nie mogliśmy załadować tego tematu. Przejdź do biblioteki, aby wybrać jeden.",
       "goToLibrary": "Przejdź do Biblioteki",
       "successPrompt": "Wróć do swojej Biblioteki, kiedy będziesz gotowy(-a).",
+      "openingMessage": "Co przychodzi Ci do głowy na temat tego zagadnienia? Napisz, co pamiętasz — wszystko, co sobie przypomnisz, pomaga nam zacząć.",
       "successMessage": "Świetna robota — dobrze to pamiętasz! Wróć do swojej Biblioteki, kiedy będziesz gotowy(-a).",
       "partialResult": "Dobry wysiłek! Pomyśl o kluczowych pojęciach i spróbuj ponownie. Co najbardziej Ci się wyróżnia?",
       "needsReview": "Prawie — trochę więcej ćwiczeń i to utrwalisz. Znajdźmy dla Ciebie lepsze podejście.",
@@ -1738,6 +1739,8 @@
       "timeoutMessage": "Wysłanie odpowiedzi trwa dłużej niż zwykle. Sprawdź połączenie i spróbuj ponownie.",
       "dontRememberFirst": "Nie pamiętam.",
       "dontRememberAgain": "Nadal nie wiem.",
+      "dontRememberFallbackHint": "W porządku — zobaczmy, co pamiętasz. Mała podpowiedź: pomyśl o głównej idei albo pierwszym kroku związanym z tym tematem. Czy coś wraca?",
+      "dontRememberReviewPrompt": "Dziękuję, że mówisz to szczerze. Przejdźmy do powtórki, żeby znów było to do opanowania.",
       "gradingUnavailableTitle": "Mam Twoją odpowiedź.",
       "gradingUnavailableMessage": "W tej chwili nie mogę sprawdzić Twojej odpowiedzi, ale jest bezpieczna. Spróbuj ponownie lub wróć do tego później."
     },
