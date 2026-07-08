@@ -40,37 +40,28 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => mockQueryClient,
 }));
 
-jest.mock(
-  '../../hooks/use-navigation-contract' /* gc1-allow: component gate rendering test; navigation-contract behavior has dedicated coverage */,
-  () => ({
-    useNavigationContract: () => ({ gates: mockGates }),
-  }),
-);
+jest.mock('../../hooks/use-navigation-contract', () => ({
+  ...jest.requireActual('../../hooks/use-navigation-contract'),
+  useNavigationContract: () => ({ gates: mockGates }),
+}));
 
-jest.mock(
-  '../../lib/profile' /* gc1-allow: component composition test controls active profile shape */,
-  () => ({
-    useProfile: () => ({
-      activeProfile: mockActiveProfile,
-      profiles: mockProfiles,
-    }),
+jest.mock('../../lib/profile', () => ({
+  ...jest.requireActual('../../lib/profile'),
+  useProfile: () => ({
+    activeProfile: mockActiveProfile,
+    profiles: mockProfiles,
   }),
-);
+}));
 
-jest.mock(
-  '../../lib/sign-out' /* gc1-allow: break test asserts wrapper is invoked, not its SecureStore internals */,
-  () => ({
-    ClerkSignOutTimeoutError: class ClerkSignOutTimeoutError extends Error {},
-    signOutWithCleanup: (...args: unknown[]) => mockSignOutWithCleanup(...args),
-  }),
-);
+jest.mock('../../lib/sign-out', () => ({
+  ...jest.requireActual('../../lib/sign-out'),
+  signOutWithCleanup: (...args: unknown[]) => mockSignOutWithCleanup(...args),
+}));
 
-jest.mock(
-  '../../lib/platform-alert' /* gc1-allow: external user-alert side effect boundary */,
-  () => ({
-    platformAlert: jest.fn(),
-  }),
-);
+jest.mock('../../lib/platform-alert', () => ({
+  ...jest.requireActual('../../lib/platform-alert'),
+  platformAlert: jest.fn(),
+}));
 
 describe('AccountAdminSheet', () => {
   beforeEach(() => {

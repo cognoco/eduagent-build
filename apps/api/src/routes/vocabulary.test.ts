@@ -18,7 +18,7 @@ jest.mock(
   () => mockDatabaseModule.module,
 );
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -34,7 +34,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -67,74 +67,71 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../services/vocabulary' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/vocabulary',
-    ) as typeof import('../services/vocabulary');
-    return {
-      ...actual,
-      listVocabulary: jest.fn().mockResolvedValue([
-        {
-          id: '770e8400-e29b-41d4-a716-446655440000',
-          profileId: 'a0000000-0000-4000-a000-000000000001',
-          subjectId: '550e8400-e29b-41d4-a716-446655440000',
-          term: 'hola',
-          termNormalized: 'hola',
-          translation: 'hello',
-          type: 'word',
-          cefrLevel: 'A1',
-          milestoneId: null,
-          mastered: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ]),
-      createVocabulary: jest.fn().mockResolvedValue({
+jest.mock('../services/vocabulary', () => {
+  const actual = jest.requireActual(
+    '../services/vocabulary',
+  ) as typeof import('../services/vocabulary');
+  return {
+    ...actual,
+    listVocabulary: jest.fn().mockResolvedValue([
+      {
         id: '770e8400-e29b-41d4-a716-446655440000',
         profileId: 'a0000000-0000-4000-a000-000000000001',
         subjectId: '550e8400-e29b-41d4-a716-446655440000',
-        term: 'buenos dias',
-        termNormalized: 'buenos dias',
-        translation: 'good morning',
-        type: 'chunk',
+        term: 'hola',
+        termNormalized: 'hola',
+        translation: 'hello',
+        type: 'word',
         cefrLevel: 'A1',
         milestoneId: null,
         mastered: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      }),
-      reviewVocabulary: jest.fn().mockResolvedValue({
-        vocabulary: {
-          id: '770e8400-e29b-41d4-a716-446655440000',
-          profileId: 'a0000000-0000-4000-a000-000000000001',
-          subjectId: '550e8400-e29b-41d4-a716-446655440000',
-          term: 'hola',
-          termNormalized: 'hola',
-          translation: 'hello',
-          type: 'word',
-          cefrLevel: 'A1',
-          milestoneId: null,
-          mastered: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        retention: {
-          vocabularyId: '770e8400-e29b-41d4-a716-446655440000',
-          easeFactor: 2.5,
-          intervalDays: 1,
-          repetitions: 1,
-          lastReviewedAt: new Date().toISOString(),
-          nextReviewAt: new Date().toISOString(),
-          failureCount: 0,
-          consecutiveSuccesses: 1,
-        },
-      }),
-      deleteVocabulary: jest.fn().mockResolvedValue(true),
-    };
-  },
-);
+      },
+    ]),
+    createVocabulary: jest.fn().mockResolvedValue({
+      id: '770e8400-e29b-41d4-a716-446655440000',
+      profileId: 'a0000000-0000-4000-a000-000000000001',
+      subjectId: '550e8400-e29b-41d4-a716-446655440000',
+      term: 'buenos dias',
+      termNormalized: 'buenos dias',
+      translation: 'good morning',
+      type: 'chunk',
+      cefrLevel: 'A1',
+      milestoneId: null,
+      mastered: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    reviewVocabulary: jest.fn().mockResolvedValue({
+      vocabulary: {
+        id: '770e8400-e29b-41d4-a716-446655440000',
+        profileId: 'a0000000-0000-4000-a000-000000000001',
+        subjectId: '550e8400-e29b-41d4-a716-446655440000',
+        term: 'hola',
+        termNormalized: 'hola',
+        translation: 'hello',
+        type: 'word',
+        cefrLevel: 'A1',
+        milestoneId: null,
+        mastered: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      retention: {
+        vocabularyId: '770e8400-e29b-41d4-a716-446655440000',
+        easeFactor: 2.5,
+        intervalDays: 1,
+        repetitions: 1,
+        lastReviewedAt: new Date().toISOString(),
+        nextReviewAt: new Date().toISOString(),
+        failureCount: 0,
+        consecutiveSuccesses: 1,
+      },
+    }),
+    deleteVocabulary: jest.fn().mockResolvedValue(true),
+  };
+});
 
 import { Hono } from 'hono';
 import { app } from '../index';

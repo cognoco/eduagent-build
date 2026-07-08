@@ -6,8 +6,7 @@ import { useApiQuery } from './use-api-query';
 // Mutable so individual tests can simulate "no active profile".
 let mockActiveProfile: { id: string } | null = { id: 'test-profile-id' };
 
-// prettier-ignore
-jest.mock('../lib/profile', () => ({ // gc1-allow: hook test needs a controllable active profile without provider setup
+jest.mock('../lib/profile', () => ({
   ...jest.requireActual('../lib/profile'),
   useProfile: () => ({ activeProfile: mockActiveProfile }),
 }));

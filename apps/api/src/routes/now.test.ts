@@ -5,13 +5,11 @@ import { nowRoutes } from './now';
 import { buildNowFeed, buildNowOverflow } from '../services/now-feed';
 import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
-jest.mock(
-  '../services/now-feed' /* gc1-allow: route unit test - service has direct unit coverage */,
-  () => ({
-    buildNowFeed: jest.fn(),
-    buildNowOverflow: jest.fn(),
-  }),
-);
+jest.mock('../services/now-feed', () => ({
+  ...jest.requireActual('../services/now-feed'),
+  buildNowFeed: jest.fn(),
+  buildNowOverflow: jest.fn(),
+}));
 
 const PROFILE_ID = TEST_PROFILE_ID;
 const CHILD_ID = '00000000-0000-4000-8000-000000000101';

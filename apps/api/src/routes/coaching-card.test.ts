@@ -45,7 +45,7 @@ jest.mock(
   }),
 );
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
