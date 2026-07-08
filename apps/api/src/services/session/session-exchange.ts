@@ -578,6 +578,8 @@ function evaluationKey(item: ChallengeRoundEvaluationItem): string {
   return `${item.answerEventId ?? ''}:${item.concept}:${item.result}`;
 }
 
+const CHALLENGE_ROUND_EVALUATION_LIMIT = 10;
+
 function mergeChallengeRoundTransition(
   persisted: ChallengeRoundSessionState,
   candidate: ChallengeRoundSessionState,
@@ -591,7 +593,7 @@ function mergeChallengeRoundTransition(
     evaluations.push(item);
   }
 
-  return {
+  const next = {
     ...persisted,
     ...candidate,
     questionIndex: Math.max(
@@ -602,8 +604,11 @@ function mergeChallengeRoundTransition(
       persisted.questionsAsked ?? 0,
       candidate.questionsAsked ?? 0,
     ),
-    evaluations,
+    evaluations: evaluations.slice(0, CHALLENGE_ROUND_EVALUATION_LIMIT),
   };
+  const parsed = challengeRoundSessionStateSchema.safeParse(next);
+  if (!parsed.success) throw parsed.error;
+  return parsed.data;
 }
 
 export async function persistActiveChallengeRoundTransition(
@@ -635,7 +640,19 @@ export async function persistActiveChallengeRoundTransition(
     const parsed = challengeRoundSessionStateSchema.safeParse(
       metadata['challengeRound'],
     );
-    if (!parsed.success) return null;
+    if (!parsed.success) {
+      captureException(
+        new Error('challengeRoundSessionStateSchema parse failed'),
+        {
+          extra: {
+            surface: 'challenge-round.persist-transition.parse-failed',
+            profileId,
+            sessionId,
+          },
+        },
+      );
+      return null;
+    }
     if (parsed.data.state !== 'active') return parsed.data;
 
     const next = mergeChallengeRoundTransition(parsed.data, candidate);

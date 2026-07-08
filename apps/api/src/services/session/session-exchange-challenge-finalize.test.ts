@@ -130,6 +130,7 @@ const TOPIC_ID = TEST_TOPIC_ID;
 const SESSION_ID = TEST_SESSION_ID;
 const PROFILE_ID = TEST_PROFILE_ID;
 const ANSWER_EVENT_ID = '00000000-0000-4000-8000-000000000005';
+const CHALLENGE_ROUND_EVALUATION_LIMIT = 10;
 
 function makeSession(metadata: Record<string, unknown>): LearningSession {
   return {
@@ -377,6 +378,10 @@ function activeState(questionsAsked: number): ChallengeRoundSessionState {
 // ---------------------------------------------------------------------------
 
 describe('claimChallengeRoundQuestionAsked — serializes stale concurrent question counters', () => {
+  beforeEach(() => {
+    mockCaptureException.mockClear();
+  });
+
   it('advances two stale-snapshot exchanges by 2 and caps at MAX_CHALLENGE_QUESTIONS', async () => {
     const challengeRound = activeState(MAX_CHALLENGE_QUESTIONS - 2);
     const state: FakeDbState = {
@@ -458,6 +463,99 @@ describe('claimChallengeRoundQuestionAsked — serializes stale concurrent quest
     expect(persisted?.questionIndex).toBe(2);
     expect(persisted?.evaluations).toEqual([secondEvaluation, firstEvaluation]);
     expect(persistedChallengeState(state)?.questionsAsked).toBe(2);
+  });
+
+  it('caps merged evaluations before persisting the transition', async () => {
+    const evaluations = Array.from(
+      { length: CHALLENGE_ROUND_EVALUATION_LIMIT + 1 },
+      (_, index): ChallengeRoundEvaluationItem => ({
+        concept: `concept ${index + 1}`,
+        result: 'solid',
+        evidence: `evidence ${index + 1}`,
+        answerEventId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+        learnerQuote: `answer ${index + 1}`,
+      }),
+    );
+    const state: FakeDbState = {
+      sessionMetadata: {
+        challengeRound: {
+          ...activeState(MAX_CHALLENGE_QUESTIONS - 1),
+          evaluations: evaluations.slice(
+            0,
+            CHALLENGE_ROUND_EVALUATION_LIMIT - 1,
+          ),
+        },
+      },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+
+    const persisted = await persistActiveChallengeRoundTransition(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      {
+        ...activeState(MAX_CHALLENGE_QUESTIONS),
+        evaluations: evaluations.slice(CHALLENGE_ROUND_EVALUATION_LIMIT - 1),
+      },
+    );
+
+    expect(persisted?.evaluations).toHaveLength(
+      CHALLENGE_ROUND_EVALUATION_LIMIT,
+    );
+    expect(persistedChallengeState(state)?.evaluations).toHaveLength(
+      CHALLENGE_ROUND_EVALUATION_LIMIT,
+    );
+    expect(persisted?.evaluations.at(-1)?.concept).toBe(
+      `concept ${CHALLENGE_ROUND_EVALUATION_LIMIT}`,
+    );
+  });
+
+  it('escalates malformed persisted challenge round metadata before returning null', async () => {
+    const state: FakeDbState = {
+      sessionMetadata: {
+        challengeRound: {
+          ...activeState(MAX_CHALLENGE_QUESTIONS),
+          evaluations: Array.from(
+            { length: CHALLENGE_ROUND_EVALUATION_LIMIT + 1 },
+            (_, index): ChallengeRoundEvaluationItem => ({
+              concept: `concept ${index + 1}`,
+              result: 'solid',
+              evidence: `evidence ${index + 1}`,
+              answerEventId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+              learnerQuote: `answer ${index + 1}`,
+            }),
+          ),
+        },
+      },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+
+    const persisted = await persistActiveChallengeRoundTransition(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      activeState(MAX_CHALLENGE_QUESTIONS),
+    );
+
+    expect(persisted).toBeNull();
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'challengeRoundSessionStateSchema parse failed',
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'challenge-round.persist-transition.parse-failed',
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+        }),
+      }),
+    );
   });
 
   it('does not let a stale active turn overwrite a terminal persisted state', async () => {
