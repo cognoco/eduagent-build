@@ -295,6 +295,49 @@ describe('insertSessionXpEntry', () => {
     );
   });
 
+  it('uses the latest passed assessment when multiple passed rows exist', async () => {
+    const { db, insertValues, queryAssessmentsFindFirst } = createMockXpDb();
+
+    queryAssessmentsFindFirst.mockImplementation((query) => {
+      if (!query.orderBy) {
+        return Promise.resolve({
+          id: 'assessment-older',
+          profileId: 'profile-001',
+          topicId: 'topic-001',
+          status: 'passed',
+          masteryScore: 0.2,
+          verificationDepth: 'recall',
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        });
+      }
+
+      return Promise.resolve({
+        id: 'assessment-latest',
+        profileId: 'profile-001',
+        topicId: 'topic-001',
+        status: 'passed',
+        masteryScore: 0.9,
+        verificationDepth: 'transfer',
+        createdAt: new Date('2026-01-02T00:00:00.000Z'),
+      });
+    });
+
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      xpLedger: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+
+    await insertSessionXpEntry(db, 'profile-001', 'topic-001', 'subject-001');
+
+    expect(queryAssessmentsFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: expect.anything() }),
+    );
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 180,
+      }),
+    );
+  });
+
   it('inserts XP as verified immediately (single-path post-sunset)', async () => {
     const { db, insertValues, queryAssessmentsFindFirst } = createMockXpDb();
 

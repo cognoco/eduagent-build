@@ -3,7 +3,7 @@
 // Business logic + DB-aware helpers, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import {
   assessments,
   learningSessions,
@@ -99,6 +99,7 @@ export async function insertSessionXpEntry(
       eq(assessments.topicId, topicId),
       eq(assessments.status, 'passed'),
     ),
+    orderBy: [desc(assessments.createdAt)],
   });
   if (!assessment || assessment.masteryScore == null) return;
 
