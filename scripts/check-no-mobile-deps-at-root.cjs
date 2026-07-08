@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Forbid mobile-only runtime dependencies in the workspace root package.json.
+// Forbid mobile-only runtime/toolchain dependencies in the workspace root package.json.
 //
 // Background: pnpm materializes a separate physical copy of a package per
 // peer-dep context. When the root and apps/mobile both declare the same
@@ -45,6 +45,7 @@ const FORBIDDEN = [
   'react-native-svg',
   'react-native-svg-transformer',
   'react-native-web',
+  'tailwindcss',
 ];
 
 const rootPkgPath = path.resolve(__dirname, '..', 'package.json');
