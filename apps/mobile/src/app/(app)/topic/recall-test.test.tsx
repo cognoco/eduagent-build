@@ -5,6 +5,8 @@ import {
   fireEvent,
   waitFor,
 } from '@testing-library/react-native';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import React from 'react';
 import { Alert } from 'react-native';
 
@@ -178,6 +180,15 @@ describe('RecallTestScreen', () => {
         }
       },
     );
+  });
+
+  it('[WI-1419] keeps recall feedback animateResponse copy behind translation keys', () => {
+    const source = readFileSync(join(__dirname, 'recall-test.tsx'), 'utf8');
+
+    expect(source).toContain("t('topic.recallTest.successMessage')");
+    expect(source).toContain("t('topic.recallTest.partialResult')");
+    expect(source).toContain("t('topic.recallTest.needsReview')");
+    expect(source).not.toMatch(/animateResponse\(\s*['"`]/);
   });
 
   it('shows a hint first, then remediation when the learner is still stuck', async () => {
