@@ -1,5 +1,7 @@
 // [WI-959] Red-green guard: person.findFirst must be called once (inArray), not N times (serial loop).
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Database } from '@eduagent/database';
 import {
   getChildGdprConsentStatusV2,
@@ -155,6 +157,17 @@ describe('[WI-959] getFirstActiveChildNameV2 — single bounded person query', (
 });
 
 describe('[WI-1433] family-v2 child consent reads require pre-verified child scope', () => {
+  it('marks all internal child-enumeration seams as internal-only', () => {
+    const source = readFileSync(join(__dirname, 'family-v2.ts'), 'utf8');
+
+    expect(source).toMatch(
+      /@internal[\s\S]*export async function getChildPersonIdsForParentV2/,
+    );
+    expect(source).toMatch(
+      /@internal[\s\S]*export async function getFirstActiveChildNameV2/,
+    );
+  });
+
   it('locks the child GDPR consent seams behind a branded proof argument', () => {
     typeOnly(() => {
       const db = {} as Database;
