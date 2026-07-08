@@ -8,7 +8,9 @@ import {
   mergeTranslatedIntoPrevious,
   commitPrunedLocaleAndBaseline,
   commitTranslatedLocaleAndBaseline,
+  chunkSourceForTranslation,
   expandSourceBaselineFile,
+  filterTranslatedFlatToSourceKeys,
   hashSourceString,
   selectGeminiDiffKeys,
   validatePruneOnlyLocale,
@@ -176,6 +178,58 @@ describe('selectGeminiDiffKeys', () => {
     ).toEqual({
       translateKeys: ['common.cancel'],
       removedKeys: [],
+    });
+  });
+});
+
+describe('chunkSourceForTranslation', () => {
+  it('splits a nested source object into key-count bounded chunks', () => {
+    const source = {
+      common: {
+        save: 'Save',
+        cancel: 'Cancel',
+      },
+      home: {
+        title: 'Home',
+      },
+    };
+
+    expect(chunkSourceForTranslation(source, 2)).toEqual([
+      {
+        common: {
+          save: 'Save',
+          cancel: 'Cancel',
+        },
+      },
+      {
+        home: {
+          title: 'Home',
+        },
+      },
+    ]);
+  });
+
+  it('rejects non-positive chunk sizes', () => {
+    expect(() =>
+      chunkSourceForTranslation({ common: { save: 'Save' } }, 0),
+    ).toThrow('maxKeysPerChunk must be positive');
+  });
+});
+
+describe('filterTranslatedFlatToSourceKeys', () => {
+  it('drops model-hallucinated keys that were not in the requested source chunk', () => {
+    expect(
+      filterTranslatedFlatToSourceKeys(
+        {
+          'common.save': 'Guardar',
+          'mentorHome.rewards.xp': 'XP',
+        },
+        {
+          'common.save': 'Save',
+        },
+      ),
+    ).toEqual({
+      'common.save': 'Guardar',
     });
   });
 });

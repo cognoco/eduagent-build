@@ -52,7 +52,12 @@ const PLURAL_SUFFIXES = ['zero', 'one', 'two', 'few', 'many', 'other'] as const;
 
 interface StalenessError {
   lang: string;
-  type: 'missing_key' | 'orphaned_key' | 'missing_variable' | 'extra_variable';
+  type:
+    | 'missing_key'
+    | 'orphaned_key'
+    | 'missing_variable'
+    | 'extra_variable'
+    | 'echoed_value';
   key: string;
   variable?: string;
 }
@@ -79,6 +84,31 @@ function extractVariables(str: string): string[] {
   return str.match(/\{\{[^}]+\}\}/g) ?? [];
 }
 
+function isPluralFamilyKey(
+  key: string,
+  sourceFlat: Record<string, string>,
+): boolean {
+  const pluralMatch = /^(.*)_(zero|one|two|few|many|other)$/.exec(key);
+  return Boolean(
+    pluralMatch &&
+    PLURAL_SUFFIXES.some((s) => `${pluralMatch[1]}_${s}` in sourceFlat),
+  );
+}
+
+function isEchoedSourceValue(
+  key: string,
+  sourceValue: string,
+  targetValue: string,
+  sourceFlat: Record<string, string>,
+): boolean {
+  return (
+    targetValue === sourceValue &&
+    sourceValue.length > 5 &&
+    !sourceValue.includes('{{') &&
+    !isPluralFamilyKey(key, sourceFlat)
+  );
+}
+
 export function checkStaleness(
   source: NestedStrings,
   targets: Record<string, NestedStrings>,
@@ -93,6 +123,12 @@ export function checkStaleness(
       if (!(key in targetFlat)) {
         errors.push({ lang, type: 'missing_key', key });
         continue;
+      }
+
+      if (
+        isEchoedSourceValue(key, sourceFlat[key], targetFlat[key], sourceFlat)
+      ) {
+        errors.push({ lang, type: 'echoed_value', key });
       }
 
       const sourceVars = extractVariables(sourceFlat[key]);
@@ -124,13 +160,7 @@ export function checkStaleness(
         // off the same plural family. A target key with a plural-category
         // suffix is legitimate when the English source carries the same
         // base key with any plural suffix.
-        const pluralMatch = /^(.*)_(zero|one|two|few|many|other)$/.exec(key);
-        if (
-          pluralMatch &&
-          PLURAL_SUFFIXES.some((s) => `${pluralMatch[1]}_${s}` in sourceFlat)
-        ) {
-          continue;
-        }
+        if (isPluralFamilyKey(key, sourceFlat)) continue;
         errors.push({ lang, type: 'orphaned_key', key });
       }
     }
@@ -204,6 +234,9 @@ function main(): void {
         console.error(
           `  [${err.lang}] Extra variable ${err.variable} not in source: ${err.key}`,
         );
+        break;
+      case 'echoed_value':
+        console.error(`  [${err.lang}] Echoed English value: ${err.key}`);
         break;
     }
   }
