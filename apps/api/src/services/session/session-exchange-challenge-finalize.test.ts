@@ -56,7 +56,11 @@ import type {
   LearningSession,
 } from '@eduagent/schemas';
 
-import { finalizeChallengeRoundIfReady } from './session-exchange';
+import {
+  claimChallengeRoundQuestionAsked,
+  finalizeChallengeRoundIfReady,
+} from './session-exchange';
+import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import { captureException } from '../sentry';
 import { inngest } from '../../inngest/client';
 import {
@@ -354,9 +358,58 @@ function draftingState(
   } as ChallengeRoundSessionState;
 }
 
+function activeState(questionsAsked: number): ChallengeRoundSessionState {
+  return {
+    state: 'active',
+    topicId: TOPIC_ID,
+    offerCount: 1,
+    declinedDontAskAgain: false,
+    questionIndex: questionsAsked,
+    totalQuestions: MAX_CHALLENGE_QUESTIONS,
+    questionsAsked,
+    evaluations: [],
+  } as ChallengeRoundSessionState;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe('claimChallengeRoundQuestionAsked — serializes stale concurrent question counters', () => {
+  it('advances two stale-snapshot exchanges by 2 and caps at MAX_CHALLENGE_QUESTIONS', async () => {
+    const challengeRound = activeState(MAX_CHALLENGE_QUESTIONS - 2);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+
+    const first = await claimChallengeRoundQuestionAsked(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+    );
+    const second = await claimChallengeRoundQuestionAsked(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+    );
+    const third = await claimChallengeRoundQuestionAsked(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+    );
+
+    expect(first?.questionsAsked).toBe(MAX_CHALLENGE_QUESTIONS - 1);
+    expect(second?.questionsAsked).toBe(MAX_CHALLENGE_QUESTIONS);
+    expect(third?.questionsAsked).toBe(MAX_CHALLENGE_QUESTIONS);
+    expect(persistedChallengeState(state)?.questionsAsked).toBe(
+      MAX_CHALLENGE_QUESTIONS,
+    );
+  });
+});
 
 describe('finalizeChallengeRoundIfReady — idempotent under concurrent/retry finalize', () => {
   it('writes mastery exactly once when finalize runs twice on the same ready round', async () => {
