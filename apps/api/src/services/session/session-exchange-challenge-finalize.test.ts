@@ -110,10 +110,10 @@ interface FakeDbState {
   masteryInserts: Array<Record<string, unknown>>;
   deepeningRows: DeepeningRow[];
   deepeningInsertCount: number;
-  // [BUG-483] session_events rows readable by validateEvaluationEventIds when
-  // finalize re-fetches DB-verified answer content for the note-draft guard.
-  // Omitted → no rows (models the same-turn case where the current-turn answer
-  // is not yet persisted).
+  // session_events rows readable by validateEvaluationEventIds when finalize
+  // re-fetches DB-verified answer content before terminal writes. Omitted uses
+  // the default durable ANSWER_EVENT_ID row; explicit [] models the same-turn /
+  // conflicted case where the current-turn answer is not yet persisted.
   sessionEventRows?: SessionEventRow[];
   // When set, the NEXT matching terminal insert throws — models a transient DB
   // error / constraint violation on the post-claim mastery or deepening write.
@@ -131,6 +131,18 @@ const SESSION_ID = TEST_SESSION_ID;
 const PROFILE_ID = TEST_PROFILE_ID;
 const ANSWER_EVENT_ID = '00000000-0000-4000-8000-000000000005';
 const CHALLENGE_ROUND_EVALUATION_LIMIT = 10;
+
+function defaultSessionEventRows(): SessionEventRow[] {
+  return [
+    {
+      id: ANSWER_EVENT_ID,
+      profileId: PROFILE_ID,
+      sessionId: SESSION_ID,
+      eventType: 'user_message',
+      content: 'Plants convert light into chemical energy.',
+    },
+  ];
+}
 
 function makeSession(metadata: Record<string, unknown>): LearningSession {
   return {
@@ -275,7 +287,7 @@ function makeFakeDb(state: FakeDbState): Database {
     // rows and let the REAL validateEvaluationEventIds do its id→content
     // mapping + strict-missing rejection in JS.
     sessionEvents: {
-      findMany: async () => state.sessionEventRows ?? [],
+      findMany: async () => state.sessionEventRows ?? defaultSessionEventRows(),
     },
   };
 
@@ -585,6 +597,31 @@ describe('claimChallengeRoundQuestionAsked — serializes stale concurrent quest
 });
 
 describe('finalizeChallengeRoundIfReady — idempotent under concurrent/retry finalize', () => {
+  it('[WI-1427] refuses terminal writes when an evaluation answerEventId is not durable', async () => {
+    const challengeRound = draftingState(SOLID_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      sessionEventRows: [],
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    const result = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      null,
+    );
+
+    expect(result).toBeNull();
+    expect(state.masteryInserts).toHaveLength(0);
+    expect(persistedChallengeState(state)?.state).toBe('drafting');
+  });
+
   it('writes mastery exactly once when finalize runs twice on the same ready round', async () => {
     const challengeRound = draftingState(SOLID_EVALS);
     const state: FakeDbState = {
@@ -978,7 +1015,7 @@ describe('finalizeChallengeRoundIfReady — note-draft guard uses DB-verified co
     expect(outcome?.draftedNote?.body).toBe(FABRICATED_DRAFT);
   });
 
-  it('fails closed to the fallback when the answer event is not yet readable from the DB (same-turn finalize)', async () => {
+  it('skips finalization when the answer event is not yet readable from the DB (same-turn finalize)', async () => {
     const challengeRound = draftingState(evalsWithRouteQuote);
     const state: FakeDbState = {
       sessionMetadata: { challengeRound },
@@ -1000,8 +1037,9 @@ describe('finalizeChallengeRoundIfReady — note-draft guard uses DB-verified co
       noteDraft,
     );
 
-    expect(outcome?.draftedNote?.body).toBeNull();
-    expect(outcome?.draftedNote?.fallbackPrompt).toBeTruthy();
+    expect(outcome).toBeNull();
+    expect(state.masteryInserts).toHaveLength(0);
+    expect(persistedChallengeState(state)?.state).toBe('drafting');
   });
 });
 
@@ -1129,7 +1167,7 @@ function makeRollbackAwareFakeDb(
         ),
     },
     sessionEvents: {
-      findMany: async () => state.sessionEventRows ?? [],
+      findMany: async () => state.sessionEventRows ?? defaultSessionEventRows(),
     },
   });
 

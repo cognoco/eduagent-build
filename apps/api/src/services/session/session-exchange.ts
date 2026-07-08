@@ -718,12 +718,10 @@ function buildFallbackDraft(
  *
  * `validateEvaluationEventIds` re-reads each `answerEventId` from
  * `session_events` (scoped to `profileId`) and replaces `learnerQuote` with the
- * real `content`. It throws if ANY id is unresolved — which is exactly the
- * same-turn case where the current-turn answer has not been persisted yet
- * (`persistExchangeResult` runs AFTER `applyChallengeRoundRuntimeSignals`). In
- * that case we return `null` so the caller fails closed to the learner-writes
- * fallback draft, rather than accepting an LLM draft validated against
- * route-trusted text.
+ * real `content`. It throws if ANY id is unresolved. The finalization claim now
+ * performs the same durable-row validation before terminal writes, so `null`
+ * here should only happen if an answer row becomes unreadable between that
+ * claim and the note-draft guard.
  */
 async function fetchVerifiedSolidContents(
   db: Database,
@@ -987,8 +985,26 @@ async function claimChallengeRoundFinalization(
     }
 
     const persisted = parsed.data;
+    let validatedEvaluations: ChallengeRoundEvaluationItem[];
+    try {
+      validatedEvaluations = await validateEvaluationEventIds(
+        tx as unknown as Database,
+        profileId,
+        sessionId,
+        persisted.evaluations,
+      );
+    } catch {
+      // Same-turn or conflicted retries can carry an evaluation for a learner
+      // event that has not actually landed in session_events. Do not claim
+      // terminal state until every answerEventId is durable and scoped.
+      return null;
+    }
+    const validatedPersisted = {
+      ...persisted,
+      evaluations: validatedEvaluations,
+    };
     const complete = transitionChallengeState(
-      transitionChallengeState(persisted, { type: 'draft_ready' }),
+      transitionChallengeState(validatedPersisted, { type: 'draft_ready' }),
       { type: 'complete' },
     );
     metadata['challengeRound'] = complete;
@@ -1007,7 +1023,7 @@ async function claimChallengeRoundFinalization(
     // Lost a race that deleted the session between SELECT and UPDATE.
     if (!row) return null;
 
-    return persisted;
+    return validatedPersisted;
   });
 }
 
@@ -1156,11 +1172,10 @@ export async function finalizeChallengeRoundIfReady(
   }
 
   // [BUG-483] Source the note-draft hallucination guard from DB-verified event
-  // text for every solid concept — including the current-turn answer — so the
-  // guard never compares the draft against text the request supplied for
-  // itself. `null` means a solid answer's event is not readable from the DB
-  // yet (same-turn finalize); buildValidatedDraft then fails closed to the
-  // learner-writes fallback rather than trusting route-supplied quotes.
+  // text for every solid concept so the guard never compares the draft against
+  // text the request supplied for itself. `null` means a solid answer's event
+  // became unreadable after the finalization claim validated it; fail closed to
+  // the learner-writes fallback rather than trusting route-supplied quotes.
   const verifiedSolidContents = await fetchVerifiedSolidContents(
     db,
     profileId,
@@ -1185,6 +1200,30 @@ export async function finalizeChallengeRoundIfReady(
     challengeRoundVerdict: verdictFromEvaluations(evaluations),
     ...(draftedNote ? { draftedNote } : {}),
   };
+}
+
+async function finalizeChallengeRoundAfterDurableUserMessage(
+  db: Database,
+  profileId: string,
+  session: LearningSession,
+  challengeRoundRuntime: ChallengeRoundRuntimeOutcome,
+  noteDraft: ChallengeRoundNoteDraftHint | null | undefined,
+): Promise<ChallengeRoundRuntimeOutcome> {
+  if (challengeRoundRuntime.challengeRound?.state !== 'drafting') {
+    return challengeRoundRuntime;
+  }
+
+  const finalized = await finalizeChallengeRoundIfReady(
+    db,
+    profileId,
+    session,
+    challengeRoundRuntime.challengeRound,
+    noteDraft,
+  );
+
+  return finalized
+    ? { ...challengeRoundRuntime, ...finalized }
+    : challengeRoundRuntime;
 }
 
 async function validateChallengeRoundEvaluationItems(
@@ -3573,7 +3612,7 @@ export async function processMessage(
     return projectAiResponseContent(lastAssistant.content, { silent: true });
   })();
 
-  const challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
+  let challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
     db,
     profileId,
     session,
@@ -3678,6 +3717,16 @@ export async function processMessage(
     options?.clientId,
     currentUserMessageEventId,
   );
+
+  if (persisted.persistedUserMessage) {
+    challengeRoundRuntime = await finalizeChallengeRoundAfterDurableUserMessage(
+      db,
+      profileId,
+      session,
+      challengeRoundRuntime,
+      result.noteDraft,
+    );
+  }
 
   if (persisted.persistedUserMessage) {
     await maybeDispatchTopicProbeExtraction(
@@ -4096,7 +4145,7 @@ export async function streamMessage(
         });
       })();
 
-      const challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
+      let challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
         db,
         profileId,
         session,
@@ -4158,6 +4207,15 @@ export async function streamMessage(
         currentUserMessageEventId,
       );
       if (persisted.persistedUserMessage) {
+        challengeRoundRuntime =
+          await finalizeChallengeRoundAfterDurableUserMessage(
+            db,
+            profileId,
+            session,
+            challengeRoundRuntime,
+            parsed.noteDraft,
+          );
+
         await maybeDispatchTopicProbeExtraction(
           db,
           profileId,
