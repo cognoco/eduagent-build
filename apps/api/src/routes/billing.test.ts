@@ -249,6 +249,7 @@ jest.mock('../services/kv', () => {
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
+const mockInngestSend = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
@@ -257,6 +258,19 @@ jest.mock('../services/sentry', () => {
   return {
     ...actual,
     captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
+
+jest.mock('../inngest/client', () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
+    inngest: {
+      ...actual.inngest,
+      send: (...args: unknown[]) => mockInngestSend(...args),
+    },
   };
 });
 
@@ -407,6 +421,7 @@ beforeEach(() => {
   mockGetOrCreateStripeCustomer.mockResolvedValue('cus_new');
   mockReadSubscriptionStatus.mockResolvedValue(null);
   mockCaptureException.mockReset();
+  mockInngestSend.mockResolvedValue(undefined);
   mockListFamilyMembers.mockResolvedValue([]);
   mockAddProfileToSubscription.mockResolvedValue(null);
   mockRemoveProfileFromSubscription.mockResolvedValue(null);
@@ -844,6 +859,33 @@ describe('billing routes', () => {
       expect(
         new Date(body.currentPeriodEnd).getFullYear(),
       ).toBeGreaterThanOrEqual(2024);
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      const [capturedErr, capturedCtx] = mockCaptureException.mock.calls[0];
+      expect(capturedErr).toEqual(
+        expect.objectContaining({
+          message: 'Stripe cancel response returned no current_period_end',
+        }),
+      );
+      expect(capturedCtx).toEqual(
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            context: 'billing.subscriptionCancel.missingCurrentPeriodEnd',
+            accountId: 'test-account-id',
+            subscriptionId: 'sub-1',
+            stripeSubscriptionId: 'sub_test123',
+          }),
+        }),
+      );
+      expect(mockInngestSend).toHaveBeenCalledWith({
+        name: 'app/billing.missing_current_period_end',
+        data: expect.objectContaining({
+          accountId: 'test-account-id',
+          subscriptionId: 'sub-1',
+          stripeSubscriptionId: 'sub_test123',
+          timestamp: expect.any(String),
+        }),
+      });
     });
   });
 
