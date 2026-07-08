@@ -205,7 +205,7 @@ let mockActiveProfile = {
   displayName: 'Owner',
 };
 let mockLinkedChildren: Array<{ id: string; displayName: string }> = [];
-let mockOwnInventory = EMPTY_INVENTORY;
+let mockOwnInventory: unknown = EMPTY_INVENTORY;
 let mockChildInventory: unknown = undefined;
 const mockUseChildInventory = jest.fn();
 const mockUseProfileSessions = jest.fn();
