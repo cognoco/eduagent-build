@@ -41,7 +41,7 @@ describe('streamSSEUtf8', () => {
   it('calls captureException when cb throws and no onError is provided', async () => {
     const captureExceptionSpy = jest
       .spyOn(sentryModule, 'captureException')
-      .mockImplementation(() => {});
+      .mockImplementation(() => undefined);
     const thrown = new Error('provider socket closed');
     const app = new Hono();
     app.get('/stream', (c) =>
@@ -66,7 +66,7 @@ describe('streamSSEUtf8', () => {
       });
     const consoleErrorSpy = jest
       .spyOn(console, 'error')
-      .mockImplementation(() => {});
+      .mockImplementation(() => undefined);
     const app = new Hono();
     app.get('/stream', (c) =>
       streamSSEUtf8(c, async () => {
