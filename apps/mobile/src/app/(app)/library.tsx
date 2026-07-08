@@ -689,6 +689,7 @@ function LibraryScreenContent({
             onPress: () => goBackOrReplace(router, '/(app)/home'),
             testID: 'library-load-timeout-home',
           }}
+          testID="library-load-timeout"
           fallbackTestID="library-load-timeout"
           loadingFallback={renderShimmerSkeleton()}
         />
