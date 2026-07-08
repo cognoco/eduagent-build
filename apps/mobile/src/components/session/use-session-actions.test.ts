@@ -3,6 +3,18 @@ import { useSessionActions } from './use-session-actions';
 import * as PlatformAlertModule from '../../lib/platform-alert';
 import * as SessionRecoveryModule from '../../lib/session-recovery';
 
+const mockCaptureException = jest.fn();
+
+jest.mock(
+  /* gc1-allow: Sentry SDK loads native module config in Jest */
+  '../../lib/sentry',
+  () => ({
+    Sentry: {
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    },
+  }),
+);
+
 // Use real platform-alert (wraps RN Alert, which is a no-op in Jest).
 // Spy so tests can introspect the calls.
 const platformAlert = jest
@@ -81,6 +93,7 @@ async function confirmEndSession() {
 describe('useSessionActions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCaptureException.mockClear();
   });
 
   it('navigates to summary for freeform sessions after close without filing prompt', async () => {
@@ -280,6 +293,36 @@ describe('useSessionActions', () => {
     });
 
     expect(opts.router.replace).toHaveBeenCalledTimes(2);
+  });
+
+  it('captures homework metadata sync failure to Sentry while moving to the next problem', async () => {
+    const err = new Error('metadata write failed');
+    const opts = createMockOpts({
+      effectiveMode: 'homework',
+      activeSessionId: 'session-1',
+      homeworkProblemsState: [
+        { id: 'p1', text: 'first' },
+        { id: 'p2', text: 'second' },
+      ],
+      currentProblemIndex: 0,
+      activeHomeworkProblem: { id: 'p1', text: 'first' },
+      syncHomeworkMetadata: jest.fn().mockRejectedValue(err),
+    });
+    const { result } = renderHook(() => useSessionActions(opts as any));
+
+    await act(async () => {
+      await result.current.handleNextProblem();
+    });
+
+    expect(opts.setCurrentProblemIndex).toHaveBeenCalledWith(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(err, {
+      tags: {
+        surface: 'session',
+        feature: 'homework_metadata_sync',
+        sync_scope: 'next_problem',
+        sessionId: 'session-1',
+      },
+    });
   });
 
   // -------------------------------------------------------------------------

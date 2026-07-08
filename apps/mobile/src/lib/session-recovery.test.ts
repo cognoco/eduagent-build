@@ -5,12 +5,24 @@ import {
   writeSessionRecoveryMarker,
 } from './session-recovery';
 
+const mockCaptureException = jest.fn();
+
 jest.mock('./secure-storage' /* gc1-allow: unit test boundary */, () => ({
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
   deleteItemAsync: jest.fn(),
   sanitizeSecureStoreKey: (raw: string) => raw.replace(/[^a-zA-Z0-9._-]/g, '_'),
 }));
+
+jest.mock(
+  /* gc1-allow: Sentry SDK loads native module config in Jest */
+  './sentry',
+  () => ({
+    Sentry: {
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    },
+  }),
+);
 
 const mockGet = jest.mocked(SecureStore.getItemAsync);
 const mockSet = jest.mocked(SecureStore.setItemAsync);
@@ -22,6 +34,7 @@ describe('session-recovery', () => {
     mockGet.mockResolvedValue(null);
     mockSet.mockResolvedValue();
     mockDelete.mockResolvedValue();
+    mockCaptureException.mockClear();
   });
 
   it('writes recovery markers under the profile-scoped key', async () => {
@@ -78,6 +91,21 @@ describe('session-recovery', () => {
     await expect(readSessionRecoveryMarker('profile-2')).resolves.toBeNull();
     expect(mockSet).not.toHaveBeenCalled();
     expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it('captures corrupt marker parse failures to Sentry before dropping the marker', async () => {
+    mockGet.mockResolvedValueOnce('{not-json');
+
+    await expect(readSessionRecoveryMarker('profile-1')).resolves.toBeNull();
+
+    expect(mockCaptureException).toHaveBeenCalledWith(expect.any(SyntaxError), {
+      tags: {
+        surface: 'session-recovery',
+        feature: 'session_recovery',
+        recovery_scope: 'read_parse',
+        profileId: 'profile-1',
+      },
+    });
   });
 
   it('classifies markers inside the 30-minute recovery window as fresh', () => {

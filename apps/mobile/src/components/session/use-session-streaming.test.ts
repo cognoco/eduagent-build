@@ -342,6 +342,41 @@ describe('useSessionStreaming', () => {
         expect.objectContaining({ sessionType: 'homework' }),
       );
     });
+
+    it('captures homework metadata sync failure to Sentry while preserving the new session', async () => {
+      const err = new Error('homework metadata down');
+      const opts = makeOpts({
+        effectiveMode: 'homework',
+        homeworkProblemsState: [{ id: 'p1', text: 'Solve x+1=2' }],
+        apiClient: {
+          ...createMockOpts().apiClient,
+          sessions: {
+            ':sessionId': {
+              'homework-state': {
+                $post: jest.fn().mockRejectedValue(err),
+              },
+            },
+          },
+        },
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      let sessionId: string | null = null;
+      await act(async () => {
+        sessionId = await result.current.ensureSession();
+      });
+
+      expect(sessionId).toBe('new-session-1');
+      expect(opts.setActiveSessionId).toHaveBeenCalledWith('new-session-1');
+      expect(mockCaptureException).toHaveBeenCalledWith(err, {
+        tags: {
+          surface: 'session',
+          feature: 'homework_metadata_sync',
+          sync_scope: 'ensure_session',
+          sessionId: 'new-session-1',
+        },
+      });
+    });
   });
 
   // -------------------------------------------------------------------------

@@ -24,6 +24,7 @@ import * as SecureStore from '../../lib/secure-storage';
 import { classifyApiError, recoveryActions } from '../../lib/format-api-error';
 import { homeHrefForReturnTo } from '../../lib/navigation';
 import { withProblemMode } from '../homework/problem-cards';
+import { reportHomeworkMetadataSyncFailure } from './homework-metadata-telemetry';
 import {
   getInputModeKey,
   serializeMilestones,
@@ -229,7 +230,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           nextProblemIndex,
         );
       } catch (err) {
-        console.warn('[Session] Homework metadata sync failed:', err);
+        reportHomeworkMetadataSyncFailure('next_problem', err, activeSessionId);
         // Keep the local flow moving even if metadata sync fails.
       }
     }
