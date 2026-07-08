@@ -66,6 +66,7 @@ export type NavigationProfile = Profile & {
 export interface NavigationFlags {
   MODE_NAV_V0_ENABLED?: boolean;
   MODE_NAV_V1_ENABLED: boolean;
+  MODE_NAV_V2_ENABLED?: boolean;
 }
 
 export interface NavigationSubscriptionContext {
@@ -172,6 +173,8 @@ const LEGACY_GUARDIAN_TABS: ReadonlySet<TabKey> = new Set([
   'progress',
   'more',
 ]);
+
+const V2_ROUTES = new Set<RouteKey>(['mentor', 'subjects', 'journal']);
 
 const LEARNING_ROUTES = new Set<RouteKey>([
   'session',
@@ -453,6 +456,10 @@ export function resolveCanEnter(
   const visibleTabs = resolution.visibleTabs;
 
   return (route: RouteKey, params?: RouteParams): boolean => {
+    if (V2_ROUTES.has(route)) {
+      return context.flags.MODE_NAV_V2_ENABLED === true;
+    }
+
     if (!context.activeProfile) return route === 'home';
     if (context.isParentProxy) {
       return route === 'home' || route === 'library' || route === 'progress';
@@ -523,6 +530,10 @@ export function resolveIsSurfaced(
 
   return (route: RouteKey, params?: RouteParams): boolean => {
     if (!canEnter(route, params)) return false;
+
+    if (V2_ROUTES.has(route)) {
+      return context.flags.MODE_NAV_V2_ENABLED === true;
+    }
 
     if (LEARNING_ROUTES.has(route)) {
       return !familyShape && !context.isParentProxy;
