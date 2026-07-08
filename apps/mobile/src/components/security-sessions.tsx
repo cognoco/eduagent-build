@@ -9,6 +9,7 @@ import {
   withClerkTimeout,
 } from '../lib/clerk-timeout';
 import { platformAlert } from '../lib/platform-alert';
+import { Button } from './common/Button';
 
 interface SessionActivity {
   browserName?: string | null;
@@ -217,17 +218,13 @@ export function SecuritySessions({
         <Text className="text-body-sm text-text-secondary text-center mt-2">
           {loadError}
         </Text>
-        <Pressable
-          onPress={loadSessions}
-          className="bg-primary rounded-card px-4 py-3 mt-4 items-center"
-          accessibilityRole="button"
+        <Button
+          onPress={() => void loadSessions()}
+          label={t('securitySessions.retryButton')}
+          className="mt-4 rounded-card"
           accessibilityLabel={t('securitySessions.retryLabel')}
           testID="security-sessions-retry"
-        >
-          <Text className="text-body font-semibold text-text-inverse">
-            {t('securitySessions.retryButton')}
-          </Text>
-        </Pressable>
+        />
       </View>
     );
   }
@@ -245,17 +242,13 @@ export function SecuritySessions({
           {t('securitySessions.emptyDescription')}
         </Text>
         {onBackToAccount ? (
-          <Pressable
+          <Button
             onPress={onBackToAccount}
-            className="bg-primary rounded-card px-4 py-3 mt-4 items-center"
-            accessibilityRole="button"
+            label={t('securitySessions.emptyBackButton')}
+            className="mt-4 rounded-card"
             accessibilityLabel={t('securitySessions.emptyBackLabel')}
             testID="security-sessions-empty-back"
-          >
-            <Text className="text-body font-semibold text-text-inverse">
-              {t('securitySessions.emptyBackButton')}
-            </Text>
-          </Pressable>
+          />
         ) : null}
       </View>
     );
@@ -276,22 +269,21 @@ export function SecuritySessions({
         </Text>
       ) : null}
       {otherSessions.length > 0 ? (
-        <Pressable
+        <Button
+          variant="danger"
           onPress={handleRevokeAll}
           disabled={isRevokingAll}
-          className="bg-danger rounded-card px-4 py-3.5 mb-4 items-center"
-          accessibilityRole="button"
-          accessibilityLabel={t('securitySessions.signOutAllLabel')}
-          testID="security-sessions-revoke-all"
-        >
-          <Text className="text-body font-semibold text-text-inverse">
-            {isRevokingAll
+          label={
+            isRevokingAll
               ? t('securitySessions.signingOutAll')
               : t('securitySessions.signOutAllButton', {
                   count: otherSessions.length,
-                })}
-          </Text>
-        </Pressable>
+                })
+          }
+          className="mb-4 rounded-card"
+          accessibilityLabel={t('securitySessions.signOutAllLabel')}
+          testID="security-sessions-revoke-all"
+        />
       ) : null}
       {sessions.map((session) => {
         const isCurrent = session.id === sessionId;

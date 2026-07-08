@@ -284,22 +284,13 @@ export default function DeleteAccountScreen() {
                 testID="delete-account-sign-out"
               />
             </View>
-            {/* Not converted to shared Button: accessibilityLabel
-                ("Close without cancelling") intentionally diverges from the
-                visible "Close" label — Button has no accessibilityLabel
-                override, so converting would regress the more specific SR
-                announcement. */}
-            <Pressable
+            <Button
+              variant="secondary"
               onPress={handleClose}
-              className="bg-surface rounded-button py-3.5 items-center"
+              label={t('common.close')}
               testID="delete-account-dismiss"
-              accessibilityRole="button"
               accessibilityLabel={t('account.closeWithoutCancellingLabel')}
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                {t('common.close')}
-              </Text>
-            </Pressable>
+            />
           </View>
         ) : stage === 'confirming' ? (
           <View testID="delete-account-confirming">
@@ -359,36 +350,16 @@ export default function DeleteAccountScreen() {
               editable={!deleteAccount.isPending}
             />
 
-            {/* Not converted to shared Button: WI-1081 (route inline buttons
-                through shared Button) — Button only supports
-                primary/secondary/tertiary, no destructive/danger variant.
-                Converting would strip the red destructive-action styling
-                from this account-deletion confirm; adding a danger variant
-                to the shared component (used 19+ places) is a design-system
-                decision outside this WI's scope. */}
-            <Pressable
+            <Button
+              variant="danger"
               onPress={() => void onConfirmDelete()}
               disabled={!canConfirm}
-              className={`rounded-button py-3.5 items-center mb-3 ${
-                canConfirm ? 'bg-danger' : 'bg-danger/40'
-              }`}
+              loading={deleteAccount.isPending}
+              label={t('account.permanentDelete')}
+              className="mb-3"
               testID="delete-account-confirm-final"
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !canConfirm }}
               accessibilityLabel={t('account.permanentDeleteLabel')}
-            >
-              {deleteAccount.isPending ? (
-                <ActivityIndicator
-                  color={colors.textInverse}
-                  testID="delete-account-loading"
-                  accessibilityLabel={t('common.loading')}
-                />
-              ) : (
-                <Text className="text-body font-semibold text-text-inverse">
-                  {t('account.permanentDelete')}
-                </Text>
-              )}
-            </Pressable>
+            />
 
             <Button
               variant="secondary"
@@ -413,20 +384,15 @@ export default function DeleteAccountScreen() {
               {t('account.warningBody2')}
             </Text>
 
-            {/* Not converted to shared Button: no danger variant — see the
-                identical note on delete-account-confirm-final above. */}
-            <Pressable
+            <Button
+              variant="danger"
               onPress={onBeginConfirm}
               disabled={isLoading}
-              className="bg-danger rounded-button py-3.5 items-center mb-3"
+              label={t('account.understandDelete')}
+              className="mb-3"
               testID="delete-account-confirm"
-              accessibilityRole="button"
               accessibilityLabel={t('account.understandDeleteLabel')}
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                {t('account.understandDelete')}
-              </Text>
-            </Pressable>
+            />
 
             <Button
               variant="secondary"

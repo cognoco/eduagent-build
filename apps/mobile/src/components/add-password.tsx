@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Text, Pressable, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useUser, useReverification } from '@clerk/clerk-expo';
 
 import { extractClerkError } from '../lib/clerk-error';
@@ -10,6 +10,7 @@ import {
 } from '../lib/clerk-timeout';
 import { useApiClient } from '../lib/api-client';
 import { Sentry } from '../lib/sentry';
+import { Button } from './common/Button';
 import { PasswordInput } from './common/PasswordInput';
 
 function getSsoProviderLabel(
@@ -142,20 +143,18 @@ export function AddPassword({
         </Text>
       ) : null}
 
-      <Pressable
+      <Button
         onPress={handleSubmit}
         disabled={isSubmitting}
-        className="bg-primary rounded-card px-4 py-3 mt-3 items-center"
-        accessibilityLabel={t('addPassword.submitLabel')}
-        accessibilityRole="button"
-        testID="add-password-submit"
-      >
-        <Text className="text-body font-semibold text-text-inverse">
-          {isSubmitting
+        label={
+          isSubmitting
             ? t('addPassword.submitting')
-            : t('addPassword.submitButton')}
-        </Text>
-      </Pressable>
+            : t('addPassword.submitButton')
+        }
+        className="mt-3 rounded-card"
+        accessibilityLabel={t('addPassword.submitLabel')}
+        testID="add-password-submit"
+      />
     </View>
   );
 }

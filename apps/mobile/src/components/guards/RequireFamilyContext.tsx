@@ -7,6 +7,7 @@ import { LEARNER_HOME_HREF } from '../../lib/navigation';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { type RouteKey, type RouteParams } from '../../lib/navigation-contract';
 import { useEnterFamilyMode } from '../../lib/use-mode-switch';
+import { Button } from '../common/Button';
 
 // [PARENT-03] RequireFamilyContext is a READ-ONLY route guard.
 // It renders children only when the user is already in Family mode.
@@ -94,17 +95,13 @@ export function RequireFamilyContext({
       )}
 
       {contract.isFamilyCapable && (
-        <Pressable
+        <Button
           testID="family-route-switch-cta"
-          className="mt-2 bg-primary rounded-xl px-6 py-3"
-          accessibilityState={{ disabled: switchingToFamily }}
           disabled={switchingToFamily}
+          label={t('guards.requireFamilyContext.switchCta')}
+          className="mt-2 rounded-xl"
           onPress={handleSwitchToFamily}
-        >
-          <Text className="text-body font-semibold text-text-inverse">
-            {t('guards.requireFamilyContext.switchCta')}
-          </Text>
-        </Pressable>
+        />
       )}
 
       <Pressable

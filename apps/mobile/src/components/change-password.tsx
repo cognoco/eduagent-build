@@ -5,7 +5,8 @@ import { platformAlert } from '../lib/platform-alert';
 import { useUser, useAuth } from '@clerk/clerk-expo';
 import { useRouter, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { PasswordInput } from './common';
+import { Button } from './common/Button';
+import { PasswordInput } from './common/PasswordInput';
 import { extractClerkError } from '../lib/clerk-error';
 import { signOutWithCleanup } from '../lib/sign-out';
 import { useApiClient } from '../lib/api-client';
@@ -184,20 +185,18 @@ export function ChangePassword(): React.JSX.Element {
         </Text>
       )}
 
-      <Pressable
+      <Button
         onPress={handleSubmit}
         disabled={isSubmitting}
-        className="bg-primary rounded-card px-4 py-3 mt-3 items-center"
-        accessibilityLabel={t('changePassword.updateLabel')}
-        accessibilityRole="button"
-        testID="update-password-button"
-      >
-        <Text className="text-body font-semibold text-text-inverse">
-          {isSubmitting
+        label={
+          isSubmitting
             ? t('changePassword.updating')
-            : t('changePassword.updateButton')}
-        </Text>
-      </Pressable>
+            : t('changePassword.updateButton')
+        }
+        className="mt-3 rounded-card"
+        accessibilityLabel={t('changePassword.updateLabel')}
+        testID="update-password-button"
+      />
     </View>
   );
 }
