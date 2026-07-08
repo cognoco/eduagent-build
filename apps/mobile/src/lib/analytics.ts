@@ -92,7 +92,7 @@ export async function hashProfileId(
     }
     profileHashCache.set(profileId, body.hash);
     return body.hash;
-  } catch {
+  } catch (e) {
     if (!unkeyedWarningEmitted) {
       unkeyedWarningEmitted = true;
       try {
@@ -101,6 +101,7 @@ export async function hashProfileId(
           level: 'warning',
           message: 'analytics.hashProfileId: server hash unavailable',
         });
+        Sentry.captureException(e);
       } catch {
         // Sentry not initialised yet (early-boot call); the next call attempts again.
         unkeyedWarningEmitted = false;

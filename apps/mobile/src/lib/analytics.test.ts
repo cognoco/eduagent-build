@@ -13,7 +13,11 @@ const ANALYTICS_SOURCE_PATH = resolve(__dirname, 'analytics.ts');
 // Root-relative CI workflow — used for the build-injection guard below.
 const CI_YML_PATH = resolve(__dirname, '../../../../.github/workflows/ci.yml');
 
-function createHashClient(options?: { hash?: string; reject?: boolean }): {
+function createHashClient(options?: {
+  hash?: string;
+  reject?: boolean;
+  rejectError?: Error;
+}): {
   analytics: {
     'hash-profile-id': {
       $post: jest.Mock;
@@ -25,7 +29,7 @@ function createHashClient(options?: { hash?: string; reject?: boolean }): {
       'hash-profile-id': {
         $post: jest.fn(async () => {
           if (options?.reject) {
-            throw new Error('network down');
+            throw options.rejectError ?? new Error('network down');
           }
           return new Response(
             JSON.stringify({
@@ -165,5 +169,17 @@ describe('hashProfileId — server-side hashing [WI-1046]', () => {
       (Sentry.addBreadcrumb as jest.Mock).mock.calls,
     );
     expect(serializedBreadcrumbs).not.toContain('profile-failure');
+  });
+
+  it('calls captureException when hash endpoint fails', async () => {
+    const hashError = new Error('network down');
+    const client = createHashClient({ reject: true, rejectError: hashError });
+    jest.clearAllMocks();
+
+    await expect(hashProfileId('profile-failure', client)).resolves.toBe(
+      'v3_unavailable',
+    );
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(hashError);
   });
 });

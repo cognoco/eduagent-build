@@ -83,6 +83,20 @@ export function streamSSEUtf8(
             extra: { context: 'sse-utf8.onError.threw' },
           });
         }
+      } else {
+        try {
+          captureException(error, {
+            extra: { context: 'sse-utf8.callback.threw' },
+          });
+        } catch (captureCaught) {
+          logger.error('[sse-utf8] captureException threw', {
+            event: 'sse_utf8.capture_exception.threw',
+            error:
+              captureCaught instanceof Error
+                ? captureCaught.message
+                : String(captureCaught),
+          });
+        }
       }
       await emitJsonErrorFrame(stream);
     }
