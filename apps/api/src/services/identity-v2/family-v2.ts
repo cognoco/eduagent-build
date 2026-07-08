@@ -84,6 +84,10 @@ export async function hasParentAccessV2(
 }
 
 /**
+ * @internal Family-v2 seam helper. Callers must already have verified the
+ * guardian edge or be in an internal dashboard enumeration path that performs
+ * the edge check before using the returned child ids.
+ *
  * v2 "children of parent": the active charge person ids a guardian holds edges
  * over (family_links → guardianship). The dashboard / nudge / notification
  * child-enumeration re-point.
@@ -219,6 +223,10 @@ export async function resolveProfileRoleV2(
 }
 
 /**
+ * @internal Family-v2 seam helper. Callers must already be operating in an
+ * internal guardian-scoped workflow; route-facing child reads must go through
+ * edge-verifying helpers instead of calling this export directly.
+ *
  * v2 of the recall-nudge-send guardian-child-name lookup: the display name of a
  * guardian's first active, non-archived child. The legacy version read the first
  * family_links child; v2 reads the first active guardianship charge. Null when
