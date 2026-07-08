@@ -22,6 +22,7 @@ import { isoDateField } from './common';
  */
 export class NotFoundError extends Error {
   readonly errorCode = 'NOT_FOUND' as const;
+  readonly status = 404 as const;
   constructor(resource: string) {
     super(`${resource} not found`);
     this.name = 'NotFoundError';
@@ -31,6 +32,7 @@ export class NotFoundError extends Error {
 
 export class ForbiddenError extends Error {
   readonly errorCode = 'FORBIDDEN' as const;
+  readonly status = 403 as const;
   /** Server-side application code (e.g. SUBJECT_INACTIVE) when distinct from the generic FORBIDDEN code. */
   readonly apiCode: string | undefined;
 
@@ -100,6 +102,7 @@ export class UnauthorizedError extends Error {
 export const CONFLICT_ERROR_NAME = 'ConflictError' as const;
 export class ConflictError extends Error {
   readonly errorCode = 'CONFLICT' as const;
+  readonly status = 409 as const;
   constructor(message: string) {
     super(message);
     this.name = CONFLICT_ERROR_NAME;
@@ -110,6 +113,7 @@ export class ConflictError extends Error {
 export const RATE_LIMITED_ERROR_NAME = 'RateLimitedError' as const;
 export class RateLimitedError extends Error {
   readonly errorCode = 'RATE_LIMITED' as const;
+  readonly status = 429 as const;
   readonly code: string | undefined;
   /** Seconds until the client may retry, usually from a Retry-After header. */
   readonly retryAfter: number | undefined;
@@ -131,6 +135,7 @@ export class RateLimitedError extends Error {
 export const CONSENT_REQUIRED_ERROR_NAME = 'ConsentRequiredError' as const;
 export class ConsentRequiredError extends Error {
   readonly errorCode = 'CONSENT_REQUIRED' as const;
+  readonly status = 403 as const;
   readonly code: string | undefined;
 
   constructor(
@@ -196,6 +201,7 @@ export class TopicNotSkippedError extends Error {
 
 export class BadRequestError extends Error {
   readonly errorCode = 'BAD_REQUEST' as const;
+  readonly status = 400 as const;
   constructor(message: string) {
     super(message);
     this.name = 'BadRequestError';
@@ -256,6 +262,7 @@ export type UpgradeOption = QuotaExceededDetails['upgradeOptions'][number];
 export class QuotaExceededError extends Error {
   readonly code = 'QUOTA_EXCEEDED' as const;
   readonly errorCode = 'QUOTA_EXCEEDED' as const;
+  readonly status = 402 as const;
   readonly details: QuotaExceededDetails;
 
   constructor(message: string, details: QuotaExceededDetails) {
@@ -268,6 +275,7 @@ export class QuotaExceededError extends Error {
 
 export class ResourceGoneError extends Error {
   readonly errorCode = 'RESOURCE_GONE' as const;
+  readonly status = 410 as const;
   readonly code: string | undefined;
   readonly details: unknown;
 

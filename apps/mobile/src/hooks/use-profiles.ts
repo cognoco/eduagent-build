@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import { useApiClient } from '../lib/api-client';
+import { shouldRetryApiError } from '../lib/api-errors';
 import type { AppContext, Profile } from '@eduagent/schemas';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
@@ -82,11 +83,7 @@ export function useUpdateProfileAppContext() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    retry: (failureCount, error) => {
-      const status = (error as { status?: number }).status;
-      if (status && status >= 400 && status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: shouldRetryApiError,
     retryDelay: 250,
     mutationFn: async ({
       profileId,

@@ -15,6 +15,7 @@ import type {
 } from '@eduagent/schemas';
 
 import { useApiClient } from '../lib/api-client';
+import { shouldRetryApiError } from '../lib/api-errors';
 import { assertOk } from '../lib/assert-ok';
 import type { NavigationAppContext } from '../lib/navigation-contract';
 import { useProfile } from '../lib/profile';
@@ -281,11 +282,7 @@ export function useSessionLibraryFiling(
     },
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
-    retry: (failureCount, error) => {
-      const status = (error as { status?: number }).status;
-      if (status && status >= 400 && status < 500) return false;
-      return failureCount < 2;
-    },
+    retry: shouldRetryApiError,
   });
 
   const session = query.data ?? null;
