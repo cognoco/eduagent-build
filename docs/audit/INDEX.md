@@ -20,6 +20,7 @@
 | [test-mocks.md](test-mocks.md) | 2026-05-12 | Current mock-boundary audit and recommended reduction strategy. |
 | [goal-spike.md](goal-spike.md) + follow-ups | 2026-05-13/14 | `/goal` spike proposals and GC1/mock-drain scope notes. |
 | [e2e/](e2e/) | 2026-05-14 | E2E quality uplift proposal, measured baseline, and raw local run logs. |
+| [2026-07-08-wi-1181-dependency-lockfile-hygiene.md](2026-07-08-wi-1181-dependency-lockfile-hygiene.md) | 2026-07-08 | WS-34 `WI-1181` dependency-lockfile hygiene audit: `pnpm why` classifications for flagged dev/build transitive dependencies and no-op lockfile outcome. |
 
 ## Reference (analysis done; execution detail inside the doc itself)
 
