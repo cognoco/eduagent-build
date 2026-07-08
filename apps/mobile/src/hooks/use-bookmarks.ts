@@ -13,10 +13,16 @@ import type {
   SessionBookmark,
   SessionBookmarkListResponse,
 } from '@eduagent/schemas';
+import {
+  bookmarkListResponseSchema,
+  createBookmarkResponseSchema,
+  sessionBookmarkListResponseSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
 
 export function useBookmarks(options?: {
@@ -53,7 +59,7 @@ export function useBookmarks(options?: {
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as BookmarkListResponse;
+        return parseJson(res, bookmarkListResponseSchema, 'GET /bookmarks');
       } finally {
         cleanup();
       }
@@ -71,6 +77,7 @@ export function useSessionBookmarks(
 
   return useApiQuery<SessionBookmarkListResponse, SessionBookmark[]>({
     queryKey: ['session-bookmarks', activeProfile?.id, sessionId],
+    schema: sessionBookmarkListResponseSchema,
     fetch: (signal) =>
       client.bookmarks.session.$get(
         { query: { sessionId: sessionId ?? '' } },
@@ -96,7 +103,7 @@ export function useCreateBookmark(): UseMutationResult<
         json: { eventId },
       });
       await assertOk(res);
-      return (await res.json()) as { bookmark: Bookmark };
+      return parseJson(res, createBookmarkResponseSchema, 'POST /bookmarks');
     },
     onSuccess: (_data) => {
       void queryClient.invalidateQueries({

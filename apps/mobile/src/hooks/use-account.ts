@@ -6,17 +6,19 @@ import {
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/expo';
 import {
+  accountDeletionResponseSchema,
   accountDeletionStatusResponseSchema,
+  cancelDeletionResponseSchema,
+  dataExportSchema,
   type AccountDeletionStatusResponse,
-} from '@eduagent/schemas';
-import type {
-  AccountDeletionResponse,
-  CancelDeletionResponse,
-  DataExport,
+  type AccountDeletionResponse,
+  type CancelDeletionResponse,
+  type DataExport,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import { combinedSignal } from '../lib/query-timeout';
+import { parseJson } from '../lib/parse-json';
 
 export function useDeleteAccount(): UseMutationResult<
   AccountDeletionResponse,
@@ -29,7 +31,11 @@ export function useDeleteAccount(): UseMutationResult<
     mutationFn: async (): Promise<AccountDeletionResponse> => {
       const res = await client.account.delete.$post({ json: {} });
       await assertOk(res);
-      return (await res.json()) as AccountDeletionResponse;
+      return parseJson(
+        res,
+        accountDeletionResponseSchema,
+        'POST /account/delete',
+      );
     },
   });
 }
@@ -45,7 +51,11 @@ export function useCancelDeletion(): UseMutationResult<
     mutationFn: async (): Promise<CancelDeletionResponse> => {
       const res = await client.account['cancel-deletion'].$post({ json: {} });
       await assertOk(res);
-      return (await res.json()) as CancelDeletionResponse;
+      return parseJson(
+        res,
+        cancelDeletionResponseSchema,
+        'POST /account/cancel-deletion',
+      );
     },
   });
 }
@@ -76,7 +86,11 @@ export function useDeletionStatus(): UseQueryResult<
           { init: { signal } },
         );
         await assertOk(res);
-        return accountDeletionStatusResponseSchema.parse(await res.json());
+        return parseJson(
+          res,
+          accountDeletionStatusResponseSchema,
+          'GET /account/deletion-status',
+        );
       } finally {
         cleanup();
       }
@@ -92,7 +106,7 @@ export function useExportData(): UseMutationResult<DataExport, Error, void> {
     mutationFn: async (): Promise<DataExport> => {
       const res = await client.account.export.$get();
       await assertOk(res);
-      return (await res.json()) as DataExport;
+      return parseJson(res, dataExportSchema, 'GET /account/export');
     },
   });
 }

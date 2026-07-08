@@ -908,6 +908,14 @@ export const deleteBookResponseSchema = z.object({
 });
 export type DeleteBookResponse = z.infer<typeof deleteBookResponseSchema>;
 
+/** POST /subjects/:id/retry-curriculum */
+export const retryCurriculumResponseSchema = z.object({
+  dispatched: z.number().int().nonnegative(),
+});
+export type RetryCurriculumResponse = z.infer<
+  typeof retryCurriculumResponseSchema
+>;
+
 /** DELETE /subjects/:id */
 export const deleteSubjectResponseSchema = z.object({
   deleted: z.literal(true),

@@ -9,9 +9,15 @@ import type {
   LearningProfile,
   AccommodationMode,
 } from '@eduagent/schemas';
+import {
+  learnerProfileGetResponseSchema,
+  learnerProfileSuccessResponseSchema,
+  parseLearnerInputResultSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { useActiveProfileRole } from './use-active-profile-role';
 import { useApiQuery } from './use-api-query';
 
@@ -59,6 +65,7 @@ export function useLearnerProfile(): UseQueryResult<LearningProfile> {
 
   return useApiQuery<{ profile: LearningProfile }, LearningProfile>({
     queryKey: learnerProfileKey(activeProfile?.id),
+    schema: learnerProfileGetResponseSchema,
     fetch: (signal) => client['learner-profile'].$get({}, { init: { signal } }),
     select: (json) => json.profile,
   });
@@ -72,6 +79,7 @@ export function useChildLearnerProfile(
 
   return useApiQuery<{ profile: LearningProfile }, LearningProfile>({
     queryKey: learnerProfileKey(childProfileId),
+    schema: learnerProfileGetResponseSchema,
     fetch: (signal) =>
       client['learner-profile'][':profileId'].$get(
         { param: { profileId: childProfileId ?? '' } },
@@ -100,7 +108,11 @@ export function useDeleteMemoryItem(): UseMutationResult<
           })
         : await client['learner-profile'].item.$delete({ json: input });
       await assertOk(res);
-      return (await res.json()) as { success: boolean };
+      return parseJson(
+        res,
+        learnerProfileSuccessResponseSchema,
+        'DELETE /learner-profile/item',
+      );
     },
     onSuccess: async (_, vars) => {
       await qc.invalidateQueries({
@@ -127,7 +139,11 @@ export function useDeleteAllMemory(): UseMutationResult<
           })
         : await client['learner-profile'].all.$delete();
       await assertOk(res);
-      return (await res.json()) as { success: boolean };
+      return parseJson(
+        res,
+        learnerProfileSuccessResponseSchema,
+        'DELETE /learner-profile/all',
+      );
     },
     onSuccess: async (_, vars) => {
       await qc.invalidateQueries({
@@ -156,7 +172,11 @@ export function useToggleMemoryCollection(): UseMutationResult<
         },
       });
       await assertOk(res);
-      return (await res.json()) as { success: boolean };
+      return parseJson(
+        res,
+        learnerProfileSuccessResponseSchema,
+        'PATCH /learner-profile/:profileId/collection',
+      );
     },
     onSuccess: async (_, vars) => {
       await qc.invalidateQueries({
@@ -190,7 +210,11 @@ export function useToggleMemoryInjection(): UseMutationResult<
             },
           });
       await assertOk(res);
-      return (await res.json()) as { success: boolean };
+      return parseJson(
+        res,
+        learnerProfileSuccessResponseSchema,
+        'PATCH /learner-profile/injection',
+      );
     },
     onSuccess: async (_, vars) => {
       await qc.invalidateQueries({
@@ -220,7 +244,11 @@ export function useGrantMemoryConsent(): UseMutationResult<
             json: { consent: input.consent },
           });
       await assertOk(res);
-      return (await res.json()) as { success: boolean };
+      return parseJson(
+        res,
+        learnerProfileSuccessResponseSchema,
+        'POST /learner-profile/consent',
+      );
     },
     onSuccess: async (_, vars) => {
       await qc.invalidateQueries({
@@ -250,11 +278,11 @@ export function useTellMentor(): UseMutationResult<
             json: { text: input.text },
           });
       await assertOk(res);
-      return (await res.json()) as {
-        success: boolean;
-        message: string;
-        fieldsUpdated: string[];
-      };
+      return parseJson(
+        res,
+        parseLearnerInputResultSchema,
+        'POST /learner-profile/tell',
+      );
     },
     onSuccess: async (_, vars) => {
       await qc.invalidateQueries({
@@ -284,7 +312,11 @@ export function useUnsuppressInference(): UseMutationResult<
             json: { value: input.value },
           });
       await assertOk(res);
-      return (await res.json()) as { success: boolean };
+      return parseJson(
+        res,
+        learnerProfileSuccessResponseSchema,
+        'POST /learner-profile/unsuppress',
+      );
     },
     onSuccess: async (_, vars) => {
       await qc.invalidateQueries({
@@ -316,7 +348,11 @@ export function useUpdateAccommodationMode(): UseMutationResult<
             json: { accommodationMode: input.accommodationMode },
           });
       await assertOk(res);
-      return (await res.json()) as { success: boolean };
+      return parseJson(
+        res,
+        learnerProfileSuccessResponseSchema,
+        'PATCH /learner-profile/accommodation-mode',
+      );
     },
     onSuccess: async (_, vars) => {
       await qc.invalidateQueries({

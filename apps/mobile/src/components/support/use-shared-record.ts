@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { useApiQuery } from '../../hooks/use-api-query';
 import { assertOk } from '../../lib/assert-ok';
 import { useApiClient } from '../../lib/api-client';
+import { parseJson } from '../../lib/parse-json';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
@@ -22,12 +23,13 @@ export function useSharedRecord(
 
   return useApiQuery({
     queryKey: ['visibility-shared-record', scope.personId, scope.edgeId],
+    schema: sharedRecordSchema,
     fetch: (signal) =>
       client.visibility.reports[':personId']['shared-record'].$get(
         { param: { personId: scope.personId } },
         { init: { signal } },
       ),
-    select: (json: unknown) => sharedRecordSchema.parse(json),
+    select: (json) => json,
   });
 }
 
@@ -47,7 +49,11 @@ export function useAppealVisibility(
         json: {},
       });
       const okRes = await assertOk(res);
-      return appealReportSchema.parse(await okRes.json());
+      return parseJson(
+        okRes,
+        appealReportSchema,
+        'POST /visibility/reports/:personId/appeal',
+      );
     },
   });
 

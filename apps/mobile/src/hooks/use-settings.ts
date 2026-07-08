@@ -12,10 +12,23 @@ import type {
   LanguageCode,
   WithdrawalArchivePreference,
 } from '@eduagent/schemas';
+import {
+  analogyDomainResponseSchema,
+  getCelebrationLevelResponseSchema,
+  getFamilyPoolBreakdownSharingResponseSchema,
+  getNotificationsResponseSchema,
+  getWithdrawalArchivePreferenceResponseSchema,
+  nativeLanguageResponseSchema,
+  notifyParentSubscribeResponseSchema,
+  pushTokenRegisteredResponseSchema,
+  updateFamilyPoolBreakdownSharingResponseSchema,
+  updateWithdrawalArchivePreferenceResponseSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
+import { parseJson } from '../lib/parse-json';
 import { useActiveProfileRole } from './use-active-profile-role';
 import { useApiQuery } from './use-api-query';
 
@@ -29,6 +42,7 @@ export function useNotificationSettings(): UseQueryResult<NotificationPrefs> {
 
   return useApiQuery<{ preferences: NotificationPrefs }, NotificationPrefs>({
     queryKey: queryKeys.settings.notifications(activeProfile?.id),
+    schema: getNotificationsResponseSchema,
     fetch: (signal) =>
       client.settings.notifications.$get({}, { init: { signal } }),
     select: (json) => json.preferences,
@@ -41,6 +55,7 @@ export function useCelebrationLevel(): UseQueryResult<CelebrationLevel> {
 
   return useApiQuery<{ celebrationLevel: CelebrationLevel }, CelebrationLevel>({
     queryKey: queryKeys.settings.celebrationLevel(activeProfile?.id),
+    schema: getCelebrationLevelResponseSchema,
     fetch: (signal) =>
       client.settings['celebration-level'].$get(
         { query: {} },
@@ -63,6 +78,7 @@ export function useChildCelebrationLevel(
       activeProfile?.id,
     ),
     enabled: activeProfileRole === 'owner' && !!childProfileId,
+    schema: getCelebrationLevelResponseSchema,
     fetch: (signal) =>
       client.settings['celebration-level'].$get(
         { query: childProfileId ? { childProfileId } : {} },
@@ -83,6 +99,7 @@ export function useWithdrawalArchivePreference(): UseQueryResult<WithdrawalArchi
   >({
     queryKey: queryKeys.settings.withdrawalArchive(activeProfile?.id),
     enabled: !!activeProfile?.id && activeProfileRole === 'owner',
+    schema: getWithdrawalArchivePreferenceResponseSchema,
     fetch: (signal) =>
       client.settings['withdrawal-archive'].$get({}, { init: { signal } }),
     select: (json) => json.value as WithdrawalArchivePreference,
@@ -97,6 +114,7 @@ export function useFamilyPoolBreakdownSharing(): UseQueryResult<boolean> {
   return useApiQuery<{ value: boolean }, boolean>({
     queryKey: queryKeys.settings.familyPoolBreakdownSharing(activeProfile?.id),
     enabled: !!activeProfile?.id && activeProfileRole === 'owner',
+    schema: getFamilyPoolBreakdownSharingResponseSchema,
     fetch: (signal) =>
       client.settings['family-pool-breakdown-sharing'].$get(
         {},
@@ -123,7 +141,11 @@ export function useUpdateNotificationSettings(): UseMutationResult<
     mutationFn: async (input: NotificationPrefsInput) => {
       const res = await client.settings.notifications.$put({ json: input });
       await assertOk(res);
-      const data = await res.json();
+      const data = await parseJson(
+        res,
+        getNotificationsResponseSchema,
+        'PUT /settings/notifications',
+      );
       return data.preferences;
     },
     onSuccess: () => {
@@ -149,7 +171,11 @@ export function useUpdateCelebrationLevel(): UseMutationResult<
         json: { celebrationLevel },
       });
       await assertOk(res);
-      const data = await res.json();
+      const data = await parseJson(
+        res,
+        getCelebrationLevelResponseSchema,
+        'PUT /settings/celebration-level',
+      );
       return data.celebrationLevel as CelebrationLevel;
     },
     onSuccess: () => {
@@ -175,7 +201,11 @@ export function useUpdateChildCelebrationLevel(): UseMutationResult<
         json: { childProfileId, celebrationLevel },
       });
       await assertOk(res);
-      const data = await res.json();
+      const data = await parseJson(
+        res,
+        getCelebrationLevelResponseSchema,
+        'PUT /settings/celebration-level',
+      );
       return data.celebrationLevel as CelebrationLevel;
     },
     onSuccess: (_level, variables) => {
@@ -204,7 +234,11 @@ export function useUpdateWithdrawalArchivePreference(): UseMutationResult<
         json: { value },
       });
       await assertOk(res);
-      const data = (await res.json()) as { value: WithdrawalArchivePreference };
+      const data = await parseJson(
+        res,
+        updateWithdrawalArchivePreferenceResponseSchema,
+        'PUT /settings/withdrawal-archive',
+      );
       return data.value as WithdrawalArchivePreference;
     },
     onSuccess: () => {
@@ -230,7 +264,11 @@ export function useUpdateFamilyPoolBreakdownSharing(): UseMutationResult<
         json: { value },
       });
       await assertOk(res);
-      const data = (await res.json()) as { value: boolean };
+      const data = await parseJson(
+        res,
+        updateFamilyPoolBreakdownSharingResponseSchema,
+        'PUT /settings/family-pool-breakdown-sharing',
+      );
       return data.value;
     },
     onSuccess: () => {
@@ -270,8 +308,11 @@ export function useRegisterPushToken(): UseMutationResult<
         },
       );
       await assertOk(res);
-      const data = await res.json();
-      return data;
+      return parseJson(
+        res,
+        pushTokenRegisteredResponseSchema,
+        'POST /settings/push-token',
+      );
     },
   });
 }
@@ -297,8 +338,11 @@ export function useNotifyParentSubscribe(): UseMutationResult<
     mutationFn: async () => {
       const res = await client.settings['notify-parent-subscribe'].$post();
       await assertOk(res);
-      const data = await res.json();
-      return data as ParentSubscribeResult;
+      return parseJson(
+        res,
+        notifyParentSubscribeResponseSchema,
+        'POST /settings/notify-parent-subscribe',
+      );
     },
   });
 }
@@ -319,6 +363,7 @@ export function useAnalogyDomain(
   >({
     queryKey: queryKeys.settings.analogyDomain(subjectId, activeProfile?.id),
     enabled: !!subjectId,
+    schema: analogyDomainResponseSchema,
     fetch: (signal) =>
       client.settings.subjects[':subjectId']['analogy-domain'].$get(
         { param: { subjectId } },
@@ -344,7 +389,11 @@ export function useUpdateAnalogyDomain(
         json: { analogyDomain },
       });
       await assertOk(res);
-      const data = (await res.json()) as { analogyDomain: string | null };
+      const data = await parseJson(
+        res,
+        analogyDomainResponseSchema,
+        'PUT /settings/subjects/:subjectId/analogy-domain',
+      );
       return data.analogyDomain as AnalogyDomain | null;
     },
     onSuccess: () => {
@@ -370,6 +419,7 @@ export function useNativeLanguage(
   >({
     queryKey: queryKeys.settings.nativeLanguage(subjectId, activeProfile?.id),
     enabled: !!subjectId,
+    schema: nativeLanguageResponseSchema,
     fetch: (signal) =>
       client.settings.subjects[':subjectId']['native-language'].$get(
         { param: { subjectId } },
@@ -395,7 +445,11 @@ export function useUpdateNativeLanguage(
         json: { nativeLanguage },
       });
       await assertOk(res);
-      const data = (await res.json()) as { nativeLanguage: string | null };
+      const data = await parseJson(
+        res,
+        nativeLanguageResponseSchema,
+        'PUT /settings/subjects/:subjectId/native-language',
+      );
       return data.nativeLanguage as LanguageCode | null;
     },
     onSuccess: () => {

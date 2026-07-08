@@ -4,17 +4,19 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { CoachingCard, QuizActivityType } from '@eduagent/schemas';
+import {
+  coachingCardEndpointResponseSchema,
+  markSurfacedResponseSchema,
+  type CoachingCardEndpointResponse,
+  type QuizActivityType,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 
-interface CoachingCardResponse {
-  coldStart: boolean;
-  card: CoachingCard | null;
-  fallback: unknown;
-}
+type CoachingCardResponse = CoachingCardEndpointResponse;
 
 export function useCoachingCard(): UseQueryResult<CoachingCardResponse> {
   const client = useApiClient();
@@ -30,7 +32,7 @@ export function useCoachingCard(): UseQueryResult<CoachingCardResponse> {
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as CoachingCardResponse;
+        return await parseJson(res, coachingCardEndpointResponseSchema);
       } finally {
         cleanup();
       }
@@ -68,7 +70,7 @@ export function useMarkQuizDiscoverySurfaced() {
         json: { activityType },
       });
       await assertOk(res);
-      return (await res.json()) as { markedCount: number };
+      return await parseJson(res, markSurfacedResponseSchema);
     },
     retry: 3,
     onSuccess: () => {

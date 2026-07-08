@@ -7,9 +7,15 @@ import {
 import { useAuth } from '@clerk/expo';
 import { useApiClient } from '../lib/api-client';
 import { shouldRetryApiError } from '../lib/api-errors';
-import type { AppContext, Profile } from '@eduagent/schemas';
+import {
+  profileListResponseSchema,
+  profileResponseSchema,
+  type AppContext,
+  type Profile,
+} from '@eduagent/schemas';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { queryKeys } from '../lib/query-keys';
 
 export function useProfiles(): UseQueryResult<Profile[]> {
@@ -33,7 +39,7 @@ export function useProfiles(): UseQueryResult<Profile[]> {
       try {
         const res = await client.profiles.$get({}, { init: { signal } });
         await assertOk(res);
-        const data = await res.json();
+        const data = await parseJson(res, profileListResponseSchema);
         return data.profiles as Profile[];
       } finally {
         cleanup();
@@ -61,8 +67,8 @@ export function useUpdateProfileName() {
         json: { displayName },
       });
       await assertOk(res);
-      const data = (await res.json()) as { profile: Profile };
-      return data.profile;
+      const data = await parseJson(res, profileResponseSchema);
+      return data.profile as Profile;
     },
     onSuccess: (profile) => {
       queryClient.setQueryData<Profile[]>(
@@ -97,8 +103,8 @@ export function useUpdateProfileAppContext() {
         json: { defaultAppContext },
       });
       await assertOk(res);
-      const data = (await res.json()) as { profile: Profile };
-      return data.profile;
+      const data = await parseJson(res, profileResponseSchema);
+      return data.profile as Profile;
     },
     onSuccess: (profile) => {
       queryClient.setQueryData<Profile[]>(

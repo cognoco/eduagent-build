@@ -12,10 +12,17 @@ import type {
   Subject,
   SubjectStatus,
 } from '@eduagent/schemas';
+import {
+  createSubjectWithStructureResponseSchema,
+  deleteSubjectResponseSchema,
+  subjectListResponseSchema,
+  subjectResponseSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 
 interface UseSubjectsOptions {
   includeInactive?: boolean;
@@ -89,7 +96,7 @@ export function useSubjects(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = await res.json();
+        const data = await parseJson(res, subjectListResponseSchema);
         return data.subjects;
       } finally {
         cleanup();
@@ -131,7 +138,7 @@ export function useCreateSubject(): UseMutationResult<
     }) => {
       const res = await client.subjects.$post({ json: input });
       await assertOk(res);
-      return (await res.json()) as CreateSubjectResponse;
+      return await parseJson(res, createSubjectWithStructureResponseSchema);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });
@@ -155,7 +162,7 @@ export function useUpdateSubject(): UseMutationResult<
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as { subject: Subject };
+      return await parseJson(res, subjectResponseSchema);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });
@@ -185,7 +192,7 @@ export function useDeleteSubject(): UseMutationResult<
         param: { id: subjectId },
       });
       await assertOk(res);
-      return (await res.json()) as DeleteSubjectResponse;
+      return await parseJson(res, deleteSubjectResponseSchema);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });
@@ -215,7 +222,7 @@ export function useConfigureLanguageSubject(): UseMutationResult<
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as { subject: Subject };
+      return await parseJson(res, subjectResponseSchema);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });

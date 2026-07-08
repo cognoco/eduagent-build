@@ -12,48 +12,26 @@ import type {
   DashboardData,
   TopicProgress,
 } from '@eduagent/schemas';
+import {
+  childDetailResponseSchema,
+  childMemoryResponseSchema,
+  childSessionDetailResponseSchema,
+  childSessionsResponseSchema,
+  childSubjectTopicsResponseSchema,
+  dashboardResponseSchema,
+  demoDashboardDataSchema,
+  noticeSeenResponseSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { useAppContext } from '../lib/app-context';
 import { FEATURE_FLAGS } from '../lib/feature-flags';
 import { queryKeys } from '../lib/query-keys';
 import { useActiveProfileRole } from './use-active-profile-role';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
-
-// Mirror of api/services/dashboard.ts:ChildSession used by the
-// `/dashboard/children/:profileId/sessions/:sessionId` route response. Hono's
-// `InferResponseType` collapses to `{}` for this chain, so we pin the shape
-// here. Keep this in sync with the api ChildSession interface — drift would
-// surface as missing-property errors in `child/[profileId]/session/[sessionId].tsx`.
-interface ChildSessionDetail {
-  sessionId: string;
-  subjectId: string;
-  subjectName: string | null;
-  topicId: string | null;
-  topicTitle: string | null;
-  sessionType: string;
-  startedAt: string;
-  endedAt: string | null;
-  exchangeCount: number;
-  escalationRung: number;
-  durationSeconds: number | null;
-  wallClockSeconds: number | null;
-  displayTitle: string;
-  displaySummary: string | null;
-  homeworkSummary: { summary: string } | null;
-  highlight: string | null;
-  narrative: string | null;
-  conversationPrompt: string | null;
-  engagementSignal:
-    | 'curious'
-    | 'stuck'
-    | 'breezing'
-    | 'focused'
-    | 'scattered'
-    | null;
-}
 
 function useDashboardNavigationScope(): {
   activeProfile: ReturnType<typeof useProfile>['activeProfile'];
@@ -93,7 +71,11 @@ export function useDashboard(): UseQueryResult<DashboardData> {
       try {
         const res = await client.dashboard.$get({}, { init: { signal } });
         await assertOk(res);
-        const data = (await res.json()) as DashboardData;
+        const data = await parseJson(
+          res,
+          dashboardResponseSchema,
+          'GET /dashboard',
+        );
 
         // [WI-854 / HOME-15] Only fall back to demo data for a genuinely empty
         // dashboard. When the last child is archived/deleted the real response
@@ -110,7 +92,11 @@ export function useDashboard(): UseQueryResult<DashboardData> {
             { init: { signal } },
           );
           await assertOk(demoRes);
-          return (await demoRes.json()) as DashboardData;
+          return parseJson(
+            demoRes,
+            demoDashboardDataSchema,
+            'GET /dashboard/demo',
+          );
         }
 
         return data;
@@ -147,7 +133,7 @@ export function useAckNotice(): UseMutationResult<
         param: { id },
       });
       await assertOk(res);
-      return (await res.json()) as { seen: true };
+      return parseJson(res, noticeSeenResponseSchema, 'POST /notices/:id/seen');
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -166,6 +152,7 @@ export function useChildDetail(
   return useApiQuery<{ child: DashboardChild | null }, DashboardChild | null>({
     queryKey: queryKeys.dashboard.childDetail(mode, childProfileId),
     enabled: canAccessFamilyChildData && !!childProfileId,
+    schema: childDetailResponseSchema,
     fetch: (signal) =>
       client.dashboard.children[':profileId'].$get(
         { param: { profileId: childProfileId ?? '' } },
@@ -185,6 +172,7 @@ export function useChildSubjectTopics(
   return useApiQuery<{ topics: TopicProgress[] }, TopicProgress[]>({
     queryKey: queryKeys.dashboard.childSubject(mode, childProfileId, subjectId),
     enabled: canAccessFamilyChildData && !!childProfileId && !!subjectId,
+    schema: childSubjectTopicsResponseSchema,
     fetch: (signal) =>
       client.dashboard.children[':profileId'].subjects[':subjectId'].$get(
         {
@@ -206,6 +194,7 @@ export function useChildSessions(childProfileId: string | undefined) {
   return useApiQuery<{ sessions: unknown[] }, unknown[]>({
     queryKey: queryKeys.dashboard.childSessions(mode, childProfileId),
     enabled: canAccessFamilyChildData && !!childProfileId,
+    schema: childSessionsResponseSchema,
     fetch: (signal) =>
       client.dashboard.children[':profileId'].sessions.$get(
         { param: { profileId: childProfileId ?? '' } },
@@ -247,7 +236,11 @@ export function useChildSessionDetail(
         );
         if (res.status === 404) return null;
         await assertOk(res);
-        const data = (await res.json()) as { session: ChildSessionDetail };
+        const data = await parseJson(
+          res,
+          childSessionDetailResponseSchema,
+          'GET /dashboard/children/:profileId/sessions/:sessionId',
+        );
         return data.session;
       } finally {
         cleanup();
@@ -268,6 +261,7 @@ export function useChildMemory(childProfileId: string | undefined) {
   return useApiQuery<{ memory: CuratedMemoryView }, CuratedMemoryView>({
     queryKey: queryKeys.dashboard.childMemory(mode, childProfileId),
     enabled: canAccessFamilyChildData && !!childProfileId,
+    schema: childMemoryResponseSchema,
     fetch: (signal) =>
       client.dashboard.children[':profileId'].memory.$get(
         { param: { profileId: childProfileId ?? '' } },

@@ -1,32 +1,36 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import { z } from 'zod';
+import { ApiResponseShapeError } from '@eduagent/schemas';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import type { Profile } from '../lib/profile';
 import { useApiQuery } from './use-api-query';
-
-// Mutable so individual tests can simulate "no active profile".
-let mockActiveProfile: { id: string } | null = { id: 'test-profile-id' };
-
-jest.mock('../lib/profile', () => ({
-  ...jest.requireActual('../lib/profile'),
-  useProfile: () => ({ activeProfile: mockActiveProfile }),
-}));
 
 let queryClient: QueryClient;
 
-function createWrapper() {
-  const w = createQueryWrapper();
+const itemsResponseSchema = z.object({
+  items: z.array(z.number()),
+});
+
+const unknownResponseSchema = z.unknown();
+
+function createWrapper(
+  activeProfile: Profile | null = createTestProfile({
+    id: 'test-profile-id',
+  }),
+) {
+  const w = createHookWrapper({ activeProfile });
   queryClient = w.queryClient;
   return w.wrapper;
 }
 
 describe('useApiQuery', () => {
-  beforeEach(() => {
-    mockActiveProfile = { id: 'test-profile-id' };
-    jest.restoreAllMocks();
-  });
-
   afterEach(() => {
     queryClient.clear();
+    jest.restoreAllMocks();
   });
 
   it('returns the selected slice of a successful response', async () => {
@@ -40,6 +44,7 @@ describe('useApiQuery', () => {
       () =>
         useApiQuery<{ items: number[] }, number>({
           queryKey: ['probe', 'success'],
+          schema: itemsResponseSchema,
           fetch: (signal) => fetchFn(signal),
           select: (json) => json.items.length,
         }),
@@ -63,6 +68,7 @@ describe('useApiQuery', () => {
       () =>
         useApiQuery<unknown, { shape: 'learner' }>({
           queryKey: ['probe', 'not-found-fallback'],
+          schema: unknownResponseSchema,
           fetch: (signal) => fetchFn(signal),
           select,
           notFoundFallback: { shape: 'learner' },
@@ -85,6 +91,7 @@ describe('useApiQuery', () => {
       () =>
         useApiQuery<{ items: number[] }, number[]>({
           queryKey: ['probe', 'error'],
+          schema: itemsResponseSchema,
           fetch: (signal) => fetchFn(signal),
           select: (json) => json.items,
         }),
@@ -111,6 +118,7 @@ describe('useApiQuery', () => {
       () =>
         useApiQuery<{ items: number[] }, number[]>({
           queryKey: ['probe', 'cleanup-ok'],
+          schema: itemsResponseSchema,
           fetch: (signal) => okFetch(signal),
           select: (json) => json.items,
         }),
@@ -127,6 +135,7 @@ describe('useApiQuery', () => {
       () =>
         useApiQuery<{ items: number[] }, number[]>({
           queryKey: ['probe', 'cleanup-err'],
+          schema: itemsResponseSchema,
           fetch: (signal) => errFetch(signal),
           select: (json) => json.items,
         }),
@@ -144,6 +153,7 @@ describe('useApiQuery', () => {
         useApiQuery({
           queryKey: ['probe', 'disabled'],
           enabled: false,
+          schema: unknownResponseSchema,
           fetch: (signal) => fetchFn(signal),
           select: (json) => json,
         }),
@@ -156,7 +166,6 @@ describe('useApiQuery', () => {
   });
 
   it('stays idle when there is no active profile, even if enabled is true', async () => {
-    mockActiveProfile = null;
     const fetchFn = jest.fn();
 
     const { result } = renderHook(
@@ -164,14 +173,37 @@ describe('useApiQuery', () => {
         useApiQuery({
           queryKey: ['probe', 'no-profile'],
           enabled: true,
+          schema: unknownResponseSchema,
           fetch: (signal) => fetchFn(signal),
           select: (json) => json,
         }),
-      { wrapper: createWrapper() },
+      { wrapper: createWrapper(null) },
     );
 
     await new Promise((r) => setTimeout(r, 50));
     expect(result.current.fetchStatus).toBe('idle');
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('rejects a successful response whose body does not match the schema', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(
+      new Response(JSON.stringify({ items: ['not-a-number'] }), {
+        status: 200,
+      }),
+    );
+
+    const { result } = renderHook(
+      () =>
+        useApiQuery<{ items: number[] }, number[]>({
+          queryKey: ['probe', 'shape-error'],
+          schema: itemsResponseSchema,
+          fetch: (signal) => fetchFn(signal),
+          select: (json) => json.items,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeInstanceOf(ApiResponseShapeError);
   });
 });

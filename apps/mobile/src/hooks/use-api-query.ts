@@ -3,9 +3,11 @@ import {
   type QueryKey,
   type UseQueryResult,
 } from '@tanstack/react-query';
+import type { ZodType } from 'zod';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 
 type RetryOption =
   | boolean
@@ -30,6 +32,8 @@ export function useApiQuery<TResponse, TData = TResponse>(opts: {
   enabled?: boolean;
   retry?: RetryOption;
   timeoutMs?: number;
+  schema: ZodType<TResponse>;
+  context?: string;
   fetch: (signal: AbortSignal) => Promise<Response>;
   select: (json: TResponse) => TData;
   notFoundFallback?: TData | (() => TData);
@@ -46,7 +50,8 @@ export function useApiQuery<TResponse, TData = TResponse>(opts: {
           return resolveFallback(opts.notFoundFallback);
         }
         await assertOk(res);
-        return opts.select((await res.json()) as TResponse);
+        const json = await parseJson(res, opts.schema, opts.context);
+        return opts.select(json);
       } finally {
         cleanup();
       }

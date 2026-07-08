@@ -16,19 +16,23 @@
 import { useCallback, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@clerk/expo';
-import type { ChallengeRoundSessionState } from '@eduagent/schemas';
+import {
+  challengeRoundRouteResponseSchema,
+  type ChallengeRoundRouteResponse,
+} from '@eduagent/schemas';
 import { useCreateNote } from './use-notes';
 import { useProfile } from '../lib/profile';
 import { getApiUrl } from '../lib/api';
 import { fetchOrThrowNetworkError } from '../lib/api-errors';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 
-async function postJson<T>(
+async function postJson(
   url: string,
   body: Record<string, unknown>,
   token: string | null,
   profileId: string | undefined,
-): Promise<T> {
+): Promise<ChallengeRoundRouteResponse> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
@@ -42,12 +46,8 @@ async function postJson<T>(
     body: JSON.stringify(body),
   });
   await assertOk(res);
-  return res.json() as Promise<T>;
+  return await parseJson(res, challengeRoundRouteResponseSchema);
 }
-
-type ChallengeRoundRouteResponse = {
-  challengeRound?: ChallengeRoundSessionState;
-};
 
 function requireChallengeIds(opts: {
   sessionId: string | null | undefined;
@@ -73,7 +73,7 @@ export function useChallengeRound(opts: {
     mutationFn: async () => {
       const ids = requireChallengeIds(opts);
       const token = await getToken();
-      return postJson<ChallengeRoundRouteResponse>(
+      return postJson(
         `${getApiUrl()}/v1/challenge-round/accept`,
         ids,
         token,
@@ -86,7 +86,7 @@ export function useChallengeRound(opts: {
     mutationFn: async (dontAskAgain: boolean) => {
       const ids = requireChallengeIds(opts);
       const token = await getToken();
-      return postJson<ChallengeRoundRouteResponse>(
+      return postJson(
         `${getApiUrl()}/v1/challenge-round/decline`,
         { ...ids, dontAskAgain },
         token,
@@ -99,7 +99,7 @@ export function useChallengeRound(opts: {
     mutationFn: async () => {
       const ids = requireChallengeIds(opts);
       const token = await getToken();
-      return postJson<ChallengeRoundRouteResponse>(
+      return postJson(
         `${getApiUrl()}/v1/challenge-round/abort`,
         ids,
         token,

@@ -14,6 +14,7 @@ import {
 
 import { assertOk } from '../lib/assert-ok';
 import { useApiClient } from '../lib/api-client';
+import { parseJson } from '../lib/parse-json';
 import { useProfile } from '../lib/profile';
 import { useActiveProfileRoleState } from './use-active-profile-role';
 import { useApiQuery } from './use-api-query';
@@ -34,10 +35,10 @@ export function useChildCapNotifications(): UseQueryResult<
     ChildCapNotification[]
   >({
     queryKey: childCapNotificationsQueryKey(activeProfile?.id),
+    schema: childCapNotificationsResponseSchema,
     fetch: (signal) =>
       client.notifications['child-cap'].$get({}, { init: { signal } }),
-    select: (json) =>
-      childCapNotificationsResponseSchema.parse(json).notifications,
+    select: (json) => json.notifications,
     enabled: activeProfileRole.role === 'owner',
   });
 }
@@ -57,8 +58,10 @@ export function useDismissChildCapNotification(): UseMutationResult<
         param: { id: notificationId },
       });
       const okRes = await assertOk(res);
-      return childCapNotificationDismissResponseSchema.parse(
-        await okRes.json(),
+      return parseJson(
+        okRes,
+        childCapNotificationDismissResponseSchema,
+        'POST /notifications/child-cap/:id/dismiss',
       );
     },
     onSuccess: () => {
@@ -84,7 +87,11 @@ export function useNotifyParentChildCap(): UseMutationResult<
         json: input,
       });
       const okRes = await assertOk(res);
-      return childCapNotifyParentResponseSchema.parse(await okRes.json());
+      return parseJson(
+        okRes,
+        childCapNotifyParentResponseSchema,
+        'POST /notifications/child-cap/notify-parent',
+      );
     },
   });
 }

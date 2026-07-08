@@ -1,5 +1,9 @@
 import { type UseQueryResult } from '@tanstack/react-query';
-import type { BookSession, GetBookSessionsResponse } from '@eduagent/schemas';
+import {
+  getBookSessionsResponseSchema,
+  type BookSession,
+  type GetBookSessionsResponse,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { queryKeys } from '../lib/query-keys';
@@ -19,6 +23,7 @@ export function useBookSessions(
     queryKey: queryKeys.bookSessions(subjectId, bookId, activeProfile?.id),
     enabled: !!subjectId && !!bookId,
     timeoutMs: LEARNING_ENTRY_QUERY_TIMEOUT_MS,
+    schema: getBookSessionsResponseSchema,
     fetch: (signal) => {
       if (!subjectId || !bookId)
         throw new Error('subjectId and bookId are required');

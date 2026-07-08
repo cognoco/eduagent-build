@@ -10,9 +10,18 @@ import type {
   AssessmentRecord,
   AssessmentStatus,
 } from '@eduagent/schemas';
+import {
+  assessmentEligibleTopicsResponseSchema,
+  createAssessmentResponseSchema,
+  declineAssessmentRefreshResponseSchema,
+  getActiveAssessmentResponseSchema,
+  getAssessmentResponseSchema,
+  submitAssessmentAnswerResponseSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
 
 export const assessmentEligibleTopicsQueryKey = ['assessments', 'eligible'];
@@ -25,6 +34,7 @@ export function useAssessment(
 
   return useApiQuery<{ assessment: Assessment }, Assessment>({
     queryKey: ['assessment', assessmentId, activeProfile?.id],
+    schema: getAssessmentResponseSchema,
     fetch: (signal) =>
       client.assessments[':assessmentId'].$get(
         { param: { assessmentId } },
@@ -47,6 +57,7 @@ export function useActiveAssessment(
     AssessmentRecord | null
   >({
     queryKey: ['assessment', 'active', subjectId, topicId, activeProfile?.id],
+    schema: getActiveAssessmentResponseSchema,
     fetch: (signal) =>
       client.subjects[':subjectId'].topics[':topicId'].assessments.active.$get(
         { param: { subjectId, topicId } },
@@ -69,7 +80,11 @@ export function useCreateAssessment(subjectId: string, topicId: string) {
         param: { subjectId, topicId },
       });
       await assertOk(res);
-      return await res.json();
+      return parseJson(
+        res,
+        createAssessmentResponseSchema,
+        'POST /subjects/:subjectId/topics/:topicId/assessments',
+      );
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['assessment'] });
@@ -94,6 +109,7 @@ export function useAssessmentEligibleTopics(): UseQueryResult<
     AssessmentEligibleTopic[]
   >({
     queryKey: [...assessmentEligibleTopicsQueryKey, activeProfile?.id],
+    schema: assessmentEligibleTopicsResponseSchema,
     fetch: (signal) =>
       client.retention['assessment-eligible'].$get({}, { init: { signal } }),
     select: (json) => json.topics,
@@ -125,10 +141,11 @@ export function useSubmitAnswer(assessmentId: string) {
         json: { answer: input.answer },
       });
       await assertOk(res);
-      return (await res.json()) as {
-        evaluation: AssessmentEvaluation;
-        status: AssessmentStatus;
-      };
+      return parseJson(
+        res,
+        submitAssessmentAnswerResponseSchema,
+        'POST /assessments/:assessmentId/answer',
+      );
     },
     onSuccess: (_data, variables) => {
       const targetAssessmentId = variables.assessmentId ?? assessmentId;
@@ -159,7 +176,11 @@ export function useDeclineAssessmentRefresh(assessmentId: string) {
         param: { assessmentId },
       });
       await assertOk(res);
-      return await res.json();
+      return parseJson(
+        res,
+        declineAssessmentRefreshResponseSchema,
+        'PATCH /assessments/:assessmentId/decline-refresh',
+      );
     },
   });
 }

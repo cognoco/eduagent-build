@@ -20,12 +20,22 @@ import type {
   CreateNoteInput,
   NoteResponse,
 } from '@eduagent/schemas';
+import {
+  allNotesResponseSchema,
+  bookNotesResponseSchema,
+  conceptMasterySignalsResponseSchema,
+  noteGetResponseSchema,
+  noteMutationResponseSchema,
+  topicIdsResponseSchema,
+  topicNotesResponseSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useApiQuery } from './use-api-query';
 import { useProfile } from '../lib/profile';
 import { queryKeys } from '../lib/query-keys';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 
 // ---------------------------------------------------------------------------
 // useBookNotes — fetch all notes for a given book
@@ -55,7 +65,7 @@ export function useAllNotes(options?: {
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as AllNotesResponse;
+        return parseJson(res, allNotesResponseSchema, 'GET /notes');
       } finally {
         cleanup();
       }
@@ -74,6 +84,7 @@ export function useBookNotes(
 
   return useApiQuery<BookNotesResponse>({
     queryKey: ['book-notes', subjectId, bookId, activeProfile?.id],
+    schema: bookNotesResponseSchema,
     fetch: (signal) =>
       client.subjects[':subjectId'].books[':bookId'].notes.$get(
         { param: { subjectId: subjectId ?? '', bookId: bookId ?? '' } },
@@ -111,6 +122,7 @@ export function useGetTopicNote(
     } | null;
   }>({
     queryKey: ['topic-note', subjectId, topicId, activeProfile?.id],
+    schema: noteGetResponseSchema,
     fetch: (signal) =>
       client.subjects[':subjectId'].topics[':topicId'].note.$get(
         { param: { subjectId: subjectId ?? '', topicId: topicId ?? '' } },
@@ -131,6 +143,7 @@ export function useNoteTopicIds(): UseQueryResult<{ topicIds: string[] }> {
 
   return useApiQuery<{ topicIds: string[] }>({
     queryKey: ['note-topic-ids', activeProfile?.id],
+    schema: topicIdsResponseSchema,
     fetch: (signal) => client.notes['topic-ids'].$get({}, { init: { signal } }),
     select: (json) => json,
   });
@@ -152,6 +165,7 @@ export function useConceptMasterySignals(
       sortedTopicIds,
     ),
     enabled: sortedTopicIds.length > 0,
+    schema: conceptMasterySignalsResponseSchema,
     fetch: (signal) =>
       client.notes['concept-mastery'].$get(
         { query: { topicIds: sortedTopicIds.join(',') } },
@@ -174,6 +188,7 @@ export function useTopicNotes(
 
   return useApiQuery<TopicNotesResponse>({
     queryKey: ['topic-notes', subjectId, topicId, activeProfile?.id],
+    schema: topicNotesResponseSchema,
     fetch: (signal) =>
       client.subjects[':subjectId'].topics[':topicId'].notes.$get(
         { param: { subjectId: subjectId ?? '', topicId: topicId ?? '' } },
@@ -207,7 +222,11 @@ export function useCreateNote(
         json: { content, ...(sessionId ? { sessionId } : {}) },
       });
       await assertOk(res);
-      return (await res.json()) as { note: NoteResponse };
+      return parseJson(
+        res,
+        noteMutationResponseSchema,
+        'POST /subjects/:subjectId/topics/:topicId/notes',
+      );
     },
     onSuccess: (_data, { topicId }) => {
       if (bookId) {
@@ -248,7 +267,7 @@ export function useUpdateNote(): UseMutationResult<
         json: { content },
       });
       await assertOk(res);
-      return (await res.json()) as { note: NoteResponse };
+      return parseJson(res, noteMutationResponseSchema, 'PATCH /notes/:noteId');
     },
     onSuccess: () => {
       // [BUG-163] Scope invalidations by active profile id so a mutation on
