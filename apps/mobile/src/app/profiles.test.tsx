@@ -6,7 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import type { Profile } from '../lib/profile';
-import { useAuth, useReverification } from '@clerk/clerk-expo';
+import { useAuth, useReverification } from '@clerk/expo';
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();

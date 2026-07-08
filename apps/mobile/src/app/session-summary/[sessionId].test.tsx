@@ -7,7 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import React from 'react';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import { platformAlert } from '../../lib/platform-alert';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {

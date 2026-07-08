@@ -43,7 +43,7 @@ import { RequireFamilyContext } from './RequireFamilyContext';
 // gc1-allow: hook test needs a deterministic navigation boundary for useRouter
 const mockReplace = jest.fn();
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('mock-token') }),
 }));
 

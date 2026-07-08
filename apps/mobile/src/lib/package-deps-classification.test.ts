@@ -84,17 +84,18 @@ function isAtLeast(version: string, minimum: string): boolean {
   return true;
 }
 
-describe('mobile Clerk dependency security floor [WI-909]', () => {
-  it('@clerk/clerk-expo stays at the CVE-2026-41248 fixed floor', () => {
-    const declaredVersion = pkg.dependencies?.['@clerk/clerk-expo'];
+describe('mobile Clerk dependency security floor [WI-909][WI-1179]', () => {
+  it('@clerk/expo uses the Core 3 package and leaves the deprecated package behind', () => {
+    const declaredVersion = pkg.dependencies?.['@clerk/expo'];
 
     expect(declaredVersion).toBeDefined();
-    expect(isAtLeast(declaredVersion ?? '', '2.19.36')).toBe(true);
+    expect(isAtLeast(declaredVersion ?? '', '3.0.0')).toBe(true);
+    expect(pkg.dependencies?.['@clerk/clerk-expo']).toBeUndefined();
   });
 
-  it('@clerk/clerk-expo lockfile snapshots do not pull vulnerable @clerk/shared', () => {
+  it('@clerk/expo lockfile snapshots do not pull vulnerable @clerk/shared', () => {
     const clerkExpoSnapshots = Object.entries(rootLockfile.snapshots ?? {})
-      .filter(([key]) => key.startsWith('@clerk/clerk-expo@'))
+      .filter(([key]) => key.startsWith('@clerk/expo@'))
       .map(([key, snapshot]) => ({
         key,
         sharedVersion: snapshot.dependencies?.['@clerk/shared'],
@@ -111,6 +112,9 @@ describe('mobile Clerk dependency security floor [WI-909]', () => {
       });
       expect(isAtLeast(snapshot.sharedVersion ?? '', '3.47.4')).toBe(true);
     }
+    expect(Object.keys(rootLockfile.snapshots ?? {})).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/^@clerk\/clerk-expo@/)]),
+    );
   });
 });
 

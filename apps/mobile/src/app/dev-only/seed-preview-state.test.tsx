@@ -6,7 +6,7 @@
  */
 
 import { render, screen, waitFor } from '@testing-library/react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 
 import {
   clearPreviewState,

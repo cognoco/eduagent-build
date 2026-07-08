@@ -5,7 +5,7 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import type {
   SubscriptionTier,
   SubscriptionStatus,

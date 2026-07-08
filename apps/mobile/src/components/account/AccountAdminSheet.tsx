@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';

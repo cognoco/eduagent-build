@@ -25,7 +25,7 @@ const mockUseAuth = jest.fn<MockAuthState, []>(() => ({
   userId: 'user-1',
   getToken: mockGetToken,
 }));
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => mockUseAuth(),
 }));
 

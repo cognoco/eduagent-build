@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import { useTranslation } from 'react-i18next';
 import { Sentry } from '../lib/sentry';
 

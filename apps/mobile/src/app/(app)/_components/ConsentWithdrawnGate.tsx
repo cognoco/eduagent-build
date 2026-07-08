@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useClerk, useUser } from '@clerk/clerk-expo';
+import { useClerk, useUser } from '@clerk/expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { computeAgeBracket } from '@eduagent/schemas';

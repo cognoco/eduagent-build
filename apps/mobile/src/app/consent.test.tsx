@@ -52,7 +52,7 @@ const mockUseAuth = jest.fn(() => ({
   isSignedIn: true,
 }));
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => mockUseAuth(),
   useUser: () => mockUseUser(),
 }));

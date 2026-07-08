@@ -175,7 +175,7 @@ jest.mock('react-native-purchases', () => ({
   },
 }));
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ClerkProvider: ({ children }: any) => children,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -222,13 +222,24 @@ jest.mock('@clerk/clerk-expo', () => ({
   }),
 }));
 
-jest.mock('@clerk/clerk-expo/token-cache', () => ({
+jest.mock('@clerk/expo/token-cache', () => ({
   tokenCache: {
     getToken: jest.fn(),
     saveToken: jest.fn(),
     clearToken: jest.fn(),
   },
 }));
+
+jest.mock('@clerk/expo/legacy', () => {
+  const clerkExpo = jest.requireMock('@clerk/expo') as {
+    useSignIn: unknown;
+    useSignUp: unknown;
+  };
+  return {
+    useSignIn: clerkExpo.useSignIn,
+    useSignUp: clerkExpo.useSignUp,
+  };
+});
 
 jest.mock('expo-web-browser', () => ({
   warmUpAsync: jest.fn().mockResolvedValue(undefined),

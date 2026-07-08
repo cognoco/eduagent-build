@@ -49,7 +49,7 @@ jest.mock('../../../lib/theme', /* gc1-allow: nativewind vars() does not resolve
   useTokenVars: () => ({}),
 }));
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
   useClerk: () => ({ signOut: jest.fn() }),
   useUser: () => ({ user: { id: 'clerk-user-1' } }),

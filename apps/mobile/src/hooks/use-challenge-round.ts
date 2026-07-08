@@ -15,7 +15,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import type { ChallengeRoundSessionState } from '@eduagent/schemas';
 import { useCreateNote } from './use-notes';
 import { useProfile } from '../lib/profile';

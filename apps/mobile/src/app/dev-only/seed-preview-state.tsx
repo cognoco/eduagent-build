@@ -6,7 +6,7 @@
  * more than one hour. Dead in production and in non-E2E dev-client builds.
  */
 
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';

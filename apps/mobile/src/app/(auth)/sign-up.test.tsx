@@ -5,7 +5,7 @@ import {
   fireEvent,
   waitFor,
 } from '@testing-library/react-native';
-import { useSignUp, useSSO } from '@clerk/clerk-expo';
+import { useSignUp, useSSO } from '@clerk/expo';
 import { Platform } from 'react-native';
 import { CLERK_REQUEST_TIMEOUT_MS } from '../../lib/clerk-timeout';
 

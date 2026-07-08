@@ -135,7 +135,7 @@ describe('useDeletionStatus', () => {
   beforeEach(() => {
     // useDeletionStatus is gated on !!isSignedIn — ensure the global mock
     // exposes isSignedIn:true so the query is enabled in each test.
-    const clerkMock = jest.requireMock('@clerk/clerk-expo') as {
+    const clerkMock = jest.requireMock('@clerk/expo') as {
       useAuth: jest.Mock;
     };
     clerkMock.useAuth.mockReturnValue({
@@ -179,7 +179,7 @@ describe('useDeletionStatus', () => {
   // and skip the fetch entirely. With userId-scoped keys, User B gets a fresh
   // fetch and User A's "scheduled: true" status never leaks across sign-out.
   it('[BREAK] does not serve user A deletion-status to user B (cross-account leak)', async () => {
-    const clerkMock = jest.requireMock('@clerk/clerk-expo') as {
+    const clerkMock = jest.requireMock('@clerk/expo') as {
       useAuth: jest.Mock;
     };
     clerkMock.useAuth.mockReturnValue({

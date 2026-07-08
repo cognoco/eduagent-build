@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useUser } from '@clerk/clerk-expo';
+import { useUser } from '@clerk/expo';
 
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';

@@ -57,7 +57,7 @@ jest.mock('../../../lib/theme', /* gc1-allow: nativewind vars() does not resolve
 }));
 
 let mockChildEmail: string | undefined;
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   // useApiClient (real, reached through the harness AppContextProvider) calls
   // useAuth().getToken — provide a stub token so the routed fetch is reached.
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),

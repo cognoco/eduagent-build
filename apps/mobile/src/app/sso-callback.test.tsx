@@ -7,7 +7,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ isSignedIn: mockIsSignedIn }),
 }));
 
