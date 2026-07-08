@@ -10,8 +10,15 @@
 - **Quartet mechanics** → folded into `_quartet/_quartet-wip/quartet-findings.md` (2026-07-01); the learning-tracker and all residual source memories deleted.
 
 - **Cosmo WI finalization drained (2026-06-20)** → `_wip/umbrella-program/cosmo-finalization-guide.md` (3 memories merged: shepherd-finalization + execute-complete-finalize + reviewer-reads-objective). Covers: `complete` vs `replace_content`, parser-clean completion-summary, `Fixed In`, re-finalize after a bounce, closure-verification reads OBJECTIVE/NAME, append-parse deadlock → operator force-close.
-- [project_cosmo_wi_project_relation_misfiling.md](project_cosmo_wi_project_relation_misfiling.md) — Cosmo WIs about eduagent captured from a Nexus-context session inherit the Nexus Project + fail the execute repo guard; fix the Project relation to MentoMate, never run from the wrong repo.
+- [project_cosmo_wi_project_relation_misfiling.md](project_cosmo_wi_project_relation_misfiling.md) — Cosmo WIs about eduagent captured from a Nexus-context session inherit the Nexus Project + fail the execute repo guard; VERIFY genuine misfiling (work lands in this repo + in-scope + unblocked) before repointing to MentoMate — estate-machinery items are often correctly Nexus; never repoint to defeat the guard (WI-1245 breach).
 - [project_prg14_agent_instructions_lane.md](project_prg14_agent_instructions_lane.md) — Repo CI/merge gotchas (ex-PRG-14 lane; shepherd lessons folded into `_quartet/_quartet-wip/quartet-findings.md` F27/F28): docs-PR `paths-ignore` blocks the required `main` check; merge-on-UNSTABLE ok for advisory-red; `session/index.test.tsx` ambient flake.
+- [feedback_bg_while_true_watcher_is_write_only.md](feedback_bg_while_true_watcher_is_write_only.md) — A run_in_background while-true PR-poll loop is WRITE-ONLY (bg tasks notify only on EXIT) → never wakes you → silent liveness lapse. Use the Monitor tool (per-line events) or a bg UNTIL-loop that exits on the terminal condition (one ping on merge). Monitor's Stage differ also LAGS — silence ≠ no transition; direct-read at decision boundaries.
+- [feedback_orchestrator_liveness_and_mcp_independence.md](feedback_orchestrator_liveness_and_mcp_independence.md) — Standing operator directive: liveness deadlines/probes/wakes for shepherd lanes; Notion MCP outage never stops work (cosmo bun CLIs + raw REST are MCP-independent). Pointer — canon is `orchestrator-protocol.md` on Nexus main.
+- [feedback_clacks_state_files_must_be_gitignored.md](feedback_clacks_state_files_must_be_gitignored.md) — Tracked clacks `_state/*.jsonl` get silently reverted by concurrent shared-tree resets. Gitignore fix HAS landed (nexus `.gitignore:166`); `monitor-manifest.json` is deliberately TRACKED; WI-1245 is Closed/Superseded — the Supabase substrate (WS-50 / WI-1263) replaces this layer.
+- [feedback_never_auto_pick_wi_301.md](feedback_never_auto_pick_wi_301.md) — When sweeping reviewer-returned / rework Cosmo items, exclude WI-301 — never claim, land, or merge it autonomously.
+- [project_mentomate_program_roadmap.md](project_mentomate_program_roadmap.md) — Program-manager role + the MentoMate Productization roadmap page in Cosmo: durable program-level state (swimlanes, critical path, gates, rulings queue).
+
+> Folded out on 2026-07-08 and deleted: `feedback_bug_ac_predeclare_red_green_revert_guard` → WI-1716 (Refine gate correctness, AC 2a); `project_gate2_reviewer_stage_entry_trigger` → WI-1722 (Holds and re-entry consistency, field evidence + AC 8); `feedback_hold_is_not_idle` → WI-1749 (Shepherd protocol: a lane holding on one gate is not idle).
 
 ## Identity Foundation (re-platform)
 
@@ -31,6 +38,7 @@
 - [project_claude_review_self_referential_401.md](project_claude_review_self_referential_401.md) — A PR editing `.github/workflows/claude*.yml` shows a benign RED claude-review (self-referential 401, not token exhaustion). Confirm via rerun-after-merge or a non-workflow follow-up PR.
 - [project_conflicting_pr_blocks_ci.md](project_conflicting_pr_blocks_ci.md) — CONFLICTING/DIRTY PR → ZERO github-actions CI runs (no merge ref); symptom = "every check app except github-actions". Check `gh pr view --json mergeable` FIRST; fix = rebase, not re-push/re-author/fresh-PR.
 - [feedback_flag_collapse_breaks_legacy_pinned_unit_mocks.md](feedback_flag_collapse_breaks_legacy_pinned_unit_mocks.md) — Collapsing a feature flag to one arm mass-breaks legacy-pinned mock-DB unit tests (v2 seams run unconditionally); diagnose by crash-site histogram (seams≠bespoke), verify counts vs base, delete-vs-migrate by phase-B-survival/integration-twin. Recurs for WI-868/869.
+- [feedback_nx_reset_before_commit.md](feedback_nx_reset_before_commit.md) — NX module-boundaries eslint rule uses a cached project graph; a stale cache triggers false "lazy-loaded library" errors on commit. Run `pnpm exec nx reset` first.
 
 ## Auth
 
@@ -53,6 +61,8 @@
 ## Workflow Preferences
 
 - [feedback_verify_code_not_memory_or_docs.md](feedback_verify_code_not_memory_or_docs.md) — ANY code-related question: verify against current source (grep/read, cite file:line) BEFORE answering; never answer from memory or plan/spec docs alone.
+- [feedback_verify_claims_against_source_before_canon.md](feedback_verify_claims_against_source_before_canon.md) — Before writing implementation claims into canon (ADR/standard/completion summary), read SOURCE not the deployed plugin cache nor your own earlier prose; ZDX-ADR-0014 needed 3 self-inflicted corrections. Grep every site of a claim; surface corrections, never quietly patch.
+- [project_zdx_bundle_guard_family.md](project_zdx_bundle_guard_family.md) — /cosmo:bundle: 3 defects of one family (lossy absorb, Stage guard, State/hold guard). Absorb-at-formation makes the WP body the ONLY live record → any field the guard misses is destroyed. All found by dogfooding, none by review.
 - Commit early + push after every commit. Never batch large changes.
 - [feedback_never_switch_branch.md](feedback_never_switch_branch.md) — NEVER switch branches unless user explicitly asks.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
@@ -89,7 +99,7 @@
 
 - [project_brand_dark_first.md](project_brand_dark_first.md) — Teal primary + lavender secondary. No accent picker. Dark default.
 - [project_product_roles_students_any_age.md](project_product_roles_students_any_age.md) — Pointer: role/persona/login model → `docs/canon/identity/` (ontology + prd Part 10); nav IA → navigation-contract/audience-matrix. Caution: not a kids-only app.
-- Coaching cards REMOVED, intent cards in place (archived from memory 2026-05-04).
+- Coaching cards are LIVE (audit-A 2026-07-06 corrected stale "removed" note): `BaseCoachingCard` rendered in `ParentHomeScreen.tsx`; `coaching_card_cache` backs the home surface.
 
 ## Persona Architecture (Epic 12 — COMPLETE, ThemeContext cleaned 2026-04-15)
 
@@ -119,6 +129,8 @@
 - [feedback_fk_violation_not_rls_and_masked_step_bisect.md](feedback_fk_violation_not_rls_and_masked_step_bisect.md) — Integration FK-violation = parent GENUINELY ABSENT (FK bypasses RLS absent FORCE RLS), never role-leak; a masked/skipped CI step invalidates run-history bisect → git-blame the failing artifact instead; "passes local, red CI" on ephemeral DB = missing-seed signature. (WI-1145 P0, 2026-06-29.)
 
 ## User Profile
+
+- [feedback_flow_testing_from_main.md](feedback_flow_testing_from_main.md) — Use when running or reporting mobile flow-plan reruns and flow-status evidence.
 
 - [user_device_small_phone.md](user_device_small_phone.md) — Tests on Galaxy S10e (5.8"). Check small-screen layout.
 
