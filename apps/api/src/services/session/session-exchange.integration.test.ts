@@ -543,7 +543,7 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
   // This test verifies the branch now fires on `currentUserMessage` instead.
   // -------------------------------------------------------------------------
 
-  it('[T7 RED→GREEN] flag=ON: grader provides solid evaluation → challenge round persists as drafting', async () => {
+  it('[T7 RED→GREEN] flag=ON: grader provides solid evaluation → challenge round completes', async () => {
     const { profileId, subjectId } = await seedProfileAndSubject(db);
     const topicId = await seedCurriculumTopic(db, subjectId);
     const session = await seedActiveSession(db, profileId, subjectId, topicId);
@@ -571,9 +571,10 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
       },
     );
 
-    // The challenge round must have advanced (not still active)
+    // The challenge round must have advanced through drafting into terminal
+    // completion once the solid grader evaluation satisfies finalization.
     expect(result.challengeRound).toBeDefined();
-    expect(result.challengeRound?.state).toBe('drafting');
+    expect(result.challengeRound?.state).toBe('complete');
     expect(result.challengeRound?.evaluations).toHaveLength(1);
     expect(result.challengeRound?.evaluations[0]?.result).toBe('solid');
     // T9: questionsAsked must be incremented
@@ -581,8 +582,12 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
 
     // Verify DB state matches the returned state
     const persisted = await readSessionChallengeRound(db, session.id);
-    expect(persisted?.state).toBe('drafting');
+    expect(persisted?.state).toBe('complete');
     expect((persisted?.evaluations as unknown[])?.length).toBe(1);
+
+    const rows = await readAssessmentsForSession(db, profileId, session.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.masteryChallengeVerifiedAt).not.toBeNull();
 
     // Verify the grader was actually called (not the inline tutor path)
     expect(llm.graderCallCount()).toBe(1);
