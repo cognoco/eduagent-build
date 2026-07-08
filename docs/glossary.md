@@ -655,7 +655,77 @@ but that's **Session mode** above, not this retired `serious|casual` toggle. The
 
 ---
 
-## 9. Not yet defined (extend when it bites)
+## 9. Learning-science foundations — the borrowed concepts
+
+The product leans on a handful of named concepts from learning science and
+language pedagogy. Code and canon reference them by name without explanation;
+this section is the one place that says what each one is, where we use it, and
+how our version deviates from the textbook.
+
+#### SM-2 (SuperMemo-2)
+The 1988 spaced-repetition scheduling algorithm (Piotr Woźniak) behind Anki and
+most flashcard apps. Each item carries a card — ease factor (starts 2.5, floor
+1.3), interval in days, consecutive-success count. After each review the recall
+is graded 0–5: a grade < 3 resets the item to short intervals; grades ≥ 3
+advance it (1 day → 6 days → previous interval × ease factor), so well-known
+material gets reviewed exponentially less often. We schedule **one card per
+Topic** (not per flashcard item). **In code:** `packages/retention/src/sm2.ts`
+(pure math), orchestrated by `apps/api/src/services/retention.ts`, fired from
+the `session.completed` Inngest chain. ⚠ Our deviations from canonical SM-2
+(grading source, EVALUATE quality floor, clamping) are catalogued in
+`packages/retention/README.md` → "Deviations from canonical SM-2".
+
+#### Retrieval practice & the spacing effect
+The two findings the whole Review backbone rests on: actively recalling
+something strengthens memory far more than re-reading it (the "testing
+effect"), and reviews spread over time beat massed cramming. This is *why* the
+app resurfaces topics and asks the learner to produce answers rather than
+showing summaries. **In code:** the entire retention loop (`retention_cards`,
+recall nudges, quiz/assessment grading feeding SM-2).
+
+#### Bloom's taxonomy
+A hierarchy of cognitive skill: remember → understand → apply → analyze →
+evaluate → create. We use it to pitch challenge difficulty: EVALUATE mode (the
+"devil's advocate" flow where the mentor presents deliberately flawed reasoning
+and the learner must find the flaw) targets the top levels (Evaluate/Create)
+and only triggers on topics with strong retention (`easeFactor >= 2.5`,
+`repetitions > 0`). **In code:** `apps/api/src/services/evaluate.ts`
+(`shouldTriggerEvaluate`); design rationale in `docs/architecture.md` →
+EVALUATE scoring.
+
+#### Feynman technique
+"You understand it when you can explain it simply, in your own words." The
+basis of TEACH_BACK (the learner explains the concept back to the mentor) and
+of the Challenge Round grading philosophy — mastery evidence must be grounded
+in the learner's own quotes, not multiple-choice hits. **In code:**
+`apps/api/src/services/teach-back.ts`, `teach-back-grader.ts`; learner-quote
+grounding in `services/challenge-round/note-draft.ts`.
+
+#### Four Strands (Paul Nation)
+A balanced language course spends roughly equal time on four strands:
+meaning-focused **input** (reading/listening), meaning-focused **output**
+(speaking/writing), **language-focused learning** (explicit grammar/vocab
+study), and **fluency development** (using what's already known, faster). Our
+default pedagogy mode for language subjects — session planning rotates
+activities across the strands. **In code:** `pedagogyModeSchema`
+(`packages/schemas/src/language.ts:4`, default `four_strands`), strand
+selection in `apps/api/src/services/curriculum.ts` and the session pipeline.
+
+#### CEFR
+The Common European Framework of Reference for Languages — the six-level
+proficiency ladder A1, A2 (basic) → B1, B2 (independent) → C1, C2 (proficient).
+Used for language-learner placement at onboarding and level tracking in
+progress. **In code:** `cefrLevelSchema` (`packages/schemas/src/language.ts:10`).
+
+#### Interleaving
+Mixing topics or subjects within one practice session produces more durable
+learning than practicing one thing in a block, even though it *feels* harder.
+Basis of the cross-subject `interleaved` session type. **In code:**
+`apps/api/src/services/interleaved.ts`; session kind in `session-enums.ts`.
+
+---
+
+## 10. Not yet defined (extend when it bites)
 
 - **Screens** — same convention applies (`‹audience›-‹surface›-screen`); add when
   screen names start colliding.

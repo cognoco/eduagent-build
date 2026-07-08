@@ -44,6 +44,17 @@ This is the one-screen operating answer to "how does content get *into* `archite
 - **Prose wrapping:** soft-wrap — one physical line per paragraph (and per list item). Do not hard-wrap at a fixed column. Renders identically on GitHub, avoids ragged lines, and keeps edits clean.
 - **Reconstructed ADRs** (written after the fact during backfill) carry a `reconstructed YYYY-MM-DD` note; where the original *why* is unrecoverable, record the decision plainly rather than invent a rationale.
 
+## Write for the reader three years out — the timelessness rules
+
+An ADR outlives the project phase that produced it. It must be understandable by someone with **no knowledge of current work items, sprints, plans, or phase codes**. Four rules, distilled from a 2026-07 full-register audit that found the same rot patterns across a dozen ADRs:
+
+1. **No work-item / open-question / ruling IDs as authority.** Never let a decision clause depend on a `WI-NNNN`, `OQ-N`, or ruling code to carry its meaning ("preserves the WI-374 caps", "confidence per OQ-9"). State the rule and its values directly; an ID may appear only as *historical attribution* ("found by a deletion-path audit", "operator-ruled 2026-06-20") — and sparingly.
+2. **No stage/phase codes as gates.** "Deferred to Phase F", "pending the T10 bake-off", "the P1 family-3 work" are meaningless once the plan they name is archived. Replace the code with the **functional precondition** the stage was waiting for ("once real minor-traffic verdict data exists to calibrate a threshold", "whichever ADR ratifies the account-based mechanism supersedes this one").
+3. **No progress snapshots in the body.** "Not yet enforced", "sign-off pending", "once X lands", "pre-launch we have no such data" are true for a week and confusing forever. The Status line is the only place lifecycle state lives; the body states standing rules that are true whenever read. If a fact is genuinely time-bound, date it ("verified against staging 2026-06-20").
+4. **No delegating normative content to specs/plans.** A spec or plan may be cited in Links as *historical context, never authority*. Schema shapes, thresholds, and contracts either live inline in the ADR, in canon (`architecture.md`), or in code/config named as the source of truth — plan files get archived and their task IDs (`T2`, `S5a`) rot.
+
+Cross-ADR references are the opposite of rot — link `MMT-ADR` liberally. Legends for genuinely durable code families (e.g. `MMT-ADR-0011`'s D1–D8 decision IDs) are fine when the ADR defines them.
+
 ## Chunking a large doc (reactive, not a policy)
 
 Splitting a large canon or spec doc into per-concern files is reactive editorial practice, not an ADR-class decision (MMT-ADR-0000 §I.5). Do it only in response to **demonstrated contention** (churn + multiple owners colliding), never as a size-triggered mandate. When you do: chunk **by concern plus a dedicated cross-cutting chunk**; keep a **mandatory principle index** (the principles catalog); and keep a spec's decision heading and its `MMT-ADR` link **in the same file** (the ratchet links at file granularity).
