@@ -1113,6 +1113,25 @@ describe('sessionCompleted', () => {
       );
     });
 
+    it('runs each retention topic in its own Inngest step so retries do not double-advance completed topics', async () => {
+      const { mockStep } = (await executeSteps(
+        createEventData({
+          interleavedTopicIds: ['topic-a', 'topic-b', 'topic-c'],
+          qualityRating: 4,
+          timestamp: undefined,
+        }),
+      )) as { mockStep: { run: jest.Mock } };
+
+      const stepNames = mockStep.run.mock.calls.map(([name]) => name);
+      expect(stepNames).toEqual(
+        expect.arrayContaining([
+          'update-retention:topic-a',
+          'update-retention:topic-b',
+          'update-retention:topic-c',
+        ]),
+      );
+    });
+
     it('prefers interleavedTopicIds over single topicId (FR92)', async () => {
       await executeSteps(
         createEventData({

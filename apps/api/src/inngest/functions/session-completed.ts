@@ -686,14 +686,19 @@ export const sessionCompleted = inngest.createFunction(
       }),
     );
 
-    // Step 1b: Update retention data via SM-2
+    // Step 1b: Update retention data via SM-2.
     // Conservative: skip retention update when no quality rating was provided,
     // rather than defaulting to 3 (which inflates metrics). Issue #19.
-    outcomes.push(
-      await step.run('update-retention', async () => {
-        if (retentionTopicIds.length === 0)
-          return { step: 'update-retention', status: 'skipped' as const };
-        if (effectiveQuality == null) {
+    if (retentionTopicIds.length === 0) {
+      outcomes.push(
+        await step.run('update-retention', async () => ({
+          step: 'update-retention',
+          status: 'skipped' as const,
+        })),
+      );
+    } else if (effectiveQuality == null) {
+      outcomes.push(
+        await step.run('update-retention', async () => {
           // [logging sweep] structured logger so PII fields land as JSON context
           logger.warn(
             '[session-completed] No qualityRating — skipping retention update',
@@ -703,25 +708,34 @@ export const sessionCompleted = inngest.createFunction(
             },
           );
           return { step: 'update-retention', status: 'skipped' as const };
-        }
-        return runCritical('update-retention', async () => {
-          const db = getStepDatabase();
-          // [L7-F7] Parallelize per-topic SM-2 updates — they are independent
-          // writes against retention_cards keyed by (profileId, topicId).
-          await Promise.all(
-            retentionTopicIds.map((tid) =>
-              updateRetentionFromSession(
+        }),
+      );
+    } else {
+      // [WI-1426] Split SM-2 writes per topic. Inngest memoizes completed
+      // step.run calls, so a retry after one topic has already persisted does
+      // not re-run that topic's retention update; each topic's step is
+      // memoized independently by its step ID.
+      await Promise.all(
+        retentionTopicIds.map((tid) =>
+          step.run(`update-retention:${tid}`, async () =>
+            runCritical(`update-retention:${tid}`, async () => {
+              const db = getStepDatabase();
+              await updateRetentionFromSession(
                 db,
                 profileId,
                 tid,
                 effectiveQuality,
                 timestamp,
-              ),
-            ),
-          );
-        });
-      }),
-    );
+              );
+            }),
+          ),
+        ),
+      );
+      outcomes.push({
+        step: 'update-retention',
+        status: 'ok' as const,
+      });
+    }
 
     // [BUG-181] Return language progress through the step result so the value
     // survives Inngest replay memoization. Mutating closure vars inside
