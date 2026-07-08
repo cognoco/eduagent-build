@@ -129,7 +129,12 @@ lifecycle skill's description to carry them.
   implementation**. Never start an unclaimed item; if a live claim holds it
   (`Claimed By` set **and** `Claim Expires > now`), pick another.
 - **Finalize via `complete`; never self-close.** WHEN the work is committed and
-  pushed → run `/cosmo:execute complete`. It authors `Fixed In` (from the landed
+  **landed on the base branch** — pushed directly, or the PR *merged*, not merely
+  opened → run `/cosmo:execute complete`. Do **not** finalize at push on a PR-based
+  flow: `complete` moves the item to `Reviewing`, and review's DoD requires the
+  `Fixed In` commit to be an ancestor of `origin/main`, so an item finalized while
+  its PR is still open bounces every time (findings F12; WI-818/822 and five WS-37
+  items on 2026-07-08). It authors `Fixed In` (from the landed
   commit), the completion summary (lifecycle template: *What was done / What changed
   / Verification / Caveats / Follow-ups*), the `Stage=Reviewing` transition, and
   `Resolved`, and settles your claim. It self-gates on the mechanical DoD and refuses
