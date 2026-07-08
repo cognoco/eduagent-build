@@ -154,7 +154,7 @@ describe('transcriptPurgeCron', () => {
   it('[BUG-993] calls captureException when delayed sessions are found alongside purge candidates', async () => {
     mockGetStepRetentionPurgeEnabled.mockReturnValue(true);
 
-    const { step } = createInngestStepRunner({
+    const { step, runNames } = createInngestStepRunner({
       runResults: {
         'find-purge-candidates': [
           {
@@ -176,6 +176,9 @@ describe('transcriptPurgeCron', () => {
     const handler = (transcriptPurgeCron as any).fn;
     await handler({ step });
 
+    expect(runNames()).toEqual(
+      expect.arrayContaining(['capture-delayed-purge-with-candidates']),
+    );
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({
         message: expect.stringContaining('1 session(s) past day-37'),
@@ -193,7 +196,7 @@ describe('transcriptPurgeCron', () => {
   it('[BUG-993] calls captureException when delayed sessions are found and no purge candidates exist', async () => {
     mockGetStepRetentionPurgeEnabled.mockReturnValue(true);
 
-    const { step, sendEventCalls } = createInngestStepRunner({
+    const { step, sendEventCalls, runNames } = createInngestStepRunner({
       runResults: {
         'find-purge-candidates': [],
         'find-delayed-purge-candidates': [
@@ -226,6 +229,9 @@ describe('transcriptPurgeCron', () => {
           }),
         },
       ]),
+    );
+    expect(runNames()).toEqual(
+      expect.arrayContaining(['capture-delayed-purge-without-candidates']),
     );
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({
