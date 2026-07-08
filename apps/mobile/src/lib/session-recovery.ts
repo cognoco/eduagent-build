@@ -38,16 +38,19 @@ export async function writeSessionRecoveryMarker(
 export async function readSessionRecoveryMarker(
   profileId?: string | null,
 ): Promise<SessionRecoveryMarker | null> {
-  const raw = await SecureStore.getItemAsync(getRecoveryKey(profileId));
+  const scopedRecoveryKey = getRecoveryKey(profileId);
+  const raw = await SecureStore.getItemAsync(scopedRecoveryKey);
 
   // Legacy fallback: if no marker found under the profileId-scoped key,
   // check the old unscoped key for pre-migration markers.
-  const effectiveRaw =
-    raw ??
-    (profileId
+  const legacyRaw =
+    raw == null && profileId
       ? await SecureStore.getItemAsync(RECOVERY_KEY).catch(() => null)
-      : null);
+      : null;
+  const effectiveRaw = raw ?? legacyRaw;
   if (!effectiveRaw) return null;
+  const effectiveKey =
+    raw == null && legacyRaw != null ? RECOVERY_KEY : scopedRecoveryKey;
 
   try {
     const parsed = JSON.parse(effectiveRaw) as SessionRecoveryMarker;
@@ -80,6 +83,7 @@ export async function readSessionRecoveryMarker(
         ...(profileId ? { profileId } : {}),
       },
     });
+    await SecureStore.deleteItemAsync(effectiveKey).catch(() => undefined);
     return null;
   }
 }
