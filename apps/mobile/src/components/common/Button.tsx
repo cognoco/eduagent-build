@@ -1,8 +1,9 @@
 import { Pressable, Text, ActivityIndicator } from 'react-native';
+import type { PressableProps } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 
-type ButtonVariant = 'primary' | 'secondary' | 'tertiary';
+type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'danger';
 type ButtonSize = 'default' | 'small';
 
 interface ButtonProps {
@@ -14,6 +15,8 @@ interface ButtonProps {
   loading?: boolean;
   accessibilityLabel?: string;
   testID?: string;
+  className?: string;
+  style?: PressableProps['style'];
 }
 
 const variantClasses: Record<
@@ -38,6 +41,12 @@ const variantClasses: Record<
     text: 'text-primary',
     disabledText: 'text-muted',
   },
+  danger: {
+    base: 'bg-danger',
+    disabled: 'bg-surface-elevated',
+    text: 'text-text-inverse',
+    disabledText: 'text-muted',
+  },
 };
 
 const sizeClasses: Record<ButtonSize, { container: string; text: string }> = {
@@ -54,6 +63,8 @@ export function Button({
   loading = false,
   accessibilityLabel,
   testID,
+  className,
+  style,
 }: ButtonProps): React.JSX.Element {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -62,15 +73,30 @@ export function Button({
   const v = variantClasses[variant];
   const s = sizeClasses[size];
   const bgClass = isDisabled ? v.disabled : v.base;
+  const containerClassName = [
+    'rounded-button items-center',
+    s.container,
+    bgClass,
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const loadingColor =
+    variant === 'primary' || variant === 'danger'
+      ? colors.textInverse
+      : colors.primary;
 
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
-      className={`rounded-button items-center ${s.container} ${bgClass}`}
-      style={({ pressed }) => ({
-        opacity: pressed && !isDisabled ? 0.8 : 1,
-      })}
+      className={containerClassName}
+      style={(state) => [
+        {
+          opacity: state.pressed && !isDisabled ? 0.8 : 1,
+        },
+        typeof style === 'function' ? style(state) : style,
+      ]}
       accessibilityRole="button"
       // SR loading state lives on the Pressable — it is the accessible element,
       // so focusing the button while loading must surface the busy state, not
@@ -83,7 +109,7 @@ export function Button({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'primary' ? colors.textInverse : colors.primary}
+          color={loadingColor}
           accessibilityLabel={t('common.loading')}
         />
       ) : (
