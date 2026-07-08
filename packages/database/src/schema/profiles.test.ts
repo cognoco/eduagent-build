@@ -8,6 +8,8 @@
 // before reaching the repository call sites.
 // ---------------------------------------------------------------------------
 
+import { getTableConfig } from 'drizzle-orm/pg-core';
+
 import { pendingNotices } from './profiles.js';
 
 describe('pendingNotices schema (BUG-224)', () => {
@@ -24,6 +26,19 @@ describe('pendingNotices schema (BUG-224)', () => {
     expect(pendingNotices).toHaveProperty('type');
     expect(pendingNotices).toHaveProperty('payloadJson');
     expect(pendingNotices).toHaveProperty('seenAt');
+  });
+
+  it('deduplicates retry-created notices by owner, type, and payload', () => {
+    const cfg = getTableConfig(pendingNotices);
+    const idx = cfg.indexes.find(
+      (i) => i.config.name === 'pending_notices_owner_type_payload_uq',
+    );
+
+    expect(idx).toBeDefined();
+    expect(idx!.config.unique).toBe(true);
+    expect(
+      (idx!.config.columns as Array<{ name: string }>).map((c) => c.name),
+    ).toEqual(['owner_profile_id', 'type', 'payload_json']);
   });
 });
 

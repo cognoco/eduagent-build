@@ -46,9 +46,26 @@ function makeSelectDb(rows: unknown[]): Database {
 function makeInsertDb(row: unknown): Database {
   const builder = {
     values: () => builder,
+    onConflictDoNothing: () => builder,
     returning: () => Promise.resolve([row]),
   };
   return { insert: () => builder } as unknown as Database;
+}
+
+function makeConflictInsertDb(row: unknown): Database {
+  const builder = {
+    values: () => builder,
+    onConflictDoNothing: () => builder,
+    returning: () => Promise.resolve([]),
+  };
+  return {
+    insert: () => builder,
+    query: {
+      supportVisibilityNotices: {
+        findFirst: () => Promise.resolve(row),
+      },
+    },
+  } as unknown as Database;
 }
 
 describe('deriveVisibilityMoments payload resilience', () => {
@@ -91,5 +108,26 @@ describe('createVisibilityNotice', () => {
         payload: { broken: true },
       } as never),
     ).rejects.toThrow(/failed validation/);
+  });
+
+  it('returns the existing visibility notice when an Inngest retry repeats the write', async () => {
+    const db = makeConflictInsertDb(baseRow());
+
+    await expect(
+      createVisibilityNotice(db, {
+        supportershipId: SUPPORTERSHIP_ID,
+        noticeType: 'support_link_ended',
+        targetAudience: 'supportee',
+        targetPersonId: TARGET_ID,
+        payload: validPayload,
+      }),
+    ).resolves.toMatchObject({
+      id: '0190a1b2-c3d4-7e8f-8a9b-0c1d2e3f4a62',
+      type: 'support_link_ended',
+      supportershipId: SUPPORTERSHIP_ID,
+      targetAudience: 'supportee',
+      targetPersonId: TARGET_ID,
+      payload: validPayload,
+    });
   });
 });

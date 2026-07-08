@@ -1,3 +1,5 @@
+import { getTableConfig } from 'drizzle-orm/pg-core';
+
 import {
   supportVisibilityAuditEvents,
   supportVisibilityContracts,
@@ -35,6 +37,27 @@ describe('visibility contract schema', () => {
     expect(supportVisibilityNotices.targetAudience).toBeDefined();
     expect(supportVisibilityNotices.targetPersonId).toBeDefined();
     expect(supportVisibilityNotices.acknowledgedAt).toBeDefined();
+  });
+
+  it('deduplicates retry-created visibility notices by domain identity and payload', () => {
+    const cfg = getTableConfig(supportVisibilityNotices);
+    const idx = cfg.indexes.find(
+      (i) =>
+        i.config.name ===
+        'support_visibility_notices_supportership_type_target_payload_uq',
+    );
+
+    expect(idx).toBeDefined();
+    expect(idx!.config.unique).toBe(true);
+    expect(
+      (idx!.config.columns as Array<{ name: string }>).map((c) => c.name),
+    ).toEqual([
+      'supportership_id',
+      'notice_type',
+      'target_audience',
+      'target_person_id',
+      'payload',
+    ]);
   });
 
   it('does not add ceremony columns to the canonical supportership edge', () => {

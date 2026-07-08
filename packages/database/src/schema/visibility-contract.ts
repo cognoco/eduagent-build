@@ -139,6 +139,15 @@ export const supportVisibilityNotices = pgTable(
       .defaultNow(),
   },
   (table) => [
+    uniqueIndex(
+      'support_visibility_notices_supportership_type_target_payload_uq',
+    ).on(
+      table.supportershipId,
+      table.noticeType,
+      table.targetAudience,
+      table.targetPersonId,
+      table.payload,
+    ),
     index('support_visibility_notices_target_created_idx').on(
       table.targetPersonId,
       table.createdAt,
