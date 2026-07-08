@@ -16,6 +16,7 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
+import { useActiveProfileRole } from './use-active-profile-role';
 import { useApiQuery } from './use-api-query';
 
 // ---------------------------------------------------------------------------
@@ -54,13 +55,14 @@ export function useChildCelebrationLevel(
 ): UseQueryResult<CelebrationLevel> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const activeProfileRole = useActiveProfileRole();
 
   return useApiQuery<{ celebrationLevel: CelebrationLevel }, CelebrationLevel>({
     queryKey: queryKeys.settings.childCelebrationLevel(
       childProfileId,
       activeProfile?.id,
     ),
-    enabled: !!activeProfile?.isOwner && !!childProfileId,
+    enabled: activeProfileRole === 'owner' && !!childProfileId,
     fetch: (signal) =>
       client.settings['celebration-level'].$get(
         { query: childProfileId ? { childProfileId } : {} },
@@ -73,13 +75,14 @@ export function useChildCelebrationLevel(
 export function useWithdrawalArchivePreference(): UseQueryResult<WithdrawalArchivePreference> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const activeProfileRole = useActiveProfileRole();
 
   return useApiQuery<
     { value: WithdrawalArchivePreference },
     WithdrawalArchivePreference
   >({
     queryKey: queryKeys.settings.withdrawalArchive(activeProfile?.id),
-    enabled: !!activeProfile?.id && activeProfile.isOwner === true,
+    enabled: !!activeProfile?.id && activeProfileRole === 'owner',
     fetch: (signal) =>
       client.settings['withdrawal-archive'].$get({}, { init: { signal } }),
     select: (json) => json.value as WithdrawalArchivePreference,
@@ -89,10 +92,11 @@ export function useWithdrawalArchivePreference(): UseQueryResult<WithdrawalArchi
 export function useFamilyPoolBreakdownSharing(): UseQueryResult<boolean> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const activeProfileRole = useActiveProfileRole();
 
   return useApiQuery<{ value: boolean }, boolean>({
     queryKey: queryKeys.settings.familyPoolBreakdownSharing(activeProfile?.id),
-    enabled: !!activeProfile?.id && activeProfile.isOwner === true,
+    enabled: !!activeProfile?.id && activeProfileRole === 'owner',
     fetch: (signal) =>
       client.settings['family-pool-breakdown-sharing'].$get(
         {},

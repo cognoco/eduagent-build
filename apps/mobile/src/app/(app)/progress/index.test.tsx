@@ -205,7 +205,7 @@ let mockActiveProfile = {
   displayName: 'Owner',
 };
 let mockLinkedChildren: Array<{ id: string; displayName: string }> = [];
-let mockOwnInventory = EMPTY_INVENTORY;
+let mockOwnInventory: unknown = EMPTY_INVENTORY;
 let mockChildInventory: unknown = undefined;
 const mockUseChildInventory = jest.fn();
 const mockUseProfileSessions = jest.fn();
@@ -367,6 +367,23 @@ describe('ProgressScreen refresh error handling', () => {
       params: { profileId: 'child-1' },
     });
     expect(mockPush).not.toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('uses child hero copy when parent proxy views the active child progress', async () => {
+    mockActiveProfileRole = 'impersonated-child';
+    mockActiveProfile = {
+      id: 'child-1',
+      createdAt: '2026-01-01T00:00:00Z',
+      displayName: 'Ari',
+    };
+    mockOwnInventory = LANGUAGE_INVENTORY;
+
+    render(<ProgressScreen />);
+
+    await waitFor(() => {
+      screen.getByText('progress.register.child.masteredTopicsHero');
+    });
+    expect(screen.queryByText('progress.hero.masteredTopics')).toBeNull();
   });
 
   it('renders vocabulary stats read-only when viewing a linked child profile', async () => {

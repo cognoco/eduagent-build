@@ -1,6 +1,7 @@
+import type { ActiveProfileRole } from '../../../../hooks/use-active-profile-role';
 import type { Translate } from '../../../../i18n';
 
-type CopyRegister = 'adult' | 'child';
+type CopyRegister = Extract<ActiveProfileRole, 'owner' | 'child'>;
 
 export function heroCopy(
   input: {

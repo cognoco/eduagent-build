@@ -11,10 +11,9 @@ export const PROFILE_MINIMUM_AGE = 13;
 export const PARENT_ACCOUNT_MINIMUM_AGE = 18;
 
 /**
- * The active-profile role discriminator. Mirrors
- * `ActiveProfileRole` in apps/mobile/src/hooks/use-active-profile-role.ts —
- * kept here as the canonical type so server-side ageing logic and mobile
- * gating share a single source.
+ * The active-profile role discriminator. Mobile re-exports this as
+ * `ActiveProfileRole`; keep this shared schema type canonical so server-side
+ * ageing logic and mobile gating share a single source.
  *
  * - 'owner':              adult/parent on their OWN profile (no parent in scope)
  * - 'child':              child profile signed in directly (rare — app is 11+)

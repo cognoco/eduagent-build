@@ -27,7 +27,7 @@ describe('heroCopy', () => {
   it('zero-mastery with sessions ≥ 1 → sessionsCompleted', () => {
     const result = heroCopy(
       { topicsMastered: 0, vocabularyTotal: 0, totalSessions: 3 },
-      'adult',
+      'owner',
       fakeT,
     );
     expect(result.title).toBe('progress.hero.sessionsCompleted');
@@ -37,7 +37,7 @@ describe('heroCopy', () => {
   it('low-mastery with sessions ≥ 5 → sessionsCompleted', () => {
     const result = heroCopy(
       { topicsMastered: 2, vocabularyTotal: 2, totalSessions: 6 },
-      'adult',
+      'owner',
       fakeT,
     );
     expect(result.title).toBe('progress.hero.sessionsCompleted');
@@ -47,7 +47,7 @@ describe('heroCopy', () => {
   it('vocab-only low (< 20) → buildingLanguage', () => {
     const result = heroCopy(
       { topicsMastered: 0, vocabularyTotal: 15, totalSessions: 4 },
-      'adult',
+      'owner',
       fakeT,
     );
     expect(result.title).toBe('progress.hero.buildingLanguage');
@@ -57,7 +57,7 @@ describe('heroCopy', () => {
   it('vocab-only high (≥ 20) → knowWords', () => {
     const result = heroCopy(
       { topicsMastered: 0, vocabularyTotal: 25, totalSessions: 4 },
-      'adult',
+      'owner',
       fakeT,
     );
     expect(result.title).toBe('progress.hero.knowWords');
@@ -67,7 +67,7 @@ describe('heroCopy', () => {
   it('topics-only low (< 20) → buildingKnowledge', () => {
     const result = heroCopy(
       { topicsMastered: 10, vocabularyTotal: 0, totalSessions: 4 },
-      'adult',
+      'owner',
       fakeT,
     );
     expect(result.title).toBe('progress.hero.buildingKnowledge');
@@ -77,7 +77,7 @@ describe('heroCopy', () => {
   it('topics-only high (≥ 20) → masteredTopics', () => {
     const result = heroCopy(
       { topicsMastered: 25, vocabularyTotal: 0, totalSessions: 4 },
-      'adult',
+      'owner',
       fakeT,
     );
     expect(result.title).toBe('progress.hero.masteredTopics');
@@ -87,7 +87,7 @@ describe('heroCopy', () => {
   it('both populated → masteredTopics + masteredTopicsAndWords', () => {
     const result = heroCopy(
       { topicsMastered: 30, vocabularyTotal: 30, totalSessions: 12 },
-      'adult',
+      'owner',
       fakeT,
     );
     expect(result.title).toBe('progress.hero.masteredTopics');
