@@ -43,32 +43,6 @@ jest.mock(
 );
 
 jest.mock(
-  '../services/retention-data' /* gc1-allow: unit-route isolation for assessments route */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/retention-data',
-    ) as typeof import('../services/retention-data');
-    return {
-      ...actual,
-      updateRetentionFromSession: jest.fn().mockResolvedValue(undefined),
-    };
-  },
-);
-
-jest.mock(
-  '../services/xp' /* gc1-allow: unit-route isolation for assessments route */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/xp',
-    ) as typeof import('../services/xp');
-    return {
-      ...actual,
-      insertSessionXpEntry: jest.fn().mockResolvedValue(undefined),
-    };
-  },
-);
-
-jest.mock(
   '../services/evaluate' /* gc1-allow: unit-route isolation for assessments route */,
   () => {
     const actual = jest.requireActual(
