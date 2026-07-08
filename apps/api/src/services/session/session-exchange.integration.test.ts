@@ -351,6 +351,18 @@ async function seedActiveSession(
       },
     })
     .returning();
+
+  await db.insert(sessionEvents).values({
+    id: answerEventId,
+    profileId,
+    subjectId,
+    sessionId: row!.id,
+    topicId,
+    eventType: 'user_message',
+    content: 'Plants use sunlight to split water.',
+    metadata: { source: 'test' },
+  });
+
   return mapSessionRow(row!);
 }
 
