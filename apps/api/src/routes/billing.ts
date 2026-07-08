@@ -374,6 +374,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       : updated.items.data[0]?.current_period_end;
     const periodEndTs = subscriptionLevelEnd ?? itemLevelEnd;
     if (!periodEndTs) {
+      const missingPeriodEndError = new Error(
+        'Stripe cancel response returned no current_period_end',
+      );
       // [logging sweep] structured logger so PII fields land as JSON context
       logger.error(
         '[billing] Subscription returned no current_period_end -- falling back to current timestamp',
@@ -381,6 +384,14 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           stripeSubscriptionId: subscription.stripeSubscriptionId,
         },
       );
+      captureException(missingPeriodEndError, {
+        extra: {
+          context: 'billing.subscriptionCancel.missingCurrentPeriodEnd',
+          accountId: account.id,
+          subscriptionId: subscription.id,
+          stripeSubscriptionId: subscription.stripeSubscriptionId,
+        },
+      });
     }
     const currentPeriodEnd = periodEndTs
       ? new Date(periodEndTs * 1000).toISOString()

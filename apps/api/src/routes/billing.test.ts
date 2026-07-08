@@ -844,6 +844,24 @@ describe('billing routes', () => {
       expect(
         new Date(body.currentPeriodEnd).getFullYear(),
       ).toBeGreaterThanOrEqual(2024);
+
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      const [capturedErr, capturedCtx] = mockCaptureException.mock.calls[0];
+      expect(capturedErr).toEqual(
+        expect.objectContaining({
+          message: 'Stripe cancel response returned no current_period_end',
+        }),
+      );
+      expect(capturedCtx).toEqual(
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            context: 'billing.subscriptionCancel.missingCurrentPeriodEnd',
+            accountId: 'test-account-id',
+            subscriptionId: 'sub-1',
+            stripeSubscriptionId: 'sub_test123',
+          }),
+        }),
+      );
     });
   });
 
