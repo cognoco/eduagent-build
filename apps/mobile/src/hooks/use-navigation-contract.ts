@@ -71,6 +71,9 @@ function useResolvedNavigationState(
   const subscriptionTier = subscription.tier;
   const effectiveAccessTier = subscription.effectiveAccessTier;
   const billingAccess = subscription.billingAccess;
+  const modeNavV0Enabled = FEATURE_FLAGS.MODE_NAV_V0_ENABLED;
+  const modeNavV1Enabled = FEATURE_FLAGS.MODE_NAV_V1_ENABLED;
+  const modeNavV2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
 
   const contract = useMemo(
     () =>
@@ -87,8 +90,9 @@ function useResolvedNavigationState(
           billingAccess,
         },
         flags: {
-          MODE_NAV_V0_ENABLED: FEATURE_FLAGS.MODE_NAV_V0_ENABLED,
-          MODE_NAV_V1_ENABLED: FEATURE_FLAGS.MODE_NAV_V1_ENABLED,
+          MODE_NAV_V0_ENABLED: modeNavV0Enabled,
+          MODE_NAV_V1_ENABLED: modeNavV1Enabled,
+          MODE_NAV_V2_ENABLED: modeNavV2Enabled,
         },
       }),
     [
@@ -101,6 +105,9 @@ function useResolvedNavigationState(
       subscriptionTier,
       effectiveAccessTier,
       billingAccess,
+      modeNavV0Enabled,
+      modeNavV1Enabled,
+      modeNavV2Enabled,
     ],
   );
 

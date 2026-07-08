@@ -702,6 +702,71 @@ describe('resolveNavigationContract route predicates', () => {
     ]);
   });
 
+  it('allows and surfaces V2 root routes only when V2 navigation is enabled', () => {
+    const v2OnContract = resolveNavigationContract(
+      makeContext({
+        flags: {
+          MODE_NAV_V2_ENABLED: true,
+        },
+      }),
+    );
+    const v2OffContract = resolveNavigationContract(
+      makeContext({
+        flags: {
+          MODE_NAV_V2_ENABLED: false,
+        },
+      }),
+    );
+
+    expectRoutes(v2OnContract, [
+      { route: 'mentor', canEnter: true, isSurfaced: true },
+      { route: 'subjects', canEnter: true, isSurfaced: true },
+      { route: 'journal', canEnter: true, isSurfaced: true },
+    ]);
+    expectRoutes(v2OffContract, [
+      { route: 'mentor', canEnter: false, isSurfaced: false },
+      { route: 'subjects', canEnter: false, isSurfaced: false },
+      { route: 'journal', canEnter: false, isSurfaced: false },
+    ]);
+  });
+
+  it('keeps V2 root routes behind active-profile and proxy guards', () => {
+    const noProfileContract = resolveNavigationContract(
+      makeContext({
+        activeProfile: null,
+        flags: {
+          MODE_NAV_V2_ENABLED: true,
+        },
+      }),
+    );
+    const proxyContract = resolveNavigationContract(
+      makeContext({
+        activeProfile: familyAdult,
+        appContext: 'family',
+        flags: {
+          MODE_NAV_V2_ENABLED: true,
+        },
+        isParentProxy: true,
+        profiles: [familyAdult, child],
+      }),
+    );
+
+    expectRoutes(noProfileContract, [
+      { route: 'home', canEnter: true, isSurfaced: true },
+      { route: 'mentor', canEnter: false, isSurfaced: false },
+      { route: 'subjects', canEnter: false, isSurfaced: false },
+      { route: 'journal', canEnter: false, isSurfaced: false },
+    ]);
+    expectRoutes(proxyContract, [
+      { route: 'home', canEnter: true, isSurfaced: true },
+      { route: 'library', canEnter: true, isSurfaced: true },
+      { route: 'progress', canEnter: true, isSurfaced: true },
+      { route: 'mentor', canEnter: false, isSurfaced: false },
+      { route: 'subjects', canEnter: false, isSurfaced: false },
+      { route: 'journal', canEnter: false, isSurfaced: false },
+    ]);
+  });
+
   it('surfaces Family routes and keeps learning routes reachable only by bridge', () => {
     const contract = resolveNavigationContract(
       makeContext({
@@ -1513,10 +1578,31 @@ describe('V0 fallback - hard constraint (AGENTS.md, spec section Hard Constraint
 
 describe('navigation-contract totality (fuzzed inputs never throw)', () => {
   const flagsCases: ReadonlyArray<ProfileContext['flags']> = [
-    { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: false },
-    { MODE_NAV_V0_ENABLED: true, MODE_NAV_V1_ENABLED: false },
-    { MODE_NAV_V0_ENABLED: false, MODE_NAV_V1_ENABLED: true },
-    { MODE_NAV_V0_ENABLED: true, MODE_NAV_V1_ENABLED: true },
+    {
+      MODE_NAV_V0_ENABLED: false,
+      MODE_NAV_V1_ENABLED: false,
+      MODE_NAV_V2_ENABLED: false,
+    },
+    {
+      MODE_NAV_V0_ENABLED: true,
+      MODE_NAV_V1_ENABLED: false,
+      MODE_NAV_V2_ENABLED: false,
+    },
+    {
+      MODE_NAV_V0_ENABLED: false,
+      MODE_NAV_V1_ENABLED: true,
+      MODE_NAV_V2_ENABLED: false,
+    },
+    {
+      MODE_NAV_V0_ENABLED: true,
+      MODE_NAV_V1_ENABLED: true,
+      MODE_NAV_V2_ENABLED: false,
+    },
+    {
+      MODE_NAV_V0_ENABLED: false,
+      MODE_NAV_V1_ENABLED: true,
+      MODE_NAV_V2_ENABLED: true,
+    },
   ];
   const appContexts: ReadonlyArray<ProfileContext['appContext']> = [
     null,
@@ -1579,6 +1665,9 @@ describe('navigation-contract totality (fuzzed inputs never throw)', () => {
     null,
   ];
   const probeRoutes: ReadonlyArray<RouteKey> = [
+    'mentor',
+    'subjects',
+    'journal',
     'home',
     'library',
     'recaps',

@@ -66,6 +66,7 @@ export type NavigationProfile = Profile & {
 export interface NavigationFlags {
   MODE_NAV_V0_ENABLED?: boolean;
   MODE_NAV_V1_ENABLED: boolean;
+  MODE_NAV_V2_ENABLED?: boolean;
 }
 
 export interface NavigationSubscriptionContext {
@@ -172,6 +173,8 @@ const LEGACY_GUARDIAN_TABS: ReadonlySet<TabKey> = new Set([
   'progress',
   'more',
 ]);
+
+const V2_ROUTES = new Set<RouteKey>(['mentor', 'subjects', 'journal']);
 
 const LEARNING_ROUTES = new Set<RouteKey>([
   'session',
@@ -458,6 +461,10 @@ export function resolveCanEnter(
       return route === 'home' || route === 'library' || route === 'progress';
     }
 
+    if (V2_ROUTES.has(route)) {
+      return context.flags.MODE_NAV_V2_ENABLED === true;
+    }
+
     if (FAMILY_CHILD_ROUTES.has(route)) {
       // V0 never sets shape='family'. In V0, legacyV0ModeNavActive +
       // effectiveAppContext='family' stands in for familyShape so family-child
@@ -538,6 +545,10 @@ export function resolveIsSurfaced(
     }
 
     switch (route) {
+      case 'mentor':
+      case 'subjects':
+      case 'journal':
+        return true;
       case 'home':
       case 'progress':
         return true;

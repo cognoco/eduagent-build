@@ -91,6 +91,9 @@ const SUB_TIERS: ReadonlyArray<SubscriptionTier | null> = [
 const BOOLS = [false, true] as const;
 
 const ALL_ROUTES: ReadonlyArray<RouteKey> = [
+  'mentor',
+  'subjects',
+  'journal',
   'home',
   'own-learning',
   'library',
@@ -191,6 +194,7 @@ function randomContext(rng: () => number): ProfileContext {
     flags: {
       MODE_NAV_V0_ENABLED: pick(rng, BOOLS),
       MODE_NAV_V1_ENABLED: pick(rng, BOOLS),
+      MODE_NAV_V2_ENABLED: pick(rng, BOOLS),
     },
   };
 }
