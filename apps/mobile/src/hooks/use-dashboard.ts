@@ -19,6 +19,7 @@ import { assertOk } from '../lib/assert-ok';
 import { useAppContext } from '../lib/app-context';
 import { FEATURE_FLAGS } from '../lib/feature-flags';
 import { queryKeys } from '../lib/query-keys';
+import { useActiveProfileRole } from './use-active-profile-role';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 
 // Mirror of api/services/dashboard.ts:ChildSession used by the
@@ -62,6 +63,7 @@ function useDashboardNavigationScope(): {
 } {
   const { activeProfile } = useProfile();
   const { mode: legacyMode } = useAppContext();
+  const activeProfileRole = useActiveProfileRole();
   const navigationContract = useNavigationDataScopeContract();
   const mode = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
     ? navigationContract.queryScope.appContext
@@ -71,7 +73,7 @@ function useDashboardNavigationScope(): {
     : activeProfile?.id;
   const canAccessFamilyChildData = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
     ? navigationContract.gates.showFamilyChildActivity
-    : legacyMode !== 'study' && activeProfile?.isOwner === true;
+    : legacyMode !== 'study' && activeProfileRole === 'owner';
 
   return { activeProfile, mode, profileId, canAccessFamilyChildData };
 }

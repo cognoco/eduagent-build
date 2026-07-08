@@ -48,6 +48,7 @@ import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
 import { Sentry } from '../lib/sentry';
+import { useActiveProfileRole } from './use-active-profile-role';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 import { useApiQuery } from './use-api-query';
 
@@ -73,6 +74,7 @@ function useProgressNavigationScope(): {
 } {
   const { activeProfile } = useProfile();
   const { mode: legacyMode } = useAppContext();
+  const activeProfileRole = useActiveProfileRole();
   const navigationContract = useNavigationDataScopeContract();
   const mode = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
     ? navigationContract.queryScope.appContext
@@ -82,7 +84,7 @@ function useProgressNavigationScope(): {
     : activeProfile?.id;
   const canAccessFamilyChildData = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
     ? navigationContract.gates.showFamilyChildActivity
-    : legacyMode !== 'study' && activeProfile?.isOwner === true;
+    : legacyMode !== 'study' && activeProfileRole === 'owner';
 
   return { activeProfile, mode, profileId, canAccessFamilyChildData };
 }

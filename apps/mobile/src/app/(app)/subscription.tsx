@@ -41,6 +41,7 @@ import {
   usePurchase,
   useRestorePurchases,
 } from '../../hooks/use-revenuecat';
+import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { track } from '../../lib/analytics';
 import { formatShortDate } from '../../lib/format-datetime';
@@ -99,6 +100,7 @@ function SubscriptionContent(): React.ReactElement | null {
   const colors = useThemeColors();
   const { activeProfile, profiles = [] } = useProfile();
   const navigationContract = useNavigationContract();
+  const activeProfileRole = useActiveProfileRole();
   const client = useApiClient();
   const { t, i18n } = useTranslation();
 
@@ -125,13 +127,12 @@ function SubscriptionContent(): React.ReactElement | null {
     );
   const byokWaitlist = useJoinByokWaitlist();
   const removeFamilyProfile = useRemoveFamilyProfile();
-  // Account-identity fact: drives analytics and the child-paywall routing
-  // decision below. Navigation UI visibility (billing card, remove-member
-  // button) consumes the contract gates; this raw owner read covers the
-  // non-UI surfaces the plan keeps explicit.
-  const isOwnerProfile = activeProfile?.isOwner === true;
   const canUseOwnerBillingGates = navigationContract.gates.showBilling;
   const canRemoveFamilyMember = navigationContract.gates.showRemoveFamilyMember;
+  // Session-owner fact: drives analytics and the child-paywall routing
+  // decision below. Raw member.isOwner reads below only classify family-pool
+  // rows; active-user role checks go through useActiveProfileRole/contract.
+  const isOwnerProfile = activeProfileRole === 'owner';
   const linkedChildCount =
     canUseOwnerBillingGates && activeProfile
       ? profiles.filter((profile) => profile.id !== activeProfile.id).length

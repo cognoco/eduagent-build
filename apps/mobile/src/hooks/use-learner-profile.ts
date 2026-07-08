@@ -12,6 +12,7 @@ import type {
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
+import { useActiveProfileRole } from './use-active-profile-role';
 import { useApiQuery } from './use-api-query';
 
 interface ToggleCollectionInput {
@@ -67,7 +68,7 @@ export function useChildLearnerProfile(
   childProfileId: string | undefined,
 ): UseQueryResult<LearningProfile> {
   const client = useApiClient();
-  const { activeProfile } = useProfile();
+  const activeProfileRole = useActiveProfileRole();
 
   return useApiQuery<{ profile: LearningProfile }, LearningProfile>({
     queryKey: learnerProfileKey(childProfileId),
@@ -77,7 +78,7 @@ export function useChildLearnerProfile(
         { init: { signal } },
       ),
     select: (json) => json.profile,
-    enabled: activeProfile?.isOwner === true && !!childProfileId,
+    enabled: activeProfileRole === 'owner' && !!childProfileId,
   });
 }
 

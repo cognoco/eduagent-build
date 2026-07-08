@@ -124,7 +124,7 @@ export default function CreateProfileScreen() {
   // adult. We must NOT redirect to the child-consent-request flow or switch
   // to the child profile afterwards.
   const isParentAddingChild =
-    activeProfile?.isOwner === true && profiles.length > 0;
+    activeProfileRole === 'owner' && profiles.length > 0;
   const isAddingChild = params.for === 'child' || isParentAddingChild;
   const isFirstProfileCreation =
     !isProfileLoading && !activeProfile && profiles.length === 0;

@@ -67,7 +67,8 @@ import { useTheme } from '../../../lib/theme';
 export default function ProgressScreen(): React.ReactElement {
   const { t } = useTranslation();
   const role = useActiveProfileRole();
-  const register = role === 'child' ? 'child' : 'adult';
+  const register =
+    role === 'child' || role === 'impersonated-child' ? 'child' : 'owner';
   const router = useRouter();
   const client = useApiClient();
   const { profileId: rawRequestedProfileId } = useLocalSearchParams<{

@@ -216,9 +216,8 @@ const V0_FALLBACK_FILES: readonly LegitimateRawNavigationGateFile[] = [
     file: 'apps/mobile/src/hooks/use-dashboard.ts',
     category: 'v0-fallback',
     reason:
-      'V0-fallback: dashboard data scope uses contract queryScope in V1 and legacy mode/profile in V0.',
+      'V0-fallback: dashboard data scope uses contract queryScope in V1 and legacy mode plus active-profile role in V0.',
     expectedFindings: {
-      'profile-owner-read': 1,
       'raw-hook-call': 1,
       'raw-hook-import': 1,
     },
@@ -237,9 +236,8 @@ const V0_FALLBACK_FILES: readonly LegitimateRawNavigationGateFile[] = [
     file: 'apps/mobile/src/hooks/use-progress.ts',
     category: 'v0-fallback',
     reason:
-      'V0-fallback: progress data scope uses contract queryScope in V1 and legacy mode/profile in V0.',
+      'V0-fallback: progress data scope uses contract queryScope in V1 and legacy mode plus active-profile role in V0.',
     expectedFindings: {
-      'profile-owner-read': 1,
       'raw-hook-call': 2,
       'raw-hook-import': 1,
     },
@@ -299,15 +297,8 @@ const NON_NAV_DOMAIN_FILES: readonly LegitimateRawNavigationGateFile[] = [
     file: 'apps/mobile/src/app/(app)/subscription.tsx',
     category: 'non-nav-domain-read',
     reason:
-      'family-member labels: subscription gates UI visibility through the contract, keeps one consolidated owner read for analytics/paywall/V0 fallback, and reads member.isOwner on family-pool rows.',
-    expectedFindings: { 'profile-owner-read': 3 },
-  },
-  {
-    file: 'apps/mobile/src/app/create-profile.tsx',
-    category: 'non-nav-domain-read',
-    reason:
-      'account ownership: create-profile validates parent-owned profile creation outside the tab contract.',
-    expectedFindings: { 'profile-owner-read': 1 },
+      'family-member labels: subscription gates active-user UI visibility through the contract and reads member.isOwner only on family-pool rows.',
+    expectedFindings: { 'profile-owner-read': 2 },
   },
   {
     file: 'apps/mobile/src/app/delete-account.tsx',
@@ -315,27 +306,6 @@ const NON_NAV_DOMAIN_FILES: readonly LegitimateRawNavigationGateFile[] = [
     reason:
       'account ownership: delete-account validates owner-only account deletion outside the tab contract.',
     expectedFindings: { 'profile-owner-read': 1 },
-  },
-  {
-    file: 'apps/mobile/src/hooks/use-consent.ts',
-    category: 'non-nav-domain-read',
-    reason:
-      'account ownership: consent status query is enabled only for parent-owned profiles.',
-    expectedFindings: { 'profile-owner-read': 1 },
-  },
-  {
-    file: 'apps/mobile/src/hooks/use-learner-profile.ts',
-    category: 'non-nav-domain-read',
-    reason:
-      'account ownership: learner-profile child editor query is enabled only for parent-owned profiles.',
-    expectedFindings: { 'profile-owner-read': 1 },
-  },
-  {
-    file: 'apps/mobile/src/hooks/use-settings.ts',
-    category: 'non-nav-domain-read',
-    reason:
-      'account ownership: parent-owned settings queries remain outside the tab navigation contract.',
-    expectedFindings: { 'profile-owner-read': 3 },
   },
   {
     file: 'apps/mobile/src/components/session/SessionMessageActions.tsx',

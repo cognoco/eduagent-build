@@ -20,6 +20,7 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
 import { parseJson } from '../lib/parse-json';
+import { useActiveProfileRole } from './use-active-profile-role';
 import { useApiQuery } from './use-api-query';
 
 export function useRequestConsent(): UseMutationResult<
@@ -159,6 +160,7 @@ export function useChildConsentStatus(
   // shared device does not collide. The server scopes the response by
   // the requesting parent, so the cache key must mirror that scope.
   const { activeProfile } = useProfile();
+  const activeProfileRole = useActiveProfileRole();
 
   return useApiQuery<ChildConsentData>({
     queryKey: ['consent', 'child', childProfileId, activeProfile?.id],
@@ -168,7 +170,7 @@ export function useChildConsentStatus(
         { init: { signal } },
       ),
     select: (json) => childConsentStatusSchema.parse(json),
-    enabled: !!childProfileId && activeProfile?.isOwner === true,
+    enabled: !!childProfileId && activeProfileRole === 'owner',
   });
 }
 

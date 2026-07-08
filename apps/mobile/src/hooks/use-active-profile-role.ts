@@ -1,3 +1,5 @@
+import type { AgeGateRole } from '@eduagent/schemas';
+
 import { useProfile } from '../lib/profile';
 import { useParentProxy } from './use-parent-proxy';
 
@@ -15,7 +17,7 @@ import { useParentProxy } from './use-parent-proxy';
 // parent must not see "Sign out" / "Delete account", but should still see
 // the child-scoped "Set by your parent" framing on screens reachable in
 // proxy mode.
-export type ActiveProfileRole = 'owner' | 'impersonated-child' | 'child';
+export type ActiveProfileRole = AgeGateRole;
 
 export interface ActiveProfileRoleState {
   /**
