@@ -47,7 +47,10 @@ import {
   formatMonthlyProgressEmail,
   type ChildStruggleLine,
 } from '../../services/notifications';
-import { getRecentNotificationCount } from '../../services/settings';
+import {
+  getRecentNotificationCount,
+  logNotification,
+} from '../../services/settings';
 import { listStruggleTopicNames } from '../../services/learner-profile';
 import { captureException } from '../../services/sentry';
 import { buildLegacyEmailIdempotencyKey } from '../../services/dedupe-key';
@@ -599,6 +602,17 @@ export const monthlyReportGenerate = inngest.createFunction(
     ) {
       await step.run('send-monthly-email', async () => {
         const db = getStepDatabase();
+        if (!pushResult.sent) {
+          const recentEmailCount = await getRecentNotificationCount(
+            db,
+            parentId,
+            'monthly_report',
+            24,
+          );
+          if (recentEmailCount > 0) {
+            return { sent: false, reason: 'dedup_24h' as const };
+          }
+        }
         const prefs = await db.query.notificationPreferences.findFirst({
           where: eq(notificationPreferences.profileId, parentId),
           columns: { monthlyProgressEmail: true },
@@ -646,7 +660,7 @@ export const monthlyReportGenerate = inngest.createFunction(
           summary,
           struggleLines,
         );
-        await sendEmail(emailPayload, {
+        const result = await sendEmail(emailPayload, {
           resendApiKey: getStepResendApiKey(),
           idempotencyKey: buildLegacyEmailIdempotencyKey(
             'monthly',
@@ -654,7 +668,15 @@ export const monthlyReportGenerate = inngest.createFunction(
             reportResult.reportMonth,
           ),
         });
-        return { sent: true };
+        if (result.sent) {
+          await logNotification(
+            db,
+            parentId,
+            'monthly_report',
+            `email-${reportResult.reportMonth}`,
+          );
+        }
+        return result;
       });
     }
 
