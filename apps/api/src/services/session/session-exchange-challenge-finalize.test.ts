@@ -59,6 +59,7 @@ import type {
 import {
   claimChallengeRoundQuestionAsked,
   finalizeChallengeRoundIfReady,
+  persistActiveChallengeRoundTransition,
 } from './session-exchange';
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import { captureException } from '../sentry';
@@ -408,6 +409,80 @@ describe('claimChallengeRoundQuestionAsked — serializes stale concurrent quest
     expect(persistedChallengeState(state)?.questionsAsked).toBe(
       MAX_CHALLENGE_QUESTIONS,
     );
+  });
+
+  it('does not let an older turn overwrite a newer persisted counter/evaluation', async () => {
+    const firstEvaluation: ChallengeRoundEvaluationItem = {
+      concept: 'first turn',
+      result: 'solid',
+      evidence: 'first',
+      answerEventId: '00000000-0000-4000-8000-000000000101',
+      learnerQuote: 'first answer',
+    };
+    const secondEvaluation: ChallengeRoundEvaluationItem = {
+      concept: 'second turn',
+      result: 'solid',
+      evidence: 'second',
+      answerEventId: '00000000-0000-4000-8000-000000000102',
+      learnerQuote: 'second answer',
+    };
+    const state: FakeDbState = {
+      sessionMetadata: {
+        challengeRound: {
+          ...activeState(2),
+          questionIndex: 2,
+          evaluations: [secondEvaluation],
+        },
+      },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+
+    const staleFirstTurnResult: ChallengeRoundSessionState = {
+      ...activeState(1),
+      questionIndex: 1,
+      evaluations: [firstEvaluation],
+    };
+
+    const persisted = await persistActiveChallengeRoundTransition(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      staleFirstTurnResult,
+    );
+
+    expect(persisted?.state).toBe('active');
+    expect(persisted?.questionsAsked).toBe(2);
+    expect(persisted?.questionIndex).toBe(2);
+    expect(persisted?.evaluations).toEqual([secondEvaluation, firstEvaluation]);
+    expect(persistedChallengeState(state)?.questionsAsked).toBe(2);
+  });
+
+  it('does not let a stale active turn overwrite a terminal persisted state', async () => {
+    const terminal = {
+      ...activeState(MAX_CHALLENGE_QUESTIONS),
+      state: 'complete',
+    } as ChallengeRoundSessionState;
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound: terminal },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+
+    const staleActive = activeState(MAX_CHALLENGE_QUESTIONS - 1);
+    const persisted = await persistActiveChallengeRoundTransition(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      staleActive,
+    );
+
+    expect(persisted?.state).toBe('complete');
+    expect(persistedChallengeState(state)?.state).toBe('complete');
   });
 });
 

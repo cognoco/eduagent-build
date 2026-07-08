@@ -574,6 +574,88 @@ export async function claimChallengeRoundQuestionAsked(
   });
 }
 
+function evaluationKey(item: ChallengeRoundEvaluationItem): string {
+  return `${item.answerEventId ?? ''}:${item.concept}:${item.result}`;
+}
+
+function mergeChallengeRoundTransition(
+  persisted: ChallengeRoundSessionState,
+  candidate: ChallengeRoundSessionState,
+): ChallengeRoundSessionState {
+  const seen = new Set<string>();
+  const evaluations: ChallengeRoundEvaluationItem[] = [];
+  for (const item of [...persisted.evaluations, ...candidate.evaluations]) {
+    const key = evaluationKey(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    evaluations.push(item);
+  }
+
+  return {
+    ...persisted,
+    ...candidate,
+    questionIndex: Math.max(
+      persisted.questionIndex ?? 0,
+      candidate.questionIndex ?? 0,
+    ),
+    questionsAsked: Math.max(
+      persisted.questionsAsked ?? 0,
+      candidate.questionsAsked ?? 0,
+    ),
+    evaluations,
+  };
+}
+
+export async function persistActiveChallengeRoundTransition(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  candidate: ChallengeRoundSessionState | undefined,
+): Promise<ChallengeRoundSessionState | null> {
+  if (!candidate) return null;
+
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .for('update')
+      .limit(1);
+
+    if (!current) return null;
+
+    const metadata = {
+      ...((current.metadata as Record<string, unknown> | null) ?? {}),
+    };
+    const parsed = challengeRoundSessionStateSchema.safeParse(
+      metadata['challengeRound'],
+    );
+    if (!parsed.success) return null;
+    if (parsed.data.state !== 'active') return parsed.data;
+
+    const next = mergeChallengeRoundTransition(parsed.data, candidate);
+    metadata['challengeRound'] = next;
+
+    const [row] = await tx
+      .update(learningSessions)
+      .set({ metadata, updatedAt: new Date() })
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .returning({ id: learningSessions.id });
+
+    return row ? next : null;
+  });
+}
+
 function verdictFromEvaluations(
   evaluations: ChallengeRoundEvaluationItem[],
 ): ChallengeRoundVerdict {
@@ -1215,23 +1297,23 @@ async function applyChallengeRoundRuntimeSignals(
       if (stallResult) {
         // Guard fired: persist the terminal state and stop. The state machine
         // is in `complete` — no mastery, no note, no further exchange looping.
-        await persistChallengeRoundState(
+        const persisted = await persistActiveChallengeRoundTransition(
           db,
           profileId,
           session.id,
           stallResult,
         );
-        return { challengeRound: stallResult };
+        return { challengeRound: persisted ?? currentWithCounter };
       }
       // Guard not yet triggered (< MAX_CHALLENGE_QUESTIONS asked). Persist the
       // counter increment so the next turn can evaluate the cap correctly.
-      await persistChallengeRoundState(
+      const persisted = await persistActiveChallengeRoundTransition(
         db,
         profileId,
         session.id,
         currentWithCounter,
       );
-      return { challengeRound: currentWithCounter };
+      return { challengeRound: persisted ?? currentWithCounter };
     }
 
     // Grader produced a non-empty result: validate event IDs + run state machine.
@@ -1277,25 +1359,25 @@ async function applyChallengeRoundRuntimeSignals(
 
     if (!result.shouldPersist) return { challengeRound: currentWithCounter };
 
-    const finalized = await finalizeChallengeRoundIfReady(
-      db,
-      profileId,
-      session,
-      result.challengeRound,
-      payload.noteDraft,
-    );
-    if (finalized) return finalized;
-
-    await persistChallengeRoundState(
+    const persisted = await persistActiveChallengeRoundTransition(
       db,
       profileId,
       session.id,
       result.challengeRound,
     );
+    if (!persisted) return { challengeRound: currentWithCounter };
+
+    const finalized = await finalizeChallengeRoundIfReady(
+      db,
+      profileId,
+      session,
+      persisted,
+      payload.noteDraft,
+    );
+    if (finalized) return finalized;
+
     return {
-      ...(result.challengeRound
-        ? { challengeRound: result.challengeRound }
-        : {}),
+      challengeRound: persisted,
     };
   }
 
