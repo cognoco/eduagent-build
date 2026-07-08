@@ -1218,14 +1218,17 @@ export async function getAllProfileBooks(
   const cursor = options?.cursor ?? null;
 
   const repo = createScopedRepository(db, profileId);
-  const allProfileSubjects = await repo.subjects.findMany();
+  const allProfileSubjects = await repo.subjects.findMany(undefined, {
+    orderBy: 'createdAtAscIdAsc',
+  });
   if (allProfileSubjects.length === 0) {
     return { subjects: [], nextCursor: null };
   }
 
   // [WI-966] Apply cursor-based pagination over the subject list.
   // The cursor is the subjectId of the last subject in the previous page.
-  // Subjects are returned in their natural DB order (consistent between pages).
+  // Subjects are returned in explicit createdAt/id order so cursor pages are
+  // stable across PostgreSQL query plans.
   let startIndex = 0;
   if (cursor !== null) {
     const cursorIdx = allProfileSubjects.findIndex((s) => s.id === cursor);

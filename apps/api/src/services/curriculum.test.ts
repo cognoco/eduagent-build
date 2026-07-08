@@ -40,7 +40,8 @@ import type {
   BookTopicGenerationResult,
   BookWithTopics,
 } from '@eduagent/schemas';
-import type { Database } from '@eduagent/database';
+import { asc } from 'drizzle-orm';
+import { subjects as subjectTable, type Database } from '@eduagent/database';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -3625,5 +3626,27 @@ describe('[WI-966] getAllProfileBooks — empty-page guard', () => {
     expect(result.subjects).toHaveLength(2);
     expect(result.subjects[0]!.subjectId).toBe('sub-1');
     expect(result.subjects[1]!.subjectId).toBe('sub-2');
+  });
+
+  it('[WI-1096] requests deterministic subject ordering before cursor slicing', async () => {
+    const subjects = [
+      { id: 'sub-1', name: 'Math' },
+      { id: 'sub-2', name: 'Science' },
+    ];
+    const { db } = mockDbForAllProfileBooks(subjects);
+
+    await getAllProfileBooks(db, PROFILE_ID, { limit: 1 });
+
+    const subjectFindMany = db.query.subjects.findMany as jest.Mock;
+    const firstCallOptions = subjectFindMany.mock.calls[0]?.[0];
+    expect(firstCallOptions).toEqual(
+      expect.objectContaining({
+        orderBy: expect.any(Array),
+      }),
+    );
+    expect(firstCallOptions.orderBy).toEqual([
+      asc(subjectTable.createdAt),
+      asc(subjectTable.id),
+    ]);
   });
 });

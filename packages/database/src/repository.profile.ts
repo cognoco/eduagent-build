@@ -31,9 +31,15 @@ export function createProfileRepository(
 ) {
   return {
     subjects: {
-      async findMany(extraWhere?: SQL) {
+      async findMany(
+        extraWhere?: SQL,
+        options?: { orderBy?: 'createdAtAscIdAsc' },
+      ) {
         return db.query.subjects.findMany({
           where: scopedWhere(subjects, extraWhere),
+          ...(options?.orderBy === 'createdAtAscIdAsc'
+            ? { orderBy: [asc(subjects.createdAt), asc(subjects.id)] }
+            : {}),
         });
       },
       async findFirst(extraWhere?: SQL) {
