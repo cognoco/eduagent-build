@@ -1,17 +1,14 @@
 import {
   __sessionCrudTestHooks,
-  buildTopicIntentMatcherMessages,
   claimSessionForFilingRetry,
   closeSession,
   closeStaleSessions,
   CLOSE_STALE_SESSIONS_PAGE_SIZE,
   flagContent,
   getSessionCompletionContext,
-  matchTopicByIntent,
   projectAiResponseContent,
   recordSessionEvent,
   recordSystemPrompt,
-  runTopicIntentMatcher,
   startFirstCurriculumSession,
   stripMarkdownFence,
   SubjectInactiveError,
@@ -22,6 +19,11 @@ import {
   getSessionMetadata,
   normalizeHomeworkSummary,
 } from './session-crud';
+import {
+  buildTopicIntentMatcherMessages,
+  matchTopicByIntent,
+  runTopicIntentMatcher,
+} from './session-topic-matcher';
 import { FILING_CONFIG } from '../../config/filing';
 import * as llmModule from '../llm';
 import * as sentryModule from '../sentry';
@@ -370,36 +372,8 @@ describe('startFirstCurriculumSession topic intent matcher', () => {
   });
 });
 
-function predicateContainsColumnValue(
-  value: unknown,
-  columnName: string,
-  expectedValue: string,
-  seen = new WeakSet<object>(),
-): boolean {
-  if (typeof value !== 'object' || value === null || seen.has(value)) {
-    return false;
-  }
-  seen.add(value);
-
-  const record = value as Record<string, unknown>;
-  const encoder = record.encoder as Record<string, unknown> | undefined;
-  if (record.value === expectedValue && encoder?.name === columnName) {
-    return true;
-  }
-
-  return Object.values(record).some((entry) => {
-    if (Array.isArray(entry)) {
-      return entry.some((item) =>
-        predicateContainsColumnValue(item, columnName, expectedValue, seen),
-      );
-    }
-    return predicateContainsColumnValue(entry, columnName, expectedValue, seen);
-  });
-}
-
 describe('matchTopicByIntent explicit topic guard', () => {
   it('requires an explicit topic to belong to the requested book scope', async () => {
-    let sawBookScopedPredicate = false;
     type QueryChain = {
       from: jest.Mock;
       innerJoin: jest.Mock;
@@ -409,17 +383,11 @@ describe('matchTopicByIntent explicit topic guard', () => {
     const query: QueryChain = {
       from: jest.fn((): QueryChain => query),
       innerJoin: jest.fn((): QueryChain => query),
-      where: jest.fn((predicate: unknown): QueryChain => {
-        sawBookScopedPredicate = predicateContainsColumnValue(
-          predicate,
-          'book_id',
-          BOOK_ID,
-        );
-        return query;
-      }),
+      where: jest.fn((): QueryChain => query),
       limit: jest.fn(
-        async (): Promise<Array<{ id: string }>> =>
-          sawBookScopedPredicate ? [{ id: EXPLICIT_TOPIC_ID }] : [],
+        async (): Promise<Array<{ topicId: string; bookId: string }>> => [
+          { topicId: EXPLICIT_TOPIC_ID, bookId: BOOK_ID },
+        ],
       ),
     };
     const db = { select: jest.fn(() => query) } as never;
@@ -438,7 +406,39 @@ describe('matchTopicByIntent explicit topic guard', () => {
         selectedTopicId: EXPLICIT_TOPIC_ID,
       }),
     );
-    expect(sawBookScopedPredicate).toBe(true);
+  });
+
+  it('rejects an explicit topic owned by the subject but outside the requested book scope', async () => {
+    type QueryChain = {
+      from: jest.Mock;
+      innerJoin: jest.Mock;
+      where: jest.Mock;
+      limit: jest.Mock;
+    };
+    const query: QueryChain = {
+      from: jest.fn((): QueryChain => query),
+      innerJoin: jest.fn((): QueryChain => query),
+      where: jest.fn((): QueryChain => query),
+      limit: jest.fn(
+        async (): Promise<Array<{ topicId: string; bookId: string }>> => [
+          {
+            topicId: EXPLICIT_TOPIC_ID,
+            bookId: '00000000-0000-7000-8000-000000000099',
+          },
+        ],
+      ),
+    };
+    const db = { select: jest.fn(() => query) } as never;
+
+    await expect(
+      matchTopicByIntent(db, PROFILE_ID, SUBJECT_ID, {
+        fallbackTopicId: FALLBACK_TOPIC_ID,
+        explicitTopicId: EXPLICIT_TOPIC_ID,
+        bookId: BOOK_ID,
+        matcherEnabled: true,
+        firstSessionStartedAt: Date.now(),
+      }),
+    ).rejects.toThrow('Topic not found in this subject');
   });
 });
 

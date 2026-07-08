@@ -20,7 +20,7 @@ jest.mock(
 );
 
 import { routeAndCall } from '../llm';
-import { runTopicIntentMatcher } from './session-crud';
+import { runTopicIntentMatcher } from './session-topic-matcher';
 
 const mockRouteAndCall = routeAndCall as jest.MockedFunction<
   typeof routeAndCall

@@ -54,7 +54,7 @@ export const LLM_CALL_SITE_FILES: readonly string[] = [
   'apps/api/src/services/quiz/generate-round.ts',
   'apps/api/src/services/recall-bridge.ts',
   'apps/api/src/services/retention-data.ts',
-  'apps/api/src/services/session/session-crud.ts',
+  'apps/api/src/services/session/session-topic-matcher.ts',
   'apps/api/src/services/subject-classify.ts',
   'apps/api/src/services/subject-resolve.ts',
   'apps/api/src/services/summaries.ts',
