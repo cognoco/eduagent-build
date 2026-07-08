@@ -397,6 +397,7 @@ async function decrementPoolQuota(
       if (contendedTopUpIds.includes(topUp.id)) return null;
 
       // Atomic: only succeeds if remaining > 0 (concurrent request may have consumed it).
+      // scope-allow: topUp row was selected in this transaction by subscriptionId.
       [updatedTopUp] = await tx
         .update(topUpCredits)
         .set({
@@ -438,6 +439,7 @@ async function decrementPoolQuota(
       // Daily cap was reached between the snapshot check and this UPDATE
       // (concurrent top-up race). Roll back the top-up decrement so the
       // user is not charged for a request that did not go through.
+      // scope-allow: refund targets the just-consumed top-up row id in this transaction.
       await tx
         .update(topUpCredits)
         .set({ remaining: sql`${topUpCredits.remaining} + 1` })
@@ -595,6 +597,7 @@ async function clampProfileQuotaLimits(
     return;
   }
 
+  // scope-allow: row was loaded by the caller's profile quota lookup before update.
   await db
     .update(profileQuotaUsage)
     .set({ monthlyLimit, dailyLimit, updatedAt: new Date() })
@@ -663,6 +666,7 @@ async function consumeOwnerTopUpCredit(
     .returning();
 
   if (!updatedRow) {
+    // scope-allow: refund targets the just-consumed profile-scoped top-up row id.
     await db
       .update(topUpCredits)
       .set({ remaining: sql`${topUpCredits.remaining} + 1` })
@@ -936,6 +940,7 @@ async function incrementPoolQuota(
       // [CR-2026-05-19-C6] Refund the original top-up batch, not monthly.
       // Daily counter still rolls back because the decrement consumed a
       // daily slot regardless of which pool funded the request.
+      // scope-allow: explicit refund of the original top-up credit id from the metered attempt.
       await tx
         .update(topUpCredits)
         .set({

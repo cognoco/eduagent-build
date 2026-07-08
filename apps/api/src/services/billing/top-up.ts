@@ -86,6 +86,7 @@ export async function getTopUpCreditsRemaining(
     filters.push(eq(topUpCredits.profileId, profileId));
   }
 
+  // scope-allow: account-level top-up total; optional profileId narrows per-profile callers.
   const result = await db
     .select({
       total: sql<number>`COALESCE(SUM(${topUpCredits.remaining}), 0)::int`,

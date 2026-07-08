@@ -911,6 +911,7 @@ export async function archiveInactiveSubjects(
   // Archive all active subjects NOT in the recently-active set.
   // C-02: exclude subjects created after the cutoff — newly created subjects
   // with zero sessions should not be archived immediately.
+  // scope-allow: archive sweep is a system maintenance update across inactive subjects.
   const result = await db
     .update(subjects)
     .set({ status: 'archived', updatedAt: now })

@@ -101,6 +101,7 @@ export async function applyRetentionUpdate({
   ];
   if (guardPredicate) predicates.push(guardPredicate);
 
+  // scope-allow: predicates is built immediately above with retentionCards.profileId.
   const result = await db
     .update(retentionCards)
     .set(buildSetClause(set, updatedAt))
