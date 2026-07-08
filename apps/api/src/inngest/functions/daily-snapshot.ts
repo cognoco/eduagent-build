@@ -29,6 +29,9 @@ import { refreshProgressSnapshot } from '../../services/snapshot-aggregation';
 import { snapshotRefreshEventSchema } from '@eduagent/schemas';
 import { captureException } from '../../services/sentry';
 
+const BATCH_SIZE = 200;
+const ACTIVE_PROFILE_SCAN_LIMIT = BATCH_SIZE;
+
 export const dailySnapshotCron = inngest.createFunction(
   { id: 'progress-daily-snapshot', name: 'Compute daily progress snapshots' },
   { cron: '0 3 * * *' },
@@ -57,7 +60,8 @@ export const dailySnapshotCron = inngest.createFunction(
               gte(learningSessions.startedAt, since),
               isNull(person.archivedAt),
             ),
-          );
+          )
+          .limit(ACTIVE_PROFILE_SCAN_LIMIT);
 
         return rows.map((row) => row.profileId);
       },
@@ -76,9 +80,12 @@ export const dailySnapshotCron = inngest.createFunction(
       new Date().toISOString().slice(0, 10),
     );
 
-    const BATCH_SIZE = 200;
-    for (let i = 0; i < activeProfileIds.length; i += BATCH_SIZE) {
-      const batch = activeProfileIds.slice(i, i + BATCH_SIZE);
+    const cappedProfileIds = activeProfileIds.slice(
+      0,
+      ACTIVE_PROFILE_SCAN_LIMIT,
+    );
+    for (let i = 0; i < cappedProfileIds.length; i += BATCH_SIZE) {
+      const batch = cappedProfileIds.slice(i, i + BATCH_SIZE);
       await step.sendEvent(
         `fan-out-progress-refresh-${i}`,
         batch.map((profileId) => ({
@@ -88,7 +95,7 @@ export const dailySnapshotCron = inngest.createFunction(
       );
     }
 
-    return { status: 'completed', queuedProfiles: activeProfileIds.length };
+    return { status: 'completed', queuedProfiles: cappedProfileIds.length };
   },
 );
 

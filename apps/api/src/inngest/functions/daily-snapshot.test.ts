@@ -43,7 +43,9 @@ function mockSelectDistinctRows(rows: { profileId: string }[]): void {
   ).selectDistinct.mockReturnValue({
     from: jest.fn().mockReturnValue({
       innerJoin: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(rows),
+        where: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue(rows),
+        }),
       }),
     }),
   });
@@ -223,8 +225,8 @@ describe('dailySnapshotCron', () => {
     expect(result).toEqual({ status: 'completed', queuedProfiles: 2 });
   });
 
-  it('sends events in batches of 200', async () => {
-    // 250 unique profiles → batch 1 has 200, batch 2 has 50
+  it('caps fan-out to one 200-profile batch per tick', async () => {
+    // 250 unique profiles → one capped batch of 200
     const rows = Array.from({ length: 250 }, (_, i) => ({
       profileId: `profile-${String(i).padStart(3, '0')}`,
     }));
@@ -232,25 +234,18 @@ describe('dailySnapshotCron', () => {
 
     const { runner, result } = await executeCronSteps();
 
-    expect(runner.sendEventCalls).toHaveLength(2);
+    expect(runner.sendEventCalls).toHaveLength(1);
 
     const firstCall = runner.sendEventCalls[0]!;
-    const secondCall = runner.sendEventCalls[1]!;
 
     expect(firstCall.name).toBe('fan-out-progress-refresh-0');
-    expect(secondCall.name).toBe('fan-out-progress-refresh-200');
 
     const firstBatch = firstCall.payload as unknown[];
-    const secondBatch = secondCall.payload as unknown[];
     expect(firstBatch).toHaveLength(200);
     expect(firstBatch[0]).toEqual(
       expect.objectContaining({ name: 'app/progress.snapshot.refresh' }),
     );
-    expect(secondBatch).toHaveLength(50);
-    expect(secondBatch[0]).toEqual(
-      expect.objectContaining({ name: 'app/progress.snapshot.refresh' }),
-    );
-    expect(result).toEqual({ status: 'completed', queuedProfiles: 250 });
+    expect(result).toEqual({ status: 'completed', queuedProfiles: 200 });
   });
 
   it('runs find-active-profiles as a named step', async () => {

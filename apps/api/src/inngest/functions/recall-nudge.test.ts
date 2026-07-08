@@ -276,7 +276,7 @@ describe('recallNudge — batching at BATCH_SIZE=500', () => {
     });
   });
 
-  it('emits fan-out-0 and fan-out-500 for 501 profiles (two chunks)', async () => {
+  it('caps a 501-profile scan to one 500-event fan-out', async () => {
     const eligible: EligibleProfile[] = Array.from({ length: 501 }, (_, i) => ({
       profileId: `p-${i}`,
       overdueCount: 2,
@@ -285,23 +285,20 @@ describe('recallNudge — batching at BATCH_SIZE=500', () => {
 
     const { sendEventCalls, result } = await executeCron(eligible);
 
-    expect(sendEventCalls).toHaveLength(2);
+    expect(sendEventCalls).toHaveLength(1);
     expect(sendEventCalls[0]?.name).toBe('fan-out-0');
-    expect(sendEventCalls[1]?.name).toBe('fan-out-500');
 
     const firstChunk = sendEventCalls[0]?.payload as unknown[];
-    const secondChunk = sendEventCalls[1]?.payload as unknown[];
     expect(firstChunk).toHaveLength(500);
-    expect(secondChunk).toHaveLength(1);
 
     expect(result).toEqual({
       status: 'completed',
-      eligibleCount: 501,
-      sentEvents: 501,
+      eligibleCount: 500,
+      sentEvents: 500,
     });
   });
 
-  it('emits three fan-out batches for 1001 profiles', async () => {
+  it('still sends only one capped batch for 1001 profiles', async () => {
     const eligible: EligibleProfile[] = Array.from(
       { length: 1001 },
       (_, i) => ({
@@ -313,19 +310,18 @@ describe('recallNudge — batching at BATCH_SIZE=500', () => {
 
     const { sendEventCalls, result } = await executeCron(eligible);
 
-    expect(sendEventCalls).toHaveLength(3);
+    expect(sendEventCalls).toHaveLength(1);
     expect(sendEventCalls[0]?.name).toBe('fan-out-0');
-    expect(sendEventCalls[1]?.name).toBe('fan-out-500');
-    expect(sendEventCalls[2]?.name).toBe('fan-out-1000');
+    expect(sendEventCalls[0]?.payload as unknown[]).toHaveLength(500);
 
     expect(result).toMatchObject({
       status: 'completed',
-      eligibleCount: 1001,
-      sentEvents: 1001,
+      eligibleCount: 500,
+      sentEvents: 500,
     });
   });
 
-  it('sentEvents accumulates correctly across multiple chunks', async () => {
+  it('sentEvents never exceeds the per-tick cap', async () => {
     const eligible: EligibleProfile[] = Array.from(
       { length: 1200 },
       (_, i) => ({
@@ -337,7 +333,7 @@ describe('recallNudge — batching at BATCH_SIZE=500', () => {
 
     const { result } = await executeCron(eligible);
 
-    expect(result.sentEvents).toBe(1200);
+    expect(result.sentEvents).toBe(500);
   });
 });
 
@@ -388,8 +384,8 @@ describe('recallNudge — find-eligible-profiles step DB path', () => {
     for (const method of methods) {
       builder[method] = jest.fn().mockReturnValue(builder);
     }
-    // groupBy is the terminal point — resolves to the provided rows
-    builder['groupBy'] = jest.fn().mockResolvedValue(rows);
+    builder['groupBy'] = jest.fn().mockReturnValue(builder);
+    builder['limit'] = jest.fn().mockResolvedValue(rows);
 
     const selectMock = jest.fn().mockReturnValue(builder);
     return { select: selectMock, builder };

@@ -37,12 +37,12 @@ function buildChainableDb(
     'where',
     'having',
     'orderBy',
-    'limit',
     'offset',
   ]) {
     builder[method] = jest.fn().mockReturnValue(builder);
   }
-  builder['groupBy'] = jest.fn().mockResolvedValue(rows);
+  builder['groupBy'] = jest.fn().mockReturnValue(builder);
+  builder['limit'] = jest.fn().mockResolvedValue(rows);
 
   return {
     select: jest.fn().mockReturnValue(builder),
@@ -95,6 +95,26 @@ describe('reviewDueScan — find-overdue-profiles step DB path', () => {
       data: { topTopicIds: string[] };
     }>;
     expect(payload[0]?.data.topTopicIds).toEqual([]);
+  });
+
+  it('caps fan-out at one 500-profile tick when the DB returns more rows', async () => {
+    const db = buildChainableDb(
+      Array.from({ length: 501 }, (_, i) => ({
+        profileId: `profile-${i}`,
+        overdueCount: 1,
+        topTopicIds: [],
+      })),
+    );
+    mockGetStepDatabase.mockReturnValue(db);
+
+    const { step, sendEventCalls } = createInngestStepRunner();
+    const handler = (reviewDueScan as any).fn;
+    const result = await handler({ step });
+
+    expect(db.builder.limit).toHaveBeenCalledWith(500);
+    expect(sendEventCalls).toHaveLength(1);
+    expect(sendEventCalls[0]?.payload as unknown[]).toHaveLength(500);
+    expect(result).toMatchObject({ eligibleCount: 500, sentEvents: 500 });
   });
 });
 
