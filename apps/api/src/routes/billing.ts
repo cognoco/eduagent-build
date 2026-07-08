@@ -71,6 +71,8 @@ import {
 import { BRAND_COLOR_PRIMARY } from '../services/brand';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
+import { safeSend } from '../services/safe-non-core';
+import { inngest } from '../inngest/client';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireAccount } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
@@ -392,6 +394,28 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           stripeSubscriptionId: subscription.stripeSubscriptionId,
         },
       });
+      await safeSend(
+        () =>
+          inngest.send({
+            // orphan-allow: structured telemetry signal required by AGENTS.md
+            // ("silent recovery in billing must emit a structured metric").
+            // The request recovers inline by using the current timestamp; this
+            // event makes the Stripe response drift queryable.
+            name: 'app/billing.missing_current_period_end',
+            data: {
+              accountId: account.id,
+              subscriptionId: subscription.id,
+              stripeSubscriptionId: subscription.stripeSubscriptionId,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'billing.subscription_cancel.missing_current_period_end',
+        {
+          accountId: account.id,
+          subscriptionId: subscription.id,
+          stripeSubscriptionId: subscription.stripeSubscriptionId,
+        },
+      );
     }
     const currentPeriodEnd = periodEndTs
       ? new Date(periodEndTs * 1000).toISOString()
