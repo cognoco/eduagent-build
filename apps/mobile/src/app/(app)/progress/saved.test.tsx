@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -193,6 +194,10 @@ function mockHooks({
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('SavedBookmarksScreen', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockMarkdownDisplay.mockClear();
@@ -219,6 +224,26 @@ describe('SavedBookmarksScreen', () => {
       mockHooks({ isLoading: true });
       render(<SavedBookmarksScreen />);
       expect(screen.queryByTestId('bookmark-row-bk-1')).toBeNull();
+    });
+
+    it('turns the loading state into retry and back actions after timeout', () => {
+      jest.useFakeTimers();
+      const refetch = jest.fn();
+      mockHooks({ isLoading: true, refetch });
+      render(<SavedBookmarksScreen />);
+
+      act(() => {
+        jest.advanceTimersByTime(15_000);
+      });
+
+      fireEvent.press(screen.getByTestId('saved-timeout-retry'));
+      fireEvent.press(screen.getByTestId('saved-timeout-back'));
+
+      expect(refetch).toHaveBeenCalledTimes(1);
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/progress',
+      );
     });
   });
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from './ErrorFallback';
@@ -27,8 +27,14 @@ interface TimeoutLoaderProps {
   loadingLabel?: string;
   /** Optional supporting text shown before timeout. */
   loadingDescription?: string;
+  /** Optional custom loading UI rendered before timeout. */
+  loadingFallback?: ReactNode;
+  /** Visual variant for both the pre-timeout loader and timeout fallback. */
+  variant?: 'card' | 'centered';
   /** testID forwarded to the spinner View. */
   testID?: string;
+  /** Optional testID used only after the timeout fallback replaces the spinner. */
+  fallbackTestID?: string;
 }
 
 /**
@@ -45,7 +51,10 @@ export function TimeoutLoader({
   secondaryAction,
   loadingLabel,
   loadingDescription,
+  loadingFallback,
+  variant = 'centered',
   testID,
+  fallbackTestID,
 }: TimeoutLoaderProps) {
   const { t } = useTranslation();
   const announce = useAnnounce();
@@ -74,18 +83,27 @@ export function TimeoutLoader({
   if (timedOut) {
     return (
       <ErrorFallback
-        variant="centered"
         title={resolvedTitle}
         message={resolvedMessage}
         primaryAction={primaryAction}
         secondaryAction={secondaryAction}
+        variant={variant}
+        testID={fallbackTestID ?? testID}
       />
     );
   }
 
+  if (loadingFallback) {
+    return <>{loadingFallback}</>;
+  }
+
   return (
     <View
-      className="flex-1 bg-background items-center justify-center px-6"
+      className={
+        variant === 'card'
+          ? 'bg-coaching-card rounded-card p-5'
+          : 'flex-1 bg-background items-center justify-center px-6'
+      }
       testID={testID}
       accessibilityRole="progressbar"
       accessibilityLabel={loadingLabel ?? t('common.timeoutLoader.loading')}

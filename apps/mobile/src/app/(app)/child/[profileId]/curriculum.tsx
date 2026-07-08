@@ -16,7 +16,7 @@ import {
 } from '../../../../lib/navigation';
 import { firstParam } from '../../../../lib/route-params';
 import { useThemeColors } from '../../../../lib/theme';
-import { TimeoutLoader } from '../../../../components/common';
+import { ErrorFallback, TimeoutLoader } from '../../../../components/common';
 
 type DashboardSubject = DashboardChild['subjects'][number];
 
@@ -237,38 +237,25 @@ export default function ChildCurriculumScreen(): React.ReactElement {
   if (childQuery.isError && !child) {
     return (
       <View
-        className="flex-1 items-center justify-center bg-background px-6"
+        className="flex-1 bg-background"
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
-        testID="child-curriculum-error"
       >
-        <Text className="mb-2 text-center text-h3 font-semibold text-text-primary">
-          {t('parentView.subjects.couldNotLoadTopics')}
-        </Text>
-        <Text className="mb-6 text-center text-body text-text-secondary">
-          {t('parentView.subjects.somethingWentWrong')}
-        </Text>
-        <Pressable
-          onPress={() => void childQuery.refetch()}
-          className="min-h-[48px] items-center justify-center rounded-button bg-primary px-6 py-3"
-          accessibilityRole="button"
-          accessibilityLabel={t('common.tryAgain')}
-          testID="child-curriculum-retry"
-        >
-          <Text className="text-body font-semibold text-text-inverse">
-            {t('common.tryAgain')}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => goBackOrReplace(router, backHref)}
-          className="mt-3 min-h-[44px] items-center justify-center px-6 py-3"
-          accessibilityRole="button"
-          accessibilityLabel={t('common.goBack')}
-          testID="child-curriculum-error-back"
-        >
-          <Text className="text-body font-semibold text-primary">
-            {t('common.back')}
-          </Text>
-        </Pressable>
+        <ErrorFallback
+          variant="centered"
+          title={t('parentView.subjects.couldNotLoadTopics')}
+          message={t('parentView.subjects.somethingWentWrong')}
+          primaryAction={{
+            label: t('common.tryAgain'),
+            onPress: () => void childQuery.refetch(),
+            testID: 'child-curriculum-retry',
+          }}
+          secondaryAction={{
+            label: t('common.goBack'),
+            onPress: () => goBackOrReplace(router, backHref),
+            testID: 'child-curriculum-error-back',
+          }}
+          testID="child-curriculum-error"
+        />
       </View>
     );
   }

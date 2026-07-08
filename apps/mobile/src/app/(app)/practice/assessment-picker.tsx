@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, useRouter, type Href } from 'expo-router';
@@ -8,6 +8,7 @@ import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
 import { useEntryGate } from '../../../hooks/use-entry-gate';
 import { Button } from '../../../components/common/Button';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
+import { TimeoutLoader } from '../../../components/common/TimeoutLoader';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace, PRACTICE_HREF } from '../../../lib/navigation';
 import { useRelativeDate } from '../../../hooks/use-time-format';
@@ -33,17 +34,6 @@ export default function AssessmentPickerScreen(): React.ReactElement {
     isError,
     refetch,
   } = useAssessmentEligibleTopics();
-  const [loadTimedOut, setLoadTimedOut] = useState(false);
-
-  useEffect(() => {
-    if (!isLoading) {
-      setLoadTimedOut(false);
-      return;
-    }
-    const timer = setTimeout(() => setLoadTimedOut(true), 15_000);
-    return () => clearTimeout(timer);
-  }, [isLoading]);
-
   const contentContainerStyle = useMemo(
     () => ({
       ...ASSESSMENT_PICKER_CONTENT_STYLE_BASE,
@@ -172,11 +162,14 @@ export default function AssessmentPickerScreen(): React.ReactElement {
               onPress: () => goBackOrReplace(router, PRACTICE_HREF),
             }}
           />
-        ) : isLoading && loadTimedOut ? (
-          <ErrorFallback
+        ) : isLoading ? (
+          <TimeoutLoader
+            isLoading
             variant="card"
             title={t('assessment.pickerLoadTimeoutTitle')}
             message={t('assessment.pickerLoadTimeoutMessage')}
+            loadingLabel={t('assessment.pickerLoading')}
+            loadingDescription={t('assessment.pickerLoadingBody')}
             primaryAction={{
               label: t('common.tryAgain', 'Try again'),
               testID: 'assessment-picker-timeout-retry',
@@ -189,20 +182,9 @@ export default function AssessmentPickerScreen(): React.ReactElement {
               testID: 'assessment-picker-timeout-back',
               onPress: () => goBackOrReplace(router, PRACTICE_HREF),
             }}
-            testID="assessment-picker-timeout"
-          />
-        ) : isLoading ? (
-          <View
-            className="bg-surface-elevated rounded-card px-4 py-5"
             testID="assessment-picker-loading"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              {t('assessment.pickerLoading')}
-            </Text>
-            <Text className="text-body-sm text-text-secondary mt-1">
-              {t('assessment.pickerLoadingBody')}
-            </Text>
-          </View>
+            fallbackTestID="assessment-picker-timeout"
+          />
         ) : (
           <View
             testID="assessment-picker-empty"

@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { Text, View } from 'react-native';
 import { TimeoutLoader } from './TimeoutLoader';
 
 describe('TimeoutLoader', () => {
@@ -51,11 +52,42 @@ describe('TimeoutLoader', () => {
       jest.advanceTimersByTime(1000);
     });
 
+    screen.getByTestId('loader');
     screen.getByText('Could not load history');
     fireEvent.press(screen.getByTestId('loader-retry'));
     fireEvent.press(screen.getByTestId('loader-back'));
 
     expect(retry).toHaveBeenCalledTimes(1);
     expect(goBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('supports custom pre-timeout loading UI with a distinct fallback testID', () => {
+    jest.useFakeTimers();
+
+    render(
+      <TimeoutLoader
+        isLoading
+        timeoutMs={1000}
+        title="Still loading"
+        primaryAction={{ label: 'Retry', onPress: jest.fn() }}
+        testID="custom-loader"
+        fallbackTestID="custom-timeout"
+        loadingFallback={
+          <View testID="custom-loader">
+            <Text>Skeleton rows</Text>
+          </View>
+        }
+      />,
+    );
+
+    screen.getByTestId('custom-loader');
+    expect(screen.queryByTestId('custom-timeout')).toBeNull();
+
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+
+    screen.getByTestId('custom-timeout');
+    expect(screen.queryByTestId('custom-loader')).toBeNull();
   });
 });

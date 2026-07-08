@@ -1,10 +1,4 @@
-import {
-  ActivityIndicator,
-  ScrollView,
-  Text,
-  View,
-  Pressable,
-} from 'react-native';
+import { ScrollView, Text, View, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,7 +7,7 @@ import type { DictationResult } from '@eduagent/schemas';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useDictationHistory } from '../../../hooks/use-dictation-api';
 import { useThemeColors } from '../../../lib/theme';
-import { ErrorFallback } from '../../../components/common/ErrorFallback';
+import { ErrorFallback, TimeoutLoader } from '../../../components/common';
 
 // [WI-902] Read-only dictation history. Lists the learner's recent sessions
 // (newest first) and shows the persisted source sentences so they can review
@@ -110,18 +104,24 @@ export default function DictationHistoryScreen(): React.ReactElement {
       </View>
 
       {isPending ? (
-        <View
-          className="items-center justify-center py-16"
-          testID="dictation-history-loading"
-        >
-          <ActivityIndicator
-            size="large"
-            color={colors.primary}
-            accessibilityLabel={t('dictation.history.loading')}
+        <View className="py-16">
+          <TimeoutLoader
+            isLoading
+            loadingLabel={t('dictation.history.loading')}
+            title={t('dictation.history.errorTitle')}
+            primaryAction={{
+              label: t('dictation.history.retry'),
+              onPress: () => void refetch(),
+              testID: 'dictation-history-timeout-retry',
+            }}
+            secondaryAction={{
+              label: t('dictation.history.back'),
+              onPress: () =>
+                goBackOrReplace(router, '/(app)/dictation' as Href),
+              testID: 'dictation-history-timeout-back',
+            }}
+            testID="dictation-history-loading"
           />
-          <Text className="text-body-sm text-text-secondary mt-4 text-center">
-            {t('dictation.history.loading')}
-          </Text>
         </View>
       ) : isError ? (
         <ErrorFallback

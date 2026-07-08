@@ -1,14 +1,7 @@
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../../lib/platform-alert';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { InterestContext } from '@eduagent/schemas';
@@ -26,7 +19,7 @@ import {
 } from '../../components/mentor-memory-sections';
 import { TellMentorInput } from '../../components/tell-mentor-input';
 import { goBackOrReplace } from '../../lib/navigation';
-import { ErrorFallback } from '../../components/common';
+import { ErrorFallback, TimeoutLoader } from '../../components/common';
 import { formatRelativeDate } from '../../lib/format-relative-date';
 import {
   useDeleteAllMemory,
@@ -66,17 +59,6 @@ export default function MentorMemoryScreen() {
   // its access from the route's profileId, not from a contract gate.
   const isOwnerSelf = navigationContract.gates.sessionIsOwner;
   const [draft, setDraft] = useState('');
-
-  // [H12] Timeout escape for loading spinner
-  const [loadTimedOut, setLoadTimedOut] = useState(false);
-  useEffect(() => {
-    if (!isLoading) {
-      setLoadTimedOut(false);
-      return;
-    }
-    const timer = setTimeout(() => setLoadTimedOut(true), 15_000);
-    return () => clearTimeout(timer);
-  }, [isLoading]);
 
   const learningStyleRows = useMemo(
     () => getLearningStyleRows(profile?.learningStyle ?? null, t),
@@ -245,69 +227,48 @@ export default function MentorMemoryScreen() {
   }
 
   if (isLoading) {
-    if (loadTimedOut) {
-      return (
-        <View
-          className="flex-1 bg-background"
-          style={{ paddingTop: insets.top }}
-        >
-          <ErrorFallback
-            variant="centered"
-            title={t('session.mentorMemory.loadTimeout.title')}
-            message={t('session.mentorMemory.loadTimeout.message')}
-            primaryAction={{
-              label: t('common.retry'),
-              onPress: () => void refetch(),
-              testID: 'mentor-memory-load-timeout-retry',
-            }}
-            secondaryAction={{
-              label: t('common.goBack'),
-              onPress: handleBack,
-              testID: 'mentor-memory-load-timeout-back',
-            }}
-            testID="mentor-memory-load-timeout"
-          />
-        </View>
-      );
-    }
     return (
-      <View
-        className="flex-1 bg-background items-center justify-center"
-        style={{ paddingTop: insets.top }}
-      >
-        <ActivityIndicator accessibilityLabel={t('common.loading')} />
+      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+        <TimeoutLoader
+          isLoading
+          title={t('session.mentorMemory.loadTimeout.title')}
+          message={t('session.mentorMemory.loadTimeout.message')}
+          loadingLabel={t('common.loading')}
+          primaryAction={{
+            label: t('common.retry'),
+            onPress: () => void refetch(),
+            testID: 'mentor-memory-load-timeout-retry',
+          }}
+          secondaryAction={{
+            label: t('common.goBack'),
+            onPress: handleBack,
+            testID: 'mentor-memory-load-timeout-back',
+          }}
+          testID="mentor-memory-loading"
+          fallbackTestID="mentor-memory-load-timeout"
+        />
       </View>
     );
   }
 
   if (isError && !profile) {
     return (
-      <View
-        testID="mentor-memory-error"
-        className="flex-1 bg-background items-center justify-center"
-        style={{ paddingTop: insets.top }}
-      >
-        <Text className="text-body text-text-primary text-center px-6">
-          {t('session.mentorMemory.loadError')}
-        </Text>
-        <Pressable
-          testID="mentor-memory-retry"
-          onPress={() => void refetch()}
-          className="mt-4 px-6 py-3 bg-primary rounded-card"
-          accessibilityRole="button"
-        >
-          <Text className="text-body font-semibold text-white">
-            {t('common.retry')}
-          </Text>
-        </Pressable>
-        <Pressable
-          testID="mentor-memory-go-back"
-          onPress={handleBack}
-          className="mt-3 px-6 py-3"
-          accessibilityRole="button"
-        >
-          <Text className="text-body text-primary">{t('common.goBack')}</Text>
-        </Pressable>
+      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+        <ErrorFallback
+          variant="centered"
+          message={t('session.mentorMemory.loadError')}
+          primaryAction={{
+            label: t('common.retry'),
+            onPress: () => void refetch(),
+            testID: 'mentor-memory-retry',
+          }}
+          secondaryAction={{
+            label: t('common.goBack'),
+            onPress: handleBack,
+            testID: 'mentor-memory-go-back',
+          }}
+          testID="mentor-memory-error"
+        />
       </View>
     );
   }
