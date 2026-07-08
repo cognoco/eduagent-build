@@ -238,6 +238,14 @@ const IDENTITY_SOURCE = fs.readFileSync(
   path.resolve(__dirname, 'identity.ts'),
   'utf-8',
 );
+const LATEST_SUBSCRIPTION_PAYER_MIGRATION_PATH = path.resolve(
+  __dirname,
+  '../../../../apps/api/drizzle/0134_subscription_payers_primary_unique.sql',
+);
+const LATEST_SUBSCRIPTION_PAYER_MIGRATION = fs.readFileSync(
+  LATEST_SUBSCRIPTION_PAYER_MIGRATION_PATH,
+  'utf-8',
+);
 
 function sourceContainsCheck(checkName: string): boolean {
   return IDENTITY_SOURCE.includes(`'${checkName}'`);
@@ -297,5 +305,28 @@ describe('identity schema — break tests (F-032, constraint guards)', () => {
     // The NOT NULL declaration must be present in the source for the payer column.
     // We check for the column definition followed by .notNull() in the block.
     expect(IDENTITY_SOURCE).toMatch(/payer_person_id.*\.notNull\(\)/s);
+  });
+
+  /**
+   * T-BREAK-5: subscription_payers one primary payer per subscription
+   *
+   * The attack being prevented: inserting a second person as `role = 'primary'`
+   * for the same subscription. PostgreSQL rejects that duplicate only when the
+   * partial unique index below exists.
+   */
+  it('[BREAK] subscription_payers: second primary insert for same subscription is rejected by a partial unique index', () => {
+    expect(IDENTITY_SOURCE).toContain(
+      "uniqueIndex('subscription_payers_primary_subscription_unique')",
+    );
+    expect(IDENTITY_SOURCE).toContain("sql`${table.role} = 'primary'`");
+    expect(LATEST_SUBSCRIPTION_PAYER_MIGRATION).toContain(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "subscription_payers_primary_subscription_unique"',
+    );
+    expect(LATEST_SUBSCRIPTION_PAYER_MIGRATION).toContain(
+      `ON "subscription_payers" USING btree ("subscription_id")`,
+    );
+    expect(LATEST_SUBSCRIPTION_PAYER_MIGRATION).toContain(
+      `WHERE "role" = 'primary'`,
+    );
   });
 });
