@@ -713,7 +713,8 @@ export const sessionCompleted = inngest.createFunction(
     } else {
       // [WI-1426] Split SM-2 writes per topic. Inngest memoizes completed
       // step.run calls, so a retry after one topic has already persisted does
-      // not re-run that topic's retention update when event.timestamp is absent.
+      // not re-run that topic's retention update; each topic's step is
+      // memoized independently by its step ID.
       await Promise.all(
         retentionTopicIds.map((tid) =>
           step.run(`update-retention:${tid}`, async () =>
