@@ -40,7 +40,8 @@ import type {
   BookTopicGenerationResult,
   BookWithTopics,
 } from '@eduagent/schemas';
-import type { Database } from '@eduagent/database';
+import { asc } from 'drizzle-orm';
+import { subjects as subjectTable, type Database } from '@eduagent/database';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -3643,6 +3644,9 @@ describe('[WI-966] getAllProfileBooks — empty-page guard', () => {
         orderBy: expect.any(Array),
       }),
     );
-    expect(firstCallOptions.orderBy).toHaveLength(2);
+    expect(firstCallOptions.orderBy).toEqual([
+      asc(subjectTable.createdAt),
+      asc(subjectTable.id),
+    ]);
   });
 });
