@@ -95,18 +95,20 @@ export const transcriptPurgeCron = inngest.createFunction(
         // ops can query how many sessions are stuck past day-37 without a
         // complete summary. The Inngest dashboard alert targets the event count;
         // Sentry captures the same signal so both surfaces stay in sync.
-        captureException(
-          new Error(
-            `transcript-purge-cron: ${delayed.length} session(s) past day-37 with missing llmSummary/learnerRecap`,
-          ),
-          {
-            extra: {
-              surface: 'transcript-purge-delayed',
-              delayedCount: delayed.length,
-              sessionIds: delayed.map((c) => c.sessionId),
+        await step.run('capture-delayed-purge-without-candidates', async () => {
+          captureException(
+            new Error(
+              `transcript-purge-cron: ${delayed.length} session(s) past day-37 with missing llmSummary/learnerRecap`,
+            ),
+            {
+              extra: {
+                surface: 'transcript-purge-delayed',
+                delayedCount: delayed.length,
+                sessionIds: delayed.map((c) => c.sessionId),
+              },
             },
-          },
-        );
+          );
+        });
         await step.sendEvent('notify-purge-delayed', {
           name: 'app/session.purge.delayed',
           data: {
@@ -133,18 +135,20 @@ export const transcriptPurgeCron = inngest.createFunction(
     if (delayed.length > 0) {
       // [BUG-993] Same captureException pattern as the candidates.length === 0
       // branch above: surfaces delayed count to Sentry alongside the Inngest event.
-      captureException(
-        new Error(
-          `transcript-purge-cron: ${delayed.length} session(s) past day-37 with missing llmSummary/learnerRecap`,
-        ),
-        {
-          extra: {
-            surface: 'transcript-purge-delayed',
-            delayedCount: delayed.length,
-            sessionIds: delayed.map((c) => c.sessionId),
+      await step.run('capture-delayed-purge-with-candidates', async () => {
+        captureException(
+          new Error(
+            `transcript-purge-cron: ${delayed.length} session(s) past day-37 with missing llmSummary/learnerRecap`,
+          ),
+          {
+            extra: {
+              surface: 'transcript-purge-delayed',
+              delayedCount: delayed.length,
+              sessionIds: delayed.map((c) => c.sessionId),
+            },
           },
-        },
-      );
+        );
+      });
       await step.sendEvent('notify-purge-delayed', {
         name: 'app/session.purge.delayed',
         data: {
