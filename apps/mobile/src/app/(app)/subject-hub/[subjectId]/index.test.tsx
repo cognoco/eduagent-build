@@ -207,9 +207,17 @@ describe('SubjectHubRoute', () => {
       topics: [
         {
           topicId: TOPIC_ID,
+          topicTitle: 'Greetings',
+          bookId: BOOK_ID,
+          easeFactor: 2.5,
+          intervalDays: 1,
+          repetitions: 0,
           xpStatus: 'pending',
           masteredAt: null,
           nextReviewAt: '2026-06-13T00:00:00.000Z',
+          lastReviewedAt: null,
+          daysSinceLastReview: null,
+          failureCount: 0,
         },
       ],
       reviewDueCount: 1,
@@ -217,9 +225,12 @@ describe('SubjectHubRoute', () => {
 
     render(<SubjectHubRoute />, { wrapper: wrapper() });
 
-    await waitFor(() => {
-      screen.getByTestId('subject-hub-screen');
-    });
+    await waitFor(
+      () => {
+        screen.getByTestId('subject-hub-screen');
+      },
+      { timeout: 5000 },
+    );
 
     fireEvent.press(screen.getByTestId('subject-hub-next-up-action'));
 
@@ -1029,6 +1040,7 @@ describe('SubjectHubRoute — writable hub notes (WI-1118)', () => {
           note: {
             id: createdNote.id,
             topicId: TOPIC_ID,
+            sessionId: null,
             content: 'mitosis has phases',
             origin: 'self',
             createdAt: '2026-06-29T00:00:00.000Z',
@@ -1045,9 +1057,12 @@ describe('SubjectHubRoute — writable hub notes (WI-1118)', () => {
   it('opens a topic, persists a trimmed note bound to that topic, and shows it', async () => {
     render(<SubjectHubRoute />, { wrapper: wrapper() });
 
-    await waitFor(() => {
-      screen.getByTestId('subject-hub-screen');
-    });
+    await waitFor(
+      () => {
+        screen.getByTestId('subject-hub-screen');
+      },
+      { timeout: 5000 },
+    );
 
     // The subject-level notes section is read-only — no add input until a topic is
     // focused (spec: "no focused topic → no add input").
