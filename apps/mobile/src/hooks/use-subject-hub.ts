@@ -117,7 +117,11 @@ export function useSubjectHub(subjectId: string | undefined): {
             { init: { signal } },
           );
           await assertOk(res);
-          return await parseJson(res, bookWithTopicsSchema);
+          return await parseJson(
+            res,
+            bookWithTopicsSchema,
+            'GET /subjects/:subjectId/books/:bookId',
+          );
         } finally {
           cleanup();
         }
@@ -144,7 +148,11 @@ export function useSubjectHub(subjectId: string | undefined): {
             { init: { signal } },
           );
           await assertOk(res);
-          const data = await parseJson(res, getBookSessionsResponseSchema);
+          const data = await parseJson(
+            res,
+            getBookSessionsResponseSchema,
+            'GET /subjects/:subjectId/books/:bookId/sessions',
+          );
           return data.sessions;
         } finally {
           cleanup();

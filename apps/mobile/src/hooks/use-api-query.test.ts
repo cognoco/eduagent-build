@@ -9,6 +9,14 @@ import {
 import type { Profile } from '../lib/profile';
 import { useApiQuery } from './use-api-query';
 
+// Mutable so individual tests can simulate "no active profile".
+let mockActiveProfile: { id: string } | null = { id: 'test-profile-id' };
+
+jest.mock('../lib/profile', () => ({
+  ...jest.requireActual('../lib/profile'),
+  useProfile: () => ({ activeProfile: mockActiveProfile }),
+}));
+
 let queryClient: QueryClient;
 
 const itemsResponseSchema = z.object({
@@ -22,6 +30,7 @@ function createWrapper(
     id: 'test-profile-id',
   }),
 ) {
+  mockActiveProfile = activeProfile ? { id: activeProfile.id } : null;
   const w = createHookWrapper({ activeProfile });
   queryClient = w.queryClient;
   return w.wrapper;
@@ -30,6 +39,7 @@ function createWrapper(
 describe('useApiQuery', () => {
   afterEach(() => {
     queryClient.clear();
+    mockActiveProfile = { id: 'test-profile-id' };
     jest.restoreAllMocks();
   });
 
