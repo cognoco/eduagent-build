@@ -236,6 +236,7 @@ interface SubjectProgressFixture {
   urgencyScore?: number;
   topicsCompleted?: number;
   topicsVerified?: number;
+  topicsMastered?: number;
   lastSessionAt?: string | null;
 }
 
@@ -309,7 +310,7 @@ function makeSubjectProgress(
     topicsTotal: 10,
     topicsCompleted: progress?.topicsCompleted ?? 5,
     topicsVerified: progress?.topicsVerified ?? 3,
-    topicsMastered: progress?.topicsVerified ?? 3,
+    topicsMastered: progress?.topicsMastered ?? 3,
     topicsLearning: 2,
     urgencyScore: progress?.urgencyScore ?? 0,
     retentionStatus: progress?.retentionStatus ?? 'strong',
