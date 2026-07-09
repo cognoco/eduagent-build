@@ -36,6 +36,8 @@ export interface BaselineEntry {
   file: string;
   subject?: string;
   reason: string;
+  temporary?: boolean;
+  expiresAt?: string;
 }
 
 export interface Violation {
@@ -86,7 +88,7 @@ export function hasHumanArchitectureSignoff(body: string): boolean {
 export function findViolations(
   addedAdrs: AddedAdr[],
   baseline: BaselineEntry[],
-  options: { skipSubjectCheck?: boolean } = {},
+  options: { skipSubjectCheck?: boolean; now?: Date } = {},
 ): Violation[] {
   const violations: Violation[] = [];
 
@@ -106,6 +108,7 @@ export function findViolations(
         },
         baseline,
         adr.message,
+        options.now,
       )
     ) {
       violations.push({
@@ -130,6 +133,7 @@ export function findViolations(
         },
         baseline,
         adr.message,
+        options.now,
       )
     ) {
       violations.push({
@@ -173,8 +177,10 @@ function isBaselineAllowed(
   violation: Omit<Violation, 'commit'> & { commit?: string },
   baseline: BaselineEntry[],
   message?: string,
+  now = new Date(),
 ): boolean {
   return baseline.some((entry) => {
+    if (!isBaselineEntryActive(entry, now)) return false;
     if (entry.kind !== violation.kind || entry.file !== violation.file) {
       return false;
     }
@@ -186,6 +192,13 @@ function isBaselineAllowed(
     }
     return true;
   });
+}
+
+function isBaselineEntryActive(entry: BaselineEntry, now: Date): boolean {
+  if (!entry.expiresAt) return true;
+  const expiresAt = Date.parse(entry.expiresAt);
+  if (!Number.isFinite(expiresAt)) return false;
+  return expiresAt >= now.getTime();
 }
 
 function loadBaseline(): BaselineEntry[] {

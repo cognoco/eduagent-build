@@ -27,11 +27,15 @@
   {
     "kind": "accepted_missing_arch_signoff",
     "file": "docs/adr/MMT-ADR-0031-challenge-verification-and-sm2-are-complementary-mastery-axes.md",
-    "reason": "upstream hook-fix needed to reconcile WI-1183 with current origin/main"
+    "reason": "temporary WI-1183 branch reconciliation; remove or replace with human Architecture sign-off before 2026-07-16",
+    "temporary": true,
+    "expiresAt": "2026-07-16T00:00:00.000Z"
   },
   {
     "kind": "accepted_missing_arch_signoff",
     "file": "docs/adr/MMT-ADR-0032-verified-learning-artifacts-require-source-and-verification-state.md",
-    "reason": "upstream hook-fix needed to reconcile WI-1183 with current origin/main"
+    "reason": "temporary WI-1183 branch reconciliation; remove or replace with human Architecture sign-off before 2026-07-16",
+    "temporary": true,
+    "expiresAt": "2026-07-16T00:00:00.000Z"
   }
 ]

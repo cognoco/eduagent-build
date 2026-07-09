@@ -30,13 +30,23 @@ const SOURCE_BASELINE_PATH = path.resolve(
 const MAX_CONCURRENCY = 3;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 4000, 16000];
+const DEFAULT_TRANSLATION_KEYS_PER_REQUEST = 80;
 
 const GEMINI_MODEL = process.env.TRANSLATE_GEMINI_MODEL ?? 'gemini-2.5-pro';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const MAX_TRANSLATION_KEYS_PER_REQUEST = Number.parseInt(
-  process.env.TRANSLATE_GEMINI_KEY_BATCH_SIZE ?? '80',
-  10,
+const MAX_TRANSLATION_KEYS_PER_REQUEST = parsePositiveInteger(
+  process.env.TRANSLATE_GEMINI_KEY_BATCH_SIZE,
+  DEFAULT_TRANSLATION_KEYS_PER_REQUEST,
 );
+
+export function parsePositiveInteger(
+  value: string | undefined,
+  fallback: number,
+): number {
+  if (!value || !/^\d+$/.test(value.trim())) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 function flattenKeys(obj: NestedStrings, prefix = ''): Record<string, string> {
   const result: Record<string, string> = {};
@@ -104,6 +114,18 @@ export function filterTranslatedFlatToSourceKeys(
     }
   }
   return filtered;
+}
+
+export function filterTranslatedToSourceKeys(
+  translated: NestedStrings,
+  source: NestedStrings,
+): NestedStrings {
+  return unflattenKeys(
+    filterTranslatedFlatToSourceKeys(
+      flattenKeys(translated),
+      flattenKeys(source),
+    ),
+  );
 }
 
 export function hashSourceString(value: string): string {
@@ -531,13 +553,16 @@ async function translateNestedWithRetry(
 ): Promise<NestedStrings> {
   const chunks = chunkSourceForTranslation(source);
   if (chunks.length === 1) {
-    return JSON.parse(
-      await translateWithRetry(
-        apiKey,
-        systemPrompt,
-        JSON.stringify(source, null, 2),
-        lang,
-      ),
+    return filterTranslatedToSourceKeys(
+      JSON.parse(
+        await translateWithRetry(
+          apiKey,
+          systemPrompt,
+          JSON.stringify(source, null, 2),
+          lang,
+        ),
+      ) as NestedStrings,
+      source,
     );
   }
 

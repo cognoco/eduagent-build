@@ -11,7 +11,9 @@ import {
   chunkSourceForTranslation,
   expandSourceBaselineFile,
   filterTranslatedFlatToSourceKeys,
+  filterTranslatedToSourceKeys,
   hashSourceString,
+  parsePositiveInteger,
   selectGeminiDiffKeys,
   validatePruneOnlyLocale,
 } from './translate-gemini';
@@ -183,6 +185,15 @@ describe('selectGeminiDiffKeys', () => {
 });
 
 describe('chunkSourceForTranslation', () => {
+  it('uses the fallback chunk size for non-finite or non-positive env values', () => {
+    expect(parsePositiveInteger(undefined, 80)).toBe(80);
+    expect(parsePositiveInteger('abc', 80)).toBe(80);
+    expect(parsePositiveInteger('NaN', 80)).toBe(80);
+    expect(parsePositiveInteger('0', 80)).toBe(80);
+    expect(parsePositiveInteger('-2', 80)).toBe(80);
+    expect(parsePositiveInteger('2', 80)).toBe(2);
+  });
+
   it('splits a nested source object into key-count bounded chunks', () => {
     const source = {
       common: {
@@ -230,6 +241,22 @@ describe('filterTranslatedFlatToSourceKeys', () => {
       ),
     ).toEqual({
       'common.save': 'Guardar',
+    });
+  });
+
+  it('drops hallucinated keys from single-chunk nested translation results too', () => {
+    expect(
+      filterTranslatedToSourceKeys(
+        {
+          common: { save: 'Guardar' },
+          mentorHome: { rewards: { xp: 'XP' } },
+        },
+        {
+          common: { save: 'Save' },
+        },
+      ),
+    ).toEqual({
+      common: { save: 'Guardar' },
     });
   });
 });
