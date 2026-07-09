@@ -55,7 +55,7 @@ jest.mock(
   }),
 );
 
-jest.mock('@clerk/clerk-expo' /* gc1-allow: external auth provider */, () => ({
+jest.mock('@clerk/expo' /* gc1-allow: external auth provider */, () => ({
   useAuth: () => ({ signOut: jest.fn(), userId: 'user-1' }),
 }));
 

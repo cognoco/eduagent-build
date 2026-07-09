@@ -7,9 +7,17 @@ guidance frames the other three.
 
 ## Product facts counsel needs
 
-- **MentoMate**: mobile AI-tutoring app; children are a core audience (guardian-owned accounts
-  with linked child profiles; solo adult learners also supported). Pre-launch: closed beta with
-  invited families, then EU app-store launch.
+- **MentoMate**: mobile AI-tutoring app; children are a core audience; solo adult learners also
+  supported. Pre-launch: closed beta with invited families, then EU app-store launch.
+- **Launch scope (v1) — important for framing all four questions:** accounts are **13+ only**
+  (self-registered, own login). The under-13 tier (guardian-created, guardian-managed accounts)
+  is **built but will not be activated at launch**; its activation awaits a separate decision.
+  Guardian-consent mechanics still operate at launch for 13+ minors in launch jurisdictions whose
+  GDPR Art. 8 digital-consent age exceeds 13 — so the minors counsel is advising on at launch are
+  the 13-to-consent-age cohort (and under-13s only if/when the managed tier activates; please
+  flag where the answer would differ between the two). Family linking at launch: a guardian
+  invites an existing 13+ teen account into the family; visibility sharing is opt-in and
+  recap-level only.
 - Learner conversation content is processed by third-party LLM providers (US-based processors)
   under DPAs; a DPIA and ROPA exist (`docs/compliance/dpia.md`, `ropa.md`), privacy policy
   drafted (`docs/privacy-policy.html`).

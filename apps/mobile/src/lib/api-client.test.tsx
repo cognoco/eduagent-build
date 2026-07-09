@@ -32,7 +32,7 @@ import {
 import { combinedSignal } from './query-timeout';
 
 const mockGetToken = jest.fn();
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ getToken: mockGetToken }),
 }));
 

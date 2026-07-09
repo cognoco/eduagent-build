@@ -7,7 +7,7 @@ import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
 import { useChallengeRound } from './use-challenge-round';
 
 // External boundary mocks - Clerk auth and native fetch
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
 }));
 

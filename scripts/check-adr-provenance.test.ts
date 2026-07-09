@@ -179,6 +179,34 @@ describe('findViolations', () => {
     ).toEqual([]);
   });
 
+  it('honors temporary baseline expiry for Accepted ADRs without sign-off', () => {
+    const acceptedWithoutSignoff = addedAdr({
+      body: '**Status:** Accepted - 2026-06-29 - **Deciders:** PM + Claude',
+    });
+    const baseline: BaselineEntry[] = [
+      {
+        kind: 'accepted_missing_arch_signoff',
+        file,
+        reason: 'temporary branch reconciliation',
+        temporary: true,
+        expiresAt: '2026-07-10T00:00:00.000Z',
+      },
+    ];
+
+    expect(
+      findViolations([acceptedWithoutSignoff], baseline, {
+        now: new Date('2026-07-09T00:00:00.000Z'),
+      }),
+    ).toEqual([]);
+    expect(
+      findViolations([acceptedWithoutSignoff], baseline, {
+        now: new Date('2026-07-11T00:00:00.000Z'),
+      }),
+    ).toEqual([
+      expect.objectContaining({ kind: 'accepted_missing_arch_signoff' }),
+    ]);
+  });
+
   it('can skip subject checks for pre-commit staged file validation', () => {
     expect(
       findViolations(

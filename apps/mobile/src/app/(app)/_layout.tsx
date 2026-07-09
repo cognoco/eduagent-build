@@ -3,7 +3,7 @@ import { Tabs, Redirect, usePathname, useRouter } from 'expo-router';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth, useClerk } from '@clerk/clerk-expo';
+import { useAuth, useClerk } from '@clerk/expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../lib/profile';

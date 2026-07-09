@@ -322,6 +322,7 @@ export const subscription = pgTable(
   },
   (table) => [
     index('subscription_organization_id_idx').on(table.organizationId),
+    index('subscription_payer_person_id_idx').on(table.payerPersonId),
     // CUT-A (MMT-ADR-0020) store-correlation uniqueness (legacy: UNIQUE columns;
     // new convention: partial unique index):
     uniqueIndex('subscription_stripe_customer_id_idx')
@@ -771,6 +772,10 @@ export const subscriptionPayers = pgTable(
       table.subscriptionId,
       table.personId,
     ),
+    uniqueIndex('subscription_payers_primary_subscription_unique')
+      .on(table.subscriptionId)
+      .where(sql`${table.role} = 'primary'`),
+    index('subscription_payers_person_id_idx').on(table.personId),
     check(
       'subscription_payers_role_valid',
       sql`${table.role} IN ('primary', 'secondary')`,

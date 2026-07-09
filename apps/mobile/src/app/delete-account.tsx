@@ -8,7 +8,7 @@ import {
   TextInput,
 } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';

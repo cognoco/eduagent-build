@@ -4,11 +4,11 @@
  *
  * Extracted from `apps/mobile/src/app/_layout.tsx` so the test only needs to
  * exercise its real dependencies (react-native, design-tokens, the global
- * `@clerk/clerk-expo` mock from test-setup.ts). No `_layout.tsx` import means
+ * `@clerk/expo` mock from test-setup.ts). No `_layout.tsx` import means
  * no module-graph side effects to silence.
  */
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 
 import { ClerkGate } from './ClerkGate';
 

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth, useReverification } from '@clerk/clerk-expo';
+import { useAuth, useReverification } from '@clerk/expo';
 import { useTranslation } from 'react-i18next';
 import {
   useProfile,

@@ -17,7 +17,7 @@
  */
 
 import { render } from '@testing-library/react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 
 import {
   clearPendingAuthRedirect,

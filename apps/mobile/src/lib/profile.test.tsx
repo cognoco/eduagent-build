@@ -20,7 +20,7 @@ import { queryKeys } from './query-keys';
 // ./secure-storage uses real implementation: expo-secure-store is globally mocked
 // in test-setup.ts with an in-memory store. We control behavior via ExpoSecureStore fns directly.
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ isSignedIn: true, userId: 'clerk-user-test' }),
 }));
 

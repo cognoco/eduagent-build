@@ -7,7 +7,7 @@ import {
   type Href,
 } from 'expo-router';
 import { View } from 'react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import { useThemeColors, useTokenVars } from '../../lib/theme';
 
 import {

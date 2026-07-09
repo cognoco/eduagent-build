@@ -35,7 +35,7 @@ describe('checkStaleness', () => {
         lang: 'de',
         type: 'missing_key',
         key: 'common.cancel',
-      })
+      }),
     );
   });
 
@@ -53,7 +53,7 @@ describe('checkStaleness', () => {
         lang: 'de',
         type: 'orphaned_key',
         key: 'common.orphan',
-      })
+      }),
     );
   });
 
@@ -72,7 +72,7 @@ describe('checkStaleness', () => {
         type: 'missing_variable',
         key: 'errors.generic',
         variable: '{{action}}',
-      })
+      }),
     );
   });
 
@@ -97,8 +97,60 @@ describe('checkStaleness', () => {
         type: 'extra_variable',
         key: 'errors.generic',
         variable: '{{name}}',
-      })
+      }),
     );
+  });
+
+  it('fails when a target echoes a non-trivial English source value', () => {
+    const targets = {
+      de: {
+        common: { save: 'Speichern', cancel: 'Cancel' },
+        errors: { generic: 'Fehler. {{action}} zum Wiederholen.' },
+      },
+    };
+    const result = checkStaleness(source, targets);
+    expect(result.pass).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({
+        lang: 'de',
+        type: 'echoed_value',
+        key: 'common.cancel',
+      }),
+    );
+  });
+
+  it('does not flag short values or interpolation templates as echoed English', () => {
+    const targets = {
+      de: {
+        common: { save: 'Save', cancel: 'Abbrechen' },
+        errors: { generic: 'Error. {{action}} to retry.' },
+      },
+    };
+    const result = checkStaleness(source, targets);
+    expect(result.pass).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('does not flag CLDR plural-family keys as echoed English', () => {
+    const pluralSource = {
+      count: {
+        item_one: 'One item',
+        item_other: 'Many items',
+      },
+    };
+    const targets = {
+      pl: {
+        count: {
+          item_one: 'One item',
+          item_few: 'Many items',
+          item_many: 'Many items',
+          item_other: 'Many items',
+        },
+      },
+    };
+    const result = checkStaleness(pluralSource, targets);
+    expect(result.pass).toBe(true);
+    expect(result.errors).toHaveLength(0);
   });
 
   it('reports errors from multiple languages', () => {
@@ -124,7 +176,7 @@ describe('assertExpectedLocalesPresent', () => {
   it('returns ok when discovered set covers expected set', () => {
     const result = assertExpectedLocalesPresent(
       ['nb', 'de', 'es', 'pt', 'pl', 'ja'],
-      ['nb', 'de', 'es', 'pt', 'pl', 'ja']
+      ['nb', 'de', 'es', 'pt', 'pl', 'ja'],
     );
     expect(result).toEqual({ ok: true });
   });
@@ -132,7 +184,7 @@ describe('assertExpectedLocalesPresent', () => {
   it('returns ok when discovered set is a strict superset of expected', () => {
     const result = assertExpectedLocalesPresent(
       ['nb', 'de', 'es', 'pt', 'pl', 'ja', 'fr'], // extra locale on disk
-      ['nb', 'de', 'es', 'pt', 'pl', 'ja']
+      ['nb', 'de', 'es', 'pt', 'pl', 'ja'],
     );
     expect(result).toEqual({ ok: true });
   });
@@ -140,7 +192,7 @@ describe('assertExpectedLocalesPresent', () => {
   it('returns missing list when some expected locales are absent on disk', () => {
     const result = assertExpectedLocalesPresent(
       ['nb', 'de'], // pt, pl, es, ja are absent
-      ['nb', 'de', 'es', 'pt', 'pl', 'ja']
+      ['nb', 'de', 'es', 'pt', 'pl', 'ja'],
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -151,12 +203,12 @@ describe('assertExpectedLocalesPresent', () => {
   it('returns all missing when discovered set is empty', () => {
     const result = assertExpectedLocalesPresent(
       [],
-      ['nb', 'de', 'es', 'pt', 'pl', 'ja']
+      ['nb', 'de', 'es', 'pt', 'pl', 'ja'],
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.missing.sort()).toEqual(
-        ['de', 'es', 'ja', 'nb', 'pl', 'pt'].sort()
+        ['de', 'es', 'ja', 'nb', 'pl', 'pt'].sort(),
       );
     }
   });

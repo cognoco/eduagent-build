@@ -29,11 +29,11 @@
     }
   },
   "dependencies": {
-    "@clerk/clerk-expo": "^2.19.39",
+    "@clerk/expo": "^3.7.1",
     "@eduagent/schemas": "workspace:*",
-    "@noble/hashes": "^1.8.0",
     "@expo-google-fonts/atkinson-hyperlegible": "^0.4.1",
     "@expo/vector-icons": "^15.0.3",
+    "@noble/hashes": "^1.8.0",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "^8.6.0",
     "@react-native-community/netinfo": "^12.0.1",

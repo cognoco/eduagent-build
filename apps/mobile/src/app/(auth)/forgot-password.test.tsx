@@ -5,7 +5,7 @@ import {
   waitFor,
   act,
 } from '@testing-library/react-native';
-import { useSignIn } from '@clerk/clerk-expo';
+import { useSignIn } from '@clerk/expo';
 
 const mockReplace = jest.fn();
 const mockBack = jest.fn();

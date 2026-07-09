@@ -7,7 +7,7 @@ const mockUpdatePassword = jest.fn();
 const mockReload = jest.fn();
 const mockOnPasswordAdded = jest.fn();
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ getToken: jest.fn(), signOut: jest.fn() }),
   useUser: () => ({
     user: {

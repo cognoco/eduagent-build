@@ -17,7 +17,7 @@ import { NotFoundError } from '../lib/api-errors';
 const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
 }));
 

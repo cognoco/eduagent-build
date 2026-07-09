@@ -8,7 +8,7 @@ import {
 import React from 'react';
 import i18n from 'i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import {
   clearPendingAuthRedirect,
   rememberPendingAuthRedirect,
@@ -75,7 +75,7 @@ jest.mock('@expo/vector-icons', () => ({
   Ionicons: () => null,
 }));
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: jest.fn(),
   useClerk: () => ({ signOut: jest.fn() }),
   useUser: () => ({

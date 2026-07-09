@@ -11,7 +11,7 @@ const mockReload = jest.fn();
 const mockDestroyOldEmail = jest.fn();
 const mockSyncEmail = jest.fn();
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useUser: () => ({
     user: {
       createEmailAddress: mockCreateEmailAddress,

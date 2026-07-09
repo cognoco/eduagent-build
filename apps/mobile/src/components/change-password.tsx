@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../lib/platform-alert';
-import { useUser, useAuth } from '@clerk/clerk-expo';
+import { useUser, useAuth } from '@clerk/expo';
 import { useRouter, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from './common/Button';

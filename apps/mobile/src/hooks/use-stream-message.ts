@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import type {
   ChallengeRoundSessionState,
   SessionMessageInput,

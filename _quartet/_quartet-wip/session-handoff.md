@@ -196,3 +196,83 @@ findings-file commits while lanes are live to avoid re-churn.
    read the automated-review verdict body, not just the check colour) if green; merge = mine, no self-merge.
 3. Read each lane's `outbox.jsonl` tail for anything emitted during compaction; Cosmo-verify (channels may be stale).
 4. Surface only `needs-operator`; drive the rest.
+
+---
+## ═══ COMPACT CHECKPOINT 2026-07-03 ~15:35Z — orchestrator session "umbrella" (post-reboot resume #4) ═══
+Session CONTINUES across compaction — monitors + crons SURVIVE; RECONCILE, do not blind re-arm.
+
+### Live machinery (this session)
+- Outbox escalation monitors: WS-18 bb2yle0b2 · WS-28 bfro5pioq · bug-lane bq4nxua5b (pattern incl `decision`). Tracked-channel truncate/replay noise recurs (WI-1245 unfixed) — on replay of June history, check tails before assuming loss.
+- WS-row delta watcher b4ia3f5h8 (PM-directives + ENE breaches, 4.5min; script scratchpad/ws-row-watcher.py + seen-state JSON). Crons: aa9443b7 liveness sweep :18/:48 · 3b81180b 10m shepherd heartbeat loop (operator-directed) · 68f88a83 2h backstop :41.
+- PM layer LIVE: PGM-1 roadmap (Programs DB) = sequencing canon; protocol f8e68eb canonical (Nexus main). Coordinate via WS-row comments [pm-directive]/[orch-ack]/[orch-escalation]. Keep Expected Next Event honest on my 7 rows.
+
+### Lane state
+- WS-18 (shepherd LIVE): WI-1128 Closed; WS-37 GRADUATED 5/5 (container Closed, WI-1355→WS-35). Chain: WI-1139 (dead-sweep, +v2 atomicity test rider) → WI-1347 → WI-1306 (M2a; Blocked-by 1347+1139) → WI-1292 (M2b). M2b PRE-AUTHORIZED (PM directive, operator confirmed IN-SESSION verbatim "Yes, I confirm"; conditions per env: Neon branch snapshot + PITR marker + catalog spot-check, evidence on executing WI). ENE 17:30Z. Inbox head ic-orch-398.
+- bug-lane (shepherd LIVE): WI-1176 merged (PR #1854), one lexical Gate-2 bounce fixed, re-finalized → expect Closed. Then idle-by-design; 3 parked HELD (WI-1258/1252/1244, re-homed WS-25→WS-22). Inbox head bug-lane-orch-121.
+- WS-28 (NO shepherd — operator relaunch pending; kickoff prompt delivered in-session): WI-1307 R1 device check = **FAIL, final for update 802cab19** (evidence + addendum on WI-1307 page): bundle bakes DEV Clerk key vs PROD API (auth structurally dead) + V0=true at source (workflow env line ~121). Remediation proposed, OPERATOR CONFIRM PENDING: one PR flipping EXPO_PUBLIC_ENABLE_MODE_NAV to false in mobile-fallback-ota.yml + republish under corrected secret (operator piped Doppler prd→GH ~14:45Z) → new update group → Zuzka re-runs R1 (dev client on S10e ready, rtV 1.0.1 compatible). WI-1310: ruled (a) GH secret suffices for OTA path (recorded on page); residual close gate = operator `eas env:list production` before M6.
+
+### WI-1245 breach aftermath (operator-ruled, all done)
+Unwound fully (work deleted, WI back to Nexus project/WS-23/Ready, claim cleared, audit comment). WI-1357 (protocol amendments, WS-26) captured — operator-instructed actions stay permitted. Misfiling memory fixed w/ verification precondition. RULE REAFFIRMED: orchestrator NEVER executes WIs (all execution via shepherds) unless operator explicitly instructs; handoff intent void until ratified; never edit routing metadata to defeat a guard.
+
+### Findings captured today
+WI-1357 (orch protocol amendments), PM silent-move finding (WS-26), refine-template red-green-revert finding (WS-23), WI-1355 re-homed WS-35.
+
+### Open operator items
+1. Confirm combined WS-28 remediation (V0 flag fix + republish, one update group) — recommended; then relaunch WS-28 shepherd to execute (its kickoff needs updating with R1-FAIL context).
+2. WI-1334 fix-or-sanction (nav-owner) · WS-29 hold review (PM rulings queue #3) · WI-1292 conditions now pre-authed (see above).
+3. WS-32 row Orchestrator/Host unset — flag to PM. Roadmap edge "WI-1310 blocks M4 proof-b" stale — [orch-escalation] owed on WS-28 row.
+**Machinery amendment ~15:45Z:** the 3 tail-F outbox monitors (bb2yle0b2/bfro5pioq/bq4nxua5b) REPLACED by ONE replay-immune id-cursor watcher **b3k0a8kkz** (scratchpad/outbox-watcher.py + outbox-watcher-seen.json, 45s poll, levels needs-*/blocked/decision) — tracked-channel truncate/replay storms were flooding context. WS-row delta watcher b4ia3f5h8 unchanged. All escalation ids through prg06ic-482 / bug-lane-1783092118 seeded as seen (482 ruled via ic-orch-399: chain re-wired WI-1347→WI-1139→WI-1306; 1139 Blocked-by += 1347).
+
+
+## WIND-DOWN 2026-07-03 19:21Z (operator-instructed, token budget)
+
+All 3 lanes sent pause directives (ic-orch-402 / v2f-orch-205 / bug-lane-orch-126): finish atomic step, push WIP,
+resume brief to outbox, one pause comment on Executing WIs, then stop. Lanes are PAUSED-BY-OPERATOR pending relaunch kickoffs.
+
+State at wind-down:
+- F35 RULED (b): Gate-1 merge orchestrator-centralized, PERMANENT. Broadcast to all lanes; doc reconciliation folded into WI-1357 (comment on page). shepherd-protocol.md still says shepherd-merges — do not trust it until WI-1357 lands.
+- WS-18: WI-1347 CLOSED; chain [WI-1364 (builder mid-run, ~40 dead fns) + WI-1398 (Ready)] -> WI-1139 (unclaimed) -> WI-1306 -> M2b. ic-orch-400 = re-wire ruling.
+- WS-28: republish SUCCESS, update group c46e0177 (both R1 defects fixed: prod Clerk key + V0=false). WI-1307 Executing, R1 device re-run PENDING — walkthrough was at Step 1 (boot dev client into c46e0177) when wind-down hit. Worktree wi-1307-v0-false cleanup owed. PR #1876 merged 20364364cc8.
+- Bug-lane: WI-1415 (node20 actions bump) Ready, builder was in flight; PR parks as draft, merge routes to orchestrator at relaunch. Lane DORMANT after 1415. 3 HELD items parked. WI-1176 CLOSED.
+- Owed at resume: R1 walkthrough continuation; eas env:list production check before M6 (WI-1310 residual); relaunch kickoffs for paused lanes; check lane outboxes for resume briefs FIRST.
+
+
+## COMPACT CHECKPOINT 2026-07-04 08:05Z (operator-requested)
+
+MACHINERY (survives compaction, same session): outbox watcher b3k0a8kkz (id-cursor, 3 lanes) · WS-row watcher b4ia3f5h8 (pm-directives + ENE) · crons aa9443b7 (:18/:48 sweep), 3b81180b (10m loop), 68f88a83 (2h backstop). Both watcher state files fresh at checkpoint. RECONCILE, don't blind re-arm.
+
+LANES:
+- WS-18 ACTIVE: chain WI-1524 (corpus WI, P1, Captured — refine DoR judge timed out once, retry->claim->dispatch is its next action) -> WI-1398 (frozen scope done, #1890 stacks on 1524) -> WI-1139 -> WI-1306 (M2a, stale claim reset to Ready earlier) -> M2b (pre-auth stands). WI-1347/1364 Closed (1364 took 3 Gate-2 bounces; AC boundary ruled ic-orch-406). Prod IDENTITY_V2_ENABLED=TRUE (Doppler prd) — prematurity permanently closed. Shepherd was compacting; expect_sol_by 08:00Z JUST LAPSED (82min silent at 08:05Z) — grace to 08:15Z, wake owed at next check if still silent (ic-orch-411-style; if dead, relaunch kickoff from the 04:42Z template in this file, updated: read outbox from prg06ic-526, inbox from ic-orch-412).
+- WS-28 HOLDING-DORMANT: session dead since ~22:40Z; WI-1307 Executing awaiting R1 device verdict (update group c46e0177, both defects fixed). R1 walkthrough with operator was at STEP 1 (boot dev client via expo.dev deep-link URL; two-login distinction explained). Relaunch kickoff needed at verdict time. Worktree wi-1307-v0-false cleanup owed.
+- bug-lane DORMANT: WI-1415 Closed (node20->node24, 27118846e). 3 HELD parked (WI-1258/1252/1244).
+
+RULINGS THIS SESSION: F35 = Gate-1 orchestrator-centralized PERMANENT (operator; broadcast; doc reconcile folded into WI-1357). ic-orch-406 (1364 AC boundary: value-vs-type imports), ic-orch-409/410 (1398 split; reopen-1347 rejected), WI-1306 stale-claim reset (audit on page). Merges done by me: #1876 (20364364), #1878 (27118846e), #1879 (5f973e07e), #1889 (ff31cbb1f).
+
+OPEN OPERATOR DECISIONS (presented ~21:30Z 07-03, NOT yet ruled):
+1. WS-37's 16 post-graduation Captured items (WI-1419..1434) — reopen WS-37 wave-2 (recommended) vs re-home to bug-lane vs park.
+2. WS-29 hold-lift for WI-1507 (launch compliance closure, PM-assigned, riders: run twice + tie WI-1442) — PM awaits my confirm-with-operator.
+OPEN OPERATOR ACTIONS: R1 re-run on c46e0177 (walkthrough Step 1 pending); eas env:list production before M6 (WI-1310 residual).
+
+
+---
+
+## COMPACT CHECKPOINT 2026-07-04 ~16:05Z
+
+**Machinery (survive compaction — RECONCILE, do not re-arm blindly):** outbox escalation watcher b6x8ykxz4 (4 lanes, needs-*/blocked/decision push only), WS-row/PM-directive+ENE watcher b6piitifp (4.5-min poll), crons aa9443b7 (:18/:48 sweep), 3b81180b (10m heartbeat), 68f88a83 (2h backstop). Just killed+rearmed on operator directive. State-file freshness = liveness proxy. **New discipline:** read each lane outbox HEAD content on sweeps, not just mtime (a bug-lane close-signoff rotted into a false "pending" mis-brief — status-level msgs are polled not pushed).
+
+**SPINE PROGRESS (big wins this session):** WI-1524 corpus (4f18a1a3a, PR #1897) + WI-1398 dual-write retire (25e07c69f, PR #1890) BOTH merged, main green, closing at Gate-2. Identity spine landed through WI-1398.
+
+**Lane states:**
+- **WS-18 identity-cutover — ACTIVE.** On WI-1139 REDO (ruled B fresh-off-main, base verified 68be453fb). PR #1904 pushed 833b8541 but CI RED on 3 lanes (API Quality Gate + Flag-ON integration + main) = ONE bounded class: test-side refs to removed tables (helpers.ts cleanupAccounts + 4 typecheck files), broadened-grep sweep, no re-scope. Builder mid-fix (13 uncommitted), push+CI-rerun ETA ~16:15Z. Rulings: ic-orch-421 (absorb dead prod-chain), 422 (DELETE-not-stub), 423 (REDO-not-rebase), 414 (identity-graph test to WI-1398 set). CHAIN AHEAD: WI-1139 -> WI-1306/M2a -> M2b (pre-auth: Neon snapshot + PITR + catalog spot-check per env). ENE 16:15Z.
+- **WS-22 bug-lane — REACTIVATED** (operator directive), pulling WI-1571 (P2 seed-helper follow-up; pre-declare F36 single-clause guard at refine). WI-1565 (P1 staging deploy blocker) CLOSED/Done — staging unblocked, Deploy verified green 68be453fb (PR #1903). 3 HELD parked (WI-1258/1252/1244).
+- **WS-29 launch-compliance — delivered, near-dormant.** Revived mid-session (operator re-init clacks). Ruling B done: WI-1507 -> Gate-2 Reviewing (reviewer-owned close), WI-1577 captured (FINAL GATE, pre-store-submission blocker, tie WI-1442+1558). Incidentals WI-1557-1561 (1558=P1). Pinged to pull other in-lane work or confirm dormant.
+- **WS-28 v2-finalization — HOLDING-DORMANT**, gated on operator R1 device test (update group c46e0177, Galaxy S10e). ENE 18:00Z. Relaunch owed at R1 verdict.
+
+**My Gate-1 merges this session (F35, own-eyes-verified):** #1896 (0d4cf37cf WS-29 early pass), #1897 (4f18a1a3a WI-1524), #1890 (25e07c69f WI-1398), #1903 (68be453fb WI-1565).
+
+**Findings banked:** F35 (Gate-1 orchestrator-centralized, PERMANENT), F36 (Bug-WI red-green-revert guard must be SINGLE clause — bounced WI-1176+WI-1565), F37 (verify worktree base is current before executing — stale WI-1139 branch reuse). All -> WI-1357 refine-template/worktree-setup skill.
+
+**OPEN OPERATOR ITEMS:**
+- DECISION: WS-37's 16 post-graduation Captured items (WI-1419-1434, 10xP2) — reopen as hardening-wave-2 lane (REC) vs re-home bug-lane vs park.
+- ACTION: R1 device test on update group c46e0177 (S10e) — gates WS-28.
+- ACTION: eas env:list production — WI-1310 residual, M6 gate.

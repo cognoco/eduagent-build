@@ -22,8 +22,8 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { ClerkProvider, useClerk } from '@clerk/clerk-expo';
-import { tokenCache as nativeTokenCache } from '@clerk/clerk-expo/token-cache';
+import { ClerkProvider, useClerk } from '@clerk/expo';
+import { tokenCache as nativeTokenCache } from '@clerk/expo/token-cache';
 import {
   MutationCache,
   QueryCache,
@@ -31,7 +31,7 @@ import {
   QueryClientProvider,
 } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import { ThemeContext, useThemeColors, useTokenVars } from '../lib/theme';
 import type { ColorScheme } from '../lib/design-tokens';
 import { ClerkGate } from '../components/ClerkGate';
@@ -85,7 +85,7 @@ configureRevenueCat();
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
 
-const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 
 if (!clerkPublishableKey) {
   throw new Error(

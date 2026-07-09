@@ -11,7 +11,7 @@
 import type { AppType } from '@eduagent/api';
 import { hc } from 'hono/client';
 import { useMemo, useRef } from 'react';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import { getApiUrl } from './api';
 
 // ---------------------------------------------------------------------------
