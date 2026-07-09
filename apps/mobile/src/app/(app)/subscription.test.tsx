@@ -15,6 +15,7 @@ import {
 } from '../../test-utils/mock-api-routes';
 import { ProfileContext, type ProfileContextValue } from '../../lib/profile';
 import { createTestProfile } from '../../test-utils/app-hook-test-utils';
+import { queryKeys } from '../../lib/query-keys';
 import type { Profile, Subscription } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
@@ -249,16 +250,23 @@ let mockActiveProfile: Profile = createTestProfile({
 // Test helpers
 // ---------------------------------------------------------------------------
 
-function createWrapper(opts?: { seedCache?: boolean }) {
+function createWrapper(opts?: {
+  seedCache?: boolean;
+  subscription?: Subscription;
+  usage?: typeof DEFAULT_USAGE;
+}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   if (opts?.seedCache) {
     queryClient.setQueryData(
-      ['subscription', mockActiveProfile.id],
-      makeSubscription(),
+      queryKeys.subscription(mockActiveProfile.id),
+      opts.subscription ?? makeSubscription(),
     );
-    queryClient.setQueryData(['usage', mockActiveProfile.id], DEFAULT_USAGE);
+    queryClient.setQueryData(
+      queryKeys.usage(mockActiveProfile.id),
+      opts.usage ?? DEFAULT_USAGE,
+    );
   }
 
   // Provide the real ProfileContext so useProfile() and the real
@@ -441,7 +449,7 @@ describe('SubscriptionScreen', () => {
         new Response(
           JSON.stringify({
             message: 'Profile removed from family subscription',
-            removedProfileId: 'p2',
+            removedProfileId: '00000000-0000-7000-a000-000000000102',
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -524,9 +532,7 @@ describe('SubscriptionScreen', () => {
       isOwner: false,
     });
 
-    render(<SubscriptionScreen />, {
-      wrapper: createWrapper({ seedCache: true }),
-    });
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
     expect(mockReplace).toHaveBeenCalledWith('/');
     expect(screen.queryByTestId('subscription-screen')).toBeNull();
@@ -543,7 +549,9 @@ describe('SubscriptionScreen', () => {
   it('shows loading indicator while offerings load', () => {
     mockOfferingsLoading = true;
 
-    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+    render(<SubscriptionScreen />, {
+      wrapper: createWrapper({ seedCache: true }),
+    });
 
     screen.getByTestId('subscription-loading');
   });
@@ -678,7 +686,11 @@ describe('SubscriptionScreen', () => {
               profileCount: 1,
               maxProfiles: 6,
               members: [
-                { profileId: 'profile-1', displayName: 'Alex', isOwner: true },
+                {
+                  profileId: '00000000-0000-7000-a000-000000000101',
+                  displayName: 'Alex',
+                  isOwner: true,
+                },
               ],
             },
           }),
@@ -1557,9 +1569,21 @@ describe('SubscriptionScreen', () => {
               profileCount: 3,
               maxProfiles: 4,
               members: [
-                { profileId: 'p1', displayName: 'Parent', isOwner: true },
-                { profileId: 'p2', displayName: 'Alex', isOwner: false },
-                { profileId: 'p3', displayName: 'Mia', isOwner: false },
+                {
+                  profileId: '00000000-0000-7000-a000-000000000101',
+                  displayName: 'Parent',
+                  isOwner: true,
+                },
+                {
+                  profileId: '00000000-0000-7000-a000-000000000102',
+                  displayName: 'Alex',
+                  isOwner: false,
+                },
+                {
+                  profileId: '00000000-0000-7000-a000-000000000103',
+                  displayName: 'Mia',
+                  isOwner: false,
+                },
               ],
             },
           }),
@@ -1577,8 +1601,12 @@ describe('SubscriptionScreen', () => {
     screen.getByText('Parent (owner)');
     screen.getByText('Alex');
     screen.getByText('Mia');
-    screen.getByTestId('remove-family-member-p2');
-    screen.getByTestId('remove-family-member-p3');
+    screen.getByTestId(
+      'remove-family-member-00000000-0000-7000-a000-000000000102',
+    );
+    screen.getByTestId(
+      'remove-family-member-00000000-0000-7000-a000-000000000103',
+    );
   });
 
   it('shows live family pool details for pro subscriptions', async () => {
@@ -1608,9 +1636,21 @@ describe('SubscriptionScreen', () => {
               profileCount: 3,
               maxProfiles: 4,
               members: [
-                { profileId: 'p1', displayName: 'Parent', isOwner: true },
-                { profileId: 'p2', displayName: 'Alex', isOwner: false },
-                { profileId: 'p3', displayName: 'Mia', isOwner: false },
+                {
+                  profileId: '00000000-0000-7000-a000-000000000101',
+                  displayName: 'Parent',
+                  isOwner: true,
+                },
+                {
+                  profileId: '00000000-0000-7000-a000-000000000102',
+                  displayName: 'Alex',
+                  isOwner: false,
+                },
+                {
+                  profileId: '00000000-0000-7000-a000-000000000103',
+                  displayName: 'Mia',
+                  isOwner: false,
+                },
               ],
             },
           }),
@@ -1657,32 +1697,43 @@ describe('SubscriptionScreen', () => {
               profileCount: 2,
               maxProfiles: 4,
               members: [
-                { profileId: 'p1', displayName: 'Parent', isOwner: true },
-                { profileId: 'p2', displayName: 'Alex', isOwner: false },
+                {
+                  profileId: '00000000-0000-7000-a000-000000000101',
+                  displayName: 'Parent',
+                  isOwner: true,
+                },
+                {
+                  profileId: '00000000-0000-7000-a000-000000000102',
+                  displayName: 'Alex',
+                  isOwner: false,
+                },
               ],
             },
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
     );
-    mockFetch.setRoute(
-      '/subscription/family/remove',
-      () =>
-        new Response(
-          JSON.stringify({
-            message: 'Profile removed from family subscription',
-            removedProfileId: 'p2',
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-    );
 
-    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+    render(<SubscriptionScreen />, {
+      wrapper: createWrapper({
+        seedCache: true,
+        subscription: makeSubscription({
+          tier: 'family',
+          status: 'active',
+        }),
+      }),
+    });
 
     await waitFor(() => {
-      screen.getByTestId('remove-family-member-p2');
+      screen.getByTestId(
+        'remove-family-member-00000000-0000-7000-a000-000000000102',
+      );
     });
-    fireEvent.press(screen.getByTestId('remove-family-member-p2'));
+    fireEvent.press(
+      screen.getByTestId(
+        'remove-family-member-00000000-0000-7000-a000-000000000102',
+      ),
+    );
 
     const confirmButtons = (Alert.alert as jest.Mock).mock.calls[0]?.[2] as
       | Array<{ text: string; onPress?: () => void }>

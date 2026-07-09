@@ -168,7 +168,7 @@ jest.mock(
     ...jest.requireActual('../../../lib/profile'),
     useProfile: () => ({
       activeProfile: {
-        id: 'test-profile-id',
+        id: '00000000-0000-7000-a000-000000000201',
         accountId: 'test-account-id',
         displayName: 'Test Learner',
         isOwner: true,
@@ -185,10 +185,34 @@ jest.mock(
 // Fetch-boundary mock — route handlers close over mutable variables below.
 // ---------------------------------------------------------------------------
 
+const TEST_PROFILE_ID = '00000000-0000-7000-a000-000000000201';
+const MATH_SUBJECT_ID = '00000000-0000-7000-a000-000000000301';
+const SCIENCE_SUBJECT_ID = '00000000-0000-7000-a000-000000000302';
+const CREATED_SUBJECT_ID = '00000000-0000-7000-a000-000000000303';
+const PHYSICS_SUBJECT_ID = '00000000-0000-7000-a000-000000000304';
+const CANDIDATE_A_SUBJECT_ID = '00000000-0000-7000-a000-000000000305';
+const CANDIDATE_B_SUBJECT_ID = '00000000-0000-7000-a000-000000000306';
+const EXTRA_SUBJECT_ID = '00000000-0000-7000-a000-000000000307';
+
+function makeSubject(id: string, name: string) {
+  return {
+    id,
+    profileId: TEST_PROFILE_ID,
+    name,
+    rawInput: null,
+    status: 'active',
+    curriculumStatus: 'ready',
+    pedagogyMode: 'socratic',
+    languageCode: null,
+    createdAt: '2026-05-21T00:00:00.000Z',
+    updatedAt: '2026-05-21T00:00:00.000Z',
+  };
+}
+
 // Default subjects list — overridden per-test via setRoute() for isLoading cases.
 const defaultSubjects = [
-  { id: 'sub-123', name: 'Mathematics', status: 'active' },
-  { id: 'sub-456', name: 'Science', status: 'active' },
+  makeSubject(MATH_SUBJECT_ID, 'Mathematics'),
+  makeSubject(SCIENCE_SUBJECT_ID, 'Science'),
 ];
 
 // Mutable results closed over by route handlers — reset in beforeEach.
@@ -197,7 +221,8 @@ let mockClassifyResult: Record<string, unknown> | Response | Error | null =
   null;
 // createSubject: defaults to a resolved subject
 let mockCreateSubjectResult: Record<string, unknown> | Response = {
-  subject: { id: 'sub-created', name: 'Biology' },
+  subject: makeSubject(CREATED_SUBJECT_ID, 'Biology'),
+  structureType: 'broad',
 };
 
 const mockFetch = createRoutedMockFetch({
@@ -330,9 +355,12 @@ beforeEach(() => {
       return mockClassifyResult;
     },
   );
-  mockCreateSubjectResult = { subject: { id: 'sub-created', name: 'Biology' } };
+  mockCreateSubjectResult = {
+    subject: makeSubject(CREATED_SUBJECT_ID, 'Biology'),
+    structureType: 'broad',
+  };
   (useLocalSearchParams as jest.Mock).mockReturnValue({
-    subjectId: 'sub-123',
+    subjectId: MATH_SUBJECT_ID,
     subjectName: 'Mathematics',
   });
   useCameraPermissions.mockReturnValue([
@@ -464,7 +492,7 @@ describe('CameraScreen', () => {
           pathname: '/(app)/session',
           params: expect.objectContaining({
             mode: 'homework',
-            subjectId: 'sub-123',
+            subjectId: MATH_SUBJECT_ID,
             subjectName: 'Mathematics',
             problemText: 'Explain gravity',
           }),
@@ -595,7 +623,7 @@ describe('CameraScreen', () => {
           pathname: '/(app)/session',
           params: expect.objectContaining({
             mode: 'homework',
-            subjectId: 'sub-123',
+            subjectId: MATH_SUBJECT_ID,
             subjectName: 'Mathematics',
             problemText: 'x^2 + 3x - 10 = 0',
           }),
@@ -713,7 +741,7 @@ describe('CameraScreen', () => {
 
   it('close button replaces to returnTo target when set', () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
-      subjectId: 'sub-123',
+      subjectId: MATH_SUBJECT_ID,
       subjectName: 'Mathematics',
       returnTo: 'own-learning',
     });
@@ -936,7 +964,7 @@ describe('CameraScreen', () => {
         pathname: '/(app)/session',
         params: expect.objectContaining({
           mode: 'homework',
-          subjectId: 'sub-123',
+          subjectId: MATH_SUBJECT_ID,
           subjectName: 'Mathematics',
           problemText: 'x^2 + 3x - 10 = 0',
         }),
@@ -1043,7 +1071,7 @@ describe('CameraScreen', () => {
         pathname: '/(app)/session',
         params: expect.objectContaining({
           mode: 'homework',
-          subjectId: 'sub-123',
+          subjectId: MATH_SUBJECT_ID,
           subjectName: 'Mathematics',
           problemText: 'Solve for x: 2x + 5 = 13',
           homeworkProblems: expect.any(String),
@@ -1190,7 +1218,7 @@ describe('CameraScreen', () => {
       expect.objectContaining({
         pathname: '/(app)/session',
         params: expect.objectContaining({
-          subjectId: 'sub-created',
+          subjectId: CREATED_SUBJECT_ID,
           subjectName: 'Biology',
         }),
       }),
@@ -1206,7 +1234,7 @@ describe('CameraScreen', () => {
   it('[WI-1203] blocks subject-pick navigation until the OCR task is confirmed', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
     // Classify returns needsConfirmation with no candidates → picker opens
-    // showing the enrolled subjects (sub-123 Mathematics) as pick options.
+    // showing the enrolled subjects (Mathematics) as pick options.
     mockClassifyResult = { needsConfirmation: true, candidates: [] };
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: 'Solve for x: 2x + 5 = 13',
@@ -1226,23 +1254,23 @@ describe('CameraScreen', () => {
 
     await waitFor(() => {
       getByTestId('subject-picker');
-      getByTestId('subject-pick-sub-123');
+      getByTestId(`subject-pick-${MATH_SUBJECT_ID}`);
     });
 
     // Do NOT press confirm-task-button — the OCR task is still unconfirmed.
-    fireEvent.press(getByTestId('subject-pick-sub-123'));
+    fireEvent.press(getByTestId(`subject-pick-${MATH_SUBJECT_ID}`));
     expect(mockRouter.replace).not.toHaveBeenCalled();
 
     // Confirming now lets the same pick proceed, proving the picker itself
     // still works once canStartSession flips true.
     fireEvent.press(getByTestId('confirm-task-button'));
-    fireEvent.press(getByTestId('subject-pick-sub-123'));
+    fireEvent.press(getByTestId(`subject-pick-${MATH_SUBJECT_ID}`));
 
     expect(mockRouter.replace).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/(app)/session',
         params: expect.objectContaining({
-          subjectId: 'sub-123',
+          subjectId: MATH_SUBJECT_ID,
           subjectName: 'Mathematics',
         }),
       }),
@@ -1320,7 +1348,7 @@ describe('CameraScreen', () => {
       expect.objectContaining({
         pathname: '/(app)/session',
         params: expect.objectContaining({
-          subjectId: 'sub-created',
+          subjectId: CREATED_SUBJECT_ID,
           subjectName: 'Biology',
         }),
       }),
@@ -1400,8 +1428,16 @@ describe('CameraScreen', () => {
     mockClassifyResult = {
       needsConfirmation: true,
       candidates: [
-        { subjectId: 'a', subjectName: 'A', confidence: 0.5 },
-        { subjectId: 'b', subjectName: 'B', confidence: 0.4 },
+        {
+          subjectId: CANDIDATE_A_SUBJECT_ID,
+          subjectName: 'A',
+          confidence: 0.5,
+        },
+        {
+          subjectId: CANDIDATE_B_SUBJECT_ID,
+          subjectName: 'B',
+          confidence: 0.4,
+        },
       ],
     };
 
@@ -1444,8 +1480,16 @@ describe('CameraScreen', () => {
     mockClassifyResult = {
       needsConfirmation: true,
       candidates: [
-        { subjectId: 'a', subjectName: 'A', confidence: 0.5 },
-        { subjectId: 'b', subjectName: 'B', confidence: 0.4 },
+        {
+          subjectId: CANDIDATE_A_SUBJECT_ID,
+          subjectName: 'A',
+          confidence: 0.5,
+        },
+        {
+          subjectId: CANDIDATE_B_SUBJECT_ID,
+          subjectName: 'B',
+          confidence: 0.4,
+        },
       ],
     };
 
@@ -1645,7 +1689,9 @@ describe('CameraScreen', () => {
     // Classify always returns a single well-formed candidate
     mockClassifyResult = {
       needsConfirmation: false,
-      candidates: [{ subjectId: 'sub-x', subjectName: 'X', confidence: 0.9 }],
+      candidates: [
+        { subjectId: EXTRA_SUBJECT_ID, subjectName: 'X', confidence: 0.9 },
+      ],
     };
 
     // First render: image-1 + done OCR → classification fires.
@@ -1730,7 +1776,7 @@ describe('CameraScreen', () => {
         needsConfirmation: false,
         candidates: [
           {
-            subjectId: 'sub-123',
+            subjectId: MATH_SUBJECT_ID,
             subjectName: 'Mathematics',
             confidence: 0.95,
           },
@@ -1773,7 +1819,8 @@ describe('CameraScreen', () => {
         suggestedSubjectName: 'Biology',
       };
       mockCreateSubjectResult = {
-        subject: { id: 'sub-created', name: 'Biology' },
+        subject: makeSubject(CREATED_SUBJECT_ID, 'Biology'),
+        structureType: 'broad',
       };
       withOcrDone('Label the parts of a plant cell');
 
@@ -1807,7 +1854,7 @@ describe('CameraScreen', () => {
         expect.objectContaining({
           pathname: '/(app)/session',
           params: expect.objectContaining({
-            subjectId: 'sub-created',
+            subjectId: CREATED_SUBJECT_ID,
             subjectName: 'Biology',
           }),
         }),
@@ -1820,11 +1867,15 @@ describe('CameraScreen', () => {
         needsConfirmation: true,
         candidates: [
           {
-            subjectId: 'sub-123',
+            subjectId: MATH_SUBJECT_ID,
             subjectName: 'Mathematics',
             confidence: 0.55,
           },
-          { subjectId: 'sub-789', subjectName: 'Physics', confidence: 0.5 },
+          {
+            subjectId: PHYSICS_SUBJECT_ID,
+            subjectName: 'Physics',
+            confidence: 0.5,
+          },
         ],
       };
       withOcrDone('A ball rolls down a frictionless ramp');
@@ -1837,10 +1888,10 @@ describe('CameraScreen', () => {
         getByTestId('subject-picker');
       });
       // Classifier candidates render as pick rows.
-      getByTestId('subject-pick-sub-123');
-      getByTestId('subject-pick-sub-789');
+      getByTestId(`subject-pick-${MATH_SUBJECT_ID}`);
+      getByTestId(`subject-pick-${PHYSICS_SUBJECT_ID}`);
       // Enrolled non-candidate subject (Science) is offered too.
-      getByTestId('subject-pick-sub-456');
+      getByTestId(`subject-pick-${SCIENCE_SUBJECT_ID}`);
       // Create + manual-entry escape hatches present.
       getByTestId('camera-create-subject');
       getByTestId('camera-subject-input');
@@ -1956,7 +2007,7 @@ describe('CameraScreen', () => {
         needsConfirmation: false,
         candidates: [
           {
-            subjectId: 'sub-123',
+            subjectId: MATH_SUBJECT_ID,
             subjectName: 'Mathematics',
             confidence: 0.95,
           },
@@ -1981,11 +2032,15 @@ describe('CameraScreen', () => {
         needsConfirmation: true,
         candidates: [
           {
-            subjectId: 'sub-123',
+            subjectId: MATH_SUBJECT_ID,
             subjectName: 'Mathematics',
             confidence: 0.55,
           },
-          { subjectId: 'sub-789', subjectName: 'Physics', confidence: 0.5 },
+          {
+            subjectId: PHYSICS_SUBJECT_ID,
+            subjectName: 'Physics',
+            confidence: 0.5,
+          },
         ],
       };
       withOcrDone('A ball rolls down a frictionless ramp');

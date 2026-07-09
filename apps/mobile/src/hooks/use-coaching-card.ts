@@ -31,8 +31,8 @@ export function useCoachingCard(): UseQueryResult<CoachingCardResponse> {
           {},
           { init: { signal } },
         );
-        await assertOk(res);
-        return await parseJson(res, coachingCardEndpointResponseSchema);
+        const okRes = await assertOk(res);
+        return await parseJson(okRes, coachingCardEndpointResponseSchema);
       } finally {
         cleanup();
       }
@@ -69,8 +69,8 @@ export function useMarkQuizDiscoverySurfaced() {
       const res = await client.quiz['missed-items']['mark-surfaced'].$post({
         json: { activityType },
       });
-      await assertOk(res);
-      return await parseJson(res, markSurfacedResponseSchema);
+      const okRes = await assertOk(res);
+      return await parseJson(okRes, markSurfacedResponseSchema);
     },
     retry: 3,
     onSuccess: () => {

@@ -786,14 +786,14 @@ describe('AppLayout', () => {
     mockUseProfile.mockReturnValue({
       profiles: [
         {
-          id: 'c1',
+          id: '00000000-0000-7000-a000-000000000102',
           isOwner: false,
           consentStatus: 'CONSENTED',
           birthYear: 2014,
         },
       ],
       activeProfile: {
-        id: 'c1',
+        id: '00000000-0000-7000-a000-000000000102',
         isOwner: false,
         consentStatus: 'CONSENTED',
         birthYear: 2014,
@@ -821,7 +821,20 @@ describe('AppLayout', () => {
       () =>
         new Response(
           JSON.stringify({
-            subjects: [{ id: 's1', name: 'Spanish', isActive: true }],
+            subjects: [
+              {
+                id: '00000000-0000-7000-a000-000000000301',
+                profileId: '00000000-0000-7000-a000-000000000101',
+                name: 'Spanish',
+                rawInput: null,
+                status: 'active',
+                curriculumStatus: 'ready',
+                pedagogyMode: 'socratic',
+                languageCode: null,
+                createdAt: '2026-05-21T00:00:00.000Z',
+                updatedAt: '2026-05-21T00:00:00.000Z',
+              },
+            ],
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -830,7 +843,7 @@ describe('AppLayout', () => {
     renderLayout();
 
     // await: probe-state effect must resolve before the tabs render.
-    await screen.findByTestId('tabs');
+    await screen.findByTestId('tabs', { includeHiddenElements: true });
     expect(screen.queryByTestId('post-approval-landing')).toBeNull();
   });
 

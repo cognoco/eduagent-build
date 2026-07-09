@@ -103,6 +103,7 @@ export type Nudge = z.infer<typeof nudgeSchema>;
 export const nudgeListResponseSchema = z.object({
   nudges: z.array(nudgeSchema),
 });
+export type NudgeListResponse = z.infer<typeof nudgeListResponseSchema>;
 
 export const nudgeCreateResponseSchema = z.object({
   nudge: nudgeSchema,

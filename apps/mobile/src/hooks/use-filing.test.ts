@@ -23,6 +23,8 @@ const originalFetch = globalThis.fetch;
 let queryClient: QueryClient;
 let usingFakeTimers = false;
 
+const TEST_SESSION_ID = '00000000-0000-7000-a000-000000000401';
+
 function createWrapper() {
   const wrapper = createHookWrapper({
     activeProfile: createTestProfile({ id: 'test-profile-id' }),
@@ -35,7 +37,7 @@ function makeSession(
   overrides: Partial<LearningSession> = {},
 ): LearningSession {
   return {
-    id: 'session-1',
+    id: TEST_SESSION_ID,
     subjectId: '00000000-0000-7000-8000-000000000001',
     topicId: null,
     sessionType: 'learning',
@@ -56,6 +58,10 @@ function makeSession(
       effectiveMode: 'freeform',
     },
     ...overrides,
+    topicTitle: overrides.topicTitle ?? null,
+    subjectName: overrides.subjectName ?? null,
+    bookId: overrides.bookId ?? null,
+    bookTitle: overrides.bookTitle ?? null,
   };
 }
 
@@ -125,9 +131,12 @@ describe('useSessionLibraryFiling', () => {
       ),
     );
 
-    const { result } = renderHook(() => useSessionLibraryFiling('session-1'), {
-      wrapper: createWrapper(),
-    });
+    const { result } = renderHook(
+      () => useSessionLibraryFiling(TEST_SESSION_ID),
+      {
+        wrapper: createWrapper(),
+      },
+    );
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -159,9 +168,12 @@ describe('useSessionLibraryFiling', () => {
       jsonResponse({ session: makeSession({ filingStatus }) }),
     );
 
-    const { result } = renderHook(() => useSessionLibraryFiling('session-1'), {
-      wrapper: createWrapper(),
-    });
+    const { result } = renderHook(
+      () => useSessionLibraryFiling(TEST_SESSION_ID),
+      {
+        wrapper: createWrapper(),
+      },
+    );
 
     await waitFor(() => {
       expect(result.current.filingStatus).toBe(filingStatus);
@@ -177,22 +189,22 @@ describe('Library filing mutations', () => {
     [
       'keep-out',
       () => useKeepSessionOutOfLibrary(),
-      '/sessions/session-1/library-filing/keep-out',
+      `/sessions/${TEST_SESSION_ID}/library-filing/keep-out`,
     ],
     [
       'add-to-library',
       () => useAddSessionToLibrary(),
-      '/sessions/session-1/library-filing/add',
+      `/sessions/${TEST_SESSION_ID}/library-filing/add`,
     ],
     [
       'restore',
       () => useRestoreSessionLibraryFiling(),
-      '/sessions/session-1/library-filing/restore',
+      `/sessions/${TEST_SESSION_ID}/library-filing/restore`,
     ],
     [
       'retry',
       () => useRetrySessionLibraryFiling(),
-      '/sessions/session-1/retry-filing',
+      `/sessions/${TEST_SESSION_ID}/retry-filing`,
     ],
   ] as const)(
     '%s calls the correct endpoint and invalidates session and Library caches',
@@ -206,7 +218,7 @@ describe('Library filing mutations', () => {
       });
 
       await act(async () => {
-        await result.current.mutateAsync({ sessionId: 'session-1' });
+        await result.current.mutateAsync({ sessionId: TEST_SESSION_ID });
       });
 
       const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -215,11 +227,11 @@ describe('Library filing mutations', () => {
 
       expectSessionInvalidationPredicate(
         invalidateSpy,
-        queryKeys.sessions.detail('study', 'session-1', 'test-profile-id'),
+        queryKeys.sessions.detail('study', TEST_SESSION_ID, 'test-profile-id'),
       );
       expectSessionInvalidationPredicate(
         invalidateSpy,
-        queryKeys.sessions.summary('study', 'session-1', 'test-profile-id'),
+        queryKeys.sessions.summary('study', TEST_SESSION_ID, 'test-profile-id'),
       );
       expect(invalidateSpy).toHaveBeenCalledWith(
         expect.objectContaining({

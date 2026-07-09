@@ -4,7 +4,11 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { Nudge, NudgeCreateInput } from '@eduagent/schemas';
+import type {
+  Nudge,
+  NudgeCreateInput,
+  NudgeListResponse,
+} from '@eduagent/schemas';
 import {
   nudgeCreateResponseSchema,
   nudgeListResponseSchema,
@@ -16,8 +20,6 @@ import { useApiClient } from '../lib/api-client';
 import { parseJson } from '../lib/parse-json';
 import { useProfile } from '../lib/profile';
 import { useApiQuery } from './use-api-query';
-
-type NudgeListResponse = { nudges: Nudge[] };
 
 export function useUnreadNudges(): UseQueryResult<Nudge[]> {
   const client = useApiClient();
