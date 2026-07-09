@@ -1501,6 +1501,31 @@ describe('learningSessionSchema [BUG-205] — accepts Date objects from neon-ser
       expect(result.data.filedAt).toBeNull();
     }
   });
+
+  it('preserves optional library filing enrichment fields', () => {
+    const result = learningSessionSchema.safeParse({
+      ...baseRow,
+      topicId: UUID,
+      filedAt: ISO,
+      filingStatus: 'filing_recovered',
+      topicTitle: 'Photosynthesis basics',
+      subjectName: 'Biology',
+      bookId: UUID,
+      bookTitle: 'Plant Biology',
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual(
+        expect.objectContaining({
+          topicTitle: 'Photosynthesis basics',
+          subjectName: 'Biology',
+          bookId: UUID,
+          bookTitle: 'Plant Biology',
+        }),
+      );
+    }
+  });
 });
 
 describe('MAX_EXCHANGES_PER_SESSION [BUG-211] — exported from schemas', () => {

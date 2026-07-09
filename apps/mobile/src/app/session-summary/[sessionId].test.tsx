@@ -26,6 +26,17 @@ const mockParams = {
   escalationRung: '2',
 } as Record<string, string | undefined>;
 
+const mockTestProfileId = '10000000-0000-4000-8000-000000000001';
+const mockTestAccountId = '10000000-0000-4000-8000-000000000002';
+const mockChildProfileId = '10000000-0000-4000-8000-000000000003';
+const mockParentProfileId = '10000000-0000-4000-8000-000000000004';
+const mockSubjectId = '550e8400-e29b-41d4-a716-446655440000';
+const mockFiledBookId = '22222222-2222-4222-8222-222222222222';
+const mockSuggestedTopicAId = '11111111-1111-4111-8111-111111111111';
+const mockSuggestedTopicBId = '33333333-3333-4333-8333-333333333333';
+const mockSuggestedTopicCId = '44444444-4444-4444-8444-444444444444';
+const mockSuggestedTopicDId = '55555555-5555-4555-8555-555555555555';
+
 // [BUG-134] Test-side: Redirect stub so we can observe the auth-gate output
 // without pulling in a real navigation context.
 jest.mock('expo-router', () => ({
@@ -102,8 +113,8 @@ jest.mock('../../lib/profile', /* gc1-allow: native-boundary: ProfileProvider us
     ...jest.requireActual('../../lib/profile'),
     useProfile: () => ({
       activeProfile: {
-        id: 'test-profile-id',
-        accountId: 'test-account-id',
+        id: mockTestProfileId,
+        accountId: mockTestAccountId,
         displayName: 'Test Learner',
         isOwner: true,
         hasPremiumLlm: false,
@@ -114,8 +125,8 @@ jest.mock('../../lib/profile', /* gc1-allow: native-boundary: ProfileProvider us
       },
       profiles: [
         {
-          id: 'test-profile-id',
-          accountId: 'test-account-id',
+          id: mockTestProfileId,
+          accountId: mockTestAccountId,
           displayName: 'Test Learner',
           isOwner: true,
           birthYear: 2012,
@@ -266,7 +277,7 @@ const mockFetch = createRoutedMockFetch({
   // `{}` response is returned, `{}.global` is undefined and `.totalSessions` throws
   // a TypeError, crashing the component on every re-render after fetch resolves.
   'progress/inventory': () => ({
-    profileId: 'test-profile-id',
+    profileId: mockTestProfileId,
     snapshotDate: '2026-05-02',
     global: {
       topicsAttempted: 0,
@@ -333,8 +344,8 @@ const mockFetch = createRoutedMockFetch({
   // Closes over mockRecentlyResolvedTopics so per-test overrides are reflected.
   'learner-profile': () => ({
     profile: {
-      id: 'test-profile-id',
-      profileId: 'test-profile-id',
+      id: mockTestProfileId,
+      profileId: mockTestProfileId,
       learningStyle: null,
       interests: [],
       strengths: [],
@@ -678,11 +689,11 @@ describe('SessionSummaryScreen', () => {
       mockUseParentProxy.mockReturnValue({
         isParentProxy: true,
         childProfile: {
-          id: 'child-profile-id',
+          id: mockChildProfileId,
           birthYear: 2012,
           consentStatus: 'CONSENTED',
         } as never,
-        parentProfile: { id: 'parent-1', isOwner: true } as never,
+        parentProfile: { id: mockParentProfileId, isOwner: true } as never,
       });
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
@@ -693,7 +704,7 @@ describe('SessionSummaryScreen', () => {
 
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/child/[profileId]/mentor-memory',
-        params: { profileId: 'child-profile-id' },
+        params: { profileId: mockChildProfileId },
       });
     });
 
@@ -718,11 +729,11 @@ describe('SessionSummaryScreen', () => {
       mockUseParentProxy.mockReturnValue({
         isParentProxy: true,
         childProfile: {
-          id: 'child-profile-id',
+          id: mockChildProfileId,
           birthYear: 2012,
           consentStatus: 'PENDING',
         } as never,
-        parentProfile: { id: 'parent-1', isOwner: true } as never,
+        parentProfile: { id: mockParentProfileId, isOwner: true } as never,
       });
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
@@ -1229,8 +1240,8 @@ describe('SessionSummaryScreen', () => {
     it('hides the Resume CTA in parent-proxy mode so parents cannot open the learner chat', () => {
       mockUseParentProxy.mockReturnValue({
         isParentProxy: true,
-        childProfile: { id: 'test-profile-id', birthYear: 2012 } as never,
-        parentProfile: { id: 'parent-1', isOwner: true } as never,
+        childProfile: { id: mockTestProfileId, birthYear: 2012 } as never,
+        parentProfile: { id: mockParentProfileId, isOwner: true } as never,
       });
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
@@ -1252,8 +1263,8 @@ describe('SessionSummaryScreen', () => {
     it('hides the transcript link in parent-proxy mode so parents cannot read the full chat', () => {
       mockUseParentProxy.mockReturnValue({
         isParentProxy: true,
-        childProfile: { id: 'test-profile-id', birthYear: 2012 } as never,
-        parentProfile: { id: 'parent-1', isOwner: true } as never,
+        childProfile: { id: mockTestProfileId, birthYear: 2012 } as never,
+        parentProfile: { id: mockParentProfileId, isOwner: true } as never,
       });
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
@@ -1450,7 +1461,7 @@ describe('SessionSummaryScreen', () => {
 
     it('rehydrates a stored draft into the input on mount', async () => {
       mockReadSummaryDraft.mockResolvedValue({
-        profileId: 'test-profile-id',
+        profileId: mockTestProfileId,
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'unfinished thought about autotrophs',
         updatedAt: new Date().toISOString(),
@@ -1596,7 +1607,7 @@ describe('SessionSummaryScreen', () => {
         status: 'skipped',
       };
       mockReadSummaryDraft.mockResolvedValue({
-        profileId: 'test-profile-id',
+        profileId: mockTestProfileId,
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'text I started last time but never submitted',
         updatedAt: new Date().toISOString(),
@@ -1858,11 +1869,11 @@ describe('SessionSummaryScreen', () => {
 
     it('renders filed destination, tap-through, and Remove from Library when topic info is available', async () => {
       mockSessionData = makeFreeformSession({
-        topicId: '11111111-1111-1111-1111-111111111111',
+        topicId: mockSuggestedTopicAId,
         filedAt: '2026-05-01T10:16:00.000Z',
         filingStatus: 'filing_recovered',
         topicTitle: 'Photosynthesis basics',
-        bookId: '22222222-2222-2222-2222-222222222222',
+        bookId: mockFiledBookId,
         bookTitle: 'Plant Biology',
         subjectName: 'Biology',
       });
@@ -1879,9 +1890,9 @@ describe('SessionSummaryScreen', () => {
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/topic/[topicId]',
         params: {
-          topicId: '11111111-1111-1111-1111-111111111111',
-          subjectId: '550e8400-e29b-41d4-a716-446655440000',
-          bookId: '22222222-2222-2222-2222-222222222222',
+          topicId: mockSuggestedTopicAId,
+          subjectId: mockSubjectId,
+          bookId: mockFiledBookId,
         },
       });
 
@@ -1907,7 +1918,7 @@ describe('SessionSummaryScreen', () => {
       // 2 exchanges is below the freeform exchangeCount>=5 auto-file floor.
       mockSessionData = makeFreeformSession({
         sessionType: 'homework',
-        topicId: '11111111-1111-1111-1111-111111111111',
+        topicId: mockSuggestedTopicAId,
         filedAt: '2026-05-01T10:16:00.000Z',
         filingStatus: null,
         topicTitle: 'Long division',
@@ -1973,8 +1984,8 @@ describe('SessionSummaryScreen', () => {
       mockTranscriptData = validTranscriptData as never;
       mockUseParentProxy.mockReturnValue({
         isParentProxy: true,
-        childProfile: { id: 'child-id', birthYear: 2012 } as never,
-        parentProfile: { id: 'parent-1', isOwner: true } as never,
+        childProfile: { id: mockChildProfileId, birthYear: 2012 } as never,
+        parentProfile: { id: mockParentProfileId, isOwner: true } as never,
       });
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
@@ -1992,36 +2003,36 @@ describe('SessionSummaryScreen', () => {
     it('shows up to 3 suggestion cards when suggestions are available', async () => {
       mockTopicSuggestionsData = [
         {
-          id: '11111111-1111-1111-1111-111111111111',
-          bookId: '22222222-2222-2222-2222-222222222222',
+          id: mockSuggestedTopicAId,
+          bookId: mockFiledBookId,
           title: 'Quadratic Functions',
           createdAt: '2026-05-01T10:00:00.000Z',
           usedAt: null,
         },
         {
-          id: '33333333-3333-3333-3333-333333333333',
-          bookId: '22222222-2222-2222-2222-222222222222',
+          id: mockSuggestedTopicBId,
+          bookId: mockFiledBookId,
           title: 'Polynomial Division',
           createdAt: '2026-05-01T10:00:00.000Z',
           usedAt: null,
         },
         {
-          id: '44444444-4444-4444-4444-444444444444',
-          bookId: '22222222-2222-2222-2222-222222222222',
+          id: mockSuggestedTopicCId,
+          bookId: mockFiledBookId,
           title: 'Complex Numbers',
           createdAt: '2026-05-01T10:00:00.000Z',
           usedAt: null,
         },
         {
-          id: '55555555-5555-5555-5555-555555555555',
-          bookId: '22222222-2222-2222-2222-222222222222',
+          id: mockSuggestedTopicDId,
+          bookId: mockFiledBookId,
           title: 'Should not appear — 4th item',
           createdAt: '2026-05-01T10:00:00.000Z',
           usedAt: null,
         },
       ];
-      mockParams.filedSubjectId = 'subject-uuid-1';
-      mockParams.filedBookId = '22222222-2222-2222-2222-222222222222';
+      mockParams.filedSubjectId = mockSubjectId;
+      mockParams.filedBookId = mockFiledBookId;
       mockTranscriptData = validTranscriptData as never;
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
@@ -2050,15 +2061,15 @@ describe('SessionSummaryScreen', () => {
     it('tapping a suggestion card navigates to the topic detail', async () => {
       mockTopicSuggestionsData = [
         {
-          id: '11111111-1111-1111-1111-111111111111',
-          bookId: '22222222-2222-2222-2222-222222222222',
+          id: mockSuggestedTopicAId,
+          bookId: mockFiledBookId,
           title: 'Quadratic Functions',
           createdAt: '2026-05-01T10:00:00.000Z',
           usedAt: null,
         },
       ];
-      mockParams.filedSubjectId = 'subject-uuid-1';
-      mockParams.filedBookId = '22222222-2222-2222-2222-222222222222';
+      mockParams.filedSubjectId = mockSubjectId;
+      mockParams.filedBookId = mockFiledBookId;
       mockTranscriptData = validTranscriptData as never;
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
@@ -2071,9 +2082,9 @@ describe('SessionSummaryScreen', () => {
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/topic/[topicId]',
         params: {
-          topicId: '11111111-1111-1111-1111-111111111111',
-          bookId: '22222222-2222-2222-2222-222222222222',
-          subjectId: 'subject-uuid-1',
+          topicId: mockSuggestedTopicAId,
+          bookId: mockFiledBookId,
+          subjectId: mockSubjectId,
         },
       });
     });
@@ -2197,8 +2208,8 @@ describe('SessionSummaryScreen', () => {
       };
       mockUseParentProxy.mockReturnValue({
         isParentProxy: true,
-        childProfile: { id: 'child-id', birthYear: 2012 } as never,
-        parentProfile: { id: 'parent-1', isOwner: true } as never,
+        childProfile: { id: mockChildProfileId, birthYear: 2012 } as never,
+        parentProfile: { id: mockParentProfileId, isOwner: true } as never,
       });
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });

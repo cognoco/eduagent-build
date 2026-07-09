@@ -368,6 +368,10 @@ export const learningSessionSchema = z.object({
   filedAt: isoDateField.nullable(),
   filingStatus: filingStatusSchema.nullable(),
   filingRetryCount: z.number().int().nonnegative(),
+  topicTitle: z.string().nullable().optional(),
+  subjectName: z.string().nullable().optional(),
+  bookId: z.string().uuid().nullable().optional(),
+  bookTitle: z.string().nullable().optional(),
 });
 export type LearningSession = z.infer<typeof learningSessionSchema>;
 
