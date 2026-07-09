@@ -86,7 +86,9 @@ const defaultDeps: StreamSessionResponseDependencies = {
   processMessage,
   refundQuotaOrEscalate,
   markPersisted,
-  sendEmptyReplyFallbackEvent: async () => undefined,
+  sendEmptyReplyFallbackEvent: async () => {
+    throw new Error('sendEmptyReplyFallbackEvent dependency is required');
+  },
   logger,
   captureException,
   addBreadcrumb,
