@@ -1,5 +1,6 @@
 import {
   buildSystemPrompt,
+  buildSystemPromptMessages,
   allowsGeneralKnowledgeSource,
 } from './exchange-prompts';
 import type { ExchangeContext } from './exchanges';
@@ -154,6 +155,51 @@ describe('buildSystemPrompt — app-help block', () => {
     const appHelpSection = prompt.slice(appHelpStart, appHelpStart + 2000);
     expect(appHelpSection).not.toMatch(/\/\(app\)/);
     expect(appHelpSection).not.toMatch(/\[.*Id\]/);
+  });
+});
+
+describe('buildSystemPromptMessages — Anthropic prompt caching split', () => {
+  it('exposes a stable cached prefix and leaves learner/session context uncached', () => {
+    const context = makeContext({
+      learnerName: 'Adult Learner',
+      birthYear: new Date().getFullYear() - 30,
+      topicTitle: 'Photosynthesis',
+      topicDescription: 'How plants turn sunlight into usable energy.',
+      teachingPreference: 'analogies first',
+      analogyDomain: 'football',
+      priorLearningContext: 'Learner previously studied plant cells.',
+      embeddingMemoryContext: 'Learner likes garden examples.',
+    });
+
+    const prompt = buildSystemPrompt(context);
+    const messages = buildSystemPromptMessages(context);
+
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toMatchObject({
+      role: 'system',
+      cacheControl: { type: 'ephemeral' },
+    });
+    expect(messages[1]).toMatchObject({ role: 'system' });
+
+    const stablePrefix = String(messages[0]!.content);
+    const volatileSuffix = String(messages[1]!.content);
+    expect(`${stablePrefix}\n\n${volatileSuffix}`).toBe(prompt);
+
+    expect(stablePrefix).toContain('You are MentoMate');
+    expect(stablePrefix).toContain('SAFETY');
+    expect(stablePrefix).not.toContain('Adult Learner');
+    expect(stablePrefix).not.toContain('Photosynthesis');
+    expect(stablePrefix).not.toContain('analogies first');
+    expect(stablePrefix).not.toContain('football');
+    expect(stablePrefix).not.toContain('plant cells');
+    expect(stablePrefix).not.toContain('garden examples');
+
+    expect(volatileSuffix).toContain('Adult Learner');
+    expect(volatileSuffix).toContain('Photosynthesis');
+    expect(volatileSuffix).toContain('analogies first');
+    expect(volatileSuffix).toContain('football');
+    expect(volatileSuffix).toContain('plant cells');
+    expect(volatileSuffix).toContain('garden examples');
   });
 });
 

@@ -10,6 +10,14 @@ interface AnthropicResponseFormatInput {
 
 const SNAPSHOT_PROFILE_ID = '12yo-dinosaurs';
 
+function renderAnthropicSystem(
+  system: ReturnType<typeof toAnthropicFormat>['system'],
+): string {
+  if (!system) return '';
+  if (typeof system === 'string') return system;
+  return system.map((block) => block.text).join('\n\n');
+}
+
 export const anthropicResponseFormatFlow: FlowDefinition<AnthropicResponseFormatInput> =
   {
     id: 'anthropic-response-format',
@@ -43,7 +51,7 @@ export const anthropicResponseFormatFlow: FlowDefinition<AnthropicResponseFormat
       const converted = toAnthropicFormat(input.messages, input.responseFormat);
 
       return {
-        system: converted.system ?? '',
+        system: renderAnthropicSystem(converted.system),
         user: JSON.stringify(converted.messages, null, 2),
         notes: [
           'Transport snapshot for Anthropic responseFormat=json conversion.',

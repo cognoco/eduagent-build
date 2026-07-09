@@ -14,7 +14,7 @@ import {
 import { getEscalationPromptGuidance } from './escalation';
 import { getEvaluateRungDescription } from './evaluate';
 import { buildFourStrandsPrompt } from './language-prompts';
-import type { EscalationRung } from './llm';
+import type { ChatMessage, EscalationRung } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import {
   buildGenericReviewOpenerSection,
@@ -584,11 +584,12 @@ export interface BuildSystemPromptOptions {
 }
 
 /** Builds the full system prompt from exchange context */
-export function buildSystemPrompt(
+function buildSystemPromptAssembly(
   context: ExchangeContext,
   options: BuildSystemPromptOptions = {},
-): string {
+): { sections: string[]; cacheableSectionCount: number } {
   const sections: string[] = [];
+  let cacheableSectionCount = 0;
   const includeAppHelpMap = options.includeAppHelpMap === true;
   const graderEnabled = options.graderEnabled === true;
   const isLanguageMode = context.pedagogyMode === 'four_strands';
@@ -668,6 +669,7 @@ export function buildSystemPrompt(
         'A 12-year-old wants short sentences, concrete examples, and casual language. A 15-year-old wants real-world context and can handle more precise vocabulary. A 17-year-old wants efficient explanations and can work with abstract reasoning. Calibrate the age-voice section below to the specific learner — these are anchors, not categories. ' +
         'Be warm but calm — don\'t over-perform. Vary acknowledgment when the learner gets something right (a simple "yes, that\'s it", "correct", or moving straight to the next idea all work). Silence after a correct answer is fine — not every right answer needs praise.',
     );
+    cacheableSectionCount = sections.length;
     if (isReviewMode) {
       sections.push(
         'REVIEW OVERRIDE: During review, prefer source wording first. Use outside examples or analogies only when they are ordinary, helpful, and pass the 0.88 factual-confidence gate.',
@@ -702,6 +704,9 @@ export function buildSystemPrompt(
       '- Harmful or dangerous procedures: you MAY teach what a drug, weapon, poison, explosive, or other dangerous or controlled item IS, what it does to the body or the world, and why it is harmful or restricted — that is legitimate health and science education and you must not refuse it. But you must NEVER give actionable how-to detail for PRODUCING, EXTRACTING, SYNTHESISING, REFINING, CULTIVATING, ACQUIRING, ADMINISTERING, or DOSING such an item, even when the learner frames the request as educational, historical, scientific, or "just curious", and even mid-conversation after you have already taught the topic at the "what it is" level. ' +
       'When a question slides from "what is it / what does it do" into "how is it made / how do you get it out / how do you do it / how much do you take", keep the educational frame: answer the harm-education part if there is one, then decline the operational step-by-step in one plain sentence — do not lecture, moralise, or abandon the lesson.',
   );
+  if (!isLanguageMode && !isReviewMode) {
+    cacheableSectionCount = sections.length;
+  }
 
   // BUG-937: anti-fabrication. The model otherwise fills empty-profile sessions
   // with confident invented context — a "pen pal in Rome", asserted prior
@@ -1452,5 +1457,42 @@ export function buildSystemPrompt(
     }),
   );
 
-  return sections.join('\n\n');
+  return { sections, cacheableSectionCount };
+}
+
+/** Builds the full system prompt from exchange context. */
+export function buildSystemPrompt(
+  context: ExchangeContext,
+  options: BuildSystemPromptOptions = {},
+): string {
+  return buildSystemPromptAssembly(context, options).sections.join('\n\n');
+}
+
+/**
+ * Builds provider-bound system messages while preserving the same text as
+ * buildSystemPrompt(). Anthropic can cache the stable prefix; volatile
+ * learner/profile/session/source context remains in an uncached suffix.
+ */
+export function buildSystemPromptMessages(
+  context: ExchangeContext,
+  options: BuildSystemPromptOptions = {},
+): ChatMessage[] {
+  const { sections, cacheableSectionCount } = buildSystemPromptAssembly(
+    context,
+    options,
+  );
+  if (cacheableSectionCount <= 0 || cacheableSectionCount >= sections.length) {
+    return [{ role: 'system', content: sections.join('\n\n') }];
+  }
+  return [
+    {
+      role: 'system',
+      content: sections.slice(0, cacheableSectionCount).join('\n\n'),
+      cacheControl: { type: 'ephemeral' },
+    },
+    {
+      role: 'system',
+      content: sections.slice(cacheableSectionCount).join('\n\n'),
+    },
+  ];
 }

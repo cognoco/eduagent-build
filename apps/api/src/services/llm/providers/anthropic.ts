@@ -7,6 +7,7 @@ import {
   type ChatStreamResult,
   type ModelConfig,
   type MessagePart,
+  type PromptCacheControl,
 } from '../types';
 import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { createLogger } from '../../logger';
@@ -42,10 +43,16 @@ interface AnthropicMessage {
   content: string | AnthropicContentBlock[];
 }
 
+interface AnthropicSystemTextBlock {
+  type: 'text';
+  text: string;
+  cache_control?: PromptCacheControl;
+}
+
 interface AnthropicRequest {
   model: string;
   max_tokens: number;
-  system?: string;
+  system?: string | AnthropicSystemTextBlock[];
   messages: AnthropicMessage[];
   stream?: boolean;
 }
@@ -85,18 +92,23 @@ export function toAnthropicFormat(
   messages: ChatMessage[],
   responseFormat?: 'json',
 ): {
-  system: string | undefined;
+  system: string | AnthropicSystemTextBlock[] | undefined;
   messages: AnthropicMessage[];
 } {
-  let system: string | undefined;
+  const systemBlocks: AnthropicSystemTextBlock[] = [];
+  let hasCacheControl = false;
   const converted: AnthropicMessage[] = [];
 
   for (const msg of messages) {
     if (msg.role === 'system') {
       // Anthropic takes system as a top-level param, not in messages
-      system = system
-        ? `${system}\n\n${getTextContent(msg.content)}`
-        : getTextContent(msg.content);
+      const text = getTextContent(msg.content);
+      const block: AnthropicSystemTextBlock = { type: 'text', text };
+      if (msg.cacheControl) {
+        block.cache_control = msg.cacheControl;
+        hasCacheControl = true;
+      }
+      systemBlocks.push(block);
     } else {
       converted.push({
         role: msg.role as 'user' | 'assistant',
@@ -109,10 +121,15 @@ export function toAnthropicFormat(
   // Anthropic has no native response_format flag; this is the only reliable
   // mechanism to steer the model toward a parseable response.
   if (responseFormat === 'json') {
-    system = system
-      ? `${system}\n\n${JSON_ONLY_DIRECTIVE}`
-      : JSON_ONLY_DIRECTIVE;
+    systemBlocks.push({ type: 'text', text: JSON_ONLY_DIRECTIVE });
   }
+
+  const system =
+    systemBlocks.length === 0
+      ? undefined
+      : hasCacheControl
+        ? systemBlocks
+        : systemBlocks.map((block) => block.text).join('\n\n');
 
   return { system, messages: converted };
 }

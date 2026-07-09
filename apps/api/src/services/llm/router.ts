@@ -1,4 +1,5 @@
 import {
+  getTextContent,
   makeChatStreamResult,
   type LLMProvider,
   type ChatMessage,
@@ -296,15 +297,67 @@ export function withSafetyPreamble(
     : safetyPreamble;
   const first = messages[0];
   if (first?.role === 'system') {
+    if (first.cacheControl) {
+      return [
+        first,
+        {
+          role: 'system',
+          content: preamble,
+        },
+        ...messages.slice(1),
+      ];
+    }
     return [
       {
         role: 'system',
-        content: `${preamble}\n\n${first.content}`,
+        content: `${preamble}\n\n${getTextContent(first.content)}`,
       },
       ...messages.slice(1),
     ];
   }
   return [{ role: 'system', content: preamble }, ...messages];
+}
+
+function stripCacheControl(message: ChatMessage): ChatMessage {
+  if (!message.cacheControl) return message;
+  const { cacheControl: _cacheControl, ...rest } = message;
+  return rest;
+}
+
+function mergeLeadingSystemMessages(messages: ChatMessage[]): ChatMessage[] {
+  const leadingSystemMessages: ChatMessage[] = [];
+  let index = 0;
+  while (messages[index]?.role === 'system') {
+    leadingSystemMessages.push(messages[index]!);
+    index++;
+  }
+  if (leadingSystemMessages.length <= 1) return messages.map(stripCacheControl);
+
+  // Non-Anthropic providers should keep the historical flattened order:
+  // router safety preamble first, then the caller's system prompt.
+  const orderedSystemMessages =
+    leadingSystemMessages[0]!.cacheControl && leadingSystemMessages[1]
+      ? [
+          leadingSystemMessages[1]!,
+          leadingSystemMessages[0]!,
+          ...leadingSystemMessages.slice(2),
+        ]
+      : leadingSystemMessages;
+  const systemTexts = orderedSystemMessages.map((message) =>
+    getTextContent(message.content),
+  );
+  return [
+    { role: 'system', content: systemTexts.join('\n\n') },
+    ...messages.slice(index).map(stripCacheControl),
+  ];
+}
+
+function prepareMessagesForProvider(
+  messages: ChatMessage[],
+  providerId: string,
+): ChatMessage[] {
+  if (providerId === 'anthropic') return messages;
+  return mergeLeadingSystemMessages(messages);
 }
 
 // ---------------------------------------------------------------------------
@@ -1509,7 +1562,11 @@ export async function routeAndCall(
     const start = Date.now();
     try {
       const raw = await withRetry(
-        () => provider.chat(safeMessages, config),
+        () =>
+          provider.chat(
+            prepareMessagesForProvider(safeMessages, config.provider),
+            config,
+          ),
         config.provider,
       );
       const result = normalizeChatResult(raw);
@@ -1638,7 +1695,11 @@ async function attemptProvider(
   const start = Date.now();
   try {
     const raw = await withRetry(
-      () => provider.chat(messages, config),
+      () =>
+        provider.chat(
+          prepareMessagesForProvider(messages, config.provider),
+          config,
+        ),
       `${config.provider} (fallback)`,
     );
     const result = normalizeChatResult(raw);
@@ -1755,7 +1816,10 @@ async function* wrapStreamWithCircuitBreaker(
           },
         );
         const fallbackResult = normalizeStreamResult(
-          fallbackProvider.chatStream(messages, fallbackConfig),
+          fallbackProvider.chatStream(
+            prepareMessagesForProvider(messages, fallbackConfig.provider),
+            fallbackConfig,
+          ),
         );
         const fallbackStream = wrapStreamWithCircuitBreaker(
           fallbackResult.stream,
@@ -1827,7 +1891,10 @@ async function* wrapStreamWithCircuitBreaker(
           },
         );
         const fallbackResult = normalizeStreamResult(
-          fallbackProvider.chatStream(messages, fallbackConfig),
+          fallbackProvider.chatStream(
+            prepareMessagesForProvider(messages, fallbackConfig.provider),
+            fallbackConfig,
+          ),
         );
         const fallbackStream = wrapStreamWithCircuitBreaker(
           fallbackResult.stream,
@@ -1952,7 +2019,10 @@ export async function routeAndStream(
       resolveStop = resolve;
     });
     const primaryResult = normalizeStreamResult(
-      provider.chatStream(safeMessages, config),
+      provider.chatStream(
+        prepareMessagesForProvider(safeMessages, config.provider),
+        config,
+      ),
     );
     const stream = wrapStreamWithCircuitBreaker(
       primaryResult.stream,
@@ -2063,7 +2133,10 @@ async function attemptStreamProvider(
     resolveStop = resolve;
   });
   const providerResult = normalizeStreamResult(
-    provider.chatStream(messages, config),
+    provider.chatStream(
+      prepareMessagesForProvider(messages, config.provider),
+      config,
+    ),
   );
   const stream = wrapStreamWithCircuitBreaker(
     providerResult.stream,

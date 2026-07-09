@@ -1677,6 +1677,131 @@ describe('LLM Router', () => {
     });
   });
 
+  describe('provider prompt-cache message shaping', () => {
+    beforeEach(() => {
+      _clearProviders();
+      _resetCircuits();
+    });
+
+    afterEach(() => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('preserves cacheable system prefix for Anthropic and keeps volatile router preamble uncached', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'anthropic',
+        async chat(messages: ChatMessage[]) {
+          receivedMessages.push(messages);
+          return okResult;
+        },
+        chatStream(): ChatStreamResult {
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
+        },
+      };
+      registerProvider(spy);
+
+      await routeAndCall(
+        [
+          {
+            role: 'system',
+            content: 'Stable session rules.',
+            cacheControl: { type: 'ephemeral' },
+          },
+          {
+            role: 'system',
+            content: 'Volatile session context.',
+          },
+          { role: 'user', content: 'Hello' },
+        ],
+        4,
+        {
+          llmTier: 'premium',
+          preferredProvider: 'anthropic',
+          ageBracket: 'adult',
+          conversationLanguage: 'cs',
+        },
+      );
+
+      const messages = receivedMessages[0]!;
+      expect(messages[0]).toEqual({
+        role: 'system',
+        content: 'Stable session rules.',
+        cacheControl: { type: 'ephemeral' },
+      });
+      expect(messages[1]!.role).toBe('system');
+      expect(messages[1]!.cacheControl).toBeUndefined();
+      expect(getTextContent(messages[1]!.content)).toContain(
+        'Write only the learner-visible prose',
+      );
+      expect(getTextContent(messages[1]!.content)).toContain(
+        'The current learner is an adult',
+      );
+      expect(messages[2]).toEqual({
+        role: 'system',
+        content: 'Volatile session context.',
+      });
+    });
+
+    it('flattens cache metadata away for providers without prompt-cache support', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'gemini',
+        async chat(messages: ChatMessage[]) {
+          receivedMessages.push(messages);
+          return okResult;
+        },
+        chatStream(): ChatStreamResult {
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
+        },
+      };
+      registerProvider(spy);
+
+      await routeAndCall(
+        [
+          {
+            role: 'system',
+            content: 'Stable session rules.',
+            cacheControl: { type: 'ephemeral' },
+          },
+          {
+            role: 'system',
+            content: 'Volatile session context.',
+          },
+          { role: 'user', content: 'Hello' },
+        ],
+        1,
+      );
+
+      const messages = receivedMessages[0]!;
+      expect(messages).toHaveLength(2);
+      expect(messages[0]!.cacheControl).toBeUndefined();
+      const system = getTextContent(messages[0]!.content);
+      expect(system).toContain('MentoMate tutoring app');
+      expect(system).toContain('Stable session rules.');
+      expect(system).toContain('Volatile session context.');
+      expect(system.indexOf('MentoMate tutoring app')).toBeLessThan(
+        system.indexOf('Stable session rules.'),
+      );
+      expect(system.indexOf('Stable session rules.')).toBeLessThan(
+        system.indexOf('Volatile session context.'),
+      );
+      expect(messages[1]).toEqual({ role: 'user', content: 'Hello' });
+    });
+  });
+
   describe('learner-facing flow tripwire (i18n Phase 1)', () => {
     beforeEach(() => {
       _clearProviders();

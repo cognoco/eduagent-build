@@ -55,10 +55,20 @@ export interface InlineDataPart {
 
 export type MessagePart = TextPart | InlineDataPart;
 
+export interface PromptCacheControl {
+  type: 'ephemeral';
+  ttl?: '5m' | '1h';
+}
+
 /** Chat message format — content is text or multimodal parts */
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string | MessagePart[];
+  /**
+   * Provider-specific prompt cache marker. Anthropic uses this on system text
+   * blocks; providers without prompt-cache support must ignore it.
+   */
+  cacheControl?: PromptCacheControl;
 }
 
 /** Extract text-only content from a ChatMessage's content field. */

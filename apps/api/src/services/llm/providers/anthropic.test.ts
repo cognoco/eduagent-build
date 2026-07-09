@@ -102,6 +102,72 @@ describe('toAnthropicFormat — responseFormat json directive', () => {
   });
 });
 
+describe('toAnthropicFormat — prompt cache system blocks', () => {
+  it('marks only the stable system prefix as an Anthropic cache breakpoint', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: 'Stable tutor rules.',
+        cacheControl: { type: 'ephemeral' },
+      },
+      {
+        role: 'system',
+        content: 'Volatile learner profile and session context.',
+      },
+      { role: 'user', content: 'Help me.' },
+    ];
+
+    const { system, messages: converted } = toAnthropicFormat(messages);
+
+    expect(system).toEqual([
+      {
+        type: 'text',
+        text: 'Stable tutor rules.',
+        cache_control: { type: 'ephemeral' },
+      },
+      {
+        type: 'text',
+        text: 'Volatile learner profile and session context.',
+      },
+    ]);
+    expect(converted).toEqual([{ role: 'user', content: 'Help me.' }]);
+  });
+
+  it('keeps JSON-only steering out of the cached stable prefix', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: 'Stable tutor rules.',
+        cacheControl: { type: 'ephemeral' },
+      },
+      { role: 'user', content: 'Give JSON.' },
+    ];
+
+    const { system } = toAnthropicFormat(messages, 'json');
+
+    expect(system).toEqual([
+      {
+        type: 'text',
+        text: 'Stable tutor rules.',
+        cache_control: { type: 'ephemeral' },
+      },
+      { type: 'text', text: JSON_DIRECTIVE },
+    ]);
+  });
+
+  it('preserves the legacy string system shape for uncached calls', () => {
+    const messages: ChatMessage[] = [
+      { role: 'system', content: 'First.' },
+      { role: 'system', content: 'Second.' },
+      { role: 'user', content: 'Hello.' },
+    ];
+
+    const { system } = toAnthropicFormat(messages);
+
+    expect(system).toBe('First.\n\nSecond.');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // createAnthropicProvider — CR-2026-05-21-080: fetch payload includes directive
 // Mocks only the Anthropic HTTP API (external boundary), not the router.
@@ -163,6 +229,98 @@ describe('createAnthropicProvider — responseFormat json in fetch payload', () 
     const body = JSON.parse(init.body as string) as { system?: string };
     expect(body.system).toBe('You are a quiz generator.');
     expect(body.system).not.toContain(JSON_DIRECTIVE);
+  });
+});
+
+describe('createAnthropicProvider — prompt caching request shape', () => {
+  let fetchSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockSuccessResponse),
+      text: () => Promise.resolve(JSON.stringify(mockSuccessResponse)),
+    } as unknown as Response);
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('sends cached system blocks on non-streaming Anthropic calls without a beta header', async () => {
+    const provider = createAnthropicProvider('test-api-key');
+
+    await provider.chat(
+      [
+        {
+          role: 'system',
+          content: 'Stable tutor rules.',
+          cacheControl: { type: 'ephemeral' },
+        },
+        { role: 'system', content: 'Volatile learner context.' },
+        { role: 'user', content: 'Hello.' },
+      ],
+      baseConfig,
+    );
+
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    const body = JSON.parse(init.body as string) as { system?: unknown };
+    expect(body.system).toEqual([
+      {
+        type: 'text',
+        text: 'Stable tutor rules.',
+        cache_control: { type: 'ephemeral' },
+      },
+      { type: 'text', text: 'Volatile learner context.' },
+    ]);
+    expect(headers['anthropic-version']).toBe('2023-06-01');
+    expect(headers['anthropic-beta']).toBeUndefined();
+  });
+
+  it('sends cached system blocks on streaming Anthropic calls', async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hi"}}\n\n',
+          ),
+        );
+        controller.close();
+      },
+    });
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      body: stream,
+      text: () => Promise.resolve(''),
+    } as unknown as Response);
+    const provider = createAnthropicProvider('test-api-key');
+
+    for await (const _chunk of provider.chatStream(
+      [
+        {
+          role: 'system',
+          content: 'Stable tutor rules.',
+          cacheControl: { type: 'ephemeral' },
+        },
+        { role: 'system', content: 'Volatile learner context.' },
+        { role: 'user', content: 'Hello.' },
+      ],
+      baseConfig,
+    )) {
+      // drain stream
+    }
+
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { system?: unknown };
+    expect(body.system).toEqual([
+      {
+        type: 'text',
+        text: 'Stable tutor rules.',
+        cache_control: { type: 'ephemeral' },
+      },
+      { type: 'text', text: 'Volatile learner context.' },
+    ]);
   });
 });
 

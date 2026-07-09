@@ -26,7 +26,7 @@ import {
   type ChallengeRoundNoteDraftHint,
 } from '@eduagent/schemas';
 import {
-  buildSystemPrompt as _buildSystemPrompt,
+  buildSystemPromptMessages as _buildSystemPromptMessages,
   allowsGeneralKnowledgeSource,
 } from './exchange-prompts';
 import { stripPhoneticHints } from './llm/sanitize';
@@ -1807,13 +1807,13 @@ export async function processExchange(
     appHelpTurn,
   });
   const promptContext: ExchangeContext = { ...context, sourceEvidence };
-  const systemPrompt = _buildSystemPrompt(promptContext, {
+  const systemMessages = _buildSystemPromptMessages(promptContext, {
     includeAppHelpMap: appHelpTurn,
     graderEnabled: promptContext.graderEnabled,
   });
 
   const messages: ChatMessage[] = [
-    { role: 'system', content: systemPrompt },
+    ...systemMessages,
     ...context.exchangeHistory.map((e) => ({
       role: e.role,
       content: e.role === 'user' ? sanitizeUserContent(e.content) : e.content,
@@ -2101,13 +2101,13 @@ export async function streamExchange(
     appHelpTurn,
   });
   const promptContext: ExchangeContext = { ...context, sourceEvidence };
-  const systemPrompt = _buildSystemPrompt(promptContext, {
+  const systemMessages = _buildSystemPromptMessages(promptContext, {
     includeAppHelpMap: appHelpTurn,
     graderEnabled: promptContext.graderEnabled,
   });
 
   const messages: ChatMessage[] = [
-    { role: 'system', content: systemPrompt },
+    ...systemMessages,
     ...context.exchangeHistory.map((e) => ({
       role: e.role,
       content: e.role === 'user' ? sanitizeUserContent(e.content) : e.content,
