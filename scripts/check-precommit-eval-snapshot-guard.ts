@@ -95,9 +95,20 @@ function splitGitLines(output: string): string[] {
 function git(cwd: string, args: string[]): string {
   return execFileSync('git', args, {
     cwd,
+    env: childGitEnv(),
     encoding: 'utf8',
     maxBuffer: 20 * 1024 * 1024,
   });
+}
+
+function childGitEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GIT_')) {
+      delete env[key];
+    }
+  }
+  return env;
 }
 
 export function main(): void {

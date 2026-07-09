@@ -17,7 +17,21 @@ import {
 } from './zero-drift-receipt';
 
 function git(repo: string, args: string[]): void {
-  execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+  execFileSync('git', args, {
+    cwd: repo,
+    env: childGitEnv(),
+    stdio: 'ignore',
+  });
+}
+
+function childGitEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GIT_')) {
+      delete env[key];
+    }
+  }
+  return env;
 }
 
 function writeRepoFile(repo: string, path: string, body: string): void {

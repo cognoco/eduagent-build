@@ -771,6 +771,9 @@ export const subscriptionPayers = pgTable(
       table.subscriptionId,
       table.personId,
     ),
+    uniqueIndex('subscription_payers_primary_subscription_unique')
+      .on(table.subscriptionId)
+      .where(sql`${table.role} = 'primary'`),
     check(
       'subscription_payers_role_valid',
       sql`${table.role} IN ('primary', 'secondary')`,
