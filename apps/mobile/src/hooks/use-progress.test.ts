@@ -51,6 +51,32 @@ const mockFetch = jest.fn();
 
 let queryClient: QueryClient;
 const originalFetch = globalThis.fetch;
+const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
+const TOPIC_ID = '770e8400-e29b-41d4-a716-446655440000';
+const SESSION_ID = '880e8400-e29b-41d4-a716-446655440000';
+
+function makeProgressMetrics() {
+  return {
+    totalSessions: 1,
+    totalActiveMinutes: 10,
+    totalWallClockMinutes: 12,
+    totalExchanges: 4,
+    topicsAttempted: 1,
+    topicsMastered: 0,
+    topicsInProgress: 1,
+    booksCompleted: 0,
+    vocabularyTotal: 0,
+    vocabularyMastered: 0,
+    vocabularyLearning: 0,
+    vocabularyNew: 0,
+    retentionCardsDue: 0,
+    retentionCardsStrong: 0,
+    retentionCardsFading: 0,
+    currentStreak: 1,
+    longestStreak: 1,
+    subjects: [],
+  };
+}
 
 beforeEach(() => {
   mockFetch.mockReset();
@@ -115,7 +141,7 @@ describe('useSubjectProgress', () => {
       new Response(
         JSON.stringify({
           progress: {
-            subjectId: 'sub-1',
+            subjectId: SUBJECT_ID,
             name: 'Mathematics',
             topicsTotal: 10,
             topicsCompleted: 3,
@@ -131,7 +157,7 @@ describe('useSubjectProgress', () => {
       ),
     );
 
-    const { result } = renderHook(() => useSubjectProgress('sub-1'), {
+    const { result } = renderHook(() => useSubjectProgress(SUBJECT_ID), {
       wrapper: createWrapper(),
     });
 
@@ -156,7 +182,7 @@ describe('useSubjectProgress', () => {
       ),
     );
 
-    const { result } = renderHook(() => useSubjectProgress('sub-1'), {
+    const { result } = renderHook(() => useSubjectProgress(SUBJECT_ID), {
       wrapper: createWrapper(),
     });
 
@@ -181,7 +207,7 @@ describe('useSubjectProgress', () => {
       ),
     );
 
-    const { result } = renderHook(() => useSubjectProgress('sub-1'), {
+    const { result } = renderHook(() => useSubjectProgress(SUBJECT_ID), {
       wrapper: createWrapper(),
     });
 
@@ -205,7 +231,7 @@ describe('useOverallProgress', () => {
         JSON.stringify({
           subjects: [
             {
-              subjectId: 'sub-1',
+              subjectId: SUBJECT_ID,
               name: 'Math',
               topicsTotal: 5,
               topicsCompleted: 2,
@@ -245,10 +271,11 @@ describe('useContinueSuggestion', () => {
       new Response(
         JSON.stringify({
           suggestion: {
-            subjectId: 'sub-1',
+            subjectId: SUBJECT_ID,
             subjectName: 'Math',
-            topicId: 'topic-1',
+            topicId: TOPIC_ID,
             topicTitle: 'Algebra',
+            lastSessionId: SESSION_ID,
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -330,10 +357,22 @@ describe('useLearningResumeTarget', () => {
 describe('useReviewSummary', () => {
   it('fetches review summary from API', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ totalOverdue: 6 }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+      new Response(
+        JSON.stringify({
+          totalOverdue: 6,
+          nextReviewTopic: {
+            topicId: TOPIC_ID,
+            subjectId: SUBJECT_ID,
+            subjectName: 'Math',
+            topicTitle: 'Algebra',
+          },
+          nextUpcomingReviewAt: null,
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
     );
 
     const { result } = renderHook(() => useReviewSummary(), {
@@ -355,14 +394,16 @@ describe('useOverdueTopics', () => {
       new Response(
         JSON.stringify({
           totalOverdue: 2,
+          truncated: false,
+          displayedCount: 1,
           subjects: [
             {
-              subjectId: 'sub-1',
+              subjectId: SUBJECT_ID,
               subjectName: 'Math',
               overdueCount: 2,
               topics: [
                 {
-                  topicId: 'topic-1',
+                  topicId: TOPIC_ID,
                   topicTitle: 'Algebra',
                   overdueDays: 3,
                   failureCount: 1,
@@ -394,11 +435,12 @@ describe('useTopicProgress', () => {
       new Response(
         JSON.stringify({
           topic: {
-            topicId: 'topic-1',
+            topicId: TOPIC_ID,
             title: 'Algebra Basics',
             description: 'Intro',
             completionStatus: 'in_progress',
             retentionStatus: 'strong',
+            daysSinceLastReview: 3,
             struggleStatus: 'normal',
             masteryScore: 0.85,
             summaryExcerpt: null,
@@ -406,15 +448,19 @@ describe('useTopicProgress', () => {
             masteredAt: null,
             strongReviews: 2,
             strongReviewsTarget: 5,
+            totalSessions: 2,
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
-    const { result } = renderHook(() => useTopicProgress('sub-1', 'topic-1'), {
-      wrapper: createWrapper(),
-    });
+    const { result } = renderHook(
+      () => useTopicProgress(SUBJECT_ID, TOPIC_ID),
+      {
+        wrapper: createWrapper(),
+      },
+    );
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
@@ -574,7 +620,7 @@ describe('useRefreshProgressSnapshot', () => {
       new Response(
         JSON.stringify({
           snapshotDate: '2026-05-12',
-          metrics: {},
+          metrics: makeProgressMetrics(),
           milestones: [],
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
