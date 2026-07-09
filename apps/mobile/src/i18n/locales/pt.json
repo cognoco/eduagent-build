@@ -304,9 +304,9 @@
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
-      "consentArchivedBody": "Data is retained for 30 days, then deleted.",
+      "consentArchivedBody": "Os dados são retidos por 30 dias e depois excluídos.",
       "consentDeletedTitle": "{{name}}'s account was deleted",
-      "consentDeletedBody": "The withdrawal grace period has ended."
+      "consentDeletedBody": "O período de carência para retirada terminou."
     },
     "parent": {
       "greeting": "Oi, {{displayName}}",
@@ -334,10 +334,10 @@
         "promptRestartWithTopic": "Querem escolher uma pequena meta de {{topic}} para esta semana?",
         "promptRestartEasierWithTopic": "Devemos tornar mais fácil retomar {{topic}}?"
       },
-      "childrenHeader": "Children",
+      "childrenHeader": "Crianças",
       "familyManagementHeader": "Gestão familiar",
       "childCard": {
-        "statusPending": "Checking in",
+        "statusPending": "Verificando",
         "reportsAction": "Relatórios",
         "nudgeAction": "Nudge",
         "learnTogetherAction": "Aprender juntos"
@@ -388,8 +388,8 @@
       "greetingFallbackName": "Olá",
       "greetingNoName": "Olá!"
     },
-    "goToProgress": "Go to Progress",
-    "goToProgressLabel": "Go to Progress",
+    "goToProgress": "Ir para o Progresso",
+    "goToProgressLabel": "Ir para o Progresso",
     "coachBand": {
       "estimatedMinutes": "{{minutes}} min",
       "a11yDismiss": "Dispensar recomendação",
@@ -461,12 +461,12 @@
     "withdrawal": {
       "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
       "bannerTitleMulti": "{{count}} accounts closing soon",
-      "bannerCta": "Reverse",
+      "bannerCta": "Reverter",
       "bannerCtaShort": "Undo",
       "daysOne": "day",
       "daysOther": "days",
-      "restoreErrorTitle": "Couldn't reverse withdrawal",
-      "restoreErrorBody": "Try again in a moment.",
+      "restoreErrorTitle": "Não foi possível reverter o cancelamento",
+      "restoreErrorBody": "Tente novamente em um momento.",
       "restoreSuccessToast": "Withdrawal reversed for {{name}}"
     }
   },
@@ -494,7 +494,7 @@
       "addChildAccessLabel": "Adicionar um perfil de criança",
       "breakdownSharingTitle": "Compartilhar uso da família",
       "breakdownSharingDescription": "Mostra uso por perfil.",
-      "breakdownSharingError": "Couldn't update setting. Try again."
+      "breakdownSharingError": "Não foi possível atualizar a configuração. Tente novamente."
     },
     "celebrations": {
       "allTitle": "Todas as comemorações",
@@ -557,16 +557,16 @@
       "tryAgainMoment": "Tente novamente em alguns instantes.",
       "couldNotSaveSetting": "Não foi possível salvar a configuração"
     },
-    "appVersion": "MentoMate v1.0.0",
+    "appVersion": "MentoMate versão 1.0.0",
     "privacy": {
-      "withdrawalArchiveTitle": "When I withdraw consent for a child",
-      "withdrawalArchiveAuto": "Automatic",
-      "withdrawalArchiveAutoDescription": "Under-13 accounts are deleted at grace expiry. 13+ accounts are archived for 30 days, then deleted.",
-      "withdrawalArchiveAlways": "Always archive (30 days)",
-      "withdrawalArchiveAlwaysDescription": "13+ accounts only. Under-13 always deletes immediately for privacy compliance.",
-      "withdrawalArchiveNever": "Never archive - delete immediately",
-      "withdrawalArchiveNeverDescription": "Delete at grace expiry instead of keeping a 30-day archive.",
-      "withdrawalArchiveError": "Couldn't update setting. Try again.",
+      "withdrawalArchiveTitle": "Quando retiro o consentimento para uma criança",
+      "withdrawalArchiveAuto": "Automático",
+      "withdrawalArchiveAutoDescription": "Contas de menores de 13 anos são excluídas ao expirar o prazo de carência. Contas de 13+ são arquivadas por 30 dias e depois excluídas.",
+      "withdrawalArchiveAlways": "Sempre arquivar (30 dias)",
+      "withdrawalArchiveAlwaysDescription": "Apenas contas de 13+. Menores de 13 anos são sempre excluídos imediatamente para conformidade com a privacidade.",
+      "withdrawalArchiveNever": "Nunca arquivar - excluir imediatamente",
+      "withdrawalArchiveNeverDescription": "Excluir ao expirar o prazo de carência, em vez de manter um arquivo de 30 dias.",
+      "withdrawalArchiveError": "Não foi possível atualizar a configuração. Tente novamente.",
       "privacyAndData": "Privacidade e dados"
     },
     "sections": {
@@ -623,7 +623,7 @@
         "pendingOwner": "A coleta de memória ainda não foi ativada.",
         "pendingChild": "Um pai ou responsável ainda precisa ativar a coleta de memória.",
         "useMemoryLabel": "Usar o que o mentor sabe",
-        "useMemoryDisabledHint": "Enable memory first, then this can turn on."
+        "useMemoryDisabledHint": "Ative a memória primeiro, depois isso pode ser ativado."
       },
       "consent": {
         "title": "Ativar memória do mentor",
@@ -686,8 +686,8 @@
         "both": "Ambos"
       },
       "examples": {
-        "title": "Examples you can add",
-        "body": "\"I learn best with examples,\" \"I like space analogies,\" or \"Fractions still feel tricky.\""
+        "title": "Exemplos que você pode adicionar",
+        "body": "\"Eu aprendo melhor com exemplos,\" \"Eu gosto de analogias espaciais,\" ou \"Frações ainda parecem difíceis.\""
       }
     },
     "accessories": {
@@ -1235,8 +1235,8 @@
       "iHaveATextSubtitle": "Digite ou cole seu próprio texto",
       "surpriseMe": "Surpreenda-me",
       "surpriseMeSubtitle": "Pratique com um novo ditado",
-      "loadingTitle": "Finding your next review...",
-      "loadingMessage": "We're choosing a dictation that should feel useful, not random.",
+      "loadingTitle": "Encontrando sua próxima revisão...",
+      "loadingMessage": "Estamos escolhendo um ditado que seja útil, não aleatório.",
       "viewPastDictations": "Ditados anteriores",
       "viewPastDictationsSubtitle": "Relembra o que praticaste"
     },
@@ -1272,7 +1272,7 @@
       "paceLabel": "Ritmo: {{pace}}. Toque para mudar.",
       "pace": {
         "slow": "Lento",
-        "normal": "Normal",
+        "normal": "Padrão",
         "fast": "Rápido"
       },
       "punctuationOn": "Pontuação lida em voz alta. Toque para desligar.",
@@ -1300,7 +1300,7 @@
       "mistakesFound_one": "{{count}} erro encontrado",
       "mistakesFound_other": "{{count}} erros encontrados",
       "correctionProgress": "Correção {{current}} de {{total}}",
-      "original": "Original",
+      "original": "Texto original",
       "youWrote": "Você escreveu",
       "error": "Erro",
       "correctVersion": "Versão correta",
@@ -1450,8 +1450,8 @@
       "skip": "Pular — começar a aprender mesmo assim",
       "skipAccessibilityLabel": "Pular e começar a aprender mesmo assim",
       "filingErrorTitle": "Não foi possível adicionar esse livro",
-      "loadingTitle": "Opening your shelf...",
-      "loadingMessage": "We're finding the books and next steps saved for this subject.",
+      "loadingTitle": "A abrir a sua prateleira...",
+      "loadingMessage": "Estamos a encontrar os livros e os próximos passos guardados para esta disciplina.",
       "bookCount_one": "{{count}} livro",
       "bookCount_other": "{{count}} livros",
       "suggestionAdd": "Adicionar à estante",
@@ -2034,11 +2034,11 @@
       "NO_TEXT": "Não encontramos nenhum texto nesta foto. Certifique-se de que a lição esteja visível e bem iluminada.",
       "ML_KIT_UNAVAILABLE": "A leitura de fotos não está disponível nesta versão. Uma atualização rápida do aplicativo traz de volta.",
       "CACHE_FAILED": "Tivemos problemas para preparar a foto. Tente novamente ou digite o problema.",
-      "NETWORK_ERROR": "We couldn't reach the server. Check your connection and try again.",
-      "AUTH_EXPIRED": "Your session expired. Sign in again to keep going.",
-      "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
-      "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
-      "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
+      "NETWORK_ERROR": "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.",
+      "AUTH_EXPIRED": "Sua sessão expirou. Faça login novamente para continuar.",
+      "IMAGE_TOO_LARGE": "Essa foto é muito grande. Tente cortar menos ou tire de mais longe.",
+      "RATE_LIMITED": "Você atingiu o limite de fotos por enquanto. Tente novamente em um minuto.",
+      "SERVER_ERROR": "Nossos servidores estão ocupados. Tente novamente em alguns segundos."
     },
     "microphoneUnavailableTitle": "Microfone indisponível",
     "microphoneUnavailableBody": "Não foi possível usar o microfone agora. Verifique se o app tem acesso ao microfone e tente novamente, ou digite.",
@@ -2091,16 +2091,16 @@
     },
     "register": {
       "child": {
-        "growthSubtitle": "Your weekly wins",
+        "growthSubtitle": "Suas vitórias semanais",
         "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
-        "retentionStrong": "What came back to you this week.",
-        "retentionFading": "Worth a quick refresh.",
-        "retentionWeak": "Worth coming back to."
+        "retentionStrong": "O que você lembrou esta semana.",
+        "retentionFading": "Vale uma revisão rápida.",
+        "retentionWeak": "Vale a pena rever."
       },
       "adult": {
-        "retentionStrong": "Still remembered.",
-        "retentionFading": "Getting fuzzy — a quick review will help.",
-        "retentionWeak": "Needs a quick refresh."
+        "retentionStrong": "Ainda lembrado.",
+        "retentionFading": "Ficando confuso — uma revisão rápida ajudará.",
+        "retentionWeak": "Precisa de uma revisão rápida."
       }
     },
     "weeklyReport": {
@@ -2237,8 +2237,8 @@
       "goneTitle": "Esta matéria não está mais disponível",
       "goneSubtitle": "Ela pode ter sido removida ou mesclada com outra matéria.",
       "pastConversations": "Conversas anteriores",
-      "loadingTitle": "Finding your progress...",
-      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
+      "loadingTitle": "Encontrando seu progresso...",
+      "loadingMessage": "Estamos reunindo sessões, revisões e palavras salvas para este assunto.",
       "startedTopicsCount_one": "{{count}} tópico iniciado",
       "startedTopicsCount_other": "{{count}} tópicos iniciados"
     },
@@ -2294,19 +2294,19 @@
       }
     },
     "previousReports": {
-      "title": "Previous reports",
-      "subtitle": "Weekly and monthly snapshots from your learning.",
-      "viewAll": "View all reports"
+      "title": "Relatórios anteriores",
+      "subtitle": "Instantâneos semanais e mensais do seu aprendizado.",
+      "viewAll": "Ver todos os relatórios"
     },
     "latestReport": {
-      "title": "Latest report",
-      "open": "Open report",
+      "title": "Último relatório",
+      "open": "Abrir relatório",
       "openWithDate": "Open report for {{date}}",
-      "empty": "Your next weekly or monthly report will appear here once there is enough learning to summarize.",
-      "error": "We couldn't load the latest report right now.",
-      "sessions": "Sessions",
+      "empty": "Seu próximo relatório semanal ou mensal aparecerá aqui quando houver aprendizado suficiente para resumir.",
+      "error": "Não foi possível carregar o relatório mais recente agora.",
+      "sessions": "Sessões",
       "time": "Time",
-      "topics": "Topics",
+      "topics": "Tópicos",
       "words": "Words",
       "practiceLessons_one": "{{count}} practice lesson",
       "practiceLessons_other": "{{count}} practice lessons",
@@ -2315,9 +2315,9 @@
     },
     "recentFocus": {
       "title": "Sessões recentes",
-      "showAll": "Show all sessions",
-      "empty": "Recent sessions will appear here once learning gets going.",
-      "error": "We couldn't load recent sessions right now.",
+      "showAll": "Mostrar todas as sessões",
+      "empty": "Sessões recentes aparecerão aqui quando o aprendizado começar.",
+      "error": "Não foi possível carregar as sessões recentes agora.",
       "sessionFallback": "Studied {{date}}"
     },
     "guardian": {
@@ -2329,20 +2329,20 @@
       "nudgeA11y": "Enviar um incentivo para {{name}}",
       "viewAllReports": "Ver todos os relatórios",
       "subjectsTitle": "Matérias",
-      "goToChildCurriculum": "Open child curriculum"
+      "goToChildCurriculum": "Abrir currículo do filho"
     },
     "remediation": {
-      "heading": "Try a different approach",
-      "body": "It is completely normal to need another pass at this.",
+      "heading": "Tente uma abordagem diferente",
+      "body": "É completamente normal precisar de outra passagem nisso.",
       "cooldownMinutes": "You can retry in {{minutes}} min — take a short break and come back.",
       "cooldownHours": "You can retry in about {{hours}} h — step away and let it settle.",
-      "cooldownTomorrow": "Take a longer break and try again tomorrow.",
-      "primaryCta": "Try a different way",
-      "primaryCtaA11y": "Try a different way to learn this topic",
-      "secondaryCta": "Or try again later",
-      "secondaryCtaA11y": "Try this topic again later",
-      "libraryLink": "While you wait, check out your Library",
-      "libraryLinkA11y": "Check out your Library"
+      "cooldownTomorrow": "Faça uma pausa mais longa e tente novamente amanhã.",
+      "primaryCta": "Tente de outra forma",
+      "primaryCtaA11y": "Tente uma forma diferente de aprender este tópico",
+      "secondaryCta": "Ou tente mais tarde",
+      "secondaryCtaA11y": "Tente este tópico novamente mais tarde",
+      "libraryLink": "Enquanto espera, veja a sua biblioteca",
+      "libraryLinkA11y": "Veja a sua biblioteca"
     },
     "accordion": {
       "loadErrorRetry": "Não foi possível carregar os tópicos. Toque para tentar novamente ou feche o cartão do assunto para dispensar.",
@@ -2436,15 +2436,15 @@
       "redirectBody": "Vamos começar pelos pronomes para que os próximos passos façam sentido desde o início."
     },
     "ready": {
-      "title": "You're all set.",
+      "title": "Está tudo pronto.",
       "introWithLearner": "For {{learner}}:",
-      "intro": "Here's what's set up:",
-      "rowTone": "Your mentor will talk to you the right way",
+      "intro": "Isto é o que está configurado:",
+      "rowTone": "O seu mentor falará consigo da forma certa",
       "rowSubject": "Starting with {{subject}}",
       "rowSubjectNoSubject": "Seu primeiro tópico está pronto",
-      "rowPace": "Pace stays at your speed — never rushed",
-      "reassurance": "Most learners feel the difference in the first session.",
-      "cta": "Let's start"
+      "rowPace": "O ritmo mantém-se à sua velocidade — nunca apressado",
+      "reassurance": "A maioria dos alunos sente a diferença na primeira sessão.",
+      "cta": "Vamos começar"
     },
     "stepIndicator": {
       "stepOf": "Passo {{current}} de {{total}}"
@@ -2667,17 +2667,17 @@
       "viewTopicDetails": "Ver detalhes de {{title}}",
       "topicsCouldNotLoad": "Os tópicos não puderam ser carregados",
       "retryLoadingTopics": "Tentar carregar os tópicos novamente",
-      "topicsNewLearnerTitle": "No lesson topics yet",
-      "topicsNewLearnerBody": "This can happen after early sessions or free browsing. Recent sessions below still show what happened.",
-      "noTopicsYetTitle": "No lesson topics yet",
-      "noTopicsYetBody": "Sessions may still exist here before the mentor has enough lesson-level progress to show.",
+      "topicsNewLearnerTitle": "Nenhum tópico de lição ainda",
+      "topicsNewLearnerBody": "Isso pode acontecer após as primeiras sessões ou navegação livre. As sessões recentes abaixo ainda mostram o que aconteceu.",
+      "noTopicsYetTitle": "Nenhum tópico de lição ainda",
+      "noTopicsYetBody": "As sessões ainda podem existir aqui antes que o mentor tenha progresso suficiente no nível da lição para mostrar.",
       "description": "This is your child's progress in {{subject}}. Topics appear once sessions connect to a lesson step.",
       "recentSubjectSessions": "Recent {{subject}} sessions",
       "viewSessionFrom": "View session from {{date}}"
     },
     "topic": {
       "topic": "Tópico",
-      "status": "Status",
+      "status": "Estado",
       "statusUnknown": "Desconhecido",
       "understanding": "Compreensão",
       "reviewStatus": "Status da revisão",
@@ -2881,10 +2881,10 @@
     },
     "home": "Início",
     "homeLabel": "Início",
-    "familyHub": "Family Hub",
-    "familyHubLabel": "Family Hub",
-    "myLearning": "My Learning",
-    "myLearningLabel": "My Learning",
+    "familyHub": "Centro Familiar",
+    "familyHubLabel": "Centro Familiar",
+    "myLearning": "Minha Aprendizagem",
+    "myLearningLabel": "Minha Aprendizagem",
     "library": "Biblioteca",
     "libraryLabel": "Biblioteca",
     "progress": "Progresso",
@@ -2895,8 +2895,8 @@
     "childrenLabel": "Família",
     "recaps": "Resumos",
     "recapsLabel": "Resumos",
-    "mentor": "Mentor",
-    "mentorLabel": "Mentor",
+    "mentor": "Tutor",
+    "mentorLabel": "Tutor",
     "subjects": "Matérias",
     "subjectsLabel": "Matérias",
     "journal": "Diário",
@@ -2916,77 +2916,77 @@
       "unknown": "Desconhecido"
     },
     "alerts": {
-      "restoredTitle": "Restored",
-      "restoredBody": "Your subscription has been restored.",
-      "successTitle": "Success",
-      "successBody": "Your subscription is now active!",
-      "purchaseConfirmedTitle": "Purchase confirmed",
-      "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
-      "topUpTitle": "Top-up",
-      "topUpBody": "500 additional credits have been added!"
+      "restoredTitle": "Restaurada",
+      "restoredBody": "Sua assinatura foi restaurada.",
+      "successTitle": "Sucesso",
+      "successBody": "Sua assinatura está ativa!",
+      "purchaseConfirmedTitle": "Compra confirmada",
+      "purchaseConfirmedBody": "Sua assinatura está sendo ativada. Geralmente aparece em um minuto — puxe para atualizar.",
+      "topUpTitle": "Recarga",
+      "topUpBody": "500 créditos adicionais foram adicionados!"
     },
     "web": {
       "plansOnMobile": "Os planos estão disponíveis no aplicativo móvel",
       "storePurchaseUnavailable": "As compras na loja não estão disponíveis neste dispositivo."
     },
     "childPaywall": {
-      "headline": "Nice work so far!",
-      "greatStart": "You've been exploring and learning — great start!",
+      "headline": "Bom trabalho até agora!",
+      "greatStart": "Você tem explorado e aprendido — ótimo começo!",
       "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
       "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
-      "usedAllQuestions": "You've used all your free questions. Ask your parent to upgrade so you can keep learning.",
+      "usedAllQuestions": "Você usou todas as suas perguntas gratuitas. Peça aos seus pais para fazerem um upgrade para você continuar aprendendo.",
       "quotaUsedAllQuestions": "Você usou suas perguntas por enquanto. Pode tentar novamente depois de {{resetAt}} ou avisar um responsável se precisar de mais espaço.",
-      "notifyButton": "Notify My Parent",
-      "notifyButtonNotified": "Parent notified",
-      "notifyButtonAccessibilityNotified": "Parent already notified",
-      "notifyButtonAccessibilityNotify": "Notify my parent",
+      "notifyButton": "Notificar Meus Pais",
+      "notifyButtonNotified": "Pais notificados",
+      "notifyButtonAccessibilityNotified": "Pais já notificados",
+      "notifyButtonAccessibilityNotify": "Notificar meus pais",
       "cooldownReminder": "You can remind them again in {{label}}.",
-      "notifiedExploreText": "Your parent has been notified! While you wait, you can still explore:",
-      "waitText": "While you wait, you can still browse your Library and see your progress.",
-      "browseLibrary": "Browse Library",
-      "browseLibraryAccessibilityLabel": "Browse Library",
-      "seeProgress": "See your progress",
-      "seeProgressAccessibilityLabel": "See your progress",
-      "goHome": "Go Home",
-      "goHomeAccessibilityLabel": "Go Home",
+      "notifiedExploreText": "Seus pais foram notificados! Enquanto espera, você ainda pode explorar:",
+      "waitText": "Enquanto espera, você ainda pode navegar pela sua Biblioteca e ver seu progresso.",
+      "browseLibrary": "Navegar na Biblioteca",
+      "browseLibraryAccessibilityLabel": "Navegar na Biblioteca",
+      "seeProgress": "Ver seu progresso",
+      "seeProgressAccessibilityLabel": "Ver seu progresso",
+      "goHome": "Ir para Início",
+      "goHomeAccessibilityLabel": "Ir para Início",
       "back": "Back",
-      "backAccessibilityLabel": "Go back",
+      "backAccessibilityLabel": "Voltar",
       "alerts": {
         "sentTitle": "Sent!",
-        "sentBody": "We let your parent know!",
-        "askParentTitle": "Ask your parent",
-        "askParentBody": "Ask your parent to open the app and subscribe.",
-        "notifyErrorTitle": "Could not send notification",
-        "notifyErrorBody": "Please check your connection and try again.",
+        "sentBody": "Avisamos seus pais!",
+        "askParentTitle": "Pergunte aos seus pais",
+        "askParentBody": "Peça aos seus pais para abrirem o aplicativo e assinarem.",
+        "notifyErrorTitle": "Não foi possível enviar a notificação",
+        "notifyErrorBody": "Verifique sua conexão e tente novamente.",
         "quotaSentBody": "Avisamos um responsável que você atingiu o limite de perguntas.",
         "quotaAskParentBody": "Peça a um responsável para abrir o app e ver os detalhes."
       }
     },
     "restore": {
-      "button": "Restore Purchases",
-      "accessibilityLabel": "Restore purchases",
-      "verifying": "Verifying purchase...",
-      "restoring": "Restoring...",
-      "failedTitle": "Restore failed",
-      "failedBody": "Could not restore purchases. Please try again.",
-      "notFoundTitle": "No subscriptions found",
-      "notFoundBody": "We could not find any previous purchases to restore.",
-      "cancelledTitle": "Restore cancelled",
-      "cancelledBody": "Restore will continue in background.",
-      "cancelAccessibilityLabel": "Cancel restore"
+      "button": "Restaurar Compras",
+      "accessibilityLabel": "Restaurar compras",
+      "verifying": "Verificando compra...",
+      "restoring": "Restaurando...",
+      "failedTitle": "Restauração falhou",
+      "failedBody": "Não foi possível restaurar as compras. Tente novamente.",
+      "notFoundTitle": "Nenhuma assinatura encontrada",
+      "notFoundBody": "Não foi possível encontrar compras anteriores para restaurar.",
+      "cancelledTitle": "Restauração cancelada",
+      "cancelledBody": "A restauração continuará em segundo plano.",
+      "cancelAccessibilityLabel": "Cancelar restauração"
     },
     "byokWaitlist": {
-      "heading": "Bring your own key",
-      "body": "Use your own API key to unlock unlimited questions. Join the waitlist to be notified when available. We'll use your account email.",
-      "joinButton": "Join Waitlist",
-      "alreadyJoinedButton": "Already joined",
-      "joinAccessibilityLabel": "Join BYOK waitlist",
-      "alreadyJoinedAccessibilityLabel": "Already joined BYOK waitlist",
+      "heading": "Traga sua própria chave",
+      "body": "Use sua própria chave de API para desbloquear perguntas ilimitadas. Entre na lista de espera para ser notificado quando disponível. Usaremos o e-mail da sua conta.",
+      "joinButton": "Entrar na Lista de Espera",
+      "alreadyJoinedButton": "Já aderiu",
+      "joinAccessibilityLabel": "Entrar na lista de espera BYOK",
+      "alreadyJoinedAccessibilityLabel": "Já aderiu à lista de espera BYOK",
       "alerts": {
-        "successTitle": "Waitlist",
-        "successBody": "You have been added to the BYOK waitlist.",
+        "successTitle": "Lista de Espera",
+        "successBody": "Você foi adicionado à lista de espera BYOK.",
         "errorTitle": "Error",
-        "errorBody": "Could not join waitlist. Try again."
+        "errorBody": "Não foi possível entrar na lista. Tente novamente."
       }
     },
     "loadError": {
@@ -3239,25 +3239,25 @@
     "openRecapLabelNoChild": "Abrir resumo para {{title}}",
     "openRecapLabelNoTitle": "Abrir o resumo de {{child}}",
     "openRecapLabelNoDetails": "Abrir resumo",
-    "detailHeading": "Session recap",
-    "backLabel": "Back to recaps",
-    "detailLoadError": "We could not load this recap",
-    "detailLoadErrorMessage": "Try again, or head back to the recaps list.",
-    "notFoundTitle": "Recap not found",
-    "notFoundMessage": "This recap is no longer available.",
+    "detailHeading": "Resumo da sessão",
+    "backLabel": "Voltar aos resumos",
+    "detailLoadError": "Não foi possível carregar este resumo",
+    "detailLoadErrorMessage": "Tente novamente ou volte para a lista de resumos.",
+    "notFoundTitle": "Resumo não encontrado",
+    "notFoundMessage": "Este resumo não está mais disponível.",
     "exchangesCount": "{{count}} exchanges",
-    "whatHappened": "What happened",
-    "detailPending": "This recap is still being prepared.",
-    "tryAsking": "Try asking",
-    "openChildSession": "Open child session",
-    "emptyCtaStartSession": "Start a session"
+    "whatHappened": "O que aconteceu",
+    "detailPending": "Este resumo ainda está sendo preparado.",
+    "tryAsking": "Tente perguntar",
+    "openChildSession": "Abrir sessão da criança",
+    "emptyCtaStartSession": "Iniciar uma sessão"
   },
   "addToMyLearning": {
-    "tip": "Save a copy of this topic into your own Library without changing your child's learning.",
-    "dismissTip": "Got it",
-    "dismiss": "Dismiss",
-    "buttonLabel": "Add to my learning",
-    "privacyNote": "Private to your learning"
+    "tip": "Salve uma cópia deste tópico em sua própria Biblioteca sem alterar o aprendizado do seu filho.",
+    "dismissTip": "Entendi",
+    "dismiss": "Dispensar",
+    "buttonLabel": "Adicionar ao meu aprendizado",
+    "privacyNote": "Privado para seu aprendizado"
   },
   "learnerHomeTimeout": {
     "loading": "Quase lá — só mais um momento...",
@@ -3466,7 +3466,7 @@
   },
   "welcomeIntro": {
     "chooser": {
-      "question": "What brings you here?",
+      "question": "O que te traz aqui?",
       "learnerCta": "Aprenda com um mentor",
       "learnerHint": "O teu mentor pessoal por uma fração do preço.",
       "parentCta": "Chega de brigas por dever de casa",
@@ -3474,103 +3474,103 @@
     },
     "learner": {
       "card1": {
-        "headline": "A mentor you can talk to",
-        "supporting": "Ask where you are stuck. Get help that adapts to how you learn."
+        "headline": "Um mentor com quem você pode conversar",
+        "supporting": "Pergunte onde você está com dificuldade. Obtenha ajuda que se adapta ao seu aprendizado."
       },
       "card2": {
-        "headline": "Remembers you, picks up where you left off",
-        "supporting": "Subjects, notes, and pace stay together so you can come back smoothly."
+        "headline": "Lembra de você, continua de onde parou",
+        "supporting": "Assuntos, anotações e ritmo permanecem juntos para que você possa retornar sem problemas."
       },
       "card3": {
-        "headline": "Built for real learning",
-        "supporting": "Clear explanations, guided questions, and practice that sticks."
+        "headline": "Feito para o aprendizado real",
+        "supporting": "Explicações claras, perguntas guiadas e prática que fixa o conhecimento."
       }
     },
     "parent": {
       "card1": {
-        "headline": "A personal mentor for your child",
-        "supporting": "Guides the method and checks their work, without handing over answers to copy."
+        "headline": "Um mentor pessoal para seu filho(a)",
+        "supporting": "Orienta o método e verifica o trabalho, sem entregar respostas para copiar."
       },
       "card2": {
-        "headline": "Stay in the loop, step in when it matters",
-        "supporting": "See progress and step in when your child actually needs you."
+        "headline": "Mantenha-se informado, intervenha quando for importante",
+        "supporting": "Veja o progresso e intervenha quando seu filho(a) realmente precisar de você."
       },
       "card3": {
-        "headline": "No more homework battles",
-        "supporting": "Turn nightly fights into calmer, more useful study time."
+        "headline": "Chega de batalhas por lição de casa",
+        "supporting": "Transforme as brigas noturnas em um tempo de estudo mais calmo e útil."
       }
     },
     "scene": {
       "learner": {
         "card1": {
-          "learner": "I do not get this yet.",
-          "mentor": "Let's slow it down. What part feels confusing?"
+          "learner": "Ainda não entendi isso.",
+          "mentor": "Vamos com calma. Que parte parece confusa?"
         },
         "card2": {
           "subjects": {
             "math": "Math",
-            "history": "History",
-            "spanish": "Spanish"
+            "history": "História",
+            "spanish": "Espanhol"
           },
           "resume": {
-            "label": "Last time",
-            "body": "You wrapped up Cells & DNA basics"
+            "label": "Última vez",
+            "body": "Você terminou o básico de Células e DNA"
           }
         },
         "card3": {
           "chips": {
-            "explain": "Clear explanation",
-            "think": "Think it through",
-            "practice": "Practice in context",
-            "remember": "Remember it later"
+            "explain": "Explicação clara",
+            "think": "Pense bem",
+            "practice": "Pratique no contexto",
+            "remember": "Lembre-se depois"
           }
         }
       },
       "parent": {
         "card1": {
-          "child": "I'm stuck on question 3.",
-          "mentor": "Let's start with what you've tried. Walk me through step one."
+          "child": "Estou preso na pergunta 3.",
+          "mentor": "Vamos começar com o que você tentou. Me guie pelo primeiro passo."
         },
         "card2": {
           "thisWeek": {
-            "label": "This week",
-            "body": "4 sessions, 2 subjects"
+            "label": "Esta semana",
+            "body": "4 sessões, 2 matérias"
           },
           "strong": {
-            "label": "Going well",
-            "body": "Fractions are clicking"
+            "label": "Indo bem",
+            "body": "Frações estão fluindo"
           },
           "review": {
-            "label": "Could use you",
-            "body": "Long division — stuck twice"
+            "label": "Pode precisar de você",
+            "body": "Divisão longa — travou duas vezes"
           }
         },
         "card3": {
           "chips": {
-            "evenings": "Calmer evenings",
-            "nagging": "Less nagging",
-            "quality": "Quality time"
+            "evenings": "Noites mais calmas",
+            "nagging": "Menos insistência",
+            "quality": "Tempo de qualidade"
           }
         }
       }
     },
     "sceneFrame": {
-      "brandLabel": "MentoMate"
+      "brandLabel": "App MentoMate"
     },
     "bridge": {
-      "headline": "Turn \"I don't get it\" into \"I've got this.\"",
-      "supporting": "Create a free account so your mentor can remember your subjects, notes, and progress.",
-      "primaryCta": "Create free account",
-      "secondaryCta": "I already have an account"
+      "headline": "Transforme \"Não entendi\" em \"Eu consegui.\"",
+      "supporting": "Crie uma conta gratuita para que seu mentor possa lembrar seus assuntos, anotações e progresso.",
+      "primaryCta": "Criar conta gratuita",
+      "secondaryCta": "Já tenho uma conta"
     },
     "next": "Next",
-    "letsStart": "Let's start",
+    "letsStart": "Vamos começar",
     "a11y": {
-      "previous": "Previous card",
-      "next": "Next card",
+      "previous": "Cartão anterior",
+      "next": "Próximo cartão",
       "dots": "Page {{current}} of {{total}}",
-      "bridgePrimary": "Create a free account",
-      "bridgeSecondary": "Sign in to an existing account"
+      "bridgePrimary": "Criar uma conta gratuita",
+      "bridgeSecondary": "Entrar em uma conta existente"
     }
   },
   "proxy": {
@@ -3605,7 +3605,7 @@
       "weeksAgo": "Há {{count}} semanas"
     },
     "duration": {
-      "under1": "<1 min",
+      "under1": "menos de 1 min",
       "minutes": "{{count}} min",
       "minutesOne": "1 min",
       "hoursMinutes": "{{hours}}h {{minutes}}m",

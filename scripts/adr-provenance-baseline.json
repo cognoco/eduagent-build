@@ -23,5 +23,19 @@
     "kind": "accepted_missing_arch_signoff",
     "file": "docs/adr/MMT-ADR-0006-ocr-on-device-primary-server-fallback-interface.md",
     "reason": "grandfathered pre-guard Accepted ADR"
+  },
+  {
+    "kind": "accepted_missing_arch_signoff",
+    "file": "docs/adr/MMT-ADR-0031-challenge-verification-and-sm2-are-complementary-mastery-axes.md",
+    "reason": "temporary WI-1183 branch reconciliation; remove or replace with human Architecture sign-off before 2026-07-16",
+    "temporary": true,
+    "expiresAt": "2026-07-16T00:00:00.000Z"
+  },
+  {
+    "kind": "accepted_missing_arch_signoff",
+    "file": "docs/adr/MMT-ADR-0032-verified-learning-artifacts-require-source-and-verification-state.md",
+    "reason": "temporary WI-1183 branch reconciliation; remove or replace with human Architecture sign-off before 2026-07-16",
+    "temporary": true,
+    "expiresAt": "2026-07-16T00:00:00.000Z"
   }
 ]
