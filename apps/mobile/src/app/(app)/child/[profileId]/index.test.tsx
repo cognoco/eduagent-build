@@ -1,5 +1,9 @@
 import { fireEvent, waitFor } from '@testing-library/react-native';
-import type { ChildSession } from '@eduagent/schemas';
+import type {
+  ChildSession,
+  DashboardChild,
+  LearningProfile,
+} from '@eduagent/schemas';
 import {
   createRoutedMockFetch,
   fetchCallsMatching,
@@ -47,8 +51,11 @@ const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
 const mockGoBackOrReplace = jest.fn();
+const CHILD_PROFILE_ID = '10000000-0000-4000-8000-0000000000c1';
+const PARENT_PROFILE_ID = '10000000-0000-4000-8000-0000000000a1';
+const FAMILY_ACCOUNT_ID = '10000000-0000-4000-8000-0000000000f1';
 let mockLocalSearchParams: { profileId: string; mode?: string } = {
-  profileId: 'child-001',
+  profileId: CHILD_PROFILE_ID,
 };
 
 jest.mock('expo-router' /* gc1-allow: native-boundary */, () => ({
@@ -213,21 +220,21 @@ const { default: ChildDetailScreen } = require('./index') as {
 
 // ---------------------------------------------------------------------------
 // Profile fixtures — guardian (active owner) + linked child. The URL profileId
-// (child-001) must appear in profiles[] to clear the IDOR / no-access guard.
+// must appear in profiles[] to clear the IDOR / no-access guard.
 // ---------------------------------------------------------------------------
 
 const guardianProfile = {
   ...NAMED_PROFILES.guardian,
-  id: 'parent-001',
-  accountId: 'account-family',
+  id: PARENT_PROFILE_ID,
+  accountId: FAMILY_ACCOUNT_ID,
   displayName: 'Parent',
   isOwner: true,
   hasFamilyLinks: true,
 };
 const linkedChildProfile = {
   ...NAMED_PROFILES.linkedChild,
-  id: 'child-001',
-  accountId: 'account-family',
+  id: CHILD_PROFILE_ID,
+  accountId: FAMILY_ACCOUNT_ID,
   displayName: 'Emma',
   isOwner: false,
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -264,7 +271,52 @@ function makeSession(overrides: Partial<ChildSession> = {}): ChildSession {
   };
 }
 
-const defaultChildDetail = {
+function makeChildDetail(
+  overrides: Partial<DashboardChild> = {},
+): DashboardChild {
+  return {
+    profileId: CHILD_PROFILE_ID,
+    displayName: 'Emma',
+    consentStatus: null,
+    respondedAt: null,
+    summary: 'Year 6',
+    sessionsThisWeek: 0,
+    sessionsLastWeek: 0,
+    totalTimeThisWeek: 0,
+    totalTimeLastWeek: 0,
+    exchangesThisWeek: 0,
+    exchangesLastWeek: 0,
+    trend: 'stable',
+    subjects: [
+      {
+        subjectId: '11111111-1111-7111-8111-111111111111',
+        name: 'Mathematics',
+        retentionStatus: 'strong',
+        rawInput: 'fractions homework',
+      },
+    ],
+    guidedVsImmediateRatio: 0,
+    retentionTrend: 'stable',
+    totalSessions: 0,
+    weeklyHeadline: undefined,
+    currentlyWorkingOn: [],
+    progress: null,
+    currentStreak: 0,
+    longestStreak: 0,
+    totalXp: 0,
+    ...overrides,
+  };
+}
+
+function definedOverrides<T extends object>(overrides: Partial<T>): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(overrides).filter(
+      ([, value]) => value !== undefined && value !== null,
+    ),
+  ) as Partial<T>;
+}
+
+const defaultChildDetail = makeChildDetail({
   displayName: 'Emma',
   summary: 'Year 6',
   currentStreak: 0,
@@ -278,12 +330,28 @@ const defaultChildDetail = {
       rawInput: 'fractions homework',
     },
   ],
-};
+});
 
-const defaultLearnerProfile = {
+const defaultLearnerProfile: LearningProfile = {
+  id: CHILD_PROFILE_ID,
+  profileId: CHILD_PROFILE_ID,
+  learningStyle: null,
+  interests: [],
+  strengths: [],
+  struggles: [],
+  communicationNotes: [],
+  suppressedInferences: [],
+  interestTimestamps: {},
+  effectivenessSessionCount: 0,
+  memoryEnabled: true,
   accommodationMode: 'none',
   memoryConsentStatus: 'granted',
-  updatedAt: null,
+  memoryCollectionEnabled: true,
+  memoryInjectionEnabled: true,
+  recentlyResolvedTopics: [],
+  version: 1,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
 const consentedStatus = {
@@ -305,15 +373,30 @@ interface RouteConfig {
 
 /**
  * Configure all endpoints the screen's real hooks call. Branches the shared
- * `/dashboard/children/child-001` route on sub-path (detail vs sessions).
+ * `/dashboard/children/:profileId` route on sub-path (detail vs sessions).
  */
 function setRoutes(config: RouteConfig = {}): void {
   const childDetail =
-    'childDetail' in config ? config.childDetail : defaultChildDetail;
+    'childDetail' in config
+      ? config.childDetail === null
+        ? null
+        : makeChildDetail(
+            definedOverrides(config.childDetail as Partial<DashboardChild>),
+          )
+      : defaultChildDetail;
   const sessions = config.sessions ?? [makeSession()];
+  const learnerProfile =
+    'learnerProfile' in config
+      ? {
+          ...defaultLearnerProfile,
+          ...definedOverrides(
+            config.learnerProfile as Partial<LearningProfile>,
+          ),
+        }
+      : defaultLearnerProfile;
 
   mockFetch.setRoute(
-    '/dashboard/children/child-001',
+    `/dashboard/children/${CHILD_PROFILE_ID}`,
     (url: string, init?: RequestInit) => {
       if (url.includes('/sessions')) {
         return { sessions };
@@ -358,14 +441,14 @@ function setRoutes(config: RouteConfig = {}): void {
     }));
   }
 
-  mockFetch.setRoute('/learner-profile/child-001', () => ({
-    profile: config.learnerProfile ?? defaultLearnerProfile,
+  mockFetch.setRoute(`/learner-profile/${CHILD_PROFILE_ID}`, () => ({
+    profile: learnerProfile,
   }));
 
   mockFetch.setRoute(
-    '/consent/child-001/status',
+    `/consent/${CHILD_PROFILE_ID}/status`,
     (_url: string, init?: RequestInit) => {
-      // revoke / restore PUTs share the /consent/child-001 prefix but carry a
+      // revoke / restore PUTs share the /consent/:profileId prefix but carry a
       // different sub-path; only the status GET resolves here.
       if (init?.method && init.method !== 'GET') return {};
       if (config.consentError) {
@@ -378,11 +461,11 @@ function setRoutes(config: RouteConfig = {}): void {
     },
   );
 
-  mockFetch.setRoute('/consent/child-001/revoke', () => ({
+  mockFetch.setRoute(`/consent/${CHILD_PROFILE_ID}/revoke`, () => ({
     message: 'revoked',
     consentStatus: 'WITHDRAWN',
   }));
-  mockFetch.setRoute('/consent/child-001/restore', () => ({
+  mockFetch.setRoute(`/consent/${CHILD_PROFILE_ID}/restore`, () => ({
     message: 'restored',
     consentStatus: 'CONSENTED',
   }));
@@ -400,7 +483,7 @@ function renderChildDetail() {
 beforeEach(() => {
   jest.clearAllMocks();
   mockFetch.mockClear();
-  mockLocalSearchParams = { profileId: 'child-001' };
+  mockLocalSearchParams = { profileId: CHILD_PROFILE_ID };
 });
 
 // ---------------------------------------------------------------------------
@@ -409,7 +492,7 @@ beforeEach(() => {
 
 describe('ChildDetailScreen — accommodation nav row', () => {
   beforeEach(() => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'settings' };
     setRoutes();
   });
 
@@ -417,7 +500,7 @@ describe('ChildDetailScreen — accommodation nav row', () => {
     const { result, cleanup } = renderChildDetail();
 
     await waitFor(() => {
-      result.getByTestId('child-accommodation-row-child-001');
+      result.getByTestId(`child-accommodation-row-${CHILD_PROFILE_ID}`);
     });
 
     cleanup();
@@ -428,12 +511,12 @@ describe('ChildDetailScreen — accommodation nav row', () => {
 
     fireEvent.press(
       await waitFor(() =>
-        result.getByTestId('child-accommodation-row-child-001'),
+        result.getByTestId(`child-accommodation-row-${CHILD_PROFILE_ID}`),
       ),
     );
 
     expect(mockPush).toHaveBeenCalledWith(
-      '/(app)/more/accommodation?childProfileId=child-001',
+      `/(app)/more/accommodation?childProfileId=${CHILD_PROFILE_ID}`,
     );
 
     cleanup();
@@ -451,7 +534,7 @@ describe('ChildDetailScreen — accommodation nav row', () => {
     const { result, cleanup } = renderChildDetail();
 
     const row = await waitFor(() =>
-      result.getByTestId('child-accommodation-row-child-001'),
+      result.getByTestId(`child-accommodation-row-${CHILD_PROFILE_ID}`),
     );
     await waitFor(() => {
       expect(row).toHaveTextContent(/Audio-First/);
@@ -475,7 +558,7 @@ describe('ChildDetailScreen — accommodation nav row', () => {
     const { result, cleanup } = renderChildDetail();
 
     const row = await waitFor(() =>
-      result.getByTestId('child-accommodation-row-child-001'),
+      result.getByTestId(`child-accommodation-row-${CHILD_PROFILE_ID}`),
     );
     await waitFor(() => {
       expect(row).toHaveTextContent(/None - Standard learning experience/);
@@ -535,19 +618,22 @@ describe('ChildDetailScreen — profile overview', () => {
         setTimeout(() => resolve(value), 50);
       });
 
-    mockFetch.setRoute('/dashboard/children/child-001', (url: string) => {
-      if (url.includes('/sessions')) {
-        return delayed({ sessions: [] });
-      }
-      return delayed({ child: defaultChildDetail });
-    });
+    mockFetch.setRoute(
+      `/dashboard/children/${CHILD_PROFILE_ID}`,
+      (url: string) => {
+        if (url.includes('/sessions')) {
+          return delayed({ sessions: [] });
+        }
+        return delayed({ child: defaultChildDetail });
+      },
+    );
     mockFetch.setRoute('/dashboard', () =>
       delayed({ children: [], pendingNotices: [], demoMode: false }),
     );
     mockFetch.setRoute('/dashboard/demo', () =>
       delayed({ children: [], pendingNotices: [], demoMode: true }),
     );
-    mockFetch.setRoute('/consent/child-001/status', () =>
+    mockFetch.setRoute(`/consent/${CHILD_PROFILE_ID}/status`, () =>
       delayed(consentedStatus),
     );
 
@@ -580,7 +666,7 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('links to the child mentor memory management screen', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'settings' };
 
     const { result, cleanup } = renderChildDetail();
 
@@ -590,14 +676,14 @@ describe('ChildDetailScreen — profile overview', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/mentor-memory',
-      params: { profileId: 'child-001' },
+      params: { profileId: CHILD_PROFILE_ID },
     });
 
     cleanup();
   });
 
   it('shows profile details when the profile already has a created date', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'settings' };
 
     const { result, cleanup } = renderChildDetail();
 
@@ -670,7 +756,7 @@ describe('ChildDetailScreen — profile overview', () => {
     expect(result.queryByTestId('child-curriculum-link')).toBeNull();
     expect(result.queryByTestId('growth-teaser')).toBeNull();
     expect(
-      result.queryByTestId('child-accommodation-row-child-001'),
+      result.queryByTestId(`child-accommodation-row-${CHILD_PROFILE_ID}`),
     ).toBeNull();
     expect(result.queryByTestId('mentor-memory-link')).toBeNull();
     expect(result.queryByTestId('child-profile-details')).toBeNull();
@@ -728,12 +814,12 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('shows only child settings when opened from the child avatar card', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'settings' };
 
     const { result, cleanup } = renderChildDetail();
 
     await waitFor(() => {
-      result.getByTestId('child-accommodation-row-child-001');
+      result.getByTestId(`child-accommodation-row-${CHILD_PROFILE_ID}`);
     });
     expect(result.queryByTestId('child-reports-link')).toBeNull();
     expect(result.queryByTestId('child-subjects-section')).toBeNull();
@@ -748,7 +834,7 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('[PARENT-03] shows only child progress when opened from the Progress action (?mode=progress)', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'progress' };
 
     const { result, cleanup } = renderChildDetail();
 
@@ -761,7 +847,7 @@ describe('ChildDetailScreen — profile overview', () => {
       result.getByTestId('session-card-22222222-2222-7222-8222-222222222222');
     });
     expect(
-      result.queryByTestId('child-accommodation-row-child-001'),
+      result.queryByTestId(`child-accommodation-row-${CHILD_PROFILE_ID}`),
     ).toBeNull();
     expect(result.queryByTestId('mentor-memory-link')).toBeNull();
     expect(result.queryByTestId('child-profile-details')).toBeNull();
@@ -771,7 +857,7 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('back arrow returns to family home instead of whatever screen is in history', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'progress' };
     mockCanGoBack.mockReturnValue(true);
 
     const { result, cleanup } = renderChildDetail();
@@ -785,7 +871,7 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('hides subject memory status while the child is still a new learner', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'progress' };
     setRoutes({
       childDetail: {
         displayName: 'Emma',
@@ -817,7 +903,7 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('uses the friendly memory status label after there is enough activity', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'progress' };
     setRoutes({
       childDetail: {
         displayName: 'Emma',
@@ -848,7 +934,7 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('uses a fresh progress nudge when the child studied recently', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'progress' };
     setRoutes({
       sessions: [
         makeSession({
@@ -874,7 +960,7 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('opens the nudge subject from the progress action card', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'progress' };
 
     const { result, cleanup } = renderChildDetail();
 
@@ -885,7 +971,7 @@ describe('ChildDetailScreen — profile overview', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
       params: {
-        profileId: 'child-001',
+        profileId: CHILD_PROFILE_ID,
         subjectId: '11111111-1111-7111-8111-111111111111',
         subjectName: 'Mathematics',
         childName: 'Emma',
@@ -896,7 +982,7 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('opens the latest topic from the progress action card when the session has one', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'progress' };
     setRoutes({
       sessions: [
         makeSession({
@@ -920,7 +1006,7 @@ describe('ChildDetailScreen — profile overview', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/topic/[topicId]',
       params: {
-        profileId: 'child-001',
+        profileId: CHILD_PROFILE_ID,
         topicId: '44444444-4444-7444-8444-444444444444',
         title: 'Fractions',
         completionStatus: 'in_progress',
@@ -942,7 +1028,7 @@ describe('ChildDetailScreen — profile overview', () => {
       dashboard: {
         children: [
           {
-            profileId: 'child-001',
+            profileId: CHILD_PROFILE_ID,
             displayName: 'Emma',
             consentStatus: null,
             respondedAt: null,
@@ -992,7 +1078,7 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('keeps child profile settings open when the linked profile exists but detail data is unavailable', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'settings' };
     setRoutes({ childDetail: null, dashboardUndefined: true });
 
     const { result, cleanup } = renderChildDetail();
@@ -1021,7 +1107,7 @@ describe('ChildDetailScreen — profile overview', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
       params: {
-        profileId: 'child-001',
+        profileId: CHILD_PROFILE_ID,
         subjectId: '11111111-1111-7111-8111-111111111111',
         subjectName: 'Mathematics',
         childName: 'Emma',
@@ -1032,7 +1118,7 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('renders parent consent management for a consented child', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'settings' };
 
     const { result, cleanup } = renderChildDetail();
 
@@ -1046,7 +1132,7 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('invokes consent revocation from the withdraw confirmation', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'settings' };
 
     const { result, cleanup } = renderChildDetail();
 
@@ -1056,7 +1142,10 @@ describe('ChildDetailScreen — profile overview', () => {
 
     // platformAlert mock auto-fires the destructive button -> revoke mutation.
     await waitFor(() => {
-      const calls = fetchCallsMatching(mockFetch, '/consent/child-001/revoke');
+      const calls = fetchCallsMatching(
+        mockFetch,
+        `/consent/${CHILD_PROFILE_ID}/revoke`,
+      );
       expect(calls.length).toBeGreaterThanOrEqual(1);
       expect(calls[0]?.init?.method).toBe('PUT');
     });
@@ -1085,7 +1174,10 @@ describe('ChildDetailScreen — profile overview', () => {
 
     fireEvent.press(result.getByTestId('consent-withdrawn-request-cta'));
     await waitFor(() => {
-      const calls = fetchCallsMatching(mockFetch, '/consent/child-001/restore');
+      const calls = fetchCallsMatching(
+        mockFetch,
+        `/consent/${CHILD_PROFILE_ID}/restore`,
+      );
       expect(calls.length).toBeGreaterThanOrEqual(1);
       expect(calls[0]?.init?.method).toBe('PUT');
     });
@@ -1094,7 +1186,7 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('keeps consent management visible and retryable when consent status fails to load', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'settings' };
     setRoutes({ consentError: 500 });
 
     const { result, cleanup } = renderChildDetail();
@@ -1105,7 +1197,10 @@ describe('ChildDetailScreen — profile overview', () => {
     result.getByTestId('consent-section');
 
     // Recover the endpoint, then retry should re-fetch and clear the error.
-    mockFetch.setRoute('/consent/child-001/status', () => consentedStatus);
+    mockFetch.setRoute(
+      `/consent/${CHILD_PROFILE_ID}/status`,
+      () => consentedStatus,
+    );
     fireEvent.press(result.getByTestId('consent-status-retry'));
 
     await waitFor(() => {
@@ -1120,14 +1215,14 @@ describe('ChildDetailScreen — profile overview', () => {
   // The error must render the user-safe formatted copy AND expose a retry that
   // re-runs the same mutation.
   it('shows a safe formatted error (not the raw message) and a retry when withdraw fails', async () => {
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'settings' };
     setRoutes();
 
     // Raw technical string the old code rendered verbatim. `isTechnicalMessage`
     // rejects it, so it must never reach the parent.
     const rawLeak = "Cannot read property 'consentId' of undefined";
     mockFetch.setRoute(
-      '/consent/child-001/revoke',
+      `/consent/${CHILD_PROFILE_ID}/revoke`,
       () =>
         new Response(JSON.stringify({ message: rawLeak }), {
           status: 500,
@@ -1157,14 +1252,17 @@ describe('ChildDetailScreen — profile overview', () => {
 
     // A retry affordance is exposed and re-runs the SAME revoke mutation.
     mockFetch.mockClear();
-    mockFetch.setRoute('/consent/child-001/revoke', () => ({
+    mockFetch.setRoute(`/consent/${CHILD_PROFILE_ID}/revoke`, () => ({
       message: 'revoked',
       consentStatus: 'WITHDRAWN',
     }));
     fireEvent.press(result.getByTestId('consent-management-retry'));
 
     await waitFor(() => {
-      const calls = fetchCallsMatching(mockFetch, '/consent/child-001/revoke');
+      const calls = fetchCallsMatching(
+        mockFetch,
+        `/consent/${CHILD_PROFILE_ID}/revoke`,
+      );
       expect(calls.length).toBeGreaterThanOrEqual(1);
       expect(calls[0]?.init?.method).toBe('PUT');
     });
@@ -1289,7 +1387,7 @@ describe('ChildDetailScreen — data-absent state (BUG-681)', () => {
     await waitFor(() => {
       const detailGets = fetchCallsMatching(
         mockFetch,
-        '/dashboard/children/child-001',
+        `/dashboard/children/${CHILD_PROFILE_ID}`,
       ).filter(
         ({ url, init }) =>
           !url.includes('/sessions') &&
@@ -1371,7 +1469,7 @@ describe('ChildDetailScreen — consent-withdrawn empty state (WI-263)', () => {
 
     const learnerProfileCalls = fetchCallsMatching(
       mockFetch,
-      '/learner-profile/child-001',
+      `/learner-profile/${CHILD_PROFILE_ID}`,
     );
     expect(learnerProfileCalls).toHaveLength(0);
 
@@ -1381,19 +1479,19 @@ describe('ChildDetailScreen — consent-withdrawn empty state (WI-263)', () => {
   it('[WI-263] positive control — fetches the learner-profile with the real childProfileId when consent is CONSENTED', async () => {
     // When consented the gate opens and the screen must fetch the real
     // child learner-profile endpoint for the settings-only rows that use it.
-    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'settings' };
     setRoutes({ consent: consentedStatus });
 
     const { result, cleanup } = renderChildDetail();
 
     await waitFor(() => {
-      result.getByTestId('child-accommodation-row-child-001');
+      result.getByTestId(`child-accommodation-row-${CHILD_PROFILE_ID}`);
     });
 
     await waitFor(() => {
       const learnerProfileCalls = fetchCallsMatching(
         mockFetch,
-        '/learner-profile/child-001',
+        `/learner-profile/${CHILD_PROFILE_ID}`,
       );
       expect(learnerProfileCalls.length).toBeGreaterThanOrEqual(1);
     });
@@ -1409,7 +1507,10 @@ describe('ChildDetailScreen — consent-withdrawn empty state (WI-263)', () => {
     );
 
     await waitFor(() => {
-      const calls = fetchCallsMatching(mockFetch, '/consent/child-001/restore');
+      const calls = fetchCallsMatching(
+        mockFetch,
+        `/consent/${CHILD_PROFILE_ID}/restore`,
+      );
       expect(calls.length).toBeGreaterThanOrEqual(1);
       expect(calls[0]?.init?.method).toBe('PUT');
     });
@@ -1420,7 +1521,7 @@ describe('ChildDetailScreen — consent-withdrawn empty state (WI-263)', () => {
   it('[WI-508] consent-restore CTA is disabled while the mutation is in-flight', async () => {
     // Stall the restore endpoint so isPending stays true after the first press.
     mockFetch.setRoute(
-      '/consent/child-001/restore',
+      `/consent/${CHILD_PROFILE_ID}/restore`,
       () => new Promise(() => undefined /* never resolves */),
     );
 
