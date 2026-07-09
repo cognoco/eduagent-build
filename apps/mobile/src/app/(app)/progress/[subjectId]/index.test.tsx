@@ -346,8 +346,6 @@ function makeLanguageProgress(
     pedagogyMode: 'four_strands',
     currentLevel: null,
     currentSublevel: null,
-    currentMilestone,
-    nextMilestone,
     ...progress,
     currentMilestone,
     nextMilestone,
@@ -960,16 +958,15 @@ describe('ProgressSubjectScreen', () => {
       await screen.findByText(/Up next: B1/);
     });
 
-    it('uses the generic next milestone label when milestone details are blank', async () => {
+    it('uses the level-only next milestone label when the milestone title is blank', async () => {
       mount({
         subjects: [languageSubject],
         languageProgress: {
           ...milestoneData,
-          nextMilestone: { level: '   ', milestoneTitle: '   ' },
+          nextMilestone: { level: 'B1', milestoneTitle: '   ' },
         },
       });
-      await screen.findByText('Up next');
-      expect(screen.queryByText(/Up next: /)).toBeNull();
+      await screen.findByText('Up next: B1');
     });
 
     it('shows "Complete a session" prompt when no milestone data yet', async () => {
