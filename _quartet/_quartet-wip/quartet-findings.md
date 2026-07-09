@@ -285,3 +285,39 @@ orchestrator bootup arms the lane outbox + Cosmo-Stage monitors ASAP, with the i
 shepherd without the orchestrator's outbox watcher armed for it*. **Status:** escalated to **WI-1236**
 (`Enhancement`, **Cosmo improvements / WS-23** — not Quartet MVP). Together F33/WI-1235 (shepherd side) +
 F34/WI-1236 (orchestrator side) close the observability gap from both ends. *(2026-07-01, operator-requested.)*
+
+**F35 — Gate-1 merge ownership: doc canon vs orchestrator practice.** shepherd-protocol.md assigns the
+Gate-1 merge to the SHEPHERD (e.g. PR #1854/WI-1176 merged by the bug-lane shepherd, strict-green verified).
+Today's practice drifted: WS-28's shepherd *requested* an orchestrator merge (PR #1876), and the orchestrator
+then instructed bug-lane to route all merges through it (bug-lane-orch-124) — an ad-hoc protocol change made
+without ratification. The shepherd caught it (bug-lane-1783104888) instead of blind-following: good catch
+behavior, bad change process. **Fix:** operator ruling on Gate-1 ownership (shepherd per doc vs
+orchestrator-centralized), then reconcile shepherd-protocol.md + orchestrator-protocol.md in lockstep —
+WI-1357 (orchestrator-protocol amendments) is the natural vehicle. **RULED (operator, 2026-07-03 ~19:25Z): option (b) orchestrator-centralized — permanent; broadcast
+ic-orch-401/v2f-orch-204/bug-lane-orch-125; doc reconciliation folded into WI-1357.** *(2026-07-03 18:57Z, orchestrator self-reported.)*
+
+## F36 — Bug-WI red-green-revert guard must be a SINGLE CLAUSE (reviewer DoD `dod.bug.regression_guard_declared`)
+Discovered: 2026-07-04 (bug-lane, WI-1565; prior instance WI-1176). The Gate-2 reviewer requires a Type=Bug AC to
+declare the red-green-revert regression guard as **pattern-name + behavioral assertion in ONE clause**, not spread
+across separate RED=/GREEN=/REVERT= sentences (that form bounced twice). Working form (WI-1565): single sentence naming
+"Red-green-revert regression guard:" + the failing→passing run evidence + the forward assertion. **Refine-template rule
+for WI-1357:** pre-declare the single-clause guard at REFINE for every Type=Bug (capture is too early). Migration-form
+guards are acceptable (RED=deploy failing on the migration, GREEN=cited clean run). No code rework — pure AC wording.
+
+## F37 — Verify worktree base is CURRENT before executing (setup-worktree stale-branch reuse)
+Discovered: 2026-07-04 (WS-18, WI-1139). setup-worktree reused a pre-existing stale `WI-1139` branch based at 20364364c
+(~WI-1364 era, 22 commits behind origin/main) instead of branching fresh off current main. Result: 34 of 76 changed
+files had ALSO changed on main since (WI-1364 deletion.ts, WI-1398 ensureLegacySubscriptionParent already gone) →
+duplicate-heavy work + a risky 34-file rebase into the schema layer. Ruled REDO fresh-off-main (ic-orch-423), discarding
+the stale branch (zero prod users = reversible). **Rule for WI-1357 / worktree-setup skill:** when a branch name already
+exists, do NOT silently reuse it — verify its base SHA is current origin/main (or branch fresh) BEFORE executing. A
+long-lived quartet where the same WI is re-attempted across sessions is exactly where stale branches accumulate.
+
+## F38 — Capture-during-triage must check whether a landed sibling already resolved the premise (2026-07-04)
+WI-1571 (P2 seed-helper follow-up) was captured 2026-07-04 during WI-1565 triage, describing a bug that WI-1303 had already fixed a full day earlier (0a1f0a11a / PR #1853, ancestor of main). The builder's GATE-0 premise-check caught it — no code to ship, and the red-green-revert AC guard was *unsatisfiable* because no pre-fix state exists on main to revert against (fabricating one = reverting a shipped fix). **Lesson:** when capturing an item during another item's triage, verify the described defect isn't already resolved by a recently-landed sibling WI before creating it (capture's dedup includes Closed-within-30-days but keyed on title/Found-In overlap, which missed the WI-1303↔WI-1571 relationship). Cost here was one builder investigation cycle, not a bad merge — GATE-0 worked. Cheap forward guard: at capture-time triage, grep the described symptom string against current main HEAD before filing.
+
+## F39 — A long orchestrator-side pause can FREEZE shepherd sessions with a frozen clock (not kill them) (2026-07-04)
+During a ~90-min rate-limit pause, TWO active shepherd lanes (WS-18, bug-lane) appeared stalled: outboxes silent ~100-115m, ENE deadlines lapsed, no git pushes. Both were in fact **suspended, not dead** — on resume WS-18 reported its `date -u` had read a *frozen* 16:23Z the entire pause while real time advanced to 18:04Z, so its heartbeat "timestamps" (prg06ic-551/552) were stale-clock artifacts and it never perceived a gap. **Detection heuristic:** a frozen session emits messages whose *internal* timestamps are self-consistent but lag wall-clock by the pause duration; a dead session emits nothing at all. Before escalating "dead shepherd → operator restart", send a wake and give a short grace — a frozen session resumes and answers on its own once the pause clears. **Also:** WS-18's stg-advisory CI runs kept getting truncated by the same resets — the shepherd correctly cut the advisory chase (CI is the gate) rather than fight the churn. Cost here: ~two wake/ping cycles, zero bad merges; both lanes recovered clean (bug-lane WI-1582 merged db999a1f; WS-18 pushing WI-1139).
+
+### F39 addendum (2026-07-04, 2nd freeze) — frozen mid-run validations leave orphaned zombie procs
+The F39 fleet-freeze recurred (~2h pause). WS-18 froze mid corpus-validation; on resume the 63 db/jest procs were orphaned ZOMBIES (2h40m stalled, not progressing, builder session also frozen) still holding DB connections. **Recovery step:** a shepherd resuming from an F39 freeze must KILL any orphaned validation/test procs before re-validating (they won't self-terminate and hold resources), then re-run clean. Authoring/worktree state survives the freeze intact (uncommitted but not lost); only the in-flight run dies. Detection unchanged (internally-consistent timestamps lagging wall-clock). WS-18 self-diagnosed and handled it correctly both times.
