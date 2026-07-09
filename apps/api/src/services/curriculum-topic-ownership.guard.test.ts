@@ -64,7 +64,7 @@ const EXPECTED_COUNTS: Record<string, number> = {
   'apps/api/src/services/family-bridge.ts': 0, // fully migrated; :546 topicBelongsToProfile → findOwnedCurriculumTopic (T5, WI-867 collapse)
   'apps/api/src/services/notes.ts': 0, // fully migrated to assertOwnedCurriculumTopic [WI-1071]
   'apps/api/src/services/recall-bridge.ts': 1,
-  'apps/api/src/services/session/session-crud.ts': 2, // verify-then-use ×2 (subjectId-scoped)
+  'apps/api/src/services/session/session-crud.ts': 1, // verify-then-use (subjectId-scoped)
 };
 
 interface MatchSite {
