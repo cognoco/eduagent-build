@@ -40,6 +40,7 @@ export async function resetDailyQuotas(
     .where(sql`${quotaPools.usedToday} > 0`)
     .returning();
 
+  // scope-allow: daily trial reset cron intentionally touches all profile quota rows.
   const profileResult = await db
     .update(profileQuotaUsage)
     .set({

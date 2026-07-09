@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import {
   useApiClient,
   getProxyMode,

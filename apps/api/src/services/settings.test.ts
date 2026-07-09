@@ -612,6 +612,39 @@ describe('getDailyNotificationCount', () => {
     collectValues(predicate);
     expect(valueParts).toContain('support_outbox_spillover');
   });
+
+  it('[WI-1423] WHERE clause excludes monthly-report email evidence IDs from the push cap', async () => {
+    const whereMock = jest.fn().mockResolvedValue([]);
+    const db = {
+      ...createMockDb({ selectResult: [] }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: whereMock,
+        }),
+      }),
+    } as unknown as Database;
+
+    await getDailyNotificationCount(db, profileId);
+
+    expect(whereMock).toHaveBeenCalledTimes(1);
+    const [predicate] = whereMock.mock.calls[0];
+    const valueParts: unknown[] = [];
+    function collectValues(node: unknown): void {
+      if (!node || typeof node !== 'object') return;
+      const obj = node as Record<string, unknown>;
+      if ('value' in obj) valueParts.push(obj['value']);
+      for (const key of Object.keys(obj)) {
+        if (key === 'table') continue;
+        if (Array.isArray(obj[key])) {
+          (obj[key] as unknown[]).forEach(collectValues);
+        } else if (typeof obj[key] === 'object') {
+          collectValues(obj[key]);
+        }
+      }
+    }
+    collectValues(predicate);
+    expect(JSON.stringify(valueParts)).toContain('email-%');
+  });
 });
 
 describe('logNotification', () => {

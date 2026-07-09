@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text, Pressable, ScrollView, View } from 'react-native';
-import { useAuth, useUser, useReverification } from '@clerk/clerk-expo';
+import { useAuth, useUser, useReverification } from '@clerk/expo';
 
 import { extractClerkError } from '../lib/clerk-error';
 import {

@@ -544,11 +544,10 @@ export async function getDailyNotificationCount(
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
 
-  // Exclude rate-limit-sentinel types that share the notification_log
-  // table but are NOT user-visible push notifications. Without this filter,
-  // each outbox-spillover rate-limit check inserts a row with type
-  // 'support_outbox_spillover' that counts toward the MAX_DAILY_PUSH cap and
-  // can silently block all push notifications for the day.
+  // Count push sends only. Email evidence rows share notification_log for
+  // 24h dedup but use `email-*` ticket IDs; counting them here would let a
+  // delivered monthly-report email consume the parent's daily push quota.
+  // Also exclude rate-limit sentinels that are not user-visible sends.
   const rows = await db
     .select()
     .from(notificationLog)
@@ -557,6 +556,7 @@ export async function getDailyNotificationCount(
         eq(notificationLog.profileId, profileId),
         gte(notificationLog.sentAt, startOfDay),
         ne(notificationLog.type, 'support_outbox_spillover'),
+        sql`(${notificationLog.ticketId} IS NULL OR ${notificationLog.ticketId} NOT LIKE 'email-%')`,
       ),
     );
 

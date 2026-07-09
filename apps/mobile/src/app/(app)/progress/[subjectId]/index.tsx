@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import {
@@ -13,7 +13,7 @@ import {
   pushLearningResumeTarget,
 } from '../../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ErrorFallback } from '../../../../components/common';
+import { ErrorFallback, TimeoutLoader } from '../../../../components/common';
 import { ProgressBar } from '../../../../components/progress';
 import {
   useProgressInventory,
@@ -53,6 +53,26 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   const { t } = useTranslation();
   const navigationContract = useNavigationContract();
   const canWrite = !navigationContract.isParentProxy;
+  const formatMilestoneUpNext = (
+    level: string | null | undefined,
+    title: string | null | undefined,
+  ): string => {
+    const cleanLevel = level?.trim() ?? '';
+    const cleanTitle = title?.trim() ?? '';
+    if (cleanLevel && cleanTitle) {
+      return t('progress.subject.upNext', {
+        level: cleanLevel,
+        title: cleanTitle,
+      });
+    }
+    if (cleanLevel) {
+      return t('progress.subject.upNextLevelOnly', { level: cleanLevel });
+    }
+    if (cleanTitle) {
+      return t('progress.subject.upNextTitleOnly', { title: cleanTitle });
+    }
+    return t('progress.subject.upNextNoDetails');
+  };
   const role = useActiveProfileRole();
   const register = role === 'child' ? 'child' : 'adult';
   const router = useRouter();
@@ -143,10 +163,11 @@ export default function ProgressSubjectScreen(): React.ReactElement {
 
   const confirmHideSubject = (): void => {
     if (!subject || !canWrite) return;
+    const subjectName = subject.subjectName.trim();
     platformAlert(
-      t('progress.subject.hideConfirmTitle', {
-        subject: subject.subjectName,
-      }),
+      subjectName
+        ? t('progress.subject.hideConfirmTitle', { subject: subjectName })
+        : t('progress.subject.hideConfirmTitleNoSubject'),
       t('progress.subject.hideConfirmMessage'),
       [
         { text: t('common.cancel'), style: 'cancel' },
@@ -161,17 +182,6 @@ export default function ProgressSubjectScreen(): React.ReactElement {
       { cancelable: true },
     );
   };
-
-  // [M20] Timeout escape for the loading skeleton
-  const [skeletonTimedOut, setSkeletonTimedOut] = useState(false);
-  useEffect(() => {
-    if (!inventoryQuery.isLoading) {
-      setSkeletonTimedOut(false);
-      return;
-    }
-    const t = setTimeout(() => setSkeletonTimedOut(true), 20_000);
-    return () => clearTimeout(t);
-  }, [inventoryQuery.isLoading]);
 
   // [EP15-C6] Every state must have at least one action. The prior
   // implementation jumped straight to the render tree when `!subjectId`
@@ -208,54 +218,50 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   // with `subject?.subjectName ?? 'Subject progress'` and an empty body,
   // which is indistinguishable from a "this subject is gone" state.
   if (inventoryQuery.isLoading) {
-    if (skeletonTimedOut) {
-      return (
-        <View
-          className="flex-1 bg-background"
-          style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
-        >
-          <ErrorFallback
-            variant="centered"
-            title={t('progress.subject.loadingTooLong')}
-            message={t('progress.subject.checkConnection')}
-            primaryAction={{
-              label: t('common.retry'),
-              onPress: () => void inventoryQuery.refetch(),
-              testID: 'progress-subject-skeleton-timeout-retry',
-            }}
-            secondaryAction={{
-              label: t('common.goBack'),
-              onPress: () => goBackOrReplace(router, backFallback),
-              testID: 'progress-subject-skeleton-timeout-back',
-            }}
-            testID="progress-subject-skeleton-timeout"
-          />
-        </View>
-      );
-    }
     return (
-      <View
-        className="flex-1 bg-background px-6 items-center justify-center"
-        style={{ paddingTop: insets.top }}
-        testID="progress-subject-loading"
-      >
-        <Text className="text-h3 font-semibold text-text-primary mt-4 text-center">
-          {t('progress.subject.loadingTitle')}
-        </Text>
-        <Text className="text-body-sm text-text-secondary mt-2 text-center">
-          {t('progress.subject.loadingMessage')}
-        </Text>
-        <Pressable
-          onPress={() => goBackOrReplace(router, backFallback)}
-          className="mt-6 rounded-button bg-surface-elevated px-6 py-3 min-h-[48px] items-center justify-center"
-          accessibilityRole="button"
-          accessibilityLabel={t('common.goBack')}
-          testID="progress-subject-loading-back"
-        >
-          <Text className="text-body font-semibold text-text-primary">
-            {t('common.goBack')}
-          </Text>
-        </Pressable>
+      <View className="flex-1 bg-background">
+        <TimeoutLoader
+          isLoading
+          timeoutMs={20_000}
+          title={t('progress.subject.loadingTooLong')}
+          message={t('progress.subject.checkConnection')}
+          primaryAction={{
+            label: t('common.retry'),
+            onPress: () => void inventoryQuery.refetch(),
+            testID: 'progress-subject-skeleton-timeout-retry',
+          }}
+          secondaryAction={{
+            label: t('common.goBack'),
+            onPress: () => goBackOrReplace(router, backFallback),
+            testID: 'progress-subject-skeleton-timeout-back',
+          }}
+          fallbackTestID="progress-subject-skeleton-timeout"
+          loadingFallback={
+            <View
+              className="flex-1 bg-background px-6 items-center justify-center"
+              style={{ paddingTop: insets.top }}
+              testID="progress-subject-loading"
+            >
+              <Text className="text-h3 font-semibold text-text-primary mt-4 text-center">
+                {t('progress.subject.loadingTitle')}
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-2 text-center">
+                {t('progress.subject.loadingMessage')}
+              </Text>
+              <Pressable
+                onPress={() => goBackOrReplace(router, backFallback)}
+                className="mt-6 rounded-button bg-surface-elevated px-6 py-3 min-h-[48px] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={t('common.goBack')}
+                testID="progress-subject-loading-back"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  {t('common.goBack')}
+                </Text>
+              </Pressable>
+            </View>
+          }
+        />
       </View>
     );
   }
@@ -543,10 +549,10 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                     </View>
                     {languageProgress.nextMilestone && (
                       <Text className="text-caption text-text-muted mt-2">
-                        {t('progress.subject.upNext', {
-                          level: languageProgress.nextMilestone.level,
-                          title: languageProgress.nextMilestone.milestoneTitle,
-                        })}
+                        {formatMilestoneUpNext(
+                          languageProgress.nextMilestone.level,
+                          languageProgress.nextMilestone.milestoneTitle,
+                        )}
                       </Text>
                     )}
                   </>

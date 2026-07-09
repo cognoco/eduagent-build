@@ -1,7 +1,14 @@
 // [WI-959] Red-green guard: person.findFirst must be called once (inArray), not N times (serial loop).
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Database } from '@eduagent/database';
-import { getFirstActiveChildNameV2 } from './family-v2';
+import {
+  getChildGdprConsentStatusV2,
+  getChildrenGdprConsentStatusesV2,
+  getFirstActiveChildNameV2,
+  type FamilyV2ChildReadProof,
+} from './family-v2';
 
 // Collect string leaves from a Drizzle AST node — detects ids in eq() and inArray() WHERE clauses.
 function collectStrings(node: unknown, seen = new Set<unknown>()): string[] {
@@ -55,6 +62,10 @@ function makeDb(options: {
   } as unknown as Database;
 
   return { db, personFindFirstMock };
+}
+
+function typeOnly(_check: () => void): void {
+  // The callback is intentionally not executed; TypeScript still checks it.
 }
 
 describe('[WI-959] getFirstActiveChildNameV2 — single bounded person query', () => {
@@ -142,5 +153,41 @@ describe('[WI-959] getFirstActiveChildNameV2 — single bounded person query', (
 
     expect(result).toBeNull();
     expect(personFindFirstMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('[WI-1433] family-v2 child consent reads require pre-verified child scope', () => {
+  it('marks all internal child-enumeration seams as internal-only', () => {
+    const source = readFileSync(join(__dirname, 'family-v2.ts'), 'utf8');
+
+    expect(source).toMatch(
+      /@internal[\s\S]*export async function getChildPersonIdsForParentV2/,
+    );
+    expect(source).toMatch(
+      /@internal[\s\S]*export async function getFirstActiveChildNameV2/,
+    );
+  });
+
+  it('locks the child GDPR consent seams behind a branded proof argument', () => {
+    typeOnly(() => {
+      const db = {} as Database;
+
+      // @ts-expect-error WI-1433: a bare child id is not enough for this read.
+      void getChildGdprConsentStatusV2(db, 'child-person-id');
+
+      // @ts-expect-error WI-1433: batched child consent reads need child-scope proof too.
+      void getChildrenGdprConsentStatusesV2(db, 'org-id', ['child-person-id']);
+
+      const proof = {} as FamilyV2ChildReadProof;
+      void getChildGdprConsentStatusV2(db, 'child-person-id', proof);
+      void getChildrenGdprConsentStatusesV2(
+        db,
+        'org-id',
+        ['child-person-id'],
+        proof,
+      );
+    });
+
+    expect(true).toBe(true);
   });
 });

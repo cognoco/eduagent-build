@@ -8,7 +8,8 @@ import {
   ScrollView,
   Dimensions,
 } from 'react-native';
-import { useSignUp, useSSO } from '@clerk/clerk-expo';
+import { useSSO } from '@clerk/expo';
+import { useSignUp } from '@clerk/expo/legacy';
 import { Trans, useTranslation } from 'react-i18next';
 import { Sentry } from '../../lib/sentry';
 import { useRouter, useLocalSearchParams } from 'expo-router';

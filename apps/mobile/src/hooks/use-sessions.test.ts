@@ -1100,7 +1100,7 @@ describe('useStreamMessage', () => {
     const tokenPromise = new Promise<string>((r) => {
       resolveToken = r;
     });
-    const clerk = require('@clerk/clerk-expo') as {
+    const clerk = require('@clerk/expo') as {
       useAuth: () => { getToken: jest.Mock };
     };
     const useAuthBefore = clerk.useAuth;

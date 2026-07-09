@@ -166,7 +166,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     },
   )
   .delete('/learner-profile/all', async (c) => {
-    assertCanManageOwnConsent(c);
+    assertCanManageOwnConsent(c.get('profileMeta'));
     const { db, profileId } = withProfile(c);
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const accountId = requireAccount(c.get('account')).id;
@@ -192,7 +192,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     async (c) => {
       // [CR-2026-05-21-010] Minor non-owner profiles cannot toggle memory
       // collection on self — data-collection consent is parent-controlled.
-      assertCanManageOwnConsent(c);
+      assertCanManageOwnConsent(c.get('profileMeta'));
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
@@ -240,7 +240,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     async (c) => {
       // [CR-2026-05-21-010] Minor non-owner profiles cannot toggle memory
       // injection on self — injection consent is parent-controlled.
-      assertCanManageOwnConsent(c);
+      assertCanManageOwnConsent(c.get('profileMeta'));
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
@@ -289,7 +289,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       // [CR-2026-05-21-010] Minor non-owner profiles cannot self-grant or
       // self-revoke memory consent — the parent's grant (via /:profileId/consent)
       // must not be overridden by the child acting on self.
-      assertCanManageOwnConsent(c);
+      assertCanManageOwnConsent(c.get('profileMeta'));
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;

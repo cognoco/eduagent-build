@@ -80,7 +80,7 @@ const mockUseAuth = jest.fn().mockReturnValue({
   getToken: jest.fn().mockResolvedValue('mock-token'),
 });
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => mockUseAuth(),
 }));
 

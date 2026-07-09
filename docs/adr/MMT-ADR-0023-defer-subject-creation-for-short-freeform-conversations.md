@@ -4,7 +4,7 @@
 
 > **Proposal, not yet accepted.** Per the lockstep rule (MMT-ADR-0000 §II.2 / `docs/adr/README.md`), the canon edits this would imply (`architecture.md` → "Freeform Ask Anything — narrower persistence path"; `PRD.md` → "Ask Anything / Freeform Persistence Boundary") land **in the same change-set as acceptance**, never at proposal time. This file records the *why* and the open implementation fork so the decision can be ruled deliberately rather than smuggled into a bugfix.
 
-> **Re-vet 2026-06-30:** **KEEP PROPOSED / AMEND.** This remains a proposal because no acceptance sign-off or mechanism choice exists. The product-shell spec and S1 task are context pointers only; they do not supply the authority for the ADR. The architectural spine is the turn-1 subject commitment risk plus ADR-0021's persistence boundary.
+> This remains a proposal until two things exist: an acceptance sign-off and a ruling on the implementation fork below (M1 vs M2). No external document supplies authority for this ADR; the architectural spine is the turn-1 subject-commitment risk plus ADR-0021's persistence boundary. (Re-affirmed Proposed 2026-06-30.)
 
 ## Context
 
@@ -44,7 +44,7 @@ The DB invariant (`subjectId NOT NULL`) is the obstacle, and there are two ways 
 
 ## Alternatives considered
 
-1. **Eager subject + kill the grid gate + always-visible override (the near-term S1 `T25`).** Adopted as the *immediate* fix and stays inside ADR-0021 (subject still resolved up front, topic still deferred). It removes the blocking library-grid gate and replaces a silent commit with mentor-voiced inline disambiguation on genuine ambiguity — but a *confident* classifier mis-pick still slips through, caught only by the override. Good enough for the visible bug; insufficient for the ambiguity class. This ADR is the path that fixes the class.
+1. **Eager subject + no blocking subject-picker gate + always-visible override (the shipped interim mitigation).** Adopted as the *immediate* fix and stays inside ADR-0021 (subject still resolved up front, topic still deferred). It removes the blocking library-grid gate and replaces a silent commit with mentor-voiced inline disambiguation on genuine ambiguity — but a *confident* classifier mis-pick still slips through, caught only by the override. Good enough for the visible bug; insufficient for the ambiguity class. This ADR is the path that fixes the class.
 2. **Stronger classifier / higher confidence threshold before silent auto-pick.** Rejected — the mis-pick is irreducible for genuinely cross-subject terms ("analysis", "translation", "modelling"); raising the bar trades silent-wrong for more-gating without solving either. "Not a stronger guesser" was the explicit steer.
 3. **Keep ADR-0021 as-is (subject required up front).** Status quo; the turn-1 mis-commit recurs for every ambiguous opener. Rejected as the target state, retained only as the near-term floor under alternative 1.
 
@@ -58,7 +58,7 @@ The DB invariant (`subjectId NOT NULL`) is the obstacle, and there are two ways 
 ## Links
 
 - **Amends:** `docs/adr/MMT-ADR-0021-freeform-library-filing-threshold.md` (Decision 3 — "subject is required up front").
-- **Contextual rollout pointer, not authority:** S1 plan `docs/plans/v2-plan/2026-06-10-s1-mentor-home.md` → `T25` (eager subject, no grid gate, override).
+- **Contextual rollout pointer, not authority (historical):** `docs/plans/v2-plan/2026-06-10-s1-mentor-home.md` — the plan that shipped the interim mitigation (eager subject, no grid gate, override).
 - **Contextual product pointer, not authority:** `docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §3.1 (cold start — first subject through the conversation).
 - **Canon (lockstep at acceptance, not now):** `architecture.md` → "Freeform Ask Anything — narrower persistence path"; `PRD.md` → "Ask Anything / Freeform Persistence Boundary".
 - **Operational owner of any threshold:** `apps/api/src/config/filing.ts` (`FILING_CONFIG`).

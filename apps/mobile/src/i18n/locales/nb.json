@@ -334,10 +334,10 @@
         "promptRestartWithTopic": "Vil dere velge ett lite {{topic}}-mål for denne uken?",
         "promptRestartEasierWithTopic": "Skal vi gjøre det lettere å starte med {{topic}} igjen?"
       },
-      "childrenHeader": "Children",
+      "childrenHeader": "Barn",
       "familyManagementHeader": "Familieadministrasjon",
       "childCard": {
-        "statusPending": "Checking in",
+        "statusPending": "Sjekker inn",
         "reportsAction": "Rapporter",
         "nudgeAction": "Nudge",
         "learnTogetherAction": "Lær sammen"
@@ -388,8 +388,8 @@
       "greetingFallbackName": "der",
       "greetingNoName": "Hei på deg!"
     },
-    "goToProgress": "Go to Progress",
-    "goToProgressLabel": "Go to Progress",
+    "goToProgress": "Gå til Fremdrift",
+    "goToProgressLabel": "Gå til Fremdrift",
     "coachBand": {
       "estimatedMinutes": "{{minutes}} min",
       "a11yDismiss": "Avvis anbefaling",
@@ -530,7 +530,7 @@
       "tryAgainMoment": "Prøv igjen om et øyeblikk.",
       "couldNotSaveSetting": "Kunne ikke lagre innstilling"
     },
-    "appVersion": "MentoMate v1.0.0",
+    "appVersion": "MentoMate versjon 1.0.0",
     "privacy": {
       "withdrawalArchiveTitle": "Når jeg trekker tilbake samtykke for et barn",
       "withdrawalArchiveAuto": "Automatisk",
@@ -596,7 +596,7 @@
         "pendingOwner": "Minneinnsamling er ikke aktivert ennå.",
         "pendingChild": "En forelder eller verge må fortsatt aktivere minneinnsamling.",
         "useMemoryLabel": "Bruk det mentoren vet",
-        "useMemoryDisabledHint": "Enable memory first, then this can turn on."
+        "useMemoryDisabledHint": "Aktiver minne først, så kan dette slås på."
       },
       "consent": {
         "title": "Aktiver mentorens minne",
@@ -659,8 +659,8 @@
         "both": "Begge"
       },
       "examples": {
-        "title": "Examples you can add",
-        "body": "\"I learn best with examples,\" \"I like space analogies,\" or \"Fractions still feel tricky.\""
+        "title": "Eksempler du kan legge til",
+        "body": "\"Jeg lærer best med eksempler,\" \"Jeg liker rom-analogier,\" eller \"Brøk føles fortsatt vanskelig.\""
       }
     },
     "accessories": {
@@ -1032,7 +1032,9 @@
       "bestScore": "Beste: {{score}}/{{total}} · Spilt: {{played}}",
       "played": "Spilt: {{played}}",
       "vocabBasicsTitle": "{{language}} grunnleggende",
+      "vocabBasicsTitleNoLanguage": "Grunnleggende vokabular",
       "vocabPersonalisedTitle": "Vokabular: {{language}}",
+      "vocabPersonalisedTitleNoLanguage": "Vokabular",
       "vocabStarterSubtitle": "Standard startord – registrer {{threshold}} av dine egne for å låse opp personlige runder",
       "vocabPlayedSubtitleDefault": "Øv på nye ord og uttrykk",
       "challengeExplainerTitle": "Utfordringsrunder",
@@ -1206,8 +1208,8 @@
       "iHaveATextSubtitle": "Skriv eller lim inn din egen tekst",
       "surpriseMe": "Overrask meg",
       "surpriseMeSubtitle": "Øv med et nytt diktat",
-      "loadingTitle": "Finding your next review...",
-      "loadingMessage": "We're choosing a dictation that should feel useful, not random.",
+      "loadingTitle": "Finner din neste gjennomgang...",
+      "loadingMessage": "Vi velger et diktat som skal føles nyttig, ikke tilfeldig.",
       "viewPastDictations": "Tidligere diktater",
       "viewPastDictationsSubtitle": "Se tilbake på det du har øvd på"
     },
@@ -1243,7 +1245,7 @@
       "paceLabel": "Tempo: {{pace}}. Trykk for å endre.",
       "pace": {
         "slow": "Sakte",
-        "normal": "Normal",
+        "normal": "Normalt",
         "fast": "Rask"
       },
       "punctuationOn": "Tegnsetting leses høyt. Trykk for å slå av.",
@@ -1271,7 +1273,7 @@
       "mistakesFound_one": "{{count}} feil funnet",
       "mistakesFound_other": "{{count}} feil funnet",
       "correctionProgress": "Retting {{current}} av {{total}}",
-      "original": "Original",
+      "original": "Opprinnelig",
       "youWrote": "Du skrev",
       "error": "Feil",
       "correctVersion": "Riktig versjon",
@@ -1402,8 +1404,8 @@
       "skip": "Hopp over – start læringen uansett",
       "skipAccessibilityLabel": "Hopp over og start læringen uansett",
       "filingErrorTitle": "Kunne ikke legge til den boken",
-      "loadingTitle": "Opening your shelf...",
-      "loadingMessage": "We're finding the books and next steps saved for this subject.",
+      "loadingTitle": "Åpner hyllen din...",
+      "loadingMessage": "Vi finner bøkene og neste trinn som er lagret for dette faget.",
       "bookCount_one": "{{count}} bok",
       "bookCount_other": "{{count}} bøker",
       "suggestionAdd": "Legg til i hyllen",
@@ -1949,6 +1951,7 @@
     "cancelAndGoBackLabel": "Avbryt og gå tilbake",
     "cancelOcrLabel": "Avbryt OCR og ta på nytt",
     "readingHomework": "Leser {{subject}}-leksene dine ...",
+    "readingHomeworkNoSubject": "Leser leksene dine ...",
     "ocrTimeout": "Lesing av bildet tar for lang tid. Sjekk tilkoblingen din og prøv igjen, eller skriv inn oppgaven.",
     "ocrDefaultError": "Vi kunne ikke lese det tydelig. Prøv å ta bildet på nytt med bedre belysning.",
     "problemsFound": "Her er oppgavene jeg fant:",
@@ -2004,11 +2007,11 @@
       "NO_TEXT": "Vi fant ingen tekst i dette bildet. Sørg for at leksene er synlige og godt opplyst.",
       "ML_KIT_UNAVAILABLE": "Bildelesing er ikke tilgjengelig i denne versjonen. En rask app-oppdatering fikser det.",
       "CACHE_FAILED": "Vi hadde problemer med å klargjøre bildet. Prøv igjen eller skriv inn oppgaven.",
-      "NETWORK_ERROR": "We couldn't reach the server. Check your connection and try again.",
-      "AUTH_EXPIRED": "Your session expired. Sign in again to keep going.",
-      "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
-      "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
-      "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
+      "NETWORK_ERROR": "Vi kunne ikke nå serveren. Sjekk tilkoblingen din og prøv igjen.",
+      "AUTH_EXPIRED": "Din økt utløp. Logg inn igjen for å fortsette.",
+      "IMAGE_TOO_LARGE": "Bildet er for stort. Prøv et mindre utsnitt eller ta et nytt bilde lenger unna.",
+      "RATE_LIMITED": "Du har nådd bildegrensen for øyeblikket. Prøv igjen om et minutt.",
+      "SERVER_ERROR": "Serverne våre er opptatt. Prøv igjen om noen sekunder."
     },
     "microphoneUnavailableTitle": "Mikrofon utilgjengelig",
     "microphoneUnavailableBody": "Vi kunne ikke bruke mikrofonen akkurat nå. Sjekk at appen har tilgang til mikrofonen og prøv igjen, eller skriv i stedet.",
@@ -2139,6 +2142,7 @@
       "pageTitle": "Lagret",
       "viewLabel": "Se lagrede forklaringer",
       "bookmarkLabel": "Lagret bokmerke fra {{subject}}",
+      "bookmarkLabelNoSubject": "Lagret bokmerke",
       "removeBookmark": "Fjern bokmerke",
       "tapToExpand": "Trykk for å utvide",
       "deleteTitle": "Fjerne bokmerke?",
@@ -2185,6 +2189,9 @@
       "wordsProgress": "{{mastered}}/{{target}} ord",
       "phrasesProgress": "{{mastered}}/{{target}} uttrykk",
       "upNext": "Neste: {{level}} – {{title}}",
+      "upNextLevelOnly": "Neste: {{level}}",
+      "upNextTitleOnly": "Neste: {{title}}",
+      "upNextNoDetails": "Neste",
       "milestoneNoData": "Fullfør en økt for å begynne å spore milepælfremgangen din.",
       "retentionTitle": "Nåværende bevaring",
       "retentionLoadError": "Vi kunne ikke laste bevaringsdata akkurat nå.",
@@ -2196,14 +2203,15 @@
       "hidingSubject": "Skjuler emne...",
       "hideSubjectHint": "Skjuler dette emnet fra hovedvisningene dine. Du kan gjenopprette det fra Bibliotek senere.",
       "hideConfirmTitle": "Skjul {{subject}}?",
+      "hideConfirmTitleNoSubject": "Skjul dette faget?",
       "hideConfirmMessage": "Dette flytter emnet ut av hovedvisningene dine. Læringshistorikken din blir lagret, og du kan gjenopprette emnet fra Bibliotek.",
       "hideConfirmAction": "Skjul emne",
       "hideErrorTitle": "Kunne ikke skjule emnet",
       "goneTitle": "Dette emnet er ikke lenger tilgjengelig",
       "goneSubtitle": "Det kan ha blitt fjernet eller slått sammen med et annet emne.",
       "pastConversations": "Tidligere samtaler",
-      "loadingTitle": "Finding your progress...",
-      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
+      "loadingTitle": "Finner fremdriften din...",
+      "loadingMessage": "Vi samler økter, repetisjoner og lagrede ord for dette emnet.",
       "startedTopicsCount_one": "{{count}} emne påbegynt",
       "startedTopicsCount_other": "{{count}} emner påbegynt"
     },
@@ -2221,6 +2229,7 @@
       "emptyMessageMany": "Øv på et språkfag for å begynne å bygge ordlisten din.",
       "emptyMessageNone": "Start et språkfag, så vil ordene du lærer vises her.",
       "viewSubjectLabel": "Se {{subject}} vokabular",
+      "viewSubjectLabelNoSubject": "Se vokabular",
       "viewAllLink": "Se alle →",
       "wordsSummary": "{{total}} ord – {{mastered}} mestret",
       "learningAppend": ", {{count}} lærer"
@@ -2258,19 +2267,19 @@
       }
     },
     "previousReports": {
-      "title": "Previous reports",
-      "subtitle": "Weekly and monthly snapshots from your learning.",
-      "viewAll": "View all reports"
+      "title": "Tidligere rapporter",
+      "subtitle": "Ukentlige og månedlige øyeblikksbilder fra læringen din.",
+      "viewAll": "Se alle rapporter"
     },
     "latestReport": {
-      "title": "Latest report",
-      "open": "Open report",
+      "title": "Siste rapport",
+      "open": "Åpne rapport",
       "openWithDate": "Open report for {{date}}",
-      "empty": "Your next weekly or monthly report will appear here once there is enough learning to summarize.",
-      "error": "We couldn't load the latest report right now.",
-      "sessions": "Sessions",
+      "empty": "Din neste ukentlige eller månedlige rapport vises her når det er nok læring å oppsummere.",
+      "error": "Vi kunne ikke laste inn den siste rapporten nå.",
+      "sessions": "Økter",
       "time": "Time",
-      "topics": "Topics",
+      "topics": "Emner",
       "words": "Words",
       "practiceLessons_one": "{{count}} practice lesson",
       "practiceLessons_other": "{{count}} practice lessons",
@@ -2279,9 +2288,9 @@
     },
     "recentFocus": {
       "title": "Nylige økter",
-      "showAll": "Show all sessions",
-      "empty": "Recent sessions will appear here once learning gets going.",
-      "error": "We couldn't load recent sessions right now.",
+      "showAll": "Vis alle økter",
+      "empty": "Nylige økter vises her når læringen kommer i gang.",
+      "error": "Vi kunne ikke laste inn nylige økter nå.",
       "sessionFallback": "Studied {{date}}"
     },
     "guardian": {
@@ -2293,7 +2302,7 @@
       "nudgeA11y": "Send {{name}} et dytt",
       "viewAllReports": "Se alle rapporter",
       "subjectsTitle": "Emner",
-      "goToChildCurriculum": "Open child curriculum"
+      "goToChildCurriculum": "Åpne barnets pensum"
     },
     "remediation": {
       "heading": "Prøv en annen tilnærming",
@@ -2400,15 +2409,15 @@
       "redirectBody": "Vi starter med pronomen, slik at de neste stegene føles riktige helt fra begynnelsen."
     },
     "ready": {
-      "title": "You're all set.",
+      "title": "Du er klar.",
       "introWithLearner": "For {{learner}}:",
-      "intro": "Here's what's set up:",
-      "rowTone": "Your mentor will talk to you the right way",
+      "intro": "Dette er satt opp:",
+      "rowTone": "Mentoren din vil snakke med deg på riktig måte",
       "rowSubject": "Starting with {{subject}}",
       "rowSubjectNoSubject": "Det første emnet ditt er klart",
-      "rowPace": "Pace stays at your speed — never rushed",
-      "reassurance": "Most learners feel the difference in the first session.",
-      "cta": "Let's start"
+      "rowPace": "Tempoet holder seg til din hastighet – aldri stresset",
+      "reassurance": "De fleste elever merker forskjellen i den første økten.",
+      "cta": "La oss starte"
     },
     "stepIndicator": {
       "stepOf": "Steg {{current}} av {{total}}"
@@ -2631,17 +2640,17 @@
       "viewTopicDetails": "Se detaljer for {{title}}",
       "topicsCouldNotLoad": "Temaer kunne ikke lastes",
       "retryLoadingTopics": "Prøv å laste temaer på nytt",
-      "topicsNewLearnerTitle": "No lesson topics yet",
-      "topicsNewLearnerBody": "This can happen after early sessions or free browsing. Recent sessions below still show what happened.",
-      "noTopicsYetTitle": "No lesson topics yet",
-      "noTopicsYetBody": "Sessions may still exist here before the mentor has enough lesson-level progress to show.",
+      "topicsNewLearnerTitle": "Ingen leksjonsemner ennå",
+      "topicsNewLearnerBody": "Dette kan skje etter tidlige økter eller fri utforskning. Nylige økter nedenfor viser fortsatt hva som skjedde.",
+      "noTopicsYetTitle": "Ingen leksjonsemner ennå",
+      "noTopicsYetBody": "Økter kan fortsatt eksistere her før mentoren har nok fremgang på leksjonsnivå å vise.",
       "description": "This is your child's progress in {{subject}}. Topics appear once sessions connect to a lesson step.",
       "recentSubjectSessions": "Recent {{subject}} sessions",
       "viewSessionFrom": "View session from {{date}}"
     },
     "topic": {
       "topic": "Tema",
-      "status": "Status",
+      "status": "Tilstand",
       "statusUnknown": "Ukjent",
       "understanding": "Forståelse",
       "reviewStatus": "Gjennomgangsstatus",
@@ -2845,10 +2854,10 @@
     },
     "home": "Hjem",
     "homeLabel": "Hjem",
-    "familyHub": "Family Hub",
-    "familyHubLabel": "Family Hub",
-    "myLearning": "My Learning",
-    "myLearningLabel": "My Learning",
+    "familyHub": "Familieoversikt",
+    "familyHubLabel": "Familieoversikt",
+    "myLearning": "Min læring",
+    "myLearningLabel": "Min læring",
     "library": "Bibliotek",
     "libraryLabel": "Bibliotek",
     "progress": "Fremgang",
@@ -2859,12 +2868,12 @@
     "childrenLabel": "Familie",
     "recaps": "Sammendrag",
     "recapsLabel": "Sammendrag",
-    "mentor": "Mentor",
-    "mentorLabel": "Mentor",
+    "mentor": "Veileder",
+    "mentorLabel": "Veileder",
     "subjects": "Fag",
     "subjectsLabel": "Fag",
-    "journal": "Journal",
-    "journalLabel": "Journal"
+    "journal": "Logg",
+    "journalLabel": "Logg"
   },
   "subscription": {
     "trial": {
@@ -2880,77 +2889,77 @@
       "unknown": "Ukjent"
     },
     "alerts": {
-      "restoredTitle": "Restored",
-      "restoredBody": "Your subscription has been restored.",
-      "successTitle": "Success",
-      "successBody": "Your subscription is now active!",
-      "purchaseConfirmedTitle": "Purchase confirmed",
-      "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
-      "topUpTitle": "Top-up",
-      "topUpBody": "500 additional credits have been added!"
+      "restoredTitle": "Gjenopprettet",
+      "restoredBody": "Abonnementet ditt er gjenopprettet.",
+      "successTitle": "Vellykket",
+      "successBody": "Abonnementet ditt er nå aktivt!",
+      "purchaseConfirmedTitle": "Kjøp bekreftet",
+      "purchaseConfirmedBody": "Abonnementet ditt aktiveres. Det vises vanligvis innen et minutt – dra ned for å oppdatere.",
+      "topUpTitle": "Påfyll",
+      "topUpBody": "500 ekstra studiepoeng er lagt til!"
     },
     "web": {
       "plansOnMobile": "Abonnementer er tilgjengelige i mobilappen",
       "storePurchaseUnavailable": "Butikkjøp er ikke tilgjengelig på denne enheten."
     },
     "childPaywall": {
-      "headline": "Nice work so far!",
-      "greatStart": "You've been exploring and learning — great start!",
+      "headline": "Bra jobbet så langt!",
+      "greatStart": "Du har utforsket og lært – en flott start!",
       "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
       "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
-      "usedAllQuestions": "You've used all your free questions. Ask your parent to upgrade so you can keep learning.",
+      "usedAllQuestions": "Du har brukt alle dine gratis spørsmål. Be forelderen din om å oppgradere slik at du kan fortsette å lære.",
       "quotaUsedAllQuestions": "Du har brukt spørsmålene dine for nå. Du kan prøve igjen etter {{resetAt}}, eller varsle en foresatt hvis du trenger mer rom.",
-      "notifyButton": "Notify My Parent",
-      "notifyButtonNotified": "Parent notified",
-      "notifyButtonAccessibilityNotified": "Parent already notified",
-      "notifyButtonAccessibilityNotify": "Notify my parent",
+      "notifyButton": "Varsle forelderen min",
+      "notifyButtonNotified": "Forelder varslet",
+      "notifyButtonAccessibilityNotified": "Forelder allerede varslet",
+      "notifyButtonAccessibilityNotify": "Varsle forelderen min",
       "cooldownReminder": "You can remind them again in {{label}}.",
-      "notifiedExploreText": "Your parent has been notified! While you wait, you can still explore:",
-      "waitText": "While you wait, you can still browse your Library and see your progress.",
-      "browseLibrary": "Browse Library",
-      "browseLibraryAccessibilityLabel": "Browse Library",
-      "seeProgress": "See your progress",
-      "seeProgressAccessibilityLabel": "See your progress",
-      "goHome": "Go Home",
-      "goHomeAccessibilityLabel": "Go Home",
+      "notifiedExploreText": "Forelderen din er varslet! Mens du venter, kan du fortsatt utforske:",
+      "waitText": "Mens du venter, kan du fortsatt bla gjennom biblioteket ditt og se fremgangen din.",
+      "browseLibrary": "Bla gjennom biblioteket",
+      "browseLibraryAccessibilityLabel": "Bla gjennom biblioteket",
+      "seeProgress": "Se fremgangen din",
+      "seeProgressAccessibilityLabel": "Se fremgangen din",
+      "goHome": "Gå hjem",
+      "goHomeAccessibilityLabel": "Gå hjem",
       "back": "Back",
-      "backAccessibilityLabel": "Go back",
+      "backAccessibilityLabel": "Gå tilbake",
       "alerts": {
         "sentTitle": "Sent!",
-        "sentBody": "We let your parent know!",
-        "askParentTitle": "Ask your parent",
-        "askParentBody": "Ask your parent to open the app and subscribe.",
-        "notifyErrorTitle": "Could not send notification",
-        "notifyErrorBody": "Please check your connection and try again.",
+        "sentBody": "Vi ga beskjed til forelderen din!",
+        "askParentTitle": "Spør forelderen din",
+        "askParentBody": "Be forelderen din om å åpne appen og abonnere.",
+        "notifyErrorTitle": "Kunne ikke sende varsel",
+        "notifyErrorBody": "Sjekk tilkoblingen din og prøv igjen.",
         "quotaSentBody": "Vi ga beskjed til en foresatt om at du har nådd spørsmålsgrensen.",
         "quotaAskParentBody": "Be en foresatt åpne appen for detaljer."
       }
     },
     "restore": {
-      "button": "Restore Purchases",
-      "accessibilityLabel": "Restore purchases",
-      "verifying": "Verifying purchase...",
-      "restoring": "Restoring...",
-      "failedTitle": "Restore failed",
-      "failedBody": "Could not restore purchases. Please try again.",
-      "notFoundTitle": "No subscriptions found",
-      "notFoundBody": "We could not find any previous purchases to restore.",
-      "cancelledTitle": "Restore cancelled",
-      "cancelledBody": "Restore will continue in background.",
-      "cancelAccessibilityLabel": "Cancel restore"
+      "button": "Gjenopprett kjøp",
+      "accessibilityLabel": "Gjenopprett kjøp",
+      "verifying": "Verifiserer kjøp...",
+      "restoring": "Gjenoppretter...",
+      "failedTitle": "Gjenoppretting mislyktes",
+      "failedBody": "Kunne ikke gjenopprette kjøp. Prøv igjen.",
+      "notFoundTitle": "Ingen abonnementer funnet",
+      "notFoundBody": "Vi fant ingen tidligere kjøp å gjenopprette.",
+      "cancelledTitle": "Gjenoppretting avbrutt",
+      "cancelledBody": "Gjenoppretting fortsetter i bakgrunnen.",
+      "cancelAccessibilityLabel": "Avbryt gjenoppretting"
     },
     "byokWaitlist": {
-      "heading": "Bring your own key",
-      "body": "Use your own API key to unlock unlimited questions. Join the waitlist to be notified when available. We'll use your account email.",
-      "joinButton": "Join Waitlist",
-      "alreadyJoinedButton": "Already joined",
-      "joinAccessibilityLabel": "Join BYOK waitlist",
-      "alreadyJoinedAccessibilityLabel": "Already joined BYOK waitlist",
+      "heading": "Ta med egen nøkkel",
+      "body": "Bruk din egen API-nøkkel for å låse opp ubegrensede spørsmål. Meld deg på ventelisten for å bli varslet når det er tilgjengelig. Vi bruker e-posten til kontoen din.",
+      "joinButton": "Meld deg på ventelisten",
+      "alreadyJoinedButton": "Allerede påmeldt",
+      "joinAccessibilityLabel": "Meld deg på BYOK-ventelisten",
+      "alreadyJoinedAccessibilityLabel": "Allerede påmeldt BYOK-ventelisten",
       "alerts": {
-        "successTitle": "Waitlist",
-        "successBody": "You have been added to the BYOK waitlist.",
+        "successTitle": "Venteliste",
+        "successBody": "Du er lagt til BYOK-ventelisten.",
         "errorTitle": "Error",
-        "errorBody": "Could not join waitlist. Try again."
+        "errorBody": "Kunne ikke melde deg på ventelisten. Prøv igjen."
       }
     },
     "loadError": {
@@ -3227,6 +3236,9 @@
     "errorMessage": "Vennligst prøv igjen om et øyeblikk.",
     "summaryPending": "Et sammendrag forberedes fortsatt for denne økten.",
     "openRecapLabel": "Åpne {{child}}s sammendrag for {{title}}",
+    "openRecapLabelNoChild": "Åpne sammendrag for {{title}}",
+    "openRecapLabelNoTitle": "Åpne {{child}}s sammendrag",
+    "openRecapLabelNoDetails": "Åpne sammendrag",
     "detailHeading": "Øktsammendrag",
     "backLabel": "Tilbake til sammendrag",
     "detailLoadError": "Vi kunne ikke laste dette sammendraget",
@@ -3238,7 +3250,7 @@
     "detailPending": "Dette sammendraget forberedes fortsatt.",
     "tryAsking": "Prøv å spørre",
     "openChildSession": "Åpne barnets økt",
-    "emptyCtaStartSession": "Start a session"
+    "emptyCtaStartSession": "Start en økt"
   },
   "addToMyLearning": {
     "tip": "Lagre en kopi av dette emnet i ditt eget bibliotek uten å påvirke barnets læring.",
@@ -3543,7 +3555,7 @@
       }
     },
     "sceneFrame": {
-      "brandLabel": "MentoMate"
+      "brandLabel": "MentoMate-app"
     },
     "bridge": {
       "headline": "Gjør «Jeg forstår det ikke» til «Dette har jeg.»",
@@ -3593,7 +3605,7 @@
       "weeksAgo": "{{count}} uker siden"
     },
     "duration": {
-      "under1": "<1 min",
+      "under1": "under 1 min",
       "minutes": "{{count}} min",
       "minutesOne": "1 min",
       "hoursMinutes": "{{hours}} t {{minutes}} m",
@@ -4102,7 +4114,7 @@
     }
   },
   "journal": {
-    "title": "Journal",
+    "title": "Logg",
     "trust": {
       "privacyPromise": "Din private læringssti: lagrede øyeblikk, notater, rapporter og mentor-minne."
     },

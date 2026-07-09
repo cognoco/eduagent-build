@@ -175,7 +175,7 @@
       "continueWithGoogle": "Googleで続行",
       "continueWithApple": "Appleで続行",
       "continueWithOpenAI": "OpenAIで続行",
-      "emailPlaceholder": "you@example.com",
+      "emailPlaceholder": "mail@example.com",
       "passwordPlaceholder": "パスワードを入力",
       "forgotPassword": "パスワードをお忘れですか？",
       "signInButton": "サインイン",
@@ -209,7 +209,7 @@
       "continueWithGoogle": "Googleで続ける",
       "continueWithApple": "Appleで続ける",
       "continueWithOpenAI": "OpenAIで続ける",
-      "emailPlaceholder": "you@example.com",
+      "emailPlaceholder": "mail@example.com",
       "passwordPlaceholder": "パスワードを作成",
       "signUpButton": "新規登録",
       "signInButton": "ログイン"
@@ -233,7 +233,7 @@
       "resendCode": "コードを再送信",
       "useDifferentEmail": "別のメールアドレスを使用",
       "backToSignIn": "サインインに戻る",
-      "emailPlaceholder": "you@example.com",
+      "emailPlaceholder": "mail@example.com",
       "sendResetCode": "リセットコードを送信"
     }
   },
@@ -304,9 +304,9 @@
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
-      "consentArchivedBody": "Data is retained for 30 days, then deleted.",
+      "consentArchivedBody": "データは30日間保持され、その後削除されます。",
       "consentDeletedTitle": "{{name}}'s account was deleted",
-      "consentDeletedBody": "The withdrawal grace period has ended."
+      "consentDeletedBody": "撤回猶予期間が終了しました。"
     },
     "parent": {
       "greeting": "こんにちは、{{displayName}}",
@@ -334,10 +334,10 @@
         "promptRestartWithTopic": "今週の{{topic}}の小さな目標を1つ決める？",
         "promptRestartEasierWithTopic": "{{topic}}を再開しやすくしてみる？"
       },
-      "childrenHeader": "Children",
+      "childrenHeader": "お子様",
       "familyManagementHeader": "ファミリー管理",
       "childCard": {
-        "statusPending": "Checking in",
+        "statusPending": "確認中",
         "reportsAction": "レポート",
         "nudgeAction": "Nudge",
         "learnTogetherAction": "一緒に学ぶ"
@@ -388,8 +388,8 @@
       "greetingFallbackName": "こんにちは",
       "greetingNoName": "こんにちは！"
     },
-    "goToProgress": "Go to Progress",
-    "goToProgressLabel": "Go to Progress",
+    "goToProgress": "進捗へ",
+    "goToProgressLabel": "進捗へ",
     "coachBand": {
       "estimatedMinutes": "{{minutes}}分",
       "a11yDismiss": "おすすめを非表示",
@@ -434,12 +434,12 @@
     "withdrawal": {
       "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
       "bannerTitleMulti": "{{count}} accounts closing soon",
-      "bannerCta": "Reverse",
+      "bannerCta": "取り消す",
       "bannerCtaShort": "Undo",
       "daysOne": "day",
       "daysOther": "days",
-      "restoreErrorTitle": "Couldn't reverse withdrawal",
-      "restoreErrorBody": "Try again in a moment.",
+      "restoreErrorTitle": "閉鎖を取り消せませんでした",
+      "restoreErrorBody": "しばらくしてからもう一度お試しください。",
       "restoreSuccessToast": "Withdrawal reversed for {{name}}"
     }
   },
@@ -467,7 +467,7 @@
       "addChildAccessLabel": "お子様のプロフィールを追加",
       "breakdownSharingTitle": "家族の利用状況を共有",
       "breakdownSharingDescription": "プロフィール別の利用を表示。",
-      "breakdownSharingError": "Couldn't update setting. Try again."
+      "breakdownSharingError": "設定を更新できませんでした。もう一度お試しください。"
     },
     "celebrations": {
       "allTitle": "すべてのお祝い",
@@ -530,16 +530,16 @@
       "tryAgainMoment": "しばらくしてからもう一度お試しください。",
       "couldNotSaveSetting": "設定を保存できませんでした"
     },
-    "appVersion": "MentoMate v1.0.0",
+    "appVersion": "MentoMate バージョン1.0.0",
     "privacy": {
-      "withdrawalArchiveTitle": "When I withdraw consent for a child",
-      "withdrawalArchiveAuto": "Automatic",
-      "withdrawalArchiveAutoDescription": "Under-13 accounts are deleted at grace expiry. 13+ accounts are archived for 30 days, then deleted.",
-      "withdrawalArchiveAlways": "Always archive (30 days)",
-      "withdrawalArchiveAlwaysDescription": "13+ accounts only. Under-13 always deletes immediately for privacy compliance.",
-      "withdrawalArchiveNever": "Never archive - delete immediately",
-      "withdrawalArchiveNeverDescription": "Delete at grace expiry instead of keeping a 30-day archive.",
-      "withdrawalArchiveError": "Couldn't update setting. Try again.",
+      "withdrawalArchiveTitle": "お子様の同意を撤回する場合",
+      "withdrawalArchiveAuto": "自動",
+      "withdrawalArchiveAutoDescription": "13歳未満のアカウントは猶予期間終了時に削除されます。13歳以上のアカウントは30日間アーカイブされ、その後削除されます。",
+      "withdrawalArchiveAlways": "常にアーカイブ（30日間）",
+      "withdrawalArchiveAlwaysDescription": "13歳以上のアカウントのみ。13歳未満はプライバシー保護のため常に即時削除されます。",
+      "withdrawalArchiveNever": "アーカイブしない - 即時削除",
+      "withdrawalArchiveNeverDescription": "30日間のアーカイブを保持する代わりに、猶予期間終了時に削除します。",
+      "withdrawalArchiveError": "設定を更新できませんでした。もう一度お試しください。",
       "privacyAndData": "プライバシーとデータ"
     },
     "sections": {
@@ -596,7 +596,7 @@
         "pendingOwner": "記憶の収集はまだ有効になっていません。",
         "pendingChild": "保護者が記憶の収集を有効にする必要があります。",
         "useMemoryLabel": "メンターが知っていることを使う",
-        "useMemoryDisabledHint": "Enable memory first, then this can turn on."
+        "useMemoryDisabledHint": "まず記憶を有効にすると、これがオンになります。"
       },
       "consent": {
         "title": "メンターの記憶を有効にする",
@@ -659,8 +659,8 @@
         "both": "両方"
       },
       "examples": {
-        "title": "Examples you can add",
-        "body": "\"I learn best with examples,\" \"I like space analogies,\" or \"Fractions still feel tricky.\""
+        "title": "追加できる例",
+        "body": "「例があると一番よく学べます」、「宇宙の例えが好きです」、「分数はまだ苦手です」"
       }
     },
     "accessories": {
@@ -1032,7 +1032,9 @@
       "bestScore": "ベスト：{{score}}/{{total}}・プレイ回数：{{played}}",
       "played": "プレイ回数：{{played}}",
       "vocabBasicsTitle": "{{language}}の基礎",
+      "vocabBasicsTitleNoLanguage": "語彙の基礎",
       "vocabPersonalisedTitle": "語彙：{{language}}",
+      "vocabPersonalisedTitleNoLanguage": "語彙",
       "vocabStarterSubtitle": "標準の単語を収録 — {{threshold}}個の自分の単語を記録して、パーソナライズされたラウンドをアンロックしましょう",
       "vocabPlayedSubtitleDefault": "新しい単語やフレーズを練習しましょう",
       "challengeExplainerTitle": "チャレンジラウンド",
@@ -1206,8 +1208,8 @@
       "iHaveATextSubtitle": "自分のテキストを入力または貼り付け",
       "surpriseMe": "おまかせ",
       "surpriseMeSubtitle": "新しいディクテーションで練習",
-      "loadingTitle": "Finding your next review...",
-      "loadingMessage": "We're choosing a dictation that should feel useful, not random.",
+      "loadingTitle": "次のレビューを見つけています...",
+      "loadingMessage": "ランダムではなく、役立つと感じられるディクテーションを選んでいます。",
       "viewPastDictations": "過去のディクテーション",
       "viewPastDictationsSubtitle": "練習した内容を振り返りましょう"
     },
@@ -1402,8 +1404,8 @@
       "skip": "スキップ — とにかく学習を開始",
       "skipAccessibilityLabel": "スキップしてとにかく学習を開始",
       "filingErrorTitle": "その本を追加できませんでした",
-      "loadingTitle": "Opening your shelf...",
-      "loadingMessage": "We're finding the books and next steps saved for this subject.",
+      "loadingTitle": "棚を開いています…",
+      "loadingMessage": "この科目に保存されている本と次のステップを見つけています。",
       "bookCount_one": "{{count}}冊の本",
       "bookCount_other": "{{count}}冊の本",
       "suggestionAdd": "本棚に追加",
@@ -1949,6 +1951,7 @@
     "cancelAndGoBackLabel": "キャンセルして戻る",
     "cancelOcrLabel": "OCRをキャンセルして再撮影",
     "readingHomework": "{{subject}}の宿題を読み取り中...",
+    "readingHomeworkNoSubject": "宿題を読み取り中...",
     "ocrTimeout": "写真の読み取りに時間がかかりすぎています。接続を確認して再試行するか、問題を入力してください。",
     "ocrDefaultError": "はっきりと読み取れませんでした。明るい場所で再度写真を撮ってみてください。",
     "problemsFound": "見つかった問題はこちらです：",
@@ -2004,11 +2007,11 @@
       "NO_TEXT": "この写真にテキストが見つかりませんでした。宿題がはっきり写り、十分な明るさがあることを確認してください。",
       "ML_KIT_UNAVAILABLE": "このバージョンでは写真の読み取りが利用できません。アプリを最新版に更新すると使えるようになります。",
       "CACHE_FAILED": "写真の準備中に問題が発生しました。もう一度試すか、問題を直接入力してください。",
-      "NETWORK_ERROR": "We couldn't reach the server. Check your connection and try again.",
-      "AUTH_EXPIRED": "Your session expired. Sign in again to keep going.",
-      "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
-      "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
-      "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
+      "NETWORK_ERROR": "サーバーに接続できませんでした。接続を確認してもう一度お試しください。",
+      "AUTH_EXPIRED": "セッションの有効期限が切れました。続行するにはもう一度サインインしてください。",
+      "IMAGE_TOO_LARGE": "写真が大きすぎます。トリミングを小さくするか、少し離れて撮り直してください。",
+      "RATE_LIMITED": "写真の制限に達しました。1分後にもう一度お試しください。",
+      "SERVER_ERROR": "サーバーが一時的に停止しています。数秒後にもう一度お試しください。"
     },
     "microphoneUnavailableTitle": "マイクが利用できません",
     "microphoneUnavailableBody": "現在マイクを使用できませんでした。アプリにマイクへのアクセス権があることを確認してもう一度お試しいただくか、入力してください。",
@@ -2061,16 +2064,16 @@
     },
     "register": {
       "child": {
-        "growthSubtitle": "Your weekly wins",
+        "growthSubtitle": "あなたの週ごとの成果",
         "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
-        "retentionStrong": "What came back to you this week.",
-        "retentionFading": "Worth a quick refresh.",
-        "retentionWeak": "Worth coming back to."
+        "retentionStrong": "今週思い出したこと。",
+        "retentionFading": "軽く復習する価値あり。",
+        "retentionWeak": "復習する価値あり。"
       },
       "adult": {
-        "retentionStrong": "Still remembered.",
-        "retentionFading": "Getting fuzzy — a quick review will help.",
-        "retentionWeak": "Needs a quick refresh."
+        "retentionStrong": "まだ覚えています。",
+        "retentionFading": "曖昧になってきました — 軽く復習すると良いでしょう。",
+        "retentionWeak": "軽く復習が必要です。"
       }
     },
     "weeklyReport": {
@@ -2139,6 +2142,7 @@
       "pageTitle": "保存済み",
       "viewLabel": "保存した説明を表示",
       "bookmarkLabel": "{{subject}}から保存したブックマーク",
+      "bookmarkLabelNoSubject": "保存したブックマーク",
       "removeBookmark": "ブックマークを削除",
       "tapToExpand": "タップして展開",
       "deleteTitle": "ブックマークを削除しますか？",
@@ -2185,6 +2189,9 @@
       "wordsProgress": "{{mastered}}/{{target}}語",
       "phrasesProgress": "{{mastered}}/{{target}}フレーズ",
       "upNext": "次は：{{level}} — {{title}}",
+      "upNextLevelOnly": "次は：{{level}}",
+      "upNextTitleOnly": "次は：{{title}}",
+      "upNextNoDetails": "次へ",
       "milestoneNoData": "セッションを完了して、マイルストーンの進捗の追跡を開始しましょう。",
       "retentionTitle": "現在の定着度",
       "retentionLoadError": "現在、定着度データを読み込めませんでした。",
@@ -2196,14 +2203,15 @@
       "hidingSubject": "科目を非表示にしています...",
       "hideSubjectHint": "この科目をメイン画面から非表示にします。あとでライブラリから復元できます。",
       "hideConfirmTitle": "{{subject}}を非表示にしますか？",
+      "hideConfirmTitleNoSubject": "この科目を非表示にしますか？",
       "hideConfirmMessage": "この科目はメイン画面から移動されます。学習履歴は保存され、あとでライブラリから復元できます。",
       "hideConfirmAction": "科目を非表示",
       "hideErrorTitle": "科目を非表示にできませんでした",
       "goneTitle": "この科目は利用できなくなりました",
       "goneSubtitle": "削除されたか、別の科目に統合された可能性があります。",
       "pastConversations": "過去の会話",
-      "loadingTitle": "Finding your progress...",
-      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
+      "loadingTitle": "進捗を検索中...",
+      "loadingMessage": "この科目のセッション、復習、保存された単語をまとめています。",
       "startedTopicsCount_one": "{{count}}個のトピックを開始",
       "startedTopicsCount_other": "{{count}}個のトピックを開始"
     },
@@ -2221,6 +2229,7 @@
       "emptyMessageMany": "言語科目を練習して、単語リストの作成を始めましょう。",
       "emptyMessageNone": "言語科目を始めると、学んだ単語がここに表示されます。",
       "viewSubjectLabel": "{{subject}}の語彙を表示",
+      "viewSubjectLabelNoSubject": "語彙を表示",
       "viewAllLink": "すべて見る →",
       "wordsSummary": "合計{{total}}語 — {{mastered}}語習得済み",
       "learningAppend": "、{{count}}語学習中"
@@ -2258,19 +2267,19 @@
       }
     },
     "previousReports": {
-      "title": "Previous reports",
-      "subtitle": "Weekly and monthly snapshots from your learning.",
-      "viewAll": "View all reports"
+      "title": "過去のレポート",
+      "subtitle": "学習の週次および月次スナップショット。",
+      "viewAll": "すべてのレポートを見る"
     },
     "latestReport": {
-      "title": "Latest report",
-      "open": "Open report",
+      "title": "最新レポート",
+      "open": "レポートを開く",
       "openWithDate": "Open report for {{date}}",
-      "empty": "Your next weekly or monthly report will appear here once there is enough learning to summarize.",
-      "error": "We couldn't load the latest report right now.",
-      "sessions": "Sessions",
+      "empty": "学習量がまとまるほどになると、次回の週次または月次レポートがここに表示されます。",
+      "error": "現在、最新のレポートを読み込めませんでした。",
+      "sessions": "セッション",
       "time": "Time",
-      "topics": "Topics",
+      "topics": "トピック",
       "words": "Words",
       "practiceLessons_one": "{{count}} practice lesson",
       "practiceLessons_other": "{{count}} practice lessons",
@@ -2279,9 +2288,9 @@
     },
     "recentFocus": {
       "title": "最近のセッション",
-      "showAll": "Show all sessions",
-      "empty": "Recent sessions will appear here once learning gets going.",
-      "error": "We couldn't load recent sessions right now.",
+      "showAll": "すべてのセッションを表示",
+      "empty": "学習が始まると、最近のセッションがここに表示されます。",
+      "error": "現在、最近のセッションを読み込めませんでした。",
       "sessionFallback": "Studied {{date}}"
     },
     "guardian": {
@@ -2293,7 +2302,7 @@
       "nudgeA11y": "{{name}}さんにリマインダーを送信",
       "viewAllReports": "すべてのレポートを表示",
       "subjectsTitle": "科目",
-      "goToChildCurriculum": "Open child curriculum"
+      "goToChildCurriculum": "お子さんのカリキュラムを開く"
     },
     "remediation": {
       "heading": "別のアプローチを試してみよう",
@@ -2400,15 +2409,15 @@
       "redirectBody": "最初からしっくり進められるように、まず代名詞から始めます。"
     },
     "ready": {
-      "title": "You're all set.",
+      "title": "準備が整いました。",
       "introWithLearner": "For {{learner}}:",
-      "intro": "Here's what's set up:",
-      "rowTone": "Your mentor will talk to you the right way",
+      "intro": "設定内容はこちら：",
+      "rowTone": "メンターが適切な方法で話しかけます",
       "rowSubject": "Starting with {{subject}}",
       "rowSubjectNoSubject": "最初のトピックの準備ができました",
-      "rowPace": "Pace stays at your speed — never rushed",
-      "reassurance": "Most learners feel the difference in the first session.",
-      "cta": "Let's start"
+      "rowPace": "ペースはあなたの速度に合わせます — 急かされることはありません",
+      "reassurance": "ほとんどの学習者は最初のセッションで違いを感じます。",
+      "cta": "始めましょう"
     },
     "stepIndicator": {
       "stepOf": "ステップ {{current}}/{{total}}"
@@ -2631,10 +2640,10 @@
       "viewTopicDetails": "{{title}}の詳細を表示",
       "topicsCouldNotLoad": "トピックを読み込めませんでした",
       "retryLoadingTopics": "トピックの読み込みを再試行",
-      "topicsNewLearnerTitle": "No lesson topics yet",
-      "topicsNewLearnerBody": "This can happen after early sessions or free browsing. Recent sessions below still show what happened.",
-      "noTopicsYetTitle": "No lesson topics yet",
-      "noTopicsYetBody": "Sessions may still exist here before the mentor has enough lesson-level progress to show.",
+      "topicsNewLearnerTitle": "まだレッスントピックはありません",
+      "topicsNewLearnerBody": "これは初期のセッション後や自由な閲覧後に発生する可能性があります。以下の最近のセッションには何が起こったかが表示されます。",
+      "noTopicsYetTitle": "まだレッスントピックはありません",
+      "noTopicsYetBody": "メンターが十分なレッスンレベルの進捗状況を示す前に、ここにセッションが存在する場合があります。",
       "description": "This is your child's progress in {{subject}}. Topics appear once sessions connect to a lesson step.",
       "recentSubjectSessions": "Recent {{subject}} sessions",
       "viewSessionFrom": "View session from {{date}}"
@@ -2845,10 +2854,10 @@
     },
     "home": "ホーム",
     "homeLabel": "ホーム",
-    "familyHub": "Family Hub",
-    "familyHubLabel": "Family Hub",
-    "myLearning": "My Learning",
-    "myLearningLabel": "My Learning",
+    "familyHub": "ファミリーハブ",
+    "familyHubLabel": "ファミリーハブ",
+    "myLearning": "マイラーニング",
+    "myLearningLabel": "マイラーニング",
     "library": "ライブラリ",
     "libraryLabel": "ライブラリ",
     "progress": "進捗",
@@ -2880,77 +2889,77 @@
       "unknown": "不明"
     },
     "alerts": {
-      "restoredTitle": "Restored",
-      "restoredBody": "Your subscription has been restored.",
-      "successTitle": "Success",
-      "successBody": "Your subscription is now active!",
-      "purchaseConfirmedTitle": "Purchase confirmed",
-      "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
-      "topUpTitle": "Top-up",
-      "topUpBody": "500 additional credits have been added!"
+      "restoredTitle": "復元済み",
+      "restoredBody": "サブスクリプションが復元されました。",
+      "successTitle": "成功",
+      "successBody": "サブスクリプションが有効になりました！",
+      "purchaseConfirmedTitle": "購入確認済み",
+      "purchaseConfirmedBody": "サブスクリプションが有効化されています。通常1分以内に表示されます — 下に引っ張って更新してください。",
+      "topUpTitle": "チャージ",
+      "topUpBody": "500クレジットが追加されました！"
     },
     "web": {
       "plansOnMobile": "プランはモバイルアプリでご利用いただけます",
       "storePurchaseUnavailable": "このデバイスではストア購入はご利用いただけません。"
     },
     "childPaywall": {
-      "headline": "Nice work so far!",
-      "greatStart": "You've been exploring and learning — great start!",
+      "headline": "ここまでよく頑張りました！",
+      "greatStart": "探求し、学習してきましたね — 素晴らしいスタートです！",
       "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
       "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
-      "usedAllQuestions": "You've used all your free questions. Ask your parent to upgrade so you can keep learning.",
+      "usedAllQuestions": "無料の質問をすべて使い切りました。学習を続けるには、保護者の方にアップグレードをお願いしてください。",
       "quotaUsedAllQuestions": "今使える質問は使い切りました。{{resetAt}}以降にもう一度試すか、もっと使いたいときは保護者に通知できます。",
-      "notifyButton": "Notify My Parent",
-      "notifyButtonNotified": "Parent notified",
-      "notifyButtonAccessibilityNotified": "Parent already notified",
-      "notifyButtonAccessibilityNotify": "Notify my parent",
+      "notifyButton": "保護者に通知",
+      "notifyButtonNotified": "保護者に通知済み",
+      "notifyButtonAccessibilityNotified": "保護者にすでに通知済み",
+      "notifyButtonAccessibilityNotify": "保護者に通知する",
       "cooldownReminder": "You can remind them again in {{label}}.",
-      "notifiedExploreText": "Your parent has been notified! While you wait, you can still explore:",
-      "waitText": "While you wait, you can still browse your Library and see your progress.",
-      "browseLibrary": "Browse Library",
-      "browseLibraryAccessibilityLabel": "Browse Library",
-      "seeProgress": "See your progress",
-      "seeProgressAccessibilityLabel": "See your progress",
-      "goHome": "Go Home",
-      "goHomeAccessibilityLabel": "Go Home",
+      "notifiedExploreText": "保護者の方に通知しました！お待ちの間、引き続き以下を探索できます:",
+      "waitText": "お待ちの間、ライブラリを閲覧したり、進捗状況を確認したりできます。",
+      "browseLibrary": "ライブラリを閲覧",
+      "browseLibraryAccessibilityLabel": "ライブラリを閲覧",
+      "seeProgress": "進捗状況を確認",
+      "seeProgressAccessibilityLabel": "進捗状況を確認",
+      "goHome": "ホームへ",
+      "goHomeAccessibilityLabel": "ホームへ",
       "back": "Back",
-      "backAccessibilityLabel": "Go back",
+      "backAccessibilityLabel": "戻る",
       "alerts": {
         "sentTitle": "Sent!",
-        "sentBody": "We let your parent know!",
-        "askParentTitle": "Ask your parent",
-        "askParentBody": "Ask your parent to open the app and subscribe.",
-        "notifyErrorTitle": "Could not send notification",
-        "notifyErrorBody": "Please check your connection and try again.",
+        "sentBody": "保護者の方にお知らせしました！",
+        "askParentTitle": "保護者の方にお願い",
+        "askParentBody": "保護者の方にアプリを開いてサブスクライブするようお願いしてください。",
+        "notifyErrorTitle": "通知を送信できませんでした",
+        "notifyErrorBody": "接続を確認して、もう一度お試しください。",
         "quotaSentBody": "質問上限に達したことを保護者に知らせました。",
         "quotaAskParentBody": "詳しくは保護者にアプリを開いてもらってください。"
       }
     },
     "restore": {
-      "button": "Restore Purchases",
-      "accessibilityLabel": "Restore purchases",
-      "verifying": "Verifying purchase...",
-      "restoring": "Restoring...",
-      "failedTitle": "Restore failed",
-      "failedBody": "Could not restore purchases. Please try again.",
-      "notFoundTitle": "No subscriptions found",
-      "notFoundBody": "We could not find any previous purchases to restore.",
-      "cancelledTitle": "Restore cancelled",
-      "cancelledBody": "Restore will continue in background.",
-      "cancelAccessibilityLabel": "Cancel restore"
+      "button": "購入を復元",
+      "accessibilityLabel": "購入を復元",
+      "verifying": "購入を確認中...",
+      "restoring": "復元中...",
+      "failedTitle": "復元に失敗しました",
+      "failedBody": "購入を復元できませんでした。もう一度お試しください。",
+      "notFoundTitle": "サブスクリプションが見つかりません",
+      "notFoundBody": "復元する以前の購入が見つかりませんでした。",
+      "cancelledTitle": "復元がキャンセルされました",
+      "cancelledBody": "復元はバックグラウンドで続行されます。",
+      "cancelAccessibilityLabel": "復元をキャンセル"
     },
     "byokWaitlist": {
-      "heading": "Bring your own key",
-      "body": "Use your own API key to unlock unlimited questions. Join the waitlist to be notified when available. We'll use your account email.",
-      "joinButton": "Join Waitlist",
-      "alreadyJoinedButton": "Already joined",
-      "joinAccessibilityLabel": "Join BYOK waitlist",
-      "alreadyJoinedAccessibilityLabel": "Already joined BYOK waitlist",
+      "heading": "独自のキーを使用",
+      "body": "独自のAPIキーを使用して、無制限の質問をアンロックしましょう。利用可能になった際に通知を受け取るには、ウェイティングリストに参加してください。アカウントのメールアドレスを使用します。",
+      "joinButton": "ウェイティングリストに参加",
+      "alreadyJoinedButton": "参加済み",
+      "joinAccessibilityLabel": "BYOKウェイティングリストに参加",
+      "alreadyJoinedAccessibilityLabel": "BYOKウェイティングリストにすでに参加済み",
       "alerts": {
-        "successTitle": "Waitlist",
-        "successBody": "You have been added to the BYOK waitlist.",
+        "successTitle": "ウェイティングリスト",
+        "successBody": "BYOKウェイティングリストに追加されました。",
         "errorTitle": "Error",
-        "errorBody": "Could not join waitlist. Try again."
+        "errorBody": "ウェイティングリストに参加できませんでした。もう一度お試しください。"
       }
     },
     "loadError": {
@@ -3227,25 +3236,28 @@
     "errorMessage": "しばらくしてからもう一度お試しください。",
     "summaryPending": "このセッションのふりかえりは現在準備中です。",
     "openRecapLabel": "{{child}}さんの{{title}}のふりかえりを開く",
-    "detailHeading": "Session recap",
-    "backLabel": "Back to recaps",
-    "detailLoadError": "We could not load this recap",
-    "detailLoadErrorMessage": "Try again, or head back to the recaps list.",
-    "notFoundTitle": "Recap not found",
-    "notFoundMessage": "This recap is no longer available.",
+    "openRecapLabelNoChild": "{{title}}のふりかえりを開く",
+    "openRecapLabelNoTitle": "{{child}}さんのふりかえりを開く",
+    "openRecapLabelNoDetails": "ふりかえりを開く",
+    "detailHeading": "セッションのまとめ",
+    "backLabel": "まとめに戻る",
+    "detailLoadError": "このまとめを読み込めませんでした",
+    "detailLoadErrorMessage": "もう一度お試しいただくか、まとめリストに戻ってください。",
+    "notFoundTitle": "まとめが見つかりません",
+    "notFoundMessage": "このまとめは利用できません。",
     "exchangesCount": "{{count}} exchanges",
-    "whatHappened": "What happened",
-    "detailPending": "This recap is still being prepared.",
-    "tryAsking": "Try asking",
-    "openChildSession": "Open child session",
-    "emptyCtaStartSession": "Start a session"
+    "whatHappened": "何が起こったか",
+    "detailPending": "このまとめはまだ準備中です。",
+    "tryAsking": "質問してみる",
+    "openChildSession": "子どものセッションを開く",
+    "emptyCtaStartSession": "セッションを開始する"
   },
   "addToMyLearning": {
-    "tip": "Save a copy of this topic into your own Library without changing your child's learning.",
-    "dismissTip": "Got it",
-    "dismiss": "Dismiss",
-    "buttonLabel": "Add to my learning",
-    "privacyNote": "Private to your learning"
+    "tip": "お子様の学習内容を変更せずに、このトピックのコピーを自分のライブラリに保存します。",
+    "dismissTip": "了解",
+    "dismiss": "閉じる",
+    "buttonLabel": "自分の学習に追加",
+    "privacyNote": "あなたの学習専用"
   },
   "learnerHomeTimeout": {
     "loading": "もうすぐです — もう少しお待ちください...",
@@ -3393,7 +3405,7 @@
   },
   "changeEmail": {
     "description": "ログイン用メールを切り替える前にコードを送信します。",
-    "emailPlaceholder": "new@example.com",
+    "emailPlaceholder": "new-mail@example.com",
     "sendCodeLabel": "メールコードを送信",
     "sendingCode": "送信中...",
     "sendCodeButton": "コードを送信",
@@ -3454,7 +3466,7 @@
   },
   "welcomeIntro": {
     "chooser": {
-      "question": "What brings you here?",
+      "question": "ここに来た目的は？",
       "learnerCta": "メンターと学ぶ",
       "learnerHint": "低価格であなただけの専属メンターを。",
       "parentCta": "宿題での親子ゲンカはもうおしまい",
@@ -3462,103 +3474,103 @@
     },
     "learner": {
       "card1": {
-        "headline": "A mentor you can talk to",
-        "supporting": "Ask where you are stuck. Get help that adapts to how you learn."
+        "headline": "話せるメンター",
+        "supporting": "行き詰まったら質問。学習方法に合わせたサポート。"
       },
       "card2": {
-        "headline": "Remembers you, picks up where you left off",
-        "supporting": "Subjects, notes, and pace stay together so you can come back smoothly."
+        "headline": "あなたを記憶し、中断したところから再開",
+        "supporting": "科目、メモ、ペースが保持され、スムーズに戻れます。"
       },
       "card3": {
-        "headline": "Built for real learning",
-        "supporting": "Clear explanations, guided questions, and practice that sticks."
+        "headline": "真の学習のために構築",
+        "supporting": "明確な説明、誘導的な質問、定着する練習。"
       }
     },
     "parent": {
       "card1": {
-        "headline": "A personal mentor for your child",
-        "supporting": "Guides the method and checks their work, without handing over answers to copy."
+        "headline": "お子様のためのパーソナルメンター",
+        "supporting": "方法を指導し、答えを渡さずに課題をチェック。"
       },
       "card2": {
-        "headline": "Stay in the loop, step in when it matters",
-        "supporting": "See progress and step in when your child actually needs you."
+        "headline": "状況を把握し、必要な時に介入",
+        "supporting": "進捗を確認し、お子様が本当に必要とするときに介入。"
       },
       "card3": {
-        "headline": "No more homework battles",
-        "supporting": "Turn nightly fights into calmer, more useful study time."
+        "headline": "宿題のバトルはもう終わり",
+        "supporting": "毎晩の争いを、より穏やかで有益な学習時間に変えましょう。"
       }
     },
     "scene": {
       "learner": {
         "card1": {
-          "learner": "I do not get this yet.",
-          "mentor": "Let's slow it down. What part feels confusing?"
+          "learner": "まだ理解できません。",
+          "mentor": "ゆっくり進めましょう。どの部分が分かりにくいですか？"
         },
         "card2": {
           "subjects": {
             "math": "Math",
-            "history": "History",
-            "spanish": "Spanish"
+            "history": "歴史",
+            "spanish": "スペイン語"
           },
           "resume": {
-            "label": "Last time",
-            "body": "You wrapped up Cells & DNA basics"
+            "label": "前回",
+            "body": "細胞とDNAの基礎を終えました"
           }
         },
         "card3": {
           "chips": {
-            "explain": "Clear explanation",
-            "think": "Think it through",
-            "practice": "Practice in context",
-            "remember": "Remember it later"
+            "explain": "明確な説明",
+            "think": "じっくり考える",
+            "practice": "文脈で練習",
+            "remember": "後で覚える"
           }
         }
       },
       "parent": {
         "card1": {
-          "child": "I'm stuck on question 3.",
-          "mentor": "Let's start with what you've tried. Walk me through step one."
+          "child": "質問3で詰まっています。",
+          "mentor": "試したことから始めましょう。ステップ1を説明してください。"
         },
         "card2": {
           "thisWeek": {
-            "label": "This week",
-            "body": "4 sessions, 2 subjects"
+            "label": "今週",
+            "body": "4セッション、2科目"
           },
           "strong": {
-            "label": "Going well",
-            "body": "Fractions are clicking"
+            "label": "順調",
+            "body": "分数が理解できた"
           },
           "review": {
-            "label": "Could use you",
-            "body": "Long division — stuck twice"
+            "label": "助けが必要",
+            "body": "長除法 — 2回詰まった"
           }
         },
         "card3": {
           "chips": {
-            "evenings": "Calmer evenings",
-            "nagging": "Less nagging",
-            "quality": "Quality time"
+            "evenings": "穏やかな夜",
+            "nagging": "小言が減る",
+            "quality": "質の高い時間"
           }
         }
       }
     },
     "sceneFrame": {
-      "brandLabel": "MentoMate"
+      "brandLabel": "MentoMateアプリ"
     },
     "bridge": {
-      "headline": "Turn \"I don't get it\" into \"I've got this.\"",
-      "supporting": "Create a free account so your mentor can remember your subjects, notes, and progress.",
-      "primaryCta": "Create free account",
-      "secondaryCta": "I already have an account"
+      "headline": "「分からない」を「分かった！」に変える。",
+      "supporting": "メンターがあなたの科目、メモ、進捗を記憶できるよう、無料アカウントを作成してください。",
+      "primaryCta": "無料アカウントを作成",
+      "secondaryCta": "すでにアカウントをお持ちの方"
     },
     "next": "Next",
-    "letsStart": "Let's start",
+    "letsStart": "始めましょう",
     "a11y": {
-      "previous": "Previous card",
-      "next": "Next card",
+      "previous": "前のカード",
+      "next": "次のカード",
       "dots": "Page {{current}} of {{total}}",
-      "bridgePrimary": "Create a free account",
-      "bridgeSecondary": "Sign in to an existing account"
+      "bridgePrimary": "無料アカウントを作成",
+      "bridgeSecondary": "既存のアカウントにサインイン"
     }
   },
   "proxy": {

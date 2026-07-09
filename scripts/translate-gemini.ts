@@ -30,9 +30,23 @@ const SOURCE_BASELINE_PATH = path.resolve(
 const MAX_CONCURRENCY = 3;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 4000, 16000];
+const DEFAULT_TRANSLATION_KEYS_PER_REQUEST = 80;
 
 const GEMINI_MODEL = process.env.TRANSLATE_GEMINI_MODEL ?? 'gemini-2.5-pro';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+const MAX_TRANSLATION_KEYS_PER_REQUEST = parsePositiveInteger(
+  process.env.TRANSLATE_GEMINI_KEY_BATCH_SIZE,
+  DEFAULT_TRANSLATION_KEYS_PER_REQUEST,
+);
+
+export function parsePositiveInteger(
+  value: string | undefined,
+  fallback: number,
+): number {
+  if (!value || !/^\d+$/.test(value.trim())) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 function flattenKeys(obj: NestedStrings, prefix = ''): Record<string, string> {
   const result: Record<string, string> = {};
@@ -70,6 +84,48 @@ function pickSourceKeys(
     if (key in sourceFlat) picked[key] = sourceFlat[key];
   }
   return unflattenKeys(picked);
+}
+
+export function chunkSourceForTranslation(
+  source: NestedStrings,
+  maxKeysPerChunk = MAX_TRANSLATION_KEYS_PER_REQUEST,
+): NestedStrings[] {
+  if (maxKeysPerChunk <= 0) {
+    throw new Error('maxKeysPerChunk must be positive');
+  }
+
+  const sourceFlat = flattenKeys(source);
+  const keys = Object.keys(sourceFlat);
+  const chunks: NestedStrings[] = [];
+  for (let i = 0; i < keys.length; i += maxKeysPerChunk) {
+    chunks.push(pickSourceKeys(source, keys.slice(i, i + maxKeysPerChunk)));
+  }
+  return chunks;
+}
+
+export function filterTranslatedFlatToSourceKeys(
+  translatedFlat: Record<string, string>,
+  sourceFlat: Record<string, string>,
+): Record<string, string> {
+  const filtered: Record<string, string> = {};
+  for (const key of Object.keys(sourceFlat)) {
+    if (key in translatedFlat) {
+      filtered[key] = translatedFlat[key];
+    }
+  }
+  return filtered;
+}
+
+export function filterTranslatedToSourceKeys(
+  translated: NestedStrings,
+  source: NestedStrings,
+): NestedStrings {
+  return unflattenKeys(
+    filterTranslatedFlatToSourceKeys(
+      flattenKeys(translated),
+      flattenKeys(source),
+    ),
+  );
 }
 
 export function hashSourceString(value: string): string {
@@ -489,6 +545,54 @@ async function translateWithRetry(
   );
 }
 
+async function translateNestedWithRetry(
+  apiKey: string,
+  systemPrompt: string,
+  source: NestedStrings,
+  lang: string,
+): Promise<NestedStrings> {
+  const chunks = chunkSourceForTranslation(source);
+  if (chunks.length === 1) {
+    return filterTranslatedToSourceKeys(
+      JSON.parse(
+        await translateWithRetry(
+          apiKey,
+          systemPrompt,
+          JSON.stringify(source, null, 2),
+          lang,
+        ),
+      ) as NestedStrings,
+      source,
+    );
+  }
+
+  const translatedFlat: Record<string, string> = {};
+  for (let index = 0; index < chunks.length; index++) {
+    const chunk = chunks[index];
+    console.log(
+      `[${lang}] Translating chunk ${index + 1}/${chunks.length} (${
+        Object.keys(flattenKeys(chunk)).length
+      } keys)`,
+    );
+    const translatedChunk = JSON.parse(
+      await translateWithRetry(
+        apiKey,
+        systemPrompt,
+        JSON.stringify(chunk, null, 2),
+        lang,
+      ),
+    ) as NestedStrings;
+    Object.assign(
+      translatedFlat,
+      filterTranslatedFlatToSourceKeys(
+        flattenKeys(translatedChunk),
+        flattenKeys(chunk),
+      ),
+    );
+  }
+  return unflattenKeys(translatedFlat);
+}
+
 interface CliOptions {
   lang?: string;
   full?: boolean;
@@ -654,7 +758,6 @@ async function main(): Promise<void> {
       }
 
       const systemPrompt = buildSystemPrompt(lang, glossary);
-      const sourceJson = JSON.stringify(toTranslate, null, 2);
 
       if (opts.dryRun) {
         console.log(
@@ -666,13 +769,12 @@ async function main(): Promise<void> {
         return;
       }
 
-      const translatedJson = await translateWithRetry(
+      let translated = await translateNestedWithRetry(
         apiKey,
         systemPrompt,
-        sourceJson,
+        toTranslate,
         lang,
       );
-      let translated: NestedStrings = JSON.parse(translatedJson);
 
       if (previousFlat) {
         const merged = mergeTranslatedIntoPrevious(

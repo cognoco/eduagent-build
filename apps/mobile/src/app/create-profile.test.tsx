@@ -8,7 +8,7 @@ import {
 import React from 'react';
 import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import {
   __resetMentorBornCeremonyForTests,
   getMentorBornCeremonySnapshot,

@@ -11,7 +11,8 @@ import {
   ActivityIndicator,
   AppState,
 } from 'react-native';
-import { useSignIn, useSSO, useClerk } from '@clerk/clerk-expo';
+import { useSSO, useClerk } from '@clerk/expo';
+import { useSignIn } from '@clerk/expo/legacy';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Trans, useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';

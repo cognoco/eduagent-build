@@ -10,7 +10,11 @@ import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import type { Bookmark } from '@eduagent/schemas';
-import { ThemedMarkdown } from '../../../components/common';
+import {
+  ErrorFallback,
+  ThemedMarkdown,
+  TimeoutLoader,
+} from '../../../components/common';
 import { useBookmarks, useDeleteBookmark } from '../../../hooks/use-bookmarks';
 import { platformAlert } from '../../../lib/platform-alert';
 import { formatApiError } from '../../../lib/format-api-error';
@@ -30,15 +34,18 @@ function BookmarkRow({
   const { t } = useTranslation();
   const relativeDate = useRelativeDate();
   const [expanded, setExpanded] = useState(false);
+  const subjectName = bookmark.subjectName.trim();
 
   return (
     <Pressable
       onPress={() => setExpanded((prev) => !prev)}
       className="bg-surface rounded-card p-4 mb-3"
       accessibilityRole="button"
-      accessibilityLabel={t('progress.saved.bookmarkLabel', {
-        subject: bookmark.subjectName,
-      })}
+      accessibilityLabel={
+        subjectName
+          ? t('progress.saved.bookmarkLabel', { subject: subjectName })
+          : t('progress.saved.bookmarkLabelNoSubject')
+      }
       testID={`bookmark-row-${bookmark.id}`}
     >
       <View className="flex-row items-start justify-between">
@@ -187,51 +194,45 @@ export default function SavedBookmarksScreen() {
         onEndReachedThreshold={0.4}
         ListEmptyComponent={
           bookmarksQuery.isLoading ? (
-            <View
-              className="items-center justify-center py-14 px-6"
-              testID="saved-loading"
-            >
-              <ActivityIndicator accessibilityLabel={t('common.loading')} />
+            <View className="py-14 px-6">
+              <TimeoutLoader
+                isLoading
+                testID="saved-loading"
+                loadingLabel={t('common.loading')}
+                title={t('progress.saved.errorLoad')}
+                message={t('errors.generic')}
+                primaryAction={{
+                  label: t('common.tryAgain'),
+                  onPress: () => void bookmarksQuery.refetch(),
+                  testID: 'saved-timeout-retry',
+                }}
+                secondaryAction={{
+                  label: t('common.goBack'),
+                  onPress: () =>
+                    goBackOrReplace(router, '/(app)/progress' as const),
+                  testID: 'saved-timeout-back',
+                }}
+              />
             </View>
           ) : bookmarksQuery.isError ? (
-            <View
-              className="items-center justify-center py-14 px-6"
-              testID="saved-error"
-            >
-              <Ionicons
-                name="alert-circle-outline"
-                size={48}
-                className="text-text-tertiary mb-4"
+            <View className="py-14 px-6">
+              <ErrorFallback
+                variant="card"
+                title={t('progress.saved.errorLoad')}
+                message={formatApiError(bookmarksQuery.error)}
+                primaryAction={{
+                  label: t('progress.saved.retryLabel'),
+                  onPress: () => void bookmarksQuery.refetch(),
+                  testID: 'saved-retry',
+                }}
+                secondaryAction={{
+                  label: t('common.goBack'),
+                  onPress: () =>
+                    goBackOrReplace(router, '/(app)/progress' as const),
+                  testID: 'saved-error-back',
+                }}
+                testID="saved-error"
               />
-              <Text className="text-body text-text-primary text-center mb-2">
-                {t('progress.saved.errorLoad')}
-              </Text>
-              <Text className="text-body-sm text-text-secondary text-center mb-4">
-                {formatApiError(bookmarksQuery.error)}
-              </Text>
-              <Pressable
-                onPress={() => void bookmarksQuery.refetch()}
-                className="bg-primary rounded-card px-5 py-3 mb-3"
-                accessibilityRole="button"
-                accessibilityLabel={t('progress.saved.retryLabel')}
-                testID="saved-retry"
-              >
-                <Text className="text-body font-semibold text-on-primary">
-                  {t('common.tryAgain')}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() =>
-                  goBackOrReplace(router, '/(app)/progress' as const)
-                }
-                accessibilityRole="button"
-                accessibilityLabel={t('common.goBack')}
-                testID="saved-error-back"
-              >
-                <Text className="text-body-sm text-primary">
-                  {t('common.goBack')}
-                </Text>
-              </Pressable>
             </View>
           ) : (
             <View className="items-center justify-center py-14 px-6">

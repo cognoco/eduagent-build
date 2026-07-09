@@ -18,7 +18,7 @@ import {
 const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
 }));
 
@@ -414,8 +414,9 @@ describe('useDictationHistory', () => {
         sentences: ['The cat sat.'],
       }),
     ]);
-    expect(queryClient.getQueryData(['dictation-history', 'test-profile-id']))
-      .toEqual(result.current.data);
+    expect(
+      queryClient.getQueryData(['dictation-history', 'test-profile-id']),
+    ).toEqual(result.current.data);
 
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toContain('/dictation/history');

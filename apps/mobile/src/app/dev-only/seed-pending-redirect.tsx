@@ -28,7 +28,7 @@
  * outside the allowlist falls back to the safe default `/(app)/home`.
  */
 
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';

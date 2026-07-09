@@ -15,7 +15,7 @@ import { createTestProfile } from '../test-utils/app-hook-test-utils';
 const mockReplace = jest.fn();
 const mockUpdateAppContextMutate = jest.fn();
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('mock-token') }),
 }));
 

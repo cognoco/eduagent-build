@@ -15,8 +15,8 @@
 //   react-native-reanimated         native-boundary
 //   react-native-svg                native-boundary
 //   react-native-purchases          external-boundary
-//   @clerk/clerk-expo               external-boundary
-//   @clerk/clerk-expo/token-cache   external-boundary
+//   @clerk/expo               external-boundary
+//   @clerk/expo/token-cache   external-boundary
 //   expo-web-browser                native-boundary
 //   expo-linking                    native-boundary
 //   expo-clipboard                  native-boundary

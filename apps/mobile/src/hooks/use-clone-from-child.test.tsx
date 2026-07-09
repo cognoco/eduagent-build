@@ -20,7 +20,7 @@ const mockRandomUUID = jest.fn();
 const mockTrack = jest.fn();
 const mockHashProfileId = jest.fn((profileId: string) => `hash:${profileId}`);
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ getToken: jest.fn(async () => 'test-token') }),
 }));
 

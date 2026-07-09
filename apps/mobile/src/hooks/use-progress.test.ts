@@ -88,6 +88,27 @@ function createWrapper() {
   return w.wrapper;
 }
 
+function createFamilyOwnerWrapper() {
+  const ownerProfile = createTestProfile({
+    id: 'owner-profile-id',
+    isOwner: true,
+    birthYear: 1985,
+    hasFamilyLinks: true,
+    defaultAppContext: 'family',
+  });
+  const childProfile = createTestProfile({
+    id: 'child-profile-id',
+    isOwner: false,
+    accountId: ownerProfile.accountId,
+  });
+  const w = createHookWrapper({
+    activeProfile: ownerProfile,
+    profiles: [ownerProfile, childProfile],
+  });
+  queryClient = w.queryClient;
+  return w.wrapper;
+}
+
 describe('useSubjectProgress', () => {
   it('fetches subject progress from API', async () => {
     mockFetch.mockResolvedValueOnce(
@@ -469,14 +490,10 @@ describe('useProfileWeeklyReports', () => {
       }),
     );
 
-    const ownerProfile = createTestProfile({
-      id: 'owner-profile-id',
-      isOwner: true,
-    });
     const { result } = renderHook(
       () => useProfileWeeklyReports('child-profile-id'),
       {
-        wrapper: createHookWrapper({ activeProfile: ownerProfile }).wrapper,
+        wrapper: createFamilyOwnerWrapper(),
       },
     );
 
@@ -516,14 +533,10 @@ describe('useChildWeeklyReports — silent-403 escalation [CR-2026-05-19-H27]', 
       ),
     );
 
-    const ownerProfile = createTestProfile({
-      id: 'owner-profile-id',
-      isOwner: true,
-    });
     const { result } = renderHook(
       () => useChildWeeklyReports('child-profile-id'),
       {
-        wrapper: createHookWrapper({ activeProfile: ownerProfile }).wrapper,
+        wrapper: createFamilyOwnerWrapper(),
       },
     );
 

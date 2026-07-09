@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, Redirect } from 'expo-router';
-import { useUser, useAuth } from '@clerk/clerk-expo';
+import { useUser, useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';

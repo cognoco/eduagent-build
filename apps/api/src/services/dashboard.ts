@@ -74,6 +74,7 @@ import {
 } from './learner-profile';
 import { assertParentAccess } from './family-access';
 import {
+  familyV2ChildReadProof,
   getChildGdprConsentStatusV2,
   getChildPersonIdsForParentV2,
   getChildrenGdprConsentStatusesV2,
@@ -302,7 +303,14 @@ async function getLatestConsentStatus(
 ): Promise<ConsentStatus | null> {
   // [WI-586] v2 path: resolve GDPR consent from the canonical consent graph
   // (consent_grant via the child's org).
-  const row = await getChildGdprConsentStatusV2(db, childProfileId);
+  const row = await getChildGdprConsentStatusV2(
+    db,
+    childProfileId,
+    familyV2ChildReadProof({
+      kind: 'internal-consent-gate',
+      caller: 'dashboard.getLatestConsentStatus',
+    }),
+  );
   return row?.status ?? null;
 }
 
@@ -872,6 +880,11 @@ export async function getChildrenForParent(
       db,
       guardianOrgId,
       childProfileIds,
+      familyV2ChildReadProof({
+        kind: 'guardian-child-enumeration',
+        guardianPersonId: parentProfileId,
+        chargePersonIds: childProfileIds,
+      }),
     );
     for (const [childId, { status, withdrawnAt }] of v2Statuses) {
       consentByProfile.set(childId, { status, respondedAt: withdrawnAt });
@@ -1084,6 +1097,11 @@ export async function getChildDetail(
   // returning null. A null return here now means "parent has access but
   // the child was not present in the dashboard list" — a genuine not-found.
   await assertParentAccess(db, parentProfileId, childProfileId); // 1 query
+  const childReadProof = familyV2ChildReadProof({
+    kind: 'guardian-edge',
+    guardianPersonId: parentProfileId,
+    chargePersonId: childProfileId,
+  });
 
   // Step 1: Get the child's profile — 1 query
   // [WI-586] v2 path: read from person table; resolve consent via v2 resolver.
@@ -1100,7 +1118,11 @@ export async function getChildDetail(
   // resolves the child's org internally and pins lawful_basis = GDPR.
   // [WI-826] withdrawnAt is now surfaced from the consent grant so the
   // WithdrawalCountdownBanner renders on the per-child detail path too.
-  const v2ConsentRow = await getChildGdprConsentStatusV2(db, childProfileId);
+  const v2ConsentRow = await getChildGdprConsentStatusV2(
+    db,
+    childProfileId,
+    childReadProof,
+  );
   const consentStatus = v2ConsentRow?.status ?? null;
   const consentRespondedAt = v2ConsentRow?.withdrawnAt?.toISOString() ?? null;
 

@@ -32,7 +32,7 @@ jest.mock('expo-router', () => ({
 
 jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicons');
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ signOut: mockClerkSignOut, userId: 'user-1' }),
 }));
 

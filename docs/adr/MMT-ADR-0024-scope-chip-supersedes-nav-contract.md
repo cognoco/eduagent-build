@@ -1,8 +1,8 @@
 # MMT-ADR-0024 — Relationship scope chip supersedes mode/proxy tab-shape navigation
 
-**Status:** Proposed · 2026-06-20 · **Scope:** Mobile app shell navigation and relationship-lens data access · **Deciders:** Architecture sign-off pending · **Builds on:** MMT-ADR-0000 (decisions layer), MMT-ADR-0007 (Person identity model), MMT-ADR-0008 (guardianship operation is distinct from everyday visibility)
+**Status:** Proposed · 2026-06-20 (re-affirmed Proposed 2026-06-30) · **Scope:** Mobile app shell navigation and relationship-lens data access · **Builds on:** MMT-ADR-0000 (decisions layer), MMT-ADR-0007 (Person identity model), MMT-ADR-0008 (guardianship operation is distinct from everyday visibility)
 
-> **Re-vet 2026-06-30:** **DEMOTE FROM CANON / KEEP PROPOSED.** This file has no human Architecture sign-off and therefore does not promote any rule into `architecture.md`. The corresponding proposed section was removed from `architecture.md`; if the scope-chip model is accepted later, the acceptance change-set must amend canon in lockstep.
+> **A Proposed ADR promotes no rule into canon.** This decision is not in force: nothing here is binding on `architecture.md` or on implementation until an acceptance change-set lands, and that change-set must amend canon in lockstep. (A section describing this model was once added to `architecture.md` prematurely and has been removed.)
 
 ## Context
 

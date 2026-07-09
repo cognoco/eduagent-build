@@ -220,7 +220,7 @@ const mockFetch = (global as { __sessionTestMockFetch?: RoutedMockFetch })
 // through once they run for real. (react-i18next is left to the global init in
 // test-setup.ts — no per-file mock, matching the prior behavior of this suite.)
 jest.mock(
-  '@clerk/clerk-expo' /* gc1-allow: external auth provider — getToken is a network/native call */,
+  '@clerk/expo' /* gc1-allow: external auth provider — getToken is a network/native call */,
   () => ({
     useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
   }),

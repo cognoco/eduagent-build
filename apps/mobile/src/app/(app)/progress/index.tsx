@@ -28,7 +28,7 @@ import {
 } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ErrorFallback } from '../../../components/common';
+import { ErrorFallback, TimeoutLoader } from '../../../components/common';
 import { NudgeActionSheet } from '../../../components/nudge/NudgeActionSheet';
 import {
   RecentSessionsList,
@@ -315,15 +315,6 @@ export default function ProgressScreen(): React.ReactElement {
   // a clean slate, which is indistinguishable from an offline/500 error.
   const isError = inventoryQuery.isError;
 
-  const [loadTimedOut, setLoadTimedOut] = useState(false);
-  useEffect(() => {
-    if (!isLoading) {
-      setLoadTimedOut(false);
-      return;
-    }
-    const timer = setTimeout(() => setLoadTimedOut(true), 15_000);
-    return () => clearTimeout(timer);
-  }, [isLoading]);
   const isEmpty =
     !!inventory &&
     inventory.global.totalSessions === 0 &&
@@ -512,25 +503,24 @@ export default function ProgressScreen(): React.ReactElement {
         ) : null}
 
         {isLoading ? (
-          loadTimedOut ? (
-            <ErrorFallback
-              title={t('progress.error.loadTitle')}
-              message={t('progress.error.loadMessageNetwork')}
-              primaryAction={{
-                label: t('common.tryAgain'),
-                onPress: () => void inventoryQuery.refetch(),
-                testID: 'progress-loading-retry',
-              }}
-              secondaryAction={{
-                label: t('progress.error.goHome'),
-                onPress: () => router.push('/(app)/home' as Href),
-                testID: 'progress-loading-home',
-              }}
-              testID="progress-loading-timeout"
-            />
-          ) : (
-            <ProgressLoadingBlock />
-          )
+          <TimeoutLoader
+            isLoading
+            variant="card"
+            title={t('progress.error.loadTitle')}
+            message={t('progress.error.loadMessageNetwork')}
+            primaryAction={{
+              label: t('common.tryAgain'),
+              onPress: () => void inventoryQuery.refetch(),
+              testID: 'progress-loading-retry',
+            }}
+            secondaryAction={{
+              label: t('progress.error.goHome'),
+              onPress: () => router.push('/(app)/home' as Href),
+              testID: 'progress-loading-home',
+            }}
+            fallbackTestID="progress-loading-timeout"
+            loadingFallback={<ProgressLoadingBlock />}
+          />
         ) : isError && !inventory ? (
           <ErrorFallback
             title={t('progress.error.loadTitle')}

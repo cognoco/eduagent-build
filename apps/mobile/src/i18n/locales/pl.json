@@ -209,7 +209,7 @@
       "continueWithGoogle": "Kontynuuj z Google",
       "continueWithApple": "Kontynuuj z Apple",
       "continueWithOpenAI": "Kontynuuj z OpenAI",
-      "emailPlaceholder": "you@example.com",
+      "emailPlaceholder": "email@example.com",
       "passwordPlaceholder": "Utwórz hasło",
       "signUpButton": "Zarejestruj się",
       "signInButton": "Zaloguj się"
@@ -304,9 +304,9 @@
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
-      "consentArchivedBody": "Data is retained for 30 days, then deleted.",
+      "consentArchivedBody": "Dane są przechowywane przez 30 dni, a następnie usuwane.",
       "consentDeletedTitle": "{{name}}'s account was deleted",
-      "consentDeletedBody": "The withdrawal grace period has ended."
+      "consentDeletedBody": "Okres karencji na wycofanie zgody zakończył się."
     },
     "parent": {
       "greeting": "Cześć {{displayName}}",
@@ -340,10 +340,10 @@
         "promptRestartWithTopic": "Chcecie wybrać jeden mały cel z {{topic}} na ten tydzień?",
         "promptRestartEasierWithTopic": "Czy mamy ułatwić powrót do {{topic}}?"
       },
-      "childrenHeader": "Children",
+      "childrenHeader": "Dzieci",
       "familyManagementHeader": "Zarządzanie rodziną",
       "childCard": {
-        "statusPending": "Checking in",
+        "statusPending": "Sprawdzanie",
         "reportsAction": "Raporty",
         "nudgeAction": "Nudge",
         "learnTogetherAction": "Uczcie się razem"
@@ -394,8 +394,8 @@
       "greetingFallbackName": "Cześć",
       "greetingNoName": "Cześć!"
     },
-    "goToProgress": "Go to Progress",
-    "goToProgressLabel": "Go to Progress",
+    "goToProgress": "Przejdź do postępów",
+    "goToProgressLabel": "Przejdź do postępów",
     "coachBand": {
       "estimatedMinutes": "{{minutes}} min",
       "a11yDismiss": "Odrzuć rekomendację",
@@ -467,12 +467,12 @@
     "withdrawal": {
       "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
       "bannerTitleMulti": "{{count}} accounts closing soon",
-      "bannerCta": "Reverse",
+      "bannerCta": "Cofnij",
       "bannerCtaShort": "Undo",
       "daysOne": "day",
       "daysOther": "days",
-      "restoreErrorTitle": "Couldn't reverse withdrawal",
-      "restoreErrorBody": "Try again in a moment.",
+      "restoreErrorTitle": "Nie udało się cofnąć wycofania",
+      "restoreErrorBody": "Spróbuj ponownie za chwilę.",
       "restoreSuccessToast": "Withdrawal reversed for {{name}}"
     }
   },
@@ -500,7 +500,7 @@
       "addChildAccessLabel": "Dodaj profil dziecka",
       "breakdownSharingTitle": "Udostępnij użycie rodziny",
       "breakdownSharingDescription": "Pokaż użycie profili.",
-      "breakdownSharingError": "Couldn't update setting. Try again."
+      "breakdownSharingError": "Nie udało się zaktualizować ustawienia. Spróbuj ponownie."
     },
     "celebrations": {
       "allTitle": "Wszystkie celebracje",
@@ -563,16 +563,16 @@
       "tryAgainMoment": "Spróbuj ponownie za chwilę.",
       "couldNotSaveSetting": "Nie można zapisać ustawienia"
     },
-    "appVersion": "MentoMate v1.0.0",
+    "appVersion": "MentoMate wersja 1.0.0",
     "privacy": {
-      "withdrawalArchiveTitle": "When I withdraw consent for a child",
-      "withdrawalArchiveAuto": "Automatic",
-      "withdrawalArchiveAutoDescription": "Under-13 accounts are deleted at grace expiry. 13+ accounts are archived for 30 days, then deleted.",
-      "withdrawalArchiveAlways": "Always archive (30 days)",
-      "withdrawalArchiveAlwaysDescription": "13+ accounts only. Under-13 always deletes immediately for privacy compliance.",
-      "withdrawalArchiveNever": "Never archive - delete immediately",
-      "withdrawalArchiveNeverDescription": "Delete at grace expiry instead of keeping a 30-day archive.",
-      "withdrawalArchiveError": "Couldn't update setting. Try again.",
+      "withdrawalArchiveTitle": "Gdy wycofuję zgodę dla dziecka",
+      "withdrawalArchiveAuto": "Automatycznie",
+      "withdrawalArchiveAutoDescription": "Konta poniżej 13 lat są usuwane po wygaśnięciu okresu karencji. Konta 13+ są archiwizowane na 30 dni, a następnie usuwane.",
+      "withdrawalArchiveAlways": "Zawsze archiwizuj (30 dni)",
+      "withdrawalArchiveAlwaysDescription": "Tylko konta 13+. Konta poniżej 13 lat są zawsze usuwane natychmiastowo ze względu na zgodność z prywatnością.",
+      "withdrawalArchiveNever": "Nigdy nie archiwizuj - usuń natychmiast",
+      "withdrawalArchiveNeverDescription": "Usuń po wygaśnięciu okresu karencji zamiast przechowywać 30-dniowe archiwum.",
+      "withdrawalArchiveError": "Nie udało się zaktualizować ustawienia. Ponów.",
       "privacyAndData": "Prywatność i dane"
     },
     "sections": {
@@ -629,7 +629,7 @@
         "pendingOwner": "Zbieranie danych do pamięci nie zostało jeszcze włączone.",
         "pendingChild": "Rodzic lub opiekun musi jeszcze włączyć zbieranie danych do pamięci.",
         "useMemoryLabel": "Użyj tego, co wie mentor",
-        "useMemoryDisabledHint": "Enable memory first, then this can turn on."
+        "useMemoryDisabledHint": "Najpierw włącz pamięć, a potem będzie można to włączyć."
       },
       "consent": {
         "title": "Włącz pamięć mentora",
@@ -692,8 +692,8 @@
         "both": "Oba"
       },
       "examples": {
-        "title": "Examples you can add",
-        "body": "\"I learn best with examples,\" \"I like space analogies,\" or \"Fractions still feel tricky.\""
+        "title": "Przykłady, które możesz dodać",
+        "body": "„Najlepiej uczę się na przykładach”, „Lubię analogie kosmiczne” lub „Ułamki nadal są trudne”."
       }
     },
     "accessories": {
@@ -1071,7 +1071,9 @@
       "bestScore": "Najlepszy: {{score}}/{{total}} · Grano: {{played}}",
       "played": "Grano: {{played}}",
       "vocabBasicsTitle": "Podstawy: {{language}}",
+      "vocabBasicsTitleNoLanguage": "Podstawy słownictwa",
       "vocabPersonalisedTitle": "Słownictwo: {{language}}",
+      "vocabPersonalisedTitleNoLanguage": "Słownictwo",
       "vocabStarterSubtitle": "Zapas słów startowych — zapisz {{threshold}} własnych, aby odblokować spersonalizowane rundy",
       "vocabPlayedSubtitleDefault": "Ćwicz nowe słowa i zwroty",
       "challengeExplainerTitle": "Rundy z wyzwaniem",
@@ -1247,8 +1249,8 @@
       "iHaveATextSubtitle": "Wpisz lub wklej własny tekst",
       "surpriseMe": "Zaskocz mnie",
       "surpriseMeSubtitle": "Ćwicz z nowym dyktandem",
-      "loadingTitle": "Finding your next review...",
-      "loadingMessage": "We're choosing a dictation that should feel useful, not random.",
+      "loadingTitle": "Szukam Twojego następnego przeglądu...",
+      "loadingMessage": "Wybieramy dyktando, które będzie przydatne, a nie losowe.",
       "viewPastDictations": "Poprzednie dyktanda",
       "viewPastDictationsSubtitle": "Zobacz, co udało Ci się poćwiczyć"
     },
@@ -1480,8 +1482,8 @@
       "skip": "Pomiń — i tak zacznij się uczyć",
       "skipAccessibilityLabel": "Pomiń i tak zacznij się uczyć",
       "filingErrorTitle": "Nie można dodać tej książki",
-      "loadingTitle": "Opening your shelf...",
-      "loadingMessage": "We're finding the books and next steps saved for this subject.",
+      "loadingTitle": "Otwieram Twoją półkę...",
+      "loadingMessage": "Szukamy książek i kolejnych kroków zapisanych dla tego przedmiotu.",
       "bookCount_one": "{{count}} książka",
       "bookCount_other": "{{count}} książek",
       "suggestionAdd": "Dodaj do półki",
@@ -2026,6 +2028,7 @@
     "cancelAndGoBackLabel": "Anuluj i wróć",
     "cancelOcrLabel": "Anuluj OCR i zrób ponownie",
     "readingHomework": "Czytanie Twojej pracy domowej z {{subject}}...",
+    "readingHomeworkNoSubject": "Czytanie Twojej pracy domowej...",
     "ocrTimeout": "Czytanie zdjęcia trwa zbyt długo. Sprawdź połączenie i spróbuj ponownie lub wpisz problem ręcznie.",
     "ocrDefaultError": "Nie mogliśmy tego wyraźnie odczytać. Spróbuj zrobić zdjęcie ponownie przy lepszym oświetleniu.",
     "problemsFound": "Oto problemy, które znalazłem:",
@@ -2081,11 +2084,11 @@
       "NO_TEXT": "Nie znaleźliśmy żadnego tekstu na tym zdjęciu. Upewnij się, że praca domowa jest widoczna i dobrze oświetlona.",
       "ML_KIT_UNAVAILABLE": "Odczytywanie zdjęć nie jest dostępne w tej wersji. Szybka aktualizacja aplikacji to naprawia.",
       "CACHE_FAILED": "Mieliśmy problem z przygotowaniem zdjęcia. Spróbuj ponownie lub wpisz zadanie ręcznie.",
-      "NETWORK_ERROR": "We couldn't reach the server. Check your connection and try again.",
-      "AUTH_EXPIRED": "Your session expired. Sign in again to keep going.",
-      "IMAGE_TOO_LARGE": "That photo is too big. Try a smaller crop or retake from further back.",
-      "RATE_LIMITED": "You've reached the photo limit for now. Try again in a minute.",
-      "SERVER_ERROR": "Our servers are taking a moment. Try again in a few seconds."
+      "NETWORK_ERROR": "Nie udało się połączyć z serwerem. Sprawdź połączenie i spróbuj ponownie.",
+      "AUTH_EXPIRED": "Twoja sesja wygasła. Zaloguj się ponownie, aby kontynuować.",
+      "IMAGE_TOO_LARGE": "To zdjęcie jest za duże. Spróbuj przyciąć je lub zrobić z dalszej odległości.",
+      "RATE_LIMITED": "Osiągnięto limit zdjęć. Spróbuj ponownie za minutę.",
+      "SERVER_ERROR": "Nasze serwery potrzebują chwili. Spróbuj ponownie za kilka sekund."
     },
     "microphoneUnavailableTitle": "Mikrofon niedostępny",
     "microphoneUnavailableBody": "Nie mogliśmy teraz użyć mikrofonu. Sprawdź, czy aplikacja ma dostęp do mikrofonu, i spróbuj ponownie lub wpisz tekst.",
@@ -2147,16 +2150,16 @@
     },
     "register": {
       "child": {
-        "growthSubtitle": "Your weekly wins",
+        "growthSubtitle": "Twoje tygodniowe sukcesy",
         "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
-        "retentionStrong": "What came back to you this week.",
-        "retentionFading": "Worth a quick refresh.",
-        "retentionWeak": "Worth coming back to."
+        "retentionStrong": "Co przypomniało Ci się w tym tygodniu.",
+        "retentionFading": "Warto szybko odświeżyć.",
+        "retentionWeak": "Warto do tego wrócić."
       },
       "adult": {
-        "retentionStrong": "Still remembered.",
-        "retentionFading": "Getting fuzzy — a quick review will help.",
-        "retentionWeak": "Needs a quick refresh."
+        "retentionStrong": "Nadal pamiętane.",
+        "retentionFading": "Zaczyna się zacierać — szybka powtórka pomoże.",
+        "retentionWeak": "Wymaga szybkiego odświeżenia."
       }
     },
     "weeklyReport": {
@@ -2254,6 +2257,7 @@
       "pageTitle": "Zapisane",
       "viewLabel": "Zobacz zapisane wyjaśnienia",
       "bookmarkLabel": "Zapisana zakładka z {{subject}}",
+      "bookmarkLabelNoSubject": "Zapisana zakładka",
       "removeBookmark": "Usuń zakładkę",
       "tapToExpand": "Stuknij, aby rozwinąć",
       "deleteTitle": "Usunąć zakładkę?",
@@ -2300,6 +2304,9 @@
       "wordsProgress": "{{mastered}}/{{target}} słów",
       "phrasesProgress": "{{mastered}}/{{target}} fraz",
       "upNext": "Następnie: {{level}} — {{title}}",
+      "upNextLevelOnly": "Następnie: {{level}}",
+      "upNextTitleOnly": "Następnie: {{title}}",
+      "upNextNoDetails": "Następne",
       "milestoneNoData": "Ukończ sesję, aby rozpocząć śledzenie postępów w kamieniach milowych.",
       "retentionTitle": "Aktualne zapamiętanie",
       "retentionLoadError": "Nie mogliśmy teraz załadować danych o zapamiętaniu.",
@@ -2311,14 +2318,15 @@
       "hidingSubject": "Ukrywanie przedmiotu...",
       "hideSubjectHint": "Ukrywa ten przedmiot w głównych widokach. Możesz go później przywrócić z Biblioteki.",
       "hideConfirmTitle": "Ukryć {{subject}}?",
+      "hideConfirmTitleNoSubject": "Ukryć ten przedmiot?",
       "hideConfirmMessage": "To przeniesie przedmiot poza główne widoki. Twoja historia nauki zostanie zachowana, a przedmiot możesz przywrócić z Biblioteki.",
       "hideConfirmAction": "Ukryj przedmiot",
       "hideErrorTitle": "Nie udało się ukryć przedmiotu",
       "goneTitle": "Ten przedmiot nie jest już dostępny",
       "goneSubtitle": "Mógł zostać usunięty lub połączony z innym przedmiotem.",
       "pastConversations": "Poprzednie rozmowy",
-      "loadingTitle": "Finding your progress...",
-      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
+      "loadingTitle": "Wyszukiwanie Twoich postępów...",
+      "loadingMessage": "Zbieramy sesje, powtórki i zapisane słowa dla tego tematu.",
       "topicsExplored_one": "Odkryto {{count}} temat",
       "topicsExplored_few": "Odkryto {{count}} tematy",
       "topicsExplored_many": "Odkryto {{count}} tematów",
@@ -2344,6 +2352,7 @@
       "emptyMessageMany": "Ćwicz przedmiot językowy, aby zacząć budować swoją listę słów.",
       "emptyMessageNone": "Rozpocznij przedmiot językowy, a słowa, których się nauczysz, pojawią się tutaj.",
       "viewSubjectLabel": "Zobacz słownictwo z {{subject}}",
+      "viewSubjectLabelNoSubject": "Zobacz słownictwo",
       "viewAllLink": "Zobacz wszystkie →",
       "wordsSummary": "{{total}} słów — {{mastered}} opanowanych",
       "learningAppend": ", {{count}} w trakcie nauki"
@@ -2389,19 +2398,19 @@
       }
     },
     "previousReports": {
-      "title": "Previous reports",
-      "subtitle": "Weekly and monthly snapshots from your learning.",
-      "viewAll": "View all reports"
+      "title": "Poprzednie raporty",
+      "subtitle": "Tygodniowe i miesięczne migawki z Twojej nauki.",
+      "viewAll": "Zobacz wszystkie raporty"
     },
     "latestReport": {
-      "title": "Latest report",
-      "open": "Open report",
+      "title": "Najnowszy raport",
+      "open": "Otwórz raport",
       "openWithDate": "Open report for {{date}}",
-      "empty": "Your next weekly or monthly report will appear here once there is enough learning to summarize.",
-      "error": "We couldn't load the latest report right now.",
-      "sessions": "Sessions",
+      "empty": "Twój następny raport tygodniowy lub miesięczny pojawi się tutaj, gdy zbierze się wystarczająco dużo danych do podsumowania.",
+      "error": "Nie udało się załadować najnowszego raportu.",
+      "sessions": "Sesje",
       "time": "Time",
-      "topics": "Topics",
+      "topics": "Tematy",
       "words": "Words",
       "practiceLessons_one": "{{count}} practice lesson",
       "practiceLessons_other": "{{count}} practice lessons",
@@ -2414,9 +2423,9 @@
     },
     "recentFocus": {
       "title": "Ostatnie sesje",
-      "showAll": "Show all sessions",
-      "empty": "Recent sessions will appear here once learning gets going.",
-      "error": "We couldn't load recent sessions right now.",
+      "showAll": "Pokaż wszystkie sesje",
+      "empty": "Ostatnie sesje pojawią się tutaj, gdy nauka ruszy.",
+      "error": "Nie udało się załadować ostatnich sesji.",
       "sessionFallback": "Studied {{date}}"
     },
     "guardian": {
@@ -2428,7 +2437,7 @@
       "nudgeA11y": "Wyślij {{name}} zachętę",
       "viewAllReports": "Zobacz wszystkie raporty",
       "subjectsTitle": "Przedmioty",
-      "goToChildCurriculum": "Open child curriculum"
+      "goToChildCurriculum": "Otwórz program nauczania dziecka"
     },
     "remediation": {
       "heading": "Spróbuj inaczej",
@@ -2535,15 +2544,15 @@
       "redirectBody": "Zaczniemy od zaimków, żeby kolejne kroki od początku były lepiej dopasowane."
     },
     "ready": {
-      "title": "You're all set.",
+      "title": "Wszystko gotowe.",
       "introWithLearner": "For {{learner}}:",
-      "intro": "Here's what's set up:",
-      "rowTone": "Your mentor will talk to you the right way",
+      "intro": "Oto co zostało ustawione:",
+      "rowTone": "Twój mentor będzie rozmawiać z Tobą we właściwy sposób",
       "rowSubject": "Starting with {{subject}}",
       "rowSubjectNoSubject": "Twój pierwszy temat jest gotowy",
-      "rowPace": "Pace stays at your speed — never rushed",
-      "reassurance": "Most learners feel the difference in the first session.",
-      "cta": "Let's start"
+      "rowPace": "Tempo dostosowuje się do Twojej prędkości — bez pośpiechu",
+      "reassurance": "Większość uczących się odczuwa różnicę już podczas pierwszej sesji.",
+      "cta": "Zaczynajmy"
     },
     "stepIndicator": {
       "stepOf": "Krok {{current}} z {{total}}"
@@ -2782,17 +2791,17 @@
       "viewTopicDetails": "Zobacz szczegóły dla {{title}}",
       "topicsCouldNotLoad": "Nie można załadować tematów",
       "retryLoadingTopics": "Spróbuj ponownie załadować tematy",
-      "topicsNewLearnerTitle": "No lesson topics yet",
-      "topicsNewLearnerBody": "This can happen after early sessions or free browsing. Recent sessions below still show what happened.",
-      "noTopicsYetTitle": "No lesson topics yet",
-      "noTopicsYetBody": "Sessions may still exist here before the mentor has enough lesson-level progress to show.",
+      "topicsNewLearnerTitle": "Brak tematów lekcji",
+      "topicsNewLearnerBody": "Może się tak zdarzyć po wczesnych sesjach lub swobodnym przeglądaniu. Ostatnie sesje poniżej nadal pokazują, co się wydarzyło.",
+      "noTopicsYetTitle": "Brak tematów lekcji",
+      "noTopicsYetBody": "Sesje mogą tu nadal istnieć, zanim mentor będzie miał wystarczające postępy na poziomie lekcji do pokazania.",
       "description": "This is your child's progress in {{subject}}. Topics appear once sessions connect to a lesson step.",
       "recentSubjectSessions": "Recent {{subject}} sessions",
       "viewSessionFrom": "View session from {{date}}"
     },
     "topic": {
       "topic": "Temat",
-      "status": "Status",
+      "status": "Stan",
       "statusUnknown": "Nieznany",
       "understanding": "Zrozumienie",
       "reviewStatus": "Status powtórki",
@@ -2996,10 +3005,10 @@
     },
     "home": "Główna",
     "homeLabel": "Główna",
-    "familyHub": "Family Hub",
-    "familyHubLabel": "Family Hub",
-    "myLearning": "My Learning",
-    "myLearningLabel": "My Learning",
+    "familyHub": "Centrum Rodzinne",
+    "familyHubLabel": "Centrum Rodzinne",
+    "myLearning": "Moja nauka",
+    "myLearningLabel": "Moja nauka",
     "library": "Biblioteka",
     "libraryLabel": "Biblioteka",
     "progress": "Postępy",
@@ -3010,8 +3019,8 @@
     "childrenLabel": "Rodzina",
     "recaps": "Podsumowania",
     "recapsLabel": "Podsumowania",
-    "mentor": "Mentor",
-    "mentorLabel": "Mentor",
+    "mentor": "Tutor",
+    "mentorLabel": "Tutor",
     "subjects": "Przedmioty",
     "subjectsLabel": "Przedmioty",
     "journal": "Dziennik",
@@ -3031,48 +3040,48 @@
       "unknown": "Nieznany"
     },
     "alerts": {
-      "restoredTitle": "Restored",
-      "restoredBody": "Your subscription has been restored.",
-      "successTitle": "Success",
-      "successBody": "Your subscription is now active!",
-      "purchaseConfirmedTitle": "Purchase confirmed",
-      "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
-      "topUpTitle": "Top-up",
-      "topUpBody": "500 additional credits have been added!"
+      "restoredTitle": "Przywrócono",
+      "restoredBody": "Twoja subskrypcja została przywrócona.",
+      "successTitle": "Sukces",
+      "successBody": "Twoja subskrypcja jest teraz aktywna!",
+      "purchaseConfirmedTitle": "Zakup potwierdzony",
+      "purchaseConfirmedBody": "Twoja subskrypcja jest aktywowana. Zazwyczaj pojawia się w ciągu minuty — przeciągnij w dół, aby odświeżyć.",
+      "topUpTitle": "Doładowanie",
+      "topUpBody": "Dodano 500 dodatkowych kredytów!"
     },
     "web": {
       "plansOnMobile": "Plany są dostępne w aplikacji mobilnej",
       "storePurchaseUnavailable": "Zakupy w sklepie nie są dostępne na tym urządzeniu."
     },
     "childPaywall": {
-      "headline": "Nice work so far!",
-      "greatStart": "You've been exploring and learning — great start!",
+      "headline": "Świetna robota!",
+      "greatStart": "Odkrywasz i uczysz się — świetny początek!",
       "xpStats_one": "You learned {{count}} topic and earned {{xp}} XP — great work!",
       "xpStats_other": "You learned {{count}} topics and earned {{xp}} XP — great work!",
-      "usedAllQuestions": "You've used all your free questions. Ask your parent to upgrade so you can keep learning.",
+      "usedAllQuestions": "Wykorzystałeś wszystkie darmowe pytania. Poproś rodzica o ulepszenie, aby móc kontynuować naukę.",
       "quotaUsedAllQuestions": "Na razie wykorzystano dostępne pytania. Możesz spróbować ponownie po {{resetAt}} albo powiadomić rodzica, jeśli potrzebujesz więcej miejsca.",
-      "notifyButton": "Notify My Parent",
-      "notifyButtonNotified": "Parent notified",
-      "notifyButtonAccessibilityNotified": "Parent already notified",
-      "notifyButtonAccessibilityNotify": "Notify my parent",
+      "notifyButton": "Powiadom Rodzica",
+      "notifyButtonNotified": "Rodzic powiadomiony",
+      "notifyButtonAccessibilityNotified": "Rodzic już powiadomiony",
+      "notifyButtonAccessibilityNotify": "Powiadom mojego rodzica",
       "cooldownReminder": "You can remind them again in {{label}}.",
-      "notifiedExploreText": "Your parent has been notified! While you wait, you can still explore:",
-      "waitText": "While you wait, you can still browse your Library and see your progress.",
-      "browseLibrary": "Browse Library",
-      "browseLibraryAccessibilityLabel": "Browse Library",
-      "seeProgress": "See your progress",
-      "seeProgressAccessibilityLabel": "See your progress",
-      "goHome": "Go Home",
-      "goHomeAccessibilityLabel": "Go Home",
+      "notifiedExploreText": "Twój rodzic został powiadomiony! Czekając, możesz nadal odkrywać:",
+      "waitText": "Czekając, możesz nadal przeglądać swoją Bibliotekę i sprawdzać postępy.",
+      "browseLibrary": "Przeglądaj Bibliotekę",
+      "browseLibraryAccessibilityLabel": "Przeglądaj Bibliotekę",
+      "seeProgress": "Zobacz swoje postępy",
+      "seeProgressAccessibilityLabel": "Zobacz swoje postępy",
+      "goHome": "Idź do domu",
+      "goHomeAccessibilityLabel": "Idź do domu",
       "back": "Back",
-      "backAccessibilityLabel": "Go back",
+      "backAccessibilityLabel": "Wróć",
       "alerts": {
         "sentTitle": "Sent!",
-        "sentBody": "We let your parent know!",
-        "askParentTitle": "Ask your parent",
-        "askParentBody": "Ask your parent to open the app and subscribe.",
-        "notifyErrorTitle": "Could not send notification",
-        "notifyErrorBody": "Please check your connection and try again.",
+        "sentBody": "Powiadomiliśmy Twojego rodzica!",
+        "askParentTitle": "Zapytaj rodzica",
+        "askParentBody": "Poproś rodzica o otwarcie aplikacji i subskrybowanie.",
+        "notifyErrorTitle": "Nie udało się wysłać powiadomienia",
+        "notifyErrorBody": "Sprawdź połączenie i spróbuj ponownie.",
         "quotaSentBody": "Powiadomiliśmy rodzica, że limit pytań został wykorzystany.",
         "quotaAskParentBody": "Poproś rodzica, aby otworzył aplikację i sprawdził szczegóły."
       },
@@ -3080,30 +3089,30 @@
       "xpStats_many": "You learned {{count}} topics and earned {{xp}} XP — great work!"
     },
     "restore": {
-      "button": "Restore Purchases",
-      "accessibilityLabel": "Restore purchases",
-      "verifying": "Verifying purchase...",
-      "restoring": "Restoring...",
-      "failedTitle": "Restore failed",
-      "failedBody": "Could not restore purchases. Please try again.",
-      "notFoundTitle": "No subscriptions found",
-      "notFoundBody": "We could not find any previous purchases to restore.",
-      "cancelledTitle": "Restore cancelled",
-      "cancelledBody": "Restore will continue in background.",
-      "cancelAccessibilityLabel": "Cancel restore"
+      "button": "Przywróć zakupy",
+      "accessibilityLabel": "Przywróć zakupy",
+      "verifying": "Weryfikowanie zakupu...",
+      "restoring": "Przywracanie...",
+      "failedTitle": "Przywracanie nieudane",
+      "failedBody": "Nie udało się przywrócić zakupów. Spróbuj ponownie.",
+      "notFoundTitle": "Nie znaleziono subskrypcji",
+      "notFoundBody": "Nie znaleźliśmy żadnych poprzednich zakupów do przywrócenia.",
+      "cancelledTitle": "Przywracanie anulowane",
+      "cancelledBody": "Przywracanie będzie kontynuowane w tle.",
+      "cancelAccessibilityLabel": "Anuluj przywracanie"
     },
     "byokWaitlist": {
-      "heading": "Bring your own key",
-      "body": "Use your own API key to unlock unlimited questions. Join the waitlist to be notified when available. We'll use your account email.",
-      "joinButton": "Join Waitlist",
-      "alreadyJoinedButton": "Already joined",
-      "joinAccessibilityLabel": "Join BYOK waitlist",
-      "alreadyJoinedAccessibilityLabel": "Already joined BYOK waitlist",
+      "heading": "Użyj własnego klucza",
+      "body": "Użyj własnego klucza API, aby odblokować nieograniczone pytania. Dołącz do listy oczekujących, aby otrzymać powiadomienie, gdy będzie dostępny. Użyjemy adresu e-mail Twojego konta.",
+      "joinButton": "Dołącz do listy",
+      "alreadyJoinedButton": "Już dołączono",
+      "joinAccessibilityLabel": "Dołącz do listy oczekujących BYOK",
+      "alreadyJoinedAccessibilityLabel": "Już dołączono do listy oczekujących BYOK",
       "alerts": {
-        "successTitle": "Waitlist",
-        "successBody": "You have been added to the BYOK waitlist.",
+        "successTitle": "Lista oczekujących",
+        "successBody": "Zostałeś dodany do listy oczekujących BYOK.",
         "errorTitle": "Error",
-        "errorBody": "Could not join waitlist. Try again."
+        "errorBody": "Nie udało się dołączyć do listy. Spróbuj ponownie."
       }
     },
     "loadError": {
@@ -3369,25 +3378,28 @@
     "errorMessage": "Spróbuj ponownie za chwilę.",
     "summaryPending": "Podsumowanie tej sesji jest jeszcze przygotowywane.",
     "openRecapLabel": "Otwórz podsumowanie {{child}} dla {{title}}",
-    "detailHeading": "Session recap",
-    "backLabel": "Back to recaps",
-    "detailLoadError": "We could not load this recap",
-    "detailLoadErrorMessage": "Try again, or head back to the recaps list.",
-    "notFoundTitle": "Recap not found",
-    "notFoundMessage": "This recap is no longer available.",
+    "openRecapLabelNoChild": "Otwórz podsumowanie dla {{title}}",
+    "openRecapLabelNoTitle": "Otwórz podsumowanie {{child}}",
+    "openRecapLabelNoDetails": "Otwórz podsumowanie",
+    "detailHeading": "Podsumowanie sesji",
+    "backLabel": "Wróć do podsumowań",
+    "detailLoadError": "Nie udało się załadować tego podsumowania",
+    "detailLoadErrorMessage": "Spróbuj ponownie lub wróć do listy podsumowań.",
+    "notFoundTitle": "Podsumowania nie znaleziono",
+    "notFoundMessage": "To podsumowanie nie jest już dostępne.",
     "exchangesCount": "{{count}} exchanges",
-    "whatHappened": "What happened",
-    "detailPending": "This recap is still being prepared.",
-    "tryAsking": "Try asking",
-    "openChildSession": "Open child session",
-    "emptyCtaStartSession": "Start a session"
+    "whatHappened": "Co się wydarzyło",
+    "detailPending": "To podsumowanie jest wciąż przygotowywane.",
+    "tryAsking": "Spróbuj zapytać",
+    "openChildSession": "Otwórz sesję dziecka",
+    "emptyCtaStartSession": "Rozpocznij sesję"
   },
   "addToMyLearning": {
-    "tip": "Save a copy of this topic into your own Library without changing your child's learning.",
-    "dismissTip": "Got it",
-    "dismiss": "Dismiss",
-    "buttonLabel": "Add to my learning",
-    "privacyNote": "Private to your learning"
+    "tip": "Zapisz kopię tego tematu w swojej Bibliotece, nie zmieniając nauki dziecka.",
+    "dismissTip": "Rozumiem",
+    "dismiss": "Odrzuć",
+    "buttonLabel": "Dodaj do mojej nauki",
+    "privacyNote": "Prywatne dla Twojej nauki"
   },
   "learnerHomeTimeout": {
     "loading": "Już prawie — jeszcze chwilkę...",
@@ -3602,7 +3614,7 @@
   },
   "welcomeIntro": {
     "chooser": {
-      "question": "What brings you here?",
+      "question": "Co Cię tu sprowadza?",
       "learnerCta": "Ucz się z mentorem",
       "learnerHint": "Twój osobisty mentor za ułamek ceny.",
       "parentCta": "Koniec z kłótniami o lekcje",
@@ -3610,103 +3622,103 @@
     },
     "learner": {
       "card1": {
-        "headline": "A mentor you can talk to",
-        "supporting": "Ask where you are stuck. Get help that adapts to how you learn."
+        "headline": "Mentor, z którym możesz porozmawiać",
+        "supporting": "Pytaj, gdy utkniesz. Uzyskaj pomoc, która dostosowuje się do Twojego stylu nauki."
       },
       "card2": {
-        "headline": "Remembers you, picks up where you left off",
-        "supporting": "Subjects, notes, and pace stay together so you can come back smoothly."
+        "headline": "Pamięta o Tobie, kontynuuje tam, gdzie skończyłeś",
+        "supporting": "Przedmioty, notatki i tempo pozostają razem, dzięki czemu możesz płynnie wrócić."
       },
       "card3": {
-        "headline": "Built for real learning",
-        "supporting": "Clear explanations, guided questions, and practice that sticks."
+        "headline": "Stworzone do prawdziwej nauki",
+        "supporting": "Jasne wyjaśnienia, ukierunkowane pytania i praktyka, która zostaje w pamięci."
       }
     },
     "parent": {
       "card1": {
-        "headline": "A personal mentor for your child",
-        "supporting": "Guides the method and checks their work, without handing over answers to copy."
+        "headline": "Osobisty mentor dla Twojego dziecka",
+        "supporting": "Prowadzi metodę i sprawdza ich pracę, nie podając gotowych odpowiedzi do skopiowania."
       },
       "card2": {
-        "headline": "Stay in the loop, step in when it matters",
-        "supporting": "See progress and step in when your child actually needs you."
+        "headline": "Bądź na bieżąco, interweniuj, gdy to ważne",
+        "supporting": "Obserwuj postępy i interweniuj, gdy Twoje dziecko naprawdę Cię potrzebuje."
       },
       "card3": {
-        "headline": "No more homework battles",
-        "supporting": "Turn nightly fights into calmer, more useful study time."
+        "headline": "Koniec z bitwami o pracę domową",
+        "supporting": "Zmień wieczorne kłótnie w spokojniejszy, bardziej efektywny czas nauki."
       }
     },
     "scene": {
       "learner": {
         "card1": {
-          "learner": "I do not get this yet.",
-          "mentor": "Let's slow it down. What part feels confusing?"
+          "learner": "Jeszcze tego nie rozumiem.",
+          "mentor": "Zwolnijmy. Która część wydaje Ci się myląca?"
         },
         "card2": {
           "subjects": {
             "math": "Math",
-            "history": "History",
-            "spanish": "Spanish"
+            "history": "Historia",
+            "spanish": "Hiszpański"
           },
           "resume": {
-            "label": "Last time",
-            "body": "You wrapped up Cells & DNA basics"
+            "label": "Ostatnio",
+            "body": "Ukończyłeś podstawy komórek i DNA"
           }
         },
         "card3": {
           "chips": {
-            "explain": "Clear explanation",
-            "think": "Think it through",
-            "practice": "Practice in context",
-            "remember": "Remember it later"
+            "explain": "Jasne wyjaśnienie",
+            "think": "Przemyśl to",
+            "practice": "Ćwicz w kontekście",
+            "remember": "Zapamiętaj na później"
           }
         }
       },
       "parent": {
         "card1": {
-          "child": "I'm stuck on question 3.",
-          "mentor": "Let's start with what you've tried. Walk me through step one."
+          "child": "Utknąłem na pytaniu 3.",
+          "mentor": "Zacznijmy od tego, co już próbowałeś. Opowiedz mi o pierwszym kroku."
         },
         "card2": {
           "thisWeek": {
-            "label": "This week",
-            "body": "4 sessions, 2 subjects"
+            "label": "W tym tygodniu",
+            "body": "4 sesje, 2 przedmioty"
           },
           "strong": {
-            "label": "Going well",
-            "body": "Fractions are clicking"
+            "label": "Idzie dobrze",
+            "body": "Ułamki zaczynają być zrozumiałe"
           },
           "review": {
-            "label": "Could use you",
-            "body": "Long division — stuck twice"
+            "label": "Może Cię potrzebować",
+            "body": "Dzielenie pisemne — utknął dwa razy"
           }
         },
         "card3": {
           "chips": {
-            "evenings": "Calmer evenings",
-            "nagging": "Less nagging",
-            "quality": "Quality time"
+            "evenings": "Spokojniejsze wieczory",
+            "nagging": "Mniej marudzenia",
+            "quality": "Wartościowy czas"
           }
         }
       }
     },
     "sceneFrame": {
-      "brandLabel": "MentoMate"
+      "brandLabel": "Aplikacja MentoMate"
     },
     "bridge": {
-      "headline": "Turn \"I don't get it\" into \"I've got this.\"",
-      "supporting": "Create a free account so your mentor can remember your subjects, notes, and progress.",
-      "primaryCta": "Create free account",
-      "secondaryCta": "I already have an account"
+      "headline": "Zmień „Nie rozumiem” w „Mam to!”",
+      "supporting": "Utwórz darmowe konto, aby Twój mentor mógł zapamiętać Twoje przedmioty, notatki i postępy.",
+      "primaryCta": "Utwórz darmowe konto",
+      "secondaryCta": "Mam już konto"
     },
     "next": "Next",
-    "letsStart": "Let's start",
+    "letsStart": "Zacznijmy",
     "a11y": {
-      "previous": "Previous card",
-      "next": "Next card",
+      "previous": "Poprzednia karta",
+      "next": "Następna karta",
       "dots": "Page {{current}} of {{total}}",
-      "bridgePrimary": "Create a free account",
-      "bridgeSecondary": "Sign in to an existing account"
+      "bridgePrimary": "Utwórz darmowe konto",
+      "bridgeSecondary": "Zaloguj się do istniejącego konta"
     }
   },
   "proxy": {
@@ -3741,7 +3753,7 @@
       "weeksAgo": "{{count}} tygodni temu"
     },
     "duration": {
-      "under1": "<1 min",
+      "under1": "poniżej 1 min",
       "minutes": "{{count}} min",
       "minutesOne": "1 min",
       "hoursMinutes": "{{hours}}h {{minutes}}m",

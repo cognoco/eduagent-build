@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 
 jest.mock('expo-router', () => ({
   Stack: ({ children }: { children?: React.ReactNode }) => {
@@ -12,7 +12,7 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: jest.fn(),
 }));
 

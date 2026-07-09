@@ -1107,7 +1107,9 @@ export default function CameraScreen(): React.ReactNode {
             <View className="h-4 bg-surface-elevated rounded-full w-3/5" />
           </View>
           <Text className="text-body text-text-secondary text-center mt-6">
-            {t('homework.readingHomework', { subject: subjectName ?? '' })}
+            {subjectName?.trim()
+              ? t('homework.readingHomework', { subject: subjectName.trim() })
+              : t('homework.readingHomeworkNoSubject')}
           </Text>
           <Pressable
             onPress={() => {

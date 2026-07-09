@@ -9,7 +9,7 @@ const mockRevokeCurrent = jest.fn();
 const mockRevokeOther = jest.fn();
 const mockRevokeOther2 = jest.fn();
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useAuth: () => ({ sessionId: 'session-current' }),
   useUser: () => ({
     user: {

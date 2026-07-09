@@ -347,6 +347,7 @@ export async function resetExpiredQuotaCyclesV2(
       AND qp.cycle_reset_at <= ${now}
   `);
 
+  // scope-allow: cycle reset cron intentionally advances all due profile quota rows.
   const profileResult = await db
     .update(profileQuotaUsage)
     .set({

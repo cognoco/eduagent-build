@@ -5,7 +5,7 @@ import {
   waitFor,
   act,
 } from '@testing-library/react-native';
-import { useSignIn, useSSO, useClerk } from '@clerk/clerk-expo';
+import { useSignIn, useSSO, useClerk } from '@clerk/expo';
 import i18n from 'i18next';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import * as Linking from 'expo-linking';
