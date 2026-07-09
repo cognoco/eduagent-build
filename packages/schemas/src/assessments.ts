@@ -343,7 +343,7 @@ export type DeclineAssessmentRefreshResponse = z.infer<
 // RetentionCardResponse extended with topic metadata (Library Topics tab)
 const retentionCardWithMetaSchema = retentionCardSchema.extend({
   topicTitle: z.string(),
-  bookId: z.string(),
+  bookId: z.string().nullable(),
 });
 
 /** GET /subjects/:subjectId/retention */

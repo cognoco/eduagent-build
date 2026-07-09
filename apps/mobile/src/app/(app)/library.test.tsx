@@ -171,7 +171,28 @@ jest.mock(
 
 // ─── Fixtures ───────────────────────────────────────────────────────────
 
-const ACTIVE_PROFILE_ID = 'profile-1';
+const ACTIVE_PROFILE_ID = '00000000-0000-4000-8000-000000001000';
+const TEST_NOW = '2026-05-31T00:00:00.000Z';
+const SUBJECT_1_ID = '00000000-0000-4000-8000-000000001001';
+const SUBJECT_2_ID = '00000000-0000-4000-8000-000000001002';
+const SUBJECT_NEW_ID = '00000000-0000-4000-8000-000000001003';
+const SUBJECT_MID_ID = '00000000-0000-4000-8000-000000001004';
+const SUBJECT_ACTIVE_ID = '00000000-0000-4000-8000-000000001005';
+const SUBJECT_PAUSED_ID = '00000000-0000-4000-8000-000000001006';
+const SUBJECT_ARCHIVED_ID = '00000000-0000-4000-8000-000000001007';
+const SUBJECT_STRONG_ID = '00000000-0000-4000-8000-000000001008';
+const SUBJECT_FADING_ID = '00000000-0000-4000-8000-000000001009';
+const SUBJECT_FORGOTTEN_ID = '00000000-0000-4000-8000-000000001010';
+const BOOK_1_ID = '00000000-0000-4000-8000-000000002001';
+const BOOK_2_ID = '00000000-0000-4000-8000-000000002002';
+const TOPIC_1_ID = '00000000-0000-4000-8000-000000003001';
+const TOPIC_2_ID = '00000000-0000-4000-8000-000000003002';
+const TOPIC_3_ID = '00000000-0000-4000-8000-000000003003';
+const TOPIC_STRONG_ID = '00000000-0000-4000-8000-000000003004';
+const TOPIC_FADING_ID = '00000000-0000-4000-8000-000000003005';
+const TOPIC_FORGOTTEN_ID = '00000000-0000-4000-8000-000000003006';
+const NOTE_1_ID = '00000000-0000-4000-8000-000000004001';
+const SESSION_1_ID = '00000000-0000-4000-8000-000000005001';
 
 const OWNER: Profile = createTestProfile({
   id: ACTIVE_PROFILE_ID,
@@ -230,6 +251,7 @@ type LibraryBooksPayload = {
       updatedAt: string;
     }>;
   }>;
+  nextCursor?: string | null;
 };
 
 interface RouteOptions {
@@ -263,6 +285,114 @@ function errorResponse(status = 503): Response {
   });
 }
 
+function isSubjectFixture(value: unknown): value is SubjectFixture {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'name' in value
+  );
+}
+
+function makeSubject(subject: SubjectFixture): unknown {
+  return {
+    id: subject.id,
+    profileId: ACTIVE_PROFILE_ID,
+    name: subject.name,
+    rawInput: null,
+    status: subject.status ?? 'active',
+    curriculumStatus: 'ready',
+    pedagogyMode: 'socratic',
+    languageCode: null,
+    createdAt: TEST_NOW,
+    updatedAt: TEST_NOW,
+  };
+}
+
+function makeSubjectListResponse(subjects: unknown): unknown {
+  if (!Array.isArray(subjects)) return { subjects };
+  return {
+    subjects: subjects.map((subject) =>
+      isSubjectFixture(subject) ? makeSubject(subject) : subject,
+    ),
+  };
+}
+
+function makeSubjectResponse(subject: SubjectFixture): unknown {
+  return { subject: makeSubject(subject) };
+}
+
+function makeProgressBody(progress: OverallProgress | undefined): unknown {
+  return {
+    subjects: (progress?.subjects ?? []).map((subject) => ({
+      subjectId: subject.subjectId,
+      name: subject.name ?? 'Subject',
+      topicsTotal: subject.topicsTotal ?? 0,
+      topicsCompleted: subject.topicsCompleted ?? 0,
+      topicsVerified: subject.topicsVerified ?? 0,
+      topicsMastered: subject.topicsMastered ?? 0,
+      topicsLearning: subject.topicsLearning ?? 0,
+      urgencyScore: subject.urgencyScore ?? 0,
+      retentionStatus: subject.retentionStatus ?? 'unknown',
+      lastSessionAt: subject.lastSessionAt ?? null,
+    })),
+    totalTopicsCompleted: progress?.totalTopicsCompleted ?? 0,
+    totalTopicsVerified: progress?.totalTopicsVerified ?? 0,
+    totalTopicsMastered: progress?.totalTopicsMastered ?? 0,
+    totalTopicsLearning: progress?.totalTopicsLearning ?? 0,
+  };
+}
+
+function makeRetentionTopic(topic: unknown): unknown {
+  if (typeof topic !== 'object' || topic === null) return topic;
+  const value = topic as Record<string, unknown>;
+  return {
+    topicId: value.topicId,
+    topicTitle: value.topicTitle ?? 'Topic',
+    bookId: 'bookId' in value ? value.bookId : BOOK_1_ID,
+    easeFactor: value.easeFactor ?? 2.5,
+    intervalDays: value.intervalDays ?? 0,
+    repetitions: value.repetitions ?? 0,
+    nextReviewAt: value.nextReviewAt ?? null,
+    lastReviewedAt: value.lastReviewedAt ?? null,
+    daysSinceLastReview: value.daysSinceLastReview ?? null,
+    xpStatus: value.xpStatus ?? 'pending',
+    masteredAt: value.masteredAt,
+    failureCount: value.failureCount ?? 0,
+    evaluateDifficultyRung: value.evaluateDifficultyRung,
+  };
+}
+
+function makeRetentionBody(retention: RetentionPayload | undefined): unknown {
+  return {
+    subjects: (retention?.subjects ?? []).map((subject) => ({
+      subjectId: subject.subjectId,
+      topics: Array.isArray(subject.topics)
+        ? subject.topics.map(makeRetentionTopic)
+        : subject.topics,
+      reviewDueCount: subject.reviewDueCount,
+    })),
+  };
+}
+
+function makeLibraryBooksBody(
+  allBooks: LibraryBooksPayload | undefined,
+): unknown {
+  return {
+    subjects: (allBooks?.subjects ?? []).map((subject) => ({
+      ...subject,
+      books: subject.books.map((book) => ({
+        ...book,
+        status: book.topicsGenerated ? 'IN_PROGRESS' : 'NOT_STARTED',
+        topicCount: 0,
+        completedTopicCount: 0,
+        masteredTopicCount: 0,
+      })),
+    })),
+    nextCursor: allBooks?.nextCursor ?? null,
+  };
+}
+
 /**
  * Build the routes map the real library hooks hit. Endpoints discovered from
  * hook sources:
@@ -277,16 +407,10 @@ function errorResponse(status = 503): Response {
  *   useProgressInventory                → GET /progress/inventory            → KnowledgeInventory
  */
 function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
-  const subjectsBody = { subjects: opts.subjects ?? [] };
-  const fallbackBody = { subjects: opts.fallbackSubjects ?? [] };
-  const progressBody = opts.progress ?? {
-    subjects: [],
-    totalTopicsCompleted: 0,
-    totalTopicsVerified: 0,
-    totalTopicsMastered: 0,
-    totalTopicsLearning: 0,
-  };
-  const retentionBody = opts.retention ?? { subjects: [] };
+  const subjectsBody = makeSubjectListResponse(opts.subjects ?? []);
+  const fallbackBody = makeSubjectListResponse(opts.fallbackSubjects ?? []);
+  const progressBody = makeProgressBody(opts.progress);
+  const retentionBody = makeRetentionBody(opts.retention);
   const inventoryBody = opts.inventory ?? {
     profileId: ACTIVE_PROFILE_ID,
     snapshotDate: '2026-05-31',
@@ -308,7 +432,7 @@ function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
     },
     subjects: [],
   };
-  const allBooksBody = opts.allBooks ?? { subjects: [] };
+  const allBooksBody = makeLibraryBooksBody(opts.allBooks);
 
   const routes: Record<
     string,
@@ -321,11 +445,13 @@ function buildRoutes(opts: RouteOptions = {}): RoutedMockFetch {
       const method = (init?.method ?? 'GET').toUpperCase();
       if (method === 'PATCH') {
         // PATCH /subjects/:id — echo back an updated subject.
-        const id = url.split('/subjects/')[1]?.split('?')[0] ?? 'sub-x';
-        return { subject: { id, name: 'Subject', status: 'archived' } };
+        const id =
+          url.split('/subjects/')[1]?.split('?')[0] ?? SUBJECT_ARCHIVED_ID;
+        return makeSubjectResponse({ id, name: 'Subject', status: 'archived' });
       }
       if (method === 'DELETE') {
-        const id = url.split('/subjects/')[1]?.split('?')[0] ?? 'sub-x';
+        const id =
+          url.split('/subjects/')[1]?.split('?')[0] ?? SUBJECT_ARCHIVED_ID;
         return { deleted: true, subjectId: id };
       }
       if (url.includes('includeInactive=true')) {
@@ -510,31 +636,31 @@ describe('LibraryScreen', () => {
   // white-screened the Library tab.
   it('[BUG-818] does not crash when retentionQuery.data.topics is undefined', async () => {
     active = mount({
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [{ id: SUBJECT_1_ID, name: 'Math', status: 'active' }],
       retention: {
         subjects: [
-          { subjectId: 'sub-1', topics: undefined, reviewDueCount: 0 },
+          { subjectId: SUBJECT_1_ID, topics: undefined, reviewDueCount: 0 },
         ],
       },
     });
 
     await waitFor(() => {
-      active!.result.getByTestId('shelf-row-header-sub-1');
+      active!.result.getByTestId(`shelf-row-header-${SUBJECT_1_ID}`);
     });
   });
 
   it('[BUG-818] does not crash when retentionQuery.data.topics is a non-array shape', async () => {
     active = mount({
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [{ id: SUBJECT_1_ID, name: 'Math', status: 'active' }],
       retention: {
         subjects: [
-          { subjectId: 'sub-1', topics: 'unexpected', reviewDueCount: 0 },
+          { subjectId: SUBJECT_1_ID, topics: 'unexpected', reviewDueCount: 0 },
         ],
       },
     });
 
     await waitFor(() => {
-      active!.result.getByTestId('shelf-row-header-sub-1');
+      active!.result.getByTestId(`shelf-row-header-${SUBJECT_1_ID}`);
     });
   });
 
@@ -564,11 +690,11 @@ describe('LibraryScreen', () => {
 
   it('renders shelf rows for each subject', async () => {
     active = mount({
-      subjects: [{ id: 'sub-1', name: 'History', status: 'active' }],
+      subjects: [{ id: SUBJECT_1_ID, name: 'History', status: 'active' }],
       progress: {
         subjects: [
           {
-            subjectId: 'sub-1',
+            subjectId: SUBJECT_1_ID,
             name: 'History',
             topicsTotal: 12,
             topicsCompleted: 3,
@@ -587,7 +713,7 @@ describe('LibraryScreen', () => {
 
     // Library v3: subject is a shelf row, not a card
     await waitFor(() => {
-      active!.result.getByTestId('shelf-row-header-sub-1');
+      active!.result.getByTestId(`shelf-row-header-${SUBJECT_1_ID}`);
     });
     active.result.getByText('History');
   });
@@ -595,11 +721,11 @@ describe('LibraryScreen', () => {
   describe('next-action coach card [coach-card]', () => {
     it('says "Continue" and targets an in-progress subject', async () => {
       active = mount({
-        subjects: [{ id: 'sub-1', name: 'History', status: 'active' }],
+        subjects: [{ id: SUBJECT_1_ID, name: 'History', status: 'active' }],
         progress: {
           subjects: [
             {
-              subjectId: 'sub-1',
+              subjectId: SUBJECT_1_ID,
               topicsTotal: 12,
               topicsCompleted: 3,
               topicsVerified: 1,
@@ -620,11 +746,11 @@ describe('LibraryScreen', () => {
       // Regression: the card used to blindly pick the first active subject and
       // call it "Continue <name>" even when nothing had ever been studied.
       active = mount({
-        subjects: [{ id: 'sub-1', name: 'Philosophy', status: 'active' }],
+        subjects: [{ id: SUBJECT_1_ID, name: 'Philosophy', status: 'active' }],
         progress: {
           subjects: [
             {
-              subjectId: 'sub-1',
+              subjectId: SUBJECT_1_ID,
               topicsTotal: 0,
               topicsCompleted: 0,
               topicsVerified: 0,
@@ -644,11 +770,11 @@ describe('LibraryScreen', () => {
 
     it('says "Revisit" when a finished subject has topics due for review', async () => {
       active = mount({
-        subjects: [{ id: 'sub-1', name: 'Biology', status: 'active' }],
+        subjects: [{ id: SUBJECT_1_ID, name: 'Biology', status: 'active' }],
         progress: {
           subjects: [
             {
-              subjectId: 'sub-1',
+              subjectId: SUBJECT_1_ID,
               topicsTotal: 8,
               topicsCompleted: 8,
               topicsVerified: 8,
@@ -658,7 +784,9 @@ describe('LibraryScreen', () => {
           ],
         },
         retention: {
-          subjects: [{ subjectId: 'sub-1', topics: [], reviewDueCount: 2 }],
+          subjects: [
+            { subjectId: SUBJECT_1_ID, topics: [], reviewDueCount: 2 },
+          ],
         },
       });
 
@@ -671,13 +799,13 @@ describe('LibraryScreen', () => {
     it('prefers an in-progress subject over an earlier unstarted one', async () => {
       active = mount({
         subjects: [
-          { id: 'sub-new', name: 'Philosophy', status: 'active' },
-          { id: 'sub-mid', name: 'History', status: 'active' },
+          { id: SUBJECT_NEW_ID, name: 'Philosophy', status: 'active' },
+          { id: SUBJECT_MID_ID, name: 'History', status: 'active' },
         ],
         progress: {
           subjects: [
             {
-              subjectId: 'sub-new',
+              subjectId: SUBJECT_NEW_ID,
               topicsTotal: 5,
               topicsCompleted: 0,
               topicsVerified: 0,
@@ -685,7 +813,7 @@ describe('LibraryScreen', () => {
               topicsLearning: 0,
             },
             {
-              subjectId: 'sub-mid',
+              subjectId: SUBJECT_MID_ID,
               topicsTotal: 10,
               topicsCompleted: 4,
               topicsVerified: 2,
@@ -707,14 +835,18 @@ describe('LibraryScreen', () => {
   it('orders active subjects first, then paused, then archived', async () => {
     active = mount({
       subjects: [
-        { id: 'sub-archived', name: 'Archived Spanish', status: 'archived' },
-        { id: 'sub-paused', name: 'Paused History', status: 'paused' },
-        { id: 'sub-active', name: 'Active Math', status: 'active' },
+        {
+          id: SUBJECT_ARCHIVED_ID,
+          name: 'Archived Spanish',
+          status: 'archived',
+        },
+        { id: SUBJECT_PAUSED_ID, name: 'Paused History', status: 'paused' },
+        { id: SUBJECT_ACTIVE_ID, name: 'Active Math', status: 'active' },
       ],
     });
 
     await waitFor(() => {
-      active!.result.getByTestId('shelf-row-header-sub-active');
+      active!.result.getByTestId(`shelf-row-header-${SUBJECT_ACTIVE_ID}`);
     });
 
     const orderedRowIds = active.result
@@ -723,9 +855,9 @@ describe('LibraryScreen', () => {
       .map((row) => String(row.props.testID))
       .filter((testID, index, allRows) => allRows.indexOf(testID) === index);
     expect(orderedRowIds).toEqual([
-      'shelf-row-header-sub-active',
-      'shelf-row-header-sub-paused',
-      'shelf-row-header-sub-archived',
+      `shelf-row-header-${SUBJECT_ACTIVE_ID}`,
+      `shelf-row-header-${SUBJECT_PAUSED_ID}`,
+      `shelf-row-header-${SUBJECT_ARCHIVED_ID}`,
     ]);
   });
 
@@ -733,11 +865,11 @@ describe('LibraryScreen', () => {
     // Library v3 redesign replaced Shelves/Books/Topics tabs with a subject
     // shelf list. There are no tab controls at the library level.
     active = mount({
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [{ id: SUBJECT_1_ID, name: 'Math', status: 'active' }],
     });
 
     await waitFor(() => {
-      active!.result.getByTestId('shelf-row-header-sub-1');
+      active!.result.getByTestId(`shelf-row-header-${SUBJECT_1_ID}`);
     });
     const { result } = active;
     expect(result.queryByTestId('library-tab-shelves')).toBeNull();
@@ -745,7 +877,7 @@ describe('LibraryScreen', () => {
     expect(result.queryByTestId('library-tab-topics')).toBeNull();
     // Instead, the subject list is the root navigation.
     result.getByTestId('shelves-list');
-    result.getByTestId('shelf-row-header-sub-1');
+    result.getByTestId(`shelf-row-header-${SUBJECT_1_ID}`);
     expect(result.queryByTestId('shelf-grid-row-active-0')).toBeNull();
     expect(result.queryByTestId('shelf-grid-plank-active-0')).toBeNull();
   });
@@ -754,18 +886,20 @@ describe('LibraryScreen', () => {
     // Library is subject-first: books and suggestions live on the subject
     // shelf screen instead of expanding inline inside the Library list.
     active = mount({
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [{ id: SUBJECT_1_ID, name: 'Math', status: 'active' }],
     });
 
     await waitFor(() => {
-      active!.result.getByTestId('shelf-row-header-sub-1');
+      active!.result.getByTestId(`shelf-row-header-${SUBJECT_1_ID}`);
     });
-    fireEvent.press(active.result.getByTestId('shelf-row-header-sub-1'));
+    fireEvent.press(
+      active.result.getByTestId(`shelf-row-header-${SUBJECT_1_ID}`),
+    );
 
     expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'sub-1' },
+      params: { subjectId: SUBJECT_1_ID },
     });
   });
 
@@ -774,7 +908,7 @@ describe('LibraryScreen', () => {
   // -----------------------------------------------------------------------
   it('does not show full-page error when only allBooksQuery fails', async () => {
     active = mount({
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [{ id: SUBJECT_1_ID, name: 'Math', status: 'active' }],
       allBooksError: true,
     });
 
@@ -787,12 +921,12 @@ describe('LibraryScreen', () => {
 
   it('does not show full-page error when progress fails after subjects load', async () => {
     active = mount({
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [{ id: SUBJECT_1_ID, name: 'Math', status: 'active' }],
       progressError: true,
     });
 
     await waitFor(() => {
-      active!.result.getByTestId('shelf-row-header-sub-1');
+      active!.result.getByTestId(`shelf-row-header-${SUBJECT_1_ID}`);
     });
     expect(active.result.queryByTestId('library-error')).toBeNull();
   });
@@ -802,11 +936,11 @@ describe('LibraryScreen', () => {
     // its data is shown instead of a full-page error.
     active = mount({
       subjectsError: true,
-      fallbackSubjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      fallbackSubjects: [{ id: SUBJECT_1_ID, name: 'Math', status: 'active' }],
     });
 
     await waitFor(() => {
-      active!.result.getByTestId('shelf-row-header-sub-1');
+      active!.result.getByTestId(`shelf-row-header-${SUBJECT_1_ID}`);
     });
     expect(active.result.queryByTestId('library-error')).toBeNull();
     active.result.getByText('1 subjects');
@@ -814,14 +948,14 @@ describe('LibraryScreen', () => {
 
   describe('Manage Subjects modal — backdrop close [BUG-510]', () => {
     const ONE_SUBJECT: SubjectFixture[] = [
-      { id: 'sub-1', name: 'Math', status: 'active' },
+      { id: SUBJECT_1_ID, name: 'Math', status: 'active' },
     ];
 
     // Delete is only offered on archived subjects (archive-first). The delete
     // tests therefore operate on an archived subject — the only state from
     // which the delete affordance renders.
     const ONE_ARCHIVED_SUBJECT: SubjectFixture[] = [
-      { id: 'sub-1', name: 'Math', status: 'archived' },
+      { id: SUBJECT_1_ID, name: 'Math', status: 'archived' },
     ];
 
     function deleteScopeOptions(): RouteOptions {
@@ -830,12 +964,12 @@ describe('LibraryScreen', () => {
         allBooks: {
           subjects: [
             {
-              subjectId: 'sub-1',
+              subjectId: SUBJECT_1_ID,
               subjectName: 'Math',
               books: [
                 {
-                  id: 'book-1',
-                  subjectId: 'sub-1',
+                  id: BOOK_1_ID,
+                  subjectId: SUBJECT_1_ID,
                   title: 'Algebra',
                   description: null,
                   emoji: null,
@@ -845,8 +979,8 @@ describe('LibraryScreen', () => {
                   updatedAt: '2026-05-31T00:00:00.000Z',
                 },
                 {
-                  id: 'book-2',
-                  subjectId: 'sub-1',
+                  id: BOOK_2_ID,
+                  subjectId: SUBJECT_1_ID,
                   title: 'Geometry',
                   description: null,
                   emoji: null,
@@ -862,7 +996,7 @@ describe('LibraryScreen', () => {
         progress: {
           subjects: [
             {
-              subjectId: 'sub-1',
+              subjectId: SUBJECT_1_ID,
               name: 'Math',
               topicsTotal: 6,
               topicsCompleted: 2,
@@ -900,7 +1034,7 @@ describe('LibraryScreen', () => {
           },
           subjects: [
             {
-              subjectId: 'sub-1',
+              subjectId: SUBJECT_1_ID,
               subjectName: 'Math',
               pedagogyMode: 'socratic',
               topics: {
@@ -979,7 +1113,9 @@ describe('LibraryScreen', () => {
 
       fireEvent.press(active.result.getByTestId('manage-subjects-button'));
       await act(async () => {
-        await pressAsync(active!.result.getByTestId('archive-subject-sub-1'));
+        await pressAsync(
+          active!.result.getByTestId(`archive-subject-${SUBJECT_1_ID}`),
+        );
       });
 
       // The real useUpdateSubject mutation fires PATCH /subjects/:id with the
@@ -987,7 +1123,7 @@ describe('LibraryScreen', () => {
       await waitFor(() => {
         const calls = fetchCallsMatching(
           active!.routedFetch,
-          '/subjects/sub-1',
+          `/subjects/${SUBJECT_1_ID}`,
         );
         expect(calls.length).toBeGreaterThan(0);
         expect(calls[0]!.init?.method).toBe('PATCH');
@@ -1004,7 +1140,9 @@ describe('LibraryScreen', () => {
       });
 
       fireEvent.press(active.result.getByTestId('manage-subjects-button'));
-      fireEvent.press(active.result.getByTestId('delete-subject-sub-1'));
+      fireEvent.press(
+        active.result.getByTestId(`delete-subject-${SUBJECT_1_ID}`),
+      );
 
       expect(platformAlertMock).toHaveBeenCalledWith(
         'Delete Math?',
@@ -1020,9 +1158,13 @@ describe('LibraryScreen', () => {
     it('only offers Delete on archived subjects (archive-first gate)', async () => {
       active = mount({
         subjects: [
-          { id: 'sub-active', name: 'Active Math', status: 'active' },
-          { id: 'sub-paused', name: 'Paused History', status: 'paused' },
-          { id: 'sub-arch', name: 'Archived Spanish', status: 'archived' },
+          { id: SUBJECT_ACTIVE_ID, name: 'Active Math', status: 'active' },
+          { id: SUBJECT_PAUSED_ID, name: 'Paused History', status: 'paused' },
+          {
+            id: SUBJECT_ARCHIVED_ID,
+            name: 'Archived Spanish',
+            status: 'archived',
+          },
         ],
       });
       await waitFor(() => {
@@ -1033,16 +1175,18 @@ describe('LibraryScreen', () => {
       // Active and paused subjects offer no delete affordance — a subject must
       // be archived (a reversible state) before it can be permanently deleted.
       expect(
-        active.result.queryByTestId('delete-subject-sub-active'),
+        active.result.queryByTestId(`delete-subject-${SUBJECT_ACTIVE_ID}`),
       ).toBeNull();
       expect(
-        active.result.queryByTestId('delete-subject-sub-paused'),
+        active.result.queryByTestId(`delete-subject-${SUBJECT_PAUSED_ID}`),
       ).toBeNull();
       // Archived subjects expose Delete alongside Restore.
       expect(
-        active.result.getByTestId('restore-subject-sub-arch'),
+        active.result.getByTestId(`restore-subject-${SUBJECT_ARCHIVED_ID}`),
       ).toBeTruthy();
-      expect(active.result.getByTestId('delete-subject-sub-arch')).toBeTruthy();
+      expect(
+        active.result.getByTestId(`delete-subject-${SUBJECT_ARCHIVED_ID}`),
+      ).toBeTruthy();
     });
 
     it.each([
@@ -1057,7 +1201,9 @@ describe('LibraryScreen', () => {
         });
 
         fireEvent.press(active.result.getByTestId('manage-subjects-button'));
-        const deleteButton = active.result.getByTestId('delete-subject-sub-1');
+        const deleteButton = active.result.getByTestId(
+          `delete-subject-${SUBJECT_1_ID}`,
+        );
 
         expect(deleteButton).toBeDisabled();
         expect(platformAlertMock).not.toHaveBeenCalled();
@@ -1071,7 +1217,9 @@ describe('LibraryScreen', () => {
       });
 
       fireEvent.press(active.result.getByTestId('manage-subjects-button'));
-      fireEvent.press(active.result.getByTestId('delete-subject-sub-1'));
+      fireEvent.press(
+        active.result.getByTestId(`delete-subject-${SUBJECT_1_ID}`),
+      );
       const cancelButton = getAlertButtons().find(
         (button) => button.style === 'cancel',
       );
@@ -1082,7 +1230,7 @@ describe('LibraryScreen', () => {
 
       const deleteCalls = fetchCallsMatching(
         active.routedFetch,
-        '/subjects/sub-1',
+        `/subjects/${SUBJECT_1_ID}`,
       ).filter((call) => call.init?.method === 'DELETE');
       expect(deleteCalls).toHaveLength(0);
     });
@@ -1094,14 +1242,14 @@ describe('LibraryScreen', () => {
         const method = (init?.method ?? 'GET').toUpperCase();
         if (method === 'DELETE') {
           subjects = [];
-          return { deleted: true, subjectId: 'sub-1' };
+          return { deleted: true, subjectId: SUBJECT_1_ID };
         }
         if (url.includes('includeInactive=true')) {
-          return { subjects };
+          return makeSubjectListResponse(subjects);
         }
-        return {
-          subjects: subjects.filter((subject) => subject.status === 'active'),
-        };
+        return makeSubjectListResponse(
+          subjects.filter((subject) => subject.status === 'active'),
+        );
       });
       active = renderScreen(<LibraryScreen />, {
         profile: OWNER,
@@ -1113,7 +1261,9 @@ describe('LibraryScreen', () => {
         active!.result.getByTestId('manage-subjects-button');
       });
       fireEvent.press(active.result.getByTestId('manage-subjects-button'));
-      fireEvent.press(active.result.getByTestId('delete-subject-sub-1'));
+      fireEvent.press(
+        active.result.getByTestId(`delete-subject-${SUBJECT_1_ID}`),
+      );
 
       const deleteButton = getAlertButtons().find(
         (button) => button.style === 'destructive',
@@ -1125,11 +1275,11 @@ describe('LibraryScreen', () => {
       await waitFor(() => {
         const deleteCalls = fetchCallsMatching(
           active!.routedFetch,
-          '/subjects/sub-1',
+          `/subjects/${SUBJECT_1_ID}`,
         ).filter((call) => call.init?.method === 'DELETE');
         expect(deleteCalls).toHaveLength(1);
         expect(
-          active!.result.queryByTestId('shelf-row-header-sub-1'),
+          active!.result.queryByTestId(`shelf-row-header-${SUBJECT_1_ID}`),
         ).toBeNull();
       });
     });
@@ -1142,9 +1292,9 @@ describe('LibraryScreen', () => {
           return errorResponse(500);
         }
         if (url.includes('includeInactive=true')) {
-          return { subjects: ONE_ARCHIVED_SUBJECT };
+          return makeSubjectListResponse(ONE_ARCHIVED_SUBJECT);
         }
-        return { subjects: ONE_ARCHIVED_SUBJECT };
+        return makeSubjectListResponse(ONE_ARCHIVED_SUBJECT);
       });
       active = renderScreen(<LibraryScreen />, {
         profile: OWNER,
@@ -1156,7 +1306,9 @@ describe('LibraryScreen', () => {
         active!.result.getByTestId('manage-subjects-button');
       });
       fireEvent.press(active.result.getByTestId('manage-subjects-button'));
-      fireEvent.press(active.result.getByTestId('delete-subject-sub-1'));
+      fireEvent.press(
+        active.result.getByTestId(`delete-subject-${SUBJECT_1_ID}`),
+      );
 
       const deleteButton = getAlertButtons().find(
         (button) => button.style === 'destructive',
@@ -1171,7 +1323,9 @@ describe('LibraryScreen', () => {
           expect.any(String),
         );
       });
-      expect(active.result.getByTestId('shelf-row-header-sub-1')).toBeTruthy();
+      expect(
+        active.result.getByTestId(`shelf-row-header-${SUBJECT_1_ID}`),
+      ).toBeTruthy();
     });
 
     it('disables other subject actions while one status update is saving', async () => {
@@ -1179,8 +1333,8 @@ describe('LibraryScreen', () => {
       let finishUpdate!: () => void;
       const routedFetch = buildRoutes({
         subjects: [
-          { id: 'sub-1', name: 'Math', status: 'active' },
-          { id: 'sub-2', name: 'History', status: 'active' },
+          { id: SUBJECT_1_ID, name: 'Math', status: 'active' },
+          { id: SUBJECT_2_ID, name: 'History', status: 'active' },
         ],
       });
       routedFetch.setRoute('/subjects', (url: string, init?: RequestInit) => {
@@ -1188,20 +1342,22 @@ describe('LibraryScreen', () => {
         if (method === 'PATCH') {
           return new Promise<unknown>((resolve) => {
             finishUpdate = () =>
-              resolve({
-                subject: { id: 'sub-1', name: 'Math', status: 'archived' },
-              });
+              resolve(
+                makeSubjectResponse({
+                  id: SUBJECT_1_ID,
+                  name: 'Math',
+                  status: 'archived',
+                }),
+              );
           });
         }
         if (url.includes('includeInactive=true')) {
-          return {
-            subjects: [
-              { id: 'sub-1', name: 'Math', status: 'active' },
-              { id: 'sub-2', name: 'History', status: 'active' },
-            ],
-          };
+          return makeSubjectListResponse([
+            { id: SUBJECT_1_ID, name: 'Math', status: 'active' },
+            { id: SUBJECT_2_ID, name: 'History', status: 'active' },
+          ]);
         }
-        return { subjects: [] };
+        return makeSubjectListResponse([]);
       });
       active = renderScreen(<LibraryScreen />, {
         profile: OWNER,
@@ -1214,12 +1370,12 @@ describe('LibraryScreen', () => {
       });
       fireEvent.press(active.result.getByTestId('manage-subjects-button'));
       const updatePromise = fireEvent.press(
-        active.result.getByTestId('archive-subject-sub-1'),
+        active.result.getByTestId(`archive-subject-${SUBJECT_1_ID}`),
       ) as unknown as Promise<void>;
 
       await waitFor(() => {
         expect(
-          active!.result.getByTestId('archive-subject-sub-2'),
+          active!.result.getByTestId(`archive-subject-${SUBJECT_2_ID}`),
         ).toBeDisabled();
       });
       await act(async () => {
@@ -1239,15 +1395,15 @@ describe('LibraryScreen', () => {
   describe('Header topic count [BUG-971]', () => {
     it('counts topics with null bookId in the header subtitle', async () => {
       active = mount({
-        subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        subjects: [{ id: SUBJECT_1_ID, name: 'Math', status: 'active' }],
         retention: {
           subjects: [
             {
-              subjectId: 'sub-1',
+              subjectId: SUBJECT_1_ID,
               topics: [
                 {
-                  topicId: 't-1',
-                  bookId: 'book-1',
+                  topicId: TOPIC_1_ID,
+                  bookId: BOOK_1_ID,
                   easeFactor: 2.5,
                   repetitions: 0,
                   lastReviewedAt: null,
@@ -1255,7 +1411,7 @@ describe('LibraryScreen', () => {
                   failureCount: 0,
                 },
                 {
-                  topicId: 't-2',
+                  topicId: TOPIC_2_ID,
                   bookId: null,
                   easeFactor: 2.5,
                   repetitions: 0,
@@ -1264,7 +1420,7 @@ describe('LibraryScreen', () => {
                   failureCount: 0,
                 },
                 {
-                  topicId: 't-3',
+                  topicId: TOPIC_3_ID,
                   bookId: null,
                   easeFactor: 2.5,
                   repetitions: 0,
@@ -1291,7 +1447,7 @@ describe('LibraryScreen', () => {
 
     it('omits the topic count segment entirely when there are no topics', async () => {
       active = mount({
-        subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        subjects: [{ id: SUBJECT_1_ID, name: 'Math', status: 'active' }],
         retention: { subjects: [] },
       });
 
@@ -1304,33 +1460,33 @@ describe('LibraryScreen', () => {
 
   describe('search result navigation', () => {
     const SEARCH_DATA = {
-      subjects: [{ id: 'sub-1', name: 'Biology' }],
+      subjects: [{ id: SUBJECT_1_ID, name: 'Biology' }],
       books: [
         {
-          id: 'book-1',
-          subjectId: 'sub-1',
+          id: BOOK_1_ID,
+          subjectId: SUBJECT_1_ID,
           subjectName: 'Biology',
           title: 'Cell Biology',
         },
       ],
       topics: [
         {
-          id: 'top-1',
-          bookId: 'book-1',
+          id: TOPIC_1_ID,
+          bookId: BOOK_1_ID,
           bookTitle: 'Cell Biology',
-          subjectId: 'sub-1',
+          subjectId: SUBJECT_1_ID,
           subjectName: 'Biology',
           name: 'Mitosis',
         },
       ],
       notes: [
         {
-          id: 'note-1',
-          sessionId: 'sess-1',
-          topicId: 'top-1',
+          id: NOTE_1_ID,
+          sessionId: SESSION_1_ID,
+          topicId: TOPIC_1_ID,
           topicName: 'Mitosis',
-          bookId: 'book-1',
-          subjectId: 'sub-1',
+          bookId: BOOK_1_ID,
+          subjectId: SUBJECT_1_ID,
           subjectName: 'Biology',
           contentSnippet: 'powerhouse of the cell',
           createdAt: '2026-01-01T00:00:00.000Z',
@@ -1338,11 +1494,11 @@ describe('LibraryScreen', () => {
       ],
       sessions: [
         {
-          sessionId: 'sess-1',
-          topicId: 'top-1',
+          sessionId: SESSION_1_ID,
+          topicId: TOPIC_1_ID,
           topicTitle: 'Mitosis',
-          bookId: 'book-1',
-          subjectId: 'sub-1',
+          bookId: BOOK_1_ID,
+          subjectId: SUBJECT_1_ID,
           subjectName: 'Biology',
           snippet: 'explored cells today',
           occurredAt: '2026-01-01T00:00:00.000Z',
@@ -1352,11 +1508,11 @@ describe('LibraryScreen', () => {
 
     async function renderSearching(): Promise<void> {
       active = mount({
-        subjects: [{ id: 'sub-1', name: 'Biology', status: 'active' }],
+        subjects: [{ id: SUBJECT_1_ID, name: 'Biology', status: 'active' }],
         progress: {
           subjects: [
             {
-              subjectId: 'sub-1',
+              subjectId: SUBJECT_1_ID,
               topicsTotal: 5,
               topicsCompleted: 2,
               topicsVerified: 2,
@@ -1368,7 +1524,7 @@ describe('LibraryScreen', () => {
         search: SEARCH_DATA,
       });
       await waitFor(() => {
-        active!.result.getByTestId('shelf-row-header-sub-1');
+        active!.result.getByTestId(`shelf-row-header-${SUBJECT_1_ID}`);
       });
       fireEvent.changeText(
         active.result.getByTestId('library-search-input'),
@@ -1379,7 +1535,7 @@ describe('LibraryScreen', () => {
         jest.advanceTimersByTime(350);
       });
       await waitFor(() => {
-        active!.result.getByTestId('search-subject-row-sub-1');
+        active!.result.getByTestId(`search-subject-row-${SUBJECT_1_ID}`);
       });
     }
 
@@ -1393,31 +1549,33 @@ describe('LibraryScreen', () => {
 
     it('subject row tap calls router.push to shelf', async () => {
       await renderSearching();
-      fireEvent.press(active!.result.getByTestId('search-subject-row-sub-1'));
+      fireEvent.press(
+        active!.result.getByTestId(`search-subject-row-${SUBJECT_1_ID}`),
+      );
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/shelf/[subjectId]',
-          params: { subjectId: 'sub-1' },
+          params: { subjectId: SUBJECT_1_ID },
         }),
       );
     });
 
     it('book row tap pushes shelf then book', async () => {
       await renderSearching();
-      fireEvent.press(active!.result.getByTestId('book-row-book-1'));
+      fireEvent.press(active!.result.getByTestId(`book-row-${BOOK_1_ID}`));
       expect(mockPush).toHaveBeenCalledTimes(2);
       expect(mockPush).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({
           pathname: '/(app)/shelf/[subjectId]',
-          params: { subjectId: 'sub-1' },
+          params: { subjectId: SUBJECT_1_ID },
         }),
       );
       expect(mockPush).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({
           pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-          params: { subjectId: 'sub-1', bookId: 'book-1' },
+          params: { subjectId: SUBJECT_1_ID, bookId: BOOK_1_ID },
         }),
       );
     });
@@ -1427,35 +1585,45 @@ describe('LibraryScreen', () => {
     // back-button fallback resolves to the correct book screen.
     it('topic row tap pushes to topic screen with subjectId and bookId context', async () => {
       await renderSearching();
-      fireEvent.press(active!.result.getByTestId('topic-row-top-1'));
+      fireEvent.press(active!.result.getByTestId(`topic-row-${TOPIC_1_ID}`));
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/topic/[topicId]',
-          params: { topicId: 'top-1', subjectId: 'sub-1', bookId: 'book-1' },
+          params: {
+            topicId: TOPIC_1_ID,
+            subjectId: SUBJECT_1_ID,
+            bookId: BOOK_1_ID,
+          },
         }),
       );
     });
 
     it('note row tap pushes to parent topic with subjectId and bookId context', async () => {
       await renderSearching();
-      fireEvent.press(active!.result.getByTestId('note-row-note-1'));
+      fireEvent.press(active!.result.getByTestId(`note-row-${NOTE_1_ID}`));
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/topic/[topicId]',
-          params: { topicId: 'top-1', subjectId: 'sub-1', bookId: 'book-1' },
+          params: {
+            topicId: TOPIC_1_ID,
+            subjectId: SUBJECT_1_ID,
+            bookId: BOOK_1_ID,
+          },
         }),
       );
     });
 
     it('session row tap pushes to root session-summary route', async () => {
       await renderSearching();
-      fireEvent.press(active!.result.getByTestId('session-row-sess-1'));
+      fireEvent.press(
+        active!.result.getByTestId(`session-row-${SESSION_1_ID}`),
+      );
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/session-summary/[sessionId]',
           params: expect.objectContaining({
-            sessionId: 'sess-1',
-            subjectId: 'sub-1',
+            sessionId: SESSION_1_ID,
+            subjectId: SUBJECT_1_ID,
           }),
         }),
       );
@@ -1477,7 +1645,7 @@ describe('LibraryScreen', () => {
       // /library/retention never resolves — subjects are loaded, so the shelf
       // rows must still render (no overall-progress loading gate required).
       const routedFetch = buildRoutes({
-        subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        subjects: [{ id: SUBJECT_1_ID, name: 'Math', status: 'active' }],
       });
       routedFetch.setRoute('/library/retention', () => NEVER());
       active = renderScreen(<LibraryScreen />, {
@@ -1487,7 +1655,7 @@ describe('LibraryScreen', () => {
       });
 
       await waitFor(() => {
-        active!.result.getByTestId('shelf-row-header-sub-1');
+        active!.result.getByTestId(`shelf-row-header-${SUBJECT_1_ID}`);
       });
     });
 
@@ -1502,17 +1670,21 @@ describe('LibraryScreen', () => {
 
       active = mount({
         subjects: [
-          { id: 'sub-strong', name: 'Strong Subject', status: 'active' },
-          { id: 'sub-fading', name: 'Fading Subject', status: 'active' },
-          { id: 'sub-forgotten', name: 'Forgotten Subject', status: 'active' },
+          { id: SUBJECT_STRONG_ID, name: 'Strong Subject', status: 'active' },
+          { id: SUBJECT_FADING_ID, name: 'Fading Subject', status: 'active' },
+          {
+            id: SUBJECT_FORGOTTEN_ID,
+            name: 'Forgotten Subject',
+            status: 'active',
+          },
         ],
         retention: {
           subjects: [
             {
-              subjectId: 'sub-strong',
+              subjectId: SUBJECT_STRONG_ID,
               topics: [
                 {
-                  topicId: 't-s1',
+                  topicId: TOPIC_STRONG_ID,
                   easeFactor: 2.5,
                   repetitions: 3,
                   nextReviewAt: FUTURE,
@@ -1524,10 +1696,10 @@ describe('LibraryScreen', () => {
               reviewDueCount: 0,
             },
             {
-              subjectId: 'sub-fading',
+              subjectId: SUBJECT_FADING_ID,
               topics: [
                 {
-                  topicId: 't-f1',
+                  topicId: TOPIC_FADING_ID,
                   easeFactor: 2.5,
                   repetitions: 2,
                   nextReviewAt: NEAR,
@@ -1539,10 +1711,10 @@ describe('LibraryScreen', () => {
               reviewDueCount: 1,
             },
             {
-              subjectId: 'sub-forgotten',
+              subjectId: SUBJECT_FORGOTTEN_ID,
               topics: [
                 {
-                  topicId: 't-g1',
+                  topicId: TOPIC_FORGOTTEN_ID,
                   easeFactor: 2.5,
                   repetitions: 1,
                   nextReviewAt: null,
@@ -1560,10 +1732,10 @@ describe('LibraryScreen', () => {
       // All three shelves render — data sourced exclusively from the library
       // retention payload (not from useOverallProgress).
       await waitFor(() => {
-        active!.result.getByTestId('shelf-row-header-sub-strong');
+        active!.result.getByTestId(`shelf-row-header-${SUBJECT_STRONG_ID}`);
       });
-      active.result.getByTestId('shelf-row-header-sub-fading');
-      active.result.getByTestId('shelf-row-header-sub-forgotten');
+      active.result.getByTestId(`shelf-row-header-${SUBJECT_FADING_ID}`);
+      active.result.getByTestId(`shelf-row-header-${SUBJECT_FORGOTTEN_ID}`);
 
       // All three subject names are visible
       active.result.getByText('Strong Subject');
@@ -1581,7 +1753,7 @@ describe('LibraryScreen', () => {
     it('renders the subject list via a virtualized SectionList', async () => {
       // 50 subjects — well above any plausible viewport window.
       const subjects = Array.from({ length: 50 }, (_, i) => ({
-        id: `sub-${i}`,
+        id: `00000000-0000-4000-8000-${String(i + 100).padStart(12, '0')}`,
         name: `Subject ${i}`,
         status: 'active' as const,
       }));
@@ -1610,7 +1782,7 @@ describe('LibraryScreen', () => {
   // -------------------------------------------------------------------------
   describe('proxy mode write guard [WI-273]', () => {
     const PROXY_ROUTES: RouteOptions = {
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [{ id: SUBJECT_1_ID, name: 'Math', status: 'active' }],
     };
 
     it('shows the proxy read-only hint when in proxy mode [WI-273]', async () => {
@@ -1671,13 +1843,15 @@ describe('LibraryScreen', () => {
       // Open the modal and press the archive action for the subject.
       fireEvent.press(active.result.getByTestId('manage-subjects-button'));
       await act(async () => {
-        await pressAsync(active!.result.getByTestId('archive-subject-sub-1'));
+        await pressAsync(
+          active!.result.getByTestId(`archive-subject-${SUBJECT_1_ID}`),
+        );
       });
 
       await waitFor(() => {
         const calls = fetchCallsMatching(
           active!.routedFetch,
-          '/subjects/sub-1',
+          `/subjects/${SUBJECT_1_ID}`,
         );
         expect(calls.length).toBeGreaterThan(0);
         expect(calls[0]!.init?.method).toBe('PATCH');
@@ -1705,13 +1879,19 @@ describe('LibraryScreen', () => {
       });
       fireEvent.press(result.getByTestId('manage-subjects-button'));
       // Controls are enabled while the modal is open in non-proxy mode.
-      expect(result.getByTestId('archive-subject-sub-1')).not.toBeDisabled();
+      expect(
+        result.getByTestId(`archive-subject-${SUBJECT_1_ID}`),
+      ).not.toBeDisabled();
 
       // Proxy mode activates while the modal is still open (state persists).
       rerender(true);
 
-      expect(result.getByTestId('archive-subject-sub-1')).toBeDisabled();
-      expect(result.getByTestId('pause-subject-sub-1')).toBeDisabled();
+      expect(
+        result.getByTestId(`archive-subject-${SUBJECT_1_ID}`),
+      ).toBeDisabled();
+      expect(
+        result.getByTestId(`pause-subject-${SUBJECT_1_ID}`),
+      ).toBeDisabled();
     });
   });
 
@@ -1759,7 +1939,9 @@ describe('LibraryScreen', () => {
       // stale-data banner in ListHeaderComponent.
       active = mount({
         subjectsError: true,
-        fallbackSubjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        fallbackSubjects: [
+          { id: SUBJECT_1_ID, name: 'Math', status: 'active' },
+        ],
       });
 
       await waitFor(() => {
@@ -1787,7 +1969,9 @@ describe('LibraryScreen', () => {
       // by rendering the error-with-fallback state and finding any stale banner.
       active = mount({
         subjectsError: true,
-        fallbackSubjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        fallbackSubjects: [
+          { id: SUBJECT_1_ID, name: 'Math', status: 'active' },
+        ],
       });
 
       // In this state the SectionList path renders showingStaleCachedData=true
@@ -1807,11 +1991,11 @@ describe('LibraryScreen', () => {
     it('curriculum-complete add-subject button has accessibilityRole="button" and non-empty accessibilityLabel', async () => {
       // Curriculum complete = all subjects have topicsMastered >= topicsTotal > 0.
       active = mount({
-        subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        subjects: [{ id: SUBJECT_1_ID, name: 'Math', status: 'active' }],
         progress: {
           subjects: [
             {
-              subjectId: 'sub-1',
+              subjectId: SUBJECT_1_ID,
               topicsTotal: 5,
               topicsCompleted: 5,
               topicsVerified: 5,
