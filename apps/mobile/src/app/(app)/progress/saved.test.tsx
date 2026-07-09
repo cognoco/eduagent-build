@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -22,6 +23,7 @@ jest.mock('react-i18next', () => ({
         'progress.saved.dateDaysAgo': `${String(opts?.count ?? '')} days ago`,
         'progress.saved.dateWeeksAgo': `${String(opts?.count ?? '')} weeks ago`,
         'progress.saved.bookmarkLabel': `Bookmark from ${String(opts?.subject ?? '')}`,
+        'progress.saved.bookmarkLabelNoSubject': 'Bookmark',
         'progress.saved.removeBookmark': 'Remove bookmark',
         'progress.saved.tapToExpand': 'Tap to expand',
         'progress.saved.deleteTitle': 'Delete bookmark?',
@@ -193,6 +195,10 @@ function mockHooks({
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('SavedBookmarksScreen', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockMarkdownDisplay.mockClear();
@@ -219,6 +225,26 @@ describe('SavedBookmarksScreen', () => {
       mockHooks({ isLoading: true });
       render(<SavedBookmarksScreen />);
       expect(screen.queryByTestId('bookmark-row-bk-1')).toBeNull();
+    });
+
+    it('turns the loading state into retry and back actions after timeout', () => {
+      jest.useFakeTimers();
+      const refetch = jest.fn();
+      mockHooks({ isLoading: true, refetch });
+      render(<SavedBookmarksScreen />);
+
+      act(() => {
+        jest.advanceTimersByTime(15_000);
+      });
+
+      fireEvent.press(screen.getByTestId('saved-timeout-retry'));
+      fireEvent.press(screen.getByTestId('saved-timeout-back'));
+
+      expect(refetch).toHaveBeenCalledTimes(1);
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/progress',
+      );
     });
   });
 
@@ -330,6 +356,16 @@ describe('SavedBookmarksScreen', () => {
       mockHooks({ bookmarks: [BOOKMARK_1] });
       render(<SavedBookmarksScreen />);
       screen.getByText(/Spanish/);
+    });
+
+    it('uses the no-subject accessibility label when a bookmark subject is blank', () => {
+      mockHooks({
+        bookmarks: [{ ...BOOKMARK_1, subjectName: '   ' }],
+      });
+      render(<SavedBookmarksScreen />);
+
+      expect(screen.getByLabelText('Bookmark')).toBeTruthy();
+      expect(screen.queryByLabelText('Bookmark from')).toBeNull();
     });
 
     it('renders topic title alongside subject name when present', () => {

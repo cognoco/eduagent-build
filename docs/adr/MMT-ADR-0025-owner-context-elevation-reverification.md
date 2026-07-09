@@ -37,7 +37,7 @@ The mobile client intercepts the non-owner→owner tap and drives a fresh factor
 
 - **Reverses a documented design choice.** The `[CR-2026-05-19-H1]` "no owner gate" intent is superseded by this ADR; the inline note and the `[BUG-133]` "no client guard" comment are updated to point here.
 - **New cross-package contract.** A new error code `OWNER_ELEVATION_REQUIRED` is added to `@eduagent/schemas` `ERROR_CODES`; the JWT trust-boundary schema (`clerkJWTClaimsSchema`) and `AuthUser` gain an `fva` field. Future profile-switch callers must handle the 403.
-- **`architecture.md` is amended in lockstep when the gate lands** (the implementation PR, not this doc PR) — canon records *current true state*, and the gate is not yet enforced in code. The amendment states: "a non-owner→owner profile switch requires a fresh primary-factor reverification (`fva`), enforced server-side and flag-guarded."
+- **The canon rule this ADR establishes:** a non-owner→owner profile switch requires a fresh primary-factor reverification (`fva`), enforced server-side and flag-guarded (`architecture.md` carries this line; ADR and canon move in lockstep).
 - **Regression coverage is mandatory.** The existing `profiles.test.tsx` test that asserts an immediate child→owner switch encodes the vulnerability and is **inverted** (per the test-integrity rule), plus a server negative-path test (`child JWT → owner switch → 403`).
 - **No schema migration** — the decision deliberately avoids an owner-PIN (which would need a DB column); the signal rides Clerk's existing session token.
 
@@ -50,6 +50,6 @@ The mobile client intercepts the non-owner→owner tap and drives a fresh factor
 
 ## What this ADR does not decide
 
-- **The exact Clerk-Expo call that forces a fresh primary-factor verification** for a non-Clerk-API action (our `/profiles/switch`) — a bounded client-mechanism spike owned by the implementation plan (`docs/plans/2026-06-20-owner-context-elevation-gate.md` T2).
-- **The precise `fva` recency threshold** (the plan sets an initial `OWNER_ELEVATION_MAX_FVA_MINUTES = 10`, tunable) and the confirmation of `fva` units against a real staging-Clerk token (plan T1).
+- **The exact Clerk-Expo call that forces a fresh primary-factor verification** for a non-Clerk-API action (our `/profiles/switch`) — an implementation detail; the code is the source of truth.
+- **The precise `fva` recency threshold** — an operational tunable (`OWNER_ELEVATION_MAX_FVA_MINUTES`, initially 10 minutes), owned by config/code, not fixed by this ADR.
 - **Owner-elevation for any surface other than the profile switch** — out of scope; `isOwner` content gating inside already-active owner context is unchanged.

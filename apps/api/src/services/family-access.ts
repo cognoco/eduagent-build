@@ -8,7 +8,6 @@
 import { type Database } from '@eduagent/database';
 import { ForbiddenError } from '../errors';
 import { calculateAge } from './age-utils';
-import type { Context, Env, Input } from 'hono';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import {
   validateGuardianshipEdgeV2,
@@ -16,18 +15,20 @@ import {
 } from './identity-v2/family-bridge-v2';
 import { verifyPersonIsOrgAdminV2 } from './identity-v2/ownership-v2';
 
-type ProfileMetaContextEnv = Env & {
-  Variables: {
-    profileMeta: ProfileMeta | undefined;
-  };
+type ProfileMetaSource = {
+  get(key: 'profileMeta'): ProfileMeta | undefined;
 };
 
-type CallerOwnerContextEnv = Env & {
-  Variables: {
-    db: Database;
-    account: { id: string } | undefined;
-    callerPersonId: string | undefined;
-  };
+type OwnConsentProfileMeta = {
+  birthYear?: number | null;
+  isOwner?: boolean;
+  resolvedVia?: ProfileMeta['resolvedVia'];
+};
+
+type CallerOwnerSource = {
+  get(key: 'db'): Database;
+  get(key: 'account'): { id: string } | undefined;
+  get(key: 'callerPersonId'): string | undefined;
 };
 
 /**
@@ -79,14 +80,12 @@ export async function assertParentAccess(
  *   - Non-owner profiles under 18 (minor child on a parent's account).
  *   - Any profile where birthYear is missing/null (fail closed).
  *
- * The `c` parameter accepts any Hono Context that exposes `profileMeta`.
+ * Accepts the already-resolved profile metadata from route context. Keep Hono
+ * out of this helper so consent authorization remains framework-independent.
  */
 export function assertCanManageOwnConsent<
-  E extends ProfileMetaContextEnv,
-  P extends string,
-  I extends Input,
->(c: Context<E, P, I>): void {
-  const profileMeta = c.get('profileMeta');
+  T extends OwnConsentProfileMeta | undefined,
+>(profileMeta: T): void {
   // [Issue 901] Reject auto-synthesized owner identity. profileScopeMiddleware
   // auto-resolves the account OWNER profile (isOwner:true) when no X-Profile-Id
   // header is sent. Because the synthesized identity IS the owner, BOTH the
@@ -140,21 +139,16 @@ export function assertCanManageOwnConsent<
  * that both guards fire at every call site without callers remembering to
  * add the isOwner check manually.
  *
- * The `c` parameter accepts any Hono Context whose route env exposes
- * `profileMeta`. Each route file keeps its own env type while this helper
- * preserves the concrete Bindings/Variables/Input shape at the call site.
+ * The source parameter accepts the narrow getter shape exposed by route
+ * context. Keep Hono out of this service so the guard remains framework-free.
  */
-export async function assertOwnerAndParentAccess<
-  E extends ProfileMetaContextEnv,
-  P extends string,
-  I extends Input,
->(
-  c: Context<E, P, I>,
+export async function assertOwnerAndParentAccess(
+  source: ProfileMetaSource,
   db: Database,
   parentProfileId: string,
   childProfileId: string,
 ): Promise<void> {
-  const profileMeta = c.get('profileMeta');
+  const profileMeta = source.get('profileMeta');
   if (profileMeta?.isOwner !== true) {
     throw new ForbiddenError(
       'Only the account owner can perform administrative actions on child profiles.',
@@ -173,15 +167,11 @@ export async function assertOwnerAndParentAccess<
   await assertParentAccess(db, parentProfileId, childProfileId);
 }
 
-export function assertOwnerProfile<
-  E extends ProfileMetaContextEnv,
-  P extends string,
-  I extends Input,
->(
-  c: Context<E, P, I>,
+export function assertOwnerProfile(
+  source: ProfileMetaSource,
   message = 'Only the account owner can view this surface.',
 ): void {
-  const profileMeta = c.get('profileMeta');
+  const profileMeta = source.get('profileMeta');
   if (profileMeta?.isOwner !== true) {
     throw new ForbiddenError(message);
   }
@@ -230,20 +220,16 @@ export function assertOwnerProfile<
  * based pattern is shared by ~30 other route files outside this WI's AC
  * scope; a repo-wide sweep is a separate, tracked follow-up).
  */
-export async function assertCallerIsAccountOwner<
-  E extends CallerOwnerContextEnv,
-  P extends string,
-  I extends Input,
->(
-  c: Context<E, P, I>,
+export async function assertCallerIsAccountOwner(
+  source: CallerOwnerSource,
   message = 'Only the account owner can perform this action.',
 ): Promise<void> {
-  const account = c.get('account');
-  const callerPersonId = c.get('callerPersonId');
+  const account = source.get('account');
+  const callerPersonId = source.get('callerPersonId');
   if (!account || !callerPersonId) {
     throw new ForbiddenError(message);
   }
-  const db = c.get('db');
+  const db = source.get('db');
   const isCallerAdmin = await verifyPersonIsOrgAdminV2(
     db,
     callerPersonId,

@@ -82,6 +82,7 @@ export async function expirePendingDeepeningRows(
   // not required because the WHERE filters on (status, pending_expires_at) only.
   // We UPDATE to 'resolved' rather than DELETE so the audit trail of every
   // "learner had a wobble here that never got corroborated" survives.
+  // scope-allow: system-wide expiry cron intentionally resolves due pending rows.
   const expiredRows = await db
     .update(needsDeepeningTopics)
     .set({

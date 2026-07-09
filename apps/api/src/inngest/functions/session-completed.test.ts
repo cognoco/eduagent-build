@@ -626,12 +626,16 @@ import type { Database } from '@eduagent/database';
 /** Simulates Inngest step.run by capturing step handlers */
 async function executeSteps(
   eventData: Record<string, unknown>,
+  options: { memoizedStepResults?: Record<string, unknown> } = {},
 ): Promise<Record<string, unknown>> {
   const steps: Record<string, () => Promise<unknown>> = {};
 
   const mockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
       steps[name] = fn;
+      if (name in (options.memoizedStepResults ?? {})) {
+        return options.memoizedStepResults?.[name];
+      }
       return fn();
     }),
     // [SWEEP-SILENT-RECOVERY] Production now dispatches a queryable
@@ -1129,6 +1133,47 @@ describe('sessionCompleted', () => {
           'update-retention:topic-b',
           'update-retention:topic-c',
         ]),
+      );
+    });
+
+    it('[WI-1426] skips already memoized retention topics on retry while unfinished topics continue', async () => {
+      await executeSteps(
+        createEventData({
+          interleavedTopicIds: ['topic-a', 'topic-b', 'topic-c'],
+          qualityRating: 4,
+          timestamp: undefined,
+        }),
+        {
+          memoizedStepResults: {
+            'update-retention:topic-a': {
+              step: 'update-retention:topic-a',
+              status: 'ok',
+            },
+          },
+        },
+      );
+
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledTimes(2);
+      expect(mockUpdateRetentionFromSession).not.toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        'topic-a',
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        'topic-b',
+        4,
+        undefined,
+      );
+      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        'topic-c',
+        4,
+        undefined,
       );
     });
 

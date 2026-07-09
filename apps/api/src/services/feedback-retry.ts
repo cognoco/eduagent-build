@@ -126,6 +126,7 @@ export async function purgeExpiredFeedbackRetries(
   db: Database,
   cutoff: Date,
 ): Promise<number> {
+  // scope-allow: retention-floor purge is a system maintenance delete.
   const deleted = await db
     .delete(feedbackRetryQueue)
     .where(lt(feedbackRetryQueue.createdAt, cutoff))

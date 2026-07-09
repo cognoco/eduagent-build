@@ -8,6 +8,7 @@ const logger = createLogger();
 
 interface PendingNoticePayload {
   childName: string;
+  sourceId?: string;
 }
 
 function parsePayload(payload: unknown): PendingNoticePayload {
@@ -34,9 +35,13 @@ export async function recordPendingNotice(
     ownerProfileId: string;
     type: PendingNoticeType;
     childName: string;
+    sourceId?: string;
   },
 ): Promise<string> {
-  const payloadJson = { childName: input.childName };
+  const payloadJson: PendingNoticePayload = { childName: input.childName };
+  if (input.sourceId) {
+    payloadJson.sourceId = input.sourceId;
+  }
   const [row] = await db
     .insert(pendingNotices)
     .values({

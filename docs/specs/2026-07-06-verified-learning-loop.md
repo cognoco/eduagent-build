@@ -9,6 +9,8 @@
 - `docs/specs/2026-06-03-review-relearn-findings-and-high-impact-todos.md` — RR-N register this spec maps onto WIs
 - `docs/_archive/plans/done/2026-05-30-topic-mastery-three-states.md` — shipped Untouched → Learning → Mastered model
 - `docs/plans/v2-plan/00-STATE-OF-PLAY.md` §5–§6 — the "knows-me" loop orientation
+- `docs/adr/MMT-ADR-0031-challenge-verification-and-sm2-are-complementary-mastery-axes.md` — proposed axes ruling for S4 / WI-1469
+- `docs/adr/MMT-ADR-0032-verified-learning-artifacts-require-source-and-verification-state.md` — proposed artifact provenance contract for S5a / S7
 
 ## Purpose
 
@@ -46,7 +48,7 @@ Non-session surfaces:
 - **Mentor/Now** (`apps/mobile/src/app/(app)/mentor.tsx`) — due-review visibility
 - **Journal/notes** (`SubjectHub` notes section, `JournalTabView`) — the artifact's home
 - **Progress** (`apps/api/src/services/progress.ts`) — the one place both mastery axes are read together today
-- **Parent recaps** (`/(app)/recaps`, `apps/api/src/services/recaps.ts`) + child screens — segment 5
+- **Parent recaps** (`/(app)/recaps`, `apps/api/src/services/recaps.ts`) + child screens — segment 5. Caveat: the recaps tab is V1-family-shape only; current prod V0 family mode does not expose it, so S7 must pick a prod-visible parent target or explicitly depend on a nav/flag rollout.
 - **Transcripts** — provenance source; subject to purge (`transcript-purge.ts`); `retrieval_events` deliberately survives purge (`packages/database/src/schema/retrieval-events.ts:69-76`)
 
 ## What exists today (per segment, with evidence)
@@ -71,6 +73,7 @@ Live across all session paths. No changes needed for this loop.
 - **Learner-authored notes: API + topic-sheet write path SHIPPED, overview still read-only.** Full CRUD in `services/notes.ts` (`createNote:472`, `updateNote:506`, `deleteNoteById:529`; session-embedded `createNoteForSession:232`). The subject-hub route wires `handleAddNote` into `SubjectHub` (`subject-hub/[subjectId]/index.tsx:310`), and `TopicDetailSheet` binds that handler to a focused topic (`TopicDetailSheet.tsx:118`). But the top-level `SubjectHub.tsx:121` notes overview still omits `onAddNote`, so that overview section renders read-only (`SubjectHubNotesSection.tsx:78`, `canAddNote = canStudy && !!onAddNote`). Felt-knowing-loop Flow 1 owns any remaining overview/landing-surface write affordance.
 - **Provenance/citation substrate: GAP.** `evidence_links` and `LearnerSource` have **zero code hits** — decided in review-continuity slice 2a, never built. The Journal browse component now exists as `JournalNotesArchive` inside `JournalTabView.tsx:587`; the missing piece is not the archive shell, but the provenance/citation substrate that lets a verified artifact point back to source evidence.
 - **Correctness grading of learner notes: GAP.** The note-correctness plan (grade notes, marks UI, save-as-note) is captured as WI-1491; it was parked 2026-06-08 pending the identity baseline reset, which has since landed on staging + prod — re-verify unparking at execution.
+- **Artifact taxonomy: GAP.** Challenge-drafted notes, learner-authored notes, and freeform "keep this" artifacts must not collapse into one generic note type. Parent proof may only consume an artifact with explicit source + verification state, e.g. `source='challenge_solid_quote'` with `verificationState='verified'`. Ordinary learner notes remain learner-authored study material until WI-1491 or a later grader marks them.
 
 ### Segment 4 — Retention / retest: SHIPPED core, broken hand-off from segment 2
 
@@ -80,9 +83,10 @@ Live across all session paths. No changes needed for this loop.
 - **The broken hand-off:** Challenge-Round verification does **not** write `retention_cards.nextReviewAt` — a Challenge-verified topic gets no scheduled re-prove. This is the loop's single most load-bearing missing edge (WI-1445).
 - Relearn resets the card to baseline pre-advance (`relearn-retention-reset`, flows doc Path 5) and its `needs_deepening_topics` insert blocks Challenge eligibility until `EXIT_CONSECUTIVE_SUCCESSES = 3` — abandoned relearn sessions can leave the block standing (flows doc Path 5, known gap 2).
 
-### Segment 5 — Parent proof: SHIPPED surface, no verified metadata
+### Segment 5 — Parent proof: V1 surface shipped, no verified metadata
 
 - Recaps derived, never raw transcript: `services/recaps.ts` (`listRecapsForParent:176`, `getRecapForParent:341`, `validateRecapItems:260`); mobile `/(app)/recaps` list+detail; `recaps` tab in `FAMILY_TABS` (`navigation-contract.ts:157-159`).
+- **Prod-visibility caveat:** flow inventory PARENT-11 marks Family Recaps as V1-only; current prod V0 family mode has no recaps tab. S7 cannot be considered shipped for parents unless it either targets a current prod parent surface (for example parent home / child session detail) or explicitly ships with the approved V1/nav rollout.
 - **GAP:** recaps carry **no** verified/mastery/provenance fields (grep of `recaps.ts` for `verified|provenance|mastery`: zero hits). A parent today sees narrative prose, not proof.
 
 ## The two mastery axes — actual reconciliation state
@@ -101,19 +105,27 @@ Live across all session paths. No changes needed for this loop.
 
 | # | Slice | Closes | WI | Stage today |
 |---|---|---|---|---|
-| S1 | Calibrate the all-or-nothing mastery bar via the simulated-learner harness, then flip `CHALLENGE_ROUND_RUNTIME_ENABLED` on staging | Segment 2 goes live | **WI-1464** (calibrate Challenge mastery bar, RR-6) + Doppler flip (op task, not a WI) | Captured |
-| S2 | Write `retention_cards.nextReviewAt` on Challenge-Round mastery verification | Segment 2→4 hand-off | **WI-1445** (correctness-chain #7) | Captured |
+| S1 | Calibrate the all-or-nothing mastery bar via the simulated-learner harness, add telemetry/rollback gates, then flip `CHALLENGE_ROUND_RUNTIME_ENABLED` on staging only | Segment 2 goes live in staging without a prod commitment | **WI-1464** (calibrate Challenge mastery bar, RR-6) + Doppler flip (op task, not a WI) | Captured |
+| S2 | Write `retention_cards.nextReviewAt` on Challenge-Round mastery verification, after the axes preflight defines the write semantics | Segment 2→4 hand-off | **WI-1445** (correctness-chain #7) | Captured |
 | S3a | Promote `needs_deepening_topics` `pending_review` → `active` (+ expiry) | weak-spot lifecycle; named flip blocker in `config.ts:154-155` | **WI-1446** (stranded promotion) | Captured |
 | S3b | Low-stakes per-concept re-prove for recovering strugglers | recovery path out of a failed Challenge (RR-7 lockout) | **WI-1465** | Captured |
 | S3c | Concept-targeted review: focus due-topic recall on open weak concepts | segment 4 uses segment 2's concept evidence | **WI-1454** | Captured |
-| S4 | Rule the SM-2-verified vs Challenge-verified relationship (write-side) | the axes ruling (RR-11); ADR-class | **WI-1469** | Captured |
-| S5a | Writable notes + freeform keep + evidence citation | Segment 3 learner-authored artifact + citation | felt-knowing-loop spec Flows 1–3 (no WIs claimed yet — promote to WIs when scheduled, per STATE-OF-PLAY §6) | Specced |
+| S4 | Rule the SM-2-verified vs Challenge-verified relationship (write-side); complete at least a preflight ruling before S2 writes schedules | the axes ruling (RR-11); ADR-class; proposed in MMT-ADR-0031 | **WI-1469** | Captured |
+| S5a | Writable notes + freeform keep + evidence citation + explicit artifact source/verification taxonomy | Segment 3 learner-authored artifact + citation; proposed in MMT-ADR-0032 | **WI-1703** (Define verified-artifact provenance contract) + **WI-1704** (Build evidence-links substrate) + felt-knowing-loop spec Flows 1–3 | Captured blockers now exist; still refine before execution |
 | S5b | Grade learner notes, marks UI, save-as-note | Segment 3 correctness | **WI-1491** (note-correctness T1–T13 umbrella; verify unparked post-baseline-reset) | Captured |
 | S6 | Visible review-promise Mentor card ("we'll check this again on …") | Segment 4 visible in Now at promise time, not only when due | **WI-1502** | Captured |
-| S7 | Parent proof consumes the verified artifact (recap carries verified-topic + artifact reference + retention state, within retention rules) | Segment 5 | **WI-1665** (captured 2026-07-06 as incidental item under WI-1657) | Captured |
-| S8 | One end-to-end loop test/eval pack: verified, partial, misconception, decay→retest, parent-visible proof | AC6 | **WI-1666** (captured 2026-07-06 as incidental item under WI-1657) | Captured |
+| S7 | Parent proof consumes the verified artifact (recap/current-prod parent surface carries verified-topic + artifact reference + retention state, within retention rules) | Segment 5 | **WI-1705** (Choose production-visible parent proof surface) → **WI-1665** (captured 2026-07-06 as incidental item under WI-1657) | Captured; surface decision blocks implementation |
+| S8 | One end-to-end loop test/eval pack, scaffolded before the staging flag flip and expanded slice-by-slice: verified, partial, misconception, decay→retest, parent-visible proof | AC6 | **WI-1666** (captured 2026-07-06 as incidental item under WI-1657) | Captured |
 
 AC coverage: AC1 = this spec · AC2 = S1+S3b (explain-back gate; the never-lock rule bounds it — see walkthrough) · AC3 = S5a+S5b (+ the already-built Challenge note-draft path) · AC4 = S2+S3a+S3c+S6 · AC5 = S7 · AC6 = S8.
+
+## Execution gates added after adversarial review
+
+- **No prod Challenge flip from this plan.** S1 may flip staging only. Any prod flip needs explicit operator approval after S3a, S4 preflight, S8 baseline coverage, and staging telemetry show no lockout/regression.
+- **No schedule write before the axes ruling.** S2 may implement the persistence mechanics only after S4 records the minimum rule for how Challenge verification, SM-2 decay, `masteredAt`, and `masteryVerificationState` interact.
+- **No parent proof before artifact provenance.** S7 is blocked until S5a has concrete Work Items and an artifact contract that distinguishes challenge-verified quotes, learner-authored notes, and freeform kept material.
+- **No parent proof counted if only V1 recaps can see it.** S7 must name the parent surface that is visible in the shipping target. If that target is V1 Family Recaps, S7 depends on the approved V1/nav rollout; otherwise it must also render on a current-prod parent surface.
+- **No late test umbrella.** S8 starts as a scaffold before S1's staging flip. Each slice adds its scenario while the behavior is introduced, not after the whole loop is assembled.
 
 ## Walkthrough per entry path (behavior once all slices land)
 
@@ -122,7 +134,7 @@ AC coverage: AC1 = this spec · AC2 = S1+S3b (explain-back gate; the never-lock 
 - **Review (Path 4):** opener names the prior ("last time you had X down"); calibration grading writes SM-2; a decayed Challenge-verified topic surfaces as due and can route to re-prove (S3c targets open weak concepts). **Risk: medium** — review is live-but-not-guaranteed on SM-2 writes (no-quality edges, flows doc Path 4 caveat); S8's decay/retest variant must cover it.
 - **Relearn (Path 5):** card reset to baseline; Challenge blocked while `needs_deepening` active, released after 3 good completions. **Never hard-locks learning** — the learner can always study the topic (AC2's constraint; never-lock is a standing product rule). Abandoned-relearn block staleness is a known gap — S3a's expiry handling should sweep it.
 - **Homework / recitation / quiz / dictation (Paths 3, 6–8):** out of loop, unchanged. Quiz/assessment keep their own retention tables.
-- **Parent (recaps tab, child screens):** recap for a session containing a verified Challenge shows "verified: <topic>" with the learner's kept artifact (quote-grounded note), never raw transcript; retention metadata (e.g. "holds strong / due for re-check") within retention rules. **Risk: medium** — copy must pass no-clinical-copy and positive-framing rules.
+- **Parent (recaps tab, child screens, or current-prod parent surface):** a parent-visible surface for a session containing a verified Challenge shows "verified: <topic>" with the learner's verified artifact (quote-grounded note), never raw transcript; retention metadata (e.g. "holds strong / due for re-check") within retention rules. **Risk: high until S7 chooses the surface** — Family Recaps are V1-only today, and copy must pass no-clinical-copy and positive-framing rules.
 
 ## Failure modes
 
@@ -135,20 +147,23 @@ AC coverage: AC1 = this spec · AC2 = S1+S3b (explain-back gate; the never-lock 
 | `pending_review` rows never promoted | promotion cron missing (today) | weak spots invisible; verification staleness under-reported | S3a (WI-1446) — this is a flip blocker, sequenced before S1's prod flip |
 | Verified then decays | SM-2 lapse after verification | topic shows due/`stale`, not "mastered forever" | `resolveMasteryVerificationState` → `stale` (`verification.ts:66`); re-prove path S3b/S3c; `masteredAt` count stays honest (sticky, but XP status decays) |
 | Note draft hallucinated | draft strays from solid quotes | draft never shown | `validateNoteDraft` lexical-overlap rejection (`note-draft.ts:173`); no artifact rather than a wrong artifact |
+| Artifact source ambiguity | generic note rows mix Challenge drafts, learner-authored notes, and freeform keep artifacts | parent sees "verified" on material that was never verified | S5a artifact taxonomy blocks S7; only explicit verified artifact sources can feed parent proof |
 | Relearn abandoned mid-block | `needs_deepening` row active, no completions | Challenge unavailable on that topic | S3a expiry; learning itself never locked |
 | Artifact missing at recap time | Challenge failed or note rejected | recap degrades to today's narrative recap | S7 renders proof block only when a verified artifact exists — additive, no regression |
+| Parent proof only lands in V1 Recaps | S7 targets `/(app)/recaps` but prod remains V0 family mode | proof works in preview, no current prod parent can see it | S7 must either depend on nav rollout approval or add the proof block to a current-prod parent surface |
 | Transcript purged after citation | retention window passed | "source no longer available" on the citation | `retrieval_events` survives purge by design (`retrieval-events.ts:69-76`); `evidence_links` dangles harmlessly (raw-id, no-FK — felt-knowing spec Retention note) |
 
 ## Recommended sequencing (and why)
 
-1. **S3a (WI-1446)** — named flip blocker; smallest; unblocks honest staleness.
-2. **S1 (WI-1464 + staging flip)** — everything user-visible is downstream of the flag; calibration first so the all-or-nothing bar doesn't lock out real learners (RR-6).
-3. **S2 (WI-1445)** — one write at an existing persistence site; turns verification into a scheduled promise.
-4. **S4 (WI-1469, ADR)** — rule the axes before building more read surfaces on top of them.
-5. **S6 (WI-1502)**, **S3b/S3c (WI-1465/WI-1454)** — visible promise + recovery, in either order.
-6. **S5a/S5b** — artifact + grading; S5a's Flow 3 (citation) last, per felt-knowing spec.
-7. **S7** — parent proof, once there is a verified artifact to show.
-8. **S8** — the loop-level eval/test pack lands incrementally with each slice but gets its umbrella WI so the end-to-end variants (verified / partial / misconception / decay-retest / parent proof) are asserted as one suite, not five scattered tests.
+1. **S4 preflight (WI-1469)** — record the minimum axes rule before S2 writes schedules. The full ADR can continue after, but the schedule semantics cannot be implicit.
+2. **S3a (WI-1446)** — named flip blocker; smallest; unblocks honest staleness.
+3. **S8 scaffold (WI-1666)** — create the loop-level eval/test harness before any staging flag flip; initially cover the dark/current-state behavior and the Challenge happy/partial/misconception seams with fixtures where live UI is still gated.
+4. **S1 (WI-1464 + staging flip only)** — calibration + telemetry + rollback gates; no prod flip in this plan.
+5. **S2 (WI-1445)** — one write at an existing persistence site, now backed by the axes preflight; turns verification into a scheduled promise.
+6. **S6 (WI-1502)**, **S3b/S3c (WI-1465/WI-1454)** — visible promise + recovery, in either order, with S8 cases added as they land.
+7. **Promote S5a to WIs, then S5a/S5b** — artifact contract + writable/kept/cited notes + grading. S5a's Flow 3 (citation) still lands last inside that group, per felt-knowing spec, but S7 cannot begin until the artifact source/verification taxonomy exists.
+8. **S7 (WI-1665)** — parent proof, once there is a verified artifact to show and the parent-visible surface is decided for the shipping target.
+9. **S8 completion pass** — the umbrella remains open until verified / partial / misconception / decay-retest / parent-proof variants all assert the assembled loop.
 
 ## Out of scope
 

@@ -403,6 +403,7 @@ export async function abandonStaleQuizRounds(
   db: Database,
   cutoff: Date,
 ): Promise<number> {
+  // scope-allow: stale-round cleanup cron intentionally scans active rounds globally.
   const result = await db
     .update(quizRounds)
     .set({ status: 'abandoned' })

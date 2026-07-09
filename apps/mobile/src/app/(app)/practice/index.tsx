@@ -816,7 +816,12 @@ export default function PracticeScreen(): React.ReactElement {
                 const displayLanguage =
                   getLanguageDisplayName(subject.languageCode) ??
                   subject.name ??
-                  'Language';
+                  '';
+                const vocabTitle = displayLanguage.trim()
+                  ? t('quiz.index.vocabBasicsTitle', {
+                      language: displayLanguage.trim(),
+                    })
+                  : t('quiz.index.vocabBasicsTitleNoLanguage');
                 const vocabCue = getQuizStatCue(
                   quizStats?.find(
                     (stat) =>
@@ -842,9 +847,7 @@ export default function PracticeScreen(): React.ReactElement {
                       openVocabularyQuiz(subject.id, displayLanguage)
                     }
                     accessibilityRole="button"
-                    accessibilityLabel={t('quiz.index.vocabBasicsTitle', {
-                      language: displayLanguage,
-                    })}
+                    accessibilityLabel={vocabTitle}
                     testID={`practice-vocabulary-${subject.id}`}
                   >
                     <View className="flex-row items-start justify-between">
@@ -864,9 +867,7 @@ export default function PracticeScreen(): React.ReactElement {
                     </View>
                     <View className="mt-4">
                       <Text className="text-body font-bold text-text-primary">
-                        {t('quiz.index.vocabBasicsTitle', {
-                          language: displayLanguage,
-                        })}
+                        {vocabTitle}
                       </Text>
                       <Text className="mt-1 text-caption text-text-secondary">
                         {t('quiz.index.vocabPlayedSubtitleDefault')}

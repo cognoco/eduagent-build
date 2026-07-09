@@ -1,4 +1,4 @@
-import { render, fireEvent } from '@testing-library/react-native';
+import { act, render, fireEvent } from '@testing-library/react-native';
 import type { DictationResult } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
@@ -64,6 +64,10 @@ function entry(overrides: Partial<DictationResult> = {}): DictationResult {
 }
 
 describe('DictationHistoryScreen', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockHistoryState = { data: undefined, isPending: true, isError: false };
@@ -73,6 +77,25 @@ describe('DictationHistoryScreen', () => {
     mockHistoryState = { data: undefined, isPending: true, isError: false };
     const { getByTestId } = render(<DictationHistoryScreen />);
     expect(getByTestId('dictation-history-loading')).toBeTruthy();
+  });
+
+  it('turns the loading state into retry and back actions after timeout', () => {
+    jest.useFakeTimers();
+    mockHistoryState = { data: undefined, isPending: true, isError: false };
+    const { getByTestId } = render(<DictationHistoryScreen />);
+
+    act(() => {
+      jest.advanceTimersByTime(15_000);
+    });
+
+    fireEvent.press(getByTestId('dictation-history-timeout-retry'));
+    fireEvent.press(getByTestId('dictation-history-timeout-back'));
+
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/dictation',
+    );
   });
 
   it('renders the error fallback with a retry that refetches', () => {

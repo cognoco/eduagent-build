@@ -83,6 +83,9 @@ const KNOWN_TAB_KEYS: ReadonlyArray<TabKey> = [
 ];
 
 const ALL_ROUTE_KEYS: ReadonlyArray<RouteKey> = [
+  'mentor',
+  'subjects',
+  'journal',
   'home',
   'own-learning',
   'library',
@@ -167,6 +170,7 @@ function makeRandomContext(i: number): ProfileContext {
     flags: {
       MODE_NAV_V0_ENABLED: bool(),
       MODE_NAV_V1_ENABLED: bool(),
+      MODE_NAV_V2_ENABLED: bool(),
     },
   };
 }

@@ -10,8 +10,12 @@
 // No-ops gracefully when EXPO_PUBLIC_SENTRY_DSN is not set.
 // ---------------------------------------------------------------------------
 
-import type { EventHint } from '@sentry/core';
 import * as Sentry from '@sentry/react-native';
+
+type SentryBeforeSend = NonNullable<
+  NonNullable<Parameters<typeof Sentry.init>[0]>['beforeSend']
+>;
+type SentryEventHint = Parameters<SentryBeforeSend>[1];
 
 /** Read DSN lazily so tests can set it after module load. */
 function getSentryDsn(): string | undefined {
@@ -45,7 +49,7 @@ function isErrorEventLike(value: unknown): value is ErrorEventLike {
  */
 export function unwrapErrorEvent<T extends Sentry.ErrorEvent>(
   event: T,
-  hint?: EventHint,
+  hint?: SentryEventHint,
 ): T {
   const original = hint?.originalException;
   if (!isErrorEventLike(original)) return event;

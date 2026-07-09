@@ -166,19 +166,16 @@ describe('assertCanManageOwnConsent', () => {
   // mobile client ALWAYS sends X-Profile-Id (api-client.ts:209) — every
   // legitimate self-consent caller has an explicitly selected profile. The
   // headerless (auto-resolve) case is exercised by the dedicated [BREAK] test.
-  function ctxWith(meta: {
+  function metaWith(meta: {
     isOwner?: boolean;
     birthYear?: number | null;
     resolvedVia?: 'auto' | 'explicit-header';
-  }): Context {
-    const fullMeta = { resolvedVia: 'explicit-header' as const, ...meta };
-    return {
-      get: (key: string) => (key === 'profileMeta' ? fullMeta : undefined),
-    } as unknown as Context;
+  }) {
+    return { resolvedVia: 'explicit-header' as const, ...meta };
   }
 
   it('allows an account owner regardless of age', () => {
-    const minorOwner = ctxWith({
+    const minorOwner = metaWith({
       isOwner: true,
       birthYear: CURRENT_UTC_YEAR - 12,
     });
@@ -187,7 +184,7 @@ describe('assertCanManageOwnConsent', () => {
 
   it('allows a non-owner adult exactly at the 18 boundary', () => {
     // age === 18 → permitted
-    const adult = ctxWith({
+    const adult = metaWith({
       isOwner: false,
       birthYear: CURRENT_UTC_YEAR - 18,
     });
@@ -201,7 +198,7 @@ describe('assertCanManageOwnConsent', () => {
   // the account JWT) — privilege escalation. The explicit-header requirement
   // must reject it even though isOwner is true.
   it('[BREAK] blocks an auto-resolved owner (no X-Profile-Id header)', () => {
-    const autoOwner = ctxWith({
+    const autoOwner = metaWith({
       isOwner: true,
       birthYear: CURRENT_UTC_YEAR - 30,
       resolvedVia: 'auto',
@@ -215,7 +212,7 @@ describe('assertCanManageOwnConsent', () => {
   // [Issue 901] A genuine adult non-owner whose header WAS sent must still pass
   // — confirms the fix blocks only the auto path, not the legitimate flow.
   it('allows a non-owner adult when the profile was explicitly selected', () => {
-    const adult = ctxWith({
+    const adult = metaWith({
       isOwner: false,
       birthYear: CURRENT_UTC_YEAR - 25,
       resolvedVia: 'explicit-header',
@@ -228,7 +225,7 @@ describe('assertCanManageOwnConsent', () => {
     // where the local year differs from the UTC year, the computed age could
     // tip to 18 and wrongly permit this minor. Pinning birthYear off the UTC
     // year keeps this assertion exact.
-    const minor = ctxWith({
+    const minor = metaWith({
       isOwner: false,
       birthYear: CURRENT_UTC_YEAR - 17,
     });
@@ -236,7 +233,7 @@ describe('assertCanManageOwnConsent', () => {
   });
 
   it('fails closed when birthYear is missing for a non-owner', () => {
-    const unknownAge = ctxWith({ isOwner: false, birthYear: null });
+    const unknownAge = metaWith({ isOwner: false, birthYear: null });
     expect(() => assertCanManageOwnConsent(unknownAge)).toThrow(ForbiddenError);
   });
 });

@@ -123,7 +123,7 @@ jest.mock(
   }),
 );
 
-jest.mock('../services/settings' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/settings', () => {
   const actual = jest.requireActual('../services/settings');
   return {
     ...actual,

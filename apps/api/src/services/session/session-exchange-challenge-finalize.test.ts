@@ -59,6 +59,7 @@ import type {
 import {
   claimChallengeRoundQuestionAsked,
   finalizeChallengeRoundIfReady,
+  persistActiveChallengeRoundTransition,
 } from './session-exchange';
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import { captureException } from '../sentry';
@@ -109,10 +110,10 @@ interface FakeDbState {
   masteryInserts: Array<Record<string, unknown>>;
   deepeningRows: DeepeningRow[];
   deepeningInsertCount: number;
-  // [BUG-483] session_events rows readable by validateEvaluationEventIds when
-  // finalize re-fetches DB-verified answer content for the note-draft guard.
-  // Omitted → no rows (models the same-turn case where the current-turn answer
-  // is not yet persisted).
+  // session_events rows readable by validateEvaluationEventIds when finalize
+  // re-fetches DB-verified answer content before terminal writes. Omitted uses
+  // the default durable ANSWER_EVENT_ID row; explicit [] models the same-turn /
+  // conflicted case where the current-turn answer is not yet persisted.
   sessionEventRows?: SessionEventRow[];
   // When set, the NEXT matching terminal insert throws — models a transient DB
   // error / constraint violation on the post-claim mastery or deepening write.
@@ -129,6 +130,19 @@ const TOPIC_ID = TEST_TOPIC_ID;
 const SESSION_ID = TEST_SESSION_ID;
 const PROFILE_ID = TEST_PROFILE_ID;
 const ANSWER_EVENT_ID = '00000000-0000-4000-8000-000000000005';
+const CHALLENGE_ROUND_EVALUATION_LIMIT = 10;
+
+function defaultSessionEventRows(): SessionEventRow[] {
+  return [
+    {
+      id: ANSWER_EVENT_ID,
+      profileId: PROFILE_ID,
+      sessionId: SESSION_ID,
+      eventType: 'user_message',
+      content: 'Plants convert light into chemical energy.',
+    },
+  ];
+}
 
 function makeSession(metadata: Record<string, unknown>): LearningSession {
   return {
@@ -273,7 +287,7 @@ function makeFakeDb(state: FakeDbState): Database {
     // rows and let the REAL validateEvaluationEventIds do its id→content
     // mapping + strict-missing rejection in JS.
     sessionEvents: {
-      findMany: async () => state.sessionEventRows ?? [],
+      findMany: async () => state.sessionEventRows ?? defaultSessionEventRows(),
     },
   };
 
@@ -376,6 +390,10 @@ function activeState(questionsAsked: number): ChallengeRoundSessionState {
 // ---------------------------------------------------------------------------
 
 describe('claimChallengeRoundQuestionAsked — serializes stale concurrent question counters', () => {
+  beforeEach(() => {
+    mockCaptureException.mockClear();
+  });
+
   it('advances two stale-snapshot exchanges by 2 and caps at MAX_CHALLENGE_QUESTIONS', async () => {
     const challengeRound = activeState(MAX_CHALLENGE_QUESTIONS - 2);
     const state: FakeDbState = {
@@ -409,9 +427,201 @@ describe('claimChallengeRoundQuestionAsked — serializes stale concurrent quest
       MAX_CHALLENGE_QUESTIONS,
     );
   });
+
+  it('does not let an older turn overwrite a newer persisted counter/evaluation', async () => {
+    const firstEvaluation: ChallengeRoundEvaluationItem = {
+      concept: 'first turn',
+      result: 'solid',
+      evidence: 'first',
+      answerEventId: '00000000-0000-4000-8000-000000000101',
+      learnerQuote: 'first answer',
+    };
+    const secondEvaluation: ChallengeRoundEvaluationItem = {
+      concept: 'second turn',
+      result: 'solid',
+      evidence: 'second',
+      answerEventId: '00000000-0000-4000-8000-000000000102',
+      learnerQuote: 'second answer',
+    };
+    const state: FakeDbState = {
+      sessionMetadata: {
+        challengeRound: {
+          ...activeState(2),
+          questionIndex: 2,
+          evaluations: [secondEvaluation],
+        },
+      },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+
+    const staleFirstTurnResult: ChallengeRoundSessionState = {
+      ...activeState(1),
+      questionIndex: 1,
+      evaluations: [firstEvaluation],
+    };
+
+    const persisted = await persistActiveChallengeRoundTransition(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      staleFirstTurnResult,
+    );
+
+    expect(persisted?.state).toBe('active');
+    expect(persisted?.questionsAsked).toBe(2);
+    expect(persisted?.questionIndex).toBe(2);
+    expect(persisted?.evaluations).toEqual([secondEvaluation, firstEvaluation]);
+    expect(persistedChallengeState(state)?.questionsAsked).toBe(2);
+  });
+
+  it('caps merged evaluations before persisting the transition', async () => {
+    const evaluations = Array.from(
+      { length: CHALLENGE_ROUND_EVALUATION_LIMIT + 1 },
+      (_, index): ChallengeRoundEvaluationItem => ({
+        concept: `concept ${index + 1}`,
+        result: 'solid',
+        evidence: `evidence ${index + 1}`,
+        answerEventId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+        learnerQuote: `answer ${index + 1}`,
+      }),
+    );
+    const state: FakeDbState = {
+      sessionMetadata: {
+        challengeRound: {
+          ...activeState(MAX_CHALLENGE_QUESTIONS - 1),
+          evaluations: evaluations.slice(
+            0,
+            CHALLENGE_ROUND_EVALUATION_LIMIT - 1,
+          ),
+        },
+      },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+
+    const persisted = await persistActiveChallengeRoundTransition(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      {
+        ...activeState(MAX_CHALLENGE_QUESTIONS),
+        evaluations: evaluations.slice(CHALLENGE_ROUND_EVALUATION_LIMIT - 1),
+      },
+    );
+
+    expect(persisted?.evaluations).toHaveLength(
+      CHALLENGE_ROUND_EVALUATION_LIMIT,
+    );
+    expect(persistedChallengeState(state)?.evaluations).toHaveLength(
+      CHALLENGE_ROUND_EVALUATION_LIMIT,
+    );
+    expect(persisted?.evaluations.at(-1)?.concept).toBe(
+      `concept ${CHALLENGE_ROUND_EVALUATION_LIMIT}`,
+    );
+  });
+
+  it('escalates malformed persisted challenge round metadata before returning null', async () => {
+    const state: FakeDbState = {
+      sessionMetadata: {
+        challengeRound: {
+          ...activeState(MAX_CHALLENGE_QUESTIONS),
+          evaluations: Array.from(
+            { length: CHALLENGE_ROUND_EVALUATION_LIMIT + 1 },
+            (_, index): ChallengeRoundEvaluationItem => ({
+              concept: `concept ${index + 1}`,
+              result: 'solid',
+              evidence: `evidence ${index + 1}`,
+              answerEventId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+              learnerQuote: `answer ${index + 1}`,
+            }),
+          ),
+        },
+      },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+
+    const persisted = await persistActiveChallengeRoundTransition(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      activeState(MAX_CHALLENGE_QUESTIONS),
+    );
+
+    expect(persisted).toBeNull();
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'challengeRoundSessionStateSchema parse failed',
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'challenge-round.persist-transition.parse-failed',
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+        }),
+      }),
+    );
+  });
+
+  it('does not let a stale active turn overwrite a terminal persisted state', async () => {
+    const terminal = {
+      ...activeState(MAX_CHALLENGE_QUESTIONS),
+      state: 'complete',
+    } as ChallengeRoundSessionState;
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound: terminal },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+
+    const staleActive = activeState(MAX_CHALLENGE_QUESTIONS - 1);
+    const persisted = await persistActiveChallengeRoundTransition(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      staleActive,
+    );
+
+    expect(persisted?.state).toBe('complete');
+    expect(persistedChallengeState(state)?.state).toBe('complete');
+  });
 });
 
 describe('finalizeChallengeRoundIfReady — idempotent under concurrent/retry finalize', () => {
+  it('[WI-1427] refuses terminal writes when an evaluation answerEventId is not durable', async () => {
+    const challengeRound = draftingState(SOLID_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      sessionEventRows: [],
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    const result = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      null,
+    );
+
+    expect(result).toBeNull();
+    expect(state.masteryInserts).toHaveLength(0);
+    expect(persistedChallengeState(state)?.state).toBe('drafting');
+  });
+
   it('writes mastery exactly once when finalize runs twice on the same ready round', async () => {
     const challengeRound = draftingState(SOLID_EVALS);
     const state: FakeDbState = {
@@ -805,7 +1015,7 @@ describe('finalizeChallengeRoundIfReady — note-draft guard uses DB-verified co
     expect(outcome?.draftedNote?.body).toBe(FABRICATED_DRAFT);
   });
 
-  it('fails closed to the fallback when the answer event is not yet readable from the DB (same-turn finalize)', async () => {
+  it('skips finalization when the answer event is not yet readable from the DB (same-turn finalize)', async () => {
     const challengeRound = draftingState(evalsWithRouteQuote);
     const state: FakeDbState = {
       sessionMetadata: { challengeRound },
@@ -827,8 +1037,9 @@ describe('finalizeChallengeRoundIfReady — note-draft guard uses DB-verified co
       noteDraft,
     );
 
-    expect(outcome?.draftedNote?.body).toBeNull();
-    expect(outcome?.draftedNote?.fallbackPrompt).toBeTruthy();
+    expect(outcome).toBeNull();
+    expect(state.masteryInserts).toHaveLength(0);
+    expect(persistedChallengeState(state)?.state).toBe('drafting');
   });
 });
 
@@ -956,7 +1167,7 @@ function makeRollbackAwareFakeDb(
         ),
     },
     sessionEvents: {
-      findMany: async () => state.sessionEventRows ?? [],
+      findMany: async () => state.sessionEventRows ?? defaultSessionEventRows(),
     },
   });
 

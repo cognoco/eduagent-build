@@ -17,15 +17,9 @@ import {
   filingRetryEventSchema,
   getSessionEffectiveMode,
   learningSessionSchema,
-  LlmStreamError,
   RateLimitedError,
   recallBridgeResultSchema,
-  SafetyFilterError,
-  streamDoneFrameSchema,
-  streamErrorFrameSchema,
-  streamFallbackFrameSchema,
   sessionAutoFileRequestedEventSchema,
-  UpstreamLlmError,
   getSubjectSessionsResponseSchema,
   type SubscriptionTier,
   type QuotaModel,
@@ -90,7 +84,8 @@ import {
   markPersisted,
   MAX_IDEMPOTENCY_KEY_LENGTH,
 } from '../services/idempotency-marker';
-import { CircuitOpenError, parseConversationLanguage } from '../services/llm';
+import { parseConversationLanguage } from '../services/llm';
+import { streamSessionResponse } from '../services/session/session-stream-response';
 import {
   isChallengeRoundRuntimeEnabled,
   isReviewCallbackOpenerEnabled,
@@ -104,34 +99,6 @@ import {
 import { FILING_CONFIG } from '../config/filing';
 
 const logger = createLogger();
-
-// [BUG-98 / A1-MED] Stack traces are no longer included in the fields that
-// flow into structured logs (Logpush → Grafana/Datadog). Sentry captures the
-// error object directly so the stack is preserved in Sentry's frame view —
-// we just don't echo it through logger.error any more, which prevents stack
-// leakage through downstream log processors.
-function getErrorDebugFields(err: unknown): {
-  error: string;
-  errorName: string;
-  cause?: string;
-  causeName?: string;
-  circuitKey?: string;
-} {
-  const cause = err instanceof Error ? err.cause : undefined;
-  const circuitKey =
-    err instanceof CircuitOpenError
-      ? err.circuitKey
-      : cause instanceof CircuitOpenError
-        ? cause.circuitKey
-        : undefined;
-  return {
-    error: err instanceof Error ? err.message : String(err),
-    errorName: err instanceof Error ? err.name : typeof err,
-    cause: cause instanceof Error ? cause.message : undefined,
-    causeName: cause instanceof Error ? cause.name : undefined,
-    circuitKey,
-  };
-}
 
 // WI-1504: launch activation instrumentation. occurrenceKey is deliberately
 // omitted — first_session_started should record only the FIRST session a
@@ -161,71 +128,6 @@ async function recordFirstSessionStarted(
     'sessions.start.first_session_started',
     { profileId, sessionId },
   );
-}
-
-function isSafetyFilterError(err: unknown): boolean {
-  return (
-    err instanceof SafetyFilterError ||
-    (err instanceof LlmStreamError && err.cause instanceof SafetyFilterError)
-  );
-}
-
-/**
- * [BUG-797] Structural shape of the completion/UI fields that a `processMessage`
- * (non-streaming) or `onComplete` (streaming) result carries through to the
- * SSE `done` frame. All three done-frame writers (normal streaming completion,
- * mid-stream non-streaming fallback, pre-stream non-streaming fallback) MUST
- * emit the same set of fields — otherwise interview/onboarding closure and UI
- * hint delivery (`readyToFinish`, `notePrompt`, `notePromptPostSession`,
- * `fluencyDrill`, `confidence`) silently vanish on the degradation paths while
- * the normal path keeps working, making the regression nearly invisible.
- */
-interface DoneFrameSource {
-  exchangeCount: number;
-  escalationRung: number;
-  expectedResponseMinutes?: number;
-  aiEventId?: string;
-  notePrompt?: boolean;
-  notePromptPostSession?: boolean;
-  fluencyDrill?: unknown;
-  languageLearning?: unknown;
-  confidence?: 'low' | 'medium' | 'high';
-  readyToFinish?: boolean;
-  challengeRound?: unknown;
-  challengeOffer?: { pitch: string };
-  draftedNote?: unknown;
-}
-
-/**
- * [BUG-797] Single source of truth for the SSE `done` frame payload so the
- * normal streaming completion and both non-streaming fallback paths cannot
- * drift in which completion/UI signals they forward to the client.
- *
- * The assembled payload is validated through `streamDoneFrameSchema` (the
- * canonical `@eduagent/schemas` contract) before it is returned, mirroring the
- * `.parse()` guards on the sibling `error`/`fallback` frames. This converts a
- * silent client-contract drift (a renamed/reshaped field shipping unnoticed)
- * into a server-side error that surfaces in staging.
- */
-function buildDoneFramePayload(source: DoneFrameSource) {
-  return streamDoneFrameSchema.parse({
-    type: 'done' as const,
-    exchangeCount: source.exchangeCount,
-    escalationRung: source.escalationRung,
-    expectedResponseMinutes: source.expectedResponseMinutes ?? 0,
-    aiEventId: source.aiEventId,
-    notePrompt: source.notePrompt || undefined,
-    notePromptPostSession: source.notePromptPostSession || undefined,
-    fluencyDrill: source.fluencyDrill || undefined,
-    languageLearning: source.languageLearning || undefined,
-    confidence: source.confidence || undefined,
-    // [#419] Propagate the server-side readyToFinish flag so the streaming /
-    // fallback paths reach parity with processMessage (non-streaming).
-    readyToFinish: source.readyToFinish ?? undefined,
-    challengeRound: source.challengeRound,
-    challengeOffer: source.challengeOffer,
-    draftedNote: source.draftedNote,
-  });
 }
 
 // [BUG-CONT-DEPTH-SWEEP] DONE: every /:sessionId endpoint in this file now
@@ -798,12 +700,20 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       );
 
       try {
-        const { stream, onComplete } = await streamMessage(
+        return await streamSessionResponse({
           db,
           profileId,
           sessionId,
           input,
-          {
+          session,
+          subscriptionId,
+          quota: {
+            source: c.get('quotaDecrementSource'),
+            quotaModel: c.get('quotaDecrementQuotaModel'),
+            topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
+          },
+          idempotencyKv: c.env.IDEMPOTENCY_KV,
+          streamOptions: {
             llmTier,
             subscriptionTier,
             quotaRemainingTurns,
@@ -820,360 +730,38 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
             ),
           },
-        );
-
-        return streamSSEUtf8(c, async (sseStream) => {
-          // [BUG-866] Track chunk count so we can detect zero-token streams.
-          let chunkCount = 0;
-          try {
-            for await (const chunk of stream) {
-              if (chunk.trim().length > 0) chunkCount++;
-              await sseStream.writeSSE({
-                data: JSON.stringify({ type: 'chunk', content: chunk }),
-              });
-            }
-          } catch (streamErr) {
-            const debugFields = getErrorDebugFields(streamErr);
-            logger.error('[sessions/stream] LLM stream failed', {
-              surface: 'sessions.stream',
-              phase: 'llm_stream_drain',
-              sessionId,
-              profileId,
-              chunkCount,
-              ...debugFields,
-            });
-            captureException(streamErr, {
-              profileId,
-              extra: {
-                sessionId,
-                phase: 'llm_stream',
-                chunkCount,
-                circuitKey: debugFields.circuitKey,
-                errorName: debugFields.errorName,
-                causeName: debugFields.causeName,
-              },
-            });
-
-            if (
-              !(streamErr instanceof RateLimitedError) &&
-              !isSafetyFilterError(streamErr)
-            ) {
-              logger.warn(
-                chunkCount === 0
-                  ? '[sessions/stream] Stream failed before visible text; trying non-streaming fallback'
-                  : '[sessions/stream] Stream failed after visible text; replacing partial reply with non-streaming fallback',
-                {
-                  sessionId,
-                  chunkCount,
-                  profileId,
-                  circuitKey: debugFields.circuitKey,
-                  error: debugFields.error,
-                  errorName: debugFields.errorName,
-                  causeName: debugFields.causeName,
-                },
-              );
-              try {
-                const fallback = await processMessage(
-                  db,
-                  profileId,
-                  sessionId,
-                  input,
-                  {
-                    llmTier,
-                    subscriptionTier,
-                    quotaRemainingTurns,
-                    quotaFractionRemaining,
-                    voyageApiKey: c.env.VOYAGE_API_KEY,
-                    clientId,
-                    memoryFactsReadEnabled,
-                    memoryFactsRelevanceEnabled,
-                    challengeRoundRuntimeEnabled,
-                    reviewCallbackOpenerEnabled,
-                    judgeFrameworkEnabled,
-                    judgeEnforcementEnabled,
-                  },
-                );
-                const eventType = chunkCount === 0 ? 'chunk' : 'replace';
-                await sseStream.writeSSE({
-                  data: JSON.stringify({
-                    type: eventType,
-                    content: fallback.response,
-                  }),
-                });
-                // [BUG-797] Mirror the full completion/UI signal set the
-                // normal streaming done frame sends — readyToFinish, notePrompt,
-                // notePromptPostSession, fluencyDrill, confidence — so
-                // interview/onboarding closure and UI hints survive the
-                // mid-stream non-streaming fallback path.
-                await sseStream.writeSSE({
-                  data: JSON.stringify(buildDoneFramePayload(fallback)),
-                });
-                await markPersisted({
-                  kv: c.env.IDEMPOTENCY_KV,
-                  profileId,
-                  flow: 'session',
-                  key: clientId,
-                });
-                return;
-              } catch (fallbackErr) {
-                const fallbackDebugFields = getErrorDebugFields(fallbackErr);
-                logger.error(
-                  '[sessions/stream] Non-streaming fallback failed',
-                  {
-                    surface: 'sessions.stream',
-                    phase: 'llm_stream_fallback',
-                    sessionId,
-                    profileId,
-                    parentErrorName: debugFields.errorName,
-                    parentCircuitKey: debugFields.circuitKey,
-                    ...fallbackDebugFields,
-                  },
-                );
-                captureException(fallbackErr, {
-                  profileId,
-                  extra: {
-                    sessionId,
-                    phase: 'llm_stream_non_streaming_fallback',
-                    parentErrorName: debugFields.errorName,
-                    parentCircuitKey: debugFields.circuitKey,
-                    circuitKey: fallbackDebugFields.circuitKey,
-                    errorName: fallbackDebugFields.errorName,
-                    causeName: fallbackDebugFields.causeName,
-                  },
-                });
-              }
-            }
-
-            // [BUG-821] refundQuotaOrEscalate never throws and escalates when a
-            // decrement happened but subscriptionId is missing.
-            await refundQuotaOrEscalate(db, subscriptionId, {
-              route: 'sessions.stream.llm_error',
-              profileId,
-              sessionId,
-              // [CR-2026-05-19-C6] Refund to the same pool the decrement
-              // consumed; otherwise top-up consumptions silently inflate
-              // monthly quota on every LLM failure.
-              source: c.get('quotaDecrementSource'),
-              quotaModel: c.get('quotaDecrementQuotaModel'),
-              topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
-            });
-            // Map error to a stable machine-readable code so clients can
-            // classify failures without brittle message parsing.
-            const errorCode: string = (() => {
-              if (streamErr instanceof RateLimitedError)
-                return 'quota_exhausted';
-              if (isSafetyFilterError(streamErr)) return 'safety_filter';
-              return 'unknown_error';
-            })();
-            await sseStream.writeSSE({
-              data: JSON.stringify(
-                streamErrorFrameSchema.parse({
-                  type: 'error',
-                  code: errorCode,
-                  message:
-                    'Something went wrong while generating a reply. Please try again.',
-                }),
-              ),
-            });
-            return;
-          }
-
-          try {
-            // onComplete reads the raw envelope via rawResponsePromise internally —
-            // the clean reply text from the stream is not needed.
-            const result = await onComplete();
-
-            if (chunkCount === 0) {
-              const zeroTokenRecovered =
-                result.fallback !== undefined ||
-                (result.response?.trim().length ?? 0) > 0;
-              const zeroTokenRecovery = result.fallback
-                ? 'fallback_frame'
-                : 'parsed_reply';
-
-              logger.warn('[sessions/stream] Zero-token stream completed', {
-                surface: 'sessions.stream',
-                sessionId,
-                profileId,
-                tokensReceived: 0,
-                recovered: zeroTokenRecovered,
-                recovery: zeroTokenRecovery,
-              });
-              addBreadcrumb(
-                'Zero-token stream completed',
-                'sessions.stream',
-                'warning',
-                {
-                  sessionId,
-                  tokensReceived: 0,
-                  recovered: zeroTokenRecovered,
-                  recovery: zeroTokenRecovery,
-                },
-              );
-              captureException(new Error('Zero-token stream completed'), {
-                profileId,
-                extra: {
-                  sessionId,
-                  tokensReceived: 0,
-                  recovered: zeroTokenRecovered,
-                  surface: 'sessions.stream',
-                  recovery: zeroTokenRecovery,
-                },
-              });
-            }
-
-            // [BUG-941] If the LLM response was empty or unparseable, emit a
-            // typed `fallback` SSE frame so the client shows a meaningful
-            // recovery prompt instead of raw envelope JSON. Refund quota because
-            // the exchange was not persisted.
-            if (result.fallback) {
-              // Capture into a const so TS narrowing survives into the async
-              // safeSend closure below (property narrowing on `result.fallback`
-              // is otherwise reset inside a nested function).
-              const fallbackInfo = result.fallback;
-              const frame = streamFallbackFrameSchema.parse({
-                type: 'fallback',
-                reason: fallbackInfo.reason,
-                fallbackText: fallbackInfo.fallbackText,
-              });
-              // Refund quota before emitting frames. refundQuotaOrEscalate
-              // never throws (escalates internally), so the SSE frames below
-              // always run and the client is never left with a truncated
-              // stream. [M-3] [BUG-821] It also escalates when a decrement
-              // happened but subscriptionId is missing.
-              await refundQuotaOrEscalate(db, subscriptionId, {
-                route: 'sessions.stream.fallback',
-                profileId,
-                sessionId,
-                // [CR-2026-05-19-C6] See sessions.stream.llm_error.
-                source: c.get('quotaDecrementSource'),
-                quotaModel: c.get('quotaDecrementQuotaModel'),
-                topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
-              });
-              await sseStream.writeSSE({ data: JSON.stringify(frame) });
-              await sseStream.writeSSE({
-                data: JSON.stringify({
-                  type: 'done',
-                  // [CR-PR129-M1] Use the persisted session count — the failed
-                  // exchange was not saved, so this is the correct current total.
-                  exchangeCount: session.exchangeCount,
-                  escalationRung: result.escalationRung,
-                  expectedResponseMinutes: 0,
-                }),
-              });
-              // [BUG-796] Dispatch the observability terminus event so the rate
-              // of empty-reply / unparseable-envelope fallbacks is queryable via
-              // the exchange-empty-reply-fallback Inngest handler. Without this
-              // the handler is wired-but-untriggered (worse than dead code per
-              // AGENTS.md). Non-core observability: safeSend captures dispatch
-              // failure to Sentry without breaking the SSE stream the client has
-              // already received. Frames are flushed above, so this only delays
-              // stream close by the dispatch round-trip (bounded by safeSend's
-              // 2s timeout).
-              await safeSend(
+          createSseResponse: (handler) => streamSSEUtf8(c, handler),
+          deps: {
+            streamMessage,
+            processMessage,
+            refundQuotaOrEscalate,
+            markPersisted,
+            sendEmptyReplyFallbackEvent: async (event) =>
+              safeSend(
                 () =>
                   inngest.send({
                     name: 'app/exchange.empty_reply_fallback',
                     data: {
-                      sessionId,
-                      profileId,
+                      sessionId: event.sessionId,
+                      profileId: event.profileId,
                       flow: 'session',
-                      exchangeCount: session.exchangeCount,
-                      reason: fallbackInfo.reason,
+                      exchangeCount: event.exchangeCount,
+                      reason: event.reason,
                     },
                   }),
                 'sessions.stream.empty_reply_fallback',
                 {
-                  sessionId,
-                  profileId,
-                  reason: fallbackInfo.reason,
+                  sessionId: event.sessionId,
+                  profileId: event.profileId,
+                  reason: event.reason,
                 },
-              );
-              return;
-            }
-
-            if (chunkCount === 0 && result.response?.trim()) {
-              await sseStream.writeSSE({
-                data: JSON.stringify({
-                  type: 'chunk',
-                  content: result.response,
-                }),
-              });
-            }
-
-            if (chunkCount > 0 && result.sourceReplacement?.trim()) {
-              await sseStream.writeSSE({
-                data: JSON.stringify({
-                  type: 'replace',
-                  content: result.sourceReplacement,
-                }),
-              });
-            }
-
-            await sseStream.writeSSE({
-              data: JSON.stringify(buildDoneFramePayload(result)),
-            });
-            await markPersisted({
-              kv: c.env.IDEMPOTENCY_KV,
-              profileId,
-              flow: 'session',
-              key: clientId,
-            });
-          } catch (err) {
-            const debugFields = getErrorDebugFields(err);
-            // [logging sweep] structured logger so PII fields land as JSON context
-            logger.error('[sessions/stream] Post-stream processing failed', {
-              surface: 'sessions.stream',
-              phase: 'on_complete',
-              sessionId,
-              profileId,
-              chunkCount,
-              ...debugFields,
-            });
-            captureException(err, {
-              profileId,
-              extra: {
-                sessionId,
-                phase: 'on_complete',
-                chunkCount,
-                circuitKey: debugFields.circuitKey,
-                errorName: debugFields.errorName,
-                causeName: debugFields.causeName,
-              },
-            });
-            // Refund quota — user should not be charged for a failed exchange.
-            // refundQuotaOrEscalate never throws (escalates internally), so the
-            // error frame below is always written and the client is never left
-            // hanging. [M-3] [BUG-821] It also escalates when a decrement
-            // happened but subscriptionId is missing.
-            await refundQuotaOrEscalate(db, subscriptionId, {
-              route: 'sessions.stream.onComplete',
-              profileId,
-              sessionId,
-              // [CR-2026-05-19-C6] See sessions.stream.llm_error.
-              source: c.get('quotaDecrementSource'),
-              quotaModel: c.get('quotaDecrementQuotaModel'),
-              topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
-            });
-            await sseStream.writeSSE({
-              data: JSON.stringify(
-                streamErrorFrameSchema.parse({
-                  type: 'error',
-                  message: 'Failed to save session progress. Please try again.',
-                }),
               ),
-            });
-          }
+            logger,
+            captureException,
+            addBreadcrumb,
+          },
         });
       } catch (err) {
-        const debugFields = getErrorDebugFields(err);
-        logger.error('[sessions/stream] Pre-stream setup failed', {
-          surface: 'sessions.stream',
-          phase: 'pre_stream_setup',
-          sessionId,
-          profileId,
-          ...debugFields,
-        });
         if (err instanceof SessionExchangeLimitError) {
           return apiError(
             c,
@@ -1182,113 +770,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             err.message,
           );
         }
-
-        const isUpstreamLlmError =
-          err instanceof UpstreamLlmError ||
-          err instanceof CircuitOpenError ||
-          (err instanceof LlmStreamError &&
-            (err.cause instanceof UpstreamLlmError ||
-              err.cause instanceof CircuitOpenError));
-        if (
-          !(err instanceof RateLimitedError) &&
-          !isSafetyFilterError(err) &&
-          !isUpstreamLlmError
-        ) {
-          logger.warn(
-            '[sessions/stream] Pre-stream setup failed; trying non-streaming fallback',
-            {
-              sessionId,
-              profileId,
-              circuitKey: debugFields.circuitKey,
-              error: debugFields.error,
-              errorName: debugFields.errorName,
-              causeName: debugFields.causeName,
-            },
-          );
-          try {
-            const fallback = await processMessage(
-              db,
-              profileId,
-              sessionId,
-              input,
-              {
-                llmTier,
-                subscriptionTier,
-                quotaRemainingTurns,
-                quotaFractionRemaining,
-                voyageApiKey: c.env.VOYAGE_API_KEY,
-                clientId,
-                memoryFactsReadEnabled,
-                memoryFactsRelevanceEnabled,
-                challengeRoundRuntimeEnabled,
-                reviewCallbackOpenerEnabled,
-                judgeFrameworkEnabled,
-                judgeEnforcementEnabled,
-              },
-            );
-            return streamSSEUtf8(c, async (sseStream) => {
-              await sseStream.writeSSE({
-                data: JSON.stringify({
-                  type: 'chunk',
-                  content: fallback.response,
-                }),
-              });
-              // [BUG-797] Mirror the full completion/UI signal set the normal
-              // streaming done frame sends so interview/onboarding closure and
-              // UI hints survive the pre-stream non-streaming fallback path.
-              await sseStream.writeSSE({
-                data: JSON.stringify(buildDoneFramePayload(fallback)),
-              });
-              await markPersisted({
-                kv: c.env.IDEMPOTENCY_KV,
-                profileId,
-                flow: 'session',
-                key: clientId,
-              });
-            });
-          } catch (fallbackErr) {
-            const fallbackDebugFields = getErrorDebugFields(fallbackErr);
-            logger.error(
-              '[sessions/stream] Pre-stream non-streaming fallback failed',
-              {
-                surface: 'sessions.stream',
-                phase: 'pre_stream_fallback',
-                sessionId,
-                profileId,
-                parentErrorName: debugFields.errorName,
-                parentCircuitKey: debugFields.circuitKey,
-                ...fallbackDebugFields,
-              },
-            );
-            captureException(fallbackErr, {
-              profileId,
-              extra: {
-                sessionId,
-                phase: 'llm_pre_stream_non_streaming_fallback',
-                parentErrorName: debugFields.errorName,
-                parentCircuitKey: debugFields.circuitKey,
-                circuitKey: fallbackDebugFields.circuitKey,
-                errorName: fallbackDebugFields.errorName,
-                causeName: fallbackDebugFields.causeName,
-              },
-            });
-          }
-        }
-
-        // Refund quota on LLM failure — user should not be charged for a failed exchange
-        // [BUG-661 / A-21] safeRefundQuota escalates if the refund itself fails.
-        // [BUG-821] refundQuotaOrEscalate escalates if a decrement happened but
-        // subscriptionId is missing, instead of silently dropping the refund.
-        // [CR-2026-05-19-C6] See sessions.stream.llm_error for pool-routing
-        // rationale.
-        await refundQuotaOrEscalate(db, subscriptionId, {
-          route: 'sessions.stream',
-          profileId,
-          sessionId,
-          source: c.get('quotaDecrementSource'),
-          quotaModel: c.get('quotaDecrementQuotaModel'),
-          topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
-        });
         throw err;
       }
     },

@@ -132,6 +132,7 @@ export const consentRevocation = inngest.createFunction(
       );
     }
     const { childProfileId, parentProfileId, revokedAt } = parsed.data;
+    const pendingNoticeSourceId = `consent-revocation:${childProfileId}:${revokedAt}`;
     const revokedAtDate =
       typeof revokedAt === 'string' ? new Date(revokedAt) : undefined;
     const revocationRespondedAt =
@@ -337,6 +338,7 @@ export const consentRevocation = inngest.createFunction(
           ownerProfileId: archiveDecision.ownerProfileId,
           type: 'consent_archived',
           childName,
+          sourceId: pendingNoticeSourceId,
         });
       });
 
@@ -422,6 +424,7 @@ export const consentRevocation = inngest.createFunction(
           ownerProfileId: archiveDecision.ownerProfileId,
           type: 'consent_deleted',
           childName,
+          sourceId: pendingNoticeSourceId,
         });
       } catch (err) {
         captureException(err, {

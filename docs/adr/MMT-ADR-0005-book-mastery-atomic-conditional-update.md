@@ -35,7 +35,7 @@ The `NOT EXISTS` predicate is evaluated atomically against committed state, so c
 ## Consequences
 
 - **The stamp logic cannot live in the application layer.** Any JS/TS path that reads sibling state then writes the book flag reintroduces the race; this is a hard rule, not a preference.
-- **A regression test is owed (and did not previously exist).** Per the repo's "correctness constraint requires a break test" rule, this ADR carries an obligation: a concurrency test that stamps the last two sibling topics **concurrently** and asserts the book ends Mastered — red against a read-then-write implementation, green against the atomic `UPDATE`. *Tracked as the break-test for this ADR; not yet written.*
+- **This constraint carries a standing regression-test obligation.** Per the repo's "correctness constraint requires a break test" rule: any change to the stamp path must ship with (or be covered by) a concurrency test that stamps the last two sibling topics **concurrently** and asserts the book ends Mastered — a test that fails against a read-then-write implementation and passes against the atomic `UPDATE`. Until such a test exists, this ADR is the only guard.
 - **No chapter/section header derives an "X of Y mastered" count from sticky memory** — section progress is the current topic set only; "fully done" is expressed solely by `mastered_at`. (Prevents a second, drifting source of truth for book completion.)
 - Topic-level mastery (`retention_cards.mastered_at`) uses the same sticky-flag discipline; this ADR is specifically about the **composition** race at the book level.
 

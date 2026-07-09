@@ -376,33 +376,23 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       : updated.items.data[0]?.current_period_end;
     const periodEndTs = subscriptionLevelEnd ?? itemLevelEnd;
     if (!periodEndTs) {
-      const missingPeriodEndError = new Error(
-        'Stripe cancel response returned no current_period_end',
-      );
+      const profileId = c.get('profileId') ?? null;
       // [logging sweep] structured logger so PII fields land as JSON context
       logger.error(
         '[billing] Subscription returned no current_period_end -- falling back to current timestamp',
         {
+          profileId,
           stripeSubscriptionId: subscription.stripeSubscriptionId,
         },
       );
-      captureException(missingPeriodEndError, {
-        extra: {
-          context: 'billing.subscriptionCancel.missingCurrentPeriodEnd',
-          accountId: account.id,
-          subscriptionId: subscription.id,
-          stripeSubscriptionId: subscription.stripeSubscriptionId,
-        },
-      });
       await safeSend(
         () =>
           inngest.send({
-            // orphan-allow: structured telemetry signal required by AGENTS.md
-            // ("silent recovery in billing must emit a structured metric").
-            // The request recovers inline by using the current timestamp; this
-            // event makes the Stripe response drift queryable.
+            // Registered observer makes Stripe response drift queryable while
+            // the request recovers inline with current time.
             name: 'app/billing.missing_current_period_end',
             data: {
+              profileId,
               accountId: account.id,
               subscriptionId: subscription.id,
               stripeSubscriptionId: subscription.stripeSubscriptionId,
@@ -411,6 +401,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           }),
         'billing.subscription_cancel.missing_current_period_end',
         {
+          profileId,
           accountId: account.id,
           subscriptionId: subscription.id,
           stripeSubscriptionId: subscription.stripeSubscriptionId,

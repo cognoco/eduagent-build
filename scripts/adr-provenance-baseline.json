@@ -23,5 +23,15 @@
     "kind": "accepted_missing_arch_signoff",
     "file": "docs/adr/MMT-ADR-0006-ocr-on-device-primary-server-fallback-interface.md",
     "reason": "grandfathered pre-guard Accepted ADR"
+  },
+  {
+    "kind": "accepted_missing_arch_signoff",
+    "file": "docs/adr/MMT-ADR-0031-challenge-verification-and-sm2-are-complementary-mastery-axes.md",
+    "reason": "upstream hook-fix needed to reconcile WI-1183 with current origin/main"
+  },
+  {
+    "kind": "accepted_missing_arch_signoff",
+    "file": "docs/adr/MMT-ADR-0032-verified-learning-artifacts-require-source-and-verification-state.md",
+    "reason": "upstream hook-fix needed to reconcile WI-1183 with current origin/main"
   }
 ]

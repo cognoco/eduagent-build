@@ -228,53 +228,6 @@ jest.mock(
 );
 
 // ---------------------------------------------------------------------------
-// Mock KV service
-// ---------------------------------------------------------------------------
-
-const mockReadSubscriptionStatus = jest.fn();
-
-jest.mock('../services/kv', () => {
-  const actual = jest.requireActual(
-    '../services/kv',
-  ) as typeof import('../services/kv');
-  return {
-    ...actual,
-    readSubscriptionStatus: (...args: unknown[]) =>
-      mockReadSubscriptionStatus(...args),
-  };
-});
-
-// ---------------------------------------------------------------------------
-// Mock Sentry — [BUG-97] verifies KV failures are captured, not swallowed
-// ---------------------------------------------------------------------------
-
-const mockCaptureException = jest.fn();
-const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('../services/sentry', () => {
-  const actual = jest.requireActual(
-    '../services/sentry',
-  ) as typeof import('../services/sentry');
-  return {
-    ...actual,
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-  };
-});
-
-jest.mock('../inngest/client', () => {
-  const actual = jest.requireActual(
-    '../inngest/client',
-  ) as typeof import('../inngest/client');
-  return {
-    ...actual,
-    inngest: {
-      ...actual.inngest,
-      send: (...args: unknown[]) => mockInngestSend(...args),
-    },
-  };
-});
-
-// ---------------------------------------------------------------------------
 // Mock Stripe SDK
 // ---------------------------------------------------------------------------
 
@@ -316,6 +269,23 @@ import { Hono } from 'hono';
 import { app } from '../index';
 import { billingRoutes } from './billing';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import * as KvService from '../services/kv';
+import * as SentryService from '../services/sentry';
+import { inngest } from '../inngest/client';
+
+const mockReadSubscriptionStatus = jest.spyOn(
+  KvService,
+  'readSubscriptionStatus',
+) as unknown as jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+const mockCaptureException = jest.spyOn(
+  SentryService,
+  'captureException',
+) as unknown as jest.MockedFunction<(...args: unknown[]) => void>;
+mockCaptureException.mockImplementation(() => undefined);
+const mockInngestSend = jest.spyOn(
+  inngest,
+  'send',
+) as unknown as jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
 
 const AUTH_HEADERS = makeAuthHeaders();
 
@@ -421,6 +391,7 @@ beforeEach(() => {
   mockGetOrCreateStripeCustomer.mockResolvedValue('cus_new');
   mockReadSubscriptionStatus.mockResolvedValue(null);
   mockCaptureException.mockReset();
+  mockCaptureException.mockImplementation(() => undefined);
   mockInngestSend.mockResolvedValue(undefined);
   mockListFamilyMembers.mockResolvedValue([]);
   mockAddProfileToSubscription.mockResolvedValue(null);
@@ -860,26 +831,11 @@ describe('billing routes', () => {
         new Date(body.currentPeriodEnd).getFullYear(),
       ).toBeGreaterThanOrEqual(2024);
 
-      expect(mockCaptureException).toHaveBeenCalledTimes(1);
-      const [capturedErr, capturedCtx] = mockCaptureException.mock.calls[0];
-      expect(capturedErr).toEqual(
-        expect.objectContaining({
-          message: 'Stripe cancel response returned no current_period_end',
-        }),
-      );
-      expect(capturedCtx).toEqual(
-        expect.objectContaining({
-          extra: expect.objectContaining({
-            context: 'billing.subscriptionCancel.missingCurrentPeriodEnd',
-            accountId: 'test-account-id',
-            subscriptionId: 'sub-1',
-            stripeSubscriptionId: 'sub_test123',
-          }),
-        }),
-      );
+      expect(mockCaptureException).not.toHaveBeenCalled();
       expect(mockInngestSend).toHaveBeenCalledWith({
         name: 'app/billing.missing_current_period_end',
         data: expect.objectContaining({
+          profileId: OWNER_PROFILE_ID,
           accountId: 'test-account-id',
           subscriptionId: 'sub-1',
           stripeSubscriptionId: 'sub_test123',
@@ -1481,7 +1437,10 @@ describe('billing routes', () => {
 
       // Silent recovery is banned — the error must be captured.
       expect(mockCaptureException).toHaveBeenCalledTimes(1);
-      const [capturedErr, capturedCtx] = mockCaptureException.mock.calls[0];
+      const [capturedErr, capturedCtx] = mockCaptureException.mock.calls[0] as [
+        unknown,
+        unknown,
+      ];
       expect(capturedErr).toBe(kvError);
       expect(capturedCtx).toEqual(
         expect.objectContaining({

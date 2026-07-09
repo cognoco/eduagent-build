@@ -18,17 +18,14 @@ jest.mock(
 // _layout that mounts the real provider chain (tracked as parallel-review
 // follow-up).
 const mockUseNavigationContract = jest.fn();
-jest.mock(
-  '../../hooks/use-navigation-contract' /* gc1-allow: pattern-a conversion; wiring all four providers in a chrome-component unit test would duplicate navigation-contract.test.ts scope without adding contract coverage */,
-  () => {
-    const actual = jest.requireActual('../../hooks/use-navigation-contract');
-    return {
-      ...actual,
-      useNavigationContract: (...args: unknown[]) =>
-        mockUseNavigationContract(...args),
-    };
-  },
-);
+jest.mock('../../hooks/use-navigation-contract', () => {
+  const actual = jest.requireActual('../../hooks/use-navigation-contract');
+  return {
+    ...actual,
+    useNavigationContract: (...args: unknown[]) =>
+      mockUseNavigationContract(...args),
+  };
+});
 
 let mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 jest.mock('react-native-safe-area-context', () => ({
@@ -44,22 +41,19 @@ const mockSwitchMode = jest.fn();
 const mockDismissError = jest.fn();
 let mockIsSwitching = false;
 let mockSwitchError: 'study' | 'family' | null = null;
-jest.mock(
-  '../../lib/use-mode-switch' /* gc1-allow: pattern-a conversion; useModeSwitch is independently tested in use-mode-switch.test; here we only verify ModeSwitcher renders the switch-error UI state */,
-  () => {
-    const actual = jest.requireActual('../../lib/use-mode-switch');
-    return {
-      ...actual,
-      useModeSwitch: () => ({
-        switchMode: mockSwitchMode,
-        isSwitching: mockIsSwitching,
-        isSwitchingRef: { current: mockIsSwitching },
-        switchError: mockSwitchError,
-        dismissError: mockDismissError,
-      }),
-    };
-  },
-);
+jest.mock('../../lib/use-mode-switch', () => {
+  const actual = jest.requireActual('../../lib/use-mode-switch');
+  return {
+    ...actual,
+    useModeSwitch: () => ({
+      switchMode: mockSwitchMode,
+      isSwitching: mockIsSwitching,
+      isSwitchingRef: { current: mockIsSwitching },
+      switchError: mockSwitchError,
+      dismissError: mockDismissError,
+    }),
+  };
+});
 
 function buildContract(
   modeSwitcher: 'global-header' | 'hidden',

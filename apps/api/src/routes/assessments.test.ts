@@ -21,18 +21,10 @@ jest.mock(
       getActiveAssessmentForTopic: jest.fn(),
       createAssessmentIfNoneActive: jest.fn(),
       getAssessment: jest.fn(),
-      updateAssessment: jest.fn(),
-      evaluateAssessmentAnswer: jest.fn(),
+      submitAssessmentAnswer: jest.fn(),
       loadAssessmentTopicContext: jest.fn(),
-      buildNeedsReviewEvaluation: jest.fn(),
       recordAssessmentCompletionActivity: jest.fn(),
       evaluateQuickCheckAnswer: jest.fn(),
-      shouldEndAssessmentForReview: jest.fn().mockReturnValue(false),
-      resolveAssessmentStatus: jest.fn().mockReturnValue('in_progress'),
-      // [WI-136 H4] Lock function — default returns the row that
-      // getAssessment would return (in-progress snapshot). Tests that need
-      // a terminal-status race override this with mockRejectedValueOnce.
-      lockAssessmentForAnswerSubmission: jest.fn(),
     };
   },
 );
@@ -46,32 +38,6 @@ jest.mock(
     return {
       ...actual,
       getSession: jest.fn(),
-    };
-  },
-);
-
-jest.mock(
-  '../services/retention-data' /* gc1-allow: unit-route isolation for assessments route */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/retention-data',
-    ) as typeof import('../services/retention-data');
-    return {
-      ...actual,
-      updateRetentionFromSession: jest.fn().mockResolvedValue(undefined),
-    };
-  },
-);
-
-jest.mock(
-  '../services/xp' /* gc1-allow: unit-route isolation for assessments route */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/xp',
-    ) as typeof import('../services/xp');
-    return {
-      ...actual,
-      insertSessionXpEntry: jest.fn().mockResolvedValue(undefined),
     };
   },
 );
@@ -128,17 +94,11 @@ import {
   getActiveAssessmentForTopic,
   createAssessmentIfNoneActive,
   getAssessment,
-  updateAssessment,
-  evaluateAssessmentAnswer,
   loadAssessmentTopicContext,
   evaluateQuickCheckAnswer,
-  shouldEndAssessmentForReview,
-  resolveAssessmentStatus,
-  lockAssessmentForAnswerSubmission,
+  submitAssessmentAnswer,
 } from '../services/assessments';
 import { getSession } from '../services/session';
-import { updateRetentionFromSession } from '../services/retention-data';
-import { insertSessionXpEntry } from '../services/xp';
 import { refundQuotaOrEscalate } from '../services/billing';
 import { assessmentRoutes } from './assessments';
 import { ERROR_CODES } from '@eduagent/schemas';
@@ -281,43 +241,14 @@ const createAssessmentIfNoneActiveMock = jest.mocked(
   createAssessmentIfNoneActive,
 );
 const getAssessmentMock = jest.mocked(getAssessment);
-const updateAssessmentMock = jest.mocked(updateAssessment);
-const evaluateAssessmentAnswerMock = jest.mocked(evaluateAssessmentAnswer);
 const loadAssessmentTopicContextMock = jest.mocked(loadAssessmentTopicContext);
 const evaluateQuickCheckAnswerMock = jest.mocked(evaluateQuickCheckAnswer);
-const shouldEndAssessmentForReviewMock = jest.mocked(
-  shouldEndAssessmentForReview,
-);
-const resolveAssessmentStatusMock = jest.mocked(resolveAssessmentStatus);
+const submitAssessmentAnswerMock = jest.mocked(submitAssessmentAnswer);
 const getSessionMock = jest.mocked(getSession);
-const lockAssessmentForAnswerSubmissionMock = jest.mocked(
-  lockAssessmentForAnswerSubmission,
-);
-const updateRetentionFromSessionMock = jest.mocked(updateRetentionFromSession);
-const insertSessionXpEntryMock = jest.mocked(insertSessionXpEntry);
 const refundQuotaOrEscalateMock = jest.mocked(refundQuotaOrEscalate);
 
 beforeEach(() => {
   jest.clearAllMocks();
-  // [WI-136 H4] Default: the lock returns whatever the test set up
-  // getAssessmentMock to resolve to (the pre-fetch snapshot). Tests that
-  // need to simulate a terminal-state race override via
-  // lockAssessmentForAnswerSubmissionMock.mockRejectedValueOnce.
-  lockAssessmentForAnswerSubmissionMock.mockImplementation(
-    async (_db: Database, _profileId: string, _assessmentId: string) => {
-      const snapshot = await getAssessmentMock(
-        _db as never,
-        _profileId,
-        _assessmentId,
-      );
-      if (!snapshot) {
-        throw new Error(
-          'lockAssessmentForAnswerSubmission mock: getAssessmentMock returned null',
-        );
-      }
-      return snapshot;
-    },
-  );
 });
 
 // ---------------------------------------------------------------------------
@@ -467,15 +398,8 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
   }
 
   it('returns 200 with evaluation for a valid answer', async () => {
-    getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
-    loadAssessmentTopicContextMock.mockResolvedValue(makeTopicContext());
-    shouldEndAssessmentForReviewMock.mockReturnValue(false);
-    evaluateAssessmentAnswerMock.mockResolvedValue(
-      makeEvaluation({ passed: true }),
-    );
-    resolveAssessmentStatusMock.mockReturnValue('in_progress');
-    updateAssessmentMock.mockResolvedValue(
-      makeAssessmentRecord({ status: 'in_progress' }),
+    submitAssessmentAnswerMock.mockResolvedValue(
+      makeSubmitAnswerResult({ status: 'in_progress' }),
     );
 
     const res = await makeApp().request(path, validAnswerBody());
@@ -483,10 +407,17 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ evaluation: { passed: true } });
+    expect(submitAssessmentAnswerMock).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      ASSESSMENT_ID,
+      'Water is H2O',
+      { conversationLanguage: 'en' },
+    );
   });
 
   it('returns 404 when the assessment is not found', async () => {
-    getAssessmentMock.mockResolvedValue(null);
+    submitAssessmentAnswerMock.mockResolvedValue(null);
 
     const res = await makeApp().request(path, validAnswerBody());
 
@@ -503,7 +434,7 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(getAssessmentMock).not.toHaveBeenCalled();
+    expect(submitAssessmentAnswerMock).not.toHaveBeenCalled();
   });
 
   it('returns 400 when the answer field is not a string', async () => {
@@ -523,178 +454,23 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     );
 
     expect(res.status).toBe(403);
-    expect(getAssessmentMock).not.toHaveBeenCalled();
+    expect(submitAssessmentAnswerMock).not.toHaveBeenCalled();
   });
 
-  // [WI-136 H4] Concurrent-submission race: two near-simultaneous POSTs.
-  // Caller A locks first, calls the LLM, commits terminal status. Caller B
-  // blocks at SELECT ... FOR UPDATE, unblocks after A commits, observes
-  // terminal status, throws ConflictError -> 409. The LLM is called exactly
-  // once across the two requests.
-  it('[WI-136 H4] concurrent answer submissions: exactly one LLM call, loser gets 409', async () => {
-    // Both requests see the in-progress snapshot from the non-transactional
-    // pre-fetch (getAssessment). The lock then serializes them.
-    getAssessmentMock.mockResolvedValue(
-      makeAssessmentRecord({ status: 'in_progress' }),
-    );
-    loadAssessmentTopicContextMock.mockResolvedValue(makeTopicContext());
-    shouldEndAssessmentForReviewMock.mockReturnValue(false);
-    evaluateAssessmentAnswerMock.mockResolvedValue(
-      makeEvaluation({ passed: true }),
-    );
-    resolveAssessmentStatusMock.mockReturnValue('passed');
-    updateAssessmentMock.mockResolvedValue(
-      makeAssessmentRecord({ status: 'passed' }),
-    );
-
+  it('[WI-136 H4] maps a terminal-state submission conflict to 409', async () => {
     const { ConflictError } = jest.requireActual('@eduagent/schemas') as {
       ConflictError: new (message: string) => Error;
     };
 
-    // Override the lock to simulate the race: first call locks the row in
-    // an in-progress state (race winner); second call sees terminal status
-    // post-commit and throws.
-    lockAssessmentForAnswerSubmissionMock
-      .mockResolvedValueOnce(makeAssessmentRecord({ status: 'in_progress' }))
-      .mockRejectedValueOnce(
-        new ConflictError(
-          "Assessment is already in terminal state 'passed'; cannot submit further answers.",
-        ),
-      );
+    submitAssessmentAnswerMock.mockRejectedValueOnce(
+      new ConflictError(
+        "Assessment is already in terminal state 'passed'; cannot submit further answers.",
+      ),
+    );
 
-    // Fire both in sequence to make the assertion deterministic. The lock
-    // mock returning in-order is the same serialization the real
-    // SELECT ... FOR UPDATE provides at the DB level.
-    const winner = await makeApp().request(path, validAnswerBody());
-    const loser = await makeApp().request(path, validAnswerBody());
+    const res = await makeApp().request(path, validAnswerBody());
 
-    expect(winner.status).toBe(200);
-    expect(loser.status).toBe(409);
-
-    // The LLM (evaluateAssessmentAnswer) is invoked exactly once across both
-    // requests — the loser short-circuits before its LLM call inside the tx.
-    expect(evaluateAssessmentAnswerMock).toHaveBeenCalledTimes(1);
-    // Likewise only one UPDATE commits.
-    expect(updateAssessmentMock).toHaveBeenCalledTimes(1);
-  });
-
-  // -------------------------------------------------------------------------
-  // [CR #8] Terminal assessment: retention + XP must be applied atomically
-  // with the status UPDATE. Previously these ran in a separate post-tx
-  // transaction with no retry and no escalation, so a failure left the
-  // assessment permanently `passed` while SM-2/retention + XP were silently
-  // skipped (and the FOR UPDATE terminal-state guard blocked resubmission).
-  // The fix folds them into the same transaction as the status UPDATE.
-  // -------------------------------------------------------------------------
-  describe('[CR #8] terminal assessment retention + XP atomicity', () => {
-    function setupPassingAnswer() {
-      getAssessmentMock.mockResolvedValue(
-        makeAssessmentRecord({ status: 'in_progress' }),
-      );
-      loadAssessmentTopicContextMock.mockResolvedValue(makeTopicContext());
-      shouldEndAssessmentForReviewMock.mockReturnValue(false);
-      evaluateAssessmentAnswerMock.mockResolvedValue(
-        makeEvaluation({ passed: true }),
-      );
-      resolveAssessmentStatusMock.mockReturnValue('passed');
-      updateAssessmentMock.mockResolvedValue(
-        makeAssessmentRecord({ status: 'passed' }),
-      );
-    }
-
-    it('applies retention + XP on a passing assessment', async () => {
-      setupPassingAnswer();
-
-      const res = await makeApp().request(path, validAnswerBody());
-
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body).toMatchObject({ status: 'passed' });
-
-      // SM-2/retention is updated for the topic.
-      expect(updateRetentionFromSessionMock).toHaveBeenCalledTimes(1);
-      expect(updateRetentionFromSessionMock).toHaveBeenCalledWith(
-        expect.anything(),
-        PROFILE_ID,
-        TOPIC_ID,
-        expect.any(Number),
-        expect.any(String),
-      );
-      // XP is granted for the passed topic/subject.
-      expect(insertSessionXpEntryMock).toHaveBeenCalledTimes(1);
-      expect(insertSessionXpEntryMock).toHaveBeenCalledWith(
-        expect.anything(),
-        PROFILE_ID,
-        TOPIC_ID,
-        SUBJECT_ID,
-      );
-    });
-
-    it('runs retention + XP inside the SAME transaction as the status UPDATE', async () => {
-      setupPassingAnswer();
-
-      // Track whether the writes happened within a db.transaction() callback.
-      let insideTransaction = false;
-      const txCallOrder: string[] = [];
-      const transactionMock = jest
-        .fn()
-        .mockImplementation(async (fn: (tx: unknown) => unknown) => {
-          insideTransaction = true;
-          try {
-            return await fn({});
-          } finally {
-            insideTransaction = false;
-          }
-        });
-      updateRetentionFromSessionMock.mockImplementation(async () => {
-        txCallOrder.push(`retention:${insideTransaction}`);
-      });
-      insertSessionXpEntryMock.mockImplementation(async () => {
-        txCallOrder.push(`xp:${insideTransaction}`);
-      });
-
-      const app = new Hono<TestEnv>();
-      app.use('*', async (c, next) => {
-        c.set('db', { transaction: transactionMock } as unknown as Database);
-        c.set('profileId', PROFILE_ID);
-        c.set('profileMeta', {
-          birthYear: 2000,
-          location: 'EU',
-          consentStatus: 'CONSENTED',
-          hasPremiumLlm: false,
-          conversationLanguage: 'en',
-          isOwner: true,
-          resolvedVia: 'explicit-header',
-        });
-        await next();
-      });
-      app.route('/v1', assessmentRoutes);
-
-      const res = await app.request(path, validAnswerBody());
-
-      expect(res.status).toBe(200);
-      // Only ONE transaction is opened (status UPDATE + retention + XP share it).
-      expect(transactionMock).toHaveBeenCalledTimes(1);
-      // Both writes observed insideTransaction === true.
-      expect(txCallOrder).toEqual(['retention:true', 'xp:true']);
-    });
-
-    it('does NOT silently succeed when the XP write fails — the failure propagates', async () => {
-      setupPassingAnswer();
-      // Simulate the post-terminal write failing. Because it is now inside the
-      // status-UPDATE transaction, the failure rolls back the whole terminal
-      // transition rather than leaving a passed-but-no-XP assessment.
-      insertSessionXpEntryMock.mockRejectedValueOnce(
-        new Error('xp insert failed'),
-      );
-
-      const res = await makeApp().request(path, validAnswerBody());
-
-      // The request fails loudly (5xx) instead of returning 200/passed with
-      // XP silently skipped. In production the surrounding tx rolls back the
-      // status UPDATE so the learner can retry.
-      expect(res.status).toBe(500);
-    });
+    expect(res.status).toBe(409);
   });
 
   // [F-146] App-help early-return must refund quota, not charge the learner
@@ -705,7 +481,9 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     const APP_HELP_ANSWER = 'What is explorer mode?';
 
     it('[BREAK] calls safeRefundQuota when the answer hits the app-help path (no LLM called)', async () => {
-      getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
+      submitAssessmentAnswerMock.mockResolvedValue(
+        makeSubmitAnswerResult({ kind: 'app_help' }),
+      );
 
       const res = await makeMeteredApp().request(
         path,
@@ -714,8 +492,6 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
 
       // Route returns 200 with the canned evaluation.
       expect(res.status).toBe(200);
-      // LLM was NOT called.
-      expect(evaluateAssessmentAnswerMock).not.toHaveBeenCalled();
       // Quota refund WAS called — the learner must not be charged for a
       // no-LLM response.
       expect(refundQuotaOrEscalateMock).toHaveBeenCalledTimes(1);
@@ -732,7 +508,9 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     // would suppress the middleware's own refund and charge the user for a
     // no-LLM turn. Revert (set quotaRefunded unconditionally) → this goes red.
     it('[WI-776] does NOT mark quotaRefunded when the refund did not complete', async () => {
-      getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
+      submitAssessmentAnswerMock.mockResolvedValue(
+        makeSubmitAnswerResult({ kind: 'app_help' }),
+      );
       refundQuotaOrEscalateMock.mockResolvedValueOnce({ refunded: false });
 
       let capturedQuotaRefunded: boolean | undefined = 'sentinel' as never;
@@ -783,13 +561,9 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     });
 
     it('[BREAK] does NOT call safeRefundQuota when the answer reaches the LLM path', async () => {
-      getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
-      loadAssessmentTopicContextMock.mockResolvedValue(makeTopicContext());
-      evaluateAssessmentAnswerMock.mockResolvedValue(
-        makeEvaluation({ passed: true }),
+      submitAssessmentAnswerMock.mockResolvedValue(
+        makeSubmitAnswerResult({ kind: 'evaluated' }),
       );
-      resolveAssessmentStatusMock.mockReturnValue('in_progress');
-      updateAssessmentMock.mockResolvedValue(makeAssessmentRecord());
 
       const res = await makeMeteredApp().request(
         path,
@@ -797,13 +571,14 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(evaluateAssessmentAnswerMock).toHaveBeenCalled();
       // No refund — the LLM ran, the quota decrement was legitimate.
       expect(refundQuotaOrEscalateMock).not.toHaveBeenCalled();
     });
 
     it('[BUG-821] routes the refund through refundQuotaOrEscalate when subscriptionId is absent but a decrement happened', async () => {
-      getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
+      submitAssessmentAnswerMock.mockResolvedValue(
+        makeSubmitAnswerResult({ kind: 'app_help' }),
+      );
 
       // App that injects quotaDecrementSource (a decrement HAPPENED) but NOT a
       // subscriptionId — the exact BUG-821 condition. Previously the route's
@@ -829,7 +604,9 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     });
 
     it('[F-146 / WI-701] sets quotaRefunded=true on the 200 early-return so the metering middleware can invalidate KV', async () => {
-      getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
+      submitAssessmentAnswerMock.mockResolvedValue(
+        makeSubmitAnswerResult({ kind: 'app_help' }),
+      );
 
       // Build a one-off app that wraps makeMeteredApp's middleware stack and
       // captures the post-handler quotaRefunded value via a spy middleware so
@@ -1100,4 +877,21 @@ function makeEvaluation(overrides: Partial<{ passed: boolean }> = {}) {
     qualityRating: 4,
     weakAreas: [] as string[],
   };
+}
+
+function makeSubmitAnswerResult(
+  overrides: Partial<{
+    kind: 'evaluated' | 'app_help';
+    status: 'in_progress' | 'passed' | 'failed' | 'failed_exhausted';
+    passed: boolean;
+  }> = {},
+) {
+  return {
+    kind: overrides.kind ?? 'evaluated',
+    evaluation: makeEvaluation({ passed: overrides.passed }),
+    status: overrides.status ?? 'in_progress',
+    assessment: makeAssessmentRecord({
+      status: overrides.status ?? 'in_progress',
+    }),
+  } as Awaited<ReturnType<typeof submitAssessmentAnswer>>;
 }
