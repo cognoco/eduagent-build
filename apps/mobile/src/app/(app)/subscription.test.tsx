@@ -523,7 +523,7 @@ describe('SubscriptionScreen', () => {
     screen.getByTestId('subscription-loading');
   });
 
-  it('redirects child role away from subscription detail', () => {
+  it('redirects child role away from subscription detail', async () => {
     // Set isOwner: false so the real SubscriptionContent child gate fires:
     // isChild=true + active subscription (no paywall) triggers router.replace('/').
     mockActiveProfile = createTestProfile({
@@ -534,7 +534,9 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(mockReplace).toHaveBeenCalledWith('/');
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/');
+    });
     expect(screen.queryByTestId('subscription-screen')).toBeNull();
   });
 
