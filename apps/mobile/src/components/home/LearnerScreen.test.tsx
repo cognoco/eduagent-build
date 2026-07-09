@@ -41,6 +41,79 @@ let mockContractHomeScreen: 'LearnerHome' | 'FamilyHome' = 'LearnerHome';
 // who can add a child but have not linked one yet. Tests opt in via this flag.
 let mockShowAddChild = false;
 
+const ACTIVE_PROFILE_ID = '10000000-0000-4000-8000-000000000001';
+const OWNER_PROFILE_ID = '10000000-0000-4000-8000-0000000000a1';
+const CHILD_PROFILE_ID = '10000000-0000-4000-8000-0000000000c1';
+const MATH_SUBJECT_ID = '11111111-1111-7111-8111-111111111111';
+const PHYSICS_SUBJECT_ID = '22222222-2222-7222-8222-222222222222';
+const PREPARING_SUBJECT_ID = '33333333-3333-7333-8333-333333333333';
+const FRACTIONS_TOPIC_ID = '44444444-4444-7444-8444-444444444444';
+const ALGEBRA_TOPIC_ID = '55555555-5555-7555-8555-555555555555';
+const RECOVERY_TOPIC_ID = '66666666-6666-7666-8666-666666666666';
+const OVERDUE_TOPIC_ID = '77777777-7777-7777-8777-777777777777';
+const ACTIVE_SESSION_ID = '88888888-8888-7888-8888-888888888888';
+const RESUME_SESSION_ID = '99999999-9999-7999-8999-999999999999';
+const RECOVERY_SESSION_ID = 'aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa';
+const ISO_NOW = '2026-02-15T09:00:00.000Z';
+
+function makeLearnerProfile(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id: ACTIVE_PROFILE_ID,
+    profileId: ACTIVE_PROFILE_ID,
+    learningStyle: null,
+    interests: [],
+    strengths: [],
+    struggles: [],
+    communicationNotes: [],
+    suppressedInferences: [],
+    interestTimestamps: {},
+    effectivenessSessionCount: 0,
+    memoryEnabled: true,
+    accommodationMode: 'none',
+    memoryConsentStatus: 'granted',
+    memoryCollectionEnabled: true,
+    memoryInjectionEnabled: true,
+    recentlyResolvedTopics: [],
+    version: 1,
+    createdAt: ISO_NOW,
+    updatedAt: ISO_NOW,
+    ...overrides,
+  };
+}
+
+function makeSubject(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id: MATH_SUBJECT_ID,
+    profileId: ACTIVE_PROFILE_ID,
+    name: 'Math',
+    rawInput: null,
+    status: 'active',
+    curriculumStatus: 'ready',
+    pedagogyMode: 'four_strands',
+    languageCode: null,
+    createdAt: ISO_NOW,
+    updatedAt: ISO_NOW,
+    ...overrides,
+  };
+}
+
+function makeProgressOverview(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    subjects: [],
+    totalTopicsCompleted: 0,
+    totalTopicsVerified: 0,
+    totalTopicsMastered: 0,
+    totalTopicsLearning: 0,
+    ...overrides,
+  };
+}
+
 const mockNavContract = () => ({
   home: {
     screen: mockContractHomeScreen,
@@ -57,7 +130,7 @@ const mockNavContract = () => ({
   },
   canEnter: () => true,
   isSurfaced: () => true,
-  queryScope: { appContext: 'study' as const, profileId: 'test-profile-id' },
+  queryScope: { appContext: 'study' as const, profileId: ACTIVE_PROFILE_ID },
   effectiveAppContext: 'study' as const,
   isParentProxy: false,
 });
@@ -71,8 +144,8 @@ jest.mock(
       proxy: {
         active: mockIsExplicitProxyMode,
         childName: mockIsExplicitProxyMode ? 'Alex' : '',
-        childProfileId: mockIsExplicitProxyMode ? 'child-id' : null,
-        parentProfileId: mockIsExplicitProxyMode ? 'owner-id' : null,
+        childProfileId: mockIsExplicitProxyMode ? CHILD_PROFILE_ID : null,
+        parentProfileId: mockIsExplicitProxyMode ? OWNER_PROFILE_ID : null,
       },
     }),
     useNavigationDataScopeContract: () => mockNavContract(),
@@ -88,11 +161,7 @@ const mockFetch = createRoutedMockFetch({
     nextReviewTopic: null,
     nextUpcomingReviewAt: null,
   },
-  '/progress/overview': {
-    subjects: [],
-    totalTopicsCompleted: 0,
-    totalTopicsVerified: 0,
-  },
+  '/progress/overview': makeProgressOverview(),
   '/progress/inventory': {
     global: { totalSessions: 2 },
     subjects: [],
@@ -103,7 +172,7 @@ const mockFetch = createRoutedMockFetch({
     demoMode: false,
   },
   '/learner-profile': {
-    profile: { accommodationMode: 'none' },
+    profile: makeLearnerProfile(),
   },
   '/subjects': { subjects: [] },
   '/usage': {
@@ -253,9 +322,16 @@ const { fetchCallsMatching } = require('../../test-utils/mock-api-routes');
 const HOME_RETURN_PARAMS = { returnTo: LEARNER_HOME_RETURN_TO };
 
 const defaultProps = {
-  profiles: [{ id: 'p1', displayName: 'Alex', isOwner: true, birthYear: 1990 }],
+  profiles: [
+    {
+      id: ACTIVE_PROFILE_ID,
+      displayName: 'Alex',
+      isOwner: true,
+      birthYear: 1990,
+    },
+  ],
   activeProfile: {
-    id: 'p1',
+    id: ACTIVE_PROFILE_ID,
     displayName: 'Alex',
     isOwner: true,
     birthYear: 1990,
@@ -263,10 +339,14 @@ const defaultProps = {
 };
 
 const QUIZ_DISCOVERY_CARD = {
-  id: 'quiz-card-1',
+  id: 'bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb',
+  profileId: ACTIVE_PROFILE_ID,
   type: 'quiz_discovery',
   title: 'Discover more',
   body: 'Try a capitals quiz',
+  priority: 5,
+  expiresAt: null,
+  createdAt: ISO_NOW,
   activityType: 'capitals',
   missedItemCount: 3,
 };
@@ -316,11 +396,7 @@ describe('LearnerScreen', () => {
       nextReviewTopic: null,
       nextUpcomingReviewAt: null,
     });
-    mockFetch.setRoute('/progress/overview', {
-      subjects: [],
-      totalTopicsCompleted: 0,
-      totalTopicsVerified: 0,
-    });
+    mockFetch.setRoute('/progress/overview', makeProgressOverview());
     mockFetch.setRoute('/progress/inventory', {
       global: { totalSessions: 2 },
       subjects: [],
@@ -331,7 +407,7 @@ describe('LearnerScreen', () => {
       demoMode: false,
     });
     mockFetch.setRoute('/learner-profile', {
-      profile: { accommodationMode: 'none' },
+      profile: makeLearnerProfile(),
     });
     mockFetch.setRoute('/subjects', { subjects: [] });
     mockFetch.setRoute('/usage', {
@@ -445,7 +521,7 @@ describe('LearnerScreen', () => {
   it('keeps Connect out of learner Home once children exist', async () => {
     mockShowAddChild = true;
     mockLinkedChildren = [
-      { id: 'child-id', displayName: 'Emma', isOwner: false },
+      { id: CHILD_PROFILE_ID, displayName: 'Emma', isOwner: false },
     ];
     renderLearner();
 
@@ -530,11 +606,14 @@ describe('LearnerScreen', () => {
   });
 
   it('shows the topics-learned momentum line on Home', async () => {
-    mockFetch.setRoute('/progress/overview', {
-      subjects: [],
-      totalTopicsCompleted: 5,
-      totalTopicsVerified: 5,
-    });
+    mockFetch.setRoute(
+      '/progress/overview',
+      makeProgressOverview({
+        totalTopicsCompleted: 5,
+        totalTopicsVerified: 5,
+        totalTopicsMastered: 5,
+      }),
+    );
 
     renderLearner();
 
@@ -545,7 +624,7 @@ describe('LearnerScreen', () => {
 
   it('shows task-first intent choices when subjects exist', async () => {
     mockFetch.setRoute('/subjects', {
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [makeSubject()],
     });
 
     renderLearner();
@@ -564,16 +643,16 @@ describe('LearnerScreen', () => {
   it('renders subject cards in carousel', async () => {
     mockFetch.setRoute('/subjects', {
       subjects: [
-        { id: 'sub-1', name: 'Math', status: 'active' },
-        { id: 'sub-2', name: 'Physics', status: 'active' },
+        makeSubject(),
+        makeSubject({ id: PHYSICS_SUBJECT_ID, name: 'Physics' }),
       ],
     });
 
     renderLearner();
 
     await waitFor(() => {
-      screen.getByTestId('home-subject-card-sub-1');
-      screen.getByTestId('home-subject-card-sub-2');
+      screen.getByTestId(`home-subject-card-${MATH_SUBJECT_ID}`);
+      screen.getByTestId(`home-subject-card-${PHYSICS_SUBJECT_ID}`);
       screen.getByText('Math');
       screen.getByText('Physics');
     });
@@ -582,19 +661,18 @@ describe('LearnerScreen', () => {
   it('labels subjects as preparing while curriculum is not ready', async () => {
     mockFetch.setRoute('/subjects', {
       subjects: [
-        {
-          id: 'sub-preparing',
+        makeSubject({
+          id: PREPARING_SUBJECT_ID,
           name: 'Ancient History',
-          status: 'active',
           curriculumStatus: 'preparing',
-        },
+        }),
       ],
     });
 
     renderLearner();
 
     await waitFor(() => {
-      screen.getByTestId('home-subject-card-sub-preparing');
+      screen.getByTestId(`home-subject-card-${PREPARING_SUBJECT_ID}`);
       screen.getByText('Ancient History');
       screen.getByText('Setting up Ancient History...');
       expect(screen.queryByText('Open')).toBeNull();
@@ -606,16 +684,16 @@ describe('LearnerScreen', () => {
     // to a non-owner profile do NOT trigger proxy chrome.
     mockIsExplicitProxyMode = true;
     mockFetch.setRoute('/subjects', {
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [makeSubject()],
     });
 
     renderLearner({
       profiles: [
-        { id: 'owner-id', displayName: 'Parent', isOwner: true },
-        { id: 'child-id', displayName: 'Alex', isOwner: false },
+        { id: OWNER_PROFILE_ID, displayName: 'Parent', isOwner: true },
+        { id: CHILD_PROFILE_ID, displayName: 'Alex', isOwner: false },
       ],
       activeProfile: {
-        id: 'child-id',
+        id: CHILD_PROFILE_ID,
         displayName: 'Alex',
         isOwner: false,
       },
@@ -638,16 +716,16 @@ describe('LearnerScreen', () => {
     // Plain profile switch: isExplicitProxyMode stays false (the default).
     // The child IS the user — must see normal learner surfaces.
     mockFetch.setRoute('/subjects', {
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [makeSubject()],
     });
 
     renderLearner({
       profiles: [
-        { id: 'owner-id', displayName: 'Parent', isOwner: true },
-        { id: 'child-id', displayName: 'Alex', isOwner: false },
+        { id: OWNER_PROFILE_ID, displayName: 'Parent', isOwner: true },
+        { id: CHILD_PROFILE_ID, displayName: 'Alex', isOwner: false },
       ],
       activeProfile: {
-        id: 'child-id',
+        id: CHILD_PROFILE_ID,
         displayName: 'Alex',
         isOwner: false,
       },
@@ -669,16 +747,16 @@ describe('LearnerScreen', () => {
     // [ACCOUNT-04] This is the legitimate proxy path — explicit proxy mode set.
     mockIsExplicitProxyMode = true;
     mockFetch.setRoute('/subjects', {
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [makeSubject()],
     });
 
     renderLearner({
       profiles: [
-        { id: 'owner-id', displayName: 'Parent', isOwner: true },
-        { id: 'child-id', displayName: 'Alex', isOwner: false },
+        { id: OWNER_PROFILE_ID, displayName: 'Parent', isOwner: true },
+        { id: CHILD_PROFILE_ID, displayName: 'Alex', isOwner: false },
       ],
       activeProfile: {
-        id: 'child-id',
+        id: CHILD_PROFILE_ID,
         displayName: 'Alex',
         isOwner: false,
       },
@@ -688,8 +766,8 @@ describe('LearnerScreen', () => {
     fireEvent.press(screen.getByTestId('proxy-view-session-summaries'));
 
     await waitFor(() => {
-      expect(mockSwitchProfile).toHaveBeenCalledWith('owner-id');
-      expect(mockPush).toHaveBeenCalledWith('/(app)/child/child-id');
+      expect(mockSwitchProfile).toHaveBeenCalledWith(OWNER_PROFILE_ID);
+      expect(mockPush).toHaveBeenCalledWith(`/(app)/child/${CHILD_PROFILE_ID}`);
     });
   });
 
@@ -747,11 +825,11 @@ describe('LearnerScreen', () => {
   it('shows coach band from resume target', async () => {
     mockFetch.setRoute('/progress/resume-target', {
       target: {
-        subjectId: 's1',
+        subjectId: MATH_SUBJECT_ID,
         subjectName: 'Math',
-        topicId: 't1',
+        topicId: FRACTIONS_TOPIC_ID,
         topicTitle: 'Fractions',
-        sessionId: 'session-1',
+        sessionId: ACTIVE_SESSION_ID,
         resumeFromSessionId: null,
         resumeKind: 'active_session',
         lastActivityAt: '2026-02-15T09:00:00.000Z',
@@ -770,10 +848,10 @@ describe('LearnerScreen', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
-        sessionId: 'session-1',
-        subjectId: 's1',
+        sessionId: ACTIVE_SESSION_ID,
+        subjectId: MATH_SUBJECT_ID,
         subjectName: 'Math',
-        topicId: 't1',
+        topicId: FRACTIONS_TOPIC_ID,
         topicName: 'Fractions',
         mode: 'learning',
         ...HOME_RETURN_PARAMS,
@@ -785,8 +863,8 @@ describe('LearnerScreen', () => {
     mockFetch.setRoute('/progress/review-summary', {
       totalOverdue: 3,
       nextReviewTopic: {
-        topicId: 't1',
-        subjectId: 's1',
+        topicId: ALGEBRA_TOPIC_ID,
+        subjectId: MATH_SUBJECT_ID,
         subjectName: 'Math',
         topicTitle: 'Algebra',
       },
@@ -809,10 +887,10 @@ describe('LearnerScreen', () => {
 
   it('shows recovery coach band and clears marker on Continue', async () => {
     mockReadSessionRecoveryMarker.mockResolvedValue({
-      sessionId: 'session-1',
-      subjectId: 's1',
+      sessionId: ACTIVE_SESSION_ID,
+      subjectId: MATH_SUBJECT_ID,
       subjectName: 'Physics',
-      topicId: 't1',
+      topicId: FRACTIONS_TOPIC_ID,
       topicName: 'Velocity',
       mode: 'learning',
       updatedAt: new Date().toISOString(),
@@ -826,15 +904,17 @@ describe('LearnerScreen', () => {
     });
 
     fireEvent.press(screen.getByTestId('home-coach-band-continue'));
-    expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
+    expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith(
+      ACTIVE_PROFILE_ID,
+    );
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
-        sessionId: 'session-1',
-        subjectId: 's1',
+        sessionId: ACTIVE_SESSION_ID,
+        subjectId: MATH_SUBJECT_ID,
         subjectName: 'Physics',
         mode: 'learning',
-        topicId: 't1',
+        topicId: FRACTIONS_TOPIC_ID,
         topicName: 'Velocity',
         ...HOME_RETURN_PARAMS,
       },
@@ -852,10 +932,10 @@ describe('LearnerScreen', () => {
   it('[CC-05] fresh recovery marker wins over resume target AND overdue review collision', async () => {
     // Fresh recovery marker (recovery arm — priority 1).
     mockReadSessionRecoveryMarker.mockResolvedValue({
-      sessionId: 'recovery-session',
-      subjectId: 'recovery-subject',
+      sessionId: RECOVERY_SESSION_ID,
+      subjectId: PHYSICS_SUBJECT_ID,
       subjectName: 'Physics',
-      topicId: 'recovery-topic',
+      topicId: RECOVERY_TOPIC_ID,
       topicName: 'Velocity',
       mode: 'learning',
       updatedAt: new Date().toISOString(),
@@ -865,11 +945,11 @@ describe('LearnerScreen', () => {
     // sessionId so we can prove the recovery sessionId — not this one — is used.
     mockFetch.setRoute('/progress/resume-target', {
       target: {
-        subjectId: 'resume-subject',
+        subjectId: MATH_SUBJECT_ID,
         subjectName: 'Math',
-        topicId: 'resume-topic',
+        topicId: FRACTIONS_TOPIC_ID,
         topicTitle: 'Fractions',
-        sessionId: 'resume-session',
+        sessionId: RESUME_SESSION_ID,
         resumeFromSessionId: null,
         resumeKind: 'active_session',
         lastActivityAt: '2026-02-15T09:00:00.000Z',
@@ -881,8 +961,8 @@ describe('LearnerScreen', () => {
     mockFetch.setRoute('/progress/review-summary', {
       totalOverdue: 3,
       nextReviewTopic: {
-        topicId: 'overdue-topic',
-        subjectId: 'overdue-subject',
+        topicId: OVERDUE_TOPIC_ID,
+        subjectId: PREPARING_SUBJECT_ID,
         subjectName: 'History',
         topicTitle: 'Algebra',
       },
@@ -905,15 +985,17 @@ describe('LearnerScreen', () => {
 
     // Recovery Continue: profile-scoped marker cleared, pushes the SESSION route
     // with the recovery sessionId/params.
-    expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
+    expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith(
+      ACTIVE_PROFILE_ID,
+    );
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
-        sessionId: 'recovery-session',
-        subjectId: 'recovery-subject',
+        sessionId: RECOVERY_SESSION_ID,
+        subjectId: PHYSICS_SUBJECT_ID,
         subjectName: 'Physics',
         mode: 'learning',
-        topicId: 'recovery-topic',
+        topicId: RECOVERY_TOPIC_ID,
         topicName: 'Velocity',
         ...HOME_RETURN_PARAMS,
       },
@@ -929,7 +1011,7 @@ describe('LearnerScreen', () => {
     // And the resume sessionId must never reach a session push.
     expect(mockPush).not.toHaveBeenCalledWith(
       expect.objectContaining({
-        params: expect.objectContaining({ sessionId: 'resume-session' }),
+        params: expect.objectContaining({ sessionId: RESUME_SESSION_ID }),
       }),
     );
   });
@@ -942,11 +1024,11 @@ describe('LearnerScreen', () => {
 
     mockFetch.setRoute('/progress/resume-target', {
       target: {
-        subjectId: 'resume-subject',
+        subjectId: MATH_SUBJECT_ID,
         subjectName: 'Math',
-        topicId: 'resume-topic',
+        topicId: FRACTIONS_TOPIC_ID,
         topicTitle: 'Fractions',
-        sessionId: 'resume-session',
+        sessionId: RESUME_SESSION_ID,
         resumeFromSessionId: null,
         resumeKind: 'active_session',
         lastActivityAt: '2026-02-15T09:00:00.000Z',
@@ -956,8 +1038,8 @@ describe('LearnerScreen', () => {
     mockFetch.setRoute('/progress/review-summary', {
       totalOverdue: 3,
       nextReviewTopic: {
-        topicId: 'overdue-topic',
-        subjectId: 'overdue-subject',
+        topicId: OVERDUE_TOPIC_ID,
+        subjectId: PREPARING_SUBJECT_ID,
         subjectName: 'History',
         topicTitle: 'Algebra',
       },
@@ -983,11 +1065,11 @@ describe('LearnerScreen', () => {
       pathname: '/(app)/session',
       params: {
         mode: 'learning',
-        subjectId: 'resume-subject',
+        subjectId: MATH_SUBJECT_ID,
         subjectName: 'Math',
-        topicId: 'resume-topic',
+        topicId: FRACTIONS_TOPIC_ID,
         topicName: 'Fractions',
-        sessionId: 'resume-session',
+        sessionId: RESUME_SESSION_ID,
         ...HOME_RETURN_PARAMS,
       },
     });
@@ -999,7 +1081,7 @@ describe('LearnerScreen', () => {
 
   it('silently clears stale markers without showing coach band', async () => {
     mockReadSessionRecoveryMarker.mockResolvedValue({
-      sessionId: 'session-1',
+      sessionId: ACTIVE_SESSION_ID,
       updatedAt: new Date().toISOString(),
     });
     mockIsRecoveryMarkerFresh.mockReturnValue(false);
@@ -1007,7 +1089,9 @@ describe('LearnerScreen', () => {
     renderLearner();
 
     await waitFor(() => {
-      expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
+      expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith(
+        ACTIVE_PROFILE_ID,
+      );
     });
 
     expect(screen.queryByTestId('home-coach-band')).toBeNull();
@@ -1079,9 +1163,9 @@ describe('LearnerScreen', () => {
   it('dismisses coach band on dismiss tap', async () => {
     mockFetch.setRoute('/progress/resume-target', {
       target: {
-        subjectId: 's1',
+        subjectId: MATH_SUBJECT_ID,
         subjectName: 'Math',
-        topicId: 't1',
+        topicId: FRACTIONS_TOPIC_ID,
         topicTitle: 'Fractions',
         sessionId: null,
         resumeFromSessionId: null,
@@ -1106,41 +1190,45 @@ describe('LearnerScreen', () => {
 
   it('navigates to the subject shelf when subject card is tapped', async () => {
     mockFetch.setRoute('/subjects', {
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [makeSubject()],
     });
 
     renderLearner();
 
-    await waitFor(() => screen.getByTestId('home-subject-card-sub-1'));
-    fireEvent.press(screen.getByTestId('home-subject-card-sub-1'));
+    await waitFor(() =>
+      screen.getByTestId(`home-subject-card-${MATH_SUBJECT_ID}`),
+    );
+    fireEvent.press(screen.getByTestId(`home-subject-card-${MATH_SUBJECT_ID}`));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'sub-1', returnTo: 'learner-home' },
+      params: { subjectId: MATH_SUBJECT_ID, returnTo: 'learner-home' },
     });
   });
 
   it('navigates to the subject shelf when subject card is tapped after a plain child switch', async () => {
     mockFetch.setRoute('/subjects', {
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [makeSubject()],
     });
 
     renderLearner({
       profiles: [
-        { id: 'owner-id', displayName: 'Parent', isOwner: true },
-        { id: 'child-id', displayName: 'Alex', isOwner: false },
+        { id: OWNER_PROFILE_ID, displayName: 'Parent', isOwner: true },
+        { id: CHILD_PROFILE_ID, displayName: 'Alex', isOwner: false },
       ],
       activeProfile: {
-        id: 'child-id',
+        id: CHILD_PROFILE_ID,
         displayName: 'Alex',
         isOwner: false,
       },
     });
 
-    await waitFor(() => screen.getByTestId('home-subject-card-sub-1'));
-    fireEvent.press(screen.getByTestId('home-subject-card-sub-1'));
+    await waitFor(() =>
+      screen.getByTestId(`home-subject-card-${MATH_SUBJECT_ID}`),
+    );
+    fireEvent.press(screen.getByTestId(`home-subject-card-${MATH_SUBJECT_ID}`));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'sub-1', returnTo: 'learner-home' },
+      params: { subjectId: MATH_SUBJECT_ID, returnTo: 'learner-home' },
     });
   });
 
@@ -1173,7 +1261,7 @@ describe('LearnerScreen', () => {
     mockFetch.setRoute('/dashboard', {
       children: [
         {
-          profileId: 'child-id',
+          profileId: CHILD_PROFILE_ID,
           displayName: 'Emma',
           consentStatus: 'WITHDRAWN',
           respondedAt,
@@ -1189,7 +1277,6 @@ describe('LearnerScreen', () => {
           guidedVsImmediateRatio: 0,
           retentionTrend: 'stable',
           totalSessions: 0,
-          weeklyHeadline: null,
           currentlyWorkingOn: [],
           progress: null,
           currentStreak: 0,
@@ -1210,7 +1297,7 @@ describe('LearnerScreen', () => {
 
   it('navigates to create-subject on carousel New subject tile', async () => {
     mockFetch.setRoute('/subjects', {
-      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      subjects: [makeSubject()],
     });
 
     renderLearner();
