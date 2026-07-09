@@ -246,9 +246,21 @@ const LATEST_SUBSCRIPTION_PAYER_MIGRATION = fs.readFileSync(
   LATEST_SUBSCRIPTION_PAYER_MIGRATION_PATH,
   'utf-8',
 );
+const LATEST_SUBSCRIPTION_PERSON_FK_INDEX_MIGRATION_PATH = path.resolve(
+  __dirname,
+  '../../../../apps/api/drizzle/0135_subscription_person_fk_indexes.sql',
+);
+const LATEST_SUBSCRIPTION_PERSON_FK_INDEX_MIGRATION = fs.readFileSync(
+  LATEST_SUBSCRIPTION_PERSON_FK_INDEX_MIGRATION_PATH,
+  'utf-8',
+);
 
 function sourceContainsCheck(checkName: string): boolean {
   return IDENTITY_SOURCE.includes(`'${checkName}'`);
+}
+
+function sourceContainsIndex(indexName: string): boolean {
+  return IDENTITY_SOURCE.includes(`index('${indexName}')`);
 }
 
 // ---------------------------------------------------------------------------
@@ -327,6 +339,26 @@ describe('identity schema — break tests (F-032, constraint guards)', () => {
     );
     expect(LATEST_SUBSCRIPTION_PAYER_MIGRATION).toContain(
       `WHERE "role" = 'primary'`,
+    );
+  });
+
+  it('[BREAK] subscription: payerPersonId FK has a dedicated erasure-scan index', () => {
+    expect(sourceContainsIndex('subscription_payer_person_id_idx')).toBe(true);
+    expect(LATEST_SUBSCRIPTION_PERSON_FK_INDEX_MIGRATION).toContain(
+      'CREATE INDEX IF NOT EXISTS "subscription_payer_person_id_idx"',
+    );
+    expect(LATEST_SUBSCRIPTION_PERSON_FK_INDEX_MIGRATION).toContain(
+      'ON "subscription" USING btree ("payer_person_id")',
+    );
+  });
+
+  it('[BREAK] subscription_payers: personId FK has a dedicated erasure-scan index', () => {
+    expect(sourceContainsIndex('subscription_payers_person_id_idx')).toBe(true);
+    expect(LATEST_SUBSCRIPTION_PERSON_FK_INDEX_MIGRATION).toContain(
+      'CREATE INDEX IF NOT EXISTS "subscription_payers_person_id_idx"',
+    );
+    expect(LATEST_SUBSCRIPTION_PERSON_FK_INDEX_MIGRATION).toContain(
+      'ON "subscription_payers" USING btree ("person_id")',
     );
   });
 });
