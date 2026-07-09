@@ -61,10 +61,18 @@ jest.mock(
 
 // ─── Fixtures ───────────────────────────────────────────────────────────
 
+const ACCOUNT_ID = '10000000-0000-4000-8000-000000000001';
+const PARENT_ID = '10000000-0000-4000-8000-000000000002';
+const CHILD_A_ID = '10000000-0000-4000-8000-0000000000a1';
+const CHILD_B_ID = '10000000-0000-4000-8000-0000000000b1';
+const SUBJECT_A_ID = '20000000-0000-4000-8000-0000000000a1';
+const SUBJECT_PROGRAMMING_ID = '20000000-0000-4000-8000-0000000000b1';
+const SUBJECT_MATH_ID = '20000000-0000-4000-8000-0000000000c1';
+
 const makeProfile = (overrides: Partial<Profile> = {}): Profile =>
   createTestProfile({
-    id: 'profile-1',
-    accountId: 'account-1',
+    id: PARENT_ID,
+    accountId: ACCOUNT_ID,
     displayName: 'Alex Parent',
     isOwner: true,
     birthYear: 1985,
@@ -74,15 +82,15 @@ const makeProfile = (overrides: Partial<Profile> = {}): Profile =>
 const PARENT = makeProfile();
 
 const CHILD_A = makeProfile({
-  id: 'child-a',
-  accountId: 'account-1',
+  id: CHILD_A_ID,
+  accountId: ACCOUNT_ID,
   displayName: 'Emma',
   isOwner: false,
 });
 
 const CHILD_B = makeProfile({
-  id: 'child-b',
-  accountId: 'account-1',
+  id: CHILD_B_ID,
+  accountId: ACCOUNT_ID,
   displayName: 'Liam',
   isOwner: false,
 });
@@ -300,17 +308,17 @@ describe('ParentHomeScreen', () => {
     const { result } = mount([PARENT, CHILD_A, CHILD_B]);
     await waitForParentTransitionNotice(result);
 
-    result.getByTestId('parent-home-check-child-child-a');
-    result.getByTestId('parent-home-check-child-child-b');
-    result.getByTestId('parent-home-learn-together-child-a');
-    result.getByTestId('parent-home-learn-together-child-b');
-    result.getByTestId('parent-home-weekly-report-child-a');
-    result.getByTestId('parent-home-weekly-report-child-b');
-    result.getByTestId('parent-home-send-nudge-child-a');
-    result.getByTestId('parent-home-send-nudge-child-b');
+    result.getByTestId(`parent-home-check-child-${CHILD_A_ID}`);
+    result.getByTestId(`parent-home-check-child-${CHILD_B_ID}`);
+    result.getByTestId(`parent-home-learn-together-${CHILD_A_ID}`);
+    result.getByTestId(`parent-home-learn-together-${CHILD_B_ID}`);
+    result.getByTestId(`parent-home-weekly-report-${CHILD_A_ID}`);
+    result.getByTestId(`parent-home-weekly-report-${CHILD_B_ID}`);
+    result.getByTestId(`parent-home-send-nudge-${CHILD_A_ID}`);
+    result.getByTestId(`parent-home-send-nudge-${CHILD_B_ID}`);
     // The Progress button is gone — Progress lives on the overview + tab now.
     expect(
-      result.queryByTestId('parent-home-child-progress-child-a'),
+      result.queryByTestId(`parent-home-child-progress-${CHILD_A_ID}`),
     ).toBeNull();
     result.getByText('Children');
     result.getByText('Your family');
@@ -325,25 +333,33 @@ describe('ParentHomeScreen', () => {
     expect(
       result.queryByText("Show them how it's done: start a quick session."),
     ).toBeNull();
-    expect(result.queryByTestId('child-accommodation-row-child-a')).toBeNull();
-    expect(result.queryByTestId('child-accommodation-row-child-b')).toBeNull();
+    expect(
+      result.queryByTestId(`child-accommodation-row-${CHILD_A_ID}`),
+    ).toBeNull();
+    expect(
+      result.queryByTestId(`child-accommodation-row-${CHILD_B_ID}`),
+    ).toBeNull();
   });
 
   it('routes the child card header to the child overview (no mode)', async () => {
     const { result } = mount([PARENT, CHILD_A]);
     await waitForParentTransitionNotice(result);
 
-    fireEvent.press(result.getByTestId('parent-home-check-child-child-a'));
-    expect(mockPush).toHaveBeenLastCalledWith('/(app)/child/child-a');
+    fireEvent.press(
+      result.getByTestId(`parent-home-check-child-${CHILD_A_ID}`),
+    );
+    expect(mockPush).toHaveBeenLastCalledWith(`/(app)/child/${CHILD_A_ID}`);
   });
 
   it('routes the child initial to child profile settings', async () => {
     const { result } = mount([PARENT, CHILD_A]);
     await waitForParentTransitionNotice(result);
 
-    fireEvent.press(result.getByTestId('parent-home-child-profile-child-a'));
+    fireEvent.press(
+      result.getByTestId(`parent-home-child-profile-${CHILD_A_ID}`),
+    );
     expect(mockPush).toHaveBeenLastCalledWith(
-      '/(app)/child/child-a?mode=settings',
+      `/(app)/child/${CHILD_A_ID}?mode=settings`,
     );
   });
 
@@ -352,7 +368,7 @@ describe('ParentHomeScreen', () => {
       dashboard: {
         children: [
           dashboardChild({
-            profileId: 'child-a',
+            profileId: CHILD_A_ID,
             displayName: 'Emma',
             sessionsThisWeek: 2,
             currentlyWorkingOn: ['Fractions'],
@@ -366,12 +382,14 @@ describe('ParentHomeScreen', () => {
     await waitForParentTransitionNotice(result);
 
     expect(
-      result.queryByTestId('parent-home-child-progress-child-a'),
+      result.queryByTestId(`parent-home-child-progress-${CHILD_A_ID}`),
     ).toBeNull();
-    result.getByTestId('parent-home-learn-together-child-a');
+    result.getByTestId(`parent-home-learn-together-${CHILD_A_ID}`);
     expect(result.queryByTestId('learn-together-sheet')).toBeNull();
 
-    fireEvent.press(result.getByTestId('parent-home-learn-together-child-a'));
+    fireEvent.press(
+      result.getByTestId(`parent-home-learn-together-${CHILD_A_ID}`),
+    );
 
     await waitFor(() => {
       result.getByTestId('learn-together-sheet');
@@ -384,7 +402,7 @@ describe('ParentHomeScreen', () => {
       dashboard: {
         children: [
           dashboardChild({
-            profileId: 'child-a',
+            profileId: CHILD_A_ID,
             displayName: 'Emma',
             sessionsThisWeek: 2,
             currentlyWorkingOn: ['Fractions'],
@@ -403,7 +421,9 @@ describe('ParentHomeScreen', () => {
       ).toHaveLength(1);
     });
 
-    fireEvent.press(result.getByTestId('parent-home-learn-together-child-a'));
+    fireEvent.press(
+      result.getByTestId(`parent-home-learn-together-${CHILD_A_ID}`),
+    );
 
     await waitFor(() => {
       result.getByTestId('learn-together-sheet');
@@ -431,16 +451,18 @@ describe('ParentHomeScreen', () => {
     const { result } = mount([PARENT, CHILD_A]);
     await waitForParentTransitionNotice(result);
 
-    fireEvent.press(result.getByTestId('parent-home-weekly-report-child-a'));
+    fireEvent.press(
+      result.getByTestId(`parent-home-weekly-report-${CHILD_A_ID}`),
+    );
 
     // [WI-1067] pushChildReports pushes the ancestor chain: child profile index
     // first, then the reports leaf — so router.back() from reports returns to
     // the child profile screen rather than falling through to the Home tab.
     expect(mockPush).toHaveBeenCalledTimes(2);
-    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/child/child-a');
+    expect(mockPush).toHaveBeenNthCalledWith(1, `/(app)/child/${CHILD_A_ID}`);
     expect(mockPush).toHaveBeenLastCalledWith({
       pathname: '/(app)/child/[profileId]/reports',
-      params: { profileId: 'child-a' },
+      params: { profileId: CHILD_A_ID },
     });
   });
 
@@ -516,7 +538,7 @@ describe('ParentHomeScreen', () => {
       dashboard: {
         children: [
           dashboardChild({
-            profileId: 'child-a',
+            profileId: CHILD_A_ID,
             displayName: 'Emma',
             summary: 'Emma is building confidence.',
             sessionsThisWeek: 2,
@@ -528,7 +550,7 @@ describe('ParentHomeScreen', () => {
             trend: 'up',
             subjects: [
               {
-                subjectId: 'subject-a',
+                subjectId: SUBJECT_A_ID,
                 name: 'Math',
                 retentionStatus: 'strong',
               },
@@ -547,30 +569,33 @@ describe('ParentHomeScreen', () => {
 
     // Mentor-voice headline replaces the old "focus · activity" snapshot.
     await waitFor(() => {
-      result.getByTestId('parent-home-child-headline-child-a');
+      result.getByTestId(`parent-home-child-headline-${CHILD_A_ID}`);
     });
     expect(
-      result.getByTestId('parent-home-child-headline-child-a').props.children,
+      result.getByTestId(`parent-home-child-headline-${CHILD_A_ID}`).props
+        .children,
     ).toBe('Emma kept things moving in Fractions.');
     // Right-aligned status word.
     expect(
-      result.getByTestId('parent-home-child-status-child-a').props.children,
+      result.getByTestId(`parent-home-child-status-${CHILD_A_ID}`).props
+        .children,
     ).toBe('Active this week');
     // Positive-only "Solid" line — Math is strong.
     expect(
-      result.getByTestId('parent-home-child-solid-child-a').props.children,
+      result.getByTestId(`parent-home-child-solid-${CHILD_A_ID}`).props
+        .children,
     ).toBe('Solid: Math');
 
     // Exactly ONE starter — the old three-prompt block is gone.
     expect(
-      result.queryByTestId('parent-home-child-prompts-child-a'),
+      result.queryByTestId(`parent-home-child-prompts-${CHILD_A_ID}`),
     ).toBeNull();
-    result.getByTestId('parent-home-tonight-child-a-starter');
+    result.getByTestId(`parent-home-tonight-${CHILD_A_ID}-starter`);
     expect(
-      result.queryByTestId('parent-home-tonight-child-a-trickiest'),
+      result.queryByTestId(`parent-home-tonight-${CHILD_A_ID}-trickiest`),
     ).toBeNull();
     expect(
-      result.queryByTestId('parent-home-tonight-child-a-next-goal'),
+      result.queryByTestId(`parent-home-tonight-${CHILD_A_ID}-next-goal`),
     ).toBeNull();
     result.getByText('What felt clearer in Fractions this week?');
 
@@ -578,14 +603,16 @@ describe('ParentHomeScreen', () => {
     expect(result.queryByText('Fractions · 18 min this week')).toBeNull();
 
     // Card border style preserved (per-child accent).
-    expect(resolvedStyle(result, 'parent-home-child-card-child-a')).toEqual(
+    expect(
+      resolvedStyle(result, `parent-home-child-card-${CHILD_A_ID}`),
+    ).toEqual(
       expect.objectContaining({
         borderColor: expect.any(String),
         borderWidth: 1,
       }),
     );
     expect(
-      resolvedStyle(result, 'parent-home-child-card-child-a').borderColor,
+      resolvedStyle(result, `parent-home-child-card-${CHILD_A_ID}`).borderColor,
     ).toMatch(/^#[0-9a-f]{8}$/i);
   });
 
@@ -593,8 +620,8 @@ describe('ParentHomeScreen', () => {
     const { result } = mount([PARENT, CHILD_A, CHILD_B], {
       dashboard: {
         children: [
-          dashboardChild({ profileId: 'child-a', sessionsThisWeek: 3 }),
-          dashboardChild({ profileId: 'child-b', sessionsThisWeek: 1 }),
+          dashboardChild({ profileId: CHILD_A_ID, sessionsThisWeek: 3 }),
+          dashboardChild({ profileId: CHILD_B_ID, sessionsThisWeek: 1 }),
         ],
         pendingNotices: [],
         demoMode: false,
@@ -618,7 +645,7 @@ describe('ParentHomeScreen', () => {
       dashboard: {
         children: [
           dashboardChild({
-            profileId: 'child-a',
+            profileId: CHILD_A_ID,
             displayName: 'Emma',
             sessionsThisWeek: 0,
             sessionsLastWeek: 1,
@@ -629,7 +656,7 @@ describe('ParentHomeScreen', () => {
             trend: 'stable',
             subjects: [
               {
-                subjectId: 'subject-programming',
+                subjectId: SUBJECT_PROGRAMMING_ID,
                 name: 'Programming',
                 retentionStatus: 'strong',
               },
@@ -648,13 +675,15 @@ describe('ParentHomeScreen', () => {
 
     // Quiet headline + status word.
     await waitFor(() => {
-      result.getByTestId('parent-home-child-headline-child-a');
+      result.getByTestId(`parent-home-child-headline-${CHILD_A_ID}`);
     });
     expect(
-      result.getByTestId('parent-home-child-headline-child-a').props.children,
+      result.getByTestId(`parent-home-child-headline-${CHILD_A_ID}`).props
+        .children,
     ).toBe('Emma had a quieter week — last time the focus was Programming.');
     expect(
-      result.getByTestId('parent-home-child-status-child-a').props.children,
+      result.getByTestId(`parent-home-child-status-${CHILD_A_ID}`).props
+        .children,
     ).toBe('Quiet week');
 
     // Exactly one restart starter — not the three-prompt fan-out.
@@ -666,9 +695,11 @@ describe('ParentHomeScreen', () => {
       result.queryByText('Should we make Programming easier to restart?'),
     ).toBeNull();
     // Quiet state hides the Solid / Coming-up block.
-    expect(result.queryByTestId('parent-home-child-solid-child-a')).toBeNull();
     expect(
-      result.queryByTestId('parent-home-child-comingup-child-a'),
+      result.queryByTestId(`parent-home-child-solid-${CHILD_A_ID}`),
+    ).toBeNull();
+    expect(
+      result.queryByTestId(`parent-home-child-comingup-${CHILD_A_ID}`),
     ).toBeNull();
   });
 
@@ -677,7 +708,7 @@ describe('ParentHomeScreen', () => {
       dashboard: {
         children: [
           dashboardChild({
-            profileId: 'child-a',
+            profileId: CHILD_A_ID,
             displayName: 'Emma',
             sessionsThisWeek: 2,
             totalSessions: 4,
@@ -744,7 +775,7 @@ describe('ParentHomeScreen', () => {
       dashboard: {
         children: [
           dashboardChild({
-            profileId: 'child-a',
+            profileId: CHILD_A_ID,
             displayName: 'Emma',
             sessionsThisWeek: 5,
             sessionsLastWeek: 3,
@@ -754,7 +785,11 @@ describe('ParentHomeScreen', () => {
             exchangesLastWeek: 10,
             trend: 'up',
             subjects: [
-              { subjectId: 'sub-a', name: 'Math', retentionStatus: 'strong' },
+              {
+                subjectId: SUBJECT_MATH_ID,
+                name: 'Math',
+                retentionStatus: 'strong',
+              },
             ],
             guidedVsImmediateRatio: 0.5,
             retentionTrend: 'improving',
@@ -762,7 +797,7 @@ describe('ParentHomeScreen', () => {
             currentlyWorkingOn: ['Math'],
           }),
           dashboardChild({
-            profileId: 'child-b',
+            profileId: CHILD_B_ID,
             displayName: 'Liam',
             totalSessions: 3,
           }),
@@ -774,33 +809,37 @@ describe('ParentHomeScreen', () => {
     await waitForParentTransitionNotice(result);
 
     await waitFor(() => {
-      result.getByTestId('parent-home-tonight-child-a-starter');
+      result.getByTestId(`parent-home-tonight-${CHILD_A_ID}-starter`);
     });
     // Each card carries exactly one starter (testID `${childId}-starter`).
     const emmaPrompt = result.getByTestId(
-      'parent-home-tonight-child-a-starter',
+      `parent-home-tonight-${CHILD_A_ID}-starter`,
     );
     const liamPrompt = result.getByTestId(
-      'parent-home-tonight-child-b-starter',
+      `parent-home-tonight-${CHILD_B_ID}-starter`,
     );
     result.getByText('What felt clearer in Math this week?');
     result.getByText('What would make starting feel easy this week?');
     // The old 3-prompt block testIDs no longer exist.
     expect(
-      result.queryByTestId('parent-home-child-prompts-child-a'),
+      result.queryByTestId(`parent-home-child-prompts-${CHILD_A_ID}`),
     ).toBeNull();
     expect(
       result.queryByText('Emma: What felt clearer in Math this week?'),
     ).toBeNull();
     expect(
-      resolvedStyle(result, 'parent-home-tonight-child-a-starter').borderColor,
+      resolvedStyle(result, `parent-home-tonight-${CHILD_A_ID}-starter`)
+        .borderColor,
     ).not.toBe(
-      resolvedStyle(result, 'parent-home-tonight-child-b-starter').borderColor,
+      resolvedStyle(result, `parent-home-tonight-${CHILD_B_ID}-starter`)
+        .borderColor,
     );
     expect(
-      resolvedStyle(result, 'parent-home-check-child-child-a').shadowColor,
+      resolvedStyle(result, `parent-home-check-child-${CHILD_A_ID}`)
+        .shadowColor,
     ).not.toBe(
-      resolvedStyle(result, 'parent-home-check-child-child-b').shadowColor,
+      resolvedStyle(result, `parent-home-check-child-${CHILD_B_ID}`)
+        .shadowColor,
     );
     expect(emmaPrompt).toBeTruthy();
     expect(liamPrompt).toBeTruthy();
@@ -811,7 +850,9 @@ describe('ParentHomeScreen', () => {
   });
 
   it('[PARENT-24] shows ParentTransitionNotice after at least one child is linked', async () => {
-    const transitionParent = makeProfile({ id: 'profile-transition' });
+    const transitionParent = makeProfile({
+      id: '10000000-0000-4000-8000-000000000003',
+    });
     const { result } = mount(
       [transitionParent, { ...CHILD_A, accountId: transitionParent.accountId }],
       {},
@@ -827,7 +868,7 @@ describe('ParentHomeScreen', () => {
 
     expect(result.queryByTestId('nudge-action-sheet-close')).toBeNull();
 
-    fireEvent.press(result.getByTestId('parent-home-send-nudge-child-a'));
+    fireEvent.press(result.getByTestId(`parent-home-send-nudge-${CHILD_A_ID}`));
 
     result.getByTestId('nudge-action-sheet-close');
     expect(mockPush).not.toHaveBeenCalled();
@@ -841,7 +882,7 @@ describe('ParentHomeScreen', () => {
       dashboard: {
         children: [
           dashboardChild({
-            profileId: 'child-a',
+            profileId: CHILD_A_ID,
             displayName: 'Emma',
             consentStatus: 'WITHDRAWN',
             respondedAt,
@@ -858,7 +899,7 @@ describe('ParentHomeScreen', () => {
     // the old prop-capture spy.
     await waitFor(() => {
       result.getByTestId('withdrawal-countdown-banner');
-      result.getByTestId('withdrawal-countdown-row-child-a');
+      result.getByTestId(`withdrawal-countdown-row-${CHILD_A_ID}`);
     });
     // The row copy interpolates the child's display name.
     result.getAllByText(/Emma/);
