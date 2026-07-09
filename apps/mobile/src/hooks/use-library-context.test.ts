@@ -11,6 +11,21 @@ import {
 // ---------------------------------------------------------------------------
 
 const mockFetch = jest.fn();
+const SUBJECT_1_ID = '11111111-1111-4111-8111-111111111111';
+const SUBJECT_2_ID = '22222222-2222-4222-8222-222222222222';
+const SUBJECT_3_ID = '33333333-3333-4333-8333-333333333333';
+const SUBJECT_STRONG_ID = '44444444-4444-4444-8444-444444444444';
+const SUBJECT_FADING_ID = '55555555-5555-4555-8555-555555555555';
+const SUBJECT_FORGOTTEN_ID = '66666666-6666-4666-8666-666666666666';
+const SUBJECT_EMPTY_ID = '77777777-7777-4777-8777-777777777777';
+const SUBJECT_WITH_TOPICS_ID = '88888888-8888-4888-8888-888888888888';
+const TOPIC_1_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const TOPIC_2_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const TOPIC_STRONG_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const TOPIC_FADING_1_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const TOPIC_FADING_2_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const TOPIC_FORGOTTEN_ID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+const BOOK_ID = '99999999-9999-4999-8999-999999999999';
 
 jest.mock(
   '../lib/api-client' /* gc1-allow: Clerk useAuth() external boundary */,
@@ -53,10 +68,13 @@ function makeRetentionResponse(
     subjectId: string;
     topics?: Array<{
       topicId?: string;
+      bookId?: string;
       easeFactor?: number;
+      intervalDays?: number;
       repetitions?: number;
       nextReviewAt?: string | null;
       lastReviewedAt?: string | null;
+      daysSinceLastReview?: number | null;
       xpStatus?: 'pending' | 'verified' | 'decayed';
       failureCount?: number;
     }>;
@@ -68,11 +86,15 @@ function makeRetentionResponse(
       subjects: subjects.map((s) => ({
         subjectId: s.subjectId,
         topics: (s.topics ?? []).map((t) => ({
-          topicId: t.topicId ?? 'topic-default',
+          topicId: t.topicId ?? TOPIC_1_ID,
+          topicTitle: 'Fixture topic',
+          bookId: t.bookId ?? BOOK_ID,
           easeFactor: t.easeFactor ?? 2.5,
+          intervalDays: t.intervalDays ?? 1,
           repetitions: t.repetitions ?? 0,
           nextReviewAt: t.nextReviewAt ?? null,
           lastReviewedAt: t.lastReviewedAt ?? null,
+          daysSinceLastReview: t.daysSinceLastReview ?? null,
           xpStatus: t.xpStatus ?? 'pending',
           failureCount: t.failureCount ?? 0,
         })),
@@ -109,10 +131,10 @@ describe('useLibraryRetention', () => {
     mockFetch.mockResolvedValueOnce(
       makeRetentionResponse([
         {
-          subjectId: 'sub-1',
+          subjectId: SUBJECT_1_ID,
           topics: [
             {
-              topicId: 'top-1',
+              topicId: TOPIC_1_ID,
               repetitions: 3,
               nextReviewAt: new Date(
                 Date.now() + 5 * 24 * 60 * 60 * 1000,
@@ -134,7 +156,7 @@ describe('useLibraryRetention', () => {
     });
 
     expect(result.current.data?.subjects).toHaveLength(1);
-    expect(result.current.data?.subjects[0]?.subjectId).toBe('sub-1');
+    expect(result.current.data?.subjects[0]?.subjectId).toBe(SUBJECT_1_ID);
     expect(result.current.data?.subjects[0]?.topics).toHaveLength(1);
   });
 
@@ -168,7 +190,7 @@ describe('useLibraryRetention', () => {
 
   it('caches under the expected query key', async () => {
     mockFetch.mockResolvedValueOnce(
-      makeRetentionResponse([{ subjectId: 'sub-1' }]),
+      makeRetentionResponse([{ subjectId: SUBJECT_1_ID }]),
     );
 
     renderHook(() => useLibraryRetention(), { wrapper: createWrapper() });
@@ -179,7 +201,7 @@ describe('useLibraryRetention', () => {
         'retention',
         'test-profile-id',
       ]) as { subjects: Array<{ subjectId: string }> } | undefined;
-      expect(cached?.subjects[0]?.subjectId).toBe('sub-1');
+      expect(cached?.subjects[0]?.subjectId).toBe(SUBJECT_1_ID);
     });
   });
 });
@@ -221,16 +243,16 @@ describe('useSubjectRetentionMap', () => {
     mockFetch.mockResolvedValueOnce(
       makeRetentionResponse([
         {
-          subjectId: 'sub-1',
+          subjectId: SUBJECT_1_ID,
           topics: [
             {
-              topicId: 't-1',
+              topicId: TOPIC_1_ID,
               repetitions: 2,
               nextReviewAt: FUTURE_DATE,
               xpStatus: 'verified',
             },
             {
-              topicId: 't-2',
+              topicId: TOPIC_2_ID,
               repetitions: 3,
               nextReviewAt: FUTURE_DATE,
               xpStatus: 'pending',
@@ -248,23 +270,23 @@ describe('useSubjectRetentionMap', () => {
       expect(result.current.size).toBeGreaterThan(0);
     });
 
-    expect(result.current.get('sub-1')).toBe('strong');
+    expect(result.current.get(SUBJECT_1_ID)).toBe('strong');
   });
 
   it('derives "fading" when one topic is close to review (1h away)', async () => {
     mockFetch.mockResolvedValueOnce(
       makeRetentionResponse([
         {
-          subjectId: 'sub-2',
+          subjectId: SUBJECT_2_ID,
           topics: [
             {
-              topicId: 't-1',
+              topicId: TOPIC_1_ID,
               repetitions: 2,
               nextReviewAt: FUTURE_DATE,
               xpStatus: 'verified',
             },
             {
-              topicId: 't-2',
+              topicId: TOPIC_2_ID,
               repetitions: 2,
               nextReviewAt: NEAR_FUTURE,
               xpStatus: 'pending',
@@ -283,23 +305,23 @@ describe('useSubjectRetentionMap', () => {
     });
 
     // Worst status wins: fading beats strong
-    expect(result.current.get('sub-2')).toBe('fading');
+    expect(result.current.get(SUBJECT_2_ID)).toBe('fading');
   });
 
   it('derives "forgotten" when one topic has failureCount >= 3', async () => {
     mockFetch.mockResolvedValueOnce(
       makeRetentionResponse([
         {
-          subjectId: 'sub-3',
+          subjectId: SUBJECT_3_ID,
           topics: [
             {
-              topicId: 't-1',
+              topicId: TOPIC_1_ID,
               repetitions: 2,
               nextReviewAt: FUTURE_DATE,
               xpStatus: 'verified',
             },
             {
-              topicId: 't-2',
+              topicId: TOPIC_2_ID,
               repetitions: 1,
               nextReviewAt: NEAR_FUTURE,
               failureCount: 3,
@@ -318,17 +340,17 @@ describe('useSubjectRetentionMap', () => {
     });
 
     // forgotten beats all other statuses
-    expect(result.current.get('sub-3')).toBe('forgotten');
+    expect(result.current.get(SUBJECT_3_ID)).toBe('forgotten');
   });
 
   it('handles mixed statuses across subjects: strong + fading + forgotten', async () => {
     mockFetch.mockResolvedValueOnce(
       makeRetentionResponse([
         {
-          subjectId: 'sub-strong',
+          subjectId: SUBJECT_STRONG_ID,
           topics: [
             {
-              topicId: 't-s1',
+              topicId: TOPIC_STRONG_ID,
               repetitions: 2,
               nextReviewAt: FUTURE_DATE,
               xpStatus: 'verified',
@@ -336,16 +358,16 @@ describe('useSubjectRetentionMap', () => {
           ],
         },
         {
-          subjectId: 'sub-fading',
+          subjectId: SUBJECT_FADING_ID,
           topics: [
             {
-              topicId: 't-f1',
+              topicId: TOPIC_FADING_1_ID,
               repetitions: 2,
               nextReviewAt: FUTURE_DATE,
               xpStatus: 'verified',
             },
             {
-              topicId: 't-f2',
+              topicId: TOPIC_FADING_2_ID,
               repetitions: 2,
               nextReviewAt: NEAR_FUTURE,
               xpStatus: 'pending',
@@ -353,8 +375,14 @@ describe('useSubjectRetentionMap', () => {
           ],
         },
         {
-          subjectId: 'sub-forgotten',
-          topics: [{ topicId: 't-g1', repetitions: 1, failureCount: 3 }],
+          subjectId: SUBJECT_FORGOTTEN_ID,
+          topics: [
+            {
+              topicId: TOPIC_FORGOTTEN_ID,
+              repetitions: 1,
+              failureCount: 3,
+            },
+          ],
         },
       ]),
     );
@@ -367,20 +395,20 @@ describe('useSubjectRetentionMap', () => {
       expect(result.current.size).toBe(3);
     });
 
-    expect(result.current.get('sub-strong')).toBe('strong');
-    expect(result.current.get('sub-fading')).toBe('fading');
-    expect(result.current.get('sub-forgotten')).toBe('forgotten');
+    expect(result.current.get(SUBJECT_STRONG_ID)).toBe('strong');
+    expect(result.current.get(SUBJECT_FADING_ID)).toBe('fading');
+    expect(result.current.get(SUBJECT_FORGOTTEN_ID)).toBe('forgotten');
   });
 
   it('omits subjects with no topics from the map', async () => {
     mockFetch.mockResolvedValueOnce(
       makeRetentionResponse([
-        { subjectId: 'sub-empty', topics: [] },
+        { subjectId: SUBJECT_EMPTY_ID, topics: [] },
         {
-          subjectId: 'sub-with-topics',
+          subjectId: SUBJECT_WITH_TOPICS_ID,
           topics: [
             {
-              topicId: 't-1',
+              topicId: TOPIC_1_ID,
               repetitions: 2,
               nextReviewAt: FUTURE_DATE,
               xpStatus: 'verified',
@@ -399,19 +427,19 @@ describe('useSubjectRetentionMap', () => {
     });
 
     // Empty-topic subject is omitted
-    expect(result.current.has('sub-empty')).toBe(false);
-    expect(result.current.has('sub-with-topics')).toBe(true);
+    expect(result.current.has(SUBJECT_EMPTY_ID)).toBe(false);
+    expect(result.current.has(SUBJECT_WITH_TOPICS_ID)).toBe(true);
   });
 
   it('updates the map when query data changes', async () => {
-    // First fetch: sub-1 is strong
+    // First fetch: SUBJECT_1_ID is strong
     mockFetch.mockResolvedValueOnce(
       makeRetentionResponse([
         {
-          subjectId: 'sub-1',
+          subjectId: SUBJECT_1_ID,
           topics: [
             {
-              topicId: 't-1',
+              topicId: TOPIC_1_ID,
               repetitions: 2,
               nextReviewAt: FUTURE_DATE,
               xpStatus: 'verified',
@@ -426,21 +454,25 @@ describe('useSubjectRetentionMap', () => {
     });
 
     await waitFor(() => {
-      expect(result.current.get('sub-1')).toBe('strong');
+      expect(result.current.get(SUBJECT_1_ID)).toBe('strong');
     });
 
-    // Seed new data with sub-1 now forgotten
+    // Seed new data with SUBJECT_1_ID now forgotten
     act(() => {
       queryClient.setQueryData(['library', 'retention', 'test-profile-id'], {
         subjects: [
           {
-            subjectId: 'sub-1',
+            subjectId: SUBJECT_1_ID,
             topics: [
               {
-                topicId: 't-1',
+                topicId: TOPIC_1_ID,
+                topicTitle: 'Fixture topic',
+                bookId: BOOK_ID,
                 repetitions: 1,
+                intervalDays: 1,
                 nextReviewAt: null,
                 lastReviewedAt: null,
+                daysSinceLastReview: null,
                 easeFactor: 2.5,
                 xpStatus: 'decayed',
                 failureCount: 0,
@@ -454,7 +486,7 @@ describe('useSubjectRetentionMap', () => {
 
     await waitFor(() => {
       // decayed → forgotten
-      expect(result.current.get('sub-1')).toBe('forgotten');
+      expect(result.current.get(SUBJECT_1_ID)).toBe('forgotten');
     });
   });
 });
