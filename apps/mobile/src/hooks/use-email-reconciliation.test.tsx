@@ -5,7 +5,7 @@ import { useEmailReconciliation } from './use-email-reconciliation';
 
 // Clerk is an external boundary (bare specifier — not an internal mock).
 const mockUseUser = jest.fn();
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useUser: () => mockUseUser(),
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
 }));

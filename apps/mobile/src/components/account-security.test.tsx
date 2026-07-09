@@ -7,7 +7,7 @@ import { AccountSecurity } from './account-security';
 let mockUser: Record<string, unknown> = {};
 const mockPush = jest.fn();
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useUser: () => ({ user: mockUser }),
   useAuth: () => ({ getToken: jest.fn(), signOut: jest.fn() }),
   // [CRITICAL-2b] Passthrough: wrapped Clerk calls run directly in tests.

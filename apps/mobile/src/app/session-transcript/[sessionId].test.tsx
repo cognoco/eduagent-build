@@ -3,7 +3,7 @@
 // from /session-summary/<id> back to the actual conversation, even though
 // the API has always returned the exchanges via GET /sessions/:id/transcript.
 import { act, render, screen, fireEvent } from '@testing-library/react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 
 const mockUseLocalSearchParams = jest.fn();
 const mockReplace = jest.fn();

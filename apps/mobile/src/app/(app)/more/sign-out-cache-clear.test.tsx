@@ -84,7 +84,7 @@ jest.mock(
 );
 
 const mockClerkSignOut = jest.fn().mockResolvedValue(undefined);
-jest.mock('@clerk/clerk-expo' /* gc1-allow: external auth provider */, () => ({
+jest.mock('@clerk/expo' /* gc1-allow: external auth provider */, () => ({
   useAuth: () => ({ signOut: mockClerkSignOut, userId: 'owner-1' }),
 }));
 

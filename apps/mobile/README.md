@@ -9,7 +9,7 @@ Expo (React Native) mobile app for MentoMate — the AI-powered tutoring platfor
 | Framework | Expo SDK 54, React Native |
 | Styling | NativeWind 4.2.1 (Tailwind CSS 3.4.19) |
 | Navigation | Expo Router (file-system based) |
-| Auth | Clerk (`@clerk/clerk-expo`) |
+| Auth | Clerk (`@clerk/expo`) |
 | Server state | TanStack Query v5 |
 | API client | Hono RPC (`import type { AppType } from '@eduagent/api'`) |
 

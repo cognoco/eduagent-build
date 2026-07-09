@@ -6,7 +6,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import { useTranslation } from 'react-i18next';
 
 import { tokens } from '../lib/design-tokens';

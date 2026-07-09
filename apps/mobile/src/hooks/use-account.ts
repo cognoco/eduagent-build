@@ -4,7 +4,7 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import {
   accountDeletionStatusResponseSchema,
   type AccountDeletionStatusResponse,

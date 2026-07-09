@@ -4,7 +4,7 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import { useApiClient } from '../lib/api-client';
 import { shouldRetryApiError } from '../lib/api-errors';
 import type { AppContext, Profile } from '@eduagent/schemas';

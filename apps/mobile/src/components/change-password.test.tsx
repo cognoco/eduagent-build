@@ -8,7 +8,7 @@ const mockUpdatePassword = jest.fn();
 const mockSignOut = jest.fn();
 const mockReplace = jest.fn();
 
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   useUser: () => ({
     user: {
       updatePassword: mockUpdatePassword,

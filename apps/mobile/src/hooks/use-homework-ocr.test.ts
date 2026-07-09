@@ -23,10 +23,10 @@ class MockFormData {
   }
 }
 
-// @clerk/clerk-expo is a third-party auth SDK — cannot run without native
+// @clerk/expo is a third-party auth SDK — cannot run without native
 // Clerk runtime. The global test-setup mock covers most cases; this local
 // override narrows getToken to a deterministic resolved value for OCR tests.
-jest.mock('@clerk/clerk-expo', () => ({
+jest.mock('@clerk/expo', () => ({
   // gc1-allow: external-boundary
   useAuth: () => ({
     getToken: jest.fn().mockResolvedValue('test-token'),

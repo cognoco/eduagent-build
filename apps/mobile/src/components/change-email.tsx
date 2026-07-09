@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text, TextInput, View } from 'react-native';
-import { useUser, useReverification } from '@clerk/clerk-expo';
+import { useUser, useReverification } from '@clerk/expo';
 
 import { assertOk } from '../lib/assert-ok';
 import { formatApiError } from '../lib/format-api-error';

@@ -27,7 +27,7 @@ _Critical rules and patterns for implementing code in MentoMate. Focus on unobvi
 | Hono | 4.11.x | On Cloudflare Workers. Same framework if migrating to Railway. |
 | Drizzle ORM | Current stable | Type-safe SQL. Not Prisma. |
 | Neon | Managed | PostgreSQL + pgvector. Serverless driver `@neondatabase/serverless`. |
-| Clerk | Current | `@clerk/clerk-expo` on mobile. JWKS verification on API. |
+| Clerk | Current | `@clerk/expo` on mobile. JWKS verification on API. |
 | Inngest | v3 | `inngest/hono` serve adapter (Hono on Cloudflare Workers). Use `inngest/cloudflare` only for bare Workers without Hono. |
 | Nx | 22.2.0 | `@naxodev/nx-cloudflare` 5.0.x for Workers deployment. |
 

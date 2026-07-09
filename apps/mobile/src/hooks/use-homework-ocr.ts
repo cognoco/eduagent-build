@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { NativeModules, Platform } from 'react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/expo';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
