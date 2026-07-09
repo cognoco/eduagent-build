@@ -1,7 +1,0 @@
-**What was done:** Added `[BREAK][Issue 901]` regression coverage to `apps/api/src/routes/onboarding.test.ts` for onboarding routes that must reject auto-resolved owner identity.
-
-**What changed:** Added a test helper that simulates `profileScopeMiddleware` auto-resolving an owner profile when no `X-Profile-Id` header is sent. Added six route-level tests covering self language, child language, self pronouns, child pronouns, self interests, and child interests. Confirmed `apps/mobile/eas.json` was setup/env drift and restored it before staging.
-
-**Verification:** Worker mutation red check temporarily disabled the `resolvedVia` guards in `family-access.ts` and `proxy-guard.ts`; `pnpm test:api:unit --runTestsByPath apps/api/src/routes/onboarding.test.ts --testNamePattern 'Issue 901'` failed with all six new tests receiving `200` instead of expected `403`. Worker restored the guards and verified focused onboarding suite, eslint, API typecheck, and pre-push. Coordinator reran `pnpm test:api:unit --runTestsByPath apps/api/src/routes/onboarding.test.ts --no-coverage`, which passed 1 suite and 45 tests. Remote `origin/WI-925` matches commit `aaa9bf0d40ec7cf53ad184a5deb1cafe0058e8aa`.
-
-**Caveats / Follow-ups:** No production code change was needed; the Issue-901 `resolvedVia` guard already exists. Test output includes existing logger warnings for expected 4xx paths and missing LLM API keys in the test environment. No PR was created.
