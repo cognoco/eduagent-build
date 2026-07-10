@@ -189,16 +189,15 @@ describe('JournalTabView', () => {
           },
           {
             kind: 'ledger_moment',
-            templateKey: 'now.ledger_moment.reward_receipt',
+            templateKey: 'now.ledger_moment.topic_mastered',
             params: {
-              ledgerKind: 'reward_receipt',
-              receiptKind: 'practice_points',
-              amount: 12,
+              ledgerKind: 'topic_mastered',
+              subjectId: 'subject-1',
               topicTitle: 'Fractions',
             },
             deepLink: {
-              route: 'journal',
-              params: {},
+              route: 'subject.hub',
+              params: { subjectId: 'subject-1' },
               chain: [],
             },
             scope: 'self',
@@ -268,7 +267,7 @@ describe('JournalTabView', () => {
     screen.getByTestId('journal-moments-strip');
     screen.getByText('Saved Fractions to your learning record.');
     screen.getByText('3 learning sessions completed');
-    screen.getByText('+12 practice points for Fractions');
+    screen.getByText('Marked Fractions as mastered.');
     screen.getByTestId('journal-segmented-control');
     // The Sessions tab renders the recap list (recap = the session's row).
     screen.getByTestId('journal-recaps-section');

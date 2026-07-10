@@ -6,11 +6,7 @@ import { z } from 'zod';
 // (topic_mastered, retention_due, needs_deepening_added, recap_ready,
 // snapshot_ready) were never written and have been pruned. A new moment kind is
 // a read-time projection in now-feed.ts, NOT a new entry here + a writer.
-export const ledgerKindSchema = z.enum([
-  'session_filed',
-  'milestone_reached',
-  'reward_receipt',
-]);
+export const ledgerKindSchema = z.enum(['session_filed', 'milestone_reached']);
 export type LedgerKind = z.infer<typeof ledgerKindSchema>;
 
 // Typed params per ledger kind — routing-relevant UUID fields are validated;
@@ -27,10 +23,6 @@ export const ledgerKindParamsSchema = z.discriminatedUnion('kind', [
     kind: z.literal('milestone_reached'),
     subjectId: z.string().uuid().optional(),
     bookId: z.string().uuid().optional(),
-  }),
-  z.object({
-    kind: z.literal('reward_receipt'),
-    subjectId: z.string().uuid().optional(),
   }),
 ]);
 export type LedgerKindParams = z.infer<typeof ledgerKindParamsSchema>;
