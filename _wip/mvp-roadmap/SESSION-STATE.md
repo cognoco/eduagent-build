@@ -1,18 +1,22 @@
 # mvp-roadmap session state — checkpoint 2026-07-10 (session 2 close)
 
-## CURRENT MANDATE (operator, 2026-07-10 late evening — ACTIVE, read first)
+## CURRENT MANDATE (operator, 2026-07-10 night — ACTIVE, read first)
 
-**Role: wave-prep engine.** Prepare Wave 1 and Wave 2 for streamlined execution — wave by wave, Wave 1 first. Wave 0 is handled by a separate executor (dedicated lane `_quartet/working/lanes/wave-0/`); do NOT touch Wave-0 items.
+**WAVES ARE SCRAPPED (operator ruling).** Replaced by **5 parallel agent batches**, all startable now; Sprint rows are membership SoR (wave rows archived). Operator/legal/manual items (DPO/DPIA 1105/1106, AI-Act self-assessment 1659, compliance docs 1107/1108/1111/1192/1193/1194, counsel consumers 1559/1109, conditionals 1663/1664, flag-combo ruling 1334, trust design 1767) are OUT of agent queues — tag `manual-external`, no Sprint. Trust builds 1497/1498/1499/1501/1502 held sprint-less behind 1767; join Batch 4 when design lands.
 
-Prep work means: bring items forward to Stage=Ready (refine: description, AC, DoR), define interdependencies (Blocked-by relations between wave items and across waves), surface gaps/ambiguities for operator ruling. Use sanctioned Cosmo paths (/cosmo:triage → /cosmo:refine); the Sprint rows are membership SoR:
-- Wave 1 "Product verticals": Sprint page 3998bce9-1f7c-81a1-81b4-c092a62972fb — 29 items: 1121,1127,1135,1137,1441,1445,1446,1451,1461,1464,1466,1496,1497,1498,1499,1501,1502,1547,1552,1553,1658,1689,1703,1705,1753,1754,1756,1767,1777
-- Wave 2 "Compliance + hardening": Sprint page 3998bce9-1f7c-8190-9a9e-ca8951bc650d — 27 items: 1107,1108,1109,1111,1162,1192,1193,1194,1195,1288,1334,1371,1379,1399,1400,1406,1555,1559,1651,1652,1663,1664,1686,1690,1691,1779,1780
+| Batch | Sprint page | Members |
+|---|---|---|
+| 1 — Verified-learning engine & proof | 3998bce9-1f7c-8170-99ea-c813067e5ae0 | 1438,1469,1445,1446,1464,1754,1666,1703,1121,1658,1705 |
+| 2 — Language vertical | 3998bce9-1f7c-8120-81b2-c330290c7d34 | 1447,1777,1755,1552,1547,1756,1553 |
+| 3 — Platform / LLM cutover (= the live delivery lane, ex-wave-0, `_quartet/working/lanes/wave-0/`) | 3998bce9-1f7c-815f-b5e8-dab473b3ceb5 | 1167,1685,1779,1686,1505 |
+| 4 — Supporter, activation & ratified bugs | 3998bce9-1f7c-8127-8988-e24fe7649b26 | 1127,1135,1137,1753,1441,1451,1461,1466,1496,1689 |
+| 5 — Hardening, ops & billing | 3998bce9-1f7c-81e6-96a6-d7704bcb1d0e | 1288,1371,1379,1162,1651,1652,1400,1406,1555,1399,1780,1500,1690,1691,1195 |
 
-First deliverable after compaction: play back the Wave-1 prep plan to the operator BEFORE executing it.
+All Blocked-by edges set + audited 2026-07-10: every open blocker is intra-batch (chains: 1438/1469→1445/1446→1464→1754; 1658→1705; 1447→1777; 1547→1756; 1167→1685→1779/1686; 1127→1135→1137→1753; 1651→1652→1400/1406). "Later — Publish & beta (post-batch; ex-Wave 3)" row keeps the publish/beta items.
 
-Known context for prep: ruling detail per item lives in docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md (§ per capability node — many items have AC-grade scope written there already, e.g. §3 verified-learning slices, §6 language items 1-16, §1/§4 supporter rulings); RUNWAY.md carries intra-wave ordering + degrade lines. Trust package: WI-1767 design pass BLOCKS 1497/1498/1499/1501/1502 (relations already set). Engine spine order: 1469(W0)→1446→1464→1754; 1445 after 1469. Language: 1552 floor; 1547→1756→1777; 1553 last; 1777 blocked-by 1447(W0). Supporter chain: 1127→1135→1137→1753.
+**Role: batch-prep engine.** Remaining prep = refine batch members to Stage=Ready (description/AC/DoR, mining MVP-DEFINITION.md ruling text) via sanctioned /cosmo:triage → /cosmo:refine, heads first; surface ambiguities for operator ruling; flag (don't clear) Parked holds (WI-1782 gap). Batch 3 items belong to the live executor lane — coordinate, don't claim.
 
-**Supersedes the pre-compaction snapshot (below the divider) and the 2026-07-09 snapshot. Everything in this session is DONE and pushed/written; nothing is mid-flight.**
+**Supersedes the pre-compaction snapshot (below the divider) and the 2026-07-09 snapshot.**
 
 ## Freeze status
 
