@@ -71,7 +71,6 @@ import {
 import { classifyApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { useCreateNote } from '../../../hooks/use-notes';
-import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
 import { useProfile } from '../../../lib/profile';
 import * as SecureStore from '../../../lib/secure-storage';
 import {
@@ -124,6 +123,7 @@ import {
   deriveSessionSubjectState,
   getLatestAiMessageId,
   getLearnerTurnCount,
+  resolveLanguageVoiceLocale,
 } from './_view-models/session-derived-state';
 import { getSessionRouteParams } from './_view-models/session-route-params';
 import { mentorBirthSeenKey } from '../../../lib/secure-store-keys';
@@ -786,10 +786,10 @@ function SessionScreenInner() {
   const activeSubject = availableSubjects.find(
     (availableSubject) => availableSubject.id === effectiveSubjectId,
   );
-  const languageVoiceLocale =
-    activeSubject?.pedagogyMode === 'four_strands'
-      ? getVoiceLocaleForLanguage(activeSubject.languageCode)
-      : undefined;
+  const languageVoiceLocale = resolveLanguageVoiceLocale({
+    activeSubject,
+    conversationLanguage: activeProfile?.conversationLanguage,
+  });
   const switcherSubjectId = topicSwitcherSubjectId ?? effectiveSubjectId;
   const switcherCurriculum = useCurriculum(switcherSubjectId);
 
