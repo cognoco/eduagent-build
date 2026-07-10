@@ -214,11 +214,12 @@ function isTransientGenerationError(message: string | undefined): boolean {
   );
 }
 
-// WI-1685: thread the V2 routing cutover flag into the pure router module the
-// same way production does (apps/api/src/middleware/llm.ts), so a staging
-// gate run with LLM_ROUTING_V2_ENABLED=true actually exercises V2 routing
-// instead of silently validating the legacy path. Logged so a run's output
-// is self-evidencing about which path it validated.
+// Thread the V2 routing cutover flag into the pure router module the same
+// way production does (apps/api/src/middleware/llm.ts) — there is no HTTP
+// middleware in script context to do this per-request, so a staging gate run
+// with LLM_ROUTING_V2_ENABLED=true actually exercises V2 routing instead of
+// silently validating the legacy path. Logged so a run's output is
+// self-evidencing about which path it validated.
 function logLlmRoutingMode(): void {
   const v2Enabled = isLlmRoutingV2Enabled(
     process.env['LLM_ROUTING_V2_ENABLED'],
