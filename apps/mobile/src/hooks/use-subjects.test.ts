@@ -1,5 +1,6 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
+import type { Subject } from '@eduagent/schemas';
 import {
   createHookWrapper,
   createTestProfile,
@@ -16,6 +17,23 @@ const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
+
+const PROFILE_ID = 'c0000000-0000-4000-8000-000000000001';
+const SUBJECT_1_ID = 'c0000000-0000-4000-8000-000000000002';
+const SUBJECT_2_ID = 'c0000000-0000-4000-8000-000000000003';
+
+function createSubjectFixture(overrides: Partial<Subject> = {}): Subject {
+  return {
+    id: SUBJECT_1_ID,
+    profileId: PROFILE_ID,
+    name: 'Math',
+    status: 'active',
+    pedagogyMode: 'socratic',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
 
 function createWrapper() {
   const w = createHookWrapper({
@@ -47,8 +65,8 @@ describe('useSubjects', () => {
       new Response(
         JSON.stringify({
           subjects: [
-            { id: 's1', name: 'Math', status: 'active' },
-            { id: 's2', name: 'Science', status: 'active' },
+            createSubjectFixture(),
+            createSubjectFixture({ id: SUBJECT_2_ID, name: 'Science' }),
           ],
         }),
         { status: 200 },
@@ -65,8 +83,8 @@ describe('useSubjects', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toEqual([
-      { id: 's1', name: 'Math', status: 'active' },
-      { id: 's2', name: 'Science', status: 'active' },
+      createSubjectFixture(),
+      createSubjectFixture({ id: SUBJECT_2_ID, name: 'Science' }),
     ]);
   });
 
@@ -102,10 +120,7 @@ describe('useSubjects', () => {
     expect(result.current.error).toBeInstanceOf(Error);
   });
 
-  it('refetchInterval tolerates a non-array payload without throwing [BUG-634 / M-2]', async () => {
-    // A malformed / error payload shaped `{ subjects: <non-array> }` must not
-    // crash the polling guard. Before the fix the guard only checked `!subjects`,
-    // so a truthy non-array reached `subjects.some(...)` and threw a TypeError.
+  it('rejects a non-array subjects payload without polling [BUG-634 / M-2]', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ subjects: 'not-an-array' }), {
         status: 200,
@@ -117,28 +132,12 @@ describe('useSubjects', () => {
     });
 
     await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
+      expect(result.current.isError).toBe(true);
     });
 
     const query = queryClient.getQueryCache().findAll()[0];
     expect(query).toBeDefined();
-    expect(query!.state.data).toBe('not-an-array');
-
-    // query.options is typed as QueryOptions (internal), which does not expose
-    // observer-level options like refetchInterval. Cast through unknown to access
-    // the runtime-present refetchInterval function.
-    const refetchInterval = (
-      query!.options as unknown as {
-        refetchInterval: (q: typeof query) => number | false;
-      }
-    ).refetchInterval;
-    expect(typeof refetchInterval).toBe('function');
-
-    let interval: number | false | undefined;
-    expect(() => {
-      interval = refetchInterval(query!);
-    }).not.toThrow();
-    expect(interval).toBe(false);
+    expect(query!.state.data).toBeUndefined();
   });
 });
 
@@ -147,7 +146,8 @@ describe('useCreateSubject', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          subject: { id: 's1', name: 'Calculus', status: 'active' },
+          subject: createSubjectFixture({ name: 'Calculus' }),
+          structureType: 'broad',
         }),
         { status: 200 },
       ),
@@ -167,7 +167,8 @@ describe('useCreateSubject', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toEqual({
-      subject: { id: 's1', name: 'Calculus', status: 'active' },
+      subject: createSubjectFixture({ name: 'Calculus' }),
+      structureType: 'broad',
     });
   });
 
@@ -197,7 +198,10 @@ describe('useUpdateSubject', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          subject: { id: 's1', name: 'Calculus', status: 'archived' },
+          subject: createSubjectFixture({
+            name: 'Calculus',
+            status: 'archived',
+          }),
         }),
         { status: 200 },
       ),
@@ -218,7 +222,7 @@ describe('useUpdateSubject', () => {
     const init = mockFetch.mock.calls[0]?.[1] as RequestInit;
     expect(JSON.parse(String(init.body))).toEqual({ status: 'archived' });
     expect(result.current.data).toEqual({
-      subject: { id: 's1', name: 'Calculus', status: 'archived' },
+      subject: createSubjectFixture({ name: 'Calculus', status: 'archived' }),
     });
   });
 
@@ -233,7 +237,10 @@ describe('useUpdateSubject', () => {
     mockFetch.mockRejectedValueOnce(rateLimited).mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          subject: { id: 's1', name: 'Calculus', status: 'archived' },
+          subject: createSubjectFixture({
+            name: 'Calculus',
+            status: 'archived',
+          }),
         }),
         { status: 200 },
       ),
@@ -252,7 +259,7 @@ describe('useUpdateSubject', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(result.current.data).toEqual({
-      subject: { id: 's1', name: 'Calculus', status: 'archived' },
+      subject: createSubjectFixture({ name: 'Calculus', status: 'archived' }),
     });
   });
 });
@@ -260,7 +267,7 @@ describe('useUpdateSubject', () => {
 describe('useDeleteSubject', () => {
   it('sends DELETE /subjects/:id and invalidates subject, curriculum, library, and progress data', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ deleted: true, subjectId: 's1' }), {
+      new Response(JSON.stringify({ deleted: true, subjectId: SUBJECT_1_ID }), {
         status: 200,
       }),
     );
@@ -279,7 +286,10 @@ describe('useDeleteSubject', () => {
 
     const init = mockFetch.mock.calls[0]?.[1] as RequestInit;
     expect(init.method).toBe('DELETE');
-    expect(result.current.data).toEqual({ deleted: true, subjectId: 's1' });
+    expect(result.current.data).toEqual({
+      deleted: true,
+      subjectId: SUBJECT_1_ID,
+    });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subjects'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['curriculum'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['library'] });

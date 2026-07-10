@@ -11,6 +11,7 @@ import {
 } from '@eduagent/schemas';
 
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import {
   ForbiddenError,
   NetworkError,
@@ -319,7 +320,7 @@ export function useCloneFromChild(): {
           { init: { signal } },
         );
         await assertOk(res);
-        return undoCloneFromChildResponseSchema.parse(await res.json());
+        return await parseJson(res, undoCloneFromChildResponseSchema);
       } finally {
         cleanup();
       }
@@ -396,7 +397,7 @@ export function useCloneFromChild(): {
           { init: { signal } },
         );
         await assertOk(res);
-        return cloneFromChildResponseSchema.parse(await res.json());
+        return await parseJson(res, cloneFromChildResponseSchema);
       } finally {
         cleanup();
       }

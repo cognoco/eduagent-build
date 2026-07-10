@@ -96,6 +96,10 @@ function createWrapper() {
   }).wrapper;
 }
 
+function serverOcrResult(text: string, confidence: number) {
+  return { text, confidence, regions: [] };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockFetch.mockReset();
@@ -189,10 +193,12 @@ describe('useHomeworkOcr', () => {
     });
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({
-          text: '1. What is chasing you?\n2. What are you avoiding?',
-          confidence: 0.88,
-        }),
+        JSON.stringify(
+          serverOcrResult(
+            '1. What is chasing you?\n2. What are you avoiding?',
+            0.88,
+          ),
+        ),
         { status: 200 },
       ),
     );
@@ -246,14 +252,16 @@ describe('useHomeworkOcr', () => {
     mockRecognize.mockResolvedValue({ text: garble });
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({
-          text: [
-            '1. What is chasing you',
-            '2. What are you avoiding',
-            '3. What do you want',
-          ].join('\n'),
-          confidence: 0.9,
-        }),
+        JSON.stringify(
+          serverOcrResult(
+            [
+              '1. What is chasing you',
+              '2. What are you avoiding',
+              '3. What do you want',
+            ].join('\n'),
+            0.9,
+          ),
+        ),
         { status: 200 },
       ),
     );
@@ -278,10 +286,7 @@ describe('useHomeworkOcr', () => {
     mockRecognize.mockResolvedValue({ text: 'how Rad meol 5 bs Homo mino' });
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({
-          text: 'Translate: "I like to learn."',
-          confidence: 0.9,
-        }),
+        JSON.stringify(serverOcrResult('Translate: "I like to learn."', 0.9)),
         { status: 200 },
       ),
     );
@@ -304,10 +309,7 @@ describe('useHomeworkOcr', () => {
     mockRecognize.mockResolvedValue({ text: '' });
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({
-          text: 'Photosynthesis notes.',
-          confidence: 0.9,
-        }),
+        JSON.stringify(serverOcrResult('Photosynthesis notes.', 0.9)),
         { status: 200 },
       ),
     );
@@ -333,17 +335,19 @@ describe('useHomeworkOcr', () => {
     });
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({
-          text: [
-            '1. What is chasing you',
-            '2. What are you avoiding',
-            '3. What do you want',
-            '4. What feels dead',
-            '5. What hurts',
-            '6. What wants to live',
-          ].join('\n'),
-          confidence: 0.86,
-        }),
+        JSON.stringify(
+          serverOcrResult(
+            [
+              '1. What is chasing you',
+              '2. What are you avoiding',
+              '3. What do you want',
+              '4. What feels dead',
+              '5. What hurts',
+              '6. What wants to live',
+            ].join('\n'),
+            0.86,
+          ),
+        ),
         { status: 200 },
       ),
     );
@@ -376,17 +380,19 @@ describe('useHomeworkOcr', () => {
     });
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({
-          text: [
-            '1. What is chasing you',
-            '2. What are you avoiding',
-            '3. What do you want',
-            '4. What feels dead',
-            '5. What hurts',
-            '6. What wants to live',
-          ].join('\n'),
-          confidence: 0.86,
-        }),
+        JSON.stringify(
+          serverOcrResult(
+            [
+              '1. What is chasing you',
+              '2. What are you avoiding',
+              '3. What do you want',
+              '4. What feels dead',
+              '5. What hurts',
+              '6. What wants to live',
+            ].join('\n'),
+            0.86,
+          ),
+        ),
         { status: 200 },
       ),
     );
@@ -419,12 +425,12 @@ describe('useHomeworkOcr', () => {
     });
     mockFetch
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ text: null, confidence: null }), {
+        new Response(JSON.stringify(serverOcrResult('', 0)), {
           status: 200,
         }),
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ text: null, confidence: null }), {
+        new Response(JSON.stringify(serverOcrResult('', 0)), {
           status: 200,
         }),
       );
@@ -504,10 +510,7 @@ describe('useHomeworkOcr', () => {
     mockRecognize.mockResolvedValue({ text: '' });
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({
-          text: 'Server-side OCR rescue text',
-          confidence: 0.93,
-        }),
+        JSON.stringify(serverOcrResult('Server-side OCR rescue text', 0.93)),
         { status: 200 },
       ),
     );
@@ -531,16 +534,39 @@ describe('useHomeworkOcr', () => {
     );
   });
 
-  it('accepts low-confidence server OCR instead of re-running the homework gate', async () => {
+  it('fails closed when server OCR returns a malformed success body', async () => {
     mockRecognize.mockResolvedValue({ text: '' });
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          text: 'Solve 2x + 5 = 13',
-          confidence: 0.2,
+          text: 'Unvalidated OCR text',
+          confidence: 'high',
+          regions: [],
         }),
         { status: 200 },
       ),
+    );
+
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.process('file:///tmp/photo.jpg');
+    });
+
+    expect(result.current.status).toBe('error');
+    expect(result.current.errorCode).toBe('SERVER_ERROR');
+    expect(result.current.text).toBeNull();
+    expect(mockTrackHomeworkOcrGateAccepted).not.toHaveBeenCalled();
+  });
+
+  it('accepts low-confidence server OCR instead of re-running the homework gate', async () => {
+    mockRecognize.mockResolvedValue({ text: '' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(serverOcrResult('Solve 2x + 5 = 13', 0.2)), {
+        status: 200,
+      }),
     );
 
     const { result } = renderHook(() => useHomeworkOcr(), {
@@ -568,12 +594,9 @@ describe('useHomeworkOcr', () => {
     const originalTextRecognition = NativeModules.TextRecognition;
     NativeModules.TextRecognition = null;
     mockFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ text: 'Uploaded OCR text', confidence: 0.89 }),
-        {
-          status: 200,
-        },
-      ),
+      new Response(JSON.stringify(serverOcrResult('Uploaded OCR text', 0.89)), {
+        status: 200,
+      }),
     );
 
     const { result } = renderHook(() => useHomeworkOcr(), {

@@ -90,6 +90,15 @@ jest.mock(
 
 const PracticeScreen = require('./index').default;
 
+const PROFILE_ID = '990e8400-e29b-41d4-a716-446655440004';
+const REVIEW_TOPIC_ID = '11111111-1111-4111-8111-111111111111';
+const MATH_SUBJECT_ID = '22222222-2222-4222-8222-222222222222';
+const ITALIAN_SUBJECT_ID = '33333333-3333-4333-8333-333333333333';
+const JAPANESE_SUBJECT_ID = '44444444-4444-4444-8444-444444444444';
+const HISTORY_SUBJECT_ID = '55555555-5555-4555-8555-555555555555';
+const ARCHIVED_SPANISH_SUBJECT_ID = '66666666-6666-4666-8666-666666666666';
+const FIXTURE_NOW = '2026-04-18T12:00:00.000Z';
+
 // ─── Route fixtures ─────────────────────────────────────────────────────────
 //
 // Real hooks fetch from these endpoints:
@@ -110,8 +119,8 @@ function buildRoutes(opts: PracticeRouteOptions = {}): Record<string, unknown> {
     '/progress/review-summary': opts.reviewSummary ?? {
       totalOverdue: 2,
       nextReviewTopic: {
-        topicId: 'topic-1',
-        subjectId: 'subject-1',
+        topicId: REVIEW_TOPIC_ID,
+        subjectId: MATH_SUBJECT_ID,
         subjectName: 'Math',
         topicTitle: 'Algebra',
       },
@@ -121,22 +130,28 @@ function buildRoutes(opts: PracticeRouteOptions = {}): Record<string, unknown> {
     '/subjects': {
       subjects: opts.subjects ?? [
         {
-          id: 'subject-it',
+          id: ITALIAN_SUBJECT_ID,
+          profileId: PROFILE_ID,
           name: 'Italian',
           pedagogyMode: 'four_strands',
           languageCode: 'it',
           status: 'active',
+          createdAt: FIXTURE_NOW,
+          updatedAt: FIXTURE_NOW,
         },
       ],
     },
     '/retention/assessment-eligible': {
       topics: opts.assessmentTopics ?? [
         {
-          topicId: 'topic-1',
-          subjectId: 'subject-1',
+          topicId: REVIEW_TOPIC_ID,
+          subjectId: MATH_SUBJECT_ID,
           subjectName: 'Math',
           topicTitle: 'Algebra',
           topicDescription: 'Variables, expressions, and equations',
+          pedagogyMode: 'socratic',
+          languageCode: null,
+          lastStudiedAt: FIXTURE_NOW,
         },
       ],
     },
@@ -340,14 +355,18 @@ describe('PracticeScreen', () => {
 
   it('routes vocabulary, recitation, dictation, and quiz history to their flows', async () => {
     mount();
-    await waitFor(() => screen.getByTestId('practice-vocabulary-subject-it'));
+    await waitFor(() =>
+      screen.getByTestId(`practice-vocabulary-${ITALIAN_SUBJECT_ID}`),
+    );
 
-    fireEvent.press(screen.getByTestId('practice-vocabulary-subject-it'));
+    fireEvent.press(
+      screen.getByTestId(`practice-vocabulary-${ITALIAN_SUBJECT_ID}`),
+    );
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz/launch',
       params: {
         activityType: 'vocabulary',
-        subjectId: 'subject-it',
+        subjectId: ITALIAN_SUBJECT_ID,
         languageName: 'Italian',
         returnTo: 'practice',
       },
@@ -376,32 +395,44 @@ describe('PracticeScreen', () => {
     mount({
       subjects: [
         {
-          id: 'subject-it',
+          id: ITALIAN_SUBJECT_ID,
+          profileId: PROFILE_ID,
           name: 'Italian',
           pedagogyMode: 'four_strands',
           languageCode: 'it',
           status: 'active',
+          createdAt: FIXTURE_NOW,
+          updatedAt: FIXTURE_NOW,
         },
         {
-          id: 'subject-ja',
+          id: JAPANESE_SUBJECT_ID,
+          profileId: PROFILE_ID,
           name: 'Japanese',
           pedagogyMode: 'four_strands',
           languageCode: 'ja',
           status: 'active',
+          createdAt: FIXTURE_NOW,
+          updatedAt: FIXTURE_NOW,
         },
         {
-          id: 'subject-history',
+          id: HISTORY_SUBJECT_ID,
+          profileId: PROFILE_ID,
           name: 'History',
           pedagogyMode: 'socratic',
           languageCode: null,
           status: 'active',
+          createdAt: FIXTURE_NOW,
+          updatedAt: FIXTURE_NOW,
         },
         {
-          id: 'subject-archived-es',
+          id: ARCHIVED_SPANISH_SUBJECT_ID,
+          profileId: PROFILE_ID,
           name: 'Spanish',
           pedagogyMode: 'four_strands',
           languageCode: 'es',
           status: 'archived',
+          createdAt: FIXTURE_NOW,
+          updatedAt: FIXTURE_NOW,
         },
       ],
     });
@@ -411,20 +442,26 @@ describe('PracticeScreen', () => {
     });
     screen.getByText('Japanese basics');
     expect(
-      screen.queryByTestId('practice-vocabulary-subject-history'),
+      screen.queryByTestId(`practice-vocabulary-${HISTORY_SUBJECT_ID}`),
     ).toBeNull();
     expect(
-      screen.queryByTestId('practice-vocabulary-subject-archived-es'),
+      screen.queryByTestId(
+        `practice-vocabulary-${ARCHIVED_SPANISH_SUBJECT_ID}`,
+      ),
     ).toBeNull();
 
-    fireEvent.press(screen.getByTestId('practice-vocabulary-subject-it'));
-    fireEvent.press(screen.getByTestId('practice-vocabulary-subject-ja'));
+    fireEvent.press(
+      screen.getByTestId(`practice-vocabulary-${ITALIAN_SUBJECT_ID}`),
+    );
+    fireEvent.press(
+      screen.getByTestId(`practice-vocabulary-${JAPANESE_SUBJECT_ID}`),
+    );
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz/launch',
       params: {
         activityType: 'vocabulary',
-        subjectId: 'subject-it',
+        subjectId: ITALIAN_SUBJECT_ID,
         languageName: 'Italian',
         returnTo: 'practice',
       },
@@ -433,7 +470,7 @@ describe('PracticeScreen', () => {
       pathname: '/(app)/quiz/launch',
       params: {
         activityType: 'vocabulary',
-        subjectId: 'subject-ja',
+        subjectId: JAPANESE_SUBJECT_ID,
         languageName: 'Japanese',
         returnTo: 'practice',
       },
@@ -476,7 +513,9 @@ describe('PracticeScreen', () => {
 
   it('places recitation and dictation after the main review and test actions', async () => {
     const view = mount();
-    await waitFor(() => screen.getByTestId('practice-vocabulary-subject-it'));
+    await waitFor(() =>
+      screen.getByTestId(`practice-vocabulary-${ITALIAN_SUBJECT_ID}`),
+    );
 
     // node is typed as ReactTestInstance (from react-test-renderer which ships no
     // .d.ts in v19), so the predicate parameter is effectively `any`. Explicit
@@ -495,7 +534,7 @@ describe('PracticeScreen', () => {
           'practice-review',
           'practice-assessment',
           'practice-quiz',
-          'practice-vocabulary-subject-it',
+          `practice-vocabulary-${ITALIAN_SUBJECT_ID}`,
           'practice-recitation',
           'practice-dictation',
           'practice-quiz-history',
@@ -507,7 +546,7 @@ describe('PracticeScreen', () => {
       'practice-review',
       'practice-assessment',
       'practice-quiz',
-      'practice-vocabulary-subject-it',
+      `practice-vocabulary-${ITALIAN_SUBJECT_ID}`,
       'practice-dictation',
       'practice-recitation',
       'practice-quiz-history',

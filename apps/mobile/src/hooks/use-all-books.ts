@@ -9,6 +9,7 @@ import type {
   BookProgressStatus,
   GetAllProfileBooksResponse,
 } from '@eduagent/schemas';
+import { getAllProfileBooksResponseSchema } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import {
@@ -16,6 +17,7 @@ import {
   LEARNING_ENTRY_QUERY_TIMEOUT_MS,
 } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 
 export interface EnrichedBook {
   book: CurriculumBook;
@@ -94,7 +96,7 @@ export function useAllBooks(): {
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as GetAllProfileBooksResponse;
+        return await parseJson(res, getAllProfileBooksResponseSchema);
       } finally {
         cleanup();
       }

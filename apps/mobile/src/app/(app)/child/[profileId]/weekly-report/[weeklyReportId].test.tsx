@@ -113,34 +113,40 @@ function makeReport(
   overrides?: Partial<{
     childName: string;
     weekStart: string;
-    thisWeek: {
+    thisWeek: Partial<{
       totalSessions: number;
       totalActiveMinutes: number;
       topicsMastered: number;
       vocabularyTotal: number;
-    };
+      topicsExplored: number;
+      streakBest: number;
+    }>;
     headlineStat: { label: string; value: number; comparison: string };
     practiceSummary: typeof PRACTICE_SUMMARY;
   }>,
 ) {
+  const thisWeek = {
+    totalSessions: 3,
+    totalActiveMinutes: 25,
+    topicsMastered: 2,
+    vocabularyTotal: 12,
+    topicsExplored: 1,
+    streakBest: 4,
+    ...overrides?.thisWeek,
+  };
+
   return {
-    id: 'wr-001',
-    profileId: 'parent-001',
-    childProfileId: 'child-001',
+    id: '11111111-1111-4111-8111-111111111111',
+    profileId: '990e8400-e29b-41d4-a716-446655440004',
+    childProfileId: '550e8400-e29b-41d4-a716-446655440001',
     reportWeek: '2026-04-27',
     viewedAt: null,
     createdAt: '2026-04-27T00:00:00Z',
     reportData: {
       childName: overrides?.childName ?? 'Emma',
       weekStart: overrides?.weekStart ?? '2026-04-27',
-      thisWeek: overrides?.thisWeek ?? {
-        totalSessions: 3,
-        totalActiveMinutes: 25,
-        topicsMastered: 2,
-        vocabularyTotal: 12,
-        topicsExplored: 1,
-        streakBest: 4,
-      },
+      thisWeek,
+      lastWeek: null,
       headlineStat: overrides?.headlineStat ?? {
         label: 'Topics mastered',
         value: 2,

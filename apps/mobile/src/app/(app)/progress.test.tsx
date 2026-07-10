@@ -145,9 +145,12 @@ const SESSION_1 = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
 const SESSION_2 = 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa';
 const SUBJECT_UUID_1 = 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb';
 const SUBJECT_UUID_2 = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+const SUBJECT_UUID_3 = 'bbbbbbbb-3333-4333-8333-bbbbbbbbbbbb';
+const SUBJECT_UUID_4 = 'bbbbbbbb-4444-4444-8444-bbbbbbbbbbbb';
 const TOPIC_UUID_1 = 'cccccccc-1111-4111-8111-cccccccccccc';
 const WEEKLY_REPORT_ID = 'dddddddd-1111-4111-8111-dddddddddddd';
 const MONTHLY_REPORT_ID = 'eeeeeeee-1111-4111-8111-eeeeeeeeeeee';
+const SNAPSHOT_DATE = '2026-02-15';
 
 type InventoryGlobal = {
   topicsAttempted: number;
@@ -191,9 +194,9 @@ type InventoryFixture = {
 };
 
 const fullSubject = {
-  subjectId: 's1',
+  subjectId: SUBJECT_UUID_1,
   subjectName: 'Math',
-  pedagogyMode: 'general',
+  pedagogyMode: 'socratic',
   topics: {
     total: 10,
     explored: 5,
@@ -214,6 +217,68 @@ const fullSubject = {
   activeMinutes: 30,
   sessionsCount: 5,
 };
+
+function makeInventoryResponse(
+  inventory: InventoryFixture | undefined,
+  profileId: string,
+) {
+  return {
+    profileId,
+    snapshotDate: SNAPSHOT_DATE,
+    ...(inventory ?? {
+      global: baseGlobal,
+      subjects: [],
+      currentlyWorkingOn: [],
+    }),
+  };
+}
+
+function makeRefreshResponse(inventory: InventoryFixture | undefined) {
+  const global = inventory?.global ?? baseGlobal;
+  return {
+    snapshotDate: SNAPSHOT_DATE,
+    metrics: {
+      totalSessions: global.totalSessions,
+      totalActiveMinutes: global.totalActiveMinutes,
+      totalWallClockMinutes: global.totalWallClockMinutes,
+      totalExchanges: 0,
+      topicsAttempted: global.topicsAttempted,
+      topicsMastered: global.topicsMastered,
+      topicsInProgress: 0,
+      booksCompleted: 0,
+      vocabularyTotal: global.vocabularyTotal,
+      vocabularyMastered: global.vocabularyMastered,
+      vocabularyLearning: 0,
+      vocabularyNew: 0,
+      retentionCardsDue: 0,
+      retentionCardsStrong: 0,
+      retentionCardsFading: 0,
+      currentStreak: global.currentStreak,
+      longestStreak: global.longestStreak,
+      subjects: [],
+    },
+    milestones: [],
+  };
+}
+
+function makeSubjectListItem(subject: {
+  id: string;
+  name: string;
+  status: string;
+}) {
+  return {
+    id: subject.id,
+    profileId: OWNER_ID,
+    name: subject.name,
+    rawInput: null,
+    status: subject.status,
+    curriculumStatus: 'ready',
+    pedagogyMode: 'socratic',
+    languageCode: null,
+    createdAt: `${SNAPSHOT_DATE}T09:00:00.000Z`,
+    updatedAt: `${SNAPSHOT_DATE}T09:00:00.000Z`,
+  };
+}
 
 function makeOwner(overrides?: Partial<Profile>): Profile {
   return createTestProfile({
@@ -300,22 +365,26 @@ function buildRoutes(opts: BuildRoutesOptions = {}) {
 
   const routes: Record<string, unknown> = {
     // Self-view endpoints
-    '/progress/inventory': opts.inventory ?? {},
+    '/progress/inventory': makeInventoryResponse(opts.inventory, OWNER_ID),
     '/progress/overview': {
       subjects: [],
       totalTopicsCompleted: opts.inventory?.global.topicsMastered ?? 0,
       totalTopicsVerified: 0,
+      totalTopicsMastered: opts.inventory?.global.topicsMastered ?? 0,
+      totalTopicsLearning: 0,
       practiceActivityCount: opts.practiceActivityCount ?? 0,
     },
     '/progress/sessions': { sessions: selfSessions },
     '/progress/weekly-reports': { reports: opts.weeklyReports ?? [] },
     '/progress/reports': { reports: opts.monthlyReports ?? [] },
     '/progress/resume-target': { target: null },
-    '/progress/refresh': {},
-    '/subjects': { subjects: opts.subjects ?? [] },
+    '/progress/refresh': makeRefreshResponse(opts.inventory),
+    '/subjects': { subjects: opts.subjects?.map(makeSubjectListItem) ?? [] },
     // Child-view endpoints (parent viewing a linked child)
     [`/children/${childId}/inventory`]: {
-      inventory: opts.childInventory ?? null,
+      inventory: opts.childInventory
+        ? makeInventoryResponse(opts.childInventory, childId)
+        : null,
     },
     [`/children/${childId}/progress-summary`]: opts.childSummary ?? {
       summary: null,
@@ -810,9 +879,7 @@ describe('ProgressScreen — progressive disclosure', () => {
           global: { ...baseGlobal, totalSessions: 0 },
           subjects: [],
         },
-        subjects: [
-          { id: 'subject-italian', name: 'Italian', status: 'active' },
-        ],
+        subjects: [{ id: SUBJECT_UUID_3, name: 'Italian', status: 'active' }],
       }),
     });
 
@@ -828,7 +895,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     fireEvent.press(screen.getByTestId('progress-start-learning'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'subject-italian' },
+      params: { subjectId: SUBJECT_UUID_3 },
     });
   });
 
@@ -846,7 +913,7 @@ describe('ProgressScreen — progressive disclosure', () => {
           subjects: [],
         },
         subjects: [
-          { id: 'subject-programming', name: 'Programming', status: 'active' },
+          { id: SUBJECT_UUID_4, name: 'Programming', status: 'active' },
         ],
       }),
     });
@@ -957,7 +1024,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     mockSearchParams = { profileId: CHILD_ID };
     const languageSubject = {
       ...fullSubject,
-      subjectId: 's-lang',
+      subjectId: SUBJECT_UUID_3,
       subjectName: 'Spanish',
       pedagogyMode: 'four_strands',
       vocabulary: {
@@ -992,7 +1059,7 @@ describe('ProgressScreen — progressive disclosure', () => {
   it('shows the tappable vocabulary chip when viewing self [LEARN-21 pair]', async () => {
     const languageSubject = {
       ...fullSubject,
-      subjectId: 's-lang',
+      subjectId: SUBJECT_UUID_3,
       subjectName: 'Spanish',
       pedagogyMode: 'four_strands',
       vocabulary: {
@@ -1254,7 +1321,7 @@ describe('ProgressScreen — progressive disclosure', () => {
   it('uses the shared subject tint map for progress subject rows', async () => {
     const biologySubject = {
       ...fullSubject,
-      subjectId: 's2',
+      subjectId: SUBJECT_UUID_2,
       subjectName: 'Biology',
       topics: { ...fullSubject.topics, mastered: 1, inProgress: 1 },
       activeMinutes: 12,
@@ -1277,20 +1344,25 @@ describe('ProgressScreen — progressive disclosure', () => {
       }),
     });
 
-    const tintMap = getSubjectTintMap(['s1', 's2'], 'light');
+    const tintMap = getSubjectTintMap(
+      [SUBJECT_UUID_1, SUBJECT_UUID_2],
+      'light',
+    );
 
     await waitFor(() => {
-      screen.getByTestId('progress-subject-s2-bookshelf');
+      screen.getByTestId(`progress-subject-${SUBJECT_UUID_2}-bookshelf`);
     });
     expect(
-      screen.getByTestId('progress-subject-s1-bookshelf').props.style
-        .borderColor,
-    ).toBe(`${tintMap.get('s1')!.solid}33`);
+      screen.getByTestId(`progress-subject-${SUBJECT_UUID_1}-bookshelf`).props
+        .style.borderColor,
+    ).toBe(`${tintMap.get(SUBJECT_UUID_1)!.solid}33`);
     expect(
-      screen.getByTestId('progress-subject-s2-bookshelf').props.style
-        .borderColor,
-    ).toBe(`${tintMap.get('s2')!.solid}33`);
-    expect(tintMap.get('s1')?.solid).not.toBe(tintMap.get('s2')?.solid);
+      screen.getByTestId(`progress-subject-${SUBJECT_UUID_2}-bookshelf`).props
+        .style.borderColor,
+    ).toBe(`${tintMap.get(SUBJECT_UUID_2)!.solid}33`);
+    expect(tintMap.get(SUBJECT_UUID_1)?.solid).not.toBe(
+      tintMap.get(SUBJECT_UUID_2)?.solid,
+    );
   });
 
   it('does not render the recent milestones block on the progress overview', async () => {
@@ -1397,7 +1469,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByTestId('progress-latest-report-section');
     screen.getByTestId('progress-recent-focus-card');
     screen.getByTestId('progress-subject-breakdown');
-    screen.getByTestId('progress-subject-s1-bookshelf');
+    screen.getByTestId(`progress-subject-${SUBJECT_UUID_1}-bookshelf`);
     screen.getByText('Subjects');
   });
 

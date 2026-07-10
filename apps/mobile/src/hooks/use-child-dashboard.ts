@@ -13,10 +13,19 @@ import type {
   WeeklyReportRecord,
   WeeklyReportSummary,
 } from '@eduagent/schemas';
-import { progressSummarySchema } from '@eduagent/schemas';
+import {
+  childInventoryResponseSchema,
+  childReportDetailResponseSchema,
+  childReportsResponseSchema,
+  progressSummarySchema,
+  reportViewedResponseSchema,
+  weeklyReportDetailResponseSchema,
+  weeklyReportsResponseSchema,
+} from '@eduagent/schemas';
 import { ForbiddenError, NotFoundError, useApiClient } from '../lib/api-client';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { queryKeys } from '../lib/query-keys';
 import { Sentry } from '../lib/sentry';
 import { useApiQuery } from './use-api-query';
@@ -34,6 +43,7 @@ export function useChildInventory(
     KnowledgeInventory | null
   >({
     queryKey: queryKeys.dashboard.childInventory(mode, childProfileId),
+    schema: childInventoryResponseSchema,
     fetch: (signal) =>
       client.dashboard.children[':profileId'].inventory.$get(
         { param: { profileId: childProfileId ?? '' } },
@@ -77,7 +87,11 @@ export function useChildProgressSummary(
           { init: { signal } },
         );
         await assertOk(res);
-        return progressSummarySchema.parse(await res.json());
+        return parseJson(
+          res,
+          progressSummarySchema,
+          'GET /dashboard/children/:profileId/progress-summary',
+        );
       } finally {
         cleanup();
       }
@@ -101,6 +115,7 @@ export function useChildReports(
     MonthlyReportSummary[]
   >({
     queryKey: queryKeys.dashboard.childReports(mode, childProfileId),
+    schema: childReportsResponseSchema,
     fetch: (signal) =>
       client.dashboard.children[':profileId'].reports.$get(
         { param: { profileId: childProfileId ?? '' } },
@@ -127,6 +142,7 @@ export function useChildReportDetail(
       childProfileId,
       reportId,
     ),
+    schema: childReportDetailResponseSchema,
     fetch: (signal) =>
       client.dashboard.children[':profileId'].reports[':reportId'].$get(
         {
@@ -161,7 +177,11 @@ export function useMarkChildReportViewed(): UseMutationResult<
         param: { profileId: childProfileId, reportId },
       });
       await assertOk(res);
-      return (await res.json()) as { viewed: boolean };
+      return parseJson(
+        res,
+        reportViewedResponseSchema,
+        'POST /dashboard/children/:profileId/reports/:reportId/view',
+      );
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
@@ -205,9 +225,11 @@ export function useChildWeeklyReports(
             { init: { signal } },
           );
           await assertOk(res);
-          const data = (await res.json()) as {
-            reports: WeeklyReportSummary[];
-          };
+          const data = await parseJson(
+            res,
+            weeklyReportsResponseSchema,
+            'GET /dashboard/children/:profileId/weekly-reports',
+          );
           return data.reports;
         } catch (err) {
           // [CR-2026-05-19-H27] Escalate family-link ACL failures to Sentry
@@ -260,6 +282,7 @@ export function useChildWeeklyReportDetail(
       childProfileId,
       reportId,
     ),
+    schema: weeklyReportDetailResponseSchema,
     fetch: (signal) =>
       client.dashboard.children[':profileId']['weekly-reports'][
         ':reportId'
@@ -296,7 +319,11 @@ export function useMarkWeeklyReportViewed(): UseMutationResult<
         param: { profileId: childProfileId, reportId },
       });
       await assertOk(res);
-      return (await res.json()) as { viewed: boolean };
+      return parseJson(
+        res,
+        reportViewedResponseSchema,
+        'POST /dashboard/children/:profileId/weekly-reports/:reportId/view',
+      );
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({

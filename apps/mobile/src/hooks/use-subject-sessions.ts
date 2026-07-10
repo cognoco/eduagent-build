@@ -3,6 +3,7 @@ import type {
   GetSubjectSessionsResponse,
   SubjectSession,
 } from '@eduagent/schemas';
+import { getSubjectSessionsResponseSchema } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { queryKeys } from '../lib/query-keys';
@@ -17,6 +18,7 @@ export function useSubjectSessions(
   return useApiQuery<GetSubjectSessionsResponse, SubjectSession[]>({
     queryKey: queryKeys.subjectSessions(subjectId, activeProfile?.id),
     enabled: !!subjectId,
+    schema: getSubjectSessionsResponseSchema,
     fetch: (signal) => {
       if (!subjectId) throw new Error('subjectId is required');
       return client.subjects[':subjectId'].sessions.$get(

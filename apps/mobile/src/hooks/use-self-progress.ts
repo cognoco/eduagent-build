@@ -31,16 +31,31 @@ import type {
   WeeklyReportSummary,
 } from '@eduagent/schemas';
 import {
+  activeSessionResponseSchema,
   childReportDetailResponseSchema,
   childReportsResponseSchema,
   childSessionsPageResponseSchema,
   childSessionsResponseSchema,
+  continueSuggestionResponseSchema,
+  knowledgeInventorySchema,
+  milestonesResponseSchema,
+  overdueTopicsResponseSchema,
+  progressOverviewResponseSchema,
+  refreshProgressResponseSchema,
+  reportViewedResponseSchema,
+  resumeNudgeResponseSchema,
+  resumeTargetResponseSchema,
+  reviewSummaryResponseSchema,
+  subjectProgressEndpointResponseSchema,
+  topicProgressEndpointResponseSchema,
+  topicResolveResponseSchema,
   weeklyReportDetailResponseSchema,
   weeklyReportsResponseSchema,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { queryKeys } from '../lib/query-keys';
 import { useApiQuery } from './use-api-query';
 import {
@@ -70,6 +85,7 @@ export function useSubjectProgress(
 
   return useApiQuery<{ progress: SubjectProgress }, SubjectProgress>({
     queryKey: queryKeys.progress.subject(mode, subjectId, profileId),
+    schema: subjectProgressEndpointResponseSchema,
     fetch: (signal) =>
       client.subjects[':subjectId'].progress.$get(
         { param: { subjectId } },
@@ -90,7 +106,7 @@ export interface OverallProgressResponse {
     topicsMastered: number;
     topicsLearning: number;
     urgencyScore: number;
-    retentionStatus: 'strong' | 'fading' | 'weak' | 'forgotten';
+    retentionStatus: 'unknown' | 'strong' | 'fading' | 'weak' | 'forgotten';
     lastSessionAt: string | null;
   }[];
   totalTopicsCompleted: number;
@@ -107,6 +123,7 @@ export function useOverallProgress(): UseQueryResult<OverallProgressResponse> {
 
   return useApiQuery<OverallProgressResponse>({
     queryKey: queryKeys.progress.overview(mode, profileId),
+    schema: progressOverviewResponseSchema,
     fetch: (signal) => client.progress.overview.$get({}, { init: { signal } }),
     select: (json) => json,
   });
@@ -123,6 +140,7 @@ export function useContinueSuggestion(): UseQueryResult<
     ContinueSuggestionResponse['suggestion']
   >({
     queryKey: queryKeys.progress.continue(mode, profileId),
+    schema: continueSuggestionResponseSchema,
     fetch: (signal) => client.progress.continue.$get({}, { init: { signal } }),
     select: (json) => json.suggestion,
   });
@@ -154,7 +172,11 @@ export async function fetchLearningResumeTarget(
     { init: signal ? { signal } : undefined },
   );
   await assertOk(res);
-  const data = (await res.json()) as { target: LearningResumeTarget | null };
+  const data = await parseJson(
+    res,
+    resumeTargetResponseSchema,
+    'GET /progress/resume-target',
+  );
   return data.target;
 }
 
@@ -193,14 +215,11 @@ export function useResumeNudge() {
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as {
-          nudge: {
-            sessionId: string;
-            topicHint: string;
-            exchangeCount: number;
-            createdAt: string;
-          } | null;
-        };
+        return parseJson(
+          res,
+          resumeNudgeResponseSchema,
+          'GET /sessions/resume-nudge',
+        );
       } finally {
         cleanup();
       }
@@ -220,6 +239,7 @@ export function useActiveSessionForTopic(topicId: string | undefined) {
       topicId,
       profileId,
     ),
+    schema: activeSessionResponseSchema,
     fetch: (signal) =>
       client.progress.topic[':topicId']['active-session'].$get(
         { param: { topicId: topicId ?? '' } },
@@ -251,6 +271,7 @@ export function useResolveTopicSubject(
       profileId,
       attempt,
     ),
+    schema: topicResolveResponseSchema,
     fetch: (signal) =>
       client.topics[':topicId'].resolve.$get(
         { param: { topicId: topicId ?? '' } },
@@ -267,6 +288,7 @@ export function useReviewSummary(): UseQueryResult<ReviewSummary> {
 
   return useApiQuery<ReviewSummary>({
     queryKey: queryKeys.progress.reviewSummary(mode, profileId),
+    schema: reviewSummaryResponseSchema,
     fetch: (signal) =>
       client.progress['review-summary'].$get({}, { init: { signal } }),
     select: (json) => json,
@@ -279,6 +301,7 @@ export function useOverdueTopics(): UseQueryResult<OverdueTopicsResponse> {
 
   return useApiQuery<OverdueTopicsResponse>({
     queryKey: queryKeys.progress.overdueTopics(mode, profileId),
+    schema: overdueTopicsResponseSchema,
     fetch: (signal) =>
       client.progress['overdue-topics'].$get({}, { init: { signal } }),
     select: (json) => json,
@@ -299,6 +322,7 @@ export function useTopicProgress(
       topicId,
       profileId,
     ),
+    schema: topicProgressEndpointResponseSchema,
     fetch: (signal) =>
       client.subjects[':subjectId'].topics[':topicId'].progress.$get(
         { param: { subjectId, topicId } },
@@ -323,7 +347,11 @@ export function useProgressInventory(): UseQueryResult<KnowledgeInventory> {
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as KnowledgeInventory;
+        return parseJson(
+          res,
+          knowledgeInventorySchema,
+          'GET /progress/inventory',
+        );
       } finally {
         cleanup();
       }
@@ -350,7 +378,11 @@ export function useProgressMilestones(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = (await res.json()) as { milestones: MilestoneRecord[] };
+        const data = await parseJson(
+          res,
+          milestonesResponseSchema,
+          'GET /progress/milestones',
+        );
         return data.milestones;
       } finally {
         cleanup();
@@ -393,7 +425,11 @@ export function useProfileSessions(
               { init: { signal } },
             );
         await assertOk(res);
-        const data = childSessionsResponseSchema.parse(await res.json());
+        const data = await parseJson(
+          res,
+          childSessionsResponseSchema,
+          'GET /progress/sessions',
+        );
         return data.sessions;
       } finally {
         cleanup();
@@ -436,7 +472,11 @@ export function useProfileSessionsArchive(
           { init: { signal } },
         );
         await assertOk(res);
-        return childSessionsPageResponseSchema.parse(await res.json());
+        return parseJson(
+          res,
+          childSessionsPageResponseSchema,
+          'GET /progress/sessions',
+        );
       } finally {
         cleanup();
       }
@@ -474,7 +514,11 @@ export function useProfileReports(
               { init: { signal } },
             );
         await assertOk(res);
-        const data = childReportsResponseSchema.parse(await res.json());
+        const data = await parseJson(
+          res,
+          childReportsResponseSchema,
+          'GET /progress/reports',
+        );
         return data.reports;
       } finally {
         cleanup();
@@ -520,7 +564,11 @@ export function useProfileWeeklyReports(
               { init: { signal } },
             );
         await assertOk(res);
-        const data = weeklyReportsResponseSchema.parse(await res.json());
+        const data = await parseJson(
+          res,
+          weeklyReportsResponseSchema,
+          'GET /progress/weekly-reports',
+        );
         return data.reports;
       } finally {
         cleanup();
@@ -585,7 +633,11 @@ export function useRefreshProgressSnapshot(): UseMutationResult<
     mutationFn: async () => {
       const res = await client.progress.refresh.$post();
       await assertOk(res);
-      return (await res.json()) as RefreshProgressResponse;
+      return parseJson(
+        res,
+        refreshProgressResponseSchema,
+        'POST /progress/refresh',
+      );
     },
     onSuccess: () => {
       invalidateProgressSnapshotQueries(queryClient, profileId);
@@ -619,7 +671,11 @@ export function useProfileReportDetail(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = childReportDetailResponseSchema.parse(await res.json());
+        const data = await parseJson(
+          res,
+          childReportDetailResponseSchema,
+          'GET /progress/reports/:reportId',
+        );
         return data.report;
       } finally {
         cleanup();
@@ -659,7 +715,11 @@ export function useProfileWeeklyReportDetail(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = weeklyReportDetailResponseSchema.parse(await res.json());
+        const data = await parseJson(
+          res,
+          weeklyReportDetailResponseSchema,
+          'GET /progress/weekly-reports/:weeklyReportId',
+        );
         return data.report;
       } finally {
         cleanup();
@@ -700,7 +760,11 @@ export function useMarkProfileReportViewed(): UseMutationResult<
         param: { reportId },
       });
       await assertOk(res);
-      return (await res.json()) as { viewed: boolean };
+      return parseJson(
+        res,
+        reportViewedResponseSchema,
+        'POST /progress/reports/:reportId/view',
+      );
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
@@ -744,7 +808,11 @@ export function useMarkProfileWeeklyReportViewed(): UseMutationResult<
         param: { weeklyReportId: reportId },
       });
       await assertOk(res);
-      return (await res.json()) as { viewed: boolean };
+      return parseJson(
+        res,
+        reportViewedResponseSchema,
+        'POST /progress/weekly-reports/:weeklyReportId/view',
+      );
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({

@@ -1,5 +1,9 @@
 import { type UseQueryResult } from '@tanstack/react-query';
-import type { TopicSession, TopicSessionsResponse } from '@eduagent/schemas';
+import {
+  topicSessionsResponseSchema,
+  type TopicSession,
+  type TopicSessionsResponse,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { queryKeys } from '../lib/query-keys';
@@ -15,6 +19,7 @@ export function useTopicSessions(
   return useApiQuery<TopicSessionsResponse, TopicSession[]>({
     queryKey: queryKeys.topicSessions(subjectId, topicId, activeProfile?.id),
     enabled: !!subjectId && !!topicId,
+    schema: topicSessionsResponseSchema,
     fetch: (signal) => {
       if (!subjectId || !topicId)
         throw new Error('subjectId and topicId are required');

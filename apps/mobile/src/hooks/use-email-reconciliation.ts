@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { useUser } from '@clerk/expo';
+import { accountEmailUpdateResponseSchema } from '@eduagent/schemas';
 
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { Sentry } from '../lib/sentry';
 
 /**
@@ -49,7 +51,10 @@ export function useEmailReconciliation(enabled: boolean): void {
         const res = await api.account.email.$get();
         // 401/403/etc — not the owner or not ready; nothing to reconcile.
         if (!res.ok) return;
-        const { email: serverEmail } = await res.json();
+        const { email: serverEmail } = await parseJson(
+          res,
+          accountEmailUpdateResponseSchema,
+        );
         if (cancelled) return;
         if (normalize(serverEmail) === normalize(clerkPrimary)) return;
 

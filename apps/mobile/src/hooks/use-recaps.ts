@@ -9,6 +9,7 @@ import { assertOk } from '../lib/assert-ok';
 import { useApiClient } from '../lib/api-client';
 import { combinedSignal } from '../lib/query-timeout';
 import { queryKeys } from '../lib/query-keys';
+import { parseJson } from '../lib/parse-json';
 import { useNavigationContract } from './use-navigation-contract';
 import { useProfile } from '../lib/profile';
 
@@ -37,7 +38,7 @@ export function useRecaps(
           { init: { signal } },
         );
         await assertOk(res);
-        return recapsResponseSchema.parse(await res.json()).recaps;
+        return (await parseJson(res, recapsResponseSchema)).recaps;
       } finally {
         cleanup();
       }
@@ -73,7 +74,7 @@ export function useRecap(
         );
         if (res.status === 404) return null;
         await assertOk(res);
-        return recapDetailResponseSchema.parse(await res.json()).recap;
+        return (await parseJson(res, recapDetailResponseSchema)).recap;
       } finally {
         cleanup();
       }

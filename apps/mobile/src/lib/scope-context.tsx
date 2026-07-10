@@ -158,12 +158,13 @@ function QueryBackedScopeProvider({
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  const scopesQuery = useApiQuery<unknown, SupporterScopeList>({
+  const scopesQuery = useApiQuery<SupporterScopeList>({
     queryKey: ['profile', activeProfile?.id ?? 'none', 'scopes'],
     enabled: !!activeProfile,
     retry: false,
+    schema: supporterScopeListSchema,
     fetch: (signal) => client.scopes.$get({}, { init: { signal } }),
-    select: (json) => supporterScopeListSchema.parse(json),
+    select: (json) => json,
     notFoundFallback: LEARNER_SCOPE_LIST,
   });
 

@@ -1,5 +1,6 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
+import type { LearningSession } from '@eduagent/schemas';
 import {
   createHookWrapper,
   createTestProfile,
@@ -37,6 +38,35 @@ jest.mock('../lib/sse', () => ({ // gc1-allow: transport-boundary — XHR-based 
 
 let queryClient: QueryClient;
 
+function makeLearningSession(
+  overrides: Partial<LearningSession> = {},
+): LearningSession {
+  return {
+    id: '660e8400-e29b-41d4-a716-446655440000',
+    subjectId: '550e8400-e29b-41d4-a716-446655440000',
+    topicId: null,
+    sessionType: 'learning',
+    inputMode: 'text',
+    verificationType: null,
+    status: 'active',
+    escalationRung: 1,
+    exchangeCount: 0,
+    startedAt: '2025-01-01T00:00:00Z',
+    lastActivityAt: '2025-01-01T00:00:00Z',
+    endedAt: null,
+    durationSeconds: null,
+    wallClockSeconds: null,
+    filedAt: null,
+    filingStatus: null,
+    filingRetryCount: 0,
+    topicTitle: null,
+    subjectName: null,
+    bookId: null,
+    bookTitle: null,
+    ...overrides,
+  };
+}
+
 function createWrapper() {
   const w = createHookWrapper({
     activeProfile: createTestProfile({ id: 'test-profile-id' }),
@@ -68,25 +98,11 @@ describe('useStartSession', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          session: {
-            id: '660e8400-e29b-41d4-a716-446655440000',
-            subjectId: '550e8400-e29b-41d4-a716-446655440000',
+          session: makeLearningSession({
             topicId: '770e8400-e29b-41d4-a716-446655440000',
             sessionType: 'homework',
             inputMode: 'voice',
-            verificationType: null,
-            status: 'active',
-            escalationRung: 1,
-            exchangeCount: 0,
-            startedAt: '2025-01-01T00:00:00Z',
-            lastActivityAt: '2025-01-01T00:00:00Z',
-            endedAt: null,
-            durationSeconds: null,
-            wallClockSeconds: null,
-            filedAt: null,
-            filingStatus: null,
-            filingRetryCount: 0,
-          },
+          }),
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -121,25 +137,9 @@ describe('useStartSession', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          session: {
-            id: '660e8400-e29b-41d4-a716-446655440000',
-            subjectId: '550e8400-e29b-41d4-a716-446655440000',
+          session: makeLearningSession({
             topicId: '770e8400-e29b-41d4-a716-446655440000',
-            sessionType: 'learning',
-            inputMode: 'text',
-            verificationType: null,
-            status: 'active',
-            escalationRung: 1,
-            exchangeCount: 0,
-            startedAt: '2025-01-01T00:00:00Z',
-            lastActivityAt: '2025-01-01T00:00:00Z',
-            endedAt: null,
-            durationSeconds: null,
-            wallClockSeconds: null,
-            filedAt: null,
-            filingStatus: null,
-            filingRetryCount: 0,
-          },
+          }),
         }),
         { status: 201, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -177,25 +177,9 @@ describe('useStartSession', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          session: {
-            id: '660e8400-e29b-41d4-a716-446655440000',
-            subjectId: '550e8400-e29b-41d4-a716-446655440000',
-            topicId: null,
+          session: makeLearningSession({
             sessionType: 'homework',
-            inputMode: 'text',
-            verificationType: null,
-            status: 'active',
-            escalationRung: 1,
-            exchangeCount: 0,
-            startedAt: '2025-01-01T00:00:00Z',
-            lastActivityAt: '2025-01-01T00:00:00Z',
-            endedAt: null,
-            durationSeconds: null,
-            wallClockSeconds: null,
-            filedAt: null,
-            filingStatus: null,
-            filingRetryCount: 0,
-          },
+          }),
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -238,25 +222,7 @@ describe('useStartSession', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          session: {
-            id: '660e8400-e29b-41d4-a716-446655440000',
-            subjectId: '550e8400-e29b-41d4-a716-446655440000',
-            topicId: null,
-            sessionType: 'learning',
-            inputMode: 'text',
-            verificationType: null,
-            status: 'active',
-            escalationRung: 1,
-            exchangeCount: 0,
-            startedAt: '2025-01-01T00:00:00Z',
-            lastActivityAt: '2025-01-01T00:00:00Z',
-            endedAt: null,
-            durationSeconds: null,
-            wallClockSeconds: null,
-            filedAt: null,
-            filingStatus: null,
-            filingRetryCount: 0,
-          },
+          session: makeLearningSession(),
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -448,25 +414,9 @@ describe('useSetSessionInputMode', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          session: {
-            id: '660e8400-e29b-41d4-a716-446655440000',
-            subjectId: '550e8400-e29b-41d4-a716-446655440000',
-            topicId: null,
-            sessionType: 'learning',
+          session: makeLearningSession({
             inputMode: 'voice',
-            verificationType: null,
-            status: 'active',
-            escalationRung: 1,
-            exchangeCount: 0,
-            startedAt: '2025-01-01T00:00:00Z',
-            lastActivityAt: '2025-01-01T00:00:00Z',
-            endedAt: null,
-            durationSeconds: null,
-            wallClockSeconds: null,
-            filedAt: null,
-            filingStatus: null,
-            filingRetryCount: 0,
-          },
+          }),
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -492,25 +442,7 @@ describe('useSetSessionInputMode', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          session: {
-            id: '660e8400-e29b-41d4-a716-446655440000',
-            subjectId: '550e8400-e29b-41d4-a716-446655440000',
-            topicId: null,
-            sessionType: 'learning',
-            inputMode: 'text',
-            verificationType: null,
-            status: 'active',
-            escalationRung: 1,
-            exchangeCount: 0,
-            startedAt: '2025-01-01T00:00:00Z',
-            lastActivityAt: '2025-01-01T00:00:00Z',
-            endedAt: null,
-            durationSeconds: null,
-            wallClockSeconds: null,
-            filedAt: null,
-            filingStatus: null,
-            filingRetryCount: 0,
-          },
+          session: makeLearningSession(),
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),

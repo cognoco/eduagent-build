@@ -121,18 +121,22 @@ describe('SubjectTopicsScreen', () => {
   });
 
   it('hides the review badge when a topic has no meaningful review data', async () => {
+    const topicId = '33333333-3333-4333-8333-333333333333';
     setRoutes({
       topics: [
         {
-          topicId: 'topic-1',
+          topicId,
           title: 'Fractions',
           description: 'Desc',
           completionStatus: 'not_started',
           retentionStatus: 'strong',
+          daysSinceLastReview: null,
           struggleStatus: 'normal',
           masteryScore: 0.4,
           summaryExcerpt: null,
           xpStatus: 'pending',
+          strongReviews: 0,
+          strongReviewsTarget: 3,
           totalSessions: 0,
         },
       ],
@@ -140,25 +144,29 @@ describe('SubjectTopicsScreen', () => {
 
     const { cleanup } = renderSubjectTopics();
 
-    await waitFor(() => screen.getByTestId('topic-card-topic-1'));
+    await waitFor(() => screen.getByTestId(`topic-card-${topicId}`));
     expect(screen.queryByTestId('retention-signal-strong')).toBeNull();
 
     cleanup();
   });
 
   it('passes totalSessions to the topic detail route and shows review data when present', async () => {
+    const topicId = '44444444-4444-4444-8444-444444444444';
     setRoutes({
       topics: [
         {
-          topicId: 'topic-1',
+          topicId,
           title: 'Fractions',
           description: 'Desc',
           completionStatus: 'in_progress',
           retentionStatus: 'fading',
+          daysSinceLastReview: 4,
           struggleStatus: 'normal',
           masteryScore: 0.4,
           summaryExcerpt: null,
           xpStatus: 'pending',
+          strongReviews: 1,
+          strongReviewsTarget: 3,
           totalSessions: 3,
         },
       ],
@@ -168,7 +176,7 @@ describe('SubjectTopicsScreen', () => {
 
     await waitFor(() => screen.getByTestId('retention-signal-fading'));
 
-    fireEvent.press(screen.getByTestId('topic-card-topic-1'));
+    fireEvent.press(screen.getByTestId(`topic-card-${topicId}`));
 
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({

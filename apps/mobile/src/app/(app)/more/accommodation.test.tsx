@@ -1,4 +1,5 @@
 import { fireEvent, act, waitFor } from '@testing-library/react-native';
+import type { AccommodationMode, LearningProfile } from '@eduagent/schemas';
 import {
   renderScreen,
   cleanupScreen,
@@ -86,9 +87,30 @@ const child = createTestProfile({
   birthYear: 2014,
 });
 
-function modeRoute(mode = 'none') {
+function modeRoute(mode: AccommodationMode = 'none') {
+  const profile: LearningProfile = {
+    id: '10000000-0000-4000-8000-000000000011',
+    profileId: '10000000-0000-4000-8000-000000000012',
+    learningStyle: null,
+    interests: [],
+    strengths: [],
+    struggles: [],
+    communicationNotes: [],
+    suppressedInferences: [],
+    interestTimestamps: {},
+    effectivenessSessionCount: 0,
+    memoryEnabled: true,
+    memoryConsentStatus: 'granted',
+    memoryCollectionEnabled: true,
+    memoryInjectionEnabled: true,
+    accommodationMode: mode,
+    recentlyResolvedTopics: [],
+    version: 1,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
   return {
-    '/learner-profile': { profile: { accommodationMode: mode } },
+    '/learner-profile': { profile },
   };
 }
 

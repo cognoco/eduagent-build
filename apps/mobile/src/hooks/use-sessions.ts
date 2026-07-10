@@ -33,7 +33,7 @@ import {
   homeworkStateSyncResponseSchema,
   messageResultSchema,
   parkingLotAddResponseSchema,
-  parkingLotItemSchema,
+  parkingLotItemsResponseSchema,
   recallBridgeResultSchema,
   sessionStartResultSchema,
   sessionSummaryGetResponseSchema,
@@ -484,13 +484,13 @@ export function useParkingLot(
 
   return useApiQuery<{ items: ParkingLotItem[] }, ParkingLotItem[]>({
     queryKey: queryKeys.sessions.parkingLot(mode, sessionId, profileId),
+    schema: parkingLotItemsResponseSchema,
     fetch: (signal) =>
       client.sessions[':sessionId']['parking-lot'].$get(
         { param: { sessionId } },
         { init: { signal } },
       ),
-    select: (json) =>
-      z.object({ items: z.array(parkingLotItemSchema) }).parse(json).items,
+    select: (json) => json.items,
     enabled: !!sessionId,
   });
 }
@@ -509,13 +509,13 @@ export function useTopicParkingLot(
       topicId,
       profileId,
     ),
+    schema: parkingLotItemsResponseSchema,
     fetch: (signal) =>
       client.subjects[':subjectId'].topics[':topicId']['parking-lot'].$get(
         { param: { subjectId, topicId } },
         { init: { signal } },
       ),
-    select: (json) =>
-      z.object({ items: z.array(parkingLotItemSchema) }).parse(json).items,
+    select: (json) => json.items,
     enabled: !!subjectId && !!topicId,
   });
 }

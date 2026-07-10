@@ -15,6 +15,9 @@ import type {
   SubscriptionStatusResponse,
 } from '@eduagent/schemas';
 import {
+  byokWaitlistResponseSchema,
+  familyRemoveResponseSchema,
+  familyResponseSchema,
   subscriptionResponseSchema,
   subscriptionStatusResponseSchema,
   usageResponseSchema,
@@ -25,6 +28,7 @@ import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
+import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
 
 // ---------------------------------------------------------------------------
@@ -67,7 +71,7 @@ export async function fetchUsageData(
 ): Promise<UsageData> {
   const res = await client.usage.$get({}, { init: { signal } });
   await assertOk(res);
-  const data = usageResponseSchema.parse(await res.json());
+  const data = await parseJson(res, usageResponseSchema, 'GET /usage');
   return data.usage;
 }
 
@@ -81,8 +85,9 @@ export function useSubscription(): UseQueryResult<SubscriptionData> {
 
   return useApiQuery<{ subscription: SubscriptionData }, SubscriptionData>({
     queryKey: queryKeys.subscription(activeProfile?.id),
+    schema: subscriptionResponseSchema,
     fetch: (signal) => client.subscription.$get({}, { init: { signal } }),
-    select: (json) => subscriptionResponseSchema.parse(json).subscription,
+    select: (json) => json.subscription,
   });
 }
 
@@ -92,8 +97,9 @@ export function useUsage(): UseQueryResult<UsageData> {
 
   return useApiQuery<{ usage: UsageData }, UsageData>({
     queryKey: queryKeys.usage(activeProfile?.id),
+    schema: usageResponseSchema,
     fetch: (signal) => client.usage.$get({}, { init: { signal } }),
-    select: (json) => usageResponseSchema.parse(json).usage,
+    select: (json) => json.usage,
   });
 }
 
@@ -120,8 +126,12 @@ export function useFamilySubscription(
           return null;
         }
         await assertOk(res);
-        const data = await res.json();
-        return data.family as FamilySubscription;
+        const data = await parseJson(
+          res,
+          familyResponseSchema,
+          'GET /subscription/family',
+        );
+        return data.family;
       } catch (error) {
         // [BUG-160] Production api-client throws before returning the Response,
         // so the res.status === 404 check above is unreachable in production.
@@ -159,7 +169,11 @@ export function useSubscriptionStatus(options?: {
           { init: { signal } },
         );
         await assertOk(res);
-        const data = subscriptionStatusResponseSchema.parse(await res.json());
+        const data = await parseJson(
+          res,
+          subscriptionStatusResponseSchema,
+          'GET /subscription/status',
+        );
         return data.status;
       } finally {
         cleanup();
@@ -181,7 +195,7 @@ export function useJoinByokWaitlist(): UseMutationResult<
     mutationFn: async () => {
       const res = await client['byok-waitlist'].$post({ json: {} });
       await assertOk(res);
-      return (await res.json()) as ByokWaitlistResult;
+      return parseJson(res, byokWaitlistResponseSchema, 'POST /byok-waitlist');
     },
   });
 }
@@ -205,7 +219,11 @@ export function useRemoveFamilyProfile(): UseMutationResult<
       };
       const res = await familyClient.remove.$post({ json: { profileId } });
       await assertOk(res);
-      return (await res.json()) as RemoveFamilyProfileResult;
+      return parseJson(
+        res,
+        familyRemoveResponseSchema,
+        'POST /subscription/family/remove',
+      );
     },
     onSuccess: async () => {
       await Promise.all([

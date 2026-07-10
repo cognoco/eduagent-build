@@ -4,6 +4,7 @@
 
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
+import type { NoteResponse } from '@eduagent/schemas';
 import {
   createHookWrapper,
   createTestProfile,
@@ -22,6 +23,26 @@ const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
+
+const NOTE_ID = 'e0000000-0000-4000-8000-000000000001';
+const TOPIC_1_ID = 'e0000000-0000-4000-8000-000000000002';
+const TOPIC_2_ID = 'e0000000-0000-4000-8000-000000000003';
+const TOPIC_3_ID = 'e0000000-0000-4000-8000-000000000004';
+
+function createNoteFixture(
+  overrides: Partial<NoteResponse> = {},
+): NoteResponse {
+  return {
+    id: NOTE_ID,
+    topicId: TOPIC_1_ID,
+    sessionId: null,
+    content: 'My note content',
+    origin: 'self',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
 
 function createWrapper() {
   const w = createHookWrapper({
@@ -48,16 +69,15 @@ afterAll(() => {
 });
 
 const mockNotes = [
-  {
-    topicId: 'topic-1',
+  createNoteFixture({
     content: 'My first note about ancient Egypt',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    topicId: 'topic-2',
+  }),
+  createNoteFixture({
+    id: 'e0000000-0000-4000-8000-000000000005',
+    topicId: TOPIC_2_ID,
     content: 'Notes about hieroglyphics',
     updatedAt: '2026-01-02T00:00:00.000Z',
-  },
+  }),
 ];
 
 const mockBookNotesResponse = { notes: mockNotes };
@@ -149,14 +169,9 @@ describe('useBookNotes', () => {
 
 describe('useCreateNote', () => {
   it('creates a note and triggers cache invalidation on success', async () => {
-    const mockNote = {
-      id: 'note-1',
-      topicId: 'topic-1',
-      profileId: 'test-profile-id',
+    const mockNote = createNoteFixture({
       content: 'My note content',
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    };
+    });
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ note: mockNote }), { status: 200 }),
     );
@@ -188,14 +203,9 @@ describe('useCreateNote', () => {
   });
 
   it('creates a separate note for new content', async () => {
-    const mockNote = {
-      id: 'note-1',
-      topicId: 'topic-1',
-      profileId: 'test-profile-id',
+    const mockNote = createNoteFixture({
       content: 'Appended content',
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    };
+    });
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ note: mockNote }), { status: 200 }),
     );
@@ -293,14 +303,7 @@ describe('useUpdateNote and useDeleteNoteById (profile-scoped invalidation)', ()
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          note: {
-            id: 'note-1',
-            topicId: 'topic-1',
-            profileId: 'test-profile-id',
-            content: 'updated',
-            createdAt: '2026-01-01T00:00:00.000Z',
-            updatedAt: '2026-01-01T00:00:00.000Z',
-          },
+          note: createNoteFixture({ content: 'updated' }),
         }),
         { status: 200 },
       ),
@@ -399,7 +402,7 @@ describe('useNoteTopicIds', () => {
   it('fetches and returns topic IDs that have notes', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ topicIds: ['topic-1', 'topic-2', 'topic-3'] }),
+        JSON.stringify({ topicIds: [TOPIC_1_ID, TOPIC_2_ID, TOPIC_3_ID] }),
         { status: 200 },
       ),
     );
@@ -414,9 +417,9 @@ describe('useNoteTopicIds', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.topicIds).toEqual([
-      'topic-1',
-      'topic-2',
-      'topic-3',
+      TOPIC_1_ID,
+      TOPIC_2_ID,
+      TOPIC_3_ID,
     ]);
   });
 
@@ -443,7 +446,7 @@ describe('useConceptMasterySignals', () => {
       new Response(
         JSON.stringify({
           signals: {
-            'topic-1': {
+            [TOPIC_1_ID]: {
               verified: true,
               hasMentorAddition: false,
               mentorAdditions: [],
@@ -463,7 +466,7 @@ describe('useConceptMasterySignals', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(result.current.data?.signals['topic-1']).toEqual({
+    expect(result.current.data?.signals[TOPIC_1_ID]).toEqual({
       verified: true,
       hasMentorAddition: false,
       mentorAdditions: [],

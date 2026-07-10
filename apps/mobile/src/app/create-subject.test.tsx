@@ -14,10 +14,86 @@ import {
   fetchCallsMatching,
   extractJsonBody,
 } from '../test-utils/mock-api-routes';
+import type { LearningSession, Subject } from '@eduagent/schemas';
 
 // Routes most-specific first: /subjects/resolve before /subjects.
 // Handler for /subjects distinguishes GET (list) from POST (create) by method.
-let subjectsListData: Array<{ id: string; name: string }> = [];
+const TEST_PROFILE_ID = '20000000-0000-4000-8000-000000000001';
+const TEST_ACCOUNT_ID = '20000000-0000-4000-8000-000000000002';
+const SUBJECT_IDS = {
+  default: '20000000-0000-4000-8000-000000000101',
+  fractions: '20000000-0000-4000-8000-000000000102',
+  history: '20000000-0000-4000-8000-000000000103',
+  worldHistory: '20000000-0000-4000-8000-000000000104',
+  first: '20000000-0000-4000-8000-000000000105',
+  biology: '20000000-0000-4000-8000-000000000106',
+  botany: '20000000-0000-4000-8000-000000000107',
+  math: '20000000-0000-4000-8000-000000000108',
+  italian: '20000000-0000-4000-8000-000000000109',
+  continueMath: '20000000-0000-4000-8000-000000000110',
+  continueHistory: '20000000-0000-4000-8000-000000000111',
+} as const;
+const BOOK_IDS = {
+  easter: '20000000-0000-4000-8000-000000000201',
+  easterTraditions: '20000000-0000-4000-8000-000000000202',
+  tea: '20000000-0000-4000-8000-000000000203',
+} as const;
+const SESSION_IDS = {
+  first: '20000000-0000-4000-8000-000000000301',
+} as const;
+const TOPIC_IDS = {
+  first: '20000000-0000-4000-8000-000000000401',
+} as const;
+const ISO_NOW = '2026-02-16T00:00:00Z';
+
+function makeSubject(overrides: Partial<Subject> & Pick<Subject, 'name'>) {
+  return {
+    id: overrides.id ?? SUBJECT_IDS.default,
+    profileId: overrides.profileId ?? TEST_PROFILE_ID,
+    name: overrides.name,
+    rawInput: overrides.rawInput ?? null,
+    status: overrides.status ?? 'active',
+    curriculumStatus: overrides.curriculumStatus ?? 'ready',
+    pedagogyMode: overrides.pedagogyMode ?? 'socratic',
+    languageCode: overrides.languageCode ?? null,
+    createdAt: overrides.createdAt ?? ISO_NOW,
+    updatedAt: overrides.updatedAt ?? ISO_NOW,
+    urgencyBoostUntil: overrides.urgencyBoostUntil ?? null,
+    urgencyBoostReason: overrides.urgencyBoostReason ?? null,
+  } satisfies Subject;
+}
+
+function makeSession(
+  overrides: Partial<LearningSession> & Pick<LearningSession, 'subjectId'>,
+) {
+  return {
+    id: overrides.id ?? SESSION_IDS.first,
+    subjectId: overrides.subjectId,
+    topicId: overrides.topicId ?? TOPIC_IDS.first,
+    sessionType: overrides.sessionType ?? 'learning',
+    inputMode: overrides.inputMode ?? 'text',
+    verificationType: overrides.verificationType ?? null,
+    status: overrides.status ?? 'active',
+    escalationRung: overrides.escalationRung ?? 1,
+    exchangeCount: overrides.exchangeCount ?? 0,
+    startedAt: overrides.startedAt ?? ISO_NOW,
+    lastActivityAt: overrides.lastActivityAt ?? ISO_NOW,
+    endedAt: overrides.endedAt ?? null,
+    durationSeconds: overrides.durationSeconds ?? null,
+    wallClockSeconds: overrides.wallClockSeconds ?? null,
+    metadata: overrides.metadata ?? {},
+    rawInput: overrides.rawInput ?? null,
+    filedAt: overrides.filedAt ?? null,
+    filingStatus: overrides.filingStatus ?? null,
+    filingRetryCount: overrides.filingRetryCount ?? 0,
+    topicTitle: overrides.topicTitle ?? null,
+    subjectName: overrides.subjectName ?? null,
+    bookId: overrides.bookId ?? null,
+    bookTitle: overrides.bookTitle ?? null,
+  } satisfies LearningSession;
+}
+
+let subjectsListData: Subject[] = [];
 let subjectsListIsError = false;
 let createSubjectResponse: unknown = null;
 let createSubjectShouldError = false;
@@ -39,11 +115,7 @@ const mockFetch = createRoutedMockFetch({
     displayMessage: '',
   },
   '/sessions/first-curriculum': {
-    session: {
-      id: 'session-first',
-      subjectId: 'subject-1',
-      topicId: 'topic-first',
-    },
+    session: makeSession({ subjectId: SUBJECT_IDS.first }),
   },
   '/subjects': { subjects: [] },
 });
@@ -67,8 +139,8 @@ jest.mock(
     ...jest.requireActual('../lib/profile'),
     useProfile: () => ({
       activeProfile: {
-        id: 'test-profile-id',
-        accountId: 'test-account-id',
+        id: TEST_PROFILE_ID,
+        accountId: TEST_ACCOUNT_ID,
         displayName: 'Test Learner',
         isOwner: true,
         hasPremiumLlm: false,
@@ -173,9 +245,20 @@ async function enterClarification(text: string): Promise<void> {
   });
 }
 
+function normalizeResolveResponse(response: unknown): unknown {
+  if (
+    response &&
+    typeof response === 'object' &&
+    !('resolvedName' in response)
+  ) {
+    return { resolvedName: null, ...response };
+  }
+  return response;
+}
+
 // Helper: configure a single resolve response for one call.
 function setResolveResponse(response: unknown) {
-  mockFetch.setRoute('/subjects/resolve', response);
+  mockFetch.setRoute('/subjects/resolve', normalizeResolveResponse(response));
 }
 
 // Helper: configure sequential resolve responses (for tests that call resolve multiple times).
@@ -184,7 +267,7 @@ function setSequentialResolveResponses(responses: unknown[]) {
   mockFetch.setRoute('/subjects/resolve', () => {
     const res = responses[callIndex] ?? responses[responses.length - 1];
     callIndex++;
-    return res;
+    return normalizeResolveResponse(res);
   });
 }
 
@@ -208,7 +291,8 @@ function defaultSubjectsHandler(url: string, init?: RequestInit): unknown {
     }
     return (
       createSubjectResponse ?? {
-        subject: { id: 'subject-default', name: 'Subject' },
+        subject: makeSubject({ id: SUBJECT_IDS.default, name: 'Subject' }),
+        structureType: 'narrow',
       }
     );
   }
@@ -228,11 +312,7 @@ const defaultResolveHandler = {
 };
 
 const defaultFirstCurriculumHandler = {
-  session: {
-    id: 'session-first',
-    subjectId: 'subject-1',
-    topicId: 'topic-first',
-  },
+  session: makeSession({ subjectId: SUBJECT_IDS.first }),
 };
 
 describe('CreateSubjectScreen', () => {
@@ -295,7 +375,8 @@ describe('CreateSubjectScreen', () => {
       displayMessage: 'Fractions it is.',
     });
     createSubjectResponse = {
-      subject: { id: 'subject-fractions', name: 'Fractions' },
+      subject: makeSubject({ id: SUBJECT_IDS.fractions, name: 'Fractions' }),
+      structureType: 'narrow',
     };
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
@@ -334,6 +415,7 @@ describe('CreateSubjectScreen', () => {
     await act(async () => {
       resolveCheck({
         status: 'ambiguous',
+        resolvedName: null,
         displayMessage: 'A few nearby subjects came up.',
         suggestions: [
           { name: 'Ancient History', description: 'Older civilizations' },
@@ -356,7 +438,11 @@ describe('CreateSubjectScreen', () => {
         displayMessage: 'Ancient History works.',
       });
       createSubjectResponse = {
-        subject: { id: 'subject-history', name: 'Ancient History' },
+        subject: makeSubject({
+          id: SUBJECT_IDS.history,
+          name: 'Ancient History',
+        }),
+        structureType: 'narrow',
       };
 
       let firstCurriculumCalls = 0;
@@ -399,9 +485,9 @@ describe('CreateSubjectScreen', () => {
           pathname: '/ready',
           params: {
             subject: 'Ancient History',
-            subjectId: 'subject-history',
-            sessionId: 'session-first',
-            topicId: 'topic-first',
+            subjectId: SUBJECT_IDS.history,
+            sessionId: SESSION_IDS.first,
+            topicId: TOPIC_IDS.first,
           },
         });
       });
@@ -422,7 +508,11 @@ describe('CreateSubjectScreen', () => {
       displayMessage: 'Ancient History works.',
     });
     createSubjectResponse = {
-      subject: { id: 'subject-history', name: 'Ancient History' },
+      subject: makeSubject({
+        id: SUBJECT_IDS.history,
+        name: 'Ancient History',
+      }),
+      structureType: 'narrow',
     };
 
     let firstCurriculumCalls = 0;
@@ -465,9 +555,12 @@ describe('CreateSubjectScreen', () => {
         ],
       });
       createSubjectResponse = {
-        subject: { id: 'subject-wh', name: 'World History' },
+        subject: makeSubject({
+          id: SUBJECT_IDS.worldHistory,
+          name: 'World History',
+        }),
         structureType: 'focused_book',
-        bookId: 'book-easter',
+        bookId: BOOK_IDS.easter,
         bookTitle: 'Easter',
         bookCount: 1,
       };
@@ -514,7 +607,7 @@ describe('CreateSubjectScreen', () => {
           pathname: '/ready',
           params: {
             subject: 'World History',
-            subjectId: 'subject-wh',
+            subjectId: SUBJECT_IDS.worldHistory,
             topicName: 'Easter',
             rawInput: 'Easter',
           },
@@ -568,7 +661,11 @@ describe('CreateSubjectScreen', () => {
       },
     ]);
     createSubjectResponse = {
-      subject: { id: 'subject-1', name: 'leaf cutter ants' },
+      subject: makeSubject({
+        id: SUBJECT_IDS.first,
+        name: 'leaf cutter ants',
+      }),
+      structureType: 'narrow',
     };
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
@@ -607,9 +704,9 @@ describe('CreateSubjectScreen', () => {
       pathname: '/ready',
       params: {
         subject: 'leaf cutter ants',
-        subjectId: 'subject-1',
-        sessionId: 'session-first',
-        topicId: 'topic-first',
+        subjectId: SUBJECT_IDS.first,
+        sessionId: SESSION_IDS.first,
+        topicId: TOPIC_IDS.first,
       },
     });
   });
@@ -663,9 +760,12 @@ describe('CreateSubjectScreen', () => {
     });
 
     createSubjectResponse = {
-      subject: { id: 'subject-wh', name: 'World History' },
+      subject: makeSubject({
+        id: SUBJECT_IDS.worldHistory,
+        name: 'World History',
+      }),
       structureType: 'focused_book',
-      bookId: 'book-easter',
+      bookId: BOOK_IDS.easter,
       bookTitle: 'Easter',
       bookCount: 1,
     };
@@ -708,9 +808,9 @@ describe('CreateSubjectScreen', () => {
       pathname: '/ready',
       params: {
         subject: 'World History',
-        subjectId: 'subject-wh',
-        sessionId: 'session-first',
-        topicId: 'topic-first',
+        subjectId: SUBJECT_IDS.worldHistory,
+        sessionId: SESSION_IDS.first,
+        topicId: TOPIC_IDS.first,
       },
     });
   });
@@ -735,9 +835,12 @@ describe('CreateSubjectScreen', () => {
     });
 
     createSubjectResponse = {
-      subject: { id: 'subject-wh', name: 'World History' },
+      subject: makeSubject({
+        id: SUBJECT_IDS.worldHistory,
+        name: 'World History',
+      }),
       structureType: 'focused_book',
-      bookId: 'book-easter-trad',
+      bookId: BOOK_IDS.easterTraditions,
       bookTitle: 'Easter Traditions',
       bookCount: 1,
     };
@@ -796,7 +899,7 @@ describe('CreateSubjectScreen', () => {
     });
 
     createSubjectResponse = {
-      subject: { id: 'subject-biology', name: 'Biology' },
+      subject: makeSubject({ id: SUBJECT_IDS.biology, name: 'Biology' }),
       structureType: 'broad',
       bookCount: 5,
     };
@@ -828,7 +931,7 @@ describe('CreateSubjectScreen', () => {
 
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/pick-book/[subjectId]',
-      params: { subjectId: 'subject-biology' },
+      params: { subjectId: SUBJECT_IDS.biology },
     });
   });
 
@@ -848,7 +951,7 @@ describe('CreateSubjectScreen', () => {
     });
 
     createSubjectResponse = {
-      subject: { id: 'subject-biology', name: 'Biology' },
+      subject: makeSubject({ id: SUBJECT_IDS.biology, name: 'Biology' }),
       structureType: 'broad',
       bookCount: 5,
     };
@@ -880,7 +983,7 @@ describe('CreateSubjectScreen', () => {
 
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/pick-book/[subjectId]',
-      params: { subjectId: 'subject-biology' },
+      params: { subjectId: SUBJECT_IDS.biology },
     });
   });
 
@@ -902,9 +1005,9 @@ describe('CreateSubjectScreen', () => {
     });
 
     createSubjectResponse = {
-      subject: { id: 'subject-botany', name: 'Botany' },
+      subject: makeSubject({ id: SUBJECT_IDS.botany, name: 'Botany' }),
       structureType: 'focused_book',
-      bookId: 'book-tea',
+      bookId: BOOK_IDS.tea,
       bookTitle: 'tea',
       bookCount: 1,
     };
@@ -947,9 +1050,9 @@ describe('CreateSubjectScreen', () => {
       pathname: '/ready',
       params: {
         subject: 'Botany',
-        subjectId: 'subject-botany',
-        sessionId: 'session-first',
-        topicId: 'topic-first',
+        subjectId: SUBJECT_IDS.botany,
+        sessionId: SESSION_IDS.first,
+        topicId: TOPIC_IDS.first,
       },
     });
   });
@@ -963,7 +1066,7 @@ describe('CreateSubjectScreen', () => {
     });
 
     createSubjectResponse = {
-      subject: { id: 'subject-history', name: 'History' },
+      subject: makeSubject({ id: SUBJECT_IDS.history, name: 'History' }),
       structureType: 'broad',
       bookCount: 6,
     };
@@ -976,7 +1079,7 @@ describe('CreateSubjectScreen', () => {
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith({
         pathname: '/(app)/pick-book/[subjectId]',
-        params: { subjectId: 'subject-history' },
+        params: { subjectId: SUBJECT_IDS.history },
       });
     });
   });
@@ -1202,7 +1305,10 @@ describe('CreateSubjectScreen', () => {
     });
 
     createSubjectResponse = {
-      subject: { id: 'subject-world-history', name: 'World History' },
+      subject: makeSubject({
+        id: SUBJECT_IDS.worldHistory,
+        name: 'World History',
+      }),
       structureType: 'broad',
       bookCount: 4,
     };
@@ -1217,7 +1323,7 @@ describe('CreateSubjectScreen', () => {
         pathname: '/(app)/session',
         params: {
           mode: 'freeform',
-          subjectId: 'subject-world-history',
+          subjectId: SUBJECT_IDS.worldHistory,
           subjectName: 'World History',
           topicName: 'Easter',
         },
@@ -1242,7 +1348,7 @@ describe('CreateSubjectScreen', () => {
     });
 
     createSubjectResponse = {
-      subject: { id: 'subject-biology', name: 'Biology' },
+      subject: makeSubject({ id: SUBJECT_IDS.biology, name: 'Biology' }),
       structureType: 'broad',
       bookCount: 5,
     };
@@ -1255,7 +1361,7 @@ describe('CreateSubjectScreen', () => {
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith({
         pathname: '/(app)/pick-book/[subjectId]',
-        params: { subjectId: 'subject-biology' },
+        params: { subjectId: SUBJECT_IDS.biology },
       });
     });
 
@@ -1281,8 +1387,8 @@ describe('CreateSubjectScreen', () => {
 
   it('shows unified subject rows when the user has existing subjects', async () => {
     subjectsListData = [
-      { id: 'sub-1', name: 'Math' },
-      { id: 'sub-2', name: 'History' },
+      makeSubject({ id: SUBJECT_IDS.continueMath, name: 'Math' }),
+      makeSubject({ id: SUBJECT_IDS.continueHistory, name: 'History' }),
     ];
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
@@ -1292,8 +1398,8 @@ describe('CreateSubjectScreen', () => {
       screen.getByText('Continue Math');
       screen.getByText('Continue History');
       expect(screen.queryByText('Or continue with')).toBeNull();
-      screen.getByTestId('subject-continue-sub-1');
-      screen.getByTestId('subject-continue-sub-2');
+      screen.getByTestId(`subject-continue-${SUBJECT_IDS.continueMath}`);
+      screen.getByTestId(`subject-continue-${SUBJECT_IDS.continueHistory}`);
     });
   });
 
@@ -1307,24 +1413,34 @@ describe('CreateSubjectScreen', () => {
   });
 
   it('tapping a continue row navigates to session with subject', async () => {
-    subjectsListData = [{ id: 'sub-1', name: 'Math' }];
+    subjectsListData = [
+      makeSubject({ id: SUBJECT_IDS.continueMath, name: 'Math' }),
+    ];
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      screen.getByTestId('subject-continue-sub-1');
+      screen.getByTestId(`subject-continue-${SUBJECT_IDS.continueMath}`);
     });
 
-    fireEvent.press(screen.getByTestId('subject-continue-sub-1'));
+    fireEvent.press(
+      screen.getByTestId(`subject-continue-${SUBJECT_IDS.continueMath}`),
+    );
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
-      params: { mode: 'learning', subjectId: 'sub-1', subjectName: 'Math' },
+      params: {
+        mode: 'learning',
+        subjectId: SUBJECT_IDS.continueMath,
+        subjectName: 'Math',
+      },
     });
   });
 
   it('hides unified subject rows when input has text', async () => {
-    subjectsListData = [{ id: 'sub-1', name: 'Math' }];
+    subjectsListData = [
+      makeSubject({ id: SUBJECT_IDS.continueMath, name: 'Math' }),
+    ];
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
@@ -1374,7 +1490,8 @@ describe('CreateSubjectScreen', () => {
     mockFetch.setRoute('/subjects', (url: string, init?: RequestInit) => {
       if (init?.method === 'POST') {
         return pendingCreate.then(() => ({
-          subject: { id: 'subject-math', name: 'Math' },
+          subject: makeSubject({ id: SUBJECT_IDS.math, name: 'Math' }),
+          structureType: 'narrow',
         }));
       }
       return { subjects: [] };
@@ -1559,7 +1676,8 @@ describe('CreateSubjectScreen', () => {
       displayMessage: 'Italian works well.',
     });
     createSubjectResponse = {
-      subject: { id: 'subject-italian', name: 'Italian' },
+      subject: makeSubject({ id: SUBJECT_IDS.italian, name: 'Italian' }),
+      structureType: 'narrow',
     };
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
@@ -1580,9 +1698,9 @@ describe('CreateSubjectScreen', () => {
         pathname: '/ready',
         params: {
           subject: 'Italian',
-          subjectId: 'subject-italian',
-          sessionId: 'session-first',
-          topicId: 'topic-first',
+          subjectId: SUBJECT_IDS.italian,
+          sessionId: SESSION_IDS.first,
+          topicId: TOPIC_IDS.first,
         },
       });
     });
@@ -1878,10 +1996,11 @@ describe('CreateSubjectScreen — [BUG-520] resolve timeout cleanup', () => {
           const subjectName = body.name ?? 'Subject';
           createdSubjectNames.push(subjectName);
           return {
-            subject: {
-              id: `subject-${createdSubjectNames.length}`,
+            subject: makeSubject({
+              id: SUBJECT_IDS.default,
               name: subjectName,
-            },
+            }),
+            structureType: 'narrow',
           };
         }
         return { subjects: [] };

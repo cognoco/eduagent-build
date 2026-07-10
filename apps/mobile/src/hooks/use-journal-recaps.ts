@@ -13,11 +13,12 @@ export function useJournalRecaps(limit = 10): UseQueryResult<RecapListItem[]> {
 
   return useApiQuery({
     queryKey: ['journal-recaps', profileId, limit],
+    schema: recapsResponseSchema,
     fetch: (signal) =>
       client.recaps.self.$get(
         { query: { limit: String(limit) } },
         { init: { signal } },
       ),
-    select: (json: unknown) => recapsResponseSchema.parse(json).recaps,
+    select: (json) => json.recaps,
   });
 }

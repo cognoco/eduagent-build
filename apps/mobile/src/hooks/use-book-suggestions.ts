@@ -1,5 +1,8 @@
 import type { UseQueryResult } from '@tanstack/react-query';
-import type { BookSuggestionsResponse } from '@eduagent/schemas';
+import {
+  bookSuggestionsResponseSchema,
+  type BookSuggestionsResponse,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { useApiQuery } from './use-api-query';
@@ -20,6 +23,7 @@ export function useBookSuggestions(
 
   return useApiQuery<BookSuggestionsResponse>({
     queryKey: ['book-suggestions', subjectId, activeProfile?.id, topup],
+    schema: bookSuggestionsResponseSchema,
     fetch: (signal) => {
       const sid = subjectId ?? '';
       return topup

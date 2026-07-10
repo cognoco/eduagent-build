@@ -13,10 +13,17 @@ import type {
   DictationResult,
   RecordDictationResultInput as SchemaRecordDictationResultInput,
 } from '@eduagent/schemas';
+import {
+  dictationHistorySchema,
+  dictationReviewResultSchema,
+  generateDictationOutputSchema,
+  prepareHomeworkOutputSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { useApiQuery } from './use-api-query';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { createTimeoutSignal } from '../lib/query-timeout';
 
 export type { DictationReviewResult };
@@ -55,7 +62,11 @@ export function usePrepareHomework() {
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as PrepareHomeworkOutput;
+        return parseJson(
+          res,
+          prepareHomeworkOutputSchema,
+          'POST /dictation/prepare-homework',
+        );
       } finally {
         cleanup();
       }
@@ -77,7 +88,11 @@ export function useGenerateDictation() {
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as GenerateDictationOutput;
+        return parseJson(
+          res,
+          generateDictationOutputSchema,
+          'POST /dictation/generate',
+        );
       } finally {
         cleanup();
       }
@@ -101,7 +116,11 @@ export function useReviewDictation() {
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as DictationReviewResult;
+        return parseJson(
+          res,
+          dictationReviewResultSchema,
+          'POST /dictation/review',
+        );
       } finally {
         cleanup();
       }
@@ -147,6 +166,7 @@ export function useDictationHistory(): UseQueryResult<DictationResult[]> {
 
   return useApiQuery<DictationHistory, DictationResult[]>({
     queryKey: ['dictation-history', activeProfile?.id],
+    schema: dictationHistorySchema,
     fetch: (signal) =>
       client.dictation.history.$get(undefined, { init: { signal } }),
     select: (json) => json.entries,

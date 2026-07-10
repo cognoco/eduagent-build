@@ -43,6 +43,8 @@ function createWrapper() {
 /** Minimal valid KnowledgeInventory response. */
 function makeInventoryResponse(totalSessions: number) {
   return {
+    profileId: '990e8400-e29b-41d4-a716-446655440004',
+    snapshotDate: '2026-04-27',
     thisWeekMini: { sessions: 0, wordsLearned: 0, topicsTouched: 0 },
     global: {
       topicsAttempted: 0,

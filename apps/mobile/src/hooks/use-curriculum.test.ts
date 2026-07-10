@@ -1,5 +1,6 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
+import type { Curriculum } from '@eduagent/schemas';
 import {
   createHookWrapper,
   createTestProfile,
@@ -18,6 +19,12 @@ const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
+
+const CURRICULUM_ID = 'd0000000-0000-4000-8000-000000000001';
+const SUBJECT_ID = 'd0000000-0000-4000-8000-000000000002';
+const BOOK_ID = 'd0000000-0000-4000-8000-000000000003';
+const TOPIC_1_ID = 'd0000000-0000-4000-8000-000000000004';
+const TOPIC_2_ID = 'd0000000-0000-4000-8000-000000000005';
 
 function createWrapper() {
   const w = createHookWrapper({
@@ -43,27 +50,29 @@ afterAll(() => {
   globalThis.fetch = originalFetch;
 });
 
-const mockCurriculum = {
-  id: 'curr-1',
-  subjectId: 'subject-1',
+const mockCurriculum: Curriculum = {
+  id: CURRICULUM_ID,
+  subjectId: SUBJECT_ID,
   version: 1,
   topics: [
     {
-      id: 'topic-1',
+      id: TOPIC_1_ID,
       title: 'Introduction',
       description: 'Getting started',
       sortOrder: 0,
       relevance: 'core',
       estimatedMinutes: 15,
+      bookId: BOOK_ID,
       skipped: false,
     },
     {
-      id: 'topic-2',
+      id: TOPIC_2_ID,
       title: 'Advanced Concepts',
       description: 'Deep dive',
       sortOrder: 1,
       relevance: 'recommended',
       estimatedMinutes: 30,
+      bookId: BOOK_ID,
       skipped: false,
     },
   ],
@@ -141,9 +150,12 @@ describe('useSkipTopic', () => {
   // refetches and silently bridging cache lifecycles across identities.
   it('[BREAK] invalidates curriculum scoped to the active profile id', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ message: 'Topic skipped' }), {
-        status: 200,
-      }),
+      new Response(
+        JSON.stringify({ message: 'Topic skipped', topicId: TOPIC_1_ID }),
+        {
+          status: 200,
+        },
+      ),
     );
 
     const wrapper = createWrapper();
@@ -170,9 +182,12 @@ describe('useSkipTopic', () => {
 
   it('calls POST to skip a topic', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ message: 'Topic skipped' }), {
-        status: 200,
-      }),
+      new Response(
+        JSON.stringify({ message: 'Topic skipped', topicId: TOPIC_1_ID }),
+        {
+          status: 200,
+        },
+      ),
     );
 
     const { result } = renderHook(() => useSkipTopic('subject-1'), {
@@ -194,9 +209,12 @@ describe('useSkipTopic', () => {
 describe('useUnskipTopic', () => {
   it('calls POST to unskip (restore) a topic', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ message: 'Topic restored' }), {
-        status: 200,
-      }),
+      new Response(
+        JSON.stringify({ message: 'Topic restored', topicId: TOPIC_1_ID }),
+        {
+          status: 200,
+        },
+      ),
     );
 
     const { result } = renderHook(() => useUnskipTopic('subject-1'), {

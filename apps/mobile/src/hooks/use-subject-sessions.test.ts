@@ -43,30 +43,26 @@ function createWrapper() {
 
 const mockSessions = [
   {
-    id: 'sess-1',
-    subjectId: 'subject-1',
-    topicId: 'topic-1',
+    id: '660e8400-e29b-41d4-a716-446655440001',
+    topicId: '770e8400-e29b-41d4-a716-446655440001',
+    topicTitle: 'Foundations',
+    bookId: '880e8400-e29b-41d4-a716-446655440001',
+    bookTitle: 'Book One',
+    chapter: 'Chapter One',
     sessionType: 'learning',
-    status: 'completed',
-    escalationRung: 1,
-    exchangeCount: 5,
-    startedAt: '2026-01-01T10:00:00Z',
-    lastActivityAt: '2026-01-01T10:30:00Z',
-    endedAt: '2026-01-01T10:30:00Z',
     durationSeconds: 1800,
+    createdAt: '2026-01-01T10:00:00Z',
   },
   {
-    id: 'sess-2',
-    subjectId: 'subject-1',
-    topicId: 'topic-2',
+    id: '660e8400-e29b-41d4-a716-446655440002',
+    topicId: '770e8400-e29b-41d4-a716-446655440002',
+    topicTitle: 'Practice',
+    bookId: '880e8400-e29b-41d4-a716-446655440001',
+    bookTitle: 'Book One',
+    chapter: 'Chapter Two',
     sessionType: 'homework',
-    status: 'completed',
-    escalationRung: 2,
-    exchangeCount: 3,
-    startedAt: '2026-01-02T11:00:00Z',
-    lastActivityAt: '2026-01-02T11:20:00Z',
-    endedAt: '2026-01-02T11:20:00Z',
     durationSeconds: 1200,
+    createdAt: '2026-01-02T11:00:00Z',
   },
 ];
 
@@ -90,7 +86,9 @@ describe('useSubjectSessions', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toHaveLength(2);
-    expect(result.current.data?.[0]?.id).toBe('sess-1');
+    expect(result.current.data?.[0]?.id).toBe(
+      '660e8400-e29b-41d4-a716-446655440001',
+    );
     expect(result.current.data?.[1]?.sessionType).toBe('homework');
   });
 

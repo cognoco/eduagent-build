@@ -58,12 +58,13 @@ export function useFetchRound(
 
   return useApiQuery<QuizRoundResponse>({
     queryKey: ['quiz-round', roundId, activeProfile?.id],
+    schema: quizRoundResponseSchema,
     fetch: (signal) =>
       client.quiz.rounds[':id'].$get(
         { param: { id: roundId ?? '' } },
         { init: { signal } },
       ),
-    select: (json) => quizRoundResponseSchema.parse(json),
+    select: (json) => json,
     enabled: !!roundId,
   });
 }
@@ -153,8 +154,9 @@ export function useRecentRounds(): UseQueryResult<RecentRound[]> {
 
   return useApiQuery<RecentRound[]>({
     queryKey: ['quiz-recent', activeProfile?.id],
+    schema: z.array(recentRoundSchema),
     fetch: (signal) => client.quiz.rounds.recent.$get({}, { init: { signal } }),
-    select: (json) => z.array(recentRoundSchema).parse(json),
+    select: (json) => json,
   });
 }
 

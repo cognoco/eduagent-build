@@ -4,9 +4,15 @@ import type {
   VocabularyCreateInput,
   VocabularyReviewInput,
 } from '@eduagent/schemas';
+import {
+  vocabularyCreateResponseSchema,
+  vocabularyListResponseSchema,
+  vocabularyReviewResponseSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { queryKeys } from '../lib/query-keys';
 import { useApiQuery } from './use-api-query';
 
@@ -16,6 +22,7 @@ export function useVocabulary(subjectId: string) {
 
   return useApiQuery<{ vocabulary: Vocabulary[] }, Vocabulary[]>({
     queryKey: queryKeys.vocabulary.subject(activeProfile?.id, subjectId),
+    schema: vocabularyListResponseSchema,
     fetch: (signal) =>
       client.subjects[':subjectId'].vocabulary.$get(
         { param: { subjectId } },
@@ -38,7 +45,11 @@ export function useCreateVocabulary(subjectId: string) {
         json: input,
       });
       await assertOk(res);
-      const data = (await res.json()) as { vocabulary: Vocabulary };
+      const data = await parseJson(
+        res,
+        vocabularyCreateResponseSchema,
+        'POST /subjects/:subjectId/vocabulary',
+      );
       return data.vocabulary;
     },
     onSuccess: () => {
@@ -75,7 +86,11 @@ export function useReviewVocabulary(subjectId: string) {
         json: input,
       });
       await assertOk(res);
-      return res.json();
+      return parseJson(
+        res,
+        vocabularyReviewResponseSchema,
+        'POST /subjects/:subjectId/vocabulary/:vocabularyId/review',
+      );
     },
     // [BUG-535] Profile-scoped, subject-scoped invalidation. The previous
     // bare ['vocabulary'] / ['language-progress'] keys matched every profile's

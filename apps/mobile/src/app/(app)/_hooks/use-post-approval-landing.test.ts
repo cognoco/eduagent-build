@@ -181,7 +181,17 @@ describe('usePostApprovalLanding [ACCOUNT-24]', () => {
   it('suppresses when the profile already has subjects (returning user, not first run)', async () => {
     const { result } = render('CONSENTED', 'child', {
       '/consent/my-status': myStatus('parent@example.com'),
-      '/subjects': subjectsRoute([{ id: 'subject-1', name: 'Maths' }]),
+      '/subjects': subjectsRoute([
+        {
+          id: '50000000-0000-4000-8000-000000000011',
+          profileId: '50000000-0000-4000-8000-000000000012',
+          name: 'Maths',
+          status: 'active',
+          pedagogyMode: 'socratic',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]),
     });
 
     // SecureStore says "not seen", but the subjects query (gated on

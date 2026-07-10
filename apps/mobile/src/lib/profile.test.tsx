@@ -1,6 +1,7 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { PublicProfile } from '@eduagent/schemas';
 import * as ExpoSecureStore from 'expo-secure-store';
 import {
   ProfileProvider,
@@ -8,7 +9,6 @@ import {
   useLinkedChildren,
   useHasLinkedChildren,
   PROFILE_SCOPED_KEYS,
-  type Profile,
 } from './profile';
 import {
   setActiveProfileId as pushProfileIdToApiClient,
@@ -25,6 +25,12 @@ jest.mock('@clerk/expo', () => ({
 }));
 
 const mockFetch = jest.fn();
+const OWNER_PROFILE_ID = '11111111-1111-4111-8111-111111111111';
+const CHILD_PROFILE_ID = '22222222-2222-4222-8222-222222222222';
+const USER_A_PROFILE_ID = '33333333-3333-4333-8333-333333333333';
+const NEWER_CHILD_PROFILE_ID = '44444444-4444-4444-8444-444444444444';
+const OLDER_CHILD_PROFILE_ID = '55555555-5555-4555-8555-555555555555';
+
 jest.mock(
   './api-client' /* gc1-allow: pattern-a conversion; real api-client requires a live Hono server; mockFetch lets tests drive profile CRUD responses */,
   () => ({
@@ -38,16 +44,17 @@ jest.mock(
   }),
 );
 
-const mockProfiles: Profile[] = [
+const mockProfiles: PublicProfile[] = [
   {
-    id: 'owner-id',
-    accountId: 'a1',
+    id: OWNER_PROFILE_ID,
     displayName: 'Parent',
     avatarUrl: null,
     birthYear: 1990,
     location: null,
     isOwner: true,
     hasPremiumLlm: false,
+    hasFamilyLinks: false,
+    defaultAppContext: null,
     conversationLanguage: 'en',
     pronouns: null,
     consentStatus: null,
@@ -56,14 +63,15 @@ const mockProfiles: Profile[] = [
     updatedAt: '2026-01-01T00:00:00Z',
   },
   {
-    id: 'child-id',
-    accountId: 'a1',
+    id: CHILD_PROFILE_ID,
     displayName: 'Alex',
     avatarUrl: null,
     birthYear: 2012,
     location: null,
     isOwner: false,
     hasPremiumLlm: false,
+    hasFamilyLinks: false,
+    defaultAppContext: null,
     conversationLanguage: 'en',
     pronouns: null,
     consentStatus: null,
@@ -112,19 +120,21 @@ describe('ProfileProvider', () => {
       expect(result.current.isLoading).toBe(false);
     });
     expect(result.current.profiles).toEqual(mockProfiles);
-    expect(result.current.activeProfile?.id).toBe('owner-id');
+    expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
     expect(result.current.activeProfile?.displayName).toBe('Parent');
   });
 
   it('restores active profile from SecureStore', async () => {
-    jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue('child-id');
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockResolvedValue(CHILD_PROFILE_ID);
     const { result } = renderHook(() => useProfile(), {
       wrapper: createWrapper(),
     });
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
-    expect(result.current.activeProfile?.id).toBe('child-id');
+    expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
     expect(result.current.activeProfile?.displayName).toBe('Alex');
   });
 
@@ -136,10 +146,10 @@ describe('ProfileProvider', () => {
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
-    expect(result.current.activeProfile?.id).toBe('owner-id');
+    expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
     expect(ExpoSecureStore.setItemAsync).toHaveBeenCalledWith(
       'mentomate_active_profile_id',
-      'owner-id',
+      OWNER_PROFILE_ID,
     );
   });
 
@@ -169,10 +179,10 @@ describe('ProfileProvider', () => {
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
-    expect(result.current.activeProfile?.id).toBe('owner-id');
+    expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
     expect(ExpoSecureStore.setItemAsync).toHaveBeenCalledWith(
       'mentomate_active_profile_id',
-      'owner-id',
+      OWNER_PROFILE_ID,
     );
   });
 
@@ -190,23 +200,22 @@ describe('ProfileProvider', () => {
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
-    expect(result.current.activeProfile?.id).toBe('owner-id');
+    expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
     const pushedIds = (pushProfileIdToApiClient as jest.Mock).mock.calls.map(
       (call) => call[0],
     );
     expect(pushedIds).not.toContain('userA-profile-id');
     expect(ExpoSecureStore.setItemAsync).toHaveBeenCalledWith(
       'mentomate_active_profile_id',
-      'owner-id',
+      OWNER_PROFILE_ID,
     );
   });
 
   it('[BREAK] cache leak: stale [profiles] cache from previous user does not leak profile id to api-client', async () => {
-    const userAProfiles: Profile[] = [
+    const userAProfiles: PublicProfile[] = [
       {
         ...mockProfiles[0]!,
-        id: 'userA-owner',
-        accountId: 'userA-account',
+        id: USER_A_PROFILE_ID,
         displayName: 'Previous User',
       },
     ];
@@ -214,7 +223,7 @@ describe('ProfileProvider', () => {
       .mocked(ExpoSecureStore.getItemAsync)
       .mockImplementation((key: string) =>
         Promise.resolve(
-          key === 'mentomate_active_profile_id' ? 'userA-owner' : null,
+          key === 'mentomate_active_profile_id' ? USER_A_PROFILE_ID : null,
         ),
       );
     mockFetch.mockReset();
@@ -230,7 +239,7 @@ describe('ProfileProvider', () => {
       queryClient.setQueryData(['profiles'], userAProfiles);
       queryClient.setQueryData(['profiles', 'clerk-userA'], userAProfiles);
     });
-    expect(result.current.activeProfile?.id).not.toBe('userA-owner');
+    expect(result.current.activeProfile?.id).not.toBe(USER_A_PROFILE_ID);
     await act(async () => {
       resolveFetch(
         new Response(JSON.stringify({ profiles: mockProfiles }), {
@@ -239,12 +248,12 @@ describe('ProfileProvider', () => {
       );
     });
     await waitFor(() => {
-      expect(result.current.activeProfile?.id).toBe('owner-id');
+      expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
     });
     const pushedIds = (pushProfileIdToApiClient as jest.Mock).mock.calls.map(
       (call) => call[0],
     );
-    expect(pushedIds).not.toContain('userA-owner');
+    expect(pushedIds).not.toContain(USER_A_PROFILE_ID);
   });
 
   it('switchProfile updates active profile and persists to SecureStore', async () => {
@@ -258,14 +267,14 @@ describe('ProfileProvider', () => {
       expect(result.current.isLoading).toBe(false);
     });
     await act(async () => {
-      await result.current.switchProfile('child-id');
+      await result.current.switchProfile(CHILD_PROFILE_ID);
     });
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(ExpoSecureStore.setItemAsync).toHaveBeenCalledWith(
       'mentomate_active_profile_id',
-      'child-id',
+      CHILD_PROFILE_ID,
     );
-    expect(result.current.activeProfile?.id).toBe('child-id');
+    expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
   });
 
   it('[BREAK] updates API-client profile and proxy mode before query resets on parent-to-child switch', async () => {
@@ -283,12 +292,12 @@ describe('ProfileProvider', () => {
       expect(result.current.isLoading).toBe(false);
     });
     await act(async () => {
-      await result.current.switchProfile('child-id');
+      await result.current.switchProfile(CHILD_PROFILE_ID);
     });
     const profilePushCalls = pushProfileIdToApiClient as jest.Mock;
     const proxyPushCalls = setProxyMode as jest.Mock;
     const childProfilePushIndex = profilePushCalls.mock.calls.findIndex(
-      (call) => call[0] === 'child-id',
+      (call) => call[0] === CHILD_PROFILE_ID,
     );
     // Plain switch → proxy must be set to FALSE (no proxyMode option passed).
     const proxyDisabledPushIndex = proxyPushCalls.mock.calls.findIndex(
@@ -299,7 +308,7 @@ describe('ProfileProvider', () => {
     const proxyPushOrder =
       proxyPushCalls.mock.invocationCallOrder[proxyDisabledPushIndex];
     const resetOrder = resetSpy.mock.invocationCallOrder.at(-1);
-    expect(pushProfileIdToApiClient).toHaveBeenLastCalledWith('child-id');
+    expect(pushProfileIdToApiClient).toHaveBeenLastCalledWith(CHILD_PROFILE_ID);
     expect(setProxyMode).toHaveBeenLastCalledWith(false);
     expect(childProfilePushIndex).toBeGreaterThanOrEqual(0);
     expect(proxyDisabledPushIndex).toBeGreaterThanOrEqual(0);
@@ -318,7 +327,7 @@ describe('ProfileProvider', () => {
       expect(result.current.isLoading).toBe(false);
     });
     await act(async () => {
-      await result.current.switchProfile('child-id', { proxyMode: true });
+      await result.current.switchProfile(CHILD_PROFILE_ID, { proxyMode: true });
     });
     expect(setProxyMode).toHaveBeenLastCalledWith(true);
     expect(result.current.isExplicitProxyMode).toBe(true);
@@ -342,47 +351,68 @@ describe('ProfileProvider', () => {
       key: unknown[];
       value: unknown;
     }> = [
-      { key: ['subjects', 'owner-id'], value: [{ id: 's1', name: 'Math' }] },
-      { key: ['progress', 'overview', 'owner-id'], value: { subjects: [] } },
-      { key: ['dashboard'], value: { children: [] } },
-      { key: ['books', 'subject-1', 'owner-id'], value: [{ id: 'book-1' }] },
       {
-        key: ['book', 'subject-1', 'book-1', 'owner-id'],
+        key: ['subjects', OWNER_PROFILE_ID],
+        value: [{ id: 's1', name: 'Math' }],
+      },
+      {
+        key: ['progress', 'overview', OWNER_PROFILE_ID],
+        value: { subjects: [] },
+      },
+      { key: ['dashboard'], value: { children: [] } },
+      {
+        key: ['books', 'subject-1', OWNER_PROFILE_ID],
+        value: [{ id: 'book-1' }],
+      },
+      {
+        key: ['book', 'subject-1', 'book-1', OWNER_PROFILE_ID],
         value: { id: 'book-1' },
       },
       {
         key: ['book-suggestions', 'subject-1'],
         value: [{ id: 'suggestion-1' }],
       },
-      { key: ['book-sessions', 'subject-1', 'book-1', 'owner-id'], value: [] },
-      { key: ['bookmarks', 'owner-id'], value: [{ id: 'bookmark-1' }] },
       {
-        key: ['session-bookmarks', 'owner-id', 'session-1'],
+        key: ['book-sessions', 'subject-1', 'book-1', OWNER_PROFILE_ID],
+        value: [],
+      },
+      { key: ['bookmarks', OWNER_PROFILE_ID], value: [{ id: 'bookmark-1' }] },
+      {
+        key: ['session-bookmarks', OWNER_PROFILE_ID, 'session-1'],
         value: [{ id: 'bookmark-1' }],
       },
-      { key: ['session-summary', 'session-1', 'owner-id'], value: {} },
-      { key: ['all-notes', 'owner-id'], value: [{ id: 'note-1' }] },
-      { key: ['book-notes', 'book-1', 'owner-id'], value: [{ id: 'note-1' }] },
+      { key: ['session-summary', 'session-1', OWNER_PROFILE_ID], value: {} },
+      { key: ['all-notes', OWNER_PROFILE_ID], value: [{ id: 'note-1' }] },
       {
-        key: ['topic-notes', 'topic-1', 'owner-id'],
+        key: ['book-notes', 'book-1', OWNER_PROFILE_ID],
         value: [{ id: 'note-1' }],
       },
-      { key: ['library', 'owner-id'], value: { subjects: [] } },
-      { key: ['library-search', 'math', 'owner-id'], value: { results: [] } },
       {
-        key: ['learner-profile', 'owner-id'],
+        key: ['topic-notes', 'topic-1', OWNER_PROFILE_ID],
+        value: [{ id: 'note-1' }],
+      },
+      { key: ['library', OWNER_PROFILE_ID], value: { subjects: [] } },
+      {
+        key: ['library-search', 'math', OWNER_PROFILE_ID],
+        value: { results: [] },
+      },
+      {
+        key: ['learner-profile', OWNER_PROFILE_ID],
         value: { accommodationMode: 'none' },
       },
-      { key: ['language-progress', 'owner-id'], value: { words: [] } },
+      { key: ['language-progress', OWNER_PROFILE_ID], value: { words: [] } },
       {
-        key: ['vocabulary', 'owner-id', 'subject-1'],
+        key: ['vocabulary', OWNER_PROFILE_ID, 'subject-1'],
         value: [{ id: 'word-1' }],
       },
-      { key: ['quiz-recent', 'owner-id'], value: [] },
-      { key: ['quiz-stats', 'owner-id'], value: { rounds: 1 } },
-      { key: ['subject-sessions', 'subject-1', 'owner-id'], value: [] },
-      { key: ['topic-suggestions', 'subject-1', 'owner-id'], value: [] },
-      { key: ['resume-nudge', 'owner-id'], value: { topicId: 'topic-1' } },
+      { key: ['quiz-recent', OWNER_PROFILE_ID], value: [] },
+      { key: ['quiz-stats', OWNER_PROFILE_ID], value: { rounds: 1 } },
+      { key: ['subject-sessions', 'subject-1', OWNER_PROFILE_ID], value: [] },
+      { key: ['topic-suggestions', 'subject-1', OWNER_PROFILE_ID], value: [] },
+      {
+        key: ['resume-nudge', OWNER_PROFILE_ID],
+        value: { topicId: 'topic-1' },
+      },
     ];
     for (const { key, value } of profileScopedQueries) {
       queryClient.setQueryData(key, value);
@@ -391,7 +421,7 @@ describe('ProfileProvider', () => {
       expect(queryClient.getQueryData(key)).toBeTruthy();
     }
     await act(async () => {
-      await result.current.switchProfile('child-id');
+      await result.current.switchProfile(CHILD_PROFILE_ID);
     });
     for (const { key } of profileScopedQueries) {
       expect(queryClient.getQueryData(key)).toBeUndefined();
@@ -403,51 +433,54 @@ describe('ProfileProvider', () => {
 
   it('keeps profile-scoped query key factory prefixes covered by PROFILE_SCOPED_KEYS', () => {
     const profileScopedFactoryKeys: Array<readonly unknown[]> = [
-      queryKeys.progress.overview('study', 'owner-id'),
-      queryKeys.progress.subject('study', 'subject-1', 'owner-id'),
-      queryKeys.progress.resumeTarget('study', 'owner-id', {
+      queryKeys.progress.overview('study', OWNER_PROFILE_ID),
+      queryKeys.progress.subject('study', 'subject-1', OWNER_PROFILE_ID),
+      queryKeys.progress.resumeTarget('study', OWNER_PROFILE_ID, {
         subjectId: 'subject-1',
       }),
-      queryKeys.dashboard.root('family', 'owner-id'),
-      queryKeys.dashboard.childDetail('family', 'child-id'),
-      queryKeys.sessions.detail('study', 'session-1', 'owner-id'),
-      queryKeys.sessions.transcript('study', 'session-1', 'owner-id'),
-      queryKeys.sessions.summary('study', 'session-1', 'owner-id'),
-      queryKeys.sessions.parkingLot('study', 'session-1', 'owner-id'),
-      queryKeys.recaps.list('family', 'owner-id', 'child-id'),
-      queryKeys.retention.topic('topic-1', 'owner-id'),
-      queryKeys.library.retention('owner-id'),
-      queryKeys.library.conceptMastery('owner-id', ['topic-1']),
-      queryKeys.languageProgress.subject('owner-id', 'subject-1'),
-      queryKeys.vocabulary.subject('owner-id', 'subject-1'),
-      queryKeys.resumeNudge.root('owner-id'),
-      queryKeys.subscription('owner-id'),
-      queryKeys.usage('owner-id'),
-      queryKeys.subscriptionFamily('owner-id'),
-      queryKeys.subscriptionStatus('owner-id'),
-      queryKeys.profiles.active('owner-id'),
-      queryKeys.settings.notifications('owner-id'),
-      queryKeys.settings.celebrationLevel('owner-id'),
-      queryKeys.settings.childCelebrationLevel('child-id', 'owner-id'),
-      queryKeys.onboarding.learnerProfile('owner-id'),
-      queryKeys.bookSessions('subject-1', 'book-1', 'owner-id'),
-      queryKeys.topicSessions('subject-1', 'topic-1', 'owner-id'),
-      queryKeys.subjectSessions('subject-1', 'owner-id'),
+      queryKeys.dashboard.root('family', OWNER_PROFILE_ID),
+      queryKeys.dashboard.childDetail('family', CHILD_PROFILE_ID),
+      queryKeys.sessions.detail('study', 'session-1', OWNER_PROFILE_ID),
+      queryKeys.sessions.transcript('study', 'session-1', OWNER_PROFILE_ID),
+      queryKeys.sessions.summary('study', 'session-1', OWNER_PROFILE_ID),
+      queryKeys.sessions.parkingLot('study', 'session-1', OWNER_PROFILE_ID),
+      queryKeys.recaps.list('family', OWNER_PROFILE_ID, CHILD_PROFILE_ID),
+      queryKeys.retention.topic('topic-1', OWNER_PROFILE_ID),
+      queryKeys.library.retention(OWNER_PROFILE_ID),
+      queryKeys.library.conceptMastery(OWNER_PROFILE_ID, ['topic-1']),
+      queryKeys.languageProgress.subject(OWNER_PROFILE_ID, 'subject-1'),
+      queryKeys.vocabulary.subject(OWNER_PROFILE_ID, 'subject-1'),
+      queryKeys.resumeNudge.root(OWNER_PROFILE_ID),
+      queryKeys.subscription(OWNER_PROFILE_ID),
+      queryKeys.usage(OWNER_PROFILE_ID),
+      queryKeys.subscriptionFamily(OWNER_PROFILE_ID),
+      queryKeys.subscriptionStatus(OWNER_PROFILE_ID),
+      queryKeys.profiles.active(OWNER_PROFILE_ID),
+      queryKeys.settings.notifications(OWNER_PROFILE_ID),
+      queryKeys.settings.celebrationLevel(OWNER_PROFILE_ID),
+      queryKeys.settings.childCelebrationLevel(
+        CHILD_PROFILE_ID,
+        OWNER_PROFILE_ID,
+      ),
+      queryKeys.onboarding.learnerProfile(OWNER_PROFILE_ID),
+      queryKeys.bookSessions('subject-1', 'book-1', OWNER_PROFILE_ID),
+      queryKeys.topicSessions('subject-1', 'topic-1', OWNER_PROFILE_ID),
+      queryKeys.subjectSessions('subject-1', OWNER_PROFILE_ID),
     ];
     const representativeScopedLiteralKeys: Array<readonly unknown[]> = [
-      ['subjects', 'owner-id'],
-      ['books', 'subject-1', 'owner-id'],
-      ['book', 'subject-1', 'book-1', 'owner-id'],
+      ['subjects', OWNER_PROFILE_ID],
+      ['books', 'subject-1', OWNER_PROFILE_ID],
+      ['book', 'subject-1', 'book-1', OWNER_PROFILE_ID],
       ['book-suggestions', 'subject-1'],
-      ['bookmarks', 'owner-id'],
-      ['session-bookmarks', 'owner-id', 'session-1'],
-      ['all-notes', 'owner-id'],
-      ['book-notes', 'book-1', 'owner-id'],
-      ['topic-notes', 'topic-1', 'owner-id'],
-      ['library-search', 'math', 'owner-id'],
-      ['quiz-recent', 'owner-id'],
-      ['quiz-stats', 'owner-id'],
-      ['topic-suggestions', 'subject-1', 'owner-id'],
+      ['bookmarks', OWNER_PROFILE_ID],
+      ['session-bookmarks', OWNER_PROFILE_ID, 'session-1'],
+      ['all-notes', OWNER_PROFILE_ID],
+      ['book-notes', 'book-1', OWNER_PROFILE_ID],
+      ['topic-notes', 'topic-1', OWNER_PROFILE_ID],
+      ['library-search', 'math', OWNER_PROFILE_ID],
+      ['quiz-recent', OWNER_PROFILE_ID],
+      ['quiz-stats', OWNER_PROFILE_ID],
+      ['topic-suggestions', 'subject-1', OWNER_PROFILE_ID],
     ];
     const scopedPrefixes = new Set(
       [...profileScopedFactoryKeys, ...representativeScopedLiteralKeys].map(
@@ -480,10 +513,10 @@ describe('ProfileProvider', () => {
       ReturnType<typeof result.current.switchProfile>
     > | null = null;
     await act(async () => {
-      switchResult = await result.current.switchProfile('child-id');
+      switchResult = await result.current.switchProfile(CHILD_PROFILE_ID);
     });
     expect(switchResult).toEqual({ success: true, persistenceFailed: true });
-    expect(result.current.activeProfile?.id).toBe('child-id');
+    expect(result.current.activeProfile?.id).toBe(CHILD_PROFILE_ID);
   });
 
   it('returns empty profiles when API returns none', async () => {
@@ -539,16 +572,18 @@ describe('ProfileProvider', () => {
     });
 
     expect(result.current.profiles).toEqual(mockProfiles);
-    expect(result.current.activeProfile?.id).toBe('owner-id');
+    expect(result.current.activeProfile?.id).toBe(OWNER_PROFILE_ID);
     expect(result.current.profileLoadError).toBeNull();
   });
 
   it('[BREAK] clears mentomate_parent_home_seen on sign-out', async () => {
-    await clearProfileSecureStorageOnSignOut(['owner-id']);
+    await clearProfileSecureStorageOnSignOut([OWNER_PROFILE_ID]);
     const deletedKeys = jest
       .mocked(ExpoSecureStore.deleteItemAsync)
       .mock.calls.map((c) => c[0] as string);
-    expect(deletedKeys).toContain('mentomate_parent_home_seen_owner-id');
+    expect(deletedKeys).toContain(
+      `mentomate_parent_home_seen_${OWNER_PROFILE_ID}`,
+    );
   });
 });
 
@@ -574,13 +609,15 @@ describe('useLinkedChildren', () => {
     await waitFor(() => {
       expect(result.current.profile.isLoading).toBe(false);
     });
-    expect(result.current.profile.activeProfile?.id).toBe('owner-id');
+    expect(result.current.profile.activeProfile?.id).toBe(OWNER_PROFILE_ID);
     expect(result.current.linked).toHaveLength(1);
-    expect(result.current.linked[0]!.id).toBe('child-id');
+    expect(result.current.linked[0]!.id).toBe(CHILD_PROFILE_ID);
   });
 
   it('returns empty when active profile is not an owner', async () => {
-    jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue('child-id');
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockResolvedValue(CHILD_PROFILE_ID);
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ profiles: mockProfiles }), { status: 200 }),
     );
@@ -591,7 +628,7 @@ describe('useLinkedChildren', () => {
     await waitFor(() => {
       expect(result.current.profile.isLoading).toBe(false);
     });
-    expect(result.current.profile.activeProfile?.id).toBe('child-id');
+    expect(result.current.profile.activeProfile?.id).toBe(CHILD_PROFILE_ID);
     expect(result.current.linked).toEqual([]);
   });
 
@@ -612,18 +649,18 @@ describe('useLinkedChildren', () => {
   });
 
   it('sorts children by linkCreatedAt, falling back to createdAt', async () => {
-    const threeProfiles: Profile[] = [
+    const threeProfiles: PublicProfile[] = [
       mockProfiles[0]!,
       {
         ...mockProfiles[1]!,
-        id: 'child-newer-created',
+        id: NEWER_CHILD_PROFILE_ID,
         displayName: 'Beta',
         createdAt: '2026-01-10T00:00:00Z',
         linkCreatedAt: '2026-01-02T00:00:00Z',
       },
       {
         ...mockProfiles[1]!,
-        id: 'child-older-created',
+        id: OLDER_CHILD_PROFILE_ID,
         displayName: 'Alpha',
         createdAt: '2026-01-03T00:00:00Z',
         linkCreatedAt: null,
@@ -641,9 +678,9 @@ describe('useLinkedChildren', () => {
     await waitFor(() => {
       expect(result.current.profile.isLoading).toBe(false);
     });
-    expect(result.current.linked.map((p: Profile) => p.id)).toEqual([
-      'child-newer-created',
-      'child-older-created',
+    expect(result.current.linked.map((p: PublicProfile) => p.id)).toEqual([
+      NEWER_CHILD_PROFILE_ID,
+      OLDER_CHILD_PROFILE_ID,
     ]);
   });
 });
@@ -690,7 +727,9 @@ describe('useHasLinkedChildren', () => {
   });
 
   it('returns false when active profile is not owner (proxy mode)', async () => {
-    jest.mocked(ExpoSecureStore.getItemAsync).mockResolvedValue('child-id');
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockResolvedValue(CHILD_PROFILE_ID);
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ profiles: mockProfiles }), { status: 200 }),
     );
@@ -731,9 +770,9 @@ describe('proxy-mode regression', () => {
       new Response(JSON.stringify({ ok: true }), { status: 200 }),
     );
     await act(async () => {
-      await result.current.profile.switchProfile('child-id');
+      await result.current.profile.switchProfile(CHILD_PROFILE_ID);
     });
-    expect(result.current.profile.activeProfile?.id).toBe('child-id');
+    expect(result.current.profile.activeProfile?.id).toBe(CHILD_PROFILE_ID);
     expect(result.current.profile.activeProfile?.isOwner).toBe(false);
     expect(result.current.linked).toEqual([]);
   });
@@ -753,7 +792,7 @@ describe('proxy-mode regression', () => {
     );
     // Enter proxy explicitly (the confirm-modal path).
     await act(async () => {
-      await result.current.profile.switchProfile('child-id', {
+      await result.current.profile.switchProfile(CHILD_PROFILE_ID, {
         proxyMode: true,
       });
     });
@@ -764,12 +803,12 @@ describe('proxy-mode regression', () => {
     );
     // Switch back to owner — proxy must be cleared.
     await act(async () => {
-      await result.current.profile.switchProfile('owner-id');
+      await result.current.profile.switchProfile(OWNER_PROFILE_ID);
     });
     expect(setProxyMode).toHaveBeenLastCalledWith(false);
     expect(result.current.profile.isExplicitProxyMode).toBe(false);
-    expect(result.current.profile.activeProfile?.id).toBe('owner-id');
+    expect(result.current.profile.activeProfile?.id).toBe(OWNER_PROFILE_ID);
     expect(result.current.linked).toHaveLength(1);
-    expect(result.current.linked[0]!.id).toBe('child-id');
+    expect(result.current.linked[0]!.id).toBe(CHILD_PROFILE_ID);
   });
 });

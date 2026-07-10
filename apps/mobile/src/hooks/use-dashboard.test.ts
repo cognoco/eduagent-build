@@ -1,5 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
+import type { DashboardChild, TopicProgress } from '@eduagent/schemas';
 import {
   createHookWrapper,
   createTestProfile,
@@ -28,6 +29,40 @@ jest.mock(
 
 let queryClient: QueryClient;
 
+const CHILD_ID = 'f0000000-0000-4000-8000-000000000001';
+const SUBJECT_ID = 'f0000000-0000-4000-8000-000000000002';
+const TOPIC_ID = 'f0000000-0000-4000-8000-000000000003';
+
+function createDashboardChild(
+  overrides: Partial<DashboardChild> = {},
+): DashboardChild {
+  return {
+    profileId: CHILD_ID,
+    displayName: 'Alice',
+    consentStatus: null,
+    respondedAt: null,
+    summary: 'Alice is doing great',
+    sessionsThisWeek: 5,
+    sessionsLastWeek: 3,
+    totalTimeThisWeek: 120,
+    totalTimeLastWeek: 90,
+    exchangesThisWeek: 24,
+    exchangesLastWeek: 18,
+    trend: 'up',
+    subjects: [
+      { subjectId: SUBJECT_ID, name: 'Math', retentionStatus: 'strong' },
+    ],
+    guidedVsImmediateRatio: 0.5,
+    retentionTrend: 'improving',
+    totalSessions: 8,
+    currentlyWorkingOn: [],
+    currentStreak: 0,
+    longestStreak: 0,
+    totalXp: 0,
+    ...overrides,
+  };
+}
+
 function createWrapper() {
   const w = createHookWrapper({
     activeProfile: createTestProfile({ id: 'test-profile-id', isOwner: true }),
@@ -55,13 +90,9 @@ afterAll(() => {
 describe('useDashboard', () => {
   it('returns dashboard data when children exist', async () => {
     const dashboardData = {
-      children: [
-        {
-          id: 'child-1',
-          displayName: 'Alice',
-          subjects: [{ id: 's1', name: 'Math' }],
-        },
-      ],
+      children: [createDashboardChild()],
+      pendingNotices: [],
+      demoMode: false,
     };
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(dashboardData), { status: 200 }),
@@ -85,7 +116,13 @@ describe('useDashboard', () => {
       demoMode: false,
     };
     const demoData = {
-      children: [{ id: 'demo-1', displayName: 'Demo Child', subjects: [] }],
+      children: [
+        createDashboardChild({
+          profileId: 'demo-1',
+          displayName: 'Demo Child',
+          subjects: [],
+        }),
+      ],
       pendingNotices: [],
       demoMode: true,
     };
@@ -182,15 +219,7 @@ describe('useDashboard', () => {
 describe('useChildDetail', () => {
   it('returns child detail data', async () => {
     const childData = {
-      child: {
-        profileId: 'child-1',
-        displayName: 'Alice',
-        summary: 'Alice is doing great',
-        sessionsThisWeek: 5,
-        sessionsLastWeek: 3,
-        trend: 'up',
-        subjects: [{ name: 'Math', retentionStatus: 'strong' }],
-      },
+      child: createDashboardChild(),
     };
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(childData), { status: 200 }),
@@ -249,20 +278,23 @@ describe('profile-switch cache isolation', () => {
 
 describe('useChildSubjectTopics', () => {
   it('returns topic progress data', async () => {
+    const topic: TopicProgress = {
+      topicId: TOPIC_ID,
+      title: 'Algebra',
+      description: 'Basic algebra',
+      completionStatus: 'in_progress',
+      retentionStatus: 'strong',
+      daysSinceLastReview: 2,
+      struggleStatus: 'normal',
+      masteryScore: 0.7,
+      strongReviews: 2,
+      strongReviewsTarget: 5,
+      summaryExcerpt: null,
+      xpStatus: 'pending',
+      totalSessions: 3,
+    };
     const topicData = {
-      topics: [
-        {
-          topicId: 't-1',
-          title: 'Algebra',
-          description: 'Basic algebra',
-          completionStatus: 'in_progress',
-          retentionStatus: 'strong',
-          struggleStatus: 'normal',
-          masteryScore: 0.7,
-          summaryExcerpt: null,
-          xpStatus: 'pending',
-        },
-      ],
+      topics: [topic],
     };
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(topicData), { status: 200 }),

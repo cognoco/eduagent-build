@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { LearningProfile } from '@eduagent/schemas';
 import {
   createRoutedMockFetch,
   extractJsonBody,
@@ -14,7 +15,9 @@ import { createTestProfile } from '../../test-utils/app-hook-test-utils';
 // rather than crashing with "Cannot read property 'map' of undefined".
 // The fix is `(profile?.interests ?? []).map(...)`.
 
-const mockProfileBase = {
+const mockProfileBase: Omit<LearningProfile, 'interests'> = {
+  id: '550e8400-e29b-41d4-a716-446655440001',
+  profileId: '550e8400-e29b-41d4-a716-446655440002',
   // Required scalar fields that the screen reads.
   learningStyle: null,
   strengths: [],
@@ -22,12 +25,20 @@ const mockProfileBase = {
   communicationNotes: [],
   interestTimestamps: {},
   // Mentor-memory consent on so the screen renders the data sections.
-  memoryConsentGranted: true,
+  suppressedInferences: [],
+  effectivenessSessionCount: 0,
+  memoryEnabled: true,
   memoryConsentStatus: 'granted',
+  memoryCollectionEnabled: true,
   memoryInjectionEnabled: true,
+  accommodationMode: 'none',
+  recentlyResolvedTopics: [],
+  version: 1,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
-let mockProfileData: Record<string, unknown> = {
+let mockProfileData: unknown = {
   ...mockProfileBase,
   interests: [],
 };

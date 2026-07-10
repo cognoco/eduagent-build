@@ -16,6 +16,7 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { readCachedNowFeed, writeCachedNowFeed } from '../lib/now-feed-cache';
+import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
 
 const NOW_FEED_STALE_TIME_MS = 30_000;
@@ -43,7 +44,7 @@ export function useNowFeed(): NowFeedQueryResult {
           { init: { signal } },
         );
         const okRes = await assertOk(res);
-        const data = nowResponseSchema.parse(await okRes.json());
+        const data = await parseJson(okRes, nowResponseSchema, 'GET /now');
         if (profileId) {
           void writeCachedNowFeed(profileId, data);
         }
@@ -99,11 +100,12 @@ export function useNowOverflow(
   return useApiQuery({
     queryKey: ['now-overflow', profileId],
     enabled,
+    schema: nowOverflowResponseSchema,
     fetch: (signal) =>
       client.now.overflow.$get(
         { query: { scope: 'self' } },
         { init: { signal } },
       ),
-    select: (json: unknown) => nowOverflowResponseSchema.parse(json),
+    select: (json) => json,
   });
 }

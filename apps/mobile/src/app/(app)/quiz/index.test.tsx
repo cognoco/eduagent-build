@@ -62,9 +62,24 @@ jest.mock('react-i18next', () => {
 // Default routes: empty stats, empty subjects, 5 vocab entries (personalised).
 // Order: most-specific first so /vocabulary matches before /subjects (both appear in
 // the vocabulary URL path /subjects/:id/vocabulary).
-const DEFAULT_VOCAB = Array.from({ length: 5 }).map((_, i) => ({
-  id: `v-${i}`,
-}));
+function vocabularyFixture(index: number) {
+  return {
+    id: `70000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    profileId: '70000000-0000-4000-8000-000000000011',
+    subjectId: '70000000-0000-4000-8000-000000000012',
+    term: `term-${index}`,
+    termNormalized: `term-${index}`,
+    translation: `translation-${index}`,
+    type: 'word',
+    mastered: false,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+const DEFAULT_VOCAB = Array.from({ length: 5 }).map((_, i) =>
+  vocabularyFixture(i),
+);
 
 const mockFetch = createRoutedMockFetch({
   '/quiz/stats': [],
@@ -167,27 +182,34 @@ jest.mock(
 
 const QuizIndexScreen = require('./index').default;
 
-const ITALIAN_SUBJECT = {
-  id: 'sub-it',
+const SUBJECT_PROFILE_ID = '60000000-0000-4000-8000-000000000009';
+
+function languageSubjectFixture(overrides: Record<string, unknown>) {
+  return {
+    profileId: SUBJECT_PROFILE_ID,
+    status: 'active',
+    pedagogyMode: 'four_strands',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+const ITALIAN_SUBJECT = languageSubjectFixture({
+  id: '60000000-0000-4000-8000-000000000001',
   name: 'Italian',
-  pedagogyMode: 'four_strands',
   languageCode: 'it',
-  status: 'active',
-};
-const SPANISH_SUBJECT = {
-  id: 'sub-es',
+});
+const SPANISH_SUBJECT = languageSubjectFixture({
+  id: '60000000-0000-4000-8000-000000000002',
   name: 'Spanish',
-  pedagogyMode: 'four_strands',
   languageCode: 'es',
-  status: 'active',
-};
-const FRESH_ITALIAN_SUBJECT = {
-  id: 'sub-it-fresh',
+});
+const FRESH_ITALIAN_SUBJECT = languageSubjectFixture({
+  id: '60000000-0000-4000-8000-000000000003',
   name: 'Italian',
-  pedagogyMode: 'four_strands',
   languageCode: 'it',
-  status: 'active',
-};
+});
 
 describe('QuizIndexScreen', () => {
   let Wrapper: React.ComponentType<{ children: React.ReactNode }>;
@@ -325,8 +347,12 @@ describe('QuizIndexScreen', () => {
       render(<QuizIndexScreen />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        screen.getByTestId('quiz-vocabulary-sub-it');
-        screen.getByTestId('quiz-vocabulary-sub-es');
+        screen.getByTestId(
+          'quiz-vocabulary-60000000-0000-4000-8000-000000000001',
+        );
+        screen.getByTestId(
+          'quiz-vocabulary-60000000-0000-4000-8000-000000000002',
+        );
         // Italian card shows its specific stats.
         screen.getByText(/Best: 2\/6 · Played: 1/);
         // Spanish card has no stat row — must show neutral fallback, not the Italian stats.
@@ -391,7 +417,7 @@ describe('QuizIndexScreen', () => {
 
       it('keeps starter framing when vocab count is below the threshold', async () => {
         mockFetch.setRoute('/vocabulary', {
-          vocabulary: [{ id: 'v-1' }, { id: 'v-2' }],
+          vocabulary: [vocabularyFixture(0), vocabularyFixture(1)],
         });
         render(<QuizIndexScreen />, { wrapper: Wrapper });
         await waitFor(() => {
@@ -419,9 +445,9 @@ describe('QuizIndexScreen', () => {
 
       it('switches to personalised framing once vocab >= threshold', async () => {
         mockFetch.setRoute('/vocabulary', {
-          vocabulary: Array.from({ length: 5 }).map((_, i) => ({
-            id: `v-${i}`,
-          })),
+          vocabulary: Array.from({ length: 5 }).map((_, i) =>
+            vocabularyFixture(i),
+          ),
         });
         render(<QuizIndexScreen />, { wrapper: Wrapper });
         await waitFor(() => {
@@ -441,9 +467,9 @@ describe('QuizIndexScreen', () => {
           ],
         });
         mockFetch.setRoute('/vocabulary', {
-          vocabulary: Array.from({ length: 5 }).map((_, i) => ({
-            id: `v-${i}`,
-          })),
+          vocabulary: Array.from({ length: 5 }).map((_, i) =>
+            vocabularyFixture(i),
+          ),
         });
         render(<QuizIndexScreen />, { wrapper: Wrapper });
         await waitFor(() => {
@@ -478,33 +504,35 @@ describe('QuizIndexScreen', () => {
     it('renders a Vocabulary card per active four_strands language subject', async () => {
       mockFetch.setRoute('/subjects', {
         subjects: [
-          {
-            id: 'sub-fr',
+          languageSubjectFixture({
+            id: '60000000-0000-4000-8000-000000000004',
             name: 'French class',
-            pedagogyMode: 'four_strands',
             languageCode: 'fr',
-            status: 'active',
-          },
-          {
-            id: 'sub-archived',
+          }),
+          languageSubjectFixture({
+            id: '60000000-0000-4000-8000-000000000005',
             name: 'Archived Spanish',
-            pedagogyMode: 'four_strands',
             languageCode: 'es',
             status: 'archived',
-          },
-          {
-            id: 'sub-non-language',
+          }),
+          languageSubjectFixture({
+            id: '60000000-0000-4000-8000-000000000006',
             name: 'Maths',
-            pedagogyMode: 'standard',
+            pedagogyMode: 'socratic',
             languageCode: null,
-            status: 'active',
-          },
+          }),
         ],
       });
       render(<QuizIndexScreen />, { wrapper: Wrapper });
       await waitFor(() => {
-        screen.getByTestId('quiz-vocabulary-sub-fr');
-        expect(screen.queryByTestId('quiz-vocabulary-sub-archived')).toBeNull();
+        screen.getByTestId(
+          'quiz-vocabulary-60000000-0000-4000-8000-000000000004',
+        );
+        expect(
+          screen.queryByTestId(
+            'quiz-vocabulary-60000000-0000-4000-8000-000000000005',
+          ),
+        ).toBeNull();
         expect(screen.queryByTestId('quiz-vocab-locked')).toBeNull();
       });
     });

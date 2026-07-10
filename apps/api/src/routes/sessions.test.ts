@@ -367,13 +367,17 @@ jest.mock('../services/session', () => {
     // [L8-F11] Mock shape extended to match learningSessionSchema, which
     // the route now parses (was previously passing through unvalidated).
     // Added fields: inputMode, verificationType, wallClockSeconds, filedAt,
-    // filingStatus, filingRetryCount.
+    // filingStatus, filingRetryCount, and nullable display fields.
     startSession: jest
       .fn()
       .mockImplementation((_db, _profileId, subjectId, input) => ({
         id: SESSION_ID,
         subjectId,
         topicId: input.topicId ?? null,
+        topicTitle: null,
+        subjectName: null,
+        bookId: null,
+        bookTitle: null,
         sessionType: 'learning',
         inputMode: 'text',
         verificationType: null,
@@ -395,6 +399,10 @@ jest.mock('../services/session', () => {
         id: SESSION_ID,
         subjectId,
         topicId: '770e8400-e29b-41d4-a716-446655440001',
+        topicTitle: null,
+        subjectName: null,
+        bookId: null,
+        bookTitle: null,
         sessionType: input.sessionType ?? 'learning',
         inputMode: 'text',
         verificationType: null,
@@ -414,7 +422,13 @@ jest.mock('../services/session', () => {
       id: SESSION_ID,
       subjectId: SUBJECT_ID,
       topicId: null,
+      topicTitle: null,
+      subjectName: null,
+      bookId: null,
+      bookTitle: null,
       sessionType: 'learning',
+      inputMode: 'text',
+      verificationType: null,
       status: 'active',
       escalationRung: 1,
       exchangeCount: 0,
@@ -422,6 +436,10 @@ jest.mock('../services/session', () => {
       lastActivityAt: new Date().toISOString(),
       endedAt: null,
       durationSeconds: null,
+      wallClockSeconds: null,
+      filedAt: null,
+      filingStatus: null,
+      filingRetryCount: 0,
     }),
     processMessage: jest.fn().mockResolvedValue({
       response: 'Mock AI tutor response',

@@ -109,9 +109,10 @@ export function useConsentStatus(): UseQueryResult<ConsentStatusData> {
 
   return useApiQuery<ConsentStatusData>({
     queryKey: ['consent-status', activeProfile?.id],
+    schema: myConsentStatusSchema,
     fetch: (signal) =>
       client.consent['my-status'].$get({}, { init: { signal } }),
-    select: (json) => myConsentStatusSchema.parse(json),
+    select: (json) => json,
   });
 }
 
@@ -164,12 +165,13 @@ export function useChildConsentStatus(
 
   return useApiQuery<ChildConsentData>({
     queryKey: ['consent', 'child', childProfileId, activeProfile?.id],
+    schema: childConsentStatusSchema,
     fetch: (signal) =>
       client.consent[':childProfileId'].status.$get(
         { param: { childProfileId: childProfileId ?? '' } },
         { init: { signal } },
       ),
-    select: (json) => childConsentStatusSchema.parse(json),
+    select: (json) => json,
     enabled: !!childProfileId && activeProfileRole === 'owner',
   });
 }

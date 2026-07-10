@@ -12,10 +12,20 @@ import type {
   CurriculumAdaptRequest,
   CurriculumAdaptResponse,
 } from '@eduagent/schemas';
+import {
+  challengeCurriculumResponseSchema,
+  curriculumAdaptResponseSchema,
+  curriculumTopicAddResponseSchema,
+  explainTopicResponseSchema,
+  getCurriculumResponseSchema,
+  topicSkipResponseSchema,
+  topicUnskipResponseSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 
 export function useCurriculum(
   subjectId: string,
@@ -41,7 +51,11 @@ export function useCurriculum(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = (await res.json()) as { curriculum: Curriculum | null };
+        const data = await parseJson(
+          res,
+          getCurriculumResponseSchema,
+          'GET /subjects/:subjectId/curriculum',
+        );
         return data.curriculum;
       } finally {
         cleanup();
@@ -66,7 +80,11 @@ export function useSkipTopic(
         json: { topicId },
       });
       await assertOk(res);
-      return (await res.json()) as { message: string };
+      return parseJson(
+        res,
+        topicSkipResponseSchema,
+        'POST /subjects/:subjectId/curriculum/skip',
+      );
     },
     onSuccess: () => {
       // [BUG-161] Scope invalidation to the active profile so a mutation
@@ -92,7 +110,11 @@ export function useUnskipTopic(
         json: { topicId },
       });
       await assertOk(res);
-      return (await res.json()) as { message: string };
+      return parseJson(
+        res,
+        topicUnskipResponseSchema,
+        'POST /subjects/:subjectId/curriculum/unskip',
+      );
     },
     onSuccess: () => {
       // [BUG-161] Scope invalidation to the active profile.
@@ -121,7 +143,11 @@ export function useChallengeCurriculum(
         json: { feedback },
       });
       await assertOk(res);
-      return (await res.json()) as { curriculum: Curriculum };
+      return parseJson(
+        res,
+        challengeCurriculumResponseSchema,
+        'POST /subjects/:subjectId/curriculum/challenge',
+      );
     },
     onSuccess: () => {
       // [BUG-161] Scope invalidation to the active profile.
@@ -152,7 +178,11 @@ export function useAddCurriculumTopic(
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as CurriculumTopicAddResponse;
+      return parseJson(
+        res,
+        curriculumTopicAddResponseSchema,
+        'POST /subjects/:subjectId/curriculum/topics',
+      );
     },
     onSuccess: (result) => {
       if (result.mode === 'create') {
@@ -178,7 +208,11 @@ export function useExplainTopic(
         param: { subjectId, topicId },
       });
       await assertOk(res);
-      const data = (await res.json()) as { explanation: string };
+      const data = await parseJson(
+        res,
+        explainTopicResponseSchema,
+        'GET /subjects/:subjectId/curriculum/topics/:topicId/explain',
+      );
       return data.explanation;
     },
   });
@@ -200,7 +234,11 @@ export function useAdaptCurriculum(
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as unknown as CurriculumAdaptResponse;
+      return parseJson(
+        res,
+        curriculumAdaptResponseSchema,
+        'POST /subjects/:subjectId/curriculum/adapt',
+      );
     },
     onSuccess: () => {
       // [BUG-161] Scope invalidation to the active profile.

@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { moveTopicResponseSchema } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 
 interface MoveTopicInput {
   subjectId: string;
@@ -27,11 +29,7 @@ export function useMoveTopic() {
         json: { targetBookId },
       });
       await assertOk(res);
-      return (await res.json()) as {
-        moved: boolean;
-        topicId: string;
-        targetBookId: string;
-      };
+      return await parseJson(res, moveTopicResponseSchema);
     },
     onSuccess: (_data, variables) => {
       // Invalidate both source and target book queries

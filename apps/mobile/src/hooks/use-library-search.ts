@@ -3,7 +3,11 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
-import type { LibrarySearchResult } from '@eduagent/schemas';
+import {
+  librarySearchResultSchema,
+  type LibrarySearchResult,
+} from '@eduagent/schemas';
+import { parseJson } from '../lib/parse-json';
 
 export function useLibrarySearch(
   query: string,
@@ -22,7 +26,7 @@ export function useLibrarySearch(
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as LibrarySearchResult;
+        return await parseJson(res, librarySearchResultSchema);
       } finally {
         cleanup();
       }

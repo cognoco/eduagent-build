@@ -18,10 +18,12 @@ import type {
   PracticeActivityHistoryResponse,
   ReportPracticeActivityType,
 } from '@eduagent/schemas';
+import { practiceActivityHistoryResponseSchema } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 
 export function usePracticeActivityHistory(options?: {
   limit?: number;
@@ -50,7 +52,7 @@ export function usePracticeActivityHistory(options?: {
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as PracticeActivityHistoryResponse;
+        return await parseJson(res, practiceActivityHistoryResponseSchema);
       } finally {
         cleanup();
       }

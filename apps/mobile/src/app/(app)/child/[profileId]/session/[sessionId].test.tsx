@@ -122,7 +122,24 @@ function setRoutes(session: unknown): void {
     },
   );
   mockFetch.setRoute('/dashboard/children/child-profile-001', () => ({
-    child: { displayName: 'Emma' },
+    child: {
+      profileId: '30000000-0000-4000-8000-000000000001',
+      displayName: 'Emma',
+      consentStatus: null,
+      respondedAt: null,
+      summary: '',
+      sessionsThisWeek: 0,
+      sessionsLastWeek: 0,
+      totalTimeThisWeek: 0,
+      totalTimeLastWeek: 0,
+      exchangesThisWeek: 0,
+      exchangesLastWeek: 0,
+      trend: 'stable',
+      subjects: [],
+      guidedVsImmediateRatio: 0,
+      retentionTrend: 'stable',
+      totalSessions: 0,
+    },
   }));
 }
 
@@ -137,9 +154,11 @@ function renderSessionDetail() {
 
 function makeSession(overrides: Record<string, unknown> = {}) {
   return {
-    sessionId: 'session-001',
-    subjectId: 'subject-1',
-    topicId: 'topic-1',
+    sessionId: '30000000-0000-4000-8000-000000000002',
+    subjectId: '30000000-0000-4000-8000-000000000003',
+    subjectName: 'Science',
+    topicId: '30000000-0000-4000-8000-000000000004',
+    topicTitle: 'Photosynthesis',
     sessionType: 'learning',
     startedAt: '2026-03-20T10:00:00Z',
     endedAt: '2026-03-20T10:08:00Z',
@@ -154,6 +173,7 @@ function makeSession(overrides: Record<string, unknown> = {}) {
     narrative: null,
     conversationPrompt: null,
     engagementSignal: null,
+    drills: [],
     ...overrides,
   };
 }
@@ -244,7 +264,7 @@ describe('SessionDetailScreen (summary-only)', () => {
   it('[BUG-901] renders an Open Topic CTA that deep-links to the topic', async () => {
     setRoutes(
       makeSession({
-        topicId: 'topic-1',
+        topicId: '30000000-0000-4000-8000-000000000004',
         topicTitle: 'Light reactions',
         displaySummary: null,
       }),
@@ -259,7 +279,7 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     fireEvent.press(cta);
     expect(mockPush).toHaveBeenCalledWith(
-      '/(app)/child/child-profile-001/topic/topic-1',
+      '/(app)/child/child-profile-001/topic/30000000-0000-4000-8000-000000000004',
     );
 
     cleanup();
@@ -312,6 +332,10 @@ describe('SessionDetailScreen (summary-only)', () => {
       makeSession({
         displayTitle: 'Math Homework',
         homeworkSummary: {
+          problemCount: 3,
+          practicedSkills: ['fraction simplification'],
+          independentProblemCount: 1,
+          guidedProblemCount: 2,
           displayTitle: 'Math Homework',
           summary: 'Walked through fraction simplification step by step',
         },

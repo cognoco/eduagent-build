@@ -47,22 +47,37 @@ afterAll(() => {
 // ---------------------------------------------------------------------------
 
 const mockSearchResult = {
-  subjects: [{ id: 'subj-1', name: 'Ancient Egypt', topicCount: 12 }],
+  subjects: [
+    { id: '10000000-0000-4000-8000-000000000001', name: 'Ancient Egypt' },
+  ],
   topics: [
     {
-      id: 'topic-1',
+      id: '20000000-0000-4000-8000-000000000001',
+      bookId: '30000000-0000-4000-8000-000000000001',
+      bookTitle: 'The Oxford History',
       name: 'Pyramids',
       subjectName: 'Ancient Egypt',
-      subjectId: 'subj-1',
+      subjectId: '10000000-0000-4000-8000-000000000001',
     },
     {
-      id: 'topic-2',
+      id: '20000000-0000-4000-8000-000000000002',
+      bookId: '30000000-0000-4000-8000-000000000001',
+      bookTitle: 'The Oxford History',
       name: 'Hieroglyphics',
       subjectName: 'Ancient Egypt',
-      subjectId: 'subj-1',
+      subjectId: '10000000-0000-4000-8000-000000000001',
     },
   ],
-  books: [{ id: 'book-1', name: 'The Oxford History', subjectId: 'subj-1' }],
+  books: [
+    {
+      id: '30000000-0000-4000-8000-000000000001',
+      title: 'The Oxford History',
+      subjectId: '10000000-0000-4000-8000-000000000001',
+      subjectName: 'Ancient Egypt',
+    },
+  ],
+  notes: [],
+  sessions: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -157,7 +172,13 @@ describe('useLibrarySearch', () => {
   });
 
   it('returns empty results for a query with no matches', async () => {
-    const emptyResult = { subjects: [], topics: [], books: [] };
+    const emptyResult = {
+      subjects: [],
+      topics: [],
+      books: [],
+      notes: [],
+      sessions: [],
+    };
 
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(emptyResult), { status: 200 }),
@@ -187,13 +208,17 @@ describe('useLibrarySearch', () => {
             subjects: [],
             topics: [
               {
-                id: 'topic-3',
+                id: '20000000-0000-4000-8000-000000000003',
+                bookId: '30000000-0000-4000-8000-000000000002',
+                bookTitle: 'The History of Rome',
                 name: 'Rome',
                 subjectName: 'History',
-                subjectId: 'subj-2',
+                subjectId: '10000000-0000-4000-8000-000000000002',
               },
             ],
             books: [],
+            notes: [],
+            sessions: [],
           }),
           { status: 200 },
         ),

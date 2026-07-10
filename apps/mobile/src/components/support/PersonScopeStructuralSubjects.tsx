@@ -143,13 +143,13 @@ export function PersonScopeStructuralSubjects({
   );
   const query = useApiQuery({
     queryKey: ['supportee-structural-subjects', scope.personId, scope.edgeId],
+    schema: supporteeStructuralSubjectsResponseSchema,
     fetch: (signal) =>
       client.scopes[':personId'].subjects.$get(
         { param: { personId: scope.personId } },
         { init: { signal } },
       ),
-    select: (json: unknown) =>
-      supporteeStructuralSubjectsResponseSchema.parse(json),
+    select: (json) => json,
   });
   const subjects = query.data?.subjects ?? [];
   const selectedSubject = subjects.find(
