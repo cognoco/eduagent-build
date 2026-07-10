@@ -1,4 +1,5 @@
-const LANGUAGE_LOCALES: Record<string, string> = {
+export const LANGUAGE_LOCALES: Record<string, string> = {
+  en: 'en-US',
   es: 'es-ES',
   fr: 'fr-FR',
   it: 'it-IT',
@@ -12,6 +13,9 @@ const LANGUAGE_LOCALES: Record<string, string> = {
   id: 'id-ID',
   ms: 'ms-MY',
   sw: 'sw-TZ',
+  cs: 'cs-CZ',
+  ja: 'ja-JP',
+  pl: 'pl-PL',
 };
 
 export function getVoiceLocaleForLanguage(

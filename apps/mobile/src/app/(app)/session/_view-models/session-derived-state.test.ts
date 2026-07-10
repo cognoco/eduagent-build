@@ -5,6 +5,7 @@ import {
   deriveSessionSubjectState,
   getLatestAiMessageId,
   getLearnerTurnCount,
+  resolveLanguageVoiceLocale,
 } from './session-derived-state';
 
 describe('session-derived-state', () => {
@@ -153,6 +154,63 @@ describe('session-derived-state', () => {
     ).toMatchObject({
       noteSubjectId: 'active-subject',
       noteTopicId: 'active-topic',
+    });
+  });
+
+  describe('resolveLanguageVoiceLocale', () => {
+    // AC-test (WI-1447): a non-four_strands Norwegian learner gets nb-NO,
+    // not en-US/provider default.
+    it('routes a non-four_strands subject through the profile conversationLanguage', () => {
+      expect(
+        resolveLanguageVoiceLocale({
+          activeSubject: { pedagogyMode: 'socratic' },
+          conversationLanguage: 'nb',
+        }),
+      ).toBe('nb-NO');
+    });
+
+    it('still uses the subject languageCode for four_strands subjects', () => {
+      expect(
+        resolveLanguageVoiceLocale({
+          activeSubject: { pedagogyMode: 'four_strands', languageCode: 'es' },
+          conversationLanguage: 'nb',
+        }),
+      ).toBe('es-ES');
+    });
+
+    it.each([
+      ['cs', 'cs-CZ'],
+      ['ja', 'ja-JP'],
+      ['pl', 'pl-PL'],
+      ['en', 'en-US'],
+    ])(
+      'resolves non-four_strands conversationLanguage "%s" to "%s"',
+      (conversationLanguage, expectedLocale) => {
+        expect(
+          resolveLanguageVoiceLocale({
+            activeSubject: { pedagogyMode: 'socratic' },
+            conversationLanguage,
+          }),
+        ).toBe(expectedLocale);
+      },
+    );
+
+    it('falls back to en-US when the profile has no conversationLanguage', () => {
+      expect(
+        resolveLanguageVoiceLocale({
+          activeSubject: { pedagogyMode: 'socratic' },
+          conversationLanguage: undefined,
+        }),
+      ).toBe('en-US');
+    });
+
+    it('falls back to en-US when there is no active subject', () => {
+      expect(
+        resolveLanguageVoiceLocale({
+          activeSubject: undefined,
+          conversationLanguage: undefined,
+        }),
+      ).toBe('en-US');
     });
   });
 });
