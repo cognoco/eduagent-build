@@ -149,6 +149,7 @@ function mockAssessmentRow(
     topicId: string;
     status: string;
     masteryScore: number | null;
+    masteryChallengeVerifiedAt: Date | null;
   }>,
 ) {
   return {
@@ -160,6 +161,7 @@ function mockAssessmentRow(
     verificationDepth: 'recall' as const,
     status: overrides?.status ?? 'in_progress',
     masteryScore: overrides?.masteryScore ?? null,
+    masteryChallengeVerifiedAt: overrides?.masteryChallengeVerifiedAt ?? null,
     qualityRating: null,
     exchangeHistory: [],
     createdAt: NOW,
@@ -291,7 +293,11 @@ function setupScopedRepo({
     | undefined,
   assessmentsFindMany = [] as ReturnType<typeof mockAssessmentRow>[],
   sessionsFindMany = [] as ReturnType<typeof mockSessionRow>[],
-  needsDeepeningFindMany = [] as Array<{ topicId: string; status: string }>,
+  needsDeepeningFindMany = [] as Array<{
+    topicId: string;
+    status: string;
+    createdAt?: Date;
+  }>,
   xpLedgerFindMany = [] as Array<{
     topicId: string;
     status: string;
@@ -891,6 +897,119 @@ describe('getTopicProgress', () => {
     const rendered = inspect(filterArg, { depth: 10, breakLength: Infinity });
     expect(rendered).toContain('exchange_count');
   });
+
+  // ---------------------------------------------------------------------------
+  // [WI-1469 / MMT-ADR-0031] Challenge verification and SM-2 retention are
+  // complementary, never-aliased axes. These four quadrants pin the
+  // co-presentation contract: `masteryVerificationState` (Challenge axis) and
+  // `xpStatus`/`retentionStatus`/`masteredAt` (SM-2 axis) must each reflect
+  // their own signal, never cross-contaminate, and a historical `masteredAt`
+  // must survive later staleness/decay on the other axis (ADR point 4).
+  // ---------------------------------------------------------------------------
+
+  it('[WI-1469] Challenge-verified/fresh: co-presents with an independent, unaffected retention state', async () => {
+    jest.useFakeTimers({ now: NOW });
+    try {
+      const topic = mockTopicRow();
+      const verifiedAt = new Date('2026-02-01T00:00:00.000Z');
+      setupScopedRepo({
+        subjectFindFirst: mockSubjectRow(),
+        retentionCardFindFirst: mockRetentionCard({
+          nextReviewAt: new Date('2026-02-25T00:00:00.000Z'), // ~9.6 days after NOW → 'strong'
+        }),
+        assessmentsFindMany: [
+          mockAssessmentRow({
+            status: 'passed',
+            masteryChallengeVerifiedAt: verifiedAt,
+          }),
+        ],
+        sessionsFindMany: [mockSessionRow({ topicId })],
+        needsDeepeningFindMany: [],
+        xpLedgerFindMany: [],
+      });
+      const db = createMockDb({ topicFindFirst: topic });
+
+      const result = await getTopicProgress(db, profileId, subjectId, topicId);
+
+      expect(result!.masteryVerificationState).toBe('fresh');
+      expect(result!.retentionStatus).toBe('strong');
+      // Challenge verification alone never sets the XP-ledger-derived xpStatus.
+      expect(result!.xpStatus).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('[WI-1469] Challenge-verified/stale-or-due: a later weak-spot demotes verification to stale while retention independently shows due, and the historical masteredAt stamp survives both', async () => {
+    const topic = mockTopicRow();
+    const verifiedAt = new Date('2026-02-01T00:00:00.000Z');
+    const laterWeakSpot = new Date('2026-02-10T00:00:00.000Z'); // postdates verification
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      // failureCount >= 3 deterministically forces retentionStatus 'forgotten'
+      // (the due/decayed signal) without depending on wall-clock time.
+      retentionCardFindFirst: mockRetentionCard({
+        failureCount: 3,
+        masteredAt: verifiedAt,
+      }),
+      assessmentsFindMany: [
+        mockAssessmentRow({
+          status: 'passed',
+          masteryChallengeVerifiedAt: verifiedAt,
+        }),
+      ],
+      sessionsFindMany: [mockSessionRow({ topicId })],
+      needsDeepeningFindMany: [
+        { topicId, status: 'active', createdAt: laterWeakSpot },
+      ],
+      xpLedgerFindMany: [],
+    });
+    const db = createMockDb({ topicFindFirst: topic });
+
+    const result = await getTopicProgress(db, profileId, subjectId, topicId);
+
+    expect(result!.masteryVerificationState).toBe('stale');
+    expect(result!.retentionStatus).toBe('forgotten');
+    // ADR point 4: a sticky mastered timestamp is historical and is never
+    // erased by later staleness on the other axis.
+    expect(result!.masteredAt).toBe(verifiedAt.toISOString());
+  });
+
+  it('[WI-1469] SM-2-verified-without-Challenge: xpStatus verified from the XP ledger, masteryVerificationState stays unverified', async () => {
+    const topic = mockTopicRow();
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      retentionCardFindFirst: mockRetentionCard(),
+      assessmentsFindMany: [], // no Challenge Round ever run for this topic
+      sessionsFindMany: [mockSessionRow({ topicId })],
+      needsDeepeningFindMany: [],
+      xpLedgerFindMany: [{ topicId, status: 'verified', createdAt: NOW }],
+    });
+    const db = createMockDb({ topicFindFirst: topic });
+
+    const result = await getTopicProgress(db, profileId, subjectId, topicId);
+
+    expect(result!.xpStatus).toBe('verified');
+    expect(result!.masteryVerificationState).toBe('unverified');
+  });
+
+  it('[WI-1469] neither-verified: no Challenge Round and no verified XP ledger entry', async () => {
+    const topic = mockTopicRow();
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      retentionCardFindFirst: undefined,
+      assessmentsFindMany: [],
+      sessionsFindMany: [],
+      needsDeepeningFindMany: [],
+      xpLedgerFindMany: [],
+    });
+    const db = createMockDb({ topicFindFirst: topic });
+
+    const result = await getTopicProgress(db, profileId, subjectId, topicId);
+
+    expect(result!.xpStatus).toBeNull();
+    expect(result!.masteryVerificationState).toBe('unverified');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -952,6 +1071,138 @@ describe('getTopicProgressBatch', () => {
 
     expect(result.map((topic) => topic.topicId)).toEqual(['owned-topic']);
     expect(JSON.stringify(result)).not.toContain('Foreign Topic');
+  });
+
+  // ---------------------------------------------------------------------------
+  // [WI-1469 / MMT-ADR-0031] Same co-presentation contract as the
+  // `getTopicProgress` quadrant tests above — `getTopicProgressBatch` is a
+  // separate implementation (not a wrapper), so it needs its own coverage per
+  // the sibling-call-site sweep rule.
+  // ---------------------------------------------------------------------------
+
+  it('[WI-1469] Challenge-verified/fresh: batch co-presents with an independent, unaffected retention state', async () => {
+    jest.useFakeTimers({ now: NOW });
+    try {
+      const topic = mockTopicRow({ id: 'batch-topic', title: 'Batch Topic' });
+      const verifiedAt = new Date('2026-02-01T00:00:00.000Z');
+      setupScopedRepo({
+        retentionCardsFindMany: [
+          mockRetentionCard({
+            topicId: 'batch-topic',
+            nextReviewAt: new Date('2026-02-25T00:00:00.000Z'),
+          }),
+        ],
+        assessmentsFindMany: [
+          mockAssessmentRow({
+            topicId: 'batch-topic',
+            status: 'passed',
+            masteryChallengeVerifiedAt: verifiedAt,
+          }),
+        ],
+        sessionsFindMany: [mockSessionRow({ topicId: 'batch-topic' })],
+        needsDeepeningFindMany: [],
+        xpLedgerFindMany: [],
+      });
+      const db = createMockDb({
+        topicsFindMany: [topic],
+        ownedTopicRows: [mockOwnedTopicRow(topic)],
+      });
+
+      const [result] = await getTopicProgressBatch(db, profileId, [
+        { id: 'batch-topic', title: 'Batch Topic', description: '' },
+      ]);
+
+      expect(result!.masteryVerificationState).toBe('fresh');
+      expect(result!.retentionStatus).toBe('strong');
+      expect(result!.xpStatus).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('[WI-1469] Challenge-verified/stale-or-due: batch demotes verification to stale while retention independently shows due, historical masteredAt survives both', async () => {
+    const topic = mockTopicRow({ id: 'batch-topic', title: 'Batch Topic' });
+    const verifiedAt = new Date('2026-02-01T00:00:00.000Z');
+    const laterWeakSpot = new Date('2026-02-10T00:00:00.000Z');
+    setupScopedRepo({
+      retentionCardsFindMany: [
+        mockRetentionCard({
+          topicId: 'batch-topic',
+          failureCount: 3,
+          masteredAt: verifiedAt,
+        }),
+      ],
+      assessmentsFindMany: [
+        mockAssessmentRow({
+          topicId: 'batch-topic',
+          status: 'passed',
+          masteryChallengeVerifiedAt: verifiedAt,
+        }),
+      ],
+      sessionsFindMany: [mockSessionRow({ topicId: 'batch-topic' })],
+      needsDeepeningFindMany: [
+        { topicId: 'batch-topic', status: 'active', createdAt: laterWeakSpot },
+      ],
+      xpLedgerFindMany: [],
+    });
+    const db = createMockDb({
+      topicsFindMany: [topic],
+      ownedTopicRows: [mockOwnedTopicRow(topic)],
+    });
+
+    const [result] = await getTopicProgressBatch(db, profileId, [
+      { id: 'batch-topic', title: 'Batch Topic', description: '' },
+    ]);
+
+    expect(result!.masteryVerificationState).toBe('stale');
+    expect(result!.retentionStatus).toBe('forgotten');
+    expect(result!.masteredAt).toBe(verifiedAt.toISOString());
+  });
+
+  it('[WI-1469] SM-2-verified-without-Challenge: batch xpStatus verified from the XP ledger, masteryVerificationState stays unverified', async () => {
+    const topic = mockTopicRow({ id: 'batch-topic', title: 'Batch Topic' });
+    setupScopedRepo({
+      retentionCardsFindMany: [mockRetentionCard({ topicId: 'batch-topic' })],
+      assessmentsFindMany: [],
+      sessionsFindMany: [mockSessionRow({ topicId: 'batch-topic' })],
+      needsDeepeningFindMany: [],
+      xpLedgerFindMany: [
+        { topicId: 'batch-topic', status: 'verified', createdAt: NOW },
+      ],
+    });
+    const db = createMockDb({
+      topicsFindMany: [topic],
+      ownedTopicRows: [mockOwnedTopicRow(topic)],
+    });
+
+    const [result] = await getTopicProgressBatch(db, profileId, [
+      { id: 'batch-topic', title: 'Batch Topic', description: '' },
+    ]);
+
+    expect(result!.xpStatus).toBe('verified');
+    expect(result!.masteryVerificationState).toBe('unverified');
+  });
+
+  it('[WI-1469] neither-verified: batch has no Challenge Round and no verified XP ledger entry', async () => {
+    const topic = mockTopicRow({ id: 'batch-topic', title: 'Batch Topic' });
+    setupScopedRepo({
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+      sessionsFindMany: [],
+      needsDeepeningFindMany: [],
+      xpLedgerFindMany: [],
+    });
+    const db = createMockDb({
+      topicsFindMany: [topic],
+      ownedTopicRows: [mockOwnedTopicRow(topic)],
+    });
+
+    const [result] = await getTopicProgressBatch(db, profileId, [
+      { id: 'batch-topic', title: 'Batch Topic', description: '' },
+    ]);
+
+    expect(result!.xpStatus).toBeNull();
+    expect(result!.masteryVerificationState).toBe('unverified');
   });
 });
 
