@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   created: 2026-07-03
-  last_confirmed: 2026-07-03
+  last_confirmed: 2026-07-10
   status: active
   originSessionId: 21c2badf-43d7-4e6a-ac7e-909be767a3fc
 ---

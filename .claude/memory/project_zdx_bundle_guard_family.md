@@ -30,3 +30,5 @@ exists (Stage, State, claim, relations, holds) and prove each is carried, refuse
 deliberately dropped with a record. Dogfood on one real cluster before a bulk pass — all
 three defects surfaced within minutes of forming a single WP.
 See [[feedback_verify_claims_against_source_before_canon]].
+
+**2026-07-10 verification:** all three fixes confirmed in cosmo 0.7.2 source (MID_LIFECYCLE_STAGES, HOLD_STATES/--allow-held, verbatim Absorbed detail) and exercised by 4 clean bundle formations (WI-1772/1777/1779/1780) — incl. the Blocked-by-carry edge (Active child with live dependency → WP inherits the union). The guard family is closed; the meta-lesson (enumerate what a child carries before deciding what a bundle copies) stands.
