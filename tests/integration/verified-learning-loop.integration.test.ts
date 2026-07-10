@@ -50,7 +50,7 @@ import {
   sessionEvents,
   subjects,
   type Database,
-} from '../../packages/database/src';
+} from '@eduagent/database';
 import {
   deleteV2IdentitiesForTest,
   ensureLegacyProfileAnchorForTest,
