@@ -12,6 +12,7 @@ import {
   subscription as subscriptionTable,
   type Database,
 } from '@eduagent/database';
+import type { SubscriptionStatus, SubscriptionTier } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 import { getTierConfig } from '../../subscription';
@@ -36,16 +37,8 @@ function createIntegrationDb(): Database {
   return createDatabase(url);
 }
 
-type PlanTier = 'free' | 'plus' | 'family' | 'pro';
-type SubscriptionStatus =
-  | 'trial'
-  | 'active'
-  | 'past_due'
-  | 'cancelled'
-  | 'expired';
-
 interface SeedGraphInput {
-  planTier?: PlanTier;
+  planTier?: SubscriptionTier;
   status?: SubscriptionStatus;
   withQuotaPool?: boolean;
   monthlyLimit?: number;
