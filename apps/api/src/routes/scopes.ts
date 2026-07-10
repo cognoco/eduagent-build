@@ -4,11 +4,13 @@ import { z } from 'zod';
 
 import {
   supporteeStructuralSubjectsResponseSchema,
+  supporterColdStartSchema,
   supporterScopeListSchema,
 } from '@eduagent/schemas';
 
 import { withProfile, type RouteEnv } from '../route-utils/route-context';
 import { resolveScopesForPerson } from '../services/scope-resolution';
+import { resolveSupporterColdStart } from '../services/supporter-coldstart';
 import { readSupporteeStructuralSubjects } from '../services/supporter-structural-mask';
 
 const personIdParamSchema = z.object({
@@ -20,6 +22,11 @@ export const scopesRoutes = new Hono<RouteEnv>()
     const { db, profileId } = withProfile(c);
     const scopes = await resolveScopesForPerson(db, profileId);
     return c.json(supporterScopeListSchema.parse(scopes));
+  })
+  .get('/scopes/coldstart', async (c) => {
+    const { db, profileId } = withProfile(c);
+    const coldStart = await resolveSupporterColdStart(db, profileId);
+    return c.json(supporterColdStartSchema.parse(coldStart));
   })
   .get(
     '/scopes/:personId/subjects',
