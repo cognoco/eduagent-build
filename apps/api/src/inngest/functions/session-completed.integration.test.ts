@@ -1564,18 +1564,22 @@ describe('session-completed integration', () => {
     // Simulate what persistChallengeRoundReviewTargets already wrote for a
     // Challenge Round misconception/partial on this topic.
     const pendingId = generateUUIDv7();
-    await db.insert(needsDeepeningTopics).values({
-      id: pendingId,
-      profileId,
-      subjectId,
-      topicId,
-      status: 'pending_review',
-      source: 'challenge_round',
-      concept: 'photosynthesis light reactions',
-      misconception: 'Believes light reactions occur in the stroma.',
-      correction: 'Light reactions occur in the thylakoid membrane.',
-      pendingExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    });
+    const [seededRow] = await db
+      .insert(needsDeepeningTopics)
+      .values({
+        id: pendingId,
+        profileId,
+        subjectId,
+        topicId,
+        status: 'pending_review',
+        source: 'challenge_round',
+        concept: 'photosynthesis light reactions',
+        misconception: 'Believes light reactions occur in the stroma.',
+        correction: 'Light reactions occur in the thylakoid membrane.',
+        pendingExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      })
+      .returning({ createdAt: needsDeepeningTopics.createdAt });
+    const seededCreatedAt = seededRow!.createdAt;
 
     const now = new Date(Date.now() + 1_000);
     const step = buildStep();
@@ -1615,8 +1619,88 @@ describe('session-completed integration', () => {
     expect(rows[0]?.id).toBe(pendingId);
     expect(rows[0]?.status).toBe('active');
     expect(rows[0]?.pendingExpiresAt).toBeNull();
+    // [WI-1446 SHOULD_FIX] resolveMasteryVerificationState's
+    // ACTIONABLE_STATUSES treats pending_review/active identically and keys
+    // only on createdAt vs. a verification timestamp — promotion must never
+    // touch createdAt, or it would change verification-state outcomes for
+    // unrelated callers. Proven here against the REAL promotion call, not
+    // just a synthetic unit test.
+    expect(rows[0]?.createdAt).toEqual(seededCreatedAt);
 
     // The learner-facing read now surfaces the promoted weak concept.
+    const deepening = await getSubjectNeedsDeepening(db, profileId, subjectId);
+    expect(deepening.topics.some((t) => t.topicId === topicId)).toBe(true);
+  });
+
+  // [WI-1446 MUST_FIX] Reviewer found: gating promotion on completionQualityRating
+  // no-ops on any completion path that omits it — plain POST /close
+  // (sessions.ts), /summary/skip, and stale-cleanup auto-close all complete a
+  // session without a qualityRating, so the stranded-row symptom would still
+  // reproduce on those paths. Promotion must run whenever the topic was
+  // touched by session-completed, independent of whether a quality signal was
+  // supplied.
+  it('[WI-1446] promotes a pending_review row even when the completion has no qualityRating (plain-close shape)', async () => {
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+    const { subjectId } = await seedSubject(profileId);
+    const { topicId } = await seedCurriculum(subjectId);
+    const { sessionId } = await seedSession({ profileId, subjectId, topicId });
+    await seedSessionEvents({ sessionId, profileId, subjectId, topicId });
+    await seedLearningProfile(profileId);
+
+    const pendingId = generateUUIDv7();
+    await db.insert(needsDeepeningTopics).values({
+      id: pendingId,
+      profileId,
+      subjectId,
+      topicId,
+      status: 'pending_review',
+      source: 'challenge_round',
+      concept: 'photosynthesis light reactions',
+      misconception: 'Believes light reactions occur in the stroma.',
+      correction: 'Light reactions occur in the thylakoid membrane.',
+      pendingExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
+    const now = new Date(Date.now() + 1_000);
+    const step = buildStep();
+    const handler = getHandler();
+
+    // No qualityRating — the plain POST /close / /summary/skip / stale-cleanup
+    // shape. updateNeedsDeepeningProgress must NOT run (no quality signal),
+    // but promotion still must.
+    await handler({
+      event: {
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId,
+          subjectId,
+          topicId,
+          exchangeCount: 2,
+          summaryStatus: 'pending',
+          timestamp: now.toISOString(),
+          verificationType: null,
+          sessionType: 'learning',
+          reason: 'user_ended',
+        },
+      },
+      step,
+    });
+
+    const rows = await db
+      .select()
+      .from(needsDeepeningTopics)
+      .where(
+        and(
+          eq(needsDeepeningTopics.profileId, profileId),
+          eq(needsDeepeningTopics.topicId, topicId),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(pendingId);
+    expect(rows[0]?.status).toBe('active');
+
     const deepening = await getSubjectNeedsDeepening(db, profileId, subjectId);
     expect(deepening.topics.some((t) => t.topicId === topicId)).toBe(true);
   });

@@ -871,9 +871,7 @@ export const sessionCompleted = inngest.createFunction(
       await step.run('update-needs-deepening', async () => {
         if (retentionTopicIds.length === 0)
           return { step: 'update-needs-deepening', status: 'skipped' as const };
-        if (completionQualityRating == null) {
-          return { step: 'update-needs-deepening', status: 'skipped' as const };
-        }
+
         return runIsolated('update-needs-deepening', profileId, async () => {
           const db = getStepDatabase();
           // [L7-F7] Parallelize per-topic needs-deepening updates.
@@ -884,15 +882,25 @@ export const sessionCompleted = inngest.createFunction(
           // rows is the expiry cron, which resolves them, never promotes.
           // Independent of updateNeedsDeepeningProgress (disjoint status
           // filters: active vs. unexpired pending_review), so no ordering
-          // dependency.
+          // dependency. Deliberately NOT gated on completionQualityRating:
+          // updateNeedsDeepeningProgress needs an explicit quality signal to
+          // advance SM-2, but promotion only needs "this topic was touched by
+          // a completed session" — gating it on qualityRating would leave
+          // Challenge-Round-flagged rows stranded on the plain POST /close,
+          // /summary/skip, and stale-cleanup auto-close paths, none of which
+          // supply a qualityRating.
           await Promise.all(
             retentionTopicIds.flatMap((tid) => [
-              updateNeedsDeepeningProgress(
-                db,
-                profileId,
-                tid,
-                completionQualityRating,
-              ),
+              ...(completionQualityRating != null
+                ? [
+                    updateNeedsDeepeningProgress(
+                      db,
+                      profileId,
+                      tid,
+                      completionQualityRating,
+                    ),
+                  ]
+                : []),
               promotePendingDeepening(db, profileId, tid, 'retention_again'),
             ]),
           );

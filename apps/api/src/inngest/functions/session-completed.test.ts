@@ -1296,9 +1296,12 @@ describe('sessionCompleted', () => {
       );
     });
 
-    // [WI-1446] promotePendingDeepening rides the same guard/loop as
-    // updateNeedsDeepeningProgress — see session-completed.ts's
-    // update-needs-deepening step.
+    // [WI-1446] promotePendingDeepening shares the loop over retentionTopicIds
+    // with updateNeedsDeepeningProgress, but NOT its qualityRating guard — see
+    // session-completed.ts's update-needs-deepening step. Promotion must run
+    // even when no quality signal is available (plain POST /close,
+    // /summary/skip, stale-cleanup auto-close), since those completions still
+    // need to surface a Challenge-Round-flagged weak concept.
     it('[WI-1446] calls promotePendingDeepening with correct args', async () => {
       await executeSteps(createEventData({ qualityRating: 4 }));
 
@@ -1323,15 +1326,20 @@ describe('sessionCompleted', () => {
       expect(outcome.status).toBe('skipped');
     });
 
-    it('skips needs-deepening update when qualityRating not provided (issue #19)', async () => {
+    it('skips updateNeedsDeepeningProgress when qualityRating not provided (issue #19), but still promotes pending rows (WI-1446)', async () => {
       const { result } = (await executeSteps(createEventData())) as any;
 
       expect(mockUpdateNeedsDeepeningProgress).not.toHaveBeenCalled();
-      expect(mockPromotePendingDeepening).not.toHaveBeenCalled();
+      expect(mockPromotePendingDeepening).toHaveBeenCalledWith(
+        expect.any(Object),
+        PROFILE_ID,
+        TOPIC_ID,
+        'retention_again',
+      );
       const outcome = result.outcomes.find(
         (o: any) => o.step === 'update-needs-deepening',
       );
-      expect(outcome.status).toBe('skipped');
+      expect(outcome.status).toBe('ok');
     });
 
     it('loops over interleavedTopicIds when present (FR92)', async () => {
