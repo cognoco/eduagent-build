@@ -26,6 +26,7 @@ import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { mergeAliasedSubscriptionV2 } from '../../services/billing/billing-v2';
 import { createLogger } from '../../services/logger';
+import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
 
@@ -40,6 +41,41 @@ export const billingAliasMerge = inngest.createFunction(
     idempotency: 'event.data.eventId',
     // Serialize per RevenueCat event so two deliveries never race the merge.
     concurrency: { key: 'event.data.eventId', limit: 1 },
+    onFailure: async ({
+      event,
+      error,
+    }: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+    }) => {
+      const eventId =
+        (event.data.event?.data as { eventId?: string } | undefined)?.eventId ??
+        null;
+      const runId = event.data.run_id ?? null;
+      const capturedError =
+        error instanceof Error
+          ? error
+          : new Error(
+              `billing-alias-merge: all retries exhausted${
+                eventId ? ` for event ${eventId}` : ''
+              }`,
+            );
+
+      captureException(capturedError, {
+        extra: {
+          surface: 'billing-alias-merge.terminal_failure',
+          eventId,
+          runId,
+        },
+      });
+      logger.error('billing.alias_merge.terminal_failure', {
+        eventId,
+        runId,
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
+
+      return { status: 'terminal_failure' as const, eventId };
+    },
   },
   { event: 'app/billing.alias_received' },
   async ({ event, step }) => {

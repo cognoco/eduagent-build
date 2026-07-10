@@ -11,6 +11,7 @@ import { migrateSecureStoreKey } from '../../../../lib/migrate-secure-store-key'
 import { useThemeColors } from '../../../../lib/theme';
 import { formatMediumDateTime } from '../../../../lib/format-datetime';
 import { useProfile } from '../../../../lib/profile';
+import { Sentry } from '../../../../lib/sentry';
 import { useNotifyParentSubscribe } from '../../../../hooks/use-settings';
 import { useNotifyParentChildCap } from '../../../../hooks/use-child-cap-notifications';
 import { useXpSummary } from '../../../../hooks/use-streaks';
@@ -183,7 +184,15 @@ export function ChildPaywall({
           t('subscription.childPaywall.alerts.askParentBody'),
         );
       }
-    } catch {
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: {
+          component: 'ChildPaywall',
+          action: isQuotaMode
+            ? 'notify_parent_quota'
+            : 'notify_parent_subscription',
+        },
+      });
       platformAlert(
         t('subscription.childPaywall.alerts.notifyErrorTitle'),
         t('subscription.childPaywall.alerts.notifyErrorBody'),

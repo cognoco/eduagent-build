@@ -45,6 +45,7 @@ import { billingAliasMerge } from './billing-alias-merge';
 // which already routes to mergeAliasedSubscriptionV2 unconditionally
 // (WI-867). There is no legacy call site left to assert against.
 import * as billingV2 from '../../services/billing/billing-v2';
+import * as sentry from '../../services/sentry';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 beforeEach(() => {
@@ -82,6 +83,55 @@ describe('billingAliasMerge worker [BUG-783]', () => {
     const result = await invoke({ eventId: 123 /* wrong type */ });
     expect(result).toEqual({ status: 'schema_error' });
     expect(consoleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('[WI-1399] escalates terminal retry exhaustion with run context', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureException')
+      .mockImplementation(() => undefined);
+    const opts = (billingAliasMerge as any).opts;
+
+    expect(typeof opts.onFailure).toBe('function');
+
+    const terminalError = new Error('RevenueCat alias merge unavailable');
+    const result = await opts.onFailure({
+      event: {
+        data: {
+          event: { data: { eventId: 'evt-alias-terminal' } },
+          run_id: 'run-alias-terminal',
+        },
+      },
+      error: terminalError,
+    });
+
+    expect(result).toEqual({
+      status: 'terminal_failure',
+      eventId: 'evt-alias-terminal',
+    });
+    expect(captureSpy).toHaveBeenCalledWith(terminalError, {
+      extra: {
+        surface: 'billing-alias-merge.terminal_failure',
+        eventId: 'evt-alias-terminal',
+        runId: 'run-alias-terminal',
+      },
+    });
+
+    const entry = JSON.parse(
+      consoleErrorSpy.mock.calls.at(-1)?.[0] as string,
+    ) as {
+      message: string;
+      context?: Record<string, unknown>;
+    };
+    expect(entry).toMatchObject({
+      message: 'billing.alias_merge.terminal_failure',
+      context: {
+        eventId: 'evt-alias-terminal',
+        runId: 'run-alias-terminal',
+        errorName: 'Error',
+      },
+    });
+
+    captureSpy.mockRestore();
   });
 });
 
