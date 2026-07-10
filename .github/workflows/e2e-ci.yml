@@ -192,8 +192,6 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
-    # Advisory — does not block merge
-    continue-on-error: true
     timeout-minutes: 45
     services:
       postgres:
@@ -459,26 +457,12 @@ jobs:
           api-level: 34
           arch: x86_64
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: |
-            adb install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-
-            # Wait for app to be fully launchable, then take a diagnostic screenshot
-            sleep 5
-            adb shell am start -n com.mentomate.app/.MainActivity
-            sleep 15
-            mkdir -p maestro-screenshots
-            adb exec-out screencap -p > maestro-screenshots/pre-test-app-state.png || true
-
-            maestro test apps/mobile/e2e/flows/ --include-tags=${{ github.event_name == 'schedule' && 'smoke,nightly,pr-blocking' || github.event_name == 'workflow_dispatch' && 'smoke,nightly,pr-blocking' || 'smoke,pr-blocking' }} --output maestro-screenshots/ || MAESTRO_EXIT=$?
-
-            # Capture final screen state and logcat on failure.
-            # android-emulator-runner splits script lines into separate shell
-            # invocations, so if/fi blocks don't work. Use inline conditionals.
-            test "${MAESTRO_EXIT:-0}" -ne 0 && adb exec-out screencap -p > maestro-screenshots/failure-final-state.png || true
-            test "${MAESTRO_EXIT:-0}" -ne 0 && adb logcat -d -t 500 > maestro-screenshots/logcat.txt || true
-            exit ${MAESTRO_EXIT:-0}
+          # The action runs every input line in a separate sh -c process. Keep
+          # exit capture and failure artifacts inside one durable script.
+          script: bash apps/mobile/e2e/scripts/run-ci-maestro.sh
         env:
           API_URL: http://10.0.2.2:8787
+          MAESTRO_INCLUDE_TAGS: wi1651-evidence
 
       - name: Upload Maestro artifacts
         if: always()

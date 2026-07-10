@@ -101,6 +101,7 @@ Tag tokens below are wrapped in backticks so the validator's parser can extract 
 | `nightly` | Full regression suite. | Nightly CI |
 | `weekly` | Extended/slow flows (camera, OCR, complex multi-step). | Weekly CI |
 | `manual` | Requires human interaction or special device setup. | Manual only |
+| `wi1651-evidence` | Branch-only exit-propagation evidence flow. | Manual dispatch only |
 
 `pr-blocking` qualification criteria (all must hold): currently passes on a clean Pixel API 34 emulator; covers a top-of-funnel or critical user path; deterministic (no flakiness from AI responses, timing, or network); runs in under 90 seconds individually.
 
