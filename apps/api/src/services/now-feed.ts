@@ -4,6 +4,7 @@ import {
   desc,
   eq,
   gt,
+  gte,
   isNotNull,
   isNull,
   lt,
@@ -20,7 +21,9 @@ import {
   needsDeepeningTopics,
   parkingLotItems,
   person,
+  progressSnapshots,
   retentionCards,
+  sessionSummaries,
   subjects,
   supportership,
   type Database,
@@ -45,6 +48,12 @@ import { getAssessmentEligibleTopics } from './retention-data';
 
 export const PARKED_AGING_WINDOW_DAYS = 7;
 export const DEEPENING_SURFACE_LEAD_DAYS = 2;
+// [WI-1121 / MMT-ADR-0022] Read-time-projected moments (topic_mastered,
+// recap_ready, snapshot_ready) have no ledger row and therefore no
+// `surfacedAt` seen-state — a recency window is the only thing stopping them
+// from surfacing forever. Shared across the three; none is individually
+// tuned enough yet to warrant its own constant.
+export const LEDGER_PROJECTION_RECENCY_DAYS = 3;
 
 export const RANKING = {
   UNFINISHED_SESSION: 0,
@@ -59,6 +68,12 @@ export const RANKING = {
 
 export const ROUTE_CATALOG = {
   'session.resume': { params: ['sessionId'], chain: [] },
+  // [WI-1121 review fix] A completed session's recap lives at
+  // /session-summary/[sessionId] (mobile: session-detail-navigation.ts's
+  // buildSessionDetailHref, already used by JournalTabView's own recap
+  // rows) — distinct from 'session.resume', which reopens the LIVE session
+  // chat and is wrong for a "recap is ready" moment on an ended session.
+  'session.summary': { params: ['sessionId'], chain: [] },
   'subject.hub': { params: ['subjectId'], chain: [] },
   'subject.topic': {
     params: ['subjectId', 'bookId', 'topicId'],
@@ -465,6 +480,9 @@ async function collectNowCandidates(
     challengeReady,
     parked,
     ledgerMoments,
+    topicMastered,
+    recapReady,
+    snapshotReady,
   ] = await Promise.all([
     collectUnfinishedSessionCandidates(db, profileId, scope),
     collectRetentionDueCandidates(db, profileId, scope, now),
@@ -476,6 +494,15 @@ async function collectNowCandidates(
     visibility === 'self'
       ? collectLedgerMomentCandidates(db, profileId, scope)
       : Promise.resolve([]),
+    visibility === 'self'
+      ? collectTopicMasteredCandidates(db, profileId, scope, now)
+      : Promise.resolve([]),
+    visibility === 'self'
+      ? collectRecapReadyCandidates(db, profileId, scope, now)
+      : Promise.resolve([]),
+    visibility === 'self'
+      ? collectSnapshotReadyCandidates(db, profileId, scope, now)
+      : Promise.resolve([]),
   ]);
 
   return [
@@ -485,6 +512,9 @@ async function collectNowCandidates(
     ...challengeReady,
     ...parked,
     ...ledgerMoments,
+    ...topicMastered,
+    ...recapReady,
+    ...snapshotReady,
   ].map((candidate) => ({
     ...candidate,
     ...(scope === 'person' ? { personId: profileId } : {}),
@@ -781,6 +811,182 @@ async function collectLedgerMomentCandidates(
   });
 }
 
+// [WI-1121 / MMT-ADR-0022] The three kinds below have no `mentor_activity_ledger`
+// row and are assembled straight from operational tables — a read-time
+// projection, per the ADR, rather than a new LedgerKind + writer. They are
+// synthesized with `kind: 'ledger_moment'` and a `now.ledger_moment.<kind>`
+// templateKey so they reuse the same mobile rendering path
+// (JournalTabView.renderLedgerMomentText, LedgerMomentCard) that real ledger
+// rows use — that mobile dispatch, and its `journal.moments.{topic_mastered,
+// recap_ready,snapshot_ready}` copy in en.json, already existed pre-built for
+// this exact shape. No `ledgerId`, so no seen-state; `LEDGER_PROJECTION_RECENCY_DAYS`
+// is what keeps them from surfacing indefinitely.
+
+async function collectTopicMasteredCandidates(
+  db: Database,
+  profileId: string,
+  scope: NowScope,
+  now: Date,
+): Promise<NowFeedCandidate[]> {
+  const cutoff = new Date(
+    now.getTime() - LEDGER_PROJECTION_RECENCY_DAYS * DAY_MS,
+  );
+
+  const rows = await db
+    .select({
+      id: retentionCards.id,
+      masteredAt: retentionCards.masteredAt,
+      subjectId: subjects.id,
+      topicId: curriculumTopics.id,
+      bookId: curriculumTopics.bookId,
+      topicTitle: curriculumTopics.title,
+    })
+    .from(retentionCards)
+    .innerJoin(
+      curriculumTopics,
+      eq(retentionCards.topicId, curriculumTopics.id),
+    )
+    .innerJoin(curriculumBooks, eq(curriculumTopics.bookId, curriculumBooks.id))
+    .innerJoin(subjects, eq(curriculumBooks.subjectId, subjects.id))
+    .where(
+      and(
+        eq(retentionCards.profileId, profileId),
+        eq(subjects.profileId, profileId),
+        isNotNull(retentionCards.masteredAt),
+        gt(retentionCards.masteredAt, cutoff),
+      ),
+    )
+    .orderBy(desc(retentionCards.masteredAt), asc(retentionCards.id))
+    .limit(20);
+
+  return rows
+    .filter((row) => row.masteredAt)
+    .map((row) => ({
+      id: `topic-mastered:${row.id}`,
+      kind: 'ledger_moment' as const,
+      createdAt: row.masteredAt as Date,
+      sortAt: row.masteredAt as Date,
+      templateKey: 'now.ledger_moment.topic_mastered',
+      params: {
+        ledgerKind: 'topic_mastered',
+        subjectId: row.subjectId,
+        topicId: row.topicId,
+        bookId: row.bookId,
+        topicTitle: row.topicTitle,
+      },
+      // [WI-1121 review fix] Routes per-topic (subject.topic), not
+      // per-subject (subject.hub): two topics mastered in the same subject
+      // within the recency window previously produced identical
+      // kind/templateKey/route/params, so getNowCardDismissKey() collided —
+      // dismissing one card hid both.
+      deepLink: resolveDeepLink('subject.topic', {
+        subjectId: row.subjectId,
+        bookId: row.bookId,
+        topicId: row.topicId,
+      }),
+      scope,
+    }));
+}
+
+// [WI-1121 caveat] Windowing on `updatedAt` is an approximation, not an exact
+// "recap just generated" signal: `summary-reconciliation-cron.ts`'s
+// find-missing-llm-summaries step (lines 62-101) can regenerate a session's
+// private `llmSummary`/`summaryGeneratedAt` up to 37 days after the session
+// ended without touching `learnerRecap`, bumping `updatedAt` in the process.
+// A learner_recap set weeks ago can therefore resurface as if it were new.
+// No dedicated "recap became visible" timestamp exists to fix this precisely;
+// out of scope for this WI — flagged for a possible follow-up.
+async function collectRecapReadyCandidates(
+  db: Database,
+  profileId: string,
+  scope: NowScope,
+  now: Date,
+): Promise<NowFeedCandidate[]> {
+  const cutoff = new Date(
+    now.getTime() - LEDGER_PROJECTION_RECENCY_DAYS * DAY_MS,
+  );
+
+  const rows = await db
+    .select({
+      id: sessionSummaries.id,
+      sessionId: sessionSummaries.sessionId,
+      updatedAt: sessionSummaries.updatedAt,
+    })
+    .from(sessionSummaries)
+    .where(
+      and(
+        eq(sessionSummaries.profileId, profileId),
+        isNotNull(sessionSummaries.learnerRecap),
+        isNull(sessionSummaries.purgedAt),
+        gt(sessionSummaries.updatedAt, cutoff),
+      ),
+    )
+    .orderBy(desc(sessionSummaries.updatedAt), asc(sessionSummaries.id))
+    .limit(20);
+
+  return rows.map((row) => ({
+    id: `recap-ready:${row.id}`,
+    kind: 'ledger_moment' as const,
+    createdAt: row.updatedAt,
+    sortAt: row.updatedAt,
+    templateKey: 'now.ledger_moment.recap_ready',
+    params: {
+      ledgerKind: 'recap_ready',
+      sessionId: row.sessionId,
+    },
+    // [WI-1121 review fix] 'session.summary' (→ /session-summary/[sessionId]),
+    // not 'session.resume' (→ the live session chat) — this session already
+    // ended; its recap lives on the summary screen.
+    deepLink: resolveDeepLink('session.summary', { sessionId: row.sessionId }),
+    scope,
+  }));
+}
+
+async function collectSnapshotReadyCandidates(
+  db: Database,
+  profileId: string,
+  scope: NowScope,
+  now: Date,
+): Promise<NowFeedCandidate[]> {
+  const cutoffDate = new Date(
+    now.getTime() - LEDGER_PROJECTION_RECENCY_DAYS * DAY_MS,
+  )
+    .toISOString()
+    .slice(0, 10);
+
+  const rows = await db
+    .select({
+      id: progressSnapshots.id,
+      snapshotDate: progressSnapshots.snapshotDate,
+      createdAt: progressSnapshots.createdAt,
+    })
+    .from(progressSnapshots)
+    .where(
+      and(
+        eq(progressSnapshots.profileId, profileId),
+        gte(progressSnapshots.snapshotDate, cutoffDate),
+      ),
+    )
+    .orderBy(desc(progressSnapshots.snapshotDate))
+    .limit(1);
+
+  // No subjectId/sessionId anchor exists for a snapshot — unlike
+  // `resolveLedgerDeepLink`'s catch-all (used only for real ledger rows whose
+  // kind is a runtime-unknown string), this collector knows its shape
+  // statically, so it builds the deepLink directly rather than going through
+  // that helper (which would need widening for a kind it doesn't handle).
+  return rows.map((row) => ({
+    id: `snapshot-ready:${row.id}`,
+    kind: 'ledger_moment' as const,
+    createdAt: row.createdAt,
+    sortAt: row.createdAt,
+    templateKey: 'now.ledger_moment.snapshot_ready',
+    params: { ledgerKind: 'snapshot_ready' },
+    deepLink: resolveDeepLink('journal', {}),
+    scope,
+  }));
+}
+
 function stringParam(
   params: Record<string, unknown>,
   key: string,
@@ -806,7 +1012,10 @@ function resolveLedgerDeepLink(
   // Other kinds keep their prior behavior: a row with no usable params is
   // excluded from the feed (caller drops candidates whose deepLink is null)
   // rather than masquerading behind a journal link.
-  if (kind === 'milestone_reached' || kind === 'reward_receipt') {
+  // [WI-1121] `reward_receipt` removed from ledgerKindSchema — dropped from
+  // this catch-all; `ledgerKindSchema.safeParse` at the caller can no longer
+  // produce it, so `kind` is now always 'session_filed' or 'milestone_reached'.
+  if (kind === 'milestone_reached') {
     return resolveDeepLink('journal', {});
   }
   return null;

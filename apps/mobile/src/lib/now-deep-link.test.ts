@@ -53,6 +53,19 @@ describe('pushNowDeepLink', () => {
     );
   });
 
+  it('[WI-1121] pushes a session summary route once when the chain is empty', () => {
+    const router = { push: jest.fn() };
+
+    pushNowDeepLink(router, {
+      route: 'session.summary',
+      params: { sessionId: 'session-1' },
+      chain: [],
+    });
+
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledWith('/session-summary/session-1');
+  });
+
   it('retention.review deep link produces topic path with mode=review', () => {
     const router = { push: jest.fn() };
 

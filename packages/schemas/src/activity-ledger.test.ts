@@ -10,8 +10,11 @@ describe('activity ledger schemas', () => {
     expect(ledgerKindSchema.options).toEqual([
       'session_filed',
       'milestone_reached',
-      'reward_receipt',
     ]);
+  });
+
+  it('[WI-1121] no longer accepts reward_receipt (removed — no producer, no spec citation)', () => {
+    expect(ledgerKindSchema.safeParse('reward_receipt').success).toBe(false);
   });
 
   describe('[WI-992] ledgerKindParamsSchema — per-kind UUID validation', () => {

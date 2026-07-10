@@ -16,6 +16,7 @@ export type NowCardKind = z.infer<typeof nowCardKindSchema>;
 
 export const nowDeepLinkRouteSchema = z.enum([
   'session.resume',
+  'session.summary',
   'subject.topic',
   'subject.hub',
   'retention.review',
