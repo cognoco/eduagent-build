@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { NativeModules, Platform } from 'react-native';
 import { useAuth } from '@clerk/expo';
+import { ocrResultSchema } from '@eduagent/schemas';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -24,6 +25,7 @@ import {
   type HomeworkOcrGateSource,
 } from '../lib/analytics';
 import { Sentry } from '../lib/sentry';
+import { parseJson } from '../lib/parse-json';
 
 /**
  * Check whether the ML Kit native module is linked in this build.
@@ -253,14 +255,11 @@ async function recognizeTextServerSide(
     );
   }
 
-  const payload = (await response.json()) as {
-    text?: string | null;
-    confidence?: number | null;
-  };
+  const payload = await parseJson(response, ocrResultSchema, 'POST /v1/ocr');
   const text = payload.text?.trim();
   return {
     text: text || null,
-    confidence: normalizeConfidence(payload.confidence),
+    confidence: payload.confidence,
   };
 }
 
