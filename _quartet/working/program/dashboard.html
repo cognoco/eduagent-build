@@ -1,0 +1,97 @@
+<!doctype html>
+<!-- Generated from the program roster + Cosmo (2026-07-10 evening, post-MVP-ratification portfolio reshape).
+     A VIEW, never a home: holds no authoritative fact — on disagreement, roster + Cosmo win.
+     Regenerate at every umbrella touch. Shape: ../../library/dashboard.md / dashboard.template.html. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MentoMate Productization — Flight Deck</title>
+<style>
+  :root[data-theme="dark"]{--bg:#11141a;--fg:#e6e9ef;--card:#1b1f29;--line:#2a2f3a;--muted:#8b93a3;--accent:#3fb8af;--warn:#f4b860;--hold:#8b93a3;--ok:#5ad48a}
+  :root[data-theme="light"]{--bg:#f7f8fa;--fg:#1b1f29;--card:#fff;--line:#e2e5ea;--muted:#5a6172;--accent:#2a8c84;--warn:#b97f1e;--hold:#5a6172;--ok:#1f9d57}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
+  header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;border-bottom:1px solid var(--line)}
+  h1{font-size:1.1rem;margin:0}
+  main{padding:1.5rem;max-width:1100px;margin:0 auto}
+  section{margin-bottom:2rem}
+  h2{font-size:.95rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  th,td{text-align:left;padding:.6rem .8rem;border-bottom:1px solid var(--line);font-size:.9rem}
+  th{color:var(--muted);font-weight:600}
+  .pill{display:inline-block;padding:.1rem .5rem;border-radius:99px;border:1px solid var(--line);font-size:.78rem}
+  .pill.open{color:var(--ok);border-color:var(--ok)}
+  .pill.hold{color:var(--hold)}
+  .pill.warn{color:var(--warn);border-color:var(--warn)}
+  .pill.accent{color:var(--accent);border-color:var(--accent)}
+  button{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:.3rem .7rem;cursor:pointer}
+  .note{color:var(--muted);font-size:.82rem}
+  .num{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<header>
+  <h1>MentoMate Productization — Flight Deck <span class="note">generated 2026-07-10 (post-ratification portfolio reshape)</span></h1>
+  <button id="t" onclick="tog()">◐ theme</button>
+</header>
+<main>
+  <p class="note">A view, never a home — regenerated from the roster + Cosmo. On any disagreement, the roster and Cosmo win.</p>
+
+  <section><h2>Program state</h2>
+  <table><tbody>
+    <tr><td>MVP definition</td><td><span class="pill accent">RATIFIED 2026-07-10</span></td><td>Roadmap-of-record: <code>docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md</code> + <code>RUNWAY.md</code> (Waves 0–3 + FILL). All 10 ratification questions ruled; QC reconciliation passed (RECONCILIATION-REPORT.md).</td></tr>
+    <tr><td>Execution freeze</td><td><span class="pill warn">ON</span></td><td>Operator-held: no MentoMate execution until explicitly lifted. RUNWAY "start immediately" language does NOT override this.</td></tr>
+    <tr><td>Workstream portfolio</td><td><span class="pill accent">RESHAPED 2026-07-10</span></td><td>5 closed (WS-4/22/34/37/44), WS-32 reopened, 42 orphans assigned, initiative links repaired. <code>_wip/mvp-roadmap/WORKSTREAM-PORTFOLIO-PROPOSAL.md</code></td></tr>
+  </tbody></table></section>
+
+  <section><h2>Board — live workstreams (open · of which parked)</h2>
+  <table><thead><tr><th>WS</th><th>Status</th><th>Name</th><th class="num">Open</th><th class="num">Parked</th><th>Runway note</th></tr></thead>
+  <tbody>
+    <tr><td>WS-39</td><td><span class="pill open">Open</span></td><td>Launch Readiness</td><td class="num">36</td><td class="num">2</td><td>Launch-ops + trust-package slice (tag <code>trust-package</code>, gated on WI-1767 design pass) + bundles WI-1772/1780</td></tr>
+    <tr><td>WS-46</td><td><span class="pill open">Open</span></td><td>Core Learning Loop</td><td class="num">22</td><td class="num">5</td><td>Verified-learning spine (Wave 1): WI-1469→1464→1754 + receipt slice</td></tr>
+    <tr><td>WS-28</td><td><span class="pill open">Open</span></td><td>V2 finalization</td><td class="num">17</td><td class="num">5</td><td>Publish-readiness chain + LLM cutover (WI-1685/1686) + caching bundle WI-1779</td></tr>
+    <tr><td>WS-30</td><td><span class="pill open">Open</span></td><td>Compliance — Legal &amp; External</td><td class="num">13</td><td class="num">4</td><td>Counsel packet OPQ-22 is the gate; AI-Act items WI-1659/1663/1664 staged on classification</td></tr>
+    <tr><td>WS-18</td><td><span class="pill open">Open</span></td><td>Identity Cutover</td><td class="num">13</td><td class="num">2</td><td>Own program; WI-1167 staging-migration fix = Runway Wave 0</td></tr>
+    <tr><td>WS-32</td><td><span class="pill open">Open</span></td><td>Supporter &amp; Linking</td><td class="num">11</td><td class="num">4</td><td>REOPENED 2026-07-10 — Q10 ruled supporter cluster IN (WI-787/1121/1127/1135/1137/1753)</td></tr>
+    <tr><td>WS-38</td><td><span class="pill open">Open</span></td><td>Four Strands Language Learning</td><td class="num">10</td><td class="num">2</td><td>Language course spine (§6 rulings); speaking bundle WI-1777 blocked-by WI-1447</td></tr>
+    <tr><td>WS-33</td><td><span class="pill open">Open</span></td><td>Mobile UX &amp; Navigation</td><td class="num">10</td><td class="num">4</td><td>Ratified-13 bug set + voice-floor audit WI-1763</td></tr>
+    <tr><td>WS-31</td><td><span class="pill open">Open</span></td><td>Safety &amp; Eval</td><td class="num">6</td><td class="num">2</td><td>Crisis cluster per Q8 (se-032 stands): WI-1690/1691/1692/1764 + bake-off WI-1438</td></tr>
+    <tr><td>WS-29</td><td><span class="pill hold">On hold</span></td><td>Compliance — Engineering</td><td class="num">17</td><td class="num">2</td><td>Hold rides counsel answers (consent-denial audit WI-1761 etc.)</td></tr>
+    <tr><td>WS-35</td><td><span class="pill hold">On hold</span></td><td>Dev-Infra &amp; Tooling</td><td class="num">10</td><td class="num">1</td><td>Machinery; absorbed WS-34/44 residuals (WI-482, WI-1562)</td></tr>
+    <tr><td>WS-36</td><td><span class="pill hold">On hold</span></td><td>Stream 2 — Estate-Canon Drain</td><td class="num">9</td><td class="num">1</td><td>Machinery (F10-verified), excluded from MVP roadmap</td></tr>
+    <tr><td>WS-52</td><td><span class="pill hold">On hold</span></td><td>Post-MVP pen</td><td class="num">12</td><td class="num">12</td><td>Holding pen — ruled OUT/fast-follow at ratification; every member = "re-triage me after launch"</td></tr>
+  </tbody></table>
+  <p class="note">Closed 2026-07-10 (drained): WS-4 Harness hygiene · WS-22 Bug Lane · WS-34 Platform Hardening · WS-37 Seam Hardening · WS-44 Coverage Debt. Killed items closed via sanctioned triage 2026-07-10: WI-1476/1477/1478 (child-cap family) · WI-1483 (coming-up-next) · WI-1491 (note-correctness umbrella) · WI-1494 (RLS umbrella, superseded). Only WI-1299 (machinery) remains deliberately workstream-less.</p></section>
+
+  <section><h2>Bundles (ADR-0014, tag <code>bundle</code>) — churn-reduction dogfood</h2>
+  <table><thead><tr><th>WP</th><th>Name</th><th>WS</th><th>Watch</th></tr></thead>
+  <tbody>
+    <tr><td>WI-1772</td><td>Prod webhook secrets (Resend + RevenueCat)</td><td>WS-39</td><td>canary — formed first, clean</td></tr>
+    <tr><td>WI-1777</td><td>Four Strands speaking slice (1548+1549)</td><td>WS-38</td><td>carries Blocked-by WI-1447 (TTS locale fix)</td></tr>
+    <tr><td>WI-1779</td><td>Prompt caching (1687+1688)</td><td>WS-28</td><td>eval-harness gated</td></tr>
+    <tr><td>WI-1780</td><td>Billing-failure UX (1474+1475)</td><td>WS-39</td><td>IN before paid launch</td></tr>
+  </tbody></table>
+  <p class="note">Track these four for PR/review-churn performance vs. single-item flow. Bundle tooling: 0 defects across 4 formations (2026-07-10). Lifecycle-close dogfood found 5 gaps → WI-1773/1774/1782/1783/1784 (family: WI-1515).</p></section>
+
+  <section><h2>Gate rail — what fires next</h2>
+  <table><thead><tr><th>Gate</th><th>Condition</th><th>Blast radius</th></tr></thead>
+  <tbody>
+    <tr><td>Freeze lift</td><td>Operator explicit ruling</td><td>Everything — no wave starts before it</td></tr>
+    <tr><td>Counsel packet (OPQ-22)</td><td>Answers on Q1 controller / Q2 consent-denial / Q3 crisis duty / Q4 name-minimization / AI-Act classification</td><td>WS-29/30 hold; WI-1663/1664 promote-or-kill; <b>AI-Act enforcement 2026-08-02 — time-critical</b></td></tr>
+    <tr><td>Wave 0 (RUNWAY)</td><td>WI-1167 staging migration fix (Executing) + WI-1685 cutover chain</td><td>Blocks the V2 routing cutover and everything staged on it</td></tr>
+    <tr><td>Trust-package design (WI-1767)</td><td>Zuzka batch design pass</td><td>Blocks WI-1497/1498/1499/1501/1502</td></tr>
+    <tr><td>Closed beta (WI-1506)</td><td>5–10 families with 13+ teens recruited</td><td>Gates PUBLIC launch (store go-live tracks ungated)</td></tr>
+  </tbody></table></section>
+
+  <section><h2>Field guide</h2>
+  <p class="note">This deck covers the MentoMate MVP program after the 2026-07-10 ratification. Read top-down: program state says whether anything may execute (freeze!); the board says where the open work lives (workstream = execution lane, counts are non-Closed WIs); bundles are the WP-altitude experiments to watch; the gate rail says what unblocks next. Item-level truth is Cosmo (Work Items DB); sequencing truth is RUNWAY.md; scope truth is MVP-DEFINITION.md. This page loses every disagreement.</p></section>
+</main>
+<script>
+  // dark default; remembers choice
+  const r=document.documentElement, k='quartet-theme';
+  r.setAttribute('data-theme', localStorage.getItem(k)||'dark');
+  function tog(){const n=r.getAttribute('data-theme')==='dark'?'light':'dark';r.setAttribute('data-theme',n);localStorage.setItem(k,n);}
+</script>
+</body>
+</html>

@@ -90,32 +90,33 @@
 <div class="wrap">
   <header>
     <h1><span class="pgm">PGM-1</span> MentoMate Productization — Roadmap</h1>
-    <span class="stamp" id="stamp">state as of 2026-07-03 · maintained by program-manager:fable</span>
+    <span class="stamp" id="stamp">state as of 2026-07-10 · MVP RATIFIED · runway waves per docs/plans/2026-07-10-mvp-roadmap/RUNWAY.md</span>
     <button class="theme" id="themeBtn" aria-label="Toggle color theme">theme</button>
   </header>
-  <p class="sub">Left → right is sequence, not calendar time. Arrows are hard dependencies. The single ordering rule:
-  <b>no rollback proven (M4) → no V0 retirement (M5) → no ship (M6)</b>. Android / Google Play only at MVP.</p>
+  <p class="sub">Left → right is the ratified wave sequence (dependency-ordered, not dated — calendar anchoring deferred). Arrows are hard dependencies.
+  Standing rules: <b>execution FREEZE is ON until the operator lifts it</b> · engine spine (1469→1464→1754) never cuts · language yields to verified-learning ·
+  V0 retirement (S6) is <b>post-launch</b>, no longer ship-gating (F4 resolved). Android / Google Play only at MVP.</p>
   <div class="legend" role="list">
     <span class="chip s-done">✓ done</span><span class="chip s-run">▶ executing</span>
-    <span class="chip s-pre">◇ pre-authorized</span><span class="chip s-gate">⬥ operator confirm</span>
-    <span class="chip s-q">○ queued</span><span class="chip s-park">⏸ parked</span>
+    <span class="chip s-pre">◇ pre-authorized</span><span class="chip s-gate">⬥ operator / human gate</span>
+    <span class="chip s-q">○ queued</span><span class="chip s-park">⏸ parked / post-launch</span>
     <span style="color:var(--ink-3)">— amber dashed arrow = crosses a live operator gate</span>
     <span style="color:var(--ink-3)">— bottom bar = relative size of work, green 0 → red 100 (PM estimate)</span>
-    <span style="color:var(--ram);font-family:var(--mono)">▎ramtop</span>
-    <span style="color:var(--ori);font-family:var(--mono)">▎orion</span>
-    <span style="color:var(--ink-3)">— left stripe = owning orchestrator</span>
+    <span style="color:var(--ink-3)">— lane/agent allocation deferred (operator 2026-07-10); no owner stripes</span>
   </div>
   <div class="boardbox"><div class="board" id="board">
-    <div class="colhead"></div><div class="colhead">Now</div><div class="colhead">Next</div>
-    <div class="colhead">Then</div><div class="colhead">Pre-ship</div><div class="colhead">Ship</div>
+    <div class="colhead"></div><div class="colhead">Wave 0 — unblock &amp; protect</div><div class="colhead">Wave 1 — product verticals</div>
+    <div class="colhead">Wave 2 — compliance + hardening</div><div class="colhead">Wave 3 — publish &amp; beta</div><div class="colhead">Launch</div>
   </div></div>
   <section class="gates">
     <h2>Gate ledger — where a human is required</h2>
     <div class="gatelist">
-      <div class="gatecard auto"><b>M2b — destructive env-apply</b><p>PRE-AUTHORIZED 2026-07-03. Runs unattended once M2a lands; per-env Neon branch snapshot + PITR marker + live-catalog check, evidence on the item.</p></div>
-      <div class="gatecard"><b>M5 — retire V0</b><p>LIVE confirm (ruled 2026-07-03, not pre-authorized). Orchestrator presents: M4 proven + tag pushed + retired-code register entry. Removes the flag-flip path back to V0.</p></div>
-      <div class="gatecard auto"><b>Preservation gate (spine §6.6)</b><p>Every strip delete (M3, M5) requires a pushed annotated tag + docs/archive/retired-code.md entry before it lands. Standing; enforced as AC.</p></div>
-      <div class="gatecard auto"><b>runtimeVersion coupling</b><p>If the M6 ship changes runtimeVersion, the V1 fallback bundle is re-published + re-proven against the new binary before M5 executes.</p></div>
+      <div class="gatecard"><b>Freeze lift</b><p>Operator explicit ruling. Nothing on this board starts before it — the runway's "start immediately" language does not override the standing freeze.</p></div>
+      <div class="gatecard"><b>Counsel packet (OPQ-22)</b><p>Q1 controller · Q2 consent-denial · Q3 crisis duty · Q4 name-minimization · <b>AI-Act classification (time-critical — enforcement 2026-08-02)</b>. High-risk answer ⇒ WI-1663/1664 promote to launch-gating, Waves 2–3 re-sequenced.</p></div>
+      <div class="gatecard"><b>DPIA signed + DPO appointed (C-5)</b><p>THE compliance launch gate: required before the first consent-gated child onboards. WI-1105/1106; pure lead time — start path in Wave 0.</p></div>
+      <div class="gatecard"><b>Trust-package design (WI-1767)</b><p>Zuzka batch design pass over all five slices; blocks WI-1497/1498/1499/1501/1502 (tag <code>trust-package</code>, WS-39).</p></div>
+      <div class="gatecard"><b>Closed beta (WI-1506)</b><p>5–10 families screened for 13+ teens. Gates PUBLIC launch; store go-live tracks ungated.</p></div>
+      <div class="gatecard auto"><b>S6 / V0 retirement — post-launch</b><p>F4 resolved 2026-07-10: WI-1308 rewritten to the post-launch S6 milestone. Irreversible; live operator confirm when it comes — but it no longer gates ship.</p></div>
     </div>
   </section>
   <footer>Operational detail (owners, item stages, rulings queue) lives in the roadmap page — the body of the
@@ -135,35 +136,58 @@
   const STATUS={done:['s-done','✓ done'],run:['s-run','▶ executing'],pre:['s-pre','◇ pre-authorized'],
     gate:['s-gate','⬥ your confirm'],q:['s-q','○ queued'],park:['s-park','⏸ parked']};
   const LANES=[
-    ['Ship path','WS-37 + WS-28 · orchestrator:ramtop'],
-    ['DB collapse','WS-18 · orchestrator:ramtop'],
-    ['Launch readiness','WS-39 · orchestrator:orion'],
-    ['Compliance','WS-30 legal · WS-29 eng (hold)'],
-    ['Product surfaces','WS-33 · orchestrator:orion'],
-    ['Hygiene','WS-34 / WS-35 — parked by design'],
+    ['Platform & shell','WS-28 V2 finalization · WS-18 identity cutover'],
+    ['Verified learning','WS-46 core learning loop'],
+    ['Language spine','WS-38 four strands'],
+    ['Family & supporter','WS-32 (reopened 2026-07-10)'],
+    ['Launch ops & trust','WS-39 launch readiness'],
+    ['Compliance & safety','WS-30 legal · WS-29 eng (hold) · WS-31 safety'],
   ];
   const NODES=[
-    {id:'m1',own:'r',sz:40,l:0,c:0,code:'M1',name:'Harden the seam',meta:'WI-1301…1305 · all 5 closed — WS-37 graduated 2026-07-03',st:'done'},
-    {id:'m4',own:'r',sz:30,l:0,c:1,code:'M4',name:'Prove the V1 fallback',meta:'WI-1307 · E2E on the published artifact — verdict due today',st:'run'},
-    {id:'m5',own:'r',sz:35,l:0,c:3,code:'M5',name:'Retire V0',meta:'WI-1308 · irreversible — live operator confirm',st:'gate',gate:true},
-    {id:'m6',own:'r',sz:50,l:0,c:4,code:'M6',name:'Ship V2',meta:'Config T on Google Play · supporter scope in',st:'q'},
-    {id:'m2a',own:'r',sz:35,l:1,c:0,code:'M2a',name:'Journal-prep + pre-chain',meta:'WI-1364 ✓ (−9.7k lines) → WI-1398 → WI-1139 → WI-1306 · FK risk retired (0129 covers)',st:'run'},
-    {id:'m2b',own:'r',sz:30,l:1,c:1,code:'M2b',name:'Env-apply (destructive)',meta:'WI-1141/1250/1292 · snapshot rider · kills staging-red',st:'pre'},
-    {id:'m3',own:'r',sz:70,l:1,c:2,code:'M3',name:'Strip legacy code',meta:'WI-779/1139 · behind pushed tag + register',st:'q'},
-    {id:'clerk',own:'o',sz:10,l:2,c:0,code:'WI-1310',name:'Prod Clerk key',meta:'GH secret piped 2026-07-03 · EAS-half verify pending',st:'done'},
-    {id:'store',own:'o',sz:55,l:2,c:0,code:'WI-1335',name:'Play Console account + listing',meta:'operator + orion · longest external lead — start now',st:'q'},
-    {id:'ops',own:'o',sz:45,l:2,c:1,code:'×4',name:'Prod-ops hardening',meta:'Sentry ✓ (WI-1336) · env-guard ✓ (WI-1340) · Inngest · email',st:'run'},
-    {id:'rc',own:'o',sz:35,l:2,c:1,code:'WI-1328·1-2',name:'RevenueCat products + offering',meta:'Option A ruled · all 7 products, Plus-only offering',st:'q'},
-    {id:'keys',own:'o',sz:25,l:2,c:2,code:'WI-1328·3-4',name:'Webhook + RC keys',meta:'Doppler → GH → EAS · webhook E2E',st:'q'},
-    {id:'repub',own:'o',sz:40,l:2,c:3,code:'WI-1328·5-6',name:'Re-publish both bundles',meta:'prod + fallback carry RC keys · preflight re-hardened · sandbox E2E',st:'q'},
-    {id:'submit',own:'o',sz:30,l:2,c:4,code:'WI-1341',name:'Store submission',meta:'eas submit · Config T flags · internal-track dry run',st:'q'},
-    {id:'comp',sz:60,l:3,c:0,code:'WS-30',name:'Legal chain',meta:'DPO done · policy fields → listing inputs · WI-1176 → Bug Lane',st:'run'},
-    {id:'surf',own:'o',sz:65,l:4,c:1,code:'WS-33',name:'V2 surface polish',meta:'nav fixes · supporter surfaces (MVP scope)',st:'run'},
-    {id:'hyg',sz:50,l:5,c:0,code:'',name:'WS-34 · WS-35',meta:'refactor / infra hygiene — not ship-gating',st:'park'},
+    // Platform & shell
+    {id:'m4',sz:30,l:0,c:0,code:'M4',name:'V1 fallback proven',meta:'WI-1307 closed 2026-07-10 · rollback channel E2E-proven',st:'done'},
+    {id:'w1167',sz:25,l:0,c:0,code:'WI-1167',name:'Staging migration fix',meta:'F6: gates the cutover chain — only item Executing under the freeze',st:'run'},
+    {id:'cutover',sz:55,l:0,c:1,code:'WI-1685',name:'V2 LLM-routing cutover',meta:'bake-off → staging gates → prod flip · rollback = flag flip · +judge flags WI-1686',st:'q'},
+    {id:'cache',sz:40,l:0,c:2,code:'WI-1779',name:'Prompt caching (bundle)',meta:'1687+1688 bundled · post-cutover · eval-harness gated · +spend guardrails WI-1505',st:'q'},
+    {id:'shell',sz:55,l:0,c:3,code:'WS-28',name:'V2 publish-readiness chain',meta:'spans Waves 1–3, must conclude by Wave 3',st:'q'},
+    {id:'s6',sz:35,l:0,c:4,code:'S6',name:'V0 retirement — POST-launch',meta:'WI-1308 rewritten (F4) · irreversible · no longer ship-gating',st:'park',gate:true},
+    // Verified learning
+    {id:'bake',sz:35,l:1,c:0,code:'WI-1438',name:'Challenge grader bake-off',meta:'gate for the whole verified-learning spine',st:'q'},
+    {id:'axis',sz:30,l:1,c:0,code:'WI-1469',name:'Mastery-axis rule',meta:'define verified / due-again / stale / mastered — everything "verified" waits on this',st:'q'},
+    {id:'evalpack',sz:30,l:1,c:0,code:'WI-1666',name:'Loop e2e/eval pack',meta:'ruled early, before visible rollout',st:'q'},
+    {id:'spine',sz:60,l:1,c:1,code:'engine',name:'Engine spine → prod flip',meta:'WI-1446 → WI-1464 → WI-1754 (cohort-limited flip) · never cuts',st:'q'},
+    {id:'proof',sz:55,l:1,c:1,code:'receipt',name:'Proof slice + parent receipt',meta:'WI-1445 · 1502 · 1703 · 1121 · 1658+1705 (V2 parent-home card) · degrades days-later under pressure',st:'q'},
+    // Language spine
+    {id:'guard',sz:30,l:2,c:0,code:'WI-1755',name:'Language-mode safety guard',meta:'before any visible Four Strands rollout · eval coverage',st:'q'},
+    {id:'tts',sz:25,l:2,c:0,code:'WI-1447',name:'STT/TTS locale fix',meta:'blocks the speaking pair · visibly breaks the promise while open',st:'q'},
+    {id:'lfloor',sz:30,l:2,c:1,code:'WI-1552',name:'Continue path (floor)',meta:'cross-session next-practice pointer — extend existing selector',st:'q'},
+    {id:'lbuild',sz:65,l:2,c:1,code:'WI-1777',name:'Course spine builds',meta:'WI-1547 graded input → WI-1756 meaning-output → speaking bundle 1777 (1548+1549, blocked-by 1447)',st:'q'},
+    {id:'lreceipt',sz:25,l:2,c:1,code:'WI-1553',name:'Session receipt',meta:'derive-from-events · degrades LAST · language yields to verified-learning',st:'q'},
+    // Family & supporter
+    {id:'fam',sz:60,l:3,c:1,code:'WS-32',name:'Supporter chain',meta:'WI-1127 coldstart route → 1135 surfaces → 1137 linking screens → 1753 teen family join',st:'q'},
+    // Launch ops & trust
+    {id:'tdesign',sz:30,l:4,c:1,code:'WI-1767',name:'Trust-package design pass',meta:'Zuzka · blocks the five trust builds',st:'gate',gate:true},
+    {id:'tbuild',sz:50,l:4,c:2,code:'trust',name:'Trust builds ×5',meta:'WI-1497/1498/1499/1501/1502 · capacity-shaped · tag trust-package',st:'q'},
+    {id:'activ',sz:30,l:4,c:1,code:'WI-1689',name:'Activation events + sink',meta:'+WI-1762 first-party sink · instrument BEFORE beta',st:'q'},
+    {id:'billing',sz:35,l:4,c:2,code:'WI-1780',name:'Billing-failure UX (bundle)',meta:'1474+1475 bundled · +WI-1399 silent-fail escalation · IN before paid launch',st:'q'},
+    {id:'secrets',sz:15,l:4,c:2,code:'WI-1772',name:'Prod webhook secrets (bundle)',meta:'Resend + RevenueCat · Doppler prd · canary bundle',st:'q'},
+    {id:'maestro',sz:45,l:4,c:2,code:'e2e',name:'Maestro gate real',meta:'WI-1651+1652 CI fixes → WI-1400 smoke baseline + WI-1406 auth subset',st:'q'},
+    {id:'store',sz:60,l:4,c:3,code:'ops-B',name:'Store/launch-ops wave',meta:'WI-1328 RevenueCat · 1335 listings · 1337 push creds · 1114 rating@13+ · 1561 worksheet refresh',st:'q'},
+    {id:'beta',sz:45,l:4,c:4,code:'WI-1506',name:'Dogfood → closed beta',meta:'WI-1503 prod build → beta (families w/ 13+ teens) · gates PUBLIC launch',st:'gate',gate:true},
+    // Compliance & safety
+    {id:'opq22',sz:20,l:5,c:0,code:'OPQ-22',name:'Dispatch counsel packet',meta:'OPERATOR · AI-Act classification TIME-CRITICAL (2026-08-02)',st:'gate',gate:true},
+    {id:'dpo',sz:30,l:5,c:0,code:'C-5',name:'DPO + DPIA signing path',meta:'WI-1105/1106 · THE launch gate · pure lead time',st:'gate',gate:true},
+    {id:'aiplan',sz:35,l:5,c:0,code:'WI-1659',name:'AI-Act compliance plan',meta:'IN unconditionally · pairs with counsel classification answer',st:'q'},
+    {id:'compcore',sz:65,l:5,c:2,code:'WS-30/29',name:'Compliance materialization',meta:'ROPA · breach plan · Art-9 · lawful basis · retention · DPAs · then counsel consumers: WI-1559 → 1109 policy publish',st:'q'},
+    {id:'safety',sz:40,l:5,c:2,code:'WS-31',name:'Safety slice',meta:'WI-1686 judge flags · 1691 digest · 1690 crisis (rescoped, NO guardian notify — Q8)',st:'q'},
+    {id:'final',sz:30,l:5,c:3,code:'gates',name:'Final compliance gates',meta:'WI-1507 closure re-run · WI-1577 FINAL GATE pre-submission',st:'q'},
   ];
-  const EDGES=[['m1','m4'],['m4','m5',1],['m5','m6',1],['m2a','m2b'],['m2b','m3'],
-    ['clerk','m4'],['store','rc'],['rc','keys'],['keys','repub'],['repub','m6'],
-    ['submit','m6'],['comp','store'],['surf','m6']];
+  const EDGES=[['w1167','cutover'],['cutover','cache'],['shell','beta'],
+    ['bake','spine'],['axis','spine'],['axis','proof'],['evalpack','spine'],
+    ['guard','lbuild',1],['tts','lbuild'],['lfloor','lbuild'],['lbuild','lreceipt'],
+    ['tdesign','tbuild',1],['activ','beta'],['store','beta'],
+    ['opq22','compcore',1],['dpo','final',1],['aiplan','compcore'],
+    ['maestro','beta'],['final','beta']];
 
   const board=document.getElementById('board');
   const cells={};
