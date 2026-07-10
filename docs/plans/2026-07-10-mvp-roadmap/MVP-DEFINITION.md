@@ -1,3 +1,5 @@
+> **Roadmap-of-record (ratified 2026-07-10).** Graduated copy per PLAN.md Phase 5; working files, inventory, coverage/gaps provenance live in `_wip/mvp-roadmap/`. Sibling-file references (COVERAGE.md, GAPS.md, inventory.jsonl) resolve there.
+
 # MentoMate MVP Definition — capability tree
 
 **Status: DRAFT v0.2 (2026-07-09) — evidence-complete, ready for ratification review.** Canon + compliance evidence passes folded in (agents canon-surface / compliance-floor, cited per node). Remaining `⧖` markers = deliberate ratification questions or Phase-3 code-verification items, not missing research. **Not ratified.** Ratification: Zuzka (product) + Jørn (operator) — Phase-2 exit of `PLAN.md`.
