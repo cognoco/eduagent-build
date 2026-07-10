@@ -265,7 +265,7 @@ describe('billing-v2 trial lifecycle (integration)', () => {
   it('atomically expires a trial and resets every downgraded quota field', async () => {
     const free = getTierConfig('free');
     const graph = await seedGraph({
-      monthlyLimit: free.monthlyQuota,
+      monthlyLimit: free.monthlyQuota + 1,
       dailyLimit: 99,
       usedThisMonth: 23,
       usedToday: 7,
@@ -289,6 +289,38 @@ describe('billing-v2 trial lifecycle (integration)', () => {
       dailyLimit: free.dailyLimit,
       usedThisMonth: 0,
       usedToday: 0,
+    });
+  });
+
+  it('preserves usage when an expiry replay finds quota already at the target limit', async () => {
+    const free = getTierConfig('free');
+    const graph = await seedGraph({
+      status: 'expired',
+      planTier: 'free',
+      monthlyLimit: free.monthlyQuota,
+      dailyLimit: free.dailyLimit,
+      usedThisMonth: 42,
+      usedToday: 5,
+    });
+
+    await expireTrialAndDowngradeQuotaV2(
+      createIntegrationDb(),
+      graph.subscriptionId,
+      free.monthlyQuota,
+      free.dailyLimit,
+    );
+
+    await expect(loadSubscription(graph.subscriptionId)).resolves.toMatchObject(
+      {
+        status: 'expired',
+        planTier: 'free',
+      },
+    );
+    await expect(loadQuotaPool(graph.subscriptionId)).resolves.toMatchObject({
+      monthlyLimit: free.monthlyQuota,
+      dailyLimit: free.dailyLimit,
+      usedThisMonth: 42,
+      usedToday: 5,
     });
   });
 
