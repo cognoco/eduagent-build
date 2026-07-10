@@ -223,6 +223,29 @@ jest.mock(
   },
 );
 
+// [WI-1446] promotePendingDeepening depends on createScopedRepository, which
+// this file's mocked @eduagent/database module does not stub (same reason
+// updateRetentionFromSession / updateNeedsDeepeningProgress above are mocked
+// rather than exercised for real against this shared unit-test db).
+const mockPromotePendingDeepening = jest.fn().mockResolvedValue({
+  promotedCount: 0,
+  promotedIds: [],
+});
+
+jest.mock(
+  '../../services/needs-deepening/promotion' /* gc1-allow: depends on createScopedRepository against the real schema — no DB in the unit runtime */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/needs-deepening/promotion',
+    ) as typeof import('../../services/needs-deepening/promotion');
+    return {
+      ...actual,
+      promotePendingDeepening: (...args: unknown[]) =>
+        mockPromotePendingDeepening(...args),
+    };
+  },
+);
+
 const mockGetCurrentLanguageProgress = jest.fn().mockResolvedValue(null);
 
 jest.mock(
@@ -1273,12 +1296,27 @@ describe('sessionCompleted', () => {
       );
     });
 
+    // [WI-1446] promotePendingDeepening rides the same guard/loop as
+    // updateNeedsDeepeningProgress — see session-completed.ts's
+    // update-needs-deepening step.
+    it('[WI-1446] calls promotePendingDeepening with correct args', async () => {
+      await executeSteps(createEventData({ qualityRating: 4 }));
+
+      expect(mockPromotePendingDeepening).toHaveBeenCalledWith(
+        expect.any(Object),
+        PROFILE_ID,
+        TOPIC_ID,
+        'retention_again',
+      );
+    });
+
     it('skips needs-deepening update when no topicId', async () => {
       const { result } = (await executeSteps(
         createEventData({ topicId: null }),
       )) as any;
 
       expect(mockUpdateNeedsDeepeningProgress).not.toHaveBeenCalled();
+      expect(mockPromotePendingDeepening).not.toHaveBeenCalled();
       const outcome = result.outcomes.find(
         (o: any) => o.step === 'update-needs-deepening',
       );
@@ -1289,6 +1327,7 @@ describe('sessionCompleted', () => {
       const { result } = (await executeSteps(createEventData())) as any;
 
       expect(mockUpdateNeedsDeepeningProgress).not.toHaveBeenCalled();
+      expect(mockPromotePendingDeepening).not.toHaveBeenCalled();
       const outcome = result.outcomes.find(
         (o: any) => o.step === 'update-needs-deepening',
       );
@@ -1321,6 +1360,27 @@ describe('sessionCompleted', () => {
         PROFILE_ID,
         'topic-c',
         5,
+      );
+
+      // [WI-1446] promotePendingDeepening loops over the same topics.
+      expect(mockPromotePendingDeepening).toHaveBeenCalledTimes(3);
+      expect(mockPromotePendingDeepening).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        'topic-a',
+        'retention_again',
+      );
+      expect(mockPromotePendingDeepening).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        'topic-b',
+        'retention_again',
+      );
+      expect(mockPromotePendingDeepening).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        'topic-c',
+        'retention_again',
       );
     });
   });

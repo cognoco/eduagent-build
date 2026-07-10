@@ -12,6 +12,7 @@ import {
   updateRetentionFromSession,
   updateNeedsDeepeningProgress,
 } from '../../services/retention-data';
+import { promotePendingDeepening } from '../../services/needs-deepening/promotion';
 import { resetRetentionCardForRelearn } from '../../services/apply-retention-update';
 import { getCurrentLanguageProgress } from '../../services/language-curriculum';
 import { extractVocabularyFromTranscript } from '../../services/vocabulary-extract';
@@ -876,15 +877,24 @@ export const sessionCompleted = inngest.createFunction(
         return runIsolated('update-needs-deepening', profileId, async () => {
           const db = getStepDatabase();
           // [L7-F7] Parallelize per-topic needs-deepening updates.
+          // [WI-1446] Also promote any unexpired pending_review rows for these
+          // topics. Challenge Round writes pending_review rows
+          // (persistChallengeRoundReviewTargets) that otherwise have no
+          // production path to 'active' — the only other consumer of pending
+          // rows is the expiry cron, which resolves them, never promotes.
+          // Independent of updateNeedsDeepeningProgress (disjoint status
+          // filters: active vs. unexpired pending_review), so no ordering
+          // dependency.
           await Promise.all(
-            retentionTopicIds.map((tid) =>
+            retentionTopicIds.flatMap((tid) => [
               updateNeedsDeepeningProgress(
                 db,
                 profileId,
                 tid,
                 completionQualityRating,
               ),
-            ),
+              promotePendingDeepening(db, profileId, tid, 'retention_again'),
+            ]),
           );
         });
       }),

@@ -34,6 +34,7 @@ import {
   learningProfiles,
   membership,
   memoryFacts,
+  needsDeepeningTopics,
   notificationPreferences,
   organization,
   person,
@@ -54,6 +55,7 @@ import * as config from '../../config';
 import * as sentry from '../../services/sentry';
 
 import * as llm from '../../services/llm';
+import { getSubjectNeedsDeepening } from '../../services/retention-data';
 import { loadTopicTitle, sessionCompleted } from './session-completed';
 import {
   deleteLegacyAccountsForTest,
@@ -1540,6 +1542,83 @@ describe('session-completed integration', () => {
     );
 
     captureExceptionSpy.mockRestore();
+  });
+
+  // [WI-1446 red-green-revert guard] Challenge Round writes needs_deepening_topics
+  // rows with status='pending_review' (persistChallengeRoundReviewTargets), but
+  // getSubjectNeedsDeepening only ever read status='active' rows, and
+  // promotePendingDeepening had no production caller — a corroborated weak
+  // concept was invisible to the learner until it silently expired 7 days later.
+  // RED pre-fix: the seeded pending row stays 'pending_review' and
+  // getSubjectNeedsDeepening does not return it. GREEN post-fix: session-completed's
+  // update-needs-deepening step promotes it to 'active'.
+  it('[WI-1446] promotes an unexpired pending_review needs-deepening row to active during session-completed', async () => {
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+    const { subjectId } = await seedSubject(profileId);
+    const { topicId } = await seedCurriculum(subjectId);
+    const { sessionId } = await seedSession({ profileId, subjectId, topicId });
+    await seedSessionEvents({ sessionId, profileId, subjectId, topicId });
+    await seedLearningProfile(profileId);
+
+    // Simulate what persistChallengeRoundReviewTargets already wrote for a
+    // Challenge Round misconception/partial on this topic.
+    const pendingId = generateUUIDv7();
+    await db.insert(needsDeepeningTopics).values({
+      id: pendingId,
+      profileId,
+      subjectId,
+      topicId,
+      status: 'pending_review',
+      source: 'challenge_round',
+      concept: 'photosynthesis light reactions',
+      misconception: 'Believes light reactions occur in the stroma.',
+      correction: 'Light reactions occur in the thylakoid membrane.',
+      pendingExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
+    const now = new Date(Date.now() + 1_000);
+    const step = buildStep();
+    const handler = getHandler();
+
+    await handler({
+      event: {
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId,
+          subjectId,
+          topicId,
+          exchangeCount: 2,
+          summaryStatus: 'pending',
+          timestamp: now.toISOString(),
+          verificationType: null,
+          sessionType: 'learning',
+          qualityRating: 4,
+          reason: 'user_ended',
+        },
+      },
+      step,
+    });
+
+    // The seeded row was promoted in place — not duplicated.
+    const rows = await db
+      .select()
+      .from(needsDeepeningTopics)
+      .where(
+        and(
+          eq(needsDeepeningTopics.profileId, profileId),
+          eq(needsDeepeningTopics.topicId, topicId),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(pendingId);
+    expect(rows[0]?.status).toBe('active');
+    expect(rows[0]?.pendingExpiresAt).toBeNull();
+
+    // The learner-facing read now surfaces the promoted weak concept.
+    const deepening = await getSubjectNeedsDeepening(db, profileId, subjectId);
+    expect(deepening.topics.some((t) => t.topicId === topicId)).toBe(true);
   });
 });
 
