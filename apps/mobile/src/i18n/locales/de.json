@@ -753,6 +753,7 @@
       "retryLabel": "Sprechversuch wiederholen"
     },
     "chatShell": {
+      "aiDisclosure": "Du sprichst mit einem KI-Mentor",
       "defaultSubtitle": "Ich bin hier, um zu helfen",
       "defaultPlaceholder": "Nachricht eingeben...",
       "imageUnavailable": "Bild nicht mehr verfügbar",

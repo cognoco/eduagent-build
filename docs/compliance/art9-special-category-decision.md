@@ -33,7 +33,7 @@ GDPR Art 9 bites on **inference**, not just on a checkbox. A feature that *deriv
 ## Existing enforcement (already in the codebase)
 
 - The repo already carries a **no-clinical-copy baseline** guard (`scripts/no-clinical-copy-baseline.json` pattern) preventing clinical language from entering user-facing copy. This decision is the policy that guard implements.
-- **Action for eng:** confirm the no-clinical-copy guard also covers LLM-extracted `memory_facts.text`, `topic_notes.content`, and `needs_deepening_topics.misconception` content paths, not only static copy. If a model could write a clinical inference into those fields, add a server-side reject/scrub on that path. (Tracked in DPIA §6 mitigations.)
+- Runtime persistence uses a separate, central attribution guard (`apps/api/src/services/persisted-learning-text-guard.ts`) for `memory_facts.text`, `topic_notes.content`, and `needs_deepening_topics.misconception`. It does not ban medical terms from educational discussion; it catches explicit health/disability characterisations of a person. Unsafe memory facts are omitted (including dedup merges), topic-note writes are rejected, and unsafe misconception text is stored as `null`. The rejected text is never logged. This is intentionally distinct from the static UI-copy ratchet above.
 
 ## Consequence for the DPIA (A1)
 
