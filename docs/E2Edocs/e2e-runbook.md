@@ -212,6 +212,41 @@ C:/Tools/doppler/doppler.exe run -c stg -- \
 
 The Doppler `-c stg` config matches the seed endpoint's `TEST_SEED_SECRET`.
 
+Seeded native flows reuse deterministic Clerk seed identities instead of
+creating a new user per run. By default, `seed-and-run.sh` uses
+`E2E_SEED_SLOT=native-01`, which maps to
+`test-e2e-native-01+clerk_test@example.com`. Slots `native-01` through
+`native-08` are reserved for parallel native runs:
+
+```bash
+C:/Tools/doppler/doppler.exe run -c stg -- \
+  bash apps/mobile/e2e/scripts/seed-and-run.sh \
+    onboarding-complete apps/mobile/e2e/flows/<your-flow>.yaml
+
+C:/Tools/doppler/doppler.exe run -c stg -- \
+  env E2E_SEED_SLOT=native-02 \
+  bash apps/mobile/e2e/scripts/seed-and-run.sh \
+    learning-active apps/mobile/e2e/flows/<your-flow>.yaml
+```
+
+After a normal seeded native run, the script calls `/v1/__test/reset` with the
+slot prefix and `preserveClerkUsers=true`. That clears the database graph for
+the reusable user while keeping the Clerk identity available for the next run.
+
+Use an explicit `EMAIL=...` only for one-off debugging. It is intentionally
+blocked unless `E2E_ALLOW_ARBITRARY_EMAIL=1` is set:
+
+```bash
+C:/Tools/doppler/doppler.exe run -c stg -- \
+  env E2E_ALLOW_ARBITRARY_EMAIL=1 EMAIL="native-e2e-debug-$(date +%s)+clerk_test@example.com" \
+  bash apps/mobile/e2e/scripts/seed-and-run.sh \
+    onboarding-complete apps/mobile/e2e/flows/<your-flow>.yaml
+```
+
+Sign-up, forgot-password, MFA, and other auth-creation flows are explicit
+carve-outs. Run those with `--no-seed` or a dedicated wrapper because they are
+testing account creation rather than reusable seeded sign-in.
+
 ### Required env vars
 
 | Env var | When | Why |
@@ -219,6 +254,8 @@ The Doppler `-c stg` config matches the seed endpoint's `TEST_SEED_SECRET`.
 | `METRO_URL=http://10.0.2.2:8081` | Always | Overrides the script default of `:8082` (the BUG-7 bundle proxy, empirically unnecessary since 2026-04-30). The harness parses the port from this URL and `adb reverse`s it automatically, so non-default ports such as `:8083` work when another branch holds `:8081`/`:8082`. The preflight check uses the same value. |
 | `TEMP=C:/tools/maestro/tmp` | Windows only | Java jansi.dll extraction otherwise hits `C:\Users\ZuzanaKopečná\AppData\...` and fails on the Unicode `č`. |
 | `TMP=C:/tools/maestro/tmp` | Windows only | Same as TEMP — both must be set. |
+| `E2E_SEED_SLOT=native-01..native-08` | Optional seeded native runs | Selects a reusable native Clerk seed identity. Defaults to `native-01`. |
+| `E2E_ALLOW_ARBITRARY_EMAIL=1` + `EMAIL=...` | Debug only | Allows an explicit one-off seed email. Do not use this for routine E2E runs. |
 
 ### Warning: `pnpm test:e2e:smoke` is currently broken on Windows
 
@@ -258,6 +295,27 @@ Stop-Process -Id <pid> -Force
 **Windows caveat:** Do NOT use bash `taskkill /PID <pid>` — MSYS mangles `/PID`
 into `C:/Program Files/Git/PID` and the call fails. Avoid `taskkill` on the
 emulator process too — it leaves AVD lock files that can break the next boot.
+
+### Stale Clerk seed users
+
+Routine seeded native runs preserve the reusable Clerk user and clean only that
+user's DB graph. To sweep old users left by earlier ad-hoc E2E runs, use the
+cleanup script in dry-run mode first:
+
+```bash
+C:/Tools/doppler/doppler.exe run -c stg -- \
+  node scripts/clean-clerk-test-users.mjs --older-than-hours=24
+```
+
+Review the `WILL DELETE` and `WILL PRESERVE` sections before executing. The
+script only deletes stale seed-managed users in owned test namespaces and
+preserves reusable slot identities such as
+`test-e2e-native-01+clerk_test@example.com`.
+
+```bash
+C:/Tools/doppler/doppler.exe run -c stg -- \
+  node scripts/clean-clerk-test-users.mjs --older-than-hours=24 --execute
+```
 
 ---
 

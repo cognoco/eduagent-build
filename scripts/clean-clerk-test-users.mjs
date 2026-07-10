@@ -1,4 +1,5 @@
-// Deletes all Clerk seed users (external_id prefix `clerk_seed_`) and their DB rows.
+// Deletes stale, owned Clerk seed users (external_id prefix `clerk_seed_`) and
+// their DB rows.
 //
 // Architecture: this script asks the server to clean up DB rows for Clerk users
 // that the server can still verify as seed-managed, then deletes those users
@@ -6,26 +7,43 @@
 // For ~49 users, doing the Clerk deletes inside the Worker would otherwise
 // exceed CF's subrequest cap.
 //
-// Safety: only users whose external_id starts with `clerk_seed_` are touched.
-// Real users (jjoerg@gmail.com, key_to@yahoo.com, zuzana.kopecna@zwizzly.com,
-// etc.) have no such tag and are preserved.
+// Safety: only owned stale test namespaces are deleted. Reusable seed users and
+// real users (jjoerg@gmail.com, key_to@yahoo.com, zuzana.kopecna@zwizzly.com,
+// etc.) are preserved.
 //
 // DEFAULTS TO DRY-RUN. Pass `--execute` to actually delete.
 //
 // Run via (staging — dry-run, lists what WOULD be deleted):
-//   doppler.exe run -c stg -- node scripts/clean-clerk-test-users.mjs
+//   doppler.exe run -c stg -- node scripts/clean-clerk-test-users.mjs --older-than-hours=24
 //
 // Run via (staging — actually delete):
-//   doppler.exe run -c stg -- node scripts/clean-clerk-test-users.mjs --execute
+//   doppler.exe run -c stg -- node scripts/clean-clerk-test-users.mjs --older-than-hours=24 --execute
 //
 // Env:
 //   API_URL           — Base URL for the API (default: https://api-stg.mentomate.com)
 //   TEST_SEED_SECRET  — Required for non-dev environments (supplied by Doppler)
 //   CLERK_SECRET_KEY  — Required (supplied by Doppler)
 
+import cleanupRules from './clean-clerk-test-users-lib.js';
+
+const { classifyClerkTestUserForCleanup } = cleanupRules;
+
 const EXECUTE = process.argv.includes('--execute');
+const olderThanArg = process.argv.find((arg) =>
+  arg.startsWith('--older-than-hours='),
+);
+const OLDER_THAN_HOURS = olderThanArg ? Number(olderThanArg.split('=')[1]) : 24;
 const SEED_CLERK_PREFIX = 'clerk_seed_';
 const CLERK_API_BASE = 'https://api.clerk.com/v1';
+
+if (!Number.isFinite(OLDER_THAN_HOURS) || OLDER_THAN_HOURS <= 0) {
+  console.error(
+    `[clean-clerk] ERROR: --older-than-hours must be a positive number, got ${JSON.stringify(
+      olderThanArg?.split('=')[1],
+    )}.`,
+  );
+  process.exit(1);
+}
 
 const apiUrl = (process.env.API_URL ?? 'https://api-stg.mentomate.com').replace(
   /\/+$/,
@@ -69,7 +87,12 @@ async function listAllUsers() {
     for (const user of users) {
       const email = user.email_addresses?.[0]?.email_address ?? '(no email)';
       const externalId = user.external_id ?? null;
-      const entry = { id: user.id, email, externalId };
+      const entry = {
+        id: user.id,
+        email,
+        externalId,
+        createdAt: user.created_at ?? user.createdAt ?? null,
+      };
       if (externalId && externalId.startsWith(SEED_CLERK_PREFIX)) {
         seedUsers.push(entry);
       } else {
@@ -143,18 +166,42 @@ async function cleanupDbRows(clerkUserIds) {
 // Main
 // ---------------------------------------------------------------------------
 const { seedUsers, otherUsers } = await listAllUsers();
+const classifiedSeedUsers = seedUsers.map((user) => ({
+  ...user,
+  cleanupDecision: classifyClerkTestUserForCleanup(user, {
+    olderThanHours: OLDER_THAN_HOURS,
+  }),
+}));
+const deletableSeedUsers = classifiedSeedUsers.filter(
+  (user) => user.cleanupDecision.eligible,
+);
+const preservedSeedUsers = classifiedSeedUsers.filter(
+  (user) => !user.cleanupDecision.eligible,
+);
 
 if (!EXECUTE) {
   console.log('[clean-clerk] DRY-RUN — no users will be deleted.');
   console.log(
-    '[clean-clerk] Pass --execute to actually delete the seed users below.\n',
+    '[clean-clerk] Pass --execute to actually delete the eligible stale seed users below.\n',
   );
+  console.log(`[clean-clerk] Stale threshold: ${OLDER_THAN_HOURS}h\n`);
 
   console.log(
-    `=== WILL DELETE — ${seedUsers.length} seed users (external_id: clerk_seed_*) ===`,
+    `=== WILL DELETE — ${deletableSeedUsers.length} stale owned seed users ===`,
   );
-  for (const u of seedUsers) {
-    console.log(`  - ${u.email}  (external_id: ${u.externalId})`);
+  for (const u of deletableSeedUsers) {
+    console.log(
+      `  - ${u.email}  (external_id: ${u.externalId}; created_at: ${u.createdAt ?? 'unknown'})`,
+    );
+  }
+
+  console.log(
+    `\n=== WILL PRESERVE — ${preservedSeedUsers.length} seed users protected by cleanup rules ===`,
+  );
+  for (const u of preservedSeedUsers) {
+    console.log(
+      `  - ${u.email}  (${u.cleanupDecision.reason}; external_id: ${u.externalId})`,
+    );
   }
 
   console.log(
@@ -172,7 +219,7 @@ if (!EXECUTE) {
   const keyToWillSurvive = preserved.some((e) => e.startsWith('key_to@yahoo'));
 
   console.log(
-    `\n[clean-clerk] Summary:  would delete=${seedUsers.length}  would preserve=${otherUsers.length}`,
+    `\n[clean-clerk] Summary:  would delete=${deletableSeedUsers.length}  would preserve=${preservedSeedUsers.length + otherUsers.length}`,
   );
   console.log(
     `[clean-clerk]   jjoerg@gmail.com preserved:   ${jorgWillSurvive ? 'YES ✓' : 'NOT FOUND — investigate'}`,
@@ -188,16 +235,16 @@ if (!EXECUTE) {
 
 // --execute path
 console.log(
-  `[clean-clerk] EXECUTE — cleaning DB rows and deleting ${seedUsers.length} Clerk seed users (local HTTP, no CF Worker limit)...\n`,
+  `[clean-clerk] EXECUTE — cleaning DB rows and deleting ${deletableSeedUsers.length} eligible stale Clerk seed users (local HTTP, no CF Worker limit)...\n`,
 );
 
-const seedIds = seedUsers.map((user) => user.id);
+const seedIds = deletableSeedUsers.map((user) => user.id);
 const result = await cleanupDbRows(seedIds);
 
 const deletedIds = [];
 let failed = 0;
 let processed = 0;
-for (const user of seedUsers) {
+for (const user of deletableSeedUsers) {
   const ok = await deleteClerkUser(user.id);
   processed++;
   if (ok) {

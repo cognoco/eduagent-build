@@ -78,9 +78,80 @@ async function callReset(
 }
 
 // Import the mock so we can verify it's not called on bad input
-const { resetDatabase } = jest.requireMock('../services/test-seed') as {
+const { resetDatabase, seedScenario } = jest.requireMock(
+  '../services/test-seed',
+) as {
   resetDatabase: jest.Mock;
+  seedScenario: jest.Mock;
 };
+
+async function callSeed(
+  body: unknown,
+  env: Record<string, string | undefined> = {
+    ENVIRONMENT: 'development',
+    TEST_SEED_SECRET: 'dev-secret',
+  },
+) {
+  const req = new Request('http://test.local/__test/seed', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Test-Secret': env['TEST_SEED_SECRET'] ?? '',
+    },
+    body: JSON.stringify(body),
+  });
+  return testSeedRoutes.request(req, undefined, env);
+}
+
+describe('[WI-1770] POST /__test/seed — native seed slots', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    seedScenario.mockResolvedValue({
+      scenario: 'default',
+      accountId: 'account-id',
+      profileId: 'profile-id',
+      email: 'test-e2e-native-01+clerk_test@example.com',
+      password: 'seed-password',
+      ids: {},
+    });
+  });
+
+  it('accepts nativeSeedSlot and seeds the deterministic native slot email', async () => {
+    const res = await callSeed({
+      scenario: 'default',
+      nativeSeedSlot: 'native-01',
+    });
+
+    expect(res.status).toBe(201);
+    expect(seedScenario).toHaveBeenCalledWith(
+      undefined,
+      'default',
+      'test-e2e-native-01+clerk_test@example.com',
+      expect.any(Object),
+    );
+  });
+
+  it('rejects a request that provides both email and nativeSeedSlot', async () => {
+    const res = await callSeed({
+      scenario: 'default',
+      email: 'custom@example.com',
+      nativeSeedSlot: 'native-01',
+    });
+
+    expect(res.status).toBe(400);
+    expect(seedScenario).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown nativeSeedSlot', async () => {
+    const res = await callSeed({
+      scenario: 'default',
+      nativeSeedSlot: 'native-99',
+    });
+
+    expect(res.status).toBe(400);
+    expect(seedScenario).not.toHaveBeenCalled();
+  });
+});
 
 describe('[WI-983] POST /__test/reset — Zod body validation', () => {
   beforeEach(() => {
@@ -104,6 +175,32 @@ describe('[WI-983] POST /__test/reset — Zod body validation', () => {
     const body = (await res.json()) as { message: string };
     expect(body.message).toBe('Database reset complete');
     expect(resetDatabase).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes preserveClerkUsers=true through to resetDatabase for reusable native slot cleanup', async () => {
+    const req = new Request(
+      'http://test.local/__test/reset?prefix=test-e2e-native-01&preserveClerkUsers=true',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Test-Secret': 'dev-secret',
+        },
+        body: JSON.stringify({}),
+      },
+    );
+    const res = await testSeedRoutes.request(req, undefined, {
+      ENVIRONMENT: 'development',
+      TEST_SEED_SECRET: 'dev-secret',
+    });
+
+    expect(res.status).toBe(200);
+    const opts = (resetDatabase as jest.Mock).mock.calls[0]?.[2] as {
+      prefix?: string;
+      preserveClerkUsers?: boolean;
+    };
+    expect(opts.prefix).toBe('test-e2e-native-01');
+    expect(opts.preserveClerkUsers).toBe(true);
   });
 
   // [WI-983] Regression: the CI seed-cleanup callers POST /__test/reset with NO

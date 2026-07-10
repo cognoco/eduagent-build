@@ -185,6 +185,8 @@ export interface ResetResult {
 export interface ResetOptions {
   /** Optional email prefix filter for per-run cleanup, e.g. integ-playwright-1234- */
   prefix?: string;
+  /** Delete DB rows while preserving matching reusable Clerk seed users. */
+  preserveClerkUsers?: boolean;
   /** If provided, skip the Clerk deletion step entirely and use this list
    * for DB cleanup. Used by scripts/clean-clerk-test-users.mjs to keep Clerk
    * HTTP calls out of the Worker invocation (Cloudflare 50-subrequest limit). */
@@ -6158,7 +6160,14 @@ export async function resetDatabase(
               id.startsWith(SEED_CLERK_PREFIX),
             ),
         }
-      : await deleteClerkTestUsers(env, { prefix });
+      : options.preserveClerkUsers
+        ? {
+            count: 0,
+            clerkUserIds: (await listSeedClerkUsers(env, { prefix })).map(
+              (user) => user.id,
+            ),
+          }
+        : await deleteClerkTestUsers(env, { prefix });
 
   if (
     options.clerkUserIds &&
