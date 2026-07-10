@@ -218,6 +218,7 @@ apps/mobile/e2e/scripts/run-logs/**/*.log
 
 # Cosmo/Quartet local runtime artifacts (clacks ledgers, monitor logs, review outputs)
 .cosmo-artifacts/
+.cosmo-watch/
 /--workstream
 /_quartet/working/lanes/**/_state/*.jsonl
 /_quartet/working/lanes/**/_state/monitor-manifest.json
