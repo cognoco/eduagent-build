@@ -239,7 +239,7 @@ All four should wait on this contract (per the "No parent proof before artifact 
 6. **S6 (WI-1502)**, **S3b/S3c (WI-1465/WI-1454)** — visible promise + recovery, in either order, with S8 cases added as they land.
 7. **Promote S5a to WIs, then S5a/S5b** — artifact contract + writable/kept/cited notes + grading. S5a's Flow 3 (citation) still lands last inside that group, per felt-knowing spec, but S7 cannot begin until the artifact source/verification taxonomy exists.
 8. **S7 (WI-1665)** — parent proof, once there is a verified artifact to show and the parent-visible surface is decided for the shipping target.
-9. **S8 completion pass** — the umbrella remains open until verified / partial / misconception / decay-retest / parent-proof variants all assert the assembled loop.
+9. **S8 completion pass** — variants (a)-(d) (verified / partial / misconception / decay-retest) are delivered by WI-1666; the remaining variant (e) parent-proof completion pass is owned by WI-1793, blocked on WI-1658 and WI-1705.
 
 ## Out of scope
 
