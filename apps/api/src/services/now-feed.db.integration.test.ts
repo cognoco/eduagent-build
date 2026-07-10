@@ -24,7 +24,11 @@ import {
   ensureLegacyProfileAnchorForTest,
   ensureV2IdentityForLegacyProfileTest,
 } from '../test-utils/legacy-identity-anchors';
-import { buildNowFeed, LEDGER_PROJECTION_RECENCY_DAYS } from './now-feed';
+import {
+  buildNowFeed,
+  buildNowOverflow,
+  LEDGER_PROJECTION_RECENCY_DAYS,
+} from './now-feed';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -58,6 +62,7 @@ interface SeededFixture {
   subjectId: string;
   bookId: string;
   topicId: string;
+  curriculumId: string;
 }
 
 async function seedFixture(
@@ -136,6 +141,7 @@ async function seedFixture(
     subjectId: subject.id,
     bookId: book.id,
     topicId: topic.id,
+    curriculumId: curriculum.id,
   };
 }
 
@@ -203,11 +209,76 @@ describe('now-feed derive-on-read projections — real DB (WI-1121)', () => {
     expect(card?.kind).toBe('ledger_moment');
     expect(card?.templateKey).toBe('now.ledger_moment.topic_mastered');
     expect(card?.params.subjectId).toBe(fixture.subjectId);
+    expect(card?.params.topicId).toBe(fixture.topicId);
     expect(card?.deepLink).toEqual({
-      route: 'subject.hub',
-      params: { subjectId: fixture.subjectId },
-      chain: [],
+      route: 'subject.topic',
+      params: {
+        subjectId: fixture.subjectId,
+        bookId: fixture.bookId,
+        topicId: fixture.topicId,
+      },
+      chain: ['subject.hub'],
     });
+  });
+
+  it('[WI-1121 review fix] gives two topics mastered in the same subject distinct card identity (no dismiss-key collision)', async () => {
+    const fixture = await seedFixture(db, 'topic-mastered-two');
+    const [secondTopic] = await db
+      .insert(curriculumTopics)
+      .values({
+        curriculumId: fixture.curriculumId,
+        bookId: fixture.bookId,
+        title: 'Topic two topic-mastered-two',
+        description: 'Description two topic-mastered-two',
+        sortOrder: 1,
+        estimatedMinutes: 30,
+      })
+      .returning({ id: curriculumTopics.id });
+    if (!secondTopic) throw new Error('second topic insert failed');
+
+    await db.insert(retentionCards).values([
+      {
+        profileId: fixture.profileId,
+        topicId: fixture.topicId,
+        easeFactor: 2.5,
+        intervalDays: 1,
+        repetitions: 3,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+        xpStatus: 'verified',
+        masteredAt: RECENT,
+      },
+      {
+        profileId: fixture.profileId,
+        topicId: secondTopic.id,
+        easeFactor: 2.5,
+        intervalDays: 1,
+        repetitions: 3,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+        xpStatus: 'verified',
+        masteredAt: RECENT,
+      },
+    ]);
+
+    const feed = await buildNowFeed(db, fixture.profileId, 'self');
+    const overflow = await buildNowOverflow(db, fixture.profileId, 'self');
+    const masteredCards = [...feed.cards, ...overflow.items].filter(
+      (c) => c.params.ledgerKind === 'topic_mastered',
+    );
+
+    expect(masteredCards).toHaveLength(2);
+    const dismissKeys = new Set(
+      masteredCards.map((c) =>
+        [
+          c.kind,
+          c.templateKey,
+          c.deepLink.route,
+          JSON.stringify(c.deepLink.params),
+        ].join('|'),
+      ),
+    );
+    expect(dismissKeys.size).toBe(2);
   });
 
   it('excludes a retention card mastered outside the recency window', async () => {
@@ -257,7 +328,7 @@ describe('now-feed derive-on-read projections — real DB (WI-1121)', () => {
     expect(card?.params.sessionId).toBe(sessionId);
     expect(card?.params.subjectId).toBeUndefined();
     expect(card?.deepLink).toEqual({
-      route: 'session.resume',
+      route: 'session.summary',
       params: { sessionId },
       chain: [],
     });

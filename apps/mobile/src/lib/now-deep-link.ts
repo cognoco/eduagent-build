@@ -25,6 +25,13 @@ const PATH_BUILDERS: Record<NowDeepLinkRoute, PathBuilder> = {
     `/(app)/session?sessionId=${encodeURIComponent(
       requiredParam(params, 'sessionId', 'session.resume'),
     )}`,
+  // [WI-1121 review fix] Matches the path buildSessionDetailHref() builds for
+  // a completed session (session-detail-navigation.ts) — the recap/summary
+  // screen, distinct from 'session.resume' (the live session chat).
+  'session.summary': (params) =>
+    `/session-summary/${encodeURIComponent(
+      requiredParam(params, 'sessionId', 'session.summary'),
+    )}`,
   'subject.hub': (params, options) => {
     const subjectId = encodeURIComponent(
       requiredParam(params, 'subjectId', 'subject.hub'),

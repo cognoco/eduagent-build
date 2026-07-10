@@ -68,6 +68,12 @@ export const RANKING = {
 
 export const ROUTE_CATALOG = {
   'session.resume': { params: ['sessionId'], chain: [] },
+  // [WI-1121 review fix] A completed session's recap lives at
+  // /session-summary/[sessionId] (mobile: session-detail-navigation.ts's
+  // buildSessionDetailHref, already used by JournalTabView's own recap
+  // rows) — distinct from 'session.resume', which reopens the LIVE session
+  // chat and is wrong for a "recap is ready" moment on an ended session.
+  'session.summary': { params: ['sessionId'], chain: [] },
   'subject.hub': { params: ['subjectId'], chain: [] },
   'subject.topic': {
     params: ['subjectId', 'bookId', 'topicId'],
@@ -831,6 +837,8 @@ async function collectTopicMasteredCandidates(
       id: retentionCards.id,
       masteredAt: retentionCards.masteredAt,
       subjectId: subjects.id,
+      topicId: curriculumTopics.id,
+      bookId: curriculumTopics.bookId,
       topicTitle: curriculumTopics.title,
     })
     .from(retentionCards)
@@ -862,9 +870,20 @@ async function collectTopicMasteredCandidates(
       params: {
         ledgerKind: 'topic_mastered',
         subjectId: row.subjectId,
+        topicId: row.topicId,
+        bookId: row.bookId,
         topicTitle: row.topicTitle,
       },
-      deepLink: resolveDeepLink('subject.hub', { subjectId: row.subjectId }),
+      // [WI-1121 review fix] Routes per-topic (subject.topic), not
+      // per-subject (subject.hub): two topics mastered in the same subject
+      // within the recency window previously produced identical
+      // kind/templateKey/route/params, so getNowCardDismissKey() collided —
+      // dismissing one card hid both.
+      deepLink: resolveDeepLink('subject.topic', {
+        subjectId: row.subjectId,
+        bookId: row.bookId,
+        topicId: row.topicId,
+      }),
       scope,
     }));
 }
@@ -915,7 +934,10 @@ async function collectRecapReadyCandidates(
       ledgerKind: 'recap_ready',
       sessionId: row.sessionId,
     },
-    deepLink: resolveDeepLink('session.resume', { sessionId: row.sessionId }),
+    // [WI-1121 review fix] 'session.summary' (→ /session-summary/[sessionId]),
+    // not 'session.resume' (→ the live session chat) — this session already
+    // ended; its recap lives on the summary screen.
+    deepLink: resolveDeepLink('session.summary', { sessionId: row.sessionId }),
     scope,
   }));
 }

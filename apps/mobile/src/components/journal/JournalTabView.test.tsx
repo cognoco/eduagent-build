@@ -193,12 +193,18 @@ describe('JournalTabView', () => {
             params: {
               ledgerKind: 'topic_mastered',
               subjectId: 'subject-1',
+              topicId: 'topic-1',
+              bookId: 'book-1',
               topicTitle: 'Fractions',
             },
             deepLink: {
-              route: 'subject.hub',
-              params: { subjectId: 'subject-1' },
-              chain: [],
+              route: 'subject.topic',
+              params: {
+                subjectId: 'subject-1',
+                bookId: 'book-1',
+                topicId: 'topic-1',
+              },
+              chain: ['subject.hub'],
             },
             scope: 'self',
           },
