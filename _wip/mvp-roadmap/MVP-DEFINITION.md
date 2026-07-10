@@ -1,6 +1,6 @@
 # MentoMate MVP Definition — capability tree
 
-**Status: DRAFT v0.2 (2026-07-09) — evidence-complete, ready for ratification review.** Canon + compliance evidence passes folded in (agents canon-surface / compliance-floor, cited per node). Remaining `⧖` markers = deliberate ratification questions or Phase-3 code-verification items, not missing research. **Not ratified.** Ratification: Zuzka (product) + Jørn (operator) — Phase-2 exit of `PLAN.md`.
+**Status: RATIFIED 2026-07-10.** Canon + compliance evidence passes folded in (agents canon-surface / compliance-floor, cited per node). Remaining `⧖` markers = Phase-3 code-verification items, not open ratification questions — all 10 ratification questions + Q7 are ruled (see §"Open questions FOR RATIFICATION"). Ratified by: Zuzka (product) + Jørn (operator) — Phase-2 exit of `PLAN.md`.
 
 **How to read a node:** `IN` = MVP fails without it · `DEGRADED` = ships reduced, named reduction · `OUT` = explicitly not MVP (fast-follow or killed) · `FILL` = approved for the MVP window as opportunistic capacity-fill — launch does **not** gate on it (distinct from IN: never argue "it's in MVP" from a FILL item). Every non-obvious state cites its ruling. `⧖` = state pending evidence pass.
 
