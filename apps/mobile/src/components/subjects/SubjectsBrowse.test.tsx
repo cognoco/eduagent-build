@@ -403,11 +403,11 @@ describe('SubjectsBrowse — search behavior', () => {
       topics: [],
       notes: [
         {
-          id: 'note-1',
-          sessionId: 'session-1',
-          topicId: 'topic-1',
+          id: '80000000-0000-4000-8000-000000000001',
+          sessionId: '80000000-0000-4000-8000-000000000002',
+          topicId: '80000000-0000-4000-8000-000000000004',
           topicName: 'Pyramids',
-          bookId: 'book-1',
+          bookId: '80000000-0000-4000-8000-000000000005',
           subjectId: SPANISH.subjectId,
           subjectName: 'Spanish',
           contentSnippet: 'nota sobre pirámides',
@@ -427,10 +427,10 @@ describe('SubjectsBrowse — search behavior', () => {
       notes: [],
       sessions: [
         {
-          sessionId: 'session-99',
-          topicId: 'topic-1',
+          sessionId: '80000000-0000-4000-8000-000000000003',
+          topicId: '80000000-0000-4000-8000-000000000004',
           topicTitle: 'Grammar',
-          bookId: 'book-1',
+          bookId: '80000000-0000-4000-8000-000000000005',
           subjectId: SPANISH.subjectId,
           subjectName: 'Spanish',
           snippet: 'explored verbs today',
@@ -532,7 +532,9 @@ describe('SubjectsBrowse — search behavior', () => {
     );
 
     // A note row from the search result should be visible.
-    expect(screen.getByTestId('note-row-note-1')).toBeTruthy();
+    expect(
+      screen.getByTestId('note-row-80000000-0000-4000-8000-000000000001'),
+    ).toBeTruthy();
     // Fetched — at least one call was made.
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
@@ -564,7 +566,9 @@ describe('SubjectsBrowse — search behavior', () => {
       { timeout: 1500 },
     );
 
-    expect(screen.getByTestId('session-row-session-99')).toBeTruthy();
+    expect(
+      screen.getByTestId('session-row-80000000-0000-4000-8000-000000000003'),
+    ).toBeTruthy();
   });
 
   it('shows an empty-results state when the API returns no matches', async () => {

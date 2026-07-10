@@ -17,6 +17,13 @@ const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
+const ASSESSMENT_ID = '40000000-0000-4000-8000-000000000001';
+const CREATED_ASSESSMENT_ID = '40000000-0000-4000-8000-000000000002';
+const ACTIVE_ASSESSMENT_ID = '40000000-0000-4000-8000-000000000003';
+const PROFILE_ID = '50000000-0000-4000-8000-000000000001';
+const SUBJECT_ID = '60000000-0000-4000-8000-000000000001';
+const TOPIC_ID = '70000000-0000-4000-8000-000000000001';
+
 function createWrapper() {
   const w = createHookWrapper({
     activeProfile: createTestProfile({ id: 'test-profile-id' }),
@@ -47,12 +54,18 @@ describe('useAssessment', () => {
       new Response(
         JSON.stringify({
           assessment: {
-            id: 'assess-1',
-            topicId: 'topic-1',
+            id: ASSESSMENT_ID,
+            profileId: PROFILE_ID,
+            subjectId: SUBJECT_ID,
+            topicId: TOPIC_ID,
+            sessionId: null,
             verificationDepth: 'recall',
             status: 'in_progress',
             masteryScore: null,
+            qualityRating: null,
+            exchangeHistory: [],
             createdAt: '2026-02-15T10:00:00.000Z',
+            updatedAt: '2026-02-15T10:00:00.000Z',
           },
         }),
         { status: 200 },
@@ -68,7 +81,7 @@ describe('useAssessment', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(result.current.data?.id).toBe('assess-1');
+    expect(result.current.data?.id).toBe(ASSESSMENT_ID);
     expect(result.current.data?.status).toBe('in_progress');
   });
 
@@ -91,8 +104,8 @@ describe('useCreateAssessment', () => {
       new Response(
         JSON.stringify({
           assessment: {
-            id: 'new-assess',
-            topicId: 'topic-1',
+            id: CREATED_ASSESSMENT_ID,
+            topicId: TOPIC_ID,
             verificationDepth: 'recall',
             status: 'in_progress',
             masteryScore: null,
@@ -126,10 +139,10 @@ describe('useActiveAssessment', () => {
       new Response(
         JSON.stringify({
           assessment: {
-            id: 'active-assess',
-            profileId: 'test-profile-id',
-            subjectId: 'sub-1',
-            topicId: 'topic-1',
+            id: ACTIVE_ASSESSMENT_ID,
+            profileId: PROFILE_ID,
+            subjectId: SUBJECT_ID,
+            topicId: TOPIC_ID,
             sessionId: null,
             verificationDepth: 'explain',
             status: 'in_progress',
@@ -161,7 +174,7 @@ describe('useActiveAssessment', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(result.current.data?.id).toBe('active-assess');
+    expect(result.current.data?.id).toBe(ACTIVE_ASSESSMENT_ID);
     expect(result.current.data?.exchangeHistory).toHaveLength(2);
   });
 });
@@ -173,7 +186,9 @@ describe('useSubmitAnswer', () => {
         JSON.stringify({
           evaluation: {
             passed: true,
+            shouldEscalateDepth: false,
             masteryScore: 0.85,
+            qualityRating: 4,
             feedback: 'Well done!',
           },
           status: 'passed',
@@ -206,7 +221,9 @@ describe('useSubmitAnswer', () => {
         JSON.stringify({
           evaluation: {
             passed: true,
+            shouldEscalateDepth: false,
             masteryScore: 0.85,
+            qualityRating: 4,
             feedback: 'Well done!',
           },
           status: 'passed',

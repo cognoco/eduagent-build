@@ -39,9 +39,10 @@ afterAll(() => {
 describe('useResolveSubject', () => {
   it('calls POST /subjects/resolve with rawInput and returns result', async () => {
     const resolveResult = {
-      subjectId: '550e8400-e29b-41d4-a716-446655440000',
-      name: 'Mathematics',
-      isNew: true,
+      status: 'resolved',
+      resolvedName: 'Mathematics',
+      suggestions: [],
+      displayMessage: 'Mathematics',
     };
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(resolveResult), { status: 200 }),

@@ -14,6 +14,13 @@ import { useAllBooks, type EnrichedBook } from './use-all-books';
 const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
 
+const SUBJECT_1_ID = 'a0000000-0000-4000-8000-000000000001';
+const SUBJECT_2_ID = 'a0000000-0000-4000-8000-000000000002';
+const SUBJECT_3_ID = 'a0000000-0000-4000-8000-000000000003';
+const BOOK_1_ID = 'b0000000-0000-4000-8000-000000000001';
+const BOOK_2_ID = 'b0000000-0000-4000-8000-000000000002';
+const BOOK_3_ID = 'b0000000-0000-4000-8000-000000000003';
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -96,17 +103,17 @@ describe('useAllBooks', () => {
     mockFetch.mockResolvedValueOnce(
       makeLibraryBooksResponse([
         {
-          subjectId: 's1',
+          subjectId: SUBJECT_1_ID,
           subjectName: 'Math',
           books: [
-            { id: 'b1', title: 'Algebra', topicsGenerated: true },
-            { id: 'b2', title: 'Geometry', topicsGenerated: false },
+            { id: BOOK_1_ID, title: 'Algebra', topicsGenerated: true },
+            { id: BOOK_2_ID, title: 'Geometry', topicsGenerated: false },
           ],
         },
         {
-          subjectId: 's2',
+          subjectId: SUBJECT_2_ID,
           subjectName: 'Science',
-          books: [{ id: 'b3', title: 'Physics', topicsGenerated: true }],
+          books: [{ id: BOOK_3_ID, title: 'Physics', topicsGenerated: true }],
         },
       ]),
     );
@@ -126,24 +133,24 @@ describe('useAllBooks', () => {
 
     // Verify enrichment: each book has subjectId + subjectName attached
     const algebra = result.current.books.find(
-      (b: EnrichedBook) => b.book.id === 'b1',
+      (b: EnrichedBook) => b.book.id === BOOK_1_ID,
     );
     expect(algebra).not.toBeUndefined();
-    expect(algebra!.subjectId).toBe('s1');
+    expect(algebra!.subjectId).toBe(SUBJECT_1_ID);
     expect(algebra!.subjectName).toBe('Math');
     expect(algebra!.status).toBe('IN_PROGRESS'); // topicsGenerated = true
 
     // b2 (Geometry, topicsGenerated=false) should NOT appear
     const geometry = result.current.books.find(
-      (b: EnrichedBook) => b.book.id === 'b2',
+      (b: EnrichedBook) => b.book.id === BOOK_2_ID,
     );
     expect(geometry).toBeUndefined();
 
     const physics = result.current.books.find(
-      (b: EnrichedBook) => b.book.id === 'b3',
+      (b: EnrichedBook) => b.book.id === BOOK_3_ID,
     );
     expect(physics).not.toBeUndefined();
-    expect(physics!.subjectId).toBe('s2');
+    expect(physics!.subjectId).toBe(SUBJECT_2_ID);
     expect(physics!.subjectName).toBe('Science');
     expect(physics!.status).toBe('IN_PROGRESS');
   });
@@ -152,12 +159,12 @@ describe('useAllBooks', () => {
     mockFetch.mockResolvedValueOnce(
       makeLibraryBooksResponse([
         {
-          subjectId: 's1',
+          subjectId: SUBJECT_1_ID,
           subjectName: 'Math',
           books: [
-            { id: 'b1', title: 'Algebra', topicsGenerated: true },
-            { id: 'b2', title: 'Not Built Yet', topicsGenerated: false },
-            { id: 'b3', title: 'Also Not Built', topicsGenerated: false },
+            { id: BOOK_1_ID, title: 'Algebra', topicsGenerated: true },
+            { id: BOOK_2_ID, title: 'Not Built Yet', topicsGenerated: false },
+            { id: BOOK_3_ID, title: 'Also Not Built', topicsGenerated: false },
           ],
         },
       ]),
@@ -172,13 +179,13 @@ describe('useAllBooks', () => {
     });
 
     // Only the built book is included
-    expect(result.current.books[0]!.book.id).toBe('b1');
+    expect(result.current.books[0]!.book.id).toBe(BOOK_1_ID);
     // Unbuilt books are excluded from the count
     expect(
-      result.current.books.find((b: EnrichedBook) => b.book.id === 'b2'),
+      result.current.books.find((b: EnrichedBook) => b.book.id === BOOK_2_ID),
     ).toBeUndefined();
     expect(
-      result.current.books.find((b: EnrichedBook) => b.book.id === 'b3'),
+      result.current.books.find((b: EnrichedBook) => b.book.id === BOOK_3_ID),
     ).toBeUndefined();
   });
 
@@ -200,7 +207,7 @@ describe('useAllBooks', () => {
   it('returns empty array when subjects have no books', async () => {
     mockFetch.mockResolvedValueOnce(
       makeLibraryBooksResponse([
-        { subjectId: 's1', subjectName: 'Math', books: [] },
+        { subjectId: SUBJECT_1_ID, subjectName: 'Math', books: [] },
       ]),
     );
 
@@ -234,9 +241,9 @@ describe('useAllBooks', () => {
     mockFetch.mockResolvedValueOnce(
       makeLibraryBooksResponse([
         {
-          subjectId: 's1',
+          subjectId: SUBJECT_1_ID,
           subjectName: 'Math',
-          books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+          books: [{ id: BOOK_1_ID, title: 'Algebra', topicsGenerated: true }],
         },
       ]),
     );
@@ -274,9 +281,9 @@ describe('useAllBooks', () => {
     mockFetch.mockResolvedValueOnce(
       makeLibraryBooksResponse([
         {
-          subjectId: 's1',
+          subjectId: SUBJECT_1_ID,
           subjectName: 'Math',
-          books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+          books: [{ id: BOOK_1_ID, title: 'Algebra', topicsGenerated: true }],
         },
       ]),
     );
@@ -296,7 +303,7 @@ describe('useAllBooks', () => {
             pages: Array<{ subjects: Array<{ books: Array<{ id: string }> }> }>;
           }
         | undefined;
-      expect(cached?.pages[0]?.subjects[0]?.books[0]?.id).toBe('b1');
+      expect(cached?.pages[0]?.subjects[0]?.books[0]?.id).toBe(BOOK_1_ID);
     });
   });
 
@@ -309,9 +316,9 @@ describe('useAllBooks', () => {
       makeLibraryBooksResponse(
         [
           {
-            subjectId: 's1',
+            subjectId: SUBJECT_1_ID,
             subjectName: 'Math',
-            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+            books: [{ id: BOOK_1_ID, title: 'Algebra', topicsGenerated: true }],
           },
         ],
         CURSOR_PAGE2,
@@ -322,9 +329,9 @@ describe('useAllBooks', () => {
       makeLibraryBooksResponse(
         [
           {
-            subjectId: 's2',
+            subjectId: SUBJECT_2_ID,
             subjectName: 'Science',
-            books: [{ id: 'b2', title: 'Physics', topicsGenerated: true }],
+            books: [{ id: BOOK_2_ID, title: 'Physics', topicsGenerated: true }],
           },
         ],
         null,
@@ -347,8 +354,8 @@ describe('useAllBooks', () => {
 
     expect(result.current.hasNextPage).toBe(false);
     const ids = result.current.books.map((b: EnrichedBook) => b.book.id);
-    expect(ids).toContain('b1');
-    expect(ids).toContain('b2');
+    expect(ids).toContain(BOOK_1_ID);
+    expect(ids).toContain(BOOK_2_ID);
   });
 
   it('[WI-966] auto-drains all pages so page-2 books appear WITHOUT a manual fetchNextPage', async () => {
@@ -363,9 +370,9 @@ describe('useAllBooks', () => {
       makeLibraryBooksResponse(
         [
           {
-            subjectId: 's1',
+            subjectId: SUBJECT_1_ID,
             subjectName: 'Math',
-            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+            books: [{ id: BOOK_1_ID, title: 'Algebra', topicsGenerated: true }],
           },
         ],
         CURSOR_PAGE2,
@@ -376,9 +383,9 @@ describe('useAllBooks', () => {
       makeLibraryBooksResponse(
         [
           {
-            subjectId: 's2',
+            subjectId: SUBJECT_2_ID,
             subjectName: 'Science',
-            books: [{ id: 'b2', title: 'Physics', topicsGenerated: true }],
+            books: [{ id: BOOK_2_ID, title: 'Physics', topicsGenerated: true }],
           },
         ],
         CURSOR_PAGE3,
@@ -389,9 +396,9 @@ describe('useAllBooks', () => {
       makeLibraryBooksResponse(
         [
           {
-            subjectId: 's3',
+            subjectId: SUBJECT_3_ID,
             subjectName: 'History',
-            books: [{ id: 'b3', title: 'Rome', topicsGenerated: true }],
+            books: [{ id: BOOK_3_ID, title: 'Rome', topicsGenerated: true }],
           },
         ],
         null,
@@ -409,9 +416,9 @@ describe('useAllBooks', () => {
 
     expect(result.current.hasNextPage).toBe(false);
     const ids = result.current.books.map((b: EnrichedBook) => b.book.id);
-    expect(ids).toContain('b1'); // page 1
-    expect(ids).toContain('b2'); // page 2 — the regression the rework fixes
-    expect(ids).toContain('b3'); // page 3
+    expect(ids).toContain(BOOK_1_ID); // page 1
+    expect(ids).toContain(BOOK_2_ID); // page 2 — the regression the rework fixes
+    expect(ids).toContain(BOOK_3_ID); // page 3
     // All three pages were actually requested from the server.
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
@@ -421,9 +428,9 @@ describe('useAllBooks', () => {
       makeLibraryBooksResponse(
         [
           {
-            subjectId: 's1',
+            subjectId: SUBJECT_1_ID,
             subjectName: 'Math',
-            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+            books: [{ id: BOOK_1_ID, title: 'Algebra', topicsGenerated: true }],
           },
         ],
         null, // nextCursor=null → last page
@@ -449,9 +456,9 @@ describe('useAllBooks', () => {
       makeLibraryBooksResponse(
         [
           {
-            subjectId: 's1',
+            subjectId: SUBJECT_1_ID,
             subjectName: 'Math',
-            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+            books: [{ id: BOOK_1_ID, title: 'Algebra', topicsGenerated: true }],
           },
         ],
         null, // last page — no drain needed
@@ -479,9 +486,9 @@ describe('useAllBooks', () => {
       makeLibraryBooksResponse(
         [
           {
-            subjectId: 's1',
+            subjectId: SUBJECT_1_ID,
             subjectName: 'Math',
-            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+            books: [{ id: BOOK_1_ID, title: 'Algebra', topicsGenerated: true }],
           },
         ],
         CURSOR_PAGE2,
@@ -491,9 +498,9 @@ describe('useAllBooks', () => {
       makeLibraryBooksResponse(
         [
           {
-            subjectId: 's2',
+            subjectId: SUBJECT_2_ID,
             subjectName: 'Science',
-            books: [{ id: 'b2', title: 'Physics', topicsGenerated: true }],
+            books: [{ id: BOOK_2_ID, title: 'Physics', topicsGenerated: true }],
           },
         ],
         null, // last page
@@ -524,9 +531,9 @@ describe('useAllBooks', () => {
       makeLibraryBooksResponse(
         [
           {
-            subjectId: 's1',
+            subjectId: SUBJECT_1_ID,
             subjectName: 'Math',
-            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+            books: [{ id: BOOK_1_ID, title: 'Algebra', topicsGenerated: true }],
           },
         ],
         null, // last page

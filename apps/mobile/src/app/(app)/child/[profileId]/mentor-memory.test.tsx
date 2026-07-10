@@ -53,6 +53,8 @@ const ChildMentorMemoryScreen = require('./mentor-memory').default;
 // ─── Test data ──────────────────────────────────────────────────────────
 
 const childProfileBase = {
+  id: '20000000-0000-4000-8000-000000000011',
+  profileId: '20000000-0000-4000-8000-000000000012',
   learningStyle: null,
   interests: [
     { label: 'Football', context: 'free_time' },
@@ -63,9 +65,16 @@ const childProfileBase = {
   struggles: [],
   communicationNotes: [],
   suppressedInferences: [],
+  effectivenessSessionCount: 0,
+  memoryEnabled: true,
   memoryConsentStatus: 'granted',
   memoryCollectionEnabled: true,
   memoryInjectionEnabled: true,
+  accommodationMode: 'none',
+  recentlyResolvedTopics: [],
+  version: 1,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
 // Guardian (owner) + linked child are required for the screen's IDOR guard:
@@ -101,7 +110,26 @@ function setRoutes(
       if (url.includes('/sessions')) return { sessions: [] };
       if (init?.method && init.method !== 'GET') return {};
       // Child detail — hook returns `data.child`.
-      return { child: { displayName: 'Emma', profileId: 'child-001' } };
+      return {
+        child: {
+          profileId: '20000000-0000-4000-8000-000000000012',
+          displayName: 'Emma',
+          consentStatus: null,
+          respondedAt: null,
+          summary: '',
+          sessionsThisWeek: 0,
+          sessionsLastWeek: 0,
+          totalTimeThisWeek: 0,
+          totalTimeLastWeek: 0,
+          exchangesThisWeek: 0,
+          exchangesLastWeek: 0,
+          trend: 'stable',
+          subjects: [],
+          guidedVsImmediateRatio: 0,
+          retentionTrend: 'stable',
+          totalSessions: 0,
+        },
+      };
     },
   );
 

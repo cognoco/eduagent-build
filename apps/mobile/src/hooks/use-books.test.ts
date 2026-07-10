@@ -4,6 +4,7 @@
 
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
+import type { BookWithTopics, CurriculumBook } from '@eduagent/schemas';
 import {
   createHookWrapper,
   createTestProfile,
@@ -25,6 +26,11 @@ const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
+
+const SUBJECT_1_ID = '220e8400-e29b-41d4-a716-446655440001';
+const BOOK_1_ID = '330e8400-e29b-41d4-a716-446655440001';
+const BOOK_2_ID = '330e8400-e29b-41d4-a716-446655440002';
+const TOPIC_1_ID = '440e8400-e29b-41d4-a716-446655440001';
 
 function createWrapper() {
   const w = createHookWrapper({
@@ -50,10 +56,10 @@ afterAll(() => {
   globalThis.fetch = originalFetch;
 });
 
-const mockBooks = [
+const mockBooks: CurriculumBook[] = [
   {
-    id: 'book-1',
-    subjectId: 'subject-1',
+    id: BOOK_1_ID,
+    subjectId: SUBJECT_1_ID,
     title: 'Ancient Egypt',
     description: 'Explore pyramids and pharaohs',
     emoji: '🏛️',
@@ -63,8 +69,8 @@ const mockBooks = [
     updatedAt: '2026-01-01T00:00:00Z',
   },
   {
-    id: 'book-2',
-    subjectId: 'subject-1',
+    id: BOOK_2_ID,
+    subjectId: SUBJECT_1_ID,
     title: 'Ancient Greece',
     description: 'Gods, heroes, and democracy',
     emoji: '⚔️',
@@ -75,17 +81,17 @@ const mockBooks = [
   },
 ];
 
-const mockBookWithTopics = {
-  book: mockBooks[0],
+const mockBookWithTopics: BookWithTopics = {
+  book: mockBooks[0]!,
   topics: [
     {
-      id: 'topic-1',
+      id: TOPIC_1_ID,
       title: 'Timeline',
       description: 'How it all began',
       sortOrder: 1,
       relevance: 'core',
       estimatedMinutes: 30,
-      bookId: 'book-1',
+      bookId: BOOK_1_ID,
       chapter: 'The Story',
       skipped: false,
     },
@@ -713,8 +719,8 @@ describe('useDeleteBook', () => {
       new Response(
         JSON.stringify({
           deleted: true,
-          bookId: 'book-1',
-          subjectId: 'subject-1',
+          bookId: BOOK_1_ID,
+          subjectId: SUBJECT_1_ID,
           topicCount: 0,
           startedTopicCount: 0,
         }),
@@ -785,8 +791,8 @@ describe('useDeleteBook', () => {
       new Response(
         JSON.stringify({
           deleted: true,
-          bookId: 'book-1',
-          subjectId: 'subject-1',
+          bookId: BOOK_1_ID,
+          subjectId: SUBJECT_1_ID,
           topicCount: 3,
           startedTopicCount: 0,
         }),

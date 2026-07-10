@@ -37,15 +37,17 @@ afterAll(() => {
 });
 
 describe('useLanguageProgress', () => {
+  const subjectId = '550e8400-e29b-41d4-a716-446655440001';
+
   it('fetches language progress for a subject', async () => {
     const progressData = {
-      subjectId: 'sub-1',
+      subjectId,
       languageCode: 'es',
       pedagogyMode: 'four_strands',
       currentLevel: 'A1',
       currentSublevel: '2',
       currentMilestone: {
-        milestoneId: 'milestone-1',
+        milestoneId: '660e8400-e29b-41d4-a716-446655440001',
         milestoneTitle: 'Basic Greetings',
         currentLevel: 'A1',
         currentSublevel: '2',
@@ -56,7 +58,7 @@ describe('useLanguageProgress', () => {
         milestoneProgress: 0.5,
       },
       nextMilestone: {
-        milestoneId: 'milestone-2',
+        milestoneId: '660e8400-e29b-41d4-a716-446655440002',
         milestoneTitle: 'Daily Routines',
         level: 'A1',
         sublevel: '3',
@@ -75,7 +77,7 @@ describe('useLanguageProgress', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(result.current.data?.subjectId).toBe('sub-1');
+    expect(result.current.data?.subjectId).toBe(subjectId);
     expect(result.current.data?.languageCode).toBe('es');
     expect(result.current.data?.currentLevel).toBe('A1');
     expect(result.current.data?.currentMilestone?.milestoneTitle).toBe(
@@ -89,7 +91,7 @@ describe('useLanguageProgress', () => {
 
   it('handles null milestones', async () => {
     const progressData = {
-      subjectId: 'sub-1',
+      subjectId,
       languageCode: 'es',
       pedagogyMode: 'four_strands',
       currentLevel: null,
@@ -132,7 +134,7 @@ describe('useLanguageProgress', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          subjectId: 'sub-1',
+          subjectId,
           languageCode: 'es',
           pedagogyMode: 'four_strands',
           currentLevel: 'A1',

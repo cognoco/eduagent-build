@@ -18,6 +18,45 @@ const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
+const PROFILE_ID = '550e8400-e29b-41d4-a716-446655440001';
+const SUBJECT_ID = '660e8400-e29b-41d4-a716-446655440001';
+const VOCAB_1_ID = '770e8400-e29b-41d4-a716-446655440001';
+const VOCAB_2_ID = '770e8400-e29b-41d4-a716-446655440002';
+
+function makeVocabulary(overrides: Record<string, unknown> = {}) {
+  return {
+    id: VOCAB_1_ID,
+    profileId: PROFILE_ID,
+    subjectId: SUBJECT_ID,
+    term: 'hola',
+    termNormalized: 'hola',
+    translation: 'hello',
+    type: 'word',
+    cefrLevel: 'A1',
+    milestoneId: null,
+    mastered: false,
+    createdAt: '2026-02-17T10:00:00.000Z',
+    updatedAt: '2026-02-17T10:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeReviewResponse() {
+  return {
+    vocabulary: makeVocabulary(),
+    retention: {
+      vocabularyId: VOCAB_1_ID,
+      easeFactor: 2.5,
+      intervalDays: 1,
+      repetitions: 1,
+      lastReviewedAt: '2026-02-17T10:00:00.000Z',
+      nextReviewAt: '2026-02-18T10:00:00.000Z',
+      failureCount: 0,
+      consecutiveSuccesses: 1,
+    },
+  };
+}
+
 function createWrapper() {
   const w = createHookWrapper({
     activeProfile: createTestProfile({ id: 'test-profile-id' }),
@@ -46,34 +85,15 @@ describe('useVocabulary', () => {
   it('fetches vocabulary list for a subject', async () => {
     const vocabularyData = {
       vocabulary: [
-        {
-          id: 'vocab-1',
-          profileId: 'test-profile-id',
-          subjectId: 'sub-1',
-          term: 'hola',
-          termNormalized: 'hola',
-          translation: 'hello',
-          type: 'word',
-          cefrLevel: 'A1',
-          milestoneId: null,
-          mastered: false,
-          createdAt: '2026-02-17T10:00:00.000Z',
-          updatedAt: '2026-02-17T10:00:00.000Z',
-        },
-        {
-          id: 'vocab-2',
-          profileId: 'test-profile-id',
-          subjectId: 'sub-1',
+        makeVocabulary(),
+        makeVocabulary({
+          id: VOCAB_2_ID,
           term: 'buenos días',
           termNormalized: 'buenos dias',
           translation: 'good morning',
           type: 'chunk',
-          cefrLevel: 'A1',
-          milestoneId: null,
           mastered: true,
-          createdAt: '2026-02-17T10:00:00.000Z',
-          updatedAt: '2026-02-17T10:00:00.000Z',
-        },
+        }),
       ],
     };
     mockFetch.mockResolvedValueOnce(
@@ -128,20 +148,12 @@ describe('useVocabulary', () => {
 describe('useCreateVocabulary', () => {
   it('creates a vocabulary item', async () => {
     const createdVocab = {
-      vocabulary: {
-        id: 'vocab-new',
-        profileId: 'test-profile-id',
-        subjectId: 'sub-1',
+      vocabulary: makeVocabulary({
+        id: '770e8400-e29b-41d4-a716-446655440003',
         term: 'gracias',
         termNormalized: 'gracias',
         translation: 'thank you',
-        type: 'word',
-        cefrLevel: 'A1',
-        milestoneId: null,
-        mastered: false,
-        createdAt: '2026-02-17T10:00:00.000Z',
-        updatedAt: '2026-02-17T10:00:00.000Z',
-      },
+      }),
     };
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(createdVocab), { status: 200 }),
@@ -195,7 +207,7 @@ describe('useCreateVocabulary', () => {
 
 describe('useReviewVocabulary', () => {
   it('submits a vocabulary review', async () => {
-    const reviewResult = { success: true };
+    const reviewResult = makeReviewResponse();
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(reviewResult), { status: 200 }),
     );
@@ -241,7 +253,7 @@ describe('useReviewVocabulary', () => {
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
 
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ success: true }), { status: 200 }),
+      new Response(JSON.stringify(makeReviewResponse()), { status: 200 }),
     );
 
     const { result } = renderHook(() => useReviewVocabulary('sub-1'), {

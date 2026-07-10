@@ -20,6 +20,10 @@ const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
+const SUBJECT_ID = '90000000-0000-4000-8000-000000000001';
+const TOPIC_ID = '90000000-0000-4000-8000-000000000002';
+const SESSION_ID = '90000000-0000-4000-8000-000000000003';
+
 function createWrapper() {
   const w = createHookWrapper({
     activeProfile: createTestProfile({ id: 'test-profile-id' }),
@@ -51,11 +55,15 @@ describe('useRetentionTopics', () => {
         JSON.stringify({
           topics: [
             {
-              topicId: 'topic-1',
+              topicId: TOPIC_ID,
+              topicTitle: 'Algebra Basics',
+              bookId: null,
               easeFactor: 2.5,
               intervalDays: 7,
               repetitions: 3,
               nextReviewAt: '2026-02-22T10:00:00.000Z',
+              lastReviewedAt: '2026-02-15T10:00:00.000Z',
+              daysSinceLastReview: 7,
               xpStatus: 'pending',
               failureCount: 0,
             },
@@ -100,11 +108,13 @@ describe('useTopicRetention', () => {
       new Response(
         JSON.stringify({
           card: {
-            topicId: 'topic-1',
+            topicId: TOPIC_ID,
             easeFactor: 2.5,
             intervalDays: 7,
             repetitions: 3,
             nextReviewAt: '2026-02-22T10:00:00.000Z',
+            lastReviewedAt: '2026-02-15T10:00:00.000Z',
+            daysSinceLastReview: 7,
             xpStatus: 'verified',
             failureCount: 0,
           },
@@ -149,7 +159,7 @@ describe('useEvaluateEligibility', () => {
       new Response(
         JSON.stringify({
           eligible: true,
-          topicId: 'topic-1',
+          topicId: TOPIC_ID,
           topicTitle: 'Algebra Basics',
           currentRung: 2,
           easeFactor: 2.7,
@@ -176,7 +186,7 @@ describe('useEvaluateEligibility', () => {
       new Response(
         JSON.stringify({
           eligible: false,
-          topicId: 'topic-1',
+          topicId: TOPIC_ID,
           topicTitle: 'New Topic',
           currentRung: 1,
           easeFactor: 2.0,
@@ -207,6 +217,9 @@ describe('useSubmitRecallTest', () => {
         JSON.stringify({
           result: {
             passed: false,
+            masteryScore: 0,
+            xpChange: '0',
+            nextReviewAt: '2026-02-16T10:00:00.000Z',
             failureCount: 1,
             hint: 'Start from the main idea.',
             failureAction: 'feedback_only',
@@ -233,6 +246,9 @@ describe('useSubmitRecallTest', () => {
 
     expect(result.current.data).toEqual({
       passed: false,
+      masteryScore: 0,
+      xpChange: '0',
+      nextReviewAt: '2026-02-16T10:00:00.000Z',
       failureCount: 1,
       hint: 'Start from the main idea.',
       failureAction: 'feedback_only',
@@ -246,7 +262,7 @@ describe('useTeachingPreference', () => {
       new Response(
         JSON.stringify({
           preference: {
-            subjectId: 'sub-1',
+            subjectId: SUBJECT_ID,
             method: 'visual_diagrams',
             analogyDomain: null,
             nativeLanguage: null,
@@ -280,7 +296,9 @@ describe('useStartRelearn — no-op ["sessions"] removal (PR-10)', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          sessionId: 'new-session-1',
+          topicId: TOPIC_ID,
+          method: 'same',
+          sessionId: SESSION_ID,
           message: 'Relearn session started',
           recap: null,
         }),

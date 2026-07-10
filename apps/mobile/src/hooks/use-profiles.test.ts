@@ -1,5 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
+import type { PublicProfile } from '@eduagent/schemas';
 import {
   createHookWrapper,
   createTestProfile,
@@ -30,6 +31,32 @@ jest.mock('@clerk/expo', () => ({
 }));
 
 let queryClient: QueryClient;
+
+const OWNER_PROFILE_ID = '80000000-0000-4000-8000-000000000001';
+const CHILD_PROFILE_ID = '80000000-0000-4000-8000-000000000002';
+
+function createPublicProfile(
+  overrides: Partial<PublicProfile> = {},
+): PublicProfile {
+  return {
+    id: OWNER_PROFILE_ID,
+    displayName: 'Alex',
+    avatarUrl: null,
+    birthYear: 2010,
+    location: null,
+    isOwner: true,
+    hasPremiumLlm: false,
+    defaultAppContext: null,
+    hasFamilyLinks: false,
+    conversationLanguage: 'en',
+    pronouns: null,
+    consentStatus: null,
+    linkCreatedAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
 
 function createWrapper() {
   const w = createHookWrapper({
@@ -66,26 +93,15 @@ afterAll(() => {
 describe('useProfiles', () => {
   it('returns profiles from API', async () => {
     const profiles = [
-      {
-        id: 'p1',
-        accountId: 'a1',
-        displayName: 'Alex',
-        avatarUrl: null,
-        birthYear: 2010,
-        isOwner: true,
-        createdAt: '2026-01-01T00:00:00Z',
-        updatedAt: '2026-01-01T00:00:00Z',
-      },
-      {
-        id: 'p2',
-        accountId: 'a1',
+      createPublicProfile(),
+      createPublicProfile({
+        id: CHILD_PROFILE_ID,
         displayName: 'Sam',
-        avatarUrl: null,
         birthYear: 2012,
         isOwner: false,
-        createdAt: '2026-01-02T00:00:00Z',
-        updatedAt: '2026-01-02T00:00:00Z',
-      },
+        createdAt: '2026-01-02T00:00:00.000Z',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+      }),
     ];
 
     mockFetch.mockResolvedValueOnce(
@@ -156,16 +172,7 @@ describe('useProfiles', () => {
 
 describe('useUpdateProfileName', () => {
   it('sends PATCH with displayName and invalidates profiles', async () => {
-    const updatedProfile = {
-      id: 'p1',
-      accountId: 'a1',
-      displayName: 'New Name',
-      avatarUrl: null,
-      birthYear: 2010,
-      isOwner: true,
-      createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-01-01T00:00:00Z',
-    };
+    const updatedProfile = createPublicProfile({ displayName: 'New Name' });
 
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ profile: updatedProfile }), {
@@ -206,18 +213,12 @@ describe('useUpdateProfileName', () => {
 
 describe('useUpdateProfileAppContext', () => {
   it('sends PATCH with defaultAppContext and invalidates profiles', async () => {
-    const updatedProfile = {
-      id: 'p1',
-      accountId: 'a1',
+    const updatedProfile = createPublicProfile({
       displayName: 'Owner',
-      avatarUrl: null,
       birthYear: 1980,
-      isOwner: true,
       defaultAppContext: 'family',
       hasFamilyLinks: true,
-      createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-01-01T00:00:00Z',
-    };
+    });
 
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ profile: updatedProfile }), {
@@ -252,18 +253,12 @@ describe('useUpdateProfileAppContext', () => {
   });
 
   it('retries once on a transient network failure before surfacing error', async () => {
-    const updatedProfile = {
-      id: 'p1',
-      accountId: 'a1',
+    const updatedProfile = createPublicProfile({
       displayName: 'Owner',
-      avatarUrl: null,
       birthYear: 1980,
-      isOwner: true,
       defaultAppContext: 'family',
       hasFamilyLinks: true,
-      createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-01-01T00:00:00Z',
-    };
+    });
 
     mockFetch
       .mockRejectedValueOnce(new TypeError('Failed to fetch'))

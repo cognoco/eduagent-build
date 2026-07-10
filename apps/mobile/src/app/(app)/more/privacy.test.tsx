@@ -139,6 +139,16 @@ function withdrawalRoute(value: 'auto' | 'always' | 'never' = 'auto') {
   };
 }
 
+const dataExportFixture = {
+  account: {
+    email: 'alex@example.com',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+  profiles: [],
+  consentStates: [],
+  exportedAt: '2026-07-10T00:00:00.000Z',
+};
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -275,7 +285,7 @@ describe('PrivacyScreen', () => {
       .mockResolvedValue({ action: Share.sharedAction } as never);
     active = renderScreen(<PrivacyScreen />, {
       profile: ownerProfile,
-      routes: { '/account/export': { data: 'test' } },
+      routes: { '/account/export': dataExportFixture },
     });
     await act(async () => {
       fireEvent.press(active!.result.getByTestId('more-row-export'));
@@ -362,7 +372,7 @@ describe('PrivacyScreen', () => {
       const shareSpy = jest.spyOn(Share, 'share');
       active = renderScreen(<PrivacyScreen />, {
         profile: ownerProfile,
-        routes: { '/account/export': { data: 'test' } },
+        routes: { '/account/export': dataExportFixture },
       });
       await act(async () => {
         fireEvent.press(active!.result.getByTestId('more-row-export'));
@@ -387,7 +397,7 @@ describe('PrivacyScreen', () => {
       delete (globalThis as { document?: unknown }).document;
       active = renderScreen(<PrivacyScreen />, {
         profile: ownerProfile,
-        routes: { '/account/export': { data: 'test' } },
+        routes: { '/account/export': dataExportFixture },
       });
       await act(async () => {
         fireEvent.press(active!.result.getByTestId('more-row-export'));
