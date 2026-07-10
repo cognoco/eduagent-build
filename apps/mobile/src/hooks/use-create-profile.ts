@@ -1,7 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ProfileCreateInput } from '@eduagent/schemas';
+import {
+  profileResponseSchema,
+  type ProfileCreateInput,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import type { Profile } from '../lib/profile';
 
 /**
@@ -31,8 +35,8 @@ export function useCreateProfile() {
         { init: { signal } },
       );
       await assertOk(res);
-      const data = (await res.json()) as { profile: Profile };
-      return data.profile;
+      const data = await parseJson(res, profileResponseSchema);
+      return data.profile as Profile;
     },
     onSuccess: (profile) => {
       // BUG-264: Optimistically add the new profile to the query cache BEFORE

@@ -36,7 +36,7 @@ describe('FeedbackSheet', () => {
 
   it('clears submitted state when reopened', async () => {
     active = renderScreen(<FeedbackSheet visible onClose={onClose} />, {
-      routes: { '/feedback': { id: 'feedback-1' } },
+      routes: { '/feedback': { success: true, queued: true } },
     });
 
     fireEvent.changeText(

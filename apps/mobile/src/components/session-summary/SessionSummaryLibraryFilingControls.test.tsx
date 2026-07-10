@@ -51,6 +51,34 @@ const {
   SessionSummaryLibraryFilingControls,
 } = require('./SessionSummaryLibraryFilingControls');
 
+function sessionFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: '90000000-0000-4000-8000-000000000001',
+    subjectId: '90000000-0000-4000-8000-000000000002',
+    topicId: null,
+    sessionType: 'learning',
+    metadata: { effectiveMode: 'freeform' },
+    inputMode: 'text',
+    verificationType: null,
+    status: 'completed',
+    escalationRung: 1,
+    exchangeCount: 5,
+    startedAt: '2026-06-27T00:00:00.000Z',
+    lastActivityAt: '2026-06-27T00:05:00.000Z',
+    endedAt: '2026-06-27T00:05:00.000Z',
+    durationSeconds: 300,
+    wallClockSeconds: 300,
+    filedAt: null,
+    filingStatus: 'filing_pending',
+    filingRetryCount: 0,
+    topicTitle: null,
+    subjectName: 'General',
+    bookId: null,
+    bookTitle: null,
+    ...overrides,
+  };
+}
+
 function setRoutes(): void {
   // The keep-out POST must be registered BEFORE the session GET: the routed
   // mock matches by url.includes(), and the keep-out URL
@@ -68,14 +96,7 @@ function setRoutes(): void {
   // Session detail GET: a freeform session over the auto-file threshold,
   // still pending filing (no topicId/filedAt) so the keep-out CTA renders.
   mockFetch.setRoute('/sessions/session-1', () => ({
-    session: {
-      sessionId: 'session-1',
-      subjectId: 'subject-1',
-      topicId: null,
-      filedAt: null,
-      filingStatus: 'filing_pending',
-      exchangeCount: 5,
-    },
+    session: sessionFixture(),
   }));
 }
 
@@ -113,14 +134,10 @@ describe('SessionSummaryLibraryFilingControls', () => {
   // restore/keep-out branches), rather than early-returning null.
   it('without alwaysFilingCandidate, a kept-out short session renders nothing', async () => {
     mockFetch.setRoute('/sessions/session-short', () => ({
-      session: {
-        sessionId: 'session-short',
-        subjectId: 'subject-1',
-        topicId: null,
-        filedAt: null,
+      session: sessionFixture({
         filingStatus: 'filing_kept_out',
         exchangeCount: 2,
-      },
+      }),
     }));
 
     const { cleanup } = renderScreen(
@@ -148,14 +165,10 @@ describe('SessionSummaryLibraryFilingControls', () => {
 
   it('with alwaysFilingCandidate, a kept-out short session renders the Add (restore) CTA', async () => {
     mockFetch.setRoute('/sessions/session-short', () => ({
-      session: {
-        sessionId: 'session-short',
-        subjectId: 'subject-1',
-        topicId: null,
-        filedAt: null,
+      session: sessionFixture({
         filingStatus: 'filing_kept_out',
         exchangeCount: 2,
-      },
+      }),
     }));
 
     const { cleanup } = renderScreen(
@@ -179,15 +192,13 @@ describe('SessionSummaryLibraryFilingControls', () => {
 
   it('renders the Remove (keep-out) CTA for a filed short session', async () => {
     mockFetch.setRoute('/sessions/session-filed', () => ({
-      session: {
-        sessionId: 'session-filed',
-        subjectId: 'subject-1',
-        topicId: 'topic-1',
+      session: sessionFixture({
+        topicId: '90000000-0000-4000-8000-000000000003',
         filedAt: '2026-06-27T00:00:00.000Z',
         filingStatus: null,
         exchangeCount: 2,
         topicTitle: 'Fractions',
-      },
+      }),
     }));
 
     const { cleanup } = renderScreen(

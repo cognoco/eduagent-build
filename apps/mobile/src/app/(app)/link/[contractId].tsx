@@ -18,6 +18,7 @@ import { assertOk } from '../../../lib/assert-ok';
 import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { parseJson } from '../../../lib/parse-json';
 import { useProfile } from '../../../lib/profile';
 import { firstParam } from '../../../lib/route-params';
 import { useThemeColors } from '../../../lib/theme';
@@ -54,12 +55,13 @@ export default function LinkContractScreen(): React.ReactElement {
   const contractQuery = useApiQuery({
     queryKey: ['visibility-contract', contractId],
     enabled: Boolean(contractId),
+    schema: visibilityContractSchema,
     fetch: (signal) =>
       client.visibility.links[':id'].contract.$get(
         { param: { id: contractId ?? '' } },
         { init: { signal } },
       ),
-    select: (json: unknown) => visibilityContractSchema.parse(json),
+    select: (json) => json,
   });
 
   const acceptMutation = useMutation({
@@ -76,7 +78,11 @@ export default function LinkContractScreen(): React.ReactElement {
         json: { actorPersonId, audience: input.audience },
       });
       const okRes = await assertOk(res);
-      return visibilityContractSchema.parse(await okRes.json());
+      return parseJson(
+        okRes,
+        visibilityContractSchema,
+        'POST /visibility/links/:id/accept',
+      );
     },
     onSuccess: (contract) => {
       queryClient.setQueryData(['visibility-contract', contract.id], contract);
@@ -90,7 +96,11 @@ export default function LinkContractScreen(): React.ReactElement {
         param: { id: contract.supportershipId },
       });
       const okRes = await assertOk(res);
-      return revocationNoticeSchema.parse(await okRes.json());
+      return parseJson(
+        okRes,
+        revocationNoticeSchema,
+        'POST /visibility/links/:id/revoke',
+      );
     },
     onSuccess: () => {
       void contractQuery.refetch();
@@ -228,7 +238,10 @@ export default function LinkContractScreen(): React.ReactElement {
             label: t('common.tryAgain'),
             onPress: () => {
               if (actionableAudience) {
-                acceptMutation.mutate({ contract, audience: actionableAudience });
+                acceptMutation.mutate({
+                  contract,
+                  audience: actionableAudience,
+                });
               }
             },
             testID: 'visibility-link-accept-retry',

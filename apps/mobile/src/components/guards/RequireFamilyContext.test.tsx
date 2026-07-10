@@ -560,11 +560,11 @@ describe('RequireFamilyContext [WI-1142] switch-to-family CTA — query-cache-ba
   const originalV0 = FEATURE_FLAGS.MODE_NAV_V0_ENABLED;
   const originalV1 = FEATURE_FLAGS.MODE_NAV_V1_ENABLED;
 
-  const CHILD_ID = 'child-1142';
+  const CHILD_ID = '550e8400-e29b-41d4-a716-446655440002';
 
   const cacheGuardian: Profile = createTestProfile({
-    id: 'guardian-1142',
-    accountId: 'account-1142',
+    id: '550e8400-e29b-41d4-a716-446655440001',
+    accountId: '660e8400-e29b-41d4-a716-446655440000',
     displayName: 'Guardian',
     isOwner: true,
     birthYear: 1985,
@@ -576,7 +576,7 @@ describe('RequireFamilyContext [WI-1142] switch-to-family CTA — query-cache-ba
 
   const cacheLinkedChild: Profile = createTestProfile({
     id: CHILD_ID,
-    accountId: 'account-1142',
+    accountId: '660e8400-e29b-41d4-a716-446655440000',
     displayName: 'Kid',
     isOwner: false,
     birthYear: 2014,

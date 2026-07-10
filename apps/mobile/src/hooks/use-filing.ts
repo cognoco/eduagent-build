@@ -13,10 +13,15 @@ import type {
   FilingResult,
   LearningSession,
 } from '@eduagent/schemas';
+import {
+  filingResultSchema,
+  learningSessionResponseSchema,
+} from '@eduagent/schemas';
 
 import { useApiClient } from '../lib/api-client';
 import { shouldRetryApiError } from '../lib/api-errors';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import type { NavigationAppContext } from '../lib/navigation-contract';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -164,7 +169,7 @@ function useSessionLibraryMutation(
       }
 
       const okRes = await assertOk(res);
-      return (await okRes.json()) as SessionLibraryMutationResult;
+      return await parseJson(okRes, learningSessionResponseSchema);
     },
     onSuccess: (data, { sessionId }) => {
       invalidateLibraryFilingQueries(queryClient, {
@@ -185,7 +190,7 @@ export function useFiling() {
     mutationFn: async (input: FilingInput) => {
       const res = await client.filing.$post({ json: input });
       await assertOk(res);
-      return (await res.json()) as FilingResult;
+      return await parseJson(res, filingResultSchema);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });
@@ -261,7 +266,7 @@ export function useSessionLibraryFiling(
           { init: { signal } },
         );
         const okRes = await assertOk(res);
-        const data = (await okRes.json()) as { session: LearningSession };
+        const data = await parseJson(okRes, learningSessionResponseSchema);
         return data.session;
       } finally {
         cleanup();
@@ -415,7 +420,7 @@ export function useMultiTopicFiling() {
           },
         });
         await assertOk(res);
-        results.push((await res.json()) as FilingResult);
+        results.push(await parseJson(res, filingResultSchema));
       }
       return results;
     },

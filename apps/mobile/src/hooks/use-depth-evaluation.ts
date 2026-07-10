@@ -1,7 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
-import type { DepthEvaluation } from '@eduagent/schemas';
+import { depthEvaluationSchema } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 
 export function useDepthEvaluation() {
   const client = useApiClient();
@@ -12,7 +13,7 @@ export function useDepthEvaluation() {
         param: { sessionId },
       });
       await assertOk(res);
-      return (await res.json()) as DepthEvaluation;
+      return await parseJson(res, depthEvaluationSchema);
     },
   });
 }

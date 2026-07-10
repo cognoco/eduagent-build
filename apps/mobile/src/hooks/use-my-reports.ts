@@ -31,8 +31,9 @@ export function useMyReports(): UseQueryResult<MonthlyReportSummary[]> {
 
   return useApiQuery({
     queryKey: ['my-reports', 'monthly', profileId],
+    schema: childReportsResponseSchema,
     fetch: (signal) => client.progress.reports.$get({}, { init: { signal } }),
-    select: (json: unknown) => childReportsResponseSchema.parse(json).reports,
+    select: (json) => json.reports,
   });
 }
 
@@ -47,8 +48,9 @@ export function useMyWeeklyReports(): UseQueryResult<WeeklyReportSummary[]> {
 
   return useApiQuery({
     queryKey: ['my-reports', 'weekly', profileId],
+    schema: weeklyReportsResponseSchema,
     fetch: (signal) =>
       client.progress['weekly-reports'].$get({}, { init: { signal } }),
-    select: (json: unknown) => weeklyReportsResponseSchema.parse(json).reports,
+    select: (json) => json.reports,
   });
 }

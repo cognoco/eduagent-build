@@ -5,39 +5,27 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import type {
+  EvaluateEligibility,
+  RecallTestResult,
+  RelearnResponse,
   RetentionCardResponse,
   SubjectRetentionResponse,
+} from '@eduagent/schemas';
+import {
+  evaluateEligibilitySchema,
+  recallTestResponseSchema,
+  relearnResponseSchema,
+  subjectRetentionResponseSchema,
+  teachingPreferenceEndpointResponseSchema,
+  topicRetentionResponseSchema,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
+import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
-
-// ---------------------------------------------------------------------------
-// Recall test + relearn response types (mirror API route wrappers)
-// ---------------------------------------------------------------------------
-
-interface RecallTestResult {
-  passed: boolean;
-  failureCount: number;
-  hint?: string;
-  failureAction?: 'feedback_only' | 'redirect_to_library';
-  remediation?: {
-    cooldownEndsAt: string;
-    suggestionText: string;
-    retentionStatus: string;
-  };
-  masteryScore?: number;
-  xpChange?: string;
-}
-
-interface RelearnResult {
-  sessionId: string;
-  message: string;
-  recap: string | null;
-}
 
 interface TeachingPreference {
   subjectId: string;
@@ -54,6 +42,7 @@ export function useRetentionTopics(
 
   return useApiQuery<SubjectRetentionResponse>({
     queryKey: queryKeys.retention.subject(subjectId, activeProfile?.id),
+    schema: subjectRetentionResponseSchema,
     fetch: (signal) =>
       client.subjects[':subjectId'].retention.$get(
         { param: { subjectId } },
@@ -75,6 +64,7 @@ export function useTopicRetention(
     RetentionCardResponse | null
   >({
     queryKey: queryKeys.retention.topic(topicId, activeProfile?.id),
+    schema: topicRetentionResponseSchema,
     fetch: (signal) =>
       client.topics[':topicId'].retention.$get(
         { param: { topicId } },
@@ -83,17 +73,6 @@ export function useTopicRetention(
     select: (json) => json.card,
     enabled: !!topicId,
   });
-}
-
-// FR128-129: Evaluate (Devil's Advocate) eligibility check
-interface EvaluateEligibility {
-  eligible: boolean;
-  topicId: string;
-  topicTitle: string;
-  currentRung: 1 | 2 | 3 | 4;
-  easeFactor: number;
-  repetitions: number;
-  reason?: string;
 }
 
 export function useEvaluateEligibility(
@@ -114,7 +93,11 @@ export function useEvaluateEligibility(
           'evaluate-eligibility'
         ].$get({ param: { topicId } }, { init: { signal } });
         await assertOk(res);
-        return (await res.json()) as EvaluateEligibility;
+        return parseJson(
+          res,
+          evaluateEligibilitySchema,
+          'GET /topics/:topicId/evaluate-eligibility',
+        );
       } finally {
         cleanup();
       }
@@ -138,7 +121,11 @@ export function useSubmitRecallTest() {
         json: input,
       });
       await assertOk(res);
-      const data = (await res.json()) as { result: RecallTestResult };
+      const data = await parseJson(
+        res,
+        recallTestResponseSchema,
+        'POST /retention/recall-test',
+      );
       return data.result;
     },
     onSuccess: () => {
@@ -163,12 +150,12 @@ export function useStartRelearn() {
       topicId: string;
       method: 'same' | 'different';
       preferredMethod?: string;
-    }): Promise<RelearnResult> => {
+    }): Promise<RelearnResponse> => {
       const res = await client.retention.relearn.$post({
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as RelearnResult;
+      return parseJson(res, relearnResponseSchema, 'POST /retention/relearn');
     },
     onSuccess: () => {
       // PR-10 deferred: broad ['retention'] and ['progress'] — relearn
@@ -198,6 +185,7 @@ export function useTeachingPreference(
       subjectId,
       activeProfile?.id,
     ),
+    schema: teachingPreferenceEndpointResponseSchema,
     fetch: (signal) =>
       client.subjects[':subjectId']['teaching-preference'].$get(
         { param: { subjectId: subjectId ?? '' } },

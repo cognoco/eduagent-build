@@ -5,6 +5,7 @@ import {
   evaluateFailureActionSchema,
   assessmentEligibleTopicSchema,
   needsDeepeningSchema,
+  libraryRetentionResponseSchema,
   retentionCardSchema,
   relearnTopicSchema,
   verificationTypeSchema,
@@ -139,6 +140,36 @@ describe('retentionCardSchema', () => {
     expect(() =>
       retentionCardSchema.parse({ ...baseCard, evaluateDifficultyRung: 5 }),
     ).toThrow();
+  });
+});
+
+describe('libraryRetentionResponseSchema', () => {
+  it('accepts orphan retention topics with null bookId', () => {
+    const result = libraryRetentionResponseSchema.parse({
+      subjects: [
+        {
+          subjectId: TEST_UUID,
+          topics: [
+            {
+              topicId: TEST_UUID,
+              topicTitle: 'Photosynthesis',
+              bookId: null,
+              easeFactor: 2.5,
+              intervalDays: 6,
+              repetitions: 3,
+              nextReviewAt: '2025-03-01T00:00:00.000Z',
+              lastReviewedAt: '2025-02-23T00:00:00.000Z',
+              daysSinceLastReview: 6,
+              xpStatus: 'verified',
+              failureCount: 0,
+            },
+          ],
+          reviewDueCount: 1,
+        },
+      ],
+    });
+
+    expect(result.subjects[0]?.topics[0]?.bookId).toBeNull();
   });
 });
 

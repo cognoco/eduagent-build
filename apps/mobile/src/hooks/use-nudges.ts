@@ -4,11 +4,20 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { Nudge, NudgeCreateInput } from '@eduagent/schemas';
-import { nudgeListResponseSchema } from '@eduagent/schemas';
+import type {
+  Nudge,
+  NudgeCreateInput,
+  NudgeListResponse,
+} from '@eduagent/schemas';
+import {
+  nudgeCreateResponseSchema,
+  nudgeListResponseSchema,
+  nudgeMarkReadResponseSchema,
+} from '@eduagent/schemas';
 
 import { assertOk } from '../lib/assert-ok';
 import { useApiClient } from '../lib/api-client';
+import { parseJson } from '../lib/parse-json';
 import { useProfile } from '../lib/profile';
 import { useApiQuery } from './use-api-query';
 
@@ -16,11 +25,12 @@ export function useUnreadNudges(): UseQueryResult<Nudge[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useApiQuery<unknown, Nudge[]>({
+  return useApiQuery<NudgeListResponse, Nudge[]>({
     queryKey: ['nudges', 'unread', activeProfile?.id],
+    schema: nudgeListResponseSchema,
     fetch: (signal) =>
       client.nudges.$get({ query: { unread: 'true' } }, { init: { signal } }),
-    select: (json) => nudgeListResponseSchema.parse(json).nudges,
+    select: (json) => json.nudges,
   });
 }
 
@@ -34,7 +44,7 @@ export function useSendNudge(): UseMutationResult<
     mutationFn: async (input) => {
       const res = await client.nudges.$post({ json: input });
       await assertOk(res);
-      return await res.json();
+      return parseJson(res, nudgeCreateResponseSchema, 'POST /nudges');
     },
   });
 }
@@ -55,7 +65,11 @@ export function useMarkNudgeRead(): UseMutationResult<
         param: { id: nudgeId },
       });
       await assertOk(res);
-      const data = (await res.json()) as { success: true; count: number };
+      const data = await parseJson(
+        res,
+        nudgeMarkReadResponseSchema,
+        'PATCH /nudges/:id/read',
+      );
       return { ...data, profileId };
     },
     onSuccess: (_data, _nudgeId, _context) => {
@@ -81,7 +95,11 @@ export function useMarkAllNudgesRead(): UseMutationResult<
       const profileId = activeProfile?.id;
       const res = await client.nudges['mark-read'].$post();
       await assertOk(res);
-      const data = (await res.json()) as { success: true; count: number };
+      const data = await parseJson(
+        res,
+        nudgeMarkReadResponseSchema,
+        'POST /nudges/mark-read',
+      );
       return { ...data, profileId };
     },
     onSuccess: (_data) => {

@@ -153,7 +153,15 @@ const mockReplace = jest.fn();
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
-const mockLocalSearchParams = jest.fn(() => ({ subjectId: 's1' }));
+const ACTIVE_PROFILE_ID = '00000000-0000-4000-8000-000000011000';
+const ACTIVE_ACCOUNT_ID = '00000000-0000-4000-8000-000000011001';
+const SUBJECT_ID = '00000000-0000-4000-8000-000000011002';
+const TOPIC_ID = '00000000-0000-4000-8000-000000011003';
+const MILESTONE_ID = '00000000-0000-4000-8000-000000011004';
+const SESSION_ID = '00000000-0000-4000-8000-000000011005';
+const TEST_NOW = '2026-05-31T00:00:00.000Z';
+
+const mockLocalSearchParams = jest.fn(() => ({ subjectId: SUBJECT_ID }));
 
 jest.mock(
   'expo-router' /* gc1-allow: expo-router needs a native navigation container unavailable in JSDOM; router spies assert navigation */,
@@ -200,9 +208,9 @@ jest.mock(
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 const fullSubject = {
-  subjectId: 's1',
+  subjectId: SUBJECT_ID,
   subjectName: 'Math',
-  pedagogyMode: 'general',
+  pedagogyMode: 'socratic',
   topics: { total: 10, explored: 5, mastered: 3, inProgress: 2, notStarted: 5 },
   vocabulary: { total: 0, mastered: 0, learning: 0, new: 0, byCefrLevel: {} },
   estimatedProficiency: null,
@@ -214,8 +222,8 @@ const fullSubject = {
 };
 
 const OWNER_PROFILE = createTestProfile({
-  id: 'profile-owner',
-  accountId: 'account-1',
+  id: ACTIVE_PROFILE_ID,
+  accountId: ACTIVE_ACCOUNT_ID,
   displayName: 'Test Owner',
   isOwner: true,
   birthYear: 1990,
@@ -228,6 +236,7 @@ interface SubjectProgressFixture {
   urgencyScore?: number;
   topicsCompleted?: number;
   topicsVerified?: number;
+  topicsMastered?: number;
   lastSessionAt?: string | null;
 }
 
@@ -268,6 +277,99 @@ function badRequest(message: string): Response {
   });
 }
 
+function makeInventoryResponse(subjects: SubjectFixture[]): unknown {
+  return {
+    profileId: ACTIVE_PROFILE_ID,
+    snapshotDate: '2026-05-31',
+    currentlyWorkingOn: ['Math'],
+    thisWeekMini: { sessions: 1, wordsLearned: 0, topicsTouched: 1 },
+    global: {
+      topicsAttempted: 5,
+      topicsMastered: 3,
+      vocabularyTotal: 0,
+      vocabularyMastered: 0,
+      weeklyDeltaTopicsMastered: null,
+      weeklyDeltaVocabularyTotal: null,
+      weeklyDeltaTopicsExplored: null,
+      totalSessions: 5,
+      totalActiveMinutes: 30,
+      totalWallClockMinutes: 45,
+      currentStreak: 1,
+      longestStreak: 2,
+    },
+    subjects,
+  };
+}
+
+function makeSubjectProgress(
+  progress: SubjectProgressFixture | undefined,
+): unknown {
+  return {
+    subjectId: SUBJECT_ID,
+    name: 'Math',
+    topicsTotal: 10,
+    topicsCompleted: progress?.topicsCompleted ?? 5,
+    topicsVerified: progress?.topicsVerified ?? 3,
+    topicsMastered: progress?.topicsMastered ?? 3,
+    topicsLearning: 2,
+    urgencyScore: progress?.urgencyScore ?? 0,
+    retentionStatus: progress?.retentionStatus ?? 'strong',
+    lastSessionAt: progress?.lastSessionAt ?? null,
+  };
+}
+
+function makeLanguageProgress(
+  progress: Record<string, unknown> | undefined,
+): unknown {
+  const currentMilestone =
+    typeof progress?.currentMilestone === 'object' &&
+    progress.currentMilestone !== null
+      ? {
+          milestoneId: MILESTONE_ID,
+          currentLevel: progress.currentLevel ?? 'A2',
+          currentSublevel: progress.currentSublevel ?? 'A2.1',
+          ...(progress.currentMilestone as Record<string, unknown>),
+        }
+      : (progress?.currentMilestone ?? null);
+  const nextMilestone =
+    typeof progress?.nextMilestone === 'object' &&
+    progress.nextMilestone !== null
+      ? {
+          milestoneId: MILESTONE_ID,
+          sublevel: 'B1.1',
+          ...(progress.nextMilestone as Record<string, unknown>),
+        }
+      : (progress?.nextMilestone ?? null);
+
+  return {
+    subjectId: SUBJECT_ID,
+    languageCode: 'en',
+    pedagogyMode: 'four_strands',
+    currentLevel: null,
+    currentSublevel: null,
+    ...progress,
+    currentMilestone,
+    nextMilestone,
+  };
+}
+
+function makeSubjectResponse(status = 'archived'): unknown {
+  return {
+    subject: {
+      id: SUBJECT_ID,
+      profileId: ACTIVE_PROFILE_ID,
+      name: 'Math',
+      rawInput: null,
+      status,
+      curriculumStatus: 'ready',
+      pedagogyMode: 'socratic',
+      languageCode: null,
+      createdAt: TEST_NOW,
+      updatedAt: TEST_NOW,
+    },
+  };
+}
+
 /**
  * Build the routes the real hooks hit. Endpoints discovered from the hook
  * sources (apps/mobile/src/hooks/use-progress.ts, use-language-progress.ts,
@@ -279,19 +381,19 @@ function badRequest(message: string): Response {
  *   - useUpdateSubject         → PATCH /subjects/:id          → { subject }
  *
  * Insertion order matters: the routed mock returns the first `includes()`
- * match. The two `/subjects/s1/...` sub-paths and the cefr path precede the
- * bare `/subjects/s1` PATCH route so a GET never falls into the PATCH handler.
+ * match. The two `/subjects/:id/...` sub-paths and the cefr path precede the
+ * bare `/subjects/:id` PATCH route so a GET never falls into the PATCH handler.
  */
 function buildRoutes(opts: RouteOptions = {}): Record<string, unknown> {
   const subjects = opts.subjects ?? [fullSubject];
 
   return {
-    '/subjects/s1/cefr-progress': opts.languageProgressError
+    [`/subjects/${SUBJECT_ID}/cefr-progress`]: opts.languageProgressError
       ? () => serverError()
-      : (opts.languageProgress ?? {}),
-    '/subjects/s1/progress': opts.subjectProgressError
+      : makeLanguageProgress(opts.languageProgress),
+    [`/subjects/${SUBJECT_ID}/progress`]: opts.subjectProgressError
       ? () => serverError()
-      : { progress: opts.subjectProgress ?? null },
+      : { progress: makeSubjectProgress(opts.subjectProgress ?? undefined) },
     '/progress/resume-target': { target: opts.resumeTarget ?? null },
     '/progress/inventory':
       opts.inventoryError === 'network'
@@ -300,11 +402,11 @@ function buildRoutes(opts: RouteOptions = {}): Record<string, unknown> {
           }
         : opts.inventoryError === 'server'
           ? () => serverError()
-          : { subjects },
+          : makeInventoryResponse(subjects),
     // Bare subject route — only the PATCH (hide) lands here.
-    '/subjects/s1': opts.hideErrorMessage
+    [`/subjects/${SUBJECT_ID}`]: opts.hideErrorMessage
       ? () => badRequest(opts.hideErrorMessage as string)
-      : { subject: { id: 's1', status: 'archived' } },
+      : makeSubjectResponse(),
   };
 }
 
@@ -384,7 +486,7 @@ describe('ProgressSubjectScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(false);
-    mockLocalSearchParams.mockReturnValue({ subjectId: 's1' });
+    mockLocalSearchParams.mockReturnValue({ subjectId: SUBJECT_ID });
   });
 
   afterEach(() => {
@@ -494,12 +596,14 @@ describe('ProgressSubjectScreen', () => {
           .length,
         subjectProgress: fetchCallsMatching(
           routedFetch,
-          '/subjects/s1/progress',
+          `/subjects/${SUBJECT_ID}/progress`,
         ).length,
         resume: fetchCallsMatching(routedFetch, '/progress/resume-target')
           .length,
-        language: fetchCallsMatching(routedFetch, '/subjects/s1/cefr-progress')
-          .length,
+        language: fetchCallsMatching(
+          routedFetch,
+          `/subjects/${SUBJECT_ID}/cefr-progress`,
+        ).length,
       };
 
       // The real screen registers its refetch callback via useFocusEffect; the
@@ -517,13 +621,17 @@ describe('ProgressSubjectScreen', () => {
           fetchCallsMatching(routedFetch, '/progress/inventory').length,
         ).toBeGreaterThan(before.inventory);
         expect(
-          fetchCallsMatching(routedFetch, '/subjects/s1/progress').length,
+          fetchCallsMatching(routedFetch, `/subjects/${SUBJECT_ID}/progress`)
+            .length,
         ).toBeGreaterThan(before.subjectProgress);
         expect(
           fetchCallsMatching(routedFetch, '/progress/resume-target').length,
         ).toBeGreaterThan(before.resume);
         expect(
-          fetchCallsMatching(routedFetch, '/subjects/s1/cefr-progress').length,
+          fetchCallsMatching(
+            routedFetch,
+            `/subjects/${SUBJECT_ID}/cefr-progress`,
+          ).length,
         ).toBeGreaterThan(before.language);
       });
     });
@@ -566,7 +674,7 @@ describe('ProgressSubjectScreen', () => {
       fireEvent.press(btn);
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/progress/[subjectId]/sessions',
-        params: { subjectId: 's1' },
+        params: { subjectId: SUBJECT_ID },
       });
     });
 
@@ -576,18 +684,18 @@ describe('ProgressSubjectScreen', () => {
       fireEvent.press(btn);
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/shelf/[subjectId]',
-        params: { subjectId: 's1' },
+        params: { subjectId: SUBJECT_ID },
       });
     });
 
     it('resumes the shared subject target on "Resume" press', async () => {
       const target = {
-        subjectId: 's1',
+        subjectId: SUBJECT_ID,
         subjectName: 'Math',
-        topicId: 't1',
+        topicId: TOPIC_ID,
         topicTitle: 'Fractions',
         sessionId: null,
-        resumeFromSessionId: 'prev-session',
+        resumeFromSessionId: SESSION_ID,
         resumeKind: 'recent_topic',
         lastActivityAt: '2026-02-15T09:00:00.000Z',
         reason: 'Continue Fractions',
@@ -605,15 +713,15 @@ describe('ProgressSubjectScreen', () => {
         pathname: '/(app)/session',
         params: expect.objectContaining({
           mode: 'learning',
-          subjectId: 's1',
+          subjectId: SUBJECT_ID,
           subjectName: 'Math',
-          topicId: 't1',
+          topicId: TOPIC_ID,
           topicName: 'Fractions',
-          resumeFromSessionId: 'prev-session',
+          resumeFromSessionId: SESSION_ID,
         }),
       });
       expect(mockPush).not.toHaveBeenCalledWith(
-        '/(app)/session?mode=learning&subjectId=s1',
+        `/(app)/session?mode=learning&subjectId=${SUBJECT_ID}`,
       );
     });
 
@@ -623,7 +731,7 @@ describe('ProgressSubjectScreen', () => {
       fireEvent.press(btn);
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/shelf/[subjectId]',
-        params: { subjectId: 's1' },
+        params: { subjectId: SUBJECT_ID },
       });
     });
 
@@ -655,7 +763,7 @@ describe('ProgressSubjectScreen', () => {
         { cancelable: true },
       );
       expect(
-        fetchCallsMatching(routedFetch, '/subjects/s1').filter(
+        fetchCallsMatching(routedFetch, `/subjects/${SUBJECT_ID}`).filter(
           (c) => c.init?.method === 'PATCH',
         ),
       ).toHaveLength(0);
@@ -689,7 +797,7 @@ describe('ProgressSubjectScreen', () => {
       await waitFor(() => {
         const patchCalls = fetchCallsMatching(
           routedFetch,
-          '/subjects/s1',
+          `/subjects/${SUBJECT_ID}`,
         ).filter((c) => c.init?.method === 'PATCH');
         expect(patchCalls).toHaveLength(1);
         expect(JSON.parse(patchCalls[0]!.init?.body as string)).toEqual({
@@ -851,16 +959,15 @@ describe('ProgressSubjectScreen', () => {
       await screen.findByText(/Up next: B1/);
     });
 
-    it('uses the generic next milestone label when milestone details are blank', async () => {
+    it('uses the level-only next milestone label when the milestone title is blank', async () => {
       mount({
         subjects: [languageSubject],
         languageProgress: {
           ...milestoneData,
-          nextMilestone: { level: '   ', milestoneTitle: '   ' },
+          nextMilestone: { level: 'B1', milestoneTitle: '   ' },
         },
       });
-      await screen.findByText('Up next');
-      expect(screen.queryByText(/Up next: /)).toBeNull();
+      await screen.findByText('Up next: B1');
     });
 
     it('shows "Complete a session" prompt when no milestone data yet', async () => {
@@ -888,12 +995,15 @@ describe('ProgressSubjectScreen', () => {
       const retryBtn = await screen.findByTestId('cefr-milestone-retry');
       const before = fetchCallsMatching(
         routedFetch,
-        '/subjects/s1/cefr-progress',
+        `/subjects/${SUBJECT_ID}/cefr-progress`,
       ).length;
       fireEvent.press(retryBtn);
       await waitFor(() => {
         expect(
-          fetchCallsMatching(routedFetch, '/subjects/s1/cefr-progress').length,
+          fetchCallsMatching(
+            routedFetch,
+            `/subjects/${SUBJECT_ID}/cefr-progress`,
+          ).length,
         ).toBeGreaterThan(before);
       });
     });
@@ -918,12 +1028,13 @@ describe('ProgressSubjectScreen', () => {
       );
       const before = fetchCallsMatching(
         routedFetch,
-        '/subjects/s1/progress',
+        `/subjects/${SUBJECT_ID}/progress`,
       ).length;
       fireEvent.press(retry);
       await waitFor(() => {
         expect(
-          fetchCallsMatching(routedFetch, '/subjects/s1/progress').length,
+          fetchCallsMatching(routedFetch, `/subjects/${SUBJECT_ID}/progress`)
+            .length,
         ).toBeGreaterThan(before);
       });
     });
@@ -1005,18 +1116,18 @@ describe('ProgressSubjectScreen', () => {
 
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/shelf/[subjectId]',
-        params: { subjectId: 's1' },
+        params: { subjectId: SUBJECT_ID },
       });
     });
 
     it('resumes the subject target when the retention card is pressed and a resume target exists', async () => {
       const target = {
-        subjectId: 's1',
+        subjectId: SUBJECT_ID,
         subjectName: 'Math',
-        topicId: 't1',
+        topicId: TOPIC_ID,
         topicTitle: 'Fractions',
         sessionId: null,
-        resumeFromSessionId: 'prev-session',
+        resumeFromSessionId: SESSION_ID,
         resumeKind: 'recent_topic',
         lastActivityAt: '2026-02-15T09:00:00.000Z',
         reason: 'Continue Fractions',
@@ -1037,8 +1148,8 @@ describe('ProgressSubjectScreen', () => {
         pathname: '/(app)/session',
         params: expect.objectContaining({
           mode: 'learning',
-          subjectId: 's1',
-          topicId: 't1',
+          subjectId: SUBJECT_ID,
+          topicId: TOPIC_ID,
         }),
       });
     });
@@ -1071,7 +1182,7 @@ describe('ProgressSubjectScreen', () => {
       fireEvent.press(hide);
       expect(mockPlatformAlert).not.toHaveBeenCalled();
       expect(
-        fetchCallsMatching(proxy.routedFetch, '/subjects/s1').filter(
+        fetchCallsMatching(proxy.routedFetch, `/subjects/${SUBJECT_ID}`).filter(
           (c) => c.init?.method === 'PATCH',
         ),
       ).toHaveLength(0);

@@ -24,7 +24,7 @@ const mockReplace = jest.fn();
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({
-    subjectId: 'subject-1',
+    subjectId: '50000000-0000-4000-8000-000000000001',
     subjectName: 'Mathematics',
   }),
   useRouter: () => ({
@@ -101,12 +101,28 @@ interface SetupOptions {
   analogyLoading?: boolean;
 }
 
+const SUBJECT_ID = '50000000-0000-4000-8000-000000000001';
+const PROFILE_ID = '50000000-0000-4000-8000-000000000002';
+
+function subjectFixture(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id: SUBJECT_ID,
+    profileId: PROFILE_ID,
+    name: 'Mathematics',
+    status: 'active',
+    pedagogyMode: 'socratic',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 function setupRoutes(opts: SetupOptions = {}) {
   const {
     analogyDomain = null,
-    subjects = [
-      { id: 'subject-1', name: 'Mathematics', pedagogyMode: 'standard' },
-    ],
+    subjects = [subjectFixture()],
     analogyLoading = false,
   } = opts;
 
@@ -293,7 +309,7 @@ describe('SubjectSettingsScreen', () => {
     fireEvent.press(screen.getByTestId('subject-settings-back'));
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'subject-1' },
+      params: { subjectId: '50000000-0000-4000-8000-000000000001' },
     });
   });
 
@@ -304,7 +320,7 @@ describe('SubjectSettingsScreen', () => {
     it('hides Analogy Preference for four_strands subjects', async () => {
       setupRoutes({
         subjects: [
-          { id: 'subject-1', name: 'Italian', pedagogyMode: 'four_strands' },
+          subjectFixture({ name: 'Italian', pedagogyMode: 'four_strands' }),
         ],
       });
 
@@ -321,9 +337,7 @@ describe('SubjectSettingsScreen', () => {
 
     it('shows Analogy Preference for non-language subjects', async () => {
       setupRoutes({
-        subjects: [
-          { id: 'subject-1', name: 'Mathematics', pedagogyMode: 'standard' },
-        ],
+        subjects: [subjectFixture()],
       });
 
       render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
@@ -339,7 +353,7 @@ describe('SubjectSettingsScreen', () => {
     it('still shows the back button on the language-subject empty state', async () => {
       setupRoutes({
         subjects: [
-          { id: 'subject-1', name: 'Italian', pedagogyMode: 'four_strands' },
+          subjectFixture({ name: 'Italian', pedagogyMode: 'four_strands' }),
         ],
       });
 

@@ -1,4 +1,7 @@
-import type { LanguageProgress } from '@eduagent/schemas';
+import {
+  languageProgressSchema,
+  type LanguageProgress,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { queryKeys } from '../lib/query-keys';
@@ -10,6 +13,7 @@ export function useLanguageProgress(subjectId: string) {
 
   return useApiQuery<LanguageProgress>({
     queryKey: queryKeys.languageProgress.subject(activeProfile?.id, subjectId),
+    schema: languageProgressSchema,
     fetch: (signal) =>
       client.subjects[':subjectId']['cefr-progress'].$get(
         { param: { subjectId } },

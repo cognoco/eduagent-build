@@ -193,6 +193,13 @@ export type ChallengeRoundSessionState = z.infer<
   typeof challengeRoundSessionStateSchema
 >;
 
+export const challengeRoundRouteResponseSchema = z.object({
+  challengeRound: challengeRoundSessionStateSchema.optional(),
+});
+export type ChallengeRoundRouteResponse = z.infer<
+  typeof challengeRoundRouteResponseSchema
+>;
+
 export const sessionMetadataSchema = z
   .object({
     inputMode: inputModeSchema.optional(),
@@ -361,6 +368,10 @@ export const learningSessionSchema = z.object({
   filedAt: isoDateField.nullable(),
   filingStatus: filingStatusSchema.nullable(),
   filingRetryCount: z.number().int().nonnegative(),
+  topicTitle: z.string().nullable(),
+  subjectName: z.string().nullable(),
+  bookId: z.string().uuid().nullable(),
+  bookTitle: z.string().nullable(),
 });
 export type LearningSession = z.infer<typeof learningSessionSchema>;
 
@@ -605,6 +616,18 @@ export type ParkingLotItemsResponse = z.infer<
   typeof parkingLotItemsResponseSchema
 >;
 
+export const resumeNudgeResponseSchema = z.object({
+  nudge: z
+    .object({
+      sessionId: z.string().uuid(),
+      topicHint: z.string(),
+      exchangeCount: z.number().int().nonnegative(),
+      createdAt: isoDateField,
+    })
+    .nullable(),
+});
+export type ResumeNudgeResponse = z.infer<typeof resumeNudgeResponseSchema>;
+
 export const parkingLotAddResponseSchema = z.object({
   item: parkingLotItemSchema,
 });
@@ -677,6 +700,13 @@ export const homeworkStartResponseSchema = z.object({
   session: learningSessionSchema,
 });
 export type HomeworkStartResponse = z.infer<typeof homeworkStartResponseSchema>;
+
+export const learningSessionResponseSchema = z.object({
+  session: learningSessionSchema,
+});
+export type LearningSessionResponse = z.infer<
+  typeof learningSessionResponseSchema
+>;
 
 // Outbox spillover result — POST /support/outbox-spillover → 200
 

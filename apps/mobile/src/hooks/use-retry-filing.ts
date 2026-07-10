@@ -1,7 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { LearningSession } from '@eduagent/schemas';
+import {
+  learningSessionResponseSchema,
+  type LearningSession,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { queryKeys } from '../lib/query-keys';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
 
@@ -28,7 +32,7 @@ export function useRetryFiling() {
       // Hono RPC ClientResponse has multiple success-status members, so the
       // union still resolves to a wider type than the function signature.
       const okRes = await assertOk(res);
-      return (await okRes.json()) as { session: LearningSession };
+      return await parseJson(okRes, learningSessionResponseSchema);
     },
     onSuccess: (_data, { sessionId }) => {
       void queryClient.invalidateQueries({

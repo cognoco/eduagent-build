@@ -24,6 +24,18 @@ import { createTestProfile } from '../../../test-utils/app-hook-test-utils';
 
 let mockFetch: RoutedMockFetch;
 
+const PROFILE_ID = '10000000-0000-4000-8000-000000000001';
+const ACCOUNT_ID = '10000000-0000-4000-8000-0000000000a1';
+const SUBJECT_ID = '11111111-1111-7111-8111-111111111111';
+const TOPIC_ID = '22222222-2222-7222-8222-222222222222';
+const BOOK_ID = '33333333-3333-7333-8333-333333333333';
+const SESSION_ID = '44444444-4444-7444-8444-444444444444';
+const SECOND_SESSION_ID = '55555555-5555-7555-8555-555555555555';
+const NOTE_ID = '66666666-6666-7666-8666-666666666666';
+const BOOKMARK_ID = '77777777-7777-7777-8777-777777777777';
+const BOOKMARK_EVENT_ID = '99999999-9999-7999-8999-999999999999';
+const ISO_NOW = '2026-02-15T09:00:00.000Z';
+
 jest.mock(
   '../../../lib/api-client', // gc1-allow: fetch-boundary — mockApiClientFactory installs hc() with a controlled mock fetch so real hooks exercise real request logic
   () => {
@@ -54,8 +66,8 @@ type TopicRouteParams = {
 };
 const mockUseLocalSearchParams = jest.fn(
   (): TopicRouteParams => ({
-    subjectId: 's1',
-    topicId: 't1',
+    subjectId: SUBJECT_ID,
+    topicId: TOPIC_ID,
   }),
 );
 
@@ -114,10 +126,11 @@ jest.mock(
 // ---------------------------------------------------------------------------
 
 const DEFAULT_TOPIC_PROGRESS = {
-  topicId: 't1',
+  topicId: TOPIC_ID,
   title: 'Algebra',
   description: '',
   completionStatus: 'not_started',
+  daysSinceLastReview: null,
   struggleStatus: 'normal',
   masteryScore: null,
   summaryExcerpt: null,
@@ -126,15 +139,17 @@ const DEFAULT_TOPIC_PROGRESS = {
   masteredAt: null,
   strongReviews: 0,
   strongReviewsTarget: 5,
+  totalSessions: 0,
 };
 
 const DEFAULT_RETENTION_CARD = {
-  topicId: 't1',
+  topicId: TOPIC_ID,
   failureCount: 0,
   repetitions: 0,
   easeFactor: 2.5,
   nextReviewAt: null,
   lastReviewedAt: null,
+  daysSinceLastReview: null,
   masteredAt: null,
   intervalDays: 1,
   xpStatus: 'pending',
@@ -180,16 +195,16 @@ function setupRoutes(opts: SetupOptions = {}) {
     bookmarks = [],
   } = opts;
 
-  // GET /topics/t1/progress → { topic }
-  mockFetch.setRoute('/topics/t1/progress', {
+  // GET /topics/:topicId/progress → { topic }
+  mockFetch.setRoute(`/topics/${TOPIC_ID}/progress`, {
     topic:
       progressOverride !== undefined
         ? progressOverride
         : { ...DEFAULT_TOPIC_PROGRESS, completionStatus },
   });
 
-  // GET /topics/t1/retention → { card }
-  mockFetch.setRoute('/topics/t1/retention', {
+  // GET /topics/:topicId/retention → { card }
+  mockFetch.setRoute(`/topics/${TOPIC_ID}/retention`, {
     card:
       retentionOverride !== undefined
         ? retentionOverride
@@ -203,7 +218,7 @@ function setupRoutes(opts: SetupOptions = {}) {
           },
   });
 
-  // GET /progress/topic/t1/active-session → { sessionId } | null
+  // GET /progress/topic/:topicId/active-session → { sessionId } | null
   mockFetch.setRoute(
     '/active-session',
     activeSessionId ? { sessionId: activeSessionId } : null,
@@ -212,35 +227,35 @@ function setupRoutes(opts: SetupOptions = {}) {
   // GET /progress/resume-target → { target }
   mockFetch.setRoute('/resume-target', { target: resumeTarget });
 
-  // GET /topics/t1/resolve → resolve result (false means don't set)
+  // GET /topics/:topicId/resolve → resolve result (false means don't set)
   if (resolveResult !== false) {
     mockFetch.setRoute('/resolve', resolveResult);
   }
 
-  // GET /subjects/s1/topics/t1/notes → { notes }
-  mockFetch.setRoute('/topics/t1/notes', { notes });
+  // GET /subjects/:subjectId/topics/:topicId/notes → { notes }
+  mockFetch.setRoute(`/topics/${TOPIC_ID}/notes`, { notes });
 
-  // GET /subjects/s1/topics/t1/sessions → { sessions }
-  mockFetch.setRoute('/topics/t1/sessions', { sessions });
+  // GET /subjects/:subjectId/topics/:topicId/sessions → { sessions }
+  mockFetch.setRoute(`/topics/${TOPIC_ID}/sessions`, { sessions });
 
-  // GET /bookmarks?topicId=t1 → { bookmarks, nextCursor: null }
+  // GET /bookmarks?topicId=:topicId → { bookmarks, nextCursor: null }
   mockFetch.setRoute('/bookmarks', { bookmarks, nextCursor: null });
 
-  // GET /subjects/s1/books/:bookId → BookWithTopics (empty connections — used
+  // GET /subjects/:subjectId/books/:bookId → BookWithTopics (empty connections — used
   // by relatedTopics rail). Registered unconditionally so any test that passes
   // bookId in search params receives a settled query rather than a pending
   // request that completes after unmount and triggers an act() warning.
-  mockFetch.setRoute('/books/book-1', {
+  mockFetch.setRoute(`/books/${BOOK_ID}`, {
     book: {
-      id: 'book-1',
-      subjectId: 's1',
+      id: BOOK_ID,
+      subjectId: SUBJECT_ID,
       title: 'Test Book',
       description: null,
       emoji: null,
       sortOrder: 0,
       topicsGenerated: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: ISO_NOW,
+      updatedAt: ISO_NOW,
     },
     topics: [],
     connections: [],
@@ -253,8 +268,8 @@ function setupRoutes(opts: SetupOptions = {}) {
 // ---------------------------------------------------------------------------
 
 const testProfile: Profile = createTestProfile({
-  id: 'test-profile-id',
-  accountId: 'test-account-id',
+  id: PROFILE_ID,
+  accountId: ACCOUNT_ID,
   displayName: 'Test Learner',
   isOwner: true,
   birthYear: 1990,
@@ -303,8 +318,8 @@ describe('TopicDetailScreen action buttons', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseLocalSearchParams.mockReturnValue({
-      subjectId: 's1',
-      topicId: 't1',
+      subjectId: SUBJECT_ID,
+      topicId: TOPIC_ID,
     });
     setupRoutes();
     const { Wrapper } = createWrapper();
@@ -316,7 +331,7 @@ describe('TopicDetailScreen action buttons', () => {
     const progressPromise = new Promise<Response>((resolve) => {
       resolveProgress = resolve;
     });
-    mockFetch.setRoute('/topics/t1/progress', () => progressPromise);
+    mockFetch.setRoute(`/topics/${TOPIC_ID}/progress`, () => progressPromise);
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
@@ -355,8 +370,8 @@ describe('TopicDetailScreen action buttons', () => {
       pathname: '/(app)/session',
       params: {
         mode: 'learning',
-        subjectId: 's1',
-        topicId: 't1',
+        subjectId: SUBJECT_ID,
+        topicId: TOPIC_ID,
         topicName: 'Algebra',
       },
     });
@@ -365,7 +380,7 @@ describe('TopicDetailScreen action buttons', () => {
   it('shows "Review this topic" as CTA for in_progress topics', async () => {
     setupRoutes({
       completionStatus: 'in_progress',
-      activeSessionId: 'session-123',
+      activeSessionId: SESSION_ID,
     });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
@@ -377,19 +392,19 @@ describe('TopicDetailScreen action buttons', () => {
 
   it('uses the shared topic resume target for in-progress topics', async () => {
     const target = {
-      subjectId: 's1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
-      topicId: 't1',
+      topicId: TOPIC_ID,
       topicTitle: 'Algebra',
       sessionId: null,
-      resumeFromSessionId: 'old-session',
+      resumeFromSessionId: SESSION_ID,
       resumeKind: 'recent_topic',
       lastActivityAt: '2026-02-15T09:00:00.000Z',
       reason: 'Continue Algebra',
     };
     setupRoutes({
       completionStatus: 'in_progress',
-      activeSessionId: 'session-123',
+      activeSessionId: SESSION_ID,
       resumeTarget: target,
     });
 
@@ -459,8 +474,8 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseLocalSearchParams.mockReturnValue({
-      subjectId: 's1',
-      topicId: 't1',
+      subjectId: SUBJECT_ID,
+      topicId: TOPIC_ID,
     });
     setupRoutes();
     const { Wrapper } = createWrapper();
@@ -483,20 +498,20 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
     expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
-  it('shows empty state when topic data is null after loading', async () => {
-    mockFetch.setRoute('/topics/t1/progress', { topic: null });
+  it('shows load error when the topic payload is null after loading', async () => {
+    mockFetch.setRoute(`/topics/${TOPIC_ID}/progress`, { topic: null });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByTestId('topic-detail-empty');
+      screen.getByTestId('topic-detail-retry');
     });
-    screen.getByText('Topic not found');
-    screen.getByTestId('topic-detail-empty-back');
+    screen.getByText("We couldn't load this topic");
+    screen.getByTestId('topic-detail-go-back');
   });
 
   it('shows retry, go-back, and go-home when queries error [3B.6]', async () => {
-    mockFetch.setRoute('/topics/t1/progress', () =>
+    mockFetch.setRoute(`/topics/${TOPIC_ID}/progress`, () =>
       Promise.resolve(
         new Response(
           JSON.stringify({ message: "We couldn't load this topic" }),
@@ -504,7 +519,7 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
         ),
       ),
     );
-    mockFetch.setRoute('/topics/t1/retention', () =>
+    mockFetch.setRoute(`/topics/${TOPIC_ID}/retention`, () =>
       Promise.resolve(
         new Response(JSON.stringify({ message: 'Retention error' }), {
           status: 500,
@@ -531,7 +546,7 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
 
   it('[F-009] shows loading spinner while resolving subjectId from a deep-link (no subjectId param)', async () => {
     mockUseLocalSearchParams.mockReturnValue({
-      topicId: 't1',
+      topicId: TOPIC_ID,
     } as { subjectId: string; topicId: string });
 
     let resolveResponse!: (r: Response) => void;
@@ -547,7 +562,7 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
     resolveResponse(
       new Response(
         JSON.stringify({
-          subjectId: 's1',
+          subjectId: SUBJECT_ID,
           subjectName: 'Mathematics',
           topicTitle: 'Algebra',
         }),
@@ -558,11 +573,11 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
 
   it('[F-009] renders topic content after resolving subjectId from deep-link', async () => {
     mockUseLocalSearchParams.mockReturnValue({
-      topicId: 't1',
+      topicId: TOPIC_ID,
     } as { subjectId: string; topicId: string });
 
     mockFetch.setRoute('/resolve', {
-      subjectId: 's1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Mathematics',
       topicTitle: 'Algebra',
     });
@@ -588,8 +603,8 @@ describe('TopicDetailScreen rendering details', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseLocalSearchParams.mockReturnValue({
-      subjectId: 's1',
-      topicId: 't1',
+      subjectId: SUBJECT_ID,
+      topicId: TOPIC_ID,
     });
     setupRoutes();
     const { Wrapper } = createWrapper();
@@ -639,7 +654,7 @@ describe('TopicDetailScreen rendering details', () => {
       lastReviewedAt: null,
       sessions: [
         {
-          id: 'session-1',
+          id: SESSION_ID,
           sessionType: 'learning',
           durationSeconds: 120,
           createdAt: yesterday,
@@ -681,9 +696,9 @@ describe('TopicDetailScreen rendering details', () => {
 
   it('replaces to the parent book when opened from a book route', async () => {
     mockUseLocalSearchParams.mockReturnValue({
-      subjectId: 's1',
-      bookId: 'book-1',
-      topicId: 't1',
+      subjectId: SUBJECT_ID,
+      bookId: BOOK_ID,
+      topicId: TOPIC_ID,
     });
     setupRoutes({ completionStatus: 'completed' });
 
@@ -695,7 +710,7 @@ describe('TopicDetailScreen rendering details', () => {
     fireEvent.press(screen.getByTestId('topic-detail-back'));
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-      params: { subjectId: 's1', bookId: 'book-1' },
+      params: { subjectId: SUBJECT_ID, bookId: BOOK_ID },
     });
     expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
@@ -717,13 +732,13 @@ describe('TopicDetailScreen rendering details', () => {
     setupRoutes({
       sessions: [
         {
-          id: 'session-1',
+          id: SESSION_ID,
           sessionType: 'learning',
           durationSeconds: 120,
           createdAt: '2026-04-30T12:00:00.000Z',
         },
         {
-          id: 'session-2',
+          id: SECOND_SESSION_ID,
           sessionType: 'learning',
           durationSeconds: 45,
           createdAt: '2026-04-29T12:00:00.000Z',
@@ -757,8 +772,8 @@ describe('TopicDetailScreen rendering details', () => {
     setupRoutes({
       notes: [
         {
-          id: 'note-1',
-          topicId: 't1',
+          id: NOTE_ID,
+          topicId: TOPIC_ID,
           content: 'My first note',
           sessionId: null,
           createdAt: '2026-01-01T10:00:00.000Z',
@@ -779,8 +794,8 @@ describe('TopicDetailScreen rendering details', () => {
 
   it('hides topic note write and delete affordances in parent-proxy view', async () => {
     const proxyChildProfile = createTestProfile({
-      id: 'proxy-child-profile',
-      accountId: 'test-account-id',
+      id: '88888888-8888-7888-8888-888888888888',
+      accountId: ACCOUNT_ID,
       displayName: 'Proxy Child',
       isOwner: false,
       birthYear: 2014,
@@ -788,8 +803,8 @@ describe('TopicDetailScreen rendering details', () => {
     setupRoutes({
       notes: [
         {
-          id: 'note-1',
-          topicId: 't1',
+          id: NOTE_ID,
+          topicId: TOPIC_ID,
           content: 'My first note',
           sessionId: null,
           createdAt: '2026-01-01T10:00:00.000Z',
@@ -811,7 +826,7 @@ describe('TopicDetailScreen rendering details', () => {
     fireEvent.press(screen.getByTestId('topic-notes-strip'));
 
     screen.getByText('My first note');
-    expect(screen.queryByTestId('note-card-note-1-menu')).toBeNull();
+    expect(screen.queryByTestId(`note-card-${NOTE_ID}-menu`)).toBeNull();
     expect(screen.queryByTestId('add-note-button')).toBeNull();
     expect(screen.queryByText('+ Add a note')).toBeNull();
   });
@@ -820,11 +835,11 @@ describe('TopicDetailScreen rendering details', () => {
     setupRoutes({
       bookmarks: [
         {
-          id: 'bookmark-1',
-          eventId: 'event-1',
-          sessionId: 'session-1',
-          subjectId: 's1',
-          topicId: 't1',
+          id: BOOKMARK_ID,
+          eventId: BOOKMARK_EVENT_ID,
+          sessionId: SESSION_ID,
+          subjectId: SUBJECT_ID,
+          topicId: TOPIC_ID,
           subjectName: 'Math',
           topicTitle: 'Algebra',
           content: 'This is a saved explanation from chat.',
@@ -839,7 +854,7 @@ describe('TopicDetailScreen rendering details', () => {
       screen.getByText('Saved from chat');
     });
     fireEvent.press(screen.getByTestId('topic-bookmarks-strip'));
-    screen.getByTestId('bookmark-card-bookmark-1');
+    screen.getByTestId(`bookmark-card-${BOOKMARK_ID}`);
   });
 
   it('shows an empty bookmarks message inside the strip when no bookmarks exist', async () => {
@@ -858,11 +873,11 @@ describe('TopicDetailScreen rendering details', () => {
     setupRoutes({
       bookmarks: [
         {
-          id: 'bookmark-1',
-          eventId: 'event-1',
-          sessionId: 'session-1',
-          subjectId: 's1',
-          topicId: 't1',
+          id: BOOKMARK_ID,
+          eventId: BOOKMARK_EVENT_ID,
+          sessionId: SESSION_ID,
+          subjectId: SUBJECT_ID,
+          topicId: TOPIC_ID,
           subjectName: 'Math',
           topicTitle: 'Algebra',
           content: 'Saved chat item.',
@@ -877,15 +892,15 @@ describe('TopicDetailScreen rendering details', () => {
       screen.getByText('Saved chat item.');
     });
     fireEvent.press(screen.getByTestId('topic-bookmarks-strip'));
-    screen.getByTestId('bookmark-card-bookmark-1');
-    fireEvent.press(screen.getByTestId('bookmark-card-bookmark-1'));
+    screen.getByTestId(`bookmark-card-${BOOKMARK_ID}`);
+    fireEvent.press(screen.getByTestId(`bookmark-card-${BOOKMARK_ID}`));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/session-summary/[sessionId]',
       params: {
-        sessionId: 'session-1',
-        subjectId: 's1',
-        topicId: 't1',
+        sessionId: SESSION_ID,
+        subjectId: SUBJECT_ID,
+        topicId: TOPIC_ID,
       },
     });
   });
@@ -895,7 +910,7 @@ describe('TopicDetailScreen rendering details', () => {
     const progressPromise = new Promise<Response>((resolve) => {
       resolveProgress = resolve;
     });
-    mockFetch.setRoute('/topics/t1/progress', () => progressPromise);
+    mockFetch.setRoute(`/topics/${TOPIC_ID}/progress`, () => progressPromise);
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
@@ -916,8 +931,8 @@ describe('TopicDetailScreen — Saved from chat (bookmarks)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseLocalSearchParams.mockReturnValue({
-      subjectId: 's1',
-      topicId: 't1',
+      subjectId: SUBJECT_ID,
+      topicId: TOPIC_ID,
     });
     const { Wrapper } = createWrapper();
     TestWrapper = Wrapper;
@@ -933,7 +948,7 @@ describe('TopicDetailScreen — Saved from chat (bookmarks)', () => {
         ([url]: [unknown, ...unknown[]]) => String(url).includes('/bookmarks'),
       );
       expect(bookmarkCall).toBeTruthy();
-      expect(String(bookmarkCall![0])).toContain('topicId=t1');
+      expect(String(bookmarkCall![0])).toContain(`topicId=${TOPIC_ID}`);
     });
   });
 });
@@ -950,7 +965,7 @@ describe('TopicDetailScreen — deep-link resolve timeout Retry', () => {
     jest.useFakeTimers();
     // Deep-link: topicId only, no subjectId → triggers resolve
     mockUseLocalSearchParams.mockReturnValue({
-      topicId: 't1',
+      topicId: TOPIC_ID,
     } as { subjectId: string; topicId: string });
     const { Wrapper } = createWrapper();
     TestWrapper = Wrapper;
@@ -970,12 +985,12 @@ describe('TopicDetailScreen — deep-link resolve timeout Retry', () => {
     mockFetch.setRoute('/resolve', () => neverSettlingResolve);
 
     // Also set up other routes so secondary queries don't emit noise
-    mockFetch.setRoute('/topics/t1/progress', { topic: null });
-    mockFetch.setRoute('/topics/t1/retention', { card: null });
+    mockFetch.setRoute(`/topics/${TOPIC_ID}/progress`, { topic: null });
+    mockFetch.setRoute(`/topics/${TOPIC_ID}/retention`, { card: null });
     mockFetch.setRoute('/active-session', null);
     mockFetch.setRoute('/resume-target', { target: null });
-    mockFetch.setRoute('/topics/t1/notes', { notes: [] });
-    mockFetch.setRoute('/topics/t1/sessions', { sessions: [] });
+    mockFetch.setRoute(`/topics/${TOPIC_ID}/notes`, { notes: [] });
+    mockFetch.setRoute(`/topics/${TOPIC_ID}/sessions`, { sessions: [] });
     mockFetch.setRoute('/bookmarks', { bookmarks: [], nextCursor: null });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });

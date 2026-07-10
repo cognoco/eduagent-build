@@ -23,7 +23,13 @@ import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
 import { deriveRetentionStatus, RETENTION_ORDER } from '../lib/retention-utils';
-import type { KnowledgeInventory, RetentionStatus } from '@eduagent/schemas';
+import {
+  libraryRetentionResponseSchema,
+  type KnowledgeInventory,
+  type LibraryRetentionResponse,
+  type RetentionStatus,
+} from '@eduagent/schemas';
+import { parseJson } from '../lib/parse-json';
 import { useProgressInventory } from './use-progress';
 
 // ---------------------------------------------------------------------------
@@ -55,10 +61,6 @@ export interface LibraryRetentionSubject {
   reviewDueCount: number;
 }
 
-export interface LibraryRetentionResponse {
-  subjects: LibraryRetentionSubject[];
-}
-
 // ---------------------------------------------------------------------------
 // Query hook
 // ---------------------------------------------------------------------------
@@ -86,7 +88,7 @@ export function useLibraryRetention(): UseQueryResult<LibraryRetentionResponse> 
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as LibraryRetentionResponse;
+        return await parseJson(res, libraryRetentionResponseSchema);
       } finally {
         cleanup();
       }

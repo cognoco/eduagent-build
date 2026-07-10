@@ -39,9 +39,15 @@ afterAll(() => {
 describe('useClassifySubject', () => {
   it('calls POST /subjects/classify with text and returns classification', async () => {
     const classifyResult = {
-      category: 'mathematics',
-      confidence: 0.95,
-      suggestedName: 'Mathematics',
+      candidates: [
+        {
+          subjectId: '550e8400-e29b-41d4-a716-446655440000',
+          subjectName: 'Mathematics',
+          confidence: 0.95,
+        },
+      ],
+      needsConfirmation: false,
+      suggestedSubjectName: 'Mathematics',
     };
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(classifyResult), { status: 200 }),

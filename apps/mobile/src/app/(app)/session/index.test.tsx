@@ -26,6 +26,16 @@ import * as sessionRecoveryModule from '../../../lib/session-recovery';
 // in test-setup.ts, so the real implementation runs without side effects.
 import * as analyticsModule from '../../../lib/analytics';
 
+const ACTIVE_PROFILE_ID = '10000000-0000-4000-8000-000000000001';
+const CHILD_PROFILE_ID = '10000000-0000-4000-8000-000000000002';
+const ACCOUNT_ID = '10000000-0000-4000-8000-000000000003';
+const SUBJECT_ID = '20000000-0000-4000-8000-000000000001';
+const SECOND_SUBJECT_ID = '20000000-0000-4000-8000-000000000002';
+const TOPIC_ID = '40000000-0000-4000-8000-000000000001';
+const SESSION_ID = '60000000-0000-4000-8000-000000000001';
+const RESUMED_SESSION_ID = '60000000-0000-4000-8000-000000000002';
+const REVIEW_SESSION_ID = '60000000-0000-4000-8000-000000000003';
+
 type MockFeatureFlags = {
   COACH_BAND_ENABLED: boolean;
   MIC_IN_PILL_ENABLED: boolean;
@@ -104,6 +114,13 @@ jest.mock(
 jest.mock(
   '../../../lib/api-client' /* gc1-allow: transport boundary — routed mock fetch drives real hooks; real error classes preserved via requireActual */,
   () => {
+    const ACTIVE_PROFILE_ID = '10000000-0000-4000-8000-000000000001';
+    const SUBJECT_ID = '20000000-0000-4000-8000-000000000001';
+    const CURRICULUM_ID = '30000000-0000-4000-8000-000000000001';
+    const TOPIC_ID = '40000000-0000-4000-8000-000000000001';
+    const BOOK_ID = '50000000-0000-4000-8000-000000000001';
+    const SESSION_ID = '60000000-0000-4000-8000-000000000001';
+    const FIXTURE_TIMESTAMP = '2026-01-01T00:00:00.000Z';
     const actual = jest.requireActual('../../../lib/api-client');
     const {
       createRoutedMockFetch,
@@ -118,6 +135,8 @@ jest.mock(
       '/streaks': { streak: { longestStreak: 1 } },
       '/progress/overview': { totalTopicsCompleted: 0 },
       '/progress/inventory': {
+        profileId: ACTIVE_PROFILE_ID,
+        snapshotDate: '2026-01-01',
         global: {
           topicsAttempted: 0,
           topicsMastered: 0,
@@ -137,27 +156,60 @@ jest.mock(
       // --- Subject sub-resources (most specific first) ---
       '/subjects/classify': { candidates: [], needsConfirmation: false },
       '/subjects/resolve': {
+        status: 'no_match',
+        resolvedName: null,
         suggestions: [],
         displayMessage: 'Pick a subject that fits, or create your own.',
       },
+      // useCreateNote (challenge-round saveNote path) must precede the
+      // general /subjects route because routed mocks use first substring match.
+      '/notes': {
+        note: {
+          id: '70000000-0000-4000-8000-000000000001',
+          topicId: '11111111-1111-4111-8111-111111111111',
+          sessionId: null,
+          content:
+            'Linear equations stay balanced when you do the same thing to both sides.',
+          createdAt: FIXTURE_TIMESTAMP,
+          updatedAt: FIXTURE_TIMESTAMP,
+        },
+      },
       '/curriculum': {
         curriculum: {
+          id: CURRICULUM_ID,
+          subjectId: SUBJECT_ID,
+          version: 1,
+          generatedAt: FIXTURE_TIMESTAMP,
           topics: [
             {
-              id: 'topic-1',
+              id: TOPIC_ID,
               title: 'Topic 1',
               description: 'Desc',
+              sortOrder: 0,
+              relevance: 'core',
+              estimatedMinutes: 30,
+              bookId: BOOK_ID,
               skipped: false,
             },
           ],
         },
       },
-      '/sessions': { session: { id: 'session-1' } },
+      '/sessions': { session: { id: SESSION_ID } },
       '/homework-state': {
         metadata: { problemCount: 2, currentProblemIndex: 0, problems: [] },
       },
       '/subjects': {
-        subjects: [{ id: 'subject-1', name: 'Math', status: 'active' }],
+        subjects: [
+          {
+            id: SUBJECT_ID,
+            profileId: ACTIVE_PROFILE_ID,
+            name: 'Math',
+            status: 'active',
+            pedagogyMode: 'socratic',
+            createdAt: FIXTURE_TIMESTAMP,
+            updatedAt: FIXTURE_TIMESTAMP,
+          },
+        ],
       },
 
       // useLearnerProfile reads data.profile (?.accommodationMode); null keeps
@@ -187,13 +239,10 @@ jest.mock(
         },
       },
       '/challenge-round/abort': { challengeRound: undefined },
-      // useCreateNote (challenge-round saveNote path) → subjects/:id/topics/:id/notes
-      '/notes': { note: { id: 'note-1' } },
-
       // bookmarks/session must precede /bookmarks
       '/bookmarks/session': { bookmarks: [] },
       '/bookmarks': { bookmark: { id: 'bookmark-1' } },
-      '/filing': { shelfId: 'shelf-1', bookId: 'book-1' },
+      '/filing': { shelfId: 'shelf-1', bookId: BOOK_ID },
       // direct apiClient calls (use-session-streaming)
       '/celebrations/pending': { pendingCelebrations: [] },
       '/celebrations/seen': { ok: true },
@@ -242,8 +291,8 @@ jest.mock(
 // ---------------------------------------------------------------------------
 
 const ACTIVE_PROFILE = createTestProfile({
-  id: 'profile-1',
-  accountId: 'test-account-id',
+  id: ACTIVE_PROFILE_ID,
+  accountId: ACCOUNT_ID,
   displayName: 'Test Learner',
   isOwner: true,
   hasPremiumLlm: false,
@@ -253,8 +302,8 @@ const ACTIVE_PROFILE = createTestProfile({
 });
 
 const CHILD_PROFILE = createTestProfile({
-  id: 'profile-child-1',
-  accountId: 'test-account-id',
+  id: CHILD_PROFILE_ID,
+  accountId: ACCOUNT_ID,
   displayName: 'Child Learner',
   isOwner: false,
   hasPremiumLlm: false,
@@ -652,7 +701,7 @@ describe('SessionScreen homework flow', () => {
     });
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       homeworkProblems: JSON.stringify([
         {
@@ -668,7 +717,7 @@ describe('SessionScreen homework flow', () => {
       ]),
     });
     mockStartSession.mockResolvedValue({
-      session: { id: 'session-1' },
+      session: { id: SESSION_ID },
     });
     mockStream.mockImplementation(
       async (
@@ -692,7 +741,7 @@ describe('SessionScreen homework flow', () => {
     mockRecordSystemPrompt.mockResolvedValue({ ok: true });
     mockCloseSession.mockResolvedValue({ wallClockSeconds: 120 });
     mockSetSessionInputMode.mockResolvedValue({
-      session: { id: 'session-1', inputMode: 'voice' },
+      session: { id: SESSION_ID, inputMode: 'voice' },
     });
     mockFlagSessionContent.mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
@@ -700,7 +749,7 @@ describe('SessionScreen homework flow', () => {
     mockSubmitSummary.mockResolvedValue({
       summary: {
         id: 'summary-1',
-        sessionId: 'session-1',
+        sessionId: SESSION_ID,
         content: 'I learned that equations stay balanced on both sides.',
         aiFeedback: null,
         status: 'accepted',
@@ -717,14 +766,14 @@ describe('SessionScreen homework flow', () => {
   });
 
   describe('managed-child mentor birth moment', () => {
-    const childMentorBirthKey = 'mentorBirthSeen_profile-child-1';
+    const childMentorBirthKey = `mentorBirthSeen_${CHILD_PROFILE_ID}`;
 
     function useLearningRouteParams() {
       (useLocalSearchParams as jest.Mock).mockReturnValue({
         mode: 'learning',
-        subjectId: 'subject-1',
+        subjectId: SUBJECT_ID,
         subjectName: 'Math',
-        topicId: 'topic-1',
+        topicId: TOPIC_ID,
         topicName: 'Topic 1',
       });
     }
@@ -831,9 +880,9 @@ describe('SessionScreen homework flow', () => {
   it('starts a fresh session route from the session-expired primary action', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
-      topicId: 'topic-1',
+      topicId: TOPIC_ID,
       topicName: 'Linear equations',
       sessionId: 'expired-session',
     });
@@ -851,9 +900,9 @@ describe('SessionScreen homework flow', () => {
       pathname: '/(app)/session',
       params: {
         mode: 'learning',
-        subjectId: 'subject-1',
+        subjectId: SUBJECT_ID,
         subjectName: 'Math',
-        topicId: 'topic-1',
+        topicId: TOPIC_ID,
         topicName: 'Linear equations',
       },
     });
@@ -868,9 +917,9 @@ describe('SessionScreen homework flow', () => {
     // would have missed this shape entirely.
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
-      topicId: 'topic-1',
+      topicId: TOPIC_ID,
       topicName: 'Linear equations',
       sessionId: 'expired-session',
     });
@@ -897,7 +946,7 @@ describe('SessionScreen homework flow', () => {
         'Solve 2x + 5 = 17',
         expect.any(Function),
         expect.any(Function),
-        'session-1',
+        SESSION_ID,
         expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
@@ -920,7 +969,7 @@ describe('SessionScreen homework flow', () => {
         'Factor x^2 + 3x + 2',
         expect.any(Function),
         expect.any(Function),
-        'session-1',
+        SESSION_ID,
         expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
@@ -934,7 +983,7 @@ describe('SessionScreen homework flow', () => {
   it('includes the capture source in homework metadata when homework starts from the gallery', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       captureSource: 'gallery',
       ocrText: 'Solve 2x + 5 = 17',
@@ -980,7 +1029,7 @@ describe('SessionScreen homework flow', () => {
     jest.useRealTimers();
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       imageUri: 'file:///cache/homework-photo.jpg',
       imageMimeType: 'image/jpeg',
@@ -1008,7 +1057,7 @@ describe('SessionScreen homework flow', () => {
         'Solve 2x + 5 = 17',
         expect.any(Function),
         expect.any(Function),
-        'session-1',
+        SESSION_ID,
         expect.objectContaining({
           imageBase64: 'base64-homework-image',
           imageMimeType: 'image/jpeg',
@@ -1031,7 +1080,7 @@ describe('SessionScreen homework flow', () => {
     mockReadAsStringAsync.mockRejectedValueOnce(new Error('read failed'));
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       imageUri: 'file:///cache/homework-photo.jpg',
       imageMimeType: 'image/jpeg',
@@ -1092,7 +1141,7 @@ describe('SessionScreen homework flow', () => {
     mockReadAsStringAsync.mockRejectedValueOnce(new Error('read failed'));
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       imageUri: 'file:///cache/homework-photo.jpg',
       imageMimeType: 'image/jpeg',
@@ -1138,7 +1187,7 @@ describe('SessionScreen homework flow', () => {
     );
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       imageUri: 'file:///cache/homework-photo.jpg',
       imageMimeType: 'image/jpeg',
@@ -1194,7 +1243,7 @@ describe('SessionScreen homework flow', () => {
     jest.useRealTimers();
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       // Outside the mocked cacheDirectory/documentDirectory roots — the
       // allowlist rejects this exactly like a deep-link `file:///etc/hosts`.
@@ -1272,7 +1321,7 @@ describe('SessionScreen homework flow', () => {
         'Solve 2x + 5 = 17',
         expect.any(Function),
         expect.any(Function),
-        'session-1',
+        SESSION_ID,
         expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
@@ -1298,7 +1347,7 @@ describe('SessionScreen homework flow', () => {
         'That feels too easy. Can you make it more challenging?',
         expect.any(Function),
         expect.any(Function),
-        'session-1',
+        SESSION_ID,
         expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
@@ -1329,7 +1378,7 @@ describe('SessionScreen homework flow', () => {
         'Can you explain that differently?',
         expect.any(Function),
         expect.any(Function),
-        'session-1',
+        SESSION_ID,
         expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
@@ -1363,7 +1412,7 @@ describe('SessionScreen homework flow', () => {
         'I think that answer is incorrect. Can you correct it and explain what changed?',
         expect.any(Function),
         expect.any(Function),
-        'session-1',
+        SESSION_ID,
         expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
@@ -1372,7 +1421,7 @@ describe('SessionScreen homework flow', () => {
   it('renders a challenge offer from the typed done payload and accepts it', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       topicId: '11111111-1111-4111-8111-111111111111',
       topicName: 'Linear equations',
@@ -1426,7 +1475,7 @@ describe('SessionScreen homework flow', () => {
   it('renders graded input from the typed language-learning done payload', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Spanish',
       topicId: '11111111-1111-4111-8111-111111111111',
       topicName: 'Ordering drinks',
@@ -1485,7 +1534,7 @@ describe('SessionScreen homework flow', () => {
   it('declines and permanently dismisses a typed challenge offer', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       topicId: '11111111-1111-4111-8111-111111111111',
       topicName: 'Linear equations',
@@ -1556,7 +1605,7 @@ describe('SessionScreen homework flow', () => {
   it('renders the active challenge banner and hides the Too easy chip', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       topicId: '11111111-1111-4111-8111-111111111111',
       topicName: 'Linear equations',
@@ -1601,7 +1650,7 @@ describe('SessionScreen homework flow', () => {
   it('renders a drafted note from the typed done payload and saves it', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       topicId: '11111111-1111-4111-8111-111111111111',
       topicName: 'Linear equations',
@@ -1668,7 +1717,7 @@ describe('SessionScreen homework flow', () => {
   it('skips a drafted note without writing it to /notes', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       topicId: '11111111-1111-4111-8111-111111111111',
       topicName: 'Linear equations',
@@ -1725,7 +1774,7 @@ describe('SessionScreen homework flow', () => {
   it('renders the fallback composer when the server emits an ungrounded draft (body=null)', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       topicId: '11111111-1111-4111-8111-111111111111',
       topicName: 'Linear equations',
@@ -1785,12 +1834,12 @@ describe('SessionScreen homework flow', () => {
   it('hydrates milestone tracker state from the recovery marker when resuming', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      sessionId: 'session-1',
-      subjectId: 'subject-1',
+      sessionId: SESSION_ID,
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
     });
     mockReadSessionRecoveryMarker.mockResolvedValueOnce({
-      sessionId: 'session-1',
+      sessionId: SESSION_ID,
       updatedAt: new Date().toISOString(),
       milestoneTracker: {
         milestonesReached: ['polar_star'],
@@ -1812,17 +1861,17 @@ describe('SessionScreen homework flow', () => {
   it('renders prior chat history when resuming a session with cached transcript', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      sessionId: 'session-1',
-      subjectId: 'subject-1',
+      sessionId: SESSION_ID,
+      subjectId: SUBJECT_ID,
       subjectName: 'Geography',
-      topicId: 'topic-1',
+      topicId: TOPIC_ID,
       topicName: 'Continents',
     });
     mockUseSessionTranscript.mockReturnValue({
       data: {
         archived: false,
         session: {
-          sessionId: 'session-1',
+          sessionId: SESSION_ID,
           exchangeCount: 2,
           inputMode: 'text',
           milestonesReached: [],
@@ -1863,20 +1912,20 @@ describe('SessionScreen homework flow', () => {
   it('auto-resumes the active session for a learning topic when no sessionId is in the route', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Geography',
-      topicId: 'topic-1',
+      topicId: TOPIC_ID,
       topicName: 'Continents',
     });
     // Return active session for this topic via fetch boundary
-    mockFetch.setRoute('/progress/topic', { sessionId: 'session-resumed' });
+    mockFetch.setRoute('/progress/topic', { sessionId: RESUMED_SESSION_ID });
 
     renderSessionScreen();
     await flushAsyncWork();
 
     await waitFor(() => {
       expect(mockSetParams).toHaveBeenCalledWith({
-        sessionId: 'session-resumed',
+        sessionId: RESUMED_SESSION_ID,
       });
     });
   });
@@ -1884,12 +1933,12 @@ describe('SessionScreen homework flow', () => {
   it('does not auto-resume over a local turn when the learner sends before lookup settles', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Geography',
-      topicId: 'topic-1',
+      topicId: TOPIC_ID,
       topicName: 'Continents',
     });
-    mockFetch.setRoute('/progress/topic', { sessionId: 'session-resumed' });
+    mockFetch.setRoute('/progress/topic', { sessionId: RESUMED_SESSION_ID });
 
     const testScreen = renderSessionScreen();
 
@@ -1906,14 +1955,14 @@ describe('SessionScreen homework flow', () => {
   it('does not auto-resume when entering a topic in review mode', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'review',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Geography',
-      topicId: 'topic-1',
+      topicId: TOPIC_ID,
       topicName: 'Continents',
     });
     // Even if the topic has an active session, review mode should NOT resume it.
     mockFetch.setRoute('/progress/topic', {
-      sessionId: 'session-shouldnt-resume',
+      sessionId: REVIEW_SESSION_ID,
     });
 
     renderSessionScreen();
@@ -1925,9 +1974,9 @@ describe('SessionScreen homework flow', () => {
   it('does not call setParams when the topic has no active session', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Geography',
-      topicId: 'topic-1',
+      topicId: TOPIC_ID,
       topicName: 'Continents',
     });
     // Default route already returns null for /progress/topic
@@ -1941,17 +1990,17 @@ describe('SessionScreen homework flow', () => {
   it('shows the topic header and opens the topic switcher when "Change topic" is tapped', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
-      sessionId: 'session-1',
-      subjectId: 'subject-1',
+      sessionId: SESSION_ID,
+      subjectId: SUBJECT_ID,
       subjectName: 'Geography',
-      topicId: 'topic-1',
+      topicId: TOPIC_ID,
       topicName: 'Continents',
     });
     mockUseSessionTranscript.mockReturnValue({
       data: {
         archived: false,
         session: {
-          sessionId: 'session-1',
+          sessionId: SESSION_ID,
           exchangeCount: 0,
           inputMode: 'text',
           milestonesReached: [],
@@ -1970,7 +2019,7 @@ describe('SessionScreen homework flow', () => {
     fireEvent.press(testScreen.getByTestId('session-topic-header-change'));
     await flushAsyncWork();
 
-    testScreen.getByTestId('switch-topic-topic-1');
+    testScreen.getByTestId(`switch-topic-${TOPIC_ID}`);
   });
 
   it('persists input-mode changes once the session exists', async () => {
@@ -1999,8 +2048,12 @@ describe('SessionScreen homework flow', () => {
     // Override classify to return ambiguous candidates
     mockFetch.setRoute('/subjects/classify', {
       candidates: [
-        { subjectId: 'subject-1', subjectName: 'Math', confidence: 0.62 },
-        { subjectId: 'subject-2', subjectName: 'Physics', confidence: 0.58 },
+        { subjectId: SUBJECT_ID, subjectName: 'Math', confidence: 0.62 },
+        {
+          subjectId: SECOND_SUBJECT_ID,
+          subjectName: 'Physics',
+          confidence: 0.58,
+        },
       ],
       needsConfirmation: true,
     });
@@ -2022,23 +2075,25 @@ describe('SessionScreen homework flow', () => {
     expect(mockStartSession).not.toHaveBeenCalled();
 
     await act(async () => {
-      fireEvent.press(testScreen.getByTestId('subject-resolution-subject-2'));
+      fireEvent.press(
+        testScreen.getByTestId(`subject-resolution-${SECOND_SUBJECT_ID}`),
+      );
     });
     await flushAsyncWork();
 
-    // After picking subject-2, use-session-streaming calls
+    // After picking the second subject, use-session-streaming calls
     // apiClient.subjects[':subjectId'].sessions.$post via the hc() client,
-    // which routes through mockFetch to /subjects/subject-2/sessions.
+    // which routes through mockFetch to that subject's sessions endpoint.
     const startCalls = fetchCallsMatching(
       mockFetch,
-      '/subjects/subject-2/sessions',
+      `/subjects/${SECOND_SUBJECT_ID}/sessions`,
     );
     expect(startCalls.length).toBeGreaterThan(0);
     const body = extractJsonBody<{ subjectId: string; inputMode: string }>(
       startCalls[0]?.init,
     );
     expect(body).toMatchObject({
-      subjectId: 'subject-2',
+      subjectId: SECOND_SUBJECT_ID,
       inputMode: 'text',
       rawInput: 'Solve 2x + 5 = 17',
     });
@@ -2047,7 +2102,7 @@ describe('SessionScreen homework flow', () => {
       'Solve 2x + 5 = 17',
       expect.any(Function),
       expect.any(Function),
-      'session-1',
+      SESSION_ID,
       expect.objectContaining({ idempotencyKey: expect.any(String) }),
     );
     await flushAsyncWork();
@@ -2067,12 +2122,13 @@ describe('SessionScreen homework flow', () => {
     const testScreen = renderSessionScreen();
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
-    await flushAsyncWork();
 
     // When classify fails and subjects haven't loaded yet, the screen falls
     // back to the resolve API flow which shows the "Create a new subject"
     // button (subject-resolution-create-new) as the zero-candidates escape hatch.
-    testScreen.getByTestId('subject-resolution-create-new');
+    await waitFor(() => {
+      testScreen.getByTestId('subject-resolution-create-new');
+    });
 
     expect(mockStartSession).not.toHaveBeenCalled();
     testScreen.unmount();
@@ -2084,7 +2140,7 @@ describe('SessionScreen homework flow', () => {
     });
     mockFetch.setRoute('/subjects/classify', {
       candidates: [
-        { subjectId: 'subject-1', subjectName: 'Math', confidence: 0.5 },
+        { subjectId: SUBJECT_ID, subjectName: 'Math', confidence: 0.5 },
       ],
       needsConfirmation: true,
     });
@@ -2119,6 +2175,7 @@ describe('SessionScreen homework flow', () => {
     });
     // Resolve returns rich suggestions so the picker has create options.
     mockFetch.setRoute('/subjects/resolve', {
+      status: 'no_match',
       resolvedName: null,
       suggestions: [
         { name: 'Astronomy', description: 'Study of celestial objects' },
@@ -2153,7 +2210,7 @@ describe('SessionScreen homework flow', () => {
   describe('V2 mentor-homework round-trip (T23)', () => {
     const MENTOR_HOMEWORK_PARAMS = {
       mode: 'homework',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       entrySource: 'mentor',
       returnTo: 'mentor',
@@ -2230,7 +2287,7 @@ describe('SessionScreen homework flow', () => {
           'Solve 2x + 5 = 17',
           expect.any(Function),
           expect.any(Function),
-          'session-1',
+          SESSION_ID,
           expect.objectContaining({ homeworkMode: 'help_me' }),
         );
       });
@@ -2289,7 +2346,7 @@ describe('SessionScreen homework flow', () => {
           'Solve 2x + 5 = 17',
           expect.any(Function),
           expect.any(Function),
-          'session-1',
+          SESSION_ID,
           expect.objectContaining({ idempotencyKey: expect.any(String) }),
         );
       });
@@ -2311,16 +2368,23 @@ describe('SessionScreen homework flow', () => {
       // Classify resolves without confirmation needed
       mockFetch.setRoute('/subjects/classify', {
         candidates: [
-          { subjectId: 'subject-1', subjectName: 'Math', confidence: 0.95 },
+          { subjectId: SUBJECT_ID, subjectName: 'Math', confidence: 0.95 },
         ],
         needsConfirmation: false,
-        resolvedSubjectId: 'subject-1',
+        resolvedSubjectId: SUBJECT_ID,
       });
 
       // Spy on Alert.alert so we can invoke the "End Session" button callback
       const alertSpy = jest.spyOn(Alert, 'alert');
 
       const testScreen = renderSessionScreen();
+
+      await waitFor(() => {
+        expect(
+          fetchCallsMatching(mockFetch, '/progress/inventory'),
+        ).toHaveLength(1);
+      });
+      await flushAsyncWork();
 
       // Send a message to start the session and get exchangeCount > 0
       fireEvent.press(testScreen.getByTestId('manual-send-button'));
@@ -2384,7 +2448,7 @@ describe('SessionScreen homework flow', () => {
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith(
           expect.objectContaining({
-            pathname: '/session-summary/session-1',
+            pathname: `/session-summary/${SESSION_ID}`,
           }),
         );
       });
@@ -2408,7 +2472,7 @@ describe('SessionScreen homework flow', () => {
 
       expect(mockReplace).not.toHaveBeenCalledWith(
         expect.objectContaining({
-          pathname: '/session-summary/session-1',
+          pathname: `/session-summary/${SESSION_ID}`,
         }),
       );
       expect(
@@ -2447,6 +2511,8 @@ describe('SessionScreen homework flow', () => {
     it('keeps later V2 Mentor sessions on the existing summary path', async () => {
       getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
       mockFetch.setRoute('/progress/inventory', {
+        profileId: ACTIVE_PROFILE_ID,
+        snapshotDate: '2026-01-01',
         global: {
           topicsAttempted: 0,
           topicsMastered: 0,
@@ -2470,7 +2536,7 @@ describe('SessionScreen homework flow', () => {
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith(
           expect.objectContaining({
-            pathname: '/session-summary/session-1',
+            pathname: `/session-summary/${SESSION_ID}`,
           }),
         );
       });
@@ -2494,13 +2560,13 @@ describe('voice mode persistence', () => {
     });
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
-      subjectId: 'subject-1',
+      subjectId: SUBJECT_ID,
       subjectName: 'Math',
       homeworkProblems: JSON.stringify([
         { id: 'problem-1', text: 'Solve 2x + 5 = 17', source: 'ocr' },
       ]),
     });
-    mockStartSession.mockResolvedValue({ session: { id: 'session-1' } });
+    mockStartSession.mockResolvedValue({ session: { id: SESSION_ID } });
     mockStream.mockImplementation(
       async (
         _msg: string,
@@ -2516,7 +2582,7 @@ describe('voice mode persistence', () => {
     );
     mockRecordSystemPrompt.mockResolvedValue({ ok: true });
     mockSetSessionInputMode.mockResolvedValue({
-      session: { id: 'session-1', inputMode: 'voice' },
+      session: { id: SESSION_ID, inputMode: 'voice' },
     });
     mockFlagSessionContent.mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
@@ -2530,7 +2596,7 @@ describe('voice mode persistence', () => {
   });
 
   it('defaults to voice when SecureStore has voice preference', async () => {
-    secureStore['voice-input-mode-profile-1'] = 'voice';
+    secureStore[`voice-input-mode-${ACTIVE_PROFILE_ID}`] = 'voice';
     const { getByTestId } = renderSessionScreen();
     await waitFor(() => {
       expect(getByTestId('mock-input-mode').props.children).toBe('voice');
@@ -2550,12 +2616,14 @@ describe('voice mode persistence', () => {
       fireEvent.press(getByTestId('mock-set-voice-mode'));
     });
     await waitFor(() => {
-      expect(secureStore['voice-input-mode-profile-1']).toBe('voice');
+      expect(secureStore[`voice-input-mode-${ACTIVE_PROFILE_ID}`]).toBe(
+        'voice',
+      );
     });
   });
 
   it('persists text preference when mode changes to text', async () => {
-    secureStore['voice-input-mode-profile-1'] = 'voice';
+    secureStore[`voice-input-mode-${ACTIVE_PROFILE_ID}`] = 'voice';
     const { getByTestId } = renderSessionScreen();
     // Wait for initial voice mode to load
     await waitFor(() => {
@@ -2565,7 +2633,7 @@ describe('voice mode persistence', () => {
       fireEvent.press(getByTestId('mock-set-text-mode'));
     });
     await waitFor(() => {
-      expect(secureStore['voice-input-mode-profile-1']).toBe('text');
+      expect(secureStore[`voice-input-mode-${ACTIVE_PROFILE_ID}`]).toBe('text');
     });
   });
 

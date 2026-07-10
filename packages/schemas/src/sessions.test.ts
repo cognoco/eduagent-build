@@ -623,6 +623,10 @@ describe('learningSessionSchema', () => {
     filedAt: null,
     filingStatus: null,
     filingRetryCount: 0,
+    topicTitle: null,
+    subjectName: null,
+    bookId: null,
+    bookTitle: null,
   };
 
   it('accepts a valid learning session', () => {
@@ -1421,6 +1425,10 @@ describe('homeworkStartResponseSchema', () => {
       filedAt: null,
       filingStatus: null,
       filingRetryCount: 0,
+      topicTitle: null,
+      subjectName: null,
+      bookId: null,
+      bookTitle: null,
     };
     expect(homeworkStartResponseSchema.safeParse({ session }).success).toBe(
       true,
@@ -1464,6 +1472,10 @@ describe('learningSessionSchema [BUG-205] — accepts Date objects from neon-ser
     filedAt: null,
     filingStatus: null,
     filingRetryCount: 0,
+    topicTitle: null,
+    subjectName: null,
+    bookId: null,
+    bookTitle: null,
   };
 
   it('accepts ISO datetime strings (existing behaviour)', () => {
@@ -1500,6 +1512,45 @@ describe('learningSessionSchema [BUG-205] — accepts Date objects from neon-ser
       expect(result.data.endedAt).toBeNull();
       expect(result.data.filedAt).toBeNull();
     }
+  });
+
+  it('preserves nullable library filing enrichment fields', () => {
+    const result = learningSessionSchema.safeParse({
+      ...baseRow,
+      topicId: UUID,
+      filedAt: ISO,
+      filingStatus: 'filing_recovered',
+      topicTitle: 'Photosynthesis basics',
+      subjectName: 'Biology',
+      bookId: UUID,
+      bookTitle: 'Plant Biology',
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual(
+        expect.objectContaining({
+          topicTitle: 'Photosynthesis basics',
+          subjectName: 'Biology',
+          bookId: UUID,
+          bookTitle: 'Plant Biology',
+        }),
+      );
+    }
+  });
+
+  it('rejects responses that omit library filing enrichment keys', () => {
+    const {
+      topicTitle: _topicTitle,
+      subjectName: _subjectName,
+      bookId: _bookId,
+      bookTitle: _bookTitle,
+      ...rowWithoutEnrichmentKeys
+    } = baseRow;
+
+    expect(
+      learningSessionSchema.safeParse(rowWithoutEnrichmentKeys).success,
+    ).toBe(false);
   });
 });
 

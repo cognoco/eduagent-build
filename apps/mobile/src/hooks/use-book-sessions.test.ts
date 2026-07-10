@@ -47,28 +47,20 @@ function createWrapper(activeProfile: Profile | null = createTestProfile()) {
 
 const mockSessions = [
   {
-    id: 'session-1',
-    bookId: 'book-1',
-    subjectId: 'subject-1',
-    status: 'completed',
-    startedAt: '2026-05-01T10:00:00.000Z',
-    endedAt: '2026-05-01T10:30:00.000Z',
-    durationSeconds: 1800,
-    topicId: 'topic-1',
-    topicName: 'Ancient Egypt Overview',
-    sessionType: 'learning',
+    id: '660e8400-e29b-41d4-a716-446655440001',
+    topicId: '770e8400-e29b-41d4-a716-446655440001',
+    topicTitle: 'Ancient Egypt Overview',
+    chapter: 'Origins',
+    exchangeCount: 5,
+    createdAt: '2026-05-01T10:00:00.000Z',
   },
   {
-    id: 'session-2',
-    bookId: 'book-1',
-    subjectId: 'subject-1',
-    status: 'completed',
-    startedAt: '2026-05-02T10:00:00.000Z',
-    endedAt: '2026-05-02T10:45:00.000Z',
-    durationSeconds: 2700,
-    topicId: 'topic-2',
-    topicName: 'Hieroglyphics',
-    sessionType: 'homework',
+    id: '660e8400-e29b-41d4-a716-446655440002',
+    topicId: '770e8400-e29b-41d4-a716-446655440002',
+    topicTitle: 'Hieroglyphics',
+    chapter: 'Writing',
+    exchangeCount: 3,
+    createdAt: '2026-05-02T10:00:00.000Z',
   },
 ];
 
@@ -97,8 +89,12 @@ describe('useBookSessions', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data).toHaveLength(2);
-    expect(result.current.data?.[0]?.id).toBe('session-1');
-    expect(result.current.data?.[1]?.id).toBe('session-2');
+    expect(result.current.data?.[0]?.id).toBe(
+      '660e8400-e29b-41d4-a716-446655440001',
+    );
+    expect(result.current.data?.[1]?.id).toBe(
+      '660e8400-e29b-41d4-a716-446655440002',
+    );
   });
 
   it('is disabled when subjectId is undefined — no fetch fires', async () => {
@@ -245,13 +241,17 @@ describe('useBookSessions', () => {
     });
 
     expect(result.current.data).toHaveLength(1);
-    expect(result.current.data?.[0]?.id).toBe('session-1');
+    expect(result.current.data?.[0]?.id).toBe(
+      '660e8400-e29b-41d4-a716-446655440001',
+    );
 
     // Switch to a different book
     rerender({ subjectId: 'subject-1', bookId: 'book-b' });
 
     await waitFor(() => {
-      expect(result.current.data?.[0]?.id).toBe('session-2');
+      expect(result.current.data?.[0]?.id).toBe(
+        '660e8400-e29b-41d4-a716-446655440002',
+      );
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -287,16 +287,12 @@ describe('useBookSessions', () => {
     const updatedSessions = [
       ...mockSessions,
       {
-        id: 'session-3',
-        bookId: 'book-1',
-        subjectId: 'subject-1',
-        status: 'active',
-        startedAt: '2026-05-03T10:00:00.000Z',
-        endedAt: null,
-        durationSeconds: null,
-        topicId: 'topic-3',
-        topicName: 'Mummies',
-        sessionType: 'learning',
+        id: '660e8400-e29b-41d4-a716-446655440003',
+        topicId: '770e8400-e29b-41d4-a716-446655440003',
+        topicTitle: 'Mummies',
+        chapter: 'Burial',
+        exchangeCount: 1,
+        createdAt: '2026-05-03T10:00:00.000Z',
       },
     ];
 
@@ -312,7 +308,9 @@ describe('useBookSessions', () => {
     });
 
     expect(result.current.data).toHaveLength(3);
-    expect(result.current.data?.[2]?.id).toBe('session-3');
+    expect(result.current.data?.[2]?.id).toBe(
+      '660e8400-e29b-41d4-a716-446655440003',
+    );
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });

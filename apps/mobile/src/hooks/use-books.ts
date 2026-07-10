@@ -13,6 +13,12 @@ import type {
   DeleteBookResponse,
   GetAllProfileBooksResponse,
 } from '@eduagent/schemas';
+import {
+  bookWithTopicsSchema,
+  deleteBookResponseSchema,
+  getBooksResponseSchema,
+  retryCurriculumResponseSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import {
@@ -21,6 +27,7 @@ import {
 } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { NetworkError } from '../lib/api-errors';
+import { parseJson } from '../lib/parse-json';
 
 const BOOK_DETAIL_NETWORK_RETRY_LIMIT = 4;
 const BOOK_DETAIL_DEFAULT_RETRY_LIMIT = 2;
@@ -67,7 +74,11 @@ export function useBooks(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = (await res.json()) as { books: CurriculumBook[] };
+        const data = await parseJson(
+          res,
+          getBooksResponseSchema,
+          'GET /subjects/:subjectId/books',
+        );
         return data.books;
       } finally {
         cleanup();
@@ -108,7 +119,11 @@ export function useBookWithTopics(
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as BookWithTopics;
+        return parseJson(
+          res,
+          bookWithTopicsSchema,
+          'GET /subjects/:subjectId/books/:bookId',
+        );
       } finally {
         cleanup();
       }
@@ -168,7 +183,11 @@ export function useGenerateBookTopics(
         json: input ?? {},
       });
       await assertOk(res);
-      return (await res.json()) as BookWithTopics;
+      return parseJson(
+        res,
+        bookWithTopicsSchema,
+        'POST /subjects/:subjectId/books/:bookId/generate-topics',
+      );
     },
     onSuccess: (_data, variables) => {
       // Use variables.subjectId / variables.bookId — the IDs from the actual
@@ -260,7 +279,11 @@ export function useRetryCurriculum(
         param: { id: subjectId },
       });
       await assertOk(res);
-      return (await res.json()) as { dispatched: number };
+      return parseJson(
+        res,
+        retryCurriculumResponseSchema,
+        'POST /subjects/:id/retry-curriculum',
+      );
     },
     onSuccess: (data) => {
       const pid = activeProfile?.id;
@@ -305,7 +328,11 @@ export function useDeleteBook(
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as DeleteBookResponse;
+      return parseJson(
+        res,
+        deleteBookResponseSchema,
+        'DELETE /subjects/:subjectId/books/:bookId',
+      );
     },
     onSuccess: (_data, variables) => {
       const { subjectId: sid, bookId: bid } = variables;

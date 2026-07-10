@@ -16,9 +16,11 @@ import type {
   InterestEntry,
   Pronouns,
 } from '@eduagent/schemas';
+import { onboardingSuccessResponseSchema } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { queryKeys } from '../lib/query-keys';
 
 interface UpdateLanguageInput {
@@ -65,7 +67,7 @@ export function useUpdateConversationLanguage(): UseMutationResult<
             json: { conversationLanguage: input.conversationLanguage },
           });
       await assertOk(res);
-      return (await res.json()) as { success: boolean };
+      return await parseJson(res, onboardingSuccessResponseSchema);
     },
     onSuccess: async () => {
       // The tutor-language change takes effect at the next session (per spec
@@ -111,7 +113,7 @@ export function useUpdatePronouns(): UseMutationResult<
             json: { pronouns: input.pronouns },
           });
       await assertOk(res);
-      return (await res.json()) as { success: boolean };
+      return await parseJson(res, onboardingSuccessResponseSchema);
     },
     onSuccess: async () => {
       await qc.invalidateQueries({
@@ -155,7 +157,7 @@ export function useUpdateInterestsContext(): UseMutationResult<
             json: { interests: input.interests },
           });
       await assertOk(res);
-      return (await res.json()) as { success: boolean };
+      return await parseJson(res, onboardingSuccessResponseSchema);
     },
     onSuccess: async (_, vars) => {
       const targetId = vars.childProfileId ?? activeProfile?.id;

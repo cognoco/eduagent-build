@@ -4,6 +4,7 @@
 
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
+import type { LearningProfile } from '@eduagent/schemas';
 import {
   createScreenWrapper,
   createTestProfile,
@@ -61,22 +62,30 @@ function createWrapper(activeProfile: Profile | null = ownerProfile) {
 // Shared fixtures
 // ---------------------------------------------------------------------------
 
-const mockLearningProfile = {
-  profileId: 'test-profile-id',
+const LEARNING_PROFILE_ID = '00000000-0000-4000-8000-000000000001';
+const OWNER_PROFILE_ID = '00000000-0000-4000-8000-000000000002';
+const CHILD_PROFILE_ID = '00000000-0000-4000-8000-000000000003';
+
+const mockLearningProfile: LearningProfile = {
+  id: LEARNING_PROFILE_ID,
+  profileId: OWNER_PROFILE_ID,
+  learningStyle: null,
+  interests: [],
+  strengths: [],
+  struggles: [],
+  communicationNotes: [],
+  suppressedInferences: [],
+  interestTimestamps: {},
+  effectivenessSessionCount: 0,
+  memoryEnabled: true,
+  memoryConsentStatus: 'granted',
   memoryCollectionEnabled: true,
   memoryInjectionEnabled: true,
-  consentStatus: 'CONSENTED',
   accommodationMode: 'none',
-  memories: [
-    {
-      id: 'mem-1',
-      key: 'prefers_visual_explanations',
-      value: 'true',
-      source: 'inferred',
-      suppressed: false,
-      createdAt: '2026-01-01T00:00:00.000Z',
-    },
-  ],
+  recentlyResolvedTopics: [],
+  version: 1,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
 // ---------------------------------------------------------------------------
@@ -108,7 +117,7 @@ describe('useLearnerProfile', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data?.profileId).toBe('test-profile-id');
+    expect(result.current.data?.profileId).toBe(OWNER_PROFILE_ID);
     expect(result.current.data?.memoryCollectionEnabled).toBe(true);
   });
 
@@ -198,7 +207,7 @@ describe('useChildLearnerProfile', () => {
   it('fetches and returns a child profile when owner and childProfileId are present', async () => {
     const childProfile = {
       ...mockLearningProfile,
-      profileId: 'child-profile-id',
+      profileId: CHILD_PROFILE_ID,
     };
 
     mockFetch.mockResolvedValueOnce(
@@ -214,7 +223,7 @@ describe('useChildLearnerProfile', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data?.profileId).toBe('child-profile-id');
+    expect(result.current.data?.profileId).toBe(CHILD_PROFILE_ID);
   });
 
   it('is disabled when childProfileId is undefined — no fetch fires', async () => {

@@ -137,6 +137,43 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, gcTime: 0 } },
 });
 
+const TEST_ACCOUNT_ID = '10000000-0000-4000-8000-000000000001';
+const PROFILE_IDS = {
+  new: '10000000-0000-4000-8000-000000000101',
+  child: '10000000-0000-4000-8000-000000000102',
+  retry: '10000000-0000-4000-8000-000000000103',
+  stale: '10000000-0000-4000-8000-000000000104',
+  slowSuccess: '10000000-0000-4000-8000-000000000105',
+  slowFamilySuccess: '10000000-0000-4000-8000-000000000106',
+  parent: '10000000-0000-4000-8000-000000000107',
+  childNew: '10000000-0000-4000-8000-000000000108',
+  childExisting: '10000000-0000-4000-8000-000000000109',
+  wi297: '10000000-0000-4000-8000-000000000110',
+  adult: '10000000-0000-4000-8000-000000000111',
+} as const;
+
+function makeProfileResponse(
+  overrides: Partial<NavigationProfile> & Pick<NavigationProfile, 'id'>,
+) {
+  return {
+    id: overrides.id,
+    displayName: overrides.displayName ?? 'Sam',
+    avatarUrl: overrides.avatarUrl ?? null,
+    birthYear: overrides.birthYear ?? 2000,
+    location: overrides.location ?? null,
+    isOwner: overrides.isOwner ?? false,
+    hasPremiumLlm: overrides.hasPremiumLlm ?? false,
+    defaultAppContext: overrides.defaultAppContext ?? null,
+    hasFamilyLinks: overrides.hasFamilyLinks ?? false,
+    conversationLanguage: overrides.conversationLanguage ?? 'en',
+    pronouns: overrides.pronouns ?? null,
+    consentStatus: overrides.consentStatus ?? null,
+    linkCreatedAt: overrides.linkCreatedAt ?? null,
+    createdAt: overrides.createdAt ?? '2026-02-16T00:00:00Z',
+    updatedAt: overrides.updatedAt ?? '2026-02-16T00:00:00Z',
+  };
+}
+
 function birthDateOneDayYoungerThanMinimumAge(): Date {
   const now = new Date();
   return new Date(now.getFullYear() - 13, now.getMonth(), now.getDate() + 1);
@@ -380,19 +417,11 @@ describe('CreateProfileScreen', () => {
   });
 
   it('calls POST and navigates back on successful submit (adult, no consent needed)', async () => {
-    const newProfile = {
-      id: 'new-id',
-      accountId: 'a1',
+    const newProfile = makeProfileResponse({
+      id: PROFILE_IDS.new,
       displayName: 'Sam',
-      avatarUrl: null,
-      birthYear: 2000,
-      location: null,
       isOwner: false,
-      hasPremiumLlm: false,
-      consentStatus: null,
-      createdAt: '2026-02-16T00:00:00Z',
-      updatedAt: '2026-02-16T00:00:00Z',
-    };
+    });
 
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ profile: newProfile }), { status: 200 }),
@@ -415,7 +444,7 @@ describe('CreateProfileScreen', () => {
     });
 
     await waitFor(() => {
-      expect(mockSwitchProfile).toHaveBeenCalledWith('new-id');
+      expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.new);
     });
 
     await waitFor(() => {
@@ -423,7 +452,7 @@ describe('CreateProfileScreen', () => {
     });
     expect(getMentorBornCeremonySnapshot()).toMatchObject({
       activeRequest: {
-        profileId: 'new-id',
+        profileId: PROFILE_IDS.new,
         reason: 'first-profile-created',
       },
       requestCount: 1,
@@ -431,19 +460,11 @@ describe('CreateProfileScreen', () => {
   });
 
   it('optimistically writes the new profile into scoped profiles cache', async () => {
-    const newProfile = {
-      id: 'new-id',
-      accountId: 'a1',
+    const newProfile = makeProfileResponse({
+      id: PROFILE_IDS.new,
       displayName: 'Sam',
-      avatarUrl: null,
-      birthYear: 2000,
-      location: null,
       isOwner: true,
-      hasPremiumLlm: false,
-      consentStatus: null,
-      createdAt: '2026-02-16T00:00:00Z',
-      updatedAt: '2026-02-16T00:00:00Z',
-    };
+    });
 
     queryClient.setQueryDefaults(['profiles', 'clerk-user-test'], {
       gcTime: Infinity,
@@ -476,19 +497,13 @@ describe('CreateProfileScreen', () => {
   // single consent surface. This test asserts the deterministic behavior:
   // switchProfile fires, and create-profile does NOT also navigate to /consent.
   it('switches to the pending child and does NOT push /consent (gate owns the surface) for a child under 16', async () => {
-    const newProfile = {
-      id: 'child-id',
-      accountId: 'a1',
+    const newProfile = makeProfileResponse({
+      id: PROFILE_IDS.child,
       displayName: 'Kid',
-      avatarUrl: null,
       birthYear: birthDateAtMinimumAge().getFullYear(),
-      location: null,
       isOwner: false,
-      hasPremiumLlm: false,
       consentStatus: 'PENDING',
-      createdAt: '2026-02-16T00:00:00Z',
-      updatedAt: '2026-02-16T00:00:00Z',
-    };
+    });
 
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ profile: newProfile }), { status: 200 }),
@@ -512,7 +527,7 @@ describe('CreateProfileScreen', () => {
 
     // Switches to the pending child so the layout ConsentPendingGate takes over.
     await waitFor(() => {
-      expect(mockSwitchProfile).toHaveBeenCalledWith('child-id');
+      expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.child);
     });
 
     // Must NOT also push/replace to /consent — that is the double-surface race.
@@ -849,19 +864,11 @@ describe('CreateProfileScreen', () => {
     });
 
     it('aborts the in-flight create before allowing a post-timeout retry to succeed once', async () => {
-      const newProfile = {
-        id: 'retry-id',
-        accountId: 'a1',
+      const newProfile = makeProfileResponse({
+        id: PROFILE_IDS.retry,
         displayName: 'Sam',
-        avatarUrl: null,
-        birthYear: 2000,
-        location: null,
         isOwner: true,
-        hasPremiumLlm: false,
-        consentStatus: null,
-        createdAt: '2026-02-16T00:00:00Z',
-        updatedAt: '2026-02-16T00:00:00Z',
-      };
+      });
       const abortError = Object.assign(new Error('Aborted'), {
         name: 'AbortError',
       });
@@ -893,27 +900,19 @@ describe('CreateProfileScreen', () => {
       fireEvent.press(screen.getByTestId('create-profile-submit'));
 
       await waitFor(() => {
-        expect(mockSwitchProfile).toHaveBeenCalledWith('retry-id');
+        expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.retry);
       });
       expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(mockSwitchProfile).toHaveBeenCalledTimes(1);
     });
 
     it('ignores a timed-out create response that resolves after the form unlocks', async () => {
-      const staleProfile = {
-        id: 'stale-id',
-        accountId: 'a1',
+      const staleProfile = makeProfileResponse({
+        id: PROFILE_IDS.stale,
         displayName: 'Sam',
-        avatarUrl: null,
-        birthYear: 2000,
-        location: null,
         isOwner: true,
-        hasPremiumLlm: false,
-        consentStatus: null,
-        createdAt: '2026-02-16T00:00:00Z',
-        updatedAt: '2026-02-16T00:00:00Z',
-      };
-      const retryProfile = { ...staleProfile, id: 'retry-id' };
+      });
+      const retryProfile = { ...staleProfile, id: PROFILE_IDS.retry };
       let firstSignal: AbortSignal | undefined;
       let resolveFirst: ((response: Response) => void) | undefined = undefined;
       mockFetch
@@ -945,30 +944,22 @@ describe('CreateProfileScreen', () => {
         );
         await Promise.resolve();
       });
-      expect(mockSwitchProfile).not.toHaveBeenCalledWith('stale-id');
+      expect(mockSwitchProfile).not.toHaveBeenCalledWith(PROFILE_IDS.stale);
 
       fireEvent.press(screen.getByTestId('create-profile-submit'));
 
       await waitFor(() => {
-        expect(mockSwitchProfile).toHaveBeenCalledWith('retry-id');
+        expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.retry);
       });
-      expect(mockSwitchProfile).not.toHaveBeenCalledWith('stale-id');
+      expect(mockSwitchProfile).not.toHaveBeenCalledWith(PROFILE_IDS.stale);
     });
 
     it('keeps the retry timeout active when a stale first response resolves after retry starts', async () => {
-      const staleProfile = {
-        id: 'stale-id',
-        accountId: 'a1',
+      const staleProfile = makeProfileResponse({
+        id: PROFILE_IDS.stale,
         displayName: 'Sam',
-        avatarUrl: null,
-        birthYear: 2000,
-        location: null,
         isOwner: true,
-        hasPremiumLlm: false,
-        consentStatus: null,
-        createdAt: '2026-02-16T00:00:00Z',
-        updatedAt: '2026-02-16T00:00:00Z',
-      };
+      });
       let firstSignal: AbortSignal | undefined;
       let secondSignal: AbortSignal | undefined;
       let resolveFirst: ((response: Response) => void) | undefined = undefined;
@@ -1021,19 +1012,11 @@ describe('CreateProfileScreen', () => {
     });
 
     it('keeps duplicate-submit lock active after the POST resolves while success work finishes', async () => {
-      const newProfile = {
-        id: 'slow-success-id',
-        accountId: 'a1',
+      const newProfile = makeProfileResponse({
+        id: PROFILE_IDS.slowSuccess,
         displayName: 'Sam',
-        avatarUrl: null,
-        birthYear: 2000,
-        location: null,
         isOwner: true,
-        hasPremiumLlm: false,
-        consentStatus: null,
-        createdAt: '2026-02-16T00:00:00Z',
-        updatedAt: '2026-02-16T00:00:00Z',
-      };
+      });
       mockFetch.mockResolvedValueOnce(
         new Response(JSON.stringify({ profile: newProfile }), { status: 200 }),
       );
@@ -1043,7 +1026,7 @@ describe('CreateProfileScreen', () => {
       await fillAndSubmit();
 
       await waitFor(() => {
-        expect(mockSwitchProfile).toHaveBeenCalledWith('slow-success-id');
+        expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.slowSuccess);
       });
 
       act(() => {
@@ -1061,19 +1044,11 @@ describe('CreateProfileScreen', () => {
     });
 
     it('clears the 30s POST timeout when the POST resolves before slower success work finishes', async () => {
-      const newProfile = {
-        id: 'slow-family-success-id',
-        accountId: 'a1',
+      const newProfile = makeProfileResponse({
+        id: PROFILE_IDS.slowFamilySuccess,
         displayName: 'Sam',
-        avatarUrl: null,
-        birthYear: 2000,
-        location: null,
         isOwner: true,
-        hasPremiumLlm: false,
-        consentStatus: null,
-        createdAt: '2026-02-16T00:00:00Z',
-        updatedAt: '2026-02-16T00:00:00Z',
-      };
+      });
       let resolveCreate: ((response: Response) => void) | undefined = undefined;
       let resolveAppContext: ((response: Response) => void) | undefined =
         undefined;
@@ -1164,7 +1139,7 @@ describe('CreateProfileScreen', () => {
       });
       await waitFor(() => {
         expect(mockSwitchProfile).toHaveBeenCalledWith(
-          'slow-family-success-id',
+          PROFILE_IDS.slowFamilySuccess,
         );
       });
       await act(async () => {
@@ -1174,19 +1149,11 @@ describe('CreateProfileScreen', () => {
     });
 
     it('ignores a timed-out create failure that rejects after a retry succeeds', async () => {
-      const retryProfile = {
-        id: 'retry-id',
-        accountId: 'a1',
+      const retryProfile = makeProfileResponse({
+        id: PROFILE_IDS.retry,
         displayName: 'Sam',
-        avatarUrl: null,
-        birthYear: 2000,
-        location: null,
         isOwner: true,
-        hasPremiumLlm: false,
-        consentStatus: null,
-        createdAt: '2026-02-16T00:00:00Z',
-        updatedAt: '2026-02-16T00:00:00Z',
-      };
+      });
       let rejectFirst: ((reason: Error) => void) | undefined = undefined;
       mockFetch
         .mockImplementationOnce(() => {
@@ -1209,7 +1176,7 @@ describe('CreateProfileScreen', () => {
 
       fireEvent.press(screen.getByTestId('create-profile-submit'));
       await waitFor(() => {
-        expect(mockSwitchProfile).toHaveBeenCalledWith('retry-id');
+        expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.retry);
       });
 
       await act(async () => {
@@ -1264,8 +1231,8 @@ describe('CreateProfileScreen', () => {
 
   describe('parent adding child', () => {
     const parentProfile: NavigationProfile = {
-      id: 'parent-id',
-      accountId: 'a1',
+      id: PROFILE_IDS.parent,
+      accountId: TEST_ACCOUNT_ID,
       displayName: 'Mum',
       avatarUrl: null,
       birthYear: 1985,
@@ -1283,8 +1250,8 @@ describe('CreateProfileScreen', () => {
     };
 
     const childProfile: NavigationProfile = {
-      id: 'child-new',
-      accountId: 'a1',
+      id: PROFILE_IDS.childNew,
+      accountId: TEST_ACCOUNT_ID,
       displayName: 'Lily',
       avatarUrl: null,
       birthYear: birthDateAtMinimumAge().getFullYear(),
@@ -1432,10 +1399,10 @@ describe('CreateProfileScreen', () => {
 
       const patchCall = mockFetch.mock.calls[1];
       expect(String(patchCall?.[0])).toContain(
-        '/profiles/parent-id/app-context',
+        `/profiles/${PROFILE_IDS.parent}/app-context`,
       );
       expect(String(patchCall?.[0])).not.toContain(
-        '/profiles/child-new/app-context',
+        `/profiles/${PROFILE_IDS.childNew}/app-context`,
       );
       const patchInit = patchCall?.[1] as RequestInit | undefined;
       expect(patchInit?.method).toBe('PATCH');
@@ -1491,8 +1458,8 @@ describe('CreateProfileScreen', () => {
 
     it('[WI-1611] keeps the owner active and updates owner family context when adding another child', async () => {
       const existingChild: NavigationProfile = {
-        id: 'child-existing',
-        accountId: 'a1',
+        id: PROFILE_IDS.childExisting,
+        accountId: TEST_ACCOUNT_ID,
         displayName: 'Max',
         avatarUrl: null,
         birthYear: birthDateAtMinimumAge().getFullYear(),
@@ -1549,10 +1516,10 @@ describe('CreateProfileScreen', () => {
       });
 
       expect(String(mockFetch.mock.calls[1]?.[0])).toContain(
-        '/profiles/parent-id/app-context',
+        `/profiles/${PROFILE_IDS.parent}/app-context`,
       );
       expect(mockSwitchProfile).not.toHaveBeenCalled();
-      expect(mockSwitchProfile).not.toHaveBeenCalledWith('child-new');
+      expect(mockSwitchProfile).not.toHaveBeenCalledWith(PROFILE_IDS.childNew);
     });
 
     it('[WI-1611] preserves child creation and shows a family-mode recovery action when owner context PATCH fails', async () => {
@@ -1616,7 +1583,7 @@ describe('CreateProfileScreen', () => {
         expect(mockFetch).toHaveBeenCalledTimes(3);
       });
       expect(String(mockFetch.mock.calls[2]?.[0])).toContain(
-        '/profiles/parent-id/app-context',
+        `/profiles/${PROFILE_IDS.parent}/app-context`,
       );
       expect(mockSwitchProfile).not.toHaveBeenCalled();
     });
@@ -1673,7 +1640,7 @@ describe('CreateProfileScreen', () => {
       );
       const retryCall = mockFetch.mock.calls[2];
       expect(String(retryCall?.[0])).toContain(
-        '/profiles/parent-id/app-context',
+        `/profiles/${PROFILE_IDS.parent}/app-context`,
       );
       expect(mockSwitchProfile).not.toHaveBeenCalled();
     });
@@ -1794,17 +1761,13 @@ describe('CreateProfileScreen', () => {
   describe('WI-297 — full birth date in POST body', () => {
     it('[break-test] submitted body includes birthMonth and birthDay alongside birthYear', async () => {
       const newProfile = {
-        id: 'wi297-id',
-        accountId: 'a1',
-        displayName: 'WI297 Test',
-        avatarUrl: null,
-        birthYear: 2005,
-        location: null,
-        isOwner: false,
-        hasPremiumLlm: false,
-        consentStatus: null,
-        createdAt: '2026-02-16T00:00:00Z',
-        updatedAt: '2026-02-16T00:00:00Z',
+        ...makeProfileResponse({
+          id: PROFILE_IDS.wi297,
+          displayName: 'WI297 Test',
+          birthYear: 2005,
+          isOwner: false,
+        }),
+        accountId: TEST_ACCOUNT_ID,
       };
 
       mockFetch.mockResolvedValueOnce(
@@ -1907,15 +1870,20 @@ describe('CreateProfileScreen', () => {
 
   describe('audience-driven first-profile setup', () => {
     const adultOwner = {
-      id: 'adult-id',
-      accountId: 'a1',
+      id: PROFILE_IDS.adult,
+      accountId: TEST_ACCOUNT_ID,
       displayName: 'Sam',
       avatarUrl: null,
       birthYear: 2000,
       location: null,
       isOwner: true,
       hasPremiumLlm: false,
+      defaultAppContext: null,
+      hasFamilyLinks: false,
+      conversationLanguage: 'en',
+      pronouns: null,
       consentStatus: null,
+      linkCreatedAt: null,
       createdAt: '2026-02-16T00:00:00Z',
       updatedAt: '2026-02-16T00:00:00Z',
     };
@@ -1999,7 +1967,7 @@ describe('CreateProfileScreen', () => {
 
       const patchCall = mockFetch.mock.calls[1];
       expect(String(patchCall?.[0])).toContain(
-        '/profiles/adult-id/app-context',
+        `/profiles/${PROFILE_IDS.adult}/app-context`,
       );
       const patchInit = patchCall?.[1] as RequestInit | undefined;
       expect(patchInit?.method).toBe('PATCH');
@@ -2015,7 +1983,7 @@ describe('CreateProfileScreen', () => {
           params: { for: 'child' },
         });
       });
-      expect(mockSwitchProfile).toHaveBeenCalledWith('adult-id');
+      expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.adult);
       expect(getMentorBornCeremonySnapshot().requestCount).toBe(0);
     });
 
@@ -2034,7 +2002,7 @@ describe('CreateProfileScreen', () => {
       fireEvent.press(screen.getByTestId('create-profile-submit'));
 
       await waitFor(() => {
-        expect(mockSwitchProfile).toHaveBeenCalledWith('adult-id');
+        expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.adult);
       });
       // Single POST only — no family PATCH.
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -2046,7 +2014,7 @@ describe('CreateProfileScreen', () => {
       });
       expect(getMentorBornCeremonySnapshot()).toMatchObject({
         activeRequest: {
-          profileId: 'adult-id',
+          profileId: PROFILE_IDS.adult,
           reason: 'first-profile-created',
         },
         requestCount: 1,

@@ -23,8 +23,8 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const mockMilestones = [
   {
-    id: 'm1',
-    profileId: 'p1',
+    id: '11111111-1111-4111-8111-111111111111',
+    profileId: '990e8400-e29b-41d4-a716-446655440004',
     milestoneType: 'topic_mastered_count' as const,
     threshold: 5,
     subjectId: null,
@@ -34,8 +34,8 @@ const mockMilestones = [
     createdAt: '2026-04-10T12:00:00Z',
   },
   {
-    id: 'm2',
-    profileId: 'p1',
+    id: '22222222-2222-4222-8222-222222222222',
+    profileId: '990e8400-e29b-41d4-a716-446655440004',
     milestoneType: 'session_count' as const,
     threshold: 10,
     subjectId: null,
@@ -59,7 +59,12 @@ describe('MilestonesListScreen', () => {
     active = renderScreen(<MilestonesListScreen />, {
       routes: { '/progress/milestones': { milestones: mockMilestones } },
     });
-    await active.result.findByText('5 topics mastered');
+    await waitFor(
+      () => {
+        active!.result.getByText('5 topics mastered');
+      },
+      { timeout: 5000 },
+    );
     active.result.getByText('10 learning sessions completed');
     active.result.getByTestId('milestones-back');
   });

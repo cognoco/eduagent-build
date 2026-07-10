@@ -81,7 +81,9 @@ const mockCanGoBack = jest.fn();
 
 // Mutable so individual tests can drop subjectId to exercise the missing-param
 // guard. Reset to the default in beforeEach.
-let mockSearchParams: { subjectId?: string } = { subjectId: 'sub-1' };
+let mockSearchParams: { subjectId?: string } = {
+  subjectId: '40000000-0000-4000-8000-000000000010',
+};
 
 jest.mock(
   'expo-router', // gc1-allow: native-boundary
@@ -103,7 +105,8 @@ jest.mock(
 const DEFAULT_SUGGESTIONS = {
   suggestions: [
     {
-      id: 'sug-1',
+      id: '40000000-0000-4000-8000-000000000001',
+      subjectId: '40000000-0000-4000-8000-000000000010',
       title: 'Europe',
       emoji: null,
       description: 'European geography',
@@ -112,7 +115,8 @@ const DEFAULT_SUGGESTIONS = {
       pickedAt: null,
     },
     {
-      id: 'sug-2',
+      id: '40000000-0000-4000-8000-000000000002',
+      subjectId: '40000000-0000-4000-8000-000000000010',
       title: 'Asia',
       emoji: null,
       description: 'Asian geography',
@@ -124,15 +128,25 @@ const DEFAULT_SUGGESTIONS = {
   curriculumBookCount: 0,
 };
 
-const DEFAULT_SUBJECTS = [{ id: 'sub-1', name: 'Geography' }];
+const DEFAULT_SUBJECTS = [
+  {
+    id: '40000000-0000-4000-8000-000000000010',
+    profileId: '40000000-0000-4000-8000-000000000011',
+    name: 'Geography',
+    status: 'active',
+    pedagogyMode: 'socratic',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+];
 
 const DEFAULT_FILING_RESULT = {
-  shelfId: 'shelf-1',
-  bookId: 'book-1',
+  shelfId: '40000000-0000-4000-8000-000000000020',
+  bookId: '40000000-0000-4000-8000-000000000021',
   shelfName: 'Geography',
   bookName: 'Europe',
   chapter: 'Western Europe',
-  topicId: 'topic-1',
+  topicId: '40000000-0000-4000-8000-000000000022',
   topicTitle: 'France',
   isNew: { shelf: false, book: true, chapter: true },
 };
@@ -162,7 +176,7 @@ describe('PickBookScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
-    mockSearchParams = { subjectId: 'sub-1' };
+    mockSearchParams = { subjectId: '40000000-0000-4000-8000-000000000010' };
     resetRoutes();
   });
 
@@ -218,7 +232,10 @@ describe('PickBookScreen', () => {
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-          params: { subjectId: 'shelf-1', bookId: 'book-1' },
+          params: {
+            subjectId: '40000000-0000-4000-8000-000000000020',
+            bookId: '40000000-0000-4000-8000-000000000021',
+          },
         }),
       );
     });
@@ -245,22 +262,25 @@ describe('PickBookScreen', () => {
     });
     expect(mockPush).toHaveBeenNthCalledWith(1, {
       pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'shelf-1' },
+      params: { subjectId: '40000000-0000-4000-8000-000000000020' },
     });
     expect(mockPush).toHaveBeenNthCalledWith(2, {
       pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-      params: { subjectId: 'shelf-1', bookId: 'book-1' },
+      params: {
+        subjectId: '40000000-0000-4000-8000-000000000020',
+        bookId: '40000000-0000-4000-8000-000000000021',
+      },
     });
   });
 
   it('seeds the shelf ancestor before pushing the book leaf on custom-text success', async () => {
     mockFetch.setRoute('/filing', {
-      shelfId: 'shelf-9',
-      bookId: 'book-9',
+      shelfId: '40000000-0000-4000-8000-000000000029',
+      bookId: '40000000-0000-4000-8000-000000000039',
       shelfName: 'Geography',
       bookName: 'My custom book',
       chapter: 'C1',
-      topicId: 'topic-9',
+      topicId: '40000000-0000-4000-8000-000000000049',
       topicTitle: 'T1',
       isNew: { shelf: false, book: true, chapter: true },
     });
@@ -282,11 +302,14 @@ describe('PickBookScreen', () => {
     });
     expect(mockPush).toHaveBeenNthCalledWith(1, {
       pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'shelf-9' },
+      params: { subjectId: '40000000-0000-4000-8000-000000000029' },
     });
     expect(mockPush).toHaveBeenNthCalledWith(2, {
       pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-      params: { subjectId: 'shelf-9', bookId: 'book-9' },
+      params: {
+        subjectId: '40000000-0000-4000-8000-000000000029',
+        bookId: '40000000-0000-4000-8000-000000000039',
+      },
     });
   });
 
@@ -425,7 +448,7 @@ describe('PickBookScreen', () => {
 
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'sub-1' },
+      params: { subjectId: '40000000-0000-4000-8000-000000000010' },
     });
   });
 
@@ -488,7 +511,7 @@ describe('PickBookScreen', () => {
         expect(mockBack).not.toHaveBeenCalled();
         expect(mockReplace).toHaveBeenCalledWith({
           pathname: '/(app)/subject-hub/[subjectId]',
-          params: { subjectId: 'sub-1' },
+          params: { subjectId: '40000000-0000-4000-8000-000000000010' },
         });
       },
     );
@@ -566,7 +589,7 @@ describe('PickBookScreen', () => {
           expect(mockBack).not.toHaveBeenCalled();
           expect(mockReplace).toHaveBeenCalledWith({
             pathname: '/(app)/subject-hub/[subjectId]',
-            params: { subjectId: 'sub-1' },
+            params: { subjectId: '40000000-0000-4000-8000-000000000010' },
           });
         } finally {
           alertSpy.mockRestore();
@@ -592,12 +615,12 @@ describe('PickBookScreen', () => {
     it('still allows filing a suggestion when subject is undefined', async () => {
       mockFetch.setRoute('/subjects', { subjects: [] });
       mockFetch.setRoute('/filing', {
-        shelfId: 'shelf-2',
-        bookId: 'book-2',
+        shelfId: '40000000-0000-4000-8000-000000000020',
+        bookId: '40000000-0000-4000-8000-000000000021',
         shelfName: 'Geography',
         bookName: 'Europe',
         chapter: 'Western Europe',
-        topicId: 'topic-2',
+        topicId: '40000000-0000-4000-8000-000000000022',
         topicTitle: 'France',
         isNew: { shelf: false, book: true, chapter: true },
       });
@@ -628,7 +651,8 @@ describe('PickBookScreen', () => {
       mockFetch.setRoute('/book-suggestions', {
         suggestions: [
           {
-            id: 'g1',
+            id: '40000000-0000-4000-8000-000000000031',
+            subjectId: '40000000-0000-4000-8000-000000000010',
             title: 'A',
             emoji: null,
             description: 'd',
@@ -637,7 +661,8 @@ describe('PickBookScreen', () => {
             pickedAt: null,
           },
           {
-            id: 'g2',
+            id: '40000000-0000-4000-8000-000000000032',
+            subjectId: '40000000-0000-4000-8000-000000000010',
             title: 'B',
             emoji: null,
             description: 'd',
@@ -666,7 +691,8 @@ describe('PickBookScreen', () => {
       mockFetch.setRoute('/book-suggestions', {
         suggestions: [
           {
-            id: 'g1',
+            id: '40000000-0000-4000-8000-000000000031',
+            subjectId: '40000000-0000-4000-8000-000000000010',
             title: 'A',
             emoji: null,
             description: 'd',
@@ -675,7 +701,8 @@ describe('PickBookScreen', () => {
             pickedAt: null,
           },
           {
-            id: 'g2',
+            id: '40000000-0000-4000-8000-000000000032',
+            subjectId: '40000000-0000-4000-8000-000000000010',
             title: 'B',
             emoji: null,
             description: 'd',
@@ -700,7 +727,8 @@ describe('PickBookScreen', () => {
       mockFetch.setRoute('/book-suggestions', {
         suggestions: [
           {
-            id: 'g1',
+            id: '40000000-0000-4000-8000-000000000031',
+            subjectId: '40000000-0000-4000-8000-000000000010',
             title: 'Old',
             emoji: null,
             description: 'd',
@@ -709,7 +737,8 @@ describe('PickBookScreen', () => {
             pickedAt: null,
           },
           {
-            id: 'g2',
+            id: '40000000-0000-4000-8000-000000000032',
+            subjectId: '40000000-0000-4000-8000-000000000010',
             title: 'New',
             emoji: null,
             description: 'd',
@@ -736,7 +765,8 @@ describe('PickBookScreen', () => {
       mockFetch.setRoute('/book-suggestions', {
         suggestions: [
           {
-            id: 'g1',
+            id: '40000000-0000-4000-8000-000000000031',
+            subjectId: '40000000-0000-4000-8000-000000000010',
             title: 'A',
             emoji: null,
             description: 'd',
@@ -815,7 +845,7 @@ describe('PickBookScreen', () => {
       // Skip routed user to the shelf.
       expect(mockReplace).toHaveBeenCalledWith({
         pathname: '/(app)/shelf/[subjectId]',
-        params: { subjectId: 'sub-1' },
+        params: { subjectId: '40000000-0000-4000-8000-000000000010' },
       });
 
       // Switch to real timers before resolving the mutation so act() can drain
@@ -830,12 +860,12 @@ describe('PickBookScreen', () => {
         resolveFiling(
           new Response(
             JSON.stringify({
-              shelfId: 'sub-1',
-              bookId: 'book-late',
+              shelfId: '40000000-0000-4000-8000-000000000010',
+              bookId: '40000000-0000-4000-8000-000000000051',
               shelfName: 'Geography',
               bookName: 'Europe',
               chapter: 'Western Europe',
-              topicId: 'topic-late',
+              topicId: '40000000-0000-4000-8000-000000000052',
               topicTitle: 'France',
               isNew: { shelf: false, book: true, chapter: true },
             }),

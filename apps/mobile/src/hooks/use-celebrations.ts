@@ -4,10 +4,15 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { PendingCelebration } from '@eduagent/schemas';
+import {
+  celebrationSeenResponseSchema,
+  pendingCelebrationsResponseSchema,
+  type PendingCelebration,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
 
 export function usePendingCelebrations(options?: {
@@ -24,6 +29,7 @@ export function usePendingCelebrations(options?: {
     PendingCelebration[]
   >({
     queryKey: ['celebrations', 'pending', targetProfileId, viewer],
+    schema: pendingCelebrationsResponseSchema,
     fetch: (signal) =>
       client.celebrations.pending.$get(
         { query: { viewer } },
@@ -67,7 +73,11 @@ export function useMarkCelebrationsSeen(): UseMutationResult<
         },
       );
       await assertOk(res);
-      return (await res.json()) as { ok: boolean };
+      return parseJson(
+        res,
+        celebrationSeenResponseSchema,
+        'POST /celebrations/seen',
+      );
     },
     onSuccess: (_result, variables) => {
       void queryClient.invalidateQueries({

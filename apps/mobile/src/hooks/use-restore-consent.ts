@@ -3,10 +3,14 @@ import {
   useQueryClient,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import type { ConsentActionResult } from '@eduagent/schemas';
+import {
+  consentActionResultSchema,
+  type ConsentActionResult,
+} from '@eduagent/schemas';
 
 import { assertOk } from '../lib/assert-ok';
 import { useApiClient } from '../lib/api-client';
+import { parseJson } from '../lib/parse-json';
 
 export interface RestoreConsentVariables {
   childProfileId: string;
@@ -28,7 +32,7 @@ export function useRestoreConsent(): UseMutationResult<
         param: { childProfileId },
       });
       await assertOk(res);
-      return (await res.json()) as ConsentActionResult;
+      return await parseJson(res, consentActionResultSchema);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
