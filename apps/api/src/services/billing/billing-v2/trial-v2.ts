@@ -72,7 +72,13 @@ export async function expireTrialAndDowngradeQuotaV2(
 
     const txDb = tx as unknown as Database;
     const currentPool = await findQuotaPool__unscoped(txDb, subscriptionId);
-    if (currentPool && currentPool.monthlyLimit === monthlyLimit) {
+    if (
+      currentPool &&
+      currentPool.monthlyLimit === monthlyLimit &&
+      currentPool.dailyLimit === dailyLimit &&
+      currentPool.usedThisMonth === 0 &&
+      currentPool.usedToday === 0
+    ) {
       return;
     }
 
