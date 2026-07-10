@@ -41,10 +41,19 @@ describe('[WI-1195] persisted learning-text guard wiring', () => {
 describe('[WI-1195] persisted learning-text clinical attribution guard', () => {
   it.each([
     'Alex has ADHD.',
+    'Alex probably has ADHD.',
+    'Alex possibly has ADHD.',
     'Sam is autistic.',
     'Jordan shows signs of dyslexia.',
   ])(
     'rejects a clinical characterisation attributed to a named person: %s',
+    (text) => {
+      expect(scrubClinicalInferenceFromLearningRecord(text)).toBeNull();
+    },
+  );
+
+  it.each(['The learner probably has ADHD.', 'The learner possibly has ADHD.'])(
+    'rejects a qualified clinical characterisation attributed to a generic person: %s',
     (text) => {
       expect(scrubClinicalInferenceFromLearningRecord(text)).toBeNull();
     },

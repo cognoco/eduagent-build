@@ -6,14 +6,15 @@ import { BadRequestError } from '../errors';
 const CLINICAL_LABEL = String.raw`(?:adhd|autis(?:m|tic)|dyslexi(?:a|c)|dyscalculi(?:a|c)|learning disabilit(?:y|ies)|mental[- ]health condition|physical[- ]health condition)`;
 const GENERIC_PERSON = String.raw`(?:i|you|learner|student|child|user|profile|they|he|she)`;
 const PERSON_NAME = String.raw`(?<person>[\p{L}\p{M}][\p{L}\p{M}'’-]{1,39})`;
+const ATTRIBUTION_QUALIFIER = String.raw`(?:(?:probably|possibly)\s+)?`;
 const ATTRIBUTION_PHRASE = String.raw`(?:may have|might have|could have|likely has|appears to have|seems to have|shows signs of|is diagnosed with|was diagnosed with|were diagnosed with|has|have|had|is|am|are|was|were)`;
 const ATTRIBUTION_MODIFIER = String.raw`(?:(?:likely|probably|possibly|suspected)\s+)?(?:a\s+|an\s+)?`;
 const GENERIC_CLINICAL_ATTRIBUTION = new RegExp(
-  String.raw`(?<![\p{L}\p{M}])${GENERIC_PERSON}(?![\p{L}\p{M}])\s+${ATTRIBUTION_PHRASE}\s+${ATTRIBUTION_MODIFIER}${CLINICAL_LABEL}(?![\p{L}\p{M}])`,
+  String.raw`(?<![\p{L}\p{M}])${GENERIC_PERSON}(?![\p{L}\p{M}])\s+${ATTRIBUTION_QUALIFIER}${ATTRIBUTION_PHRASE}\s+${ATTRIBUTION_MODIFIER}${CLINICAL_LABEL}(?![\p{L}\p{M}])`,
   'iu',
 );
 const NAMED_CLINICAL_ATTRIBUTION = new RegExp(
-  String.raw`(?<![\p{L}\p{M}])${PERSON_NAME}(?![\p{L}\p{M}])\s+${ATTRIBUTION_PHRASE}\s+${ATTRIBUTION_MODIFIER}${CLINICAL_LABEL}(?![\p{L}\p{M}])`,
+  String.raw`(?<![\p{L}\p{M}])${PERSON_NAME}(?![\p{L}\p{M}])\s+${ATTRIBUTION_QUALIFIER}${ATTRIBUTION_PHRASE}\s+${ATTRIBUTION_MODIFIER}${CLINICAL_LABEL}(?![\p{L}\p{M}])`,
   'giu',
 );
 const GENERIC_POSSESSIVE_CLINICAL_ATTRIBUTION = new RegExp(
