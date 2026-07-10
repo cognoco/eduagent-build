@@ -16,7 +16,9 @@
 #
 # Environment variables (optional):
 #   API_URL          — API base URL (default: http://localhost:8787)
-#   EMAIL            — Test user email (default: test-e2e+clerk_test@example.com)
+#   E2E_SEED_SLOT    — Reusable native seed slot (default: native-01; native-01..native-08)
+#   EMAIL            — Explicit seed email override; requires E2E_ALLOW_ARBITRARY_EMAIL=1
+#   E2E_ALLOW_ARBITRARY_EMAIL — Allow EMAIL override for one-off debug runs (default: 0)
 #   MAESTRO_PATH     — Path to maestro binary (default: /c/tools/maestro/bin/maestro)
 #   APP_TIMEOUT      — Seconds to wait for sign-in screen (default: 30)
 #
@@ -55,7 +57,8 @@ EXTRA_ARGS=("$@")
 
 # ── Config ──
 API_URL="${API_URL:-http://localhost:8787}"
-EMAIL="${EMAIL:-test-e2e+clerk_test@example.com}"
+E2E_SEED_SLOT="${E2E_SEED_SLOT:-native-01}"
+E2E_ALLOW_ARBITRARY_EMAIL="${E2E_ALLOW_ARBITRARY_EMAIL:-0}"
 MAESTRO="${MAESTRO_PATH:-/c/tools/maestro/bin/maestro}"
 ADB="${ADB_PATH:-/c/Android/Sdk/platform-tools/adb.exe}"
 APP_ID="com.mentomate.app"
@@ -146,13 +149,27 @@ if [ $NO_SEED -eq 1 ]; then
   echo "[release] --no-seed: skipping seed API."
   MAESTRO_ENV_ARGS=(-e "API_URL=${API_URL}")
   echo "[release] Running: ${MAESTRO} test --config ${CONFIG_FILE} ${FLOW_FILE}"
-  exec "${MAESTRO}" test --config "${CONFIG_FILE}" "${MAESTRO_ENV_ARGS[@]}" "${EXTRA_ARGS[@]:+${EXTRA_ARGS[@]}}" "${FLOW_FILE}"
+  "${MAESTRO}" test --config "${CONFIG_FILE}" "${MAESTRO_ENV_ARGS[@]}" "${EXTRA_ARGS[@]:+${EXTRA_ARGS[@]}}" "${FLOW_FILE}"
+  exit "$?"
 fi
 
-echo "[release] Seeding scenario='${SCENARIO}' email='${EMAIL}' ..."
-SEED_PAYLOAD=$(node -e "process.stdout.write(JSON.stringify({scenario: process.argv[1], email: process.argv[2]}))" "$SCENARIO" "$EMAIL")
+if [ -n "${EMAIL+x}" ] && [ "${E2E_ALLOW_ARBITRARY_EMAIL}" != "1" ]; then
+  echo "[release] ERROR: EMAIL override requires E2E_ALLOW_ARBITRARY_EMAIL=1." >&2
+  echo "[release] Use E2E_SEED_SLOT=${E2E_SEED_SLOT} for ordinary reusable native seed users." >&2
+  exit 1
+fi
+
+if [ -n "${EMAIL+x}" ]; then
+  echo "[release] Seeding scenario='${SCENARIO}' email='${EMAIL}' (explicit override) ..."
+  SEED_PAYLOAD=$(node -e "process.stdout.write(JSON.stringify({scenario: process.argv[1], email: process.argv[2]}))" "$SCENARIO" "$EMAIL")
+else
+  echo "[release] Seeding scenario='${SCENARIO}' nativeSeedSlot='${E2E_SEED_SLOT}' ..."
+  SEED_PAYLOAD=$(node -e "process.stdout.write(JSON.stringify({scenario: process.argv[1], nativeSeedSlot: process.argv[2]}))" "$SCENARIO" "$E2E_SEED_SLOT")
+fi
+TEST_SECRET="${TEST_SEED_SECRET:-}"
 SEED_RESPONSE=$(curl -sf -X POST "${API_URL}/v1/__test/seed" \
   -H "Content-Type: application/json" \
+  ${TEST_SECRET:+-H "X-Test-Secret: ${TEST_SECRET}"} \
   -d "$SEED_PAYLOAD")
 
 if [ -z "$SEED_RESPONSE" ]; then
@@ -192,4 +209,18 @@ if [ -n "$SEED_IDS" ]; then
 fi
 
 echo "[release] Running: ${MAESTRO} test --config ${CONFIG_FILE} ${FLOW_FILE}"
-exec "${MAESTRO}" test --config "${CONFIG_FILE}" "${MAESTRO_ENV_ARGS[@]}" "${EXTRA_ARGS[@]:+${EXTRA_ARGS[@]}}" "${FLOW_FILE}"
+set +e
+"${MAESTRO}" test --config "${CONFIG_FILE}" "${MAESTRO_ENV_ARGS[@]}" "${EXTRA_ARGS[@]:+${EXTRA_ARGS[@]}}" "${FLOW_FILE}"
+MAESTRO_EXIT=$?
+set -e
+
+if [ -z "${EMAIL+x}" ]; then
+  CLEANUP_PREFIX="${SEED_EMAIL%@*}"
+  CLEANUP_PREFIX="${CLEANUP_PREFIX%%+*}"
+  echo "[release] Cleaning seeded DB graph for native slot prefix='${CLEANUP_PREFIX}' (preserving Clerk user) ..."
+  curl -sf -X POST "${API_URL}/v1/__test/reset?prefix=${CLEANUP_PREFIX}&preserveClerkUsers=true" \
+    ${TEST_SECRET:+-H "X-Test-Secret: ${TEST_SECRET}"} \
+    || echo "[release] WARN: native seed cleanup failed; rerun cleanup or next reseed will self-heal." >&2
+fi
+
+exit "$MAESTRO_EXIT"

@@ -74,6 +74,20 @@ type TestEnv = {
  * `ep-holy-leaf`). Keep this in lockstep with the production DATABASE_URL.
  */
 const PRODUCTION_DATABASE_HOST_MARKERS: readonly string[] = ['ep-holy-leaf'];
+const NATIVE_SEED_SLOTS = [
+  'native-01',
+  'native-02',
+  'native-03',
+  'native-04',
+  'native-05',
+  'native-06',
+  'native-07',
+  'native-08',
+] as const;
+
+function nativeSeedSlotEmail(slot: (typeof NATIVE_SEED_SLOTS)[number]): string {
+  return `test-e2e-${slot}+clerk_test@example.com`;
+}
 
 /**
  * Returns true when the given connection string points at a known production
@@ -94,10 +108,30 @@ export function isProductionDatabaseUrl(
   );
 }
 
-const seedInputSchema = z.object({
-  scenario: z.enum(VALID_SCENARIOS as [SeedScenario, ...SeedScenario[]]),
-  email: z.string().email().default('test-e2e@example.com'),
-});
+const seedInputSchema = z
+  .object({
+    scenario: z.enum(VALID_SCENARIOS as [SeedScenario, ...SeedScenario[]]),
+    email: z.string().email().optional(),
+    nativeSeedSlot: z.enum(NATIVE_SEED_SLOTS).optional(),
+  })
+  .superRefine((input, ctx) => {
+    if (input.email && input.nativeSeedSlot) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['nativeSeedSlot'],
+        message: 'Provide either email or nativeSeedSlot, not both',
+      });
+    }
+  })
+  .transform((input) => ({
+    scenario: input.scenario,
+    email:
+      input.email ??
+      (input.nativeSeedSlot
+        ? nativeSeedSlotEmail(input.nativeSeedSlot)
+        : 'test-e2e@example.com'),
+    nativeSeedSlot: input.nativeSeedSlot,
+  }));
 
 // [WI-983] Local schema for /__test/reset — test-infrastructure only, not in @eduagent/schemas.
 // The whole body is optional. This preserves the pre-WI-983 contract for the CI seed-cleanup
@@ -241,6 +275,7 @@ testSeedRoutes.post(
       SEED_PASSWORD: c.env.SEED_PASSWORD,
     };
     const prefix = c.req.query('prefix')?.trim() || undefined;
+    const preserveClerkUsers = c.req.query('preserveClerkUsers') === 'true';
     const { verifiedSeedClerkUserIds } = c.req.valid('json');
 
     const { deletedCount, clerkUsersDeleted } = await resetDatabase(
@@ -248,6 +283,7 @@ testSeedRoutes.post(
       seedEnv,
       {
         prefix,
+        preserveClerkUsers,
         verifiedSeedClerkUserIds,
       },
     );

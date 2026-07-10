@@ -268,6 +268,38 @@ for fn in apply_network_speed apply_network_delay schedule_network_kill; do
 done
 
 echo ""
+echo "─── native seed-slot wiring (WI-1770 / WI-1771) ───────────────────────"
+
+SEED_RELEASE_SH="${SCRIPT_DIR}/seed-and-run-release.sh"
+
+for script in "$SEED_RUN_SH" "$SEED_RELEASE_SH"; do
+  script_name="$(basename "$script")"
+  if grep -q "E2E_SEED_SLOT" "$script" && grep -q "nativeSeedSlot" "$script"; then
+    _tpass "${script_name} uses E2E_SEED_SLOT and sends nativeSeedSlot to the seed API"
+  else
+    _tfail "${script_name} must default to E2E_SEED_SLOT and send nativeSeedSlot, not an ad-hoc EMAIL"
+  fi
+
+  if grep -q "E2E_ALLOW_ARBITRARY_EMAIL" "$script"; then
+    _tpass "${script_name} guards explicit EMAIL overrides behind E2E_ALLOW_ARBITRARY_EMAIL"
+  else
+    _tfail "${script_name} must reject EMAIL overrides unless E2E_ALLOW_ARBITRARY_EMAIL=1"
+  fi
+
+  if grep -q "/v1/__test/reset" "$script"; then
+    _tpass "${script_name} wires a native seeded-run cleanup reset"
+  else
+    _tfail "${script_name} must call /v1/__test/reset for seeded native cleanup"
+  fi
+
+  if grep -Eq "^[[:space:]]*exec[[:space:]]" "$script"; then
+    _tfail "${script_name} must not exec Maestro directly; cleanup traps need the child exit code first"
+  else
+    _tpass "${script_name} does not exec Maestro directly"
+  fi
+done
+
+echo ""
 echo "─── Summary ────────────────────────────────────────────────────────────"
 echo "  PASS: $PASS"
 echo "  FAIL: $FAIL"

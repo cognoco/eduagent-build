@@ -668,6 +668,55 @@ describe('resetDatabase', () => {
     expect(db.delete).not.toHaveBeenCalled();
   });
 
+  it('[WI-1771] preserveClerkUsers cleans DB rows for a seed Clerk user without deleting the Clerk user', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: 'user_native_01',
+          external_id: `${SEED_CLERK_PREFIX}native`,
+          email_addresses: [
+            { email_address: 'test-e2e-native-01+clerk_test@example.com' },
+          ],
+        },
+      ],
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const deleteReturning = jest.fn().mockResolvedValue([{ id: 'org-1' }]);
+    const deleteFn = jest.fn().mockImplementation(() => ({
+      where: jest.fn().mockImplementation(() => ({
+        returning: deleteReturning,
+      })),
+    }));
+    const selectFn = makeResetSelectMock({
+      logins: [{ personId: 'p1', clerkUserId: 'user_native_01' }],
+      orgsForPersons: [{ organizationId: 'org-1' }],
+      membersOfOrgs: [{ personId: 'p1' }],
+      fullMemberships: [{ personId: 'p1', organizationId: 'org-1' }],
+    });
+    const db = {
+      select: selectFn,
+      delete: deleteFn,
+    } as unknown as Database;
+
+    const result = await resetDatabase(
+      db,
+      { CLERK_SECRET_KEY: 'sk_test' },
+      { prefix: 'test-e2e-native-01', preserveClerkUsers: true },
+    );
+
+    expect(result).toEqual({ deletedCount: 1, clerkUsersDeleted: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('/users?');
+    expect(
+      fetchMock.mock.calls.some((call) => {
+        const init = call[1] as RequestInit | undefined;
+        return init?.method === 'PATCH' || init?.method === 'DELETE';
+      }),
+    ).toBe(false);
+  });
+
   it('[WI-84 review] does not trust caller-supplied Clerk IDs without a seed marker', async () => {
     const deleteReturning = jest.fn().mockResolvedValue([]);
     const deleteWhere = jest.fn().mockReturnValue({
