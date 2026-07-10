@@ -229,12 +229,18 @@ async function seedDraftingSession(
 
 async function readSessionChallengeRound(
   db: Database,
+  profileId: string,
   sessionId: string,
 ): Promise<ChallengeRoundSessionState> {
   const [row] = await db
     .select({ metadata: learningSessions.metadata })
     .from(learningSessions)
-    .where(eq(learningSessions.id, sessionId));
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+      ),
+    );
   const meta = row?.metadata as Record<string, unknown> | undefined;
   return meta?.challengeRound as unknown as ChallengeRoundSessionState;
 }
@@ -260,11 +266,20 @@ async function readAssessmentsForSession(
 /** Mark a session `completed` so it never competes for a Now-feed
  * `unfinished_session` candidate slot alongside the `retention_due` card
  * under test — isolates the assertion to the signal under test. */
-async function markSessionCompleted(db: Database, sessionId: string) {
+async function markSessionCompleted(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+) {
   await db
     .update(learningSessions)
     .set({ status: 'completed' })
-    .where(eq(learningSessions.id, sessionId));
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+      ),
+    );
 }
 
 function nextAnswerEventId(): string {
@@ -289,7 +304,7 @@ async function driveVerifiedChallengeRound(
       learnerQuote: LEARNER_ANSWER,
     },
   ]);
-  const meta = await readSessionChallengeRound(db, session.id);
+  const meta = await readSessionChallengeRound(db, profileId, session.id);
   const result = await finalizeChallengeRoundIfReady(
     db,
     profileId,
@@ -411,7 +426,7 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
         },
       ],
     );
-    const meta = await readSessionChallengeRound(db, session.id);
+    const meta = await readSessionChallengeRound(db, profileId, session.id);
     const result = await finalizeChallengeRoundIfReady(
       db,
       profileId,
@@ -480,7 +495,7 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
         },
       ],
     );
-    const meta = await readSessionChallengeRound(db, session.id);
+    const meta = await readSessionChallengeRound(db, profileId, session.id);
     const result = await finalizeChallengeRoundIfReady(
       db,
       profileId,
@@ -535,7 +550,7 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
       subjectId,
       topicId,
     );
-    await markSessionCompleted(db, firstSessionId);
+    await markSessionCompleted(db, profileId, firstSessionId);
 
     const freshProgress = await getTopicProgress(
       db,
@@ -625,7 +640,11 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
         },
       ],
     );
-    const secondMeta = await readSessionChallengeRound(db, secondSession.id);
+    const secondMeta = await readSessionChallengeRound(
+      db,
+      profileId,
+      secondSession.id,
+    );
     const secondResult = await finalizeChallengeRoundIfReady(
       db,
       profileId,
@@ -634,7 +653,7 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
       null,
     );
     expect(secondResult).not.toBeNull();
-    await markSessionCompleted(db, secondSession.id);
+    await markSessionCompleted(db, profileId, secondSession.id);
 
     const staleProgress = await getTopicProgress(
       db,
