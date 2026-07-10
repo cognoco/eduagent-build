@@ -2,6 +2,11 @@ import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { QueryClient } from '@tanstack/react-query';
+import type {
+  BookSuggestion,
+  CurriculumBook,
+  Subject,
+} from '@eduagent/schemas';
 import {
   fetchCallsMatching,
   type RoutedMockFetch,
@@ -82,7 +87,19 @@ jest.mock('expo-router', () => ({
 }));
 
 // Default search params — overridden per test via mockSearchParams
-let mockSearchParams = () => ({ subjectId: 'sub-1' });
+const PROFILE_ID = '110e8400-e29b-41d4-a716-446655440001';
+const ACCOUNT_ID = '110e8400-e29b-41d4-a716-446655440002';
+const SUBJECT_ID = '220e8400-e29b-41d4-a716-446655440001';
+const BOOK_1_ID = '330e8400-e29b-41d4-a716-446655440001';
+const BOOK_2_ID = '330e8400-e29b-41d4-a716-446655440002';
+const NEW_BOOK_ID = '330e8400-e29b-41d4-a716-446655440003';
+const TOPIC_ID = '440e8400-e29b-41d4-a716-446655440001';
+const SUGGESTION_1_ID = '550e8400-e29b-41d4-a716-446655440001';
+const SUGGESTION_2_ID = '550e8400-e29b-41d4-a716-446655440002';
+const SUGGESTION_3_ID = '550e8400-e29b-41d4-a716-446655440003';
+const CREATED_AT = '2026-01-01T00:00:00.000Z';
+
+let mockSearchParams = () => ({ subjectId: SUBJECT_ID });
 
 jest.mock(
   '../../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
@@ -151,39 +168,79 @@ jest.mock(
 // Default API route responses
 // ---------------------------------------------------------------------------
 
-const DEFAULT_BOOKS = [
+const DEFAULT_BOOKS: CurriculumBook[] = [
   {
-    id: 'book-1',
+    id: BOOK_1_ID,
+    subjectId: SUBJECT_ID,
     title: 'Algebra Basics',
+    description: null,
     emoji: '📐',
+    sortOrder: 0,
     topicsGenerated: true,
+    createdAt: CREATED_AT,
+    updatedAt: CREATED_AT,
   },
   {
-    id: 'book-2',
+    id: BOOK_2_ID,
+    subjectId: SUBJECT_ID,
     title: 'Geometry',
+    description: null,
     emoji: '📏',
+    sortOrder: 1,
     topicsGenerated: false,
+    createdAt: CREATED_AT,
+    updatedAt: CREATED_AT,
   },
 ];
 
-const DEFAULT_SUBJECTS = [{ id: 'sub-1', name: 'Mathematics' }];
+const DEFAULT_SUBJECTS: Subject[] = [
+  {
+    id: SUBJECT_ID,
+    profileId: PROFILE_ID,
+    name: 'Mathematics',
+    status: 'active',
+    pedagogyMode: 'socratic',
+    createdAt: CREATED_AT,
+    updatedAt: CREATED_AT,
+  },
+];
+
+function makeSuggestion(
+  id: string,
+  title: string,
+  emoji: string | null = null,
+  description: string | null = null,
+): BookSuggestion {
+  return {
+    id,
+    subjectId: SUBJECT_ID,
+    title,
+    emoji,
+    description,
+    category: null,
+    createdAt: CREATED_AT,
+    pickedAt: null,
+  };
+}
 
 function resetRoutes() {
   // Most-specific first to avoid prefix collision:
-  // '/book-suggestions' before '/books', '/subjects/sub-1/books' before '/subjects'
+  // '/book-suggestions' before '/books', subject books before '/subjects'
   mockFetch.setRoute('/book-suggestions', {
     suggestions: [],
     curriculumBookCount: 2,
   });
-  mockFetch.setRoute('/subjects/sub-1/books', { books: DEFAULT_BOOKS });
+  mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, {
+    books: DEFAULT_BOOKS,
+  });
   mockFetch.setRoute('/subjects', { subjects: DEFAULT_SUBJECTS });
   mockFetch.setRoute('/filing', {
-    shelfId: 'sub-1',
-    bookId: 'book-new',
+    shelfId: SUBJECT_ID,
+    bookId: NEW_BOOK_ID,
     shelfName: 'Mathematics',
     bookName: 'Number Theory',
     chapter: 'Intro',
-    topicId: 'topic-1',
+    topicId: TOPIC_ID,
     topicTitle: 'Numbers',
     isNew: { shelf: false, book: true, chapter: true },
   });
@@ -194,8 +251,8 @@ function resetRoutes() {
 // ---------------------------------------------------------------------------
 
 const TEST_PROFILE = createTestProfile({
-  id: 'test-profile-id',
-  accountId: 'test-account-id',
+  id: PROFILE_ID,
+  accountId: ACCOUNT_ID,
   displayName: 'Test Learner',
   isOwner: true,
   birthYear: 1990,
@@ -222,7 +279,7 @@ describe('ShelfScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSearchParams = () => ({ subjectId: 'sub-1' });
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
     resetRoutes();
     const { Wrapper } = createWrapper();
     TestWrapper = Wrapper;
@@ -260,7 +317,7 @@ describe('ShelfScreen', () => {
     const booksPromise = new Promise<Response>((resolve) => {
       resolveBooksResponse = resolve;
     });
-    mockFetch.setRoute('/subjects/sub-1/books', () => booksPromise);
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, () => booksPromise);
 
     const { getByTestId, getByText } = render(<ShelfScreen />, {
       wrapper: TestWrapper,
@@ -285,7 +342,7 @@ describe('ShelfScreen', () => {
     const booksPromise = new Promise<Response>((resolve) => {
       resolveBooksResponse = resolve;
     });
-    mockFetch.setRoute('/subjects/sub-1/books', () => booksPromise);
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, () => booksPromise);
 
     const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
     fireEvent.press(getByTestId('shelf-loading-back'));
@@ -303,7 +360,7 @@ describe('ShelfScreen', () => {
   // BUG-82: Error state — retry and back buttons [BUG-82]
   // -----------------------------------------------------------------------
   it('shows error state with retry and back buttons when booksQuery fails [BUG-82]', async () => {
-    mockFetch.setRoute('/subjects/sub-1/books', () =>
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, () =>
       Promise.resolve(
         new Response(JSON.stringify({ message: 'Failed to load books' }), {
           status: 500,
@@ -324,7 +381,7 @@ describe('ShelfScreen', () => {
 
   it('retry button calls refetch on booksQuery when booksQuery fails [BUG-82]', async () => {
     let callCount = 0;
-    mockFetch.setRoute('/subjects/sub-1/books', () => {
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, () => {
       callCount++;
       return Promise.resolve(
         new Response(JSON.stringify({ message: 'Network error' }), {
@@ -349,7 +406,7 @@ describe('ShelfScreen', () => {
   });
 
   it('go-home button on error screen returns to home [BUG-82]', async () => {
-    mockFetch.setRoute('/subjects/sub-1/books', () =>
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, () =>
       Promise.resolve(
         new Response(JSON.stringify({ message: 'oops' }), { status: 500 }),
       ),
@@ -500,15 +557,15 @@ describe('ShelfScreen', () => {
     const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      getByTestId('book-card-book-1');
+      getByTestId(`book-card-${BOOK_1_ID}`);
     });
-    fireEvent.press(getByTestId('book-card-book-1'));
+    fireEvent.press(getByTestId(`book-card-${BOOK_1_ID}`));
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: expect.objectContaining({
-          subjectId: 'sub-1',
-          bookId: 'book-1',
+          subjectId: SUBJECT_ID,
+          bookId: BOOK_1_ID,
         }),
       }),
     );
@@ -518,7 +575,7 @@ describe('ShelfScreen', () => {
   // Empty state
   // -----------------------------------------------------------------------
   it('shows empty state when no books exist', async () => {
-    mockFetch.setRoute('/subjects/sub-1/books', { books: [] });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, { books: [] });
 
     const { getByTestId, getByText } = render(<ShelfScreen />, {
       wrapper: TestWrapper,
@@ -535,7 +592,7 @@ describe('ShelfScreen', () => {
   });
 
   it('empty state pick button opens the book picker', async () => {
-    mockFetch.setRoute('/subjects/sub-1/books', { books: [] });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, { books: [] });
 
     const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
 
@@ -547,13 +604,13 @@ describe('ShelfScreen', () => {
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/(app)/pick-book/[subjectId]',
-        params: { subjectId: 'sub-1' },
+        params: { subjectId: SUBJECT_ID },
       }),
     );
   });
 
   it('empty state retry reloads shelf data', async () => {
-    mockFetch.setRoute('/subjects/sub-1/books', { books: [] });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, { books: [] });
 
     const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
 
@@ -562,20 +619,20 @@ describe('ShelfScreen', () => {
     });
     const callsBeforeRetry = fetchCallsMatching(
       mockFetch,
-      '/subjects/sub-1/books',
+      `/subjects/${SUBJECT_ID}/books`,
     ).length;
 
     fireEvent.press(getByTestId('shelf-empty-retry'));
 
     await waitFor(() => {
       expect(
-        fetchCallsMatching(mockFetch, '/subjects/sub-1/books').length,
+        fetchCallsMatching(mockFetch, `/subjects/${SUBJECT_ID}/books`).length,
       ).toBeGreaterThan(callsBeforeRetry);
     });
   });
 
   it('empty state back button returns to library', async () => {
-    mockFetch.setRoute('/subjects/sub-1/books', { books: [] });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, { books: [] });
 
     const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
 
@@ -590,21 +647,21 @@ describe('ShelfScreen', () => {
     // Regression: with zero books but visible "Study next" suggestion cards,
     // the empty state used to say "Your curriculum is still being built.
     // Check back soon." — contradicting the cards the user can already tap.
-    mockFetch.setRoute('/subjects/sub-1/books', { books: [] });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, { books: [] });
     mockFetch.setRoute('/book-suggestions', {
       suggestions: [
-        {
-          id: 'sugg-1',
-          title: 'Geometry Foundations',
-          emoji: '📐',
-          description: 'Triangles, lines, angles.',
-        },
-        {
-          id: 'sugg-2',
-          title: 'Calculus: The Basics',
-          emoji: '∫',
-          description: 'Limits and derivatives.',
-        },
+        makeSuggestion(
+          SUGGESTION_1_ID,
+          'Geometry Foundations',
+          '📐',
+          'Triangles, lines, angles.',
+        ),
+        makeSuggestion(
+          SUGGESTION_2_ID,
+          'Calculus: The Basics',
+          '∫',
+          'Limits and derivatives.',
+        ),
       ],
       curriculumBookCount: 0,
     });
@@ -625,15 +682,8 @@ describe('ShelfScreen', () => {
   // Single-book auto-skip
   // -----------------------------------------------------------------------
   it('renders normally when there is only one book (no auto-skip)', async () => {
-    mockFetch.setRoute('/subjects/sub-1/books', {
-      books: [
-        {
-          id: 'book-1',
-          title: 'Algebra Basics',
-          emoji: '📐',
-          topicsGenerated: true,
-        },
-      ],
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, {
+      books: [DEFAULT_BOOKS[0]],
     });
 
     const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
@@ -667,7 +717,7 @@ describe('ShelfScreen', () => {
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/(app)/pick-book/[subjectId]',
-        params: { subjectId: 'sub-1' },
+        params: { subjectId: SUBJECT_ID },
       }),
     );
   });
@@ -675,9 +725,9 @@ describe('ShelfScreen', () => {
   it('labels the choose-book path as browse all when extra suggestions exist', async () => {
     mockFetch.setRoute('/book-suggestions', {
       suggestions: [
-        { id: 'sug-1', title: 'Number Theory' },
-        { id: 'sug-2', title: 'Calculus Intro' },
-        { id: 'sug-3', title: 'Statistics' },
+        makeSuggestion(SUGGESTION_1_ID, 'Number Theory'),
+        makeSuggestion(SUGGESTION_2_ID, 'Calculus Intro'),
+        makeSuggestion(SUGGESTION_3_ID, 'Statistics'),
       ],
       curriculumBookCount: 2,
     });
@@ -695,8 +745,8 @@ describe('ShelfScreen', () => {
   it('shows book suggestion cards when suggestions exist', async () => {
     mockFetch.setRoute('/book-suggestions', {
       suggestions: [
-        { id: 'sug-1', title: 'Number Theory' },
-        { id: 'sug-2', title: 'Calculus Intro' },
+        makeSuggestion(SUGGESTION_1_ID, 'Number Theory'),
+        makeSuggestion(SUGGESTION_2_ID, 'Calculus Intro'),
       ],
       curriculumBookCount: 2,
     });
@@ -704,23 +754,23 @@ describe('ShelfScreen', () => {
     const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      getByTestId('shelf-suggestion-sug-1');
+      getByTestId(`shelf-suggestion-${SUGGESTION_1_ID}`);
     });
-    getByTestId('shelf-suggestion-sug-2');
+    getByTestId(`shelf-suggestion-${SUGGESTION_2_ID}`);
   });
 
   it('picking a book suggestion calls filing and navigates to new book', async () => {
     mockFetch.setRoute('/book-suggestions', {
-      suggestions: [{ id: 'sug-1', title: 'Number Theory', emoji: '🔢' }],
+      suggestions: [makeSuggestion(SUGGESTION_1_ID, 'Number Theory', '🔢')],
       curriculumBookCount: 2,
     });
     mockFetch.setRoute('/filing', {
-      shelfId: 'sub-1',
-      bookId: 'book-new',
+      shelfId: SUBJECT_ID,
+      bookId: NEW_BOOK_ID,
       shelfName: 'Mathematics',
       bookName: 'Number Theory',
       chapter: 'Intro',
-      topicId: 'topic-1',
+      topicId: TOPIC_ID,
       topicTitle: 'Numbers',
       isNew: { shelf: false, book: true, chapter: true },
     });
@@ -728,17 +778,17 @@ describe('ShelfScreen', () => {
     const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      getByTestId('shelf-suggestion-sug-1');
+      getByTestId(`shelf-suggestion-${SUGGESTION_1_ID}`);
     });
-    fireEvent.press(getByTestId('shelf-suggestion-sug-1'));
+    fireEvent.press(getByTestId(`shelf-suggestion-${SUGGESTION_1_ID}`));
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
           params: {
-            subjectId: 'sub-1',
-            bookId: 'book-new',
+            subjectId: SUBJECT_ID,
+            bookId: NEW_BOOK_ID,
           },
         }),
       );
@@ -756,7 +806,7 @@ describe('ShelfScreen', () => {
     jest.useFakeTimers();
 
     mockFetch.setRoute('/book-suggestions', {
-      suggestions: [{ id: 'sug-1', title: 'Number Theory', emoji: '🔢' }],
+      suggestions: [makeSuggestion(SUGGESTION_1_ID, 'Number Theory', '🔢')],
       curriculumBookCount: 2,
     });
 
@@ -777,10 +827,10 @@ describe('ShelfScreen', () => {
     });
 
     await waitFor(() => {
-      getByTestId('shelf-suggestion-sug-1');
+      getByTestId(`shelf-suggestion-${SUGGESTION_1_ID}`);
     });
 
-    fireEvent.press(getByTestId('shelf-suggestion-sug-1'));
+    fireEvent.press(getByTestId(`shelf-suggestion-${SUGGESTION_1_ID}`));
 
     // Re-render to pick up isPending state
     rerender(<ShelfScreen />);
@@ -812,7 +862,7 @@ describe('ShelfScreen', () => {
     expect(mockReplace).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/(app)/shelf/[subjectId]',
-        params: { subjectId: 'sub-1' },
+        params: { subjectId: SUBJECT_ID },
       }),
     );
 
@@ -828,12 +878,12 @@ describe('ShelfScreen', () => {
       resolveFilingResponse(
         new Response(
           JSON.stringify({
-            shelfId: 'sub-1',
-            bookId: 'book-new',
+            shelfId: SUBJECT_ID,
+            bookId: NEW_BOOK_ID,
             shelfName: 'Mathematics',
             bookName: 'Number Theory',
             chapter: 'Intro',
-            topicId: 'topic-1',
+            topicId: TOPIC_ID,
             topicTitle: 'Numbers',
             isNew: { shelf: false, book: true, chapter: true },
           }),
@@ -861,7 +911,7 @@ describe('ShelfScreen', () => {
 
   it('shows ErrorFallback overlay when picking a book suggestion fails', async () => {
     mockFetch.setRoute('/book-suggestions', {
-      suggestions: [{ id: 'sug-1', title: 'Number Theory', emoji: '🔢' }],
+      suggestions: [makeSuggestion(SUGGESTION_1_ID, 'Number Theory', '🔢')],
       curriculumBookCount: 2,
     });
     mockFetch.setRoute('/filing', () =>
@@ -875,9 +925,9 @@ describe('ShelfScreen', () => {
     const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      getByTestId('shelf-suggestion-sug-1');
+      getByTestId(`shelf-suggestion-${SUGGESTION_1_ID}`);
     });
-    fireEvent.press(getByTestId('shelf-suggestion-sug-1'));
+    fireEvent.press(getByTestId(`shelf-suggestion-${SUGGESTION_1_ID}`));
 
     await waitFor(() => {
       getByTestId('shelf-filing-error-overlay');
