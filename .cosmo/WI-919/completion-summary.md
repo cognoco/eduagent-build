@@ -1,7 +1,0 @@
-**What was done:** Fixed WI-919 by ensuring `useApiReachability` clears its health-check abort timeout when the health fetch rejects.
-
-**What changed:** Moved timeout cleanup into a fetch-scoped `finally` so both successful and rejected fetches clear the timeout. Added regression coverage proving rejected health fetches call `clearTimeout`, and kept the existing unreachable-state rejection test deterministic by manually rejecting the in-flight fetch.
-
-**Verification:** RED: `pnpm exec jest src/hooks/use-api-reachability.test.ts --no-coverage --runInBand` from `apps/mobile` failed because `clearTimeout` was called 0 times after a rejected fetch. GREEN: the same focused Jest command passed with 7 tests. Fresh coordinator rerun after push: `pnpm exec jest src/hooks/use-api-reachability.test.ts --no-coverage --runInBand` passed with exit 0. Worker also reported `pnpm exec eslint apps/mobile/src/hooks/use-api-reachability.ts apps/mobile/src/hooks/use-api-reachability.test.ts`, `pnpm exec tsc --noEmit -p apps/mobile/tsconfig.json`, and `pnpm exec tsx scripts/check-gc1-pattern-a.ts` exited 0 before commit.
-
-**Caveats / Follow-ups:** Focused Jest output includes existing Expo native-module warnings and rejection-path React act warnings, but no test failures and no open-handle warning after the fix. ESLint output included the known missing cached Nx ProjectGraph warning in this Windows worktree; the command exited 0.

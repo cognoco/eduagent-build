@@ -1,7 +1,0 @@
-**What was done:** Added regression coverage for WI-924 (settings routes missing Issue-901 resolvedVia break-tests).
-
-**What changed:** Added `[BREAK][Issue 901]` table-driven tests in `apps/api/src/routes/settings.test.ts`. The coverage exercises 11 settings owner-gated call sites where an authenticated caller with an auto-resolved owner profile (`isOwner: true`, `resolvedVia: 'auto'`) must receive `403`, and asserts each protected service mock is not called when the auto-resolved identity is rejected. Route-test mocks were added for child celebration settings, push-token registration, parent subscription notification, and subject preference writes.
-
-**Verification:** Worker red proof: temporarily disabled the `resolvedVia` guards in `family-access.ts` and `proxy-guard.ts`; `pnpm test:api:unit --runTestsByPath apps/api/src/routes/settings.test.ts --testNamePattern 'Issue 901'` failed with all 11 new tests receiving `200` instead of expected `403`. Worker green checks: `pnpm test:api:unit --runTestsByPath apps/api/src/routes/settings.test.ts` passed with 34 tests, `pnpm exec eslint apps/api/src/routes/settings.test.ts` passed, and `pnpm exec tsc --build apps/api/tsconfig.json --pretty false` passed.
-
-**Caveats / Follow-ups:** Test output still includes existing logger noise from the settings suite, including the known test-environment LLM key warning and `billing.v2.initial_trial_missing_repair_failed`; the suite exits green. Setup/env drift in `apps/mobile/eas.json` was restored and not included. No follow-up is required for this item.

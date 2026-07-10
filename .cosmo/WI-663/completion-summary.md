@@ -1,7 +1,0 @@
-**What was done:** Fixed WI-663 by scoping prune-only Gemini translation validation to the removed keys instead of re-validating the entire existing Polish locale file.
-
-**What changed:** `scripts/translate-gemini.ts` now exports `validatePruneOnlyLocale`, and the prune-only branch calls it after deleting removed keys. `scripts/translate-gemini.test.ts` covers a prune-only Polish fixture with an unrelated pre-existing glossary violation and verifies prune-only output still fails if a removed key remains.
-
-**Verification:** Red focused worker test failed with 2 prune-only validation failures because `validatePruneOnlyLocale` did not exist. Worker green focused test passed with 20 tests, glossary guard passed with 24 tests, internal mock scan had no hits, typecheck passed, and pre-push validation passed for commit `23e1eeefec050c286e676c4d1622efc7812221c6`. Coordinator reran `pnpm exec jest --config scripts/jest.config.cjs --testMatch '**/translate-gemini.test.ts' --runInBand --no-coverage`, which passed with 1 suite and 20 tests. Coordinator reran `pnpm exec jest --config scripts/jest.config.cjs --testMatch '**/translate.test.ts' --runInBand --no-coverage`, which passed with 1 suite and 24 tests. Remote `origin/WI-663` matches commit `23e1eeefec050c286e676c4d1622efc7812221c6`.
-
-**Caveats / Follow-ups:** Standard `scripts/jest.config.cjs` path glob does not reliably discover these tests from `.worktrees` on Windows without explicit `--testMatch`, so coordinator verification used explicit test matches. No PR was created.

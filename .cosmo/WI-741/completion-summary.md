@@ -1,9 +1,0 @@
-## Completion Summary
-
-What was done: Three agent-instruction correctness fixes landed via squash-merged PR #1171. F-039 and F-040 made two skill `description:` fields trigger-only per the repo Skill Authoring rule; F-042 made the `scope-keyword-check.sh` hook self-contained by removing its reference to a non-existent skill.
-
-What changed: `.agents/skills/commit/SKILL.md` — dropped the "Thin overlay over the global /zdx-core:commit primitive…" workflow clause from the description, added a standalone `push` trigger to match the AGENTS.md skill table. `.agents/skills/worktree-setup/SKILL.md` — dropped the "Creates a git worktree at .worktrees/<branch>/…" workflow-narration prefix while keeping the trigger clause and the EnterWorktree/superpowers override redirect. `.claude/hooks/scope-keyword-check.sh` — replaced the "you MUST invoke the `deep-scope-understanding` skill" instruction (skill does not exist) with inline self-enumeration steps, retaining the "you MUST" enforcement signal; header comment updated accordingly. `.claude/skills/commit/SKILL.md` and `.claude/skills/worktree-setup/SKILL.md` regenerated via `pnpm sync-skills`.
-
-Verification: Hook behavior tested — exits 0 on a non-matching prompt (silent) and emits the `hookSpecificOutput` JSON on a matching prompt (V0/V1/flag/nav-contract keywords), confirming pass-through unchanged. Synced `.claude/skills/` copies confirmed to carry the new trigger-only descriptions. Adversarial review (Sonnet) raised two SHOULD_FIX items — restore `MUST` in the hook payload and add the `push` trigger — both applied before push. CI all green on PR #1171; no open review findings.
-
-Caveats / Follow-ups: None — scope was limited to the three named files plus their synced copies; F-038 (code-review/thermo skill descriptions) was moot since those skills were already removed.
