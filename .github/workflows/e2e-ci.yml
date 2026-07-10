@@ -247,7 +247,9 @@ jobs:
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5
         with:
           path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-          key: apk-debug-${{ hashFiles('apps/mobile/app.json', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'apps/mobile/assets/**', 'pnpm-lock.yaml') }}
+          # Branch-only WI-1651 evidence: use the last known-good immutable APK
+          # cache so exit propagation can be exercised despite WI-1797.
+          key: apk-debug-c38ff4b54c5f5655de17141ec4401d333265bc2bc9249fda183f244400f810ec
 
       # --- Phase 1: strict pnpm install + schema migrate ---
       # [BUG-243] Use drizzle-kit migrate (not push) for the Maestro DB —
