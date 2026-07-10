@@ -15,7 +15,7 @@
 |---|---|---|---|---|---|---|
 | PRG-31 | active (executing, autonomous) | ORION | LLM safety + eval-envelope correctness — 3 WIs Closed; **P1 safety leak WI-1154** provably fixed (break test) | — | `working/lanes/safety-eval/` + WS-31 (Cosmo) | Released 2026-07-02, P1-first; shepherd kickoff handed to operator to spawn |
 | PRG-33 | active (executing, autonomous) | ORION | Mobile UX & navigation coherence — all WS-33 WIs Closed, no nav-shell regression across V0-off/V0-on/V1 | — | `working/lanes/mobile-ux-nav/` + WS-33 (Cosmo) | Released 2026-07-02 (refine→sequence→execute autonomously); no operator execute gate |
-| PRG-34 | parked (operator-confirmed 2026-07-02) | ORION | Platform-hardening debt burn-down — 14 WIs Closed | Ramtop overlap deconfliction (WI-1183/1179/1069/1098) | `working/lanes/platform-hardening/` + WS-34 (Cosmo) | HELD by operator. Release when WS-31/33 moving AND Ramtop file-surface overlap deconflicted |
+| PRG-34 | active (released, awaiting operator-launched shepherd) | ORION | Platform-hardening debt burn-down — 17 WIs Closed | Execution-time Ramtop overlap coordination (WI-1183/1179/1069/1098) | `working/lanes/platform-hardening/` + WS-34 (Cosmo) | Released 2026-07-08 by operator on PM recommendation; shepherd kickoff authored |
 | PRG-NN | — | — | **unrouted intake** (holding row — keep last) | — | — | — |
 
 `Status` ∈ proposed · active · graduated · parked · killed.
