@@ -2122,12 +2122,13 @@ describe('SessionScreen homework flow', () => {
     const testScreen = renderSessionScreen();
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
-    await flushAsyncWork();
 
     // When classify fails and subjects haven't loaded yet, the screen falls
     // back to the resolve API flow which shows the "Create a new subject"
     // button (subject-resolution-create-new) as the zero-candidates escape hatch.
-    testScreen.getByTestId('subject-resolution-create-new');
+    await waitFor(() => {
+      testScreen.getByTestId('subject-resolution-create-new');
+    });
 
     expect(mockStartSession).not.toHaveBeenCalled();
     testScreen.unmount();

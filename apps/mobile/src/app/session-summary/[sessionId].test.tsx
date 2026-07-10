@@ -1760,6 +1760,10 @@ describe('SessionSummaryScreen', () => {
       filedAt: null,
       filingStatus: null,
       filingRetryCount: 0,
+      topicTitle: null,
+      subjectName: null,
+      bookId: null,
+      bookTitle: null,
       ...overrides,
     };
   }
