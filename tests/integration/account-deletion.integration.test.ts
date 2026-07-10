@@ -17,6 +17,8 @@
  * 6. Both mutation endpoints require authentication (401 without token)
  */
 
+import { readFileSync } from 'node:fs';
+
 import { eq, sql } from 'drizzle-orm';
 import {
   assessments,
@@ -1552,3 +1554,22 @@ if (isIdentityV2Enabled()) {
     });
   });
 }
+
+describe('Integration: v2 account deletion coverage liveness guard', () => {
+  it('keeps the flag-on D2 suite and test runnable', () => {
+    const source = readFileSync(__filename, 'utf8');
+    const suiteTitle = 'Integration: v2 account deletion cascade (WI-825)';
+    const testTitle =
+      '[D2] cascade-deletes all retention-pipeline rows for the deleted v2 person';
+
+    const runnableSuite = ['describe', `('${suiteTitle}'`].join('');
+    const skippedSuite = ['describe', '.skip', `('${suiteTitle}'`].join('');
+    const runnableTest = ['it', `('${testTitle}'`].join('');
+    const skippedTest = ['it', '.skip', `('${testTitle}'`].join('');
+
+    expect(source).toContain(runnableSuite);
+    expect(source).not.toContain(skippedSuite);
+    expect(source).toContain(runnableTest);
+    expect(source).not.toContain(skippedTest);
+  });
+});
