@@ -62,14 +62,15 @@ Mostly counsel-answer consumers and pre-publish obligations; overlaps Wave 1 whe
 - **AI Act:** WI-1195 (Art-50 in-chat disclosure — unconditional) · WI-1663/1664 **only if** counsel classifies high-risk (then they become launch-gating — replan immediately).
 - **Safety:** suitability-judge enablement (WI-1686) · blocked-event digest (WI-1691) · crisis slice build (WI-1690, rescoped).
 - **Billing before paid launch:** payment-failed notify (WI-1555/1474) · past-due banner (WI-1475) · silent-fail escalation (WI-1399).
-- **Platform:** prompt caching (WI-1687→1688, post-cutover) · spend guardrails + kill switch (WI-1505) · Maestro smoke baseline (WI-1400) + auth-resilience subset (WI-1406).
+- **Platform:** prompt caching (WI-1687→1688, post-cutover) · spend guardrails + kill switch (WI-1505) · Maestro CI fixes (WI-1651 + WI-1652 — make the e2e gate real) → Maestro smoke baseline (WI-1400) + auth-resilience subset (WI-1406) · dev/preview flag-combo ruling (WI-1334).
+- **Hardening (residual-14 batch, ruled 2026-07-10):** concepts FK repoint + migration 0129 (WI-1288) · trial-v2 integration coverage (WI-1371) · account-deletion v2 cascade un-gate (WI-1379 — must precede the post-launch WI-779 flag collapse) · v2 billing fields in GDPR export (WI-1162).
 
 ## Wave 3 — Publish & beta
 
 - **Store/launch-ops (OPQ-6 wave B):** RevenueCat purchases (WI-1328) · store listings (WI-1335) · APNs/FCM prod creds (WI-1337) · age rating + declarations at 13+ (WI-1114) · country availability/hard-blocks (WI-1115) · data-safety worksheet refresh (WI-1561).
 - **Shell:** V2 publish-readiness chain (WS-28 + WI-1307 fallback proof) — spans Waves 1–3; must conclude here.
 - **Final gates:** launch compliance closure re-run (WI-1507) · **WI-1577 FINAL GATE pre-store-submission re-run**.
-- **Dogfood prod build (WI-1503) → closed beta (WI-1506, families screened for 13+ teens) → store go-live → public launch.**
+- **Dogfood prod build (WI-1503) → closed beta (WI-1506, families screened for 13+ teens; WI-1655 device-evidence batch runs with it) → store go-live → public launch.**
 
 ## FILL pick-list (never scheduled; grab when a lane idles)
 
@@ -82,7 +83,7 @@ WI-1704 (evidence-links substrate; promote only if 1658 proves need) · WI-1465 
 - **Cross-vertical yield:** language yields to verified-learning.
 - **Conditional replan trigger:** counsel says Annex-III high-risk → WI-1663/1664 promote to launch-gating; Wave 2/3 re-sequenced around them.
 
-## Open sequencing decisions
+## Open sequencing inputs (operator)
 
 1. **Calendar anchoring** — **DEFERRED (operator, 2026-07-10):** waves are dependency-ordered, not dated; work starts on Wave 0 without a date. Anchor the target store-go-live date when the counsel/DPO lead times firm up; it back-propagates onto Wave 3.
 2. **Lane/agent allocation** — **DEFERRED (operator, 2026-07-10)** alongside calendar anchoring.
