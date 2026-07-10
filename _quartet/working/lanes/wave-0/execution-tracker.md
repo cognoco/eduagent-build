@@ -1,10 +1,11 @@
 # Batch 3 — Platform / LLM cutover · Execution Tracker
 
 > **Restructured 2026-07-10 (operator ruling): waves are scrapped, replaced by 5 parallel agent
-> batches.** This lane (formerly "Wave 0") continues as the **Batch 3** lane — it keeps its
-> in-flight work (WI-1167, Executing). The other ex-Wave-0 build items moved to the heads of
-> Batches 1/2/5; operator/legal items (DPO/DPIA, AI-Act self-assessment, counsel consumers) left
-> the agent queues entirely (tag `manual-external`).
+> batches.** This tracker (path is the historical `wave-0/`) now describes **Batch 3, a normal
+> batch like the others** — no reserved executor (the agent on WI-1167 was stood down; its claim
+> is clear, the item sits Executing awaiting pickup). The other ex-Wave-0 build items moved to
+> the heads of Batches 1/2/5; operator/legal items (DPO/DPIA, AI-Act self-assessment, counsel
+> consumers) left the agent queues entirely (tag `manual-external`).
 
 ## Charter
 
@@ -25,15 +26,16 @@ Workstreams stay bookkeeping axes. Freeze: LIFTED 2026-07-10 (all MentoMate).
 Every open Blocked-by edge is intra-batch (audited 2026-07-10) — a lane claims any member with
 no open blocker, chains unroll inside the batch.
 
-## This batch (5 items)
+## This batch (4 items — Workstream Order = intra-batch claim sequence)
 
-| WI | What | Order |
-|---|---|---|
-| WI-1167 | Staging deploy-migration fix | HEAD — Executing (carry-over) |
-| WI-1685 | V2 LLM-routing cutover chain (bake-off → staging gates → prod flip) | after 1167; rollback = flag flip |
-| WI-1779 | Prompt-caching bundle (1687+1688) | after 1685 |
-| WI-1686 | Suitability-judge enablement | after 1685 |
-| WI-1505 | Spend guardrails + kill switch | parallel, claim anytime |
+| Order | WI | What | Note |
+|---|---|---|---|
+| 10 | WI-1167 | Staging deploy-migration fix | Executing, claim clear — pick up first |
+| 20 | WI-1685 | V2 LLM-routing cutover chain (bake-off → staging gates → prod flip) | after 1167; rollback = flag flip |
+| 30 | WI-1686 | Suitability-judge enablement | after 1685 |
+| 40 | WI-1779 | Prompt-caching bundle (1687+1688) | after 1685 |
+
+WI-1505 (spend guardrails) was already Closed — removed from the batch 2026-07-10.
 
 ## Canon authority
 
