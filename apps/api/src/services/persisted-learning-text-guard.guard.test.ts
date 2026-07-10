@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { scrubClinicalInferenceFromLearningRecord } from './persisted-learning-text-guard';
 
 const SERVICE_ROOT = resolve(__dirname);
 
@@ -35,4 +36,27 @@ describe('[WI-1195] persisted learning-text guard wiring', () => {
       ),
     ).toHaveLength(2);
   });
+});
+
+describe('[WI-1195] persisted learning-text clinical attribution guard', () => {
+  it.each([
+    'Alex has ADHD.',
+    'Sam is autistic.',
+    'Jordan shows signs of dyslexia.',
+  ])(
+    'rejects a clinical characterisation attributed to a named person: %s',
+    (text) => {
+      expect(scrubClinicalInferenceFromLearningRecord(text)).toBeNull();
+    },
+  );
+
+  it.each([
+    'ADHD can affect executive function.',
+    'Alex is learning about ADHD.',
+  ])(
+    'allows educational discussion without a clinical characterisation: %s',
+    (text) => {
+      expect(scrubClinicalInferenceFromLearningRecord(text)).toBe(text);
+    },
+  );
 });
