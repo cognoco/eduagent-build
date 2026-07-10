@@ -127,6 +127,78 @@ AC coverage: AC1 = this spec · AC2 = S1+S3b (explain-back gate; the never-lock 
 - **No parent proof counted if only V1 recaps can see it.** S7 must name the parent surface that is visible in the shipping target. If that target is V1 Family Recaps, S7 depends on the approved V1/nav rollout; otherwise it must also render on a current-prod parent surface.
 - **No late test umbrella.** S8 starts as a scaffold before S1's staging flip. Each slice adds its scenario while the behavior is introduced, not after the whole loop is assembled.
 
+## Artifact Provenance Contract (WI-1703)
+
+**Decision authority:** `docs/adr/MMT-ADR-0032-verified-learning-artifacts-require-source-and-verification-state.md` (Accepted 2026-07-08). This section is that ADR's concrete elaboration — the exact values, tables, and degradation rules S5a's downstream Work Items (WI-1704, WI-1705, WI-1658, WI-1665) build against. It commits no schema and runs no migration; it is the vocabulary those WIs must not drift from.
+
+### Three axes that must not collapse into one
+
+The loop already has three different things that each use "source" or "verification state" vocabulary. Naming them side by side once here is the point of this contract — conflating any two of them is exactly the failure mode MMT-ADR-0032 exists to prevent.
+
+| Axis | Grain | Values | Owner | Purpose |
+|---|---|---|---|---|
+| **Artifact source** (new, this contract) | one artifact | `challenge_solid_quote` / `challenge_drafted_note` / `learner_authored_note` / `freeform_keep` | WI-1704 | What kind of evidentiary claim this artifact carries — set once at creation, immutable |
+| **Artifact verification state** (new, this contract) | one artifact | `unverified` / `verified` | WI-1704 | Whether *this artifact* may feed proof surfaces |
+| `MasteryVerificationState` (existing, `verification.ts:25`) | one topic | `unverified` / `fresh` / `stale` | Segment 2 (shipped) | Whether a topic's Challenge-Round pass is still current given later weak-spot evidence — a retention-freshness signal, not an artifact property |
+| `LearnerSource.kind` (existing, decided not built — review-continuity slice 2a) | one citation | `note` / `bookmark` / `transcript_excerpt` / `homework_ocr` | WI-1704 (shared substrate) | Which table a piece of content came from, for in-conversation "you learned this from your note" citation — orthogonal to whether that content is *verified* |
+| `noteOrigin` (existing, `packages/schemas/src/notes.ts:7`) | one `topic_notes` row | `self` / `mentor` | Shipped | Who authored the note text — not whether it is evidentiary proof |
+
+A `topic_notes` row can be `noteOrigin='self'`, `LearnerSource.kind='note'`, artifact source `learner_authored_note`, and verification state `unverified` — four independent facts about the same row. None of the four is derivable from another.
+
+### Artifact source values (AC1)
+
+Matches `docs/architecture.md` → Cross-Cutting Concerns → "Retention & spaced repetition" (verified-artifact clause) exactly; both name the same four sources. Proposed as a new `@eduagent/schemas` enum (`artifactSourceSchema`), mirroring the existing `noteOriginSchema` / `taskTypeSchema` pattern — WI-1704 owns adding it.
+
+| Value | What it is | Storage today | Set by |
+|---|---|---|---|
+| `challenge_solid_quote` | A learner quote a Challenge Round evaluated `solid` for one concept | Not a stored row — a pointer (`answerEventId`) into `session_events`, produced transiently by `decideMasteryAndReview()` (`evaluation.ts:128`) as `solidAnswerQuotes` | Server, at Challenge Round finalization; immutable |
+| `challenge_drafted_note` | A note drafted from `solidAnswerQuotes`, gated by the lexical-overlap hallucination guard | `DraftedChallengeNote` (`session-exchange.ts:342`) is currently in-memory only — the guard (`validateNoteDraft`, `note-draft.ts:143`) and persistence (`createNoteForSession`, `notes.ts:232`) both exist but the pipeline connecting them is **unwired** (`notes.ts:239-246`); once wired, persists as a `topic_notes` row | Server, only after `validateNoteDraft` passes; immutable |
+| `learner_authored_note` | A note the learner wrote directly, no Challenge Round involved | `topic_notes` row via `createNote`/`createNoteForSession` | Learner, at write time; immutable |
+| `freeform_keep` | Anything the learner chose to keep from a freeform (non-Challenge) exchange, no correctness claim | `bookmarks` row (`docs/specs/2026-06-27-felt-knowing-loop.md` Flow 2 — `topicId` nullable, `subjectId` required) — **not** a `topic_notes` row | Learner, at keep-tap time; immutable |
+
+### Verification state + proof eligibility (AC2)
+
+`ArtifactVerificationState = 'unverified' | 'verified'`. Two states only — there is no third "pending" state for artifacts (contrast `MasteryVerificationState`'s `stale`, which is a topic-grain retention concept, not an artifact one).
+
+| Source | Initial state | How it becomes `verified` | Can it be promoted later? |
+|---|---|---|---|
+| `challenge_solid_quote` | `verified` | Verified by origin: only exists because `decideMasteryAndReview` returned `outcome: 'verified'` for that concept | No — verification is inherent to how the row is produced, not a separate step |
+| `challenge_drafted_note` | `verified` | Verified by origin, conditional on passing `validateNoteDraft` against DB-verified solid-quote content (`fetchVerifiedSolidContents`, `session-exchange.ts:726`) at draft time — a note that fails the guard is never shown, never persisted, never `unverified`-and-lying-around | No |
+| `learner_authored_note` | `unverified` | Only via an explicit grading flow that evaluates correctness (WI-1491, parked) — never by default, age, or edit count (MMT-ADR-0032 §2) | Yes, once WI-1491 ships — out of scope here |
+| `freeform_keep` | `unverified` | No path exists or is planned — "no correctness claim at all" is the source's defining property (MMT-ADR-0032 context) | No |
+
+**Proof eligibility is not `verificationState === 'verified'` alone.** Per `docs/adr/MMT-ADR-0031-challenge-verification-and-sm2-are-complementary-mastery-axes.md` §5, "*a proof surface may claim a topic is verified only when it is Challenge-verified, and it must simultaneously expose the retention state*" — copy or badges implying permanent mastery from either axis alone are prohibited. So a parent/progress proof surface renders a verified artifact **together with** the topic's current `MasteryVerificationState` (`fresh`/`stale`) and retention band, never the artifact's verification alone as an unqualified checkmark.
+
+A `learner_authored_note` or `freeform_keep` artifact **never** feeds parent/progress proof while `unverified` — it remains learner-only study material, visible in the learner's own Journal/Library, never surfaced as evidence to a parent or supporter.
+
+### Durability asymmetry (part of AC5's degradation rules)
+
+The two verified sources do not have the same evidence lifetime, and a proof surface must degrade accordingly rather than treating "verified" as a single durable fact:
+
+- The **verified fact** — `assessments.masteryChallengeVerifiedAt` — is a timestamp, never cleared (loop-map §"Two mastery axes"). This persists regardless of what happens to the underlying quote.
+- A **`challenge_drafted_note` body** persists in `topic_notes` — a durable, learner-owned row. Nothing purges `topic_notes`. This is the **preferred durable proof artifact** once the drafting pipeline is wired.
+- A **`challenge_solid_quote`'s evidence** (`answerEventId` → `session_events.content`) is *not* separately preserved — `session_events` is the raw transcript and is subject to the same session-scoped transcript-purge window as the rest of the conversation (`transcript-purge-cron.ts`, ~day-37; distinct from `retrieval_events`'s own independent 37-day TTL, which is a different table for the unrelated review/recall-log flow — do not conflate the two 37-day windows). Once that session's transcript purges, the quote pointer dangles.
+
+**Degradation rule.** When a `challenge_solid_quote`'s evidence has purged (or a future `evidence_links` row otherwise dangles — raw-id, no-FK by design, mirroring the existing `bookmarks`/`evidence_links` precedent in `docs/_archive/specs/Done/2026-06-08-memory-task-review-continuity.md`), the proof surface:
+- keeps showing the verified **fact** ("verified: `<topic>` on `<date>`") — the timestamp never lied and is never retracted;
+- degrades the **quote** to "source no longer available" — never fabricates a substitute quote, never falls back to raw transcript to backfill it;
+- keeps co-presenting the topic's current retention state (fresh/stale/due) per MMT-ADR-0031, independent of the quote's availability.
+
+If a `challenge_drafted_note` exists for the same verification (the durable path), prefer rendering that over a solid-quote pointer — it does not degrade on the transcript clock.
+
+### Transcript-safety prohibition (AC5)
+
+Parent/supporter and progress proof surfaces **never** render: raw `session_events` transcript content, any `partial`/`misconception`/`missing` evaluation text, or an `unverified` `learner_authored_note`/`freeform_keep` artifact as if it were proof. This extends the derived-output posture of `docs/adr/MMT-ADR-0027-supporter-visibility-contract.md` (server-side allow-list, no path from raw chat to a supporter-visible fact) to the learning-proof surface specifically. The only learner-quote content a proof surface may show is the stored content of a `verified` artifact itself (a drafted-note body, or — before it purges — the solid-quote's own text) — never a live re-read of the surrounding transcript.
+
+### Follow-up implementation Work Items (AC4)
+
+All four are blocked on this contract existing (per the "No parent proof before artifact provenance" execution gate above) and must not implement ahead of it drifting names:
+
+- **WI-1704** (Build evidence-links substrate for verified learning artifacts) — schema/API: owns turning the artifact-source and verification-state enums above into actual storage (column, side table, or equivalent — this contract commits to the *names and values*, not the physical shape) plus the `evidence_links`/`LearnerSource` substrate from review-continuity slice 2a.
+- **WI-1705** (Choose production-visible parent proof surface before rendering verified artifacts) — product/mobile: names which current-prod surface renders the proof block; consumes this contract's proof-eligibility rule but does not itself render anything.
+- **WI-1658** (Build parent proof receipts from verified learner explanations) — API/mobile: a receipt-style consumer of this contract.
+- **WI-1665** (Parent proof: recap consumes the verified-learning artifact — loop slice S7) — API/mobile: the Recaps-surface consumer of this contract, already tracked in this WI's Related Items.
+
 ## Walkthrough per entry path (behavior once all slices land)
 
 - **Guided (Path 2):** learner finishes explaining; Challenge Round offered (envelope signal, server cap `MAX_INTERVIEW_EXCHANGES`-style bound); all-solid → topic shows `fresh` verification, a note in their own quoted words lands in the Journal, `nextReviewAt` is scheduled, Now shows the review promise. Any partial → not verified, weak concepts routed to `needs_deepening_topics`, low-stakes re-prove offered later. **Risk: low** — this is the designed happy path.
