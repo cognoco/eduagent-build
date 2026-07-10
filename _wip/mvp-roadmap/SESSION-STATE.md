@@ -4,7 +4,7 @@
 
 ## Freeze status
 
-**ON.** Operator asked "are we ready to lift?" at session end — assessment given (administratively yes; recommend lifting for Wave 0 with counsel-packet + DPO dispatch in parallel) but **no explicit lift was ruled. Do not execute product work until the operator lifts it in so many words.**
+**LIFTED 2026-07-10 (operator ruling, explicit: "You are to lift the freeze across all of Mentomate").** Delivery model correction from the operator: NOT per-workstream orchestrator spawning — **one dedicated Wave-0 delivery lane** (`_quartet/working/lanes/wave-0/execution-tracker.md`); workstreams are bookkeeping axes. Waves recorded as Cosmo Sprint rows (Wave 0: 11 · Wave 1: 29 · Wave 2: 27 · Wave 3: 11); legal/DPO paths moving in parallel, not waited on.
 
 ## What this session did (all complete)
 
