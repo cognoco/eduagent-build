@@ -1,10 +1,10 @@
 # Backlog inventory — Phase 1 ground truth
 
-**Pulled:** 2026-07-09 (Notion REST, live). **Source:** Work Items DB, `Project = MentoMate`, `Stage ≠ Closed`. Raw data: `inventory.jsonl` (one JSON per WI).
+**Pulled:** 2026-07-09 (Notion REST, live). **Source:** Work Items DB, `Project = MentoMate`, `Stage ≠ Closed`. Raw data: `inventory.jsonl` (one JSON per WI). **Overlay:** 3 gap-capture rows added 2026-07-10 (`WI-1754`, `WI-1755`, `WI-1756`), so local roadmap data now tracks 204 rows.
 
 ## Totality
 
-**201 non-Closed MentoMate work items.**
+**201 non-Closed MentoMate work items in the original pull; 204 rows in local roadmap data after the 2026-07-10 gap captures.**
 
 | By stage | | By priority | | By type | |
 |---|---|---|---|---|---|
@@ -30,6 +30,19 @@
 4. **18 items are Stage=Executing while execution is on ice** — spread over 8 workstreams (Safety & Eval 5, Platform Hardening 4, Compliance-Legal 3, …). Unless these map to WS-34/WS-37, most are **stale claims** needing reset or explicit exemption. (WS numeric IDs not resolved in this pull; verify before resetting.)
 5. Probable misfiles into MentoMate: WI-1299 (fleet-wide notion-skill fix), 1 item in "Quartet Runtime" WS, 1 in "Harness hygiene" sprint — machinery, not product.
 6. New since triage: an **EU AI Act cluster** (WI-1659/1663/1664, Compliance-Legal, Executing) — post-dates the spec-triage and ROADMAP-A; must be represented in the MVP definition's compliance node.
+
+## Phase-4 ruling overlay — Four Strands (2026-07-10)
+
+The raw inventory still contains 11 Four Strands workstream items. They are no longer an unresolved Q2 bundle:
+
+- **Launch-IN narrow slices:** WI-1547 (graded input), WI-1548 (repeat-after-me/shadowing), WI-1549 (speaking-attempt persistence), WI-1552 (next-activity selector), WI-1553 (session-end learning summary), WI-1755 (language-mode safety/eval guard), WI-1756 (structured meaning-output card/loop).
+- **FILL:** WI-1394 (CEFR browser re-home), WI-1554 (strand-balance / skill-profile UX).
+- **OUT/post-launch, unconditionally (2026-07-10 amendment):** WI-1550 (language-native competency profile), WI-1551 (session-to-competency evaluator) — the WI-1553 receipt is derive-from-events, so the earlier receipt-field conditionals are struck.
+- **Merged:** WI-1492 → WI-1548 (existing SpeakingPracticeCard is the presumed repeat-after-me surface; Parked, Duplicate close via review gate). WI-1757 → WI-1755 (parallel-creation duplicate of the safety guard; same handling).
+- **Reshape/close:** WI-1493 (planning umbrella) once this ruling is reflected in Cosmo.
+- **Amendments 2026-07-10 (challenge pass):** WI-1552 AC reshaped (within-session selector exists in `language-session-engine.ts`; gap is cross-session continue path). WI-1548 Blocked-by WI-1447 (target audio needs the locale fix). Degrade line: speaking pair (1548+1549) → meaning-output card (1756) → graded-input upgrade (1547); receipt (1553) last; floor (mode live + 1755 + 1447 + 1552 continue path) never cuts. Cross-vertical yield: language slice yields to the verified-learning slice under date pressure.
+
+G10/G11 were captured as WI-1755/WI-1756 on 2026-07-10; both remain Captured/Active with Sprint unset for triage/refine.
 
 ## Phase-1 residue — DONE 2026-07-09
 

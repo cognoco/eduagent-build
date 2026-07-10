@@ -21,3 +21,5 @@ type: project
 - `nativeLanguage` stored on teachingPreferences (per subject, not per profile)
 
 **How to apply:** This supersedes the "Epic 6 deferred to v1.1" note in market_language_pivot.md. Language learning is now actively being built, not deferred. The English-only launch decision may still apply to the UI language, but the app now supports teaching foreign languages.
+
+**MVP ruling update (2026-07-10):** Launch language learning cannot be framed as thin chat practice. Because the product promise is "learn anything" and parents pay only if the child wants to keep using it, MVP must include a minimum credible language-course spine: continue/next-practice path, balanced strand intent, graded input, output/correction/retry, narrow repeat-after-me/shadowing, fluency persistence, retention/progress, and a simple session receipt. Canonical source: `_wip/mvp-roadmap/MVP-DEFINITION.md` §6.

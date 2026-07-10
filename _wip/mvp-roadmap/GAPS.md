@@ -4,33 +4,39 @@
 
 ## Gaps (no WI exists)
 
-| # | Gap | Definition anchor | Proposed action |
-|---|---|---|---|
-| G1 | **Challenge Round production flip itself** — bake-off (WI-1438) and calibration (WI-1464) are gates, but no WI executes the flip + sequencing | §3 | Create WI at Phase 5; sequence after 1438/1464 |
-| G2 | **Consent-denial state build** (retain-dormant vs erase) — ruled direction Item 4-D2, counsel Q2 pending; current denial behavior never audited; zero WIs | §1/§10 | Create audit WI now (counsel-independent); build WI after Q2 |
-| G3 | **First-party analytics sink** — event wiring exists (WI-1689/1570) but nothing captures where events land / minimal query surface (addendum ruled IN) | §12 | Create WI; confirm scope at ratification |
-| G4 | **Voice floor verification** — shell spec rules "voice input everywhere incl. cold-start"; no WI verifies mic/transcription coverage across V2 surfaces (only fixes 1447/1486 exist) | §6 / Q6 | Create audit-slice WI after Q6 confirms the floor |
-| G5 | **Locale-correct crisis helpline sourcing** — def says "we will source locale-correct numbers separately"; no WI | §9 / counsel Q3 | Create WI, counsel-gated |
-| G6 | **Privacy-policy publish TODO bundle** (DPO name, controller address, Art-27/UK rep decision, final age floor, false-claims fix) — WI-1109 covers publish broadly but the worksheet of concrete TODOs lives only in the HTML comments | §10 | Fold explicit checklist into WI-1109 body at Phase 5 |
-| G7 | **Item 4-D1 (provenance) and D3 (parking-return) builds** — ruled, deferred to fast-follow; no build WIs (WI-1416 only holds the now-ruled decisions; WI-1703 is loop-artifact provenance, a different thing) | §4 | Create fast-follow WIs at Phase 5 |
-| G8 | **Trust-package design passes** — each Item-6 slice needs a Zuzka design pass before build; no design WIs, only the 5 build WIs | §11 | Ratification: confirm design-pass mechanics; add to WI bodies |
-| G9 | **Age-floor cementing + store-rating dependency** — Q9 says confirm final; no WI carries the decision through policy + worksheet + register once ruled | §10 / Q9 | Fold into WI-1561/1109 at Phase 5 after Q9 |
+**None remaining — all gaps closed 2026-07-10 (see Resolved).**
+
+## Resolved gaps
+
+| # | Closing WI | What changed |
+|---|---|---|
+| G1 | WI-1754 | Challenge Round beta/prod flip now has an explicit launch-gating execution item. |
+| G2 | WI-1761 | Consent-denial behavior audit (counsel-independent) created 2026-07-10; build WI follows counsel Q2. |
+| G3 | WI-1762 | First-party activation-analytics sink + minimal query surface created 2026-07-10. |
+| G4 | WI-1763 | Voice-floor coverage audit across V2 surfaces created 2026-07-10 (Q6 confirmed the floor). |
+| G5 | WI-1764 | Locale-correct crisis helpline sourcing created 2026-07-10; State=Awaiting Info pending counsel Q3 jurisdictions. |
+| G6 | WI-1109 (fold) | Explicit publish-TODO checklist folded into WI-1109 notes 2026-07-10 (DPO name, controller address, Art-27 EU rep, UK-rep decision via WI-1110, 13+ floor, false-claims fix). |
+| G7 | WI-1765 + WI-1766 | D1 provenance schema + D3 parking-lot return builds created 2026-07-10, both Parked (ruled fast-follow). |
+| G8 | WI-1767 | Batch design pass ruled (operator 2026-07-10: one pass, not per-item); Design WI created, Blocking → 1497/1498/1499/1501/1502. |
+| G9 | WI-1109/1114/1561 (fold) | Q9 ruled 2026-07-10 (13+ = launch floor, not forever cap); ruling notes appended to all three carriers. |
+| G10 | WI-1755 | Language-mode safety/eval guard captured; Risk/Impact populated; Sprint left for triage/refine. |
+| G11 | WI-1756 | Structured meaning-output card/loop captured; Risk/Impact populated; Sprint left for triage/refine. |
 
 ## Flags (conflicts / duplicates surfaced by mapping)
 
-| # | Flag | Items | Resolution path |
+| # | Flag | Items | Resolution |
 |---|---|---|---|
-| F1 | **Crisis contradiction** — WI-1690 specs guardian notification; implemented se-032 posture is never-notify | WI-1690 vs WI-1358 | Ratification Q8 (already on the list); do NOT build 1690 before |
-| F2 | **Activation-wiring duplicate** — WI-1689 (Phase-0 ruling capture) vs WI-1570 (earlier client-dispatch capture) describe the same work | 1689/1570 | Merge at Phase 5 |
-| F3 | **RevenueCat duplicate** — WI-1117 (Compliance-Legal) vs WI-1328 (Launch Readiness) | 1117/1328 | Merge at Phase 5 |
-| F4 | **V0-retirement conflict** — WI-1308 (M5: retire V0 *before ship*) vs the standing S6-deferred-irreversible ruling | 1308 | Ratification: reconcile M5 wording with S6 ruling |
-| F5 | **WI-1416's 4 rulings largely superseded** — Item-4 ballot ruled D1–D4 on 2026-07-05 | 1416 | Close-against-ballot at Phase 5 (residue: S3 rare rows) |
-| F6 | **Staging deploy migration broken** (WI-1167) silently gates the V2 routing cutover (WI-1685 needs staging validation) | 1167→1685 | Sequence 1167 first; it's mapped GATE |
+| F1 | **Crisis contradiction** | WI-1690 vs WI-1358 | **RESOLVED 2026-07-10 (Q8):** se-032 stands; WI-1690 rescoped in Cosmo (name/desc/AC — no guardian notification). |
+| F2 | **Activation-wiring duplicate** | 1689/1570 | **EXECUTED 2026-07-10:** WI-1689 canonical (detail absorbed); WI-1570 Parked → Duplicate close via review gate. |
+| F3 | **RevenueCat duplicate** | 1117/1328 | **EXECUTED 2026-07-10:** WI-1328 umbrella canonical; WI-1117 Parked → Duplicate close via review gate (its "both stores" scope narrowed by the Play-only Option-A ruling). |
+| F4 | **V0-retirement conflict** | 1308 | **RESOLVED 2026-07-10 (operator):** S6-deferred stands; WI-1308 name/description rewritten to post-launch S6-milestone timing. |
+| F5 | **WI-1416's 4 rulings superseded** | 1416 | **EXECUTED 2026-07-10:** noted against ballot (D1→WI-1765, D2→WI-1761+counsel Q2, D3→WI-1766, D4 residue flagged for review); Parked → close-against-ballot via review gate. |
+| F6 | **Staging deploy migration broken** (WI-1167) gates the V2 routing cutover (WI-1685) | 1167→1685 | Sequence 1167 first — added to RUNWAY-DRAFT Wave 0. |
 | F7 | **WI-1448 snapshot stale** — closed Superseded→WI-1688 on 2026-07-09, inventory row pre-dates it | 1448 | None; noted so counts reconcile (real open total = 200) |
-| F8 | **Supporter/linking cluster (8 WIs, WS-32 on hold) entirely hangs on Q10** — if launch family model = join-my-family v1 only, most is fast-follow but WI-1137 (ceremony screens) likely has an IN subset | 787/1121/1127/1134/1135/1136/1137/1185 | Ratification Q10, then split 1137 |
-| F9 | **Maestro-CI defects undermine an IN gate** — WI-1651/1652 (CI always-green / only 2 flows) make the WI-1400 e2e baseline unverifiable | 1651/1652→1400 | Propose IN at ratification (mapped RATIFY) |
-| F10 | **Machinery in product backlog** — 11 items (Stream-2 ADR-governance cluster, WI-1299, WI-1650) are not MentoMate product work | see COVERAGE node — | Phase 5: repoint/re-home per misfiling memory (verify first) |
+| F8 | **Supporter/linking cluster hangs on Q10** | 787/1121/1127/1134/1135/1136/1137/1185 | **RESOLVED 2026-07-10 (Q10):** ruled item-by-item — see MVP-DEFINITION §1/§4; WI-1137 IN whole (no split needed), WI-1753 extracted from 1580. |
+| F9 | **Maestro-CI defects undermine an IN gate** | 1651/1652→1400 | **RESOLVED 2026-07-10:** WI-1651/1652 ruled IN (additional-rulings batch). |
+| F10 | **Machinery in product backlog** — 11 items (Stream-2 ADR-governance cluster, WI-1299, WI-1650) are not MentoMate product work | see COVERAGE node | **RESOLVED 2026-07-10:** verified — NONE are cross-project misfiles (WI-1299's defect lives in this repo's own `.agents/skills/notion/SKILL.md`; the ADR cluster governs this repo's ADRs). All 11 noted as machinery, excluded from the MVP roadmap; no Project repoints. |
 
 ## Reading the totals
 
-73 GATE items close the definition's IN surface; 59 RATIFY items hang on the 10 open questions (dominated by Q1 verified-loop, Q2 4-strands ×11, Q10 supporter ×8, Q5 AI-Act); 17 OUT + 14 QUARANTINE are Phase-5 fate execution; 24 HYGIENE don't gate launch; 14 non-product. **No IN capability is entirely uncovered except the nine gaps above — the definition and the backlog are structurally close; the risk is concentrated in the un-ruled questions, not in missing captures.**
+81 GATE items close the definition's IN surface; 48 RATIFY items still hang on open questions (dominated by Q1 verified-loop, Q10 supporter, Q5 AI-Act, and smaller residual rulings); 3 FILL items are approved MVP-window work but not launch-gating; 19 OUT + 14 QUARANTINE are Phase-5 fate execution; 24 HYGIENE don't gate launch; 15 non-product/docs/machinery items remain. **Eight active no-WI gaps remain; G1/G10/G11 are now closed by WI-1754/WI-1755/WI-1756.**

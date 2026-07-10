@@ -145,23 +145,40 @@ Mappings to unratified nodes inherit the draft's rulings; a flipped ruling at ra
 |---|---|---|---|---|
 | WI-1183 | Executing | P2 | Add i18n value-equality guard and re-translate echoed-English strings per locale | WS-34 closeout — i18n echo guard, PR #2009 |
 | WI-1447 | Ready | P2 | Fix voice STT/TTS locale fallback for non-language subjects; add cs/ja/pl/en locale mappings | STT/TTS locale fallback fix — ratified-13 |
+| WI-1547 | Backlog | P2 | Upgrade Four Strands graded input generation beyond seed passages | graded input upgrade — launch-IN narrow course slice |
+| WI-1548 | Backlog | P2 | Add repeat-after-me and shadowing activities end-to-end | repeat-after-me/shadowing — launch-IN narrow speaking slice |
+| WI-1549 | Backlog | P2 | Persist language speaking attempts with transcript comparison scores | speaking attempts persistence — launch-IN paired with WI-1548 |
+| WI-1552 | Backlog | P2 | Build adaptive next-activity selector for Four Strands sessions | adaptive next-activity selector — launch-IN narrow continue path |
+| WI-1553 | Backlog | P2 | Add language session-end learning summary | session-end summary — launch-IN narrow learning receipt |
+| WI-1755 | Captured | P1 | Harden Four Strands language-mode routing and eval guards for launch | language-mode safety/eval guard — closes G10 |
+| WI-1756 | Captured | P1 | Render Four Strands meaning-output task with correction and retry loop | structured meaning-output card/loop — closes G11 |
+
+### FILL — approved MVP-window work, not launch-gating
+
+| WI | Stage | Pri | Name | Note |
+|---|---|---|---|---|
+| WI-1394 | Ready | P3 | Re-home CEFR vocabulary browser into the V2 shell (legacy Progress-only today) | CEFR browser re-home — FILL; not launch-gating if receipt + continue path exist |
+| WI-1492 | Backlog | P3 | Wire SpeakingPracticeCard into the live four-strands session flow | SpeakingPracticeCard wiring — FILL unless fastest path for WI-1548 |
+| WI-1554 | Backlog | P2 | Show Four Strands balance and skill profile in language progress UX | strands balance / skill-profile UX — FILL until competency model exists |
 
 ### RATIFY — needs Phase-4 ruling
 
 | WI | Stage | Pri | Name | Note |
 |---|---|---|---|---|
 | WI-904 | Backlog | P2 | Dictation playback: rework pacing around clear speech and phrase/sentence pauses | dictation pacing — propose post-MVP (Q6 baseline suffices) |
-| WI-1394 | Ready | P3 | Re-home CEFR vocabulary browser into the V2 shell (legacy Progress-only today) | CEFR browser re-home — Q2 4-strands scope |
-| WI-1492 | Backlog | P3 | Wire SpeakingPracticeCard into the live four-strands session flow | SpeakingPracticeCard wiring — Q2 |
-| WI-1493 | Ready | P3 | Convert the 4-strands doc into a real plan and enumerate remaining Minimum-Lovable gaps | 4-strands doc→plan conversion — this IS the Q2 vehicle |
-| WI-1547 | Backlog | P2 | Upgrade Four Strands graded input generation beyond seed passages | graded input upgrade — Q2 |
-| WI-1548 | Backlog | P2 | Add repeat-after-me and shadowing activities end-to-end | repeat-after-me/shadowing — Q2 |
-| WI-1549 | Backlog | P2 | Persist language speaking attempts with transcript comparison scores | speaking attempts persistence — Q2 |
-| WI-1550 | Backlog | P2 | Add language-native competency profile model | competency profile model — Q2 |
-| WI-1551 | Backlog | P2 | Evaluate language sessions into competency updates | session→competency evaluation — Q2 |
-| WI-1552 | Backlog | P2 | Build adaptive next-activity selector for Four Strands sessions | adaptive activity selector — Q2 |
-| WI-1553 | Backlog | P2 | Add language session-end learning summary | session-end summary — Q2 |
-| WI-1554 | Backlog | P2 | Show Four Strands balance and skill profile in language progress UX | strands balance UX — Q2 |
+
+### OUT — ruled post-launch / not MVP
+
+| WI | Stage | Pri | Name | Note |
+|---|---|---|---|---|
+| WI-1550 | Backlog | P2 | Add language-native competency profile model | full competency profile model — post-launch; tiny receipt fields only if needed |
+| WI-1551 | Backlog | P2 | Evaluate language sessions into competency updates | full session→competency evaluator — post-launch; receipt summary only if needed |
+
+### DOCS — close/reshape after ruling
+
+| WI | Stage | Pri | Name | Note |
+|---|---|---|---|---|
+| WI-1493 | Ready | P3 | Convert the 4-strands doc into a real plan and enumerate remaining Minimum-Lovable gaps | 4-strands doc→plan conversion — reshape/close after ruling is reflected |
 
 ### QUARANTINE — decision-pack fate stands; execute Phase 5
 
@@ -427,4 +444,3 @@ Mappings to unratified nodes inherit the draft's rulings; a flipped ruling at ra
 | WI-1299 | Captured | P2 | Repo notion skill points agents at the wrong Work Items DB (fleet-wide ZAF, not the Cosmo/ZDX pipeline) | verify misfile, likely repoint to Nexus |
 | WI-1309 | Ready | P2 | Drain the Stream-2 backlog (umbrella-program docs) into Cosmo WIs under WS-36 | Stream-2 drain umbrella |
 | WI-1650 | Ready | P3 | claude-review emits factually-false blocking findings (hallucinated rename; contradicts own prior-round premise) | claude-review defect — tooling, not product |
-
