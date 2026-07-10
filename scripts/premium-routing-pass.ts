@@ -27,9 +27,11 @@ import {
   OPENAI_ADVANCED_MODEL,
   OPENAI_ADVANCED_MODEL_CANDIDATES,
   registerProvider,
+  setLlmRoutingV2Enabled,
   type OpenAIAdvancedModel,
   type PreferredLlmProvider,
 } from '../apps/api/src/services/llm/index';
+import { isLlmRoutingV2Enabled } from '../apps/api/src/config';
 import {
   processMessage,
   startSession,
@@ -240,6 +242,19 @@ function seedEnv(): { CLERK_SECRET_KEY?: string; SEED_PASSWORD?: string } {
   return {
     SEED_PASSWORD: process.env['SEED_PASSWORD'],
   };
+}
+
+// WI-1685: thread the V2 routing cutover flag into the pure router module the
+// same way production does (apps/api/src/middleware/llm.ts), so a staging
+// gate run with LLM_ROUTING_V2_ENABLED=true actually exercises V2 routing
+// instead of silently validating the legacy path. Logged so a run's output
+// is self-evidencing about which path it validated.
+function logLlmRoutingMode(): void {
+  const v2Enabled = isLlmRoutingV2Enabled(
+    process.env['LLM_ROUTING_V2_ENABLED'],
+  );
+  setLlmRoutingV2Enabled(v2Enabled);
+  console.log(`LLM routing: ${v2Enabled ? 'v2' : 'legacy'}`);
 }
 
 function registerLiveProviders(): RegisteredKeys {
@@ -939,6 +954,7 @@ function renderMarkdown(results: CaseResult[]): string {
 }
 
 async function main(): Promise<void> {
+  logLlmRoutingMode();
   if (hasFlag('--help')) {
     console.log(
       [

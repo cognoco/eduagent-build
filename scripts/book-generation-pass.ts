@@ -22,7 +22,9 @@ import {
   createGeminiProvider,
   createOpenAIProvider,
   registerProvider,
+  setLlmRoutingV2Enabled,
 } from '../apps/api/src/services/llm/index';
+import { isLlmRoutingV2Enabled } from '../apps/api/src/config';
 import { buildCurrentTopicMapContext } from '../apps/api/src/services/session/session-context-builders';
 
 type IssueSeverity = 'fail' | 'warn';
@@ -210,6 +212,19 @@ function isTransientGenerationError(message: string | undefined): boolean {
   return /timeout|timed out|503|unavailable|high demand|temporar/i.test(
     message,
   );
+}
+
+// WI-1685: thread the V2 routing cutover flag into the pure router module the
+// same way production does (apps/api/src/middleware/llm.ts), so a staging
+// gate run with LLM_ROUTING_V2_ENABLED=true actually exercises V2 routing
+// instead of silently validating the legacy path. Logged so a run's output
+// is self-evidencing about which path it validated.
+function logLlmRoutingMode(): void {
+  const v2Enabled = isLlmRoutingV2Enabled(
+    process.env['LLM_ROUTING_V2_ENABLED'],
+  );
+  setLlmRoutingV2Enabled(v2Enabled);
+  console.log(`LLM routing: ${v2Enabled ? 'v2' : 'legacy'}`);
 }
 
 function registerLiveProviders(): RegisteredKeys {
@@ -1069,6 +1084,7 @@ function renderMarkdown(results: CaseResult[], keys: RegisteredKeys): string {
 }
 
 async function main(): Promise<void> {
+  logLlmRoutingMode();
   if (hasFlag('--help')) {
     console.log(
       [
