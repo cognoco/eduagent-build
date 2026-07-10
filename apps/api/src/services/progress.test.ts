@@ -977,9 +977,17 @@ describe('getTopicProgress', () => {
 
   it('[WI-1469] SM-2-verified-without-Challenge: xpStatus verified from the XP ledger, masteryVerificationState stays unverified', async () => {
     const topic = mockTopicRow();
+    const masteredAt = new Date('2026-02-05T00:00:00.000Z');
     setupScopedRepo({
       subjectFindFirst: mockSubjectRow(),
-      retentionCardFindFirst: mockRetentionCard(),
+      // Retention side is itself verified/mastered (not just the XP ledger),
+      // so the test actually exercises retention-card co-presentation — it
+      // would fail if a regression stopped co-presenting the retention
+      // card's own verified/mastered state alongside the XP ledger status.
+      retentionCardFindFirst: mockRetentionCard({
+        xpStatus: 'verified',
+        masteredAt,
+      }),
       assessmentsFindMany: [], // no Challenge Round ever run for this topic
       sessionsFindMany: [mockSessionRow({ topicId })],
       needsDeepeningFindMany: [],
@@ -990,6 +998,8 @@ describe('getTopicProgress', () => {
     const result = await getTopicProgress(db, profileId, subjectId, topicId);
 
     expect(result!.xpStatus).toBe('verified');
+    expect(result!.completionStatus).toBe('verified');
+    expect(result!.masteredAt).toBe(masteredAt.toISOString());
     expect(result!.masteryVerificationState).toBe('unverified');
   });
 
@@ -1161,8 +1171,19 @@ describe('getTopicProgressBatch', () => {
 
   it('[WI-1469] SM-2-verified-without-Challenge: batch xpStatus verified from the XP ledger, masteryVerificationState stays unverified', async () => {
     const topic = mockTopicRow({ id: 'batch-topic', title: 'Batch Topic' });
+    const masteredAt = new Date('2026-02-05T00:00:00.000Z');
     setupScopedRepo({
-      retentionCardsFindMany: [mockRetentionCard({ topicId: 'batch-topic' })],
+      // Retention side is itself verified/mastered (not just the XP ledger),
+      // so the test actually exercises retention-card co-presentation — it
+      // would fail if a regression stopped co-presenting the retention
+      // card's own verified/mastered state alongside the XP ledger status.
+      retentionCardsFindMany: [
+        mockRetentionCard({
+          topicId: 'batch-topic',
+          xpStatus: 'verified',
+          masteredAt,
+        }),
+      ],
       assessmentsFindMany: [],
       sessionsFindMany: [mockSessionRow({ topicId: 'batch-topic' })],
       needsDeepeningFindMany: [],
@@ -1180,6 +1201,8 @@ describe('getTopicProgressBatch', () => {
     ]);
 
     expect(result!.xpStatus).toBe('verified');
+    expect(result!.completionStatus).toBe('verified');
+    expect(result!.masteredAt).toBe(masteredAt.toISOString());
     expect(result!.masteryVerificationState).toBe('unverified');
   });
 
