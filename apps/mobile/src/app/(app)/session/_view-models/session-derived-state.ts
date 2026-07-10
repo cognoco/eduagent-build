@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../../../components/session';
+import { getVoiceLocaleForLanguage } from '../../../../lib/language-locales';
 
 export function countLearnerMessages(messages: readonly ChatMessage[]): number {
   return messages.filter(
@@ -71,4 +72,16 @@ export function deriveSessionSubjectState(args: {
       args.activeSessionTopicId ??
       undefined,
   };
+}
+
+export function resolveLanguageVoiceLocale(args: {
+  activeSubject:
+    | { pedagogyMode?: string; languageCode?: string | null }
+    | undefined;
+  conversationLanguage: string | null | undefined;
+}): string {
+  if (args.activeSubject?.pedagogyMode === 'four_strands') {
+    return getVoiceLocaleForLanguage(args.activeSubject.languageCode);
+  }
+  return getVoiceLocaleForLanguage(args.conversationLanguage);
 }
