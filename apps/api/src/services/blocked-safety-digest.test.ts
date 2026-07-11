@@ -128,17 +128,30 @@ function bucket(
 function makeDeliveryDb(
   markedRows: Array<{ bucketDate: string }> = [{ bucketDate: '2026-07-10' }],
   reread: { deliveredAt: Date | null } | null = null,
+  lockedRows: Array<ReturnType<typeof bucket>> = [bucket()],
 ) {
   const returning = jest.fn().mockResolvedValue(markedRows);
   const where = jest.fn().mockReturnValue({ returning });
   const set = jest.fn().mockReturnValue({ where });
   const update = jest.fn().mockReturnValue({ set });
   const findFirst = jest.fn().mockResolvedValue(reread);
+  const forUpdate = jest.fn().mockResolvedValue(lockedRows);
+  const selectWhere = jest.fn().mockReturnValue({ for: forUpdate });
+  const from = jest.fn().mockReturnValue({ where: selectWhere });
+  const select = jest.fn().mockReturnValue({ from });
+  const dbShape = {
+    select,
+    update,
+    query: { blockedSafetyDailyBuckets: { findFirst } },
+  };
+  const transaction = jest.fn(
+    async (callback: (tx: typeof dbShape) => Promise<unknown>) =>
+      callback(dbShape),
+  );
   return {
-    db: {
-      update,
-      query: { blockedSafetyDailyBuckets: { findFirst } },
-    } as unknown as Database,
+    db: { ...dbShape, transaction } as unknown as Database,
+    transaction,
+    forUpdate,
     update,
     set,
   };
@@ -152,17 +165,18 @@ describe('[WI-1691] deliverBlockedSafetyDigestBucket', () => {
   };
 
   it('sends no email for an empty bucket', async () => {
-    const harness = makeDeliveryDb();
+    const emptyBucket = bucket({
+      dangerousProcedureBlockedCount: 0,
+      minorPiiEchoRedactedCount: 0,
+      suitabilityBlockedCount: 0,
+    });
+    const harness = makeDeliveryDb(undefined, undefined, [emptyBucket]);
     const send = jest.fn();
 
     await expect(
       deliverBlockedSafetyDigestBucket(
         harness.db,
-        bucket({
-          dangerousProcedureBlockedCount: 0,
-          minorPiiEchoRedactedCount: 0,
-          suitabilityBlockedCount: 0,
-        }),
+        emptyBucket,
         emailConfig,
         send,
       ),
@@ -234,14 +248,23 @@ describe('[WI-1691] deliverBlockedSafetyDigestBucket', () => {
     await expect(
       deliverBlockedSafetyDigestBucket(harness.db, bucket(), emailConfig, send),
     ).rejects.toThrow('blocked-safety digest bucket was not marked delivered');
+
+    expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it('treats a concurrent prior mark as idempotent delivery success', async () => {
-    const harness = makeDeliveryDb([], { deliveredAt: NOW });
+  it('locks and skips a bucket that a concurrent delivery already marked', async () => {
+    const harness = makeDeliveryDb([], { deliveredAt: NOW }, [
+      bucket({ deliveredAt: NOW }),
+    ]);
     const send = jest.fn().mockResolvedValue({ sent: true });
 
     await expect(
       deliverBlockedSafetyDigestBucket(harness.db, bucket(), emailConfig, send),
     ).resolves.toEqual({ delivered: true });
+
+    expect(harness.transaction).toHaveBeenCalledTimes(1);
+    expect(harness.forUpdate).toHaveBeenCalledWith('update');
+    expect(send).not.toHaveBeenCalled();
+    expect(harness.update).not.toHaveBeenCalled();
   });
 });
