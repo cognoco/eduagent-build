@@ -8,7 +8,7 @@ import {
   curriculumTopics,
   learningProfiles,
   learningSessions,
-  profiles,
+  person,
   retentionCards,
   sessionEvents,
   subjects,
@@ -22,7 +22,9 @@ import {
   _clearProviders,
   _setOpenAIAdvancedModelForTesting,
   createAnthropicProvider,
+  createCerebrasProvider,
   createGeminiProvider,
+  createMistralProvider,
   createOpenAIProvider,
   OPENAI_ADVANCED_MODEL,
   OPENAI_ADVANCED_MODEL_CANDIDATES,
@@ -264,10 +266,20 @@ function registerLiveProviders(): RegisteredKeys {
   const geminiKey = process.env['GEMINI_API_KEY'];
   const openaiKey = process.env['OPENAI_API_KEY'];
   const anthropicKey = process.env['ANTHROPIC_API_KEY'];
+  const cerebrasKey = process.env['CEREBRAS_API_KEY'];
+  const mistralKey = process.env['MISTRAL_API_KEY'];
 
   if (geminiKey) registerProvider(createGeminiProvider(geminiKey));
   if (openaiKey) registerProvider(createOpenAIProvider(openaiKey));
   if (anthropicKey) registerProvider(createAnthropicProvider(anthropicKey));
+
+  // Interactive-routing v2 providers (MMT-ADR-0016), mirroring
+  // apps/api/src/middleware/llm.ts: registered whenever the key is present so
+  // they are available behind LLM_ROUTING_V2_ENABLED; the router does not
+  // select them while the flag is off, so registering them is inert until
+  // cutover.
+  if (cerebrasKey) registerProvider(createCerebrasProvider(cerebrasKey));
+  if (mistralKey) registerProvider(createMistralProvider(mistralKey));
 
   return {
     gemini: Boolean(geminiKey),
@@ -411,13 +423,13 @@ async function updateSeedProfile(
   subjectId: string,
 ): Promise<void> {
   await db
-    .update(profiles)
+    .update(person)
     .set({
       displayName: 'Maya',
-      birthYear: new Date().getFullYear() - 15,
+      birthDate: `${new Date().getFullYear() - 15}-01-01`,
       updatedAt: new Date(),
     })
-    .where(eq(profiles.id, profileId));
+    .where(eq(person.id, profileId));
 
   await db
     .insert(learningProfiles)

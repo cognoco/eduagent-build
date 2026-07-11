@@ -7,7 +7,7 @@ import {
   createDatabase,
   curriculumTopics,
   learningProfiles,
-  profiles,
+  person,
   retentionCards,
   sessionEvents,
   subjects,
@@ -26,7 +26,9 @@ import type {
 import {
   _clearProviders,
   createAnthropicProvider,
+  createCerebrasProvider,
   createGeminiProvider,
+  createMistralProvider,
   createOpenAIProvider,
   registerProvider,
   setLlmRoutingV2Enabled,
@@ -149,8 +151,8 @@ interface ModeResult {
   }>;
 }
 
-function birthYearForAge(age: number): number {
-  return new Date().getFullYear() - age;
+function birthDateForAge(age: number): string {
+  return `${new Date().getFullYear() - age}-01-01`;
 }
 
 const learnerProfiles = {
@@ -428,10 +430,20 @@ function registerLiveProviders(): void {
   const geminiKey = process.env['GEMINI_API_KEY'];
   const openaiKey = process.env['OPENAI_API_KEY'];
   const anthropicKey = process.env['ANTHROPIC_API_KEY'];
+  const cerebrasKey = process.env['CEREBRAS_API_KEY'];
+  const mistralKey = process.env['MISTRAL_API_KEY'];
 
   if (geminiKey) registerProvider(createGeminiProvider(geminiKey));
   if (openaiKey) registerProvider(createOpenAIProvider(openaiKey));
   if (anthropicKey) registerProvider(createAnthropicProvider(anthropicKey));
+
+  // Interactive-routing v2 providers (MMT-ADR-0016), mirroring
+  // apps/api/src/middleware/llm.ts: registered whenever the key is present so
+  // they are available behind LLM_ROUTING_V2_ENABLED; the router does not
+  // select them while the flag is off, so registering them is inert until
+  // cutover.
+  if (cerebrasKey) registerProvider(createCerebrasProvider(cerebrasKey));
+  if (mistralKey) registerProvider(createMistralProvider(mistralKey));
 
   if (!geminiKey && !openaiKey && !anthropicKey) {
     throw new Error('At least one LLM provider key is required');
@@ -531,13 +543,13 @@ async function updateSeedProfile(
   learnerProfile: LearnerProfileVariant,
 ): Promise<void> {
   await db
-    .update(profiles)
+    .update(person)
     .set({
       displayName: learnerName,
-      birthYear: birthYearForAge(learnerProfile.age),
+      birthDate: birthDateForAge(learnerProfile.age),
       updatedAt: new Date(),
     })
-    .where(eq(profiles.id, profileId));
+    .where(eq(person.id, profileId));
 
   await db
     .insert(learningProfiles)
