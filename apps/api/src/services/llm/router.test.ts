@@ -29,7 +29,8 @@ import type {
 import { SafetyFilterError } from '../../errors';
 
 const mockCaptureException = jest.fn();
-jest.mock('../sentry' /* gc1-allow: external Sentry boundary */, () => ({
+jest.mock('../sentry', () => ({
+  ...jest.requireActual('../sentry'),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
