@@ -49,20 +49,16 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../../lib/theme' /* gc1-allow: native-boundary — theme hook requires native ColorScheme */,
-  () => ({
-    useThemeColors: () => ({ textSecondary: '#777', primary: '#6366f1' }),
-  }),
-);
+// prettier-ignore
+jest.mock(/* gc1-allow: native-boundary — theme hook requires native ColorScheme */ '../../../lib/theme', () => ({
+  useThemeColors: () => ({ textSecondary: '#777', primary: '#6366f1' }),
+}));
 
 const mockPlatformAlert = jest.fn();
-jest.mock(
-  '../../../lib/platform-alert' /* gc1-allow: native-boundary — wraps native Alert */,
-  () => ({
-    platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
-  }),
-);
+// prettier-ignore
+jest.mock(/* gc1-allow: native-boundary — wraps native Alert */ '../../../lib/platform-alert', () => ({
+  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+}));
 
 const MentorLanguageScreen = require('./mentor-language').default;
 
