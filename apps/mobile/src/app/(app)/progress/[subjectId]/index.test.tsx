@@ -110,6 +110,21 @@ jest.mock(
           'progress.subject.continuePracticeStrandFluency':
             'Next up: a timed fluency drill',
           'progress.subject.continuePracticeCta': 'Continue',
+          'progress.subject.strandBalanceTitle': 'Recent practice balance',
+          'progress.subject.strandSessionsSampled': `${opts?.count ?? ''} sessions sampled`,
+          'progress.subject.strandMeaningInput': 'Meaning input',
+          'progress.subject.strandMeaningOutput': 'Meaning output',
+          'progress.subject.strandLanguageFocus': 'Language focus',
+          'progress.subject.strandFluency': 'Fluency',
+          'progress.subject.skillProfileTitle': 'Skill profile',
+          'progress.subject.skillVocabulary': 'Vocabulary',
+          'progress.subject.skillGrammar': 'Grammar',
+          'progress.subject.skillReading': 'Reading',
+          'progress.subject.skillListening': 'Listening comprehension practice',
+          'progress.subject.skillSpeaking': 'Speaking',
+          'progress.subject.skillFluency': 'Fluency',
+          'progress.subject.skillEvidenceCount': `${opts?.count ?? ''} activities`,
+          'progress.subject.viewCefrVocabulary': 'Browse CEFR vocabulary',
           'progress.subject.retentionTitle': 'Current retention',
           'progress.subject.retentionLoadError':
             "We couldn't load retention data right now.",
@@ -362,6 +377,8 @@ function makeLanguageProgress(
     // fixtures that don't care about it still parse; tests targeting the
     // continue-practice entry point override it explicitly.
     nextPractice: null,
+    strandBalance: null,
+    skillProfile: null,
     ...progress,
     currentMilestone,
     nextMilestone,
@@ -1020,6 +1037,95 @@ describe('ProgressSubjectScreen', () => {
             `/subjects/${SUBJECT_ID}/cefr-progress`,
           ).length,
         ).toBeGreaterThan(before);
+      });
+    });
+
+    describe('Four Strands balance and skill profile', () => {
+      const evidenceData = {
+        ...milestoneData,
+        strandBalance: {
+          counts: {
+            meaning_input: 6,
+            meaning_output: 3,
+            language_focus: 4,
+            fluency: 2,
+          },
+          sessionsSampled: 3,
+        },
+        skillProfile: [
+          { skill: 'vocabulary', progress: 0.5, evidenceCount: 25 },
+          { skill: 'grammar', progress: null, evidenceCount: 4 },
+          { skill: 'listening', progress: 0.75, evidenceCount: 8 },
+          { skill: 'speaking', progress: null, evidenceCount: 6 },
+          { skill: 'fluency', progress: 0.625, evidenceCount: 8 },
+        ],
+      };
+
+      it('renders all recent strand counts and evidence-backed skill rows', async () => {
+        mount({
+          subjects: [languageSubject],
+          languageProgress: evidenceData,
+        });
+
+        await screen.findByTestId('language-strand-balance');
+        screen.getByText('Recent practice balance');
+        screen.getByText('Meaning input');
+        screen.getByText('Meaning output');
+        screen.getByText('Language focus');
+        screen.getByTestId('language-skill-profile');
+        screen.getByText('Vocabulary');
+        screen.getByText('Grammar');
+        screen.getByText('Listening comprehension practice');
+        screen.getByText('Speaking');
+        expect(screen.queryByText('Reading')).toBeNull();
+      });
+
+      it('renders the long listening label in the flexible skill row', async () => {
+        mount({
+          subjects: [languageSubject],
+          languageProgress: evidenceData,
+        });
+
+        await screen.findByText('Listening comprehension practice');
+        screen.getByTestId('language-skill-listening');
+      });
+
+      it('hides both sections when recent evidence is sparse', async () => {
+        mount({
+          subjects: [languageSubject],
+          languageProgress: {
+            ...milestoneData,
+            strandBalance: null,
+            skillProfile: null,
+          },
+        });
+
+        await screen.findByTestId('cefr-milestone-card');
+        expect(screen.queryByTestId('language-strand-balance')).toBeNull();
+        expect(screen.queryByTestId('language-skill-profile')).toBeNull();
+      });
+
+      it('leaves non-language subjects without language evidence sections', async () => {
+        mount({ subjects: [fullSubject], languageProgressError: true });
+
+        await screen.findByTestId('progress-subject-resume');
+        expect(screen.queryByTestId('language-strand-balance')).toBeNull();
+        expect(screen.queryByTestId('language-skill-profile')).toBeNull();
+      });
+
+      it('opens the CEFR vocabulary browser through the full ancestor route', async () => {
+        mount({
+          subjects: [languageSubject],
+          languageProgress: evidenceData,
+        });
+
+        const link = await screen.findByTestId('cefr-vocabulary-browser-link');
+        fireEvent.press(link);
+
+        expect(mockPush).toHaveBeenCalledWith({
+          pathname: '/(app)/vocabulary/[subjectId]',
+          params: { subjectId: SUBJECT_ID },
+        });
       });
     });
 
