@@ -96,13 +96,21 @@ Tag tokens below are wrapped in backticks so the validator's parser can extract 
 
 | Tag | Meaning | Run cadence |
 |---|---|---|
-| `pr-blocking` | Must pass for PR merge. Stable, deterministic, <90s each, combined set <8 min. | Every PR |
-| `smoke` | Broad coverage of critical paths. Superset of `pr-blocking`. | Nightly + on-demand |
+| `pr-blocking` | Small deterministic trusted-CI set. Every tagged flow must appear in `ci-maestro-manifest.json`. | Trusted post-push CI + on-demand `pr` suite |
+| `smoke` | Broad coverage of critical paths. | Nightly + on-demand |
 | `nightly` | Full regression suite. | Nightly CI |
 | `weekly` | Extended/slow flows (camera, OCR, complex multi-step). | Weekly CI |
 | `manual` | Requires human interaction or special device setup. | Manual only |
 
 `pr-blocking` qualification criteria (all must hold): currently passes on a clean Pixel API 34 emulator; covers a top-of-funnel or critical user path; deterministic (no flakiness from AI responses, timing, or network); runs in under 90 seconds individually.
+
+The secret-backed native job cannot safely execute untrusted pull-request head
+code. Pull-request-triggered `workflow_run` events are therefore skipped; the
+explicit four-shard `pr` manifest runs after trusted pushes and can be selected
+manually with `workflow_dispatch`. The eight-shard nightly suite discovers
+`smoke`, `nightly`, and `pr-blocking` tags recursively, then reseeds before each
+flow. The CI-plan regression guard fails when a `pr-blocking` tag falls outside
+the manifest or a scheduled flow has no valid seed mapping.
 
 ### Domain tags
 

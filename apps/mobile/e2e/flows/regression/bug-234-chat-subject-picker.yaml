@@ -16,7 +16,7 @@
 #   - apps/mobile/src/components/session/ChatShell.tsx
 appId: com.mentomate.app
 tags:
-  - pr-blocking
+  - nightly
   - regression
   - chat
   - ux-dead-end

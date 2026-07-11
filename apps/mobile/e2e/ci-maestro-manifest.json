@@ -1,0 +1,78 @@
+{
+  "pr": [
+    {
+      "flow": "flows/account/more-tab-navigation.yaml",
+      "scenario": "onboarding-complete"
+    },
+    { "flow": "flows/app-launch.yaml", "scenario": null },
+    {
+      "flow": "flows/auth/deep-link-redirect-signed-in.yaml",
+      "scenario": "onboarding-complete"
+    },
+    {
+      "flow": "flows/auth/deep-link-redirect-signed-out.yaml",
+      "scenario": "onboarding-complete"
+    },
+    { "flow": "flows/auth/sign-in-navigation.yaml", "scenario": null },
+    {
+      "flow": "flows/auth/sign-in-validation-devclient.yaml",
+      "scenario": null
+    },
+    { "flow": "flows/auth/sso-buttons.yaml", "scenario": null },
+    { "flow": "flows/auth/sso-user-cancel.yaml", "scenario": null },
+    {
+      "flow": "flows/consent/consent-withdrawn-gate.yaml",
+      "scenario": "consent-withdrawn-solo"
+    },
+    {
+      "flow": "flows/regression/bug-238-tab-bar-no-leak.yaml",
+      "scenario": "learning-active"
+    },
+    { "flow": "flows/retention/library.yaml", "scenario": "retention-due" },
+    {
+      "flow": "flows/subjects/multi-subject.yaml",
+      "scenario": "multi-subject"
+    },
+    {
+      "flow": "flows/subjects/practice-subject-picker.yaml",
+      "scenario": "multi-subject"
+    }
+  ],
+  "scenarioOverrides": {
+    "flows/account/learner-mentor-memory-populated.yaml": "mentor-memory-populated",
+    "flows/account/learner-mentor-memory.yaml": "language-subject-active",
+    "flows/app-launch-devclient.yaml": null,
+    "flows/app-launch.yaml": null,
+    "flows/auth/deep-link-redirect-signed-in.yaml": "onboarding-complete",
+    "flows/auth/deep-link-redirect-signed-out.yaml": "onboarding-complete",
+    "flows/auth/deep-link-redirect-ttl-expired.yaml": "onboarding-complete",
+    "flows/auth/forgot-password.yaml": "onboarding-complete",
+    "flows/auth/sign-in-navigation.yaml": null,
+    "flows/auth/sign-in-validation-devclient.yaml": null,
+    "flows/auth/sso-buttons-render.yaml": null,
+    "flows/auth/sso-buttons.yaml": null,
+    "flows/auth/sso-user-cancel.yaml": null,
+    "flows/auth/welcome-text-first-time.yaml": null,
+    "flows/consent/consent-above-threshold.yaml": "pre-profile",
+    "flows/consent/consent-coppa-under13.yaml": "pre-profile",
+    "flows/consent/consent-deny-confirmation.yaml": null,
+    "flows/consent/consent-gdpr-under16.yaml": "pre-profile",
+    "flows/consent/consent-pending-gate.yaml": "consent-pending",
+    "flows/consent/consent-withdrawn-gate.yaml": "consent-withdrawn-solo",
+    "flows/consent/hand-to-parent-consent.yaml": "pre-profile",
+    "flows/consent/post-approval-landing.yaml": "onboarding-complete",
+    "flows/edge/animated-splash.yaml": null,
+    "flows/onboarding/create-subject.yaml": "onboarding-complete",
+    "flows/onboarding/preview-self.yaml": null,
+    "flows/onboarding/view-curriculum.yaml": "onboarding-complete",
+    "flows/onboarding/welcome-intro-parent.yaml": null,
+    "flows/onboarding/welcome-intro.yaml": "onboarding-complete",
+    "flows/parent/child-mentor-memory-populated.yaml": "mentor-memory-populated",
+    "flows/parent/child-mentor-memory.yaml": "parent-multi-child",
+    "flows/parent/child-report-detail.yaml": "parent-with-reports",
+    "flows/parent/child-reports-empty.yaml": "parent-multi-child",
+    "flows/progress/progress-analytics.yaml": "learning-active",
+    "flows/progress/vocabulary-browser.yaml": "language-subject-active",
+    "flows/quiz/quiz-error-consent.yaml": "consent-pending"
+  }
+}

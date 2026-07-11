@@ -27,7 +27,7 @@
 #   5. Click "Deny" again → click "OK" → verify denial landing page
 appId: com.mentomate.app
 tags:
-  - nightly
+  - blocked
   - consent
   - epic-10
   - placeholder

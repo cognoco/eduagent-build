@@ -29,6 +29,7 @@ appId: com.mentomate.app
 tags:
   - smoke
   - edge
+  - blocked
 ---
 # ═══════════════════════════════════════════════
 #  STEP 0: Restart the app via Maestro launchApp

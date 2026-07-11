@@ -90,7 +90,7 @@ The full 187-flow library is organized in batches. To run the full regression su
 C:/Tools/doppler/doppler.exe run -c stg -- bash apps/mobile/e2e/scripts/run-all-regression.sh
 ```
 
-CI runs flows tagged `smoke,pr-blocking` on every PR-triggered run, and `smoke,nightly,pr-blocking` on the nightly schedule (see `.github/workflows/e2e-ci.yml`, `Run Maestro E2E tests` step).
+CI runs the explicit `pr-blocking` manifest after trusted pushes (or an on-demand `pr` dispatch) and recursively discovers `smoke,nightly,pr-blocking` flows for the eight-shard nightly/on-demand suite. Pull-request `workflow_run` events do not execute the secret-backed native job because that would run untrusted PR-head code with repository secrets. The manifest and seed-map drift guard lives in `scripts/e2e-ci-injection-and-smoke-gate.test.ts`.
 
 ---
 

@@ -14,7 +14,7 @@
 #      subject-resolution-create-new)
 appId: com.mentomate.app
 tags:
-  - pr-blocking
+  - nightly
   - regression
   - chat
   - classifier
