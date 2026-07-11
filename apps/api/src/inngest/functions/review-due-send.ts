@@ -60,6 +60,14 @@ export const reviewDueSend = inngest.createFunction(
       // serialize on the lock and the second caller observes the first's
       // row. Mirrors the BUG-838 fix in daily-reminder-send.ts.
       //
+      // [WI-1461] dedupTypes shares this bucket with recall-nudge-send's
+      // 'recall_nudge' type: review-due-scan.ts and recall-nudge.ts scan the
+      // same overdue-retention-card population, so without a shared bucket a
+      // profile eligible for both crons could get both pushes the same day
+      // for the same overdue cards. Whichever send handler's transaction
+      // commits first consumes the day's review-family slot; this is
+      // deliberately first-wins, not review_reminder-preferred.
+      //
       // [BUG-976 / CCR-PR129-M-3] Fail closed on DB error: skip this cycle
       // rather than throwing uncaught (which would cause Inngest to retry
       // indefinitely and block the notification pipeline). captureException
@@ -71,7 +79,11 @@ export const reviewDueSend = inngest.createFunction(
           db,
           profileId,
           'review_reminder',
-          { hours: 24, maxCount: 1 },
+          {
+            hours: 24,
+            maxCount: 1,
+            dedupTypes: ['recall_nudge', 'review_reminder'],
+          },
         );
       } catch (err) {
         captureException(err, {

@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, ne, sql, exists } from 'drizzle-orm';
+import { eq, and, gte, inArray, ne, sql, exists } from 'drizzle-orm';
 import { NotFoundError } from '../errors';
 import {
   notificationPreferences,
@@ -617,21 +617,35 @@ export async function getRecentNotificationCount(
  * Server-internal variant — no profile-ownership check. Use only from trusted
  * server contexts (Inngest functions, internal notification pipelines).
  * For user-driven flows use `checkAndLogRateLimit`.
+ *
+ * [WI-1461] `opts.dedupTypes` shares the rate-limit bucket (lock key + count
+ * window) across multiple notification types — used by recall-nudge-send and
+ * review-due-send so the two independent overdue-retention-card crons cannot
+ * both push the same profile the same day. The row is still logged with the
+ * caller's own `type`; only the *count check* and the *advisory lock* span
+ * the dedup set. Omitting `dedupTypes` preserves the exact prior per-type
+ * behavior (the default `[type]` singleton reproduces the same lock key).
  */
 export async function checkAndLogRateLimitInternal(
   db: Database,
   profileId: string,
   type: NotificationPayload['type'],
-  opts: { hours: number; maxCount: number },
+  opts: {
+    hours: number;
+    maxCount: number;
+    dedupTypes?: NotificationPayload['type'][];
+  },
 ): Promise<boolean> {
+  const dedupTypes = opts.dedupTypes ?? [type];
+  const lockKey =
+    'rate-limit:' + profileId + ':' + dedupTypes.slice().sort().join('+');
+
   return db.transaction(async (tx) => {
-    // Advisory lock per (profileId, notificationKey) — serializes concurrent
+    // Advisory lock per (profileId, dedup bucket) — serializes concurrent
     // rate-limit checks for the same bucket without blocking unrelated ones.
     // Lock is released automatically on commit/rollback. [BUG-856]
     await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${
-        'rate-limit:' + profileId + ':' + type
-      }, 0))`,
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
     );
 
     const since = new Date(Date.now() - opts.hours * 60 * 60 * 1000);
@@ -641,7 +655,7 @@ export async function checkAndLogRateLimitInternal(
       .where(
         and(
           eq(notificationLog.profileId, profileId),
-          eq(notificationLog.type, type),
+          inArray(notificationLog.type, dedupTypes),
           gte(notificationLog.sentAt, since),
         ),
       );

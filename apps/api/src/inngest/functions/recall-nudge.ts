@@ -48,7 +48,11 @@ export const recallNudge = inngest.createFunction(
       // 1. Account timezone maps to local hour 7-9 (±1h window around 8 AM)
       // 2. Has retention cards with nextReviewAt in the past
       // 3. Push notifications are enabled
-      // 4. Consent is granted or not required (adult with no consent record)
+      // 4. Review reminders are enabled [WI-1461] — recall-nudge is a
+      //    review-oriented push, so it must respect the same preference
+      //    review-due-scan.ts already gates on; ignoring it let a learner's
+      //    explicit reviewReminders=false be silently overridden.
+      // 5. Consent is granted or not required (adult with no consent record)
 
       // [CUT-B2] v2 scan: profiles×accounts → person×membership×organization;
       // learning joins unchanged; consent gate from the shared windowed
@@ -94,6 +98,7 @@ export const recallNudge = inngest.createFunction(
           and(
             eq(notificationPreferences.profileId, person.id),
             eq(notificationPreferences.pushEnabled, true),
+            eq(notificationPreferences.reviewReminders, true),
           ),
         )
         .where(
