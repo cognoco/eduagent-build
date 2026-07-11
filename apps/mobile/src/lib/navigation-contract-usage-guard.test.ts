@@ -297,6 +297,13 @@ const NON_NAV_DOMAIN_FILES: readonly LegitimateRawNavigationGateFile[] = [
     expectedFindings: { 'profile-owner-read': 1 },
   },
   {
+    file: 'apps/mobile/src/app/(app)/more/mentor-language.tsx',
+    category: 'non-nav-domain-read',
+    reason:
+      'child-target read: childProfile?.isOwner classifies the edit target, not navigation ownership. Active-user gating flows through contract.gates.showMentorLanguageChildEditor.',
+    expectedFindings: { 'profile-owner-read': 1 },
+  },
+  {
     file: 'apps/mobile/src/app/(app)/more/index.tsx',
     category: 'non-nav-domain-read',
     reason:

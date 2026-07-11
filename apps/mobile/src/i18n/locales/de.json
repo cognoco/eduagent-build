@@ -524,7 +524,8 @@
       "mentorLanguage": "Mentor-Sprache",
       "subscription": "Abonnement",
       "signOut": "Abmelden",
-      "couldNotSignOut": "Abmeldung fehlgeschlagen"
+      "couldNotSignOut": "Abmeldung fehlgeschlagen",
+      "mentorLanguageDisabledHint": "Nur der Kontoinhaber kann die Sprache des Mentors ändern."
     },
     "other": {
       "helpAndSupport": "Hilfe & Support",
@@ -571,6 +572,12 @@
       "securitySessions": "Geräte",
       "privacy": "Datenschutz & Daten",
       "help": "Hilfe & Feedback"
+    },
+    "mentorLanguage": {
+      "screenTitle": "Mentor-Sprache",
+      "childScreenTitle": "{{name}}s Mentor-Sprache",
+      "screenDescription": "Wähle die Sprache, die dein Mentor verwendet, wenn er mit dir spricht. Diese ist unabhängig von der Menüsprache der App.",
+      "conversationOnlyHint": "Der Mentor spricht {{language}}; die App-Menüs bleiben auf Englisch."
     }
   },
   "session": {

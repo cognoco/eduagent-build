@@ -18,6 +18,7 @@ import {
   SUPPORTED_LANGUAGES,
   type SupportedLanguage,
 } from '../../../i18n';
+import { CONVERSATION_LANGUAGE_LABELS } from '../../../lib/conversation-languages';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useProfile } from '../../../lib/profile';
@@ -89,6 +90,29 @@ export default function AccountScreen(): React.ReactElement {
             testID="settings-app-language"
           />
         ) : null}
+        {/* WI-1496: the tutor's conversation language (profiles.conversationLanguage),
+            distinct from the App Language row above (i18next UI shell). Non-owner
+            child profiles get a disabled explanatory row instead — the self
+            /onboarding/language route 403s them (AGENTS.md "Languages"). */}
+        <SettingsRow
+          label={t('more.account.mentorLanguage')}
+          value={
+            CONVERSATION_LANGUAGE_LABELS[
+              activeProfile?.conversationLanguage ?? 'en'
+            ].native
+          }
+          description={
+            navigationContract.gates.sessionIsOwner
+              ? undefined
+              : t('more.account.mentorLanguageDisabledHint')
+          }
+          onPress={
+            navigationContract.gates.sessionIsOwner
+              ? () => router.push('/(app)/more/mentor-language' as Href)
+              : undefined
+          }
+          testID="settings-mentor-language"
+        />
         {/* [FCR-2026-05-23-L2.M2.6] Client-side gating via navigationContract.gates.showBilling
             (and showAccountSecurity above) is intentional defence-in-depth UI hardening.
             The server enforces the same isOwner constraint on every billing/subscription

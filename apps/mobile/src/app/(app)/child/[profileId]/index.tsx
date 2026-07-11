@@ -24,6 +24,7 @@ import {
 // [F-153] useRestoreConsent moved to use-restore-consent (variables-as-arg pattern)
 import { useRestoreConsent } from '../../../../hooks/use-restore-consent';
 import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
+import { CONVERSATION_LANGUAGE_LABELS } from '../../../../lib/conversation-languages';
 import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
 import { formatApiError } from '../../../../lib/format-api-error';
 import { formatShortDate } from '../../../../lib/format-datetime';
@@ -1092,6 +1093,26 @@ export default function ChildDetailScreen(): React.ReactElement {
                   )
                 }
                 testID={`child-accommodation-row-${profileId}`}
+              />
+            ) : null}
+
+            {profileId && child?.displayName ? (
+              <RowLink
+                icon="chatbubble-ellipses-outline"
+                title={t('more.mentorLanguage.childScreenTitle', {
+                  name: child.displayName,
+                })}
+                subtitle={
+                  CONVERSATION_LANGUAGE_LABELS[
+                    ownedProfile?.conversationLanguage ?? 'en'
+                  ].native
+                }
+                onPress={() =>
+                  router.push(
+                    `/(app)/more/mentor-language?childProfileId=${profileId}` as Href,
+                  )
+                }
+                testID={`child-mentor-language-row-${profileId}`}
               />
             ) : null}
 

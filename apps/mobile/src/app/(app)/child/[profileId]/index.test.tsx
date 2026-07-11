@@ -568,6 +568,54 @@ describe('ChildDetailScreen — accommodation nav row', () => {
   });
 });
 
+// WI-1496 — guardian-facing mentor-language row, routed through
+// /(app)/more/mentor-language (the guardian query-param path), never the
+// self /onboarding/language route.
+describe('ChildDetailScreen — mentor-language nav row', () => {
+  beforeEach(() => {
+    mockLocalSearchParams = { profileId: CHILD_PROFILE_ID, mode: 'settings' };
+    setRoutes();
+  });
+
+  it('renders the mentor-language nav row with the resolved tutor language', async () => {
+    // Override to a non-English value so this proves the ownedProfile read
+    // path, rather than passing vacuously via the 'en' fallback default.
+    const { result, cleanup } = renderScreen(<ChildDetailScreen />, {
+      profile: guardianProfile,
+      profiles: [
+        guardianProfile,
+        { ...linkedChildProfile, conversationLanguage: 'de' },
+      ],
+      installGlobalFetch: false,
+      routedFetch: mockFetch,
+    });
+
+    const row = await waitFor(() =>
+      result.getByTestId(`child-mentor-language-row-${CHILD_PROFILE_ID}`),
+    );
+    expect(row).toHaveTextContent(/Deutsch/);
+    expect(row).not.toHaveTextContent(/English/);
+
+    cleanup();
+  });
+
+  it('navigates to the guardian mentor-language screen when pressed', async () => {
+    const { result, cleanup } = renderChildDetail();
+
+    fireEvent.press(
+      await waitFor(() =>
+        result.getByTestId(`child-mentor-language-row-${CHILD_PROFILE_ID}`),
+      ),
+    );
+
+    expect(mockPush).toHaveBeenCalledWith(
+      `/(app)/more/mentor-language?childProfileId=${CHILD_PROFILE_ID}`,
+    );
+
+    cleanup();
+  });
+});
+
 describe('ChildDetailScreen — profile overview', () => {
   beforeEach(() => {
     setRoutes();

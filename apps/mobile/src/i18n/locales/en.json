@@ -524,6 +524,12 @@
       "offTitle": "Off",
       "offDescription": "Track milestones quietly without animations"
     },
+    "mentorLanguage": {
+      "screenTitle": "Mentor language",
+      "childScreenTitle": "{{name}}'s mentor language",
+      "screenDescription": "Choose the language your mentor uses when it talks with you. This is separate from the app's menu language.",
+      "conversationOnlyHint": "Tutor will speak {{language}}; app menus stay in English."
+    },
     "notifications": {
       "sectionHeader": "Notifications",
       "pushTitle": "Push notifications",
@@ -555,6 +561,7 @@
       "sectionHeader": "Account",
       "profile": "Profile",
       "mentorLanguage": "Mentor language",
+      "mentorLanguageDisabledHint": "Only the account owner can change the mentor's language.",
       "subscription": "Subscription",
       "signOut": "Sign out",
       "couldNotSignOut": "Could not sign out"

@@ -520,7 +520,8 @@
       "mentorLanguage": "Mentorspråk",
       "subscription": "Abonnement",
       "signOut": "Logg ut",
-      "couldNotSignOut": "Kunne ikke logge ut"
+      "couldNotSignOut": "Kunne ikke logge ut",
+      "mentorLanguageDisabledHint": "Bare kontoeieren kan endre mentorens språk."
     },
     "other": {
       "helpAndSupport": "Hjelp og støtte",
@@ -571,6 +572,12 @@
     "proxyPreview": {
       "title": "Innstillinger er satt på pause i foreldrevisning",
       "description": "Bytt tilbake til kontoen din for å endre innstillinger. Når du ser som et barn, er dette området låst."
+    },
+    "mentorLanguage": {
+      "screenTitle": "Mentorspråk",
+      "childScreenTitle": "{{name}}s mentorspråk",
+      "screenDescription": "Velg språket mentoren din bruker når den snakker med deg. Dette er atskilt fra appens menyspråk.",
+      "conversationOnlyHint": "Mentor vil snakke {{language}}; appmenyene forblir på engelsk."
     }
   },
   "session": {
