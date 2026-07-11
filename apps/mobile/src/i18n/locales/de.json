@@ -1040,6 +1040,11 @@
     "voiceToggle": {
       "a11yMute": "KI-Stimme stummschalten",
       "a11yUnmute": "KI-Stimme einschalten"
+    },
+    "meaningOutput": {
+      "title": "Sprich es aus",
+      "targetWords": "Versuche zu verwenden: {{words}}",
+      "dismissLabel": "Sprechübung überspringen"
     }
   },
   "quiz": {

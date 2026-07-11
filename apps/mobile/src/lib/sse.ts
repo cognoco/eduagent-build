@@ -81,6 +81,28 @@ export interface LanguageGradedInputEvent {
   audioEnabled: boolean;
 }
 
+export interface LanguageMeaningOutputEvent {
+  type: 'meaning_output';
+  taskType:
+    | 'role_play'
+    | 'personal_answer'
+    | 'retell'
+    | 'describe'
+    | 'ask_question';
+  communicativeGoal: string;
+  prompt: string;
+  responseMode:
+    | 'dialogue_turn'
+    | 'short_answer'
+    | 'short_retell'
+    | 'short_description'
+    | 'question';
+  targetWords: string[];
+  targetGrammar: string[];
+  retryExpectation: 'retry_after_feedback';
+  correctionExpectation: 'meaning_first_then_form';
+}
+
 export interface LanguageLearningActivityEvent {
   strand: 'meaning_input' | 'meaning_output' | 'language_focus' | 'fluency';
   activityType:
@@ -92,6 +114,7 @@ export interface LanguageLearningActivityEvent {
   targetWords: string[];
   targetGrammar: string[];
   gradedInput?: LanguageGradedInputEvent;
+  meaningOutput?: LanguageMeaningOutputEvent;
 }
 
 export interface ChallengeRoundOfferEvent {

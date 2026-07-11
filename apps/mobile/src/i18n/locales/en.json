@@ -788,6 +788,11 @@
       "stopAudioLabel": "Stop the passage",
       "dismissLabel": "Dismiss reading card"
     },
+    "meaningOutput": {
+      "title": "Try saying it",
+      "targetWords": "Try to use: {{words}}",
+      "dismissLabel": "Dismiss speaking task"
+    },
     "speakingPractice": {
       "title": "Say it back",
       "subtitle": "Repeat the line",

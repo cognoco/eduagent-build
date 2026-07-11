@@ -37,6 +37,7 @@ export interface LanguageSessionState {
   activeStrand: LanguageStrand;
   sessionStrandCounts: LanguageStrandCounts;
   previousComprehension?: LanguageComprehensionEvaluation;
+  previousMeaningOutputTask?: LanguageMeaningOutputArtifact;
   nextActivity: LanguageActivityTelemetry;
 }
 
@@ -223,6 +224,36 @@ function findLatestGradedInputEvent(
     return parsed.data as LanguageActivityTelemetry;
   }
   return null;
+}
+
+// WI-1756: the meaning-output correction/retry brief is only present on the
+// nextActivity of the turn it is *presented* on — by the following turn the
+// strand has rotated away and the brief is gone. This re-surfaces it for
+// exactly the one answer turn, so the tutor is anchored to the specific task
+// the learner is replying to. Recency-guarded by construction (only the
+// single most recent AI turn is consulted, never walked further back),
+// unlike findLatestGradedInputEvent above — deliberately not reused/extended
+// here (F3, out of scope for this WI).
+function findPendingMeaningOutputTask(
+  events: Array<{ eventType: string; metadata: unknown }>,
+): LanguageMeaningOutputArtifact | undefined {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const event = events[i];
+    if (event?.eventType !== 'ai_response') {
+      continue;
+    }
+    const metadata = event.metadata;
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      return undefined;
+    }
+    const parsed = streamLanguageLearningActivitySchema.safeParse(
+      (metadata as { languageLearning?: unknown }).languageLearning,
+    );
+    return parsed.success
+      ? (parsed.data as LanguageActivityTelemetry).meaningOutput
+      : undefined;
+  }
+  return undefined;
 }
 
 function starterWordsForLanguage(languageCode?: string): string[] {
@@ -644,6 +675,9 @@ export async function buildLanguageSessionState(input: {
         learnerMessage: input.learnerMessage,
       })
     : undefined;
+  const previousMeaningOutputTask = input.learnerMessage
+    ? findPendingMeaningOutputTask(input.events)
+    : undefined;
   const activeStrand =
     previousComprehension && previousComprehension.verdict !== 'understood'
       ? 'language_focus'
@@ -656,6 +690,7 @@ export async function buildLanguageSessionState(input: {
     activeStrand,
     sessionStrandCounts,
     previousComprehension,
+    previousMeaningOutputTask,
     nextActivity: await buildLanguageActivityTelemetry({
       strand: activeStrand,
       inputMode: input.inputMode,

@@ -1067,6 +1067,11 @@
     "voiceToggle": {
       "a11yMute": "Silenciar voz da IA",
       "a11yUnmute": "Ativar som da voz da IA"
+    },
+    "meaningOutput": {
+      "title": "Tente dizer",
+      "targetWords": "Tente usar: {{words}}",
+      "dismissLabel": "Dispensar tarefa de fala"
     }
   },
   "quiz": {

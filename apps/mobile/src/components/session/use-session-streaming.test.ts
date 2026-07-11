@@ -899,6 +899,57 @@ describe('useSessionStreaming', () => {
       expect(opts.setLanguageLearning).toHaveBeenCalledWith(languageLearning);
     });
 
+    it('surfaces meaning-output activity from a completed language turn [WI-1756]', async () => {
+      // Regression guard: languageLearning used to be dropped to `null`
+      // whenever `gradedInput` was absent, which silently discarded every
+      // meaning_output turn (WI-1756 AC1). This object has no `gradedInput`
+      // key at all.
+      const languageLearning = {
+        strand: 'meaning_output',
+        activityType: 'free_response',
+        modality: 'text',
+        targetWords: ['agua'],
+        targetGrammar: [],
+        meaningOutput: {
+          type: 'meaning_output',
+          taskType: 'personal_answer',
+          communicativeGoal:
+            'Share a true or imagined personal answer someone could respond to.',
+          prompt: 'Answer personally in one or two short sentences using agua.',
+          responseMode: 'short_answer',
+          targetWords: ['agua'],
+          targetGrammar: [],
+          retryExpectation: 'retry_after_feedback',
+          correctionExpectation: 'meaning_first_then_form',
+        },
+      };
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (
+            _text: string,
+            onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+          ) => {
+            onChunk('Tell me about your day.');
+            await onComplete({
+              aiEventId: 'ai-event-meaning-output',
+              exchangeCount: 1,
+              escalationRung: 0,
+              expectedResponseMinutes: 5,
+              languageLearning,
+            });
+          },
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('Hola');
+      });
+
+      expect(opts.setLanguageLearning).toHaveBeenCalledWith(languageLearning);
+    });
+
     it('shows error message when session creation fails', async () => {
       const opts = makeOpts({ effectiveSubjectId: '' });
       const { result } = renderHook(() => useSessionStreaming(opts as any));

@@ -561,4 +561,123 @@ describe('buildLanguageSessionState', () => {
       targetWords: ['agua'],
     });
   });
+
+  it('re-surfaces the just-presented meaning-output task for exactly one answer turn [WI-1756]', async () => {
+    const meaningOutputEvent = {
+      eventType: 'ai_response',
+      metadata: {
+        languageLearning: {
+          strand: 'meaning_output',
+          activityType: 'free_response',
+          modality: 'text',
+          targetWords: ['agua'],
+          targetGrammar: [],
+          meaningOutput: {
+            type: 'meaning_output',
+            taskType: 'personal_answer',
+            communicativeGoal:
+              'Share a true or imagined personal answer someone could respond to.',
+            prompt:
+              'Answer personally in one or two short sentences using agua.',
+            responseMode: 'short_answer',
+            targetWords: ['agua'],
+            targetGrammar: [],
+            retryExpectation: 'retry_after_feedback',
+            correctionExpectation: 'meaning_first_then_form',
+          },
+        },
+      },
+    };
+
+    const state = await buildLanguageSessionState({
+      exchangeCount: 2,
+      events: [meaningOutputEvent],
+      learnerMessage: 'Yo bebo agua.',
+      inputMode: 'text',
+      languageCode: 'es',
+      cefrLevel: 'A1',
+      knownWords: ['agua'],
+      targetWords: ['agua'],
+    });
+
+    expect(state.previousMeaningOutputTask).toMatchObject({
+      taskType: 'personal_answer',
+      prompt: 'Answer personally in one or two short sentences using agua.',
+    });
+  });
+
+  it('does not re-surface a meaning-output task once a newer turn has moved on [WI-1756]', async () => {
+    // Bounded recency by construction: findPendingMeaningOutputTask consults
+    // only the single most recent AI turn, never walking further back —
+    // unlike the pre-existing findLatestGradedInputEvent (F3, out of scope
+    // for this WI) — so an older meaning-output task never bleeds into a
+    // later, unrelated turn.
+    const staleMeaningOutputEvent = {
+      eventType: 'ai_response',
+      metadata: {
+        languageLearning: {
+          strand: 'meaning_output',
+          activityType: 'free_response',
+          modality: 'text',
+          targetWords: ['agua'],
+          targetGrammar: [],
+          meaningOutput: {
+            type: 'meaning_output',
+            taskType: 'personal_answer',
+            communicativeGoal:
+              'Share a true or imagined personal answer someone could respond to.',
+            prompt:
+              'Answer personally in one or two short sentences using agua.',
+            responseMode: 'short_answer',
+            targetWords: ['agua'],
+            targetGrammar: [],
+            retryExpectation: 'retry_after_feedback',
+            correctionExpectation: 'meaning_first_then_form',
+          },
+        },
+      },
+    };
+    const laterGradedInputEvent = {
+      eventType: 'ai_response',
+      metadata: {
+        languageLearning: {
+          strand: 'meaning_input',
+          activityType: 'graded_input',
+          modality: 'text',
+          targetWords: ['pan'],
+          targetGrammar: [],
+          gradedInput: {
+            type: 'graded_input',
+            modality: 'reading',
+            cefrLevel: 'A1',
+            knownWordRatioTarget: 0.96,
+            knownWordEstimate: 0.5,
+            targetWords: ['pan'],
+            text: 'Ana quiere pan.',
+            comprehensionQuestions: [
+              {
+                id: 'gist-1',
+                prompt: 'What does Ana want?',
+                answerHint: 'Ana wants bread',
+              },
+            ],
+            audioEnabled: false,
+          },
+        },
+      },
+    };
+
+    const state = await buildLanguageSessionState({
+      exchangeCount: 3,
+      events: [staleMeaningOutputEvent, laterGradedInputEvent],
+      learnerMessage: 'Ana quiere pan.',
+      inputMode: 'text',
+      languageCode: 'es',
+      cefrLevel: 'A1',
+      knownWords: ['agua'],
+      targetWords: ['agua'],
+    });
+
+    expect(state.previousMeaningOutputTask).toBeUndefined();
+  });
 });
