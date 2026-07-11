@@ -27,6 +27,7 @@ describe('SupportPersonPickerSheet', () => {
         ]}
         onSelectPerson={onSelectPerson}
         onAddChild={onAddChild}
+        onSelectExistingTeen={jest.fn()}
         onClose={onClose}
       />,
     );
@@ -55,6 +56,7 @@ describe('SupportPersonPickerSheet', () => {
         eligiblePersons={[]}
         onSelectPerson={onSelectPerson}
         onAddChild={onAddChild}
+        onSelectExistingTeen={jest.fn()}
         onClose={onClose}
       />,
     );
