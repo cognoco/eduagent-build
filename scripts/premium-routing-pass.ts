@@ -59,7 +59,9 @@ interface PremiumRoutingCase {
   requestedLlmTier: LLMTier;
   advancedProvider?: AdvancedProvider;
   targetRung: 4 | 5;
-  expectedProvider: PreferredLlmProvider;
+  // Widened beyond PreferredLlmProvider (openai|anthropic|gemini) to admit
+  // 'cerebras' — the V2 universal default (MMT-ADR-0016 §1.5).
+  expectedProvider: PreferredLlmProvider | 'cerebras';
   expectedModel: string;
   expectedTier: LLMTier;
   expectedReason: string;
@@ -108,6 +110,7 @@ interface RegisteredKeys {
   gemini: boolean;
   openai: boolean;
   anthropic: boolean;
+  cerebras: boolean;
 }
 
 const HARD_TOPIC = {
@@ -122,25 +125,25 @@ const HARD_PROMPT =
 const cases: PremiumRoutingCase[] = [
   {
     id: 'plus-hard-anthropic',
-    label: 'Plus hard turn -> Claude candidate',
+    label: 'Plus hard turn -> OpenAI advanced candidate',
     subscriptionTier: 'plus',
     requestedLlmTier: 'standard',
     advancedProvider: 'anthropic',
     targetRung: 4,
-    expectedProvider: 'anthropic',
-    expectedModel: 'claude-sonnet-4-6',
+    expectedProvider: 'openai',
+    expectedModel: 'gpt-5.4',
     expectedTier: 'premium',
     expectedReason: 'plus_included_advanced_rung',
   },
   {
     id: 'plus-rung4-openai-deferred',
-    label: 'Plus rung 4 with GPT preference -> Claude candidate',
+    label: 'Plus rung 4 with GPT preference -> OpenAI advanced candidate',
     subscriptionTier: 'plus',
     requestedLlmTier: 'standard',
     advancedProvider: 'openai',
     targetRung: 4,
-    expectedProvider: 'anthropic',
-    expectedModel: 'claude-sonnet-4-6',
+    expectedProvider: 'openai',
+    expectedModel: 'gpt-5.4',
     expectedTier: 'premium',
     expectedReason: 'plus_included_advanced_rung',
   },
@@ -158,25 +161,24 @@ const cases: PremiumRoutingCase[] = [
   },
   {
     id: 'family-standard-hard',
-    label: 'Family standard hard turn -> Gemini only',
+    label: 'Family standard hard turn -> Cerebras universal default',
     subscriptionTier: 'family',
     requestedLlmTier: 'standard',
     targetRung: 4,
-    expectedProvider: 'gemini',
-    expectedModel: 'gemini-2.5-pro',
+    expectedProvider: 'cerebras',
+    expectedModel: 'gpt-oss-120b',
     expectedTier: 'standard',
     expectedReason: 'family_standard_gemini_only',
-    expectedPolicy: 'gemini_only',
   },
   {
     id: 'family-upgrade-anthropic',
-    label: 'Family advanced add-on -> Claude candidate',
+    label: 'Family advanced add-on -> OpenAI advanced candidate',
     subscriptionTier: 'family',
     requestedLlmTier: 'premium',
     advancedProvider: 'anthropic',
     targetRung: 4,
-    expectedProvider: 'anthropic',
-    expectedModel: 'claude-sonnet-4-6',
+    expectedProvider: 'openai',
+    expectedModel: 'gpt-5.4',
     expectedTier: 'premium',
     expectedReason: 'premium_profile_or_addon_advanced_rung',
   },
@@ -285,6 +287,7 @@ function registerLiveProviders(): RegisteredKeys {
     gemini: Boolean(geminiKey),
     openai: Boolean(openaiKey),
     anthropic: Boolean(anthropicKey),
+    cerebras: Boolean(cerebrasKey),
   };
 }
 
@@ -331,6 +334,36 @@ function selectCases(): PremiumRoutingCase[] {
   return selected;
 }
 
+// V2 primary-model matrix (MMT-ADR-0016 §1.5), mirrored from
+// apps/api/src/services/llm/router.ts's getModelConfigV2Matrix (not exported,
+// so re-derived here rather than imported) so this fixture's expectations
+// track canon instead of re-freezing a snapshot of it. Pure function of
+// (rung, tier): rung >= 4 and tier === 'premium' routes to the OpenAI
+// advanced candidate (docs/registers/llm-models/master.md:45); every other
+// combination — including Family, which never resolves to `premium` upstream
+// — lands on the Cerebras universal default (master.md:40). providerPolicy
+// (e.g. gemini_only) is not consulted by the V2 matrix — Gemini has no V2
+// route (router.ts:671).
+const V2_ADVANCED_MODEL_MIN_RUNG = 4;
+const CEREBRAS_V2_DEFAULT_MODEL = 'gpt-oss-120b';
+
+function withV2RoutingMatrix(
+  selected: PremiumRoutingCase[],
+): PremiumRoutingCase[] {
+  return selected.map((item) => {
+    const isAdvanced =
+      item.targetRung >= V2_ADVANCED_MODEL_MIN_RUNG &&
+      item.expectedTier === 'premium';
+    return isAdvanced
+      ? { ...item, expectedProvider: 'openai' as const }
+      : {
+          ...item,
+          expectedProvider: 'cerebras' as const,
+          expectedModel: CEREBRAS_V2_DEFAULT_MODEL,
+        };
+  });
+}
+
 function withOpenAIExpectedModel(
   selected: PremiumRoutingCase[],
   openAIModel: OpenAIAdvancedModel,
@@ -344,7 +377,7 @@ function withOpenAIExpectedModel(
 
 function providerIsRegistered(
   keys: RegisteredKeys,
-  provider: PreferredLlmProvider,
+  provider: PreferredLlmProvider | 'cerebras',
 ): boolean {
   return keys[provider] === true;
 }
@@ -944,21 +977,21 @@ function renderMarkdown(results: CaseResult[]): string {
     lines.push(
       '## Premium Candidate Notes',
       '',
-      `- GPT candidate: ${String(
+      `- OpenAI rung-5 candidate: ${String(
         plusOpenai.aiEvent.metadata['llmModel'],
       )} at rung ${plusOpenai.case.targetRung} (${plusOpenai.issues.length} issue(s))`,
-      `- Claude candidate: ${String(
+      `- OpenAI rung-4 candidate: ${String(
         plusAnthropic.aiEvent.metadata['llmModel'],
       )} at rung ${plusAnthropic.case.targetRung} (${plusAnthropic.issues.length} issue(s))`,
       ...(familyGemini
         ? [
-            `- Gemini control: ${String(
+            `- Cerebras universal-default control: ${String(
               familyGemini.aiEvent.metadata['llmModel'],
             )} at rung ${familyGemini.case.targetRung} (${familyGemini.issues.length} issue(s))`,
           ]
         : []),
       '',
-      'Use the transcript quality, source audit, and routing metadata together before changing the production default. The OpenAI advanced candidate should remain rung-5-only unless this gate is deliberately updated.',
+      'Use the transcript quality, source audit, and routing metadata together before changing the production default. Under the V2 matrix (MMT-ADR-0016 §1.5) the OpenAI advanced candidate serves rung >= 4 premium-tier turns, not rung-5-only — this gate mirrors that in withV2RoutingMatrix().',
       '',
     );
   }
@@ -996,7 +1029,7 @@ async function main(): Promise<void> {
 
   if (hasFlag('--list-cases')) {
     console.log(
-      withOpenAIExpectedModel(cases, openAIModel)
+      withOpenAIExpectedModel(withV2RoutingMatrix(cases), openAIModel)
         .map(
           (item) =>
             `${item.id}: ${item.label} -> rung ${item.targetRung} ${item.expectedProvider}/${item.expectedModel}/${item.expectedTier}`,
@@ -1006,7 +1039,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  const selected = withOpenAIExpectedModel(selectCases(), openAIModel);
+  const selected = withOpenAIExpectedModel(
+    withV2RoutingMatrix(selectCases()),
+    openAIModel,
+  );
   const keys = registerLiveProviders();
   const runnable = requireProviders(selected, keys);
   const db = createDatabase(requireEnv('DATABASE_URL'), {
