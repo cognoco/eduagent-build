@@ -28,6 +28,7 @@ jest.mock(
 );
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockGoBackOrReplace = jest.fn();
 const mockCanEnterPractice = jest.fn();
 let mockCanEnterPracticeValue = true;
@@ -36,7 +37,7 @@ let mockSearchParams: Record<string, string> = {};
 jest.mock('expo-router', () => {
   const { Text } = require('react-native');
   return {
-    useRouter: () => ({ push: mockPush }),
+    useRouter: () => ({ push: mockPush, replace: mockReplace }),
     useLocalSearchParams: () => mockSearchParams,
     Redirect: ({ href }: { href: string }) => (
       <Text testID="redirect">{href}</Text>
@@ -81,13 +82,8 @@ jest.mock(
 jest.mock(
   '../../../lib/navigation' /* gc1-allow: imports expo-router Router type */,
   () => ({
+    ...jest.requireActual('../../../lib/navigation'),
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-    homeHrefForReturnTo: (returnTo: unknown) => {
-      if (returnTo === 'practice') return '/(app)/practice';
-      if (returnTo === 'journal') return '/(app)/journal';
-      return '/(app)/home';
-    },
-    PRACTICE_RETURN_TO: 'practice',
   }),
 );
 
@@ -238,10 +234,8 @@ describe('PracticeScreen', () => {
     await waitFor(() => screen.getByTestId('practice-back'));
 
     fireEvent.press(screen.getByTestId('practice-back'));
-    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-      expect.anything(),
-      '/(app)/journal',
-    );
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('navigates to the relearn picker when review topics are available', async () => {

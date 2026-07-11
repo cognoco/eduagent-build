@@ -28,6 +28,8 @@ import { useSubjects } from '../../../hooks/use-subjects';
 import {
   goBackOrReplace,
   homeHrefForReturnTo,
+  JOURNAL_HREF,
+  JOURNAL_RETURN_TO,
   PRACTICE_RETURN_TO,
 } from '../../../lib/navigation';
 import { useReviewSummary } from '../../../hooks/use-progress';
@@ -389,6 +391,11 @@ export default function PracticeScreen(): React.ReactElement {
   const practiceReturnParams = { returnTo: PRACTICE_RETURN_TO } as const;
 
   const handleBack = () => {
+    if (returnTo === JOURNAL_RETURN_TO) {
+      router.replace(JOURNAL_HREF);
+      return;
+    }
+
     goBackOrReplace(router, homeHrefForReturnTo(returnTo));
   };
 
