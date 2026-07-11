@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { computeAgeBracket, type Profile } from '@eduagent/schemas';
+import { computeAgeBracketFromDate, type Profile } from '@eduagent/schemas';
 
 import { FEATURE_FLAGS } from './feature-flags';
 import { isFamilyCapableProfile, useProfile } from './profile';
@@ -36,13 +36,17 @@ const AppContext = createContext<AppContextValue>({
   familyCapable: false,
 });
 
-function isServerFamilyCapableProfile(
+export function isServerFamilyCapableProfile(
   profile: Profile | null | undefined,
 ): boolean {
   return (
     !!profile &&
     profile.isOwner &&
-    computeAgeBracket(profile.birthYear) === 'adult' &&
+    computeAgeBracketFromDate(
+      profile.birthYear,
+      profile.birthMonth ?? undefined,
+      profile.birthDay ?? undefined,
+    ) === 'adult' &&
     profile.hasFamilyLinks === true
   );
 }

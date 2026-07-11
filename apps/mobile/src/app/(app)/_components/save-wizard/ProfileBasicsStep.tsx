@@ -10,7 +10,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
-  computeAgeBracket,
+  computeAgeBracketFromDate,
   conversationLanguageSchema,
   type Profile,
 } from '@eduagent/schemas';
@@ -87,7 +87,7 @@ export function ProfileBasicsStep({
   // canSubmit falls back to today's behaviour (field validations only).
   const parentIsAdult =
     isValidYear(parentBirthYear) &&
-    computeAgeBracket(Number(parentBirthYear)) === 'adult';
+    computeAgeBracketFromDate(Number(parentBirthYear)) === 'adult';
   const adultGateRequired =
     FEATURE_FLAGS.ADULT_OWNER_GATE_ENABLED && needsChild;
   const adultGatePasses = !adultGateRequired || parentIsAdult;

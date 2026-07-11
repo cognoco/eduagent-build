@@ -118,9 +118,10 @@ describe('Integration: WI-297 — profile creation full-date age gate', () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.profile.birthYear).toBe(birthYear);
-    // birthMonth/birthDay are NOT persisted (migration-free) — should not appear in profile
-    expect(body.profile.birthMonth).toBeUndefined();
-    expect(body.profile.birthDay).toBeUndefined();
+    // The gate consumes the full date transiently, while creation persists a
+    // year-only date; the response contract includes null month/day fields.
+    expect(body.profile.birthMonth).toBeNull();
+    expect(body.profile.birthDay).toBeNull();
   });
 
   it('year-only path (no birthMonth/birthDay) still works for age >= 13', async () => {

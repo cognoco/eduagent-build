@@ -53,6 +53,7 @@ import {
   resolveLatestConsentStatusAnyBasis,
   type ConsentBasis,
 } from './consent-status-v2';
+import { birthMonthDayFromDate, birthYearFromDate } from './profile-v2';
 
 /**
  * v2 `generateExport` — the GDPR Art-15 access/portability export over the
@@ -200,29 +201,34 @@ export async function generateExportV2(
   // 6. Profiles export (person → the legacy Profile export shape). isOwner from
   // membership; consentStatus from the resolver; conversationLanguage/pronouns
   // /avatarUrl/defaultAppContext from the re-homed person columns.
-  const profilesExport: DataExport['profiles'] = personRows.map((p) => ({
-    id: p.id,
-    displayName: p.displayName,
-    avatarUrl: p.avatarUrl ?? null,
-    birthYear: Number(p.birthDate.slice(0, 4)),
-    location: jurisdictionToLocation(p.residenceJurisdiction),
-    isOwner: isOwnerByPersonId.get(p.id) ?? false,
-    // has_premium_llm is derived post-cutover; served false here (mobile
-    // contract revision is out of scope — §1.3).
-    hasPremiumLlm: false,
-    defaultAppContext:
-      (p.defaultAppContext as Profile['defaultAppContext']) ?? null,
-    hasFamilyLinks: isOwnerByPersonId.get(p.id)
-      ? relevantEdges.some((g) => g.guardianPersonId === p.id)
-      : relevantEdges.some((g) => g.chargePersonId === p.id),
-    conversationLanguage:
-      p.conversationLanguage as Profile['conversationLanguage'],
-    pronouns: p.pronouns ?? null,
-    consentStatus: consentStatusByPersonId.get(p.id) ?? null,
-    linkCreatedAt: linkGrantedByChild.get(p.id)?.toISOString() ?? null,
-    createdAt: p.createdAt.toISOString(),
-    updatedAt: p.updatedAt.toISOString(),
-  }));
+  const profilesExport: DataExport['profiles'] = personRows.map((p) => {
+    const { birthMonth, birthDay } = birthMonthDayFromDate(p.birthDate);
+    return {
+      id: p.id,
+      displayName: p.displayName,
+      avatarUrl: p.avatarUrl ?? null,
+      birthYear: birthYearFromDate(p.birthDate),
+      birthMonth,
+      birthDay,
+      location: jurisdictionToLocation(p.residenceJurisdiction),
+      isOwner: isOwnerByPersonId.get(p.id) ?? false,
+      // has_premium_llm is derived post-cutover; served false here (mobile
+      // contract revision is out of scope — §1.3).
+      hasPremiumLlm: false,
+      defaultAppContext:
+        (p.defaultAppContext as Profile['defaultAppContext']) ?? null,
+      hasFamilyLinks: isOwnerByPersonId.get(p.id)
+        ? relevantEdges.some((g) => g.guardianPersonId === p.id)
+        : relevantEdges.some((g) => g.chargePersonId === p.id),
+      conversationLanguage:
+        p.conversationLanguage as Profile['conversationLanguage'],
+      pronouns: p.pronouns ?? null,
+      consentStatus: consentStatusByPersonId.get(p.id) ?? null,
+      linkCreatedAt: linkGrantedByChild.get(p.id)?.toISOString() ?? null,
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
+    };
+  });
 
   // 7. Learning-data half: reuse the legacy export (profileId = person.id keyed;
   // unchanged by the cutover — incl. the D3 mentor_activity_ledger inclusion).

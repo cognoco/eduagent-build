@@ -1709,6 +1709,8 @@ function makeProfileRow(
     displayName: overrides.displayName ?? 'Test User',
     avatarUrl: null,
     birthYear: 2000,
+    birthMonth: null,
+    birthDay: null,
     location: 'EU' as const,
     isOwner: overrides.isOwner ?? true,
     hasPremiumLlm: false,
