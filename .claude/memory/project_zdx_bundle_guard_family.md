@@ -32,3 +32,5 @@ three defects surfaced within minutes of forming a single WP.
 See [[feedback_verify_claims_against_source_before_canon]].
 
 **2026-07-10 verification:** all three fixes confirmed in cosmo 0.7.2 source (MID_LIFECYCLE_STAGES, HOLD_STATES/--allow-held, verbatim Absorbed detail) and exercised by 4 clean bundle formations (WI-1772/1777/1779/1780) — incl. the Blocked-by-carry edge (Active child with live dependency → WP inherits the union). The guard family is closed; the meta-lesson (enumerate what a child carries before deciding what a bundle copies) stands.
+
+**2026-07-11 — 4th defect, formation side (family reopened):** formation writes the brief ONLY into the WP page body; Description/AC PROPERTIES stay empty. Hit 4/4 of the 2026-07-10 bundles, and refine.ts's mechanical DoR checklist does NOT flag an empty AC property on a WP — so a Ready WP presents a blank spec to property-reading consumers (claim surfaces, rollups). Remediated by hand on all four; evidence logged as a comment on WI-1591 (open bundle-tooling item). Fix direction: mirror whole-bundle AC into properties at formation, or make the WP DoR gate fail on empty AC.
