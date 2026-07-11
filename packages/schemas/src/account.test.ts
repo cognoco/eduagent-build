@@ -36,6 +36,7 @@ import {
   dataExportTeachingPreferenceRowSchema,
   dataExportTopUpCreditRowSchema,
   dataExportXpLedgerRowSchema,
+  DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
 } from './account.js';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440000';
@@ -459,6 +460,8 @@ describe('account schemas', () => {
         },
         profiles: [],
         consentStates: [],
+        subscriptionFieldDescriptions:
+          DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
         exportedAt: ISO,
       });
       expect(result.success).toBe(true);
@@ -472,6 +475,8 @@ describe('account schemas', () => {
         account: { email: 'user@example.com', createdAt: ISO },
         profiles: [],
         consentStates: [],
+        subscriptionFieldDescriptions:
+          DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
         subjects: [
           {
             id: UUID,
@@ -492,6 +497,9 @@ describe('account schemas', () => {
           {
             id: UUID,
             accountId: UUID,
+            payerPersonId: UUID,
+            storeProductId: null,
+            storePlatform: null,
             stripeCustomerId: null,
             stripeSubscriptionId: null,
             tier: 'free',
@@ -541,6 +549,9 @@ describe('account schemas', () => {
       const result = dataExportSubscriptionRowSchema.safeParse({
         id: UUID,
         accountId: UUID,
+        payerPersonId: UUID,
+        storeProductId: null,
+        storePlatform: null,
         stripeCustomerId: null,
         stripeSubscriptionId: null,
         tier: 'free',
@@ -558,6 +569,55 @@ describe('account schemas', () => {
         updatedAt: ISO,
       });
       expect(result.success).toBe(true);
+    });
+
+    it('[WI-1836] rejects malformed approved subscription export fields', () => {
+      const result = dataExportSubscriptionRowSchema.safeParse({
+        id: UUID,
+        accountId: UUID,
+        payerPersonId: 'not-a-uuid',
+        storeProductId: 42,
+        storePlatform: null,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        tier: 'free',
+        status: 'active',
+        trialEndsAt: null,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        cancelledAt: null,
+        lastStripeEventTimestamp: null,
+        lastStripeEventId: null,
+        revenuecatOriginalAppUserId: null,
+        lastRevenuecatEventId: null,
+        lastRevenuecatEventTimestampMs: null,
+        createdAt: ISO,
+        updatedAt: ISO,
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('[WI-1836] preserves intelligible subscription field descriptions in the parsed export', () => {
+      const result = dataExportSchema.safeParse({
+        account: { email: 'user@example.com', createdAt: ISO },
+        profiles: [],
+        consentStates: [],
+        subscriptionFieldDescriptions:
+          DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
+        exportedAt: ISO,
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(
+          (
+            result.data as typeof result.data & {
+              subscriptionFieldDescriptions?: unknown;
+            }
+          ).subscriptionFieldDescriptions,
+        ).toBeDefined();
+      }
     });
 
     it('[WI-978] tightened assessment schema rejects partial rows', () => {
@@ -593,6 +653,8 @@ describe('account schemas', () => {
         account: { email: 'not-an-email', createdAt: ISO },
         profiles: [],
         consentStates: [],
+        subscriptionFieldDescriptions:
+          DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
         exportedAt: ISO,
       });
       expect(result.success).toBe(false);
@@ -625,6 +687,8 @@ describe('account schemas', () => {
             },
           ],
           consentStates: [],
+          subscriptionFieldDescriptions:
+            DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
           exportedAt: ISO,
         });
         expect(result.success).toBe(true);
@@ -661,6 +725,8 @@ describe('account schemas', () => {
             },
           ],
           consentStates: [],
+          subscriptionFieldDescriptions:
+            DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
           exportedAt: ISO,
         });
         expect(result.success).toBe(true);

@@ -43,6 +43,7 @@ import {
   dataExportSessionEmbeddingRowSchema,
   dataExportNeedsDeepeningTopicRowSchema,
   dataExportMentorActivityLedgerRowSchema,
+  DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
 } from '@eduagent/schemas';
 import type { DataExport } from '@eduagent/schemas';
 import { projectAiResponseContent } from './llm/project-response';
@@ -356,6 +357,7 @@ export async function generateExport(
     account: { email: '', createdAt: new Date(0).toISOString() },
     profiles: [],
     consentStates: [],
+    subscriptionFieldDescriptions: DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
     // [BUG-413] Apply serializeDates to every row so Date objects from the
     // Drizzle / neon-serverless driver are converted to ISO strings before
     // they reach the export payload.  Without this, rows passed as

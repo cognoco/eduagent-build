@@ -10,6 +10,24 @@ import {
 import { clearJWKSCache } from '../middleware/jwt';
 import { TEST_PROFILE_ID, TEST_PROFILE_ID_2 } from '@eduagent/test-utils';
 
+const mockSubscriptionFieldDescriptions = {
+  payerPersonId: {
+    label: 'Person responsible for payment',
+    description:
+      'The identifier of the person responsible for the subscription payment relationship.',
+  },
+  storeProductId: {
+    label: 'Store product',
+    description:
+      'The product identifier assigned by the app store for this subscription, when applicable.',
+  },
+  storePlatform: {
+    label: 'Store platform',
+    description:
+      'The app-store platform that supplied this subscription, when applicable.',
+  },
+} as const;
+
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
@@ -155,6 +173,7 @@ jest.mock('../services/export', () => {
       },
       profiles: [],
       consentStates: [],
+      subscriptionFieldDescriptions: mockSubscriptionFieldDescriptions,
       exportedAt: new Date().toISOString(),
     }),
   };
@@ -310,6 +329,7 @@ jest.mock('../services/identity-v2/export-v2', () => {
       },
       profiles: [],
       consentStates: [],
+      subscriptionFieldDescriptions: mockSubscriptionFieldDescriptions,
       exportedAt: new Date().toISOString(),
     }),
   };

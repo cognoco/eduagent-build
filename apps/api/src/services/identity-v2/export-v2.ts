@@ -45,6 +45,7 @@ import {
   dataExportFamilyLinkRowSchema,
   dataExportQuotaPoolRowSchema,
   dataExportTopUpCreditRowSchema,
+  DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
 } from '@eduagent/schemas';
 import type { ConsentStatus, DataExport, Profile } from '@eduagent/schemas';
 import { generateExport, serializeDates } from '../export';
@@ -242,6 +243,7 @@ export async function generateExportV2(
     },
     profiles: profilesExport,
     consentStates: consentStatesExport,
+    subscriptionFieldDescriptions: DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
     // [WI-1097] guardianship "replaces family_links" (schema comment): map the
     // edge to the legacy/contract familyLinks row shape (guardian = parent,
     // charge = child) so the v2 export's familyLinks conform to the now-strict
@@ -262,13 +264,17 @@ export async function generateExportV2(
     // to the legacy-named export shape the schema expects (accountId/tier/
     // currentPeriod*) before parsing — mirrors the explicit field-mapping the
     // `account`/`familyLinks` sections above already do. organization.id ==
-    // accounts.id by the deterministic reseed. payerPersonId/storeProductId/
-    // storePlatform are not part of the DataExport contract, so they drop here.
+    // accounts.id by the deterministic reseed. The three approved Article 15
+    // subscription fields remain explicit here and are explained once by the
+    // top-level subscriptionFieldDescriptions dictionary.
     subscriptions: subscriptionRows.map((s) =>
       dataExportSubscriptionRowSchema.parse(
         serializeDates({
           id: s.id,
           accountId: s.organizationId,
+          payerPersonId: s.payerPersonId,
+          storeProductId: s.storeProductId,
+          storePlatform: s.storePlatform,
           stripeCustomerId: s.stripeCustomerId,
           stripeSubscriptionId: s.stripeSubscriptionId,
           tier: s.planTier,

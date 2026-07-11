@@ -283,6 +283,8 @@ describeIfDb('generateExportV2 subscription mapping [WI-1161]', () => {
       planTier: 'plus',
       status: 'active',
       payerPersonId: owner!.id,
+      storeProductId: 'com.mentomate.plus.monthly',
+      storePlatform: 'APP_STORE',
       periodStartAt: periodStart,
       periodEndAt: periodEnd,
       stripeCustomerId: `cus_export_${owner!.id}`,
@@ -298,6 +300,9 @@ describeIfDb('generateExportV2 subscription mapping [WI-1161]', () => {
       currentPeriodStart?: string | null;
       currentPeriodEnd?: string | null;
       stripeCustomerId?: string | null;
+      payerPersonId?: string;
+      storeProductId?: string | null;
+      storePlatform?: string | null;
       organizationId?: string;
       planTier?: string;
     };
@@ -307,6 +312,29 @@ describeIfDb('generateExportV2 subscription mapping [WI-1161]', () => {
     expect(row.currentPeriodStart).toBe(periodStart.toISOString());
     expect(row.currentPeriodEnd).toBe(periodEnd.toISOString());
     expect(row.stripeCustomerId).toBe(`cus_export_${owner!.id}`);
+    expect(row.payerPersonId).toBe(owner!.id);
+    expect(row.storeProductId).toBe('com.mentomate.plus.monthly');
+    expect(row.storePlatform).toBe('APP_STORE');
+    expect(
+      (result as unknown as { subscriptionFieldDescriptions?: unknown })
+        .subscriptionFieldDescriptions,
+    ).toEqual({
+      payerPersonId: {
+        label: 'Person responsible for payment',
+        description:
+          'The identifier of the person responsible for the subscription payment relationship.',
+      },
+      storeProductId: {
+        label: 'Store product',
+        description:
+          'The product identifier assigned by the app store for this subscription, when applicable.',
+      },
+      storePlatform: {
+        label: 'Store platform',
+        description:
+          'The app-store platform that supplied this subscription, when applicable.',
+      },
+    });
     // Raw v2 field names are stripped by the schema parse (not leaked):
     expect(row.organizationId).toBeUndefined();
     expect(row.planTier).toBeUndefined();
