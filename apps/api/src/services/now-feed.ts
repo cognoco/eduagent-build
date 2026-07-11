@@ -14,6 +14,7 @@ import {
 
 import {
   createScopedRepository,
+  billingAlerts,
   curriculumBooks,
   curriculumTopics,
   learningSessions,
@@ -26,6 +27,7 @@ import {
   sessionSummaries,
   subjects,
   supportership,
+  subscription,
   type Database,
 } from '@eduagent/database';
 import {
@@ -41,10 +43,13 @@ import {
   type NowQuery,
   type NowResponse,
   type NowScope,
+  subscriptionStatusSchema,
+  subscriptionTierSchema,
 } from '@eduagent/schemas';
 
 import { markMomentSurfaced } from './activity-ledger';
 import { getAssessmentEligibleTopics } from './retention-data';
+import { resolveEffectiveAccessTier } from './subscription';
 
 export const PARKED_AGING_WINDOW_DAYS = 7;
 export const DEEPENING_SURFACE_LEAD_DAYS = 2;
@@ -56,6 +61,7 @@ export const DEEPENING_SURFACE_LEAD_DAYS = 2;
 export const LEDGER_PROJECTION_RECENCY_DAYS = 3;
 
 export const RANKING = {
+  BILLING_ALERT: -1,
   UNFINISHED_SESSION: 0,
   RETENTION_DUE: 1,
   PROMOTED_AGING: 1.5,
@@ -67,6 +73,12 @@ export const RANKING = {
 } as const;
 
 export const ROUTE_CATALOG = {
+  'settings.more': { params: [], chain: [] },
+  'settings.account': { params: [], chain: ['settings.more'] },
+  'billing.manage': {
+    params: [],
+    chain: ['settings.more', 'settings.account'],
+  },
   'session.resume': { params: ['sessionId'], chain: [] },
   // [WI-1121 review fix] A completed session's recap lives at
   // /session-summary/[sessionId] (mobile: session-detail-navigation.ts's
@@ -133,6 +145,8 @@ export function resolveDeepLink(
 
 function basePriority(kind: NowCardKind): number {
   switch (kind) {
+    case 'billing_alert':
+      return RANKING.BILLING_ALERT;
     case 'unfinished_session':
       return RANKING.UNFINISHED_SESSION;
     case 'retention_due':
@@ -474,6 +488,7 @@ async function collectNowCandidates(
   edgeId?: string,
 ): Promise<NowFeedCandidate[]> {
   const [
+    billing,
     unfinished,
     dueRetention,
     needsDeepening,
@@ -484,6 +499,9 @@ async function collectNowCandidates(
     recapReady,
     snapshotReady,
   ] = await Promise.all([
+    visibility === 'self' && scope === 'self'
+      ? collectBillingAlertCandidates(db, profileId, now)
+      : Promise.resolve([]),
     collectUnfinishedSessionCandidates(db, profileId, scope),
     collectRetentionDueCandidates(db, profileId, scope, now),
     collectNeedsDeepeningCandidates(db, profileId, scope, now),
@@ -506,6 +524,7 @@ async function collectNowCandidates(
   ]);
 
   return [
+    ...billing,
     ...unfinished,
     ...dueRetention,
     ...needsDeepening,
@@ -520,6 +539,64 @@ async function collectNowCandidates(
     ...(scope === 'person' ? { personId: profileId } : {}),
     ...(edgeId ? { edgeId } : {}),
   }));
+}
+
+async function collectBillingAlertCandidates(
+  db: Database,
+  payerPersonId: string,
+  now: Date,
+): Promise<NowFeedCandidate[]> {
+  const rows = await db
+    .select({
+      id: billingAlerts.id,
+      createdAt: billingAlerts.createdAt,
+      occurredAt: billingAlerts.occurredAt,
+      planTier: subscription.planTier,
+      status: subscription.status,
+      periodEndAt: subscription.periodEndAt,
+    })
+    .from(billingAlerts)
+    .innerJoin(subscription, eq(subscription.id, billingAlerts.subscriptionId))
+    .where(
+      and(
+        eq(subscription.payerPersonId, payerPersonId),
+        eq(subscription.status, 'past_due'),
+      ),
+    )
+    .orderBy(desc(billingAlerts.occurredAt), desc(billingAlerts.id))
+    .limit(1);
+
+  return rows.flatMap((row) => {
+    const tier = subscriptionTierSchema.safeParse(row.planTier);
+    const status = subscriptionStatusSchema.safeParse(row.status);
+    if (!tier.success || !status.success) return [];
+    const access = resolveEffectiveAccessTier(
+      {
+        tier: tier.data,
+        status: status.data,
+        trialEndsAt: null,
+        currentPeriodEnd: row.periodEndAt?.toISOString() ?? null,
+      },
+      now,
+    );
+
+    return [
+      {
+        id: row.id,
+        kind: 'billing_alert' as const,
+        createdAt: row.createdAt,
+        sortAt: row.occurredAt,
+        templateKey: 'now.billing_alert.payment_failed',
+        params: {
+          planTier: tier.data,
+          accessState: access.billingAccess,
+          deadlineAt: row.periodEndAt?.toISOString() ?? null,
+        },
+        deepLink: resolveDeepLink('billing.manage', {}),
+        scope: 'self' as const,
+      },
+    ];
+  });
 }
 
 async function collectUnfinishedSessionCandidates(

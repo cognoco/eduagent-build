@@ -21,6 +21,9 @@ const DEFAULT_OPTIONS: Required<PushNowDeepLinkOptions> = {
 };
 
 const PATH_BUILDERS: Record<NowDeepLinkRoute, PathBuilder> = {
+  'settings.more': () => '/(app)/more',
+  'settings.account': () => '/(app)/more/account',
+  'billing.manage': () => '/(app)/subscription',
   'session.resume': (params) =>
     `/(app)/session?sessionId=${encodeURIComponent(
       requiredParam(params, 'sessionId', 'session.resume'),

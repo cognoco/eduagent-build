@@ -50,6 +50,8 @@ function candidate(
 
 function deepLinkFor(kind: CandidateKind, id: string) {
   switch (kind) {
+    case 'billing_alert':
+      return resolveDeepLink('billing.manage', {});
     case 'unfinished_session':
       return resolveDeepLink('session.resume', { sessionId: `session-${id}` });
     case 'retention_due':

@@ -91,6 +91,7 @@ export const HIDDEN_TAB_ROUTES = [
   'account',
   'dashboard',
   'subscription',
+  'billing',
   'mentor-memory',
   'session',
   'homework',

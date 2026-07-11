@@ -2,6 +2,8 @@ import type { Href, Router } from 'expo-router';
 import type { LearningResumeTarget } from '@eduagent/schemas';
 
 export const FAMILY_HOME_PATH = '/(app)/home';
+// [WI-1658]
+export const FAMILY_HOME_RETURN_TO = 'family-home';
 export const LEARNER_HOME_RETURN_TO = 'learner-home';
 export const LEARNER_HOME_HREF = '/(app)/home';
 export const OWN_LEARNING_RETURN_TO = 'own-learning';
@@ -50,6 +52,7 @@ export function homeHrefForReturnTo(
     } as Href;
   }
   if (token === FAMILY_RECAPS_RETURN_TO) return FAMILY_RECAPS_HREF as Href;
+  if (token === FAMILY_HOME_RETURN_TO) return FAMILY_HOME_PATH as Href;
   if (token === FAMILY_CHILDREN_RETURN_TO && id) return childProfileHref(id);
   if (token === FAMILY_PROGRESS_RETURN_TO) return FAMILY_PROGRESS_HREF as Href;
   if (token === STUDY_PROGRESS_RETURN_TO) return STUDY_PROGRESS_HREF as Href;

@@ -384,6 +384,22 @@
         "nudgeAction": "Nudge",
         "learnTogetherAction": "Learn together"
       },
+      "verifiedProof": {
+        "headline": "Verified: {{topic}}",
+        "verifiedOn": "Verified {{date}}",
+        "quoteUnavailable": "Source no longer available",
+        "state": {
+          "unverified": "Not yet verified",
+          "fresh": "Verified",
+          "stale": "Worth another look"
+        },
+        "retention": {
+          "strong": "Sticking well",
+          "fading": "Starting to fade",
+          "weak": "Getting rusty",
+          "forgotten": "Time to review"
+        }
+      },
       "card": {
         "statusQuietWeek": "Quiet week",
         "statusJustStarting": "Just getting started",
@@ -2987,6 +3003,13 @@
       "subjects": "Browse subjects"
     },
     "cards": {
+      "billing_alert": {
+        "title": "Payment needs attention",
+        "cta": "Manage billing",
+        "currentAccess": "Your paid access stays active until {{deadline}}.",
+        "currentAccessNoDeadline": "Your paid access is still active.",
+        "freeFallback": "Your account is using free access now. Update payment to restore your plan."
+      },
       "unfinished_session": {
         "title": "Continue your last session",
         "cta": "Continue",

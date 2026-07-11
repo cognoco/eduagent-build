@@ -136,6 +136,7 @@ interface RouteOptions {
   recaps?: unknown[];
   childMemory?: unknown;
   progressSummary?: unknown;
+  verifiedProof?: unknown;
 }
 
 /**
@@ -190,6 +191,8 @@ function buildRoutes(opts: RouteOptions = {}) {
       activityState: 'no_recent_activity',
       nudgeRecommended: false,
     },
+    // [WI-1658] Default: no verified win yet — VerifiedProofCard renders nothing.
+    '/verified-proof': opts.verifiedProof ?? { hasProof: false, quote: null },
     // The real useDashboard falls through to /dashboard/demo when the primary
     // response has zero children — route both so the fallback never returns
     // the empty default-200 body (which lacks `.children`).
@@ -361,6 +364,38 @@ describe('ParentHomeScreen', () => {
     expect(mockPush).toHaveBeenLastCalledWith(
       `/(app)/child/${CHILD_A_ID}?mode=settings`,
     );
+  });
+
+  // [WI-1658]
+  it('renders the verified-proof card per-child when a verified win exists', async () => {
+    const { result } = mount([PARENT, CHILD_A], {
+      verifiedProof: {
+        hasProof: true,
+        topicId: '10000000-0000-4000-8000-0000000000c1',
+        topicTitle: 'Photosynthesis',
+        subjectId: '10000000-0000-4000-8000-0000000000d1',
+        sessionId: '10000000-0000-4000-8000-0000000000e1',
+        verifiedAt: '2026-07-01T12:00:00.000Z',
+        quote: 'Plants convert light into chemical energy.',
+        masteryVerificationState: 'fresh',
+        retentionStatus: 'strong',
+      },
+    });
+    await waitForParentTransitionNotice(result);
+
+    await waitFor(() => {
+      result.getByTestId(`parent-home-child-verified-proof-${CHILD_A_ID}`);
+    });
+    result.getByText(/Photosynthesis/);
+  });
+
+  it('does not render the verified-proof card when there is no verified win', async () => {
+    const { result } = mount([PARENT, CHILD_A]);
+    await waitForParentTransitionNotice(result);
+
+    expect(
+      result.queryByTestId(`parent-home-child-verified-proof-${CHILD_A_ID}`),
+    ).toBeNull();
   });
 
   it('opens the Learn-together sheet from the card action (no Progress button)', async () => {

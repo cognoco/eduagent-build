@@ -386,7 +386,23 @@
       },
       "childProfileLabel": "{{name}}のプロフィール",
       "greetingFallbackName": "こんにちは",
-      "greetingNoName": "こんにちは！"
+      "greetingNoName": "こんにちは！",
+      "verifiedProof": {
+        "headline": "検証済み: {{topic}}",
+        "verifiedOn": "{{date}}に検証済み",
+        "quoteUnavailable": "出典は現在利用できません",
+        "state": {
+          "unverified": "未検証",
+          "fresh": "検証済み",
+          "stale": "要再確認"
+        },
+        "retention": {
+          "strong": "よく定着しています",
+          "fading": "記憶が薄れています",
+          "weak": "記憶が曖昧です",
+          "forgotten": "復習が必要です"
+        }
+      }
     },
     "goToProgress": "進捗へ",
     "goToProgressLabel": "進捗へ",
@@ -3923,7 +3939,14 @@
         "cta": "開く"
       },
       "complete": "完了",
-      "dismissIcon": "x"
+      "dismissIcon": "x",
+      "billing_alert": {
+        "title": "お支払いの確認が必要です",
+        "cta": "お支払い管理",
+        "currentAccess": "有料プランは{{deadline}}まで有効です。",
+        "freeFallback": "現在、無料プランをご利用中です。プランを復元するには、お支払い情報を更新してください。",
+        "currentAccessNoDeadline": "有料アクセスはまだ有効です。"
+      }
     },
     "ledger": {
       "label": "学習の記録",

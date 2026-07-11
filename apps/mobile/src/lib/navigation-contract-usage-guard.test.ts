@@ -263,6 +263,16 @@ const V0_FALLBACK_FILES: readonly LegitimateRawNavigationGateFile[] = [
 // and must NOT be migrated to the contract.
 const NON_NAV_DOMAIN_FILES: readonly LegitimateRawNavigationGateFile[] = [
   {
+    file: 'apps/mobile/src/app/(app)/billing/manage.tsx',
+    category: 'non-nav-domain-read',
+    reason:
+      'canonical payer lookup: useParentProxy().parentProfile identifies the subscription payer before switching; post-switch billing access is gated by navigationContract.gates.showBilling.',
+    expectedFindings: {
+      'raw-hook-call': 1,
+      'raw-hook-import': 1,
+    },
+  },
+  {
     file: 'apps/mobile/src/app/(app)/more/accommodation.tsx',
     category: 'non-nav-domain-read',
     reason:

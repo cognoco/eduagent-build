@@ -157,6 +157,88 @@ describe('NowCardStack', () => {
     expect(queryByTestId('now-card-parked_item')).toBeNull();
   });
 
+  it('keeps an active billing alert visible even when its key is locally dismissed', () => {
+    const billing = card('billing_alert', 'billing-1', {
+      templateKey: 'now.billing_alert.payment_failed',
+      params: {
+        planTier: 'plus',
+        accessState: 'free_fallback',
+        deadlineAt: null,
+      },
+      deepLink: {
+        route: 'billing.manage',
+        params: {},
+        chain: ['settings.more', 'settings.account'],
+      },
+    });
+    const { getByTestId, queryByTestId } = render(
+      <NowCardStack
+        feed={feed([billing])}
+        dismissedKeys={new Set([getNowCardDismissKey(billing)])}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+        onShowOverflow={jest.fn()}
+      />,
+    );
+
+    expect(getByTestId('now-card-billing_alert')).toBeTruthy();
+    expect(queryByTestId('now-card-dismiss')).toBeNull();
+  });
+
+  it('states the billing deadline and whether paid access is still current', () => {
+    const billing = card('billing_alert', 'billing-current', {
+      templateKey: 'now.billing_alert.payment_failed',
+      params: {
+        planTier: 'plus',
+        accessState: 'current',
+        deadlineAt: '2026-08-01T00:00:00.000Z',
+      },
+      deepLink: {
+        route: 'billing.manage',
+        params: {},
+        chain: ['settings.more', 'settings.account'],
+      },
+    });
+    const { getByText } = render(
+      <NowCardStack
+        feed={feed([billing])}
+        dismissedKeys={new Set()}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+        onShowOverflow={jest.fn()}
+      />,
+    );
+
+    expect(getByText(/paid access stays active until/i)).toBeTruthy();
+  });
+
+  it('states when the subscription has already fallen back to free access', () => {
+    const billing = card('billing_alert', 'billing-fallback', {
+      templateKey: 'now.billing_alert.payment_failed',
+      params: {
+        planTier: 'plus',
+        accessState: 'free_fallback',
+        deadlineAt: null,
+      },
+      deepLink: {
+        route: 'billing.manage',
+        params: {},
+        chain: ['settings.more', 'settings.account'],
+      },
+    });
+    const { getByText } = render(
+      <NowCardStack
+        feed={feed([billing])}
+        dismissedKeys={new Set()}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+        onShowOverflow={jest.fn()}
+      />,
+    );
+
+    expect(getByText(/using free access now/i)).toBeTruthy();
+  });
+
   it('always renders synthesized quota affordances as modules', () => {
     const quota = card('ledger_moment', 'quota', {
       templateKey: 'now.ledger_moment.quota',

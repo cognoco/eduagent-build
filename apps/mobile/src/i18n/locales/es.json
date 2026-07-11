@@ -386,7 +386,23 @@
       },
       "childProfileLabel": "Perfil de {{name}}",
       "greetingFallbackName": "ahí",
-      "greetingNoName": "¡Hola!"
+      "greetingNoName": "¡Hola!",
+      "verifiedProof": {
+        "headline": "Verificado: {{topic}}",
+        "verifiedOn": "Verificado el {{date}}",
+        "quoteUnavailable": "Fuente no disponible",
+        "state": {
+          "unverified": "Sin verificar",
+          "fresh": "Verificado",
+          "stale": "Conviene revisar"
+        },
+        "retention": {
+          "strong": "Bien retenido",
+          "fading": "Se está olvidando",
+          "weak": "Algo olvidado",
+          "forgotten": "Hora de repasar"
+        }
+      }
     },
     "goToProgress": "Ir a Progreso",
     "goToProgressLabel": "Ir a Progreso",
@@ -3923,7 +3939,14 @@
         "cta": "Abrir"
       },
       "complete": "Hecho",
-      "dismissIcon": "x"
+      "dismissIcon": "x",
+      "billing_alert": {
+        "title": "El pago requiere atención",
+        "cta": "Gestionar facturación",
+        "currentAccess": "Tu acceso de pago sigue activo hasta el {{deadline}}.",
+        "freeFallback": "Tu cuenta está usando el acceso gratuito ahora. Actualiza el pago para restaurar tu plan.",
+        "currentAccessNoDeadline": "Tu acceso de pago sigue activo."
+      }
     },
     "ledger": {
       "label": "Momento de aprendizaje",

@@ -7,6 +7,12 @@ import { sessionTypeSchema } from './session-enums.ts';
 export const noteOriginSchema = z.enum(['self', 'mentor']);
 export type NoteOrigin = z.infer<typeof noteOriginSchema>;
 
+// [WI-1658] Single value written today; WI-1704 owns widening this to the
+// full artifactSource enum (challenge_solid_quote / challenge_drafted_note /
+// learner_authored_note / freeform_keep) once the evidence-link substrate lands.
+export const noteArtifactSourceSchema = z.literal('challenge_drafted_note');
+export type NoteArtifactSource = z.infer<typeof noteArtifactSourceSchema>;
+
 /**
  * [BUG-212] Canonical client-facing note shape. The previously-duplicated
  * `topicNoteSchema` (DB row, included `profileId`) and `noteResponseSchema`

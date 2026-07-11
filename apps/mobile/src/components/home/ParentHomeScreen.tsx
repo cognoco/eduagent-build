@@ -64,6 +64,7 @@ import {
   resolveParentCardCopy,
 } from './parent-card-copy';
 import { MentorSlot, resolveMentorSlotInsight } from './MentorSlot';
+import { VerifiedProofCard } from './VerifiedProofCard';
 
 function initialOf(name: string): string {
   return name.trim().charAt(0).toUpperCase() || '?';
@@ -502,6 +503,13 @@ const ChildCommandCard = memo(function ChildCommandCard({
           ))}
         </View>
       ) : null}
+
+      {/* [WI-1658] Verified-proof receipt — a structured fact, deliberately NOT
+          folded into resolveParentCardCopy's narrative-copy pipeline above, so
+          the "momentum" narrative and the verified-fact receipt never collapse
+          into one string (MMT-ADR-0031 §5). Renders nothing until there's a
+          verified win. */}
+      <VerifiedProofCard childProfileId={child.id} accentColor={accent} />
 
       {/* Condensed Solid / Coming-up — each line hidden when its field is null. */}
       {copy?.solid ? (

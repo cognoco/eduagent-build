@@ -37,6 +37,18 @@ function candidate(
 }
 
 describe('now feed ranking', () => {
+  it('ranks an active billing alert ahead of every learning candidate', () => {
+    const billing = candidate({ id: 'billing-1', kind: 'billing_alert' });
+    const unfinished = candidate({
+      id: 'session-1',
+      kind: 'unfinished_session',
+    });
+
+    expect(
+      rankCandidates([unfinished, billing], now).map((item) => item.id),
+    ).toEqual(['billing-1', 'session-1']);
+  });
+
   it('orders mixed candidates by deterministic priority', () => {
     const ranked = rankCandidates(
       [
@@ -262,6 +274,14 @@ describe('now feed route catalog', () => {
         topicId: 'topic-1',
       },
       chain: ['subject.hub'],
+    });
+  });
+
+  it('returns the full More -> Account ancestor chain for manage-billing links', () => {
+    expect(resolveDeepLink('billing.manage', {})).toEqual({
+      route: 'billing.manage',
+      params: {},
+      chain: ['settings.more', 'settings.account'],
     });
   });
 

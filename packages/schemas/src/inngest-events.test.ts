@@ -1,4 +1,5 @@
 import {
+  billingAlertDeliveryFailedEventSchema,
   classificationFailedEventSchema,
   filingResolvedEventSchema,
   filingRetryCompletedEventSchema,
@@ -15,6 +16,32 @@ import {
 } from './inngest-events.js';
 
 const validUuid = '00000000-0000-4000-8000-000000000001';
+
+describe('billing alert delivery failure event schema', () => {
+  it('accepts controlled delivery failure reasons', () => {
+    expect(
+      billingAlertDeliveryFailedEventSchema.safeParse({
+        alertId: validUuid,
+        subscriptionId: validUuid,
+        channel: 'email',
+        reason: 'resend_api_error_503',
+        timestamp: '2026-07-11T10:00:00.000Z',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects uncontrolled reason text that could contain PII', () => {
+    expect(
+      billingAlertDeliveryFailedEventSchema.safeParse({
+        alertId: validUuid,
+        subscriptionId: validUuid,
+        channel: 'email',
+        reason: 'Delivery failed for payer@example.test',
+        timestamp: '2026-07-11T10:00:00.000Z',
+      }).success,
+    ).toBe(false);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // [WI-577] PII-free event payload shapes (F-073/F-083/F-084/F-095)

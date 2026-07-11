@@ -118,6 +118,20 @@ describe('pushNowDeepLink', () => {
     expect(router.push).toHaveBeenCalledWith('/(app)/mentor');
   });
 
+  it('pushes the full More -> Account -> Subscription manage-billing chain', () => {
+    const router = { push: jest.fn() };
+
+    pushNowDeepLink(router, {
+      route: 'billing.manage',
+      params: {},
+      chain: ['settings.more', 'settings.account'],
+    });
+
+    expect(router.push).toHaveBeenNthCalledWith(1, '/(app)/more');
+    expect(router.push).toHaveBeenNthCalledWith(2, '/(app)/more/account');
+    expect(router.push).toHaveBeenNthCalledWith(3, '/(app)/subscription');
+  });
+
   it('throws before indexing a missing or unknown chain key', () => {
     const router = { push: jest.fn() };
 

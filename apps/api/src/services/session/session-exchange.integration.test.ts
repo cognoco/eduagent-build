@@ -50,6 +50,7 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   assessments,
   createDatabase,
+  createScopedRepository,
   curricula,
   curriculumBooks,
   curriculumTopics,
@@ -58,10 +59,17 @@ import {
   membership,
   organization,
   person,
+  retentionCards,
   sessionEvents,
   subjects,
+  topicNotes,
   type Database,
 } from '@eduagent/database';
+import type { ChallengeRoundNoteDraftHint } from '@eduagent/schemas';
+import {
+  applyRetentionUpdate,
+  insertRetentionCardIfAbsent,
+} from '../apply-retention-update';
 import {
   deleteV2IdentitiesForTest,
   ensureLegacyProfileAnchorForTest,
@@ -544,6 +552,164 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
     const rows = await readAssessmentsForSession(db, profileId, session.id);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.masteryChallengeVerifiedAt).not.toBeNull();
+  });
+
+  // [WI-1658] Real-DB persistence assertion for the verified-proof note. The
+  // unit-level gating tests (session-exchange-challenge-finalize.test.ts) use
+  // a fake Database with no topic_notes surface and assert only the gating
+  // decision via a boundary spy; this is the one place that exercises the
+  // real createNoteForSession / insertNoteWithCap write end-to-end.
+  it('[WI-1658] finalizeChallengeRoundIfReady with solid evaluations also persists a topic_notes row marked artifact_source challenge_drafted_note', async () => {
+    const { profileId, subjectId } = await seedProfileAndSubject(db);
+    const topicId = await seedCurriculumTopic(db, subjectId);
+    const answerEventId = generateUUIDv7();
+    const session = await seedDraftingSession(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+      answerEventId,
+    );
+    const meta = await readSessionChallengeRound(db, session.id);
+
+    const noteDraft: ChallengeRoundNoteDraftHint = {
+      content: 'Plants use sunlight to split water.',
+      source_concepts: ['photosynthesis'],
+      source_answer_event_ids: [answerEventId],
+    };
+
+    const result = await finalizeChallengeRoundIfReady(
+      db,
+      profileId,
+      session,
+      meta as Parameters<typeof finalizeChallengeRoundIfReady>[3],
+      noteDraft,
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.draftedNote?.body).toBe(
+      'Plants use sunlight to split water.',
+    );
+
+    const noteRows = await db
+      .select({
+        content: topicNotes.content,
+        artifactSource: topicNotes.artifactSource,
+      })
+      .from(topicNotes)
+      .where(
+        and(
+          eq(topicNotes.profileId, profileId),
+          eq(topicNotes.topicId, topicId),
+          eq(topicNotes.sessionId, session.id),
+        ),
+      );
+
+    expect(noteRows).toHaveLength(1);
+    expect(noteRows[0]!.artifactSource).toBe('challenge_drafted_note');
+    expect(noteRows[0]!.content).toBe('Plants use sunlight to split water.');
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-1445] retention_cards.nextReviewAt seed — persistence-site guard.
+  // MMT-ADR-0031: Challenge verification may seed the retention card's first
+  // re-check promise but must never mark it permanently retained.
+  // -------------------------------------------------------------------------
+
+  it('[WI-1445] finalizeChallengeRoundIfReady seeds retention_cards.nextReviewAt for a NEW card', async () => {
+    const { profileId, subjectId } = await seedProfileAndSubject(db);
+    const topicId = await seedCurriculumTopic(db, subjectId);
+    const answerEventId = generateUUIDv7();
+    const session = await seedDraftingSession(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+      answerEventId,
+    );
+    const meta = await readSessionChallengeRound(db, session.id);
+
+    const result = await finalizeChallengeRoundIfReady(
+      db,
+      profileId,
+      session,
+      meta as Parameters<typeof finalizeChallengeRoundIfReady>[3],
+      null,
+    );
+    expect(result).not.toBeNull();
+
+    const repo = createScopedRepository(db, profileId);
+    const card = await repo.retentionCards.findFirst(
+      eq(retentionCards.topicId, topicId),
+    );
+    expect(card).toBeDefined();
+    expect(card?.nextReviewAt ?? null).not.toBeNull();
+    expect(card?.repetitions).toBe(1);
+    // Never marks the card permanently retained (MMT-ADR-0031).
+    expect(card?.xpStatus).toBe('pending');
+    expect(card?.masteredAt ?? null).toBeNull();
+  });
+
+  it('[WI-1445] finalizeChallengeRoundIfReady advances nextReviewAt on an EXISTING card without touching xpStatus/masteredAt', async () => {
+    const { profileId, subjectId } = await seedProfileAndSubject(db);
+    const topicId = await seedCurriculumTopic(db, subjectId);
+
+    // Pre-seed a retention card already SM-2-verified through ordinary review
+    // (xpStatus: 'verified', a historical masteredAt, no nextReviewAt yet) —
+    // simulates a topic that was reviewed to mastery before this Challenge
+    // Round, exercising the ADR-0031 "verification never terminates SM-2"
+    // guarantee against a card that already carries retained-state fields.
+    // repetitions stays 0 throughout this seed (insertRetentionCardIfAbsent's
+    // default), so this exercises the `repetitionsZero` guard branch against
+    // a REAL Postgres connection — the integer-equality WHERE clause that
+    // sidesteps the B73 optimistic-lock timestamp-precision issue (see
+    // retention-data.ts's updateRetentionFromSession guard selection).
+    await insertRetentionCardIfAbsent({ db, profileId, topicId });
+    const repoBefore = createScopedRepository(db, profileId);
+    const seeded = await repoBefore.retentionCards.findFirst(
+      eq(retentionCards.topicId, topicId),
+    );
+    if (!seeded) throw new Error('retention card not seeded');
+    const priorMasteredAt = new Date('2026-06-01T00:00:00.000Z');
+    await applyRetentionUpdate({
+      db,
+      profileId,
+      cardId: seeded.id,
+      set: { xpStatus: 'verified', masteredAt: priorMasteredAt },
+      guard: { kind: 'none' },
+      updatedAt: new Date(),
+    });
+
+    const answerEventId = generateUUIDv7();
+    const session = await seedDraftingSession(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+      answerEventId,
+    );
+    const meta = await readSessionChallengeRound(db, session.id);
+
+    const result = await finalizeChallengeRoundIfReady(
+      db,
+      profileId,
+      session,
+      meta as Parameters<typeof finalizeChallengeRoundIfReady>[3],
+      null,
+    );
+    expect(result).not.toBeNull();
+
+    const repoAfter = createScopedRepository(db, profileId);
+    const cardAfter = await repoAfter.retentionCards.findFirst(
+      eq(retentionCards.topicId, topicId),
+    );
+    expect(cardAfter?.nextReviewAt ?? null).not.toBeNull();
+    // ADR-0031: verification seeds scheduling but never marks retained —
+    // the pre-existing xpStatus/masteredAt must survive unchanged.
+    expect(cardAfter?.xpStatus).toBe('verified');
+    expect(cardAfter?.masteredAt?.toISOString()).toBe(
+      priorMasteredAt.toISOString(),
+    );
   });
 
   // -------------------------------------------------------------------------
