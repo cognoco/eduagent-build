@@ -1,5 +1,5 @@
 {
-  "id": "6bf574df-fc33-4b9e-87c0-aa8323f0ae12",
+  "id": "2ce7e4c6-c008-4d96-8c83-c68f26a8cb21",
   "prevId": "b3639521-4cfd-42bf-b7b1-b86fc5514a05",
   "version": "7",
   "dialect": "postgresql",
@@ -962,134 +962,6 @@
           "columns": ["profile_id", "subject_id"]
         }
       },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.billing_alerts": {
-      "name": "billing_alerts",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "subscription_id": {
-          "name": "subscription_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_event_id": {
-          "name": "source_event_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "occurred_at": {
-          "name": "occurred_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "push_status": {
-          "name": "push_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "push_failure_reason": {
-          "name": "push_failure_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "email_status": {
-          "name": "email_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "email_failure_reason": {
-          "name": "email_failure_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "billing_alerts_source_event_id_uq": {
-          "name": "billing_alerts_source_event_id_uq",
-          "columns": [
-            {
-              "expression": "source_event_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "billing_alerts_subscription_created_idx": {
-          "name": "billing_alerts_subscription_created_idx",
-          "columns": [
-            {
-              "expression": "subscription_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "billing_alerts_subscription_id_subscription_id_fk": {
-          "name": "billing_alerts_subscription_id_subscription_id_fk",
-          "tableFrom": "billing_alerts",
-          "tableTo": "subscription",
-          "columnsFrom": ["subscription_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -9287,6 +9159,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "artifact_source": {
+          "name": "artifact_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -11807,7 +11685,6 @@
         "review_reminder",
         "daily_reminder",
         "trial_expiry",
-        "payment_failed",
         "streak_warning",
         "consent_request",
         "consent_reminder",

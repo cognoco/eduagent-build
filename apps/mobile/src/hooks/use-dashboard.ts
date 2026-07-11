@@ -11,6 +11,7 @@ import type {
   DashboardChild,
   DashboardData,
   TopicProgress,
+  VerifiedProofResponse,
 } from '@eduagent/schemas';
 import {
   childDetailResponseSchema,
@@ -21,6 +22,7 @@ import {
   dashboardResponseSchema,
   demoDashboardDataSchema,
   noticeSeenResponseSchema,
+  verifiedProofResponseSchema,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
@@ -159,6 +161,43 @@ export function useChildDetail(
         { init: { signal } },
       ),
     select: (json) => json.child,
+  });
+}
+
+/**
+ * [WI-1658] Latest verified-proof receipt for the parent home card.
+ *
+ * Hono RPC does not type hyphenated path segments — the `verified-proof`
+ * route segment is cast to the handler shape, mirroring the precedent in
+ * use-child-dashboard.ts's `useChildProgressSummary` (`progress-summary`).
+ */
+export function useVerifiedProof(
+  childProfileId: string | undefined,
+): UseQueryResult<VerifiedProofResponse> {
+  const client = useApiClient();
+  const { mode, canAccessFamilyChildData } = useDashboardNavigationScope();
+
+  return useApiQuery<VerifiedProofResponse, VerifiedProofResponse>({
+    queryKey: queryKeys.dashboard.childVerifiedProof(mode, childProfileId),
+    enabled: canAccessFamilyChildData && !!childProfileId,
+    schema: verifiedProofResponseSchema,
+    fetch: (signal) => {
+      const verifiedProofClient = (
+        client.dashboard.children[':profileId'] as unknown as {
+          'verified-proof': {
+            $get: (
+              args: { param: { profileId: string } },
+              options?: { init?: RequestInit },
+            ) => Promise<Response>;
+          };
+        }
+      )['verified-proof'];
+      return verifiedProofClient.$get(
+        { param: { profileId: childProfileId ?? '' } },
+        { init: { signal } },
+      );
+    },
+    select: (json) => json,
   });
 }
 

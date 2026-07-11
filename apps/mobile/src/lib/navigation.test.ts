@@ -18,6 +18,7 @@ import {
   STUDY_PROGRESS_RETURN_TO,
   FAMILY_CHILDREN_HREF,
   FAMILY_CHILDREN_RETURN_TO,
+  FAMILY_HOME_RETURN_TO,
 } from './navigation';
 import type { LearningResumeTarget } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
@@ -83,6 +84,11 @@ describe('homeHrefForReturnTo', () => {
   it('falls back to the family home for any other value', () => {
     expect(homeHrefForReturnTo('something-else')).toBe('/(app)/home');
     expect(homeHrefForReturnTo(undefined)).toBe('/(app)/home');
+  });
+
+  // [WI-1658]
+  it('resolves FAMILY_HOME_RETURN_TO to FAMILY_HOME_PATH', () => {
+    expect(homeHrefForReturnTo(FAMILY_HOME_RETURN_TO)).toBe(FAMILY_HOME_PATH);
   });
 });
 
