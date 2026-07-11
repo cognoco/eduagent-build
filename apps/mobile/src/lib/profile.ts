@@ -12,7 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from './secure-storage';
 import { sanitizeSecureStoreKey } from './secure-storage';
 import { Sentry } from './sentry';
-import { computeAgeBracket, type Profile } from '@eduagent/schemas';
+import { computeAgeBracketFromDate, type Profile } from '@eduagent/schemas';
 import { useProfiles } from '../hooks/use-profiles';
 import {
   useApiClient,
@@ -41,14 +41,22 @@ export function isGuardianProfile(
  */
 export function isFamilyCapableProfile(
   activeProfile:
-    | Pick<Profile, 'id' | 'isOwner' | 'birthYear'>
+    | Pick<Profile, 'id' | 'isOwner' | 'birthYear' | 'birthMonth' | 'birthDay'>
     | null
     | undefined,
   profiles: ReadonlyArray<Pick<Profile, 'id' | 'isOwner'>>,
 ): boolean {
   if (!activeProfile) return false;
   if (!activeProfile.isOwner) return false;
-  if (computeAgeBracket(activeProfile.birthYear) !== 'adult') return false;
+  if (
+    computeAgeBracketFromDate(
+      activeProfile.birthYear,
+      activeProfile.birthMonth ?? undefined,
+      activeProfile.birthDay ?? undefined,
+    ) !== 'adult'
+  ) {
+    return false;
+  }
   return profiles.some((p) => p.id !== activeProfile.id && p.isOwner === false);
 }
 
