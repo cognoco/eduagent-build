@@ -111,7 +111,7 @@ describeIfPostDrop('generateExportV2 (integration)', () => {
       .insert(person)
       .values({
         displayName: 'Owner',
-        birthDate: '1980-01-01',
+        birthDate: '1980-06-15',
         residenceJurisdiction: 'EU',
       })
       .returning();
@@ -185,6 +185,12 @@ describeIfPostDrop('generateExportV2 (integration)', () => {
     expect(result.account.email).toBe(ownerEmail);
     // (c) the child appears in the v2 profiles export.
     expect(result.profiles.map((p) => p.id)).toContain(child!.id);
+    const ownerProfile = result.profiles.find((p) => p.id === owner!.id);
+    expect(ownerProfile?.birthMonth).toBe(6);
+    expect(ownerProfile?.birthDay).toBe(15);
+    const childProfile = result.profiles.find((p) => p.id === child!.id);
+    expect(childProfile?.birthMonth).toBeNull();
+    expect(childProfile?.birthDay).toBeNull();
     // (d) the learning half ran: the seeded subject is in the export.
     expect(
       result.subjects.some(
