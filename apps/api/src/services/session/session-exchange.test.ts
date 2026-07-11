@@ -24,6 +24,8 @@ import {
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import { MAX_INTERVIEW_EXCHANGES } from '../exchanges';
 import { SessionExchangeLimitError } from './session-crud';
+import { computeNextPracticePointer } from '../language-session-engine';
+import { resetSessionStaticContextCache } from './session-cache';
 
 type ExchangeHistoryEntry = ReturnType<typeof buildExchangeHistory>[number];
 
@@ -1258,5 +1260,204 @@ describe('resolvePromptLearnerName', () => {
         displayName: null,
       }),
     ).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-1552 (review rework, finding ac.4a.two_session_persistence_readback) —
+// prepareExchangeContext persist->read-back boundary.
+//
+// The engine-level test in language-session-engine.test.ts ("seeds
+// activeStrand at session start from a cross-session pointer") passes a
+// crossSessionPointer straight into buildLanguageSessionState — it never
+// exercises the DB read or the profileId-scoped repository lookup in
+// prepareExchangeContext (session-exchange.ts, ~2636-2650) that "session two"
+// actually depends on. This suite simulates the real boundary: "session one"
+// persists a pointer on the subjects row (the shape session-completed.ts
+// writes at session-close), and "session two"'s first exchange
+// (exchangeCount 0) reads it back through the real prepareExchangeContext /
+// createScopedRepository path and threads it into languageSessionState.
+//
+// No jest.mock of internal modules (GC1/GC6) — only a duck-typed db stub,
+// following session-summary.test.ts's conventions. db.query.subjects.findFirst
+// backs BOTH getSubject's pedagogyMode read (via getSessionStaticContext) and
+// the cross-session-pointer scoped-repository read from Finding 1 of this
+// rework — one fixture row serves both, since both route through the same
+// scoped repository call in production.
+// ---------------------------------------------------------------------------
+describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back', () => {
+  beforeEach(() => {
+    // prepareExchangeContext populates the module-level session-static-context
+    // cache as a side effect; without a reset, a stale entry from an earlier
+    // test (in this file or a sibling) would short-circuit past the DB reads
+    // this suite exists to exercise.
+    resetSessionStaticContextCache();
+  });
+
+  const PROFILE_ID = 'prof-wi1552';
+  const SESSION_ID = 'sess-wi1552';
+  const SUBJECT_ID = 'subj-wi1552';
+
+  function buildSessionRow() {
+    return {
+      id: SESSION_ID,
+      profileId: PROFILE_ID,
+      subjectId: SUBJECT_ID,
+      topicId: null,
+      sessionType: 'learning',
+      inputMode: 'text',
+      verificationType: null,
+      status: 'active',
+      escalationRung: 1,
+      exchangeCount: 0,
+      startedAt: new Date('2026-01-02T10:00:00Z'),
+      lastActivityAt: new Date('2026-01-02T10:00:00Z'),
+      endedAt: null,
+      durationSeconds: null,
+      wallClockSeconds: null,
+      rawInput: null,
+      filedAt: null,
+      filingStatus: null,
+      filingRetryCount: 0,
+      metadata: null,
+      updatedAt: new Date('2026-01-02T10:00:00Z'),
+      createdAt: new Date('2026-01-02T10:00:00Z'),
+    };
+  }
+
+  // "Session one" ending: session-completed.ts computes and persists exactly
+  // this shape on subjects.nextLanguagePracticePointer (WI-1552).
+  const persistedPointer = computeNextPracticePointer({
+    meaning_input: 4,
+    meaning_output: 3,
+    language_focus: 0,
+    fluency: 3,
+  });
+
+  function buildSubjectRow(
+    pointer: typeof persistedPointer | null = persistedPointer,
+  ) {
+    return {
+      id: SUBJECT_ID,
+      profileId: PROFILE_ID,
+      name: 'Spanish',
+      rawInput: null,
+      status: 'active',
+      pedagogyMode: 'four_strands',
+      languageCode: 'es',
+      createdAt: new Date('2026-01-01T09:00:00Z'),
+      updatedAt: new Date('2026-01-01T09:00:00Z'),
+      urgencyBoostUntil: null,
+      urgencyBoostReason: null,
+      nextLanguagePracticePointer: pointer,
+    };
+  }
+
+  const personRow = {
+    id: PROFILE_ID,
+    organizationId: 'org-wi1552',
+    displayName: 'Learner WI-1552',
+    avatarUrl: null,
+    birthDate: '2011-06-15',
+    residenceJurisdiction: 'US',
+    conversationLanguage: 'en',
+    pronouns: null,
+    defaultAppContext: null,
+    createdAt: new Date('2020-01-01T00:00:00Z'),
+    updatedAt: new Date('2020-01-01T00:00:00Z'),
+    roles: ['learner'],
+  };
+
+  // Every db.select().from(...) call site in prepareExchangeContext's
+  // four_strands/exchangeCount-0 path either supports .where/.limit or
+  // .innerJoin/.leftJoin/.orderBy, and several never call .limit() at all
+  // (e.g. fetchPriorTopics ends on .orderBy()). Make every method return the
+  // same thenable node so any call sequence resolves to `rows`, regardless of
+  // where the real code stops chaining.
+  function makeChainNode(rows: unknown[]) {
+    const node: {
+      where: () => typeof node;
+      orderBy: () => typeof node;
+      innerJoin: () => typeof node;
+      leftJoin: () => typeof node;
+      limit: () => typeof node;
+      then: (resolve: (v: unknown[]) => void) => void;
+    } = {
+      where: () => node,
+      orderBy: () => node,
+      innerJoin: () => node,
+      leftJoin: () => node,
+      limit: () => node,
+      then: (resolve) => resolve(rows),
+    };
+    return node;
+  }
+
+  // loadProfileRowByIdV2 is the only .select() call site in this path whose
+  // projection includes `organizationId` (the person/membership join) — use
+  // that as the dispatch key to hand back the seeded person row; every other
+  // .select() call site (vocabulary reads, urgency read, last-session-summary
+  // read, fetchPriorTopics, fetchCrossSubjectHighlights) gets an empty result.
+  function makeDb(subjectRow: ReturnType<typeof buildSubjectRow>) {
+    const subjectsFindFirst = jest.fn().mockResolvedValue(subjectRow);
+    return {
+      query: {
+        learningSessions: {
+          findFirst: jest.fn().mockResolvedValue(buildSessionRow()),
+        },
+        subjects: { findFirst: subjectsFindFirst },
+        sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
+        teachingPreferences: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
+        learningModes: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        learningProfiles: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
+      },
+      select: jest.fn((cols: Record<string, unknown>) => ({
+        from: () =>
+          cols && 'organizationId' in cols
+            ? makeChainNode([personRow])
+            : makeChainNode([]),
+      })),
+    } as never;
+  }
+
+  it('seeds session two, exchange 0 from the pointer session one persisted to subjects (AC1/AC4a)', async () => {
+    const db = makeDb(buildSubjectRow(persistedPointer));
+
+    const result = await prepareExchangeContext(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      'Hola, quiero seguir practicando',
+      { semanticMemoryRetrievalEnabled: false },
+    );
+
+    // language_focus is the least-practiced strand in persistedPointer's
+    // counts (0, vs. 3-4 for the others) — this is only reachable if the
+    // pointer was actually read back off the subjects row and threaded
+    // through to buildLanguageSessionState/chooseNextLanguageStrand.
+    expect(result.context.languageSessionState?.activeStrand).toBe(
+      'language_focus',
+    );
+    expect(result.context.pedagogyMode).toBe('four_strands');
+  });
+
+  it('falls back to the default strand when no pointer was persisted (no prior session)', async () => {
+    const db = makeDb(buildSubjectRow(null));
+
+    const result = await prepareExchangeContext(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      'Hola, quiero empezar',
+      { semanticMemoryRetrievalEnabled: false },
+    );
+
+    expect(result.context.languageSessionState?.activeStrand).toBe(
+      'meaning_input',
+    );
   });
 });
