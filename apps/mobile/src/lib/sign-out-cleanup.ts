@@ -198,6 +198,12 @@ export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
     reason:
       'Pre-auth welcome-intro "seen" flag is device-scoped (single static key, no userId or profileId) — falls outside PER_PROFILE_KEYS. Per GLOBAL_KEYS comment, onboarding flags that legitimately survive sign-out cycles are intentionally excluded from the global wipe: a user who signs out and back in on the same device must not re-see the intro. The key contains no user identifier, so cross-account leakage is structurally impossible (the only signal is "this device has been through the welcome cards once"). Spec: docs/plans/2026-05-27-pre-auth-welcome-flow.md. [Line updated WI-1090: local const replaced by barrel import, shifted line by 4]',
   },
+  {
+    file: 'apps/mobile/src/lib/anonymous-id.ts',
+    line: 30,
+    reason:
+      '[WI-1689] Device-scoped activation-funnel anonymous id (single static key, no userId or profileId) — falls outside PER_PROFILE_KEYS. Deliberately survives sign-out (like intro-state.ts above) so activation events fired before and after signup, and across a sign-out/sign-in cycle on the same device, can be correlated to the same install. The value is a random UUID with no user identifier, so cross-account leakage is structurally impossible.',
+  },
 ];
 
 /**

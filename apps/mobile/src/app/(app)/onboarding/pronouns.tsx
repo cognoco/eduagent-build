@@ -24,6 +24,7 @@ import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
 import { platformAlert } from '../../../lib/platform-alert';
 import { Sentry } from '../../../lib/sentry';
 import { useThemeColors } from '../../../lib/theme';
+import { useReportActivationEvent } from '../../../lib/activation-events';
 
 const PRESETS = ['she/her', 'he/him', 'they/them'] as const;
 // Separate from PRESETS so we can render a distinct "Other" card that opens
@@ -112,6 +113,7 @@ export default function PronounsScreen(): React.ReactElement {
   const startFirstCurriculumSession = useStartFirstCurriculumSession(
     subjectId ?? '',
   );
+  const reportActivationEvent = useReportActivationEvent();
 
   const navigateForward = useCallback(() => {
     if (hasForwardedRef.current) return;
@@ -121,6 +123,12 @@ export default function PronounsScreen(): React.ReactElement {
       goBackOrReplace(router, '/(app)/more' as Href);
       return;
     }
+    // [WI-1689] Pronouns is the final onboarding step (onboarding/index.tsx
+    // redirects here first); fire onboarding_completed only for the real
+    // onboarding flow, not a Settings re-edit (guarded above).
+    reportActivationEvent('onboarding_completed', {
+      route: 'onboarding.pronouns',
+    });
     if (!subjectId) {
       router.replace('/(app)/home' as const);
       return;
@@ -145,7 +153,14 @@ export default function PronounsScreen(): React.ReactElement {
         },
       },
     );
-  }, [returnTo, router, subjectId, subjectName, startFirstCurriculumSession]);
+  }, [
+    returnTo,
+    router,
+    subjectId,
+    subjectName,
+    startFirstCurriculumSession,
+    reportActivationEvent,
+  ]);
 
   // Age-gate: learners below 13 never see the screen. Silently forward so
   // the back stack doesn't accumulate a useless entry.
