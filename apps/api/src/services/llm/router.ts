@@ -21,8 +21,6 @@ import {
   NoEligibleModelError,
   type ExchangeRouterRow,
 } from '../policy-engine';
-import { captureException } from '../sentry';
-
 const logger = createLogger();
 
 export type PreferredLlmProvider = 'gemini' | 'openai' | 'anthropic';
@@ -71,15 +69,19 @@ type LlmFallbackReason =
  * attaching prompts, model output, session identifiers, or provider error
  * bodies to Sentry.
  */
-function captureLlmFallbackSignal(input: {
+async function captureLlmFallbackSignal(input: {
   reason: LlmFallbackReason;
   provider: string;
   fallbackProvider: string;
   circuitKey: string;
   capability: LlmCapability;
   flow?: string;
-}): void {
+}): Promise<void> {
   try {
+    // Keep Sentry out of the router's eager module graph. Several integration
+    // suites install the Cloudflare SDK mock after importing router consumers;
+    // a static wrapper import here binds the SDK before those mocks exist.
+    const { captureException } = await import('../sentry');
     captureException(new Error('LLM provider fallback activated'), {
       tags: {
         surface: 'llm-router',
@@ -1625,7 +1627,7 @@ export async function routeAndCall(
           error: err instanceof Error ? err.message : String(err),
         },
       );
-      captureLlmFallbackSignal({
+      await captureLlmFallbackSignal({
         reason: 'primary-error',
         provider: config.provider,
         fallbackProvider: fallbackConfig.provider,
@@ -1660,7 +1662,7 @@ export async function routeAndCall(
       flow: _options?.flow,
       sessionId: _options?.sessionId,
     });
-    captureLlmFallbackSignal({
+    await captureLlmFallbackSignal({
       reason: 'primary-circuit-open',
       provider: config.provider,
       fallbackProvider: fallbackConfig.provider,
@@ -1819,7 +1821,7 @@ async function* wrapStreamWithCircuitBreaker(
             sessionId: metricContext.sessionId,
           },
         );
-        captureLlmFallbackSignal({
+        await captureLlmFallbackSignal({
           reason: 'empty-stream',
           provider: providerId,
           fallbackProvider: fallbackConfig.provider,
@@ -1899,7 +1901,7 @@ async function* wrapStreamWithCircuitBreaker(
             error: err instanceof Error ? err.message : String(err),
           },
         );
-        captureLlmFallbackSignal({
+        await captureLlmFallbackSignal({
           reason: 'stream-error',
           provider: providerId,
           fallbackProvider: fallbackConfig.provider,
@@ -2104,7 +2106,7 @@ export async function routeAndStream(
       flow: options?.flow,
       sessionId: options?.sessionId,
     });
-    captureLlmFallbackSignal({
+    await captureLlmFallbackSignal({
       reason: 'primary-circuit-open',
       provider: config.provider,
       fallbackProvider: fallbackConfig.provider,

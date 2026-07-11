@@ -29,10 +29,17 @@ import type {
 import { SafetyFilterError } from '../../errors';
 
 const mockCaptureException = jest.fn();
-jest.mock('../sentry', () => ({
-  ...jest.requireActual('../sentry'),
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('../sentry', () => {
+  (
+    globalThis as typeof globalThis & {
+      __routerSentryModuleLoaded?: boolean;
+    }
+  ).__routerSentryModuleLoaded = true;
+  return {
+    ...jest.requireActual('../sentry'),
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
 // [IMP-1] Test helper — returns a ChatResult matching the LLMProvider
 // interface. Spies must not rely on the `normalizeChatResult` back-compat
@@ -253,6 +260,16 @@ beforeAll(() => {
 });
 
 describe('LLM Router', () => {
+  it('does not load the Sentry wrapper until a fallback signal is emitted', () => {
+    expect(
+      (
+        globalThis as typeof globalThis & {
+          __routerSentryModuleLoaded?: boolean;
+        }
+      ).__routerSentryModuleLoaded,
+    ).toBeUndefined();
+  });
+
   describe('routeAndCall', () => {
     it('routes to provider and returns response', async () => {
       const result = await routeAndCall(
