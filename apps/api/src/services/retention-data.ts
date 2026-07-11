@@ -1668,7 +1668,13 @@ export async function updateRetentionFromSession(
 
   await assertOwnedCurriculumTopic(db, { profileId, topicId });
 
-  // Auto-create retention card on first encounter
+  // Auto-create retention card on first encounter. `isNew` stays strictly
+  // "this exact call inserted the row" (ensureRetentionCard's own semantics
+  // when it finds no existing row) — it does NOT mean "never reviewed": a
+  // card found via `existing` can pre-exist with repetitions still 0 (e.g.
+  // auto-created earlier by topic-probe-extract.ts's own ensureRetentionCard
+  // call, or reset to 0 by a failed SM-2 review after real history), and
+  // must still be lock-protected below.
   const ensured = existing
     ? { card: existing, isNew: false }
     : await ensureRetentionCard(db, profileId, topicId);
@@ -1721,9 +1727,32 @@ export async function updateRetentionFromSession(
     // each other to overwrite stale reads. If a non-JS writer (raw SQL,
     // background job in another language, etc.) is ever introduced, revisit
     // this comparison rather than re-widening it blindly.
+    // [WI-1445] A never-reviewed EXISTING card is the one exception —
+    // discriminated by `lastReviewedAt === null`, NOT `repetitions === 0`.
+    // `repetitions` alone is ambiguous: SM-2 resets it to 0 on every FAILED
+    // review too, so a card with real prior history (failureCount > 0,
+    // xpStatus: 'decayed') can also read repetitions === 0 while its
+    // `updatedAt` was set by a JS writer on that very reset (every SM-2
+    // write sets `lastReviewedAt` alongside `updatedAt`) — for that card the
+    // strict updatedAt-equality CAS above is exactly correct and must not be
+    // downgraded, or two concurrent writers racing on it could both match
+    // and the loser's stale write would silently clobber ease/interval.
+    // `lastReviewedAt === null` means the row has NEVER been touched by any
+    // JS writer (only `insertRetentionCardIfAbsent`'s SQL defaultNow()) — for
+    // that case ONLY, the timestamp can carry sub-millisecond precision a JS
+    // Date read-back truncates, so the strict equality would silently match
+    // 0 rows. Guard on `repetitionsZero` instead (integer equality, immune to
+    // timestamp precision) — same established primitive
+    // topic-probe-extract.ts's seedRetentionCard uses for this exact
+    // never-reviewed-card scenario. Both branches still detect a genuine
+    // concurrent writer: if another session already advanced repetitions (or
+    // updatedAt) between our read and this write, the WHERE clause fails to
+    // match and `updateResult.updated` is false.
     guard: ensured.isNew
       ? { kind: 'none' }
-      : { kind: 'optimisticLock', updatedAt: card.updatedAt },
+      : card.lastReviewedAt === null
+        ? { kind: 'repetitionsZero' }
+        : { kind: 'optimisticLock', updatedAt: card.updatedAt },
     updatedAt: new Date(),
   });
 
