@@ -114,6 +114,7 @@ import { ConfirmationToast } from './_components/ConfirmationToast';
 import { SessionScreenChrome } from './_components/SessionScreenChrome';
 import { useImageBase64 } from './_hooks/use-image-base64';
 import { useBookmarkHandler } from './_hooks/use-bookmark-handler';
+import { useFreeformKeepHandler } from './_hooks/use-freeform-keep-handler';
 import { useSessionRecovery } from './_hooks/use-session-recovery';
 import { useSessionTranscriptHydration } from './_hooks/use-session-transcript-hydration';
 import { renderSessionMessageActions } from './_components/MessageActionsRenderer';
@@ -122,6 +123,7 @@ import {
   countPersistedAiResponses,
   deriveSessionSubjectState,
   getLatestAiMessageId,
+  getLatestBookmarkableEventId,
   getLearnerTurnCount,
   resolveLanguageVoiceLocale,
 } from './_view-models/session-derived-state';
@@ -648,6 +650,8 @@ function SessionScreenInner() {
   const { bookmarkState, handleToggleBookmark } = useBookmarkHandler({
     sessionId: activeSessionId ?? routeSessionId ?? undefined,
   });
+  const { keepPending, keepSaved, handleKeepNow, resetKeepSaved } =
+    useFreeformKeepHandler();
   const recordSystemPrompt = useRecordSystemPrompt(activeSessionId ?? '');
   const recordSessionEvent = useRecordSessionEvent(activeSessionId ?? '');
   const setSessionInputMode = useSetSessionInputMode(activeSessionId ?? '');
@@ -726,6 +730,7 @@ function SessionScreenInner() {
       setLowConfidenceMessageId(null);
       closedSessionRef.current = null;
       sessionNoteSavedRef.current = false;
+      resetKeepSaved();
       hasHydratedRecoveryRef.current = false;
       resetMilestones();
       setHomeworkProblemsState(initialHomeworkProblems);
@@ -736,6 +741,7 @@ function SessionScreenInner() {
     }, [
       hasHydratedRecoveryRef,
       openingContent,
+      resetKeepSaved,
       resetMilestones,
       routeSessionId,
       initialHomeworkProblems,
@@ -1344,6 +1350,11 @@ function SessionScreenInner() {
     [messages, isStreaming],
   );
 
+  const bookmarkableEventId = useMemo(
+    () => getLatestBookmarkableEventId({ messages, isStreaming }),
+    [messages, isStreaming],
+  );
+
   const aiResponseCount = useMemo(
     () => countPersistedAiResponses(messages),
     [messages],
@@ -1656,6 +1667,10 @@ function SessionScreenInner() {
               userMessageCount={userMessageCount}
               showQuestionCount={modeConfig.showQuestionCount}
               showBookLink={showBookLink}
+              bookmarkableEventId={bookmarkableEventId}
+              keepPending={keepPending}
+              keepSaved={keepSaved}
+              onKeepNow={handleKeepNow}
             />
           </>
         }

@@ -836,7 +836,9 @@
     "notePrompt": {
       "writeNote": "メモを書く",
       "saveFailedTitle": "メモを保存できませんでした",
-      "summaryPlaceholder": "このセッションで覚えておくことは何ですか？"
+      "summaryPlaceholder": "このセッションで覚えておくことは何ですか？",
+      "keepThis": "この返信を保存",
+      "keepPending": "保存中…"
     },
     "parkingLot": {
       "title": "パーキングロット",

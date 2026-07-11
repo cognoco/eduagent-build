@@ -27,6 +27,18 @@ export function getLatestAiMessageId(args: {
   );
 }
 
+export function getLatestBookmarkableEventId(args: {
+  messages: readonly ChatMessage[];
+  isStreaming: boolean;
+}): string | null {
+  const latestAiMessageId = getLatestAiMessageId(args);
+  if (!latestAiMessageId) return null;
+  return (
+    args.messages.find((message) => message.id === latestAiMessageId)
+      ?.eventId ?? null
+  );
+}
+
 export function countPersistedAiResponses(
   messages: readonly ChatMessage[],
 ): number {

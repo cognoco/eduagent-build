@@ -39,6 +39,10 @@ function createProps(overrides: Record<string, unknown> = {}) {
     userMessageCount: 0,
     showQuestionCount: false,
     showBookLink: false,
+    bookmarkableEventId: null,
+    keepPending: false,
+    keepSaved: false,
+    onKeepNow: jest.fn(),
     ...overrides,
   };
 }
@@ -140,5 +144,64 @@ describe('SessionFooter', () => {
     expect(screen.getByTestId('note-text-input').props.placeholder).toBe(
       'What should we remember from this session?',
     );
+  });
+
+  it('offers a bookmark keep CTA for topicless notePrompt moments once a bookmarkable event exists', () => {
+    const onKeepNow = jest.fn();
+    const createNote = { mutate: jest.fn(), isPending: false };
+    const props = createProps({
+      notePromptOffered: true,
+      topicId: undefined,
+      bookmarkableEventId: 'event-1',
+      onKeepNow,
+      createNote,
+    });
+    render(<SessionFooter {...(props as any)} />);
+
+    expect(screen.queryByTestId('session-note-prompt')).toBeNull();
+    fireEvent.press(screen.getByTestId('session-freeform-keep-prompt'));
+
+    expect(onKeepNow).toHaveBeenCalledWith('event-1');
+    expect(createNote.mutate).not.toHaveBeenCalled();
+  });
+
+  it('defers the bookmark keep CTA (no error) before any bookmarkable event exists', () => {
+    const props = createProps({
+      notePromptOffered: true,
+      topicId: undefined,
+      bookmarkableEventId: null,
+    });
+    render(<SessionFooter {...(props as any)} />);
+
+    expect(screen.queryByTestId('session-freeform-keep-prompt')).toBeNull();
+    expect(screen.getByTestId('session-freeform-keep-deferred')).toBeTruthy();
+    expect(screen.getByText('One sec…')).toBeTruthy();
+    expect(Alert.alert).not.toHaveBeenCalled();
+  });
+
+  it('hides the bookmark keep CTA once already saved', () => {
+    const props = createProps({
+      notePromptOffered: true,
+      topicId: undefined,
+      bookmarkableEventId: 'event-1',
+      keepSaved: true,
+    });
+    render(<SessionFooter {...(props as any)} />);
+
+    expect(screen.queryByTestId('session-freeform-keep-prompt')).toBeNull();
+    expect(screen.queryByTestId('session-freeform-keep-deferred')).toBeNull();
+  });
+
+  it('does not offer the bookmark keep CTA for topic-bound sessions', () => {
+    const props = createProps({
+      notePromptOffered: true,
+      topicId: 'topic-1',
+      bookmarkableEventId: 'event-1',
+    });
+    render(<SessionFooter {...(props as any)} />);
+
+    expect(screen.queryByTestId('session-freeform-keep-prompt')).toBeNull();
+    expect(screen.queryByTestId('session-freeform-keep-deferred')).toBeNull();
+    expect(screen.getByTestId('session-note-prompt')).toBeTruthy();
   });
 });

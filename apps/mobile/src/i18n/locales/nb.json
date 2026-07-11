@@ -836,7 +836,9 @@
     "notePrompt": {
       "writeNote": "Skriv et notat",
       "saveFailedTitle": "Kunne ikke lagre notat",
-      "summaryPlaceholder": "Hva skal vi huske fra denne økten?"
+      "summaryPlaceholder": "Hva skal vi huske fra denne økten?",
+      "keepThis": "Lagre dette svaret",
+      "keepPending": "Ett øyeblikk..."
     },
     "parkingLot": {
       "title": "Parkeringsplass",
