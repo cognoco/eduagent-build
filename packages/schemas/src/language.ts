@@ -244,5 +244,34 @@ export const languageProgressSchema = z.object({
     })
     .nullable(),
   nextPractice: languageNextPracticePointerSchema.nullable(),
+  strandBalance: z
+    .object({
+      counts: z.object({
+        meaning_input: z.number().int().nonnegative(),
+        meaning_output: z.number().int().nonnegative(),
+        language_focus: z.number().int().nonnegative(),
+        fluency: z.number().int().nonnegative(),
+      }),
+      sessionsSampled: z.number().int().nonnegative(),
+    })
+    .nullable()
+    .default(null),
+  skillProfile: z
+    .array(
+      z.object({
+        skill: z.enum([
+          'vocabulary',
+          'grammar',
+          'reading',
+          'listening',
+          'speaking',
+          'fluency',
+        ]),
+        progress: z.number().min(0).max(1).nullable(),
+        evidenceCount: z.number().int().nonnegative(),
+      }),
+    )
+    .nullable()
+    .default(null),
 });
 export type LanguageProgress = z.infer<typeof languageProgressSchema>;
