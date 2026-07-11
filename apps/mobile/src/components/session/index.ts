@@ -22,6 +22,7 @@ export type { QuotaExceededCardProps } from './QuotaExceededCard';
 export { FluencyDrillStrip } from './FluencyDrillStrip';
 export { GradedInputCard } from './GradedInputCard';
 export { MeaningOutputCard } from './MeaningOutputCard';
+export { SpeakingPracticeActivity } from './SpeakingPracticeActivity';
 export {
   MilestoneDots,
   MILESTONE_DOTS_NARROW_BREAKPOINT_PT,

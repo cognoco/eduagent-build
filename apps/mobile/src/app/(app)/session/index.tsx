@@ -26,6 +26,7 @@ import {
   FluencyDrillStrip,
   GradedInputCard,
   MeaningOutputCard,
+  SpeakingPracticeActivity,
   type ChatMessage,
 } from '../../../components/session';
 import { FirstSessionGreeting } from '../../../components/session/FirstSessionGreeting';
@@ -1494,6 +1495,22 @@ function SessionScreenInner() {
       onDismiss={() => setLanguageLearning(null)}
     />
   ) : null;
+  // WI-1777: `key` on the target sentence forces a remount (fresh transcript
+  // + feedback state) whenever the server rotates to a new target — retry
+  // (same target) never remounts, only a genuinely new turn does.
+  const speakingPracticeSessionId = activeSessionId ?? routeSessionId;
+  const speakingPracticeCard =
+    languageLearning?.speakingPractice &&
+    speakingPracticeSessionId &&
+    subjectId ? (
+      <SpeakingPracticeActivity
+        key={languageLearning.speakingPractice.targetText}
+        activity={languageLearning}
+        sessionId={speakingPracticeSessionId}
+        subjectId={subjectId}
+        textToSpeechLanguage={languageVoiceLocale}
+      />
+    ) : null;
   const firstSessionWrapUpCard = firstSessionWrapUp ? (
     <FirstSessionWrapUpCard
       value={firstSessionReflectionText}
@@ -1653,6 +1670,7 @@ function SessionScreenInner() {
           <>
             {gradedInputCard}
             {meaningOutputCard}
+            {speakingPracticeCard}
             {challengeOfferCard}
             {draftedNoteReview}
             <BookmarkNudgeTooltip

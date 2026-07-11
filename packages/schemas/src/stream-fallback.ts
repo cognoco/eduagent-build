@@ -144,6 +144,22 @@ export type LanguageMeaningOutputResponseMode =
   StreamLanguageMeaningOutputResponseMode;
 export type LanguageMeaningOutputArtifact = StreamLanguageMeaningOutput;
 
+// WI-1777: repeat-after-me/shadowing speaking practice. One shape serves both
+// modes (`type` discriminates) — the field is named `speakingPractice` rather
+// than `repeatAfterMe` for that reason. `retryGuidance` is a fixed enum, not
+// freeform text, mirroring `retryExpectation`/`correctionExpectation` above.
+export const streamLanguageSpeakingPracticeSchema = z.object({
+  type: z.enum(['repeat_after_me', 'shadowing']),
+  targetText: z.string().min(1),
+  locale: z.string().min(1),
+  modality: z.literal('voice'),
+  retryGuidance: z.enum(['retry_same_target']),
+});
+export type StreamLanguageSpeakingPractice = z.infer<
+  typeof streamLanguageSpeakingPracticeSchema
+>;
+export type LanguageSpeakingPracticeArtifact = StreamLanguageSpeakingPractice;
+
 export const languageComprehensionVerdictSchema = z.enum([
   'understood',
   'partial',
@@ -178,12 +194,15 @@ export const streamLanguageLearningActivitySchema = z.object({
     'free_response',
     'correction_retry',
     'timed_drill',
+    'repeat_after_me',
+    'shadowing',
   ]),
   modality: z.enum(['text', 'voice', 'listening']),
   targetWords: z.array(z.string()),
   targetGrammar: z.array(z.string()),
   gradedInput: streamLanguageGradedInputSchema.optional(),
   meaningOutput: streamLanguageMeaningOutputSchema.optional(),
+  speakingPractice: streamLanguageSpeakingPracticeSchema.optional(),
 });
 export type StreamLanguageLearningActivity = z.infer<
   typeof streamLanguageLearningActivitySchema

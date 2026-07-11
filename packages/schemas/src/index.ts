@@ -85,3 +85,6 @@ export * from './notifications';
 
 // Launch activation instrumentation (WI-1504)
 export * from './activation-events';
+
+// Speaking-practice attempt persistence (WI-1777)
+export * from './speaking-practice';

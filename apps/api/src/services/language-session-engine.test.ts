@@ -209,6 +209,89 @@ describe('buildLanguageActivityTelemetry', () => {
     });
   });
 
+  // WI-1777
+  it.each(['A1', 'A2'] as const)(
+    'maps beginner (%s) fluency strands to a repeat_after_me speaking-practice artifact',
+    async (cefrLevel) => {
+      const activity = await buildLanguageActivityTelemetry({
+        strand: 'fluency',
+        inputMode: 'text',
+        languageCode: 'es',
+        cefrLevel,
+        targetWords: ['cafe'],
+        targetGrammar: [],
+      });
+
+      expect(activity.activityType).toBe('repeat_after_me');
+      expect(activity.modality).toBe('voice');
+      expect(activity.speakingPractice).toMatchObject({
+        type: 'repeat_after_me',
+        locale: 'es-ES',
+        modality: 'voice',
+        retryGuidance: 'retry_same_target',
+      });
+      expect(activity.speakingPractice?.targetText.length).toBeGreaterThan(0);
+    },
+  );
+
+  it('does not gate B1+ fluency into speaking practice (unchanged timed_drill behavior)', async () => {
+    const activity = await buildLanguageActivityTelemetry({
+      strand: 'fluency',
+      inputMode: 'voice',
+      cefrLevel: 'B1',
+      targetWords: ['cafe'],
+      targetGrammar: ['je voudrais + noun'],
+    });
+
+    expect(activity.activityType).toBe('timed_drill');
+    expect(activity.speakingPractice).toBeUndefined();
+  });
+
+  it('defaults to en-US locale for an unrecognized language code', async () => {
+    const activity = await buildLanguageActivityTelemetry({
+      strand: 'fluency',
+      cefrLevel: 'A1',
+      targetWords: [],
+      targetGrammar: [],
+    });
+
+    expect(activity.speakingPractice?.locale).toBe('en-US');
+  });
+
+  it('rotates the target sentence deterministically across fluency turns', async () => {
+    const first = await buildLanguageActivityTelemetry({
+      strand: 'fluency',
+      languageCode: 'es',
+      cefrLevel: 'A1',
+      fluencyTurnIndex: 0,
+      targetWords: [],
+      targetGrammar: [],
+    });
+    const second = await buildLanguageActivityTelemetry({
+      strand: 'fluency',
+      languageCode: 'es',
+      cefrLevel: 'A1',
+      fluencyTurnIndex: 1,
+      targetWords: [],
+      targetGrammar: [],
+    });
+    const repeat = await buildLanguageActivityTelemetry({
+      strand: 'fluency',
+      languageCode: 'es',
+      cefrLevel: 'A1',
+      fluencyTurnIndex: 0,
+      targetWords: [],
+      targetGrammar: [],
+    });
+
+    expect(first.speakingPractice?.targetText).not.toBe(
+      second.speakingPractice?.targetText,
+    );
+    expect(first.speakingPractice?.targetText).toBe(
+      repeat.speakingPractice?.targetText,
+    );
+  });
+
   it('falls back to the deterministic passage when LLM generation fails', async () => {
     // No birthYear given, so ageBracket fails closed to 'child'; the router's
     // under-18 gate routes to `approvedTextFallbackConfig`, which prefers

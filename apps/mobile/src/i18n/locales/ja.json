@@ -773,7 +773,9 @@
       "matched": "合っています",
       "retryWithMissingWords": "もう一度: {{words}}",
       "retry": "もう一度",
-      "retryLabel": "発話をやり直す"
+      "retryLabel": "発話をやり直す",
+      "extraWords": "追加: {{words}}",
+      "attemptError": "録音を保存できませんでした。もう一度録音してください。"
     },
     "chatShell": {
       "aiDisclosure": "AIメンターと話しています",

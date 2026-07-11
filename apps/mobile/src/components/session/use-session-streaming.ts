@@ -900,7 +900,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             }
             setLanguageLearning(
               result.languageLearning?.gradedInput ||
-                result.languageLearning?.meaningOutput
+                result.languageLearning?.meaningOutput ||
+                result.languageLearning?.speakingPractice
                 ? result.languageLearning
                 : null,
             );

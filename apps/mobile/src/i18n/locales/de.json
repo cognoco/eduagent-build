@@ -773,7 +773,9 @@
       "matched": "Passt",
       "retryWithMissingWords": "Versuch es nochmal: {{words}}",
       "retry": "Nochmal",
-      "retryLabel": "Sprechversuch wiederholen"
+      "retryLabel": "Sprechversuch wiederholen",
+      "extraWords": "Extra: {{words}}",
+      "attemptError": "Dieser Versuch konnte nicht gespeichert werden. Nimm erneut auf."
     },
     "chatShell": {
       "aiDisclosure": "Du sprichst mit einem KI-Mentor",

@@ -773,7 +773,9 @@
       "matched": "Treff",
       "retryWithMissingWords": "Prøv igjen: {{words}}",
       "retry": "Prøv igjen",
-      "retryLabel": "Prøv taleforsøket igjen"
+      "retryLabel": "Prøv taleforsøket igjen",
+      "extraWords": "Ekstra: {{words}}",
+      "attemptError": "Kunne ikke lagre forsøket. Prøv å ta opp på nytt."
     },
     "chatShell": {
       "aiDisclosure": "Du snakker med en KI-mentor",
