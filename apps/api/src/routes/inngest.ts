@@ -2,6 +2,12 @@ import { Hono } from 'hono';
 import { serve } from 'inngest/hono';
 
 import { inngest, functions } from '../inngest';
+import {
+  readInngestEnvBindings,
+  runWithInngestRequestContext,
+} from '../inngest/helpers';
+
+const serveInngest = serve({ client: inngest, functions });
 
 // [BUG-237] External path is /v1/inngest. This route is mounted under the
 // worker's /v1 basePath in index.ts, so the local segment must stay /inngest.
@@ -17,5 +23,8 @@ import { inngest, functions } from '../inngest';
 export const inngestRoute = new Hono().on(
   ['GET', 'POST', 'PUT'],
   '/inngest',
-  serve({ client: inngest, functions }),
+  (context) =>
+    runWithInngestRequestContext(readInngestEnvBindings(context.env), () =>
+      serveInngest(context),
+    ),
 );
