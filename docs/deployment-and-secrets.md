@@ -174,7 +174,12 @@ Secrets come from **three sources**:
 
 ### Trigger
 
-**Manual dispatch only** — go to GitHub Actions → `deploy.yml` → "Run workflow" and select `api_environment: production`.
+API code deployment is manual-dispatch-only: go to GitHub Actions →
+`deploy.yml` → "Run workflow" and select `api_environment: production`.
+
+Production Worker secrets also have an independent 30-minute reconciliation
+path in `production-secret-sync.yml`. It updates secrets only; it does not
+deploy API code or run migrations.
 
 ### Pipeline steps
 
@@ -634,7 +639,7 @@ GitHub Actions secrets (set in GitHub, not Doppler):
 | `DATABASE_URL_STAGING_HOST` | `deploy.yml` — expected host guard for staging DB target verification |
 | `DATABASE_URL_PRODUCTION_HOST` | `deploy.yml` — expected host guard for production DB target verification |
 | `DOPPLER_TOKEN_STG` | `deploy.yml`, `e2e-web.yml` — staging Doppler service token for Worker secret sync |
-| `DOPPLER_TOKEN_PRD` | `deploy.yml` — production Doppler service token for Worker secret sync |
+| `DOPPLER_TOKEN_PRD` | `deploy.yml`, `production-secret-sync.yml` — production Doppler service token for Worker secret sync |
 | `SKIP_DOPPLER_SYNC` | `deploy.yml` — opt-out flag when Doppler→Worker sync was run locally before dispatch |
 | `STAGING_API_URL` | Optional smoke-test override for `deploy.yml` `api-smoke-test` job; defaults to `https://api-stg.mentomate.com`. Set only when the staging custom domain differs (e.g. during a domain migration). |
 | `PRODUCTION_API_URL` | Optional smoke-test override for `deploy.yml` `api-production-smoke-test` job; defaults to `https://api.mentomate.com`. Set only when the production custom domain differs. |
@@ -649,7 +654,11 @@ GitHub Actions secrets (set in GitHub, not Doppler):
 
 ## Syncing Secrets from Doppler to Cloudflare Workers
 
-Doppler does **not** have a native auto-sync integration for Cloudflare Workers. Secrets are pushed manually using `scripts/sync-secrets.js`, which downloads from Doppler and uploads via `wrangler secret bulk`.
+Doppler does **not** have a native auto-sync integration for Cloudflare Workers.
+`scripts/sync-secrets.js` downloads from Doppler and uploads via
+`wrangler secret bulk`. Deploys run it before traffic switches, and
+`production-secret-sync.yml` runs the production target every 30 minutes
+between deploys.
 
 ### Commands
 
@@ -663,7 +672,7 @@ pnpm env:sync               # Local files (from stg) + stg Worker sync (manual; 
 
 ### When to run
 
-- **After changing a secret in Doppler** — run `pnpm secrets:sync <env>` for the affected environment(s)
+- **After changing a secret in Doppler** — staging/dev still require `pnpm secrets:sync <env>` or a deploy; production reconciles within 30 minutes and can be manually dispatched immediately
 - **After changing an `EXPO_PUBLIC_*` var in Doppler** — run `pnpm env:sync`, then commit the updated `eas.json`
 - **After first clone** — run `pnpm env:sync` (generates local files from `stg`); run `pnpm secrets:sync stg prd` for staging/production
 - **Before first production deploy** — verify all production-required keys are set
@@ -696,6 +705,7 @@ If wrangler is not authenticated, the sync skips gracefully (does not break `pnp
 |----------|------|---------|---------|
 | **CI** | `ci.yml` | Push to main, PRs | Lint + typecheck + test + build (all projects) |
 | **Deploy** | `deploy.yml` | Push to main, manual dispatch | API deploy (staging/prod) + mobile builds |
+| **Production secret sync** | `production-secret-sync.yml` | Every 30 minutes, manual dispatch | Reconcile Doppler `prd` to the production Worker and verify env health |
 | **Mobile CI** | `mobile-ci.yml` | PRs/push touching mobile paths, manual | Mobile lint + test + preview builds |
 | **E2E** | `e2e-ci.yml` | Push/PR (relevant paths), nightly cron, manual | Integration tests + Maestro E2E flows |
 | **E2E Web** | `e2e-web.yml` | PRs | Playwright web E2E suite against staging |
@@ -740,6 +750,7 @@ If wrangler is not authenticated, the sync skips gracefully (does not break `pnp
 | File | Purpose |
 |------|---------|
 | `.github/workflows/deploy.yml` | API + mobile deployment orchestration |
+| `.github/workflows/production-secret-sync.yml` | Scheduled production Worker secret reconciliation + alerting |
 | `.github/workflows/ci.yml` | Main CI pipeline |
 | `.github/workflows/mobile-ci.yml` | Mobile CI and preview builds |
 | `.github/workflows/e2e-ci.yml` | E2E testing infrastructure |
