@@ -328,6 +328,23 @@ jobs:
         working-directory: apps/mobile
         run: npx expo prebuild --platform android --no-install
 
+      # Gradle auto-installs this NDK when absent, but a transient corrupt
+      # archive then fails the whole shard without retry. Install it explicitly
+      # so the network boundary is bounded and retried before the native build.
+      - name: Install Android NDK with retry
+        if: steps.apk-cache.outputs.cache-hit != 'true'
+        run: |
+          for attempt in 1 2 3; do
+            if sdkmanager --install "ndk;27.1.12297006"; then
+              exit 0
+            fi
+            echo "::warning::NDK install attempt ${attempt}/3 failed"
+            if [ "$attempt" -lt 3 ]; then
+              sleep "$((attempt * 5))"
+            fi
+          done
+          exit 1
+
       # Cache Gradle build outputs to avoid 25-minute native recompilation.
       # Key includes gradle files + native dependency versions so cache
       # invalidates when native deps change.
