@@ -3,7 +3,8 @@ const consoleErrorSpy = jest
   .mockImplementation(() => undefined);
 
 jest.mock(
-  '../client' /* gc1-allow: observer unit test exposes Inngest trigger metadata; registry guards verify production registration */,
+  /* gc1-allow: observer unit test exposes Inngest trigger metadata; registry guards verify production registration */
+  '../client',
   () => ({
     inngest: {
       createFunction: jest.fn((opts: unknown, trigger: unknown, fn: unknown) =>

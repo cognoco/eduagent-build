@@ -6,7 +6,8 @@ const mockSendPushNotification = jest.fn();
 const mockSendEmail = jest.fn();
 
 jest.mock(
-  '../helpers' /* gc1-allow: unit pins Inngest bindings; real DB chain is covered by payment-failed-alert.integration.test.ts */,
+  /* gc1-allow: unit pins Inngest bindings; real DB chain is covered by payment-failed-alert.integration.test.ts */
+  '../helpers',
   () => ({
     getStepDatabase: () => mockDb,
     getStepResendApiKey: () => 'resend-test-key',
@@ -15,7 +16,8 @@ jest.mock(
 );
 
 jest.mock(
-  '../../services/billing/payment-failed-alert' /* gc1-allow: unit isolates step orchestration; real SQL/dedupe/fan-out is covered by payment-failed-alert.integration.test.ts */,
+  /* gc1-allow: unit isolates step orchestration; real SQL/dedupe/fan-out is covered by payment-failed-alert.integration.test.ts */
+  '../../services/billing/payment-failed-alert',
   () => ({
     recordPaymentFailedAlert: (...args: unknown[]) =>
       mockRecordPaymentFailedAlert(...args),
@@ -39,7 +41,8 @@ jest.mock('../../services/notifications', () => {
 });
 
 jest.mock(
-  '../client' /* gc1-allow: unit captures registration without opening the external Inngest client */,
+  /* gc1-allow: unit captures registration without opening the external Inngest client */
+  '../client',
   () => ({
     inngest: {
       createFunction: jest.fn((opts: unknown, trigger: unknown, fn: unknown) =>

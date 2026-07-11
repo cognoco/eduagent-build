@@ -20,7 +20,8 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock(
-  '../../../lib/profile' /* gc1-allow: route test pins profile states; ProfileProvider switching is covered by lib/profile.test.tsx */,
+  /* gc1-allow: route test pins profile states; ProfileProvider switching is covered by lib/profile.test.tsx */
+  '../../../lib/profile',
   () => ({
     useProfile: () => ({
       activeProfile: mockActiveProfile,
