@@ -43,12 +43,12 @@ export const recapListItemSchema = z.object({
       topicId: z.string().uuid(),
       topicTitle: z.string(),
       subjectId: z.string().uuid().nullable(),
-      verifiedAt: z.string(),
+      verifiedAt: isoDateField,
       verificationState: z.enum(['unverified', 'fresh', 'stale']),
       retentionStatus: z
         .enum(['strong', 'fading', 'weak', 'forgotten'])
         .nullable(),
-      nextReviewDate: z.string().nullable(),
+      nextReviewDate: isoDateField.nullable(),
       quote: z.string().nullable(),
     })
     .nullable()
