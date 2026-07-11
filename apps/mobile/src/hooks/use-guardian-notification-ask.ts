@@ -56,6 +56,58 @@ export function useGuardianNotificationAsk(): void {
     let cancelled = false;
     const timeouts: ReturnType<typeof setTimeout>[] = [];
 
+    // [WI-1441 round 3] Attempts to persist pushEnabled=true server-side and
+    // reports whether it actually succeeded. The caller must only consume the
+    // primer (mark SecureStore seen) when this resolves true — marking seen
+    // on a failed sync reproduces the original bug: the OS grant would be
+    // recorded, but the server's pushEnabled would silently stay false
+    // forever with no further retry.
+    const syncPushEnabled = async (
+      breadcrumbPrefix: string,
+    ): Promise<boolean> => {
+      let prefs = notifQueryRef.current.data;
+      if (!prefs) {
+        try {
+          prefs = (await notifQueryRef.current.refetch()).data;
+        } catch (refetchErr) {
+          Sentry.addBreadcrumb({
+            category: 'permissions',
+            message: `${breadcrumbPrefix}: prefs refetch before pushEnabled sync failed`,
+            level: 'warning',
+            data: { error: String(refetchErr) },
+          });
+        }
+      }
+      if (!prefs) {
+        Sentry.addBreadcrumb({
+          category: 'permissions',
+          message: `${breadcrumbPrefix}: pushEnabled sync skipped — notification prefs unavailable`,
+          level: 'warning',
+        });
+        return false;
+      }
+      try {
+        await updateNotificationsRef.current.mutateAsync({
+          reviewReminders: prefs.reviewReminders,
+          dailyReminders: prefs.dailyReminders,
+          weeklyProgressPush: prefs.weeklyProgressPush,
+          weeklyProgressEmail: prefs.weeklyProgressEmail,
+          monthlyProgressEmail: prefs.monthlyProgressEmail,
+          maxDailyPush: prefs.maxDailyPush,
+          pushEnabled: true,
+        });
+        return true;
+      } catch (mutateErr) {
+        Sentry.addBreadcrumb({
+          category: 'permissions',
+          message: `${breadcrumbPrefix}: pushEnabled sync failed`,
+          level: 'warning',
+          data: { error: String(mutateErr) },
+        });
+        return false;
+      }
+    };
+
     void (async () => {
       const key = guardianNotificationAskKey(profileId);
 
@@ -84,7 +136,24 @@ export function useGuardianNotificationAsk(): void {
       }
       if (cancelled) return;
 
-      if (status === 'granted' || !canAskAgain) {
+      if (status === 'granted') {
+        // [WI-1441 round 3] Silent repair path: permission is already
+        // granted — possibly from an earlier attempt whose sync failed. Do
+        // NOT re-prompt with the OS dialog (the user already said yes); just
+        // retry the persist quietly, and only consume the primer if it
+        // succeeds. A repeated failure leaves the primer eligible so the
+        // next mount tries again.
+        const synced = await syncPushEnabled(
+          'guardian notif primer (silent repair)',
+        );
+        if (cancelled) return;
+        if (synced) {
+          void SecureStore.setItemAsync(key, 'true').catch(() => undefined);
+        }
+        return;
+      }
+
+      if (!canAskAgain) {
         void SecureStore.setItemAsync(key, 'true').catch(() => undefined);
         return;
       }
@@ -112,60 +181,21 @@ export function useGuardianNotificationAsk(): void {
                     const result =
                       await Notifications.requestPermissionsAsync();
                     if (result.status === 'granted') {
-                      // [WI-1441] Sync pushEnabled=true server-side — this is
-                      // the only path (besides the explicit More > Notifications
-                      // toggle) that grants OS permission, and without this the
-                      // server default stays false forever, silently skipping
-                      // every push-eligibility cron for this user.
-                      //
-                      // A grant landing before the settings query resolves
-                      // must not silently skip the sync — force a refetch so
-                      // the grant always eventually persists.
-                      let prefs = notifQueryRef.current.data;
-                      if (!prefs) {
-                        try {
-                          prefs = (await notifQueryRef.current.refetch()).data;
-                        } catch (refetchErr) {
-                          Sentry.addBreadcrumb({
-                            category: 'permissions',
-                            message:
-                              'guardian notif primer: prefs refetch before pushEnabled sync failed',
-                            level: 'warning',
-                            data: { error: String(refetchErr) },
-                          });
-                        }
+                      // [WI-1441 round 3] Only consume the primer once the
+                      // sync actually succeeds. If it fails, leave SecureStore
+                      // un-marked — the next mount will find permission
+                      // already granted and retry via the silent repair path
+                      // above, rather than losing the sync forever.
+                      const synced = await syncPushEnabled(
+                        'guardian notif primer',
+                      );
+                      if (synced) {
+                        markSeen();
                       }
-                      if (prefs) {
-                        updateNotificationsRef.current.mutate(
-                          {
-                            reviewReminders: prefs.reviewReminders,
-                            dailyReminders: prefs.dailyReminders,
-                            weeklyProgressPush: prefs.weeklyProgressPush,
-                            weeklyProgressEmail: prefs.weeklyProgressEmail,
-                            monthlyProgressEmail: prefs.monthlyProgressEmail,
-                            maxDailyPush: prefs.maxDailyPush,
-                            pushEnabled: true,
-                          },
-                          {
-                            onError: (mutateErr) => {
-                              Sentry.addBreadcrumb({
-                                category: 'permissions',
-                                message:
-                                  'guardian notif primer: pushEnabled sync failed',
-                                level: 'warning',
-                                data: { error: String(mutateErr) },
-                              });
-                            },
-                          },
-                        );
-                      } else {
-                        Sentry.addBreadcrumb({
-                          category: 'permissions',
-                          message:
-                            'guardian notif primer: pushEnabled sync skipped — notification prefs unavailable',
-                          level: 'warning',
-                        });
-                      }
+                    } else {
+                      // User was asked and declined, or dismissed — genuinely
+                      // terminal; consume the primer as before.
+                      markSeen();
                     }
                   } catch (err) {
                     Sentry.addBreadcrumb({
@@ -175,7 +205,6 @@ export function useGuardianNotificationAsk(): void {
                       level: 'warning',
                       data: { error: String(err) },
                     });
-                  } finally {
                     markSeen();
                   }
                 })();
