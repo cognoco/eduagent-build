@@ -54,9 +54,11 @@ jest.mock(
 // verified-proof note is covered by session-exchange.integration.test.ts
 // against a real DB; this spy exists only to assert the GATING decision (was
 // createNoteForSession called, and with what args) without expanding the fake
-// DB to model insertNoteWithCap's advisory-lock/cap/dedup transaction.
-// (gc1-allow: fake DB in this file cannot model topic_notes persistence.)
-jest.mock('../notes' /* gc1-allow: fake DB cannot model topic_notes */, () => ({
+// DB to model insertNoteWithCap's advisory-lock/cap/dedup transaction. The
+// real module loads fine in this environment, so only the one write function
+// is stubbed — everything else is the real ../notes implementation.
+jest.mock('../notes', () => ({
+  ...jest.requireActual('../notes'),
   createNoteForSession: jest.fn(),
 }));
 
