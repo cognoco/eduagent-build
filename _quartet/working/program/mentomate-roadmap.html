@@ -142,7 +142,7 @@
   const NODES=[
     // Platform & shell
     {id:'b3',sz:45,l:0,c:0,code:'B3',name:'Platform / LLM cutover',meta:'6 open · 3 closed · WI-1685 Executing: staging autonomous, prod flip = operator approval (ruled) · then 1779 caching (1796 ruled C) + 1686 judge flags',st:'run'},
-    {id:'b7',sz:55,l:0,c:1,code:'B7',name:'Dev-infra & CI health',meta:'21 items · Maestro CI bugs first (protect B5 e2e gate) · guards, hygiene, WI-1810 break test · all HITL: none',st:'run'},
+    {id:'b7',sz:55,l:0,c:1,code:'B7',name:'Dev-infra & CI health',meta:'21 items · free heads 1791→1798→1345 first · Maestro pair 1792/1797 Blocked-by WI-1652 (B5, same CI file — self-clears at its close) · WI-1810 break test · all HITL: none',st:'run'},
     {id:'shell',sz:55,l:0,c:3,code:'WS-28',name:'V2 publish-readiness chain',meta:'must conclude before store submission',st:'q'},
     {id:'s6',sz:35,l:0,c:4,code:'S6',name:'V0 retirement — POST-launch',meta:'irreversible · operator executes at its milestone, never autonomous',st:'park',gate:true},
     // Verified learning
@@ -167,7 +167,7 @@
     {id:'final',sz:30,l:5,c:3,code:'gates',name:'Final compliance gates',meta:'WI-1507 closure re-run · WI-1577 FINAL GATE pre-submission',st:'q'},
   ];
   const EDGES=[
-    ['b3','shell'],['b7','b5'],['shell','beta'],
+    ['b3','shell'],['b5','b7'],['shell','beta'],
     ['b1','beta'],
     ['tdesign','tbuild',1],
     ['b6','store'],['opsact','store',1],['store','beta'],
