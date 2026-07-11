@@ -1,6 +1,9 @@
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
+import i18next from 'i18next';
 import type { NowCard as NowCardData } from '@eduagent/schemas';
 
+import deCatalog from '../../i18n/locales/de.json';
+import jaCatalog from '../../i18n/locales/ja.json';
 import { NowCard } from './NowCard';
 
 function card(overrides: Partial<NowCardData> = {}): NowCardData {
@@ -108,5 +111,72 @@ describe('NowCard', () => {
     expect(rendered.getByTestId('now-card-arc').props.children).toBe(
       'Getting stronger',
     );
+  });
+
+  it('formats billing deadlines with the active app locale instead of the device locale', async () => {
+    const originalLanguage = i18next.language;
+    const deviceLocale = new Intl.DateTimeFormat().resolvedOptions().locale;
+    const appLanguage = deviceLocale.startsWith('de') ? 'ja' : 'de';
+    const appCatalog = appLanguage === 'de' ? deCatalog : jaCatalog;
+    const hadAppCatalog = i18next.hasResourceBundle(appLanguage, 'translation');
+    const deadline = new Date('2026-08-01T00:00:00.000Z');
+    const expectedDeadline = new Intl.DateTimeFormat(appLanguage, {
+      dateStyle: 'medium',
+    }).format(deadline);
+    const expectedDeadlinePattern = new RegExp(
+      expectedDeadline.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+    );
+    const dateTimeFormatSpy = jest.spyOn(Intl, 'DateTimeFormat');
+    let unmount: (() => void) | undefined;
+
+    try {
+      i18next.addResourceBundle(
+        appLanguage,
+        'translation',
+        appCatalog,
+        false,
+        true,
+      );
+      await act(async () => {
+        await i18next.changeLanguage(appLanguage);
+      });
+      dateTimeFormatSpy.mockClear();
+
+      const rendered = render(
+        <NowCard
+          card={card({
+            kind: 'billing_alert',
+            templateKey: 'now.billing_alert.payment_failed',
+            params: {
+              planTier: 'plus',
+              accessState: 'current',
+              deadlineAt: deadline.toISOString(),
+            },
+            deepLink: {
+              route: 'billing.manage',
+              params: {},
+              chain: ['settings.more', 'settings.account'],
+            },
+          })}
+          onContinue={jest.fn()}
+          onDecline={jest.fn()}
+        />,
+      );
+      unmount = rendered.unmount;
+
+      expect(dateTimeFormatSpy).toHaveBeenCalledWith(appLanguage, {
+        dateStyle: 'medium',
+      });
+      expect(rendered.getByText(expectedDeadlinePattern)).toBeTruthy();
+    } finally {
+      unmount?.();
+      dateTimeFormatSpy.mockRestore();
+      await act(async () => {
+        await i18next.changeLanguage(originalLanguage);
+      });
+      if (!hadAppCatalog) {
+        i18next.removeResourceBundle(appLanguage, 'translation');
+      }
+    }
   });
 });

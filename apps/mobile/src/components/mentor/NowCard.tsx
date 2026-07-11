@@ -100,7 +100,7 @@ export function NowCard({
   enterDelayMs = 0,
   animate = true,
 }: NowCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colors = useThemeColors();
   const reduceMotion = useReducedMotion();
   const copy = resolveNowCardCopyKeys(card);
@@ -112,9 +112,9 @@ export function NowCard({
       : null;
   const formattedDeadline =
     deadline && !Number.isNaN(deadline.getTime())
-      ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(
-          deadline,
-        )
+      ? new Intl.DateTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
+          dateStyle: 'medium',
+        }).format(deadline)
       : null;
 
   return (
