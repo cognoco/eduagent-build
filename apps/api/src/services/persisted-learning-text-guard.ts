@@ -27,7 +27,23 @@ const NAMED_POSSESSIVE_CLINICAL_ATTRIBUTION = new RegExp(
 );
 const CLINICAL_TERM_ONLY = new RegExp(String.raw`^${CLINICAL_LABEL}$`, 'iu');
 const STARTS_WITH_UPPERCASE_LETTER = /^\p{Lu}/u;
+const CLINICAL_ATTRIBUTION_CONTRACTIONS: ReadonlyArray<
+  readonly [pattern: RegExp, expanded: string]
+> = [
+  [/\bi['’]m\b/giu, 'I am'],
+  [/\byou['’]re\b/giu, 'you are'],
+  [/\bhe['’]s\b/giu, 'he is'],
+  [/\bshe['’]s\b/giu, 'she is'],
+  [/\bthey['’]re\b/giu, 'they are'],
+];
 
+function expandClinicalAttributionContractions(value: string): string {
+  return CLINICAL_ATTRIBUTION_CONTRACTIONS.reduce(
+    (expanded, [pattern, replacement]) =>
+      expanded.replace(pattern, replacement),
+    value,
+  );
+}
 function containsNamedClinicalAttribution(value: string): boolean {
   return [
     NAMED_CLINICAL_ATTRIBUTION,
@@ -48,9 +64,10 @@ export function scrubClinicalInferenceFromLearningRecord(
   value: string | null | undefined,
 ): string | null {
   if (value == null) return null;
-  return GENERIC_CLINICAL_ATTRIBUTION.test(value) ||
-    GENERIC_POSSESSIVE_CLINICAL_ATTRIBUTION.test(value) ||
-    containsNamedClinicalAttribution(value)
+  const valueForMatching = expandClinicalAttributionContractions(value);
+  return GENERIC_CLINICAL_ATTRIBUTION.test(valueForMatching) ||
+    GENERIC_POSSESSIVE_CLINICAL_ATTRIBUTION.test(valueForMatching) ||
+    containsNamedClinicalAttribution(valueForMatching)
     ? null
     : value;
 }

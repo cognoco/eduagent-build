@@ -18,6 +18,7 @@ describe('[WI-1195] persisted learning-text guard wiring', () => {
     const memoryDedup = readService('memory/dedup-actions.ts');
     const notes = readService('notes.ts');
     const challengeRound = readService('session/session-exchange.ts');
+    const learnerProfile = readService('learner-profile.ts');
 
     expect(
       memoryMapping.match(
@@ -39,6 +40,11 @@ describe('[WI-1195] persisted learning-text guard wiring', () => {
         /learningTextGuard\.scrubClinicalInferenceFromLearningRecord/g,
       ),
     ).toHaveLength(2);
+    expect(
+      learnerProfile.match(
+        /learningTextGuard\.scrubClinicalInferenceFromLearningRecord/g,
+      ),
+    ).toHaveLength(1);
   });
 });
 
@@ -74,6 +80,17 @@ describe('[WI-1195] persisted learning-text clinical attribution guard', () => {
     ).toBeNull();
   });
 
+  it.each([
+    "I'm autistic.",
+    'I’m autistic.',
+    "She's dyslexic.",
+    'She’s dyslexic.',
+    "They're autistic.",
+    'They’re autistic.',
+  ])('rejects a contracted clinical characterisation: %s', (text) => {
+    expect(scrubClinicalInferenceFromLearningRecord(text)).toBeNull();
+  });
+
   it('keeps null input null', () => {
     expect(scrubClinicalInferenceFromLearningRecord(null)).toBeNull();
   });
@@ -87,6 +104,9 @@ describe('[WI-1195] persisted learning-text clinical attribution guard', () => {
   it.each([
     'ADHD can affect executive function.',
     'Alex is learning about ADHD.',
+    "I'm learning about autism.",
+    'She’s studying dyslexia.',
+    "They're discussing ADHD.",
   ])(
     'allows educational discussion without a clinical characterisation: %s',
     (text) => {
