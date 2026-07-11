@@ -237,6 +237,21 @@ describe('check-change-class.sh', () => {
     expect(output).toContain('pnpm test:api:integration');
   });
 
+  it('routes meta-only drizzle diffs (no .sql file) through db migrations (WI-1846)', () => {
+    mkdirSync(join(repo, 'apps', 'api', 'drizzle', 'meta'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(repo, 'apps', 'api', 'drizzle', 'meta', '0999_snapshot.json'),
+      '{}\n',
+    );
+    git(repo, ['add', '.']);
+
+    const flags = runRouter(repo);
+    expect(flags.classes).toContain('db-migrations');
+    expect(flags.database).toBe('true');
+  });
+
   it('emits eval=true when prompt builders are touched, including services/llm subdirectories', () => {
     mkdirSync(
       join(repo, 'apps', 'api', 'src', 'services', 'llm', 'providers'),
