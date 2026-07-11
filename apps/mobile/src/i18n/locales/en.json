@@ -3480,6 +3480,23 @@
     "memberOwnerLabel": "{{name}} (owner)"
   },
   "sessionSummary": {
+    "languagePractice": {
+      "title": "Language practice",
+      "scenario": "Today you practiced {{scenario}}",
+      "newWords": "New words: {{words}}",
+      "strengthenedWords": "You strengthened: {{words}}",
+      "grammarPattern": "Grammar focus: {{patterns}}",
+      "comprehension": "You answered {{correct}}/{{total}} comprehension questions correctly",
+      "speakingAttempts_one": "You spoke {{count}} time",
+      "speakingAttempts_other": "You spoke {{count}} times",
+      "fluencyResult": "Fluency check: {{correct}}/{{total}}",
+      "nextRecommendation": {
+        "meaning_input": "Next time: more reading and listening practice",
+        "meaning_output": "Next time: more speaking and writing practice",
+        "language_focus": "Next time: we'll work on grammar patterns",
+        "fluency": "Next time: a quick fluency sprint"
+      }
+    },
     "mentorMemoryCue": {
       "title": "What your mentor knows about you.",
       "subtitle": "Tap to review or change."

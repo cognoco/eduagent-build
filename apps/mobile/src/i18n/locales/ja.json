@@ -3146,7 +3146,24 @@
       "exchanges_other": "{{count}}個のやり取りを完了"
     },
     "a11yContinueLearning": "学習を続ける",
-    "a11yContinueToHome": "ホームへ進む"
+    "a11yContinueToHome": "ホームへ進む",
+    "languagePractice": {
+      "title": "語学練習",
+      "scenario": "今日は{{scenario}}を練習しました",
+      "newWords": "新しい単語: {{words}}",
+      "strengthenedWords": "復習した単語: {{words}}",
+      "grammarPattern": "文法ポイント: {{patterns}}",
+      "comprehension": "読解問題で{{total}}問中{{correct}}問正解しました",
+      "speakingAttempts_one": "{{count}}回話しました",
+      "speakingAttempts_other": "{{count}}回話しました",
+      "fluencyResult": "流暢さチェック: {{correct}}/{{total}}",
+      "nextRecommendation": {
+        "meaning_input": "次回は、もっとリーディングとリスニングを練習しましょう",
+        "meaning_output": "次回は、もっとスピーキングとライティングを練習しましょう",
+        "language_focus": "次回は、文法パターンに取り組みましょう",
+        "fluency": "次回: 流暢さの短期集中トレーニング"
+      }
+    }
   },
   "sessionTranscript": {
     "archived": {
