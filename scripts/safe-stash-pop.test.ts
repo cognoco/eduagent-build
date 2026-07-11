@@ -14,7 +14,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve as resolvePath } from 'node:path';
 import {
   listStashEntries,
   parseArgs,
@@ -25,6 +25,13 @@ import {
   NoMatchError,
   AmbiguousMatchError,
 } from './safe-stash-pop';
+
+// tsx binary from the repo's node_modules (avoids depending on npx's PATH
+// resolution, which -- run with cwd pointed at a throwaway repo outside the
+// monorepo -- can't see node_modules/.bin/tsx and falls back to a registry
+// fetch; mirrors scripts/check-merge-invariant.test.ts's TSX const).
+const TSX = resolvePath(__dirname, '../node_modules/.bin/tsx');
+const CLI = resolvePath(__dirname, 'safe-stash-pop.ts');
 
 function git(cwd: string, args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' });
@@ -91,7 +98,7 @@ describe('safe-stash-pop (WI-1798)', () => {
     });
   });
 
-  test('resolveTarget refuses a bare pop when 2+ stash entries exist', () => {
+  test('resolveTarget refuses any bare pop/apply regardless of stack depth', () => {
     repo = makeRepoWithTwoStashes();
     const entries = listStashEntries(repo);
     expect(entries).toHaveLength(2);
@@ -155,9 +162,8 @@ describe('safe-stash-pop (WI-1798)', () => {
 
   test('end-to-end CLI: bare pop is refused, stash stack untouched', () => {
     repo = makeRepoWithTwoStashes();
-    const cliPath = join(__dirname, 'safe-stash-pop.ts');
     expect(() =>
-      execFileSync('npx', ['tsx', cliPath, 'pop'], {
+      execFileSync(TSX, [CLI, 'pop'], {
         cwd: repo,
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -168,8 +174,7 @@ describe('safe-stash-pop (WI-1798)', () => {
 
   test('end-to-end CLI: correctly-targeted pop succeeds and applies the right content', () => {
     repo = makeRepoWithTwoStashes();
-    const cliPath = join(__dirname, 'safe-stash-pop.ts');
-    execFileSync('npx', ['tsx', cliPath, 'pop', '-m', 'session-A'], {
+    execFileSync(TSX, [CLI, 'pop', '-m', 'session-A'], {
       cwd: repo,
       encoding: 'utf8',
     });
