@@ -118,6 +118,25 @@ describe('resolveMasteryVerificationState', () => {
     expect(result).toBe('fresh');
   });
 
+  it('[WI-1446] promoting a weak-spot row from pending_review to active does not change the resolved state', () => {
+    // ACTIONABLE_STATUSES treats pending_review and active identically — only
+    // createdAt vs. verifiedAt matters. WI-1446 promotes unexpired
+    // pending_review rows to active (status + pendingExpiresAt only;
+    // createdAt is untouched), so this must be a no-op for verification state.
+    const createdAt = new Date(VERIFIED_AT.getTime() + 60 * 1000);
+    const pending = resolveMasteryVerificationState({
+      verifiedAt: VERIFIED_AT,
+      newWeakSpotRows: [row({ status: 'pending_review', createdAt })],
+    });
+    const promoted = resolveMasteryVerificationState({
+      verifiedAt: VERIFIED_AT,
+      newWeakSpotRows: [row({ status: 'active', createdAt })],
+    });
+    expect(pending).toBe('stale');
+    expect(promoted).toBe('stale');
+    expect(promoted).toBe(pending);
+  });
+
   it('returns "stale" when at least one of many rows is a later actionable counter-signal', () => {
     const result = resolveMasteryVerificationState({
       verifiedAt: VERIFIED_AT,

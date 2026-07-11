@@ -22,7 +22,10 @@
  *   2. generates retention cards from session exchanges
  *      → auto-creates a retentionCard row when none exists
  *   3. handles sessions with zero meaningful exchanges gracefully
- *      → no errors, no spurious data, retention/deepening steps skipped
+ *      → no errors, no spurious data; update-retention skipped (no
+ *        qualityRating), update-needs-deepening still runs (WI-1446
+ *        decoupled promotePendingDeepening from the qualityRating guard)
+ *        but is a harmless no-op here
  */
 
 import { eq, and, sql } from 'drizzle-orm';
@@ -37,6 +40,7 @@ import {
   sessionEvents,
   retentionCards,
   sessionSummaries,
+  needsDeepeningTopics,
 } from '@eduagent/database';
 import {
   ensureV2IdentityForLegacyProfileTest,
@@ -323,6 +327,18 @@ async function loadRetentionCard(profileId: string, topicId: string) {
   });
 }
 
+// [WI-1446] For asserting the decoupled promotePendingDeepening call is a
+// harmless no-op when there are no pending_review rows for the topic.
+async function loadNeedsDeepeningRows(profileId: string, topicId: string) {
+  const db = createIntegrationDb();
+  return db.query.needsDeepeningTopics.findMany({
+    where: and(
+      eq(needsDeepeningTopics.profileId, profileId),
+      eq(needsDeepeningTopics.topicId, topicId),
+    ),
+  });
+}
+
 async function loadSessionSummary(sessionId: string) {
   const db = createIntegrationDb();
   return db.query.sessionSummaries.findFirst({
@@ -513,11 +529,24 @@ describe('session-completed Inngest pipeline (integration)', () => {
     );
     expect(retentionOutcome?.status).toBe('skipped');
 
-    // needs-deepening step also requires a quality rating — must be SKIPPED
+    // [WI-1446] update-needs-deepening no longer skips wholesale when
+    // qualityRating is absent: promotePendingDeepening runs unconditionally
+    // for every topic in retentionTopicIds (only updateNeedsDeepeningProgress
+    // stays gated on qualityRating), so the step legitimately reports 'ok'
+    // here — a harmless no-op since there are no pending_review rows for
+    // this topic.
     const needsDeepeningOutcome = result.outcomes.find(
       (o) => o.step === 'update-needs-deepening',
     );
-    expect(needsDeepeningOutcome?.status).toBe('skipped');
+    expect(needsDeepeningOutcome?.status).toBe('ok');
+
+    // The decoupled promotion attempt created/promoted nothing — no
+    // needs_deepening_topics row exists for this topic.
+    const deepeningRows = await loadNeedsDeepeningRows(
+      scenario.profileId,
+      scenario.topicId,
+    );
+    expect(deepeningRows).toHaveLength(0);
 
     // No spurious retention card should be created
     const card = await loadRetentionCard(scenario.profileId, scenario.topicId);
