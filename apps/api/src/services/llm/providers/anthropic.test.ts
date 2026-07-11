@@ -315,3 +315,100 @@ describe('[WI-481] createAnthropicProvider — malformed response body', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// toAnthropicFormat — WI-1779 cache_control on the stable system prefix
+// ---------------------------------------------------------------------------
+
+describe('toAnthropicFormat — cache_control breakpoint (WI-1779)', () => {
+  const stable = 'STABLE SYSTEM RULES';
+  const volatile = 'VOLATILE PER-TURN STATE';
+  const systemContent = `${stable}\n\n${volatile}`;
+
+  it('keeps system a plain string when no cache boundary is marked', () => {
+    const messages: ChatMessage[] = [
+      { role: 'system', content: systemContent },
+      { role: 'user', content: 'hi' },
+    ];
+    const { system } = toAnthropicFormat(messages);
+    expect(system).toBe(systemContent);
+  });
+
+  it('splits system into cached prefix + uncached remainder at the boundary', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: systemContent,
+        cachePrefixLength: stable.length,
+      },
+      { role: 'user', content: 'hi' },
+    ];
+    const { system } = toAnthropicFormat(messages);
+    expect(Array.isArray(system)).toBe(true);
+    const blocks = system as Array<{
+      type: string;
+      text: string;
+      cache_control?: { type: string };
+    }>;
+    expect(blocks).toHaveLength(2);
+    const [prefixBlock, remainderBlock] = blocks;
+    // First block is the cached stable prefix.
+    expect(prefixBlock).toEqual({
+      type: 'text',
+      text: stable,
+      cache_control: { type: 'ephemeral' },
+    });
+    // Second block is the uncached remainder; carries no cache_control.
+    expect(remainderBlock?.text).toBe(`\n\n${volatile}`);
+    expect(remainderBlock?.cache_control).toBeUndefined();
+  });
+
+  it('appends the JSON directive AFTER the boundary, leaving the cached prefix intact', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: systemContent,
+        cachePrefixLength: stable.length,
+      },
+      { role: 'user', content: 'hi' },
+    ];
+    const { system } = toAnthropicFormat(messages, 'json');
+    const blocks = system as Array<{ text: string; cache_control?: unknown }>;
+    // The cached prefix is byte-identical to the no-json case.
+    expect(blocks[0]?.text).toBe(stable);
+    expect(blocks[0]?.cache_control).toEqual({ type: 'ephemeral' });
+    // The JSON directive rides in the uncached remainder.
+    const remainder = blocks[1]?.text ?? '';
+    expect(remainder).toContain(JSON_DIRECTIVE);
+    expect(remainder.startsWith(`\n\n${volatile}`)).toBe(true);
+  });
+
+  it('falls back to a plain string when a second system message is present', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: systemContent,
+        cachePrefixLength: stable.length,
+      },
+      { role: 'system', content: 'extra directive' },
+      { role: 'user', content: 'hi' },
+    ];
+    const { system } = toAnthropicFormat(messages);
+    expect(typeof system).toBe('string');
+    expect(system).toBe(`${systemContent}\n\nextra directive`);
+  });
+
+  it('does not split when the boundary is out of range', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: systemContent,
+        cachePrefixLength: systemContent.length,
+      },
+      { role: 'user', content: 'hi' },
+    ];
+    const { system } = toAnthropicFormat(messages);
+    // Boundary === length → nothing volatile to separate → plain string.
+    expect(system).toBe(systemContent);
+  });
+});

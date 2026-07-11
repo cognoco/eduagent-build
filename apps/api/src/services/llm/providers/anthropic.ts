@@ -42,10 +42,19 @@ interface AnthropicMessage {
   content: string | AnthropicContentBlock[];
 }
 
+// Prompt-caching system block (WI-1779). Anthropic accepts `system` as either a
+// plain string or an array of text blocks; a `cache_control` marker on a block
+// caches the prefix up to and including it.
+type AnthropicSystemBlock = {
+  type: 'text';
+  text: string;
+  cache_control?: { type: 'ephemeral' };
+};
+
 interface AnthropicRequest {
   model: string;
   max_tokens: number;
-  system?: string;
+  system?: string | AnthropicSystemBlock[];
   messages: AnthropicMessage[];
   stream?: boolean;
 }
@@ -85,18 +94,30 @@ export function toAnthropicFormat(
   messages: ChatMessage[],
   responseFormat?: 'json',
 ): {
-  system: string | undefined;
+  system: string | AnthropicSystemBlock[] | undefined;
   messages: AnthropicMessage[];
 } {
-  let system: string | undefined;
+  let systemText: string | undefined;
+  // WI-1779: char offset within systemText where the cache-stable prefix ends.
+  let cacheBoundary: number | undefined;
   const converted: AnthropicMessage[] = [];
 
   for (const msg of messages) {
     if (msg.role === 'system') {
       // Anthropic takes system as a top-level param, not in messages
-      system = system
-        ? `${system}\n\n${getTextContent(msg.content)}`
-        : getTextContent(msg.content);
+      const text = getTextContent(msg.content);
+      if (systemText === undefined) {
+        systemText = text;
+        // Only a single, string-content system message carries a usable caching
+        // boundary. Any additional system message shifts the offsets, so drop
+        // the split in that case (correctness over caching).
+        if (typeof msg.content === 'string' && msg.cachePrefixLength != null) {
+          cacheBoundary = msg.cachePrefixLength;
+        }
+      } else {
+        systemText = `${systemText}\n\n${text}`;
+        cacheBoundary = undefined;
+      }
     } else {
       converted.push({
         role: msg.role as 'user' | 'assistant',
@@ -107,11 +128,37 @@ export function toAnthropicFormat(
 
   // Append JSON directive when caller requests structured JSON output.
   // Anthropic has no native response_format flag; this is the only reliable
-  // mechanism to steer the model toward a parseable response.
+  // mechanism to steer the model toward a parseable response. It is stable text
+  // appended AFTER the cache boundary, so it lands in the uncached remainder
+  // and never perturbs the cached prefix.
   if (responseFormat === 'json') {
-    system = system
-      ? `${system}\n\n${JSON_ONLY_DIRECTIVE}`
+    systemText = systemText
+      ? `${systemText}\n\n${JSON_ONLY_DIRECTIVE}`
       : JSON_ONLY_DIRECTIVE;
+  }
+
+  // WI-1779: when a caller marked a cache-stable prefix, emit `system` as two
+  // text blocks with a `cache_control` breakpoint on the stable one. Anthropic
+  // silently skips caching if the prefix is under the model minimum (~1024–4096
+  // tokens), which is harmless. Otherwise `system` stays a plain string.
+  let system: string | AnthropicSystemBlock[] | undefined;
+  if (systemText === undefined) {
+    system = undefined;
+  } else if (
+    cacheBoundary != null &&
+    cacheBoundary > 0 &&
+    cacheBoundary < systemText.length
+  ) {
+    system = [
+      {
+        type: 'text',
+        text: systemText.slice(0, cacheBoundary),
+        cache_control: { type: 'ephemeral' },
+      },
+      { type: 'text', text: systemText.slice(cacheBoundary) },
+    ];
+  } else {
+    system = systemText;
   }
 
   return { system, messages: converted };

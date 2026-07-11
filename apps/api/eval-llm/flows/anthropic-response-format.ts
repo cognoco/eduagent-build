@@ -42,8 +42,15 @@ export const anthropicResponseFormatFlow: FlowDefinition<AnthropicResponseFormat
     buildPrompt(input: AnthropicResponseFormatInput): PromptMessages {
       const converted = toAnthropicFormat(input.messages, input.responseFormat);
 
+      // `system` is a plain string unless a caller marked a cache boundary
+      // (WI-1779); this flow never does, so flatten defensively for the snapshot.
+      const systemText =
+        typeof converted.system === 'string'
+          ? converted.system
+          : (converted.system?.map((block) => block.text).join('\n\n') ?? '');
+
       return {
-        system: converted.system ?? '',
+        system: systemText,
         user: JSON.stringify(converted.messages, null, 2),
         notes: [
           'Transport snapshot for Anthropic responseFormat=json conversion.',
