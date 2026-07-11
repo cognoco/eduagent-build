@@ -31,6 +31,7 @@ import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useEntryGate } from '../../../hooks/use-entry-gate';
 import { firstParam } from '../../../lib/route-params';
+import { useReportActivationEvent } from '../../../lib/activation-events';
 
 type TeachingMethodId =
   | 'visual_diagrams'
@@ -283,14 +284,29 @@ export default function RelearnScreen() {
     setPhase('topics');
   }, []);
 
+  const reportActivationEvent = useReportActivationEvent();
+
   const handleSelectTopic = useCallback(
     (subject: OverdueSubject, topic: OverdueTopic) => {
       setSelectedSubject(subject);
       setSelectedTopic(buildSelectedTopic(subject, topic));
       setError(null);
       setPhase('method');
+      // [WI-1689] review_card_tapped — occurrenceId=topicId (not UTC-day
+      // bucketed) so each distinct topic tapped in a day records its own row.
+      // Assumption (team-lead ruled, docs/runbooks/activation-funnel-queries.md:37-38):
+      // no canonical "review card" UI existed at wiring time; this topics-phase
+      // list is the app's actual spaced-repetition review entry point. The API
+      // response (services/overdue-topics.ts) only exposes topicId, not the
+      // backing retention_cards.id, so topicId is the occurrenceId — tagged via
+      // occurrenceKind so a future re-map to the retention-card id is detectable.
+      reportActivationEvent('review_card_tapped', {
+        occurrenceId: topic.topicId,
+        route: 'topic.relearn',
+        metadata: { occurrenceKind: 'topicId' },
+      });
     },
-    [],
+    [reportActivationEvent],
   );
 
   const handleStartMethod = useCallback(
@@ -391,6 +407,35 @@ export default function RelearnScreen() {
     }
     return allSubjects;
   }, [allSubjects, selectedSubject]);
+
+  // [WI-1689] review_card_seen — one impression per distinct topicId shown in
+  // the topics phase (occurrenceId=topicId, not UTC-day bucketed, so several
+  // distinct topics seen in one day each record). Assumption (team-lead ruled,
+  // docs/runbooks/activation-funnel-queries.md:37-38): no canonical "review
+  // card" UI existed at wiring time; this is the app's actual spaced-repetition
+  // review entry. occurrenceKind='topicId' documents that the API only exposes
+  // topicId, not the backing retention_cards.id (services/overdue-topics.ts).
+  // Genuinely per-row: this ScrollView (not FlatList) renders every topic row
+  // eagerly with no viewport virtualization, so every row in topicsToRender IS
+  // actually rendered each time this effect runs — not a
+  // list-mount-implies-all-seen approximation. Effect-driven (not fired during
+  // render) and deduped per-mount via the ref so re-renders of an
+  // already-seen list don't re-report.
+  const seenTopicIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (phase !== 'topics') return;
+    for (const subject of topicsToRender) {
+      for (const topic of subject.topics) {
+        if (seenTopicIdsRef.current.has(topic.topicId)) continue;
+        seenTopicIdsRef.current.add(topic.topicId);
+        reportActivationEvent('review_card_seen', {
+          occurrenceId: topic.topicId,
+          route: 'topic.relearn',
+          metadata: { occurrenceKind: 'topicId' },
+        });
+      }
+    }
+  }, [phase, topicsToRender, reportActivationEvent]);
 
   const blocked = useEntryGate('topic/relearn', {
     for: isParentBridgeSource ? 'child' : 'self',

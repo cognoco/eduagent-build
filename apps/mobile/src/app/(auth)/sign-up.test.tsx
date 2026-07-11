@@ -45,6 +45,14 @@ jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'r
   useTokenVars: () => ({}),
 }));
 
+const mockReportActivationEvent = jest.fn();
+jest.mock(
+  '../../lib/activation-events' /* gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests */,
+  () => ({
+    useReportActivationEvent: () => mockReportActivationEvent,
+  }),
+);
+
 const mockStartSSOFlow = jest.fn();
 
 const SignUpScreen = require('./sign-up').default;
@@ -180,6 +188,12 @@ describe('SignUpScreen', () => {
 
     // Auth layout guard handles navigation — no explicit router.replace
     expect(mockReplace).not.toHaveBeenCalled();
+
+    // [WI-1689] signup_started also fires for the SSO sign-up path, once
+    // Clerk's session is activated.
+    expect(mockReportActivationEvent).toHaveBeenCalledWith('signup_started', {
+      route: 'sign_up',
+    });
   });
 
   it('transitions to verification phase after sign-up', async () => {
@@ -255,6 +269,12 @@ describe('SignUpScreen', () => {
 
     // Auth layout guard handles navigation — no explicit router.replace
     expect(mockReplace).not.toHaveBeenCalled();
+
+    // [WI-1689] signup_started fires once the session exists (JWT available)
+    // but before the app's own account/profile is bootstrapped.
+    expect(mockReportActivationEvent).toHaveBeenCalledWith('signup_started', {
+      route: 'sign_up',
+    });
   });
 
   it('displays error on sign-up failure', async () => {

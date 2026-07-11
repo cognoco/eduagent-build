@@ -111,6 +111,14 @@ jest.mock(
   }),
 );
 
+const mockReportActivationEvent = jest.fn();
+jest.mock(
+  '../../../lib/activation-events' /* gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests */,
+  () => ({
+    useReportActivationEvent: () => mockReportActivationEvent,
+  }),
+);
+
 const RelearnScreen = require('./relearn').default;
 
 function makeOverdueData(totalOverdue = 4) {
@@ -221,6 +229,35 @@ describe('RelearnScreen', () => {
 
     screen.getByTestId('relearn-topic-topic-1');
     screen.getByTestId('relearn-topic-topic-3');
+
+    // [WI-1689] review_card_seen — one impression per distinct topic shown,
+    // occurrenceId=topicId (not UTC-day bucketed), tagged occurrenceKind so a
+    // future re-map to the retention-card id is detectable.
+    await waitFor(() => {
+      expect(mockReportActivationEvent).toHaveBeenCalledWith(
+        'review_card_seen',
+        {
+          occurrenceId: 'topic-1',
+          route: 'topic.relearn',
+          metadata: { occurrenceKind: 'topicId' },
+        },
+      );
+    });
+    expect(mockReportActivationEvent).toHaveBeenCalledWith('review_card_seen', {
+      occurrenceId: 'topic-2',
+      route: 'topic.relearn',
+      metadata: { occurrenceKind: 'topicId' },
+    });
+    expect(mockReportActivationEvent).toHaveBeenCalledWith('review_card_seen', {
+      occurrenceId: 'topic-3',
+      route: 'topic.relearn',
+      metadata: { occurrenceKind: 'topicId' },
+    });
+    expect(mockReportActivationEvent).toHaveBeenCalledWith('review_card_seen', {
+      occurrenceId: 'topic-4',
+      route: 'topic.relearn',
+      metadata: { occurrenceKind: 'topicId' },
+    });
   });
 
   it('skips straight to the method phase for direct topic entry', async () => {
@@ -292,6 +329,16 @@ describe('RelearnScreen', () => {
     await waitFor(() => {
       screen.getByTestId('relearn-method-phase');
     });
+
+    // [WI-1689] review_card_tapped — occurrenceId=topicId.
+    expect(mockReportActivationEvent).toHaveBeenCalledWith(
+      'review_card_tapped',
+      {
+        occurrenceId: 'topic-1',
+        route: 'topic.relearn',
+        metadata: { occurrenceKind: 'topicId' },
+      },
+    );
   });
 
   it('starts relearn and navigates to session with recap', async () => {

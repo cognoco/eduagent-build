@@ -22,7 +22,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { ClerkProvider, useClerk } from '@clerk/expo';
+import { ClerkProvider, useClerk, useUser } from '@clerk/expo';
 import { tokenCache as nativeTokenCache } from '@clerk/expo/token-cache';
 import {
   MutationCache,
@@ -37,6 +37,7 @@ import type { ColorScheme } from '../lib/design-tokens';
 import { ClerkGate } from '../components/ClerkGate';
 import { ProfileProvider, useProfile } from '../lib/profile';
 import { AppContextProvider } from '../lib/app-context';
+import { useReportActivationEvent } from '../lib/activation-events';
 import {
   setOnAuthExpired,
   clearOnAuthExpired,
@@ -145,7 +146,9 @@ const ACCENT_STORE_PREFIX = 'accentPreset_';
 function ThemedApp() {
   const { activeProfile, profiles } = useProfile();
   const { signOut } = useClerk();
-  const { userId } = useAuth();
+  const { userId, isSignedIn } = useAuth();
+  const { user } = useUser();
+  const reportActivationEvent = useReportActivationEvent();
   // Keep the latest profile list in a ref so the auth-expired callback
   // (registered once at mount) can pass current ids into signOutWithCleanup
   // without re-registering on every profile change.
@@ -156,6 +159,35 @@ function ThemedApp() {
   // without re-registering.
   const userIdRef = useRef(userId);
   userIdRef.current = userId;
+
+  // [WI-1689] app_opened / day2_return — fired once per ThemedApp mount
+  // (cold launch), gated on an existing Clerk session: POST
+  // /v1/activation-events requires a valid Clerk JWT for every request
+  // (authMiddleware is global; PRE_GRAPH_ALLOWLIST only waives the
+  // account/profile-row requirement, not auth — see activation-events.ts
+  // route header). A genuinely signed-out first-ever open cannot be
+  // recorded under the current auth contract; this is a documented gap
+  // pending a server-side pre-auth allowance, not a silent drop.
+  //
+  // day2_return uses the Clerk user's `createdAt` (not a locally persisted
+  // timestamp) as the signup-day anchor, so sign-out/sign-in on the same
+  // device never resets it and no new device-local state is needed.
+  const hasReportedAppOpenRef = useRef(false);
+  useEffect(() => {
+    if (hasReportedAppOpenRef.current) return;
+    if (!isSignedIn) return;
+    hasReportedAppOpenRef.current = true;
+    reportActivationEvent('app_opened', { route: 'app_launch' });
+
+    const createdAt = user?.createdAt;
+    if (createdAt) {
+      const signupUtcDay = createdAt.toISOString().slice(0, 10);
+      const todayUtcDay = new Date().toISOString().slice(0, 10);
+      if (todayUtcDay > signupUtcDay) {
+        reportActivationEvent('day2_return', { route: 'app_launch' });
+      }
+    }
+  }, [isSignedIn, user?.createdAt, reportActivationEvent]);
   // Always follow the phone's system color scheme (light/dark).
   const systemColorScheme = useColorScheme();
   const colorScheme: ColorScheme =

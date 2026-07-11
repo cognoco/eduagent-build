@@ -49,15 +49,20 @@ authoritative column list. Summary:
 
 All queries assume `psql` / Neon SQL editor. Substitute a date range as needed;
 examples use a rolling 30-day window. Exclude non-production noise by adding
-`AND environment = 'production'` once the mobile client is sending it
-consistently.
+`AND environment = 'production'` — the mobile client (WI-1689) now sends
+`environment` consistently on every client-driven event.
 
 ### 1. Signup completion (signup_started → signup_completed)
 
 Client-reported `signup_started` carries no `profile_id` (fires pre-account),
 so it can only be joined to `signup_completed` via `anonymous_id` IF the
-client forwards the same `anonymous_id` on both calls. If that's not wired
-client-side yet, report the two counts independently:
+client forwards the same `anonymous_id` on both calls. As of WI-1689 the
+mobile client generates and persists a device-scoped `anonymous_id` and sends
+it on every client-driven event (including `signup_started`), but
+`POST /v1/profiles` (which records `signup_completed`) does not yet accept or
+forward an `anonymousId` field — the join below still requires that follow-up
+wiring on the profiles-bootstrap route (server-owned, out of WI-1689's
+client-only scope). Until then, report the two counts independently:
 
 ```sql
 SELECT

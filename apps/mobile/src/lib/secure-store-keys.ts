@@ -26,6 +26,15 @@ import { sanitizeSecureStoreKey } from './secure-storage';
 /** Pre-auth welcome-intro seen flag (device-scoped, no profileId). */
 export const PRE_AUTH_INTRO_KEY = 'preAuthIntroSeen.v1';
 
+/**
+ * Device-scoped anonymous id for activation-funnel telemetry (WI-1689).
+ * Generated once and reused for the life of the install — deliberately
+ * survives sign-out (see sign-out-cleanup.ts GLOBAL_KEYS comment) so
+ * pre-signup and post-signup activation events from the same device can be
+ * correlated. Contains no user identifier (random UUID only).
+ */
+export const ACTIVATION_ANONYMOUS_ID_KEY = 'activationAnonymousId.v1';
+
 // ---------------------------------------------------------------------------
 // Per-profile key constructors — take a profileId and return the full key.
 // ---------------------------------------------------------------------------

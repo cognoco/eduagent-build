@@ -139,6 +139,14 @@ jest.mock('@expo/vector-icons', () => ({
   },
 }));
 
+const mockReportActivationEvent = jest.fn();
+jest.mock(
+  '../../../lib/activation-events' /* gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests */,
+  () => ({
+    useReportActivationEvent: () => mockReportActivationEvent,
+  }),
+);
+
 const PronounsScreen = require('./pronouns').default as React.ComponentType;
 
 // Render the screen against the REAL ProfileContext, projecting the current
@@ -367,6 +375,8 @@ describe('PronounsScreen', () => {
       expect.anything(),
       '/(app)/more',
     );
+    // [WI-1689] A Settings re-edit is not onboarding completing.
+    expect(mockReportActivationEvent).not.toHaveBeenCalled();
   });
 
   it('replaces home immediately on skip when no onboarding subject is present', () => {
@@ -377,6 +387,12 @@ describe('PronounsScreen', () => {
     expect(mockUpdatePronounsMutate).toHaveBeenCalledWith(
       { pronouns: null },
       expect.objectContaining({ onError: expect.any(Function) }),
+    );
+    // [WI-1689] Pronouns is the final onboarding step; reaching home via the
+    // real onboarding flow (not a Settings re-edit) fires onboarding_completed.
+    expect(mockReportActivationEvent).toHaveBeenCalledWith(
+      'onboarding_completed',
+      { route: 'onboarding.pronouns' },
     );
     expect(queryByTestId('pronouns-skip')).toBeNull();
   });

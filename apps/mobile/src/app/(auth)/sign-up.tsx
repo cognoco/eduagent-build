@@ -32,6 +32,7 @@ import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
 import { MentomateLogo } from '../../components/MentomateLogo';
 import { markSessionActivated } from '../../lib/auth-transition';
+import { useReportActivationEvent } from '../../lib/activation-events';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -71,6 +72,7 @@ export default function SignUpScreen() {
     onFieldLayout: onVerifyFieldLayout,
     onFieldFocus: onVerifyFieldFocus,
   } = useKeyboardScroll();
+  const reportActivationEvent = useReportActivationEvent();
 
   const { startSSOFlow } = useSSO();
   const openAIStrategy = getOpenAISSOStrategy();
@@ -120,6 +122,13 @@ export default function SignUpScreen() {
         await setActive({ session: sessionId });
         markSessionActivated();
         clearActivationFailure();
+        // [WI-1689] signup_started — this is the earliest point in the
+        // sign-up flow where a Clerk session (and therefore a JWT) exists;
+        // POST /v1/activation-events requires one for every request (see
+        // the route's PRE_GRAPH_ALLOWLIST comment — it waives the
+        // account/profile row, not auth). The app/MentoMate account itself
+        // has not been bootstrapped yet at this point.
+        reportActivationEvent('signup_started', { route: 'sign_up' });
         return true;
       } catch {
         setPendingSessionActivationId(sessionId);
@@ -128,7 +137,7 @@ export default function SignUpScreen() {
         return false;
       }
     },
-    [clearActivationFailure, setActive],
+    [clearActivationFailure, reportActivationEvent, setActive],
   );
 
   const retrySessionActivation = useCallback(async () => {
