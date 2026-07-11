@@ -90,7 +90,7 @@ describe('checkSource', () => {
   });
 });
 
-describe('checkFiles (integration — the 3 WI-1345-swept files)', () => {
+describe('checkFiles (integration — the WI-1345-swept files)', () => {
   it('finds zero violations in the real repo files', () => {
     const repoRoot = require('node:path').resolve(__dirname, '..');
     expect(checkFiles(repoRoot)).toEqual([]);
