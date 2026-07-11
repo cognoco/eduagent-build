@@ -2181,6 +2181,151 @@ describe('updateRetentionFromSession', () => {
       warnSpy.mockRestore();
     }
   });
+
+  it('[WI-1445] a never-reviewed EXISTING card (lastReviewedAt === null) guards on repetitionsZero, not the optimistic-lock timestamp', async () => {
+    // A retention card can pre-exist NEVER reviewed by any JS writer without
+    // THIS call having created it (e.g. auto-created earlier by
+    // topic-probe-extract.ts's own ensureRetentionCard call, or by
+    // insertRetentionCardIfAbsent) — its updatedAt was set by the DB's
+    // defaultNow(), not a JS writer, so the B73 strict updatedAt-equality
+    // guard can silently match 0 rows on a sub-millisecond precision
+    // mismatch. `isNew` stays strictly "this call inserted the row" (existing
+    // is truthy here → isNew: false); the guard falls back to
+    // `repetitionsZero` (integer equality — immune to timestamp precision).
+    // The discriminator is `lastReviewedAt === null`, NOT `repetitions === 0`
+    // alone — a reviewed-then-reset card also has repetitions 0 but a
+    // JS-precision updatedAt and must keep the optimistic lock (see the
+    // sibling test below).
+    const virginCard = mockRetentionCardRow();
+    Object.assign(virginCard, { repetitions: 0, lastReviewedAt: null });
+    setupScopedRepo({ retentionCardFindFirst: virginCard });
+
+    let capturedWhere: unknown = null;
+    const db = createMockDb();
+    (db.update as jest.Mock).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockImplementation((expr: unknown) => {
+          capturedWhere = expr;
+          const p = Promise.resolve(undefined);
+          (p as unknown as Record<string, unknown>).returning = jest
+            .fn()
+            .mockResolvedValue([{}]);
+          return p;
+        }),
+      }),
+    });
+
+    await updateRetentionFromSession(db, profileId, topicId, 5);
+
+    expect(capturedWhere).not.toBeNull();
+    const { PgDialect } = await import('drizzle-orm/pg-core');
+    const dialect = new PgDialect();
+    const rendered = dialect.sqlToQuery(capturedWhere as never).sql;
+
+    // Fingerprint of guard: repetitionsZero — an integer equality on
+    // repetitions, NOT the B73 updated_at equality. This is the
+    // discriminating assertion: `guard: none` would produce a WHERE clause
+    // with NEITHER predicate, so this test would have failed to catch a
+    // regression back to skipping the lock entirely.
+    expect(rendered).toMatch(/"repetitions"\s*=\s*\$\d+/);
+    expect(rendered).not.toMatch(/"updated_at"\s*=\s*\$\d+/);
+  });
+
+  it('[WI-1445] a reviewed-then-reset EXISTING card (repetitions === 0, lastReviewedAt set) keeps the optimistic-lock CAS', async () => {
+    // The case repetitions===0 alone must NOT be treated as "never reviewed":
+    // a card with REAL prior history (it was reviewed before — failureCount
+    // > 0, xpStatus: 'decayed', lastReviewedAt set to a past JS-written date)
+    // has its repetitions reset to 0 by a failed SM-2 review, but that same
+    // write also set `updatedAt` via JS `new Date()` — no precision issue, so
+    // the original optimistic-lock CAS still works and must NOT be
+    // downgraded to repetitionsZero (which would let two concurrent
+    // zero-repetition writers both match the same predicate and the loser
+    // silently clobber the winner's ease/interval/timestamps).
+    const decayedThenResetCard = mockRetentionCardRow();
+    Object.assign(decayedThenResetCard, {
+      repetitions: 0,
+      failureCount: 2,
+      xpStatus: 'decayed',
+      lastReviewedAt: new Date('2026-02-15T09:00:00.000Z'),
+    });
+    setupScopedRepo({ retentionCardFindFirst: decayedThenResetCard });
+
+    let capturedWhere: unknown = null;
+    const db = createMockDb();
+    (db.update as jest.Mock).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockImplementation((expr: unknown) => {
+          capturedWhere = expr;
+          const p = Promise.resolve(undefined);
+          (p as unknown as Record<string, unknown>).returning = jest
+            .fn()
+            .mockResolvedValue([{}]);
+          return p;
+        }),
+      }),
+    });
+
+    await updateRetentionFromSession(db, profileId, topicId, 5);
+
+    expect(capturedWhere).not.toBeNull();
+    const { PgDialect } = await import('drizzle-orm/pg-core');
+    const dialect = new PgDialect();
+    const rendered = dialect.sqlToQuery(capturedWhere as never).sql;
+
+    // Fingerprint of guard: optimisticLock — updated_at equality, NOT the
+    // repetitionsZero integer equality. Proves repetitions===0 alone does not
+    // route this card to the timestamp-precision workaround.
+    expect(rendered).toMatch(/"updated_at"\s*=\s*\$\d+/);
+    expect(rendered).not.toMatch(/"repetitions"\s*=\s*\$\d+/);
+  });
+
+  it('[WI-1445] a concurrent write on a reviewed-then-reset card is detected by the CAS, not silently clobbered', async () => {
+    // Zero-to-zero concurrent-write case: two sessions both read the same
+    // reset-to-repetitions-0 card (real history, lastReviewedAt set). One
+    // writes first, advancing updatedAt; the second's optimisticLock
+    // predicate (matching the STALE updatedAt it read) no longer matches the
+    // current row, so the update affects 0 rows. This must surface as a
+    // detected conflict (logged), exactly like the pre-existing B73
+    // optimistic-lock conflict path — never a silent no-op that looks like
+    // success.
+    const decayedThenResetCard = mockRetentionCardRow();
+    Object.assign(decayedThenResetCard, {
+      repetitions: 0,
+      failureCount: 2,
+      xpStatus: 'decayed',
+      lastReviewedAt: new Date('2026-02-15T09:00:00.000Z'),
+    });
+    setupScopedRepo({ retentionCardFindFirst: decayedThenResetCard });
+
+    const db = createMockDb();
+    (db.update as jest.Mock).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockImplementation(() => {
+          const p = Promise.resolve(undefined);
+          // 0 rows returned — simulates a concurrent writer having already
+          // advanced updatedAt (via a competing SM-2 write) before this
+          // WHERE clause ran, so the stale-updatedAt predicate no longer
+          // matches.
+          (p as unknown as Record<string, unknown>).returning = jest
+            .fn()
+            .mockResolvedValue([]);
+          return p;
+        }),
+      }),
+    });
+
+    const warnSpy = jest.spyOn(console, 'warn').mockReturnValue(undefined);
+    try {
+      await updateRetentionFromSession(db, profileId, topicId, 5);
+
+      expect(db.update).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Optimistic lock conflict'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

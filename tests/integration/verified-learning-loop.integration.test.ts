@@ -370,14 +370,10 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     expect(progress?.masteryVerificationState).toBe('fresh');
   });
 
-  it('(a) nextReviewAt tripwire: Challenge verification does not (yet) schedule a retention re-prove', async () => {
-    // INTENTIONAL GAP TRIPWIRE — WI-1445 not yet landed: finalizeChallengeRoundIfReady
-    // does not schedule retention_cards.nextReviewAt on Challenge Round mastery
-    // verification. This assertion documents TODAY'S gap deliberately (AC1:
-    // "stub if not yet landed, flag as follow-up"). It goes RED the moment
-    // WI-1445 lands the nextReviewAt seed write — WI-1445's PR must flip this
-    // assertion to the positive `expect(...).not.toBeNull()` form in the SAME
-    // change, or CI goes red on merge-order.
+  it('(a) verified Challenge Round seeds retention_cards.nextReviewAt (WI-1445)', async () => {
+    // WI-1445: finalizeChallengeRoundIfReady now schedules retention_cards.nextReviewAt
+    // as the first re-check promise on an all-solid Challenge Round (MMT-ADR-0031 —
+    // verification seeds retention scheduling but never terminates it).
     const { profileId, subjectId } = await seedProfileAndSubject(db);
     const topicId = await seedCurriculumTopic(db, subjectId);
     await insertRetentionCardIfAbsent({ db, profileId, topicId });
@@ -388,7 +384,7 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
     const card = await repo.retentionCards.findFirst(
       eq(retentionCards.topicId, topicId),
     );
-    expect(card?.nextReviewAt ?? null).toBeNull();
+    expect(card?.nextReviewAt ?? null).not.toBeNull();
   });
 
   // -------------------------------------------------------------------------
