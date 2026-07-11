@@ -14,11 +14,27 @@ export const paymentFailedEventSchema = z.object({
 });
 export type PaymentFailedEvent = z.infer<typeof paymentFailedEventSchema>;
 
+export const billingAlertDeliveryFailureReasonSchema = z.union([
+  z.enum([
+    'no_push_token',
+    'invalid_token',
+    'push_disabled',
+    'daily_cap_exceeded',
+    'network_error',
+    'log_write_failed',
+    'no_email',
+    'no_api_key',
+    'suppressed',
+    'unknown',
+  ]),
+  z.string().regex(/^(?:expo|resend)_api_error_[1-5][0-9]{2}$/),
+]);
+
 export const billingAlertDeliveryFailedEventSchema = z.object({
   alertId: z.string().uuid(),
   subscriptionId: z.string().uuid(),
   channel: z.enum(['push', 'email']),
-  reason: z.string().min(1),
+  reason: billingAlertDeliveryFailureReasonSchema,
   timestamp: isoDateField,
 });
 export type BillingAlertDeliveryFailedEvent = z.infer<
