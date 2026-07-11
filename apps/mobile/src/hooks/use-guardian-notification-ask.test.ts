@@ -45,12 +45,8 @@ const mockAlert = platformAlert as jest.Mock;
 // useUpdateNotificationSettings (via ./use-settings) so the mutation payload
 // (preserved fields + pushEnabled) is exercised end to end. GC1-clean: the
 // only mocked boundary is global fetch, mirroring
-// use-child-cap-notifications.test.ts. (The sibling
-// use-post-session-notification-ask.test.ts still mocks ./use-settings
-// internally — that file's ~10 pre-existing bare-renderHook() tests have no
-// QueryClientProvider/ProfileContext wrapper, so switching it to this
-// fetch-boundary approach would require rewriting all of them; tracked as a
-// known GC1 deferral rather than done here.)
+// use-post-session-notification-ask.test.ts and
+// use-child-cap-notifications.test.ts.
 const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
 
