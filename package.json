@@ -20,6 +20,7 @@
     "test:llm:source-grounding": "node scripts/doppler-run.mjs run --project mentomate --config stg -- pnpm eval:llm -- --live --flow probes --scenarios source-grounding --max-live-calls 12",
     "test:llm:personalization-matrix": "node scripts/doppler-run.mjs run --project mentomate --config stg -- pnpm eval:llm -- --live --flow probes --scenarios personalization --max-live-calls 16",
     "test:llm:provider-degradation": "pnpm exec tsx scripts/provider-degradation-pass.ts",
+    "test:llm:premium-routing": "node scripts/doppler-run.mjs run -c stg -- pnpm exec tsx scripts/premium-routing-pass.ts",
     "test:llm:homework-source": "node scripts/doppler-run.mjs run --project mentomate --config stg -- pnpm eval:llm -- --live --flow probes --scenarios homework-source --max-live-calls 8",
     "test:llm:post-session-artifacts": "node scripts/doppler-run.mjs run --project mentomate --config stg -- pnpm eval:llm -- --live --flow session-summary --flow session-recap --flow session-analysis --flow progress-summary --flow assessment-evaluation --max-live-calls 45",
     "test:llm:artifact-personalization": "node scripts/doppler-run.mjs run --project mentomate --config stg -- pnpm exec tsx scripts/artifact-personalization-pass.ts",
