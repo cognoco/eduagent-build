@@ -51,15 +51,17 @@ judge call alone, before any of the rest of the exchange's work.
 **Winner: Sonnet 4.6 — RETAINED. No `GRADER_MODEL` change (AC-5's
 explicit-no-change path).** Operator-ruled 2026-07-11.
 
-Sonnet 4.6 is the only candidate clean on both axes across all 5 fixtures.
-Haiku 4.5 and GPT-5-mini at `reasoning_effort=minimal` both mislabeled the
-same misconception fixture (CGR02) as `partial` — a **correlated** soft miss
-across both fast/cheap configurations, not independent noise, on a P1 item
-that gates the false-mastery guard in the Challenge Round grader
-(`decideMasteryAndReview()` — any non-`solid` evaluation blocks mastery).
-GPT-5-mini's default-reasoning config gets the label right but at ~2.4x
-Sonnet 4.6's latency, which the 25s synchronous wall does not comfortably
-absorb.
+Haiku 4.5 and GPT-5-mini at `reasoning_effort=minimal` failed the **judgment
+axis**: both mislabeled the same misconception fixture (CGR02) as `partial`
+— a **correlated** soft miss across both fast/cheap configurations, not
+independent noise, on a P1 item that gates the false-mastery guard in the
+Challenge Round grader (`decideMasteryAndReview()` — any non-`solid`
+evaluation blocks mastery). GPT-5-mini's default-reasoning config was clean
+on **both axes** — it got the CGR02 label right — but was rejected on the
+**latency budget**: at ~2.4x Sonnet 4.6's latency (~12.9s/call vs the 25s
+synchronous Workers wall), it does not comfortably fit a per-exchange
+blocking call. Sonnet 4.6 is retained as the only candidate that is both
+axis-clean AND within the latency budget.
 
 **Explicit override of the harness's own selection rule.** The harness's
 written rule (`challenge-grader.ts` §"RECORDING THE WINNER") is: pass =
