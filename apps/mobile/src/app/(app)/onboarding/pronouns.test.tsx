@@ -140,12 +140,10 @@ jest.mock('@expo/vector-icons', () => ({
 }));
 
 const mockReportActivationEvent = jest.fn();
-jest.mock(
-  '../../../lib/activation-events' /* gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests */,
-  () => ({
-    useReportActivationEvent: () => mockReportActivationEvent,
-  }),
-);
+jest.mock('../../../lib/activation-events', () => ({
+  ...jest.requireActual('../../../lib/activation-events'),
+  useReportActivationEvent: () => mockReportActivationEvent,
+}));
 
 const PronounsScreen = require('./pronouns').default as React.ComponentType;
 

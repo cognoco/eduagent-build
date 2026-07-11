@@ -1,8 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
-import {
-  createRoutedMockFetch,
-  mockApiClientFactory,
-} from '../test-utils/mock-api-routes';
+import { createRoutedMockFetch } from '../test-utils/mock-api-routes';
 import { Sentry } from './sentry';
 
 jest.mock('expo-constants', () => ({
@@ -15,10 +12,16 @@ jest.mock('expo-updates', () => ({
 
 const mockFetch = createRoutedMockFetch();
 
-jest.mock(
-  './api-client' /* gc1-allow: external-boundary; typed Hono RPC client wraps fetch through mockApiClientFactory */,
-  () => mockApiClientFactory(mockFetch),
-);
+// Pattern A: spread the real module, override only useApiClient so the
+// typed Hono RPC client is bound to the routed mock fetch instead of a real
+// network call.
+jest.mock('./api-client', () => ({
+  ...jest.requireActual('./api-client'),
+  useApiClient: () => {
+    const { hc } = require('hono/client');
+    return hc('http://localhost', { fetch: mockFetch });
+  },
+}));
 
 // [WI-1689] Late `require()`, not a top-level `import` — ES imports are
 // hoisted above the `const mockFetch = ...` above, which would make the
