@@ -550,6 +550,7 @@ describe('languageProgressSchema', () => {
     currentSublevel: null,
     currentMilestone: null,
     nextMilestone: null,
+    nextPractice: null,
   };
 
   it('accepts progress with all nullable fields null', () => {
@@ -605,6 +606,44 @@ describe('languageProgressSchema', () => {
     const result = languageProgressSchema.safeParse({
       ...validProgress,
       languageCode: 'x',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // WI-1552: additive nextPractice field.
+  it('accepts progress with a persisted next-practice pointer', () => {
+    const parsed = languageProgressSchema.parse({
+      ...validProgress,
+      nextPractice: {
+        strand: 'meaning_output',
+        reason:
+          'least-practiced strand from the prior session (meaning_input=3, meaning_output=0, language_focus=2, fluency=2)',
+        sessionStrandCounts: {
+          meaning_input: 3,
+          meaning_output: 0,
+          language_focus: 2,
+          fluency: 2,
+        },
+        computedAt: '2026-07-11T10:00:00.000Z',
+      },
+    });
+    expect(parsed.nextPractice?.strand).toBe('meaning_output');
+  });
+
+  it('rejects an invalid strand on the next-practice pointer', () => {
+    const result = languageProgressSchema.safeParse({
+      ...validProgress,
+      nextPractice: {
+        strand: 'not-a-real-strand',
+        reason: 'x',
+        sessionStrandCounts: {
+          meaning_input: 0,
+          meaning_output: 0,
+          language_focus: 0,
+          fluency: 0,
+        },
+        computedAt: '2026-07-11T10:00:00.000Z',
+      },
     });
     expect(result.success).toBe(false);
   });
