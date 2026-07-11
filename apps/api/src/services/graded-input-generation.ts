@@ -59,10 +59,36 @@ export interface GenerateGradedInputContentInput {
 }
 
 /**
+ * Extract label strings from a raw `learningProfile.interests` jsonb value.
+ * The column's runtime shape is `InterestEntry[]` (`{ label, context }[]`),
+ * not `string[]` — callers must not cast it directly (a TypeScript-only cast
+ * doesn't change the runtime objects, and those objects reaching
+ * `sanitizeXmlValue`'s `.trim()` throw a TypeError). Tolerates a legacy
+ * `string[]` shape too. Non-string, non-`{label: string}` entries are dropped
+ * rather than thrown on, matching this function's own never-throws contract.
+ */
+export function extractInterestLabels(
+  rawInterests: unknown,
+): string[] | undefined {
+  if (!Array.isArray(rawInterests)) return undefined;
+  return rawInterests.flatMap((entry): string[] => {
+    if (typeof entry === 'string') return [entry];
+    if (
+      entry &&
+      typeof entry === 'object' &&
+      typeof (entry as { label?: unknown }).label === 'string'
+    ) {
+      return [(entry as { label: string }).label];
+    }
+    return [];
+  });
+}
+
+/**
  * Generate graded-input passage content via the LLM. Returns null (never
- * throws) on any failure — missing/invalid JSON, schema violation, or a
- * network/provider error — so the caller can fall back to the deterministic
- * seed-passage template.
+ * throws) on any failure — malformed input, missing/invalid JSON, schema
+ * violation, or a network/provider error — so the caller can fall back to the
+ * deterministic seed-passage template.
  *
  * Deliberately does NOT pass `conversationLanguage` to routeAndCall: the
  * router's personalization preamble instructs the model to write the JSON
@@ -76,16 +102,19 @@ export interface GenerateGradedInputContentInput {
 export async function generateGradedInputContent(
   input: GenerateGradedInputContentInput,
 ): Promise<GradedInputGenerationResult | null> {
-  const messages = buildGradedInputGenerationPrompt({
-    languageCode: input.languageCode,
-    cefrLevel: input.cefrLevel,
-    knownWords: input.knownWords,
-    targetWords: input.targetWords,
-    modality: input.modality,
-    interests: input.interests,
-  });
-
   try {
+    // Building the prompt lives inside the try/catch alongside the LLM call:
+    // this function's "never throws" contract must hold structurally — any
+    // malformed input degrades to the deterministic fallback — not merely
+    // because callers happen to pass well-shaped data.
+    const messages = buildGradedInputGenerationPrompt({
+      languageCode: input.languageCode,
+      cefrLevel: input.cefrLevel,
+      knownWords: input.knownWords,
+      targetWords: input.targetWords,
+      modality: input.modality,
+      interests: input.interests,
+    });
     const result = await routeAndCall(messages, 2, {
       flow: 'language.graded_input',
       ageBracket: input.ageBracket,
