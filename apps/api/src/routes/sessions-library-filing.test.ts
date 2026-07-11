@@ -279,7 +279,6 @@ jest.mock('../services/session', () => {
     closeSession: jest.fn(),
     getSessionCompletionContext: jest.fn(),
     getSessionTranscript: jest.fn(),
-    evaluateSessionDepth: jest.fn(),
     recordSystemPrompt: jest.fn(),
     recordSessionEvent: jest.fn(),
     setSessionInputMode: jest.fn(),

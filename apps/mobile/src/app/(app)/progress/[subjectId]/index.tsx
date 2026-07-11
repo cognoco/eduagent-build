@@ -31,7 +31,7 @@ import {
   formatApiError,
 } from '../../../../lib/format-api-error';
 import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
-import type { LanguageStrandName } from '@eduagent/schemas';
+import type { LanguageProgress, LanguageStrandName } from '@eduagent/schemas';
 
 // WI-1552: maps a persisted next-practice pointer's strand to its i18n key.
 // Deliberately does not surface the pointer's `reason` field verbatim — that
@@ -44,6 +44,17 @@ const STRAND_COPY_KEYS = {
   language_focus: 'progress.subject.continuePracticeStrandLanguageFocus',
   fluency: 'progress.subject.continuePracticeStrandFluency',
 } as const satisfies Record<LanguageStrandName, string>;
+
+const LANGUAGE_STRANDS: LanguageStrandName[] = [
+  'meaning_input',
+  'meaning_output',
+  'language_focus',
+  'fluency',
+];
+
+type LanguageSkill = NonNullable<
+  LanguageProgress['skillProfile']
+>[number]['skill'];
 
 function strandCopyKey(strand: LanguageStrandName) {
   return STRAND_COPY_KEYS[strand];
@@ -90,6 +101,34 @@ export default function ProgressSubjectScreen(): React.ReactElement {
     }
     return t('progress.subject.upNextNoDetails');
   };
+  const formatStrandLabel = (strand: LanguageStrandName): string => {
+    switch (strand) {
+      case 'meaning_input':
+        return t('progress.subject.strandMeaningInput');
+      case 'meaning_output':
+        return t('progress.subject.strandMeaningOutput');
+      case 'language_focus':
+        return t('progress.subject.strandLanguageFocus');
+      case 'fluency':
+        return t('progress.subject.strandFluency');
+    }
+  };
+  const formatSkillLabel = (skill: LanguageSkill): string => {
+    switch (skill) {
+      case 'vocabulary':
+        return t('progress.subject.skillVocabulary');
+      case 'grammar':
+        return t('progress.subject.skillGrammar');
+      case 'reading':
+        return t('progress.subject.skillReading');
+      case 'listening':
+        return t('progress.subject.skillListening');
+      case 'speaking':
+        return t('progress.subject.skillSpeaking');
+      case 'fluency':
+        return t('progress.subject.skillFluency');
+    }
+  };
   const role = useActiveProfileRole();
   const register = role === 'child' ? 'child' : 'adult';
   const router = useRouter();
@@ -129,11 +168,24 @@ export default function ProgressSubjectScreen(): React.ReactElement {
       legacyProgress.lastSessionAt != null);
   const isLanguageSubject =
     subject?.pedagogyMode === 'four_strands' || !!languageProgress;
+  const maxStrandCount = Math.max(
+    1,
+    ...LANGUAGE_STRANDS.map(
+      (strand) => languageProgress?.strandBalance?.counts[strand] ?? 0,
+    ),
+  );
   const canResumeSubject = !!resumeTargetQuery.data;
 
   const openSubjectShelf = (targetSubjectId: string): void => {
     router.push({
       pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: targetSubjectId },
+    } as Href);
+  };
+
+  const openCefrVocabulary = (targetSubjectId: string): void => {
+    router.push({
+      pathname: '/(app)/vocabulary/[subjectId]',
       params: { subjectId: targetSubjectId },
     } as Href);
   };
@@ -577,6 +629,111 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                   <Text className="text-body-sm text-text-secondary mt-2">
                     {t('progress.subject.milestoneNoData')}
                   </Text>
+                )}
+
+                {languageProgress?.strandBalance && (
+                  <View
+                    className="mt-4 pt-4 border-t border-border gap-3"
+                    testID="language-strand-balance"
+                  >
+                    <View className="flex-row flex-wrap items-start justify-between gap-2">
+                      <Text className="text-body-sm font-semibold text-text-primary flex-1 min-w-0">
+                        {t('progress.subject.strandBalanceTitle')}
+                      </Text>
+                      <Text className="text-caption text-text-muted">
+                        {t('progress.subject.strandSessionsSampled', {
+                          count: languageProgress.strandBalance.sessionsSampled,
+                        })}
+                      </Text>
+                    </View>
+                    {LANGUAGE_STRANDS.map((strand) => {
+                      const count =
+                        languageProgress.strandBalance!.counts[strand];
+                      return (
+                        <View key={strand} className="gap-1">
+                          <View className="flex-row flex-wrap items-center justify-between gap-2">
+                            <Text className="text-caption text-text-secondary flex-1 min-w-0">
+                              {formatStrandLabel(strand)}
+                            </Text>
+                            <Text
+                              className="text-caption text-text-muted"
+                              style={{ fontVariant: ['tabular-nums'] }}
+                            >
+                              {count}
+                            </Text>
+                          </View>
+                          <View className="bg-border rounded-full h-2 overflow-hidden">
+                            <View
+                              className="bg-secondary h-full rounded-full"
+                              style={{
+                                width: `${Math.round(
+                                  (count / maxStrandCount) * 100,
+                                )}%`,
+                              }}
+                            />
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {languageProgress?.skillProfile &&
+                  languageProgress.skillProfile.length > 0 && (
+                    <View
+                      className="mt-4 pt-4 border-t border-border gap-3"
+                      testID="language-skill-profile"
+                    >
+                      <Text className="text-body-sm font-semibold text-text-primary">
+                        {t('progress.subject.skillProfileTitle')}
+                      </Text>
+                      {languageProgress.skillProfile.map((entry) => (
+                        <View
+                          key={entry.skill}
+                          className="gap-1"
+                          testID={`language-skill-${entry.skill}`}
+                        >
+                          <View className="flex-row flex-wrap items-center justify-between gap-2">
+                            <Text className="text-caption text-text-secondary flex-1 min-w-0">
+                              {formatSkillLabel(entry.skill)}
+                            </Text>
+                            {entry.progress === null && (
+                              <Text className="text-caption text-text-muted">
+                                {t('progress.subject.skillEvidenceCount', {
+                                  count: entry.evidenceCount,
+                                })}
+                              </Text>
+                            )}
+                          </View>
+                          {entry.progress !== null && (
+                            <View className="bg-border rounded-full h-2 overflow-hidden">
+                              <View
+                                className="bg-primary h-full rounded-full"
+                                style={{
+                                  width: `${Math.round(entry.progress * 100)}%`,
+                                }}
+                              />
+                            </View>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                {languageProgress && subject && (
+                  <Pressable
+                    onPress={() => openCefrVocabulary(subject.subjectId)}
+                    className="mt-4 pt-4 border-t border-border self-start min-h-[44px] justify-center"
+                    accessibilityRole="button"
+                    accessibilityLabel={t(
+                      'progress.subject.viewCefrVocabulary',
+                    )}
+                    testID="cefr-vocabulary-browser-link"
+                  >
+                    <Text className="text-body-sm font-semibold text-primary">
+                      {t('progress.subject.viewCefrVocabulary')}
+                    </Text>
+                  </Pressable>
                 )}
 
                 {/* WI-1552: cross-session next-practice pointer, persisted at

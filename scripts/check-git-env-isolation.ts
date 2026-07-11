@@ -15,10 +15,10 @@
  * This is the structural backstop: an AST walk asserting every
  * git-touching `spawnSync`/`execFileSync` call in the WI-1345-swept files
  * carries an `env` option built via that file's own local `childGitEnv()`
- * helper (each of the 3 files defines its own, not a shared import — see
+ * helper (each swept file defines its own, not a shared import — see
  * each file's WI-1345 commit).
  *
- * SCOPE: exactly the 3 files below. Every spawnSync/execFileSync call
+ * SCOPE: exactly the files below. Every spawnSync/execFileSync call
  * currently in these files is git-touching (git itself, or a wrapper — TSX
  * running a script that shells out to git, BASH running a script that
  * shells out to git) — verified by inspection at WI-1345 round 3. A future
@@ -49,6 +49,7 @@ export const SWEPT_FILES = [
   'scripts/check-merge-invariant.test.ts',
   'scripts/husky-main-guard.test.ts',
   'scripts/check-change-class.test.ts',
+  '_quartet/clacks/channel-relocation.test.ts',
 ];
 
 const SPAWN_CALLEES = new Set(['spawnSync', 'execFileSync']);
@@ -191,7 +192,7 @@ function runCli(): void {
     );
   }
   process.stderr.write(
-    '\nEvery git-touching spawnSync/execFileSync call in these 3 files must ' +
+    `\nEvery git-touching spawnSync/execFileSync call in these ${SWEPT_FILES.length} files must ` +
       'pass env: childGitEnv(...), so an ambient GIT_* var (e.g. a ' +
       'husky-exported GIT_DIR) can never redirect the call at a mkdtemp ' +
       'fixture repo instead of the ambient checkout.\n',

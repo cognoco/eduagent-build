@@ -94,19 +94,6 @@ jest.mock('../services/profile', () => {
   };
 });
 
-// [WI-586 flip-safety] identity-v2 helpers — stub the person-based age-bracket
-// reader so the evaluate-depth flag-split (v2 person vs legacy profiles) can be
-// asserted without a real DB.
-jest.mock('../services/identity-v2/helpers', () => {
-  const actual = jest.requireActual(
-    '../services/identity-v2/helpers',
-  ) as typeof import('../services/identity-v2/helpers');
-  return {
-    ...actual,
-    getPersonAgeBracket: jest.fn().mockResolvedValue('teen'),
-  };
-});
-
 // [WI-586 flip-safety] Under IDENTITY_V2_ENABLED the account middleware resolves
 // identity via resolveIdentityV2; stub it so flag-ON route tests authenticate
 // without an unmocked DB (resolver itself is covered by identity integration tests).
@@ -270,7 +257,7 @@ jest.mock('../services/billing', () => {
 
 // [WI-586 flip-safety] Under IDENTITY_V2_ENABLED the metering middleware reads
 // the billing-v2 store twins instead of the legacy billing reads. Stub them with
-// the same shapes so a metered route (evaluate-depth) authorises under flag-ON
+// the same shapes so metered routes authorise under flag-ON
 // without an unmocked DB. The v2 twins themselves are covered by the billing-v2
 // integration suites.
 jest.mock(
@@ -503,12 +490,6 @@ jest.mock('../services/session', () => {
         },
       ],
     }),
-    evaluateSessionDepth: jest.fn().mockResolvedValue({
-      meaningful: true,
-      reason: 'enough learner detail',
-      method: 'heuristic',
-      topics: ['gravity'],
-    }),
     recordSystemPrompt: jest.fn().mockResolvedValue(undefined),
     recordSessionEvent: jest.fn().mockResolvedValue(undefined),
     setSessionInputMode: jest
@@ -678,7 +659,6 @@ import {
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, MAX_HOMEWORK_PROBLEMS } from '@eduagent/schemas';
-import { getPersonAgeBracket } from '../services/identity-v2/helpers';
 import { FILING_CONFIG } from '../config/filing';
 
 const TEST_ENV = {
@@ -1075,68 +1055,6 @@ describe('session routes', () => {
         'I learned gravity pulls things down.',
       );
       expect(body.session).toBeUndefined();
-    });
-  });
-
-  describe('POST /v1/sessions/:sessionId/evaluate-depth', () => {
-    // [WI-586] The age-bracket reader mocks are module-level jest.fn()s that
-    // accumulate calls across tests; clear their call history per test so the
-    // flag-OFF / flag-ON "not.toHaveBeenCalled()" assertions are order-independent.
-    beforeEach(() => {
-      (getPersonAgeBracket as jest.Mock).mockClear();
-    });
-
-    it('returns 410 with SESSION_ARCHIVED when transcript has been purged', async () => {
-      (getSessionTranscript as jest.Mock).mockResolvedValueOnce({
-        archived: true,
-        archivedAt: new Date().toISOString(),
-        summary: {
-          narrative:
-            'Learner explored gravity and discussed how it pulls objects together. They asked thoughtful questions about why apples fall.',
-          topicsCovered: ['gravity'],
-          sessionState: 'completed' as const,
-          reEntryRecommendation:
-            'Pick up by reviewing how mass affects gravitational pull.',
-          learnerRecap: 'I learned gravity pulls things down.',
-          topicId: null,
-        },
-      });
-
-      const res = await app.request(
-        `/v1/sessions/${SESSION_ID}/evaluate-depth`,
-        { method: 'POST', headers: AUTH_HEADERS },
-        TEST_ENV,
-      );
-
-      expect(res.status).toBe(410);
-      const body = await res.json();
-      expect(body).toEqual(
-        expect.objectContaining({
-          code: 'SESSION_ARCHIVED',
-          message: 'Session transcript has been archived',
-        }),
-      );
-    });
-
-    // [WI-867] CUT: flag-OFF path dropped — route always calls getPersonAgeBracket post-collapse.
-    // Original test: 'flag-OFF: reads the age bracket from the legacy profiles path'.
-
-    // [WI-586 flip-safety, WI-867] evaluate-depth always reads the age bracket from the
-    // v2 person path (getPersonAgeBracket) post-collapse. The flag-ON env is preserved
-    // here as a no-op to demonstrate the route works with or without the flag set.
-    // RED-FLIP: stub getPersonAgeBracket to throw and this test fails → proves the v2 path is live.
-    it('reads the age bracket from the v2 person path', async () => {
-      const res = await app.request(
-        `/v1/sessions/${SESSION_ID}/evaluate-depth`,
-        { method: 'POST', headers: AUTH_HEADERS },
-        TEST_ENV,
-      );
-
-      expect(res.status).toBe(200);
-      expect(getPersonAgeBracket).toHaveBeenCalledWith(
-        expect.anything(),
-        'test-profile-id',
-      );
     });
   });
 

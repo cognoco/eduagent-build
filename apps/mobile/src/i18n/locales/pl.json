@@ -1540,7 +1540,6 @@
       "startTitle": "Zacznij {{subject}}"
     },
     "noteSignal": {
-      "verified": "Zweryfikowano",
       "verifiedAccessibilityLabel": "Zweryfikowano – Twoje słowa się potwierdziły",
       "mentorAddition": "Mentor ma więcej na ten temat.",
       "showMentorAdditionAccessibilityLabel": "Pokaż, co dodał mentor.",
@@ -1659,7 +1658,6 @@
     "inactiveFallbackBanner": {
       "message": "Nie udało się wczytać wstrzymanych i zarchiwizowanych przedmiotów. Stuknij, aby spróbować ponownie — nie zniknęły."
     },
-    "notStartedCount": "{{notStarted}} / {{total}} nierozpoczętych",
     "chooseTopic": "Wybierz temat",
     "provenanceFrom": "Od {{name}}",
     "recentlyAdded": "Ostatnio dodane",
@@ -1668,8 +1666,6 @@
     "sessionCount_many": "{{count}} sesji",
     "sessionCount_other": "{{count}} sesji",
     "a11yClearSearch": "Wyczyść wyszukiwanie",
-    "a11yEditNote": "Edytuj notatkę",
-    "a11yDeleteNote": "Usuń notatkę",
     "a11yCloseTopicPicker": "Zamknij wybór tematu",
     "myNotes": {
       "subtitleBookmarks_one": "1 zapisana odpowiedź",
@@ -1702,9 +1698,6 @@
       "thisTopicFallback": "ten temat",
       "addedFromChildNamed": "Dodano z nauki {{name}}.",
       "addedFromChild": "Dodano z nauki dziecka."
-    },
-    "collapsibleChapter": {
-      "a11yHeader": "{{title}}, {{notStarted}} z {{total}} tematów nierozpoczętych"
     },
     "inlineNote": {
       "a11yCollapse": "Notatka do {{topic}}. {{source}}. Dotknij, aby zwinąć.",
@@ -2373,7 +2366,28 @@
       "startedTopicsCount_one": "Rozpoczęto {{count}} temat",
       "startedTopicsCount_other": "Rozpoczęto {{count}} tematów",
       "startedTopicsCount_few": "Rozpoczęto {{count}} tematy",
-      "startedTopicsCount_many": "Rozpoczęto {{count}} tematów"
+      "startedTopicsCount_many": "Rozpoczęto {{count}} tematów",
+      "strandBalanceTitle": "Bilans ostatnich ćwiczeń",
+      "strandSessionsSampled": "{{count}} ostatnia sesja",
+      "strandSessionsSampled_few": "{{count}} ostatnie sesje",
+      "strandSessionsSampled_many": "{{count}} ostatnich sesji",
+      "strandSessionsSampled_other": "{{count}} ostatnich sesji",
+      "strandMeaningInput": "Odbiór skoncentrowany na znaczeniu",
+      "strandMeaningOutput": "Tworzenie skoncentrowane na znaczeniu",
+      "strandLanguageFocus": "Nauka skoncentrowana na języku",
+      "strandFluency": "Rozwój płynności",
+      "skillProfileTitle": "Profil umiejętności",
+      "skillVocabulary": "Słownictwo",
+      "skillGrammar": "Gramatyka",
+      "skillReading": "Czytanie",
+      "skillListening": "Słuchanie",
+      "skillSpeaking": "Mówienie",
+      "skillFluency": "Płynność",
+      "skillEvidenceCount": "{{count}} aktywność",
+      "skillEvidenceCount_few": "{{count}} aktywności",
+      "skillEvidenceCount_many": "{{count}} aktywności",
+      "skillEvidenceCount_other": "{{count}} aktywności",
+      "viewCefrVocabulary": "Przeglądaj słownictwo CEFR"
     },
     "vocabulary": {
       "pageTitle": "Twoje słownictwo",
@@ -3841,12 +3855,6 @@
       "crossContextPromptMessage": "Jesteś w trakcie sesji. Najpierw ją ukończ lub otwórz aktualizację i opuść bieżącą aktywność.",
       "stayHere": "Zostań tutaj",
       "openUpdate": "Otwórz aktualizację"
-    },
-    "guardianPrimer": {
-      "title": "Chcesz być na bieżąco?",
-      "message": "Możemy wysłać delikatne przypomnienie, gdy dziecko będzie potrzebować Twojej uwagi. Możesz to zmienić w dowolnym momencie w Ustawieniach.",
-      "allow": "Zezwól",
-      "notNow": "Nie teraz"
     }
   },
   "myNotes": {
