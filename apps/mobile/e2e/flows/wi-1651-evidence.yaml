@@ -2,5 +2,4 @@ appId: com.mentomate.app
 tags:
   - wi1651-evidence
 ---
-- assertVisible: "WI-1651 deliberate failure marker"
 - takeScreenshot: wi-1651-evidence-pass
