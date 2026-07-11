@@ -87,7 +87,7 @@ import {
 import { parseConversationLanguage } from '../services/llm';
 import { streamSessionResponse } from '../services/session/session-stream-response';
 import {
-  isChallengeRoundRuntimeEnabled,
+  isChallengeRoundEnabledForProfile,
   isReviewCallbackOpenerEnabled,
   isChallengeRoundGraderEnabled,
   isTopicIntentMatcherEnabled,
@@ -148,6 +148,7 @@ type SessionRouteEnv = {
     VOYAGE_API_KEY?: string;
     MATCHER_ENABLED?: string;
     CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
+    CHALLENGE_ROUND_COHORT_PROFILE_IDS?: string;
     REVIEW_CALLBACK_OPENER_ENABLED?: string;
     CHALLENGE_ROUND_GRADER_ENABLED?: string;
     JUDGE_FRAMEWORK_ENABLED?: string;
@@ -488,8 +489,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const memoryFactsRelevanceEnabled =
         memoryFactsReadEnabled &&
         isMemoryFactsRelevanceEnabled(c.env.MEMORY_FACTS_RELEVANCE_RETRIEVAL);
-      const challengeRoundRuntimeEnabled = isChallengeRoundRuntimeEnabled(
+      const challengeRoundRuntimeEnabled = isChallengeRoundEnabledForProfile(
         c.env.CHALLENGE_ROUND_RUNTIME_ENABLED,
+        profileId,
+        c.env.CHALLENGE_ROUND_COHORT_PROFILE_IDS,
       );
       const reviewCallbackOpenerEnabled = isReviewCallbackOpenerEnabled(
         c.env.REVIEW_CALLBACK_OPENER_ENABLED,
@@ -686,8 +689,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const memoryFactsRelevanceEnabled =
         memoryFactsReadEnabled &&
         isMemoryFactsRelevanceEnabled(c.env.MEMORY_FACTS_RELEVANCE_RETRIEVAL);
-      const challengeRoundRuntimeEnabled = isChallengeRoundRuntimeEnabled(
+      const challengeRoundRuntimeEnabled = isChallengeRoundEnabledForProfile(
         c.env.CHALLENGE_ROUND_RUNTIME_ENABLED,
+        profileId,
+        c.env.CHALLENGE_ROUND_COHORT_PROFILE_IDS,
       );
       const reviewCallbackOpenerEnabled = isReviewCallbackOpenerEnabled(
         c.env.REVIEW_CALLBACK_OPENER_ENABLED,

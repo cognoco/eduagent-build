@@ -161,6 +161,16 @@ const envSchema = z.object({
   // See docs/plans/2026-05-18-challenge-round-targets.md "Rollout Gate".
   CHALLENGE_ROUND_RUNTIME_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // Launch-cohort allowlist for Challenge Round (WI-1754 AC2). Comma-
+  // separated profile ids. Narrows CHALLENGE_ROUND_RUNTIME_ENABLED to an
+  // explicit cohort instead of the whole environment — see
+  // isChallengeRoundEnabledForProfile. Default-closed: empty/unset means no
+  // profile is in the cohort (mirrors MEMORY_FACTS_DEDUP_ROLLOUT_PCT's
+  // default-0 "nobody yet" posture), so a missing Doppler var never
+  // accidentally widens Challenge Round to every profile in an enabled
+  // environment.
+  CHALLENGE_ROUND_COHORT_PROFILE_IDS: z.string().optional().default(''),
+
   // Warm review-callback opener (RR-1 + RR-13 minimal thread). When 'true',
   // session-exchange populates ExchangeContext.reviewCallback for review-mode
   // first turns and the REVIEW prompt block emits the outcome-branched warm
@@ -318,6 +328,48 @@ export function isChallengeRoundRuntimeEnabled(
   value: string | undefined,
 ): boolean {
   return value === 'true';
+}
+
+/**
+ * Challenge Round launch-cohort gate (WI-1754 AC2). Per-profile allowlist
+ * check for CHALLENGE_ROUND_COHORT_PROFILE_IDS, analogous in shape to
+ * isProfileInDedupRollout but exact-match rather than probabilistic — cohort
+ * membership must be a deliberate allowlist entry, not a percentage bucket.
+ *
+ * Default-closed like isProfileInDedupRollout(id, 0): an empty/unset
+ * allowlist returns false for every profile, so a missing Doppler var
+ * narrows the cohort to nobody rather than widening it to everybody.
+ */
+export function isProfileInChallengeRoundCohort(
+  profileId: string,
+  allowlist: string | undefined,
+): boolean {
+  if (!allowlist) return false;
+  const ids = allowlist
+    .split(',')
+    .map((id) => id.trim().toLowerCase())
+    .filter((id) => id.length > 0);
+  if (ids.length === 0) return false;
+  return ids.includes(profileId.toLowerCase());
+}
+
+/**
+ * Combined Challenge Round enablement gate for a specific profile (WI-1754
+ * AC2). The environment-wide CHALLENGE_ROUND_RUNTIME_ENABLED kill switch and
+ * the launch-cohort allowlist must both pass — a flag flip alone can no
+ * longer enable Challenge Round broadly, only ever narrow to the cohort.
+ * Wired into ExchangeContext.challengeRuntimeEnabled at the sessions route
+ * boundary (routes/sessions.ts).
+ */
+export function isChallengeRoundEnabledForProfile(
+  flagValue: string | undefined,
+  profileId: string,
+  cohortAllowlist: string | undefined,
+): boolean {
+  return (
+    isChallengeRoundRuntimeEnabled(flagValue) &&
+    isProfileInChallengeRoundCohort(profileId, cohortAllowlist)
+  );
 }
 
 /**
