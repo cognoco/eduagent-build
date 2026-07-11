@@ -322,13 +322,9 @@ export const challengeRoundMasteryFlow: FlowDefinition<ChallengeMasteryInput> =
     id: 'challenge-round-mastery',
     name: 'Challenge Round mastery evidence',
     sourceFile: 'apps/api/src/services/exchanges.ts:buildSystemPrompt',
-    // NOTE: deliberately NOT emitsEnvelope. The flow validates the envelope
-    // shape per-sample (expectedResponseSchema) and asserts the evaluation
-    // evidence (evaluateQuality), but it is excluded from the aggregate
-    // signal-distribution baseline — adding it there would require a live
-    // reseed of baseline.json before the key-free --validate-baseline CI guard
-    // could pass. The main-loop envelope distribution is already covered by
-    // probes / exchanges / safety-probes / language-quality.
+    // [WI-1789] Include this structured-response flow in the aggregate signal
+    // distribution guard. Its live observations are seeded in baseline.json.
+    emitsEnvelope: true,
     expectedResponseSchema: llmResponseEnvelopeSchema,
 
     buildPromptInput(): ChallengeMasteryInput | null {
