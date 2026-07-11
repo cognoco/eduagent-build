@@ -48,6 +48,9 @@ import { exchangesFlow } from './flows/exchanges';
 import { topicProbeSignalsFlow } from './flows/topic-probe-signals';
 import { topicIntentMatcherFlow } from './flows/topic-intent-matcher';
 import { subjectClassifyFlow } from './flows/subject-classify';
+// [WI-1755] Launch-guard eval coverage for the language-learning-intent
+// detector used at subject creation. See flow file for context.
+import { languageDetectFlow } from './flows/language-detect';
 import { probesFlow } from './flows/probes';
 // [H3 — 2026-06-05 safety audit] Adversarial safety regression suite:
 // jailbreaks, prompt extraction, crisis disclosures, harmful-content asks.
@@ -186,6 +189,7 @@ const FLOWS: FlowDefinition[] = [
   topicProbeSignalsFlow as FlowDefinition,
   topicIntentMatcherFlow as FlowDefinition,
   subjectClassifyFlow as FlowDefinition,
+  languageDetectFlow as FlowDefinition,
   probesFlow as FlowDefinition,
   safetyProbesFlow as FlowDefinition,
   languageQualityFlow as FlowDefinition,
