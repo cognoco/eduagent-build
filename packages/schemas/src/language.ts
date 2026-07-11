@@ -254,7 +254,8 @@ export const languageProgressSchema = z.object({
       }),
       sessionsSampled: z.number().int().nonnegative(),
     })
-    .nullable(),
+    .nullable()
+    .default(null),
   skillProfile: z
     .array(
       z.object({
@@ -270,6 +271,7 @@ export const languageProgressSchema = z.object({
         evidenceCount: z.number().int().nonnegative(),
       }),
     )
-    .nullable(),
+    .nullable()
+    .default(null),
 });
 export type LanguageProgress = z.infer<typeof languageProgressSchema>;
