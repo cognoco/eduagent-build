@@ -363,7 +363,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     readFileSync(join(repoRoot, 'apps/mobile/e2e/config.yaml'), 'utf8'),
   ) as { flows?: string[] };
 
-  function loadPlan(suite: 'pr' | 'nightly') {
+  function loadPlan(suite: 'pr' | 'nightly' | 'v2') {
     const result = spawnSync(
       'node',
       [
@@ -579,6 +579,68 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'flows/edge/animated-splash.yaml',
     );
     expect(plan.every(({ shard }) => shard >= 1 && shard <= 8)).toBe(true);
+  });
+
+  it('[WI-1400] defines a V2-only native publish-readiness suite with interaction coverage', () => {
+    const plan = loadPlan('v2');
+    const workflowRaw = loadWorkflowRaw('e2e-ci.yml');
+    const flow = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-shell-navigation.yaml'),
+      'utf8',
+    );
+    const signInSetup = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/_setup/seed-and-sign-in.yaml'),
+      'utf8',
+    );
+    const conventions = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/CONVENTIONS.md'),
+      'utf8',
+    );
+
+    expect(plan).toEqual([
+      {
+        flow: 'flows/v2/v2-shell-navigation.yaml',
+        scenario: 'learning-active',
+        shard: 1,
+      },
+    ]);
+    expect(workflowRaw).toContain('- v2');
+    expect(workflowRaw).toContain('EXPO_PUBLIC_ENABLE_MODE_NAV_V2:');
+    expect(workflowRaw).toContain("inputs.maestro_suite == 'v2'");
+    expect(signInSetup).toMatch(/id: ['"]mentor-screen['"]/);
+    expect(conventions).toContain('`v2`');
+
+    for (const selector of [
+      'tab-mentor',
+      'tab-subjects',
+      'tab-journal',
+      'mentor-screen',
+      'mentor-bar-homework-chip',
+      'camera-view',
+      'close-button',
+      'subjects-screen',
+      'subjects-browse-row-${SUBJECT_ID}',
+      'subject-hub-screen',
+      'journal-screen',
+      'journal-tab-practice',
+      'journal-practice-section',
+      'journal-practice-open-hub',
+      'practice-screen',
+      'practice-back',
+    ]) {
+      expect(flow).toContain(selector);
+    }
+    for (const legacyTab of [
+      'tab-home',
+      'tab-my-learning',
+      'tab-library',
+      'tab-recaps',
+      'tab-progress',
+      'tab-more',
+    ]) {
+      expect(flow).toMatch(new RegExp(`id: ['"]${legacyTab}['"]`));
+    }
+    expect(flow.match(/assertNotVisible:/g)).toHaveLength(6);
   });
 
   it('keeps the generated Android APK free of the duplicate OSGI manifest', () => {

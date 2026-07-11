@@ -38,6 +38,12 @@
       "scenario": "multi-subject"
     }
   ],
+  "v2": [
+    {
+      "flow": "flows/v2/v2-shell-navigation.yaml",
+      "scenario": "learning-active"
+    }
+  ],
   "scenarioOverrides": {
     "flows/account/learner-mentor-memory-populated.yaml": "mentor-memory-populated",
     "flows/account/learner-mentor-memory.yaml": "language-subject-active",
