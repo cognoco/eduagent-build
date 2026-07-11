@@ -641,6 +641,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       expect(flow).toMatch(new RegExp(`id: ['"]${legacyTab}['"]`));
     }
     expect(flow.match(/assertNotVisible:/g)).toHaveLength(6);
+    expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(2);
   });
 
   it('keeps the generated Android APK free of the duplicate OSGI manifest', () => {
