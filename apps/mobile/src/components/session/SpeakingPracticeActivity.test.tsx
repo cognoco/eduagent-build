@@ -13,41 +13,31 @@ const mockStartListening = jest.fn();
 const mockStopListening = jest.fn();
 const mockClearTranscript = jest.fn();
 
+// GC1: the whole `jest.mock(...)` call must close on the same physical line
+// it opens on for the checker (scripts/check-gc1-pattern-a.ts) to honor a
+// same-line `gc1-allow` — a multi-line factory body defeats its AST check
+// even with the marker on the opening line. Keeping the factory nested
+// inline (rather than hoisting it out to a separately-declared const) also
+// matters for correctness: the outer factory here creates a plain object
+// immediately and only reads mockSttState etc. from the INNER function,
+// which isn't called until React render time (by when they're initialized).
+// A named-const factory would need that const already initialized at
+// require-time, before its own declaration runs — it isn't, so that
+// approach throws/returns undefined. Squashing onto one line is formatting
+// only; it doesn't change this evaluation order.
 // prettier-ignore
-jest.mock('../../hooks/use-speech-recognition', () => ({ // gc1-allow: voice hook touches native recording APIs outside component scope
-  useSpeechRecognition: () => ({
-    ...mockSttState,
-    startListening: mockStartListening,
-    stopListening: mockStopListening,
-    clearTranscript: mockClearTranscript,
-    requestMicrophonePermission: jest.fn(),
-    getMicrophonePermissionStatus: jest.fn(),
-  }),
-}));
+jest.mock('../../hooks/use-speech-recognition', () => ({ useSpeechRecognition: () => ({ ...mockSttState, startListening: mockStartListening, stopListening: mockStopListening, clearTranscript: mockClearTranscript, requestMicrophonePermission: jest.fn(), getMicrophonePermissionStatus: jest.fn() }) })); // gc1-allow: voice hook touches native recording APIs outside component scope
 
 const mockSpeak = jest.fn();
 const mockStopSpeaking = jest.fn();
 
 // prettier-ignore
-jest.mock('../../hooks/use-text-to-speech', () => ({ // gc1-allow: voice output hook touches native speech APIs outside component scope
-  useTextToSpeech: () => ({
-    isSpeaking: false,
-    rate: 1.0,
-    speak: mockSpeak,
-    stop: mockStopSpeaking,
-    replay: jest.fn(),
-    setRate: jest.fn(),
-  }),
-}));
+jest.mock('../../hooks/use-text-to-speech', () => ({ useTextToSpeech: () => ({ isSpeaking: false, rate: 1.0, speak: mockSpeak, stop: mockStopSpeaking, replay: jest.fn(), setRate: jest.fn() }) })); // gc1-allow: voice output hook touches native speech APIs outside component scope
 
 const mockMutateAsync = jest.fn();
 
 // prettier-ignore
-jest.mock('../../hooks/use-speaking-practice-api', () => ({ // gc1-allow: network-mutation hook — API client integration covered by attempt.integration.test.ts
-  useRecordSpeakingPracticeAttempt: () => ({
-    mutateAsync: mockMutateAsync,
-  }),
-}));
+jest.mock('../../hooks/use-speaking-practice-api', () => ({ useRecordSpeakingPracticeAttempt: () => ({ mutateAsync: mockMutateAsync }) })); // gc1-allow: network-mutation hook — API client integration covered by attempt.integration.test.ts
 
 function makeActivity(): LanguageLearningActivityEvent {
   return {
