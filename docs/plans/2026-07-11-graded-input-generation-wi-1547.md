@@ -42,6 +42,13 @@ server-computed exactly as today (deliberate scope boundary, not an oversight).
      `!Number.isFinite(birthYear) ? 'child' : computeAgeBracketFromDate(birthYear, birthMonth, birthDay)`.
      This prevents an under-18 learner's passage generation from routing to
      Gemini (`router.ts:772,803-804` `isUnder18AgeBracket` → `approvedTextFallbackConfig`).
+     Not a new decision — it's this feature applying the existing, already-ratified
+     under-18 Gemini-exclusion fail-closed routing mechanism (**MMT-ADR-0014**,
+     "Fail-closed on exhaustion": *"getFallbackConfig drops under-18-banned vendors
+     (Gemini/Vertex) and terminates in CircuitOpenError, never in an unfiltered
+     default"*). (Note: MMT-ADR-0016 governs the safety/judge architecture broadly
+     and explicitly defers the Gemini-exclusion routing mechanism itself to
+     MMT-ADR-0014 — cite the latter here.)
    - Parses with `parseStructuredLlmOutput(gradedInputGenerationResultSchema, result.response, 'graded-input-generation')`
      (the documented seam, `llm/parse-structured.ts`) — no bespoke retry loop
      (simpler than `book-suggestion-generation.ts`; matches `homework-summary.ts`'s
