@@ -254,7 +254,7 @@ if hit '^packages/database/src/schema/'; then
 fi
 
 # ── DB Migrations ────────────────────────────────────────────────────────
-if hit '^apps/api/drizzle/.*\.sql$'; then
+if hit '^apps/api/drizzle/(.*\.sql|meta/.*)$'; then
   CLASSES+=("db-migrations")
   add_cmd fast  "pnpm db:migrate:dev"        "Apply migration to dev DB"
   add_cmd fast  "pnpm exec nx run @eduagent/database:test" "Database package tests (RLS coverage)"
