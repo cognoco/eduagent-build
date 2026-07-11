@@ -208,6 +208,13 @@ const profileSchemaShape = {
   displayName: z.string(),
   avatarUrl: z.string().url().nullable(),
   birthYear: birthYearSchema,
+  // WI-1259 — exact-birth-date client mirroring. Month/day ride the client
+  // profile so the mobile family-capable pre-checks can match the server's
+  // computeAgeBracketFromDate decision (WI-367). null = year-only birth date
+  // (the YYYY-01-01 sentinel; see birthMonthDayFromDate). Default null so
+  // cached pre-WI-1259 responses parse cleanly.
+  birthMonth: z.number().int().min(1).max(12).nullable().default(null),
+  birthDay: z.number().int().min(1).max(31).nullable().default(null),
   location: locationSchema.nullable(),
   isOwner: z.boolean(),
   hasPremiumLlm: z.boolean().default(false),
