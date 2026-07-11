@@ -65,10 +65,6 @@
   .node .name{font-weight:600;font-size:13px;margin:1px 0 3px;text-wrap:balance}
   .node .meta{color:var(--ink-3);font-size:11.5px;line-height:1.35}
   .node .chip{margin-top:6px}
-  .node.own-r{border-left:3px solid var(--ram)}
-  .node.own-o{border-left:3px solid var(--ori)}
-  .owntag{position:absolute;top:8px;right:10px;font-family:var(--mono);font-size:9px;letter-spacing:.08em}
-  .own-r .owntag{color:var(--ram)} .own-o .owntag{color:var(--ori)}
   .szbar{margin-top:7px;height:4px;border-radius:2px;background:var(--chip-mut);overflow:hidden}
   .szbar i{display:block;height:100%;border-radius:2px}
   .szlbl{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);margin-top:2px}
@@ -90,37 +86,37 @@
 <div class="wrap">
   <header>
     <h1><span class="pgm">PGM-1</span> MentoMate Productization — Roadmap</h1>
-    <span class="stamp" id="stamp">state as of 2026-07-10 · MVP RATIFIED · runway waves per docs/plans/2026-07-10-mvp-roadmap/RUNWAY.md</span>
+    <span class="stamp" id="stamp">state as of 2026-07-11 · 8 parallel batches · HITL gates swept &amp; typed (OPERATOR-GATE-LEDGER.md)</span>
     <button class="theme" id="themeBtn" aria-label="Toggle color theme">theme</button>
   </header>
-  <p class="sub">Left → right is the ratified wave sequence (dependency-ordered, not dated — calendar anchoring deferred). Arrows are hard dependencies.
-  Standing rules: <b>freeze LIFTED 2026-07-10 (all MentoMate); Wave-0 dedicated lane is the delivery engine</b> · engine spine (1469→1464→1754) never cuts · language yields to verified-learning ·
-  V0 retirement (S6) is <b>post-launch</b>, no longer ship-gating (F4 resolved). Android / Google Play only at MVP.</p>
+  <p class="sub">Delivery model since 2026-07-10: <b>waves scrapped — 8 parallel agent batches</b> (Cosmo Sprint rows; Workstream Order = claim sequence;
+  every item's AC carries a typed <code>HITL:</code> gate declaration). Left → right is dependency flow, not dates. Arrows are hard dependencies;
+  amber dashed arrows cross a live human gate. Engine spine never cuts · language yields to verified-learning · S6/V0 retirement is post-launch. Android / Google Play only at MVP.</p>
   <div class="legend" role="list">
-    <span class="chip s-done">✓ done</span><span class="chip s-run">▶ executing</span>
+    <span class="chip s-done">✓ done</span><span class="chip s-run">▶ running</span>
     <span class="chip s-pre">◇ pre-authorized</span><span class="chip s-gate">⬥ operator / human gate</span>
-    <span class="chip s-q">○ queued</span><span class="chip s-park">⏸ parked / post-launch</span>
-    <span style="color:var(--ink-3)">— amber dashed arrow = crosses a live operator gate</span>
-    <span style="color:var(--ink-3)">— bottom bar = relative size of work, green 0 → red 100 (PM estimate)</span>
-    <span style="color:var(--ink-3)">— lane/agent allocation deferred (operator 2026-07-10); no owner stripes</span>
+    <span class="chip s-q">○ queued</span><span class="chip s-park">⏸ parked / pinned / post-launch</span>
+    <span style="color:var(--ink-3)">— bottom bar = relative size of remaining work (PM estimate)</span>
   </div>
   <div class="boardbox"><div class="board" id="board">
-    <div class="colhead"></div><div class="colhead">Wave 0 — unblock &amp; protect</div><div class="colhead">Wave 1 — product verticals</div>
-    <div class="colhead">Wave 2 — compliance + hardening</div><div class="colhead">Wave 3 — publish &amp; beta</div><div class="colhead">Launch</div>
+    <div class="colhead"></div><div class="colhead">Batches in flight (B1–B5)</div><div class="colhead">New batches (B6–B8)</div>
+    <div class="colhead">Operator track (OPQ) · staged</div><div class="colhead">Publish &amp; beta</div><div class="colhead">Launch</div>
   </div></div>
   <section class="gates">
-    <h2>Gate ledger — where a human is required</h2>
+    <h2>Gate ledger — where a human is required (full detail: OPERATOR-GATE-LEDGER.md + OPQ)</h2>
     <div class="gatelist">
-      <div class="gatecard auto"><b>Freeze lift — RULED 2026-07-10</b><p>Lifted across all MentoMate. Wave-0 dedicated lane (_quartet/working/lanes/wave-0/) is the delivery engine; waves recorded as Cosmo Sprint rows.</p></div>
-      <div class="gatecard"><b>Counsel packet (OPQ-22)</b><p>Q1 controller · Q2 consent-denial · Q3 crisis duty · Q4 name-minimization · <b>AI-Act classification (time-critical — enforcement 2026-08-02)</b>. High-risk answer ⇒ WI-1663/1664 promote to launch-gating, Waves 2–3 re-sequenced.</p></div>
-      <div class="gatecard"><b>DPIA signed + DPO appointed (C-5)</b><p>THE compliance launch gate: required before the first consent-gated child onboards. WI-1105/1106; pure lead time — start path in Wave 0.</p></div>
-      <div class="gatecard"><b>Trust-package design (WI-1767)</b><p>Zuzka batch design pass over all five slices; blocks WI-1497/1498/1499/1501/1502 (tag <code>trust-package</code>, WS-39).</p></div>
-      <div class="gatecard"><b>Closed beta (WI-1506)</b><p>5–10 families screened for 13+ teens. Gates PUBLIC launch; store go-live tracks ungated.</p></div>
-      <div class="gatecard auto"><b>S6 / V0 retirement — post-launch</b><p>F4 resolved 2026-07-10: WI-1308 rewritten to the post-launch S6 milestone. Irreversible; live operator confirm when it comes — but it no longer gates ship.</p></div>
+      <div class="gatecard auto"><b>Ruling session — 7/8 RULED 2026-07-11</b><p>1685 prod flip = operator approval · 1461 ratified · 1796 = C now (A → WI-1812 post-launch) · 787 blocked-by-default · 1665 IN → B8 · 1324/1141 closed. Gate discipline proposed as standing DoR (WI-1806).</p></div>
+      <div class="gatecard"><b>OPQ-30 — PINNED: DB-RLS posture</b><p>WI-1196 + 1002-RLS-half fenced out of batches; 1002 FK-half carved claimable. Long-lead by design; hard deadline = DPIA signing.</p></div>
+      <div class="gatecard"><b>Counsel packet (OPQ-22)</b><p>Q1 controller · Q2 consent-denial · Q3 crisis duty · Q4 name-minimization · <b>AI-Act classification (enforcement 2026-08-02)</b>. Feeds OPQ-24 retention values, helplines (OPQ-41), controller entity (OPQ-8).</p></div>
+      <div class="gatecard"><b>DPIA signed + DPO appointed (C-5)</b><p>THE compliance launch gate (WI-1105/1106, in motion). Converges with OPQ-30 at signing.</p></div>
+      <div class="gatecard"><b>Trust-package design (OPQ-40, WI-1767)</b><p>Highest-leverage single human session: five AC-complete builds (1497/98/99/1501/1502) are mechanically DoR-blocked until the design pass records solution options.</p></div>
+      <div class="gatecard"><b>Prod-console actions (OPQ-36/37/38/39/27/26)</b><p>Inngest prod env · store creds + Config-T go-ahead · webhook secrets · Sentry tokens · alert rules · MFA fixtures. All manual-external — never in agent queues.</p></div>
+      <div class="gatecard"><b>Closed beta (WI-1506, OPQ-11)</b><p>5–10 families screened for 13+ teens. Gates PUBLIC launch; store go-live tracks ungated.</p></div>
+      <div class="gatecard auto"><b>Pre-declared approvals (drip at maturity)</b><p>WI-1754 cohort flip (+ later broad rollout) · WI-1686 judge flags w/ recorded spot-check · WI-1685 prod flip · WI-617 branch protection · WI-1812 experiment merge.</p></div>
     </div>
   </section>
   <footer>Operational detail (owners, item stages, rulings queue) lives in the roadmap page — the body of the
-  <b>PGM-1</b> row in the Cosmo Programs DB. This chart is the sequencing view; it is redeployed by the program
+  <b>PGM-1</b> row in the Cosmo Programs DB — and the OPQ (Operator Queue DB). This chart is the sequencing view; it is redeployed by the program
   manager when program state changes, at this same URL.</footer>
 </div>
 <script>
@@ -133,61 +129,49 @@
     root.setAttribute('data-theme',next); localStorage.setItem(KEY,next); draw();
   });
 
-  const STATUS={done:['s-done','✓ done'],run:['s-run','▶ executing'],pre:['s-pre','◇ pre-authorized'],
-    gate:['s-gate','⬥ your confirm'],q:['s-q','○ queued'],park:['s-park','⏸ parked']};
+  const STATUS={done:['s-done','✓ done'],run:['s-run','▶ running'],pre:['s-pre','◇ pre-authorized'],
+    gate:['s-gate','⬥ human gate'],q:['s-q','○ queued'],park:['s-park','⏸ parked / pinned']};
   const LANES=[
-    ['Platform & shell','WS-28 V2 finalization · WS-18 identity cutover'],
-    ['Verified learning','WS-46 core learning loop'],
-    ['Language spine','WS-38 four strands'],
-    ['Family & supporter','WS-32 (reopened 2026-07-10)'],
-    ['Launch ops & trust','WS-39 launch readiness'],
-    ['Compliance & safety','WS-30 legal · WS-29 eng (hold) · WS-31 safety'],
+    ['Platform & shell','B3 · B7 · WS-28/18'],
+    ['Verified learning','B1 · WS-46'],
+    ['Language spine','B2 · WS-38'],
+    ['Family, supporter & fill','B4 · B8 · WS-32/33'],
+    ['Launch ops & trust','B5 · B6 · WS-39'],
+    ['Compliance & safety','OPQ · WS-30/29/31'],
   ];
   const NODES=[
     // Platform & shell
-    {id:'m4',sz:30,l:0,c:0,code:'M4',name:'V1 fallback proven',meta:'WI-1307 closed 2026-07-10 · rollback channel E2E-proven',st:'done'},
-    {id:'w1167',sz:25,l:0,c:0,code:'WI-1167',name:'Staging migration fix',meta:'F6: gates the cutover chain — only item Executing under the freeze',st:'run'},
-    {id:'cutover',sz:55,l:0,c:1,code:'WI-1685',name:'V2 LLM-routing cutover',meta:'bake-off → staging gates → prod flip · rollback = flag flip · +judge flags WI-1686',st:'q'},
-    {id:'cache',sz:40,l:0,c:2,code:'WI-1779',name:'Prompt caching (bundle)',meta:'1687+1688 bundled · post-cutover · eval-harness gated · +spend guardrails WI-1505',st:'q'},
-    {id:'shell',sz:55,l:0,c:3,code:'WS-28',name:'V2 publish-readiness chain',meta:'spans Waves 1–3, must conclude by Wave 3',st:'q'},
-    {id:'s6',sz:35,l:0,c:4,code:'S6',name:'V0 retirement — POST-launch',meta:'WI-1308 rewritten (F4) · irreversible · no longer ship-gating',st:'park',gate:true},
+    {id:'b3',sz:45,l:0,c:0,code:'B3',name:'Platform / LLM cutover',meta:'6 open · 3 closed · WI-1685 Executing: staging autonomous, prod flip = operator approval (ruled) · then 1779 caching (1796 ruled C) + 1686 judge flags',st:'run'},
+    {id:'b7',sz:55,l:0,c:1,code:'B7',name:'Dev-infra & CI health',meta:'21 items · Maestro CI bugs first (protect B5 e2e gate) · guards, hygiene, WI-1810 break test · all HITL: none',st:'run'},
+    {id:'shell',sz:55,l:0,c:3,code:'WS-28',name:'V2 publish-readiness chain',meta:'must conclude before store submission',st:'q'},
+    {id:'s6',sz:35,l:0,c:4,code:'S6',name:'V0 retirement — POST-launch',meta:'irreversible · operator executes at its milestone, never autonomous',st:'park',gate:true},
     // Verified learning
-    {id:'bake',sz:35,l:1,c:0,code:'WI-1438',name:'Challenge grader bake-off',meta:'gate for the whole verified-learning spine',st:'q'},
-    {id:'axis',sz:30,l:1,c:0,code:'WI-1469',name:'Mastery-axis rule',meta:'define verified / due-again / stale / mastered — everything "verified" waits on this',st:'q'},
-    {id:'evalpack',sz:30,l:1,c:0,code:'WI-1666',name:'Loop e2e/eval pack',meta:'ruled early, before visible rollout',st:'q'},
-    {id:'spine',sz:60,l:1,c:1,code:'engine',name:'Engine spine → prod flip',meta:'WI-1446 → WI-1464 → WI-1754 (cohort-limited flip) · never cuts',st:'q'},
-    {id:'proof',sz:55,l:1,c:1,code:'receipt',name:'Proof slice + parent receipt',meta:'WI-1445 · 1502 · 1703 · 1121 · 1658+1705 (V2 parent-home card) · degrades days-later under pressure',st:'q'},
-    // Language spine
-    {id:'guard',sz:30,l:2,c:0,code:'WI-1755',name:'Language-mode safety guard',meta:'before any visible Four Strands rollout · eval coverage',st:'q'},
-    {id:'tts',sz:25,l:2,c:0,code:'WI-1447',name:'STT/TTS locale fix',meta:'blocks the speaking pair · visibly breaks the promise while open',st:'q'},
-    {id:'lfloor',sz:30,l:2,c:1,code:'WI-1552',name:'Continue path (floor)',meta:'cross-session next-practice pointer — extend existing selector',st:'q'},
-    {id:'lbuild',sz:65,l:2,c:1,code:'WI-1777',name:'Course spine builds',meta:'WI-1547 graded input → WI-1756 meaning-output → speaking bundle 1777 (1548+1549, blocked-by 1447)',st:'q'},
-    {id:'lreceipt',sz:25,l:2,c:1,code:'WI-1553',name:'Session receipt',meta:'derive-from-events · degrades LAST · language yields to verified-learning',st:'q'},
-    // Family & supporter
-    {id:'fam',sz:60,l:3,c:1,code:'WS-32',name:'Supporter chain',meta:'WI-1127 coldstart route → 1135 surfaces → 1137 linking screens → 1753 teen family join',st:'q'},
+    {id:'b1',sz:20,l:1,c:0,code:'B1',name:'Engine spine + proof — ENDGAME',meta:'10/13 closed · 2 in review · closes on WI-1754 cohort prod flip (pre-declared approval)',st:'run'},
+    // Language
+    {id:'b2',sz:40,l:2,c:0,code:'B2',name:'Language vertical',meta:'5 open · 3 closed · WI-1777 speaking bundle unblocked (1447 landed) · receipt 1553 degrades last',st:'run'},
+    // Family, supporter & fill
+    {id:'b4',sz:30,l:3,c:0,code:'B4',name:'Supporter, activation & bugs',meta:'5 open · 6 closed · 1461/1451 merged · chain tail (1137→1753) running',st:'run'},
+    {id:'b8',sz:35,l:3,c:1,code:'B8',name:'Product fill & polish',meta:'787 (ruled blocked-by-default) · 1002 FK-half only (OPQ-30 carve) · 1259 · 1554 · 1667 · 1665 (ruled IN, rehomed here)',st:'run'},
+    {id:'tbuild',sz:50,l:3,c:2,code:'trust',name:'Trust builds ×5 — staged',meta:'WI-1497/98/99/1501/1502 · AC-complete, DoR-blocked until OPQ-40 design pass · join B4/B8 same-day after',st:'park'},
     // Launch ops & trust
-    {id:'tdesign',sz:30,l:4,c:1,code:'WI-1767',name:'Trust-package design pass',meta:'Zuzka · blocks the five trust builds',st:'gate',gate:true},
-    {id:'tbuild',sz:50,l:4,c:2,code:'trust',name:'Trust builds ×5',meta:'WI-1497/1498/1499/1501/1502 · capacity-shaped · tag trust-package',st:'q'},
-    {id:'activ',sz:30,l:4,c:1,code:'WI-1689',name:'Activation events + sink',meta:'+WI-1762 first-party sink · instrument BEFORE beta',st:'q'},
-    {id:'billing',sz:35,l:4,c:2,code:'WI-1780',name:'Billing-failure UX (bundle)',meta:'1474+1475 bundled · +WI-1399 silent-fail escalation · IN before paid launch',st:'q'},
-    {id:'secrets',sz:15,l:4,c:2,code:'WI-1772',name:'Prod webhook secrets (bundle)',meta:'Resend + RevenueCat · Doppler prd · canary bundle',st:'q'},
-    {id:'maestro',sz:45,l:4,c:2,code:'e2e',name:'Maestro gate real',meta:'WI-1651+1652 CI fixes → WI-1400 smoke baseline + WI-1406 auth subset',st:'q'},
-    {id:'store',sz:60,l:4,c:3,code:'ops-B',name:'Store/launch-ops wave',meta:'WI-1328 RevenueCat · 1335 listings · 1337 push creds · 1114 rating@13+ · 1561 worksheet refresh',st:'q'},
+    {id:'b5',sz:40,l:4,c:0,code:'B5',name:'Hardening, ops & billing',meta:'9 open · 9 closed · billing WP 1780 · safety builds 1690/1691 · Maestro consumers 1400/1406',st:'run'},
+    {id:'b6',sz:30,l:4,c:1,code:'B6',name:'Launch-ops & prod readiness',meta:'1640 P1 crash · 1641 drift guard · 1761 consent audit · 1762 analytics sink · 1341 store pipeline (pre-ship gate)',st:'run'},
+    {id:'opsact',sz:25,l:4,c:2,code:'OPQ',name:'Prod-console actions',meta:'OPQ-36 Inngest env · 37 store creds · 38 webhook secrets · 39 Sentry tokens · 27 alert rules · 26 MFA fixtures',st:'gate',gate:true},
+    {id:'store',sz:60,l:4,c:3,code:'ops-B',name:'Store/launch-ops wave',meta:'WI-1328 RevenueCat · 1335 listings · 1337 push creds · 1114 rating@13+ · 1561 worksheet',st:'q'},
     {id:'beta',sz:45,l:4,c:4,code:'WI-1506',name:'Dogfood → closed beta',meta:'WI-1503 prod build → beta (families w/ 13+ teens) · gates PUBLIC launch',st:'gate',gate:true},
     // Compliance & safety
-    {id:'opq22',sz:20,l:5,c:0,code:'OPQ-22',name:'Dispatch counsel packet',meta:'OPERATOR · AI-Act classification TIME-CRITICAL (2026-08-02)',st:'gate',gate:true},
-    {id:'dpo',sz:30,l:5,c:0,code:'C-5',name:'DPO + DPIA signing path',meta:'WI-1105/1106 · THE launch gate · pure lead time',st:'gate',gate:true},
-    {id:'aiplan',sz:35,l:5,c:0,code:'WI-1659',name:'AI-Act compliance plan',meta:'IN unconditionally · pairs with counsel classification answer',st:'q'},
-    {id:'compcore',sz:65,l:5,c:2,code:'WS-30/29',name:'Compliance materialization',meta:'ROPA · breach plan · Art-9 · lawful basis · retention · DPAs · then counsel consumers: WI-1559 → 1109 policy publish',st:'q'},
-    {id:'safety',sz:40,l:5,c:2,code:'WS-31',name:'Safety slice',meta:'WI-1686 judge flags · 1691 digest · 1690 crisis (rescoped, NO guardian notify — Q8)',st:'q'},
+    {id:'opq22',sz:20,l:5,c:2,code:'OPQ-22',name:'Counsel packet + DPO/DPIA path',meta:'in motion · AI-Act classification TIME-CRITICAL (2026-08-02) · C-5 = THE launch gate',st:'gate',gate:true},
+    {id:'rlspin',sz:25,l:5,c:2,code:'OPQ-30',name:'DB-RLS posture — PINNED',meta:'deliberately unruled · long-lead · fences WI-1196 + 1002-RLS-half · deadline = DPIA signing',st:'park',gate:true},
+    {id:'tdesign',sz:15,l:5,c:2,code:'OPQ-40',name:'Trust design pass (Zuzka)',meta:'highest-leverage human session — unblocks 5 builds',st:'gate',gate:true},
+    {id:'compcore',sz:65,l:5,c:2,code:'WS-30/29',name:'Compliance materialization',meta:'ROPA · breach · Art-9 · lawful basis · retention (OPQ-24/25) · DPAs · counsel consumers 1559→1109 · all manual-external',st:'q'},
     {id:'final',sz:30,l:5,c:3,code:'gates',name:'Final compliance gates',meta:'WI-1507 closure re-run · WI-1577 FINAL GATE pre-submission',st:'q'},
   ];
-  const EDGES=[['w1167','cutover'],['cutover','cache'],['shell','beta'],
-    ['bake','spine'],['axis','spine'],['axis','proof'],['evalpack','spine'],
-    ['guard','lbuild',1],['tts','lbuild'],['lfloor','lbuild'],['lbuild','lreceipt'],
-    ['tdesign','tbuild',1],['activ','beta'],['store','beta'],
-    ['opq22','compcore',1],['dpo','final',1],['aiplan','compcore'],
-    ['maestro','beta'],['final','beta']];
+  const EDGES=[
+    ['b3','shell'],['b7','b5'],['shell','beta'],
+    ['b1','beta'],
+    ['tdesign','tbuild',1],
+    ['b6','store'],['opsact','store',1],['store','beta'],
+    ['opq22','compcore',1],['rlspin','final',1],['compcore','final'],['final','beta']];
 
   const board=document.getElementById('board');
   const cells={};
@@ -198,14 +182,12 @@
     for(let c=0;c<5;c++){const d=document.createElement('div');d.className='cell';board.appendChild(d);cells[li+'-'+c]=d;}
   });
   NODES.forEach(n=>{
-    const el=document.createElement('div');el.className='node'+(n.gate?' gate':'')+(n.st==='done'?' done':'')+
-      (n.own==='r'?' own-r':n.own==='o'?' own-o':'');
+    const el=document.createElement('div');el.className='node'+(n.gate?' gate':'')+(n.st==='done'?' done':'');
     el.id='n-'+n.id;
-    el.innerHTML=(n.own?'<span class="owntag">'+(n.own==='r'?'ramtop':'orion')+'</span>':'')+
-      (n.code?'<span class="code">'+n.code+'</span>':'')+
+    el.innerHTML=(n.code?'<span class="code">'+n.code+'</span>':'')+
       '<div class="name">'+n.name+'</div><div class="meta">'+n.meta+'</div>'+
       '<span class="chip '+STATUS[n.st][0]+'">'+STATUS[n.st][1]+'</span>'+
-      (n.sz!=null?'<div class="szbar" title="size of work: '+n.sz+'/100"><i style="width:'+n.sz+
+      (n.sz!=null?'<div class="szbar" title="size of remaining work: '+n.sz+'/100"><i style="width:'+n.sz+
         '%;background:hsl('+Math.round(120-n.sz*1.2)+',65%,42%)"></i></div>'+
         '<div class="szlbl">size '+n.sz+'/100</div>':'');
     cells[n.l+'-'+n.c].appendChild(el);

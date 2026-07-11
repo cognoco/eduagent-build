@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Generated from the program roster + Cosmo (2026-07-10 evening, post-MVP-ratification portfolio reshape).
+<!-- Generated from the program roster + Cosmo (2026-07-11, post gate-sweep + ruling session + Batches 6-8).
      A VIEW, never a home: holds no authoritative fact — on disagreement, roster + Cosmo win.
      Regenerate at every umbrella touch. Shape: ../../library/dashboard.md / dashboard.template.html. -->
 <html lang="en">
@@ -28,64 +28,71 @@
   button{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:.3rem .7rem;cursor:pointer}
   .note{color:var(--muted);font-size:.82rem}
   .num{font-variant-numeric:tabular-nums}
+  .bar{display:inline-block;height:.55rem;border-radius:3px;background:var(--ok);vertical-align:middle}
+  .bar.rest{background:var(--line)}
 </style>
 </head>
 <body>
 <header>
-  <h1>MentoMate Productization — Flight Deck <span class="note">generated 2026-07-10 (post-ratification portfolio reshape)</span></h1>
+  <h1>MentoMate Productization — Flight Deck <span class="note">generated 2026-07-11 (gate sweep + ruling session + Batches 6–8)</span></h1>
   <button id="t" onclick="tog()">◐ theme</button>
 </header>
 <main>
-  <p class="note">A view, never a home — regenerated from the roster + Cosmo. On any disagreement, the roster and Cosmo win.</p>
+  <p class="note">A view, never a home — regenerated from the roster + Cosmo. On any disagreement, the roster and Cosmo win. Snapshot counts as of 2026-07-11 morning; batches move hourly.</p>
 
   <section><h2>Program state</h2>
   <table><tbody>
-    <tr><td>MVP definition</td><td><span class="pill accent">RATIFIED 2026-07-10</span></td><td>Roadmap-of-record: <code>docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md</code> + <code>RUNWAY.md</code> (Waves 0–3 + FILL). All 10 ratification questions ruled; QC reconciliation passed (RECONCILIATION-REPORT.md).</td></tr>
-    <tr><td>Execution freeze</td><td><span class="pill open">LIFTED 2026-07-10</span></td><td>Operator ruling: lifted across ALL of MentoMate. Delivery model (ruled 2026-07-10 night): <b>waves scrapped → 5 parallel agent batches</b> (Cosmo Sprint rows, all startable now): B1 Verified-learning (11) · B2 Language (7) · B3 Platform/LLM cutover (5, live lane at _quartet/working/lanes/wave-0/) · B4 Supporter+bugs (10) · B5 Hardening/ops (15). Manual legal/compliance items tagged <code>manual-external</code>, out of agent queues.</td></tr>
-    <tr><td>Workstream portfolio</td><td><span class="pill accent">RESHAPED 2026-07-10</span></td><td>5 closed (WS-4/22/34/37/44), WS-32 reopened, 42 orphans assigned, initiative links repaired. <code>_wip/mvp-roadmap/WORKSTREAM-PORTFOLIO-PROPOSAL.md</code></td></tr>
+    <tr><td>MVP definition</td><td><span class="pill accent">RATIFIED 2026-07-10</span></td><td>Roadmap-of-record: <code>docs/plans/2026-07-10-mvp-roadmap/</code>. Delivery model: <b>8 parallel agent batches</b> (Cosmo Sprint rows; Workstream Order = intra-batch claim sequence; waves scrapped 2026-07-10).</td></tr>
+    <tr><td>HITL gate discipline</td><td><span class="pill accent">SWEPT 2026-07-11</span></td><td>Every open item carries a typed <code>HITL:</code> declaration (Approval/Decision/Action + position). Ledger: <code>_wip/mvp-roadmap/OPERATOR-GATE-LEDGER.md</code>. Ruling session: 7/8 ruled; OPQ-30 pinned. Standing DoR change proposed as WI-1806.</td></tr>
+    <tr><td>Execution freeze</td><td><span class="pill open">LIFTED 2026-07-10</span></td><td>All batches live in parallel. Manual legal/compliance/design items are <code>manual-external</code> (OPQ actions), never in agent queues. Governance/ADR cluster (757, 895–900) routed to estate track 2026-07-11.</td></tr>
   </tbody></table></section>
 
-  <section><h2>Board — live workstreams (open · of which parked)</h2>
-  <table><thead><tr><th>WS</th><th>Status</th><th>Name</th><th class="num">Open</th><th class="num">Parked</th><th>Runway note</th></tr></thead>
+  <section><h2>Batch board (open · closed — Stage mix at snapshot)</h2>
+  <table><thead><tr><th>Batch</th><th class="num">Open</th><th class="num">Closed</th><th>Stage mix (open)</th><th>Note</th></tr></thead>
   <tbody>
-    <tr><td>WS-39</td><td><span class="pill open">Open</span></td><td>Launch Readiness</td><td class="num">36</td><td class="num">2</td><td>Launch-ops + trust-package slice (tag <code>trust-package</code>, gated on WI-1767 design pass) + bundles WI-1772/1780</td></tr>
-    <tr><td>WS-46</td><td><span class="pill open">Open</span></td><td>Core Learning Loop</td><td class="num">22</td><td class="num">5</td><td>Verified-learning spine (Wave 1): WI-1469→1464→1754 + receipt slice</td></tr>
-    <tr><td>WS-28</td><td><span class="pill open">Open</span></td><td>V2 finalization</td><td class="num">17</td><td class="num">5</td><td>Publish-readiness chain + LLM cutover (WI-1685/1686) + caching bundle WI-1779</td></tr>
-    <tr><td>WS-30</td><td><span class="pill open">Open</span></td><td>Compliance — Legal &amp; External</td><td class="num">13</td><td class="num">4</td><td>Counsel packet OPQ-22 is the gate; AI-Act items WI-1659/1663/1664 staged on classification</td></tr>
-    <tr><td>WS-18</td><td><span class="pill open">Open</span></td><td>Identity Cutover</td><td class="num">13</td><td class="num">2</td><td>Own program; WI-1167 staging-migration fix = Runway Wave 0</td></tr>
-    <tr><td>WS-32</td><td><span class="pill open">Open</span></td><td>Supporter &amp; Linking</td><td class="num">11</td><td class="num">4</td><td>REOPENED 2026-07-10 — Q10 ruled supporter cluster IN (WI-787/1121/1127/1135/1137/1753)</td></tr>
-    <tr><td>WS-38</td><td><span class="pill open">Open</span></td><td>Four Strands Language Learning</td><td class="num">10</td><td class="num">2</td><td>Language course spine (§6 rulings); speaking bundle WI-1777 blocked-by WI-1447</td></tr>
-    <tr><td>WS-33</td><td><span class="pill open">Open</span></td><td>Mobile UX &amp; Navigation</td><td class="num">10</td><td class="num">4</td><td>Ratified-13 bug set + voice-floor audit WI-1763</td></tr>
-    <tr><td>WS-31</td><td><span class="pill open">Open</span></td><td>Safety &amp; Eval</td><td class="num">6</td><td class="num">2</td><td>Crisis cluster per Q8 (se-032 stands): WI-1690/1691/1692/1764 + bake-off WI-1438</td></tr>
-    <tr><td>WS-29</td><td><span class="pill hold">On hold</span></td><td>Compliance — Engineering</td><td class="num">17</td><td class="num">2</td><td>Hold rides counsel answers (consent-denial audit WI-1761 etc.)</td></tr>
-    <tr><td>WS-35</td><td><span class="pill hold">On hold</span></td><td>Dev-Infra &amp; Tooling</td><td class="num">10</td><td class="num">1</td><td>Machinery; absorbed WS-34/44 residuals (WI-482, WI-1562)</td></tr>
-    <tr><td>WS-36</td><td><span class="pill hold">On hold</span></td><td>Stream 2 — Estate-Canon Drain</td><td class="num">9</td><td class="num">1</td><td>Machinery (F10-verified), excluded from MVP roadmap</td></tr>
-    <tr><td>WS-52</td><td><span class="pill hold">On hold</span></td><td>Post-MVP pen</td><td class="num">12</td><td class="num">12</td><td>Holding pen — ruled OUT/fast-follow at ratification; every member = "re-triage me after launch"</td></tr>
+    <tr><td>B1 Verified-learning engine &amp; proof</td><td class="num">3</td><td class="num">10</td><td>2 In Review · 1 Ready</td><td>Endgame — closes on WI-1754 cohort prod flip (pre-declared Approval)</td></tr>
+    <tr><td>B2 Language vertical</td><td class="num">5</td><td class="num">3</td><td>1 Exec · 1 In Review · 2 Ready · 1 Captured</td><td>Speaking bundle WI-1777 unblocked (1447 landed)</td></tr>
+    <tr><td>B3 Platform / LLM cutover</td><td class="num">6</td><td class="num">3</td><td>2 Exec · 2 Ready · 1 Refining · 1 Captured</td><td>WI-1685 gate ruled: staging autonomous, prod flip = operator Approval</td></tr>
+    <tr><td>B4 Supporter, activation &amp; bugs</td><td class="num">5</td><td class="num">6</td><td>2 Exec · 2 In Review · 1 Ready</td><td>1461/1451 merged; supporter chain tail running</td></tr>
+    <tr><td>B5 Hardening, ops &amp; billing</td><td class="num">9</td><td class="num">9</td><td>1 Exec · 8 Ready</td><td>WI-1555 closed dup of WP WI-1780; Maestro chain feeds B7's CI fixes</td></tr>
+    <tr><td>B6 Launch-ops &amp; prod readiness <span class="pill accent">NEW</span></td><td class="num">5</td><td class="num">0</td><td>5 Ready</td><td>1640 P1 crash · 1641 drift guard · 1761 · 1762 · 1341 (pre-ship Action gate)</td></tr>
+    <tr><td>B7 Dev-infra &amp; CI health <span class="pill accent">NEW</span></td><td class="num">21</td><td class="num">0</td><td>19 Ready · 1 Exec · 1 Captured</td><td>Maestro CI bugs first (protect B5's e2e gate); incl. WI-1810 break test</td></tr>
+    <tr><td>B8 Product fill &amp; polish <span class="pill accent">NEW</span></td><td class="num">6</td><td class="num">0</td><td>6 Ready</td><td>787 ruled blocked-by-default · 1002 FK-half only (OPQ-30 carve) · 1665 rehomed here</td></tr>
   </tbody></table>
-  <p class="note">Closed 2026-07-10 (drained): WS-4 Harness hygiene · WS-22 Bug Lane · WS-34 Platform Hardening · WS-37 Seam Hardening · WS-44 Coverage Debt. Killed items closed via sanctioned triage 2026-07-10: WI-1476/1477/1478 (child-cap family) · WI-1483 (coming-up-next) · WI-1491 (note-correctness umbrella) · WI-1494 (RLS umbrella, superseded). Only WI-1299 (machinery) remains deliberately workstream-less.</p></section>
+  <p class="note">Not batched: trust builds 1497/98/99/1502 (mechanically DoR-blocked until the WI-1767 design pass — OPQ-40); WI-1196 + 1002-RLS-half (pinned, OPQ-30); Post-MVP pen WS-52 (incl. WI-1812 prompt-consolidation experiment); "Later — Publish &amp; beta" row (ex-Wave 3); manual-external track.</p></section>
 
-  <section><h2>Bundles (ADR-0014, tag <code>bundle</code>) — churn-reduction dogfood</h2>
-  <table><thead><tr><th>WP</th><th>Name</th><th>WS</th><th>Watch</th></tr></thead>
+  <section><h2>OPQ rail — open human gates (the operator's queue)</h2>
+  <table><thead><tr><th>OPQ</th><th>Type</th><th>P</th><th>What</th><th>Blocks</th></tr></thead>
   <tbody>
-    <tr><td>WI-1772</td><td>Prod webhook secrets (Resend + RevenueCat)</td><td>WS-39</td><td>canary — formed first, clean</td></tr>
-    <tr><td>WI-1777</td><td>Four Strands speaking slice (1548+1549)</td><td>WS-38</td><td>carries Blocked-by WI-1447 (TTS locale fix)</td></tr>
-    <tr><td>WI-1779</td><td>Prompt caching (1687+1688)</td><td>WS-28</td><td>eval-harness gated</td></tr>
-    <tr><td>WI-1780</td><td>Billing-failure UX (1474+1475)</td><td>WS-39</td><td>IN before paid launch</td></tr>
+    <tr><td>OPQ-40</td><td><span class="pill warn">Action</span></td><td>P1</td><td>Trust-package design pass (Zuzka) — <b>highest-leverage single session</b></td><td>5 trust builds (DoR-blocked)</td></tr>
+    <tr><td>OPQ-22</td><td><span class="pill warn">Action</span></td><td>P1</td><td>Counsel packet (Q1–Q4 + AI-Act classification; enforcement 2026-08-02)</td><td>WS-29/30; OPQ-24; 1764/1690 content</td></tr>
+    <tr><td>OPQ-36</td><td><span class="pill warn">Action</span></td><td>P1</td><td>Inngest Cloud prod environment</td><td>69 prod background fns</td></tr>
+    <tr><td>OPQ-37 + OPQ-6</td><td><span class="pill warn">Action</span></td><td>P1</td><td>Store creds (Play SA JSON, Apple) + Config-T go-ahead; RevenueCat/listings/APNs</td><td>Store submission, Wave-3 publish</td></tr>
+    <tr><td>OPQ-30</td><td><span class="pill hold">Decision</span></td><td>P1</td><td><b>PINNED</b> — DB-RLS posture (WI-1196+1002); long-lead by design</td><td>DPIA condition 6; hard deadline = DPIA signing</td></tr>
+    <tr><td>OPQ-24/25</td><td><span class="pill warn">Action</span></td><td>P1</td><td>Counsel retention periods + prod retention purge (WI-1194)</td><td>DPIA retention gaps</td></tr>
+    <tr><td>OPQ-41</td><td><span class="pill warn">Action</span></td><td>P1</td><td>Locale-correct crisis helplines (counsel-tied)</td><td>WI-1690 content sub-slice</td></tr>
+    <tr><td>OPQ-27</td><td><span class="pill warn">Action</span></td><td>P1</td><td>Prod alert rules (Sentry/Inngest console)</td><td>WI-1500 launch-health promise</td></tr>
+    <tr><td>OPQ-8</td><td><span class="pill hold">Decision</span></td><td>P1</td><td>Data-controller entity (Cognoco s.r.o. vs NO entity)</td><td>WI-1559 → privacy policy chain</td></tr>
+    <tr><td>OPQ-38/39</td><td><span class="pill warn">Action</span></td><td>P2</td><td>Webhook secrets (Resend/RevenueCat) · Sentry tokens — one Doppler session each</td><td>Prod webhook verify; crash triage</td></tr>
+    <tr><td>OPQ-26</td><td><span class="pill warn">Action</span></td><td>P2</td><td>Staging Clerk MFA fixtures</td><td>WI-1406 native-MFA sub-scope</td></tr>
+    <tr><td>OPQ-23/13</td><td><span class="pill accent">Approval</span></td><td>P2</td><td>GDPR export fields · WI-1310 description reconciliation</td><td>—</td></tr>
+    <tr><td>OPQ-11/12</td><td><span class="pill warn">Action</span></td><td>P2</td><td>Dogfood device run + beta family run · prod-catalog reachability check</td><td>Beta gate; WI-1442</td></tr>
+    <tr><td>OPQ-9</td><td><span class="pill hold">Decision</span></td><td>P3</td><td>WS-37 post-graduation routing (16 Captured items)</td><td>—</td></tr>
   </tbody></table>
-  <p class="note">Track these four for PR/review-churn performance vs. single-item flow. Bundle tooling: 0 defects across 4 formations (2026-07-10). Lifecycle-close dogfood found 5 gaps → WI-1773/1774/1782/1783/1784 (family: WI-1515).</p></section>
+  <p class="note">Pre-declared approvals that drip in as builds mature (no action today): WI-1754 cohort flip (+ later broad-rollout), WI-1686 judge flags (spot-check recorded), WI-1685 prod flip (ruled: operator), WI-617 branch protection, WI-1812 experiment merge.</p></section>
 
-  <section><h2>Gate rail — what fires next</h2>
-  <table><thead><tr><th>Gate</th><th>Condition</th><th>Blast radius</th></tr></thead>
+  <section><h2>Bundles (ADR-0014, tag <code>bundle</code>)</h2>
+  <table><thead><tr><th>WP</th><th>Name</th><th>Home</th><th>State</th></tr></thead>
   <tbody>
-    <tr><td>Freeze lift</td><td>RULED 2026-07-10 — lifted</td><td>5 batches all live in parallel; no inter-batch gates (Blocked-by edges are intra-batch, audited)</td></tr>
-    <tr><td>Counsel packet (OPQ-22)</td><td>Answers on Q1 controller / Q2 consent-denial / Q3 crisis duty / Q4 name-minimization / AI-Act classification</td><td>WS-29/30 hold; WI-1663/1664 promote-or-kill; <b>AI-Act enforcement 2026-08-02 — time-critical</b></td></tr>
-    <tr><td>Batch-3 cutover chain</td><td>WI-1167 staging migration fix (Executing) → WI-1685 cutover</td><td>Blocks prompt caching (WI-1779) + judge enablement (WI-1686) — intra-batch only</td></tr>
-    <tr><td>Trust-package design (WI-1767)</td><td>Zuzka batch design pass</td><td>Blocks WI-1497/1498/1499/1501/1502</td></tr>
-    <tr><td>Closed beta (WI-1506)</td><td>5–10 families with 13+ teens recruited</td><td>Gates PUBLIC launch (store go-live tracks ungated)</td></tr>
-  </tbody></table></section>
+    <tr><td>WI-1772</td><td>Prod webhook secrets</td><td>manual-external (OPQ-38)</td><td>pure operator Action</td></tr>
+    <tr><td>WI-1777</td><td>Four Strands speaking slice</td><td>B2</td><td>unblocked (1447 landed)</td></tr>
+    <tr><td>WI-1779</td><td>Prompt caching</td><td>B3</td><td>Executing; WI-1796 ruled C-now (A → WI-1812, post-launch)</td></tr>
+    <tr><td>WI-1780</td><td>Billing-failure UX</td><td>B5</td><td>Ready; absorbed 1474/1475; WI-1555 closed as its dup</td></tr>
+  </tbody></table>
+  <p class="note">Formation defect #4 (empty Description/AC properties, 4/4 WPs) logged on WI-1591; all four remediated by hand 2026-07-11.</p></section>
 
   <section><h2>Field guide</h2>
-  <p class="note">This deck covers the MentoMate MVP program after the 2026-07-10 ratification. Read top-down: program state says whether anything may execute (freeze!); the board says where the open work lives (workstream = execution lane, counts are non-Closed WIs); bundles are the WP-altitude experiments to watch; the gate rail says what unblocks next. Item-level truth is Cosmo (Work Items DB); sequencing truth is RUNWAY.md; scope truth is MVP-DEFINITION.md. This page loses every disagreement.</p></section>
+  <p class="note">Read top-down: program state says how delivery works (8 batches, gate discipline); the batch board says where build work stands (claim by Workstream Order, respect <code>HITL:</code> lines in AC); the OPQ rail is the operator's own queue — decisions/actions/approvals typed per the OPQ definitions. Item truth = Cosmo Work Items DB; gate truth = OPERATOR-GATE-LEDGER.md + OPQ rows; scope truth = MVP-DEFINITION.md. This page loses every disagreement.</p></section>
 </main>
 <script>
   // dark default; remembers choice
