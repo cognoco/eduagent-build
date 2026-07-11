@@ -346,6 +346,36 @@ describe('runChallengeRoundGrader', () => {
       const [, , options] = mockRouteAndCall.mock.calls[0]!;
       expect(options?.sessionId).toBe(BASE_INPUT.sessionId);
     });
+
+    // [WI-1800] An under-18 Challenge Round grading call must route through
+    // capability:'judge' WITH the learner's (minor) ageBracket still threaded
+    // through — the router, not this call site, is responsible for exempting
+    // judge from the under-18 Gemini-ban gate (see router.test.ts
+    // "[WI-1800] judge capability must not be hijacked..." for the actual
+    // model-resolution regression coverage).
+    //
+    // NOTE on red-green-revert: routeAndCall is mocked at the external
+    // boundary in this file (GC1-compliant), so this test cannot observe
+    // which model config the real router resolves to — it can only assert
+    // what grader.ts passes INTO routeAndCall, which is unaffected by the
+    // WI-1800 bug (the bug lives entirely inside getModelConfig's internal
+    // branch ordering). A true RED for the bug is only expressible in
+    // router.test.ts, where getModelConfigForTest is exercised directly
+    // against the real (unmocked) routing logic; this test does not go red
+    // on current code and is not represented as doing so.
+    it('an under-18 grading call still passes capability:judge with the minor ageBracket to routeAndCall', async () => {
+      mockRouteAndCall.mockResolvedValue(routeResult(SOLID_VERDICT_JSON));
+
+      const minorInput: RunChallengeRoundGraderInput = {
+        ...BASE_INPUT,
+        ageBracket: 'adolescent',
+      };
+      await runChallengeRoundGrader(minorInput);
+
+      const [, , options] = mockRouteAndCall.mock.calls[0]!;
+      expect(options?.capability).toBe('judge');
+      expect(options?.ageBracket).toBe('adolescent');
+    });
   });
 
   // Degraded event includes the opaque ids (no learner text).

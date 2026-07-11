@@ -112,7 +112,8 @@ export async function runChallengeRoundGrader(
     ageBracket: input.ageBracket,
   });
 
-  // 1. Route to the judge (capability:'judge' selects the tier/age-blind path).
+  // 1. Route to the judge (capability:'judge' selects the tier/age-blind
+  //    grader path — exempt from the under-18 Gemini-ban gate, WI-1800).
   let response: string;
   try {
     const result = await routeAndCall(messages, GRADER_RUNG, {
