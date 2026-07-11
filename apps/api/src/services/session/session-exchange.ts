@@ -156,6 +156,7 @@ import {
   summarizeEvaluation,
   validateEvaluationEventIds,
   type MasteryDecision,
+  type MasteryOutcome,
 } from '../challenge-round/evaluation';
 import { validateNoteDraft } from '../challenge-round/note-draft';
 import {
@@ -1086,6 +1087,18 @@ async function releaseChallengeRoundClaim(
   await persistChallengeRoundState(db, profileId, sessionId, claimed);
 }
 
+// [WI-1804] challengeRoundCooldowns.lastOutcome encoding for completion
+// outcomes (see packages/database/src/schema/challenge-round-cooldowns.ts).
+// `invalid` has no code — the caller skips the cooldown write entirely.
+const COMPLETION_COOLDOWN_OUTCOME_CODE: Record<
+  Exclude<MasteryOutcome, 'invalid'>,
+  number
+> = {
+  verified: 2,
+  partial: 1,
+  reteach: 3,
+};
+
 export async function finalizeChallengeRoundIfReady(
   db: Database,
   profileId: string,
@@ -1138,6 +1151,38 @@ export async function finalizeChallengeRoundIfReady(
         decision,
         now,
       );
+    }
+
+    // [WI-1804] Write the completion cooldown for every real outcome (RR-8:
+    // a just-completed topic was immediately re-offerable). `invalid` (no
+    // usable evaluation signal) writes nothing — same as today.
+    //
+    // NOTE: unlike the markMasteryVerified branch above, this write is NOT
+    // gated by findOwnedCurriculumTopic on the `reteach` path — reteach's
+    // reviewTargets is always empty, so persistChallengeRoundReviewTargets
+    // early-returns before reaching its ownership check. Do not assume that
+    // check protects this write for every outcome; see the "reteach + topic
+    // not owned" test in session-exchange-challenge-finalize.test.ts for the
+    // ruled rationale (profile-scoped write, inert for an out-of-curriculum
+    // topic); tracked follow-up is WI-1811.
+    if (decision.outcome !== 'invalid') {
+      const lastOutcome = COMPLETION_COOLDOWN_OUTCOME_CODE[decision.outcome];
+      await db
+        .insert(challengeRoundCooldowns)
+        .values({
+          profileId,
+          topicId,
+          lastOutcome,
+          lastOfferedAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [
+            challengeRoundCooldowns.profileId,
+            challengeRoundCooldowns.topicId,
+          ],
+          set: { lastOutcome, lastOfferedAt: now, updatedAt: now },
+        });
     }
   } catch (err) {
     // Release leg: restore the pre-claim `drafting` state so the round is

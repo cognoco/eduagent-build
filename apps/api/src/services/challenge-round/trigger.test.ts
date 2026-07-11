@@ -269,6 +269,53 @@ describe('evaluateChallengeReadiness — in-session state + cooldown', () => {
     ).toBe(true);
   });
 
+  it('gates a completed round within the completion cooldown window', () => {
+    const oneHourAgo = new Date('2026-05-19T11:00:00Z');
+    expect(
+      evaluateChallengeReadiness({
+        ...baseInput,
+        challengeRoundState: {
+          state: 'complete',
+          offerCount: 1,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+        cooldownLastOfferedAt: oneHourAgo,
+        cooldownLastOutcome: 2, // verified
+      }).eligible,
+    ).toBe(false);
+    expect(
+      evaluateChallengeReadiness({
+        ...baseInput,
+        challengeRoundState: {
+          state: 'complete',
+          offerCount: 1,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+        cooldownLastOfferedAt: oneHourAgo,
+        cooldownLastOutcome: 2,
+      }).reason,
+    ).toBe('cooldown');
+  });
+
+  it('allows a completed round again after the completion cooldown elapses', () => {
+    const yesterday = new Date('2026-05-18T11:00:00Z');
+    expect(
+      evaluateChallengeReadiness({
+        ...baseInput,
+        challengeRoundState: {
+          state: 'complete',
+          offerCount: 1,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+        cooldownLastOfferedAt: yesterday,
+        cooldownLastOutcome: 2,
+      }).eligible,
+    ).toBe(true);
+  });
+
   it('allows offering again after an aborted round', () => {
     expect(
       evaluateChallengeReadiness({
@@ -305,15 +352,15 @@ describe('evaluateChallengeReadiness — in-session state + cooldown', () => {
     ).toBe(true);
   });
 
-  it('does not apply cooldown when last outcome was not a decline (outcome !== 0)', () => {
+  it('applies cooldown for a non-decline outcome too (uniform completion cooldown, RR-8)', () => {
     const oneHourAgo = new Date('2026-05-19T11:00:00Z');
     expect(
       evaluateChallengeReadiness({
         ...baseInput,
         cooldownLastOfferedAt: oneHourAgo,
-        cooldownLastOutcome: 2, // verified — re-offer allowed sooner
+        cooldownLastOutcome: 2, // verified — same 24h window as decline
       }).eligible,
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('returns cooldown reason when within the window', () => {
@@ -326,4 +373,47 @@ describe('evaluateChallengeReadiness — in-session state + cooldown', () => {
       }).reason,
     ).toBe('cooldown');
   });
+
+  it.each([
+    [1, 'accepted_partial'],
+    [2, 'verified'],
+    [3, 'reteach'],
+  ] as const)(
+    'gates outcome code %d (%s) within the 24h completion cooldown window',
+    (code, _label) => {
+      const oneHourAgo = new Date('2026-05-19T11:00:00Z');
+      expect(
+        evaluateChallengeReadiness({
+          ...baseInput,
+          cooldownLastOfferedAt: oneHourAgo,
+          cooldownLastOutcome: code,
+        }).eligible,
+      ).toBe(false);
+      expect(
+        evaluateChallengeReadiness({
+          ...baseInput,
+          cooldownLastOfferedAt: oneHourAgo,
+          cooldownLastOutcome: code,
+        }).reason,
+      ).toBe('cooldown');
+    },
+  );
+
+  it.each([
+    [1, 'accepted_partial'],
+    [2, 'verified'],
+    [3, 'reteach'],
+  ] as const)(
+    'allows outcome code %d (%s) again after the 24h completion cooldown elapses',
+    (code, _label) => {
+      const yesterday = new Date('2026-05-18T11:00:00Z');
+      expect(
+        evaluateChallengeReadiness({
+          ...baseInput,
+          cooldownLastOfferedAt: yesterday,
+          cooldownLastOutcome: code,
+        }).eligible,
+      ).toBe(true);
+    },
+  );
 });

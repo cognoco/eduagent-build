@@ -12,18 +12,18 @@ import { curriculumTopics } from './subjects';
 import { generateUUIDv7 } from '../utils/uuid';
 
 /**
- * Challenge Round cross-session decline cooldown — one row per
+ * Challenge Round cross-session completion cooldown — one row per
  * `(profile_id, topic_id)`. Written when a learner declines an offered round
- * or completes one; read by the trigger evaluator to suppress repeat offers
- * within 24h of a decline. Acceptances/completions update the row but do not
- * gate subsequent offers (those use in-session state instead).
+ * or completes one (any outcome); read by the trigger evaluator to suppress
+ * repeat offers within 24h of the last decline or completion (WI-1466/WI-1804
+ * — RR-8: a just-completed topic was otherwise immediately re-offerable).
  *
  * `last_outcome` encoding (kept narrow on purpose — analytics live in
  * `ai_response.metadata` and Inngest events, not here):
  *   0 = declined          → 24h cooldown enforced by trigger
- *   1 = accepted_partial  → no cross-session cooldown
- *   2 = verified          → no cross-session cooldown
- *   3 = reteach           → no cross-session cooldown
+ *   1 = accepted_partial  → 24h cooldown enforced by trigger
+ *   2 = verified          → 24h cooldown enforced by trigger
+ *   3 = reteach           → 24h cooldown enforced by trigger
  *
  * Both FKs cascade on delete (MED-2 from the Challenge Round plan): profile
  * delete wipes cooldown rows (correct under GDPR export-delete), and a

@@ -140,6 +140,10 @@ interface FakeDbState {
   // error / constraint violation on the post-claim mastery or deepening write.
   failNextMasteryInsert?: boolean;
   failNextDeepeningInsert?: boolean;
+  failNextCooldownInsert?: boolean;
+  // challengeRoundCooldowns upserts observed (WI-1804): one entry per
+  // insert().values().onConflictDoUpdate() call that reaches the fake DB.
+  cooldownUpserts?: Array<Record<string, unknown>>;
   // When true, findOwnedCurriculumTopic returns no row — models a topic that is
   // NOT owned by this profile (cross-profile / wrong-subject finalize attempt).
   // The active mastery/deepening writes must reject before touching either table.
@@ -239,6 +243,13 @@ function makeFakeDb(state: FakeDbState): Database {
             updatedAt: new Date(),
             createdAt: new Date(),
           });
+        } else if ('lastOutcome' in vals) {
+          // [WI-1804] challengeRoundCooldowns upsert — completion cooldown write.
+          if (state.failNextCooldownInsert) {
+            state.failNextCooldownInsert = false;
+            throw new Error('transient cooldown insert failure');
+          }
+          (state.cooldownUpserts ??= []).push(vals);
         } else if ('easeFactor' in vals) {
           // [WI-1445] insertRetentionCardIfAbsent — onConflictDoNothing
           // semantics: only seed state.retentionCard if absent.
@@ -273,6 +284,9 @@ function makeFakeDb(state: FakeDbState): Database {
         then: (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
           runInsert().then(resolve, reject),
         onConflictDoNothing: (_opts?: unknown) => runInsert(),
+        // [WI-1804] challengeRoundCooldowns upsert uses onConflictDoUpdate,
+        // mirroring route-actions.ts's decline writer.
+        onConflictDoUpdate: (_opts?: unknown) => runInsert(),
       };
     },
   });
@@ -449,6 +463,17 @@ const PARTIAL_EVALS: ChallengeRoundEvaluationItem[] = [
     answerEventId: ANSWER_EVENT_ID,
     learnerQuote: 'Plants make food somehow.',
     correction: 'Light energy is converted to chemical energy in chloroplasts.',
+  },
+];
+
+// [WI-1804] All evaluated concepts `missing` → outcome 'reteach'.
+const RETEACH_EVALS: ChallengeRoundEvaluationItem[] = [
+  {
+    concept: 'photosynthesis',
+    result: 'missing',
+    evidence: 'No answer given.',
+    answerEventId: ANSWER_EVENT_ID,
+    learnerQuote: '(no answer)',
   },
 ];
 
@@ -817,6 +842,140 @@ describe('finalizeChallengeRoundIfReady — idempotent under concurrent/retry fi
 });
 
 // ---------------------------------------------------------------------------
+// [WI-1804] Completion cooldown — finalize now upserts challengeRoundCooldowns
+// for all three completion outcomes (verified→2, accepted_partial→1,
+// reteach→3), gated by the same 24h window decline already uses. `invalid`
+// (empty evaluations) writes nothing. The write sits inside the existing
+// mastery/deepening try/catch, so a cooldown-write failure takes the same
+// release-and-retry path.
+// ---------------------------------------------------------------------------
+
+describe('finalizeChallengeRoundIfReady — completion cooldown (WI-1804)', () => {
+  it.each([
+    { label: 'verified', evals: SOLID_EVALS, expectedOutcome: 2 },
+    { label: 'accepted_partial', evals: PARTIAL_EVALS, expectedOutcome: 1 },
+    { label: 'reteach', evals: RETEACH_EVALS, expectedOutcome: 3 },
+  ])(
+    'writes challengeRoundCooldowns exactly once for $label (lastOutcome $expectedOutcome) under double-finalize',
+    async ({ evals, expectedOutcome }) => {
+      const challengeRound = draftingState(evals);
+      const state: FakeDbState = {
+        sessionMetadata: { challengeRound },
+        masteryInserts: [],
+        deepeningRows: [],
+        deepeningInsertCount: 0,
+      };
+      const db = makeFakeDb(state);
+      const session = makeSession(state.sessionMetadata);
+
+      await finalizeChallengeRoundIfReady(
+        db,
+        PROFILE_ID,
+        session,
+        challengeRound,
+        null,
+      );
+      await finalizeChallengeRoundIfReady(
+        db,
+        PROFILE_ID,
+        session,
+        challengeRound,
+        null,
+      );
+
+      expect(state.cooldownUpserts).toHaveLength(1);
+      expect(state.cooldownUpserts?.[0]).toEqual(
+        expect.objectContaining({
+          profileId: PROFILE_ID,
+          topicId: TOPIC_ID,
+          lastOutcome: expectedOutcome,
+        }),
+      );
+    },
+  );
+
+  it('writes no cooldown row for the invalid outcome (empty evaluations)', async () => {
+    const challengeRound = draftingState([]);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    const result = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      null,
+    );
+
+    expect(result).not.toBeNull();
+    expect(state.cooldownUpserts ?? []).toHaveLength(0);
+    expect(state.masteryInserts).toHaveLength(0);
+    expect(state.deepeningRows).toHaveLength(0);
+  });
+
+  it('restores drafting, escalates, and re-throws when the cooldown write fails; a retry then completes exactly once', async () => {
+    const challengeRound = draftingState(SOLID_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      failNextCooldownInsert: true,
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    await expect(
+      finalizeChallengeRoundIfReady(
+        db,
+        PROFILE_ID,
+        session,
+        challengeRound,
+        null,
+      ),
+    ).rejects.toThrow('transient cooldown insert failure');
+
+    // Released back to drafting; the mastery write from the same attempt is
+    // NOT rolled back by this fake (each write is its own real statement, as
+    // in production), but the round must be re-finalizeable and the cooldown
+    // row must not have landed.
+    expect(persistedChallengeState(state)?.state).toBe('drafting');
+    expect(state.cooldownUpserts ?? []).toHaveLength(0);
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'transient cooldown insert failure' }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'challenge-round.finalize.terminal-write-failed',
+        }),
+      }),
+    );
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/challenge-round.finalize.failed',
+      }),
+    );
+
+    const retry = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      null,
+    );
+    expect(retry).not.toBeNull();
+    expect(persistedChallengeState(state)?.state).toBe('complete');
+    expect(state.cooldownUpserts).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Ownership scoping: the ACTIVE mastery/deepening write path is the only
 // challenge-round persistence implementation reachable from production (the
 // parallel `challenge-round/persistence.ts` helpers were dead code, imported
@@ -881,6 +1040,60 @@ describe('finalizeChallengeRoundIfReady — rejects writes for a topic not owned
     // The ownership gate fired before any write — no deepening row leaked.
     expect(state.deepeningInsertCount).toBe(0);
     expect(state.deepeningRows).toHaveLength(0);
+  });
+
+  // [WI-1804] reteach's reviewTargets is always empty (allMissing filters no
+  // partial/misconception items), so persistChallengeRoundReviewTargets
+  // early-returns on `decision.reviewTargets.length === 0` BEFORE calling
+  // findOwnedCurriculumTopic (session-exchange.ts ~:895) — the ownership gate
+  // verified/partial get for free (see the two tests above) never runs for
+  // reteach. The cooldown upsert sits unconditionally after that call inside
+  // the same try block, so it becomes the first (and only) write on this
+  // path.
+  //
+  // Ruled (shepherd, 2026-07-11): asserted here as deliberate, documented
+  // behavior rather than fixed in this WI — a real gap, but low severity and
+  // out of scope for "write the cooldown":
+  //   - Not a cross-tenant leak: `profileId` in the write is always the
+  //     authenticated caller's own id (the row's unique key is
+  //     profileId+topicId, and profileId is never attacker-controlled here).
+  //   - Inert: a cooldown row for a topic outside the profile's curriculum
+  //     suppresses offers that could never fire for that profile anyway, so
+  //     the write has no observable product effect.
+  // Tracked as WI-1811 (P3) for a separate ruling on whether to add the
+  // ownership guard uniformly. Do NOT add findOwnedCurriculumTopic here
+  // without that separate WI (option B — guard this write — was explicitly
+  // rejected as out of scope here).
+  it('reteach + topic not owned — still succeeds and writes a cooldown row (documented asymmetry)', async () => {
+    const challengeRound = draftingState(RETEACH_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      topicNotOwned: true,
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    const result = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      null,
+    );
+
+    expect(result).not.toBeNull();
+    expect(state.masteryInserts).toHaveLength(0);
+    expect(state.deepeningRows).toHaveLength(0);
+    expect(state.cooldownUpserts).toEqual([
+      expect.objectContaining({
+        profileId: PROFILE_ID,
+        topicId: TOPIC_ID,
+        lastOutcome: 3,
+      }),
+    ]);
   });
 });
 

@@ -125,7 +125,7 @@ export function evaluateChallengeReadiness(
     }
   }
 
-  if (input.cooldownLastOfferedAt && input.cooldownLastOutcome === 0) {
+  if (input.cooldownLastOfferedAt && input.cooldownLastOutcome !== null) {
     const elapsed = input.now.getTime() - input.cooldownLastOfferedAt.getTime();
     if (elapsed < CHALLENGE_OFFER_COOLDOWN_MS) {
       return { eligible: false, reason: 'cooldown' };
