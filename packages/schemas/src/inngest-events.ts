@@ -4,6 +4,27 @@ import { childCapNotificationKindSchema } from './notifications.ts';
 import { subscriptionStatusSchema, subscriptionTierSchema } from './billing.ts';
 import { conversationLanguageSchema } from './profiles.ts';
 
+export const paymentFailedEventSchema = z.object({
+  subscriptionId: z.string().uuid(),
+  stripeSubscriptionId: z.string().min(1).optional(),
+  accountId: z.string().uuid(),
+  attempt: z.number().int().positive().optional(),
+  source: z.enum(['stripe', 'revenuecat']).optional(),
+  timestamp: isoDateField,
+});
+export type PaymentFailedEvent = z.infer<typeof paymentFailedEventSchema>;
+
+export const billingAlertDeliveryFailedEventSchema = z.object({
+  alertId: z.string().uuid(),
+  subscriptionId: z.string().uuid(),
+  channel: z.enum(['push', 'email']),
+  reason: z.string().min(1),
+  timestamp: isoDateField,
+});
+export type BillingAlertDeliveryFailedEvent = z.infer<
+  typeof billingAlertDeliveryFailedEventSchema
+>;
+
 export const filingTimedOutEventSchema = z.object({
   sessionId: z.string().uuid(),
   profileId: z.string().uuid(),

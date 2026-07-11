@@ -4082,7 +4082,13 @@
         "cta": "Otwórz"
       },
       "complete": "Gotowe",
-      "dismissIcon": "x"
+      "dismissIcon": "x",
+      "billing_alert": {
+        "title": "Płatność wymaga uwagi",
+        "cta": "Zarządzaj płatnościami",
+        "currentAccess": "Twój płatny dostęp pozostaje aktywny do {{deadline}}.",
+        "freeFallback": "Twoje konto korzysta teraz z darmowego dostępu. Zaktualizuj płatność, aby przywrócić swój plan."
+      }
     },
     "ledger": {
       "label": "Chwila nauki",

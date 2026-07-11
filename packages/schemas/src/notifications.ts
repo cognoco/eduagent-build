@@ -5,6 +5,7 @@ export const notificationTypeSchema = z.enum([
   'review_reminder',
   'daily_reminder',
   'trial_expiry',
+  'payment_failed',
   'streak_warning',
   'consent_request',
   'consent_reminder',
@@ -66,17 +67,25 @@ const nudgePayloadSchema = notificationBaseSchema.extend({
   }),
 });
 
+const paymentFailedPayloadSchema = notificationBaseSchema.extend({
+  type: z.literal('payment_failed'),
+  data: z.object({
+    payerPersonId: z.string().uuid(),
+  }),
+});
+
 /** All other types: no structured data payload at current call sites */
 const noDataPayloadSchema = notificationBaseSchema.extend({
   // [CR-178] Exclude 'nudge' so this branch can't accidentally match it —
   // new types added to notificationTypeSchema automatically fall here unless
   // a dedicated typed variant is added above.
-  type: notificationTypeSchema.exclude(['nudge']),
+  type: notificationTypeSchema.exclude(['nudge', 'payment_failed']),
   data: z.undefined().optional(),
 });
 
 export const notificationPayloadSchema = z.union([
   nudgePayloadSchema,
+  paymentFailedPayloadSchema,
   noDataPayloadSchema,
 ]);
 export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;

@@ -3922,7 +3922,13 @@
         "cta": "Abrir"
       },
       "complete": "Concluído",
-      "dismissIcon": "x"
+      "dismissIcon": "x",
+      "billing_alert": {
+        "title": "Pagamento precisa de atenção",
+        "cta": "Gerenciar cobrança",
+        "currentAccess": "Seu acesso pago permanece ativo até {{deadline}}.",
+        "freeFallback": "Sua conta está usando o acesso gratuito agora. Atualize o pagamento para restaurar seu plano."
+      }
     },
     "ledger": {
       "label": "Momento de aprendizado",

@@ -185,3 +185,47 @@ export const byokWaitlist = pgTable('byok_waitlist', {
     .notNull()
     .defaultNow(),
 });
+
+/**
+ * Durable in-app recovery alerts for failed subscription payments.
+ *
+ * This is intentionally separate from notification_log: that table records
+ * push delivery/rate-limit activity, while these rows remain user-visible for
+ * as long as the canonical subscription is past_due.
+ */
+export const billingAlerts = pgTable(
+  'billing_alerts',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    subscriptionId: uuid('subscription_id')
+      .notNull()
+      .references(() => subscription.id, { onDelete: 'cascade' }),
+    sourceEventId: text('source_event_id').notNull(),
+    source: text('source', {
+      enum: ['stripe', 'revenuecat', 'unknown'],
+    }).notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    pushStatus: text('push_status', { enum: ['sent', 'failed'] }),
+    pushFailureReason: text('push_failure_reason'),
+    emailStatus: text('email_status', { enum: ['sent', 'failed'] }),
+    emailFailureReason: text('email_failure_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('billing_alerts_source_event_id_uq').on(table.sourceEventId),
+    index('billing_alerts_subscription_created_idx').on(
+      table.subscriptionId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export type BillingAlertRow = typeof billingAlerts.$inferSelect;
+export type NewBillingAlertRow = typeof billingAlerts.$inferInsert;

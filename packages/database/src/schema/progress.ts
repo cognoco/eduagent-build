@@ -125,6 +125,7 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'review_reminder',
   'daily_reminder',
   'trial_expiry',
+  'payment_failed',
   'streak_warning',
   'consent_request',
   'consent_reminder',

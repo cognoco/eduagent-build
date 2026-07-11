@@ -46,6 +46,15 @@ function notificationTargetForData(
     case 'subscribe_request':
     case 'trial_expiry':
       return { context: 'study', href: '/(app)/subscription' as Href };
+    case 'payment_failed':
+      if (typeof data.payerPersonId !== 'string') return null;
+      return {
+        context: 'study',
+        href: {
+          pathname: '/(app)/billing/manage',
+          params: { payerPersonId: data.payerPersonId },
+        } as Href,
+      };
     default:
       return null;
   }

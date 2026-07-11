@@ -29,6 +29,7 @@ export {
   formatConsentReminderEmail,
   formatSecurityNotificationEmail,
   formatAccountReclaimAttemptEmail,
+  formatPaymentFailedEmail,
   type EmailPayload,
   type EmailOptions,
   type EmailResult,

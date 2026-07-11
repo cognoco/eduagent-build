@@ -2986,6 +2986,12 @@
       "subjects": "Browse subjects"
     },
     "cards": {
+      "billing_alert": {
+        "title": "Payment needs attention",
+        "cta": "Manage billing",
+        "currentAccess": "Your paid access stays active until {{deadline}}.",
+        "freeFallback": "Your account is using free access now. Update payment to restore your plan."
+      },
       "unfinished_session": {
         "title": "Continue your last session",
         "cta": "Continue",

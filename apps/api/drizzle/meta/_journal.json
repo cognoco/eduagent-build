@@ -939,6 +939,13 @@
       "when": 1783509602997,
       "tag": "0135_subscription_person_fk_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "7",
+      "when": 1783728131007,
+      "tag": "0136_payment_failed_alerts",
+      "breakpoints": true
     }
   ]
 }

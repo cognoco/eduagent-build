@@ -1,4 +1,4 @@
-import { formatConsentApprovedEmail } from './email';
+import { formatConsentApprovedEmail, formatPaymentFailedEmail } from './email';
 
 const PARENT = 'parent@example.com';
 const CHILD = 'Mira';
@@ -23,5 +23,23 @@ describe('formatConsentApprovedEmail', () => {
     expect(payload.body).toContain(WITHDRAWAL_URL);
     // It must read as a confirmation + withdrawal affordance, not a request.
     expect(payload.body.toLowerCase()).toContain('withdraw');
+  });
+});
+
+describe('formatPaymentFailedEmail', () => {
+  it('uses the dedicated payment_failed type and actionable manage-billing link', () => {
+    const payload = formatPaymentFailedEmail(
+      PARENT,
+      'mentomate://billing/manage?payerPersonId=payer-1',
+    );
+
+    expect(payload).toMatchObject({
+      to: PARENT,
+      type: 'payment_failed',
+      subject: 'Action needed: update your MentoMate payment',
+    });
+    expect(payload.body).toContain(
+      'mentomate://billing/manage?payerPersonId=payer-1',
+    );
   });
 });
