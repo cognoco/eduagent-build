@@ -239,6 +239,38 @@ describe('check-change-class.sh', () => {
     expect(flags.eval).toBe('true');
   });
 
+  // ── llm-routing class command resolves to a real script (WI-1795) ───────
+  // The llm-routing class emits a `pnpm <script>` command that gates the
+  // premium-routing pass. A regression that names an unregistered script makes
+  // --run fail/no-op and misleads a human reading the advisory output. Pin that
+  // the emitted script name is actually registered in package.json.
+  it('routes llm-routing changes to a registered package.json script', () => {
+    mkdirSync(join(repo, 'apps', 'api', 'src', 'services'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(repo, 'apps', 'api', 'src', 'services', 'subscription.ts'),
+      'export const s = 1;\n',
+    );
+    git(repo, ['add', '.']);
+
+    const output = String(
+      runChangeClass(repo, ['--branch'], { encoding: 'utf8' }),
+    );
+    expect(output).toContain('llm-routing');
+
+    // Extract the `pnpm <script>` the class schedules and assert it resolves to
+    // a real, invocable target in the repo's package.json.
+    const match = output.match(/pnpm (test:llm:[\w-]+)/);
+    expect(match).not.toBeNull();
+    const scriptName = match![1];
+
+    const pkg = JSON.parse(
+      readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
+    );
+    expect(pkg.scripts[scriptName]).toBeDefined();
+  });
+
   it('emits integration=true for a lockfile-only change (dependencies class)', () => {
     writeFileSync(join(repo, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n');
     git(repo, ['add', '.']);
