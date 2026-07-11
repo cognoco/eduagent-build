@@ -200,8 +200,9 @@ capacity_flags AS (
     ) AS is_supportee,
     EXISTS (
       SELECT 1
-      FROM subscription
-      WHERE subscription.payer_person_id = activation_events.profile_id
+      FROM subscription_payers
+      JOIN subscription ON subscription.id = subscription_payers.subscription_id
+      WHERE subscription_payers.person_id = activation_events.profile_id
         AND subscription.status IN ('trial', 'active', 'past_due')
     ) AS is_payer
   FROM activation_events
