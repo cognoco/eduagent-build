@@ -109,7 +109,7 @@ Key skills:
 | maestro-testing | Writing or debugging Maestro flows | `.agents/skills/maestro-testing/SKILL.md` |
 | deep-bugfixing | Adversarial runtime-assumption reviews | `.agents/skills/deep-bugfixing/SKILL.md` |
 | learning-evolution-next | Learning-product evolution audit | `.agents/skills/learning-evolution-next/SKILL.md` |
-| notion | EduAgent/MentoMate Notion work items | `.agents/skills/notion/SKILL.md` |
+| old-notion | Working the EduAgent "Issue Tracker" bug backlog as batch shepherd — Issue Tracker bug-shepherding only, NOT Cosmo/ZDX work items (see "Cosmo work items" above) | `.agents/skills/my/old-notion/SKILL.md` |
 | receiving-code-review | Receiving review feedback (human or automated) | `.agents/skills/receiving-code-review/SKILL.md` |
 | test-driven-development | Implementing any feature or bugfix, before writing code | `.agents/skills/test-driven-development/SKILL.md` |
 | systematic-debugging | Any bug, test failure, or unexpected behavior | `.agents/skills/systematic-debugging/SKILL.md` |
