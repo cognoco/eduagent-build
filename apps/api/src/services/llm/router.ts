@@ -21,6 +21,7 @@ import {
   NoEligibleModelError,
   type ExchangeRouterRow,
 } from '../policy-engine';
+import { captureException } from '../sentry';
 
 const logger = createLogger();
 
@@ -57,6 +58,54 @@ function getErrorDiagnostics(err: unknown): {
     status: (err as { status?: number }).status,
     statusCode: status,
   };
+}
+
+type LlmFallbackReason =
+  | 'primary-error'
+  | 'primary-circuit-open'
+  | 'stream-error'
+  | 'empty-stream';
+
+/**
+ * Emits the countable launch-health signal for a provider fallback without
+ * attaching prompts, model output, session identifiers, or provider error
+ * bodies to Sentry.
+ */
+function captureLlmFallbackSignal(input: {
+  reason: LlmFallbackReason;
+  provider: string;
+  fallbackProvider: string;
+  circuitKey: string;
+  capability: LlmCapability;
+  flow?: string;
+}): void {
+  try {
+    captureException(new Error('LLM provider fallback activated'), {
+      tags: {
+        surface: 'llm-router',
+        signal: 'provider-fallback',
+        reason: input.reason,
+        provider: input.provider,
+        fallbackProvider: input.fallbackProvider,
+        capability: input.capability,
+      },
+      extra: {
+        circuitKey: input.circuitKey,
+        ...(input.flow ? { flow: input.flow } : {}),
+      },
+    });
+  } catch (captureError) {
+    // Observability must never turn a successful provider fallback into a
+    // learner-visible outage. Keep this diagnostic shape-only as well.
+    logger.error('llm.fallback_signal.capture_failed', {
+      provider: input.provider,
+      fallbackProvider: input.fallbackProvider,
+      reason: input.reason,
+      capability: input.capability,
+      captureErrorName:
+        captureError instanceof Error ? captureError.name : typeof captureError,
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1576,6 +1625,14 @@ export async function routeAndCall(
           error: err instanceof Error ? err.message : String(err),
         },
       );
+      captureLlmFallbackSignal({
+        reason: 'primary-error',
+        provider: config.provider,
+        fallbackProvider: fallbackConfig.provider,
+        circuitKey,
+        capability,
+        flow: _options?.flow,
+      });
       return attemptProvider(fallbackConfig, safeMessages, rung, {
         capability,
         conversationLanguage: _options?.conversationLanguage,
@@ -1602,6 +1659,14 @@ export async function routeAndCall(
       conversationLanguage: _options?.conversationLanguage,
       flow: _options?.flow,
       sessionId: _options?.sessionId,
+    });
+    captureLlmFallbackSignal({
+      reason: 'primary-circuit-open',
+      provider: config.provider,
+      fallbackProvider: fallbackConfig.provider,
+      circuitKey,
+      capability,
+      flow: _options?.flow,
     });
     return attemptProvider(fallbackConfig, safeMessages, rung, {
       capability,
@@ -1754,6 +1819,14 @@ async function* wrapStreamWithCircuitBreaker(
             sessionId: metricContext.sessionId,
           },
         );
+        captureLlmFallbackSignal({
+          reason: 'empty-stream',
+          provider: providerId,
+          fallbackProvider: fallbackConfig.provider,
+          circuitKey,
+          capability,
+          flow: metricContext.flow,
+        });
         const fallbackResult = normalizeStreamResult(
           fallbackProvider.chatStream(messages, fallbackConfig),
         );
@@ -1826,6 +1899,14 @@ async function* wrapStreamWithCircuitBreaker(
             error: err instanceof Error ? err.message : String(err),
           },
         );
+        captureLlmFallbackSignal({
+          reason: 'stream-error',
+          provider: providerId,
+          fallbackProvider: fallbackConfig.provider,
+          circuitKey,
+          capability,
+          flow: metricContext.flow,
+        });
         const fallbackResult = normalizeStreamResult(
           fallbackProvider.chatStream(messages, fallbackConfig),
         );
@@ -2022,6 +2103,14 @@ export async function routeAndStream(
       conversationLanguage: options?.conversationLanguage,
       flow: options?.flow,
       sessionId: options?.sessionId,
+    });
+    captureLlmFallbackSignal({
+      reason: 'primary-circuit-open',
+      provider: config.provider,
+      fallbackProvider: fallbackConfig.provider,
+      circuitKey,
+      capability,
+      flow: options?.flow,
     });
     return attemptStreamProvider(fallbackConfig, safeMessages, rung, {
       capability,
