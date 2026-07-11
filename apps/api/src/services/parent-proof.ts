@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, gte, isNotNull } from 'drizzle-orm';
 import {
   assessments,
   curriculumTopics,
@@ -14,6 +14,16 @@ import {
   type MasteryVerificationState,
 } from './challenge-round/verification';
 import { getRetentionStatus } from './retention';
+
+// [WI-1658 rework] Read-side quote age-out (AC4). WI-1194 cites this same
+// 30-day window as the clock verbatim quotes should align to (its
+// description: quotes "currently survive the 30-day transcript purge") — it
+// is also the literal cutoff `transcript-purge-cron.ts` already uses
+// (`cutoff.setUTCDate(cutoff.getUTCDate() - 30)`). Deleting the aged row
+// (write-side purge) stays WI-1194's scope; this is read-side suppression
+// only — past the window the quote reads back as null and the existing
+// degradation branch below renders the abstracted line instead.
+const QUOTE_AGE_OUT_DAYS = 30;
 
 export interface VerifiedProofReceipt {
   hasProof: boolean;
@@ -35,7 +45,10 @@ export interface VerifiedProofReceipt {
  * marked `artifact_source = 'challenge_drafted_note'` — never a raw
  * transcript, never an unmarked learner/session-summary note. Co-presents
  * `masteryVerificationState` alongside the fact per MMT-ADR-0031 §5 — never
- * an unqualified "verified forever" claim.
+ * an unqualified "verified forever" claim. The quote read-side ages out past
+ * `QUOTE_AGE_OUT_DAYS` (AC4): topic/date/verification-status keep returning,
+ * only the quote itself drops to null and the caller's abstracted-line
+ * degradation branch takes over.
  *
  * Parent-chain read (assessments/topic_notes/retentionCards joined/filtered
  * by `childProfileId`, not the requesting parent's own profileId) — the
@@ -73,6 +86,11 @@ export async function getLatestVerifiedProofForChild(
     return { hasProof: false, quote: null };
   }
 
+  const quoteAgeOutCutoff = new Date();
+  quoteAgeOutCutoff.setUTCDate(
+    quoteAgeOutCutoff.getUTCDate() - QUOTE_AGE_OUT_DAYS,
+  );
+
   const [noteRow, weakSpotRows, retentionCard] = await Promise.all([
     db
       .select({ content: topicNotes.content })
@@ -83,6 +101,7 @@ export async function getLatestVerifiedProofForChild(
           eq(topicNotes.topicId, latest.topicId),
           eq(topicNotes.sessionId, latest.sessionId),
           eq(topicNotes.artifactSource, 'challenge_drafted_note'),
+          gte(topicNotes.createdAt, quoteAgeOutCutoff),
         ),
       )
       .orderBy(desc(topicNotes.createdAt))

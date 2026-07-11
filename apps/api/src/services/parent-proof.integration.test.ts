@@ -319,6 +319,54 @@ describeIfDb('getLatestVerifiedProofForChild (integration) [WI-1658]', () => {
     expect(result.quote).toBeNull();
   });
 
+  it('[WI-1658 rework] ages out a marked note past the retention window — quote returns null, card still renders (AC4)', async () => {
+    const parent = await seedProfile({ displayName: 'Parent AgeOut' });
+    const child = await seedProfile({
+      displayName: 'Child AgeOut',
+      isOwner: false,
+      orgId: parent.orgId,
+    });
+    await seedFamilyLink(parent.profileId, child.profileId);
+    await seedConsented(child.profileId, parent.orgId);
+    const { subjectId, topicId } = await seedTopic(
+      child.profileId,
+      'Geography',
+      'Plate Tectonics',
+    );
+    const sessionId = await seedSession(child.profileId, subjectId, topicId);
+    await seedVerifiedAssessment({
+      profileId: child.profileId,
+      subjectId,
+      topicId,
+      sessionId,
+      verifiedAt: new Date(),
+    });
+    // Marked note seeded 31 days old — one day past the 30-day age-out
+    // window this WI shares with transcript-purge-cron.ts's own cutoff.
+    const agedCreatedAt = new Date();
+    agedCreatedAt.setUTCDate(agedCreatedAt.getUTCDate() - 31);
+    await db.insert(topicNotes).values({
+      profileId: child.profileId,
+      topicId,
+      sessionId,
+      content: 'This quote should never come back once aged out.',
+      artifactSource: 'challenge_drafted_note',
+      createdAt: agedCreatedAt,
+    });
+
+    const result = await getLatestVerifiedProofForChild(
+      db,
+      parent.profileId,
+      child.profileId,
+    );
+
+    // Topic/date/verification-status still return (the card keeps working) —
+    // only the quote is suppressed, same degradation branch as "no note".
+    expect(result.hasProof).toBe(true);
+    expect(result.topicId).toBe(topicId);
+    expect(result.quote).toBeNull();
+  });
+
   it('never returns a learner-authored note (no artifactSource marker) as the quote', async () => {
     const parent = await seedProfile({ displayName: 'Parent Collision' });
     const child = await seedProfile({
