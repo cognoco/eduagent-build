@@ -49,6 +49,7 @@ import { and, eq, like, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   assessments,
+  challengeRoundCooldowns,
   createDatabase,
   createScopedRepository,
   curricula,
@@ -552,6 +553,66 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
     const rows = await readAssessmentsForSession(db, profileId, session.id);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.masteryChallengeVerifiedAt).not.toBeNull();
+  });
+
+  // [WI-1804] Real-DB proof that the completion cooldown upsert resolves a
+  // genuine unique-constraint conflict via onConflictDoUpdate rather than
+  // throwing — the unit-level fake-DB tests
+  // (session-exchange-challenge-finalize.test.ts) never seed a pre-existing
+  // row keyed by (profileId, topicId), so they cannot exercise the real
+  // Postgres conflict path the way this test does.
+  it('[WI-1804] finalizeChallengeRoundIfReady overwrites a prior decline cooldown row on a completion outcome', async () => {
+    const { profileId, subjectId } = await seedProfileAndSubject(db);
+    const topicId = await seedCurriculumTopic(db, subjectId);
+    const answerEventId = generateUUIDv7();
+    const session = await seedDraftingSession(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+      answerEventId,
+    );
+
+    // Seed a PRIOR decline cooldown row for the same (profileId, topicId) —
+    // mirrors declineChallengeRound's insert shape (route-actions.ts:113-128).
+    await db.insert(challengeRoundCooldowns).values({
+      profileId,
+      topicId,
+      lastOutcome: 0,
+      lastOfferedAt: new Date(Date.now() - 60 * 60 * 1000),
+      updatedAt: new Date(Date.now() - 60 * 60 * 1000),
+    });
+
+    const meta = await readSessionChallengeRound(db, session.id);
+    expect(meta?.state).toBe('drafting');
+
+    // seedDraftingSession's evaluation is a single solid item → outcome
+    // 'verified' (lastOutcome 2). Finalize must overwrite the stale decline
+    // row via onConflictDoUpdate, not throw a unique-constraint violation.
+    const result = await finalizeChallengeRoundIfReady(
+      db,
+      profileId,
+      session,
+      meta as Parameters<typeof finalizeChallengeRoundIfReady>[3],
+      null,
+    );
+
+    expect(result).not.toBeNull();
+
+    const cooldownRows = await db
+      .select({ lastOutcome: challengeRoundCooldowns.lastOutcome })
+      .from(challengeRoundCooldowns)
+      .where(
+        and(
+          eq(challengeRoundCooldowns.profileId, profileId),
+          eq(challengeRoundCooldowns.topicId, topicId),
+        ),
+      );
+
+    // Still exactly one row (upsert, not a duplicate insert), now reflecting
+    // the completion outcome (verified → 2) instead of the stale decline (0).
+    expect(cooldownRows).toHaveLength(1);
+    expect(cooldownRows[0]!.lastOutcome).toBe(2);
   });
 
   // [WI-1658] Real-DB persistence assertion for the verified-proof note. The
