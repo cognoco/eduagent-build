@@ -1668,9 +1668,20 @@ export async function updateRetentionFromSession(
 
   await assertOwnedCurriculumTopic(db, { profileId, topicId });
 
-  // Auto-create retention card on first encounter
+  // Auto-create retention card on first encounter. `isNew` mirrors
+  // ensureRetentionCard's own definition (repetitions === 0) rather than
+  // "did this call insert the row" — a card can pre-exist with repetitions
+  // still 0 (e.g. auto-created earlier by topic-probe-extract.ts's own
+  // ensureRetentionCard call) and its updatedAt was set by the DB's
+  // defaultNow(), not a JS writer. The optimistic-lock guard's strict
+  // updatedAt equality assumes a JS-precision timestamp (see B73 above); a
+  // SQL-defaulted timestamp can carry sub-millisecond precision that a JS
+  // Date read-back truncates, so the WHERE clause silently matches 0 rows.
+  // Skipping the lock for any never-reviewed (repetitions === 0) card is
+  // safe: there is no prior meaningful state to protect, same as the
+  // genuinely-just-created branch below.
   const ensured = existing
-    ? { card: existing, isNew: false }
+    ? { card: existing, isNew: existing.repetitions === 0 }
     : await ensureRetentionCard(db, profileId, topicId);
   const card = ensured.card;
 

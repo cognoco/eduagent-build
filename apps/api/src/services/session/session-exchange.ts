@@ -96,6 +96,7 @@ import { getRelevantMemories } from '../memory/relevance';
 import {
   computeDaysSinceLastReview,
   getTeachingPreference,
+  updateRetentionFromSession,
 } from '../retention-data';
 import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
@@ -818,26 +819,49 @@ async function persistChallengeRoundMasteryEvidence(
   if (!session.subjectId) {
     throw new Error('Challenge Round mastery requires a subject-bound session');
   }
+  const subjectId = session.subjectId;
   const ownedTopic = await findOwnedCurriculumTopic(db, {
     profileId,
     topicId,
-    subjectId: session.subjectId,
+    subjectId,
   });
   if (!ownedTopic) {
     throw new Error('Challenge Round topic is not owned by this profile');
   }
 
-  await db.insert(assessments).values({
-    profileId,
-    subjectId: session.subjectId,
-    topicId,
-    sessionId: session.id,
-    verificationDepth: 'transfer',
-    status: 'passed',
-    masteryScore: 1,
-    qualityRating: 5,
-    exchangeHistory: [],
-    masteryChallengeVerifiedAt: now,
+  // [WI-1445] The assessments insert and the retention seed write below must
+  // land atomically. The caller (`finalizeChallengeRoundIfReady`) releases the
+  // claim back to `drafting` and retries on ANY throw from this function — if
+  // the retention write threw after the assessments insert had already
+  // committed, a retry would insert a second assessments row for the same
+  // verification. One transaction keeps both writes, or neither, together.
+  await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    await txDb.insert(assessments).values({
+      profileId,
+      subjectId,
+      topicId,
+      sessionId: session.id,
+      verificationDepth: 'transfer',
+      status: 'passed',
+      masteryScore: 1,
+      qualityRating: 5,
+      exchangeHistory: [],
+      masteryChallengeVerifiedAt: now,
+    });
+
+    // MMT-ADR-0031: Challenge verification may seed the retention card's
+    // first re-check promise but never marks it retained — the underlying
+    // SM-2 quality-5 update only ever writes scheduling fields (ease factor,
+    // interval, repetitions, lastReviewedAt, nextReviewAt), never xpStatus or
+    // masteredAt, and auto-creates the card on first encounter.
+    await updateRetentionFromSession(
+      txDb,
+      profileId,
+      topicId,
+      5,
+      now.toISOString(),
+    );
   });
 }
 

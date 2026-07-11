@@ -2181,6 +2181,48 @@ describe('updateRetentionFromSession', () => {
       warnSpy.mockRestore();
     }
   });
+
+  it('[WI-1445] a never-reviewed EXISTING card (repetitions === 0) skips the optimistic lock', async () => {
+    // A retention card can pre-exist with repetitions still 0 without this
+    // call having created it (e.g. auto-created earlier by
+    // topic-probe-extract.ts's own ensureRetentionCard call, or seeded by a
+    // test helper) — its updatedAt may have been set by the DB's
+    // defaultNow(), not a JS writer. Before the WI-1445 fix, `existing`
+    // being truthy forced `isNew: false`, applying the strict updatedAt
+    // equality guard (B73) against a timestamp precision the JS round-trip
+    // cannot reproduce — silently skipping the write. `isNew` must instead
+    // mirror ensureRetentionCard's own definition (repetitions === 0), which
+    // skips the lock (guard: none) for a never-reviewed card same as the
+    // genuinely-just-created branch.
+    const virginCard = mockRetentionCardRow();
+    Object.assign(virginCard, { repetitions: 0 });
+    setupScopedRepo({ retentionCardFindFirst: virginCard });
+
+    let capturedWhere: unknown = null;
+    const db = createMockDb();
+    (db.update as jest.Mock).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockImplementation((expr: unknown) => {
+          capturedWhere = expr;
+          const p = Promise.resolve(undefined);
+          (p as unknown as Record<string, unknown>).returning = jest
+            .fn()
+            .mockResolvedValue([{}]);
+          return p;
+        }),
+      }),
+    });
+
+    await updateRetentionFromSession(db, profileId, topicId, 5);
+
+    expect(capturedWhere).not.toBeNull();
+    const { PgDialect } = await import('drizzle-orm/pg-core');
+    const dialect = new PgDialect();
+    const rendered = dialect.sqlToQuery(capturedWhere as never).sql;
+
+    // guard: none — no updated_at equality predicate in the WHERE clause.
+    expect(rendered).not.toMatch(/"updated_at"\s*=\s*\$\d+/);
+  });
 });
 
 // ---------------------------------------------------------------------------

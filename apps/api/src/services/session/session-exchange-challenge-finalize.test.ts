@@ -110,6 +110,9 @@ interface FakeDbState {
   masteryInserts: Array<Record<string, unknown>>;
   deepeningRows: DeepeningRow[];
   deepeningInsertCount: number;
+  // [WI-1445] retention_cards row touched by persistChallengeRoundMasteryEvidence's
+  // updateRetentionFromSession seed write. undefined until auto-created.
+  retentionCard?: Record<string, unknown>;
   // session_events rows readable by validateEvaluationEventIds when finalize
   // re-fetches DB-verified answer content before terminal writes. Omitted uses
   // the default durable ANSWER_EVENT_ID row; explicit [] models the same-turn /
@@ -219,51 +222,106 @@ function makeFakeDb(state: FakeDbState): Database {
   // routes its needsDeepeningTopics read + update/insert loop through `tx`, so
   // the tx must expose the same insert/update/query surface as the top-level db.
   const insertHandler = (_table: unknown) => ({
-    values: async (vals: Record<string, unknown>) => {
-      // Distinguish assessments vs needs_deepening_topics by the columns.
-      if ('masteryChallengeVerifiedAt' in vals) {
-        if (state.failNextMasteryInsert) {
-          state.failNextMasteryInsert = false;
-          throw new Error('transient mastery insert failure');
+    values: (vals: Record<string, unknown>) => {
+      const runInsert = async () => {
+        // Distinguish assessments / needs_deepening_topics / retention_cards
+        // by their distinctive columns.
+        if ('masteryChallengeVerifiedAt' in vals) {
+          if (state.failNextMasteryInsert) {
+            state.failNextMasteryInsert = false;
+            throw new Error('transient mastery insert failure');
+          }
+          state.masteryInserts.push(vals);
+        } else if ('source' in vals && vals.source === 'challenge_round') {
+          if (state.failNextDeepeningInsert) {
+            state.failNextDeepeningInsert = false;
+            throw new Error('transient deepening insert failure');
+          }
+          state.deepeningInsertCount += 1;
+          state.deepeningRows.push({
+            id: `ndt-${state.deepeningRows.length + 1}`,
+            profileId: vals.profileId as string,
+            subjectId: vals.subjectId as string,
+            topicId: vals.topicId as string,
+            status: (vals.status as string) ?? 'pending_review',
+            source: 'challenge_round',
+            concept: (vals.concept as string) ?? null,
+            misconception: (vals.misconception as string) ?? null,
+            correction: (vals.correction as string) ?? null,
+            updatedAt: new Date(),
+            createdAt: new Date(),
+          });
+        } else if ('easeFactor' in vals) {
+          // [WI-1445] insertRetentionCardIfAbsent — onConflictDoNothing
+          // semantics: only seed state.retentionCard if absent.
+          if (!state.retentionCard) {
+            state.retentionCard = {
+              id: 'retention-card-1',
+              profileId: vals.profileId as string,
+              topicId: vals.topicId as string,
+              easeFactor: (vals.easeFactor as number) ?? 2.5,
+              intervalDays: (vals.intervalDays as number) ?? 1,
+              repetitions: (vals.repetitions as number) ?? 0,
+              failureCount: (vals.failureCount as number) ?? 0,
+              consecutiveSuccesses: (vals.consecutiveSuccesses as number) ?? 0,
+              xpStatus: (vals.xpStatus as string) ?? 'pending',
+              lastReviewedAt: null,
+              nextReviewAt: null,
+              masteredAt: null,
+              evaluateDifficultyRung: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+          }
         }
-        state.masteryInserts.push(vals);
-      } else if ('source' in vals && vals.source === 'challenge_round') {
-        if (state.failNextDeepeningInsert) {
-          state.failNextDeepeningInsert = false;
-          throw new Error('transient deepening insert failure');
-        }
-        state.deepeningInsertCount += 1;
-        state.deepeningRows.push({
-          id: `ndt-${state.deepeningRows.length + 1}`,
-          profileId: vals.profileId as string,
-          subjectId: vals.subjectId as string,
-          topicId: vals.topicId as string,
-          status: (vals.status as string) ?? 'pending_review',
-          source: 'challenge_round',
-          concept: (vals.concept as string) ?? null,
-          misconception: (vals.misconception as string) ?? null,
-          correction: (vals.correction as string) ?? null,
-          updatedAt: new Date(),
-          createdAt: new Date(),
-        });
-      }
-      return undefined;
+        return undefined;
+      };
+      // Lazy: real code either awaits `.values(vals)` directly (assessments,
+      // needs_deepening_topics) or chains `.onConflictDoNothing(...)`
+      // (retention_cards). Only whichever is actually awaited runs the
+      // insert — never both, so the effect fires exactly once either way.
+      return {
+        then: (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
+          runInsert().then(resolve, reject),
+        onConflictDoNothing: (_opts?: unknown) => runInsert(),
+      };
     },
   });
 
-  // update() serves two call shapes:
+  // update() serves three call shapes:
   //   - session-metadata persist: .set({metadata}).where().returning() → [row]
+  //   - retention_cards SM-2 write: .set({easeFactor/nextReviewAt/...}).where().returning() → [{id}]
   //   - needsDeepeningTopics update: .set({...}).where() awaited directly
   const updateHandler = () => ({
-    set: (vals: { metadata?: Record<string, unknown> }) => {
+    set: (vals: Record<string, unknown>) => {
+      if (vals.metadata !== undefined) {
+        const whereResult = {
+          returning: async () => {
+            state.sessionMetadata = vals.metadata as Record<string, unknown>;
+            return [fullSessionRow(state.sessionMetadata)];
+          },
+          then: (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
+            Promise.resolve(undefined).then(resolve, reject),
+        };
+        return { where: () => whereResult };
+      }
+      if ('easeFactor' in vals || 'nextReviewAt' in vals) {
+        // [WI-1445] applyRetentionUpdate — ignores the guard predicate (these
+        // tests never exercise the optimistic-lock conflict path) and always
+        // succeeds against the seeded retentionCard.
+        const whereResult = {
+          returning: async () => {
+            if (!state.retentionCard) return [];
+            state.retentionCard = { ...state.retentionCard, ...vals };
+            return [{ id: state.retentionCard.id }];
+          },
+          then: (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
+            Promise.resolve(undefined).then(resolve, reject),
+        };
+        return { where: () => whereResult };
+      }
+      // needsDeepeningTopics update — awaited directly, no .returning().
       const whereResult = {
-        returning: async () => {
-          if (vals.metadata) {
-            state.sessionMetadata = vals.metadata;
-          }
-          return [fullSessionRow(state.sessionMetadata)];
-        },
-        // Awaited-directly form (needsDeepeningTopics update has no .returning()).
         then: (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
           Promise.resolve(undefined).then(resolve, reject),
       };
@@ -289,27 +347,74 @@ function makeFakeDb(state: FakeDbState): Database {
     sessionEvents: {
       findMany: async () => state.sessionEventRows ?? defaultSessionEventRows(),
     },
+    // [WI-1445] ensureRetentionCard / updateRetentionFromSession's scoped-repo
+    // read route here. Ignores the opaque WHERE (single fixture profile/topic
+    // per test) and returns the current seeded card, if any.
+    retentionCards: {
+      findFirst: async () => state.retentionCard ?? undefined,
+    },
   };
+
+  // Unified select chain: `.select().from()` supports BOTH continuations real
+  // call sites use — `.where()` (the session-metadata claim read) and
+  // `.innerJoin()` (findOwnedCurriculumTopic's ownership join, used directly
+  // by persistChallengeRoundMasteryEvidence AND again inside
+  // ensureRetentionCard/updateRetentionFromSession's own ownership check).
+  function makeSelectChain() {
+    const ownershipNode: {
+      innerJoin: () => typeof ownershipNode;
+      where: () => typeof ownershipNode;
+      limit: () => Promise<Record<string, unknown>[]>;
+    } = {
+      innerJoin: () => ownershipNode,
+      where: () => ownershipNode,
+      limit: async () =>
+        state.topicNotOwned
+          ? []
+          : [
+              {
+                topicId: TOPIC_ID,
+                topicTitle: 'T',
+                topicDescription: null,
+                topicChapter: null,
+                topicEstimatedMinutes: null,
+                bookId: 'book-1',
+                bookTitle: 'B',
+                curriculumId: 'cur-1',
+                subjectId: SUBJECT_ID,
+                topicSource: 'manual',
+                subjectName: 'S',
+                subjectPedagogyMode: null,
+                subjectLanguageCode: null,
+              },
+            ],
+    };
+    const metadataNode = {
+      for: () => ({
+        limit: async () => [{ metadata: state.sessionMetadata }],
+      }),
+      // persistSessionMetadata uses .for('update') too; some callers omit
+      // .for — support a bare .limit as well for safety.
+      limit: async () => [{ metadata: state.sessionMetadata }],
+    };
+    return {
+      from: () => ({
+        innerJoin: () => ownershipNode,
+        where: () => metadataNode,
+      }),
+    };
+  }
 
   // The session-metadata claim/persist transaction:
   //   tx.select({metadata}).from(learningSessions).where().for('update').limit(1)
   //   then tx.update(learningSessions).set().where().returning()
   // [WI-1060] also serves persistChallengeRoundReviewTargets's read+write loop,
-  // so the tx exposes insert + query + the scoped-repo read surface too.
+  // [WI-1445] and persistChallengeRoundMasteryEvidence's retention-card seed —
+  // so the tx exposes the same select/insert/update/query surface as the
+  // top-level db.
   function makeTx() {
     return {
-      select: () => ({
-        from: () => ({
-          where: () => ({
-            for: () => ({
-              limit: async () => [{ metadata: state.sessionMetadata }],
-            }),
-            // persistSessionMetadata uses .for('update') too; some callers
-            // omit .for — support a bare .limit as well for safety.
-            limit: async () => [{ metadata: state.sessionMetadata }],
-          }),
-        }),
-      }),
+      select: makeSelectChain,
       update: updateHandler,
       insert: insertHandler,
       query: queryHandler,
@@ -321,7 +426,7 @@ function makeFakeDb(state: FakeDbState): Database {
       fn(makeTx()),
 
     // findOwnedCurriculumTopic entry point.
-    select: () => ownedTopicSelect,
+    select: makeSelectChain,
 
     insert: insertHandler,
 
