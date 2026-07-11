@@ -56,6 +56,10 @@ describe('homeHrefForReturnTo', () => {
     expect(homeHrefForReturnTo(PRACTICE_RETURN_TO)).toBe(PRACTICE_HREF);
   });
 
+  it('returns the journal href when returnTo is journal', () => {
+    expect(homeHrefForReturnTo('journal')).toBe('/(app)/journal');
+  });
+
   it('resolves Family and Study context return tokens', () => {
     expect(homeHrefForReturnTo(FAMILY_RECAPS_RETURN_TO)).toBe(
       FAMILY_RECAPS_HREF,
