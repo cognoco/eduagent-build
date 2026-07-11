@@ -5,7 +5,8 @@
 // that expose parent-scoped endpoints (e.g., learner-profile child routes).
 // Route files must not import ORM primitives or schema tables directly.
 
-import { type Database } from '@eduagent/database';
+import { eq } from 'drizzle-orm';
+import { login, type Database } from '@eduagent/database';
 import { ForbiddenError } from '../errors';
 import { calculateAge } from './age-utils';
 import type { ProfileMeta } from '../middleware/profile-scope';
@@ -60,6 +61,27 @@ export async function assertParentAccess(
     parentProfileId,
     childProfileId,
   );
+}
+
+/**
+ * Operational guardian access is suppressed once the charge has their own
+ * Login. Consent-authority is the explicit exception and must not call this
+ * guard (MMT-ADR-0008; OPQ-32).
+ */
+export async function assertChargeNotCredentialed(
+  db: Database,
+  chargePersonId: string,
+): Promise<void> {
+  const [credential] = await db
+    .select({ personId: login.personId })
+    .from(login)
+    .where(eq(login.personId, chargePersonId))
+    .limit(1);
+  if (credential) {
+    throw new ForbiddenError(
+      'Guardians cannot access a credentialed charge through managed-child surfaces.',
+    );
+  }
 }
 
 /**

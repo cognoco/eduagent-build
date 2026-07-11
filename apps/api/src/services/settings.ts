@@ -23,7 +23,10 @@ import type {
   NotificationPayload,
 } from '@eduagent/schemas';
 import { ForbiddenError } from '@eduagent/schemas';
-import { assertParentAccess } from './family-access';
+import {
+  assertChargeNotCredentialed,
+  assertParentAccess,
+} from './family-access';
 import {
   verifyPersonOwnershipV2,
   verifyPersonIsOrgAdminV2,
@@ -287,6 +290,7 @@ export async function getChildCelebrationLevel(
   childProfileId: string,
 ): Promise<CelebrationLevel> {
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   const row = await db.query.learningProfiles.findFirst({
     where: eq(learningProfiles.profileId, childProfileId),
   });
@@ -330,6 +334,7 @@ export async function upsertChildCelebrationLevel(
   celebrationLevel: CelebrationLevel,
 ): Promise<{ celebrationLevel: CelebrationLevel }> {
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   const existing = await db.query.learningProfiles.findFirst({
     where: eq(learningProfiles.profileId, childProfileId),
   });

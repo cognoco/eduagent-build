@@ -7,7 +7,10 @@ import {
   topicNotes,
   type Database,
 } from '@eduagent/database';
-import { assertParentAccess } from './family-access';
+import {
+  assertChargeNotCredentialed,
+  assertParentAccess,
+} from './family-access';
 import { assertChildDashboardDataVisible } from './dashboard';
 import {
   resolveMasteryVerificationState,
@@ -61,6 +64,7 @@ export async function getLatestVerifiedProofForChild(
   childProfileId: string,
 ): Promise<VerifiedProofReceipt> {
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   await assertChildDashboardDataVisible(db, childProfileId);
 
   const [latest] = await db

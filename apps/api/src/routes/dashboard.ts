@@ -45,6 +45,7 @@ import {
   markWeeklyReportViewed,
 } from '../services/weekly-report';
 import {
+  assertChargeNotCredentialed,
   assertOwnerAndParentAccess,
   assertOwnerProfile,
   assertParentAccess,
@@ -211,15 +212,6 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       // Defense-in-depth: route-entry parent-link check before the service.
       // getChildTopicSnapshotForParent also runs the same guard.
       await assertParentAccess(db, parentProfileId, childProfileId);
-
-      const snapshot = await getChildTopicSnapshotForParent(
-        db,
-        parentProfileId,
-        childProfileId,
-        topicId,
-      );
-      if (!snapshot) return notFound(c, 'Topic not found');
-      return c.json(childTopicSnapshotResponseSchema.parse({ snapshot }));
     } catch (error) {
       if (error instanceof ForbiddenError) {
         // Audit-log unauthorized parent-link probes. The 404 hides topic
@@ -236,6 +228,16 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       }
       throw error;
     }
+
+    await assertChargeNotCredentialed(db, childProfileId);
+    const snapshot = await getChildTopicSnapshotForParent(
+      db,
+      parentProfileId,
+      childProfileId,
+      topicId,
+    );
+    if (!snapshot) return notFound(c, 'Topic not found');
+    return c.json(childTopicSnapshotResponseSchema.parse({ snapshot }));
   })
 
   // List child's sessions
@@ -300,6 +302,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertChargeNotCredentialed(db, childProfileId);
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const projection = await getMemoryProjection(db, childProfileId, {

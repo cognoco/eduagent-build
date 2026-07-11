@@ -155,7 +155,11 @@ function createMockDb({
   const guardianshipRow = hasParentLink
     ? { id: 'guard-1', revokedAt: null }
     : undefined;
+  const loginLimit = jest.fn().mockResolvedValue([]);
+  const loginWhere = jest.fn().mockReturnValue({ limit: loginLimit });
+  const loginFrom = jest.fn().mockReturnValue({ where: loginWhere });
   return {
+    select: jest.fn().mockReturnValue({ from: loginFrom }),
     query: {
       monthlyReports: {
         findMany: jest.fn().mockResolvedValue(findManyResult),
@@ -1350,8 +1354,12 @@ describe('markMonthlyReportViewed', () => {
     const mockWhere = jest.fn().mockResolvedValue(undefined);
     const mockSet = jest.fn().mockReturnValue({ where: mockWhere });
     const mockUpdate = jest.fn().mockReturnValue({ set: mockSet });
+    const loginLimit = jest.fn().mockResolvedValue([]);
+    const loginWhere = jest.fn().mockReturnValue({ limit: loginLimit });
+    const loginFrom = jest.fn().mockReturnValue({ where: loginWhere });
 
     const db = {
+      select: jest.fn().mockReturnValue({ from: loginFrom }),
       query: {
         guardianship: {
           findFirst: jest
