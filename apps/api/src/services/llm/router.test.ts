@@ -697,7 +697,7 @@ describe('LLM Router', () => {
           surface: 'llm-router',
           signal: 'provider-fallback',
           reason: 'stream-error',
-          provider: 'gemini',
+          provider: result.provider,
           fallbackProvider: 'openai',
           capability: 'text',
         },
@@ -845,7 +845,8 @@ describe('LLM Router', () => {
     it('captures a safe signal when an open primary stream circuit uses fallback', async () => {
       _clearProviders();
       _resetCircuits();
-      registerProvider(createFailingStreamProvider('gemini'));
+      const failingPrimary = createFailingStreamProvider('gemini');
+      registerProvider(failingPrimary);
 
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       try {
@@ -883,7 +884,7 @@ describe('LLM Router', () => {
           expect.objectContaining({
             tags: expect.objectContaining({
               reason: 'primary-circuit-open',
-              provider: 'gemini',
+              provider: failingPrimary.id,
               fallbackProvider: 'openai',
             }),
           }),
@@ -1077,7 +1078,7 @@ describe('LLM Router', () => {
             surface: 'llm-router',
             signal: 'provider-fallback',
             reason: 'primary-error',
-            provider: 'gemini',
+            provider: flaky.id,
             fallbackProvider: 'openai',
             capability: 'text',
           },
@@ -1099,7 +1100,8 @@ describe('LLM Router', () => {
     it('captures a safe signal when an open primary circuit routes directly to fallback', async () => {
       _clearProviders();
       _resetCircuits();
-      registerProvider(createFailingStreamProvider('gemini'));
+      const failingPrimary = createFailingStreamProvider('gemini');
+      registerProvider(failingPrimary);
 
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       try {
@@ -1134,7 +1136,7 @@ describe('LLM Router', () => {
           expect.objectContaining({
             tags: expect.objectContaining({
               reason: 'primary-circuit-open',
-              provider: 'gemini',
+              provider: failingPrimary.id,
               fallbackProvider: 'openai',
             }),
           }),
