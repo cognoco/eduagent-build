@@ -37,7 +37,7 @@ import { matchBarIntent } from '../../lib/bar-intent-match';
 import { hasFirstRealState } from '../../lib/first-real-state';
 import {
   pushAddChildForSupport,
-  pushLinkNewForManagedPerson,
+  pushLinkInitiateForManagedPerson,
 } from '../../lib/navigation';
 import { pushNowDeepLink } from '../../lib/now-deep-link';
 import { useScopeContext } from '../../lib/scope-context';
@@ -393,7 +393,7 @@ export default function MentorScreen(): React.ReactElement {
   const openScopedJournal = (scope: (typeof personScopes)[number]): void =>
     openScopedRoute(scope, '/(app)/journal');
   const handleSelectEligiblePerson = (person: EligibleManagedPerson): void =>
-    pushLinkNewForManagedPerson(router, person);
+    pushLinkInitiateForManagedPerson(router, person);
   const handleAddChildFallback = (): void => pushAddChildForSupport(router);
 
   if (activeScope.kind === 'supporter-hub') {

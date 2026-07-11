@@ -197,24 +197,24 @@ export function pushChildReports(
 }
 
 /**
- * [WI-1393] Push a managed person (an owner's linked, not-yet-supported
- * child) into the link-ceremony create screen. `link/new` is a
- * `FULL_SCREEN_ROUTES` entry with no nested dynamic child (its sibling
- * `link/[contractId]` is a separate leaf, not a descendant) — a single push
- * is enough, matching the direct-push precedent already used for
- * quiz/dictation/homework-camera from Mentor.
+ * [WI-1393, renamed WI-1137] Push a managed person (an owner's linked,
+ * not-yet-supported child) into the link-ceremony initiate screen.
+ * `link/initiate` is a `FULL_SCREEN_ROUTES` entry with no nested dynamic
+ * child (its sibling `link/[contractId]` is a separate leaf, not a
+ * descendant) — a single push is enough, matching the direct-push precedent
+ * already used for quiz/dictation/homework-camera from Mentor.
  *
  * `relation: 'parent'` reflects the only relationship this MVP entry point
  * expresses: the adult account owner starting a support link for their own
- * linked child. Cross-account / non-owner relations are out of scope
- * (deferred follow-on WI).
+ * linked child. Cross-account / non-owner relations reach the same screen's
+ * inline picker (WI-1137) instead.
  */
-export function pushLinkNewForManagedPerson(
+export function pushLinkInitiateForManagedPerson(
   router: Pick<Router, 'push'>,
   person: { id: string; displayName: string },
 ): void {
   router.push({
-    pathname: '/(app)/link/new',
+    pathname: '/(app)/link/initiate',
     params: {
       supporteePersonId: person.id,
       supporteeName: person.displayName,
@@ -226,9 +226,10 @@ export function pushLinkNewForManagedPerson(
 /**
  * [WI-1393] Graceful degrade for the "start supporting" picker when there
  * are zero eligible managed persons: guide the owner to add a child first
- * instead of pushing `/link/new` param-less (which would land on its
- * missing-param `ErrorFallback`). Mirrors the add-child destination used by
- * `AccountAdminSheet`'s "Add child" row.
+ * instead of pushing `/link/initiate` param-less (which would land on that
+ * screen's own inline picker instead — this helper skips straight to
+ * add-child from the SupportHub anchors). Mirrors the add-child destination
+ * used by `AccountAdminSheet`'s "Add child" row.
  */
 export function pushAddChildForSupport(router: Pick<Router, 'push'>): void {
   router.push({

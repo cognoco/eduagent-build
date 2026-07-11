@@ -257,7 +257,7 @@ describe('SupportHubMentorTab', () => {
   // WI-1393: the persistent header "Start supporting" anchor (A2) opens the
   // eligible-person picker and, once a person is selected, hands it to the
   // caller-provided navigation callback — proving the forward trigger into
-  // /(app)/link/new actually fires (never a dead-end, never param-less).
+  // /(app)/link/initiate actually fires (never a dead-end, never param-less).
   it('opens the eligible-person picker from the header anchor and forwards the selection', () => {
     const onSelectEligiblePerson = jest.fn();
 
@@ -285,7 +285,7 @@ describe('SupportHubMentorTab', () => {
   });
 
   // WI-1393 AC2: with zero eligible persons, the cold-start empty-state anchor
-  // (A1) must guide the owner to add a child instead of reaching /link/new
+  // (A1) must guide the owner to add a child instead of reaching /link/initiate
   // param-less.
   it('degrades the cold-start empty state to add-a-child when there are no eligible persons', () => {
     const onAddChildFallback = jest.fn();

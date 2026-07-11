@@ -435,10 +435,10 @@ describe('MentorScreen', () => {
   });
 
   // WI-1393: the V2 shell previously had zero forward navigation to
-  // /(app)/link/new — this proves the cold-start empty-state anchor (A1)
+  // /(app)/link/initiate — this proves the cold-start empty-state anchor (A1)
   // actually reaches it with a supporteePersonId, so the missing-param
   // ErrorFallback on that screen is never hit from this trigger.
-  it('[WI-1393] reaches /(app)/link/new with supporteePersonId via the empty-state picker when an eligible managed person exists', () => {
+  it('[WI-1393] reaches /(app)/link/initiate with supporteePersonId via the empty-state picker when an eligible managed person exists', () => {
     mockScopeContext = {
       activeScope: { kind: 'supporter-hub' },
       availableScopes: [],
@@ -458,7 +458,7 @@ describe('MentorScreen', () => {
     );
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/link/new',
+      pathname: '/(app)/link/initiate',
       params: {
         supporteePersonId: NAMED_PROFILES.linkedChild.id,
         supporteeName: NAMED_PROFILES.linkedChild.displayName,
@@ -468,7 +468,7 @@ describe('MentorScreen', () => {
   });
 
   // WI-1393 AC2: zero eligible managed persons must degrade to add-a-child,
-  // never a param-less push to /(app)/link/new.
+  // never a param-less push to /(app)/link/initiate.
   it('[WI-1393] degrades to add-a-child when there are zero eligible managed persons', () => {
     mockScopeContext = {
       activeScope: { kind: 'supporter-hub' },
@@ -490,7 +490,7 @@ describe('MentorScreen', () => {
       params: { for: 'child' },
     });
     expect(mockPush).not.toHaveBeenCalledWith(
-      expect.objectContaining({ pathname: '/(app)/link/new' }),
+      expect.objectContaining({ pathname: '/(app)/link/initiate' }),
     );
   });
 });

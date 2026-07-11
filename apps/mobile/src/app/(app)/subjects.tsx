@@ -16,7 +16,7 @@ import {
 import { useSubjectsIndex } from '../../hooks/use-subjects-index';
 import {
   pushAddChildForSupport,
-  pushLinkNewForManagedPerson,
+  pushLinkInitiateForManagedPerson,
 } from '../../lib/navigation';
 import { useScopeContext } from '../../lib/scope-context';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
@@ -75,7 +75,7 @@ export default function SubjectsScreen(): React.ReactElement {
 
   if (activeScope.kind === 'supporter-hub') {
     const handleSelectEligiblePerson = (person: EligibleManagedPerson): void =>
-      pushLinkNewForManagedPerson(router, person);
+      pushLinkInitiateForManagedPerson(router, person);
     const handleAddChildFallback = (): void => pushAddChildForSupport(router);
 
     return (

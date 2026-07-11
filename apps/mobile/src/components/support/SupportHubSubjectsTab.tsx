@@ -13,7 +13,7 @@ interface SupportHubSubjectsTabProps {
   onOpenPersonScope: (scope: PersonScope) => void;
   /** WI-1393 — managed persons without an existing visibility contract. */
   eligiblePersons?: readonly EligibleManagedPerson[];
-  /** WI-1393 — navigates to `/(app)/link/new` with the selected person. */
+  /** WI-1393 — navigates to `/(app)/link/initiate` with the selected person. */
   onSelectEligiblePerson?: (person: EligibleManagedPerson) => void;
   /** WI-1393 — 0-eligible degrade: guides the owner to add a child first. */
   onAddChildFallback?: () => void;

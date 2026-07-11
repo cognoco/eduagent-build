@@ -4393,7 +4393,13 @@
       "revoking": "Finalizando uso compartido...",
       "revoked": "El uso compartido está finalizando. El mentor verá un aviso.",
       "revokeErrorTitle": "No se pudo dejar de compartir",
-      "missingActor": "No pudimos identificar a la persona activa."
+      "missingActor": "No pudimos identificar a la persona activa.",
+      "relationLabel": "Relación",
+      "pickerTitle": "¿Con quién quieres compartir tu progreso?",
+      "pickerManagedEmpty": "Aún no hay niños elegibles.",
+      "pickerExistingTeenOption": "Familiar existente (13+)",
+      "existingTeenUnavailableTitle": "Aún no disponible",
+      "existingTeenUnavailableMessage": "La opción de invitar a un familiar existente aún no está disponible. Vuelve a intentarlo pronto."
     }
   },
   "supporterColdStart": {

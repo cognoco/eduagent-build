@@ -16,7 +16,7 @@ interface SupportPersonPickerSheetProps {
  * WI-1393 — the "start supporting" picker opened from the V2 support-hub
  * anchors (cold-start empty state, persistent header action, Subjects empty
  * state). Lists managed persons without an existing visibility contract;
- * selecting one carries `supporteePersonId` into `/(app)/link/new` so that
+ * selecting one carries `supporteePersonId` into `/(app)/link/initiate` so that
  * screen's missing-param `ErrorFallback` is never reached from these
  * anchors. When there are zero eligible persons, degrades to an "add a
  * child" affordance instead of dead-ending.
