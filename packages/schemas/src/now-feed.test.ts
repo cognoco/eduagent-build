@@ -59,6 +59,7 @@ describe('now feed schemas', () => {
 
   it('defines every S0 and S4 card kind', () => {
     expect(nowCardKindSchema.options).toEqual([
+      'billing_alert',
       'unfinished_session',
       'retention_due',
       'parked_item',

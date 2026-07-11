@@ -4,6 +4,7 @@ export const nowScopeSchema = z.enum(['self', 'supporter-hub', 'person']);
 export type NowScope = z.infer<typeof nowScopeSchema>;
 
 export const nowCardKindSchema = z.enum([
+  'billing_alert',
   'unfinished_session',
   'retention_due',
   'parked_item',
@@ -15,6 +16,9 @@ export const nowCardKindSchema = z.enum([
 export type NowCardKind = z.infer<typeof nowCardKindSchema>;
 
 export const nowDeepLinkRouteSchema = z.enum([
+  'settings.more',
+  'settings.account',
+  'billing.manage',
   'session.resume',
   'session.summary',
   'subject.topic',

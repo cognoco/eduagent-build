@@ -1,87 +1,217 @@
-// @inngest-admin: no-db (logging observer; no DB access)
-// ---------------------------------------------------------------------------
-// Payment Failed Observe — observable terminus for the app/payment.failed
-// event emitted by Stripe and RevenueCat webhook handlers when a subscription
-// transitions to past_due status. [AUDIT-INNGEST-1 / 2026-05-01]
-//
-// Pre-fix: both webhooks emitted app/payment.failed with no Inngest listener,
-// with a comment claiming the event was "consumed by observability tooling."
-// In practice this meant the events fired into the void — the Inngest
-// dashboard could not query them and there was no structured-log terminus,
-// so a real retry/notify/dunning strategy could not be built without first
-// rediscovering every send site. This violates the AGENTS.md "Silent
-// recovery without escalation" rule.
-//
-// This handler is the queryable terminus, following the same pattern as
-// trial-expiry-failure-observe.ts. A real retry/notify/dunning strategy is
-// intentionally deferred — the structured log + return-shape contract is
-// enough to make the failure stream observable today.
-//
-// Event payload shapes (current senders):
-//   Stripe (apps/api/src/routes/stripe-webhook.ts):
-//     { subscriptionId, stripeSubscriptionId, accountId, attempt, timestamp }
-//   RevenueCat (apps/api/src/routes/revenuecat-webhook.ts):
-//     { subscriptionId, accountId, source: 'revenuecat', timestamp }
-// ---------------------------------------------------------------------------
+// @inngest-admin: event-profile (subscriptionId resolves canonical payer)
+import {
+  billingAlertDeliveryFailedEventSchema,
+  paymentFailedEventSchema,
+  summarizeRawPayload,
+} from '@eduagent/schemas';
 
-import { z } from 'zod';
-import { inngest } from '../client';
+import {
+  getBillingAlertDeliveryTarget,
+  recordBillingAlertDeliveryOutcome,
+  recordPaymentFailedAlert,
+  type PaymentFailureSource,
+} from '../../services/billing/payment-failed-alert';
 import { createLogger } from '../../services/logger';
-import { summarizeRawPayload } from '@eduagent/schemas';
+import {
+  formatPaymentFailedEmail,
+  sendEmail,
+  sendPushNotification,
+} from '../../services/notifications';
+import { inngest } from '../client';
+import {
+  getStepDatabase,
+  getStepEmailFrom,
+  getStepResendApiKey,
+} from '../helpers';
 
 const logger = createLogger();
 
-// Validates event payload shape so schema drift is detected as a structured
-// error rather than silently returning null fields. Matches AUDIT-INNGEST-1
-// pattern. All fields are optional because both senders (Stripe + RevenueCat)
-// provide different subsets.
-const paymentFailedPayloadSchema = z.object({
-  subscriptionId: z.string().optional(),
-  stripeSubscriptionId: z.string().optional(),
-  accountId: z.string().optional(),
-  attempt: z.number().optional(),
-  source: z.string().optional(),
-  timestamp: z.string().optional(),
-});
+function resolveSource(data: {
+  source?: 'stripe' | 'revenuecat';
+  stripeSubscriptionId?: string;
+}): PaymentFailureSource {
+  return data.source ?? (data.stripeSubscriptionId ? 'stripe' : 'unknown');
+}
+
+function fallbackSourceEventId(
+  data: {
+    subscriptionId: string;
+    timestamp: string | Date;
+    attempt?: number;
+  },
+  source: PaymentFailureSource,
+): string {
+  const timestamp =
+    data.timestamp instanceof Date
+      ? data.timestamp.toISOString()
+      : data.timestamp;
+  return [
+    'payment-failed',
+    source,
+    data.subscriptionId,
+    timestamp,
+    data.attempt ?? 'none',
+  ].join(':');
+}
 
 export const paymentFailedObserve = inngest.createFunction(
   {
     id: 'payment-failed-observe',
-    name: 'Payment failure observability',
+    name: 'Notify payer of payment failure',
+    idempotency: 'event.id',
   },
   { event: 'app/payment.failed' },
-  async ({ event }) => {
-    const parseResult = paymentFailedPayloadSchema.safeParse(event.data);
-    if (!parseResult.success) {
+  async ({ event, step }) => {
+    const parsed = paymentFailedEventSchema.safeParse(event.data);
+    if (!parsed.success) {
       logger.error('billing.payment_failed.schema_drift', {
-        issues: parseResult.error.issues,
+        issues: parsed.error.issues,
         rawData: summarizeRawPayload(event.data),
       });
       return { status: 'schema_error' as const };
     }
-    const data = parseResult.data;
 
-    const source =
-      data.source ?? (data.stripeSubscriptionId ? 'stripe' : 'unknown');
+    const data = parsed.data;
+    const source = resolveSource(data);
+    const sourceEventId = event.id ?? fallbackSourceEventId(data, source);
+    const occurredAt = new Date(data.timestamp);
 
     logger.error('billing.payment_failed.received', {
       source,
-      subscriptionId: data.subscriptionId ?? null,
-      stripeSubscriptionId: data.stripeSubscriptionId ?? null,
-      accountId: data.accountId ?? null,
+      subscriptionId: data.subscriptionId,
       attempt: data.attempt ?? null,
-      eventTimestamp: data.timestamp ?? null,
-      receivedAt: new Date().toISOString(),
+      eventTimestamp: occurredAt.toISOString(),
     });
 
+    const persisted = await step.run('persist-billing-alert', async () => {
+      const db = getStepDatabase();
+      return recordPaymentFailedAlert(db, {
+        subscriptionId: data.subscriptionId,
+        sourceEventId,
+        source,
+        occurredAt,
+      });
+    });
+
+    // A distinct run that loses the unique source-event race must not fan out.
+    // Retries of the *same* Inngest run resume with the memoized inserted=true
+    // step result and continue into any channel step that has not completed.
+    if (!persisted.inserted) {
+      return {
+        status: 'deduplicated' as const,
+        alertId: persisted.alertId,
+      };
+    }
+
+    const deliveryState = await step.run(
+      'load-billing-alert-delivery-state',
+      async () => {
+        const db = getStepDatabase();
+        const target = await getBillingAlertDeliveryTarget(
+          db,
+          persisted.alertId,
+        );
+        if (!target) {
+          throw new Error('billing alert delivery target not found');
+        }
+        // Never return the email address into Inngest step state.
+        return {
+          payerPersonId: target.payerPersonId,
+        };
+      },
+    );
+
+    const push = await step.run('send-payment-failed-push', async () => {
+      const db = getStepDatabase();
+      return sendPushNotification(
+        db,
+        {
+          profileId: deliveryState.payerPersonId,
+          title: 'Payment needs attention',
+          body: 'Update your payment method to restore your MentoMate plan.',
+          type: 'payment_failed',
+          data: { payerPersonId: deliveryState.payerPersonId },
+        },
+        { skipDailyCap: true, bypassPreferenceCheck: true },
+      );
+    });
+
+    await step.run('record-payment-failed-push-outcome', async () => {
+      const db = getStepDatabase();
+      await recordBillingAlertDeliveryOutcome(db, {
+        alertId: persisted.alertId,
+        channel: 'push',
+        sent: push.sent,
+        ...(push.reason ? { reason: push.reason } : {}),
+      });
+    });
+    if (!push.sent) {
+      const failure = billingAlertDeliveryFailedEventSchema.parse({
+        alertId: persisted.alertId,
+        subscriptionId: data.subscriptionId,
+        channel: 'push',
+        reason: push.reason ?? 'unknown',
+        timestamp: new Date().toISOString(),
+      });
+      await step.sendEvent('escalate-payment-failed-push', {
+        id: `${sourceEventId}:push-delivery-failed`,
+        name: 'app/billing.alert_delivery_failed',
+        data: failure,
+      });
+    }
+
+    const email = await step.run('send-payment-failed-email', async () => {
+      const db = getStepDatabase();
+      const target = await getBillingAlertDeliveryTarget(db, persisted.alertId);
+      if (!target) {
+        throw new Error('billing alert delivery target not found');
+      }
+      if (!target.email) {
+        return { sent: false, reason: 'no_email' };
+      }
+      const manageBillingUrl =
+        'mentomate://billing/manage?payerPersonId=' +
+        encodeURIComponent(target.payerPersonId);
+      return sendEmail(
+        formatPaymentFailedEmail(target.email, manageBillingUrl),
+        {
+          db,
+          resendApiKey: getStepResendApiKey(),
+          emailFrom: getStepEmailFrom(),
+          idempotencyKey: sourceEventId,
+        },
+      );
+    });
+
+    await step.run('record-payment-failed-email-outcome', async () => {
+      const db = getStepDatabase();
+      await recordBillingAlertDeliveryOutcome(db, {
+        alertId: persisted.alertId,
+        channel: 'email',
+        sent: email.sent,
+        ...(email.reason ? { reason: email.reason } : {}),
+      });
+    });
+    if (!email.sent) {
+      const failure = billingAlertDeliveryFailedEventSchema.parse({
+        alertId: persisted.alertId,
+        subscriptionId: data.subscriptionId,
+        channel: 'email',
+        reason: email.reason ?? 'unknown',
+        timestamp: new Date().toISOString(),
+      });
+      await step.sendEvent('escalate-payment-failed-email', {
+        id: `${sourceEventId}:email-delivery-failed`,
+        name: 'app/billing.alert_delivery_failed',
+        data: failure,
+      });
+    }
+
     return {
-      status: 'logged' as const,
-      source,
-      subscriptionId: data.subscriptionId ?? null,
-      stripeSubscriptionId: data.stripeSubscriptionId ?? null,
-      accountId: data.accountId ?? null,
-      attempt: data.attempt ?? null,
-      retryDeferred: 'pending_payment_failed_retry_strategy',
+      status: 'processed' as const,
+      alertId: persisted.alertId,
+      push,
+      email,
     };
   },
 );

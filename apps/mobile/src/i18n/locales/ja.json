@@ -3939,7 +3939,14 @@
         "cta": "開く"
       },
       "complete": "完了",
-      "dismissIcon": "x"
+      "dismissIcon": "x",
+      "billing_alert": {
+        "title": "お支払いの確認が必要です",
+        "cta": "お支払い管理",
+        "currentAccess": "有料プランは{{deadline}}まで有効です。",
+        "freeFallback": "現在、無料プランをご利用中です。プランを復元するには、お支払い情報を更新してください。",
+        "currentAccessNoDeadline": "有料アクセスはまだ有効です。"
+      }
     },
     "ledger": {
       "label": "学習の記録",

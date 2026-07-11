@@ -90,4 +90,26 @@ describe('decideNotificationTapNavigation', () => {
       }),
     ).toEqual({ kind: 'ignore' });
   });
+
+  it('routes payment failures through the canonical payer landing screen', () => {
+    expect(
+      decideNotificationTapNavigation({
+        currentPathname: '/home',
+        effectiveAppContext: 'study',
+        notificationData: {
+          type: 'payment_failed',
+          payerPersonId: '00000000-0000-7000-a000-000000000001',
+        },
+      }),
+    ).toEqual({
+      context: 'study',
+      kind: 'push',
+      href: {
+        pathname: '/(app)/billing/manage',
+        params: {
+          payerPersonId: '00000000-0000-7000-a000-000000000001',
+        },
+      },
+    });
+  });
 });

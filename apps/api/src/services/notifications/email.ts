@@ -39,7 +39,8 @@ export interface EmailPayload {
     | 'weekly_progress'
     | 'monthly_progress'
     | 'security_notification'
-    | 'account_reclaim';
+    | 'account_reclaim'
+    | 'payment_failed';
 }
 
 export interface EmailOptions {
@@ -295,5 +296,19 @@ export function formatAccountReclaimAttemptEmail(
       `If this was you and you need help recovering access, contact ${supportEmail}. ` +
       'Support will verify ownership before making any account changes.',
     type: 'account_reclaim',
+  };
+}
+
+export function formatPaymentFailedEmail(
+  to: string,
+  manageBillingUrl: string,
+): EmailPayload {
+  return {
+    to,
+    subject: 'Action needed: update your MentoMate payment',
+    body:
+      'We could not process your latest MentoMate payment. Open MentoMate to review your payment method and restore your plan:\n\n' +
+      manageBillingUrl,
+    type: 'payment_failed',
   };
 }

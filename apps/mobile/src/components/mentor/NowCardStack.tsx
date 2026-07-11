@@ -83,7 +83,11 @@ export function NowCardStack({
   const reduceMotion = useReducedMotion();
   const cards = feed.cards
     .filter(isActionableCard)
-    .filter((card) => !dismissedKeys.has(getNowCardDismissKey(card)))
+    .filter(
+      (card) =>
+        card.kind === 'billing_alert' ||
+        !dismissedKeys.has(getNowCardDismissKey(card)),
+    )
     .slice(0, 3);
   const anchor = cards[0];
   const modules = cards.slice(1, 3);
@@ -97,7 +101,9 @@ export function NowCardStack({
   }
 
   const slotAnimation = (enterDelayMs: number) => ({
-    entering: reduceMotion ? undefined : FadeIn.delay(enterDelayMs).duration(300),
+    entering: reduceMotion
+      ? undefined
+      : FadeIn.delay(enterDelayMs).duration(300),
     exiting: reduceMotion ? undefined : FadeOut.duration(200),
   });
 

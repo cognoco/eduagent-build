@@ -15,6 +15,7 @@ import { topupExpiryReminderSend } from './functions/topup-expiry-reminder-send'
 import { billingSubscriptionStoreTeardown } from './functions/billing-subscription-store-teardown';
 import { trialExpiryFailureObserve } from './functions/trial-expiry-failure-observe';
 import { paymentFailedObserve } from './functions/payment-failed-observe';
+import { billingAlertDeliveryFailedObserve } from './functions/billing-alert-delivery-failed-observe';
 import { billingMissingCurrentPeriodEndObserve } from './functions/billing-missing-current-period-end-observe';
 import { billingAliasMerge } from './functions/billing-alias-merge';
 import { exchangeEmptyReplyFallback } from './functions/exchange-empty-reply-fallback';
@@ -139,6 +140,7 @@ export {
   billingSubscriptionStoreTeardown,
   trialExpiryFailureObserve,
   paymentFailedObserve,
+  billingAlertDeliveryFailedObserve,
   billingMissingCurrentPeriodEndObserve,
   billingAliasMerge,
   exchangeEmptyReplyFallback,
@@ -231,6 +233,7 @@ export const functions = [
   billingSubscriptionStoreTeardown,
   trialExpiryFailureObserve,
   paymentFailedObserve,
+  billingAlertDeliveryFailedObserve,
   billingMissingCurrentPeriodEndObserve,
   billingAliasMerge,
   exchangeEmptyReplyFallback,

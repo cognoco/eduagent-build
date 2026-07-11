@@ -3939,7 +3939,14 @@
         "cta": "Åpne"
       },
       "complete": "Ferdig",
-      "dismissIcon": "x"
+      "dismissIcon": "x",
+      "billing_alert": {
+        "title": "Betalingen krever oppmerksomhet",
+        "cta": "Administrer betaling",
+        "currentAccess": "Din betalte tilgang er aktiv frem til {{deadline}}.",
+        "freeFallback": "Kontoen din bruker nå gratis tilgang. Oppdater betalingen for å gjenopprette abonnementet ditt.",
+        "currentAccessNoDeadline": "Din betalte tilgang er fortsatt aktiv."
+      }
     },
     "ledger": {
       "label": "Læringsøyeblikk",

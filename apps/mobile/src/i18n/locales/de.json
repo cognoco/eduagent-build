@@ -3939,7 +3939,14 @@
         "cta": "Öffnen"
       },
       "complete": "Fertig",
-      "dismissIcon": "x"
+      "dismissIcon": "x",
+      "billing_alert": {
+        "title": "Problem mit der Zahlung",
+        "cta": "Abrechnung verwalten",
+        "currentAccess": "Dein bezahlter Zugang bleibt bis zum {{deadline}} aktiv.",
+        "freeFallback": "Dein Konto hat jetzt kostenlosen Zugang. Aktualisiere die Zahlung, um deinen Plan wiederherzustellen.",
+        "currentAccessNoDeadline": "Dein bezahlter Zugang ist noch aktiv."
+      }
     },
     "ledger": {
       "label": "Lernmoment",

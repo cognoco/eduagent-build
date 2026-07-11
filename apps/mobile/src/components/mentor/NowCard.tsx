@@ -31,6 +31,11 @@ const CARD_COPY_KEYS: Partial<
     { templateKey: string; title: TranslateKey; cta: TranslateKey }
   >
 > = {
+  billing_alert: {
+    templateKey: 'now.billing_alert.payment_failed',
+    title: 'mentorHome.cards.billing_alert.title',
+    cta: 'mentorHome.cards.billing_alert.cta',
+  },
   unfinished_session: {
     templateKey: 'now.unfinished_session.default',
     title: 'mentorHome.cards.unfinished_session.title',
@@ -95,11 +100,22 @@ export function NowCard({
   enterDelayMs = 0,
   animate = true,
 }: NowCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colors = useThemeColors();
   const reduceMotion = useReducedMotion();
   const copy = resolveNowCardCopyKeys(card);
   const isAnchor = variant === 'anchor';
+  const isBillingAlert = card.kind === 'billing_alert';
+  const deadline =
+    typeof card.params.deadlineAt === 'string'
+      ? new Date(card.params.deadlineAt)
+      : null;
+  const formattedDeadline =
+    deadline && !Number.isNaN(deadline.getTime())
+      ? new Intl.DateTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
+          dateStyle: 'medium',
+        }).format(deadline)
+      : null;
 
   return (
     <Animated.View
@@ -120,6 +136,17 @@ export function NowCard({
       <Text className="text-text-primary font-bold">
         {t(copy.title, card.params)}
       </Text>
+      {isBillingAlert ? (
+        <Text className="mt-2 text-sm text-text-secondary">
+          {card.params.accessState === 'current'
+            ? formattedDeadline
+              ? t('mentorHome.cards.billing_alert.currentAccess', {
+                  deadline: formattedDeadline,
+                })
+              : t('mentorHome.cards.billing_alert.currentAccessNoDeadline')
+            : t('mentorHome.cards.billing_alert.freeFallback')}
+        </Text>
+      ) : null}
       {arcState ? (
         <Text
           testID="now-card-arc"
@@ -139,7 +166,7 @@ export function NowCard({
             {t(copy.cta)}
           </Text>
         </Pressable>
-        {onCompleted ? (
+        {onCompleted && !isBillingAlert ? (
           <Pressable
             testID="now-card-complete"
             accessibilityRole="button"
@@ -152,18 +179,20 @@ export function NowCard({
           </Pressable>
         ) : null}
       </View>
-      <Pressable
-        testID="now-card-dismiss"
-        accessibilityRole="button"
-        accessibilityLabel={t('home.coachBand.a11yDismiss')}
-        hitSlop={8}
-        onPress={() => onDecline(card)}
-        className="absolute right-2 top-2 p-1"
-      >
-        <Text className="text-text-secondary">
-          {t('mentorHome.cards.dismissIcon')}
-        </Text>
-      </Pressable>
+      {!isBillingAlert ? (
+        <Pressable
+          testID="now-card-dismiss"
+          accessibilityRole="button"
+          accessibilityLabel={t('home.coachBand.a11yDismiss')}
+          hitSlop={8}
+          onPress={() => onDecline(card)}
+          className="absolute right-2 top-2 p-1"
+        >
+          <Text className="text-text-secondary">
+            {t('mentorHome.cards.dismissIcon')}
+          </Text>
+        </Pressable>
+      ) : null}
     </Animated.View>
   );
 }
