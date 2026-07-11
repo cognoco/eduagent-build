@@ -25,6 +25,26 @@ const providerErrorSchema = z.object({
   code: z.union([z.string(), z.number()]).optional(),
 });
 
+// Prompt-cache usage metadata for cache observability (WI-1827). Every field
+// is `.catch(undefined)` so a present-but-malformed usage block degrades to
+// absent instead of failing the whole response parse — usage capture must
+// never turn a good LLM response into a provider error (AC clause 4).
+//
+// OpenAI-compatible providers (OpenAI, Cerebras) report automatic prompt-cache
+// hits under `usage.prompt_tokens_details.cached_tokens`.
+const openAICompatUsageSchema = z
+  .object({
+    prompt_tokens_details: z
+      .object({
+        cached_tokens: z.number().nullable().optional().catch(undefined),
+      })
+      .nullable()
+      .optional()
+      .catch(undefined),
+  })
+  .optional()
+  .catch(undefined);
+
 const chatChoiceSchema = z.object({
   message: z
     .object({
@@ -60,6 +80,7 @@ const chatChoiceSchema = z.object({
 
 export const openAIResponseSchema = z.object({
   choices: z.array(chatChoiceSchema).optional(),
+  usage: openAICompatUsageSchema,
   error: providerErrorSchema.optional(),
 });
 
@@ -71,6 +92,7 @@ export type OpenAIResponseParsed = z.infer<typeof openAIResponseSchema>;
 
 export const cerebrasResponseSchema = z.object({
   choices: z.array(chatChoiceSchema).optional(),
+  usage: openAICompatUsageSchema,
   error: providerErrorSchema.optional(),
 });
 
@@ -101,6 +123,25 @@ const anthropicContentBlockSchema = z.object({
   text: z.string().optional(),
 });
 
+// Anthropic reports prompt-cache usage explicitly (WI-1827):
+// cache_creation_input_tokens / cache_read_input_tokens. Same fail-open
+// discipline as the OpenAI-compatible usage block — a malformed usage field
+// degrades to absent, never a parse failure (AC clause 4). `0` is retained
+// verbatim (cache_read_input_tokens = 0 is the prefix-regression signal).
+export const anthropicUsageSchema = z
+  .object({
+    input_tokens: z.number().nullable().optional().catch(undefined),
+    output_tokens: z.number().nullable().optional().catch(undefined),
+    cache_creation_input_tokens: z
+      .number()
+      .nullable()
+      .optional()
+      .catch(undefined),
+    cache_read_input_tokens: z.number().nullable().optional().catch(undefined),
+  })
+  .optional()
+  .catch(undefined);
+
 export const anthropicResponseSchema = z.object({
   content: z.array(anthropicContentBlockSchema).optional(),
   stop_reason: z
@@ -108,6 +149,7 @@ export const anthropicResponseSchema = z.object({
     .nullable()
     .optional()
     .transform((v) => v ?? undefined),
+  usage: anthropicUsageSchema,
   error: providerErrorSchema.optional(),
 });
 

@@ -412,3 +412,175 @@ describe('toAnthropicFormat — cache_control breakpoint (WI-1779)', () => {
     expect(system).toBe(systemContent);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Usage / prompt-cache metadata (WI-1827)
+//
+// Fetch-mocked at the HTTP boundary (external boundary — allowed). Asserts the
+// Anthropic adapter surfaces cache_creation/cache_read tokens on both the
+// non-streaming ChatResult.usage and the streaming ChatStreamResult.usagePromise,
+// and that malformed usage degrades to absent rather than throwing (AC clause 4).
+// ---------------------------------------------------------------------------
+
+const usageMockFetch = jest.fn();
+(global as unknown as { fetch: typeof fetch }).fetch = usageMockFetch;
+
+const USAGE_TEST_MESSAGES: ChatMessage[] = [
+  { role: 'system', content: 'You are helpful.' },
+  { role: 'user', content: 'Hello' },
+];
+
+const USAGE_TEST_CONFIG: ModelConfig = {
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-6',
+  maxTokens: 4096,
+};
+
+function createUsageJsonResponse(body: unknown): Partial<Response> {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => body,
+    text: async () => '',
+  };
+}
+
+function createUsageSseResponse(...events: string[]): Partial<Response> {
+  const encoder = new TextEncoder();
+  const text = events.map((e) => `data: ${e}`).join('\n') + '\n';
+  return {
+    ok: true,
+    status: 200,
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(text));
+        controller.close();
+      },
+    }) as unknown as Response['body'],
+  };
+}
+
+describe('Anthropic Provider — usage metadata (WI-1827)', () => {
+  const provider = createAnthropicProvider('test-key');
+
+  beforeEach(() => {
+    usageMockFetch.mockReset();
+  });
+
+  it('chat() surfaces cache_creation/cache_read/input/output tokens', async () => {
+    usageMockFetch.mockResolvedValueOnce(
+      createUsageJsonResponse({
+        content: [{ type: 'text', text: 'hi' }],
+        stop_reason: 'end_turn',
+        usage: {
+          input_tokens: 200,
+          output_tokens: 15,
+          cache_creation_input_tokens: 1024,
+          cache_read_input_tokens: 0,
+        },
+      }),
+    );
+
+    const result = await provider.chat(USAGE_TEST_MESSAGES, USAGE_TEST_CONFIG);
+    expect(result.content).toBe('hi');
+    expect(result.usage).toEqual({
+      inputTokens: 200,
+      outputTokens: 15,
+      cacheCreationInputTokens: 1024,
+      // 0 is the cache-miss / prefix-regression signal — must be preserved.
+      cacheReadInputTokens: 0,
+    });
+  });
+
+  it('chat() treats malformed usage as absent, not an error (clause 4)', async () => {
+    usageMockFetch.mockResolvedValueOnce(
+      createUsageJsonResponse({
+        content: [{ type: 'text', text: 'hi' }],
+        stop_reason: 'end_turn',
+        // Whole usage block is the wrong type — must degrade to absent.
+        usage: 'not-an-object',
+      }),
+    );
+
+    const result = await provider.chat(USAGE_TEST_MESSAGES, USAGE_TEST_CONFIG);
+    expect(result.content).toBe('hi');
+    expect(result.usage).toBeUndefined();
+  });
+
+  it('chat() omits usage when the provider reports none', async () => {
+    usageMockFetch.mockResolvedValueOnce(
+      createUsageJsonResponse({
+        content: [{ type: 'text', text: 'hi' }],
+        stop_reason: 'end_turn',
+      }),
+    );
+
+    const result = await provider.chat(USAGE_TEST_MESSAGES, USAGE_TEST_CONFIG);
+    expect(result.usage).toBeUndefined();
+  });
+
+  it('chatStream() usagePromise captures message_start + message_delta usage', async () => {
+    usageMockFetch.mockResolvedValueOnce(
+      createUsageSseResponse(
+        JSON.stringify({
+          type: 'message_start',
+          message: {
+            usage: {
+              input_tokens: 1200,
+              cache_creation_input_tokens: 0,
+              cache_read_input_tokens: 1024,
+              output_tokens: 1,
+            },
+          },
+        }),
+        JSON.stringify({
+          type: 'content_block_delta',
+          delta: { type: 'text_delta', text: 'Hello' },
+        }),
+        JSON.stringify({
+          type: 'message_delta',
+          delta: { stop_reason: 'end_turn' },
+          usage: { output_tokens: 15 },
+        }),
+        '[DONE]',
+      ),
+    );
+
+    const streamResult = provider.chatStream(
+      USAGE_TEST_MESSAGES,
+      USAGE_TEST_CONFIG,
+    );
+    let text = '';
+    for await (const chunk of streamResult) text += chunk;
+    expect(text).toBe('Hello');
+
+    const usage = await streamResult.usagePromise;
+    expect(usage).toEqual({
+      inputTokens: 1200,
+      cacheCreationInputTokens: 0,
+      // 1024 read from cache — the observable cache-hit signal.
+      cacheReadInputTokens: 1024,
+      // output_tokens updated by the terminal message_delta.
+      outputTokens: 15,
+    });
+  });
+
+  it('chatStream() usagePromise resolves undefined when no usage events arrive', async () => {
+    usageMockFetch.mockResolvedValueOnce(
+      createUsageSseResponse(
+        JSON.stringify({
+          type: 'content_block_delta',
+          delta: { type: 'text_delta', text: 'Hi' },
+        }),
+        '[DONE]',
+      ),
+    );
+
+    const streamResult = provider.chatStream(
+      USAGE_TEST_MESSAGES,
+      USAGE_TEST_CONFIG,
+    );
+    for await (const _chunk of streamResult) void _chunk;
+    await expect(streamResult.usagePromise).resolves.toBeUndefined();
+  });
+});

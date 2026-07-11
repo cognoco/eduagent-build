@@ -80,10 +80,43 @@ export function getTextContent(content: string | MessagePart[]): string {
     .join('\n');
 }
 
+/**
+ * Normalized token-usage metadata surfaced from a provider response, for
+ * prompt-cache observability (WI-1827). All fields are optional numbers — a
+ * provider that omits usage, or a malformed/absent usage block, yields
+ * `undefined` for the field (or the whole object) rather than an error. Usage
+ * capture must never throw or block the response/stream.
+ *
+ * `0` is a meaningful value and is preserved verbatim: `cacheReadInputTokens: 0`
+ * is the signal a prompt-prefix regression produces (cache miss), so it must
+ * never be coalesced away.
+ */
+export interface LlmUsage {
+  /** Uncached prompt tokens billed at the standard input rate. */
+  inputTokens?: number;
+  /** Generated output tokens. */
+  outputTokens?: number;
+  /** Anthropic explicit prompt cache: tokens written to the cache this call. */
+  cacheCreationInputTokens?: number;
+  /** Anthropic explicit prompt cache: tokens served from the cache this call. */
+  cacheReadInputTokens?: number;
+  /**
+   * OpenAI/Cerebras automatic prompt cache: cached prompt tokens
+   * (`usage.prompt_tokens_details.cached_tokens`). Best-effort — present only
+   * when the OpenAI-compatible provider reports it.
+   */
+  cachedTokens?: number;
+}
+
 /** Result of a non-streaming provider call. */
 export interface ChatResult {
   content: string;
   stopReason: StopReason;
+  /**
+   * Token-usage metadata for cache observability (WI-1827). Optional: absent
+   * when the provider does not report usage or the usage block was malformed.
+   */
+  usage?: LlmUsage;
 }
 
 /**
@@ -103,6 +136,16 @@ export interface ChatResult {
 export interface ChatStreamResult extends AsyncIterable<string> {
   stream: AsyncIterable<string>;
   stopReasonPromise: Promise<StopReason>;
+  /**
+   * Token-usage metadata for cache observability (WI-1827), mirroring
+   * `stopReasonPromise`. Resolves once the stream finishes (normal drain or
+   * error) to the usage captured from the provider's stream events, or
+   * `undefined` when the provider reports none. Optional on the interface:
+   * providers that never emit usage simply do not set it, and the router
+   * coalesces a missing promise to `undefined`. Like `stopReasonPromise`, it
+   * resolves rather than rejects so awaiting callers never hang.
+   */
+  usagePromise?: Promise<LlmUsage | undefined>;
 }
 
 /**
@@ -115,10 +158,12 @@ export interface ChatStreamResult extends AsyncIterable<string> {
 export function makeChatStreamResult(
   stream: AsyncIterable<string>,
   stopReasonPromise: Promise<StopReason>,
+  usagePromise?: Promise<LlmUsage | undefined>,
 ): ChatStreamResult {
   return {
     stream,
     stopReasonPromise,
+    usagePromise,
     [Symbol.asyncIterator]() {
       return stream[Symbol.asyncIterator]();
     },
