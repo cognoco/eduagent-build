@@ -69,7 +69,7 @@ export const FULL_SCREEN_ROUTES = new Set([
   'quiz',
   'practice',
   'link',
-  'link/new',
+  'link/initiate',
   'link/[contractId]',
   'shelf',
   'shelf/[subjectId]',
@@ -99,7 +99,7 @@ export const HIDDEN_TAB_ROUTES = [
   'quiz',
   'practice',
   'link',
-  'link/new',
+  'link/initiate',
   'link/[contractId]',
   'shelf',
   'subject',
@@ -211,6 +211,8 @@ export default function AppLayout() {
 
   // [M15] Timeout for isProfileLoading spinner
   const [profileLoadTimedOut, setProfileLoadTimedOut] = React.useState(false);
+  const [profileLoadRetryAttempt, setProfileLoadRetryAttempt] =
+    React.useState(0);
   React.useEffect(() => {
     if (!isProfileLoading) {
       setProfileLoadTimedOut(false);
@@ -218,7 +220,7 @@ export default function AppLayout() {
     }
     const t = setTimeout(() => setProfileLoadTimedOut(true), 20_000);
     return () => clearTimeout(t);
-  }, [isProfileLoading]);
+  }, [isProfileLoading, profileLoadRetryAttempt]);
 
   // Age-gated Sentry: re-evaluate on profile switch (Story 10.14)
   React.useEffect(() => {
@@ -449,7 +451,12 @@ export default function AppLayout() {
             message={t('tabs.profileLoadTimeout.message')}
             primaryAction={{
               label: t('common.retry'),
-              onPress: () => setProfileLoadTimedOut(false),
+              onPress: () => {
+                setProfileLoadTimedOut(false);
+                setProfileLoadRetryAttempt((attempt) => attempt + 1);
+                void queryClient.invalidateQueries({ queryKey: ['profiles'] });
+                void queryClient.refetchQueries({ queryKey: ['profiles'] });
+              },
               testID: 'profile-loading-timeout-retry',
             }}
             secondaryAction={{

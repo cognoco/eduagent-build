@@ -1,0 +1,1 @@
+ALTER TABLE "session_summaries" ADD COLUMN "language_learning_summary" jsonb;

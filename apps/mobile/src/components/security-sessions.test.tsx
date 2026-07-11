@@ -127,6 +127,23 @@ describe('SecuritySessions', () => {
     });
   });
 
+  it('[WI-1849] surfaces a rejected single-session revoke without refreshing', async () => {
+    mockRevokeOther.mockRejectedValue({
+      errors: [{ longMessage: 'Could not revoke this device' }],
+    });
+    active = renderScreen(<SecuritySessions />);
+
+    await waitFor(() => {
+      screen.getByTestId('revoke-session-session-other');
+    });
+    fireEvent.press(screen.getByTestId('revoke-session-session-other'));
+
+    await waitFor(() => {
+      screen.getByText('Could not revoke this device');
+    });
+    expect(mockGetSessions).toHaveBeenCalledTimes(1);
+  });
+
   it('[HIGH-1] signs out all other devices in one action, sparing the current session', async () => {
     active = renderScreen(<SecuritySessions />);
 
@@ -144,6 +161,26 @@ describe('SecuritySessions', () => {
     });
     // The current session's own revoke is never invoked by the bulk action.
     expect(mockRevokeCurrent).not.toHaveBeenCalled();
+  });
+
+  it('[WI-1849] surfaces a rejected bulk revoke and stops before later sessions', async () => {
+    mockRevokeOther.mockRejectedValue({
+      errors: [{ longMessage: 'Could not sign out all devices' }],
+    });
+    active = renderScreen(<SecuritySessions />);
+
+    await waitFor(() => {
+      screen.getByTestId('security-sessions-revoke-all');
+    });
+    fireEvent.press(screen.getByTestId('security-sessions-revoke-all'));
+
+    await waitFor(() => {
+      screen.getByText('Could not sign out all devices');
+    });
+    expect(mockRevokeOther).toHaveBeenCalledTimes(1);
+    expect(mockRevokeOther2).not.toHaveBeenCalled();
+    expect(mockRevokeCurrent).not.toHaveBeenCalled();
+    expect(mockGetSessions).toHaveBeenCalledTimes(1);
   });
 
   it('[HIGH-2] surfaces the IP address so identical device labels can be told apart', async () => {

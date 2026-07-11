@@ -24,10 +24,12 @@ interface SupportHubMentorTabProps {
   onOpenJournal?: (scope: PersonScope) => void;
   /** WI-1393 — managed persons without an existing visibility contract. */
   eligiblePersons?: readonly EligibleManagedPerson[];
-  /** WI-1393 — navigates to `/(app)/link/new` with the selected person. */
+  /** WI-1393 — navigates to `/(app)/link/initiate` with the selected person. */
   onSelectEligiblePerson?: (person: EligibleManagedPerson) => void;
   /** WI-1393 — 0-eligible degrade: guides the owner to add a child first. */
   onAddChildFallback?: () => void;
+  /** [WI-1137 Codex P2] navigates to `/(app)/link/initiate` param-less. */
+  onSelectExistingTeen?: () => void;
 }
 
 function hasShareableFacts(record?: SharedRecord): boolean {
@@ -176,6 +178,7 @@ export function SupportHubMentorTab({
   eligiblePersons = [],
   onSelectEligiblePerson,
   onAddChildFallback,
+  onSelectExistingTeen,
 }: SupportHubMentorTabProps): React.ReactElement {
   const { t } = useTranslation();
   const [isPickerVisible, setIsPickerVisible] = useState(false);
@@ -193,6 +196,11 @@ export function SupportHubMentorTab({
   const handleAddChild = (): void => {
     setIsPickerVisible(false);
     onAddChildFallback?.();
+  };
+
+  const handleSelectExistingTeen = (): void => {
+    setIsPickerVisible(false);
+    onSelectExistingTeen?.();
   };
 
   return (
@@ -272,6 +280,7 @@ export function SupportHubMentorTab({
           eligiblePersons={eligiblePersons}
           onSelectPerson={handleSelectPerson}
           onAddChild={handleAddChild}
+          onSelectExistingTeen={handleSelectExistingTeen}
           onClose={() => setIsPickerVisible(false)}
         />
       ) : null}

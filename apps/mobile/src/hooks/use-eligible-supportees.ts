@@ -22,7 +22,7 @@ export interface EligibleManagedPerson {
  * signal for "eligible for a new link" — no extra API call needed.
  *
  * WI-1393: these are the candidates offered by the support-hub "start
- * supporting" picker so `/(app)/link/new` is never reached without a
+ * supporting" picker so `/(app)/link/initiate` is never reached without a
  * `supporteePersonId`.
  */
 export function useEligibleManagedPersons(): EligibleManagedPerson[] {

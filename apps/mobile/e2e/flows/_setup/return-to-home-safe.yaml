@@ -10,12 +10,16 @@
 # learner-screen with dashboard-scroll or parent-home-screen.
 appId: com.mentomate.app
 ---
-# If dashboard-scroll is visible, we're on the Family dashboard — do nothing.
-# If parent-home-screen is visible, we're on the ParentHomeScreen — do nothing.
-# If learner-screen is visible, we're on the learner home — do nothing.
-# Only press Back when we're truly stuck on a session/other screen.
+# If mentor-screen is visible, we're on the V2 Mentor landing — do nothing.
+# Otherwise continue through the legacy home/dashboard guards and only press
+# Back when we're truly stuck on a session/other screen.
 - runFlow:
     when:
       notVisible:
-        id: "dashboard-scroll"
-    file: return-to-home-check-parent-home.yaml
+        id: 'mentor-screen'
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: 'dashboard-scroll'
+          file: return-to-home-check-parent-home.yaml

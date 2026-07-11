@@ -3303,7 +3303,26 @@
       "exchanges_many": "Udało Ci się ukończyć {{count}} wymian"
     },
     "a11yContinueLearning": "Kontynuuj naukę",
-    "a11yContinueToHome": "Przejdź do strony głównej"
+    "a11yContinueToHome": "Przejdź do strony głównej",
+    "languagePractice": {
+      "title": "Praktyka językowa",
+      "scenario": "Dziś ćwiczyłeś/aś {{scenario}}",
+      "newWords": "Nowe słowa: {{words}}",
+      "strengthenedWords": "Utrwalone słowa: {{words}}",
+      "grammarPattern": "Gramatyka: {{patterns}}",
+      "comprehension": "Pytania o zrozumienie: {{correct}}/{{total}} poprawnie",
+      "speakingAttempts_one": "Mówiłeś/aś {{count}} raz",
+      "speakingAttempts_few": "Mówiłeś/aś {{count}} razy",
+      "speakingAttempts_many": "Mówiłeś/aś {{count}} razy",
+      "speakingAttempts_other": "Mówiłeś/aś {{count}} razy",
+      "fluencyResult": "Sprawdzian płynności: {{correct}}/{{total}}",
+      "nextRecommendation": {
+        "meaning_input": "Następnym razem: więcej ćwiczeń z czytania i słuchania",
+        "meaning_output": "Następnym razem: więcej ćwiczeń z mówienia i pisania",
+        "language_focus": "Następnym razem: popracujemy nad wzorcami gramatycznymi",
+        "fluency": "Następnym razem: szybki sprint z płynności"
+      }
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -4495,7 +4514,8 @@
       "emptyTitle": "Brak dostępnych uczniów",
       "emptyDescription": "Najpierw dodaj dziecko do swojego konta, a potem wróć tutaj, aby zacząć je wspierać.",
       "addChildAction": "Dodaj dziecko",
-      "closeLabel": "Zamknij"
+      "closeLabel": "Zamknij",
+      "existingTeenOption": "Połącz istniejącego członka rodziny (13+)"
     }
   },
   "visibility": {
@@ -4568,7 +4588,13 @@
       "revoking": "Kończenie udostępniania...",
       "revoked": "Udostępnianie kończy się. Osoba wspierająca zobaczy powiadomienie.",
       "revokeErrorTitle": "Błąd kończenia udostępniania",
-      "missingActor": "Nie mogliśmy zidentyfikować aktywnej osoby."
+      "missingActor": "Nie mogliśmy zidentyfikować aktywnej osoby.",
+      "relationLabel": "Relacja",
+      "pickerTitle": "Komu chcesz udostępniać swoje postępy?",
+      "pickerManagedEmpty": "Jeszcze brak uprawnionych dzieci.",
+      "pickerExistingTeenOption": "Istniejący członek rodziny (13+)",
+      "existingTeenUnavailableTitle": "Jeszcze niedostępne",
+      "existingTeenUnavailableMessage": "Zapraszanie istniejącego członka rodziny nie jest jeszcze dostępne. Sprawdź ponownie wkrótce."
     }
   },
   "supporterColdStart": {

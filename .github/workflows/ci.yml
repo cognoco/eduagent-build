@@ -419,6 +419,19 @@ jobs:
         if: github.event_name == 'pull_request' && steps.change-class.outputs.unit == 'true'
         run: pnpm test:api:unit
 
+      # Database package tests for the db-migrations change class (WI-1164).
+      # The router already listed `nx run @eduagent/database:test` as advisory
+      # for apps/api/drizzle/**.sql changes, but nx affected can't see
+      # packages/database as affected by a drizzle-only diff (no declared
+      # dependency), so the suite never ran on the PR that needed it — a
+      # migration added without a correctly-named/coherent snapshot could
+      # merge green and only red the required check on `main` later (the
+      # WI-1163 P0). Gate directly on the router's `database` flag, same
+      # pattern as the unit-tests step above.
+      - name: Database package tests (db-migrations — WI-1164)
+        if: github.event_name == 'pull_request' && steps.change-class.outputs.database == 'true'
+        run: pnpm exec nx run @eduagent/database:test
+
       # Advisory check: flag stale counts in AGENTS.md (does not block PRs)
       - name: Validate AGENTS.md counts
         if: always()

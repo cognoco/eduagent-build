@@ -9,6 +9,14 @@ interface SupportPersonPickerSheetProps {
   eligiblePersons: readonly EligibleManagedPerson[];
   onSelectPerson: (person: EligibleManagedPerson) => void;
   onAddChild: () => void;
+  /**
+   * [WI-1137 Codex P2] Persistent entry into `/(app)/link/initiate`'s own
+   * param-less inline picker (which offers the join-my-family
+   * existing-teen path). Rendered regardless of `eligiblePersons.length` so
+   * that path is reachable whether or not the owner already has managed
+   * children — it must not be nested under the zero-eligible degrade.
+   */
+  onSelectExistingTeen: () => void;
   onClose: () => void;
 }
 
@@ -16,7 +24,7 @@ interface SupportPersonPickerSheetProps {
  * WI-1393 — the "start supporting" picker opened from the V2 support-hub
  * anchors (cold-start empty state, persistent header action, Subjects empty
  * state). Lists managed persons without an existing visibility contract;
- * selecting one carries `supporteePersonId` into `/(app)/link/new` so that
+ * selecting one carries `supporteePersonId` into `/(app)/link/initiate` so that
  * screen's missing-param `ErrorFallback` is never reached from these
  * anchors. When there are zero eligible persons, degrades to an "add a
  * child" affordance instead of dead-ending.
@@ -26,6 +34,7 @@ export function SupportPersonPickerSheet({
   eligiblePersons,
   onSelectPerson,
   onAddChild,
+  onSelectExistingTeen,
   onClose,
 }: SupportPersonPickerSheetProps): React.ReactElement {
   const { t } = useTranslation();
@@ -98,6 +107,18 @@ export function SupportPersonPickerSheet({
             </ScrollView>
           </>
         )}
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('supportHub.picker.existingTeenOption')}
+          onPress={onSelectExistingTeen}
+          className="mt-4 min-h-[44px] items-center justify-center rounded-button border border-border px-5 py-3"
+          testID="support-person-picker-existing-teen"
+        >
+          <Text className="text-body font-semibold text-text-primary">
+            {t('supportHub.picker.existingTeenOption')}
+          </Text>
+        </Pressable>
       </View>
     </BottomSheet>
   );

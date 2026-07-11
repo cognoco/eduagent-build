@@ -3480,6 +3480,23 @@
     "memberOwnerLabel": "{{name}} (owner)"
   },
   "sessionSummary": {
+    "languagePractice": {
+      "title": "Language practice",
+      "scenario": "Today you practiced {{scenario}}",
+      "newWords": "New words: {{words}}",
+      "strengthenedWords": "You strengthened: {{words}}",
+      "grammarPattern": "Grammar focus: {{patterns}}",
+      "comprehension": "You answered {{correct}}/{{total}} comprehension questions correctly",
+      "speakingAttempts_one": "You spoke {{count}} time",
+      "speakingAttempts_other": "You spoke {{count}} times",
+      "fluencyResult": "Fluency check: {{correct}}/{{total}}",
+      "nextRecommendation": {
+        "meaning_input": "Next time: more reading and listening practice",
+        "meaning_output": "Next time: more speaking and writing practice",
+        "language_focus": "Next time: we'll work on grammar patterns",
+        "fluency": "Next time: a quick fluency sprint"
+      }
+    },
     "mentorMemoryCue": {
       "title": "What your mentor knows about you.",
       "subtitle": "Tap to review or change."
@@ -4085,6 +4102,7 @@
       "emptyTitle": "No learners available yet",
       "emptyDescription": "Add a child to your account first, then come back to start supporting them.",
       "addChildAction": "Add a child",
+      "existingTeenOption": "Link an existing family member (13+)",
       "closeLabel": "Close"
     }
   },
@@ -4147,6 +4165,12 @@
       "createAction": "Create sharing request",
       "creating": "Creating request...",
       "createErrorTitle": "Couldn't create sharing request",
+      "relationLabel": "Relationship",
+      "pickerTitle": "Who do you want to share progress with?",
+      "pickerManagedEmpty": "No eligible children yet.",
+      "pickerExistingTeenOption": "Existing family member (13+)",
+      "existingTeenUnavailableTitle": "Not available yet",
+      "existingTeenUnavailableMessage": "Inviting an existing family member isn't available yet. Check back soon.",
       "loading": "Loading sharing agreement",
       "missingTitle": "Sharing link missing",
       "missingMessage": "Open this from the support invitation again.",

@@ -43,7 +43,7 @@ permissions:
 
 # Never deploy in parallel — one deployment at a time
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.api_environment == 'production' && 'deploy-production' || format('deploy-{0}', github.ref) }}
   cancel-in-progress: false
 
 jobs:

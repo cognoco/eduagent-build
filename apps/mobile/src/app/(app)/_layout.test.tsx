@@ -36,6 +36,9 @@ jest.mock(
 const mockUseProfile = jest.fn();
 const mockUsePathname = jest.fn();
 const mockReplace = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn(() => false);
+const mockClerkSignOut = jest.fn();
 const mockTabs = Object.assign(
   ({
     children,
@@ -63,7 +66,12 @@ jest.mock('expo-router', () => ({
   },
   Tabs: mockTabs,
   usePathname: () => mockUsePathname(),
-  useRouter: () => ({ push: jest.fn(), replace: mockReplace }),
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: mockReplace,
+    back: mockBack,
+    canGoBack: mockCanGoBack,
+  }),
 }));
 
 let mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
@@ -77,7 +85,7 @@ jest.mock('@expo/vector-icons', () => ({
 
 jest.mock('@clerk/expo', () => ({
   useAuth: jest.fn(),
-  useClerk: () => ({ signOut: jest.fn() }),
+  useClerk: () => ({ signOut: mockClerkSignOut }),
   useUser: () => ({
     user: {
       primaryEmailAddress: { emailAddress: 'child@example.com' },
@@ -308,6 +316,11 @@ describe('AppLayout', () => {
     });
     clearPendingAuthRedirect();
     mockReplace.mockReset();
+    mockBack.mockReset();
+    mockCanGoBack.mockReset();
+    mockCanGoBack.mockReturnValue(false);
+    mockClerkSignOut.mockReset();
+    mockClerkSignOut.mockResolvedValue(undefined);
     mockUsePathname.mockReturnValue('/home');
     mockSpeechGetPermissions.mockResolvedValue({
       granted: true,
@@ -533,6 +546,23 @@ describe('AppLayout', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 
+  it('[WI-1849] times out a stuck auth redirect and recovers to Home', () => {
+    jest.useFakeTimers();
+    rememberPendingAuthRedirect('/(app)/quiz');
+    mockUsePathname.mockReturnValue('/home');
+
+    renderLayout();
+    screen.getByTestId('auth-redirect-replay');
+
+    act(() => {
+      jest.advanceTimersByTime(15_000);
+    });
+
+    screen.getByTestId('auth-redirect-timeout');
+    fireEvent.press(screen.getByTestId('auth-redirect-timeout-home'));
+    expect(mockReplace).toHaveBeenLastCalledWith('/(app)/home');
+  });
+
   it('preserves the query string when replaying a child deep-link [BUG-766]', () => {
     // [BUG-766] Direct hard-load of /child/{id}?mode=progress used to lose
     // the mode query during the sign-in → replay round-trip, landing the
@@ -662,6 +692,40 @@ describe('AppLayout', () => {
     screen.getByTestId('profile-loading');
     expect(screen.queryByTestId('tabs')).toBeNull();
     expect(screen.queryByTestId('redirect')).toBeNull();
+  });
+
+  it('[WI-1849] exposes retry and sign-out recovery after profile loading times out', async () => {
+    jest.useFakeTimers();
+    mockUseProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      isLoading: true,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+
+    renderLayout();
+    screen.getByTestId('profile-loading');
+
+    act(() => {
+      jest.advanceTimersByTime(20_000);
+    });
+    screen.getByTestId('profile-loading-timeout');
+
+    fireEvent.press(screen.getByTestId('profile-loading-timeout-retry'));
+    screen.getByTestId('profile-loading');
+
+    act(() => {
+      jest.advanceTimersByTime(20_000);
+    });
+    screen.getByTestId('profile-loading-timeout');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('profile-loading-timeout-signout'));
+      await Promise.resolve();
+    });
+    expect(mockClerkSignOut).toHaveBeenCalledTimes(1);
   });
 
   it('[BUG-PROFILE-GATE] shows a retryable profile-load error instead of create-profile gate', () => {
@@ -1493,7 +1557,7 @@ describe('HIDDEN_TAB_ROUTES — tab-bar leak guard (QA-07 / Bug 763)', () => {
       'homework',
       'dictation',
       'practice',
-      'link/new',
+      'link/initiate',
       'link/[contractId]',
       'vocabulary',
       'topic',
@@ -1513,7 +1577,7 @@ describe('HIDDEN_TAB_ROUTES — tab-bar leak guard (QA-07 / Bug 763)', () => {
 
 describe('FULL_SCREEN_ROUTES — nested ceremony route guard', () => {
   it('hides chrome for every visibility link ceremony screen', () => {
-    for (const route of ['link', 'link/new', 'link/[contractId]']) {
+    for (const route of ['link', 'link/initiate', 'link/[contractId]']) {
       expect(FULL_SCREEN_ROUTES.has(route)).toBe(true);
     }
   });

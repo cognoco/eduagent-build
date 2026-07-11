@@ -193,9 +193,26 @@ describe('usePostSessionNotificationAsk', () => {
     expect(mockReqPerm).not.toHaveBeenCalled();
   });
 
-  it('marks seen and skips prompt when permission is already granted', async () => {
+  // [WI-1441 round 3] The already-granted path now also drives the
+  // pushEnabled sync silently (no OS dialog), instead of marking seen
+  // unconditionally — see the "silent repair" regression tests below for the
+  // retry behavior when this sync fails.
+  it('already-granted path silently syncs pushEnabled and marks seen without showing the OS prompt', async () => {
     mockGetPerm.mockResolvedValue({ status: 'granted', canAskAgain: true });
     renderPostSessionAsk('p1', true, false);
+
+    await waitFor(() => {
+      expect(findPutBody()).toBeDefined();
+    });
+    expect(findPutBody()).toEqual({
+      reviewReminders: true,
+      dailyReminders: false,
+      weeklyProgressPush: false,
+      weeklyProgressEmail: true,
+      monthlyProgressEmail: false,
+      maxDailyPush: 5,
+      pushEnabled: true,
+    });
     await waitFor(() => {
       expect(mockSecureSet).toHaveBeenCalledWith(
         expect.stringContaining('notificationFirstAskShown_p1'),
@@ -206,6 +223,7 @@ describe('usePostSessionNotificationAsk', () => {
       jest.advanceTimersByTime(5000);
     });
     expect(mockAlert).not.toHaveBeenCalled();
+    expect(mockReqPerm).not.toHaveBeenCalled();
   });
 
   it('marks seen and skips prompt when OS has blocked re-asking', async () => {
@@ -526,5 +544,112 @@ describe('usePostSessionNotificationAsk', () => {
       expect(mockReqPerm).toHaveBeenCalledTimes(1);
     });
     expect(findPutBody()).toBeUndefined();
+  });
+
+  // [WI-1441 round 3] Regression guard: if notification prefs cannot be
+  // loaded when permission is already granted, the primer must NOT be marked
+  // seen — otherwise the sync is lost forever with no further retry. A later
+  // mount (a fresh session-summary instance) must retry, and — because
+  // permission is already granted — do so via the silent repair path (no OS
+  // dialog).
+  it('granted with prefs unavailable does not consume the primer, and a later mount retries via silent repair', async () => {
+    mockGetPerm.mockResolvedValue({ status: 'granted', canAskAgain: true });
+    mockFetch.mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        const method = (init?.method ?? 'GET').toUpperCase();
+        if (url.includes('/settings/notifications') && method === 'GET') {
+          return Promise.reject(new Error('network down'));
+        }
+        return Promise.reject(
+          new Error(`Unhandled fetch in test: ${method} ${url}`),
+        );
+      },
+    );
+
+    const { unmount } = renderPostSessionAsk('p1', true, false);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSecureSet).not.toHaveBeenCalled();
+    unmount();
+
+    // A later mount — a fresh component instance, so a fresh in-memory guard
+    // — with permission still granted must retry. Once prefs are reachable
+    // it persists and marks seen, all without ever showing the OS Alert.
+    mockFetch.mockImplementation(defaultFetchImpl);
+    renderPostSessionAsk('p1', true, false);
+
+    await waitFor(() => {
+      expect(findPutBody()).toBeDefined();
+    });
+    await waitFor(() => {
+      expect(mockSecureSet).toHaveBeenCalledWith(
+        expect.stringContaining('notificationFirstAskShown_p1'),
+        'true',
+      );
+    });
+    expect(mockAlert).not.toHaveBeenCalled();
+  });
+
+  // [WI-1441 round 3] Regression guard: if the persist mutation itself fails
+  // after a granted OS response, the primer must NOT be marked seen either —
+  // otherwise the OS grant is recorded as "asked" while the server's
+  // pushEnabled silently stays false with no further retry.
+  it('Allow with a failing persist does not consume the primer', async () => {
+    mockFetch.mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        const method = (init?.method ?? 'GET').toUpperCase();
+        if (url.includes('/settings/notifications') && method === 'GET') {
+          return Promise.resolve(jsonResponse({ preferences: NOTIF_PREFS }));
+        }
+        if (url.includes('/settings/notifications') && method === 'PUT') {
+          return Promise.resolve(
+            new Response('Internal Error', { status: 500 }),
+          );
+        }
+        return Promise.reject(
+          new Error(`Unhandled fetch in test: ${method} ${url}`),
+        );
+      },
+    );
+
+    renderPostSessionAsk('p1', true, false);
+
+    await waitFor(() => {
+      expect(mockGetPerm).toHaveBeenCalled();
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+
+    expect(mockAlert).toHaveBeenCalledTimes(1);
+    const buttons = mockAlert.mock.calls[0]![2] as Array<{
+      style?: string;
+      onPress?: () => void;
+    }>;
+    const allowBtn = buttons.find((b) => b.style !== 'cancel');
+
+    await act(async () => {
+      allowBtn?.onPress?.();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(findPutBody()).toBeDefined();
+    });
+    // The mutation was attempted (and failed) — the primer must not be
+    // consumed so a later attempt can retry.
+    expect(mockSecureSet).not.toHaveBeenCalled();
   });
 });

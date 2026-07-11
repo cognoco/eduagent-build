@@ -72,6 +72,7 @@ function buildBaseSummaryRow() {
     engagementSignal: null as string | null,
     nextTopicReason: null as string | null,
     llmSummary: null as unknown,
+    languageLearningSummary: null as unknown,
     purgedAt: null as Date | null,
     createdAt: new Date('2026-01-01T10:05:00Z'),
     updatedAt: new Date('2026-01-01T10:05:00Z'),
@@ -183,6 +184,45 @@ describe('mapSummaryRow', () => {
     expect(summary.learnerRecap).toBeNull();
     expect(summary.nextTopicId).toBeNull();
     expect(summary.nextTopicReason).toBeNull();
+  });
+
+  // [WI-1553] AC4 — additive/legacy-safety for language_learning_summary.
+  it('maps languageLearningSummary to null for a legacy row (column NULL)', () => {
+    const row = buildSummaryRow({ languageLearningSummary: null });
+    const summary = mapSummaryRow(row as never);
+    expect(summary.languageLearningSummary).toBeNull();
+  });
+
+  it('maps languageLearningSummary to null for a malformed jsonb value', () => {
+    const row = buildSummaryRow({ languageLearningSummary: { bogus: true } });
+    const summary = mapSummaryRow(row as never);
+    expect(summary.languageLearningSummary).toBeNull();
+  });
+
+  it('parses a well-formed languageLearningSummary row', () => {
+    const row = buildSummaryRow({
+      languageLearningSummary: {
+        practicedScenario: 'order food at a cafe',
+        newWords: [{ term: 'croissant', type: 'word' }],
+        strengthenedWords: [],
+        grammarPatterns: ['polite requests'],
+        comprehension: { correct: 1, total: 1 },
+        speakingAttempts: 1,
+        fluency: null,
+        nextRecommendationStrand: 'fluency',
+      },
+    });
+    const summary = mapSummaryRow(row as never);
+    expect(summary.languageLearningSummary).toEqual({
+      practicedScenario: 'order food at a cafe',
+      newWords: [{ term: 'croissant', type: 'word' }],
+      strengthenedWords: [],
+      grammarPatterns: ['polite requests'],
+      comprehension: { correct: 1, total: 1 },
+      speakingAttempts: 1,
+      fluency: null,
+      nextRecommendationStrand: 'fluency',
+    });
   });
 });
 

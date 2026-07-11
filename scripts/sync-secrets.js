@@ -58,6 +58,9 @@ const DOPPLER_CLI =
   process.platform === 'win32' ? 'C:\\Tools\\doppler\\doppler.exe' : 'doppler';
 
 const API_DIR = path.join(__dirname, '..', 'apps', 'api');
+const WRANGLER_CLI = require.resolve('wrangler/bin/wrangler.js', {
+  paths: [API_DIR],
+});
 
 function shouldInclude(key, value) {
   if (EXCLUDE_EXACT.includes(key)) return false;
@@ -68,13 +71,25 @@ function shouldInclude(key, value) {
   return true;
 }
 
-function isWranglerAuthenticated() {
-  const result = spawnSync('pnpm exec wrangler whoami', {
-    encoding: 'utf-8',
-    cwd: API_DIR,
-    shell: true,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
+function buildWranglerTargetArgs(wranglerEnv, workerName, configPath) {
+  if (configPath) {
+    return ['--name', workerName, '--config', configPath];
+  }
+  return wranglerEnv ? ['--env', wranglerEnv] : [];
+}
+
+function isWranglerAuthenticated(configPath) {
+  const configArgs = configPath ? ['--config', configPath] : [];
+  const result = spawnSync(
+    process.execPath,
+    [WRANGLER_CLI, 'whoami', ...configArgs],
+    {
+      encoding: 'utf-8',
+      cwd: API_DIR,
+      shell: false,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    },
+  );
   return result.status === 0;
 }
 
@@ -104,6 +119,10 @@ function isWranglerConfigRendered() {
   }
 }
 
+function shouldSkipSync(isRendered, configPath) {
+  return !isRendered && !configPath;
+}
+
 function downloadSecrets(config) {
   try {
     const raw = execSync(
@@ -129,16 +148,24 @@ function filterSecrets(secrets) {
   return { filtered, excluded };
 }
 
-function pushToWorker(secrets, wranglerEnv) {
-  const json = JSON.stringify(secrets);
-  const envFlag = wranglerEnv ? ` --env ${wranglerEnv}` : '';
-  const cmd = `pnpm exec wrangler secret bulk${envFlag}`;
+function buildWranglerBulkArgs(wranglerEnv, workerName, configPath) {
+  return [
+    WRANGLER_CLI,
+    'secret',
+    'bulk',
+    ...buildWranglerTargetArgs(wranglerEnv, workerName, configPath),
+  ];
+}
 
-  const result = spawnSync(cmd, {
+function pushToWorker(secrets, wranglerEnv, workerName, configPath) {
+  const json = JSON.stringify(secrets);
+  const args = buildWranglerBulkArgs(wranglerEnv, workerName, configPath);
+
+  const result = spawnSync(process.execPath, args, {
     input: json,
     encoding: 'utf-8',
     cwd: API_DIR,
-    shell: true,
+    shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -150,10 +177,60 @@ function pushToWorker(secrets, wranglerEnv) {
   return { success: true };
 }
 
+function findMissingSecretNames(expectedNames, actualNames) {
+  const actual = new Set(actualNames);
+  return expectedNames.filter((name) => !actual.has(name));
+}
+
+function verifyWorkerSecretNames(
+  expectedNames,
+  wranglerEnv,
+  workerName,
+  configPath,
+) {
+  const args = [
+    WRANGLER_CLI,
+    'secret',
+    'list',
+    '--format',
+    'json',
+    ...buildWranglerTargetArgs(wranglerEnv, workerName, configPath),
+  ];
+  const result = spawnSync(process.execPath, args, {
+    encoding: 'utf-8',
+    cwd: API_DIR,
+    shell: false,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  if (result.status !== 0) {
+    return {
+      success: false,
+      error: (result.stderr || result.stdout || 'Unknown error').trim(),
+    };
+  }
+
+  try {
+    const listed = JSON.parse(result.stdout);
+    const actualNames = listed.map((entry) => entry.name);
+    const missing = findMissingSecretNames(expectedNames, actualNames);
+    return missing.length > 0
+      ? {
+          success: false,
+          error: `Worker is missing synced keys: ${missing.join(', ')}`,
+        }
+      : { success: true };
+  } catch {
+    return {
+      success: false,
+      error: 'Wrangler secret list returned invalid JSON',
+    };
+  }
+}
+
 /**
  * Sync a single environment. Returns true on success, false on failure.
  */
-function syncEnvironment(envKey) {
+function syncEnvironment(envKey, configPath) {
   const env = ENV_MAP[envKey];
   if (!env) {
     console.error(
@@ -185,10 +262,28 @@ function syncEnvironment(envKey) {
     console.log(`  \x1b[90mExcluded: ${excluded.join(', ')}\x1b[0m`);
   }
 
-  const result = pushToWorker(filtered, env.wranglerEnv);
+  const result = pushToWorker(
+    filtered,
+    env.wranglerEnv,
+    env.workerName,
+    configPath,
+  );
   if (result.success) {
+    const verification = verifyWorkerSecretNames(
+      Object.keys(filtered),
+      env.wranglerEnv,
+      env.workerName,
+      configPath,
+    );
+    if (!verification.success) {
+      console.error(
+        `  \x1b[31m✗ Could not verify synced keys on ${env.workerName}\x1b[0m`,
+      );
+      console.error(`  ${verification.error}`);
+      return false;
+    }
     console.log(
-      `  \x1b[32m✓ Synced ${syncCount} secrets to ${env.workerName}\x1b[0m`,
+      `  \x1b[32m✓ Synced and verified ${syncCount} secrets on ${env.workerName}\x1b[0m`,
     );
     return true;
   }
@@ -205,12 +300,13 @@ function syncEnvironment(envKey) {
  */
 function syncSecrets(targets) {
   const envs = targets && targets.length > 0 ? targets : ['dev', 'stg', 'prd'];
+  const configPath = process.env.WRANGLER_SYNC_CONFIG;
 
   console.log(
     '\x1b[36m\x1b[1m[Doppler → Cloudflare Workers] Secret Sync\x1b[0m',
   );
 
-  if (!isWranglerConfigRendered()) {
+  if (shouldSkipSync(isWranglerConfigRendered(), configPath)) {
     console.log(
       '\x1b[33m[sync]\x1b[0m wrangler.toml account_id is an unrendered ' +
         'placeholder (__CF_ACCOUNT_ID__) — skipping Cloudflare Worker secret sync.',
@@ -229,7 +325,7 @@ function syncSecrets(targets) {
     return { ok: true, results: {} };
   }
 
-  if (!isWranglerAuthenticated()) {
+  if (!isWranglerAuthenticated(configPath)) {
     console.log(
       '\x1b[33m[sync]\x1b[0m Wrangler not authenticated — skipping Cloudflare sync.',
     );
@@ -240,7 +336,7 @@ function syncSecrets(targets) {
 
   const results = {};
   for (const target of envs) {
-    results[target] = syncEnvironment(target);
+    results[target] = syncEnvironment(target, configPath);
   }
 
   console.log('');
@@ -251,7 +347,13 @@ function syncSecrets(targets) {
 
 // Export for use as a module (called by setup-env.js);
 // isRenderedWranglerToml is exported for the regression test.
-module.exports = { syncSecrets, isRenderedWranglerToml };
+module.exports = {
+  buildWranglerBulkArgs,
+  findMissingSecretNames,
+  isRenderedWranglerToml,
+  shouldSkipSync,
+  syncSecrets,
+};
 
 // CLI entry point — only runs when called directly
 if (require.main === module) {

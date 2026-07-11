@@ -57,6 +57,20 @@ if [ "$GIT_DIR_PATH" != "$GIT_COMMON_PATH" ]; then
   exit 1
 fi
 
+# ── Guard against a shared .git/config flipped to core.bare=true ───────
+# A concurrent worktree-add race on the shared .git/config can momentarily
+# leave core.bare=true, which makes `git rev-parse --show-toplevel` fail
+# outright (a bare repo has no work tree) with a raw git error before this
+# script's own error handling can engage. Detect it and fail loudly with an
+# actionable remediation instead of surfacing that raw error.
+if [ "$(git config --get core.bare 2>/dev/null || echo false)" = "true" ]; then
+  echo "ERROR: the shared .git/config has core.bare=true." >&2
+  echo "       This repo must never be bare; something (a rare worktree-add" >&2
+  echo "       race, or a manual edit) toggled it. Fix it and retry:" >&2
+  echo "         git config core.bare false" >&2
+  exit 1
+fi
+
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 

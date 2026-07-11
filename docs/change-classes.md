@@ -20,7 +20,7 @@ is the cross-package suite under `tests/integration/`.
 | Class | File Pattern | Fast | Slow | Notes |
 |---|---|---|---|---|
 | **db-schema** | `packages/database/src/schema/**` | `db:push:dev`, `db:generate:dev` | `test:api:integration` | Never push to staging/prod |
-| **db-migrations** | `packages/database/drizzle/**` | `db:migrate:dev` | `test:api:integration` | Migrate before deploy; rollback section if dropping |
+| **db-migrations** | `packages/database/drizzle/**` | `db:migrate:dev`, `nx run @eduagent/database:test` | `test:api:integration` | Migrate before deploy; rollback section if dropping. Emits `--github-output database=true`; the `Database package tests (db-migrations — WI-1164)` ci.yml step runs the suite on PRs |
 | **llm-prompts** | `services/**/*-prompts.ts`, `services/llm/*.ts` | `eval:llm` | `eval:llm --live`, `test:llm:enduser` | Pre-commit enforces snapshot staging |
 | **llm-routing** | `services/llm/router.ts`, `services/session/session-exchange.ts`, `services/subscription.ts`, `scripts/premium-routing-pass.ts` | — | `test:llm:premium-routing` | Live Plus/Family advanced-model routing gate |
 | **llm-book-generation** | `packages/schemas/src/subjects.ts`, `services/book-generation.ts`, `services/book-suggestion-generation.ts`, `services/curriculum.ts`, `services/session/session-context-builders.ts`, `scripts/book-generation-pass.ts` | — | `test:llm:book-generation` | Live book/topic-map generation quality gate |
