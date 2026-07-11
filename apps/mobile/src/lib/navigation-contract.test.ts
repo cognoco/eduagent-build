@@ -504,6 +504,7 @@ describe('resolveNavigationContract gates', () => {
         showAccountSecurity: true,
         showBilling: true,
         showCelebrationsChildEditor: true,
+        showMentorLanguageChildEditor: true,
         showExportDelete: true,
         showFamilyChildActivity: true,
         showLearnThisToo: true,
@@ -537,6 +538,7 @@ describe('resolveNavigationContract gates', () => {
         showAddChild: false,
         showBilling: false,
         showCelebrationsChildEditor: false,
+        showMentorLanguageChildEditor: false,
         showExportDelete: false,
         showFamilyChildActivity: false,
         showLearnThisToo: false,
@@ -1085,6 +1087,7 @@ describe('resolveNavigationContract snapshot surface', () => {
         showAddChild: false,
         showBilling: false,
         showCelebrationsChildEditor: false,
+        showMentorLanguageChildEditor: false,
         showExportDelete: false,
         showFamilyChildActivity: false,
         showFamilyHome: false,
@@ -1135,6 +1138,7 @@ describe('resolveNavigationContract snapshot surface', () => {
         showAddChild: true,
         showBilling: true,
         showCelebrationsChildEditor: true,
+        showMentorLanguageChildEditor: true,
         showExportDelete: true,
         showFamilyChildActivity: true,
         showFamilyHome: true,
@@ -1185,6 +1189,7 @@ describe('resolveNavigationContract snapshot surface', () => {
         showAddChild: false,
         showBilling: false,
         showCelebrationsChildEditor: false,
+        showMentorLanguageChildEditor: false,
         showExportDelete: false,
         showFamilyChildActivity: false,
         showFamilyHome: false,
@@ -1232,6 +1237,7 @@ describe('resolveNavigationContract snapshot surface', () => {
         showAddChild: false,
         showBilling: false,
         showCelebrationsChildEditor: false,
+        showMentorLanguageChildEditor: false,
         showExportDelete: false,
         showFamilyChildActivity: false,
         showFamilyHome: false,
@@ -1282,6 +1288,7 @@ describe('resolveNavigationContract snapshot surface', () => {
         showAddChild: true,
         showBilling: true,
         showCelebrationsChildEditor: false,
+        showMentorLanguageChildEditor: false,
         showExportDelete: true,
         showFamilyChildActivity: false,
         showFamilyHome: false,
@@ -1412,6 +1419,7 @@ describe('V0 fallback - hard constraint (AGENTS.md, spec section Hard Constraint
     expect(contract.diagnostic.reason).toBe('legacy-v0-flags-off');
     expect(contract.gates.showAccommodationChildEditor).toBe(true);
     expect(contract.gates.showCelebrationsChildEditor).toBe(true);
+    expect(contract.gates.showMentorLanguageChildEditor).toBe(true);
     expect(contract.gates.showRemoveFamilyMember).toBe(true);
     expect(contract.gates.showAddChild).toBe(true);
     // Other child-editor gates stay V1-only — their consumers retain V0 splits.
@@ -1440,6 +1448,7 @@ describe('V0 fallback - hard constraint (AGENTS.md, spec section Hard Constraint
 
     expect(contract.gates.showAccommodationChildEditor).toBe(false);
     expect(contract.gates.showCelebrationsChildEditor).toBe(false);
+    expect(contract.gates.showMentorLanguageChildEditor).toBe(false);
     expect(contract.gates.showRemoveFamilyMember).toBe(false);
     expect(contract.gates.showAddChild).toBe(false);
   });

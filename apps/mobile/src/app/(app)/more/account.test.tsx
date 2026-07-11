@@ -212,4 +212,32 @@ describe('AccountScreen', () => {
     // Clerk mock returns fullName='Alex Test'
     active.result.getByText('Alex Test');
   });
+
+  // WI-1496 — mentor language row (profiles.conversationLanguage), distinct
+  // from the App Language row (i18next UI shell) tested above.
+  it('shows an enabled mentor-language row for an owner, navigating to the picker', () => {
+    active = renderScreen(<AccountScreen />, {
+      profile: ownerProfile,
+      routes: defaultRoutes,
+    });
+    const row = active.result.getByTestId('settings-mentor-language');
+    fireEvent.press(row);
+    expect(mockPush).toHaveBeenCalledWith('/(app)/more/mentor-language');
+  });
+
+  it('shows a disabled mentor-language row with explanatory copy for a non-owner child, without hiding the current value', () => {
+    active = renderScreen(<AccountScreen />, {
+      profile: childProfile,
+      routes: defaultRoutes,
+    });
+    const row = active.result.getByTestId('settings-mentor-language');
+    // Still shows the resolved language (default 'en' → 'English'), not blank.
+    expect(row).toHaveTextContent(/English/);
+    expect(row).toHaveTextContent(
+      /Only the account owner can change the mentor's language\./,
+    );
+    mockPush.mockClear();
+    fireEvent.press(row);
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 });

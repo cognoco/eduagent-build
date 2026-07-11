@@ -547,7 +547,8 @@
       "mentorLanguage": "Idioma do mentor",
       "subscription": "Assinatura",
       "signOut": "Sair",
-      "couldNotSignOut": "Não foi possível sair"
+      "couldNotSignOut": "Não foi possível sair",
+      "mentorLanguageDisabledHint": "Apenas o proprietário da conta pode alterar o idioma do mentor."
     },
     "other": {
       "helpAndSupport": "Ajuda e Suporte",
@@ -598,6 +599,12 @@
     "proxyPreview": {
       "title": "Configurações pausadas na pré-visualização dos pais",
       "description": "Volte para sua conta para alterar configurações. Enquanto visualiza como criança, esta área fica bloqueada."
+    },
+    "mentorLanguage": {
+      "screenTitle": "Idioma do mentor",
+      "childScreenTitle": "Idioma do mentor de {{name}}",
+      "screenDescription": "Escolha o idioma que seu mentor usa para falar com você. Este idioma é independente do idioma dos menus do aplicativo.",
+      "conversationOnlyHint": "O mentor falará em {{language}}; os menus do app continuarão em inglês."
     }
   },
   "session": {

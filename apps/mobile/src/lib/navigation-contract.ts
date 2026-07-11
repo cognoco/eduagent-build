@@ -99,6 +99,7 @@ export interface NavigationGates {
   showProgressProfilePicker: boolean;
   showAccommodationChildEditor: boolean;
   showCelebrationsChildEditor: boolean;
+  showMentorLanguageChildEditor: boolean;
   showInlineStudyInvite: boolean;
   showLearnThisToo: boolean;
   progressScope: 'self' | 'children';
@@ -379,7 +380,7 @@ export function resolveGates(
       context.activeProfile !== null
     : isAdultOwner(context.activeProfile) && ownerNotProxy;
   const childEditorGate = ownerRole && familyShape && !context.isParentProxy;
-  // More-screen child editors (accommodation/celebrations) and the linked-
+  // More-screen child editors (accommodation/celebrations/mentor-language) and the linked-
   // child removal/withdrawal-archive gate were previously V1-only because
   // they required `familyShape`, which V0 never sets. V0's production
   // behavior is broader — any owner (not in proxy) sees these affordances —
@@ -423,6 +424,7 @@ export function resolveGates(
     showProgressProfilePicker: childEditorGate,
     showAccommodationChildEditor: moreScreenChildEditorGate,
     showCelebrationsChildEditor: moreScreenChildEditorGate,
+    showMentorLanguageChildEditor: moreScreenChildEditorGate,
     showInlineStudyInvite: ownerRole && familyCapable && !context.isParentProxy,
     showLearnThisToo: learnThisTooGate,
     progressScope: familyShape ? 'children' : 'self',

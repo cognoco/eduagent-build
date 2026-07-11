@@ -520,7 +520,8 @@
       "mentorLanguage": "メンターの言語",
       "subscription": "サブスクリプション",
       "signOut": "サインアウト",
-      "couldNotSignOut": "サインアウトできませんでした"
+      "couldNotSignOut": "サインアウトできませんでした",
+      "mentorLanguageDisabledHint": "アカウントの所有者のみがメンターの言語を変更できます。"
     },
     "other": {
       "helpAndSupport": "ヘルプとサポート",
@@ -571,6 +572,12 @@
     "proxyPreview": {
       "title": "保護者プレビューでは設定は一時停止されています",
       "description": "設定を変更するには自分のアカウントに戻ってください。子どもとして表示している間、このエリアはロックされます。"
+    },
+    "mentorLanguage": {
+      "screenTitle": "メンターの言語",
+      "childScreenTitle": "{{name}}さんのメンターの言語",
+      "screenDescription": "メンターがあなたと話すときに使う言語を選んでください。これはアプリのメニュー言語とは別の設定です。",
+      "conversationOnlyHint": "メンターは{{language}}で話します。アプリのメニューは英語のままです。"
     }
   },
   "session": {
