@@ -139,6 +139,18 @@ type TestEnv = {
   };
 };
 
+function createUncredentialedDb(): Database {
+  return {
+    select: jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    }),
+  } as unknown as Database;
+}
+
 function makeApp(overrides?: {
   accountId?: string;
   isOwner?: boolean;
@@ -149,7 +161,7 @@ function makeApp(overrides?: {
 }) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
-    c.set('db', {} as Database);
+    c.set('db', createUncredentialedDb());
     c.set(
       'user',
       overrides?.user ?? {
@@ -895,6 +907,7 @@ describe('PATCH /v1/profiles/:id', () => {
       } as Account);
       // Non-owner active profile = PROFILE_ID_A
       c.set('profileId', PROFILE_ID_A);
+      c.set('callerPersonId', PROFILE_ID_A);
       c.set('profileMeta', {
         isOwner: false,
         birthYear: 2008,
@@ -993,6 +1006,7 @@ describe('PATCH /v1/profiles/:id', () => {
       // resolvedVia:'explicit-header' mirrors real mobile client behaviour
       // (X-Profile-Id always sent). Without it the first guard (Issue 901) fires.
       c.set('profileId', PROFILE_ID_A);
+      c.set('callerPersonId', PROFILE_ID_A);
       c.set('profileMeta', {
         isOwner: false,
         birthYear: 2008,
@@ -1212,6 +1226,7 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
 
     const appSelfUpdate = makeApp({
       profileId: PROFILE_ID_A,
+      callerPersonId: PROFILE_ID_A,
       profileMeta: {
         isOwner: false,
         birthYear: 2008,

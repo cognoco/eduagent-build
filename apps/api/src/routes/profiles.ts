@@ -27,6 +27,7 @@ import {
   updateProfileV2,
 } from '../services/identity-v2/profile-v2';
 import { verifyPersonIsOrgAdminV2 } from '../services/identity-v2/ownership-v2';
+import { assertChargeNotCredentialed } from '../services/family-access';
 
 import {
   notFound,
@@ -333,7 +334,11 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const db = c.get('db');
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
-    const profile = await getProfileV2(db, c.req.param('id'), account.id);
+    const id = c.req.param('id');
+    if (c.get('callerPersonId') !== id) {
+      await assertChargeNotCredentialed(db, id);
+    }
+    const profile = await getProfileV2(db, id, account.id);
     if (!profile) return notFound(c, 'Profile not found');
     return c.json(profileResponseSchema.parse({ profile }));
   })
@@ -372,6 +377,10 @@ export const profileRoutes = new Hono<ProfileEnv>()
           ERROR_CODES.FORBIDDEN,
           'Only the account owner can update other profiles.',
         );
+      }
+
+      if (c.get('callerPersonId') !== id) {
+        await assertChargeNotCredentialed(db, id);
       }
 
       let profile: Awaited<ReturnType<typeof updateProfileAppContext>>;
@@ -432,6 +441,10 @@ export const profileRoutes = new Hono<ProfileEnv>()
           ERROR_CODES.FORBIDDEN,
           'Only the account owner can update other profiles.',
         );
+      }
+
+      if (c.get('callerPersonId') !== id) {
+        await assertChargeNotCredentialed(db, id);
       }
 
       const profile = await updateProfileV2(db, id, account.id, input);
