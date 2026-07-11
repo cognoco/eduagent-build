@@ -455,4 +455,47 @@ describe('checkFile — integration', () => {
     ].join('\n');
     expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
   });
+
+  // WI-1355 variant (a): gc1-allow trails the specifier on the SAME line,
+  // inside a genuinely multi-line jest.mock( call. Found diagnosing PR 1842
+  // (3 false violations) — the captured `content` slice ended at the
+  // specifier literal's own end, so a comment after it on that line fell
+  // outside the slice GC1_ALLOW.test() inspects.
+  it('allows a multiline internal mock with gc1-allow trailing the specifier on the same line', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      '+jest.mock(',
+      "+  './services/foo', // gc1-allow: unit-test boundary",
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo', // gc1-allow: unit-test boundary",
+      '  () => ({ bar: jest.fn() })',
+      ');',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
+  // WI-1355 variant (b): gc1-allow sits on its OWN line, immediately after
+  // the specifier line, before the factory function begins.
+  it('allows a multiline internal mock with gc1-allow on its own line immediately after the specifier', () => {
+    const diff = [
+      '@@ -0,0 +1,5 @@',
+      '+jest.mock(',
+      "+  './services/foo',",
+      '+  // gc1-allow: unit-test boundary',
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo',",
+      '  // gc1-allow: unit-test boundary',
+      '  () => ({ bar: jest.fn() })',
+      ');',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
 });

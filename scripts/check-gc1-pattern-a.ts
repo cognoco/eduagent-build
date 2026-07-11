@@ -175,11 +175,37 @@ function findAddedMockCallsFromSource(
         const specifier = firstArg ? getStringLiteralText(firstArg) : null;
         if (specifier?.startsWith('./') || specifier?.startsWith('../')) {
           let end = firstArg ? firstArg.getEnd() : node.getEnd();
-          // Preserve the existing same-line escape hatch:
-          // `jest.mock('./foo', () => ({})); // gc1-allow: reason`.
           if (getLineNumber(sourceFile, node.getEnd()) === line) {
+            // Preserve the existing same-line escape hatch:
+            // `jest.mock('./foo', () => ({})); // gc1-allow: reason`.
             const lineEnd = stagedSrc.indexOf('\n', node.getEnd());
             end = lineEnd === -1 ? stagedSrc.length : lineEnd;
+          } else {
+            // Multi-line call: a `gc1-allow` escape hatch may trail the
+            // specifier on its own physical line, or sit on its own line
+            // immediately after the specifier before the factory body.
+            // Widen `end` through the rest of the specifier's line, then
+            // through any following blank/comment-only trivia lines
+            // (bounded so a long factory body is never swallowed).
+            let cursor = stagedSrc.indexOf('\n', end);
+            end = cursor === -1 ? stagedSrc.length : cursor;
+            for (let scanned = 0; scanned < 15 && cursor !== -1; scanned++) {
+              const nextCursor = stagedSrc.indexOf('\n', cursor + 1);
+              const lineEndPos =
+                nextCursor === -1 ? stagedSrc.length : nextCursor;
+              const trimmed = stagedSrc.slice(cursor + 1, lineEndPos).trim();
+              if (
+                trimmed === '' ||
+                trimmed.startsWith('//') ||
+                trimmed.startsWith('/*') ||
+                trimmed.startsWith('*')
+              ) {
+                cursor = nextCursor;
+                end = cursor === -1 ? stagedSrc.length : cursor;
+                continue;
+              }
+              break;
+            }
           }
           sites.push({
             line,
