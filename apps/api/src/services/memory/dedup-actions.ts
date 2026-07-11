@@ -8,6 +8,7 @@ import {
 } from '@eduagent/database';
 
 import { normalizeMemoryValue } from '../learner-profile';
+import * as learningTextGuard from '../persisted-learning-text-guard';
 import type { DedupResponse } from './dedup-prompt';
 
 type DedupActionDb = Pick<Database, 'delete' | 'insert' | 'update'>;
@@ -54,6 +55,7 @@ export type DedupActionOutcome =
   | { kind: 'keep_both' }
   | { kind: 'discard_new'; deletedId: string }
   | { kind: 'merge_rejected_new_content'; offendingTokens: string[] }
+  | { kind: 'merge_rejected_clinical_inference' }
   | { kind: 'merge_rejected_metadata_mismatch' };
 
 export interface ApplyDedupActionArgs {
@@ -64,7 +66,7 @@ export interface ApplyDedupActionArgs {
 
 function maxConfidence(
   a: 'low' | 'medium' | 'high',
-  b: 'low' | 'medium' | 'high'
+  b: 'low' | 'medium' | 'high',
 ): 'low' | 'medium' | 'high' {
   return CONFIDENCE_RANK[a] >= CONFIDENCE_RANK[b] ? a : b;
 }
@@ -83,14 +85,14 @@ function tokenize(value: string): string[] {
 export function findNewContentTokens(
   merged: string,
   candidateText: string,
-  neighbourText: string
+  neighbourText: string,
 ): string[] {
   const allowed = new Set([
     ...tokenize(candidateText),
     ...tokenize(neighbourText),
   ]);
   return Array.from(new Set(tokenize(merged))).filter(
-    (token) => !STOPWORDS.has(token) && !allowed.has(token)
+    (token) => !STOPWORDS.has(token) && !allowed.has(token),
   );
 }
 
@@ -102,7 +104,7 @@ function metadataRecord(value: unknown): Record<string, unknown> {
 
 function metadataIndexKeysAgree(
   candidate: Record<string, unknown>,
-  neighbour: Record<string, unknown>
+  neighbour: Record<string, unknown>,
 ): boolean {
   return (
     (candidate.subject ?? '') === (neighbour.subject ?? '') &&
@@ -112,7 +114,7 @@ function metadataIndexKeysAgree(
 
 export async function applyDedupAction(
   tx: DedupActionDb,
-  args: ApplyDedupActionArgs
+  args: ApplyDedupActionArgs,
 ): Promise<DedupActionOutcome> {
   const { action, candidate, neighbour } = args;
 
@@ -124,8 +126,8 @@ export async function applyDedupAction(
       .where(
         and(
           eq(memoryFacts.id, candidate.id),
-          eq(memoryFacts.profileId, candidate.profileId)
-        )
+          eq(memoryFacts.profileId, candidate.profileId),
+        ),
       );
     return { kind: 'discard_new', deletedId: candidate.id };
   }
@@ -138,8 +140,8 @@ export async function applyDedupAction(
       .where(
         and(
           eq(memoryFacts.id, neighbour.id),
-          eq(memoryFacts.profileId, neighbour.profileId)
-        )
+          eq(memoryFacts.profileId, neighbour.profileId),
+        ),
       );
     return { kind: 'supersede', supersededId: neighbour.id };
   }
@@ -147,10 +149,17 @@ export async function applyDedupAction(
   const offendingTokens = findNewContentTokens(
     action.merged_text,
     candidate.text,
-    neighbour.text
+    neighbour.text,
   );
   if (offendingTokens.length > 0) {
     return { kind: 'merge_rejected_new_content', offendingTokens };
+  }
+  if (
+    learningTextGuard.scrubClinicalInferenceFromLearningRecord(
+      action.merged_text,
+    ) === null
+  ) {
+    return { kind: 'merge_rejected_clinical_inference' };
   }
 
   const candidateMetadata = metadataRecord(candidate.metadata);
@@ -169,11 +178,11 @@ export async function applyDedupAction(
     metadata: { ...neighbourMetadata, ...candidateMetadata },
     sourceSessionIds: unionUnique(
       candidate.sourceSessionIds,
-      neighbour.sourceSessionIds
+      neighbour.sourceSessionIds,
     ),
     sourceEventIds: unionUnique(
       candidate.sourceEventIds,
-      neighbour.sourceEventIds
+      neighbour.sourceEventIds,
     ),
     observedAt:
       candidate.observedAt > neighbour.observedAt
@@ -192,8 +201,8 @@ export async function applyDedupAction(
       .where(
         and(
           eq(memoryFacts.id, id),
-          eq(memoryFacts.profileId, candidate.profileId)
-        )
+          eq(memoryFacts.profileId, candidate.profileId),
+        ),
       );
   }
 

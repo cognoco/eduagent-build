@@ -14,6 +14,7 @@ import { assertOwnedCurriculumTopic } from './curriculum-topic-ownership';
 import { createLogger } from './logger';
 import { paginateRows } from './pagination';
 import { captureException } from './sentry';
+import * as learningTextGuard from './persisted-learning-text-guard';
 
 const MAX_NOTES_PER_TOPIC = 50;
 const POSTGRES_UNDEFINED_COLUMN = '42703';
@@ -159,6 +160,7 @@ async function insertNoteWithCap(
   },
   options: { dedupeExactSessionContent?: boolean } = {},
 ): Promise<MappedNoteRow> {
+  learningTextGuard.assertNoClinicalInferenceInLearningRecord(values.content);
   return db.transaction(async (tx) => {
     const lockKey = `notes:${values.profileId}:${values.topicId}`;
     await tx.execute(
@@ -509,6 +511,7 @@ export async function updateNote(
   noteId: string,
   content: string,
 ): Promise<MappedNoteRow> {
+  learningTextGuard.assertNoClinicalInferenceInLearningRecord(content);
   const [row] = await db
     .update(topicNotes)
     .set({ content, updatedAt: new Date() })

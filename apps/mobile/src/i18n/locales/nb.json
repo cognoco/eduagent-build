@@ -753,6 +753,7 @@
       "retryLabel": "Prøv taleforsøket igjen"
     },
     "chatShell": {
+      "aiDisclosure": "Du snakker med en KI-mentor",
       "defaultSubtitle": "Jeg er her for å hjelpe",
       "defaultPlaceholder": "Skriv en melding ...",
       "imageUnavailable": "Bildet er ikke lenger tilgjengelig",

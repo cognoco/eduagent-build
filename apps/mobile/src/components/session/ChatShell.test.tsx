@@ -235,6 +235,19 @@ describe('ChatShell', () => {
     screen.getByText('Hello student!');
   });
 
+  it('[WI-1195] persistently identifies the chat as an AI interaction', () => {
+    renderChatShell();
+
+    const disclosure = screen.getByTestId('chat-ai-disclosure');
+    expect(disclosure.props.accessibilityLabel).toBe(
+      "You're talking to an AI mentor",
+    );
+    expect(disclosure.props.className).toContain('px-4');
+    const disclosureText = screen.getByText("You're talking to an AI mentor");
+    expect(disclosureText.props.numberOfLines).toBe(2);
+    expect(disclosureText.props.className).toContain('flex-shrink');
+  });
+
   it('renders text input and send button', () => {
     renderChatShell();
 

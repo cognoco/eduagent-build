@@ -299,6 +299,7 @@ export async function runDedupForProfile(
         report.discarded += 1;
         break;
       case 'merge_rejected_new_content':
+      case 'merge_rejected_clinical_inference':
       case 'merge_rejected_metadata_mismatch':
         report.failures += 1;
         report.keptBoth += 1;

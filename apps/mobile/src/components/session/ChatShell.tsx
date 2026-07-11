@@ -906,6 +906,25 @@ export function ChatShell({
           </View>
           {headerRightContent}
         </View>
+        <View
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel={t('session.chatShell.aiDisclosure')}
+          className="flex-row items-center gap-1.5 px-4 pb-2"
+          testID="chat-ai-disclosure"
+        >
+          <Ionicons
+            name="sparkles-outline"
+            size={13}
+            color={colors.textSecondary}
+          />
+          <Text
+            className="text-[11px] text-text-secondary flex-shrink"
+            numberOfLines={2}
+          >
+            {t('session.chatShell.aiDisclosure')}
+          </Text>
+        </View>
         {headerBelow ? <View className="px-4 pb-3">{headerBelow}</View> : null}
       </View>
 
