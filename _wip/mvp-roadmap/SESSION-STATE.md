@@ -1,5 +1,16 @@
 # mvp-roadmap session state — checkpoint 2026-07-10 (session 2 close)
 
+## CURRENT MANDATE (operator, 2026-07-11 — ACTIVE, read first)
+
+**Role: OPQ burn-down assistant + batch-execution orchestrator support.** The operator is processing the open Operator Queue with my help. Just delivered: full review of the 19 open MentoMate OPQs — 4 flagged `3rd party` checkbox (OPQ-8 controller entity, OPQ-22 counsel packet, OPQ-24 retention periods dl 2026-07-25, OPQ-41 helplines) and the remaining 15 sequenced for resolution:
+
+**Ruled sequence:** 1 OPQ-23 (approve GDPR export fields — unblocks WI-1162 in B5) · 2 OPQ-13 (WI-1310 reconciliation approval) · 3 OPQ-40 (trust design pass — unblocks 5 builds → B4/B8) · 4 OPQ-26 (staging MFA fixtures → WI-1406/B5) · 5–6 OPQ-37+OPQ-6 (one store-console sitting; 37 unblocks B6 WI-1341 flip) · 7 OPQ-36 (Inngest prod env; prereq for 27) · 8–9 OPQ-39+OPQ-38 (one Doppler sitting; 39 prereq for 27) · 10 OPQ-27 (alert rules — after 36+39+WI-1500 lands) · 11 OPQ-12 (to_regclass check) · 12 OPQ-25 (dependent on 3rd-party OPQ-24 values) · 13 OPQ-11 (device/beta runs — after prod build). OPQ-30 PINNED (not sequenced; deadline = DPIA signing). OPQ-9 P3 unsequenced.
+
+**OPEN DECISION (asked, unanswered at compaction):** should the sequence be persisted into the OPQ rows (Seq-N note in Options field / Deadline ordering), or is the reply + ledger enough?
+
+Standing context: 8 batches live (Sprint rows; membership + IDs in the section below); every open AC carries a typed `HITL:` line; OPERATOR-GATE-LEDGER.md is the ruling-session record (7/8 ruled + OPQ-30 pin); PGM-1 carries the 2026-07-11 checkpoint; spine session-103 pushed. Cross-batch hold: 1652→1792/1797 (self-clears). Docs-only --no-verify authorization was session-scoped — reconfirm before further main pushes. Key gotchas: use --out-file on capture, never re-run on parse failure; quote-dense python via scratchpad file + `rtk python3`, never inline heredoc; pre-write collision guard on any Cosmo fan-out (snapshots stale in minutes).
+
+
 ## CURRENT MANDATE (operator, 2026-07-10 night — ACTIVE, read first)
 
 **WAVES ARE SCRAPPED (operator ruling).** Replaced by **5 parallel agent batches**, all startable now; Sprint rows are membership SoR (wave rows archived). Operator/legal/manual items (DPO/DPIA 1105/1106, AI-Act self-assessment 1659, compliance docs 1107/1108/1111/1192/1193/1194, counsel consumers 1559/1109, conditionals 1663/1664, flag-combo ruling 1334, trust design 1767) are OUT of agent queues — tag `manual-external`, no Sprint. Trust builds 1497/1498/1499/1501/1502 held sprint-less behind 1767; join Batch 4 when design lands.
