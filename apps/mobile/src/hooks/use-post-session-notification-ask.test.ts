@@ -28,6 +28,26 @@ jest.mock(
   }),
 );
 
+// [WI-1441] Pattern A: spread the real module (its other exports fetch over
+// the network via React Query and are unused here) and override only the two
+// hooks this file actually calls, so the mock is exercised as a targeted
+// override rather than a full-module replacement.
+let mockNotifPrefs:
+  | {
+      reviewReminders: boolean;
+      dailyReminders: boolean;
+      weeklyProgressPush: boolean;
+      weeklyProgressEmail: boolean;
+      monthlyProgressEmail: boolean;
+    }
+  | undefined;
+const mockUpdateMutate = jest.fn();
+jest.mock('./use-settings', () => ({
+  ...jest.requireActual('./use-settings'),
+  useNotificationSettings: () => ({ data: mockNotifPrefs }),
+  useUpdateNotificationSettings: () => ({ mutate: mockUpdateMutate }),
+}));
+
 const mockSecureGet = SecureStore.getItemAsync as jest.Mock;
 const mockSecureSet = SecureStore.setItemAsync as jest.Mock;
 const mockGetPerm = Notifications.getPermissionsAsync as jest.Mock;
@@ -41,6 +61,13 @@ beforeEach(() => {
   mockSecureSet.mockResolvedValue(undefined);
   mockGetPerm.mockResolvedValue({ status: 'undetermined', canAskAgain: true });
   mockReqPerm.mockResolvedValue({ status: 'granted' });
+  mockNotifPrefs = {
+    reviewReminders: true,
+    dailyReminders: false,
+    weeklyProgressPush: false,
+    weeklyProgressEmail: true,
+    monthlyProgressEmail: false,
+  };
 });
 
 afterEach(() => {
@@ -275,5 +302,74 @@ describe('usePostSessionNotificationAsk', () => {
       expect.stringContaining('notificationFirstAskShown_p1'),
       'true',
     );
+  });
+
+  // [WI-1441] Regression guard: granting OS permission via this primer must
+  // sync pushEnabled=true server-side, preserving the rest of the user's
+  // existing notification preferences. Before the fix, requestPermissionsAsync
+  // resolving 'granted' never called the settings-update mutation at all.
+  it('Allow syncs pushEnabled=true server-side, preserving other preference fields', async () => {
+    renderHook(() => usePostSessionNotificationAsk('p1', true, false));
+
+    await waitFor(() => {
+      expect(mockGetPerm).toHaveBeenCalled();
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+
+    expect(mockAlert).toHaveBeenCalledTimes(1);
+    const buttons = mockAlert.mock.calls[0]![2] as Array<{
+      style?: string;
+      onPress?: () => void;
+    }>;
+    const allowBtn = buttons.find((b) => b.style !== 'cancel');
+
+    await act(async () => {
+      allowBtn?.onPress?.();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockUpdateMutate).toHaveBeenCalledWith(
+        {
+          reviewReminders: true,
+          dailyReminders: false,
+          weeklyProgressPush: false,
+          weeklyProgressEmail: true,
+          monthlyProgressEmail: false,
+          pushEnabled: true,
+        },
+        expect.objectContaining({ onError: expect.any(Function) }),
+      );
+    });
+  });
+
+  it('Allow does not sync pushEnabled when the OS request does not resolve granted', async () => {
+    mockReqPerm.mockResolvedValue({ status: 'denied' });
+    renderHook(() => usePostSessionNotificationAsk('p1', true, false));
+
+    await waitFor(() => {
+      expect(mockGetPerm).toHaveBeenCalled();
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+
+    const buttons = mockAlert.mock.calls[0]![2] as Array<{
+      style?: string;
+      onPress?: () => void;
+    }>;
+    const allowBtn = buttons.find((b) => b.style !== 'cancel');
+
+    await act(async () => {
+      allowBtn?.onPress?.();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockReqPerm).toHaveBeenCalledTimes(1);
+    });
+    expect(mockUpdateMutate).not.toHaveBeenCalled();
   });
 });
