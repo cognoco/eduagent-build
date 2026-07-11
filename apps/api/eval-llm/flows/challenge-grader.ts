@@ -53,8 +53,7 @@
 // Candidate → OpenRouter slug mapping:
 //   Sonnet 4.6 (default, stronger):  anthropic/claude-sonnet-4-6
 //   Haiku 4.5  (demotion candidate): anthropic/claude-haiku-4-5
-//   GPT-5-mini (optional):           openai/gpt-4o-mini   ← verify slug at
-//                                    openrouter.ai before running
+//   GPT-5-mini (optional):           openai/gpt-5-mini
 //
 // BAKE-OFF COMMANDS (run one per candidate — needs Doppler stg + OPENROUTER_API_KEY):
 //
@@ -66,9 +65,9 @@
 //   doppler run -c stg -- pnpm eval:llm -- --flow challenge-grader --live \
 //     --openrouter-model anthropic/claude-haiku-4-5
 //
-//   # Candidate 3 — GPT-5-mini (optional; verify slug at openrouter.ai)
+//   # Candidate 3 — GPT-5-mini (optional)
 //   doppler run -c stg -- pnpm eval:llm -- --flow challenge-grader --live \
-//     --openrouter-model openai/gpt-4o-mini
+//     --openrouter-model openai/gpt-5-mini
 //
 // After each run: restore snapshots before committing:
 //   git checkout -- apps/api/eval-llm/snapshots
