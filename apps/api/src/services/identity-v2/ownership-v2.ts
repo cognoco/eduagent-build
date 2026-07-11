@@ -19,7 +19,12 @@
 // middleware — NEVER request-supplied) and authorizes the write only when the
 // caller is:
 //   - SELF     — callerPersonId === targetPersonId, OR
-//   - GUARDIAN — an active guardianship edge caller→target (isGuardianOf).
+//   - GUARDIAN — an active guardianship edge caller→target (isGuardianOf),
+//     provided the target has no Login. Per domain-model.md §4, Guardianship
+//     capability placement — Option A (MMT-ADR-0008), a credentialed charge
+//     suppresses guardian operate/write authority. Guardian writes to a
+//     credentialed charge are blocked by default (OPQ-32); exceptions may only
+//     arrive as future named capabilities with provenance (WI-1765).
 // Supporter edges are excluded by canon: §2A.4 makes the supporter edge
 // data-access-only (read/visibility), never write.
 //
@@ -34,7 +39,8 @@
 // ---------------------------------------------------------------------------
 
 import { and, eq, sql } from 'drizzle-orm';
-import { membership, type Database } from '@eduagent/database';
+import { login, membership, type Database } from '@eduagent/database';
+import { ForbiddenError } from '@eduagent/schemas';
 import { isGuardianOf } from './guardianship';
 
 /**
@@ -48,8 +54,9 @@ import { isGuardianOf } from './guardianship';
  * request-supplied).
  *
  * Authorizes only when the target is a member of the org AND the caller is the
- * target (self) OR holds an active guardianship edge over the target. Throws
- * (matching the legacy guard's throw-on-miss contract) otherwise.
+ * target (self) OR holds an active guardianship edge over a target with no
+ * Login. Throws (matching the legacy guard's throw-on-miss contract)
+ * otherwise.
  */
 export async function verifyPersonOwnershipV2(
   db: Database,
@@ -78,7 +85,17 @@ export async function verifyPersonOwnershipV2(
     return; // self-ownership is intrinsic
   }
   if (await isGuardianOf(db, callerPersonId, personId)) {
-    return; // guardian operate/manage over the charge
+    const [credential] = await db
+      .select({ personId: login.personId })
+      .from(login)
+      .where(eq(login.personId, personId))
+      .limit(1);
+    if (credential) {
+      throw new ForbiddenError(
+        `WI-787 credentialed-charge suppression: guardian writes to credentialed charge ${personId} are blocked`,
+      );
+    }
+    return; // guardian operate/manage over the managed charge
   }
   throw new Error(
     `Person ${callerPersonId} lacks write authority over person ${personId}`,
