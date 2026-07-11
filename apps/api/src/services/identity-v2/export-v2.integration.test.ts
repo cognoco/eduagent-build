@@ -34,6 +34,7 @@
 
 import { resolve } from 'path';
 import { eq } from 'drizzle-orm';
+import { DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS } from '@eduagent/schemas';
 import {
   consentGrant,
   createDatabase,
@@ -321,26 +322,9 @@ describeIfDb('generateExportV2 subscription mapping [WI-1161]', () => {
     expect(row.payerPersonId).toBe(owner!.id);
     expect(row.storeProductId).toBe('com.mentomate.plus.monthly');
     expect(row.storePlatform).toBe('APP_STORE');
-    expect(
-      (result as unknown as { subscriptionFieldDescriptions?: unknown })
-        .subscriptionFieldDescriptions,
-    ).toEqual({
-      payerPersonId: {
-        label: 'Person responsible for payment',
-        description:
-          'The identifier of the person responsible for the subscription payment relationship.',
-      },
-      storeProductId: {
-        label: 'Store product',
-        description:
-          'The product identifier assigned by the app store for this subscription, when applicable.',
-      },
-      storePlatform: {
-        label: 'Store platform',
-        description:
-          'The app-store platform that supplied this subscription, when applicable.',
-      },
-    });
+    expect(result.subscriptionFieldDescriptions).toEqual(
+      DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
+    );
     // Raw v2 field names are stripped by the schema parse (not leaked):
     expect(row.organizationId).toBeUndefined();
     expect(row.planTier).toBeUndefined();

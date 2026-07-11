@@ -9,24 +9,10 @@ import {
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
 import { TEST_PROFILE_ID, TEST_PROFILE_ID_2 } from '@eduagent/test-utils';
-
-const mockSubscriptionFieldDescriptions = {
-  payerPersonId: {
-    label: 'Person responsible for payment',
-    description:
-      'The identifier of the person responsible for the subscription payment relationship.',
-  },
-  storeProductId: {
-    label: 'Store product',
-    description:
-      'The product identifier assigned by the app store for this subscription, when applicable.',
-  },
-  storePlatform: {
-    label: 'Store platform',
-    description:
-      'The app-store platform that supplied this subscription, when applicable.',
-  },
-} as const;
+import {
+  DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
+  ERROR_CODES,
+} from '@eduagent/schemas';
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -173,7 +159,8 @@ jest.mock('../services/export', () => {
       },
       profiles: [],
       consentStates: [],
-      subscriptionFieldDescriptions: mockSubscriptionFieldDescriptions,
+      subscriptionFieldDescriptions:
+        DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
       exportedAt: new Date().toISOString(),
     }),
   };
@@ -329,7 +316,8 @@ jest.mock('../services/identity-v2/export-v2', () => {
       },
       profiles: [],
       consentStates: [],
-      subscriptionFieldDescriptions: mockSubscriptionFieldDescriptions,
+      subscriptionFieldDescriptions:
+        DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
       exportedAt: new Date().toISOString(),
     }),
   };
@@ -359,7 +347,6 @@ import { captureException, captureMessage } from '../services/sentry';
 import { generateExport } from '../services/export';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError } from '../errors';
-import { ERROR_CODES } from '@eduagent/schemas';
 import {
   scheduleDeletionV2,
   cancelDeletionV2,
