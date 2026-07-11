@@ -26,9 +26,13 @@ const providerErrorSchema = z.object({
 });
 
 // Prompt-cache usage metadata for cache observability (WI-1827). Every field
-// is `.catch(undefined)` so a present-but-malformed usage block degrades to
-// absent instead of failing the whole response parse — usage capture must
-// never turn a good LLM response into a provider error (AC clause 4).
+// is `.optional().catch(undefined)` so an absent, null, or malformed usage
+// block degrades to `undefined` instead of failing the whole response parse —
+// usage capture must never turn a good LLM response into a provider error (AC
+// clause 4). `.optional()` admits absent/undefined (and is required for the
+// `.catch(undefined)` output type); `.catch` absorbs null and malformed. No
+// `.nullable()` — response-schema convention forbids `.nullable().optional()`
+// (AGENTS Known Exceptions), and `.catch` already covers the null case.
 //
 // OpenAI-compatible providers (OpenAI, Cerebras) report automatic prompt-cache
 // hits under `usage.prompt_tokens_details.cached_tokens`.
@@ -36,9 +40,8 @@ const openAICompatUsageSchema = z
   .object({
     prompt_tokens_details: z
       .object({
-        cached_tokens: z.number().nullable().optional().catch(undefined),
+        cached_tokens: z.number().optional().catch(undefined),
       })
-      .nullable()
       .optional()
       .catch(undefined),
   })
@@ -130,14 +133,10 @@ const anthropicContentBlockSchema = z.object({
 // verbatim (cache_read_input_tokens = 0 is the prefix-regression signal).
 export const anthropicUsageSchema = z
   .object({
-    input_tokens: z.number().nullable().optional().catch(undefined),
-    output_tokens: z.number().nullable().optional().catch(undefined),
-    cache_creation_input_tokens: z
-      .number()
-      .nullable()
-      .optional()
-      .catch(undefined),
-    cache_read_input_tokens: z.number().nullable().optional().catch(undefined),
+    input_tokens: z.number().optional().catch(undefined),
+    output_tokens: z.number().optional().catch(undefined),
+    cache_creation_input_tokens: z.number().optional().catch(undefined),
+    cache_read_input_tokens: z.number().optional().catch(undefined),
   })
   .optional()
   .catch(undefined);

@@ -423,7 +423,6 @@ describe('toAnthropicFormat — cache_control breakpoint (WI-1779)', () => {
 // ---------------------------------------------------------------------------
 
 const usageMockFetch = jest.fn();
-(global as unknown as { fetch: typeof fetch }).fetch = usageMockFetch;
 
 const USAGE_TEST_MESSAGES: ChatMessage[] = [
   { role: 'system', content: 'You are helpful.' },
@@ -462,6 +461,15 @@ function createUsageSseResponse(...events: string[]): Partial<Response> {
 
 describe('Anthropic Provider — usage metadata (WI-1827)', () => {
   const provider = createAnthropicProvider('test-key');
+  const originalFetch = global.fetch;
+
+  beforeAll(() => {
+    (global as unknown as { fetch: typeof fetch }).fetch = usageMockFetch;
+  });
+
+  afterAll(() => {
+    (global as unknown as { fetch: typeof fetch }).fetch = originalFetch;
+  });
 
   beforeEach(() => {
     usageMockFetch.mockReset();
