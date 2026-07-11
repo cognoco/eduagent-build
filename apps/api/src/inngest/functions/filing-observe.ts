@@ -19,7 +19,7 @@
 // Schemas live in @eduagent/schemas:
 //   filingResolvedEventSchema -- already exported (used by both emitters).
 //
-// Pattern mirrors ask-classification-observe.ts and ask-gate-observe.ts.
+// Pattern mirrors ask-classification-observe.ts.
 // ---------------------------------------------------------------------------
 
 import {

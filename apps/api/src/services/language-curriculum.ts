@@ -1,7 +1,10 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import {
   curricula,
   curriculumTopics,
+  learningSessions,
+  sessionEvents,
+  sessionSummaries,
   subjects,
   vocabulary,
   type Database,
@@ -9,14 +12,17 @@ import {
 import { ensureDefaultBook } from './curriculum-core';
 import {
   languageNextPracticePointerSchema,
+  parseLanguageLearningSummary,
   type CefrLevel,
   type GeneratedTopic,
   type LanguageProgress,
   type LanguageMilestoneProgress,
 } from '@eduagent/schemas';
 import { getLanguageByCode } from '../data/languages';
+import { getLanguageStrandCounts } from './language-session-engine';
 
 const CEFR_LEVELS: CefrLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+const RECENT_LANGUAGE_SESSION_LIMIT = 20;
 
 const MILESTONE_LIBRARY: Record<
   CefrLevel,
@@ -463,6 +469,185 @@ function calculateMilestoneProgress(
   return Math.max(0, Math.min(1, (wordRatio + chunkRatio) / 2));
 }
 
+type SkillProfile = NonNullable<LanguageProgress['skillProfile']>;
+
+interface RecentLanguageEvidence {
+  sessionsSampled: number;
+  strandBalance: LanguageProgress['strandBalance'];
+  summarySkills: Array<
+    Omit<SkillProfile[number], 'skill'> & {
+      skill: Exclude<SkillProfile[number]['skill'], 'vocabulary' | 'reading'>;
+    }
+  >;
+}
+
+async function getRecentLanguageEvidence(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+): Promise<RecentLanguageEvidence> {
+  const recentSessions = await db
+    .select({ sessionId: learningSessions.id })
+    .from(learningSessions)
+    .innerJoin(subjects, eq(learningSessions.subjectId, subjects.id))
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.subjectId, subjectId),
+        eq(subjects.profileId, profileId),
+        inArray(learningSessions.status, ['completed', 'auto_closed']),
+      ),
+    )
+    .orderBy(desc(learningSessions.createdAt))
+    .limit(RECENT_LANGUAGE_SESSION_LIMIT);
+
+  const sessionIds = recentSessions.map((row) => row.sessionId);
+  if (sessionIds.length === 0) {
+    return { sessionsSampled: 0, strandBalance: null, summarySkills: [] };
+  }
+
+  const [summaryRows, eventRows] = await Promise.all([
+    db
+      .select({
+        sessionId: sessionSummaries.sessionId,
+        languageLearningSummary: sessionSummaries.languageLearningSummary,
+      })
+      .from(sessionSummaries)
+      .innerJoin(
+        learningSessions,
+        eq(sessionSummaries.sessionId, learningSessions.id),
+      )
+      .innerJoin(subjects, eq(learningSessions.subjectId, subjects.id))
+      .where(
+        and(
+          inArray(sessionSummaries.sessionId, sessionIds),
+          eq(sessionSummaries.profileId, profileId),
+          eq(learningSessions.profileId, profileId),
+          eq(learningSessions.subjectId, subjectId),
+          eq(subjects.profileId, profileId),
+        ),
+      ),
+    db
+      .select({
+        sessionId: sessionEvents.sessionId,
+        eventType: sessionEvents.eventType,
+        metadata: sessionEvents.metadata,
+      })
+      .from(sessionEvents)
+      .innerJoin(
+        learningSessions,
+        eq(sessionEvents.sessionId, learningSessions.id),
+      )
+      .innerJoin(subjects, eq(learningSessions.subjectId, subjects.id))
+      .where(
+        and(
+          inArray(sessionEvents.sessionId, sessionIds),
+          eq(sessionEvents.profileId, profileId),
+          eq(sessionEvents.subjectId, subjectId),
+          eq(sessionEvents.eventType, 'ai_response'),
+          eq(learningSessions.profileId, profileId),
+          eq(learningSessions.subjectId, subjectId),
+          eq(subjects.profileId, profileId),
+        ),
+      ),
+  ]);
+
+  const counts = getLanguageStrandCounts(eventRows);
+  const strandEvidenceCount = Object.values(counts).reduce(
+    (total, count) => total + count,
+    0,
+  );
+
+  const grammarPatterns = new Set<string>();
+  let comprehensionCorrect = 0;
+  let comprehensionTotal = 0;
+  let speakingAttempts = 0;
+  let fluencyCorrect = 0;
+  let fluencyTotal = 0;
+  const seenSummarySessions = new Set<string>();
+
+  for (const row of summaryRows) {
+    if (seenSummarySessions.has(row.sessionId)) continue;
+    seenSummarySessions.add(row.sessionId);
+    const summary = parseLanguageLearningSummary(row.languageLearningSummary);
+    if (!summary) continue;
+    for (const pattern of summary.grammarPatterns) {
+      grammarPatterns.add(pattern);
+    }
+    if (summary.comprehension) {
+      comprehensionCorrect += summary.comprehension.correct;
+      comprehensionTotal += summary.comprehension.total;
+    }
+    speakingAttempts += summary.speakingAttempts;
+    if (summary.fluency) {
+      fluencyCorrect += summary.fluency.correct;
+      fluencyTotal += summary.fluency.total;
+    }
+  }
+
+  const summarySkills: RecentLanguageEvidence['summarySkills'] = [];
+  if (grammarPatterns.size > 0) {
+    summarySkills.push({
+      skill: 'grammar',
+      progress: null,
+      evidenceCount: grammarPatterns.size,
+    });
+  }
+  if (comprehensionTotal > 0) {
+    summarySkills.push({
+      skill: 'listening',
+      progress: comprehensionCorrect / comprehensionTotal,
+      evidenceCount: comprehensionTotal,
+    });
+  }
+  if (speakingAttempts > 0) {
+    summarySkills.push({
+      skill: 'speaking',
+      progress: null,
+      evidenceCount: speakingAttempts,
+    });
+  }
+  if (fluencyTotal > 0) {
+    summarySkills.push({
+      skill: 'fluency',
+      progress: fluencyCorrect / fluencyTotal,
+      evidenceCount: fluencyTotal,
+    });
+  }
+
+  return {
+    sessionsSampled: recentSessions.length,
+    strandBalance:
+      strandEvidenceCount > 0
+        ? { counts, sessionsSampled: recentSessions.length }
+        : null,
+    summarySkills,
+  };
+}
+
+function buildSkillProfile(
+  evidence: RecentLanguageEvidence,
+  currentMilestone: LanguageMilestoneProgress | null,
+): LanguageProgress['skillProfile'] {
+  if (evidence.sessionsSampled === 0) return null;
+  const skills: SkillProfile = [];
+  if (currentMilestone && currentMilestone.wordsMastered > 0) {
+    skills.push({
+      skill: 'vocabulary',
+      progress:
+        currentMilestone.wordsTarget > 0
+          ? Math.min(
+              1,
+              currentMilestone.wordsMastered / currentMilestone.wordsTarget,
+            )
+          : null,
+      evidenceCount: currentMilestone.wordsMastered,
+    });
+  }
+  skills.push(...evidence.summarySkills);
+  return skills.length > 0 ? skills : null;
+}
+
 export async function getCurrentLanguageProgress(
   db: Database,
   profileId: string,
@@ -485,6 +670,11 @@ export async function getCurrentLanguageProgress(
     .nullable()
     .catch(null)
     .parse(subject.nextLanguagePracticePointer ?? null);
+  const recentEvidence = await getRecentLanguageEvidence(
+    db,
+    profileId,
+    subjectId,
+  );
 
   const curriculum = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, subjectId),
@@ -500,6 +690,8 @@ export async function getCurrentLanguageProgress(
       currentMilestone: null,
       nextMilestone: null,
       nextPractice,
+      strandBalance: recentEvidence.strandBalance,
+      skillProfile: buildSkillProfile(recentEvidence, null),
     };
   }
 
@@ -587,6 +779,8 @@ export async function getCurrentLanguageProgress(
       currentMilestone: null,
       nextMilestone: null,
       nextPractice,
+      strandBalance: recentEvidence.strandBalance,
+      skillProfile: buildSkillProfile(recentEvidence, null),
     };
   }
 
@@ -619,6 +813,8 @@ export async function getCurrentLanguageProgress(
         }
       : null,
     nextPractice,
+    strandBalance: recentEvidence.strandBalance,
+    skillProfile: buildSkillProfile(recentEvidence, currentMilestone),
   };
 }
 

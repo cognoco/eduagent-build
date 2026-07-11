@@ -149,14 +149,10 @@ export const LLM_ROUTE_PATTERNS_ANY_METHOD = [
   // loop and burn unlimited LLM capacity at zero cost. Meter it like any
   // other LLM-driven session endpoint.
   /\/sessions\/[^/]+\/recall-bridge\/?$/,
-  // [BUG-653 / A-5] evaluateSessionDepth runs an LLM call (depth gate +
-  // topic detection). Without metering, an authenticated client could
-  // spam this endpoint and burn unbounded LLM capacity at zero cost.
-  /\/sessions\/[^/]+\/evaluate-depth\/?$/,
   // [WI-149 / DS-060] explainTopicOrdering is GET but invokes routeAndCall
   // to produce a natural-language explanation for a topic's curriculum
   // position. Authenticated abuse possible without metering (same class as
-  // recall-bridge / evaluate-depth). Path uses UUIDs for subject and topic.
+  // recall-bridge). Path uses UUIDs for subject and topic.
   /\/subjects\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/curriculum\/topics\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/explain\/?$/,
 ];
 
@@ -175,7 +171,7 @@ export const LLM_ROUTE_PATTERNS_POST_ONLY = [
   // free-text subject name. Before fix it was missing here AND missing
   // requireProfileId at the route level, letting any authenticated user
   // spam the resolver in a tight loop at zero cost. Same class as
-  // recall-bridge (BUG-623) and evaluate-depth (BUG-653). Route-level
+  // recall-bridge (BUG-623). Route-level
   // requireProfileId is in routes/subjects.ts.
   /\/subjects\/resolve\/?$/,
   // Retry filing re-runs the LLM-backed filing flow. Match only UUIDs so a

@@ -541,3 +541,36 @@ describe('toOpenAIContent', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Best-effort prompt-cache usage (WI-1827)
+// ---------------------------------------------------------------------------
+
+describe('OpenAI Provider — usage (WI-1827)', () => {
+  const provider = createOpenAIProvider(TEST_API_KEY);
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('surfaces prompt_tokens_details.cached_tokens as usage.cachedTokens', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'hi' } }],
+        usage: { prompt_tokens_details: { cached_tokens: 512 } },
+      }),
+      text: async () => '',
+    });
+
+    const result = await provider.chat(TEST_MESSAGES, TEST_CONFIG);
+    expect(result.usage).toEqual({ cachedTokens: 512 });
+  });
+
+  it('omits usage when cached_tokens is absent', async () => {
+    mockFetch.mockResolvedValueOnce(createOkResponse('hi'));
+    const result = await provider.chat(TEST_MESSAGES, TEST_CONFIG);
+    expect(result.usage).toBeUndefined();
+  });
+});

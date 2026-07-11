@@ -11,7 +11,7 @@ import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { createLogger } from '../../logger';
 import { SafetyFilterError } from '../../../errors';
 import { createProviderApiError, createProviderHttpError } from './errors';
-import { toOpenAIContent } from './openai';
+import { toOpenAIContent, toOpenAICompatLlmUsage } from './openai';
 import { normalizeModelRefusal } from './refusal-envelope';
 import {
   cerebrasResponseSchema,
@@ -261,6 +261,7 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
       return {
         content: normalized ?? text,
         stopReason: normalizeStopReason('openai', choice?.finish_reason),
+        usage: toOpenAICompatLlmUsage(data.usage),
       };
     },
 
