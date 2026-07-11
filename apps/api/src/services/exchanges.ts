@@ -26,7 +26,7 @@ import {
   type ChallengeRoundNoteDraftHint,
 } from '@eduagent/schemas';
 import {
-  buildSystemPrompt as _buildSystemPrompt,
+  buildSystemPromptSegments as _buildSystemPromptSegments,
   allowsGeneralKnowledgeSource,
 } from './exchange-prompts';
 import { stripPhoneticHints } from './llm/sanitize';
@@ -667,6 +667,26 @@ export function estimateExpectedResponseMinutes(
 // ---------------------------------------------------------------------------
 
 export { buildSystemPrompt } from './exchange-prompts';
+
+// WI-1779: assemble the exchange system message, marking the cache-stable
+// prefix so the Anthropic adapter places a `cache_control` breakpoint at the
+// stable/volatile split (OpenAI/Cerebras auto-cache the identical prefix).
+function buildExchangeSystemMessage(
+  promptContext: ExchangeContext,
+  appHelpTurn: boolean,
+): ChatMessage {
+  const { stablePrefix, volatileSuffix } = _buildSystemPromptSegments(
+    promptContext,
+    {
+      includeAppHelpMap: appHelpTurn,
+      graderEnabled: promptContext.graderEnabled,
+    },
+  );
+  const content = volatileSuffix
+    ? `${stablePrefix}\n\n${volatileSuffix}`
+    : stablePrefix;
+  return { role: 'system', content, cachePrefixLength: stablePrefix.length };
+}
 
 const SOURCE_EXCERPT_MAX_CHARS = 360;
 
@@ -1812,13 +1832,8 @@ export async function processExchange(
     appHelpTurn,
   });
   const promptContext: ExchangeContext = { ...context, sourceEvidence };
-  const systemPrompt = _buildSystemPrompt(promptContext, {
-    includeAppHelpMap: appHelpTurn,
-    graderEnabled: promptContext.graderEnabled,
-  });
-
   const messages: ChatMessage[] = [
-    { role: 'system', content: systemPrompt },
+    buildExchangeSystemMessage(promptContext, appHelpTurn),
     ...context.exchangeHistory.map((e) => ({
       role: e.role,
       content: e.role === 'user' ? sanitizeUserContent(e.content) : e.content,
@@ -2106,13 +2121,8 @@ export async function streamExchange(
     appHelpTurn,
   });
   const promptContext: ExchangeContext = { ...context, sourceEvidence };
-  const systemPrompt = _buildSystemPrompt(promptContext, {
-    includeAppHelpMap: appHelpTurn,
-    graderEnabled: promptContext.graderEnabled,
-  });
-
   const messages: ChatMessage[] = [
-    { role: 'system', content: systemPrompt },
+    buildExchangeSystemMessage(promptContext, appHelpTurn),
     ...context.exchangeHistory.map((e) => ({
       role: e.role,
       content: e.role === 'user' ? sanitizeUserContent(e.content) : e.content,

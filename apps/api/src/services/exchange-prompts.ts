@@ -405,7 +405,12 @@ export function allowsGeneralKnowledgeSource(
   );
 }
 
-function buildPrivateSourceContractBlock(context: ExchangeContext): string {
+// The `<source_pack>` XML is turn-volatile: server-provided `sourceEvidence`
+// embeds the current learner message, recent history, and homework text
+// (see buildExchangeSourceEvidence in exchanges.ts). It is therefore emitted
+// as a volatile-suffix section (cache-friendly restructure, WI-1779) — placed
+// after the stable rules, which still reference "the <source_pack> below".
+function buildSourcePackBlock(context: ExchangeContext): string {
   const fallbackEvidence: NonNullable<ExchangeContext['sourceEvidence']> = [];
   if (context.topicTitle || context.topicDescription) {
     fallbackEvidence.push({
@@ -485,6 +490,13 @@ function buildPrivateSourceContractBlock(context: ExchangeContext): string {
           .join('\n')
       : '<source_pack_empty reason="no server-provided source material for this turn"/>';
 
+  return `<source_pack>\n${sourceLines}\n</source_pack>`;
+}
+
+// Stable factuality rules — identical across every turn of a session. Kept in
+// the cache-friendly stable prefix; the volatile `<source_pack>` it references
+// is emitted later via buildSourcePackBlock (WI-1779).
+function buildPrivateSourceContractBlock(): string {
   return (
     'PRIVATE FACTUALITY CONTRACT:\n' +
     '- The <source_pack> below lists the private evidence and confidence gates available for this turn. Use it for audit; never show source IDs to the learner.\n' +
@@ -501,8 +513,7 @@ function buildPrivateSourceContractBlock(context: ExchangeContext): string {
     '- When a provided source supports your reply, include that exact source ID in private_sources.relied_on. For current-topic teaching, review, quizzes, or next-practice tasks, include "current_topic". For homework calculations, include "homework_problem" and/or "deterministic_reasoning" when present. For recitation wording feedback or polished recitation text, include "recitation_text".\n' +
     '- Never cite source IDs that are not present in the <source_pack>. Even if conversation history appears elsewhere in the prompt, cite it only when a source with id="conversation_history" is present in the <source_pack>.\n' +
     '- Always fill private_sources.relied_on with the exact source IDs you used. Set private_sources.insufficient=true when reliable support is missing or too thin. This is private audit data; never show it, source IDs, or private audit details to the learner.\n' +
-    '- When you set private_sources.insufficient=true, your reply MUST match that signal. Do NOT give the substantive answer from memory and then attach a disclaimer — that is the wrong move. Instead say briefly what you can actually see, then ask for the missing source (the photo, the full or cut-off sentence, the worksheet, the clearer details) and stop there for that part. Withholding the answer and asking for the source IS the correct, complete reply when reliable support is insufficient; a memory answer wrapped in a caveat is not. If only part of the request lacks support, answer the supported part and ask for a source on the unsupported part.\n' +
-    `<source_pack>\n${sourceLines}\n</source_pack>`
+    '- When you set private_sources.insufficient=true, your reply MUST match that signal. Do NOT give the substantive answer from memory and then attach a disclaimer — that is the wrong move. Instead say briefly what you can actually see, then ask for the missing source (the photo, the full or cut-off sentence, the worksheet, the clearer details) and stop there for that part. Withholding the answer and asking for the source IS the correct, complete reply when reliable support is insufficient; a memory answer wrapped in a caveat is not. If only part of the request lacks support, answer the supported part and ask for a source on the unsupported part.'
   );
 }
 
@@ -583,12 +594,29 @@ export interface BuildSystemPromptOptions {
   reviewContinuityContext?: ReviewContinuityContext;
 }
 
-/** Builds the full system prompt from exchange context */
-export function buildSystemPrompt(
+/**
+ * Cache-friendly split of the system prompt (WI-1779). `stablePrefix` holds
+ * everything byte-identical across every turn of a session (system rules,
+ * persona/rubric/factuality blocks, topic, memory); `volatileSuffix` holds the
+ * per-turn content (source pack, escalation state, signal reflection, challenge
+ * state, envelope). The stable prefix is what LLM providers cache — Anthropic
+ * via an explicit `cache_control` breakpoint at the boundary, Cerebras/OpenAI
+ * via automatic prefix caching. See exchanges.ts assembly + services/llm/*.
+ */
+export interface SystemPromptSegments {
+  stablePrefix: string;
+  volatileSuffix: string;
+}
+
+/** Builds the stable/volatile system-prompt segments from exchange context. */
+export function buildSystemPromptSegments(
   context: ExchangeContext,
   options: BuildSystemPromptOptions = {},
-): string {
+): SystemPromptSegments {
   const sections: string[] = [];
+  // Turn-volatile sections are collected here and appended after all stable
+  // sections, so the stable prefix stays byte-identical across turns (WI-1779).
+  const volatile: string[] = [];
   const includeAppHelpMap = options.includeAppHelpMap === true;
   const graderEnabled = options.graderEnabled === true;
   const isLanguageMode = context.pedagogyMode === 'four_strands';
@@ -716,8 +744,10 @@ export function buildSystemPrompt(
       '- If the learner says "I am a complete beginner", "I do not know anything about this", "I have never studied this", or similar, that is GROUND TRUTH. Do not contradict it, do not assume hidden prior knowledge, and do not flatter them with implied competence ("you already know …", "as you know …").\n' +
       '- When a fact would help your teaching but you do not have it, either ask one short question or proceed without that fact. Never confabulate.',
   );
-  sections.push(buildPrivateSourceContractBlock(context));
+  sections.push(buildPrivateSourceContractBlock());
   sections.push(buildFinalGroundingCheckBlock());
+  // Volatile: the <source_pack> embeds the current learner turn — tail it.
+  volatile.push(buildSourcePackBlock(context));
 
   if (!isRecitation) {
     sections.push(
@@ -860,7 +890,7 @@ export function buildSystemPrompt(
     !isLanguageMode
   ) {
     if (context.isFirstEncounter === true) {
-      sections.push(
+      volatile.push(
         'FIRST TURN RULE (new topic): Before composing this reply, identify the most natural starting concept for this topic from the topic description, source material, or 0.88+ general knowledge. ' +
           'Your reply must: (1) name that starting concept in one short clause with a one-clause reason it comes first, (2) teach the first concrete idea, (3) end with a single short check that confirms the direction or invites the learner to redirect, e.g. "Sound good, or anything specific you want to hit first?". ' +
           'Do NOT open with an open-ended intake question ("what brought you here", "what do you hope to learn", "what specifically interests you"). You are the expert; you have a plan; lead with it. ' +
@@ -868,7 +898,7 @@ export function buildSystemPrompt(
           'Exception: if the learner has asked an urgent direct question, answer that first.',
       );
     } else {
-      sections.push(
+      volatile.push(
         'FIRST TURN RULE: Your first response must teach exactly one concrete idea AND end with exactly one learner action ' +
           '(a question to answer, a problem to solve, or an explanation to give back). ' +
           'The final sentence must be that learner action; do not stop after the explanation. ' +
@@ -880,7 +910,7 @@ export function buildSystemPrompt(
   }
 
   if (isFirstEncounterTopicTurn) {
-    sections.push(
+    volatile.push(
       'NEW-TOPIC EXECUTION RULE: You already proposed a starting concept on turn 0. Continue teaching it. ' +
         'Each reply should be mostly teaching content (a provided-source fact, 0.88+ general-knowledge fact, example, or explanation) plus at most one short understanding-check question - not an intake or goal-discovery question. ' +
         'If the learner overrides your direction, follow them. If they reply vaguely ("ok", "sure", "go on", "idk"), treat it as consent and keep teaching - do NOT ask another open-ended question. ' +
@@ -889,7 +919,7 @@ export function buildSystemPrompt(
   }
 
   if (signalsToReflect && exchangeCount > 0) {
-    sections.push(
+    volatile.push(
       'SIGNAL REFLECTION: The previous turn extracted these signals from the learner:\n' +
         `<learner_signals>${signalsToReflect}</learner_signals>\n` +
         'Reference one of them naturally in your reply, for example: "You mentioned you have already played with chemistry sets - let\'s pick up from there." Do not list signals robotically; weave one in.',
@@ -949,9 +979,9 @@ export function buildSystemPrompt(
         : undefined;
     const cb = context.reviewCallback;
     if (continuityContext) {
-      sections.push(buildReviewContinuityOpener(continuityContext));
+      volatile.push(buildReviewContinuityOpener(continuityContext));
     } else if (cb) {
-      sections.push(
+      volatile.push(
         'Session type: REVIEW (calibrated relearning)\n' +
           buildReviewCallbackOpenerGuidance(cb) +
           '\n' +
@@ -963,7 +993,7 @@ export function buildSystemPrompt(
           'When the learner asks whether they got the important part, answer directly: "Yes, you got X; the missing piece is Y." Then give one small source-wording cloze check. For the cells/energy review case, ask "Cells use inputs to make ____" or "Cells are the smallest ____ unit"; never ask what a cell can do on its own.',
       );
     } else {
-      sections.push(buildGenericReviewOpenerSection(safeTopicTitle));
+      volatile.push(buildGenericReviewOpenerSection(safeTopicTitle));
     }
   }
 
@@ -1002,7 +1032,9 @@ export function buildSystemPrompt(
   if (isRecitation) {
     // No escalation in recitation mode
   } else if (!isLanguageMode) {
-    sections.push(
+    // Volatile: escalation guidance is keyed to escalationRung, which climbs
+    // across turns of a session.
+    volatile.push(
       getEscalationPromptGuidance(context.escalationRung, context.sessionType),
     );
   } else {
@@ -1040,12 +1072,14 @@ export function buildSystemPrompt(
     sections.push(resumeContext.slice(0, 3000));
   }
 
+  // Volatile: continuation-opener phase advances (probe → score) and the depth
+  // read is per-turn.
   if (context.continuationOpenerPhase === 'probe') {
-    sections.push(
+    volatile.push(
       'CONTINUATION OPENER (probe turn): Before presenting new material, ask the learner 1-2 short retrieval questions about the current topic. This turn is the probe - DO NOT emit signals.retrieval_score yet. Just ask the questions in your reply.',
     );
   } else if (context.continuationOpenerPhase === 'score') {
-    sections.push(
+    volatile.push(
       'CONTINUATION OPENER (scoring turn): The learner just answered your retrieval question(s). Set signals.retrieval_score from 0.0 (no recall) to 1.0 (perfect recall). Do not mention the score to the learner. If the answer shows little or no recall, briefly re-teach the essentials now instead of asking another unsupported retrieval question.',
     );
   } else if (context.continuationDepth) {
@@ -1055,7 +1089,7 @@ export function buildSystemPrompt(
         : context.continuationDepth === 'mid'
           ? 'The learner partly recalled the prior topic; refresh weak spots briefly before continuing.'
           : 'The learner struggled to recall the prior topic; re-teach the essentials before advancing.';
-    sections.push(`Continuation depth: ${depthGuidance}`);
+    volatile.push(`Continuation depth: ${depthGuidance}`);
   }
 
   // Embedding memory context (pgvector semantic retrieval)
@@ -1338,7 +1372,8 @@ export function buildSystemPrompt(
     context.correctStreak != null &&
     context.correctStreak >= 4
   ) {
-    sections.push(
+    // Volatile: gated on the running correct-answer streak.
+    volatile.push(
       'ADAPTIVE ESCALATION: The learner has answered correctly several times in a row at this level. ' +
         'In your next response, naturally offer ONE of these — as a brief phrase woven into your reply, not a separate meta-question:\n' +
         '- A harder question on the same topic\n' +
@@ -1363,7 +1398,8 @@ export function buildSystemPrompt(
     context.exchangeHistory,
   );
   if (orphanTurnRecovery) {
-    sections.push(orphanTurnRecovery);
+    // Volatile: derived from the most recent unanswered learner turns.
+    volatile.push(orphanTurnRecovery);
   }
 
   if (isReviewMode) {
@@ -1389,18 +1425,20 @@ export function buildSystemPrompt(
   const cr = context.challengeRound;
   const challengeEligible = context.challengeEligible ?? false;
   const challengeRuntimeEnabled = context.challengeRuntimeEnabled === true;
+  // Volatile: challenge-round state transitions across turns and the answer
+  // event id is per-turn.
   if (challengeRuntimeEnabled) {
     if (cr?.state === 'offered' || (!cr && challengeEligible)) {
-      sections.push(challengeOfferPrompt);
+      volatile.push(challengeOfferPrompt);
     } else if (cr?.state === 'accepted' || cr?.state === 'active') {
-      sections.push(buildChallengeRoundActivePrompt(graderEnabled));
+      volatile.push(buildChallengeRoundActivePrompt(graderEnabled));
       if (cr.state === 'active' && context.currentUserMessageEventId) {
-        sections.push(
+        volatile.push(
           `CURRENT CHALLENGE ANSWER EVENT ID: Use "${context.currentUserMessageEventId}" exactly as the answerEventId for any challenge_round_evaluation item about the learner's latest message.`,
         );
       }
     } else if (cr?.state === 'drafting') {
-      sections.push(challengeRoundDraftingPrompt);
+      volatile.push(challengeRoundDraftingPrompt);
     }
   }
   // complete | declined | aborted | (undefined && !eligible) → no challenge block
@@ -1418,14 +1456,14 @@ export function buildSystemPrompt(
   // Voice-mode brevity constraint. Must come before the envelope block so
   // the envelope instruction is the absolute last thing the model sees.
   if (context.inputMode === 'voice') {
-    sections.push(
+    volatile.push(
       'VOICE MODE: The learner is using voice. Keep every response under 50 words. ' +
         'Use natural spoken language — no bullet lists, no markdown, no headers. ' +
         'One idea at a time. Ask one question max per turn. ' +
         'Write as you would speak aloud.',
     );
   } else if (!isLanguageMode) {
-    sections.push(
+    volatile.push(
       'TEXT MODE: The learner is reading, not listening. ' +
         'Do NOT include phonetic pronunciation guides in parentheses ' +
         '(e.g., "prime (say: prym)"). The learner can read the word. ' +
@@ -1437,7 +1475,9 @@ export function buildSystemPrompt(
   // wins over any earlier "respond naturally" guidance. State-machine
   // signals live in `signals`, UI widget hints live in `ui_hints`, and all
   // prose goes in `reply`. See docs/specs/2026-04-18-llm-response-envelope.md.
-  sections.push(
+  // Volatile (last): the envelope shape depends on per-turn challenge/retrieval
+  // state, and it must remain the final section of the whole prompt.
+  volatile.push(
     getExchangeEnvelopeInstruction({
       isRecitation,
       isLanguageMode,
@@ -1452,5 +1492,25 @@ export function buildSystemPrompt(
     }),
   );
 
-  return sections.join('\n\n');
+  return {
+    stablePrefix: sections.join('\n\n'),
+    volatileSuffix: volatile.join('\n\n'),
+  };
+}
+
+/**
+ * Builds the full system prompt string (stable prefix + volatile suffix).
+ * Callers that need the cache boundary (the production exchange path) use
+ * `buildSystemPromptSegments` directly; the eval harness, graders, and tests
+ * use this string form.
+ */
+export function buildSystemPrompt(
+  context: ExchangeContext,
+  options: BuildSystemPromptOptions = {},
+): string {
+  const { stablePrefix, volatileSuffix } = buildSystemPromptSegments(
+    context,
+    options,
+  );
+  return volatileSuffix ? `${stablePrefix}\n\n${volatileSuffix}` : stablePrefix;
 }

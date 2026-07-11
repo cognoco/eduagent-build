@@ -328,6 +328,11 @@ function getPersonalizationPreamble(opts: {
 // language, silently corrupting the §6 candidate comparison. Reusing this
 // function (rather than re-deriving the preamble in the harness) keeps the two
 // paths from drifting.
+// Separator between the safety/personalization preamble and the caller's
+// system prompt. Shared by the join and the WI-1779 cache-boundary shift so the
+// two can never disagree.
+const PREAMBLE_JOIN = '\n\n';
+
 export function withSafetyPreamble(
   messages: ChatMessage[],
   ageBracket?: AgeBracket,
@@ -347,13 +352,20 @@ export function withSafetyPreamble(
     : safetyPreamble;
   const first = messages[0];
   if (first?.role === 'system') {
-    return [
-      {
-        role: 'system',
-        content: `${preamble}\n\n${first.content}`,
-      },
-      ...messages.slice(1),
-    ];
+    const merged: ChatMessage = {
+      role: 'system',
+      content: `${preamble}${PREAMBLE_JOIN}${first.content}`,
+    };
+    // WI-1779: the preamble is session-stable and joins the cached prefix, so
+    // shift the caching boundary by the prepended length (preamble + the join
+    // separator) to keep the cache_control breakpoint at the underlying
+    // stable/volatile split. Both the join above and this shift use
+    // PREAMBLE_JOIN, so the offset can never drift from the separator.
+    if (typeof first.content === 'string' && first.cachePrefixLength != null) {
+      merged.cachePrefixLength =
+        preamble.length + PREAMBLE_JOIN.length + first.cachePrefixLength;
+    }
+    return [merged, ...messages.slice(1)];
   }
   return [{ role: 'system', content: preamble }, ...messages];
 }

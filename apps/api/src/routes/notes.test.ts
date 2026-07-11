@@ -436,6 +436,27 @@ describe('note routes', () => {
       expect(res.status).toBe(400);
     });
 
+    it('[WI-1788] rejects client attempts to claim Challenge-Round provenance', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeApp(db);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/topics/${TOPIC_ID}/notes`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: 'Fabricated content with no overlap to verified answers.',
+            artifactSource: 'challenge_drafted_note',
+          }),
+        },
+      );
+
+      // Challenge provenance is server-owned. The strict request schema keeps
+      // generic learner-authored notes from masquerading as verified proof.
+      expect(res.status).toBe(400);
+    });
+
     it('returns 400 for non-UUID subjectId', async () => {
       const db = makeFakeDb({ noteExists: false });
       const app = makeApp(db);

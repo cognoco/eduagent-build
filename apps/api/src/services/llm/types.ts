@@ -59,6 +59,16 @@ export type MessagePart = TextPart | InlineDataPart;
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string | MessagePart[];
+  /**
+   * Prompt-caching boundary (WI-1779). On a `role: 'system'` message with
+   * string content, the character offset where the cache-stable prefix ends:
+   * `content.slice(0, cachePrefixLength)` is byte-identical across turns of a
+   * session and is what providers cache. The Anthropic adapter places an
+   * explicit `cache_control` breakpoint here; OpenAI/Cerebras ignore the field
+   * and cache the identical prefix automatically. Unset ⇒ no explicit
+   * breakpoint (existing behavior for grader/judge and non-exchange flows).
+   */
+  cachePrefixLength?: number;
 }
 
 /** Extract text-only content from a ChatMessage's content field. */
