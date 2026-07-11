@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import { useProfile } from '../lib/profile';
+import { MentorBirthErrorBoundary } from '../components/common/MentorBirthErrorBoundary';
 import { MentorBirthAnimation } from '../components/common/MentorBirthAnimation';
 import { CheckmarkPopAnimation } from '../components/common/CheckmarkPopAnimation';
 import { Button } from '../components/common/Button';
@@ -129,10 +130,12 @@ export default function ReadyScreen() {
         }
       >
         <View className="items-center mt-8 mb-4">
-          <MentorBirthAnimation
-            size={220}
-            readyLabel={t('onboarding.mentorBirth.ready')}
-          />
+          <MentorBirthErrorBoundary componentTag="ready-mentor-birth">
+            <MentorBirthAnimation
+              size={220}
+              readyLabel={t('onboarding.mentorBirth.ready')}
+            />
+          </MentorBirthErrorBoundary>
         </View>
 
         <Text className="text-h1 font-bold text-text-primary text-center mb-2">
