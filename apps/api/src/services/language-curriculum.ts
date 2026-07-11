@@ -7,11 +7,12 @@ import {
   type Database,
 } from '@eduagent/database';
 import { ensureDefaultBook } from './curriculum-core';
-import type {
-  CefrLevel,
-  GeneratedTopic,
-  LanguageProgress,
-  LanguageMilestoneProgress,
+import {
+  languageNextPracticePointerSchema,
+  type CefrLevel,
+  type GeneratedTopic,
+  type LanguageProgress,
+  type LanguageMilestoneProgress,
 } from '@eduagent/schemas';
 import { getLanguageByCode } from '../data/languages';
 
@@ -478,6 +479,13 @@ export async function getCurrentLanguageProgress(
     return null;
   }
 
+  // WI-1552: raw jsonb — validate through the schema before trusting the
+  // shape, per the repo's jsonb-read convention.
+  const nextPractice = languageNextPracticePointerSchema
+    .nullable()
+    .catch(null)
+    .parse(subject.nextLanguagePracticePointer ?? null);
+
   const curriculum = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, subjectId),
     orderBy: desc(curricula.version),
@@ -491,6 +499,7 @@ export async function getCurrentLanguageProgress(
       currentSublevel: null,
       currentMilestone: null,
       nextMilestone: null,
+      nextPractice,
     };
   }
 
@@ -577,6 +586,7 @@ export async function getCurrentLanguageProgress(
       currentSublevel: null,
       currentMilestone: null,
       nextMilestone: null,
+      nextPractice,
     };
   }
 
@@ -608,6 +618,7 @@ export async function getCurrentLanguageProgress(
           sublevel: nextMilestoneRow.currentSublevel,
         }
       : null,
+    nextPractice,
   };
 }
 

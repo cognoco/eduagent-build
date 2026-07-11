@@ -8,8 +8,10 @@ import {
   pgEnum,
   index,
   uniqueIndex,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import type { LanguageNextPracticePointer } from '@eduagent/schemas';
 import { person } from './identity';
 import { generateUUIDv7 } from '../utils/uuid';
 
@@ -74,6 +76,16 @@ export const subjects = pgTable(
       'book_suggestions_last_generation_attempted_at',
       { withTimezone: true },
     ),
+    // WI-1552: cross-session Four Strands next-practice pointer. Persisted at
+    // session-completed time (apps/api/src/inngest/functions/session-completed.ts)
+    // for four_strands subjects, and read back at the next session's first
+    // exchange (language-session-engine.ts chooseNextLanguageStrand) to seed
+    // the strand choice. Additive only — nullable, no default; existing
+    // consumers of `subjects` are unaffected. Read through
+    // languageNextPracticePointerSchema before trusting the shape (raw jsonb).
+    nextLanguagePracticePointer: jsonb('next_language_practice_pointer').$type<
+      LanguageNextPracticePointer | null | undefined
+    >(),
   },
   (table) => [
     index('subjects_profile_id_idx').on(table.profileId),

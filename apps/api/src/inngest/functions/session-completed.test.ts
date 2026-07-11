@@ -991,6 +991,7 @@ describe('sessionCompleted', () => {
       'relearn-retention-reset',
       'update-retention',
       'update-vocabulary-retention',
+      'update-next-practice-pointer',
       'update-needs-deepening',
       'check-milestone-completion',
       'write-coaching-card',
@@ -1015,6 +1016,7 @@ describe('sessionCompleted', () => {
       .filter((o: any) => o.status !== 'skipped')
       .map((o: any) => o.status);
     expect(statuses).toEqual([
+      'ok',
       'ok',
       'ok',
       'ok',
@@ -1762,6 +1764,124 @@ describe('sessionCompleted', () => {
         (o: any) => o.step === 'update-vocabulary-retention',
       );
       expect(outcome.status).toBe('ok');
+    });
+  });
+
+  // WI-1552: the "write" half of the two-session cross-session next-practice
+  // flow — session-curriculum.test.ts's getCurrentLanguageProgress tests
+  // cover the "read back" half.
+  describe('update-next-practice-pointer step', () => {
+    const { resetDatabaseUrl } = require('../helpers');
+
+    function languageLearningEvent(strand: string) {
+      return {
+        eventType: 'ai_response',
+        metadata: { languageLearning: { strand } },
+      };
+    }
+
+    function setupNextPracticeMock(
+      subjectData: Record<string, unknown> | null,
+      events: Array<Record<string, unknown>> = [],
+    ) {
+      resetDatabaseUrl();
+      const subjectFindFirst = jest.fn().mockResolvedValue(subjectData);
+      const sessionEventsFindMany = jest.fn().mockResolvedValue(events);
+      const updateSet = jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue([]),
+      });
+      const updateFn = jest.fn().mockReturnValue({ set: updateSet });
+      (createDatabase as jest.Mock).mockImplementation(() => ({
+        query: {
+          sessionEvents: { findMany: sessionEventsFindMany },
+          subjects: { findFirst: subjectFindFirst },
+        },
+        update: updateFn,
+      }));
+      return { subjectFindFirst, sessionEventsFindMany, updateFn, updateSet };
+    }
+
+    const fourStrandsSubject = {
+      id: SUBJECT_ID,
+      profileId: PROFILE_ID,
+      pedagogyMode: 'four_strands',
+      languageCode: 'es',
+    };
+
+    afterEach(() => {
+      resetDatabaseUrl();
+    });
+
+    it('skips when subjectId is not provided', async () => {
+      const { result } = (await executeSteps(
+        createEventData({ subjectId: null }),
+      )) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'update-next-practice-pointer',
+      );
+      expect(outcome.status).toBe('skipped');
+    });
+
+    it('does not persist when subject is not four_strands', async () => {
+      const { updateFn } = setupNextPracticeMock({
+        id: SUBJECT_ID,
+        profileId: PROFILE_ID,
+        pedagogyMode: 'socratic',
+        languageCode: null,
+      });
+
+      const { result } = (await executeSteps(createEventData())) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'update-next-practice-pointer',
+      );
+      expect(outcome.status).toBe('ok');
+      expect(updateFn).not.toHaveBeenCalled();
+    });
+
+    it('does not persist when the session had no recorded strand activity', async () => {
+      const { updateFn } = setupNextPracticeMock(fourStrandsSubject, []);
+
+      await executeSteps(createEventData());
+
+      expect(updateFn).not.toHaveBeenCalled();
+    });
+
+    it('persists the least-practiced strand as the next-practice pointer', async () => {
+      const { updateFn, updateSet } = setupNextPracticeMock(
+        fourStrandsSubject,
+        [
+          languageLearningEvent('meaning_input'),
+          languageLearningEvent('meaning_input'),
+          languageLearningEvent('meaning_input'),
+          languageLearningEvent('language_focus'),
+          languageLearningEvent('language_focus'),
+          languageLearningEvent('fluency'),
+          languageLearningEvent('fluency'),
+        ],
+      );
+
+      const { result } = (await executeSteps(createEventData())) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'update-next-practice-pointer',
+      );
+      expect(outcome.status).toBe('ok');
+      expect(updateFn).toHaveBeenCalledWith(expect.anything());
+      expect(updateSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nextLanguagePracticePointer: expect.objectContaining({
+            strand: 'meaning_output',
+            sessionStrandCounts: {
+              meaning_input: 3,
+              meaning_output: 0,
+              language_focus: 2,
+              fluency: 2,
+            },
+          }),
+        }),
+      );
     });
   });
 

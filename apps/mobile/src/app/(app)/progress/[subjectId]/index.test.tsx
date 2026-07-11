@@ -100,6 +100,16 @@ jest.mock(
           'progress.subject.upNextNoDetails': 'Up next',
           'progress.subject.milestoneNoData':
             'Complete a session to start tracking your milestone progress.',
+          'progress.subject.continuePracticeTitle': 'Continue practice',
+          'progress.subject.continuePracticeStrandMeaningInput':
+            'Next up: reading & listening practice',
+          'progress.subject.continuePracticeStrandMeaningOutput':
+            'Next up: speaking & writing practice',
+          'progress.subject.continuePracticeStrandLanguageFocus':
+            'Next up: grammar & vocabulary practice',
+          'progress.subject.continuePracticeStrandFluency':
+            'Next up: a timed fluency drill',
+          'progress.subject.continuePracticeCta': 'Continue',
           'progress.subject.retentionTitle': 'Current retention',
           'progress.subject.retentionLoadError':
             "We couldn't load retention data right now.",
@@ -347,6 +357,11 @@ function makeLanguageProgress(
     pedagogyMode: 'four_strands',
     currentLevel: null,
     currentSublevel: null,
+    // WI-1552: languageProgressSchema requires `nextPractice` (nullable, not
+    // optional) — the real API always includes it. Default to null so
+    // fixtures that don't care about it still parse; tests targeting the
+    // continue-practice entry point override it explicitly.
+    nextPractice: null,
     ...progress,
     currentMilestone,
     nextMilestone,
@@ -1005,6 +1020,110 @@ describe('ProgressSubjectScreen', () => {
             `/subjects/${SUBJECT_ID}/cefr-progress`,
           ).length,
         ).toBeGreaterThan(before);
+      });
+    });
+
+    // ── WI-1552: cross-session next-practice continue entry point ──────────
+    describe('continue-practice entry point', () => {
+      it('renders for a language subject with a persisted next-practice pointer', async () => {
+        mount({
+          subjects: [languageSubject],
+          languageProgress: {
+            ...milestoneData,
+            nextPractice: {
+              strand: 'meaning_output',
+              reason:
+                'least-practiced strand from the prior session (meaning_input=3, meaning_output=0, language_focus=2, fluency=2)',
+              sessionStrandCounts: {
+                meaning_input: 3,
+                meaning_output: 0,
+                language_focus: 2,
+                fluency: 2,
+              },
+              computedAt: '2026-07-11T10:00:00.000Z',
+            },
+          },
+        });
+
+        await screen.findByTestId('continue-practice-entry');
+        screen.getByText('Continue practice');
+        // The strand-derived label renders; the raw `reason` debug string
+        // never does (AC3 — reason is safe debug metadata, not UI copy).
+        screen.getByText('Next up: speaking & writing practice');
+        expect(
+          screen.queryByText(/least-practiced strand from the prior session/),
+        ).toBeNull();
+      });
+
+      it('does not render when the language subject has no persisted pointer yet', async () => {
+        mount({
+          subjects: [languageSubject],
+          languageProgress: milestoneData, // no nextPractice key
+        });
+
+        await screen.findByTestId('cefr-milestone-card');
+        expect(screen.queryByTestId('continue-practice-entry')).toBeNull();
+      });
+
+      it('does not render for a non-language subject', async () => {
+        // fullSubject defaults to pedagogyMode 'socratic'; forcing the
+        // cefr-progress call to error (mirroring the real 404 a non-four_strands
+        // subject gets) keeps isLanguageSubject false, so the whole milestone
+        // card — and the continue-practice entry inside it — never mounts.
+        mount({ subjects: [fullSubject], languageProgressError: true });
+
+        await screen.findByTestId('progress-subject-resume');
+        expect(screen.queryByTestId('cefr-milestone-card')).toBeNull();
+        expect(screen.queryByTestId('continue-practice-entry')).toBeNull();
+      });
+
+      it('pressing the entry triggers the same resume/continue action as the header button', async () => {
+        const target = {
+          subjectId: SUBJECT_ID,
+          subjectName: 'Spanish',
+          topicId: TOPIC_ID,
+          topicTitle: 'Ordering food',
+          sessionId: null,
+          resumeFromSessionId: SESSION_ID,
+          resumeKind: 'recent_topic',
+          lastActivityAt: '2026-02-15T09:00:00.000Z',
+          reason: 'Continue Ordering food',
+        };
+        mount({
+          subjects: [languageSubject],
+          languageProgress: {
+            ...milestoneData,
+            nextPractice: {
+              strand: 'fluency',
+              reason: 'least-practiced strand from the prior session',
+              sessionStrandCounts: {
+                meaning_input: 4,
+                meaning_output: 3,
+                language_focus: 3,
+                fluency: 0,
+              },
+              computedAt: '2026-07-11T10:00:00.000Z',
+            },
+          },
+          resumeTarget: target,
+        });
+
+        const entry = await screen.findByTestId('continue-practice-entry');
+        fireEvent.press(entry);
+
+        // Same real pushLearningResumeTarget path the header "Resume" button
+        // uses (see the sibling test above) — the continue-practice entry is
+        // an additional entry point onto the identical resume/continue flow,
+        // not a separate mechanism.
+        expect(mockPush).toHaveBeenCalledWith('/(app)/home');
+        expect(mockPush).toHaveBeenCalledWith({
+          pathname: '/(app)/session',
+          params: expect.objectContaining({
+            mode: 'learning',
+            subjectId: SUBJECT_ID,
+            resumeFromSessionId: SESSION_ID,
+          }),
+        });
       });
     });
   });

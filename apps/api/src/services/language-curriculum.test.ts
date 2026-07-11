@@ -365,6 +365,70 @@ describe('getCurrentLanguageProgress', () => {
     expect(result!.currentLevel).toBeNull();
     expect(result!.currentMilestone).toBeNull();
     expect(result!.nextMilestone).toBeNull();
+    expect(result!.nextPractice).toBeNull();
+  });
+
+  // WI-1552 (AC1/AC4a): the cross-session pointer read back from
+  // subjects.next_language_practice_pointer surfaces as `nextPractice` on
+  // the response consumed by mobile's useLanguageProgress hook — this is
+  // the "read back to seed the following session" half of the two-session
+  // flow (the write half is covered by session-completed.test.ts).
+  it('surfaces a persisted next-practice pointer as nextPractice', async () => {
+    const db = createMockDb({
+      subjectFindFirst: {
+        id: SUBJECT_ID,
+        profileId: PROFILE_ID,
+        name: 'Spanish',
+        pedagogyMode: 'four_strands',
+        languageCode: 'es',
+        nextLanguagePracticePointer: {
+          strand: 'meaning_output',
+          reason:
+            'least-practiced strand from the prior session (meaning_input=3, meaning_output=0, language_focus=2, fluency=2)',
+          sessionStrandCounts: {
+            meaning_input: 3,
+            meaning_output: 0,
+            language_focus: 2,
+            fluency: 2,
+          },
+          computedAt: '2026-07-11T10:00:00.000Z',
+        },
+      },
+      curriculumFindFirst: undefined,
+    });
+
+    const result = await getCurrentLanguageProgress(db, PROFILE_ID, SUBJECT_ID);
+
+    expect(result!.nextPractice).toEqual({
+      strand: 'meaning_output',
+      reason:
+        'least-practiced strand from the prior session (meaning_input=3, meaning_output=0, language_focus=2, fluency=2)',
+      sessionStrandCounts: {
+        meaning_input: 3,
+        meaning_output: 0,
+        language_focus: 2,
+        fluency: 2,
+      },
+      computedAt: '2026-07-11T10:00:00.000Z',
+    });
+  });
+
+  it('falls back to a null nextPractice when the pointer fails schema validation', async () => {
+    const db = createMockDb({
+      subjectFindFirst: {
+        id: SUBJECT_ID,
+        profileId: PROFILE_ID,
+        name: 'Spanish',
+        pedagogyMode: 'four_strands',
+        languageCode: 'es',
+        nextLanguagePracticePointer: { strand: 'not-a-real-strand' },
+      },
+      curriculumFindFirst: undefined,
+    });
+
+    const result = await getCurrentLanguageProgress(db, PROFILE_ID, SUBJECT_ID);
+
+    expect(result!.nextPractice).toBeNull();
   });
 
   it('returns progress with null milestones when curriculum has no CEFR topics', async () => {

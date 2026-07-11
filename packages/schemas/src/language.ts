@@ -155,6 +155,38 @@ export type LanguageMilestoneProgress = z.infer<
   typeof languageMilestoneProgressSchema
 >;
 
+// WI-1552: cross-session Four Strands next-practice pointer. Persisted on
+// `subjects.next_language_practice_pointer` at session-completed time and
+// read back to seed the strand choice for the following session. `strand`
+// deliberately duplicates the `LanguageStrand` enum values from
+// stream-fallback.ts's streamLanguageLearningActivitySchema rather than
+// importing it — stream-fallback.ts imports cefrLevelSchema from this file,
+// so importing back would be circular. `reason` is safe debug metadata
+// (strand counts only, no learner content) — never rendered verbatim in the
+// mobile UI; see docs/plans/2026-07-11-wi1552-cross-session-next-practice.md.
+export const languageStrandNameSchema = z.enum([
+  'meaning_input',
+  'meaning_output',
+  'language_focus',
+  'fluency',
+]);
+export type LanguageStrandName = z.infer<typeof languageStrandNameSchema>;
+
+export const languageNextPracticePointerSchema = z.object({
+  strand: languageStrandNameSchema,
+  reason: z.string().min(1),
+  sessionStrandCounts: z.object({
+    meaning_input: z.number().int().nonnegative(),
+    meaning_output: z.number().int().nonnegative(),
+    language_focus: z.number().int().nonnegative(),
+    fluency: z.number().int().nonnegative(),
+  }),
+  computedAt: isoDateField,
+});
+export type LanguageNextPracticePointer = z.infer<
+  typeof languageNextPracticePointerSchema
+>;
+
 export const languageProgressSchema = z.object({
   subjectId: z.string().uuid(),
   languageCode: languageCodeSchema,
@@ -170,5 +202,6 @@ export const languageProgressSchema = z.object({
       sublevel: z.string(),
     })
     .nullable(),
+  nextPractice: languageNextPracticePointerSchema.nullable(),
 });
 export type LanguageProgress = z.infer<typeof languageProgressSchema>;

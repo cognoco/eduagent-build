@@ -31,6 +31,23 @@ import {
   formatApiError,
 } from '../../../../lib/format-api-error';
 import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
+import type { LanguageStrandName } from '@eduagent/schemas';
+
+// WI-1552: maps a persisted next-practice pointer's strand to its i18n key.
+// Deliberately does not surface the pointer's `reason` field verbatim — that
+// stays server-side debug metadata (see language-session-engine.ts).
+// `as const` keeps the values as literal key types so strandCopyKey's return
+// type is a member of i18next's typed t() key union, not a widened `string`.
+const STRAND_COPY_KEYS = {
+  meaning_input: 'progress.subject.continuePracticeStrandMeaningInput',
+  meaning_output: 'progress.subject.continuePracticeStrandMeaningOutput',
+  language_focus: 'progress.subject.continuePracticeStrandLanguageFocus',
+  fluency: 'progress.subject.continuePracticeStrandFluency',
+} as const satisfies Record<LanguageStrandName, string>;
+
+function strandCopyKey(strand: LanguageStrandName) {
+  return STRAND_COPY_KEYS[strand];
+}
 
 function StatCard({
   label,
@@ -560,6 +577,34 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                   <Text className="text-body-sm text-text-secondary mt-2">
                     {t('progress.subject.milestoneNoData')}
                   </Text>
+                )}
+
+                {/* WI-1552: cross-session next-practice pointer, persisted at
+                    the end of a prior four_strands session. `reason` is safe
+                    debug metadata only — the label below is derived from
+                    `strand`, never the raw reason string. */}
+                {languageProgress?.nextPractice && (
+                  <Pressable
+                    onPress={handlePrimarySubjectAction}
+                    className="mt-4 pt-4 border-t border-border flex-row items-center justify-between"
+                    accessibilityRole="button"
+                    accessibilityLabel={t(
+                      'progress.subject.continuePracticeTitle',
+                    )}
+                    testID="continue-practice-entry"
+                  >
+                    <View className="flex-1 pe-3">
+                      <Text className="text-body-sm font-semibold text-text-primary">
+                        {t('progress.subject.continuePracticeTitle')}
+                      </Text>
+                      <Text className="text-caption text-text-muted mt-0.5">
+                        {t(strandCopyKey(languageProgress.nextPractice.strand))}
+                      </Text>
+                    </View>
+                    <Text className="text-body-sm font-semibold text-primary">
+                      {t('progress.subject.continuePracticeCta')}
+                    </Text>
+                  </Pressable>
                 )}
               </View>
             )}

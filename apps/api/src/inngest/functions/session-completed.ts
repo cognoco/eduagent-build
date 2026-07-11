@@ -15,6 +15,10 @@ import {
 import { promotePendingDeepening } from '../../services/needs-deepening/promotion';
 import { resetRetentionCardForRelearn } from '../../services/apply-retention-update';
 import { getCurrentLanguageProgress } from '../../services/language-curriculum';
+import {
+  computeNextPracticePointer,
+  getLanguageStrandCounts,
+} from '../../services/language-session-engine';
 import { extractVocabularyFromTranscript } from '../../services/vocabulary-extract';
 import { upsertExtractedVocabulary } from '../../services/vocabulary';
 import { createPendingSessionSummary } from '../../services/summaries';
@@ -865,6 +869,87 @@ export const sessionCompleted = inngest.createFunction(
 
     const previousLanguageProgress = vocabularyOutcome.previousLanguageProgress;
     const nextLanguageProgress = vocabularyOutcome.nextLanguageProgress;
+
+    // WI-1552: persist the cross-session next-practice pointer for
+    // four_strands subjects. Mirrors update-vocabulary-retention's gate
+    // (own subject + events fetch — steps are independently memoized by
+    // Inngest, so re-fetching here rather than sharing the vocabulary step's
+    // closure vars is the established, replay-safe pattern in this
+    // function). Soft-fails via runIsolated: a failure here must never block
+    // the rest of the post-session pipeline.
+    outcomes.push(
+      await step.run('update-next-practice-pointer', async () => {
+        if (!subjectId) {
+          return {
+            step: 'update-next-practice-pointer',
+            status: 'skipped' as const,
+          };
+        }
+
+        return runIsolated(
+          'update-next-practice-pointer',
+          profileId,
+          async () => {
+            const db = getStepDatabase();
+            const subject = await db.query.subjects.findFirst({
+              where: and(
+                eq(subjects.id, subjectId),
+                eq(subjects.profileId, profileId),
+              ),
+            });
+            if (
+              !subject ||
+              subject.pedagogyMode !== 'four_strands' ||
+              !subject.languageCode
+            ) {
+              return;
+            }
+
+            const events = await db.query.sessionEvents.findMany({
+              where: and(
+                eq(sessionEvents.sessionId, sessionId),
+                eq(sessionEvents.profileId, profileId),
+              ),
+              orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
+            });
+            const sessionStrandCounts = getLanguageStrandCounts(events);
+            const hadStrandActivity = Object.values(sessionStrandCounts).some(
+              (count) => count > 0,
+            );
+            // A session with zero recorded strand activity (e.g. closed with no
+            // AI turns) has nothing to learn from — skip the write rather than
+            // clobbering a meaningful prior pointer with a degenerate default.
+            if (!hadStrandActivity) {
+              return;
+            }
+
+            const pointer = computeNextPracticePointer(sessionStrandCounts);
+            await db
+              .update(subjects)
+              .set({
+                nextLanguagePracticePointer: pointer,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(subjects.id, subjectId),
+                  eq(subjects.profileId, profileId),
+                ),
+              );
+
+            // AC3: selection reasons logged as safe debug metadata (strand
+            // counts only — no learner content).
+            logger.info('[session-completed] persisted next-practice pointer', {
+              profileId,
+              sessionId,
+              subjectId,
+              strand: pointer.strand,
+              reason: pointer.reason,
+            });
+          },
+        );
+      }),
+    );
 
     // Step 1c: Update needs-deepening progress (FR63)
     outcomes.push(
