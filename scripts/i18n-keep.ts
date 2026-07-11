@@ -345,7 +345,7 @@ const raw: readonly KeepPattern[] = [
     pattern: 'journal.practice.type.*',
     reason:
       'selected via practiceTypeLabel(type, t) → t(`journal.practice.type.${type}`) at ' +
-      'apps/mobile/src/components/journal/JournalTabView.tsx:883',
+      'apps/mobile/src/components/journal/JournalPracticeSection.tsx:28',
   },
   {
     pattern: 'home.parent.verifiedProof.state.*',
