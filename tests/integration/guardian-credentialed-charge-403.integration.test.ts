@@ -161,6 +161,7 @@ describe('Integration: WI-787 — guardian writes to credentialed charge are 403
       TEST_ENV,
     );
     expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe('FORBIDDEN');
   });
 
   it('POST /v1/learner-profile/:childId/tell on a credentialed child → 403', async () => {
@@ -182,6 +183,7 @@ describe('Integration: WI-787 — guardian writes to credentialed charge are 403
       TEST_ENV,
     );
     expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe('FORBIDDEN');
   });
 
   it('PUT /v1/settings/celebration-level (child branch) on a credentialed child → 403', async () => {
@@ -206,12 +208,150 @@ describe('Integration: WI-787 — guardian writes to credentialed charge are 403
       TEST_ENV,
     );
     expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe('FORBIDDEN');
+  });
+
+  // ---------------------------------------------------------------------
+  // Round-3 additions (Gate-2 lens): targeted single-charge operate/manage/
+  // view surfaces on /profiles/:id and family removal that still bypassed
+  // the leaf guards. (Aggregate-enumeration surfaces — dashboard root,
+  // weekly/monthly digest fan-out — are tracked as a follow-up WI, not here.)
+  // Also asserts the FORBIDDEN envelope, not just status (lens MATERIAL).
+  // ---------------------------------------------------------------------
+
+  it('GET /v1/profiles/:childId on a credentialed child → 403 FORBIDDEN', async () => {
+    const parentId = await createParent();
+    const childId = await seedConsentedChild(parentId, 'Credentialed Teen F', {
+      credentialed: true,
+    });
+
+    const res = await app.request(
+      `/v1/profiles/${childId}`,
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER.userId, email: PARENT_USER.email },
+          parentId,
+        ),
+      },
+      TEST_ENV,
+    );
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe('FORBIDDEN');
+  });
+
+  it('PATCH /v1/profiles/:childId on a credentialed child → 403 FORBIDDEN', async () => {
+    const parentId = await createParent();
+    const childId = await seedConsentedChild(parentId, 'Credentialed Teen G', {
+      credentialed: true,
+    });
+
+    const res = await app.request(
+      `/v1/profiles/${childId}`,
+      {
+        method: 'PATCH',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER.userId, email: PARENT_USER.email },
+          parentId,
+        ),
+        body: JSON.stringify({ displayName: 'Renamed By Guardian' }),
+      },
+      TEST_ENV,
+    );
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe('FORBIDDEN');
+  });
+
+  it('PATCH /v1/profiles/:childId/app-context on a credentialed child → 403 FORBIDDEN', async () => {
+    const parentId = await createParent();
+    const childId = await seedConsentedChild(parentId, 'Credentialed Teen H', {
+      credentialed: true,
+    });
+
+    const res = await app.request(
+      `/v1/profiles/${childId}/app-context`,
+      {
+        method: 'PATCH',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER.userId, email: PARENT_USER.email },
+          parentId,
+        ),
+        body: JSON.stringify({ defaultAppContext: 'study' }),
+      },
+      TEST_ENV,
+    );
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe('FORBIDDEN');
+  });
+
+  it('POST /v1/subscription/family/remove of a credentialed child → 403 FORBIDDEN', async () => {
+    const parentId = await createParent();
+    const childId = await seedConsentedChild(parentId, 'Credentialed Teen I', {
+      credentialed: true,
+    });
+
+    const res = await app.request(
+      '/v1/subscription/family/remove',
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER.userId, email: PARENT_USER.email },
+          parentId,
+        ),
+        body: JSON.stringify({ profileId: childId }),
+      },
+      TEST_ENV,
+    );
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe('FORBIDDEN');
   });
 
   // ---------------------------------------------------------------------
   // Pins — must be green before AND after the fix. They fence the
   // suppression from over-blocking.
   // ---------------------------------------------------------------------
+
+  it('PIN: GET /v1/profiles/:parentId (own profile) stays allowed', async () => {
+    const parentId = await createParent();
+    // credential a child too, to prove the guard is target-scoped, not global
+    await seedConsentedChild(parentId, 'Credentialed Teen J', {
+      credentialed: true,
+    });
+
+    const res = await app.request(
+      `/v1/profiles/${parentId}`,
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER.userId, email: PARENT_USER.email },
+          parentId,
+        ),
+      },
+      TEST_ENV,
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it('PIN: PATCH /v1/profiles/:childId on an UNcredentialed child stays allowed', async () => {
+    const parentId = await createParent();
+    const childId = await seedConsentedChild(parentId, 'Ordinary Child K', {
+      credentialed: false,
+    });
+
+    const res = await app.request(
+      `/v1/profiles/${childId}`,
+      {
+        method: 'PATCH',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER.userId, email: PARENT_USER.email },
+          parentId,
+        ),
+        body: JSON.stringify({ displayName: 'Renamed Ordinary' }),
+      },
+      TEST_ENV,
+    );
+    expect(res.status).toBe(200);
+  });
 
   it('PIN: PUT /v1/consent/:childId/revoke on a credentialed child stays allowed (consent-authority exception)', async () => {
     const parentId = await createParent();
