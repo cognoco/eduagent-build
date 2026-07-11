@@ -421,6 +421,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const ndkStep = mobileMaestro.steps?.find(
       (step) => step.name === 'Install Android NDK with retry',
     );
+    const manualBundleStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Bundle JS for cached APK',
+    );
     const workflowScripts = (mobileMaestro.steps ?? [])
       .map((step) => (typeof step.run === 'string' ? step.run : ''))
       .join('\n');
@@ -439,12 +442,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'apk-e2e-release-',
     );
     expect(String(buildStep?.run)).toContain('assembleRelease');
-    expect(String(buildStep?.run)).toContain(
+    expect(String(buildStep?.run)).not.toContain(
       '-x createBundleReleaseJsAndAssets',
     );
     expect(String(ndkStep?.run)).toContain('for attempt in 1 2 3');
     expect(String(ndkStep?.run)).toContain(
       'sdkmanager --install "ndk;27.1.12297006"',
+    );
+    expect(String(ndkStep?.run)).toContain('"ndk;27.0.12077973"');
+    expect(manualBundleStep?.if).toBe(
+      "steps.apk-cache.outputs.cache-hit == 'true'",
     );
     expect(workflowScripts).not.toContain('assembleDebug');
     expect(runner).toContain(

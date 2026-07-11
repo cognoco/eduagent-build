@@ -335,7 +335,7 @@ jobs:
         if: steps.apk-cache.outputs.cache-hit != 'true'
         run: |
           for attempt in 1 2 3; do
-            if sdkmanager --install "ndk;27.1.12297006"; then
+            if sdkmanager --install "ndk;27.1.12297006" "ndk;27.0.12077973"; then
               exit 0
             fi
             echo "::warning::NDK install attempt ${attempt}/3 failed"
@@ -385,9 +385,9 @@ jobs:
           echo "--- Patched _ctx.android.js (first match) ---"
           find node_modules/.pnpm -path "*/expo-router/_ctx.android.js" -exec head -3 {} \; -quit
 
-      # Bundle JS into the APK so the app works without a Metro dev server.
-      # Debug builds normally fetch JS from Metro at runtime, but in CI
-      # there is no Metro server. Pre-bundling embeds the JS in the APK.
+      # On a cache hit, produce the fresh JS bundle that will replace the stale
+      # one in the cached release APK. On a cache miss, Gradle's release bundle
+      # task performs this work as part of assembleRelease instead.
       #
       # Key decisions:
       # - Direct node path (not npx expo): npx resolves to the hoisted
@@ -395,7 +395,8 @@ jobs:
       #   The direct path + working-directory keeps cwd = apps/mobile.
       # - --dev false: dev mode tries to open DevTools WebSocket connections
       #   which crash in embedded (offline) APKs.
-      - name: Bundle JS for offline APK
+      - name: Bundle JS for cached APK
+        if: steps.apk-cache.outputs.cache-hit == 'true'
         working-directory: apps/mobile
         run: |
           mkdir -p android/app/src/main/assets
@@ -452,14 +453,14 @@ jobs:
 
       # ── On cache MISS: full native build ──
       # Compile a release-variant APK so Expo's debug-only development launcher
-      # is absent and MainActivity boots the embedded bundle directly. The JS
-      # bundle above deliberately uses NODE_ENV=test + EXPO_PUBLIC_E2E=true;
-      # skip Gradle's release re-bundle so it cannot overwrite that test bundle
-      # with a NODE_ENV=production build.
+      # is absent and MainActivity boots the embedded bundle directly. Gradle's
+      # release bundle task inherits NODE_ENV=test + EXPO_PUBLIC_E2E=true from
+      # the job; it must remain in the task graph because Android resource
+      # packaging consumes its generated providers.
       - name: Build E2E release APK
         if: steps.apk-cache.outputs.cache-hit != 'true'
         working-directory: apps/mobile/android
-        run: ./gradlew assembleRelease -x createBundleReleaseJsAndAssets --no-daemon --stacktrace
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       # ── Test execution — always runs ──
 
