@@ -3312,6 +3312,8 @@
       "grammarPattern": "Gramatyka: {{patterns}}",
       "comprehension": "Pytania o zrozumienie: {{correct}}/{{total}} poprawnie",
       "speakingAttempts_one": "Mówiłeś/aś {{count}} raz",
+      "speakingAttempts_few": "Mówiłeś/aś {{count}} razy",
+      "speakingAttempts_many": "Mówiłeś/aś {{count}} razy",
       "speakingAttempts_other": "Mówiłeś/aś {{count}} razy",
       "fluencyResult": "Sprawdzian płynności: {{correct}}/{{total}}",
       "nextRecommendation": {
