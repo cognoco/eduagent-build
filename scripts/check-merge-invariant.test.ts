@@ -213,7 +213,10 @@ function createMergeCommit(
     const absPath = join(repo, path);
     if (content === null) {
       // Drop: remove from index and working tree.
-      spawnSync('git', ['rm', '-f', '--cached', path], { cwd: repo });
+      spawnSync('git', ['rm', '-f', '--cached', path], {
+        cwd: repo,
+        env: childGitEnv(TEST_GIT_IDENTITY),
+      });
       try {
         rmSync(absPath);
       } catch {
@@ -561,38 +564,54 @@ describe('check-merge-invariant', () => {
     }
 
     it('does not mutate an ambient repo when GIT_DIR leaks into the env (write sites)', () => {
+      const { repo: fixtureRepo, mainSha, featureSha } = buildBaseFixture();
       const ambientRepo = buildAmbientFixture('wi1345-ambient-write-');
-      const fixtureRepo = mkdtempSync(join(tmpdir(), 'wi1345-fixture-write-'));
       try {
+        // Ambient repo ALSO tracks a file with the same name the fixture's
+        // override loop drops ('feature-only.ts'). This collision is
+        // deliberate: `git rm --cached` only touches the INDEX, not HEAD, so
+        // if the override loop's spawnSync resolves against the ambient
+        // GIT_DIR instead of `cwd`, it silently removes this path from the
+        // AMBIENT index without changing ambient HEAD at all — a corruption
+        // a HEAD/config-only check would miss entirely (proven empirically:
+        // without this collision, an unguarded `rm --cached` targets a path
+        // absent from the ambient index and no-ops).
+        writeFileSync(
+          join(ambientRepo, 'feature-only.ts'),
+          'export const featureOnly = "ambient";\n',
+        );
+        rawGit(ambientRepo, ['add', 'feature-only.ts']);
+        rawGit(ambientRepo, ['commit', '-q', '-m', 'ambient feature-only.ts']);
+
         const ambientConfigPath = join(ambientRepo, '.git', 'config');
         const headBefore = rawGit(ambientRepo, ['rev-parse', 'HEAD']);
         const configBefore = readFileSync(ambientConfigPath, 'utf8');
+        const statusBefore = rawGit(ambientRepo, ['status', '--porcelain']);
 
         const restoreGitDir = poisonGitDir(ambientRepo);
         try {
-          // Exercises the git() helper AND createMergeCommit's write path
-          // (both use the same env-construction pattern under test).
-          git(fixtureRepo, ['init', '-b', 'main']);
-          git(fixtureRepo, ['config', 'user.email', 'test@example.com']);
-          git(fixtureRepo, ['config', 'user.name', 'Test']);
-          writeFileSync(
-            join(fixtureRepo, 'fixture.ts'),
-            'export const fixture = true;\n',
-          );
-          git(fixtureRepo, ['add', '.']);
-          git(fixtureRepo, ['commit', '-m', 'fixture commit']);
+          // Drives every write-touching call site in this file under the
+          // poisoned env: git() (checkout -b / checkout main), the inline
+          // `merge --no-commit` spawnSync, the override loop's
+          // `git rm -f --cached` spawnSync (a null override triggers the
+          // drop path), and the inline `commit` spawnSync.
+          createMergeCommit(fixtureRepo, mainSha, featureSha, {
+            'feature-only.ts': null,
+          });
         } finally {
           restoreGitDir();
         }
 
         const headAfter = rawGit(ambientRepo, ['rev-parse', 'HEAD']);
         const configAfter = readFileSync(ambientConfigPath, 'utf8');
+        const statusAfter = rawGit(ambientRepo, ['status', '--porcelain']);
 
         expect(headAfter).toBe(headBefore);
         expect(configAfter).toBe(configBefore);
+        expect(statusAfter).toBe(statusBefore);
       } finally {
-        rmSync(ambientRepo, { recursive: true, force: true });
         rmSync(fixtureRepo, { recursive: true, force: true });
+        rmSync(ambientRepo, { recursive: true, force: true });
       }
     });
 
