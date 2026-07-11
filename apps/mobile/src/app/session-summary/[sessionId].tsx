@@ -1143,6 +1143,89 @@ export default function SessionSummaryScreen() {
           </View>
         ) : null}
 
+        {/* [WI-1553] four_strands session-end learning summary. Every row is
+            positively omitted when its source field is empty/null — no
+            negative placeholder copy (AC2). */}
+        {persisted?.languageLearningSummary ? (
+          <View
+            className="bg-surface rounded-card p-4 mb-4"
+            testID="language-practice-card"
+          >
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              {t('sessionSummary.languagePractice.title')}
+            </Text>
+            {persisted.languageLearningSummary.practicedScenario ? (
+              <Text className="text-body text-text-primary mb-1">
+                {t('sessionSummary.languagePractice.scenario', {
+                  scenario: persisted.languageLearningSummary.practicedScenario,
+                })}
+              </Text>
+            ) : null}
+            {persisted.languageLearningSummary.newWords.length > 0 ? (
+              <Text className="text-body text-text-secondary mb-1">
+                {t('sessionSummary.languagePractice.newWords', {
+                  words: persisted.languageLearningSummary.newWords
+                    .map((word) => word.term)
+                    .join(', '),
+                })}
+              </Text>
+            ) : null}
+            {persisted.languageLearningSummary.strengthenedWords.length > 0 ? (
+              <Text className="text-body text-text-secondary mb-1">
+                {t('sessionSummary.languagePractice.strengthenedWords', {
+                  words: persisted.languageLearningSummary.strengthenedWords
+                    .map((word) => word.term)
+                    .join(', '),
+                })}
+              </Text>
+            ) : null}
+            {persisted.languageLearningSummary.grammarPatterns.length > 0 ? (
+              <Text className="text-body text-text-secondary mb-1">
+                {t('sessionSummary.languagePractice.grammarPattern', {
+                  patterns:
+                    persisted.languageLearningSummary.grammarPatterns.join(
+                      ', ',
+                    ),
+                })}
+              </Text>
+            ) : null}
+            {persisted.languageLearningSummary.comprehension ? (
+              <Text className="text-body text-text-secondary mb-1">
+                {t('sessionSummary.languagePractice.comprehension', {
+                  correct:
+                    persisted.languageLearningSummary.comprehension.correct,
+                  total: persisted.languageLearningSummary.comprehension.total,
+                })}
+              </Text>
+            ) : null}
+            {persisted.languageLearningSummary.speakingAttempts > 0 ? (
+              <Text className="text-body text-text-secondary mb-1">
+                {t('sessionSummary.languagePractice.speakingAttempts', {
+                  count: persisted.languageLearningSummary.speakingAttempts,
+                })}
+              </Text>
+            ) : null}
+            {persisted.languageLearningSummary.fluency ? (
+              <Text className="text-body text-text-secondary mb-1">
+                {t('sessionSummary.languagePractice.fluencyResult', {
+                  correct: persisted.languageLearningSummary.fluency.correct,
+                  total: persisted.languageLearningSummary.fluency.total,
+                })}
+              </Text>
+            ) : null}
+            {persisted.languageLearningSummary.nextRecommendationStrand ? (
+              <Text className="text-body-sm text-text-secondary mt-2">
+                {
+                  // [i18n-keep: see scripts/i18n-keep.ts — dynamic strand key]
+                  t(
+                    `sessionSummary.languagePractice.nextRecommendation.${persisted.languageLearningSummary.nextRecommendationStrand}`,
+                  )
+                }
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
         {shouldShowMentorMemoryCue ? (
           <MentorMemoryCue
             title={t('sessionSummary.mentorMemoryCue.title')}

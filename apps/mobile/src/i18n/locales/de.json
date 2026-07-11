@@ -3146,7 +3146,24 @@
       "exchanges_other": "Du hast {{count}} Austausche geschafft"
     },
     "a11yContinueLearning": "Weiterlernen",
-    "a11yContinueToHome": "Zur Startseite"
+    "a11yContinueToHome": "Zur Startseite",
+    "languagePractice": {
+      "title": "Sprachübung",
+      "scenario": "Heute hast du {{scenario}} geübt",
+      "newWords": "Neue Wörter: {{words}}",
+      "strengthenedWords": "Du hast gefestigt: {{words}}",
+      "grammarPattern": "Grammatikfokus: {{patterns}}",
+      "comprehension": "Du hast {{correct}}/{{total}} Verständnisfragen richtig beantwortet",
+      "speakingAttempts_one": "Du hast {{count}} Mal gesprochen",
+      "speakingAttempts_other": "Du hast {{count}} Mal gesprochen",
+      "fluencyResult": "Flüssigkeitscheck: {{correct}}/{{total}}",
+      "nextRecommendation": {
+        "meaning_input": "Nächstes Mal: mehr Lese- und Hörübungen",
+        "meaning_output": "Nächstes Mal: mehr Sprech- und Schreibübungen",
+        "language_focus": "Nächstes Mal: Wir arbeiten an Grammatikmustern",
+        "fluency": "Nächstes Mal: ein kurzer Flüssigkeitssprint"
+      }
+    }
   },
   "sessionTranscript": {
     "archived": {

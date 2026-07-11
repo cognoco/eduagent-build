@@ -6,6 +6,7 @@ import {
   celebrationReasonSchema,
   pendingCelebrationSchema,
 } from './progress.ts';
+import { languageSessionSummarySchema } from './language.ts';
 
 export const orphanReasonSchema = z.enum([
   'llm_stream_error',
@@ -569,6 +570,9 @@ export const sessionSummarySchema = z.object({
   baseXp: z.number().nullable().optional(),
   reflectionBonusXp: z.number().nullable().optional(),
   purgedAt: isoDateField.nullable().optional(),
+  // WI-1553: four_strands session-end learning summary. Additive — absent on
+  // legacy rows and non-language sessions, where it parses to null.
+  languageLearningSummary: languageSessionSummarySchema.nullable().optional(),
 });
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 

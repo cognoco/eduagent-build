@@ -18,6 +18,7 @@ import {
   vocabularyDeleteResponseSchema,
   languageMilestoneProgressSchema,
   languageProgressSchema,
+  languageSessionSummarySchema,
 } from './language.js';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440000';
@@ -644,6 +645,67 @@ describe('languageProgressSchema', () => {
         },
         computedAt: '2026-07-11T10:00:00.000Z',
       },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1553] languageSessionSummarySchema
+// ---------------------------------------------------------------------------
+describe('languageSessionSummarySchema', () => {
+  it('accepts a fully-populated (rich-data) summary', () => {
+    const result = languageSessionSummarySchema.safeParse({
+      practicedScenario: 'order food at a cafe',
+      newWords: [{ term: 'croissant', type: 'word' }],
+      strengthenedWords: [{ term: 'bonjour', type: 'word' }],
+      grammarPatterns: ['polite requests: je voudrais'],
+      comprehension: { correct: 1, total: 1 },
+      speakingAttempts: 2,
+      fluency: { correct: 4, total: 5 },
+      nextRecommendationStrand: 'fluency',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an all-empty/null (sparse-data) summary', () => {
+    const result = languageSessionSummarySchema.safeParse({
+      practicedScenario: null,
+      newWords: [],
+      strengthenedWords: [],
+      grammarPatterns: [],
+      comprehension: null,
+      speakingAttempts: 0,
+      fluency: null,
+      nextRecommendationStrand: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an invalid word type', () => {
+    const result = languageSessionSummarySchema.safeParse({
+      practicedScenario: null,
+      newWords: [{ term: 'x', type: 'not-a-real-type' }],
+      strengthenedWords: [],
+      grammarPatterns: [],
+      comprehension: null,
+      speakingAttempts: 0,
+      fluency: null,
+      nextRecommendationStrand: null,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an invalid nextRecommendationStrand', () => {
+    const result = languageSessionSummarySchema.safeParse({
+      practicedScenario: null,
+      newWords: [],
+      strengthenedWords: [],
+      grammarPatterns: [],
+      comprehension: null,
+      speakingAttempts: 0,
+      fluency: null,
+      nextRecommendationStrand: 'not-a-real-strand',
     });
     expect(result.success).toBe(false);
   });

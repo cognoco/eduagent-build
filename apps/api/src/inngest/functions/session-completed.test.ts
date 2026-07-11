@@ -137,6 +137,20 @@ const mockDatabaseModule = createDatabaseModuleMock({
       sessionId: col('sessionId'),
       profileId: col('profileId'),
     },
+    // [WI-1553] update-vocabulary-retention's pre-upsert existence check.
+    vocabulary: {
+      profileId: col('profileId'),
+      subjectId: col('subjectId'),
+      termNormalized: col('termNormalized'),
+    },
+    // [WI-1553] compute-language-session-summary's fluency-drill lookup.
+    practiceActivityEvents: {
+      profileId: col('profileId'),
+      activityType: col('activityType'),
+      metadata: col('metadata'),
+      score: col('score'),
+      total: col('total'),
+    },
     profiles: { id: col('id'), displayName: col('displayName') },
     // [WI-784] v2 identity tables — used by the flag-on billing twin branch
     person: {
@@ -631,7 +645,11 @@ jest.mock(
 );
 
 import { sessionCompleted, embedNewFactsForProfile } from './session-completed';
-import { createDatabase } from '@eduagent/database';
+import {
+  createDatabase,
+  sessionSummaries as sessionSummariesTable,
+  practiceActivityEvents as practiceActivityEventsTable,
+} from '@eduagent/database';
 import type { Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
@@ -995,6 +1013,7 @@ describe('sessionCompleted', () => {
       'update-needs-deepening',
       'check-milestone-completion',
       'write-coaching-card',
+      'compute-language-session-summary',
       'generate-session-insights',
       'generate-learner-recap',
       'generate-llm-summary',
@@ -1016,6 +1035,7 @@ describe('sessionCompleted', () => {
       .filter((o: any) => o.status !== 'skipped')
       .map((o: any) => o.status);
     expect(statuses).toEqual([
+      'ok',
       'ok',
       'ok',
       'ok',
@@ -1432,6 +1452,9 @@ describe('sessionCompleted', () => {
               }),
             },
             streaks: { findFirst: jest.fn().mockResolvedValue(null) },
+            // [WI-1553] update-vocabulary-retention now classifies extracted
+            // terms against the pre-existing vocabulary set before upserting.
+            vocabulary: { findMany: jest.fn().mockResolvedValue([]) },
           },
           select: chainable,
         };
@@ -1882,6 +1905,212 @@ describe('sessionCompleted', () => {
           }),
         }),
       );
+    });
+  });
+
+  // [WI-1553] Session-end language learning summary — derived from
+  // session_events, gated on four_strands, soft-failed via runIsolated.
+  describe('compute-language-session-summary step', () => {
+    const { resetDatabaseUrl } = require('../helpers');
+
+    function languageLearningEvent(
+      strand: string,
+      extra: Record<string, unknown> = {},
+    ) {
+      return {
+        eventType: 'ai_response',
+        content: '',
+        metadata: {
+          languageLearning: {
+            strand,
+            activityType: 'free_response',
+            modality: 'text',
+            targetWords: [],
+            targetGrammar: [],
+            ...extra,
+          },
+        },
+      };
+    }
+
+    function setupLanguageSummaryMock(args: {
+      subject: Record<string, unknown> | null;
+      events?: Array<Record<string, unknown>>;
+      summaryRow?: { id: string } | null;
+      fluencyRows?: Array<{ score: number | null; total: number | null }>;
+    }) {
+      resetDatabaseUrl();
+      const subjectFindFirst = jest.fn().mockResolvedValue(args.subject);
+      const sessionEventsFindMany = jest
+        .fn()
+        .mockResolvedValue(args.events ?? []);
+      const updateSet = jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue([]),
+      });
+      const updateFn = jest.fn().mockReturnValue({ set: updateSet });
+
+      const selectFn = jest.fn(() => ({
+        from: (table: unknown) => {
+          if (table === sessionSummariesTable) {
+            return {
+              where: () => ({
+                limit: () =>
+                  Promise.resolve(
+                    args.summaryRow != null ? [args.summaryRow] : [],
+                  ),
+              }),
+            };
+          }
+          if (table === practiceActivityEventsTable) {
+            return { where: () => Promise.resolve(args.fluencyRows ?? []) };
+          }
+          // curriculumTopics → curriculumBooks → subjects join chain, used
+          // by loadTopicTitle; no topic-title fixtures needed for these
+          // tests (topicId is not set on createEventData() overrides below).
+          return {
+            innerJoin: () => ({
+              innerJoin: () => ({
+                where: () => ({ limit: () => Promise.resolve([]) }),
+              }),
+            }),
+          };
+        },
+      }));
+
+      (createDatabase as jest.Mock).mockImplementation(() => ({
+        query: {
+          subjects: { findFirst: subjectFindFirst },
+          sessionEvents: { findMany: sessionEventsFindMany },
+        },
+        select: selectFn,
+        update: updateFn,
+      }));
+      return {
+        subjectFindFirst,
+        sessionEventsFindMany,
+        updateFn,
+        updateSet,
+        selectFn,
+      };
+    }
+
+    const fourStrandsSubject = {
+      id: SUBJECT_ID,
+      profileId: PROFILE_ID,
+      pedagogyMode: 'four_strands',
+      languageCode: 'es',
+      nextLanguagePracticePointer: { strand: 'fluency' },
+    };
+
+    afterEach(() => {
+      resetDatabaseUrl();
+    });
+
+    it('skips when subjectId is not provided', async () => {
+      const { result } = (await executeSteps(
+        createEventData({ subjectId: null, topicId: null }),
+      )) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'compute-language-session-summary',
+      );
+      expect(outcome.status).toBe('skipped');
+    });
+
+    it('AC5 non-language case: does not write when subject is not four_strands', async () => {
+      const { updateFn } = setupLanguageSummaryMock({
+        subject: {
+          id: SUBJECT_ID,
+          profileId: PROFILE_ID,
+          pedagogyMode: 'socratic',
+          languageCode: null,
+        },
+        summaryRow: { id: 'summary-1' },
+      });
+
+      const { result } = (await executeSteps(createEventData())) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'compute-language-session-summary',
+      );
+      expect(outcome.status).toBe('ok');
+      expect(updateFn).not.toHaveBeenCalled();
+    });
+
+    it('writes a computed language_learning_summary for a four_strands subject', async () => {
+      const { updateFn, updateSet } = setupLanguageSummaryMock({
+        subject: fourStrandsSubject,
+        events: [
+          languageLearningEvent('meaning_output', { targetGrammar: ['x'] }),
+        ],
+        summaryRow: { id: 'summary-1' },
+        fluencyRows: [{ score: 4, total: 5 }],
+      });
+
+      const { result } = (await executeSteps(createEventData())) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'compute-language-session-summary',
+      );
+      expect(outcome.status).toBe('ok');
+      expect(updateFn).toHaveBeenCalledWith(sessionSummariesTable);
+      expect(updateSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          languageLearningSummary: expect.objectContaining({
+            grammarPatterns: ['x'],
+            fluency: { correct: 4, total: 5 },
+            nextRecommendationStrand: 'fluency',
+          }),
+        }),
+      );
+    });
+
+    it('does not write when no session_summaries row exists yet', async () => {
+      const { updateFn } = setupLanguageSummaryMock({
+        subject: fourStrandsSubject,
+        summaryRow: null,
+      });
+
+      await executeSteps(createEventData());
+
+      expect(updateFn).not.toHaveBeenCalled();
+    });
+
+    it('isolates errors without blocking other steps', async () => {
+      resetDatabaseUrl();
+      const subjectFindFirst = jest
+        .fn()
+        .mockRejectedValue(new Error('db unavailable'));
+      (createDatabase as jest.Mock).mockImplementation(() => ({
+        query: {
+          subjects: { findFirst: subjectFindFirst },
+          sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
+        },
+        select: jest.fn(),
+        update: jest.fn(),
+      }));
+
+      const { result } = (await executeSteps(createEventData())) as any;
+
+      const outcome = result.outcomes.find(
+        (o: any) => o.step === 'compute-language-session-summary',
+      );
+      expect(outcome.status).toBe('failed');
+
+      // [F3 — Phase-4 review] Asserting an EARLIER step (write-coaching-card,
+      // which runs before compute-language-session-summary) proves nothing
+      // about isolation. The real proof is that steps AFTER the throwing
+      // step still ran and the whole function still resolved normally rather
+      // than rejecting/aborting partway through.
+      expect(result.status).toMatch(/^completed/);
+      const insightsOutcome = result.outcomes.find(
+        (o: any) => o.step === 'generate-session-insights',
+      );
+      const recapOutcome = result.outcomes.find(
+        (o: any) => o.step === 'generate-learner-recap',
+      );
+      expect(insightsOutcome).toBeDefined();
+      expect(recapOutcome).toBeDefined();
     });
   });
 

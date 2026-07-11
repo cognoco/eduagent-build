@@ -3173,7 +3173,24 @@
       "exchanges_other": "Você concluiu {{count}} trocas"
     },
     "a11yContinueLearning": "Continuar a aprender",
-    "a11yContinueToHome": "Continuar para a página inicial"
+    "a11yContinueToHome": "Continuar para a página inicial",
+    "languagePractice": {
+      "title": "Prática de idioma",
+      "scenario": "Hoje você praticou {{scenario}}",
+      "newWords": "Palavras novas: {{words}}",
+      "strengthenedWords": "Você fortaleceu: {{words}}",
+      "grammarPattern": "Foco em gramática: {{patterns}}",
+      "comprehension": "Você respondeu corretamente a {{correct}}/{{total}} perguntas de compreensão",
+      "speakingAttempts_one": "Você falou {{count}} vez",
+      "speakingAttempts_other": "Você falou {{count}} vezes",
+      "fluencyResult": "Verificação de fluência: {{correct}}/{{total}}",
+      "nextRecommendation": {
+        "meaning_input": "Próxima vez: mais prática de leitura e audição",
+        "meaning_output": "Próxima vez: mais prática de fala e escrita",
+        "language_focus": "Próxima vez: vamos trabalhar nos padrões gramaticais",
+        "fluency": "Próxima vez: um sprint rápido de fluência"
+      }
+    }
   },
   "sessionTranscript": {
     "archived": {

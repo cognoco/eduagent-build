@@ -3303,7 +3303,26 @@
       "exchanges_many": "Udało Ci się ukończyć {{count}} wymian"
     },
     "a11yContinueLearning": "Kontynuuj naukę",
-    "a11yContinueToHome": "Przejdź do strony głównej"
+    "a11yContinueToHome": "Przejdź do strony głównej",
+    "languagePractice": {
+      "title": "Praktyka językowa",
+      "scenario": "Dziś ćwiczyłeś/aś {{scenario}}",
+      "newWords": "Nowe słowa: {{words}}",
+      "strengthenedWords": "Utrwalone słowa: {{words}}",
+      "grammarPattern": "Gramatyka: {{patterns}}",
+      "comprehension": "Pytania o zrozumienie: {{correct}}/{{total}} poprawnie",
+      "speakingAttempts_one": "Mówiłeś/aś {{count}} raz",
+      "speakingAttempts_few": "Mówiłeś/aś {{count}} razy",
+      "speakingAttempts_many": "Mówiłeś/aś {{count}} razy",
+      "speakingAttempts_other": "Mówiłeś/aś {{count}} razy",
+      "fluencyResult": "Sprawdzian płynności: {{correct}}/{{total}}",
+      "nextRecommendation": {
+        "meaning_input": "Następnym razem: więcej ćwiczeń z czytania i słuchania",
+        "meaning_output": "Następnym razem: więcej ćwiczeń z mówienia i pisania",
+        "language_focus": "Następnym razem: popracujemy nad wzorcami gramatycznymi",
+        "fluency": "Następnym razem: szybki sprint z płynności"
+      }
+    }
   },
   "sessionTranscript": {
     "archived": {
