@@ -54,6 +54,12 @@ describe('Inngest helpers', () => {
     delete process.env['DATABASE_URL'];
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+    resetDatabaseUrl();
+    delete process.env['DATABASE_URL'];
+  });
+
   it('[WI-84 DS-228] creates step databases with Neon pool cache disabled', () => {
     const url =
       'postgresql://user:pw@ep-test.us-east-2.aws.neon.tech/db?sslmode=require';

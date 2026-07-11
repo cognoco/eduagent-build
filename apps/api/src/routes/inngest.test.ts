@@ -4,16 +4,19 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-jest.mock('../inngest', () => {
-  const actual = jest.requireActual(
-    '../inngest',
-  ) as typeof import('../inngest');
-  return {
-    ...actual,
-    inngest: { id: 'test-inngest' },
-    functions: [],
-  };
-});
+jest.mock(
+  '../inngest',
+  /* gc1-allow: registry-boundary: loading the real registry imports all production Inngest functions; route tests replace only the registry payload while exercising the real Hono route */ () => {
+    const actual = jest.requireActual(
+      '../inngest',
+    ) as typeof import('../inngest');
+    return {
+      ...actual,
+      inngest: { id: 'test-inngest' },
+      functions: [],
+    };
+  },
+);
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn(() => async () => {
@@ -34,6 +37,10 @@ import { Hono } from 'hono';
 import { inngestRoute } from './inngest';
 
 describe('inngestRoute', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('is mountable on a Hono app', () => {
     const app = new Hono();
     expect(() => app.route('/v1', inngestRoute)).not.toThrow();
