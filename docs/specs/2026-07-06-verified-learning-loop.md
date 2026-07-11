@@ -188,6 +188,13 @@ The two verified sources do not have the same evidence lifetime, and a proof sur
 
 If a `challenge_drafted_note` exists for the same verification (the durable path), prefer rendering that over a solid-quote pointer — it does not degrade on the transcript clock.
 
+**Addendum (2026-07-11, WI-1658 rework — read-side quote age-out).** The `challenge_drafted_note` durability stated above ("nothing purges `topic_notes`", "does not degrade on the transcript clock") is a *write-side* / row-existence statement — it predates AC4's separate obligation to align quote *retention* with WI-1194's clock, and the two must not be conflated. The split now implemented in `getLatestVerifiedProofForChild` (`apps/api/src/services/parent-proof.ts`):
+
+- The **verified fact** — topic, `verifiedAt`, `MasteryVerificationState` — remains durable and is never suppressed; MMT-ADR-0031 §5 co-presentation is unaffected by anything below.
+- The **verbatim quote** is retention-sensitive child content and is *read-suppressed* (never deleted here) once its `topic_notes` row is older than 30 days — the same cutoff `transcript-purge-cron.ts` already uses and the window WI-1194's own description names for verbatim quotes generally. Past that window the quote reads back as null and the existing degradation rule above renders "source no longer available", identical to the dangling-evidence case.
+- This is **read-side suppression only**. The `topic_notes` row itself is not deleted by this WI — write-side purge of aged rows remains WI-1194's scope (tracked via the cross-cutting sweep comment on that WI's page, alongside `concept_mastery.learner_quote` and `session_summaries.learnerRecap`).
+- "Does not degrade on the transcript clock" (above) refers to the row surviving `transcript-purge-cron.ts`'s *session*-transcript purge, which only targets `session_summaries`/`session_events`, never `topic_notes` — it was never a claim that the quote is exempt from its own retention window.
+
 **Edge case: a verified artifact from a topic never Challenge-verified.** Because `challenge_solid_quote` artifacts exist at concept grain (see AC2 table above), a topic can hold a verified solid-quote artifact for one concept while its overall `MasteryVerificationState` is `unverified` (the round outcome was `partial` — other concepts were weak, so `assessments.masteryChallengeVerifiedAt` was never set). A proof surface must not present that single concept's solid quote as "topic verified" — it renders only per-concept ("verified: `<concept>`, part of `<topic>`") and never upgrades to a topic-level verified claim until the topic's own `MasteryVerificationState` transitions away from `unverified`.
 
 ### Transcript-safety prohibition (AC5)
