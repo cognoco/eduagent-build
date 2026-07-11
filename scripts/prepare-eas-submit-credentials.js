@@ -59,6 +59,7 @@ function materializeGooglePlayServiceAccount({
     encoding: 'utf8',
     mode: 0o600,
   });
+  // The write mode only applies on creation; enforce it for existing files too.
   fsImpl.chmodSync(outputPath, 0o600);
   return outputPath;
 }
