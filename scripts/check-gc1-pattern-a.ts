@@ -39,7 +39,12 @@ const MOCK_LINE = /jest\.(?:mock|doMock)\(\s*['"`](\.\.?\/[^'"`]+)['"`]/;
 const MOCK_OPEN = /jest\.(?:mock|doMock)\s*\(/;
 // Matches a leading specifier argument on its own line: `  './foo',` or `"../bar"`.
 const SPECIFIER_LINE = /^\s*['"`](\.\.?\/[^'"`]+)['"`]/;
-const GC1_ALLOW = /gc1-allow/i;
+// A genuine escape directive: `gc1-allow:` must be the first token of its
+// own `//` or `/*` comment, not merely a substring anywhere in the scanned
+// text — e.g. a comment ABOUT gc1-allow ("this codebase used to require
+// gc1-allow tags everywhere") must not satisfy the check (WI-1355 rework,
+// round 1 adversarial review).
+const GC1_ALLOW = /(?:\/\/|\/\*)\s*gc1-allow:/i;
 
 export function extractSpecifier(line: string): string | null {
   // Single-line form: jest.mock('./foo', ...) on one physical line.
@@ -175,11 +180,33 @@ function findAddedMockCallsFromSource(
         const specifier = firstArg ? getStringLiteralText(firstArg) : null;
         if (specifier?.startsWith('./') || specifier?.startsWith('../')) {
           let end = firstArg ? firstArg.getEnd() : node.getEnd();
-          // Preserve the existing same-line escape hatch:
-          // `jest.mock('./foo', () => ({})); // gc1-allow: reason`.
           if (getLineNumber(sourceFile, node.getEnd()) === line) {
+            // Preserve the existing same-line escape hatch:
+            // `jest.mock('./foo', () => ({})); // gc1-allow: reason`.
             const lineEnd = stagedSrc.indexOf('\n', node.getEnd());
             end = lineEnd === -1 ? stagedSrc.length : lineEnd;
+          } else {
+            // Multi-line call: a `gc1-allow` escape hatch may trail the
+            // specifier on its own physical line, or sit on its own line
+            // immediately after the specifier, before the factory body.
+            // Widen `end` through the rest of the specifier's line, then AT
+            // MOST one immediately-following comment-only line — no further
+            // (WI-1355 rework, round 1 adversarial review: an unbounded
+            // walk-forward handed arbitrarily long factory-body comments to
+            // a bare substring test, so any comment merely mentioning
+            // "gc1-allow" — anywhere in the factory body — bypassed the
+            // ratchet for a genuinely non-Pattern-A mock).
+            const cursor = stagedSrc.indexOf('\n', end);
+            end = cursor === -1 ? stagedSrc.length : cursor;
+            if (cursor !== -1) {
+              const nextCursor = stagedSrc.indexOf('\n', cursor + 1);
+              const lineEndPos =
+                nextCursor === -1 ? stagedSrc.length : nextCursor;
+              const trimmed = stagedSrc.slice(cursor + 1, lineEndPos).trim();
+              if (trimmed.startsWith('//') || trimmed.startsWith('/*')) {
+                end = lineEndPos;
+              }
+            }
           }
           sites.push({
             line,
@@ -419,11 +446,14 @@ function runCli(): void {
     '  1. Convert to Pattern A (preferred — see AGENTS.md GC1 ratchet).',
   );
   console.error("  2. Use a bare specifier if it's a true external boundary.");
-  console.error('  3. If you genuinely need a full mock, add');
+  console.error('  3. If you genuinely need a full mock, add a');
   console.error(
-    '     `// gc1-allow: <reason>` on the SAME line as jest.mock(.',
+    '     `gc1-allow: <reason>` comment: on the SAME line as jest.mock( for',
   );
-  console.error('     A comment on the line BELOW does NOT satisfy the check.');
+  console.error(
+    '     a single-line call, or trailing the specifier / on its own line',
+  );
+  console.error('     immediately after the specifier for a multi-line call.');
   process.exit(1);
 }
 
