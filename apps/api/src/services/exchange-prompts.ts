@@ -94,7 +94,7 @@ const FINAL_OUTPUT_FILTER_RULE =
 const LEARNING_SESSION_GUIDANCE =
   'Session type: LEARNING\n' +
   'Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.\n' +
-  'On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.\n' +
+  'On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.\n' +
   "If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.\n" +
   'If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.\n' +
   'If it shows a gap, re-explain from a different angle — do not repeat the same explanation.\n' +
@@ -205,6 +205,7 @@ export function getSessionTypeGuidance(
         'Say whether the answer is right or wrong. If wrong, point to the specific error and explain why briefly.\n' +
         'If you show a similar worked example, keep it tiny: one setup line and the key correction step only.\n' +
         "When possible, verify by substituting the learner's answer back into the original problem or by naming the inverse-operation check. For linear equations, the default self-check is: substitute the final x back into the original equation and confirm both sides match.\n" +
+        'When you check the answer by working it out yourself, you ARE relying on deterministic_reasoning — include "deterministic_reasoning" in private_sources.relied_on for that turn.\n' +
         'Do not reveal the final answer to the actual homework problem.\n' +
         'Do not ask Socratic follow-up questions — the learner wants a check, not a conversation.\n' +
         incompleteSourceLine
@@ -367,7 +368,7 @@ function getExchangeEnvelopeInstruction(context: {
   }
 
   const fluencyLine = context.isLanguageMode
-    ? '\n- When you start a fluency drill (rapid-fire translation, fill-blank, vocabulary recall), set `ui_hints.fluency_drill.active` to true and `ui_hints.fluency_drill.duration_s` to a value between 15 and 90. When you evaluate the drill result, set `active` to false and include `score` with `correct` and `total` integers.'
+    ? '\n- When the learner asks for a fluency drill (e.g. "a 30 second drill", "rapid-fire practice"), you MUST start it: set `ui_hints.fluency_drill.active` to true and `ui_hints.fluency_drill.duration_s` to a value between 15 and 90 (use the seconds the learner named when they gave one), and OMIT `score` at the start. Your `reply` must frame it as a short timed activity — state the duration (e.g. "30 seconds") and immediately give the rapid-fire prompts. A fluency drill practices connectors or vocabulary the learner has already met in this session; it is mechanical output practice, NOT a factual claim, so do NOT ask for source material or refuse it on grounds of missing sources. When you later evaluate a completed drill, set `active` to false and include `score` with `correct` and `total` integers.'
     : '';
 
   return (
@@ -1051,6 +1052,8 @@ export function buildSystemPromptSegments(
         'Session type: LANGUAGE LEARNING',
         'Use direct teaching instead of the normal Socratic escalation ladder.',
         'Balance input, output, explicit language study, and fluency work within the session.',
+        'EXPLICIT CORRECTION: When the learner produces a target-language sentence with a grammar or connector error, do not just restate the corrected sentence — name the specific missing or incorrect word explicitly. Say which word is missing or wrong and what it should be. Example: if the learner writes "Mi opinión, ...", point out that the word "en" is missing and it should be "en mi opinión", not "mi opinión". Then show the full corrected sentence and invite them to try one of their own.',
+        'On setup/readiness turns for a loaded topic — presenting a reading passage, graded input, or a warm-up prompt drawn from the topic — include "current_topic" in private_sources.relied_on when that source exists, even if the visible reply is mostly a prompt or greeting.',
       ].join('\n'),
     );
   } else if (

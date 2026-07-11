@@ -134,7 +134,7 @@ Subject: <subject_name>Mathematics</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -264,3 +264,15 @@ Start a learning session about algebra equations.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "Algebra equations are mathematical statements that express equality between two expressions. They often involve variables, like 'x' or 'y', which represent unknown values. For example, an equation like `2x + 3 = 7` shows that when you multiply `2` by some number `x`, then add `3`, you get `7`. The goal is to find out what `x` equals.\n\nOne common method to solve this equation is to isolate the variable. Starting with `2x + 3 = 7`, you can subtract `3` from both sides to get `2x = 4`, and then divide by `2` to find that `x = 2`.\n\nCan you try solving the equation `3y - 5 = 10` and tell me what you find for `y`?",
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
+  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "", "factual_confidence": 1.0 },
+  "confidence": "high"
+}
+```

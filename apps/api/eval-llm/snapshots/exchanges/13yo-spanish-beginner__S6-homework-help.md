@@ -276,3 +276,9 @@ Can you help me with this homework question? "Spanish present tense verbs — fi
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{"reply":"It looks like the homework question might be mixed up, as \"find the value of x\" sounds more like a math question. For Spanish present tense verbs, we usually focus on conjugating them. Could you check if there's more information or a different part of the question you can share? Maybe it's asking you to conjugate a verb or fill in a blank with the correct form? Let me know!","signals":{"partial_progress":false,"needs_deepening":true,"understanding_check":false,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["current_topic"],"insufficient":true,"reason":"The question appears incomplete or misquoted, and more context is needed.","factual_confidence":0.0}}
+```

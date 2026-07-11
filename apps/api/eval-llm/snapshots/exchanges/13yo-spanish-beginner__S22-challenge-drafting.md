@@ -162,7 +162,7 @@ Subject: <subject_name>Languages</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -306,3 +306,9 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 9
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{ "reply": "Great starting point!\n\nThe present tense in Spanish is used to describe actions that are happening now. It's like saying \"I eat\" or \"she runs\" in English. To use a verb in the present tense, you need to change its ending based on who is doing the action.\n\nLet's take the verb `hablar` (to speak) as an example:\n- For `yo` (I), we'll use `hablo`, so \"I speak\" is `yo hablo`.\n- For `tú` (you), we use `hablas`, so \"you speak\" is `tú hablas`.\n\nWhat’s one thing you notice about how we changed the verb `hablar`?", "signals": { "partial_progress": true, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false }, "ui_hints": { "note_prompt": { "show": false, "post_session": false } }, "private_sources": { "relied_on": ["current_topic", "general_knowledge"], "insufficient": false, "reason": "Teaching Spanish present tense verbs using the verb 'hablar' as an example, covered by current topic and general knowledge on verb conjugation.", "factual_confidence": 0.95 }, "confidence": "high" }
+```

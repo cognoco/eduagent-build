@@ -151,7 +151,7 @@ Subject: <subject_name>Languages</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -292,3 +292,9 @@ I remember we covered ser vs estar but I still mix them up when I'm writing.
 - topicTitle: Spanish present tense verbs
 - sourceEvidence: learner_message:context, current_topic:reliable, general_knowledge:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{"reply":"Let’s break down ser and estar again. \n\nThe verb **ser** is used for permanent or essential qualities, like identity, characteristics, and time. For example, \"Soy estudiante\" means \"I am a student.\" \n\nOn the other hand, **estar** is used for temporary states and locations. For instance, \"Estoy cansado\" means \"I am tired.\" \n\nTo help remember, think of ser as describing what something *is*, while estar tells us how something *is* at the moment. Do you want to try using both verbs in sentences to practice?","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":true,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["learner_message","mentor_memory"],"insufficient":false,"reason":"learner's needs for clarification on ser vs. estar","factual_confidence":1.0},"confidence":"high"}
+```

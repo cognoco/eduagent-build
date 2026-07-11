@@ -156,7 +156,7 @@ Subject: <subject_name>Science</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -300,3 +300,15 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 9
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{  
+  "reply": "Great start! The Mesozoic era is one of the three major eras in Earth's geological history. It lasted from about 252 to 66 million years ago and is often called the age of the dinosaurs because they were the dominant animals during this time.\n\nHere's an example to dive deeper: Imagine the Earth as a giant timeline. The Mesozoic era would be a very long section, split into three periods: the Triassic, Jurassic, and Cretaceous. Many significant events happened during each period, like the rise of dinosaurs in the Triassic and the development of flowering plants in the Cretaceous. \n\nTo check understanding, why do you think the Mesozoic era is important in Earth’s history? How did the environment during this era support life like dinosaurs?\n\nLet me know if you need another kind of example or further explanation!",  
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },  
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },  
+  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "", "factual_confidence": 0.95 },  
+  "confidence": "high" 
+}
+```

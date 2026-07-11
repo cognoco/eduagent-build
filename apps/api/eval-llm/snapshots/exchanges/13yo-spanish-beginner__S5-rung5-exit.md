@@ -161,7 +161,7 @@ Subject: <subject_name>Languages</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -296,3 +296,9 @@ Signal guidance:
 - History turns: 5, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{"reply":"No worries. Let's handle this step by step.\n\n**Ser** is used to describe things that are permanent or long-lasting. Think of it like describing identity, nationality, or time. For example:\n- \"Yo soy estudiante\" (I am a student) – it's part of your identity.\n- \"Ella es de España\" (She is from Spain) – indicating where she is from.\n\nOn the other hand, **estar** is used for temporary states and locations. It’s like describing how you feel or where something is right now. Examples include:\n- \"Estoy cansado\" (I am tired) – a temporary state.\n- \"El libro está en la mesa\" (The book is on the table) – showing location.\n\nHere's a short example to test your understanding:\n- Which verb would you use to say \"Los caballos ____ en el establo\" (The horses are in the stable)? Hint: Think about location.\n\nGive it a try!","signals":{ "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false }, "ui_hints": { "note_prompt": { "show": false, "post_session": false } }, "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Grounded explanation on when to use ser vs estar with examples to aid understanding." }, "confidence": "high"}
+```

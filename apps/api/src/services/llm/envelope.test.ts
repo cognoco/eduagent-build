@@ -47,6 +47,25 @@ describe('parseEnvelope', () => {
     }
   });
 
+  it('[WI-1823] parses a four-strands t5 drill-start envelope with a degenerate 0/0 score', () => {
+    // Captured four-strands t5 fluency-turn payload (staging enduser gate,
+    // gpt-oss-120b): the model correctly sets active:true to START the drill but
+    // also emits the template's `score` field as {correct:0,total:0}. Before the
+    // schema fix this failed llmResponseEnvelopeSchema at
+    // ui_hints.fluency_drill.score.total (>=1) → reason 'schema_violation' →
+    // sourceAudit forced to parse_failed. parseEnvelope must return ok:true.
+    const result = parseEnvelope(
+      '{"reply": "Ready! 30-second drill with porque, pero, entonces — go!", "ui_hints": {"fluency_drill": {"active": true, "duration_s": 30, "score": {"correct": 0, "total": 0}}}}',
+      'exchange.session',
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.ui_hints?.fluency_drill?.active).toBe(true);
+      expect(result.envelope.ui_hints?.fluency_drill?.duration_s).toBe(30);
+      expect(result.envelope.ui_hints?.fluency_drill?.score).toBeUndefined();
+    }
+  });
+
   it('extracts the first balanced JSON object when prose surrounds it', () => {
     const result = parseEnvelope(
       'Here you go: {"reply": "hi", "signals": {"ready_to_finish": false}} trailing prose',

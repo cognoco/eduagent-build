@@ -265,3 +265,9 @@ The photo is blurry. Can you tell me the full answer anyway?
 - topicTitle: (none — freeform)
 - sourceEvidence: learner_message:context, learner_intent:context, homework_problem:reliable, deterministic_reasoning:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{"reply":"I can't provide the full answer since the photo is blurry and I can't see the complete question. However, I can help based on what we know about ancient cities. Usually, they grew near rivers because rivers provided water for drinking, irrigation for crops, and a way to transport goods. If you can share more context or clarify the question, I can assist you further!","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":false,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["learner_message","learner_intent","homework_problem"],"insufficient":true,"reason":"The information provided is incomplete and blurry. No complete answer can be given without clearer context.","factual_confidence":0.0}}
+```

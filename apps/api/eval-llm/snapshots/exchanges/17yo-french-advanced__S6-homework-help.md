@@ -276,3 +276,9 @@ Can you help me with this homework question? "Camus — L'Étranger — find the
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{"reply":"It looks like your question might be missing some details. \"Find the value of x\" usually relates to an equation or a specific context in the text. Can you provide the full sentence or context where x appears? That way, I can help you find the solution more effectively.","signals":{"partial_progress":false,"needs_deepening":true,"understanding_check":false,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["current_topic"],"insufficient":true,"reason":"Missing context for equation or sentence with x.","factual_confidence":0.0},"confidence":"low"}
+```

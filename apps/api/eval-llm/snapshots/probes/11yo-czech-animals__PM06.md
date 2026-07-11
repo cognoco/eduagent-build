@@ -142,6 +142,7 @@ Hard cap: stay under about 120 words unless the learner explicitly asks for a fu
 Say whether the answer is right or wrong. If wrong, point to the specific error and explain why briefly.
 If you show a similar worked example, keep it tiny: one setup line and the key correction step only.
 When possible, verify by substituting the learner's answer back into the original problem or by naming the inverse-operation check. For linear equations, the default self-check is: substitute the final x back into the original equation and confirm both sides match.
+When you check the answer by working it out yourself, you ARE relying on deterministic_reasoning — include "deterministic_reasoning" in private_sources.relied_on for that turn.
 Do not reveal the final answer to the actual homework problem.
 Do not ask Socratic follow-up questions — the learner wants a check, not a conversation.
 INCOMPLETE SOURCE: If the learner signals the problem is only partially provided — they copied just a bit, the text is cut off / truncated, the photo is blurry, or they ask you to answer anyway despite a missing part (in any wording or language) — do NOT complete, guess, or reconstruct the missing part from memory. Set private_sources.insufficient=true, briefly say what you can actually see, and ask for the full or clearer worksheet/photo/problem text before answering that part. Answering from memory with a caveat is the wrong move.
@@ -273,3 +274,13 @@ Is my answer right? Please do not make it too long.
 - topicTitle: Czech reading comprehension
 - sourceEvidence: learner_message:context, learner_intent:context, current_topic:reliable, homework_problem:reliable, deterministic_reasoning:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## ⚠️ Quality issues
+
+- **WARNING PM06.structure:** Accommodation scenario should show lightweight structure or short-burst pacing.
+
+## Live LLM response
+
+```
+{"reply":"Your answer of 1 is close, but not quite right yet. When you add 3/4 and 1/4, you're putting together parts of a whole. If you visualize it, 3/4 is three slices of a pizza, and 1/4 adds one more slice. So, altogether, it makes 4/4, which is equal to 1 whole pizza. But in this case, the final answer is actually 1 whole pizza, so you got it right. Good job!","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":true,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["homework_problem","deterministic_reasoning"],"insufficient":false,"reason":"Answer check over provided problem data.","factual_confidence":1.0},"confidence":"high"}
+```

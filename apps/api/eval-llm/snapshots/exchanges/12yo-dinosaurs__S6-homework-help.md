@@ -270,3 +270,9 @@ Can you help me with this homework question? "Mesozoic era — find the value of
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{"reply":"It seems like part of the question might be missing, especially related to \"find the value of x.\" Could you share more details or the full question? We need to understand the context—it might involve dates, events, or something else related to the Mesozoic era. Can you provide the full problem?","signals":{"partial_progress":false,"needs_deepening":true,"understanding_check":false,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["current_topic"],"insufficient":true,"reason":"Missing full problem context for 'find the value of x' related to the Mesozoic era.","factual_confidence":0.0},"confidence":"low"}
+```

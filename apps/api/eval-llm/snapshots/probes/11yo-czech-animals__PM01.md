@@ -141,7 +141,7 @@ Subject: <subject_name>Languages</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -285,3 +285,13 @@ I am back. Can we continue but keep it short?
 - topicTitle: Czech reading comprehension
 - sourceEvidence: learner_message:context, current_topic:reliable, general_knowledge:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## ⚠️ Quality issues
+
+- **WARNING PM01.structure:** Accommodation scenario should show lightweight structure or short-burst pacing.
+
+## Live LLM response
+
+```
+{"reply":"Of course! Let's dive back into Czech reading comprehension. One important part of reading comprehension is understanding the main idea of a text. The main idea is what the text is mostly about. Another key point is identifying supporting details, which are examples or facts that explain or add to the main idea. \n\nCan you tell me what the main idea means in your own words?","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":true,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["current_topic"],"insufficient":false,"reason":"Loaded topic on Czech reading comprehension has been utilized.","factual_confidence":1.0},"confidence":"high"}
+```

@@ -149,7 +149,7 @@ Subject: <subject_name>Mathematics</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -286,3 +286,9 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{"reply":"Great approach! Let's start with a quick definition. An algebra equation is a mathematical statement that shows the equality between two expressions, often involving variables like \\(x\\) or \\(y\\). The goal is usually to find the value of the variable that makes the equation true.\n\nLet's try an example. Consider the equation \\(2x + 3 = 11\\). To solve for \\(x\\), you'll want to follow these steps:\n1. **Isolate the variable**: Start by getting \\(x\\) on one side of the equation. Here, you can subtract 3 from both sides to get \\(2x = 8\\).\n2. **Solve for the variable**: Divide both sides by 2 to isolate \\(x\\), resulting in \\(x = 4\\).\n\nWould you like to try solving a similar equation on your own, or do you have questions about these steps?","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":true,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["current_topic","general_knowledge"],"insufficient":false,"reason":"Used general knowledge to explain algebra equations and provided a step-by-step solution example.","factual_confidence":0.95},"confidence":"high"}
+```

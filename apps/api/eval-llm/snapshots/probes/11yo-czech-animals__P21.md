@@ -145,7 +145,7 @@ Subject: <subject_name>Languages</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -280,3 +280,15 @@ Honestly I don't remember any of this, it's been ages.
 - topicTitle: Czech reading comprehension
 - sourceEvidence: learner_message:context, current_topic:reliable, general_knowledge:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{  
+  "reply": "No problem! Let’s start fresh with Czech reading comprehension. This is all about understanding written texts in Czech. A key part of this is being able to identify the main ideas and supporting details in what you read. For example, if you read a short story, the main idea is what it’s mostly about, and the details are the specific things that support that idea. Does that make sense so far? What do you remember about reading comprehension from before?",  
+  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },  
+  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },  
+  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Topic has been forgotten, starting with a fresh explanation.", "factual_confidence": 1.0 },  
+  "confidence": "high"  
+}
+```
