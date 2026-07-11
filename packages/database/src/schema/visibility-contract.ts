@@ -107,6 +107,7 @@ export const supportVisibilityAuditEvents = pgTable(
       table.createdAt,
     ),
     index('support_visibility_audit_events_actor_idx').on(table.actorPersonId),
+    index('support_visibility_audit_events_contract_idx').on(table.contractId),
     check(
       'support_visibility_audit_events_type_check',
       sql`${table.eventType} IN ('contract_initiated','contract_accepted','appeal_requested','supportership_revoked','graduation_restamped')`,
@@ -155,6 +156,7 @@ export const supportVisibilityNotices = pgTable(
     index('support_visibility_notices_supportership_idx').on(
       table.supportershipId,
     ),
+    index('support_visibility_notices_contract_idx').on(table.contractId),
     check(
       'support_visibility_notices_type_check',
       sql`${table.noticeType} IN ('support_link_ended','graduation_contract_restamped')`,

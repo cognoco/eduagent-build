@@ -967,6 +967,13 @@
       "when": 1783763646297,
       "tag": "0139_wi1552_subjects_next_language_practice_pointer",
       "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "7",
+      "when": 1783780000794,
+      "tag": "0140_supporter_contract_fk_indexes",
+      "breakpoints": true
     }
   ]
 }
