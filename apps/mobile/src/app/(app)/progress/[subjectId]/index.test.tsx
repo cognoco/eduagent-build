@@ -1080,14 +1080,35 @@ describe('ProgressSubjectScreen', () => {
         expect(screen.queryByText('Reading')).toBeNull();
       });
 
-      it('renders the long listening label in the flexible skill row', async () => {
+      it('gives the long skill label the shrink-and-wrap contract that prevents small-phone clipping', async () => {
         mount({
           subjects: [languageSubject],
           languageProgress: evidenceData,
         });
 
-        await screen.findByText('Listening comprehension practice');
-        screen.getByTestId('language-skill-listening');
+        const label = await screen.findByText(
+          'Listening comprehension practice',
+        );
+        const skillRow = screen.getByTestId('language-skill-listening');
+        // Small-phone anti-clip contract: the longest skill label must shrink
+        // within its row (flex-1 + min-w-0) rather than clip or force
+        // horizontal overflow, and its row must wrap rather than overflow when
+        // label + trailing content cannot sit side by side at a narrow width.
+        // This is the stack-appropriate guard for AC4 — the layout is pure
+        // flexbox with no width branch, so RN/jest (no Yoga pass) cannot
+        // measure pixel overflow; this pins the classes that make Yoga wrap.
+        expect(label.props.className).toContain('flex-1');
+        expect(label.props.className).toContain('min-w-0');
+        // react-test-renderer v19 ships no .d.ts, so the predicate parameter is
+        // effectively `any`; a structural annotation silences noImplicitAny
+        // without `any` (same pattern as practice/index.test.tsx).
+        type RNTestNode = { props?: Record<string, unknown> };
+        const wrappingRows = skillRow.findAll(
+          (node: RNTestNode) =>
+            typeof node.props?.className === 'string' &&
+            node.props.className.includes('flex-wrap'),
+        );
+        expect(wrappingRows.length).toBeGreaterThan(0);
       });
 
       it('hides both sections when recent evidence is sparse', async () => {
