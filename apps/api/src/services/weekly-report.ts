@@ -18,7 +18,10 @@ import {
   weeklyReportSummarySchema,
   SchemaDriftError,
 } from '@eduagent/schemas';
-import { assertParentAccess } from './family-access';
+import {
+  assertChargeNotCredentialed,
+  assertParentAccess,
+} from './family-access';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 import { sumTopicsExplored } from './progress-helpers';
@@ -204,6 +207,7 @@ export async function listWeeklyReportsForParentChild(
   childProfileId: string,
 ): Promise<WeeklyReportSummary[]> {
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   const rows = await db.query.weeklyReports.findMany({
     where: and(
       eq(weeklyReports.profileId, parentProfileId),
@@ -251,6 +255,7 @@ export async function getWeeklyReportForParentChild(
   reportId: string,
 ): Promise<WeeklyReportRecord | null> {
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   const row = await db.query.weeklyReports.findFirst({
     where: and(
       eq(weeklyReports.id, reportId),
@@ -269,6 +274,7 @@ export async function markWeeklyReportViewed(
   reportId: string,
 ): Promise<void> {
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   await db
     .update(weeklyReports)
     .set({ viewedAt: new Date() })

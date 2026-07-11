@@ -20,6 +20,13 @@ const mockDbInsert = jest.fn().mockReturnValue({
 const mockProfileFindFirst = jest.fn().mockResolvedValue(undefined);
 const mockFamilyLinksFindFirst = jest.fn().mockResolvedValue(undefined);
 const mockConsentStateFindFirst = jest.fn().mockResolvedValue(undefined);
+const mockDbSelect = jest.fn().mockReturnValue({
+  from: jest.fn().mockReturnValue({
+    where: jest.fn().mockReturnValue({
+      limit: jest.fn().mockResolvedValue([]),
+    }),
+  }),
+});
 // [WI-867] v2 profile-scope seam continuity mock.
 const mockFindOwnerPersonScope = jest
   .fn()
@@ -60,6 +67,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
   includeActual: true,
   db: {
     insert: (...args: unknown[]) => mockDbInsert(...args),
+    select: (...args: unknown[]) => mockDbSelect(...args),
     query: {
       profiles: {
         findFirst: (...args: unknown[]) => mockProfileFindFirst(...args),

@@ -72,7 +72,10 @@ import {
   getCurrentlyWorkingOn,
   selectCurrentlyWorkingOn,
 } from './learner-profile';
-import { assertParentAccess } from './family-access';
+import {
+  assertChargeNotCredentialed,
+  assertParentAccess,
+} from './family-access';
 import {
   familyV2ChildReadProof,
   getChildGdprConsentStatusV2,
@@ -1097,6 +1100,7 @@ export async function getChildDetail(
   // returning null. A null return here now means "parent has access but
   // the child was not present in the dashboard list" — a genuine not-found.
   await assertParentAccess(db, parentProfileId, childProfileId); // 1 query
+  await assertChargeNotCredentialed(db, childProfileId);
   const childReadProof = familyV2ChildReadProof({
     kind: 'guardian-edge',
     guardianPersonId: parentProfileId,
@@ -1315,6 +1319,7 @@ export async function getChildSubjectTopics(
 ): Promise<TopicProgress[]> {
   // [EP15-I5] See assertParentAccess comment — ForbiddenError → 403.
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   await assertChildDashboardDataVisible(db, childProfileId);
 
   // Verify the subject belongs to the child before querying curriculum (IDOR guard).
@@ -1407,6 +1412,7 @@ export async function getChildSessions(
   // [EP15-I5] ForbiddenError → 403. Empty array now means "parent has
   // access and the child has no sessions", not "access denied".
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   await assertChildDashboardDataVisible(db, childProfileId);
   // [WI-586] v2 path: the active-(non-archived)-profile check reads person
   // (profiles dropped); flag-off reads legacy profiles.
@@ -1427,6 +1433,7 @@ export async function getChildSessionDetail(
   sessionId: string,
 ): Promise<ChildSession | null> {
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   await assertChildDashboardDataVisible(db, childProfileId);
 
   const session = await db.query.learningSessions.findFirst({
@@ -1538,6 +1545,7 @@ export async function getChildInventory(
   // [EP15-I5] Return type tightened from `| null`. Access denial now
   // throws (→ 403); the only remaining path is a valid inventory.
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   await assertChildDashboardDataVisible(db, childProfileId);
   return buildKnowledgeInventory(db, childProfileId);
 }
@@ -1554,6 +1562,7 @@ export async function getChildProgressHistory(
 ): Promise<ProgressHistory> {
   // [EP15-I5] Return type tightened — access denial throws, not returns null.
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   await assertChildDashboardDataVisible(db, childProfileId);
   return buildProgressHistory(db, childProfileId, input);
 }
@@ -1566,6 +1575,7 @@ export async function getChildReports(
   // [EP15-I5] Access denial throws (→ 403). Empty array now means "no
   // reports yet for this child" — semantically distinct from forbidden.
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   await assertChildDashboardDataVisible(db, childProfileId);
   return listMonthlyReportsForParentChild(db, parentProfileId, childProfileId);
 }
@@ -1578,6 +1588,7 @@ export async function getChildReportDetail(
 ): Promise<MonthlyReportRecord | null> {
   // [EP15-I5] null now only means "access granted but report not found".
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   await assertChildDashboardDataVisible(db, childProfileId);
   return getMonthlyReportForParentChild(
     db,
@@ -1596,6 +1607,7 @@ export async function markChildReportViewed(
   // [EP15-I5] Previously silently returned on access denial, letting an
   // unauthorized POST pretend to succeed. Now throws → 403.
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   await assertChildDashboardDataVisible(db, childProfileId);
   await markMonthlyReportViewed(db, parentProfileId, childProfileId, reportId);
 }

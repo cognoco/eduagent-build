@@ -236,7 +236,12 @@ function makeDb({
     innerJoin: selectInnerJoin1,
   });
 
-  const selectFn = jest.fn().mockReturnValue({ from: selectFrom });
+  const loginLimit = jest.fn().mockResolvedValue([]);
+  const loginWhere = jest.fn().mockReturnValue({ limit: loginLimit });
+  const loginFrom = jest.fn().mockReturnValue({ where: loginWhere });
+  const selectFn = jest.fn().mockImplementation((fields: object) => ({
+    from: 'personId' in fields ? loginFrom : selectFrom,
+  }));
 
   // ── query relational API ───────────────────────────────────────────────────
   // profiles.findFirst is called twice (fromProfile, toProfile) in sequence.

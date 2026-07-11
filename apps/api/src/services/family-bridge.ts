@@ -20,7 +20,10 @@ import type {
 } from '@eduagent/schemas';
 
 import { NotFoundError } from '../errors';
-import { assertParentAccess } from './family-access';
+import {
+  assertChargeNotCredentialed,
+  assertParentAccess,
+} from './family-access';
 import { getChargeSubjectsForGuardianV2 } from './identity-v2/family-bridge-v2';
 import {
   findOwnedCurriculumTopic,
@@ -377,6 +380,7 @@ export async function cloneTopicFromChild(
   if (cached) return cached;
 
   await assertParentAccess(db, adultProfileId, input.childProfileId);
+  await assertChargeNotCredentialed(db, input.childProfileId);
   const snapshot = await getChildTopicSnapshotForParent(
     db,
     adultProfileId,

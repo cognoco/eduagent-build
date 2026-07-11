@@ -24,6 +24,7 @@ import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
+  assertChargeNotCredentialed,
   assertOwnerAndParentAccess,
   assertOwnerProfile,
 } from '../services/family-access';
@@ -124,6 +125,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
       await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertChargeNotCredentialed(db, childProfileId);
       const { conversationLanguage } = c.req.valid('json');
       try {
         await dispatchUpdateConversationLanguage(
@@ -189,6 +191,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
       await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertChargeNotCredentialed(db, childProfileId);
       const { pronouns } = c.req.valid('json');
       try {
         await dispatchUpdatePronouns(db, childProfileId, account.id, pronouns);
@@ -239,6 +242,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
       await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+      await assertChargeNotCredentialed(db, childProfileId);
       const { interests } = c.req.valid('json');
       try {
         await updateInterestsContext(db, childProfileId, account.id, interests);

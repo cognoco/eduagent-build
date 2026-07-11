@@ -49,6 +49,7 @@ import {
 import { registerProvider } from '../../apps/api/src/services/llm';
 import { createMockProvider } from '../../apps/api/src/services/llm/test-utils';
 import { getChildSessionDetail } from '../../apps/api/src/services/dashboard';
+import { ForbiddenError } from '@eduagent/schemas';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
 import { clearFetchCalls, getFetchCalls } from './fetch-interceptor';
@@ -630,22 +631,19 @@ describe('session-completed Inngest pipeline (integration)', () => {
     );
     expect(summary!.engagementSignal).toBe('curious');
 
-    const sessionDetail = await getChildSessionDetail(
-      createIntegrationDb(),
-      parentProfileId,
-      scenario.profileId,
-      scenario.sessionId,
-    );
-
-    expect(sessionDetail).toEqual(
-      expect.objectContaining({
-        highlight: 'Practiced equivalent fractions',
-        narrative:
-          'They compared fraction sizes and fixed one shaky step after a hint.',
-        conversationPrompt: 'Which fraction felt easiest to compare today?',
-        engagementSignal: 'curious',
-      }),
-    );
+    // [WI-787] scenario.profileId is a credentialed charge — it owns its login
+    // (seeded with clerkUserId) and also carries a guardian edge — so the
+    // guardian's dashboard read of it is now suppressed. The recap fields'
+    // storage and exposure are already verified by the loadSessionSummary
+    // assertions above; this call asserts the credentialed-charge boundary.
+    await expect(
+      getChildSessionDetail(
+        createIntegrationDb(),
+        parentProfileId,
+        scenario.profileId,
+        scenario.sessionId,
+      ),
+    ).rejects.toThrow(ForbiddenError);
   });
 
   it('falls back to the short-session highlight without narrative fields', async () => {
