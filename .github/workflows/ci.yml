@@ -48,6 +48,12 @@ jobs:
           - 5432:5432
     env:
       DATABASE_URL: postgresql://eduagent:eduagent@localhost:5432/tests
+      # WI-1513: DB is built via `drizzle-kit migrate`, which already includes
+      # 0129_m_repoint.sql — the FK re-point migration — so the schema this job
+      # tests against is already post-repoint. Setting this flag lets the
+      # child-profile-v2 full-write itGraph cases (previously gated to SKIP
+      # everywhere in CI) actually execute here.
+      IDENTITY_V2_REPOINTED: 'true'
       CI: true
       NX_DAEMON: false
       NX_ISOLATE_PLUGINS: false
@@ -489,6 +495,11 @@ jobs:
     env:
       DATABASE_URL: postgresql://eduagent:eduagent@localhost:5433/tests_v2
       IDENTITY_V2_ENABLED: 'true'
+      # WI-1513: this lane's DB is also built via `drizzle-kit migrate`
+      # (0129_m_repoint.sql included), so it is already post-repoint too — see
+      # the `main` job's IDENTITY_V2_REPOINTED comment above for the full
+      # rationale.
+      IDENTITY_V2_REPOINTED: 'true'
       CI: true
       NX_DAEMON: false
       NX_ISOLATE_PLUGINS: false
