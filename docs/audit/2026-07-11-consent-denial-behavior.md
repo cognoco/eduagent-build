@@ -1,9 +1,13 @@
 # WI-1761 - Consent-denial behavior audit
 
-**Date:** 2026-07-11  
-**Scope:** Current denial behavior across the API, relational data, external identity, timers, and mobile recovery.  
-**Status:** COMPLETE - read-only audit; no product behavior changed.  
-**Decision baseline:** `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md:24`  
+**Date:** 2026-07-11
+
+**Scope:** Current denial behavior across the API, relational data, external identity, timers, and mobile recovery.
+
+**Status:** COMPLETE - read-only audit; no product behavior changed.
+
+**Decision baseline:** `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md:24`
+
 **Legal boundary:** This report identifies engineering and accountability risks. It does not make a legal determination; counsel Q2 owns the retention-versus-erasure ruling.
 
 ## Executive conclusion
