@@ -18,7 +18,13 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolve as resolvePath } from 'node:path';
@@ -28,18 +34,38 @@ const SCRIPT = resolvePath(__dirname, 'check-merge-invariant.ts');
 // tsx binary from the repo's node_modules (avoids needing tsx on PATH).
 const TSX = resolvePath(__dirname, '../node_modules/.bin/tsx');
 
+/**
+ * Clones process.env with every GIT_* key stripped, then layers `overrides`
+ * on top. Prevents an ambient GIT_DIR/GIT_WORK_TREE (e.g. exported by husky
+ * during pre-push -> nx -> jest) from leaking into these child git processes
+ * and redirecting their writes/reads at the ambient repo instead of the
+ * mkdtemp fixture passed as `cwd` (WI-1345). Same pattern as the
+ * childGitEnv() fix already landed for WI-1324 in
+ * apps/api/eval-llm/runner/zero-drift-receipt.test.ts (commit 96168d6c5).
+ */
+function childGitEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GIT_')) {
+      delete env[key];
+    }
+  }
+  return { ...env, ...overrides };
+}
+
+const TEST_GIT_IDENTITY: NodeJS.ProcessEnv = {
+  GIT_AUTHOR_NAME: 'Test',
+  GIT_AUTHOR_EMAIL: 'test@example.com',
+  GIT_COMMITTER_NAME: 'Test',
+  GIT_COMMITTER_EMAIL: 'test@example.com',
+  HOME: process.env.HOME ?? '/tmp',
+};
+
 function git(repo: string, args: string[]): string {
   const result = spawnSync('git', args, {
     cwd: repo,
     encoding: 'utf8',
-    env: {
-      ...process.env,
-      GIT_AUTHOR_NAME: 'Test',
-      GIT_AUTHOR_EMAIL: 'test@example.com',
-      GIT_COMMITTER_NAME: 'Test',
-      GIT_COMMITTER_EMAIL: 'test@example.com',
-      HOME: process.env.HOME ?? '/tmp',
-    },
+    env: childGitEnv(TEST_GIT_IDENTITY),
   });
   if (result.status !== 0) {
     throw new Error(
@@ -56,9 +82,7 @@ function runScript(
   const result = spawnSync(TSX, [SCRIPT, ...args], {
     cwd: repo,
     encoding: 'utf8',
-    env: {
-      ...process.env,
-    },
+    env: childGitEnv(),
   });
   return {
     stdout: result.stdout ?? '',
@@ -178,14 +202,7 @@ function createMergeCommit(
     {
       cwd: repo,
       encoding: 'utf8',
-      env: {
-        ...process.env,
-        GIT_AUTHOR_NAME: 'Test',
-        GIT_AUTHOR_EMAIL: 'test@example.com',
-        GIT_COMMITTER_NAME: 'Test',
-        GIT_COMMITTER_EMAIL: 'test@example.com',
-        HOME: process.env.HOME ?? '/tmp',
-      },
+      env: childGitEnv(TEST_GIT_IDENTITY),
     },
   );
   // Ignore non-zero exit from merge (expected in no-commit mode with conflicts);
@@ -219,14 +236,7 @@ function createMergeCommit(
     {
       cwd: repo,
       encoding: 'utf8',
-      env: {
-        ...process.env,
-        GIT_AUTHOR_NAME: 'Test',
-        GIT_AUTHOR_EMAIL: 'test@example.com',
-        GIT_COMMITTER_NAME: 'Test',
-        GIT_COMMITTER_EMAIL: 'test@example.com',
-        HOME: process.env.HOME ?? '/tmp',
-      },
+      env: childGitEnv(TEST_GIT_IDENTITY),
     },
   );
 
@@ -479,5 +489,135 @@ describe('check-merge-invariant', () => {
     // Must fail because exclusion is undocumented.
     expect(result.status).not.toBe(0);
     expect(result.stdout + result.stderr).toMatch(/reason|undocumented/i);
+  });
+
+  // ---------------------------------------------------------------------------
+  // WI-1345 regression guard: ambient-environment isolation.
+  //
+  // The fixtures above spawn real git writes (init/add/commit) against a
+  // mkdtemp temp repo. If the child env additively inherits process.env
+  // without stripping GIT_* keys, an ambient GIT_DIR (as husky exports during
+  // pre-push -> nx -> jest) makes those writes land on the AMBIENT repo
+  // instead of the temp fixture — the fleet-wide worktree clobber this WI
+  // fixes. Both tests below use only disposable mkdtemp fixtures to stand in
+  // for "the ambient repo" — never the real worktree or shared checkout.
+  // ---------------------------------------------------------------------------
+  describe('git() ambient-environment isolation (WI-1345)', () => {
+    /**
+     * Raw git helper used ONLY to build/inspect the "ambient" fixture that
+     * stands in for the real checkout — deliberately independent of the
+     * git()/runScript functions under test, so the verification doesn't rely
+     * on the same (possibly buggy) env-construction logic it's checking.
+     */
+    function rawGit(repo: string, args: string[]): string {
+      const cleanEnv: NodeJS.ProcessEnv = { ...process.env };
+      for (const key of Object.keys(cleanEnv)) {
+        if (key.startsWith('GIT_')) {
+          delete cleanEnv[key];
+        }
+      }
+      const result = spawnSync('git', args, {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...cleanEnv,
+          GIT_AUTHOR_NAME: 'Ambient',
+          GIT_AUTHOR_EMAIL: 'ambient@example.com',
+          GIT_COMMITTER_NAME: 'Ambient',
+          GIT_COMMITTER_EMAIL: 'ambient@example.com',
+          HOME: process.env.HOME ?? '/tmp',
+        },
+      });
+      if (result.status !== 0) {
+        throw new Error(
+          `rawGit ${args.join(' ')} failed:\n${result.stderr}\n${result.stdout}`,
+        );
+      }
+      return (result.stdout ?? '').trim();
+    }
+
+    function buildAmbientFixture(prefix: string): string {
+      const ambientRepo = mkdtempSync(join(tmpdir(), prefix));
+      rawGit(ambientRepo, ['init', '-q', '-b', 'main']);
+      rawGit(ambientRepo, ['config', 'user.email', 'ambient@example.com']);
+      rawGit(ambientRepo, ['config', 'user.name', 'Ambient']);
+      writeFileSync(join(ambientRepo, 'ambient.txt'), 'ambient content\n');
+      rawGit(ambientRepo, ['add', '.']);
+      rawGit(ambientRepo, ['commit', '-q', '-m', 'ambient initial commit']);
+      return ambientRepo;
+    }
+
+    /** Sets GIT_DIR to simulate husky's export; returns a restore function. */
+    function poisonGitDir(ambientRepo: string): () => void {
+      const saved = process.env.GIT_DIR;
+      process.env.GIT_DIR = join(ambientRepo, '.git');
+      return () => {
+        if (saved === undefined) {
+          delete process.env.GIT_DIR;
+        } else {
+          process.env.GIT_DIR = saved;
+        }
+      };
+    }
+
+    it('does not mutate an ambient repo when GIT_DIR leaks into the env (write sites)', () => {
+      const ambientRepo = buildAmbientFixture('wi1345-ambient-write-');
+      const fixtureRepo = mkdtempSync(join(tmpdir(), 'wi1345-fixture-write-'));
+      try {
+        const ambientConfigPath = join(ambientRepo, '.git', 'config');
+        const headBefore = rawGit(ambientRepo, ['rev-parse', 'HEAD']);
+        const configBefore = readFileSync(ambientConfigPath, 'utf8');
+
+        const restoreGitDir = poisonGitDir(ambientRepo);
+        try {
+          // Exercises the git() helper AND createMergeCommit's write path
+          // (both use the same env-construction pattern under test).
+          git(fixtureRepo, ['init', '-b', 'main']);
+          git(fixtureRepo, ['config', 'user.email', 'test@example.com']);
+          git(fixtureRepo, ['config', 'user.name', 'Test']);
+          writeFileSync(
+            join(fixtureRepo, 'fixture.ts'),
+            'export const fixture = true;\n',
+          );
+          git(fixtureRepo, ['add', '.']);
+          git(fixtureRepo, ['commit', '-m', 'fixture commit']);
+        } finally {
+          restoreGitDir();
+        }
+
+        const headAfter = rawGit(ambientRepo, ['rev-parse', 'HEAD']);
+        const configAfter = readFileSync(ambientConfigPath, 'utf8');
+
+        expect(headAfter).toBe(headBefore);
+        expect(configAfter).toBe(configBefore);
+      } finally {
+        rmSync(ambientRepo, { recursive: true, force: true });
+        rmSync(fixtureRepo, { recursive: true, force: true });
+      }
+    });
+
+    it('runScript resolves the merge check against cwd, not a leaked GIT_DIR (read site)', () => {
+      const { repo, mainSha, featureSha } = buildBaseFixture();
+      const mergeSha = createMergeCommit(repo, mainSha, featureSha, {});
+      const ambientRepo = buildAmbientFixture('wi1345-ambient-read-');
+      try {
+        const restoreGitDir = poisonGitDir(ambientRepo);
+        let result: { stdout: string; stderr: string; status: number };
+        try {
+          result = runScript(repo, [mainSha, featureSha, mergeSha]);
+        } finally {
+          restoreGitDir();
+        }
+
+        // A faithful merge must still pass — the production script's
+        // read-only git ops (merge-base/diff/ls-tree) must resolve against
+        // `cwd` (the fixture repo), not the poisoned ambient GIT_DIR.
+        expect(result.status).toBe(0);
+        expect(result.stdout + result.stderr).not.toMatch(/FAIL/i);
+      } finally {
+        rmSync(repo, { recursive: true, force: true });
+        rmSync(ambientRepo, { recursive: true, force: true });
+      }
+    });
   });
 });
