@@ -113,6 +113,9 @@ function ScopeStateProvider({
     if (scopeList.shape === 'learner') return IMPLICIT_ME_SCOPE;
     const preferredScopeKey = userScopeKey ?? storedScopeKey;
     if (!preferredScopeKey) return defaultScope;
+    if (preferredScopeKey === scopeKey(IMPLICIT_ME_SCOPE)) {
+      return IMPLICIT_ME_SCOPE;
+    }
     return (
       scopeList.scopes.find((scope) => scopeKey(scope) === preferredScopeKey) ??
       defaultScope
@@ -122,7 +125,15 @@ function ScopeStateProvider({
   const setActiveScope = useCallback(
     (scope: ScopeDescriptor) => {
       if (scopeList.shape !== 'supporter') return;
-      if (!isKnownScope(scope, scopeList.scopes)) return;
+      // 'me' is a supporter's own identity, not a relationship the server
+      // needs to have resolved yet — unlike 'person' scopes, which require a
+      // live supportership edge. resolveScopesForPerson only adds 'me' to
+      // scopeList.scopes once the supporter has real learning state of their
+      // own, but mentor.tsx/subjects.tsx already render the same cold-start
+      // experience for a zero-history 'me' scope that every brand-new
+      // learner account passes through, so it's safe to switch into it here
+      // even before the server has surfaced it as a known scope.
+      if (scope.kind !== 'me' && !isKnownScope(scope, scopeList.scopes)) return;
       const nextScopeKey = scopeKey(scope);
       setUserScopeKey(nextScopeKey);
       if (profileId) {

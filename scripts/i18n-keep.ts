@@ -368,6 +368,12 @@ const raw: readonly KeepPattern[] = [
       'it (the accommodation screen title moved to learningPreferences.screenTitle), ' +
       'so the mobile-only orphan walker cannot see the API consumer',
   },
+  {
+    pattern: 'supporterColdStart.granted.nudgeStep*',
+    reason:
+      'stale-idle de-escalation copy selected via NUDGE_KEY_BY_STEP[card.staleIdleStep] at ' +
+      'apps/mobile/src/components/support/SupporterColdStart.tsx:87',
+  },
 ];
 
 export const KEEP_PATTERNS: readonly KeepPattern[] = raw.map((p) =>

@@ -66,6 +66,41 @@ describe('ScopeContextProvider', () => {
     expect(result.current.activeScope).toEqual(personScope);
   });
 
+  it('lets a first-time supporter switch into Me even though the server has not resolved it as a known scope yet', () => {
+    const { result } = renderHook(() => useScopeContext(), {
+      wrapper: wrapperFor({
+        shape: 'supporter',
+        scopes: [{ kind: 'supporter-hub' }, personScope],
+        defaultScopeIndex: 0,
+      }),
+    });
+
+    act(() => result.current.setActiveScope({ kind: 'me' }));
+
+    expect(result.current.activeScope).toEqual({ kind: 'me' });
+  });
+
+  it('still ignores an unknown person scope (unlike Me, it requires a live supportership edge)', () => {
+    const { result } = renderHook(() => useScopeContext(), {
+      wrapper: wrapperFor({
+        shape: 'supporter',
+        scopes: [{ kind: 'supporter-hub' }, personScope],
+        defaultScopeIndex: 0,
+      }),
+    });
+
+    act(() =>
+      result.current.setActiveScope({
+        kind: 'person',
+        personId: 'unknown-person',
+        edgeId: 'unknown-edge',
+        displayName: 'Ghost',
+      }),
+    );
+
+    expect(result.current.activeScope).toEqual({ kind: 'supporter-hub' });
+  });
+
   it('prefers persisted last-active scope over the server default hint', async () => {
     const profileId = '00000000-0000-4000-8000-000000000901';
     await SecureStore.setItemAsync(

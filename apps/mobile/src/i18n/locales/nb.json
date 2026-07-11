@@ -4395,5 +4395,35 @@
       "revokeErrorTitle": "Kunne ikke avslutte deling",
       "missingActor": "Vi kunne ikke identifisere den aktive personen."
     }
+  },
+  "supporterColdStart": {
+    "loadingTitle": "Sjekker støttesenteret ditt ...",
+    "errorTitle": "Kunne ikke laste inn støttesenteret ditt",
+    "errorMessage": "Prøv igjen om et øyeblikk.",
+    "addChild": {
+      "title": "Legg til barnet ditt",
+      "message": "Du vil se sammendragene, fremgangen og seirene deres. Og de vet alltid hva du ser.",
+      "cta": "Legg til barnet mitt"
+    },
+    "managed": {
+      "message": "{{name}} er klar. Gi dem telefonen når de er klare.",
+      "cta": "Bytt til {{name}}"
+    },
+    "granted": {
+      "message": "Hjelp {{name}} med å komme i gang.",
+      "hint": "Sammendragene og fremgangen deres vil vises her når de begynner.",
+      "cta": "Oppmuntre {{name}}",
+      "nudgeStep1": "Din oppmuntring nådde {{name}}. De har ikke startet ennå – de fleste begynner i løpet av den første uken.",
+      "nudgeStep2": "Neste gang du er med {{name}}, kan dere åpne den første økten side om side.",
+      "nudgeStep3": "Prøv læringsopplevelsen selv – og hjelp {{name}} med å komme i gang.",
+      "nudgeStep4": "Fortsett å lære selv mens {{name}} finner sitt øyeblikk."
+    }
+  },
+  "supporterSelfLearningDoorway": {
+    "loadingTitle": "Sjekker støttesenteret ditt ...",
+    "errorTitle": "Kunne ikke laste inn støttesenteret ditt",
+    "errorMessage": "Prøv igjen om et øyeblikk.",
+    "cta": "Lær noe selv",
+    "hint": "Start eller fortsett din egen læring."
   }
 }

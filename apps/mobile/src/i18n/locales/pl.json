@@ -4559,5 +4559,35 @@
       "revokeErrorTitle": "Błąd kończenia udostępniania",
       "missingActor": "Nie mogliśmy zidentyfikować aktywnej osoby."
     }
+  },
+  "supporterColdStart": {
+    "loadingTitle": "Sprawdzanie Twojego centrum wsparcia...",
+    "errorTitle": "Nie udało się wczytać Twojego centrum wsparcia",
+    "errorMessage": "Spróbuj ponownie za chwilę.",
+    "addChild": {
+      "title": "Dodaj swoje dziecko",
+      "message": "Zobaczysz podsumowania, postępy i sukcesy dziecka. Zawsze będzie wiedziało, co widzisz.",
+      "cta": "Dodaj moje dziecko"
+    },
+    "managed": {
+      "message": "{{name}} ma wszystko gotowe. Gdy zechce zacząć, przekaż telefon.",
+      "cta": "Przełącz na {{name}}"
+    },
+    "granted": {
+      "message": "Pomóż {{name}} zacząć.",
+      "hint": "Podsumowania i postępy pojawią się tutaj, gdy tylko zacznie naukę.",
+      "cta": "Zachęć {{name}}",
+      "nudgeStep1": "Twoja zachęta dotarła do {{name}}. Jeszcze nie rozpoczęto nauki — większość uczniów zaczyna w pierwszym tygodniu.",
+      "nudgeStep2": "Następnym razem, gdy będziesz z {{name}}, rozpocznijcie pierwszą sesję razem.",
+      "nudgeStep3": "Wypróbuj naukę samodzielnie i pomóż {{name}} zacząć.",
+      "nudgeStep4": "Ucz się dalej, podczas gdy {{name}} znajdzie swój moment na start."
+    }
+  },
+  "supporterSelfLearningDoorway": {
+    "loadingTitle": "Sprawdzanie Twojego centrum wsparcia...",
+    "errorTitle": "Nie udało się wczytać Twojego centrum wsparcia",
+    "errorMessage": "Spróbuj ponownie za chwilę.",
+    "cta": "Naucz się czegoś samodzielnie",
+    "hint": "Rozpocznij lub kontynuuj własną naukę."
   }
 }
