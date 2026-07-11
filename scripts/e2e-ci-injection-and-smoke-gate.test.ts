@@ -504,6 +504,34 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(writeVarsScript).not.toContain('${{ secrets.');
   });
 
+  it('allows the release APK to reach the local HTTP API only in E2E builds', () => {
+    const appConfig = JSON.parse(
+      readFileSync(join(repoRoot, 'apps/mobile/app.json'), 'utf8'),
+    ) as { expo: { plugins: Array<string | [string, unknown]> } };
+    const pluginNames = appConfig.expo.plugins.map((plugin) =>
+      Array.isArray(plugin) ? plugin[0] : plugin,
+    );
+    const {
+      applyE2ECleartextPolicy,
+    } = require('../apps/mobile/plugins/withE2ECleartextForTests');
+
+    expect(pluginNames).toContain('./plugins/withE2ECleartextForTests');
+
+    const productionManifest = {
+      application: [{ $: { 'android:usesCleartextTraffic': 'true' } }],
+    };
+    applyE2ECleartextPolicy(productionManifest, false);
+    expect(
+      productionManifest.application[0].$['android:usesCleartextTraffic'],
+    ).toBeUndefined();
+
+    const e2eManifest = { application: [{ $: {} }] };
+    applyE2ECleartextPolicy(e2eManifest, true);
+    expect(e2eManifest.application[0].$['android:usesCleartextTraffic']).toBe(
+      'true',
+    );
+  });
+
   it('keeps every pr-blocking flow in the explicit PR plan', () => {
     const plan = loadPlan('pr');
 
