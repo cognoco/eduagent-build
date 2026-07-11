@@ -43,6 +43,7 @@ import {
   dataExportSessionEmbeddingRowSchema,
   dataExportNeedsDeepeningTopicRowSchema,
   dataExportMentorActivityLedgerRowSchema,
+  DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
 } from '@eduagent/schemas';
 import type { DataExport } from '@eduagent/schemas';
 import { projectAiResponseContent } from './llm/project-response';
@@ -356,6 +357,7 @@ export async function generateExport(
     account: { email: '', createdAt: new Date(0).toISOString() },
     profiles: [],
     consentStates: [],
+    subscriptionFieldDescriptions: DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
     // [BUG-413] Apply serializeDates to every row so Date objects from the
     // Drizzle / neon-serverless driver are converted to ISO strings before
     // they reach the export payload.  Without this, rows passed as
@@ -425,6 +427,9 @@ export async function generateExport(
         content: projectSessionEmbeddingContent(serialized['content']),
       });
     }),
+    // Learning-only producer: do not parse or emit subscription rows here.
+    // generateExportV2 owns the typed subscription mapping and replaces this
+    // placeholder with rows that satisfy dataExportSubscriptionRowSchema.
     subscriptions: [],
     quotaPools: [],
     topUpCredits: [],

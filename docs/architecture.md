@@ -1782,7 +1782,7 @@ MVP offline behavior is **read-only cached data, no offline writes**:
 | Parental consent timeout Inngest job | Scheduled reminder emails (Day 7, 14, 25) + auto-delete (Day 30) | Epic 0 stories |
 | Notification preferences schema | `notification_preferences` JSONB on profiles table | Epic 4 stories |
 | Content flagging storage | How user-flagged content is persisted and reviewed | Epic 2 stories |
-| Data export endpoint | GDPR data export format and endpoint | Epic 0 stories |
+| Data export endpoint | RESOLVED — schema-parsed JSON; subscription rows include payment-responsibility and store fields plus a required human-readable description dictionary | Completed (`MMT-ADR-0033`) |
 | Concept Map / prerequisite DAG | Cycle detection algorithm, LLM structured output for edges, graph-aware coaching card logic, visualization library selection | Epic 7 stories |
 
 ### Risk Areas
