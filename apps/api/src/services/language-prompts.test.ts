@@ -246,6 +246,62 @@ describe('buildFourStrandsPrompt', () => {
     expect(joined).toContain('Ask for a quick retry after correcting.');
   });
 
+  it('gates the correction+retry brief to the answer turn via previousMeaningOutputTask [WI-1756]', () => {
+    // AC5 answer-turn coverage: on the turn where the learner replies to a
+    // meaning-output task, the strand has already rotated away and
+    // nextActivity.meaningOutput is empty (see the presentation-turn test
+    // above). This asserts the re-surfaced previousMeaningOutputTask brief —
+    // not the always-on static "Direct correction rules" text — is what
+    // anchors the correction+retry instruction to this specific task.
+    const result = buildFourStrandsPrompt(
+      makeContext({
+        languageCode: 'es',
+        languageSessionState: {
+          activeStrand: 'language_focus',
+          sessionStrandCounts: {
+            meaning_input: 1,
+            meaning_output: 1,
+            language_focus: 0,
+            fluency: 0,
+          },
+          previousMeaningOutputTask: {
+            type: 'meaning_output',
+            taskType: 'personal_answer',
+            communicativeGoal:
+              'Share a true or imagined personal answer someone could respond to.',
+            prompt:
+              'Answer personally in one or two short sentences using word(s): agua; grammar: ser vs estar.',
+            responseMode: 'short_answer',
+            targetWords: ['agua'],
+            targetGrammar: ['ser vs estar'],
+            retryExpectation: 'retry_after_feedback',
+            correctionExpectation: 'meaning_first_then_form',
+          },
+          nextActivity: {
+            strand: 'language_focus',
+            activityType: 'correction_retry',
+            modality: 'text',
+            targetWords: ['agua'],
+            targetGrammar: ['ser vs estar'],
+          },
+        },
+      }),
+    );
+    const joined = result.join('\n');
+
+    expect(joined).not.toContain('Meaning-output task:');
+    expect(joined).toContain(
+      'Previous meaning-output task (the learner is answering it now):',
+    );
+    expect(joined).toContain('Task type: personal_answer');
+    expect(joined).toContain(
+      'Answer personally in one or two short sentences using word(s): agua; grammar: ser vs estar.',
+    );
+    expect(joined).toContain(
+      "The learner's last message is their attempt at this task. Judge it against this specific task. If it is incomplete, off-task, or malformed, give the corrected/model form, briefly explain why, and ask for a retry on the same task before moving on.",
+    );
+  });
+
   it('includes the server-graded comprehension result when present', () => {
     const result = buildFourStrandsPrompt(
       makeContext({

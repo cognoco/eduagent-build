@@ -55,6 +55,8 @@ In scope:
 Out of scope:
 - `apps/api/src/services/language-session-engine.ts` and its test — the
   artifact generation is already implemented and tested; do not touch.
+  **Superseded post-review (see "Post-review remediation" below): the
+  answer-turn correction anchor required a small, additive change here.**
 - `packages/schemas/src/stream-fallback.ts` — the schema already has
   `meaningOutput` optional on `streamLanguageLearningActivitySchema`; do not
   touch.
@@ -322,6 +324,52 @@ Out of scope:
       - `pnpm run check:i18n`
       done when: all of the above pass with zero failures.
 
+## Post-review remediation (Phase 4 adversarial review, findings F1/F2)
+
+The Phase 4 adversarial review found that T5's correction+retry test only
+proved the **presentation-turn** injection of the meaning-output brief
+(`meaningOutputLines`): on the turn the learner actually **answers**,
+`sessionStrandCounts.meaning_output` has already incremented, round-robin
+`chooseNextLanguageStrand` rotates away, and `nextActivity.meaningOutput` is
+empty — so the one correction-anchoring instruction disappears exactly when
+it's needed, leaving correction to rest on conversation history plus the
+always-on generic "Direct correction rules" text (F2). The T5 test's
+assertions (`'Correct errors'`, `'Ask for a quick retry after correcting.'`)
+are static strings present on every turn regardless of strand, so it proved
+nothing about the answer turn specifically (F1).
+
+Shepherd-adjudicated fix (minimal, additive, no deterministic answer
+evaluator — mirrors the *re-surfacing* pattern already used for graded input's
+`previousComprehension`, not its *evaluation* pattern):
+
+- `apps/api/src/services/language-session-engine.ts`: added
+  `previousMeaningOutputTask?: LanguageMeaningOutputArtifact` to
+  `LanguageSessionState`, and `findPendingMeaningOutputTask()` — a
+  **recency-guarded** lookup (consults only the single most recent AI turn,
+  never walking further back, unlike the pre-existing
+  `findLatestGradedInputEvent`) — wired into `buildLanguageSessionState`
+  alongside the existing `previousComprehension` computation. Does **not**
+  touch `chooseNextLanguageStrand` or force `activeStrand` back to
+  `meaning_output`.
+- `apps/api/src/services/language-prompts.ts`: added a
+  `previousMeaningOutputLines` block, gated on
+  `state.previousMeaningOutputTask`, that anchors the correction+retry
+  instruction to the specific task the learner just answered — independent of
+  whether `nextActivity.meaningOutput` (the *next* presented task) is
+  populated.
+- Tests: `language-session-engine.test.ts` gained two `buildLanguageSessionState`
+  cases proving the field is populated for the immediately-following answer
+  turn and is **not** re-surfaced once a newer turn has moved on (the bounded-
+  recency property that avoids F3's staleness pattern). `language-prompts.test.ts`
+  gained an answer-turn case asserting the gated brief — not the static
+  generic text — is what's present for that state (F1 remediation).
+
+F3 (stale graded-input `previousComprehension` mis-attributed to
+meaning-output answers, via the recency-less `findLatestGradedInputEvent`) and
+F4 (no standalone `MeaningOutputCard` render test, matching sibling
+`GradedInputCard` convention) were adjudicated as out of scope / accepted —
+not touched here; F3 is carried forward as a follow-up WI candidate.
+
 ## AC → task cross-reference
 
 | AC | Satisfied by |
@@ -329,5 +377,5 @@ Out of scope:
 | Server-emitted `meaningOutput` preserved through streaming/mobile boundary | T1, T2 |
 | Session UI renders one structured meaning-output task | T3, T4 |
 | Learner can answer by text or voice using the existing input floor | No code change — `inputDisabled` in `session/index.tsx` has no strand/activityType condition (verified by reading the full prop derivation before writing this plan); composer already works for any active strand |
-| Tutor gives direct correction and asks for a retry when incomplete/malformed | T5 (existing generic "Direct correction rules" + new task-specific context) |
-| Smoke/unit coverage proves the card/state path and one correction+retry happy path | T1, T4, T5 tests |
+| Tutor gives direct correction and asks for a retry when incomplete/malformed | T5 (existing generic "Direct correction rules" + new task-specific context) + Post-review remediation (answer-turn re-surfacing via `previousMeaningOutputTask`) |
+| Smoke/unit coverage proves the card/state path and one correction+retry happy path | T1, T4, T5 tests + Post-review remediation tests (answer-turn-gated assertion) |
