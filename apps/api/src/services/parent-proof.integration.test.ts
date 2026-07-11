@@ -343,22 +343,28 @@ describeIfDb('getLatestVerifiedProofForChild (integration) [WI-1658]', () => {
     });
     // Seed BOTH an ordinary session-summary note (no marker) and a
     // Challenge-verified note (marked) for the SAME (topicId, sessionId) —
-    // the concrete regression this WI's schema fork exists to prevent.
-    await db.insert(topicNotes).values([
-      {
-        profileId: child.profileId,
-        topicId,
-        sessionId,
-        content: 'An ordinary session-summary reflection.',
-      },
-      {
-        profileId: child.profileId,
-        topicId,
-        sessionId,
-        content: 'The verified concept quote.',
-        artifactSource: 'challenge_drafted_note',
-      },
-    ]);
+    // the concrete regression this WI's schema fork exists to prevent. The
+    // UNMARKED note gets a strictly NEWER createdAt than the marked one, so
+    // this is a deterministic guard: without the artifactSource filter,
+    // `ORDER BY desc(createdAt) LIMIT 1` would reliably return the wrong
+    // (unmarked, newer) row instead of passing by an unspecified
+    // same-timestamp tie-break.
+    const now = new Date();
+    await db.insert(topicNotes).values({
+      profileId: child.profileId,
+      topicId,
+      sessionId,
+      content: 'The verified concept quote.',
+      artifactSource: 'challenge_drafted_note',
+      createdAt: new Date(now.getTime() - 1000),
+    });
+    await db.insert(topicNotes).values({
+      profileId: child.profileId,
+      topicId,
+      sessionId,
+      content: 'An ordinary session-summary reflection.',
+      createdAt: now,
+    });
 
     const result = await getLatestVerifiedProofForChild(
       db,

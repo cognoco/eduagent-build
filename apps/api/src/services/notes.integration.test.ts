@@ -386,6 +386,9 @@ describeIfDb(
       expect(
         rows.some((r) => r.artifactSource === 'challenge_drafted_note'),
       ).toBe(true);
+      // Prove both rows genuinely coexist — the dedup fix must not have
+      // instead started duplicating writes it used to correctly collapse.
+      expect(rows).toHaveLength(2);
     });
   },
 );

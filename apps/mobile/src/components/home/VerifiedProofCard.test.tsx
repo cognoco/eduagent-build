@@ -107,6 +107,42 @@ describe('VerifiedProofCard', () => {
     active.result.getByText(/Plants convert light into chemical energy\./);
   });
 
+  // [WI-1658] Regression: masteryVerificationState and retentionStatus are
+  // independent axes. A 'stale' verification with NO retention_cards row
+  // (retentionStatus absent — a real API output shape) must still render
+  // its 'stale' qualifier — never suppressed just because retention data is
+  // missing, which would render an unqualified "verified" claim in effect.
+  it('renders the stale qualifier even when retentionStatus is absent', async () => {
+    active = renderScreen(
+      <VerifiedProofCard
+        childProfileId={CHILD_PROFILE_ID}
+        accentColor="#123456"
+      />,
+      {
+        profile: PARENT,
+        profiles: [PARENT, CHILD],
+        routes: {
+          '/verified-proof': {
+            hasProof: true,
+            topicId: '10000000-0000-4000-8000-0000000000c1',
+            topicTitle: 'Photosynthesis',
+            subjectId: '10000000-0000-4000-8000-0000000000d1',
+            sessionId: SESSION_ID,
+            verifiedAt: '2026-07-01T12:00:00.000Z',
+            quote: 'Plants convert light into chemical energy.',
+            masteryVerificationState: 'stale',
+            // retentionStatus intentionally omitted.
+          },
+        },
+      },
+    );
+
+    await active.result.findByTestId(
+      `parent-home-child-verified-proof-${CHILD_PROFILE_ID}`,
+    );
+    active.result.getByText(/Worth another look/);
+  });
+
   it('renders the degradation line when quote is null', async () => {
     active = renderScreen(
       <VerifiedProofCard

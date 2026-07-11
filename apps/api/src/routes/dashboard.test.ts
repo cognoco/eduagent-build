@@ -727,6 +727,32 @@ describe('dashboard routes', () => {
       expect(params).toContain(PROFILE_ID);
     });
 
+    // [WI-1658 / BUG-744] verified-proof endpoint calls assertOwnerAndParentAccess
+    // directly at route entry — same IDOR contract as the memory route above.
+    it('[BREAK] GET /dashboard/children/:id/verified-proof returns 403 for unlinked parent', async () => {
+      mockFindFamilyLink.mockResolvedValueOnce(undefined);
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/verified-proof`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockFindFamilyLink).toHaveBeenCalledTimes(1);
+      expect(mockGetLatestVerifiedProofForChild).not.toHaveBeenCalled();
+
+      // Pin the actual UUIDs the route asked the family-link table about —
+      // catches a future refactor that drops or swaps the parent/child
+      // equality clauses (would still 403 here since the mock returns
+      // undefined, but would silently break the real IDOR contract).
+      const params = extractDrizzleParamValues(
+        mockFindFamilyLink.mock.calls[0]?.[0],
+      );
+      expect(params).toContain('test-profile-id');
+      expect(params).toContain(PROFILE_ID);
+    });
+
     it('GET /dashboard/children/:id/memory returns 200 for linked parent', async () => {
       // assertParentAccess succeeds (default mock)
       const res = await app.request(

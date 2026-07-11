@@ -49,7 +49,12 @@ export function VerifiedProofCard({
   const query = useVerifiedProof(childProfileId);
   const proof = query.data;
 
-  if (!proof?.hasProof || !proof.sessionId || !proof.topicTitle) {
+  if (
+    !proof?.hasProof ||
+    !proof.sessionId ||
+    !proof.topicTitle ||
+    !proof.verifiedAt
+  ) {
     return null;
   }
 
@@ -86,9 +91,12 @@ export function VerifiedProofCard({
         {t('home.parent.verifiedProof.verifiedOn', {
           date: formatShortDate(proof.verifiedAt, i18n?.language),
         })}
-        {stateLabel && retentionLabel
-          ? ` · ${stateLabel} · ${retentionLabel}`
-          : null}
+        {/* [WI-1658] stateLabel and retentionLabel are independent axes — a
+            missing retentionStatus (no retention_cards row) must never
+            suppress the verification-state qualifier too, or a 'stale'
+            verification would render unqualified (MMT-ADR-0031 §5). */}
+        {stateLabel ? ` · ${stateLabel}` : null}
+        {retentionLabel ? ` · ${retentionLabel}` : null}
       </Text>
       {proof.quote ? (
         <Text
