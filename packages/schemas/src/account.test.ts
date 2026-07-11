@@ -610,13 +610,9 @@ describe('account schemas', () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(
-          (
-            result.data as typeof result.data & {
-              subscriptionFieldDescriptions?: unknown;
-            }
-          ).subscriptionFieldDescriptions,
-        ).toBeDefined();
+        expect(result.data.subscriptionFieldDescriptions).toEqual(
+          DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
+        );
       }
     });
 
