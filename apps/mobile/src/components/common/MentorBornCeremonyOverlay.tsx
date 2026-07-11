@@ -1,39 +1,14 @@
-import React, { useCallback, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Sentry } from '../../lib/sentry';
 import {
   completeMentorBornCeremony,
   useMentorBornCeremonyRequest,
 } from '../../lib/mentor-born-ceremony';
+import { MentorBirthErrorBoundary } from './MentorBirthErrorBoundary';
 import { MentorBirthAnimation } from './MentorBirthAnimation';
 
 export const MENTOR_BORN_CEREMONY_CAP_MS = 2_500;
-
-/** Thin error boundary so mentor-born animation crashes don't block the app. */
-class MentorBornErrorBoundary extends React.Component<
-  { children: React.ReactNode; onError: () => void },
-  { hasError: boolean }
-> {
-  override state = { hasError: false };
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  override componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error(
-      '[MentorBornCeremony] crashed:',
-      error.message,
-      info.componentStack,
-    );
-    Sentry.captureException(error, {
-      tags: { component: 'MentorBornCeremony' },
-    });
-    this.props.onError();
-  }
-  override render() {
-    return this.state.hasError ? null : this.props.children;
-  }
-}
 
 export function MentorBornCeremonyOverlay() {
   const request = useMentorBornCeremonyRequest();
@@ -57,13 +32,16 @@ export function MentorBornCeremonyOverlay() {
       style={styles.overlay}
       testID="mentor-born-ceremony-overlay"
     >
-      <MentorBornErrorBoundary onError={onComplete}>
+      <MentorBirthErrorBoundary
+        componentTag="MentorBornCeremony"
+        onError={onComplete}
+      >
         <MentorBirthAnimation
           readyLabel={t('onboarding.mentorBirth.ready')}
           onComplete={onComplete}
           size={220}
         />
-      </MentorBornErrorBoundary>
+      </MentorBirthErrorBoundary>
     </View>
   );
 }

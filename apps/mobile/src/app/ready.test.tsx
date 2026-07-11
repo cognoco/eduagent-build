@@ -1,4 +1,5 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
+import { Sentry } from '../lib/sentry';
 import {
   createScreenWrapper,
   createTestProfile,
@@ -6,6 +7,7 @@ import {
 import ReadyScreen from './ready';
 
 const mockReplace = jest.fn();
+let mockMentorBirthShouldThrow = false;
 let mockParams: {
   subject?: string;
   subjectId?: string;
@@ -40,7 +42,28 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
 
+jest.mock(
+  '../components/common/MentorBirthAnimation' /* gc1-allow: targeted render-fault injection verifies the ready screen's local crash boundary */,
+  () => ({
+    MentorBirthAnimation: ({ readyLabel }: { readyLabel: string }) => {
+      if (mockMentorBirthShouldThrow) {
+        throw new Error('mentor birth render failed');
+      }
+      const { Text, View } = require('react-native');
+      return (
+        <View testID="mentor-birth-animation">
+          <Text>{readyLabel}</Text>
+        </View>
+      );
+    },
+  }),
+);
+
 describe('ReadyScreen', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   beforeEach(() => {
     jest.useRealTimers();
     mockParams = {
@@ -48,6 +71,41 @@ describe('ReadyScreen', () => {
       subjectId: 'subject-1',
     };
     mockReplace.mockClear();
+    mockMentorBirthShouldThrow = false;
+    jest.mocked(Sentry.captureException).mockClear();
+  });
+
+  it('contains mentor birth animation crashes and keeps the ready screen usable', () => {
+    jest.useFakeTimers();
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockMentorBirthShouldThrow = true;
+    const activeProfile = createTestProfile({
+      id: 'profile-1',
+      displayName: 'Ari',
+      isOwner: true,
+      birthYear: 2014,
+    });
+    const { wrapper } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
+
+    const { getByTestId, getByText } = render(<ReadyScreen />, { wrapper });
+
+    act(() => {
+      jest.advanceTimersByTime(1700);
+    });
+
+    getByTestId('ready-start');
+    getByTestId('ready-row-tone');
+    getByText("You're all set.");
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'mentor birth render failed' }),
+      {
+        extra: { componentStack: expect.any(String) },
+        tags: { component: 'ready-mentor-birth' },
+      },
+    );
   });
 
   it('uses the mentor birth animation as the onboarding handoff', () => {
