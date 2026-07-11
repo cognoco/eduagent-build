@@ -435,6 +435,37 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
     expect(plan.every(({ shard }) => shard >= 1 && shard <= 8)).toBe(true);
   });
+
+  it('keeps the generated Android APK free of the duplicate OSGI manifest', () => {
+    const appConfig = JSON.parse(
+      readFileSync(join(repoRoot, 'apps/mobile/app.json'), 'utf8'),
+    ) as {
+      expo: {
+        plugins: Array<
+          | string
+          | [
+              string,
+              {
+                android?: {
+                  packagingOptions?: { exclude?: string[] };
+                };
+              },
+            ]
+        >;
+      };
+    };
+    const buildProperties = appConfig.expo.plugins.find(
+      (plugin) =>
+        Array.isArray(plugin) && plugin[0] === 'expo-build-properties',
+    );
+
+    expect(Array.isArray(buildProperties)).toBe(true);
+    expect(
+      Array.isArray(buildProperties)
+        ? buildProperties[1].android?.packagingOptions?.exclude
+        : undefined,
+    ).toContain('META-INF/versions/9/OSGI-INF/MANIFEST.MF');
+  });
 });
 
 type MaestroHarness = {
