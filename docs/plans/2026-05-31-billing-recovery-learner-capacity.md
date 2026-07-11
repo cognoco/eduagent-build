@@ -3,39 +3,36 @@ title: Billing Recovery and Learner Capacity - Implementation Plan
 date: 2026-05-31
 profile: code
 spec: docs/audits/2026-05-31-logical-gap-audit.md
-status: parked
+status: partially-implemented
 gap_ids: [billing-3, billing-4, notif-3]
 ---
 
 # Billing Recovery and Learner Capacity - Implementation Plan
 
-> **STATUS (2026-07-11):** PARTIALLY IMPLEMENTED — the T1/T2 payment-failure
-> recovery slice shipped in [PR #2039](https://github.com/cognoco/eduagent-build/pull/2039)
+> **STATUS (2026-07-11): PARTIALLY IMPLEMENTED.** T1/T2 shipped in
+> [PR #2039](https://github.com/cognoco/eduagent-build/pull/2039)
 > ([squash commit `9e6cc091f`](https://github.com/cognoco/eduagent-build/commit/9e6cc091ff7f01b52e69200462d2f2524426be78)).
-> T0 and T3-T6 remain parked; this document does not authorize that work.
+> **Only T0 and T3-T6 remain PARKED** pending the identity/backend rework; this
+> document does not authorize implementing those tasks.
 
-> ## ⏸️ STATUS — PARKED (last reviewed 2026-06-08)
->
-> **Do not implement the remaining parked tasks yet.** They are waiting on the identity/backend rework
-> ([`_wip/identity-foundation/`](../../_wip/identity-foundation/ROADMAP.md)) to land.
->
-> **Already classified** (the old "Classification pending" note is resolved —
-> see re-triage in `_wip/identity-foundation/_research/drift-map.md:315,470`):
-> - **T1 + T2 (gap `billing-3`: payment-failed notice + past-due banner)** =
->   **non-identity, DO-NOW slice.** Independent; safe to extract and build.
->   Key it on the paying account/subscription, not the `isOwner` gate.
-> - **T3 + T4 + T5 (gaps `billing-4`, `notif-3`, `learn-1`)** = **FOLDED into the
->   identity rewrite.** Owner→child top-up allocation is built on the `owner`
->   primitive the cut dissolves + conflicts with org-pool quota intent, and is
->   **hard-blocked on `learn-1`** (non-owner child 403s every learning write).
->
-> **Reviewed:** an end-user adversarial pass (2026-06-08) folded 8 findings into
-> this doc (EU-HIGH-1..3, EU-MED-1..5 — see "Review Findings Addressed" at the
-> bottom). EU-MED-4/-5 apply to the do-now T1/T2 slice; the rest ride with the
-> folded half. **Don't redo this review — extend it.**
->
-> **Next step when unparking:** carve a clean T1/T2-only plan (drop the T0
-> migration — notification + banner needs none), keep EU-MED-4/-5.
+**Classification detail** (the old "Classification pending" note is resolved;
+see re-triage in `_wip/identity-foundation/_research/drift-map.md:315,470`):
+
+- **T1 + T2 (gap `billing-3`: payment-failed notice + past-due banner)** =
+  **non-identity slice, now implemented.** It is keyed on the paying
+  account/subscription, not the `isOwner` gate.
+- **T3 + T4 + T5 (gaps `billing-4`, `notif-3`, `learn-1`)** = **FOLDED into the
+  identity rewrite.** Owner→child top-up allocation is built on the `owner`
+  primitive the cut dissolves + conflicts with org-pool quota intent, and is
+  **hard-blocked on `learn-1`** (non-owner child 403s every learning write).
+
+**Reviewed:** an end-user adversarial pass (2026-06-08) folded 8 findings into
+this doc (EU-HIGH-1..3, EU-MED-1..5 — see "Review Findings Addressed" at the
+bottom). EU-MED-4/-5 apply to the implemented T1/T2 slice; the rest ride with
+the folded half. **Don't redo this review — extend it.**
+
+**Next step for the parked work:** re-plan T0 and T3-T6 after the
+identity/backend rework lands; do not reopen the implemented T1/T2 slice.
 
 **Goal:** Make paid-access failures and child-cap exhaustion recoverable before
 users silently lose access or get stuck waiting for a parent who was never
@@ -73,7 +70,7 @@ not a fixed application-owned window.
   it precedes unfinished-session priority `0` and every learning candidate.
   This is deliberate: payment recovery must not be displaced by study work
   (`apps/api/src/services/now-feed.ts:63-73,143-165,204-224`). The mobile
-  `useNowFeed` hook requests this server-ranked self feed for the active profile
+  `useNowFeed` hook requests this server-ranked self-feed for the active profile
   (`apps/mobile/src/hooks/use-now-feed.ts:30-58`).
 - At most one billing card is returned: alerts are ordered by occurrence time
   and ID descending, then limited to one
