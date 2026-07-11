@@ -10,6 +10,8 @@ import {
   LEARNER_HOME_RETURN_TO,
   PRACTICE_HREF,
   PRACTICE_RETURN_TO,
+  JOURNAL_HREF,
+  JOURNAL_RETURN_TO,
   FAMILY_RECAPS_HREF,
   FAMILY_RECAPS_RETURN_TO,
   FAMILY_PROGRESS_HREF,
@@ -57,7 +59,7 @@ describe('homeHrefForReturnTo', () => {
   });
 
   it('returns the journal href when returnTo is journal', () => {
-    expect(homeHrefForReturnTo('journal')).toBe('/(app)/journal');
+    expect(homeHrefForReturnTo(JOURNAL_RETURN_TO)).toBe(JOURNAL_HREF);
   });
 
   it('resolves Family and Study context return tokens', () => {
