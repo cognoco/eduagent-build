@@ -361,30 +361,6 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      # expo-router's _ctx*.js files use require.context(process.env.EXPO_ROUTER_APP_ROOT).
-      # require.context is evaluated at COMPILE TIME by Metro's static analysis —
-      # it rejects dynamic expressions like process.env.*. The full Expo CLI
-      # pipeline has a Babel plugin that replaces these with string literals,
-      # but export:embed skips that step. We must inline them ourselves.
-      - name: Patch expo-router context files for offline bundling
-        run: |
-          # require.context resolves paths relative to the FILE that contains
-          # the call, not relative to projectRoot. In the pnpm store, _ctx.android.js
-          # lives deep in node_modules/.pnpm/expo-router@.../node_modules/expo-router/,
-          # so a relative "./src/app" would resolve to a non-existent directory there.
-          # Use an absolute path instead — require.context is compile-time only,
-          # so the absolute CI path is resolved by Metro during bundling and never
-          # evaluated on the device at runtime.
-          APP_ROOT="$(cd apps/mobile && pwd)/src/app"
-          echo "Patching EXPO_ROUTER_APP_ROOT → $APP_ROOT"
-          find node_modules/.pnpm -path "*/expo-router/_ctx*.js" -exec \
-            sed -i "s|process\.env\.EXPO_ROUTER_APP_ROOT|\"$APP_ROOT\"|g" {} +
-          find node_modules/.pnpm -path "*/expo-router/_ctx*.js" -exec \
-            sed -i 's|process\.env\.EXPO_ROUTER_IMPORT_MODE|"lazy"|g' {} +
-          # Verify the patch worked
-          echo "--- Patched _ctx.android.js (first match) ---"
-          find node_modules/.pnpm -path "*/expo-router/_ctx.android.js" -exec head -3 {} \; -quit
-
       # On a cache hit, produce the fresh JS bundle that will replace the stale
       # one in the cached release APK. On a cache miss, Gradle's release bundle
       # task performs this work as part of assembleRelease instead.
@@ -398,6 +374,12 @@ jobs:
       - name: Bundle JS for cached APK
         if: steps.apk-cache.outputs.cache-hit == 'true'
         working-directory: apps/mobile
+        env:
+          # NODE_ENV=test makes babel-preset-expo deliberately skip the
+          # EXPO_ROUTER_APP_ROOT transform, yielding an empty route context.
+          # Build the device bundle like EAS while EXPO_PUBLIC_E2E keeps the
+          # deterministic test hooks enabled.
+          NODE_ENV: production
         run: |
           mkdir -p android/app/src/main/assets
 
@@ -460,6 +442,8 @@ jobs:
       - name: Build E2E release APK
         if: steps.apk-cache.outputs.cache-hit != 'true'
         working-directory: apps/mobile/android
+        env:
+          NODE_ENV: production
         run: ./gradlew -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m" assembleRelease --no-daemon --max-workers=2 --stacktrace
 
       # ── Test execution — always runs ──

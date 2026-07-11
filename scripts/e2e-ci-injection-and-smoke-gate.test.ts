@@ -424,6 +424,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const manualBundleStep = mobileMaestro.steps?.find(
       (step) => step.name === 'Bundle JS for cached APK',
     );
+    const routerPatchStep = mobileMaestro.steps?.find(
+      (step) =>
+        step.name === 'Patch expo-router context files for offline bundling',
+    );
     const workflowScripts = (mobileMaestro.steps ?? [])
       .map((step) => (typeof step.run === 'string' ? step.run : ''))
       .join('\n');
@@ -455,6 +459,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(manualBundleStep?.if).toBe(
       "steps.apk-cache.outputs.cache-hit == 'true'",
     );
+    expect(manualBundleStep?.env).toMatchObject({ NODE_ENV: 'production' });
+    expect(buildStep?.env).toMatchObject({ NODE_ENV: 'production' });
+    expect(routerPatchStep).toBeUndefined();
+    expect(workflowScripts).not.toContain('EXPO_ROUTER_APP_ROOT');
     expect(workflowScripts).not.toContain('assembleDebug');
     expect(runner).toContain(
       'android/app/build/outputs/apk/release/app-release.apk',
