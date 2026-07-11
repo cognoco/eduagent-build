@@ -28,7 +28,7 @@ authoritative column list. Summary:
 | Event | Launch-critical? | Recorded by | Notes |
 |---|---|---|---|
 | `app_opened` | Yes — funnel denominator | Client → `POST /activation-events` | Dedup: 1 row/device/UTC day. **Interim contract:** gated on an existing Clerk session, so it does not fire for a signed-out/pre-account app open — this is *not* a true "every cold launch" denominator until WI-1803 (anonymous ingest) lands. Pre-signup drop-off is not observable in this interim state. |
-| `signup_started` | Yes | Client → `POST /activation-events` | Fires when the signup flow begins (pre-account); `profile_id` is null. |
+| `signup_started` | Yes | Client → `POST /activation-events` | Fires only after a Clerk session is established (not pre-account); `profile_id` is nullable only during the brief session-to-profile-creation window, not for a signed-out visitor. |
 | `signup_completed` | Yes | Server — `routes/profiles.ts`, at owner-graph creation (`createIdentityGraph`) | 1 row/profile ever (dedup on profile id). |
 | `onboarding_completed` | Yes | Client → `POST /activation-events` | **Deviation from the "server records what it can reach" default:** the API has no single terminal "onboarding complete" transition — `routes/onboarding.ts` only exposes independent PATCH steps (language / pronouns / interests), and the mobile client owns the onboarding wizard's completion state. Recorded via the ingest route instead. |
 | `first_subject_or_lesson_started` | Yes | Server — `routes/subjects.ts`, `POST /subjects` | 1 row/profile ever. |
@@ -54,8 +54,11 @@ examples use a rolling 30-day window. Exclude non-production noise by adding
 
 ### 1. Signup completion (signup_started → signup_completed)
 
-Client-reported `signup_started` carries no `profile_id` (fires pre-account),
-so it can only be joined to `signup_completed` via `anonymous_id` IF the
+Client-reported `signup_started` carries no `profile_id` during the brief
+window between Clerk session establishment and this app's own profile-row
+creation (not a pre-account/signed-out event under the interim session-gated
+contract — see the schema table above), so it can only be joined to
+`signup_completed` via `anonymous_id` IF the
 client forwards the same `anonymous_id` on both calls. As of WI-1689 the
 mobile client generates and persists a device-scoped `anonymous_id` and sends
 it on every client-driven event (including `signup_started`), but
