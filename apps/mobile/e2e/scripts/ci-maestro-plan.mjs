@@ -112,6 +112,7 @@ function validateManifest(allFlows, validScenarios) {
       .map(({ flow }) => flow),
   );
   const manifestPr = new Set(manifest.pr.map(({ flow }) => flow));
+  const manifestV2 = new Set(manifest.v2.map(({ flow }) => flow));
 
   for (const [flow, scenario] of Object.entries(manifest.scenarioOverrides)) {
     if (!byPath.has(flow))
@@ -125,6 +126,8 @@ function validateManifest(allFlows, validScenarios) {
 
   if (manifestPr.size !== manifest.pr.length)
     fail('PR manifest contains duplicate flows');
+  if (manifestV2.size !== manifest.v2.length)
+    fail('V2 manifest contains duplicate flows');
   for (const flow of taggedPr) {
     if (!manifestPr.has(flow))
       fail(`pr-blocking flow missing from PR manifest: ${flow}`);
@@ -144,6 +147,21 @@ function validateManifest(allFlows, validScenarios) {
       );
     }
   }
+  for (const { flow, scenario } of manifest.v2) {
+    const metadata = byPath.get(flow);
+    if (!metadata) fail(`V2 manifest flow does not exist: ${flow}`);
+    if (!metadata.tags.includes('v2'))
+      fail(`V2 manifest flow lacks v2 tag: ${flow}`);
+    if (scenario !== null && !validScenarios.has(scenario)) {
+      fail(`V2 manifest flow ${flow} names unknown seed scenario ${scenario}`);
+    }
+    const resolved = resolveScenario(metadata, validScenarios);
+    if (resolved !== scenario) {
+      fail(
+        `V2 manifest scenario mismatch for ${flow}: ${scenario} != ${resolved}`,
+      );
+    }
+  }
 }
 
 function buildPlan(suite) {
@@ -154,17 +172,19 @@ function buildPlan(suite) {
   const selected =
     suite === 'pr'
       ? manifest.pr
-      : allFlows
-          .filter(
-            ({ tags }) =>
-              tags.some((tag) => scheduledTags.has(tag)) &&
-              !tags.some((tag) => nonExecutableTags.has(tag)),
-          )
-          .map((metadata) => ({
-            flow: metadata.flow,
-            scenario: resolveScenario(metadata, validScenarios),
-          }));
-  const shardCount = suite === 'pr' ? 4 : 8;
+      : suite === 'v2'
+        ? manifest.v2
+        : allFlows
+            .filter(
+              ({ tags }) =>
+                tags.some((tag) => scheduledTags.has(tag)) &&
+                !tags.some((tag) => nonExecutableTags.has(tag)),
+            )
+            .map((metadata) => ({
+              flow: metadata.flow,
+              scenario: resolveScenario(metadata, validScenarios),
+            }));
+  const shardCount = suite === 'pr' ? 4 : suite === 'v2' ? 1 : 8;
 
   return assignScenarioShards(selected, shardCount).sort((left, right) =>
     left.flow.localeCompare(right.flow),
@@ -177,8 +197,8 @@ function option(name) {
 }
 
 const suite = option('--suite');
-if (suite !== 'pr' && suite !== 'nightly')
-  fail('--suite must be pr or nightly');
+if (suite !== 'pr' && suite !== 'nightly' && suite !== 'v2')
+  fail('--suite must be pr, nightly, or v2');
 const format = option('--format') ?? 'tsv';
 const all = process.argv.includes('--all');
 const shardOption = option('--shard');
