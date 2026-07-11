@@ -753,6 +753,7 @@
       "retryLabel": "発話をやり直す"
     },
     "chatShell": {
+      "aiDisclosure": "AIメンターと話しています",
       "defaultSubtitle": "お手伝いします",
       "defaultPlaceholder": "メッセージを入力...",
       "imageUnavailable": "画像は利用できなくなりました",

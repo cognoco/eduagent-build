@@ -38,10 +38,13 @@ import type { SessionAnalysisOutput } from '@eduagent/schemas';
 
 import {
   applyAnalysis,
+  buildHumanReadableMemoryExport,
+  buildMemoryBlock,
   deleteAllMemory,
   getLearningProfile,
   getOrCreateLearningProfile,
   grantMemoryConsent,
+  type MemoryBlockProfile,
 } from './learner-profile';
 
 // ---------------------------------------------------------------------------
@@ -231,6 +234,119 @@ describe('applyAnalysis (integration)', () => {
     expect(row).toBeDefined();
     const interests = row!.interests as string[];
     expect(interests).toEqual(expect.arrayContaining(['volcanoes', 'space']));
+  });
+
+  it('[WI-1195] scrubs clinical characterisations before profile persistence, export, and memory reinjection', async () => {
+    const own = await seedAccountAndProfile(0);
+    const db = createIntegrationDb();
+    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted', {
+      callerPersonId: own.profileId,
+    });
+
+    const clinicalCharacterisations = [
+      "I'm autistic.",
+      'Sam is autistic.',
+      'Jordan shows signs of dyslexia.',
+      'The learner has ADHD.',
+      'She’s dyslexic.',
+    ];
+    const safeResolvedTopic = 'multiplication';
+
+    // Simulate a legacy vulnerable row so this application also proves the
+    // boundary scrubs merged existing state and unsafe recently-resolved data.
+    await db
+      .update(learningProfiles)
+      .set({
+        struggles: [
+          {
+            topic: clinicalCharacterisations[3]!,
+            subject: 'Math',
+            lastSeen: new Date().toISOString(),
+            attempts: 1,
+            confidence: 'low',
+            source: 'inferred',
+          },
+          {
+            topic: safeResolvedTopic,
+            subject: 'Math',
+            lastSeen: new Date().toISOString(),
+            attempts: 1,
+            confidence: 'low',
+            source: 'inferred',
+          },
+        ],
+      })
+      .where(eq(learningProfiles.profileId, own.profileId));
+
+    const result = await applyAnalysis(
+      db,
+      own.profileId,
+      buildAnalysis({
+        interests: ['volcanoes', clinicalCharacterisations[0]!],
+        strengths: [
+          { topic: 'fractions', subject: 'Math' },
+          { topic: clinicalCharacterisations[1]!, subject: 'Math' },
+          { topic: 'decimals', subject: clinicalCharacterisations[2]! },
+        ],
+        struggles: [
+          { topic: 'long division', subject: 'Math' },
+          { topic: clinicalCharacterisations[3]!, subject: 'Math' },
+          { topic: 'spelling', subject: clinicalCharacterisations[4]! },
+        ],
+        communicationNotes: [
+          'Prefers short explanations.',
+          clinicalCharacterisations[2]!,
+        ],
+        resolvedTopics: [
+          { topic: clinicalCharacterisations[3]!, subject: 'Math' },
+          { topic: safeResolvedTopic, subject: 'Math' },
+        ],
+      }),
+      'Earth Science',
+    );
+
+    const [row] = await db
+      .select()
+      .from(learningProfiles)
+      .where(eq(learningProfiles.profileId, own.profileId));
+    expect(row).toBeDefined();
+
+    const factRows = await db
+      .select()
+      .from(memoryFacts)
+      .where(eq(memoryFacts.profileId, own.profileId));
+
+    const persisted = JSON.stringify(row);
+    const persistedFacts = JSON.stringify(factRows);
+    const emittedNotifications = JSON.stringify(result.notifications);
+    const exported = buildHumanReadableMemoryExport(row);
+    const reinjected = buildMemoryBlock(
+      row as unknown as MemoryBlockProfile,
+      null,
+      null,
+      null,
+      row!.recentlyResolvedTopics as Array<{
+        topic: string;
+        subject: string | null;
+      }>,
+    ).text;
+
+    for (const clinicalCharacterisation of clinicalCharacterisations) {
+      expect(persisted).not.toContain(clinicalCharacterisation);
+      expect(persistedFacts).not.toContain(clinicalCharacterisation);
+      expect(emittedNotifications).not.toContain(clinicalCharacterisation);
+      expect(exported).not.toContain(clinicalCharacterisation);
+      expect(reinjected).not.toContain(clinicalCharacterisation);
+    }
+
+    expect(persisted).toContain('volcanoes');
+    expect(result.notifications).toContainEqual({
+      type: 'struggle_resolved',
+      topic: safeResolvedTopic,
+      subject: 'Math',
+    });
+    expect(exported).toContain('fractions');
+    expect(reinjected).toContain('Prefers short explanations.');
   });
 
   it('short-circuits and writes nothing when confidence is low', async () => {

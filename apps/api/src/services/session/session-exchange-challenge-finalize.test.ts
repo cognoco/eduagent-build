@@ -689,6 +689,37 @@ describe('finalizeChallengeRoundIfReady — idempotent under concurrent/retry fi
     // And no mastery write on the partial path.
     expect(state.masteryInserts).toHaveLength(0);
   });
+
+  it('[WI-1195] scrubs a clinical inference before persisting a misconception', async () => {
+    const challengeRound = draftingState([
+      {
+        concept: 'equivalent fractions',
+        result: 'misconception',
+        evidence: 'The learner shows signs of dyscalculia.',
+        answerEventId: ANSWER_EVENT_ID,
+        learnerQuote: 'One half is smaller than two fourths.',
+        correction: 'One half and two fourths represent the same amount.',
+      },
+    ]);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+
+    await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      makeSession(state.sessionMetadata),
+      challengeRound,
+      null,
+    );
+
+    expect(state.deepeningRows).toHaveLength(1);
+    expect(state.deepeningRows[0]?.misconception).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

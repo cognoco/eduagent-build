@@ -786,6 +786,7 @@
       "retryLabel": "Ponów próbę mówienia"
     },
     "chatShell": {
+      "aiDisclosure": "Rozmawiasz z mentorem AI",
       "defaultSubtitle": "Jestem tu, by pomóc",
       "defaultPlaceholder": "Wpisz wiadomość...",
       "imageUnavailable": "Obraz nie jest już dostępny",

@@ -280,6 +280,51 @@ describeIfDb('listAllNotes (integration)', () => {
     );
     expect(result.notes).toHaveLength(2);
   });
+
+  it('[WI-1195] rejects clinical characterisations at every topic-note write boundary', async () => {
+    const { profileId } = await seedProfile();
+    const { subjectId, topicId } = await seedTopic(
+      profileId,
+      'Math',
+      'Fractions',
+    );
+    const sessionId = await seedSession(profileId, subjectId, topicId);
+
+    await expect(
+      createNote(
+        db,
+        profileId,
+        subjectId,
+        topicId,
+        'The learner likely has ADHD.',
+      ),
+    ).rejects.toThrow(/health or disability characterisation/i);
+
+    await expect(
+      createNoteForSession(db, {
+        profileId,
+        topicId,
+        sessionId,
+        content: 'The child appears to have autism.',
+      }),
+    ).rejects.toThrow(/health or disability characterisation/i);
+
+    const safeNote = await createNote(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+      'The learner confuses numerator and denominator.',
+    );
+    await expect(
+      updateNote(
+        db,
+        profileId,
+        safeNote.id,
+        'The student may have dyscalculia.',
+      ),
+    ).rejects.toThrow(/health or disability characterisation/i);
+  });
 });
 
 // ---------------------------------------------------------------------------

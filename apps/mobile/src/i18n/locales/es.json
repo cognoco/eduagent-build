@@ -753,6 +753,7 @@
       "retryLabel": "Reintentar intento hablado"
     },
     "chatShell": {
+      "aiDisclosure": "Estás hablando con un mentor de IA",
       "defaultSubtitle": "Estoy aquí para ayudar",
       "defaultPlaceholder": "Escribe un mensaje...",
       "imageUnavailable": "Imagen ya no disponible",
