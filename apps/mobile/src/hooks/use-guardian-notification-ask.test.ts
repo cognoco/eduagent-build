@@ -61,7 +61,9 @@ const NOTIF_PREFS = {
   weeklyProgressEmail: true,
   monthlyProgressEmail: false,
   pushEnabled: false,
-  maxDailyPush: 3,
+  // Deliberately non-default so a sync that omits/loses maxDailyPush (and
+  // gets reset to the API's hardcoded default of 3) is caught.
+  maxDailyPush: 5,
   pushTokenRegistered: false,
 };
 
@@ -357,6 +359,80 @@ describe('useGuardianNotificationAsk', () => {
       weeklyProgressPush: false,
       weeklyProgressEmail: true,
       monthlyProgressEmail: false,
+      maxDailyPush: 5,
+      pushEnabled: true,
+    });
+  });
+
+  // [WI-1441 rework] Regression guard: a grant landing before the settings
+  // query has resolved must not silently skip the sync. Before this fix,
+  // `if (prefs)` guarded the mutate with no fallback, so a user who granted
+  // permission during the query's initial load never got pushEnabled synced.
+  // Hangs the initial GET so notifQuery.data is still undefined when Allow
+  // fires, then lets it resolve and confirms the sync still lands.
+  it('syncs pushEnabled once notification prefs load, even if unavailable at grant time', async () => {
+    let resolveGet: ((value: Response) => void) | undefined;
+    const pendingGet = new Promise<Response>((resolve) => {
+      resolveGet = resolve;
+    });
+    mockFetch.mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        const method = (init?.method ?? 'GET').toUpperCase();
+        if (url.includes('/settings/notifications') && method === 'GET') {
+          return pendingGet;
+        }
+        if (url.includes('/settings/notifications') && method === 'PUT') {
+          const body =
+            typeof init?.body === 'string'
+              ? (JSON.parse(init.body) as Record<string, unknown>)
+              : {};
+          return Promise.resolve(
+            jsonResponse({ preferences: { ...NOTIF_PREFS, ...body } }),
+          );
+        }
+        return Promise.reject(
+          new Error(`Unhandled fetch in test: ${method} ${url}`),
+        );
+      },
+    );
+
+    renderGuardianAsk();
+
+    await waitForPermissionCheck();
+    await advancePastPrimerDelay();
+
+    const buttons = mockAlert.mock.calls[0]![2] as Array<{
+      style?: string;
+      onPress?: () => void;
+    }>;
+    const allowButton = buttons.find((button) => button.style !== 'cancel');
+
+    await act(async () => {
+      allowButton?.onPress?.();
+      await Promise.resolve();
+    });
+
+    // The settings query is still pending (GET never resolved) — the sync
+    // must not have fired yet.
+    expect(findPutBody()).toBeUndefined();
+
+    await act(async () => {
+      resolveGet?.(jsonResponse({ preferences: NOTIF_PREFS }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(findPutBody()).toBeDefined();
+    });
+    expect(findPutBody()).toEqual({
+      reviewReminders: true,
+      dailyReminders: false,
+      weeklyProgressPush: false,
+      weeklyProgressEmail: true,
+      monthlyProgressEmail: false,
+      maxDailyPush: 5,
       pushEnabled: true,
     });
   });

@@ -32,9 +32,12 @@ export function useGuardianNotificationAsk(): void {
   // [WI-1441] Read via refs, not the effect's dependency array: the "Allow"
   // handler below is created once inside the effect closure, and neither
   // value should re-trigger/re-schedule the primer if it changes mid-flight.
-  const { data: notifPrefs } = useNotificationSettings();
-  const notifPrefsRef = useRef(notifPrefs);
-  notifPrefsRef.current = notifPrefs;
+  // The full query result (not just `.data`) is kept so a grant that lands
+  // before the settings query resolves can force a refetch instead of
+  // silently skipping the sync.
+  const notifQuery = useNotificationSettings();
+  const notifQueryRef = useRef(notifQuery);
+  notifQueryRef.current = notifQuery;
   const updateNotifications = useUpdateNotificationSettings();
   const updateNotificationsRef = useRef(updateNotifications);
   updateNotificationsRef.current = updateNotifications;
@@ -114,7 +117,24 @@ export function useGuardianNotificationAsk(): void {
                       // toggle) that grants OS permission, and without this the
                       // server default stays false forever, silently skipping
                       // every push-eligibility cron for this user.
-                      const prefs = notifPrefsRef.current;
+                      //
+                      // A grant landing before the settings query resolves
+                      // must not silently skip the sync — force a refetch so
+                      // the grant always eventually persists.
+                      let prefs = notifQueryRef.current.data;
+                      if (!prefs) {
+                        try {
+                          prefs = (await notifQueryRef.current.refetch()).data;
+                        } catch (refetchErr) {
+                          Sentry.addBreadcrumb({
+                            category: 'permissions',
+                            message:
+                              'guardian notif primer: prefs refetch before pushEnabled sync failed',
+                            level: 'warning',
+                            data: { error: String(refetchErr) },
+                          });
+                        }
+                      }
                       if (prefs) {
                         updateNotificationsRef.current.mutate(
                           {
@@ -123,6 +143,7 @@ export function useGuardianNotificationAsk(): void {
                             weeklyProgressPush: prefs.weeklyProgressPush,
                             weeklyProgressEmail: prefs.weeklyProgressEmail,
                             monthlyProgressEmail: prefs.monthlyProgressEmail,
+                            maxDailyPush: prefs.maxDailyPush,
                             pushEnabled: true,
                           },
                           {
@@ -137,6 +158,13 @@ export function useGuardianNotificationAsk(): void {
                             },
                           },
                         );
+                      } else {
+                        Sentry.addBreadcrumb({
+                          category: 'permissions',
+                          message:
+                            'guardian notif primer: pushEnabled sync skipped — notification prefs unavailable',
+                          level: 'warning',
+                        });
                       }
                     }
                   } catch (err) {

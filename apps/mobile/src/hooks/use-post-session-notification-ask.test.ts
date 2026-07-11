@@ -32,19 +32,27 @@ jest.mock(
 // the network via React Query and are unused here) and override only the two
 // hooks this file actually calls, so the mock is exercised as a targeted
 // override rather than a full-module replacement.
-let mockNotifPrefs:
-  | {
-      reviewReminders: boolean;
-      dailyReminders: boolean;
-      weeklyProgressPush: boolean;
-      weeklyProgressEmail: boolean;
-      monthlyProgressEmail: boolean;
-    }
-  | undefined;
+type MockNotifPrefs = {
+  reviewReminders: boolean;
+  dailyReminders: boolean;
+  weeklyProgressPush: boolean;
+  weeklyProgressEmail: boolean;
+  monthlyProgressEmail: boolean;
+  maxDailyPush: number;
+};
+let mockNotifPrefs: MockNotifPrefs | undefined;
 const mockUpdateMutate = jest.fn();
+// Reads mockNotifPrefs live (via closure) rather than snapshotting it at
+// mockResolvedValue-call time, so a test that reassigns mockNotifPrefs
+// mid-flow (e.g. simulating the query resolving after Allow is pressed)
+// is reflected on the next refetch() call.
+const mockRefetch = jest.fn(() => Promise.resolve({ data: mockNotifPrefs }));
 jest.mock('./use-settings', () => ({
   ...jest.requireActual('./use-settings'),
-  useNotificationSettings: () => ({ data: mockNotifPrefs }),
+  useNotificationSettings: () => ({
+    data: mockNotifPrefs,
+    refetch: mockRefetch,
+  }),
   useUpdateNotificationSettings: () => ({ mutate: mockUpdateMutate }),
 }));
 
@@ -67,7 +75,11 @@ beforeEach(() => {
     weeklyProgressPush: false,
     weeklyProgressEmail: true,
     monthlyProgressEmail: false,
+    maxDailyPush: 5,
   };
+  mockRefetch.mockImplementation(() =>
+    Promise.resolve({ data: mockNotifPrefs }),
+  );
 });
 
 afterEach(() => {
@@ -338,6 +350,66 @@ describe('usePostSessionNotificationAsk', () => {
           weeklyProgressPush: false,
           weeklyProgressEmail: true,
           monthlyProgressEmail: false,
+          maxDailyPush: 5,
+          pushEnabled: true,
+        },
+        expect.objectContaining({ onError: expect.any(Function) }),
+      );
+    });
+    // Prefs were already loaded — no refetch needed.
+    expect(mockRefetch).not.toHaveBeenCalled();
+  });
+
+  // [WI-1441 rework] Regression guard: a grant landing before the settings
+  // query has resolved must not silently skip the sync. Before this fix,
+  // `if (prefs)` guarded the mutate with no fallback, so a user who granted
+  // permission during the query's initial load never got pushEnabled synced.
+  it('syncs pushEnabled once notification prefs load, even if unavailable at grant time', async () => {
+    mockNotifPrefs = undefined;
+    const latePrefs: MockNotifPrefs = {
+      reviewReminders: false,
+      dailyReminders: true,
+      weeklyProgressPush: true,
+      weeklyProgressEmail: false,
+      monthlyProgressEmail: true,
+      maxDailyPush: 7,
+    };
+    mockRefetch.mockResolvedValueOnce({ data: latePrefs });
+
+    renderHook(() => usePostSessionNotificationAsk('p1', true, false));
+
+    await waitFor(() => {
+      expect(mockGetPerm).toHaveBeenCalled();
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+
+    expect(mockAlert).toHaveBeenCalledTimes(1);
+    const buttons = mockAlert.mock.calls[0]![2] as Array<{
+      style?: string;
+      onPress?: () => void;
+    }>;
+    const allowBtn = buttons.find((b) => b.style !== 'cancel');
+
+    await act(async () => {
+      allowBtn?.onPress?.();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockRefetch).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(mockUpdateMutate).toHaveBeenCalledWith(
+        {
+          reviewReminders: false,
+          dailyReminders: true,
+          weeklyProgressPush: true,
+          weeklyProgressEmail: false,
+          monthlyProgressEmail: true,
+          maxDailyPush: 7,
           pushEnabled: true,
         },
         expect.objectContaining({ onError: expect.any(Function) }),

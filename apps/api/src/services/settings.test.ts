@@ -197,7 +197,7 @@ describe('upsertNotificationPrefs', () => {
     expect(db.insert).not.toHaveBeenCalled();
   });
 
-  it('defaults maxDailyPush to 3 when not provided', async () => {
+  it('defaults maxDailyPush to 3 when not provided and no existing row', async () => {
     const db = createMockDb({ findFirstResult: undefined });
     const result = await upsertNotificationPrefs(
       db,
@@ -212,6 +212,41 @@ describe('upsertNotificationPrefs', () => {
     );
 
     expect(result.maxDailyPush).toBe(3);
+  });
+
+  // [WI-1441] Regression guard: maxDailyPush must fall back to the existing
+  // row's value when omitted, matching weeklyProgressPush/weeklyProgressEmail/
+  // monthlyProgressEmail immediately above it. Before this fix, an omitted
+  // maxDailyPush always defaulted straight to 3 with no existing-row
+  // fallback, so any caller that omits it (e.g. a notification-permission
+  // primer syncing only pushEnabled) silently reset a user's customized
+  // value. Uses 5 — deliberately not 3 — so the test cannot pass by
+  // coincidentally matching the default.
+  it('preserves an existing custom maxDailyPush when the update omits it', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        reviewReminders: true,
+        dailyReminders: true,
+        pushEnabled: false,
+        maxDailyPush: 5,
+        weeklyProgressPush: true,
+        weeklyProgressEmail: true,
+        monthlyProgressEmail: true,
+      },
+    });
+    const result = await upsertNotificationPrefs(
+      db,
+      profileId,
+      TEST_ACCOUNT_ID,
+      {
+        reviewReminders: true,
+        dailyReminders: true,
+        pushEnabled: true,
+      },
+      { callerPersonId: profileId },
+    );
+
+    expect(result.maxDailyPush).toBe(5);
   });
 
   // [BUG-661 / FCR-2026-05-23-L3.L3.2] Break test: defense-in-depth guard on
