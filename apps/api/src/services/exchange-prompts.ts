@@ -35,26 +35,7 @@ import { calculateAge } from './age-utils';
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Source-discipline / 0.88 confidence-gate restatements (WI-1796, Option C).
-//
-// The confidence-gate + source-discipline rule is deliberately restated at many
-// call sites, each phrased for its mode (teaching opener, review override,
-// first-turn rule, etc.). WI-1796 (structural-only consolidation) hoists each
-// INLINE restatement into a named constant so the family is greppable and drifts
-// less — WITHOUT changing the delivered prompt. Each constant reproduces its
-// original site text byte-for-byte and is spliced back at the exact position and
-// frequency, so the rendered prompt is identical to before (Tier-1 snapshot
-// equality is the gate; behavioral consolidation is deferred to WI-1812).
-//
-// Not hoisted, per the WI-1796 acceptance criteria: the two variants WI-1779
-// already isolated as their own dedicated functions — buildPrivateSourceContractBlock
-// and buildFinalGroundingCheckBlock — are already consolidated; leave them alone.
-// Every other inline restatement (including whole teaching blocks that carry the
-// gate as one clause, e.g. the LEARNING/freeform templates and the general
-// MentoMate teaching block) is hoisted as a WHOLE unit — never a sub-sentence
-// slice — so byte-identity is trivially preserved.
-// ---------------------------------------------------------------------------
+// Prompt rule constants: structural extraction only — rendered prompt text must stay byte-identical.
 
 // Fallback `general_knowledge` source-pack excerpt (buildSourcePackBlock).
 const GENERAL_KNOWLEDGE_SOURCE_EXCERPT =
