@@ -10,6 +10,15 @@ on:
     # Nightly run — smoke + nightly flows at 3 AM UTC
     - cron: '0 3 * * *'
   workflow_dispatch:
+    inputs:
+      maestro_suite:
+        description: Maestro suite to execute
+        required: true
+        default: nightly
+        type: choice
+        options:
+          - nightly
+          - pr
 
 # Cancel in-progress E2E runs when a new commit is pushed to the same PR.
 # Prevents wasting CI minutes on outdated commits.
@@ -192,7 +201,11 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON((github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.maestro_suite == 'nightly')) && '[1,2,3,4,5,6,7,8]' || '[1,2,3,4]') }}
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -462,12 +475,16 @@ jobs:
           script: bash apps/mobile/e2e/scripts/run-ci-maestro.sh
         env:
           API_URL: http://10.0.2.2:8787
-          MAESTRO_INCLUDE_TAGS: ${{ github.event_name == 'schedule' && 'smoke,nightly,pr-blocking' || github.event_name == 'workflow_dispatch' && 'smoke,nightly,pr-blocking' || 'smoke,pr-blocking' }}
+          CI_SEED_API_URL: http://localhost:8787
+          TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
+          MAESTRO_CI_SUITE: ${{ (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.maestro_suite == 'nightly')) && 'nightly' || 'pr' }}
+          MAESTRO_CI_SHARD: ${{ matrix.shard }}
+          E2E_SEED_SLOT: native-0${{ matrix.shard }}
 
       - name: Upload Maestro artifacts
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6
         with:
-          name: maestro-results
+          name: maestro-results-${{ matrix.shard }}
           path: maestro-screenshots/
           retention-days: 7

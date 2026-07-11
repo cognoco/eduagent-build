@@ -54,6 +54,7 @@ type Job = {
   name?: string;
   if?: unknown;
   needs?: unknown;
+  strategy?: Record<string, unknown>;
   steps?: Array<Record<string, unknown>>;
   'continue-on-error'?: unknown;
 };
@@ -335,12 +336,112 @@ describe('[WI-1651] e2e-ci.yml propagates Maestro failures', () => {
       rmSync(harness.root, { recursive: true, force: true });
     }
   });
+
+  it('does not launch Maestro when a seeded shard cannot be prepared', () => {
+    const harness = createMaestroHarness(0);
+
+    try {
+      const result = runCiMaestro(harness, {
+        MAESTRO_CI_SHARD: '2',
+        FAKE_CURL_EXIT: '31',
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(existsSync(harness.maestroMarker)).toBe(false);
+    } finally {
+      rmSync(harness.root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () => {
+  const workflow = loadWorkflow('e2e-ci.yml');
+  const jobs = workflow.jobs as Record<string, Job>;
+  const mobileMaestro = jobs['mobile-maestro']!;
+  const workspaceConfig = parseYaml(
+    readFileSync(join(repoRoot, 'apps/mobile/e2e/config.yaml'), 'utf8'),
+  ) as { flows?: string[] };
+
+  function loadPlan(suite: 'pr' | 'nightly') {
+    const result = spawnSync(
+      'node',
+      [
+        join(repoRoot, 'apps/mobile/e2e/scripts/ci-maestro-plan.mjs'),
+        '--suite',
+        suite,
+        '--all',
+        '--format',
+        'json',
+      ],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+
+    expect(result.status).toBe(0);
+    return JSON.parse(result.stdout) as Array<{
+      flow: string;
+      scenario: string | null;
+      shard: number;
+    }>;
+  }
+
+  it('declares recursive workspace discovery instead of the root-only default', () => {
+    expect(workspaceConfig.flows).toContain('flows/**');
+  });
+
+  it('uses a sharded suite plan instead of passing a root-only folder to Maestro', () => {
+    const runnerStep = mobileMaestro.steps?.find((step) =>
+      String(step.uses ?? '').startsWith(
+        'reactivecircus/android-emulator-runner@',
+      ),
+    );
+    const runnerEnv = (runnerStep?.env ?? {}) as Record<string, unknown>;
+    const strategy = (mobileMaestro.strategy ?? {}) as Record<string, unknown>;
+
+    expect(strategy.matrix).toBeDefined();
+    expect(runnerEnv.MAESTRO_CI_SUITE).toBeDefined();
+    expect(runnerEnv.MAESTRO_CI_SHARD).toBeDefined();
+    expect(runnerEnv.MAESTRO_INCLUDE_TAGS).toBeUndefined();
+
+    const runner = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/scripts/run-ci-maestro.sh'),
+      'utf8',
+    );
+    expect(runner).toContain('ci-maestro-plan.mjs');
+    expect(runner).not.toMatch(/maestro test apps\/mobile\/e2e\/flows\//);
+  });
+
+  it('keeps every pr-blocking flow in the explicit PR plan', () => {
+    const plan = loadPlan('pr');
+
+    expect(plan).toHaveLength(13);
+    expect(plan.map(({ flow }) => flow)).toContain(
+      'flows/account/more-tab-navigation.yaml',
+    );
+    expect(new Set(plan.map(({ flow }) => flow)).size).toBe(plan.length);
+  });
+
+  it('discovers the full scheduled tag set, including parent subdirectories', () => {
+    const plan = loadPlan('nightly');
+
+    expect(plan.length).toBeGreaterThan(100);
+    expect(plan.some(({ flow }) => flow.startsWith('flows/parent/'))).toBe(
+      true,
+    );
+    expect(plan.map(({ flow }) => flow)).not.toContain(
+      'flows/consent/consent-deny-confirmation.yaml',
+    );
+    expect(plan.map(({ flow }) => flow)).not.toContain(
+      'flows/edge/animated-splash.yaml',
+    );
+    expect(plan.every(({ shard }) => shard >= 1 && shard <= 8)).toBe(true);
+  });
 });
 
 type MaestroHarness = {
   root: string;
   binDir: string;
   outputDir: string;
+  maestroMarker: string;
   bashEnv: string;
   maestroExit: number;
 };
@@ -351,10 +452,15 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
   const outputDir = join(root, 'artifacts');
   const maestro = join(binDir, 'maestro');
   const adb = join(binDir, 'adb');
+  const curl = join(binDir, 'curl');
+  const maestroMarker = join(root, 'maestro-ran');
   const bashEnv = join(root, 'bash-env');
 
   mkdirSync(binDir, { recursive: true });
-  writeFileSync(maestro, '#!/usr/bin/env bash\nexit "$FAKE_MAESTRO_EXIT"\n');
+  writeFileSync(
+    maestro,
+    '#!/usr/bin/env bash\ntouch "$FAKE_MAESTRO_MARKER"\nexit "$FAKE_MAESTRO_EXIT"\n',
+  );
   writeFileSync(
     adb,
     [
@@ -366,14 +472,37 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
       '',
     ].join('\n'),
   );
+  writeFileSync(
+    curl,
+    [
+      '#!/usr/bin/env bash',
+      'if [ "${FAKE_CURL_EXIT:-0}" -ne 0 ]; then exit "$FAKE_CURL_EXIT"; fi',
+      'case "$*" in',
+      '  */v1/__test/seed*) printf \'{"email":"test@example.com","password":"pw","accountId":"account","profileId":"profile","ids":{}}\' ;;',
+      "  *) printf '{}' ;;",
+      'esac',
+      '',
+    ].join('\n'),
+  );
   writeFileSync(bashEnv, 'sleep() { :; }\n');
   chmodSync(maestro, 0o755);
   chmodSync(adb, 0o755);
+  chmodSync(curl, 0o755);
 
-  return { root, binDir, outputDir, bashEnv, maestroExit };
+  return {
+    root,
+    binDir,
+    outputDir,
+    maestroMarker,
+    bashEnv,
+    maestroExit,
+  };
 }
 
-function runCiMaestro(harness: MaestroHarness) {
+function runCiMaestro(
+  harness: MaestroHarness,
+  envOverrides: NodeJS.ProcessEnv = {},
+) {
   return spawnSync(
     'bash',
     [join(repoRoot, 'apps/mobile/e2e/scripts/run-ci-maestro.sh')],
@@ -385,8 +514,11 @@ function runCiMaestro(harness: MaestroHarness) {
         PATH: `${harness.binDir}:${process.env.PATH ?? ''}`,
         BASH_ENV: harness.bashEnv,
         FAKE_MAESTRO_EXIT: String(harness.maestroExit),
-        MAESTRO_INCLUDE_TAGS: 'smoke,pr-blocking',
+        FAKE_MAESTRO_MARKER: harness.maestroMarker,
+        MAESTRO_CI_SUITE: 'pr',
+        MAESTRO_CI_SHARD: '1',
         MAESTRO_OUTPUT_DIR: harness.outputDir,
+        ...envOverrides,
       },
     },
   );

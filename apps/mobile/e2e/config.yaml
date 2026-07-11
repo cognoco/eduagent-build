@@ -3,6 +3,11 @@
 
 appId: com.mentomate.app
 
+# Maestro only discovers root-level YAML by default. Keep the workspace
+# recursive; CI applies its own curated/sharded plan before invoking each flow.
+flows:
+  - 'flows/**'
+
 # Default timeout for element lookups (milliseconds).
 # Increased from Maestro default (5s) to handle Expo dev build startup.
 defaultTimeout: 10000
