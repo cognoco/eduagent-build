@@ -26,7 +26,17 @@
 // package and assert on structure. No fixtures, no mocks — the committed
 // workflow files are the system under test.
 
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 
@@ -45,6 +55,7 @@ type Job = {
   if?: unknown;
   needs?: unknown;
   steps?: Array<Record<string, unknown>>;
+  'continue-on-error'?: unknown;
 };
 
 /** Every shell script body across all steps of all jobs in a workflow. */
@@ -267,3 +278,116 @@ describe('[F-157] e2e-web.yml required smoke check is an honest pass-through', (
     expect(runSmoke.name).not.toBe(REQUIRED_CHECK_NAME);
   });
 });
+
+describe('[WI-1651] e2e-ci.yml propagates Maestro failures', () => {
+  const workflow = loadWorkflow('e2e-ci.yml');
+  const jobs = workflow.jobs as Record<string, Job>;
+  const mobileMaestro = jobs['mobile-maestro']!;
+  const runnerStep = mobileMaestro.steps?.find((step) =>
+    String(step.uses ?? '').startsWith(
+      'reactivecircus/android-emulator-runner@',
+    ),
+  );
+
+  it('runs one durable shell script and does not mask a failed runner step', () => {
+    const runnerWith = runnerStep?.with as Record<string, unknown> | undefined;
+
+    expect(runnerStep).toBeDefined();
+    expect(String(runnerWith?.script ?? '').trim()).toBe(
+      'bash apps/mobile/e2e/scripts/run-ci-maestro.sh',
+    );
+    expect(mobileMaestro['continue-on-error']).not.toBe(true);
+  });
+
+  it('returns the Maestro exit code and captures both failure artifacts', () => {
+    const harness = createMaestroHarness(23);
+
+    try {
+      const result = runCiMaestro(harness);
+
+      expect(result.status).toBe(23);
+      expect(
+        readFileSync(
+          join(harness.outputDir, 'failure-final-state.png'),
+          'utf8',
+        ),
+      ).toBe('fake-png');
+      expect(readFileSync(join(harness.outputDir, 'logcat.txt'), 'utf8')).toBe(
+        'fake-logcat',
+      );
+    } finally {
+      rmSync(harness.root, { recursive: true, force: true });
+    }
+  });
+
+  it('returns zero without creating failure artifacts when Maestro passes', () => {
+    const harness = createMaestroHarness(0);
+
+    try {
+      const result = runCiMaestro(harness);
+
+      expect(result.status).toBe(0);
+      expect(
+        existsSync(join(harness.outputDir, 'failure-final-state.png')),
+      ).toBe(false);
+      expect(existsSync(join(harness.outputDir, 'logcat.txt'))).toBe(false);
+    } finally {
+      rmSync(harness.root, { recursive: true, force: true });
+    }
+  });
+});
+
+type MaestroHarness = {
+  root: string;
+  binDir: string;
+  outputDir: string;
+  bashEnv: string;
+  maestroExit: number;
+};
+
+function createMaestroHarness(maestroExit: number): MaestroHarness {
+  const root = mkdtempSync(join(tmpdir(), 'wi-1651-maestro-'));
+  const binDir = join(root, 'bin');
+  const outputDir = join(root, 'artifacts');
+  const maestro = join(binDir, 'maestro');
+  const adb = join(binDir, 'adb');
+  const bashEnv = join(root, 'bash-env');
+
+  mkdirSync(binDir, { recursive: true });
+  writeFileSync(maestro, '#!/usr/bin/env bash\nexit "$FAKE_MAESTRO_EXIT"\n');
+  writeFileSync(
+    adb,
+    [
+      '#!/usr/bin/env bash',
+      'case "$*" in',
+      '  "exec-out screencap -p") printf fake-png ;;',
+      '  "logcat -d -t 500") printf fake-logcat ;;',
+      'esac',
+      '',
+    ].join('\n'),
+  );
+  writeFileSync(bashEnv, 'sleep() { :; }\n');
+  chmodSync(maestro, 0o755);
+  chmodSync(adb, 0o755);
+
+  return { root, binDir, outputDir, bashEnv, maestroExit };
+}
+
+function runCiMaestro(harness: MaestroHarness) {
+  return spawnSync(
+    'bash',
+    [join(repoRoot, 'apps/mobile/e2e/scripts/run-ci-maestro.sh')],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${harness.binDir}:${process.env.PATH ?? ''}`,
+        BASH_ENV: harness.bashEnv,
+        FAKE_MAESTRO_EXIT: String(harness.maestroExit),
+        MAESTRO_INCLUDE_TAGS: 'smoke,pr-blocking',
+        MAESTRO_OUTPUT_DIR: harness.outputDir,
+      },
+    },
+  );
+}
