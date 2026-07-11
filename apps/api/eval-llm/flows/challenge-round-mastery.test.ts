@@ -26,6 +26,10 @@ function inputFor(scenarioId: string): ChallengeMasteryInput {
 }
 
 describe('challenge-round-mastery — evaluateChallengeMastery', () => {
+  it('[WI-1789] participates in the aggregate envelope baseline', () => {
+    expect(challengeRoundMasteryFlow.emitsEnvelope).toBe(true);
+  });
+
   it('accepts a well-formed solid evaluation for a correct answer', () => {
     const input = inputFor('CRM01-solid');
     const issues = evaluateChallengeMastery(

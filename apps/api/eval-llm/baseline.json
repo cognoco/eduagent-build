@@ -1,50 +1,50 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-28T15:13:41.845Z",
+  "updatedAt": "2026-07-11T11:30:13.562Z",
   "flows": {
     "exchanges": {
-      "n": 102,
+      "n": 122,
       "rates": {
-        "envelopeOk": 0.9705882352941176,
-        "hasReply": 0.9705882352941176,
-        "replyHasLiteralEscape": 0.00980392156862745,
-        "partialProgress": 0.16666666666666666,
-        "needsDeepening": 0.0392156862745098,
-        "understandingCheck": 0.5980392156862745,
+        "envelopeOk": 1,
+        "hasReply": 1,
+        "replyHasLiteralEscape": 0,
+        "partialProgress": 0.19672131147540983,
+        "needsDeepening": 0.05737704918032787,
+        "understandingCheck": 0.5819672131147541,
         "readyToFinish": 0,
-        "notePromptShow": 0.00980392156862745,
-        "fluencyDrillActive": 0,
-        "confidenceLow": 0.12745098039215685
+        "notePromptShow": 0,
+        "fluencyDrillActive": 0.01639344262295082,
+        "confidenceLow": 0.09836065573770492
       }
     },
     "probes": {
       "n": 80,
       "rates": {
-        "envelopeOk": 1,
-        "hasReply": 1,
+        "envelopeOk": 0.9875,
+        "hasReply": 0.9875,
         "replyHasLiteralEscape": 0,
-        "partialProgress": 0.2125,
-        "needsDeepening": 0,
-        "understandingCheck": 0.725,
+        "partialProgress": 0.175,
+        "needsDeepening": 0.0125,
+        "understandingCheck": 0.5625,
         "readyToFinish": 0,
-        "notePromptShow": 0,
+        "notePromptShow": 0.0125,
         "fluencyDrillActive": 0,
-        "confidenceLow": 0.0875
+        "confidenceLow": 0.0375
       }
     },
     "safety-probes": {
-      "n": 44,
+      "n": 74,
       "rates": {
         "envelopeOk": 1,
         "hasReply": 1,
-        "replyHasLiteralEscape": 0.022727272727272728,
-        "partialProgress": 0.022727272727272728,
+        "replyHasLiteralEscape": 0,
+        "partialProgress": 0.02702702702702703,
         "needsDeepening": 0,
-        "understandingCheck": 0.5,
+        "understandingCheck": 0.44594594594594594,
         "readyToFinish": 0,
         "notePromptShow": 0,
         "fluencyDrillActive": 0,
-        "confidenceLow": 0.13636363636363635
+        "confidenceLow": 0.16216216216216217
       }
     },
     "language-quality": {
@@ -56,6 +56,21 @@
         "partialProgress": 0,
         "needsDeepening": 0,
         "understandingCheck": 1,
+        "readyToFinish": 0,
+        "notePromptShow": 0,
+        "fluencyDrillActive": 0,
+        "confidenceLow": 0
+      }
+    },
+    "challenge-round-mastery": {
+      "n": 3,
+      "rates": {
+        "envelopeOk": 1,
+        "hasReply": 1,
+        "replyHasLiteralEscape": 0,
+        "partialProgress": 0.3333333333333333,
+        "needsDeepening": 0,
+        "understandingCheck": 0.3333333333333333,
         "readyToFinish": 0,
         "notePromptShow": 0,
         "fluencyDrillActive": 0,
