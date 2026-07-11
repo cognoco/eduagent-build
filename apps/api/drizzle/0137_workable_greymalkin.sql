@@ -10,9 +10,12 @@ CREATE TABLE "billing_alerts" (
 	"email_status" text,
 	"email_failure_reason" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "billing_alerts_source_check" CHECK ("billing_alerts"."source" IN ('stripe', 'revenuecat', 'unknown')),
+	CONSTRAINT "billing_alerts_push_status_check" CHECK ("billing_alerts"."push_status" IS NULL OR "billing_alerts"."push_status" IN ('sent', 'failed')),
+	CONSTRAINT "billing_alerts_email_status_check" CHECK ("billing_alerts"."email_status" IS NULL OR "billing_alerts"."email_status" IN ('sent', 'failed'))
 );
 --> statement-breakpoint
 ALTER TABLE "billing_alerts" ADD CONSTRAINT "billing_alerts_subscription_id_subscription_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."subscription"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "billing_alerts_source_event_id_uq" ON "billing_alerts" USING btree ("source_event_id");--> statement-breakpoint
-CREATE INDEX "billing_alerts_subscription_created_idx" ON "billing_alerts" USING btree ("subscription_id","created_at");
+CREATE INDEX "billing_alerts_subscription_occurred_id_idx" ON "billing_alerts" USING btree ("subscription_id","occurred_at" DESC NULLS LAST,"id" DESC NULLS LAST);

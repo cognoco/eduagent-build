@@ -3944,7 +3944,8 @@
         "title": "El pago requiere atención",
         "cta": "Gestionar facturación",
         "currentAccess": "Tu acceso de pago sigue activo hasta el {{deadline}}.",
-        "freeFallback": "Tu cuenta está usando el acceso gratuito ahora. Actualiza el pago para restaurar tu plan."
+        "freeFallback": "Tu cuenta está usando el acceso gratuito ahora. Actualiza el pago para restaurar tu plan.",
+        "currentAccessNoDeadline": "Tu acceso de pago sigue activo."
       }
     },
     "ledger": {

@@ -1,5 +1,5 @@
 {
-  "id": "144a66eb-8533-4fb6-b393-e8b3bf0546dc",
+  "id": "c82beb56-d4af-45f2-8611-e7fe3ffb1e5f",
   "prevId": "2ce7e4c6-c008-4d96-8c83-c68f26a8cb21",
   "version": "7",
   "dialect": "postgresql",
@@ -1055,8 +1055,8 @@
           "method": "btree",
           "with": {}
         },
-        "billing_alerts_subscription_created_idx": {
-          "name": "billing_alerts_subscription_created_idx",
+        "billing_alerts_subscription_occurred_id_idx": {
+          "name": "billing_alerts_subscription_occurred_id_idx",
           "columns": [
             {
               "expression": "subscription_id",
@@ -1065,9 +1065,15 @@
               "nulls": "last"
             },
             {
-              "expression": "created_at",
+              "expression": "occurred_at",
               "isExpression": false,
-              "asc": true,
+              "asc": false,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": false,
               "nulls": "last"
             }
           ],
@@ -1091,7 +1097,20 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "billing_alerts_source_check": {
+          "name": "billing_alerts_source_check",
+          "value": "\"billing_alerts\".\"source\" IN ('stripe', 'revenuecat', 'unknown')"
+        },
+        "billing_alerts_push_status_check": {
+          "name": "billing_alerts_push_status_check",
+          "value": "\"billing_alerts\".\"push_status\" IS NULL OR \"billing_alerts\".\"push_status\" IN ('sent', 'failed')"
+        },
+        "billing_alerts_email_status_check": {
+          "name": "billing_alerts_email_status_check",
+          "value": "\"billing_alerts\".\"email_status\" IS NULL OR \"billing_alerts\".\"email_status\" IN ('sent', 'failed')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.byok_waitlist": {

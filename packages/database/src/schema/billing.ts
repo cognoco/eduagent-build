@@ -220,9 +220,22 @@ export const billingAlerts = pgTable(
   },
   (table) => [
     uniqueIndex('billing_alerts_source_event_id_uq').on(table.sourceEventId),
-    index('billing_alerts_subscription_created_idx').on(
+    index('billing_alerts_subscription_occurred_id_idx').on(
       table.subscriptionId,
-      table.createdAt,
+      table.occurredAt.desc(),
+      table.id.desc(),
+    ),
+    check(
+      'billing_alerts_source_check',
+      sql`${table.source} IN ('stripe', 'revenuecat', 'unknown')`,
+    ),
+    check(
+      'billing_alerts_push_status_check',
+      sql`${table.pushStatus} IS NULL OR ${table.pushStatus} IN ('sent', 'failed')`,
+    ),
+    check(
+      'billing_alerts_email_status_check',
+      sql`${table.emailStatus} IS NULL OR ${table.emailStatus} IN ('sent', 'failed')`,
     ),
   ],
 );

@@ -179,4 +179,36 @@ describe('NowCard', () => {
       }
     }
   });
+
+  it('keeps current-access copy when the billing deadline is invalid', () => {
+    const rendered = render(
+      <NowCard
+        card={card({
+          kind: 'billing_alert',
+          templateKey: 'now.billing_alert.payment_failed',
+          params: {
+            planTier: 'plus',
+            accessState: 'current',
+            deadlineAt: 'not-a-date',
+          },
+          deepLink: {
+            route: 'billing.manage',
+            params: {},
+            chain: ['settings.more', 'settings.account'],
+          },
+        })}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+      />,
+    );
+
+    expect(
+      rendered.getByText('Your paid access is still active.'),
+    ).toBeTruthy();
+    expect(
+      rendered.queryByText(
+        'Your account is using free access now. Update payment to restore your plan.',
+      ),
+    ).toBeNull();
+  });
 });

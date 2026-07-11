@@ -6,6 +6,7 @@ const mockPush = jest.fn();
 const mockSwitchProfile = jest.fn();
 let mockShowBilling = false;
 let mockPayerPersonId = '00000000-0000-7000-a000-000000000001';
+let mockParentProfile: { id: string } | null = { id: mockPayerPersonId };
 let mockActiveProfile = {
   id: '00000000-0000-7000-a000-000000000002',
   isOwner: false,
@@ -34,11 +35,17 @@ jest.mock(/* gc1-allow: route capability seam */ '../../../hooks/use-navigation-
   useNavigationContract: () => ({ gates: { showBilling: mockShowBilling } }),
 }));
 
+// prettier-ignore
+jest.mock(/* gc1-allow: canonical payer identity seam */ '../../../hooks/use-parent-proxy', () => ({
+  useParentProxy: () => ({ parentProfile: mockParentProfile }),
+}));
+
 describe('BillingManageLanding', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockShowBilling = false;
     mockPayerPersonId = '00000000-0000-7000-a000-000000000001';
+    mockParentProfile = { id: mockPayerPersonId };
     mockActiveProfile = {
       id: '00000000-0000-7000-a000-000000000002',
       isOwner: false,
@@ -86,7 +93,7 @@ describe('BillingManageLanding', () => {
   });
 
   it('routes to profile selection when the payer is not available on this account', async () => {
-    mockProfiles = [mockActiveProfile];
+    mockParentProfile = null;
 
     render(<BillingManageLanding />);
 
@@ -95,21 +102,23 @@ describe('BillingManageLanding', () => {
   });
 
   it('rejects an available non-owner id from a tampered billing link', async () => {
+    mockParentProfile = null;
     mockProfiles = [
       mockActiveProfile,
       { id: mockPayerPersonId, isOwner: false },
     ];
 
-    const rendered = render(<BillingManageLanding />);
+    render(<BillingManageLanding />);
 
-    await waitFor(() =>
-      expect(mockSwitchProfile).toHaveBeenCalledWith(mockPayerPersonId),
-    );
-    expect(mockReplace).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/profiles'));
+    expect(mockSwitchProfile).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
+  });
 
-    mockActiveProfile = { id: mockPayerPersonId, isOwner: false };
-    rendered.rerender(<BillingManageLanding />);
+  it('routes to profile selection when switching to the payer rejects', async () => {
+    mockSwitchProfile.mockRejectedValue(new Error('network unavailable'));
+
+    render(<BillingManageLanding />);
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/profiles'));
     expect(mockPush).not.toHaveBeenCalled();

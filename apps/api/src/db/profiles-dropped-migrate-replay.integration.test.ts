@@ -309,4 +309,48 @@ describe('migration-tail replay on a profiles-dropped database [WI-1167]', () =>
     );
     expect(profilesCheck.rows[0].reg).toBeNull();
   });
+
+  it('installs billing-alert checks and uses the latest-alert feed index', async () => {
+    const constraints = await scratchPool.query(
+      `SELECT conname
+       FROM pg_constraint
+       WHERE conrelid = 'billing_alerts'::regclass
+         AND conname = ANY($1::text[])
+       ORDER BY conname`,
+      [
+        [
+          'billing_alerts_email_status_check',
+          'billing_alerts_push_status_check',
+          'billing_alerts_source_check',
+        ],
+      ],
+    );
+    expect(constraints.rows).toEqual([
+      { conname: 'billing_alerts_email_status_check' },
+      { conname: 'billing_alerts_push_status_check' },
+      { conname: 'billing_alerts_source_check' },
+    ]);
+
+    const client = await scratchPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SET LOCAL enable_seqscan = off');
+      const explain = await client.query(
+        `EXPLAIN (COSTS OFF)
+         SELECT id
+         FROM billing_alerts
+         WHERE subscription_id = $1
+         ORDER BY occurred_at DESC, id DESC
+         LIMIT 1`,
+        ['00000000-0000-0000-0000-000000000000'],
+      );
+      const plan = explain.rows
+        .map((row: { 'QUERY PLAN': string }) => row['QUERY PLAN'])
+        .join('\n');
+      expect(plan).toContain('billing_alerts_subscription_occurred_id_idx');
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  });
 });

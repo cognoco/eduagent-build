@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
+import { useParentProxy } from '../../../hooks/use-parent-proxy';
 import { useProfile } from '../../../lib/profile';
 
 /**
@@ -17,7 +18,8 @@ export default function BillingManageLanding(): null {
   const payerPersonId = Array.isArray(rawPayerPersonId)
     ? rawPayerPersonId[0]
     : rawPayerPersonId;
-  const { activeProfile, profiles, switchProfile } = useProfile();
+  const { activeProfile, switchProfile } = useProfile();
+  const { parentProfile } = useParentProxy();
   const navigationContract = useNavigationContract();
   const seededRef = useRef(false);
 
@@ -25,8 +27,7 @@ export default function BillingManageLanding(): null {
     if (seededRef.current) return;
 
     const payerIsAvailable =
-      typeof payerPersonId === 'string' &&
-      profiles.some((profile) => profile.id === payerPersonId);
+      typeof payerPersonId === 'string' && parentProfile?.id === payerPersonId;
     if (!payerIsAvailable) {
       seededRef.current = true;
       router.replace('/profiles' as Href);
@@ -52,15 +53,20 @@ export default function BillingManageLanding(): null {
       return;
     }
 
-    void switchProfile(payerPersonId).then((result) => {
-      if (!result.success) {
-        if (!cancelled) {
-          seededRef.current = true;
-          router.replace('/profiles' as Href);
-        }
-        return;
+    const switchToPayer = async (): Promise<void> => {
+      try {
+        const result = await switchProfile(payerPersonId);
+        if (result.success) return;
+      } catch {
+        // Profile selection is the safe recovery surface for switch failures.
       }
-    });
+
+      if (!cancelled) {
+        seededRef.current = true;
+        router.replace('/profiles' as Href);
+      }
+    };
+    void switchToPayer();
 
     return () => {
       cancelled = true;
@@ -68,8 +74,8 @@ export default function BillingManageLanding(): null {
   }, [
     activeProfile?.id,
     navigationContract.gates.showBilling,
+    parentProfile?.id,
     payerPersonId,
-    profiles,
     router,
     switchProfile,
   ]);

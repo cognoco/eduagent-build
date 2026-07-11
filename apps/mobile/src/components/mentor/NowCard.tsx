@@ -138,10 +138,12 @@ export function NowCard({
       </Text>
       {isBillingAlert ? (
         <Text className="mt-2 text-sm text-text-secondary">
-          {card.params.accessState === 'current' && formattedDeadline
-            ? t('mentorHome.cards.billing_alert.currentAccess', {
-                deadline: formattedDeadline,
-              })
+          {card.params.accessState === 'current'
+            ? formattedDeadline
+              ? t('mentorHome.cards.billing_alert.currentAccess', {
+                  deadline: formattedDeadline,
+                })
+              : t('mentorHome.cards.billing_alert.currentAccessNoDeadline')
             : t('mentorHome.cards.billing_alert.freeFallback')}
         </Text>
       ) : null}

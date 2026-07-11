@@ -23,17 +23,20 @@ jest.mock(/* gc1-allow: service seam */ '../../services/billing/payment-failed-a
   }),
 );
 
-jest.mock('../../services/notifications', () => {
-  const actual = jest.requireActual(
-    '../../services/notifications',
-  ) as typeof import('../../services/notifications');
-  return {
-    ...actual,
-    sendPushNotification: (...args: unknown[]) =>
-      mockSendPushNotification(...args),
-    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-  };
-});
+jest.mock(
+  '../../services/notifications' /* gc1-allow: unit pins external send boundaries; real push/email is covered by payment-failed-alert.integration.test.ts */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendPushNotification: (...args: unknown[]) =>
+        mockSendPushNotification(...args),
+      sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+    };
+  },
+);
 
 jest.mock(/* gc1-allow: registration boundary */ '../client', () => ({
   inngest: {
@@ -52,13 +55,14 @@ const ALERT_ID = '00000000-0000-7000-a000-000000000012';
 
 async function runHandler(
   overrides: Record<string, unknown> = {},
-  eventId = 'stripe-payment-failed:evt-123',
+  eventId: string | undefined = 'stripe-payment-failed:evt-123',
+  omitEventId = false,
 ) {
   const runner = createInngestStepRunner();
   const handler = (paymentFailedObserve as any).fn;
   const result = await handler({
     event: {
-      id: eventId,
+      ...(!omitEventId ? { id: eventId } : {}),
       name: 'app/payment.failed',
       data: {
         subscriptionId: SUBSCRIPTION_ID,
@@ -234,5 +238,64 @@ describe('paymentFailedObserve', () => {
     expect(second.result).toMatchObject({ status: 'deduplicated' });
     expect(mockSendPushNotification).toHaveBeenCalledTimes(1);
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns schema_error without persistence for an invalid event payload', async () => {
+    const { result } = await runHandler({ subscriptionId: undefined });
+
+    expect(result).toEqual({ status: 'schema_error' });
+    expect(mockRecordPaymentFailedAlert).not.toHaveBeenCalled();
+  });
+
+  it('records and escalates no_email without calling the email provider', async () => {
+    mockGetBillingAlertDeliveryTarget.mockResolvedValue({
+      alertId: ALERT_ID,
+      subscriptionId: SUBSCRIPTION_ID,
+      payerPersonId: PAYER_PERSON_ID,
+      email: null,
+      pushStatus: null,
+      emailStatus: null,
+    });
+
+    const { result, sendEventCalls } = await runHandler();
+
+    expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockRecordBillingAlertDeliveryOutcome).toHaveBeenCalledWith(mockDb, {
+      alertId: ALERT_ID,
+      channel: 'email',
+      sent: false,
+      reason: 'no_email',
+    });
+    expect(result).toMatchObject({
+      status: 'processed',
+      email: { sent: false, reason: 'no_email' },
+    });
+    expect(sendEventCalls).toEqual([
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          name: 'app/billing.alert_delivery_failed',
+          data: expect.objectContaining({
+            channel: 'email',
+            reason: 'no_email',
+          }),
+        }),
+      }),
+    ]);
+  });
+
+  it('builds a deterministic unknown-source id when the event id is absent', async () => {
+    const { result } = await runHandler(
+      { source: undefined, stripeSubscriptionId: undefined },
+      undefined,
+      true,
+    );
+
+    expect(mockRecordPaymentFailedAlert).toHaveBeenCalledWith(mockDb, {
+      subscriptionId: SUBSCRIPTION_ID,
+      sourceEventId: `payment-failed:unknown:${SUBSCRIPTION_ID}:2026-07-11T10:00:00.000Z:2`,
+      source: 'unknown',
+      occurredAt: new Date('2026-07-11T10:00:00.000Z'),
+    });
+    expect(result).toMatchObject({ status: 'processed' });
   });
 });
