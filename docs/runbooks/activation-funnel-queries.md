@@ -13,7 +13,7 @@ authoritative column list. Summary:
 
 | Column | Notes |
 |---|---|
-| `profile_id` | **Nullable.** Set once a profile exists. **Interim contract (WI-1689):** `app_opened` and `signup_started` are gated client-side on an existing Clerk session (see `use-activation-launch-events.ts`, `sign-up.tsx`), so neither fires for a genuinely signed-out, pre-account visitor. `profile_id` can still be null on these two events during the narrow window between Clerk session creation and this app's own profile-row creation (mid-onboarding) — that's the only remaining null-`profile_id` case for client-sent events, not a raw pre-signup visitor. See the funnel-denominator caveat in the event inventory below and the follow-up work item WI-1803 (anonymous ingest). |
+| `profile_id` | **Nullable.** Set once a profile exists. **Interim contract (WI-1689):** `app_opened` and `signup_started` are gated client-side on an existing Clerk *auth session* (see `use-activation-launch-events.ts`, `sign-up.tsx`), so neither fires for a signed-out visitor with no Clerk session. That auth session is distinct from this app's own *account/profile graph*, which is created later, at `POST /profiles` (see `apps/api/src/routes/profiles.ts`) — both events can still fire in the window after the Clerk session starts but before that graph exists, so `profile_id` is null there. That's a post-Clerk/pre-app-account window, not a raw anonymous (no-session) visitor. See the funnel-denominator caveat in the event inventory below and the follow-up work item WI-1803 (anonymous ingest). |
 | `anonymous_id` | Client-generated device/anon id. Present on client-driven events; may also be forwarded on server-recorded events if the client sends it, to let pre- and post-signup rows for the same device be joined. |
 | `event_type` | One of the 10 launch-critical events below. Forward-only allow-list enforced by the `activation_events_event_type_known` CHECK constraint. |
 | `occurred_at` | When the event happened (client-reported for ingest-route events, server time for server-recorded events). |
@@ -27,8 +27,8 @@ authoritative column list. Summary:
 
 | Event | Launch-critical? | Recorded by | Notes |
 |---|---|---|---|
-| `app_opened` | Yes — funnel denominator | Client → `POST /activation-events` | Dedup: 1 row/device/UTC day. **Interim contract:** gated on an existing Clerk session, so it does not fire for a signed-out/pre-account app open — this is *not* a true "every cold launch" denominator until WI-1803 (anonymous ingest) lands. Pre-signup drop-off is not observable in this interim state. |
-| `signup_started` | Yes | Client → `POST /activation-events` | Fires when the signup flow begins (pre-account); `profile_id` is null. |
+| `app_opened` | Yes — funnel denominator | Client → `POST /activation-events` | Dedup: 1 row/device/UTC day. **Interim contract:** gated on an existing Clerk auth session, so it does not fire for a signed-out visitor with no session — this is *not* a true "every cold launch" denominator until WI-1803 (anonymous ingest) lands. Like `signup_started`, it can still fire before this app's own account/profile graph exists (`profile_id` null in that post-Clerk/pre-app-account window); pre-Clerk-session drop-off is not observable in this interim state. |
+| `signup_started` | Yes | Client → `POST /activation-events` | Fires once a Clerk auth session exists (not for a signed-out visitor), but before this app's own account/profile graph is created (`POST /profiles`); `profile_id` is therefore null from `signup_started` until that graph is bootstrapped, not because the visitor is anonymous. |
 | `signup_completed` | Yes | Server — `routes/profiles.ts`, at owner-graph creation (`createIdentityGraph`) | 1 row/profile ever (dedup on profile id). |
 | `onboarding_completed` | Yes | Client → `POST /activation-events` | **Deviation from the "server records what it can reach" default:** the API has no single terminal "onboarding complete" transition — `routes/onboarding.ts` only exposes independent PATCH steps (language / pronouns / interests), and the mobile client owns the onboarding wizard's completion state. Recorded via the ingest route instead. |
 | `first_subject_or_lesson_started` | Yes | Server — `routes/subjects.ts`, `POST /subjects` | 1 row/profile ever. |
@@ -40,7 +40,7 @@ authoritative column list. Summary:
 
 **Missing / malformed rows — how to interpret:**
 
-- `profile_id IS NULL` can still occur for `app_opened` and `signup_started` — the narrow window between Clerk session creation and this app's own profile-row creation (mid-onboarding). Do not treat as a bug. Under the interim session-gated contract (WI-1689), neither event fires for a genuinely signed-out, pre-account visitor at all: a user who never establishes a Clerk session produces zero activation-funnel rows, so pre-signup drop-off is not observable until WI-1803 (anonymous ingest) lands.
+- `profile_id IS NULL` is expected for `app_opened` and `signup_started` in the post-Clerk/pre-app-account window: a Clerk auth session already exists, but this app's own account/profile graph (`POST /profiles`) hasn't been created yet. Do not treat as a bug. Under the interim session-gated contract (WI-1689), neither event fires for a signed-out visitor with no Clerk session at all — that visitor produces zero activation-funnel rows, so pre-Clerk-session drop-off is not observable until WI-1803 (anonymous ingest) lands.
 - A gap in `first_session_started` → `first_session_completed` for a profile means the session was abandoned (not necessarily an instrumentation bug) — cross-check against `learning_sessions` before assuming a tracking miss.
 - All writes go through `safeWrite()` (`services/safe-non-core.ts`), so a write failure is captured in Sentry (surface tags: `*.first_session_started`, `*.first_session_completed`, `profiles.create.signup_completed`, `subjects.create.first_subject_or_lesson_started`, `activation-events.ingest`) but never breaks the user-facing request. **Under-counting is possible** (silent-by-design) — if a funnel step looks anomalously low, check Sentry for the matching surface tag before concluding it's a real drop-off.
 - `event_type` is a closed allow-list (DB CHECK) — a client sending an unrecognized value gets rejected at the schema layer (`activationEventIngestRequestSchema` in `@eduagent/schemas`) before it ever reaches the DB, so a malformed `event_type` should never appear as a row.
@@ -54,8 +54,11 @@ examples use a rolling 30-day window. Exclude non-production noise by adding
 
 ### 1. Signup completion (signup_started → signup_completed)
 
-Client-reported `signup_started` carries no `profile_id` (fires pre-account),
-so it can only be joined to `signup_completed` via `anonymous_id` IF the
+Client-reported `signup_started` carries no `profile_id` in the post-Clerk/
+pre-app-account window — a Clerk auth session already exists (see the schema
+table above; this is not a signed-out event), but this app's own account/
+profile graph hasn't been created yet — so it can only be joined to
+`signup_completed` via `anonymous_id` IF the
 client forwards the same `anonymous_id` on both calls. As of WI-1689 the
 mobile client generates and persists a device-scoped `anonymous_id` and sends
 it on every client-driven event (including `signup_started`), but
