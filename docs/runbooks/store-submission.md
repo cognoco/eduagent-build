@@ -4,10 +4,11 @@ Operator path for the Config-T production build and first store submissions. Thi
 
 ## Gate
 
-Do not merge the Config-T production flag change, materialize store credentials, trigger a production build, or submit to a store until **OPQ-37** records both:
+Do not merge the Config-T production flag change, materialize store credentials, trigger a production build, or submit to a store until **OPQ-37** records all three:
 
-1. the cross-lane M6 go-ahead for Config T; and
-2. approved Google Play and Apple submission credentials for the real store records.
+1. the product owner explicitly executes the V0-retirement ruling required by the mentor-is-the-app spec section 13 S6 gate, or cites the separate recorded ruling;
+2. the cross-lane M6 go-ahead for Config T; and
+3. approved Google Play and Apple submission credentials for the real store records.
 
 The committed Android profile targets **Play internal** testing. The iOS profile relies on EAS-managed App Store Connect credentials and targets TestFlight through the normal EAS submit path. No Apple identifier or private key belongs in `eas.json`.
 
@@ -20,7 +21,16 @@ doppler run -c prd -- pnpm mobile:submit:prepare
 git check-ignore apps/mobile/.eas-submit/google-play-service-account.json
 ```
 
-The materializer validates the credential shape, writes mode `0600`, and exits without writing when the value is missing or malformed. Never paste the JSON into a shell argument, `eas.json`, an environment file, a CI log, or a pull request.
+The materializer validates the credential shape, writes mode `0600`, and exits without writing when the value is missing or malformed. POSIX systems enforce that mode. Windows does not enforce POSIX read permissions, so the helper emits a warning; restrict the file to the current operator and inspect the resulting ACL before submission:
+
+```powershell
+$credentialPath = 'apps/mobile/.eas-submit/google-play-service-account.json'
+$principal = "$env:USERDOMAIN\$env:USERNAME"
+icacls $credentialPath /inheritance:r /grant:r "${principal}:(R,W)"
+icacls $credentialPath
+```
+
+Stop if any unapproved principal retains access. Never paste the JSON into a shell argument, `eas.json`, an environment file, a CI log, or a pull request.
 
 ## Preflight
 

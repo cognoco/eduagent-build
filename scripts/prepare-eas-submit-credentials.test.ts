@@ -4,6 +4,7 @@ import {
   GOOGLE_PLAY_SERVICE_ACCOUNT_ENV,
   materializeGooglePlayServiceAccount,
   parseGooglePlayServiceAccount,
+  warnIfPosixPermissionsUnsupported,
 } from './prepare-eas-submit-credentials';
 
 const repoRoot = process.cwd();
@@ -44,6 +45,8 @@ describe('WI-1341 production EAS submit contract', () => {
       'doppler run -c prd -- pnpm mobile:submit:prepare',
     );
     expect(runbook).toContain('OPQ-37');
+    expect(runbook).toContain('V0-retirement ruling');
+    expect(runbook).toContain('spec section 13 S6');
     expect(runbook).toContain('Play internal');
     expect(runbook).toContain('TestFlight');
     expect(runbook).toContain('--id <android-build-id>');
@@ -116,5 +119,22 @@ describe('Google Play service-account materialization', () => {
       ],
       ['chmodSync', 'C:/tmp/google-play-service-account.json', 0o600],
     ]);
+  });
+
+  it('warns Windows operators that POSIX mode bits do not enforce the ACL', () => {
+    const writes: string[] = [];
+    const stderr = { write: (message: string) => writes.push(message) };
+
+    expect(
+      warnIfPosixPermissionsUnsupported({ platform: 'win32', stderr }),
+    ).toBe(true);
+    expect(writes.join('')).toContain('Windows');
+    expect(writes.join('')).toContain('ACL');
+
+    writes.length = 0;
+    expect(
+      warnIfPosixPermissionsUnsupported({ platform: 'linux', stderr }),
+    ).toBe(false);
+    expect(writes).toEqual([]);
   });
 });

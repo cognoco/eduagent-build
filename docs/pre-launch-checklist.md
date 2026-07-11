@@ -85,7 +85,7 @@ Last updated: 2026-05-29
 
 - [ ] **EAS production build**
   - Build with `eas build --platform all --profile production`
-  - Confirm OPQ-37 authorizes the shared Config-T switch before merging or building
+  - Confirm OPQ-37 explicitly records the product-owned V0-retirement ruling required by the mentor-is-the-app spec section 13 S6 gate, plus the cross-lane Config-T go-ahead, before merging or building
   - Verify `pnpm check:mode-nav-flag-combo` reports production as Config T (V0 off, V1 on, V2 on)
   - Verify `EXPO_PUBLIC_API_URL` points to `https://api.mentomate.com`
   - Verify `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` is the live key

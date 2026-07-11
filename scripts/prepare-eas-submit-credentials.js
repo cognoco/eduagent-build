@@ -64,8 +64,23 @@ function materializeGooglePlayServiceAccount({
   return outputPath;
 }
 
+function warnIfPosixPermissionsUnsupported({
+  platform = process.platform,
+  stderr = process.stderr,
+} = {}) {
+  if (platform !== 'win32') {
+    return false;
+  }
+
+  stderr.write(
+    'Warning: Windows does not enforce POSIX mode 0600; apply and verify the credential file ACL per docs/runbooks/store-submission.md before submission.\n',
+  );
+  return true;
+}
+
 function main() {
   const outputPath = materializeGooglePlayServiceAccount();
+  warnIfPosixPermissionsUnsupported();
   process.stdout.write(
     `Prepared ignored Google Play submit credential at ${path.relative(
       process.cwd(),
@@ -90,4 +105,5 @@ module.exports = {
   GOOGLE_PLAY_SERVICE_ACCOUNT_ENV,
   materializeGooglePlayServiceAccount,
   parseGooglePlayServiceAccount,
+  warnIfPosixPermissionsUnsupported,
 };
