@@ -42,22 +42,20 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
 
-jest.mock(
-  '../components/common/MentorBirthAnimation' /* gc1-allow: targeted render-fault injection verifies the ready screen's local crash boundary */,
-  () => ({
-    MentorBirthAnimation: ({ readyLabel }: { readyLabel: string }) => {
-      if (mockMentorBirthShouldThrow) {
-        throw new Error('mentor birth render failed');
-      }
-      const { Text, View } = require('react-native');
-      return (
-        <View testID="mentor-birth-animation">
-          <Text>{readyLabel}</Text>
-        </View>
-      );
-    },
-  }),
-);
+jest.mock('../components/common/MentorBirthAnimation', () => ({
+  ...jest.requireActual('../components/common/MentorBirthAnimation'),
+  MentorBirthAnimation: ({ readyLabel }: { readyLabel: string }) => {
+    if (mockMentorBirthShouldThrow) {
+      throw new Error('mentor birth render failed');
+    }
+    const { Text, View } = require('react-native');
+    return (
+      <View testID="mentor-birth-animation">
+        <Text>{readyLabel}</Text>
+      </View>
+    );
+  },
+}));
 
 describe('ReadyScreen', () => {
   afterEach(() => {
