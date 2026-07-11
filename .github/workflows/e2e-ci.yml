@@ -335,7 +335,7 @@ jobs:
         if: steps.apk-cache.outputs.cache-hit != 'true'
         run: |
           for attempt in 1 2 3; do
-            if sdkmanager --install "ndk;27.1.12297006" "ndk;27.0.12077973"; then
+            if "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006" "ndk;27.0.12077973"; then
               exit 0
             fi
             echo "::warning::NDK install attempt ${attempt}/3 failed"

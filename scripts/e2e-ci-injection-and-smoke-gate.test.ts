@@ -447,7 +447,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
     expect(String(ndkStep?.run)).toContain('for attempt in 1 2 3');
     expect(String(ndkStep?.run)).toContain(
-      'sdkmanager --install "ndk;27.1.12297006"',
+      '"$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006"',
     );
     expect(String(ndkStep?.run)).toContain('"ndk;27.0.12077973"');
     expect(manualBundleStep?.if).toBe(
