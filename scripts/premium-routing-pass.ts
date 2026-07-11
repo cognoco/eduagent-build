@@ -111,6 +111,7 @@ interface RegisteredKeys {
   openai: boolean;
   anthropic: boolean;
   cerebras: boolean;
+  mistral: boolean;
 }
 
 const HARD_TOPIC = {
@@ -288,6 +289,7 @@ function registerLiveProviders(): RegisteredKeys {
     openai: Boolean(openaiKey),
     anthropic: Boolean(anthropicKey),
     cerebras: Boolean(cerebrasKey),
+    mistral: Boolean(mistralKey),
   };
 }
 
@@ -1001,6 +1003,16 @@ function renderMarkdown(results: CaseResult[]): string {
 
 async function main(): Promise<void> {
   logLlmRoutingMode();
+  // Legacy routing expectations are retired from this gate — its cases
+  // (withV2RoutingMatrix) assert the V2 primary-model matrix only. Running
+  // this pass with the flag off would compare live results against V2
+  // expectations under legacy routing, which is guaranteed-wrong and pure
+  // debugging waste — fail fast instead.
+  if (!isLlmRoutingV2Enabled(process.env['LLM_ROUTING_V2_ENABLED'])) {
+    throw new Error(
+      'premium-routing-pass expects V2 routing only. Set LLM_ROUTING_V2_ENABLED=true before running this gate.',
+    );
+  }
   if (hasFlag('--help')) {
     console.log(
       [
