@@ -123,6 +123,7 @@ import {
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
 import { safeSend, safeWrite } from '../safe-non-core';
+import * as learningTextGuard from '../persisted-learning-text-guard';
 import {
   buildResumeContext,
   loadPriorSessionMeta,
@@ -898,7 +899,10 @@ async function persistChallengeRoundReviewTargets(
         await txDb
           .update(needsDeepeningTopics)
           .set({
-            misconception: target.misconception,
+            misconception:
+              learningTextGuard.scrubClinicalInferenceFromLearningRecord(
+                target.misconception,
+              ),
             correction: target.correction,
             ...(existing.status === 'pending_review'
               ? { pendingExpiresAt }
@@ -922,7 +926,10 @@ async function persistChallengeRoundReviewTargets(
         status: 'pending_review',
         source: 'challenge_round',
         concept: target.concept,
-        misconception: target.misconception,
+        misconception:
+          learningTextGuard.scrubClinicalInferenceFromLearningRecord(
+            target.misconception,
+          ),
         correction: target.correction,
         pendingExpiresAt,
         updatedAt: now,

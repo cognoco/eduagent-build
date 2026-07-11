@@ -44,6 +44,7 @@ import {
   requireCallerPersonId,
   type IdentityV2Opts,
 } from './identity-v2/identity-v2-opts';
+import * as learningTextGuard from './persisted-learning-text-guard';
 
 export type { IdentityV2Opts };
 
@@ -1302,6 +1303,78 @@ function mergeProfileState(
   } as LearningProfileRow;
 }
 
+function isSafePersistedLearningText(value: string | null): boolean {
+  return (
+    value === null ||
+    learningTextGuard.scrubClinicalInferenceFromLearningRecord(value) !== null
+  );
+}
+
+/**
+ * Scrub every free-text JSONB field written by session analysis before the
+ * learning_profiles update and before the same state is mapped to memory facts.
+ */
+function sanitizeAnalysisProfileProjection(
+  profile: LearningProfileRow,
+): Record<string, unknown> {
+  const interests = asStringArray(profile.interests).filter((interest) =>
+    isSafePersistedLearningText(interest),
+  );
+  const interestKeys = new Set(interests.map(normalizeMemoryValue));
+  const interestTimestamps = Object.fromEntries(
+    Object.entries(asInterestTimestampMap(profile.interestTimestamps)).filter(
+      ([key]) => interestKeys.has(normalizeMemoryValue(key)),
+    ),
+  );
+
+  const strengths = asStrengthArray(profile.strengths)
+    .filter((entry) => isSafePersistedLearningText(entry.subject))
+    .map((entry) => ({
+      ...entry,
+      topics: entry.topics.filter((topic) =>
+        isSafePersistedLearningText(topic),
+      ),
+    }))
+    .filter((entry) => entry.topics.length > 0);
+
+  const struggles = asStruggleArray(profile.struggles).filter(
+    (entry) =>
+      isSafePersistedLearningText(entry.subject) &&
+      isSafePersistedLearningText(entry.topic),
+  );
+
+  const communicationNotes = asStringArray(profile.communicationNotes).filter(
+    (note) => isSafePersistedLearningText(note),
+  );
+
+  const recentlyResolvedTopics = Array.isArray(profile.recentlyResolvedTopics)
+    ? profile.recentlyResolvedTopics.filter((entry) => {
+        if (typeof entry === 'string') {
+          return isSafePersistedLearningText(entry);
+        }
+        if (!entry || typeof entry !== 'object') return false;
+        const topic = Reflect.get(entry, 'topic');
+        const subject = Reflect.get(entry, 'subject');
+        return (
+          typeof topic === 'string' &&
+          isSafePersistedLearningText(topic) &&
+          (subject === null ||
+            (typeof subject === 'string' &&
+              isSafePersistedLearningText(subject)))
+        );
+      })
+    : [];
+
+  return {
+    interests,
+    interestTimestamps,
+    strengths,
+    struggles,
+    communicationNotes,
+    recentlyResolvedTopics,
+  };
+}
+
 /**
  * Server-side only — called exclusively from Inngest session-completed pipeline.
  * The profileId originates from a trusted DB-sourced session row, not user input.
@@ -1372,19 +1445,30 @@ export async function applyAnalysis(
       }
 
       const mergedState = mergeProfileState(profile, updates);
+      const safeProjection = sanitizeAnalysisProfileProjection(mergedState);
+      const safeMergedState = {
+        ...mergedState,
+        ...safeProjection,
+      } as LearningProfileRow;
+      const safeNotifications = notifications.filter(
+        (notification) =>
+          isSafePersistedLearningText(notification.topic) &&
+          isSafePersistedLearningText(notification.subject),
+      );
       await tx
         .update(learningProfiles)
         .set({
           ...updates,
+          ...safeProjection,
           version: sql`${learningProfiles.version} + 1`,
           updatedAt: new Date(),
         })
         .where(eq(learningProfiles.profileId, profileId));
-      await writeMemoryFactsForAnalysis(tx, profileId, mergedState);
+      await writeMemoryFactsForAnalysis(tx, profileId, safeMergedState);
 
       return {
         finalFieldsUpdated: fieldsUpdated,
-        finalNotifications: notifications,
+        finalNotifications: safeNotifications,
       };
     },
   );

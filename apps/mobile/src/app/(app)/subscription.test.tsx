@@ -70,6 +70,24 @@ jest.mock(
   }),
 );
 
+const mockSentryCaptureException = jest.fn();
+jest.mock(
+  '../../lib/sentry' /* gc1-allow: external observability boundary — the native Sentry transport cannot run in Jest */,
+  () => {
+    const actual = jest.requireActual(
+      '../../lib/sentry',
+    ) as typeof import('../../lib/sentry');
+    return {
+      ...actual,
+      Sentry: {
+        ...actual.Sentry,
+        captureException: (...args: unknown[]) =>
+          mockSentryCaptureException(...args),
+      },
+    };
+  },
+);
+
 // ---------------------------------------------------------------------------
 // Fetch-boundary mock (replaces hook-level mocks for use-subscription,
 // use-settings, use-streaks)
@@ -1871,6 +1889,95 @@ describe('SubscriptionScreen', () => {
       fireEvent.press(screen.getByTestId('browse-library-button'));
       expect(mockPush).toHaveBeenCalledWith('/(app)/library');
     });
+
+    it.each([
+      {
+        mode: 'subscription',
+        endpoint: '/settings/notify-parent-subscribe',
+        action: 'notify_parent_subscription',
+      },
+      {
+        mode: 'quota',
+        endpoint: '/notifications/child-cap/notify-parent',
+        action: 'notify_parent_quota',
+      },
+    ])(
+      '[WI-1399] escalates rejected $mode notifications while preserving the alert',
+      async ({ mode, endpoint, action }) => {
+        if (mode === 'quota') {
+          mockFetch.setRoute(
+            '/subscription',
+            () =>
+              new Response(
+                JSON.stringify({
+                  subscription: makeSubscription({ status: 'active' }),
+                }),
+                {
+                  status: 200,
+                  headers: { 'Content-Type': 'application/json' },
+                },
+              ),
+          );
+          mockFetch.setRoute(
+            '/usage',
+            () =>
+              new Response(
+                JSON.stringify({
+                  usage: {
+                    ...DEFAULT_USAGE,
+                    warningLevel: 'exceeded',
+                    dailyRemainingQuestions: 0,
+                    resetsAt: '2026-06-01T00:00:00.000Z',
+                  },
+                }),
+                {
+                  status: 200,
+                  headers: { 'Content-Type': 'application/json' },
+                },
+              ),
+          );
+        }
+        mockFetch.setRoute(
+          endpoint,
+          () =>
+            new Response(
+              JSON.stringify({
+                code: 'UPSTREAM_ERROR',
+                message: 'Notification delivery unavailable',
+              }),
+              {
+                status: 502,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
+        );
+
+        render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+        await waitFor(() => {
+          screen.getByTestId('child-paywall');
+        });
+        fireEvent.press(screen.getByTestId('notify-parent-button'));
+
+        await waitFor(() => {
+          expect(mockSentryCaptureException).toHaveBeenCalledWith(
+            expect.any(Error),
+            {
+              tags: {
+                component: 'ChildPaywall',
+                action,
+              },
+            },
+          );
+        });
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'Could not send notification',
+          'Please check your connection and try again.',
+          undefined,
+          undefined,
+        );
+      },
+    );
 
     it('shows "great start" text when child has no XP data', async () => {
       mockFetch.setRoute(

@@ -780,6 +780,7 @@
       "retryLabel": "Tentar a fala novamente"
     },
     "chatShell": {
+      "aiDisclosure": "Você está falando com um mentor de IA",
       "defaultSubtitle": "Estou aqui para ajudar",
       "defaultPlaceholder": "Digite uma mensagem...",
       "imageUnavailable": "Imagem não está mais disponível",

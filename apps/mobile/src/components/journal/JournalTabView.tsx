@@ -119,43 +119,6 @@ function renderMilestoneMomentText(card: NowCard, t: TFunction): string {
   }
 }
 
-function renderRewardMomentText(card: NowCard, t: TFunction): string {
-  const receiptKind = stringParam(card.params, 'receiptKind');
-  switch (receiptKind) {
-    case 'practice_points': {
-      const amount = numberParam(card.params, 'amount');
-      const topicTitle = stringParam(card.params, 'topicTitle');
-      if (amount == null) break;
-      return topicTitle
-        ? t('mentorHome.rewards.practicePoints', { amount, topicTitle })
-        : t('mentorHome.rewards.practicePointsNoTopic', { amount });
-    }
-    case 'reflection_bonus': {
-      const multiplier = numberParam(card.params, 'multiplier');
-      const totalXp = numberParam(card.params, 'totalXp');
-      if (multiplier == null || totalXp == null) break;
-      return t('mentorHome.rewards.reflectionBonus', { multiplier, totalXp });
-    }
-    case 'quiz_personal_best': {
-      const game = stringParam(card.params, 'game');
-      const score = numberParam(card.params, 'score');
-      if (score == null) break;
-      return game === 'guess_who'
-        ? t('mentorHome.rewards.quizPersonalBestGuessWho', { score })
-        : t('mentorHome.rewards.quizPersonalBestCapitals', { score });
-    }
-    case 'mastery_delta': {
-      const mastered = numberParam(card.params, 'mastered');
-      const weeklyDelta = numberParam(card.params, 'weeklyDelta');
-      if (mastered == null) break;
-      return weeklyDelta != null
-        ? t('mentorHome.rewards.masteryDelta', { mastered, weeklyDelta })
-        : t('mentorHome.rewards.masteryDeltaNoWeekly', { mastered });
-    }
-  }
-  return t('journal.moments.generic', card.params);
-}
-
 function renderLedgerMomentText(card: NowCard, t: TFunction): string {
   switch (ledgerCopyKey(card)) {
     case 'journal.moments.session_filed':
@@ -168,8 +131,6 @@ function renderLedgerMomentText(card: NowCard, t: TFunction): string {
       return t('journal.moments.snapshot_ready', card.params);
     case 'journal.moments.milestone_reached':
       return renderMilestoneMomentText(card, t);
-    case 'journal.moments.reward_receipt':
-      return renderRewardMomentText(card, t);
     case 'journal.moments.reflection_bonus':
       return t('journal.moments.reflection_bonus', card.params);
     case 'journal.moments.quiz_personal_best':

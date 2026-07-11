@@ -9,6 +9,7 @@ import {
   type StrengthEntry,
   type FocusAreaEntry,
 } from '@eduagent/schemas';
+import * as learningTextGuard from '../persisted-learning-text-guard';
 
 export type MemoryFactCategory =
   | 'strength'
@@ -229,6 +230,12 @@ export function dedupeMemoryFactRows(
 ): MemoryFactInsert[] {
   const byIdentity = new Map<string, MemoryFactInsert>();
   for (const row of rows) {
+    if (
+      learningTextGuard.scrubClinicalInferenceFromLearningRecord(row.text) ===
+      null
+    ) {
+      continue;
+    }
     byIdentity.set(memoryFactIdentityKey(row), row);
   }
   return [...byIdentity.values()];

@@ -54,4 +54,26 @@ describe('memory facts backfill mapping', () => {
       }),
     );
   });
+
+  it('[WI-1195] drops clinical characterisations while retaining educational observations', () => {
+    const result = buildBackfillRowsForProfile({
+      profileId: '018f8f3e-0000-7000-8000-000000000001',
+      strengths: [],
+      struggles: [],
+      interests: [],
+      communicationNotes: [
+        'The learner shows signs of dyslexia.',
+        'ADHD can affect executive function.',
+        'The learner responds well to worked examples.',
+      ],
+      suppressedInferences: [],
+      interestTimestamps: {},
+      createdAt: new Date('2026-05-01T00:00:00.000Z'),
+    });
+
+    expect(result.rows.map((row) => row.text)).toEqual([
+      'ADHD can affect executive function.',
+      'The learner responds well to worked examples.',
+    ]);
+  });
 });

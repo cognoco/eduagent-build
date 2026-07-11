@@ -780,6 +780,7 @@
       "retryLabel": "Retry speaking attempt"
     },
     "chatShell": {
+      "aiDisclosure": "You're talking to an AI mentor",
       "defaultSubtitle": "I'm here to help",
       "defaultPlaceholder": "Type a message...",
       "imageUnavailable": "Image no longer available",

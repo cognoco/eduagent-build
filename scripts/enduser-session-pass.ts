@@ -29,7 +29,9 @@ import {
   createGeminiProvider,
   createOpenAIProvider,
   registerProvider,
+  setLlmRoutingV2Enabled,
 } from '../apps/api/src/services/llm/index';
+import { isLlmRoutingV2Enabled } from '../apps/api/src/config';
 import {
   resetDatabase,
   seedScenario,
@@ -404,6 +406,20 @@ function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is required`);
   return value;
+}
+
+// Thread the V2 routing cutover flag into the pure router module the same
+// way production does (apps/api/src/middleware/llm.ts) — there is no HTTP
+// middleware in script context to do this per-request, so a staging gate run
+// with LLM_ROUTING_V2_ENABLED=true actually exercises V2 routing instead of
+// silently validating the legacy path. Logged so a run's output is
+// self-evidencing about which path it validated.
+function logLlmRoutingMode(): void {
+  const v2Enabled = isLlmRoutingV2Enabled(
+    process.env['LLM_ROUTING_V2_ENABLED'],
+  );
+  setLlmRoutingV2Enabled(v2Enabled);
+  console.log(`LLM routing: ${v2Enabled ? 'v2' : 'legacy'}`);
 }
 
 function registerLiveProviders(): void {
@@ -1636,6 +1652,7 @@ function renderQualityMarkdown(
 }
 
 async function main(): Promise<void> {
+  logLlmRoutingMode();
   if (
     process.argv.includes('--list-modes') ||
     process.argv.includes('--help')
