@@ -390,7 +390,7 @@ describe('getRecapForParent — verified-proof enrichment', () => {
 
   function proofDb(noteCreatedAt = new Date()): Database {
     return fakeProofDb(
-      new Map([
+      new Map<unknown, unknown[]>([
         [sessionSummaries, []],
         [
           assessments,
@@ -451,7 +451,7 @@ describe('getRecapForParent — verified-proof enrichment', () => {
 
   it('leaves verified proof null and preserves the recap when no verified assessment exists', async () => {
     const noProofDb = fakeProofDb(
-      new Map([
+      new Map<unknown, unknown[]>([
         [sessionSummaries, []],
         [assessments, []],
       ]),

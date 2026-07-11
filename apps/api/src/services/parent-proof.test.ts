@@ -69,7 +69,7 @@ function retentionRows(): unknown[] {
 describe('getVerifiedProofForSessionTopic', () => {
   it('returns a marked kept note with verification, retention, and next-review state', async () => {
     const db = fakeDbByTable(
-      new Map([
+      new Map<unknown, unknown[]>([
         [assessments, verifiedAssessmentRows()],
         [
           topicNotes,
@@ -102,7 +102,7 @@ describe('getVerifiedProofForSessionTopic', () => {
   });
 
   it('returns no proof when no verified assessment exists', async () => {
-    const db = fakeDbByTable(new Map([[assessments, []]]));
+    const db = fakeDbByTable(new Map<unknown, unknown[]>([[assessments, []]]));
 
     await expect(
       getVerifiedProofForSessionTopic(db, PROFILE_ID, SESSION_ID, TOPIC_ID),
@@ -113,7 +113,7 @@ describe('getVerifiedProofForSessionTopic', () => {
     const agedCreatedAt = new Date();
     agedCreatedAt.setUTCDate(agedCreatedAt.getUTCDate() - 31);
     const db = fakeDbByTable(
-      new Map([
+      new Map<unknown, unknown[]>([
         [assessments, verifiedAssessmentRows()],
         [topicNotes, [{ content: 'An aged quote.', createdAt: agedCreatedAt }]],
         [needsDeepeningTopics, []],
