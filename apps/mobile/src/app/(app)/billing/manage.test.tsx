@@ -101,12 +101,8 @@ describe('BillingManageLanding', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('rejects an available non-owner id from a tampered billing link', async () => {
-    mockParentProfile = null;
-    mockProfiles = [
-      mockActiveProfile,
-      { id: mockPayerPersonId, isOwner: false },
-    ];
+  it('rejects a tampered payer id that does not match the canonical owner', async () => {
+    mockParentProfile = { id: '00000000-0000-7000-a000-000000000003' };
 
     render(<BillingManageLanding />);
 
