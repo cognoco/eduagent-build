@@ -19,17 +19,14 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, push: mockPush }),
 }));
 
-jest.mock(
-  /* gc1-allow: route test pins profile states; ProfileProvider switching is covered by lib/profile.test.tsx */
-  '../../../lib/profile',
-  () => ({
-    useProfile: () => ({
-      activeProfile: mockActiveProfile,
-      profiles: mockProfiles,
-      switchProfile: mockSwitchProfile,
-    }),
+// prettier-ignore
+jest.mock(/* gc1-allow: profile seam */ '../../../lib/profile', () => ({
+  useProfile: () => ({
+    activeProfile: mockActiveProfile,
+    profiles: mockProfiles,
+    switchProfile: mockSwitchProfile,
   }),
-);
+}));
 
 describe('BillingManageLanding', () => {
   beforeEach(() => {

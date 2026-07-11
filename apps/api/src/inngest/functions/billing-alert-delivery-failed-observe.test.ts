@@ -2,17 +2,13 @@ const consoleErrorSpy = jest
   .spyOn(console, 'error')
   .mockImplementation(() => undefined);
 
-jest.mock(
-  /* gc1-allow: observer unit test exposes Inngest trigger metadata; registry guards verify production registration */
-  '../client',
-  () => ({
-    inngest: {
-      createFunction: jest.fn((opts: unknown, trigger: unknown, fn: unknown) =>
-        Object.assign(fn as object, { opts, trigger, fn }),
-      ),
-    },
-  }),
-);
+jest.mock(/* gc1-allow: observer boundary */ '../client', () => ({
+  inngest: {
+    createFunction: jest.fn((opts: unknown, trigger: unknown, fn: unknown) =>
+      Object.assign(fn as object, { opts, trigger, fn }),
+    ),
+  },
+}));
 
 import * as sentryService from '../../services/sentry';
 import { billingAlertDeliveryFailedObserve } from './billing-alert-delivery-failed-observe';
