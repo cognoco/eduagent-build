@@ -16,8 +16,30 @@ const BASH =
     ? 'C:\\Program Files\\Git\\bin\\bash.exe'
     : 'bash';
 
+/**
+ * Clones the given base env (default: process.env) with every GIT_* key
+ * stripped. Prevents an ambient GIT_DIR (e.g. exported by husky during
+ * pre-push -> nx -> jest) from leaking into these child git/bash processes
+ * and redirecting them at the ambient repo instead of the mkdtemp fixture
+ * passed as `cwd` (WI-1345 sweep). Same pattern as
+ * scripts/check-merge-invariant.test.ts's childGitEnv().
+ */
+function childGitEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...base };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GIT_')) {
+      delete env[key];
+    }
+  }
+  return env;
+}
+
 function git(repo: string, args: string[]): void {
-  execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+  execFileSync('git', args, {
+    cwd: repo,
+    stdio: 'ignore',
+    env: childGitEnv(),
+  });
 }
 
 function runChangeClass(
@@ -36,6 +58,7 @@ function runChangeClass(
   return execFileSync(BASH, ['-c', command], {
     cwd: repo,
     ...options,
+    env: childGitEnv(options.env),
   });
 }
 
@@ -403,5 +426,63 @@ describe('check-change-class.sh', () => {
     expect(command).toContain('jest --config jest.config.cjs');
     expect(command).toContain('**/src/**/*.test.ts');
     expect(command).toContain('\\.integration\\.test\\.ts$');
+  });
+
+  // WI-1345 sweep: this file's git()/runChangeClass() spawn real git/bash
+  // processes against a mkdtemp fixture repo. Confirm an ambient GIT_DIR
+  // leak (as husky exports during pre-push -> nx -> jest) does not redirect
+  // those writes at the ambient repo. Uses only disposable mkdtemp fixtures,
+  // never the real worktree or shared checkout.
+  it('does not mutate an ambient repo when GIT_DIR leaks into the env', () => {
+    const ambientRepo = mkdtempSync(join(tmpdir(), 'wi1345-ambient-ccc-'));
+    try {
+      git(ambientRepo, ['init', '-q', '-b', 'main']);
+      git(ambientRepo, ['config', 'user.email', 'ambient@example.com']);
+      git(ambientRepo, ['config', 'user.name', 'Ambient']);
+      writeFileSync(join(ambientRepo, 'ambient.txt'), 'ambient content\n');
+      git(ambientRepo, ['add', '.']);
+      git(ambientRepo, ['commit', '-q', '-m', 'ambient initial commit']);
+
+      const ambientConfigPath = join(ambientRepo, '.git', 'config');
+      const headBefore = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ambientRepo,
+        encoding: 'utf8',
+        env: childGitEnv(),
+      }).trim();
+      const configBefore = readFileSync(ambientConfigPath, 'utf8');
+
+      const savedGitDir = process.env.GIT_DIR;
+      process.env.GIT_DIR = join(ambientRepo, '.git');
+      try {
+        writeFileSync(
+          join(repo, 'src', 'unclassified.ts'),
+          'export const a = 4;\n',
+        );
+        const output = runChangeClass(repo, ['--branch'], {
+          encoding: 'utf8',
+        });
+        // The check must still resolve against `repo` (cwd), not the
+        // poisoned ambient GIT_DIR.
+        expect(output).toContain('typescript');
+      } finally {
+        if (savedGitDir === undefined) {
+          delete process.env.GIT_DIR;
+        } else {
+          process.env.GIT_DIR = savedGitDir;
+        }
+      }
+
+      const headAfter = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ambientRepo,
+        encoding: 'utf8',
+        env: childGitEnv(),
+      }).trim();
+      const configAfter = readFileSync(ambientConfigPath, 'utf8');
+
+      expect(headAfter).toBe(headBefore);
+      expect(configAfter).toBe(configBefore);
+    } finally {
+      rmSync(ambientRepo, { recursive: true, force: true });
+    }
   });
 });
