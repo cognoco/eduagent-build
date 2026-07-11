@@ -28,6 +28,19 @@ import type {
 } from './types';
 import { SafetyFilterError } from '../../errors';
 
+const mockCaptureException = jest.fn();
+jest.mock('../sentry', () => {
+  (
+    globalThis as typeof globalThis & {
+      __routerSentryModuleLoaded?: boolean;
+    }
+  ).__routerSentryModuleLoaded = true;
+  return {
+    ...jest.requireActual('../sentry'),
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
+
 // [IMP-1] Test helper — returns a ChatResult matching the LLMProvider
 // interface. Spies must not rely on the `normalizeChatResult` back-compat
 // shim in router.ts; doing so makes the test a type lie that hides
@@ -247,6 +260,16 @@ beforeAll(() => {
 });
 
 describe('LLM Router', () => {
+  it('does not load the Sentry wrapper until a fallback signal is emitted', () => {
+    expect(
+      (
+        globalThis as typeof globalThis & {
+          __routerSentryModuleLoaded?: boolean;
+        }
+      ).__routerSentryModuleLoaded,
+    ).toBeUndefined();
+  });
+
   describe('routeAndCall', () => {
     it('routes to provider and returns response', async () => {
       const result = await routeAndCall(
@@ -654,10 +677,12 @@ describe('LLM Router', () => {
     });
 
     it('falls back to openai and sets fallbackUsed on stream failure', async () => {
+      mockCaptureException.mockClear();
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       const result = await routeAndStream(
-        [{ role: 'user', content: 'test' }],
+        [{ role: 'user', content: 'private learner text' }],
         1,
+        { flow: 'session.exchange', sessionId: 'private-session-id' },
       );
 
       // Provider metadata reflects initial selection (gemini)
@@ -679,7 +704,65 @@ describe('LLM Router', () => {
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('failed before first byte, trying fallback'),
       );
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      const [capturedError, capturedContext] =
+        mockCaptureException.mock.calls[0]!;
+      expect(capturedError).toEqual(
+        expect.objectContaining({ message: 'LLM provider fallback activated' }),
+      );
+      expect(capturedContext).toEqual({
+        tags: {
+          surface: 'llm-router',
+          signal: 'provider-fallback',
+          reason: 'stream-error',
+          provider: result.provider,
+          fallbackProvider: 'openai',
+          capability: 'text',
+        },
+        extra: {
+          circuitKey: 'gemini:text',
+          flow: 'session.exchange',
+        },
+      });
+      expect(JSON.stringify(mockCaptureException.mock.calls[0])).not.toContain(
+        'private learner text',
+      );
+      expect(JSON.stringify(mockCaptureException.mock.calls[0])).not.toContain(
+        'private-session-id',
+      );
       warnSpy.mockRestore();
+    });
+
+    it('keeps the learner fallback working when Sentry capture throws', async () => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createFailingStreamProvider('gemini'));
+      registerProvider(createMockProvider('openai'));
+      mockCaptureException.mockReset();
+      mockCaptureException.mockImplementationOnce(() => {
+        throw new Error('Sentry unavailable');
+      });
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation();
+      try {
+        const result = await routeAndStream(
+          [{ role: 'user', content: 'private learner text' }],
+          1,
+        );
+        const chunks: string[] = [];
+        for await (const chunk of result.stream) chunks.push(chunk);
+
+        expect(result.fallbackUsed).toBe(true);
+        expect(chunks.join('')).toContain('Mock streamed');
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('llm.fallback_signal.capture_failed'),
+        );
+      } finally {
+        warnSpy.mockRestore();
+        errorSpy.mockRestore();
+        mockCaptureException.mockReset();
+      }
     });
 
     it('[BUG-ANTHROPIC-FALLBACK] falls back from premium Anthropic to Gemini when OpenAI is absent', async () => {
@@ -738,6 +821,7 @@ describe('LLM Router', () => {
     });
 
     it('[BUG-ZERO-TOKEN-STREAM] falls back when primary stream completes with zero chunks', async () => {
+      mockCaptureException.mockClear();
       _clearProviders();
       _resetCircuits();
       registerProvider(createEmptyStreamProvider('gemini'));
@@ -763,7 +847,75 @@ describe('LLM Router', () => {
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('completed with zero chunks, trying fallback'),
       );
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'LLM provider fallback activated' }),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            surface: 'llm-router',
+            signal: 'provider-fallback',
+            reason: 'empty-stream',
+          }),
+        }),
+      );
       warnSpy.mockRestore();
+    });
+
+    it('captures a safe signal when an open primary stream circuit uses fallback', async () => {
+      _clearProviders();
+      _resetCircuits();
+      const failingPrimary = createFailingStreamProvider('gemini');
+      registerProvider(failingPrimary);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const result = await routeAndStream(
+            [{ role: 'user', content: 'test' }],
+            1,
+          );
+          await expect(async () => {
+            for await (const _chunk of result.stream) {
+              // Drain so the text circuit records the transient failure.
+            }
+          }).rejects.toThrow('Stream connection lost');
+        }
+
+        registerProvider(createMockProvider('gemini'));
+        registerProvider(createMockProvider('openai'));
+        mockCaptureException.mockClear();
+
+        const result = await routeAndStream(
+          [{ role: 'user', content: 'private learner text' }],
+          1,
+          { flow: 'session.exchange', sessionId: 'private-session-id' },
+        );
+        const chunks: string[] = [];
+        for await (const chunk of result.stream) chunks.push(chunk);
+
+        expect(result.provider).toBe('openai');
+        expect(chunks.join('')).toContain('Mock streamed');
+        expect(mockCaptureException).toHaveBeenCalledTimes(1);
+        expect(mockCaptureException).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: 'LLM provider fallback activated',
+          }),
+          expect.objectContaining({
+            tags: expect.objectContaining({
+              reason: 'primary-circuit-open',
+              provider: failingPrimary.id,
+              fallbackProvider: 'openai',
+            }),
+          }),
+        );
+        expect(
+          JSON.stringify(mockCaptureException.mock.calls[0]),
+        ).not.toContain('private learner text');
+        expect(
+          JSON.stringify(mockCaptureException.mock.calls[0]),
+        ).not.toContain('private-session-id');
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
 
     it('[HIGH-LLM-PROBE] releases half-open probe after zero-chunk fallback', async () => {
@@ -915,6 +1067,7 @@ describe('LLM Router', () => {
     });
 
     it('exhausts retries then falls back to secondary provider', async () => {
+      mockCaptureException.mockClear();
       const flaky = createTransientFailProvider('gemini', 5); // always fails
       _clearProviders();
       _resetCircuits();
@@ -922,7 +1075,11 @@ describe('LLM Router', () => {
       registerProvider(createMockProvider('openai'));
 
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
-      const result = await routeAndCall([{ role: 'user', content: 'test' }], 1);
+      const result = await routeAndCall(
+        [{ role: 'user', content: 'private learner text' }],
+        1,
+        { flow: 'session.exchange', sessionId: 'private-session-id' },
+      );
 
       // Falls back to openai after gemini retries exhausted
       expect(result.provider).toBe('openai');
@@ -931,7 +1088,86 @@ describe('LLM Router', () => {
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('failed after retries, trying fallback'),
       );
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'LLM provider fallback activated' }),
+        {
+          tags: {
+            surface: 'llm-router',
+            signal: 'provider-fallback',
+            reason: 'primary-error',
+            provider: flaky.id,
+            fallbackProvider: 'openai',
+            capability: 'text',
+          },
+          extra: {
+            circuitKey: 'gemini:text',
+            flow: 'session.exchange',
+          },
+        },
+      );
+      expect(JSON.stringify(mockCaptureException.mock.calls[0])).not.toContain(
+        'private learner text',
+      );
+      expect(JSON.stringify(mockCaptureException.mock.calls[0])).not.toContain(
+        'private-session-id',
+      );
       warnSpy.mockRestore();
+    });
+
+    it('captures a safe signal when an open primary circuit routes directly to fallback', async () => {
+      _clearProviders();
+      _resetCircuits();
+      const failingPrimary = createFailingStreamProvider('gemini');
+      registerProvider(failingPrimary);
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const result = await routeAndStream(
+            [{ role: 'user', content: 'test' }],
+            1,
+          );
+          await expect(async () => {
+            for await (const _chunk of result.stream) {
+              // Drain so the text circuit records the transient failure.
+            }
+          }).rejects.toThrow('Stream connection lost');
+        }
+
+        registerProvider(createMockProvider('gemini'));
+        registerProvider(createMockProvider('openai'));
+        mockCaptureException.mockClear();
+
+        const result = await routeAndCall(
+          [{ role: 'user', content: 'private learner text' }],
+          1,
+          { flow: 'session.exchange', sessionId: 'private-session-id' },
+        );
+
+        expect(result.provider).toBe('openai');
+        expect(mockCaptureException).toHaveBeenCalledTimes(1);
+        expect(mockCaptureException).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: 'LLM provider fallback activated',
+          }),
+          expect.objectContaining({
+            tags: expect.objectContaining({
+              reason: 'primary-circuit-open',
+              provider: failingPrimary.id,
+              fallbackProvider: 'openai',
+            }),
+          }),
+        );
+        expect(
+          JSON.stringify(mockCaptureException.mock.calls[0]),
+        ).not.toContain('private learner text');
+        expect(
+          JSON.stringify(mockCaptureException.mock.calls[0]),
+        ).not.toContain('private-session-id');
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
 
     it('[BUG-GEMINI-ANTHROPIC-FALLBACK] falls back to Anthropic for non-streaming calls when OpenAI is absent', async () => {
