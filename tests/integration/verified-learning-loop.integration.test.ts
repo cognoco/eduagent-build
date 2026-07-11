@@ -31,16 +31,18 @@
  */
 
 import { resolve } from 'path';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '../../packages/test-utils/src';
 import {
   assessments,
+  consentGrant,
   createDatabase,
   createScopedRepository,
   curricula,
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
+  guardianship,
   learningSessions,
   membership,
   needsDeepeningTopics,
@@ -58,6 +60,7 @@ import {
 } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { finalizeChallengeRoundIfReady } from '../../apps/api/src/services/session/session-exchange';
 import { mapSessionRow } from '../../apps/api/src/services/session/session-events';
+import { getLatestVerifiedProofForChild } from '../../apps/api/src/services/parent-proof';
 import type {
   ChallengeRoundEvaluationItem,
   ChallengeRoundSessionState,
@@ -95,7 +98,7 @@ const seededV2ProfileIds: string[] = [];
 
 async function seedProfileAndSubject(
   db: Database,
-): Promise<{ profileId: string; subjectId: string }> {
+): Promise<{ profileId: string; subjectId: string; accountId: string }> {
   const idx = ++seedCounter;
   const accountId = generateUUIDv7();
   const profileId = generateUUIDv7();
@@ -134,7 +137,75 @@ async function seedProfileAndSubject(
     .values({ profileId, name: `Biology ${idx}` })
     .returning({ id: subjects.id });
 
-  return { profileId, subjectId: subject!.id };
+  return { profileId, subjectId: subject!.id, accountId };
+}
+
+/** Variant (e) only: a parent profile in the SAME org as the child, so
+ * `seedConsented`'s `orgId` param (resolved from the CHILD's own org by
+ * `getChildGdprConsentStatusV2`) lines up regardless of which side's id is
+ * passed. Mirrors seedProfileAndSubject's anchor + person + membership
+ * shape, minus the subject (a parent has none here). */
+async function seedParentProfile(
+  db: Database,
+  accountId: string,
+): Promise<string> {
+  const idx = ++seedCounter;
+  const parentProfileId = generateUUIDv7();
+  const clerkUserId = `clerk_wi1666_${RUN_ID}_${idx}_parent`;
+  const email = `wi1666-${RUN_ID}-${idx}-parent@test.invalid`;
+
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId: parentProfileId,
+    accountId,
+    displayName: `Loop Parent ${idx}`,
+    birthYear: 1980,
+    isOwner: true,
+    clerkUserId,
+    email,
+  });
+
+  await db.insert(person).values({
+    id: parentProfileId,
+    displayName: `Loop Parent ${idx}`,
+    birthDate: '1980-01-01',
+    residenceJurisdiction: 'US',
+  });
+  await db.insert(membership).values({
+    personId: parentProfileId,
+    organizationId: accountId,
+    roles: ['admin'],
+  });
+  seededV2ProfileIds.push(parentProfileId);
+
+  return parentProfileId;
+}
+
+/** Ported from apps/api/src/services/parent-proof.integration.test.ts:82. */
+async function seedFamilyLink(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string,
+): Promise<void> {
+  await db.insert(guardianship).values({
+    guardianPersonId: parentProfileId,
+    chargePersonId: childProfileId,
+  });
+}
+
+/** Ported from apps/api/src/services/parent-proof.integration.test.ts:92. */
+async function seedConsented(
+  db: Database,
+  profileId: string,
+  orgId: string,
+): Promise<void> {
+  await db.insert(consentGrant).values({
+    chargePersonId: profileId,
+    organizationId: orgId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
+    grantedAt: new Date(),
+  });
 }
 
 async function seedCurriculumTopic(
@@ -318,6 +389,15 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
   });
 
   afterAll(async () => {
+    // Variant (e)'s consentGrant rows carry an ON DELETE RESTRICT FK to
+    // person — must be cleared before deleteV2IdentitiesForTest deletes the
+    // person rows below, or that call fails for every variant sharing this
+    // afterAll. No-op (empty inArray match) for variants (a)-(d).
+    if (seededV2ProfileIds.length > 0) {
+      await db
+        .delete(consentGrant)
+        .where(inArray(consentGrant.chargePersonId, seededV2ProfileIds));
+    }
     if (seededV2AccountIds.length > 0 || seededV2ProfileIds.length > 0) {
       await deleteV2IdentitiesForTest(db, {
         accountIds: seededV2AccountIds,
@@ -674,5 +754,35 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
         ['active', 'pending_review'].includes(r.status),
       ),
     ).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // Variant (e) — parent-visible proof (WI-1793, S8 completion pass)
+  // -------------------------------------------------------------------------
+
+  it('(e) parent-visible proof: a real verified Challenge Round surfaces via getLatestVerifiedProofForChild for a linked, consented parent', async () => {
+    const { profileId, subjectId, accountId } = await seedProfileAndSubject(db);
+    const topicId = await seedCurriculumTopic(db, subjectId);
+    const parentProfileId = await seedParentProfile(db, accountId);
+    await seedFamilyLink(db, parentProfileId, profileId);
+    await seedConsented(db, profileId, accountId);
+
+    await driveVerifiedChallengeRound(db, profileId, subjectId, topicId);
+
+    const proof = await getLatestVerifiedProofForChild(
+      db,
+      parentProfileId,
+      profileId,
+    );
+
+    expect(proof.hasProof).toBe(true);
+    expect(proof.topicId).toBe(topicId);
+    expect(proof.topicTitle).toBe('Photosynthesis');
+    expect(proof.masteryVerificationState).toBe('fresh');
+    // Real content assertion (not just hasProof) — the topic_notes row
+    // written by the real finalize path above (session-exchange.ts's
+    // artifact-persist step) must be the exact drafted-note body, sourced
+    // through the parent-chain read in parent-proof.ts, not a vacuous pass.
+    expect(proof.quote).toBe(NOTE_DRAFT_CONTENT);
   });
 });
