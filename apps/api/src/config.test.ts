@@ -3,6 +3,8 @@ import {
   isMemoryFactsRelevanceEnabled,
   isProfileInDedupRollout,
   isChallengeRoundRuntimeEnabled,
+  isProfileInChallengeRoundCohort,
+  isChallengeRoundEnabledForProfile,
   isChallengeRoundGraderEnabled,
   isReviewContinuityOpenerEnabled,
   isManagedTierActive,
@@ -671,6 +673,14 @@ describe('validateEnv', () => {
     expect(isChallengeRoundRuntimeEnabled('yes')).toBe(false);
   });
 
+  it('CHALLENGE_ROUND_COHORT_PROFILE_IDS defaults to "" when unset', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.CHALLENGE_ROUND_COHORT_PROFILE_IDS).toBe('');
+  });
+
   it('CHALLENGE_ROUND_GRADER_ENABLED defaults to "true" when unset', () => {
     const env = validateEnv({
       ENVIRONMENT: 'development',
@@ -776,6 +786,7 @@ describe('validateProductionBindings', () => {
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: 0,
     MATCHER_ENABLED: 'false',
     CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
+    CHALLENGE_ROUND_COHORT_PROFILE_IDS: '',
     REVIEW_CALLBACK_OPENER_ENABLED: 'false',
     JUDGE_FRAMEWORK_ENABLED: 'false',
     JUDGE_ENFORCEMENT_ENABLED: 'false',
@@ -959,6 +970,79 @@ describe('isProfileInDedupRollout', () => {
     }
     expect(inRollout / count).toBeGreaterThan(0.25);
     expect(inRollout / count).toBeLessThan(0.35);
+  });
+});
+
+describe('isProfileInChallengeRoundCohort', () => {
+  it('returns false for an empty or unset allowlist (mirrors isProfileInDedupRollout(id, 0))', () => {
+    const id = '00000000-0000-0000-0000-000000000001';
+    expect(isProfileInChallengeRoundCohort(id, undefined)).toBe(false);
+    expect(isProfileInChallengeRoundCohort(id, '')).toBe(false);
+    expect(isProfileInChallengeRoundCohort(id, '   ')).toBe(false);
+    expect(isProfileInChallengeRoundCohort(id, ',,')).toBe(false);
+  });
+
+  it('returns true when the profile id is in the comma-separated allowlist', () => {
+    const id = '00000000-0000-0000-0000-000000000001';
+    expect(
+      isProfileInChallengeRoundCohort(
+        id,
+        '00000000-0000-0000-0000-000000000002,00000000-0000-0000-0000-000000000001',
+      ),
+    ).toBe(true);
+  });
+
+  it('returns false when the profile id is not in the allowlist', () => {
+    expect(
+      isProfileInChallengeRoundCohort(
+        '00000000-0000-0000-0000-000000000099',
+        '00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-000000000002',
+      ),
+    ).toBe(false);
+  });
+
+  it('is case-insensitive and trims whitespace around each entry', () => {
+    const id = 'ABCDEF00-0000-0000-0000-000000000001';
+    expect(
+      isProfileInChallengeRoundCohort(
+        id,
+        ' abcdef00-0000-0000-0000-000000000001 , 00000000-0000-0000-0000-000000000002',
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('isChallengeRoundEnabledForProfile', () => {
+  const cohortId = '00000000-0000-0000-0000-000000000001';
+  const otherId = '00000000-0000-0000-0000-000000000099';
+  const allowlist = cohortId;
+
+  it('is disabled when the flag is off, regardless of cohort membership', () => {
+    expect(
+      isChallengeRoundEnabledForProfile('false', cohortId, allowlist),
+    ).toBe(false);
+    expect(
+      isChallengeRoundEnabledForProfile(undefined, cohortId, allowlist),
+    ).toBe(false);
+  });
+
+  it('is enabled when the flag is on and the profile is in the cohort', () => {
+    expect(isChallengeRoundEnabledForProfile('true', cohortId, allowlist)).toBe(
+      true,
+    );
+  });
+
+  it('is disabled when the flag is on but the profile is not in the cohort', () => {
+    expect(isChallengeRoundEnabledForProfile('true', otherId, allowlist)).toBe(
+      false,
+    );
+  });
+
+  it('is disabled when the flag is on but the allowlist is empty/unset', () => {
+    expect(isChallengeRoundEnabledForProfile('true', cohortId, undefined)).toBe(
+      false,
+    );
+    expect(isChallengeRoundEnabledForProfile('true', cohortId, '')).toBe(false);
   });
 });
 
