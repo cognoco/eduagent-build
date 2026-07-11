@@ -17,8 +17,10 @@ describe('useActivationLaunchEvents', () => {
   it('fires app_opened once on first signed-in render, not again on re-render', () => {
     const reportActivationEvent = jest.fn();
     const { rerender } = renderHook(
-      (props: { isSignedIn: boolean; userCreatedAt: Date | undefined }) =>
-        useActivationLaunchEvents({ ...props, reportActivationEvent }),
+      (props: {
+        isSignedIn: boolean;
+        userCreatedAt: Date | null | undefined;
+      }) => useActivationLaunchEvents({ ...props, reportActivationEvent }),
       {
         initialProps: { isSignedIn: true, userCreatedAt: undefined },
       },

@@ -20,7 +20,7 @@ import type { ReportActivationEvent } from '../lib/activation-events';
  */
 export function useActivationLaunchEvents(params: {
   isSignedIn: boolean | undefined;
-  userCreatedAt: Date | undefined;
+  userCreatedAt: Date | null | undefined;
   reportActivationEvent: ReportActivationEvent;
 }): void {
   const { isSignedIn, userCreatedAt, reportActivationEvent } = params;
