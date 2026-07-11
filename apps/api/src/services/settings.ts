@@ -141,7 +141,11 @@ export async function upsertNotificationPrefs(
     where: eq(notificationPreferences.profileId, profileId),
   });
 
-  const maxDailyPush = input.maxDailyPush ?? 3;
+  // [WI-1441] Fall back to the existing row's value first, matching the
+  // three siblings below — omitting maxDailyPush must preserve a user's
+  // customized value, not silently reset it to the default. A caller that
+  // truly wants the default sends 3 explicitly.
+  const maxDailyPush = input.maxDailyPush ?? existing?.maxDailyPush ?? 3;
   const weeklyProgressPush =
     input.weeklyProgressPush ?? existing?.weeklyProgressPush ?? true;
   const weeklyProgressEmail =

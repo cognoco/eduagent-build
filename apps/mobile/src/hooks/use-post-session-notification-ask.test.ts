@@ -1,7 +1,14 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import * as Notifications from 'expo-notifications';
+import type { QueryClient } from '@tanstack/react-query';
+
 import * as SecureStore from '../lib/secure-storage';
 import { platformAlert } from '../lib/platform-alert';
+import { setActiveProfileId } from '../lib/api-client';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
 import { usePostSessionNotificationAsk } from './use-post-session-notification-ask';
 
 jest.mock(
@@ -28,31 +35,100 @@ jest.mock(
   }),
 );
 
-// [WI-1441] Pattern A: spread the real module (its other exports fetch over
-// the network via React Query and are unused here) and override only the two
-// hooks this file actually calls, so the mock is exercised as a targeted
-// override rather than a full-module replacement.
-let mockNotifPrefs:
-  | {
-      reviewReminders: boolean;
-      dailyReminders: boolean;
-      weeklyProgressPush: boolean;
-      weeklyProgressEmail: boolean;
-      monthlyProgressEmail: boolean;
-    }
-  | undefined;
-const mockUpdateMutate = jest.fn();
-jest.mock('./use-settings', () => ({
-  ...jest.requireActual('./use-settings'),
-  useNotificationSettings: () => ({ data: mockNotifPrefs }),
-  useUpdateNotificationSettings: () => ({ mutate: mockUpdateMutate }),
-}));
-
 const mockSecureGet = SecureStore.getItemAsync as jest.Mock;
 const mockSecureSet = SecureStore.setItemAsync as jest.Mock;
 const mockGetPerm = Notifications.getPermissionsAsync as jest.Mock;
 const mockReqPerm = Notifications.requestPermissionsAsync as jest.Mock;
 const mockAlert = platformAlert as jest.Mock;
+
+// [WI-1441] This hook now calls the real useNotificationSettings /
+// useUpdateNotificationSettings (via ./use-settings) so the mutation payload
+// (preserved fields + pushEnabled) is exercised end to end. GC1-clean: the
+// only mocked boundary is global fetch, mirroring
+// use-guardian-notification-ask.test.ts and use-child-cap-notifications.test.ts.
+const mockFetch = jest.fn();
+const originalFetch = globalThis.fetch;
+
+const NOTIF_PREFS = {
+  reviewReminders: true,
+  dailyReminders: false,
+  weeklyProgressPush: false,
+  weeklyProgressEmail: true,
+  monthlyProgressEmail: false,
+  pushEnabled: false,
+  // Deliberately non-default so a sync that omits/loses maxDailyPush (and
+  // gets reset to the API's hardcoded default of 3) is caught.
+  maxDailyPush: 5,
+  pushTokenRegistered: false,
+};
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), { status: 200 });
+}
+
+function defaultFetchImpl(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const url = typeof input === 'string' ? input : input.toString();
+  const method = (init?.method ?? 'GET').toUpperCase();
+  if (url.includes('/settings/notifications') && method === 'GET') {
+    return Promise.resolve(jsonResponse({ preferences: NOTIF_PREFS }));
+  }
+  if (url.includes('/settings/notifications') && method === 'PUT') {
+    const body =
+      typeof init?.body === 'string'
+        ? (JSON.parse(init.body) as Record<string, unknown>)
+        : {};
+    return Promise.resolve(
+      jsonResponse({ preferences: { ...NOTIF_PREFS, ...body } }),
+    );
+  }
+  return Promise.reject(new Error(`Unhandled fetch in test: ${method} ${url}`));
+}
+
+/** Finds the JSON body of the first PUT request to /settings/notifications. */
+function findPutBody(): Record<string, unknown> | undefined {
+  const putCall = mockFetch.mock.calls.find(([, init]) => {
+    const reqInit = init as RequestInit | undefined;
+    return reqInit?.method === 'PUT';
+  });
+  const body = (putCall?.[1] as RequestInit | undefined)?.body;
+  return typeof body === 'string'
+    ? (JSON.parse(body) as Record<string, unknown>)
+    : undefined;
+}
+
+// The hook under test takes profileId as a plain argument rather than
+// reading it from ProfileContext, so a single fixed active profile is enough
+// to satisfy useNotificationSettings/useUpdateNotificationSettings — the
+// mocked fetch responses don't vary by profile ID.
+const testProfile = createTestProfile({ id: 'p1' });
+
+let queryClient: QueryClient | undefined;
+
+function setupWrapper() {
+  const wrapped = createHookWrapper({ activeProfile: testProfile });
+  queryClient = wrapped.queryClient;
+  setActiveProfileId(testProfile.id);
+  return wrapped.wrapper;
+}
+
+function renderPostSessionAsk(
+  profileId: string | undefined,
+  hasCompletedSession: boolean,
+  isParentProxy: boolean,
+) {
+  return renderHook(
+    () =>
+      usePostSessionNotificationAsk(
+        profileId,
+        hasCompletedSession,
+        isParentProxy,
+      ),
+    { wrapper: setupWrapper() },
+  );
+}
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -61,22 +137,24 @@ beforeEach(() => {
   mockSecureSet.mockResolvedValue(undefined);
   mockGetPerm.mockResolvedValue({ status: 'undetermined', canAskAgain: true });
   mockReqPerm.mockResolvedValue({ status: 'granted' });
-  mockNotifPrefs = {
-    reviewReminders: true,
-    dailyReminders: false,
-    weeklyProgressPush: false,
-    weeklyProgressEmail: true,
-    monthlyProgressEmail: false,
-  };
+  mockFetch.mockReset();
+  mockFetch.mockImplementation(defaultFetchImpl);
+  globalThis.fetch = mockFetch as typeof fetch;
 });
 
 afterEach(() => {
   jest.useRealTimers();
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
 });
 
 describe('usePostSessionNotificationAsk', () => {
   it('does nothing without a profileId', async () => {
-    renderHook(() => usePostSessionNotificationAsk(undefined, true, false));
+    renderPostSessionAsk(undefined, true, false);
     await act(async () => {
       jest.advanceTimersByTime(5000);
     });
@@ -85,7 +163,7 @@ describe('usePostSessionNotificationAsk', () => {
   });
 
   it('does nothing when no session has been completed', async () => {
-    renderHook(() => usePostSessionNotificationAsk('p1', false, false));
+    renderPostSessionAsk('p1', false, false);
     await act(async () => {
       jest.advanceTimersByTime(5000);
     });
@@ -94,7 +172,7 @@ describe('usePostSessionNotificationAsk', () => {
   });
 
   it('does nothing in parent-proxy mode', async () => {
-    renderHook(() => usePostSessionNotificationAsk('p1', true, true));
+    renderPostSessionAsk('p1', true, true);
     await act(async () => {
       jest.advanceTimersByTime(5000);
     });
@@ -104,7 +182,7 @@ describe('usePostSessionNotificationAsk', () => {
 
   it('does not prompt if SecureStore says we already asked', async () => {
     mockSecureGet.mockResolvedValue('true');
-    renderHook(() => usePostSessionNotificationAsk('p1', true, false));
+    renderPostSessionAsk('p1', true, false);
     await waitFor(() => {
       expect(mockSecureGet).toHaveBeenCalled();
     });
@@ -117,7 +195,7 @@ describe('usePostSessionNotificationAsk', () => {
 
   it('marks seen and skips prompt when permission is already granted', async () => {
     mockGetPerm.mockResolvedValue({ status: 'granted', canAskAgain: true });
-    renderHook(() => usePostSessionNotificationAsk('p1', true, false));
+    renderPostSessionAsk('p1', true, false);
     await waitFor(() => {
       expect(mockSecureSet).toHaveBeenCalledWith(
         expect.stringContaining('notificationFirstAskShown_p1'),
@@ -135,7 +213,7 @@ describe('usePostSessionNotificationAsk', () => {
       status: 'denied',
       canAskAgain: false,
     });
-    renderHook(() => usePostSessionNotificationAsk('p1', true, false));
+    renderPostSessionAsk('p1', true, false);
     await waitFor(() => {
       expect(mockSecureSet).toHaveBeenCalledWith(
         expect.stringContaining('notificationFirstAskShown_p1'),
@@ -150,7 +228,7 @@ describe('usePostSessionNotificationAsk', () => {
   });
 
   it('shows primer after delay; Allow fires OS prompt and marks seen', async () => {
-    renderHook(() => usePostSessionNotificationAsk('p1', true, false));
+    renderPostSessionAsk('p1', true, false);
 
     await waitFor(() => {
       expect(mockGetPerm).toHaveBeenCalled();
@@ -189,7 +267,7 @@ describe('usePostSessionNotificationAsk', () => {
     const { rerender } = renderHook(
       ({ profileId }: { profileId: string }) =>
         usePostSessionNotificationAsk(profileId, true, false),
-      { initialProps: { profileId: 'profile-A' } },
+      { initialProps: { profileId: 'profile-A' }, wrapper: setupWrapper() },
     );
 
     // Wait for permissions check to complete for profile A.
@@ -247,7 +325,7 @@ describe('usePostSessionNotificationAsk', () => {
         usePostSessionNotificationAsk('p1', true, proxy),
       // Start in proxy mode so the first render does no work, then flip to
       // non-proxy to drive the first real attempt (which fails on SecureStore).
-      { initialProps: { proxy: true } },
+      { initialProps: { proxy: true }, wrapper: setupWrapper() },
     );
 
     // Flip to non-proxy → first real attempt runs and hits the throwing get.
@@ -276,7 +354,7 @@ describe('usePostSessionNotificationAsk', () => {
   });
 
   it('Not now marks seen and does not fire OS prompt', async () => {
-    renderHook(() => usePostSessionNotificationAsk('p1', true, false));
+    renderPostSessionAsk('p1', true, false);
 
     await waitFor(() => {
       expect(mockGetPerm).toHaveBeenCalled();
@@ -309,7 +387,7 @@ describe('usePostSessionNotificationAsk', () => {
   // existing notification preferences. Before the fix, requestPermissionsAsync
   // resolving 'granted' never called the settings-update mutation at all.
   it('Allow syncs pushEnabled=true server-side, preserving other preference fields', async () => {
-    renderHook(() => usePostSessionNotificationAsk('p1', true, false));
+    renderPostSessionAsk('p1', true, false);
 
     await waitFor(() => {
       expect(mockGetPerm).toHaveBeenCalled();
@@ -331,23 +409,100 @@ describe('usePostSessionNotificationAsk', () => {
     });
 
     await waitFor(() => {
-      expect(mockUpdateMutate).toHaveBeenCalledWith(
-        {
-          reviewReminders: true,
-          dailyReminders: false,
-          weeklyProgressPush: false,
-          weeklyProgressEmail: true,
-          monthlyProgressEmail: false,
-          pushEnabled: true,
-        },
-        expect.objectContaining({ onError: expect.any(Function) }),
-      );
+      expect(findPutBody()).toBeDefined();
+    });
+    expect(findPutBody()).toEqual({
+      reviewReminders: true,
+      dailyReminders: false,
+      weeklyProgressPush: false,
+      weeklyProgressEmail: true,
+      monthlyProgressEmail: false,
+      maxDailyPush: 5,
+      pushEnabled: true,
+    });
+  });
+
+  // [WI-1441 rework] Regression guard: a grant landing before the settings
+  // query has resolved must not silently skip the sync. Before this fix,
+  // `if (prefs)` guarded the mutate with no fallback, so a user who granted
+  // permission during the query's initial load never got pushEnabled synced.
+  // Hangs the initial GET so notifQuery.data is still undefined when Allow
+  // fires, then lets it resolve and confirms the sync still lands.
+  it('syncs pushEnabled once notification prefs load, even if unavailable at grant time', async () => {
+    let resolveGet: ((value: Response) => void) | undefined;
+    const pendingGet = new Promise<Response>((resolve) => {
+      resolveGet = resolve;
+    });
+    mockFetch.mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        const method = (init?.method ?? 'GET').toUpperCase();
+        if (url.includes('/settings/notifications') && method === 'GET') {
+          return pendingGet;
+        }
+        if (url.includes('/settings/notifications') && method === 'PUT') {
+          const body =
+            typeof init?.body === 'string'
+              ? (JSON.parse(init.body) as Record<string, unknown>)
+              : {};
+          return Promise.resolve(
+            jsonResponse({ preferences: { ...NOTIF_PREFS, ...body } }),
+          );
+        }
+        return Promise.reject(
+          new Error(`Unhandled fetch in test: ${method} ${url}`),
+        );
+      },
+    );
+
+    renderPostSessionAsk('p1', true, false);
+
+    await waitFor(() => {
+      expect(mockGetPerm).toHaveBeenCalled();
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+
+    expect(mockAlert).toHaveBeenCalledTimes(1);
+    const buttons = mockAlert.mock.calls[0]![2] as Array<{
+      style?: string;
+      onPress?: () => void;
+    }>;
+    const allowBtn = buttons.find((b) => b.style !== 'cancel');
+
+    await act(async () => {
+      allowBtn?.onPress?.();
+      await Promise.resolve();
+    });
+
+    // The settings query is still pending (GET never resolved) — the sync
+    // must not have fired yet.
+    expect(findPutBody()).toBeUndefined();
+
+    await act(async () => {
+      resolveGet?.(jsonResponse({ preferences: NOTIF_PREFS }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(findPutBody()).toBeDefined();
+    });
+    expect(findPutBody()).toEqual({
+      reviewReminders: true,
+      dailyReminders: false,
+      weeklyProgressPush: false,
+      weeklyProgressEmail: true,
+      monthlyProgressEmail: false,
+      maxDailyPush: 5,
+      pushEnabled: true,
     });
   });
 
   it('Allow does not sync pushEnabled when the OS request does not resolve granted', async () => {
     mockReqPerm.mockResolvedValue({ status: 'denied' });
-    renderHook(() => usePostSessionNotificationAsk('p1', true, false));
+    renderPostSessionAsk('p1', true, false);
 
     await waitFor(() => {
       expect(mockGetPerm).toHaveBeenCalled();
@@ -370,6 +525,6 @@ describe('usePostSessionNotificationAsk', () => {
     await waitFor(() => {
       expect(mockReqPerm).toHaveBeenCalledTimes(1);
     });
-    expect(mockUpdateMutate).not.toHaveBeenCalled();
+    expect(findPutBody()).toBeUndefined();
   });
 });
