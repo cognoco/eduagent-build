@@ -974,6 +974,13 @@
       "when": 1783773664210,
       "tag": "0140_wi1553_session_summaries_language_learning_summary",
       "breakpoints": true
+    },
+    {
+      "idx": 141,
+      "version": "7",
+      "when": 1783780000794,
+      "tag": "0141_supporter_contract_fk_indexes",
+      "breakpoints": true
     }
   ]
 }
