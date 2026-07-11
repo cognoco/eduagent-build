@@ -40,6 +40,9 @@
 
 import { and, eq, sql } from 'drizzle-orm';
 import { login, membership, type Database } from '@eduagent/database';
+// ForbiddenError comes from the schema package, which `../errors` re-exports
+// verbatim — so route catch-blocks importing from `../errors` and this import
+// are the same class; `instanceof` checks match either way.
 import { ForbiddenError } from '@eduagent/schemas';
 import { isGuardianOf } from './guardianship';
 

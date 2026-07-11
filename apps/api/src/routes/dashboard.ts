@@ -212,6 +212,19 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       // Defense-in-depth: route-entry parent-link check before the service.
       // getChildTopicSnapshotForParent also runs the same guard.
       await assertParentAccess(db, parentProfileId, childProfileId);
+      // [WI-787] Credentialed-charge suppression stays INSIDE this try so its
+      // ForbiddenError is audit-logged and converted to 404 like the
+      // parent-link denial — on this IDOR-hidden route topic existence must
+      // stay hidden, so a credentialed charge surfaces as 404, not 403.
+      await assertChargeNotCredentialed(db, childProfileId);
+      const snapshot = await getChildTopicSnapshotForParent(
+        db,
+        parentProfileId,
+        childProfileId,
+        topicId,
+      );
+      if (!snapshot) return notFound(c, 'Topic not found');
+      return c.json(childTopicSnapshotResponseSchema.parse({ snapshot }));
     } catch (error) {
       if (error instanceof ForbiddenError) {
         // Audit-log unauthorized parent-link probes. The 404 hides topic
@@ -228,16 +241,6 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       }
       throw error;
     }
-
-    await assertChargeNotCredentialed(db, childProfileId);
-    const snapshot = await getChildTopicSnapshotForParent(
-      db,
-      parentProfileId,
-      childProfileId,
-      topicId,
-    );
-    if (!snapshot) return notFound(c, 'Topic not found');
-    return c.json(childTopicSnapshotResponseSchema.parse({ snapshot }));
   })
 
   // List child's sessions
