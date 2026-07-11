@@ -45,7 +45,7 @@ const mockAlert = platformAlert as jest.Mock;
 // useUpdateNotificationSettings (via ./use-settings) so the mutation payload
 // (preserved fields + pushEnabled) is exercised end to end. GC1-clean: the
 // only mocked boundary is global fetch, mirroring
-// use-guardian-notification-ask.test.ts and use-child-cap-notifications.test.ts.
+// use-child-cap-notifications.test.ts.
 const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
 

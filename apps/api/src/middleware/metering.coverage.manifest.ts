@@ -98,7 +98,6 @@ export const LLM_CALL_SITE_EXEMPT: readonly string[] = [
   'apps/api/src/services/session-highlights.ts',
   'apps/api/src/services/session-llm-summary.ts',
   'apps/api/src/services/session-recap.ts',
-  'apps/api/src/services/session/session-depth.ts',
   'apps/api/src/services/session/topic-probe-extraction.ts',
   'apps/api/src/services/vocabulary-extract.ts',
   // The test-only seed route bypasses auth (gated by TEST_SEED_SECRET) and is

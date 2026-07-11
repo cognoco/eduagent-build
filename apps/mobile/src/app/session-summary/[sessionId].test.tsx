@@ -616,14 +616,6 @@ describe('SessionSummaryScreen', () => {
     screen.getByText(/strong independent thinking/);
   });
 
-  it('does not fire hidden depth evaluation on mount', async () => {
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
-
-    await flushAsyncEffects();
-
-    expect(fetchCallsMatching(mockFetch, 'evaluate-depth')).toHaveLength(0);
-  });
-
   // [BUG-801] When the URL passes exchangeCount='0' (legitimate value for
   // a session that ended before any exchanges), the screen must honor it
   // rather than silently fall back to the server's transcript count.

@@ -122,9 +122,6 @@ export {
 } from './session-book';
 export type { BookSession } from '@eduagent/schemas';
 
-// Depth evaluation
-export { evaluateSessionDepth } from './session-depth';
-
 // Topic sessions (Library v3)
 export { getTopicSessions } from './session-topic';
 export type { TopicSession } from './session-topic';
