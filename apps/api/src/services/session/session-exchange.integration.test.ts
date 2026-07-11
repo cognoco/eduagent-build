@@ -601,6 +601,11 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
     // simulates a topic that was reviewed to mastery before this Challenge
     // Round, exercising the ADR-0031 "verification never terminates SM-2"
     // guarantee against a card that already carries retained-state fields.
+    // repetitions stays 0 throughout this seed (insertRetentionCardIfAbsent's
+    // default), so this exercises the `repetitionsZero` guard branch against
+    // a REAL Postgres connection — the integer-equality WHERE clause that
+    // sidesteps the B73 optimistic-lock timestamp-precision issue (see
+    // retention-data.ts's updateRetentionFromSession guard selection).
     await insertRetentionCardIfAbsent({ db, profileId, topicId });
     const repoBefore = createScopedRepository(db, profileId);
     const seeded = await repoBefore.retentionCards.findFirst(

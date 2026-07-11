@@ -1668,20 +1668,15 @@ export async function updateRetentionFromSession(
 
   await assertOwnedCurriculumTopic(db, { profileId, topicId });
 
-  // Auto-create retention card on first encounter. `isNew` mirrors
-  // ensureRetentionCard's own definition (repetitions === 0) rather than
-  // "did this call insert the row" — a card can pre-exist with repetitions
-  // still 0 (e.g. auto-created earlier by topic-probe-extract.ts's own
-  // ensureRetentionCard call) and its updatedAt was set by the DB's
-  // defaultNow(), not a JS writer. The optimistic-lock guard's strict
-  // updatedAt equality assumes a JS-precision timestamp (see B73 above); a
-  // SQL-defaulted timestamp can carry sub-millisecond precision that a JS
-  // Date read-back truncates, so the WHERE clause silently matches 0 rows.
-  // Skipping the lock for any never-reviewed (repetitions === 0) card is
-  // safe: there is no prior meaningful state to protect, same as the
-  // genuinely-just-created branch below.
+  // Auto-create retention card on first encounter. `isNew` stays strictly
+  // "this exact call inserted the row" (ensureRetentionCard's own semantics
+  // when it finds no existing row) — it does NOT mean "never reviewed": a
+  // card found via `existing` can pre-exist with repetitions still 0 (e.g.
+  // auto-created earlier by topic-probe-extract.ts's own ensureRetentionCard
+  // call, or reset to 0 by a failed SM-2 review after real history), and
+  // must still be lock-protected below.
   const ensured = existing
-    ? { card: existing, isNew: existing.repetitions === 0 }
+    ? { card: existing, isNew: false }
     : await ensureRetentionCard(db, profileId, topicId);
   const card = ensured.card;
 
@@ -1732,9 +1727,25 @@ export async function updateRetentionFromSession(
     // each other to overwrite stale reads. If a non-JS writer (raw SQL,
     // background job in another language, etc.) is ever introduced, revisit
     // this comparison rather than re-widening it blindly.
+    // [WI-1445] A never-reviewed EXISTING card (repetitions === 0) is the
+    // one exception: its `updatedAt` may have been set by the DB's
+    // defaultNow() rather than a JS writer (e.g. a bare card seeded by
+    // insertRetentionCardIfAbsent/ensureRetentionCard from another call),
+    // and that SQL-generated timestamp can carry sub-millisecond precision a
+    // JS Date read-back truncates — the strict equality above would then
+    // silently match 0 rows and skip the write. Guard on `repetitionsZero`
+    // instead (integer equality, immune to timestamp precision) — same
+    // established primitive topic-probe-extract.ts's seedRetentionCard uses
+    // for this exact never-reviewed-card scenario. This still detects a
+    // genuine concurrent writer: if another session already advanced
+    // repetitions away from 0 between our read and this write, the WHERE
+    // clause fails to match and `updateResult.updated` is false, same as an
+    // optimistic-lock conflict.
     guard: ensured.isNew
       ? { kind: 'none' }
-      : { kind: 'optimisticLock', updatedAt: card.updatedAt },
+      : card.repetitions === 0
+        ? { kind: 'repetitionsZero' }
+        : { kind: 'optimisticLock', updatedAt: card.updatedAt },
     updatedAt: new Date(),
   });
 

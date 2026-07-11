@@ -187,36 +187,6 @@ function fullSessionRow(
 }
 
 function makeFakeDb(state: FakeDbState): Database {
-  // findOwnedCurriculumTopic does db.select({...}).from().innerJoin()*3
-  // .where().limit(1) → returns an owned topic row.
-  const ownedTopicSelect = {
-    from: () => ownedTopicSelect,
-    innerJoin: () => ownedTopicSelect,
-    where: () => ownedTopicSelect,
-    // A non-owned topic surfaces as zero rows from the ownership-scoped join —
-    // exactly how findOwnedCurriculumTopic signals "not owned by this profile".
-    limit: async () =>
-      state.topicNotOwned
-        ? []
-        : [
-            {
-              topicId: TOPIC_ID,
-              topicTitle: 'T',
-              topicDescription: null,
-              topicChapter: null,
-              topicEstimatedMinutes: null,
-              bookId: 'book-1',
-              bookTitle: 'B',
-              curriculumId: 'cur-1',
-              subjectId: SUBJECT_ID,
-              topicSource: 'manual',
-              subjectName: 'S',
-              subjectPedagogyMode: null,
-              subjectLanguageCode: null,
-            },
-          ],
-  };
-
   // Shared write/read handlers — used by BOTH the top-level db and the tx
   // handed to db.transaction(). [WI-1060] persistChallengeRoundReviewTargets now
   // routes its needsDeepeningTopics read + update/insert loop through `tx`, so
@@ -276,10 +246,11 @@ function makeFakeDb(state: FakeDbState): Database {
         }
         return undefined;
       };
-      // Lazy: real code either awaits `.values(vals)` directly (assessments,
-      // needs_deepening_topics) or chains `.onConflictDoNothing(...)`
-      // (retention_cards). Only whichever is actually awaited runs the
-      // insert — never both, so the effect fires exactly once either way.
+      // Invariant this lazy thenable relies on: every real call site awaits
+      // EITHER `.values(vals)` directly (assessments, needs_deepening_topics)
+      // OR chains `.onConflictDoNothing(...)` (retention_cards' insertRetentionCardIfAbsent)
+      // — never both on the same call. Only whichever is actually awaited
+      // runs `runInsert()`, so the effect fires exactly once either way.
       return {
         then: (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
           runInsert().then(resolve, reject),
@@ -1439,6 +1410,271 @@ describe('finalizeChallengeRoundIfReady — review-targets transaction atomicity
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({
         message: 'transient deepening insert failure',
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'challenge-round.finalize.terminal-write-failed',
+        }),
+      }),
+    );
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'app/challenge-round.finalize.failed' }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1445] Mastery-evidence write transaction atomicity.
+//
+// `persistChallengeRoundMasteryEvidence` wraps its assessments insert AND the
+// retention-card seed write (updateRetentionFromSession) in a single
+// db.transaction(). Without it, a throw from the retention write AFTER the
+// assessments insert already ran (but had not yet committed on its own)
+// would leave the caller's release-on-throw retry path (see the
+// mastery-write-failure describe block above) free to re-run
+// persistChallengeRoundMasteryEvidence on the next attempt — inserting a
+// SECOND assessments row for the same verification, because the first
+// row's insert was never rolled back.
+//
+// RED (remove db.transaction() from persistChallengeRoundMasteryEvidence):
+//   the assessments insert commits directly; when the retention write then
+//   throws, state.masteryInserts.length === 1 — partial commit survives.
+// GREEN (with db.transaction()): the assessments insert goes into a pending
+//   buffer; the rollback (never flushing) discards it;
+//   state.masteryInserts.length === 0 after the throw.
+// ---------------------------------------------------------------------------
+
+/**
+ * Rollback-aware fake db for the mastery-write atomicity red-green test.
+ * Mirrors makeRollbackAwareFakeDb's structure (WI-1060), applied to the
+ * assessments + retention_cards writes instead of needs_deepening_topics.
+ *
+ * - Transaction #1 (claim): simple pass-through.
+ * - Transaction #2 (mastery evidence, MY new wrap): rollback-aware — the
+ *   assessments insert AND retention-card find/insert/update all touch a
+ *   pending scratch buffer, flushed to committed state only on success.
+ * - Transaction #3 (release, fires because #2 threw): simple pass-through
+ *   (persistSessionMetadata opens its own FOR UPDATE transaction).
+ *
+ * `opts.failRetentionUpdate`: when true, the retention-card SM-2 update
+ * (applyRetentionUpdate's UPDATE, the LAST write in the sequence) throws —
+ * models a transient DB error after the assessments insert already ran.
+ */
+function makeMasteryRollbackAwareFakeDb(
+  state: FakeDbState,
+  opts: { failRetentionUpdate: boolean },
+): Database {
+  const committedMasteryInserts: Array<Record<string, unknown>> = [];
+  let committedRetentionCard: Record<string, unknown> | undefined;
+  let txCount = 0;
+
+  const ownershipNode: {
+    innerJoin: () => typeof ownershipNode;
+    where: () => typeof ownershipNode;
+    limit: () => Promise<Record<string, unknown>[]>;
+  } = {
+    innerJoin: () => ownershipNode,
+    where: () => ownershipNode,
+    limit: async () =>
+      state.topicNotOwned
+        ? []
+        : [
+            {
+              topicId: TOPIC_ID,
+              topicTitle: 'T',
+              topicDescription: null,
+              topicChapter: null,
+              topicEstimatedMinutes: null,
+              bookId: 'book-1',
+              bookTitle: 'B',
+              curriculumId: 'cur-1',
+              subjectId: SUBJECT_ID,
+              topicSource: 'manual',
+              subjectName: 'S',
+              subjectPedagogyMode: null,
+              subjectLanguageCode: null,
+            },
+          ],
+  };
+  const metadataNode = {
+    for: () => ({ limit: async () => [{ metadata: state.sessionMetadata }] }),
+    limit: async () => [{ metadata: state.sessionMetadata }],
+  };
+  const makeSelectHandler = () => () => ({
+    from: () => ({
+      innerJoin: () => ownershipNode,
+      where: () => metadataNode,
+    }),
+  });
+
+  const makeUpdateHandler = () => () => ({
+    set: (vals: Record<string, unknown>) => {
+      if (vals.metadata !== undefined) {
+        const whereResult = {
+          returning: async () => {
+            state.sessionMetadata = vals.metadata as Record<string, unknown>;
+            return [fullSessionRow(state.sessionMetadata)];
+          },
+          then: (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
+            Promise.resolve(undefined).then(resolve, reject),
+        };
+        return { where: () => whereResult };
+      }
+      // retention_cards SM-2 write — the fault-injection point.
+      const whereResult = {
+        returning: async () => {
+          if (opts.failRetentionUpdate) {
+            throw new Error('transient retention update failure');
+          }
+          if (!committedRetentionCard) return [];
+          committedRetentionCard = { ...committedRetentionCard, ...vals };
+          return [{ id: committedRetentionCard.id }];
+        },
+        then: (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
+          Promise.resolve(undefined).then(resolve, reject),
+      };
+      return { where: () => whereResult };
+    },
+  });
+
+  // `pendingMastery`/`pendingCard` are the tx-scoped scratch buffer for the
+  // rollback-aware transaction (#2); null selects the simple pass-through
+  // buffer (writes land directly in the committed state).
+  const makeInsertHandler =
+    (pendingMastery: Array<Record<string, unknown>> | null) =>
+    (_table: unknown) => ({
+      values: (vals: Record<string, unknown>) => {
+        const runInsert = async () => {
+          if ('masteryChallengeVerifiedAt' in vals) {
+            if (pendingMastery !== null) {
+              pendingMastery.push(vals);
+            } else {
+              committedMasteryInserts.push(vals);
+              state.masteryInserts = [...committedMasteryInserts];
+            }
+          } else if ('easeFactor' in vals && !committedRetentionCard) {
+            committedRetentionCard = {
+              id: 'retention-card-1',
+              profileId: vals.profileId as string,
+              topicId: vals.topicId as string,
+              easeFactor: (vals.easeFactor as number) ?? 2.5,
+              intervalDays: (vals.intervalDays as number) ?? 1,
+              repetitions: (vals.repetitions as number) ?? 0,
+              failureCount: (vals.failureCount as number) ?? 0,
+              consecutiveSuccesses: (vals.consecutiveSuccesses as number) ?? 0,
+              xpStatus: (vals.xpStatus as string) ?? 'pending',
+              lastReviewedAt: null,
+              nextReviewAt: null,
+              masteredAt: null,
+              evaluateDifficultyRung: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+          }
+          return undefined;
+        };
+        // Invariant (see makeFakeDb's insertHandler for the full rationale):
+        // real call sites await EITHER `.values(vals)` directly OR chain
+        // `.onConflictDoNothing(...)`, never both — exactly one of `then` /
+        // `onConflictDoNothing` runs `runInsert()` per call.
+        return {
+          then: (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
+            runInsert().then(resolve, reject),
+          onConflictDoNothing: (_o?: unknown) => runInsert(),
+        };
+      },
+    });
+
+  const makeQueryHandler = () => ({
+    needsDeepeningTopics: { findMany: async () => [] },
+    sessionEvents: {
+      findMany: async () => state.sessionEventRows ?? defaultSessionEventRows(),
+    },
+    retentionCards: {
+      findFirst: async () => committedRetentionCard ?? undefined,
+    },
+  });
+
+  const db = {
+    transaction: async (fn: (tx: unknown) => unknown) => {
+      txCount++;
+      if (txCount !== 2) {
+        // Claim (#1) and release (#3): simple pass-through.
+        const tx = {
+          select: makeSelectHandler(),
+          update: makeUpdateHandler(),
+          insert: makeInsertHandler(null),
+          query: makeQueryHandler(),
+        };
+        return fn(tx);
+      }
+
+      // Mastery-evidence (#2): rollback-aware. The assessments insert lands
+      // in a pending buffer; if fn throws (the retention write fails), the
+      // buffer is never flushed — that IS the rollback. No catch needed:
+      // the exception propagates naturally to the caller.
+      const pendingMastery: Array<Record<string, unknown>> = [];
+      const tx = {
+        select: makeSelectHandler(),
+        update: makeUpdateHandler(),
+        insert: makeInsertHandler(pendingMastery),
+        query: makeQueryHandler(),
+      };
+      const result = await fn(tx);
+      committedMasteryInserts.push(...pendingMastery);
+      state.masteryInserts = [...committedMasteryInserts];
+      return result;
+    },
+
+    select: makeSelectHandler(),
+    insert: makeInsertHandler(null),
+    update: makeUpdateHandler(),
+    query: makeQueryHandler(),
+  };
+
+  return db as unknown as Database;
+}
+
+describe('finalizeChallengeRoundIfReady — mastery-evidence write transaction atomicity [WI-1445]', () => {
+  beforeEach(() => {
+    mockCaptureException.mockClear();
+    mockInngestSend.mockClear();
+  });
+
+  it('[WI-1445] rolls back the assessments insert when the retention write throws (atomicity)', async () => {
+    const challengeRound = draftingState(SOLID_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeMasteryRollbackAwareFakeDb(state, {
+      failRetentionUpdate: true,
+    });
+    const session = makeSession(state.sessionMetadata);
+
+    await expect(
+      finalizeChallengeRoundIfReady(
+        db,
+        PROFILE_ID,
+        session,
+        challengeRound,
+        null,
+      ),
+    ).rejects.toThrow('transient retention update failure');
+
+    // GREEN: transaction rolled back — no assessments row committed despite
+    // the insert having run before the retention write threw.
+    expect(state.masteryInserts).toHaveLength(0);
+
+    // Claim released: session is back to 'drafting' so a retry can re-run
+    // WITHOUT duplicating the assessments row.
+    expect(persistedChallengeState(state)?.state).toBe('drafting');
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'transient retention update failure',
       }),
       expect.objectContaining({
         extra: expect.objectContaining({
