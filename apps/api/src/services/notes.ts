@@ -1,4 +1,4 @@
-import { eq, and, inArray, sql, desc, lt, type SQL } from 'drizzle-orm';
+import { eq, and, inArray, sql, desc, lt, isNull, type SQL } from 'drizzle-orm';
 import {
   topicNotes,
   curriculumTopics,
@@ -8,7 +8,7 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import type { AllNote } from '@eduagent/schemas';
+import type { AllNote, NoteArtifactSource } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../errors';
 import { assertOwnedCurriculumTopic } from './curriculum-topic-ownership';
 import { createLogger } from './logger';
@@ -156,6 +156,7 @@ async function insertNoteWithCap(
     profileId: string;
     sessionId: string | null;
     content: string;
+    artifactSource?: string | null;
   },
   options: { dedupeExactSessionContent?: boolean } = {},
 ): Promise<MappedNoteRow> {
@@ -168,7 +169,16 @@ async function insertNoteWithCap(
     // Idempotency for retries: submitSummary can be retried with the same
     // payload. Only dedupe the exact same session+topic+content; users can
     // write multiple different notes during the same chat.
+    //
+    // [WI-1658] Dedup is also artifactSource-aware: a marked write (e.g. a
+    // verified-proof note) must never be swallowed by a match against an
+    // earlier UNMARKED row with identical content (or vice versa) — that
+    // would silently drop the marker. `eq(col, null)` never matches in SQL,
+    // so a null marker needs `isNull(...)`, not `eq(...)`.
     if (options.dedupeExactSessionContent && values.sessionId) {
+      const artifactSourceMatch = values.artifactSource
+        ? eq(topicNotes.artifactSource, values.artifactSource)
+        : isNull(topicNotes.artifactSource);
       const [existingForSession] = await tx
         .select({
           id: topicNotes.id,
@@ -185,6 +195,7 @@ async function insertNoteWithCap(
             eq(topicNotes.sessionId, values.sessionId),
             eq(topicNotes.topicId, values.topicId),
             eq(topicNotes.content, values.content),
+            artifactSourceMatch,
           ),
         )
         .limit(1);
@@ -236,14 +247,12 @@ export async function createNoteForSession(
     topicId: string;
     sessionId: string;
     content: string;
-    // [L15-003 / L15-001] When a challenge_round caller path is wired up, it
-    // MUST pass `params.content` through validateNoteDraft (services/challenge-round/note-draft.ts)
-    // first to enforce the lexical-overlap hallucination guard. The end-to-end
-    // pipeline (envelope projection → decideMasteryAndReview → validateNoteDraft
-    // → createNoteForSession) is currently UNWIRED — no production code path
-    // calls validateNoteDraft today, and no guard test exists. Re-add the
-    // guard test (services/challenge-round/note-draft.guard.test.ts) alongside
-    // the wiring work.
+    // [WI-1658] Set by the Challenge-Round finalize path (session-exchange.ts)
+    // to mark a note as a verified-proof artifact. The caller is responsible
+    // for running `params.content` through validateNoteDraft
+    // (services/challenge-round/note-draft.ts) beforehand — this function
+    // does not re-validate.
+    artifactSource?: NoteArtifactSource;
   },
 ): Promise<MappedNoteRow> {
   return insertNoteWithCap(
@@ -253,6 +262,7 @@ export async function createNoteForSession(
       profileId: params.profileId,
       sessionId: params.sessionId,
       content: params.content,
+      artifactSource: params.artifactSource ?? null,
     },
     {
       dedupeExactSessionContent: true,

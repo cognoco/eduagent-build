@@ -100,6 +100,7 @@ import {
 import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
 import { getRetentionStatus, type RetentionState } from '../retention';
+import { createNoteForSession } from '../notes';
 import type {
   EscalationRung,
   LlmProviderPolicy,
@@ -1188,6 +1189,30 @@ export async function finalizeChallengeRoundIfReady(
     evaluations,
     verifiedSolidContents,
   );
+
+  // [WI-1658] Persist the validated draft as the durable verified-proof artifact,
+  // ONLY on a fully-verified round (every evaluation item solid). This sidesteps
+  // the event-grain gap the Artifact Provenance Contract flags for mixed rounds:
+  // a verified round has no non-solid evaluation item to mix in, so the
+  // contract's "all sourced answer events solid" condition holds trivially here.
+  // Best-effort: a persistence failure must not fail Challenge Round finalization,
+  // which has already durably recorded the verified fact via
+  // persistChallengeRoundMasteryEvidence above.
+  if (decision.outcome === 'verified' && draftedNote?.body) {
+    await safeWrite(
+      () =>
+        createNoteForSession(db, {
+          profileId,
+          topicId,
+          sessionId: session.id,
+          content: draftedNote.body as string,
+          artifactSource: 'challenge_drafted_note',
+        }),
+      'challenge-round.finalize.note-persist',
+      { profileId, sessionId: session.id, topicId },
+    );
+  }
+
   // The terminal `complete` state was already persisted by the claim above
   // (single source of truth). Recompute the same value for the return payload.
   const complete = transitionChallengeState(

@@ -386,7 +386,23 @@
       },
       "childProfileLabel": "{{name}}s profil",
       "greetingFallbackName": "der",
-      "greetingNoName": "Hei på deg!"
+      "greetingNoName": "Hei på deg!",
+      "verifiedProof": {
+        "headline": "Bekreftet: {{topic}}",
+        "verifiedOn": "Bekreftet {{date}}",
+        "quoteUnavailable": "Kilden er ikke lenger tilgjengelig",
+        "state": {
+          "unverified": "Ikke bekreftet ennå",
+          "fresh": "Bekreftet",
+          "stale": "Bør ses på igjen"
+        },
+        "retention": {
+          "strong": "Sitter godt",
+          "fading": "Begynner å svinne",
+          "weak": "Begynner å ruste",
+          "forgotten": "På tide å repetere"
+        }
+      }
     },
     "goToProgress": "Gå til Fremdrift",
     "goToProgressLabel": "Gå til Fremdrift",

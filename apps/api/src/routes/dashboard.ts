@@ -19,6 +19,7 @@ import {
   weeklyReportDetailResponseSchema,
   demoDashboardDataSchema,
   progressSummarySchema,
+  verifiedProofResponseSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
@@ -57,6 +58,7 @@ import {
 } from '../services/memory/projection';
 import { getProgressSummary } from '../services/progress-summary';
 import { getChildTopicSnapshotForParent } from '../services/family-bridge';
+import { getLatestVerifiedProofForChild } from '../services/parent-proof';
 
 type DashboardRouteEnv = {
   Bindings: {
@@ -273,6 +275,22 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       return notFound(c, 'Session not found');
     }
     return c.json(childSessionDetailResponseSchema.parse({ session }));
+  })
+
+  // [WI-1658] Latest verified-proof receipt (parent home card)
+  .get('/dashboard/children/:profileId/verified-proof', async (c) => {
+    const { db, profileId: parentProfileId } = withProfile(c);
+    const childProfileId = c.req.param('profileId');
+
+    // [BUG-834] Defense-in-depth at route entry.
+    await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+
+    const proof = await getLatestVerifiedProofForChild(
+      db,
+      parentProfileId,
+      childProfileId,
+    );
+    return c.json(verifiedProofResponseSchema.parse(proof));
   })
 
   // Curated memory view for parent

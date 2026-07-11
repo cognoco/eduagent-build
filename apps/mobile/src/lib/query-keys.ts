@@ -206,6 +206,13 @@ export const queryKeys = {
     childDetail: (mode: ModeSegment, childProfileId: string | undefined) =>
       ['dashboard', mode, 'child', childProfileId] as const,
 
+    // [WI-1658]
+    childVerifiedProof: (
+      mode: ModeSegment,
+      childProfileId: string | undefined,
+    ) =>
+      ['dashboard', mode, 'child', childProfileId, 'verified-proof'] as const,
+
     childSubject: (
       mode: ModeSegment,
       childProfileId: string | undefined,

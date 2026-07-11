@@ -392,7 +392,23 @@
       },
       "childProfileLabel": "Profil {{name}}",
       "greetingFallbackName": "Cześć",
-      "greetingNoName": "Cześć!"
+      "greetingNoName": "Cześć!",
+      "verifiedProof": {
+        "headline": "Zweryfikowano: {{topic}}",
+        "verifiedOn": "Zweryfikowano {{date}}",
+        "quoteUnavailable": "Źródło już niedostępne",
+        "state": {
+          "unverified": "Jeszcze niezweryfikowane",
+          "fresh": "Zweryfikowano",
+          "stale": "Warto sprawdzić ponownie"
+        },
+        "retention": {
+          "strong": "Dobrze zapamiętane",
+          "fading": "Zaczyna zanikać",
+          "weak": "Wymaga odświeżenia",
+          "forgotten": "Czas na powtórkę"
+        }
+      }
     },
     "goToProgress": "Przejdź do postępów",
     "goToProgressLabel": "Przejdź do postępów",

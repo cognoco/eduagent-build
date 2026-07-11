@@ -386,7 +386,23 @@
       },
       "childProfileLabel": "{{name}}s Profil",
       "greetingFallbackName": "Hallo",
-      "greetingNoName": "Hallo!"
+      "greetingNoName": "Hallo!",
+      "verifiedProof": {
+        "headline": "Verifiziert: {{topic}}",
+        "verifiedOn": "Verifiziert am {{date}}",
+        "quoteUnavailable": "Quelle nicht mehr verfügbar",
+        "state": {
+          "unverified": "Noch nicht verifiziert",
+          "fresh": "Verifiziert",
+          "stale": "Sollte erneut geprüft werden"
+        },
+        "retention": {
+          "strong": "Sitzt gut",
+          "fading": "Beginnt zu verblassen",
+          "weak": "Wird lückenhaft",
+          "forgotten": "Zeit zum Wiederholen"
+        }
+      }
     },
     "goToProgress": "Zum Fortschritt",
     "goToProgressLabel": "Zum Fortschritt",

@@ -386,7 +386,23 @@
       },
       "childProfileLabel": "{{name}}のプロフィール",
       "greetingFallbackName": "こんにちは",
-      "greetingNoName": "こんにちは！"
+      "greetingNoName": "こんにちは！",
+      "verifiedProof": {
+        "headline": "検証済み: {{topic}}",
+        "verifiedOn": "{{date}}に検証済み",
+        "quoteUnavailable": "出典は現在利用できません",
+        "state": {
+          "unverified": "未検証",
+          "fresh": "検証済み",
+          "stale": "要再確認"
+        },
+        "retention": {
+          "strong": "よく定着しています",
+          "fading": "記憶が薄れています",
+          "weak": "記憶が曖昧です",
+          "forgotten": "復習が必要です"
+        }
+      }
     },
     "goToProgress": "進捗へ",
     "goToProgressLabel": "進捗へ",
