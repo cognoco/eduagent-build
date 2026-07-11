@@ -297,15 +297,38 @@ jobs:
       - name: Build schemas package
         run: pnpm exec tsc --build packages/schemas/tsconfig.lib.json
 
+      # The seed service must create real users in the same Clerk instance as
+      # the preview publishable key embedded in the APK. Read all seed secrets
+      # from Doppler staging, matching the trusted Playwright workflow, so the
+      # local API never falls back to database-only fake Clerk identities.
+      - name: Install Doppler CLI
+        run: |
+          DOPPLER_VERSION="3.76.0"
+          DOPPLER_ARCHIVE="doppler_${DOPPLER_VERSION}_linux_amd64.tar.gz"
+          DOPPLER_SHA256="04f1ff30ed162d7af1dba7f11ad6a37ef35099de86a7ec6e261b64b1b337a3f3"
+          curl -fsSLO "https://github.com/DopplerHQ/cli/releases/download/${DOPPLER_VERSION}/${DOPPLER_ARCHIVE}"
+          echo "${DOPPLER_SHA256}  ${DOPPLER_ARCHIVE}" | sha256sum -c -
+          sudo tar -xzf "${DOPPLER_ARCHIVE}" -C /usr/local/bin doppler
+          doppler --version
+
       # Write .dev.vars so wrangler dev can pass secrets into the Workers runtime.
       # wrangler dev runs in an isolated V8 sandbox — it does NOT inherit shell
       # env vars. It reads non-secret bindings from wrangler.toml [vars] and
       # secret bindings from .dev.vars in the project directory.
       - name: Write wrangler .dev.vars for API
         run: |
-          printf "DATABASE_URL=%s\nNODE_ENV=test\nTEST_SEED_SECRET=%s\n" "$DATABASE_URL" "$TEST_SEED_SECRET" > apps/api/.dev.vars
+          if [ -z "${DOPPLER_TOKEN:-}" ]; then
+            echo "::error title=Doppler token missing::DOPPLER_TOKEN_STG is required to create real Clerk seed users."
+            exit 1
+          fi
+          doppler run -p mentomate -c stg --command "
+            umask 077
+            printf 'DATABASE_URL=%s\nNODE_ENV=test\nTEST_SEED_SECRET=%s\nCLERK_SECRET_KEY=%s\nSEED_PASSWORD=%s\n' \
+              \"\$DATABASE_URL\" \"\$TEST_SEED_SECRET\" \"\$CLERK_SECRET_KEY\" \"\$SEED_PASSWORD\" \
+              > apps/api/.dev.vars
+          "
         env:
-          TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
 
       # Start API server in background (NODE_ENV=test enables __test/* routes)
       - name: Start API server (background)

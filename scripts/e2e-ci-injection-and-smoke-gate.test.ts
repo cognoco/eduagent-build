@@ -484,6 +484,26 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(appLaunchFlow).toContain('_setup/nav-welcome-to-sign-in.yaml');
   });
 
+  it('gives the local seed API the staging Clerk credentials needed for real sign-in users', () => {
+    const installDopplerStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Install Doppler CLI',
+    );
+    const writeVarsStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Write wrangler .dev.vars for API',
+    );
+    const writeVarsEnv = (writeVarsStep?.env ?? {}) as Record<string, unknown>;
+    const writeVarsScript = String(writeVarsStep?.run ?? '');
+
+    expect(String(installDopplerStep?.run)).toContain('DOPPLER_VERSION=');
+    expect(String(installDopplerStep?.run)).toContain('sha256sum -c -');
+    expect(writeVarsEnv.DOPPLER_TOKEN).toBe('${{ secrets.DOPPLER_TOKEN_STG }}');
+    expect(writeVarsScript).toContain('doppler run -p mentomate -c stg');
+    expect(writeVarsScript).toContain('CLERK_SECRET_KEY');
+    expect(writeVarsScript).toContain('SEED_PASSWORD');
+    expect(writeVarsScript).toContain('TEST_SEED_SECRET');
+    expect(writeVarsScript).not.toContain('${{ secrets.');
+  });
+
   it('keeps every pr-blocking flow in the explicit PR plan', () => {
     const plan = loadPlan('pr');
 
