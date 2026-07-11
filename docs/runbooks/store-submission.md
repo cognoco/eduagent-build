@@ -46,7 +46,7 @@ cd apps/mobile
 eas build --platform all --profile production --non-interactive
 ```
 
-Record build IDs, commit, profile, flag classification, and links. Verify the installed candidate against the production API and the Config-T shell before submission.
+Record each build ID, commit, profile, flag classification, and link. Verify the installed candidate against the production API and the Config-T shell before submission. Use that recorded build ID for submission; never select a candidate by recency.
 
 ## Internal Submission
 
@@ -54,7 +54,7 @@ Android's `track: internal` is the dry-run destination; it is a real upload to P
 
 ```powershell
 cd apps/mobile
-eas submit -p android --profile production --latest --non-interactive --wait
+eas submit -p android --profile production --id <android-build-id> --non-interactive --wait
 ```
 
 Confirm the submission succeeds and the build appears on Play internal testing before promoting any release.
@@ -63,7 +63,7 @@ For iOS, submit the verified production build to TestFlight:
 
 ```powershell
 cd apps/mobile
-eas submit -p ios --profile production --latest --non-interactive --wait
+eas submit -p ios --profile production --id <ios-build-id> --non-interactive --wait
 ```
 
 Confirm processing in App Store Connect and add only approved internal TestFlight groups.

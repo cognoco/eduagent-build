@@ -46,6 +46,9 @@ describe('WI-1341 production EAS submit contract', () => {
     expect(runbook).toContain('OPQ-37');
     expect(runbook).toContain('Play internal');
     expect(runbook).toContain('TestFlight');
+    expect(runbook).toContain('--id <android-build-id>');
+    expect(runbook).toContain('--id <ios-build-id>');
+    expect(runbook).not.toContain('--latest');
   });
 });
 
