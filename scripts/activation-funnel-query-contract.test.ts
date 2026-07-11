@@ -101,7 +101,7 @@ describe('activation funnel query runbook', () => {
       'does not select `profile_id`, `anonymous_id`, or `metadata` as raw output',
     );
     expect(runbook).toContain('No raw learning content');
-    expect(runbook).toMatch(/signed-in app opens only/i);
+    expect(runbook).toMatch(/app_opened[^.\n]*signed-in launches only/i);
     expect(contract).not.toContain('first_seen');
     expect(contract).not.toContain('last_seen');
     expect(contract).toContain('returned_after_signup');

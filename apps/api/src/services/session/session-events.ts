@@ -10,7 +10,7 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import { NotFoundError } from '@eduagent/schemas';
+import { NotFoundError, parseLanguageLearningSummary } from '@eduagent/schemas';
 import type {
   LearningSession,
   SessionSummary,
@@ -79,6 +79,9 @@ export function mapSummaryRow(
     nextTopicTitle: null,
     nextTopicReason: row.nextTopicReason ?? null,
     purgedAt: row.purgedAt?.toISOString() ?? null,
+    languageLearningSummary: parseLanguageLearningSummary(
+      row.languageLearningSummary,
+    ),
   };
 }
 

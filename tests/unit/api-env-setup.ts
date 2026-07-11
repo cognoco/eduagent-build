@@ -1,3 +1,5 @@
+import { ensureFetchIsSpyable } from '../../apps/api/src/test-utils/ensure-fetch-spyable';
+
 const API_UNIT_IDENTITY_V2_DEFAULT = 'false';
 
 function resetApiUnitEnv(): void {
@@ -9,4 +11,5 @@ resetApiUnitEnv();
 
 beforeEach(() => {
   resetApiUnitEnv();
+  ensureFetchIsSpyable();
 });

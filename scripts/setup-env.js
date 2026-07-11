@@ -164,9 +164,10 @@ const EAS_JSON_DENYLIST = [
  * Preserves all non-env profile settings and any unmanaged env vars.
  * Only writes if content actually changed (avoids git noise).
  */
-function updateEasJson() {
-  const easPath = path.join(__dirname, '..', 'apps', 'mobile', 'eas.json');
-
+function updateEasJson(
+  easPath = path.join(__dirname, '..', 'apps', 'mobile', 'eas.json'),
+  fetchSecretsJson = downloadSecretsJson,
+) {
   if (!fs.existsSync(easPath)) {
     console.log(
       '\x1b[33m[Doppler]\x1b[0m Skipping eas.json update (file not found)',
@@ -200,7 +201,7 @@ function updateEasJson() {
     const profiles = Array.isArray(profileNames)
       ? profileNames
       : [profileNames];
-    const secrets = downloadSecretsJson(envKey);
+    const secrets = fetchSecretsJson(envKey);
     if (!secrets) {
       console.log(
         `\x1b[33m[Doppler]\x1b[0m   Skipping ${profiles.join(', ')} ` +
@@ -233,19 +234,18 @@ function updateEasJson() {
         easConfig.build[profileName] = {};
       }
 
-      // Merge: preserve unmanaged vars, set managed vars from Doppler
+      // Merge: preserve every existing var by default, then overlay managed
+      // vars Doppler actually returned this run. Strip denylisted secrets
+      // unconditionally so legacy entries get removed on next sync
+      // (BUG-235/345).
       const existingEnv = easConfig.build[profileName].env || {};
       const mergedEnv = {};
 
-      // Keep any vars not managed by this script, but strip denylisted
-      // secrets so legacy entries get removed on next sync (BUG-235/345).
       for (const [key, value] of Object.entries(existingEnv)) {
         if (EAS_JSON_DENYLIST.includes(key)) {
           continue;
         }
-        if (!key.startsWith('EXPO_PUBLIC_') && !EAS_EXTRA_VARS.includes(key)) {
-          mergedEnv[key] = value;
-        }
+        mergedEnv[key] = value;
       }
 
       // Set all managed vars from Doppler
@@ -274,6 +274,20 @@ function updateEasJson() {
           continue;
         }
         mergedEnv[key] = value;
+      }
+
+      // Warn about any managed key preserved from existingEnv only because
+      // Doppler doesn't currently define it — it would otherwise have been
+      // silently dropped (WI-1311).
+      for (const key of Object.keys(mergedEnv)) {
+        const isManaged =
+          key.startsWith('EXPO_PUBLIC_') || EAS_EXTRA_VARS.includes(key);
+        if (isManaged && !(key in managedVars)) {
+          console.log(
+            `\x1b[33m[Doppler]\x1b[0m   preserving ${key} (not in Doppler ` +
+              `${envKey}, would otherwise be dropped)`,
+          );
+        }
       }
 
       // Sort keys for deterministic output
@@ -416,4 +430,13 @@ function main() {
   }
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  updateEasJson,
+  EAS_PROFILE_MAP,
+  EAS_EXTRA_VARS,
+  EAS_JSON_DENYLIST,
+};

@@ -39,6 +39,10 @@ import {
   type StrengthEntry,
   type FocusAreaEntry,
 } from './learning-profiles';
+import {
+  languageSessionSummarySchema,
+  type LanguageSessionSummaryData,
+} from './language';
 
 // ---------------------------------------------------------------------------
 // [BUG-220] coaching_card_cache.card_data
@@ -127,6 +131,24 @@ export const sessionSummaryLlmSummarySchema = llmSummarySchema.nullable();
 export function parseSessionSummaryLlmSummary(raw: unknown): LlmSummary | null {
   if (raw === null || raw === undefined) return null;
   const parsed = llmSummarySchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+// ---------------------------------------------------------------------------
+// [WI-1553] session_summaries.language_learning_summary
+// ---------------------------------------------------------------------------
+// Same additive-jsonb pattern as llm_summary above: the drizzle column uses
+// `$type<LanguageSessionSummaryData | null>()` (TS-only), so a legacy row
+// (column NULL — predates this WI, or a non-four_strands session that never
+// wrote it) or a malformed row both parse to null via this helper rather than
+// throwing. This is the mechanism behind AC4 (additive/legacy-safe).
+// ---------------------------------------------------------------------------
+
+export function parseLanguageLearningSummary(
+  raw: unknown,
+): LanguageSessionSummaryData | null {
+  if (raw === null || raw === undefined) return null;
+  const parsed = languageSessionSummarySchema.safeParse(raw);
   return parsed.success ? parsed.data : null;
 }
 

@@ -58,12 +58,64 @@ export function usePostSessionNotificationAsk(
     // so a later session-summary mount can retry — latching here permanently
     // suppresses the one-time primer for the rest of the mount on any blip.
     // The guard is latched only at the real terminal points (already-asked,
-    // already-granted/OS-blocked, or primer actually scheduled).
+    // OS-blocked, or primer actually scheduled).
     const latchGuard = (): void => {
       firedForProfileRef.current = profileId;
     };
     let cancelled = false;
     const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    // [WI-1441 round 3] Attempts to persist pushEnabled=true server-side and
+    // reports whether it actually succeeded. The caller must only consume the
+    // primer (mark SecureStore seen) when this resolves true — marking seen
+    // on a failed sync reproduces the original bug: the OS grant would be
+    // recorded, but the server's pushEnabled would silently stay false
+    // forever with no further retry.
+    const syncPushEnabled = async (
+      breadcrumbPrefix: string,
+    ): Promise<boolean> => {
+      let prefs = notifQueryRef.current.data;
+      if (!prefs) {
+        try {
+          prefs = (await notifQueryRef.current.refetch()).data;
+        } catch (refetchErr) {
+          Sentry.addBreadcrumb({
+            category: 'permissions',
+            message: `${breadcrumbPrefix}: prefs refetch before pushEnabled sync failed`,
+            level: 'warning',
+            data: { error: String(refetchErr) },
+          });
+        }
+      }
+      if (!prefs) {
+        Sentry.addBreadcrumb({
+          category: 'permissions',
+          message: `${breadcrumbPrefix}: pushEnabled sync skipped — notification prefs unavailable`,
+          level: 'warning',
+        });
+        return false;
+      }
+      try {
+        await updateNotificationsRef.current.mutateAsync({
+          reviewReminders: prefs.reviewReminders,
+          dailyReminders: prefs.dailyReminders,
+          weeklyProgressPush: prefs.weeklyProgressPush,
+          weeklyProgressEmail: prefs.weeklyProgressEmail,
+          monthlyProgressEmail: prefs.monthlyProgressEmail,
+          maxDailyPush: prefs.maxDailyPush,
+          pushEnabled: true,
+        });
+        return true;
+      } catch (mutateErr) {
+        Sentry.addBreadcrumb({
+          category: 'permissions',
+          message: `${breadcrumbPrefix}: pushEnabled sync failed`,
+          level: 'warning',
+          data: { error: String(mutateErr) },
+        });
+        return false;
+      }
+    };
 
     void (async () => {
       const key = notificationFirstAskKey(profileId);
@@ -99,9 +151,28 @@ export function usePostSessionNotificationAsk(
       }
       if (cancelled) return;
 
-      if (status === 'granted' || !canAskAgain) {
-        // Already granted or OS-blocked — no point asking. Mark seen so we
-        // don't keep probing on every session-summary mount.
+      if (status === 'granted') {
+        // [WI-1441 round 3] Silent repair path: permission is already
+        // granted — possibly from an earlier attempt whose sync failed. Do
+        // NOT re-prompt with the OS dialog (the user already said yes); just
+        // retry the persist quietly, and only consume the primer if it
+        // succeeds. A repeated failure leaves the primer eligible so the
+        // next session-summary mount tries again.
+        const synced = await syncPushEnabled(
+          'post-session notif primer (silent repair)',
+        );
+        if (cancelled) return;
+        if (synced) {
+          latchGuard();
+          void SecureStore.setItemAsync(key, 'true').catch(() => undefined);
+        }
+        return;
+      }
+
+      if (!canAskAgain) {
+        // OS has permanently blocked re-asking — nothing more we can do, so
+        // this is a genuinely terminal no-op. Mark seen so we don't keep
+        // probing on every session-summary mount.
         latchGuard();
         void SecureStore.setItemAsync(key, 'true').catch(() => undefined);
         return;
@@ -135,60 +206,21 @@ export function usePostSessionNotificationAsk(
                     const result =
                       await Notifications.requestPermissionsAsync();
                     if (result.status === 'granted') {
-                      // [WI-1441] Sync pushEnabled=true server-side — this is
-                      // the only path (besides the explicit More > Notifications
-                      // toggle) that grants OS permission, and without this the
-                      // server default stays false forever, silently skipping
-                      // every push-eligibility cron for this user.
-                      //
-                      // A grant landing before the settings query resolves
-                      // must not silently skip the sync — force a refetch so
-                      // the grant always eventually persists.
-                      let prefs = notifQueryRef.current.data;
-                      if (!prefs) {
-                        try {
-                          prefs = (await notifQueryRef.current.refetch()).data;
-                        } catch (refetchErr) {
-                          Sentry.addBreadcrumb({
-                            category: 'permissions',
-                            message:
-                              'post-session notif primer: prefs refetch before pushEnabled sync failed',
-                            level: 'warning',
-                            data: { error: String(refetchErr) },
-                          });
-                        }
+                      // [WI-1441 round 3] Only consume the primer once the
+                      // sync actually succeeds. If it fails, leave SecureStore
+                      // un-marked — the next session-summary mount will find
+                      // permission already granted and retry via the silent
+                      // repair path above, rather than losing the sync forever.
+                      const synced = await syncPushEnabled(
+                        'post-session notif primer',
+                      );
+                      if (synced) {
+                        markSeen();
                       }
-                      if (prefs) {
-                        updateNotificationsRef.current.mutate(
-                          {
-                            reviewReminders: prefs.reviewReminders,
-                            dailyReminders: prefs.dailyReminders,
-                            weeklyProgressPush: prefs.weeklyProgressPush,
-                            weeklyProgressEmail: prefs.weeklyProgressEmail,
-                            monthlyProgressEmail: prefs.monthlyProgressEmail,
-                            maxDailyPush: prefs.maxDailyPush,
-                            pushEnabled: true,
-                          },
-                          {
-                            onError: (mutateErr) => {
-                              Sentry.addBreadcrumb({
-                                category: 'permissions',
-                                message:
-                                  'post-session notif primer: pushEnabled sync failed',
-                                level: 'warning',
-                                data: { error: String(mutateErr) },
-                              });
-                            },
-                          },
-                        );
-                      } else {
-                        Sentry.addBreadcrumb({
-                          category: 'permissions',
-                          message:
-                            'post-session notif primer: pushEnabled sync skipped — notification prefs unavailable',
-                          level: 'warning',
-                        });
-                      }
+                    } else {
+                      // User was asked and declined, or dismissed — genuinely
+                      // terminal; consume the primer as before.
+                      markSeen();
                     }
                   } catch (err) {
                     Sentry.addBreadcrumb({
@@ -198,7 +230,6 @@ export function usePostSessionNotificationAsk(
                       level: 'warning',
                       data: { error: String(err) },
                     });
-                  } finally {
                     markSeen();
                   }
                 })();

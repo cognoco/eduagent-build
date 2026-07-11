@@ -8,6 +8,18 @@ The authoritative row shape is `packages/database/src/schema/activation-events.t
 
 Run these queries with `psql` against the intended environment-specific Neon connection. The connection is the environment boundary: server-owned events currently store `environment IS NULL`, so a row-level environment filter cannot safely distinguish production from staging. Confirm the selected Doppler config/connection first, then set a half-open UTC range so adjacent reviews do not double-count boundary events:
 
+| Column | Notes |
+|---|---|
+| `profile_id` | **Nullable.** Set once a profile exists. **Interim contract (WI-1689):** `app_opened` and `signup_started` are gated client-side on an existing Clerk *auth session* (see `use-activation-launch-events.ts`, `sign-up.tsx`), so neither fires for a signed-out visitor with no Clerk session. That auth session is distinct from this app's own *account/profile graph*, which is created later, at `POST /profiles` (see `apps/api/src/routes/profiles.ts`) — both events can still fire in the window after the Clerk session starts but before that graph exists, so `profile_id` is null there. That's a post-Clerk/pre-app-account window, not a raw anonymous (no-session) visitor. See the funnel-denominator caveat in the event inventory below and the follow-up work item WI-1803 (anonymous ingest). |
+| `anonymous_id` | Client-generated device/anon id. Present on client-driven events; may also be forwarded on server-recorded events if the client sends it, to let pre- and post-signup rows for the same device be joined. |
+| `event_type` | One of the 10 launch-critical events below. Forward-only allow-list enforced by the `activation_events_event_type_known` CHECK constraint. |
+| `occurred_at` | When the event happened (client-reported for ingest-route events, server time for server-recorded events). |
+| `environment`, `app_version`, `platform` | Build/environment provenance, so staging/dev noise is identifiable and excludable from launch-funnel numbers. |
+| `profile_shape` | Best-effort segment (`solo_owner` \| `guardian` \| `child` \| `proxy` \| `unknown`). See caveat below — most rows are `unknown` for the owner case; join `profiles.has_family_links` for exact segmentation. |
+| `route` | The route/service/screen source (e.g. `POST /subjects`, `onboarding.language_step`). |
+| `metadata` | jsonb — free-form, additive detail (e.g. `{subjectId}`, `{sessionId}`). **Never** raw learning content or sensitive child data — see the guard in `services/activation-events.ts`. |
+| `created_at` | Row insert time. Indexed — use this (not `occurred_at`) for funnel windowing unless you specifically need client-reported time. |
+
 ```psql
 \conninfo
 \set from_ts '2026-07-01T00:00:00Z'
@@ -20,22 +32,25 @@ The output is the review artifact. Do not export the raw table. Record the datab
 
 ## Event inventory
 
-| Event | Owner | Identity key | Counting note |
+| Event | Launch-critical? | Recorded by | Notes |
 |---|---|---|---|
-| `app_opened` | Client | anonymous device | Signed-in app opens only; the authenticated endpoint cannot observe signed-out or first-ever opens. Once per device/UTC day by default. |
-| `signup_started` | Client | anonymous device | Pre-account; `profile_id` is null. |
-| `signup_completed` | Server | profile | First owner graph creation. The server does not yet receive the pre-signup anonymous id. |
-| `onboarding_completed` | Client | profile + anonymous device | Client owns the terminal wizard transition. |
-| `first_subject_or_lesson_started` | Server | profile | First subject creation. |
-| `first_session_started` | Server | profile | First session start. |
-| `first_session_completed` | Server | profile | Shared session-filing completion choke point. |
-| `review_card_seen` | Client | profile + occurrence | Secondary activation signal. |
-| `review_card_tapped` | Client | profile + occurrence | Secondary activation signal. |
-| `day2_return` | Client | profile + anonymous device | Client-computed return signal. |
+| `app_opened` | Yes — funnel denominator | Client → `POST /activation-events` | Dedup: 1 row/device/UTC day. **Interim contract:** gated on an existing Clerk auth session, so it does not fire for a signed-out visitor with no session — this is *not* a true "every cold launch" denominator until WI-1803 (anonymous ingest) lands. Like `signup_started`, it can still fire before this app's own account/profile graph exists (`profile_id` null in that post-Clerk/pre-app-account window); pre-Clerk-session drop-off is not observable in this interim state. |
+| `signup_started` | Yes | Client → `POST /activation-events` | Fires once a Clerk auth session exists (not for a signed-out visitor), but before this app's own account/profile graph is created (`POST /profiles`); `profile_id` is therefore null from `signup_started` until that graph is bootstrapped, not because the visitor is anonymous. |
+| `signup_completed` | Yes | Server — `routes/profiles.ts`, at owner-graph creation (`createIdentityGraph`) | 1 row/profile ever (dedup on profile id). |
+| `onboarding_completed` | Yes | Client → `POST /activation-events` | **Deviation from the "server records what it can reach" default:** the API has no single terminal "onboarding complete" transition — `routes/onboarding.ts` only exposes independent PATCH steps (language / pronouns / interests), and the mobile client owns the onboarding wizard's completion state. Recorded via the ingest route instead. |
+| `first_subject_or_lesson_started` | Yes | Server — `routes/subjects.ts`, `POST /subjects` | 1 row/profile ever. |
+| `first_session_started` | Yes | Server — `routes/sessions.ts`, both session-start routes | 1 row/profile ever. |
+| `first_session_completed` | Yes | Server — `services/session/session-filing-dispatch.ts` → `dispatchSessionCompletedEvent` | Single choke point shared by all 3 completion routes (`/close`, `/summary`, `/summary/skip`). 1 row/profile ever. |
+| `review_card_seen` | Secondary | Client → `POST /activation-events` | Dedup by `occurrenceId` (pass the card id) so multiple distinct cards in one day each record. |
+| `review_card_tapped` | Secondary | Client → `POST /activation-events` | Same dedup pattern as above. |
+| `day2_return` | Yes — retention signal | Client → `POST /activation-events` | Client computes "this is a return on day N+1" and reports it; the server does not independently derive it (no cross-session first-open timestamp lookup at write time — keep this in mind if the client-computed flag is ever suspect). |
 
-`signup_started` and `signup_completed` cannot currently be joined by actor: the former is anonymous and the server-owned completion event does not receive `anonymous_id`. Report those counts independently. Profile-cohort conversion starts at `signup_completed` until that correlation is deliberately added.
+`signup_started` and `signup_completed` cannot currently be joined by actor. The client sends its device-scoped `anonymous_id` with `signup_started`, but the server-owned profile-bootstrap route does not receive or forward it when recording `signup_completed`. Report those counts independently. Profile-cohort conversion starts at `signup_completed` until that correlation is deliberately added.
 
-All writes are non-core `safeWrite()` calls. Under-counting is possible if telemetry fails; check Sentry surface tags before interpreting an anomalous drop as user behavior.
+- `profile_id IS NULL` is expected for `app_opened` and `signup_started` in the post-Clerk/pre-app-account window: a Clerk auth session already exists, but this app's own account/profile graph (`POST /profiles`) hasn't been created yet. Do not treat as a bug. Under the interim session-gated contract (WI-1689), neither event fires for a signed-out visitor with no Clerk session at all — that visitor produces zero activation-funnel rows, so pre-Clerk-session drop-off is not observable until WI-1803 (anonymous ingest) lands.
+- A gap in `first_session_started` → `first_session_completed` for a profile means the session was abandoned (not necessarily an instrumentation bug) — cross-check against `learning_sessions` before assuming a tracking miss.
+- All writes go through `safeWrite()` (`services/safe-non-core.ts`), so a write failure is captured in Sentry (surface tags: `*.first_session_started`, `*.first_session_completed`, `profiles.create.signup_completed`, `subjects.create.first_subject_or_lesson_started`, `activation-events.ingest`) but never breaks the user-facing request. **Under-counting is possible** (silent-by-design) — if a funnel step looks anomalously low, check Sentry for the matching surface tag before concluding it's a real drop-off.
+- `event_type` is a closed allow-list (DB CHECK) — a client sending an unrecognized value gets rejected at the schema layer (`activationEventIngestRequestSchema` in `@eduagent/schemas`) before it ever reaches the DB, so a malformed `event_type` should never appear as a row.
 
 ## Supported beta query surface
 

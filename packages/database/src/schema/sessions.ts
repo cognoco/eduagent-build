@@ -15,6 +15,7 @@ import type {
   LlmSummary,
   OnboardingDraftExchangeHistory,
   OnboardingDraftExtractedSignals,
+  LanguageSessionSummaryData,
 } from '@eduagent/schemas';
 import { person } from './identity';
 import { subjects, curriculumTopics } from './subjects';
@@ -284,6 +285,15 @@ export const sessionSummaries = pgTable(
       withTimezone: true,
     }),
     purgedAt: timestamp('purged_at', { withTimezone: true }),
+    // [WI-1553] four_strands session-end learning summary, derived from
+    // session_events at session-completed time. NULL for legacy rows and
+    // non-four_strands sessions. Parse via
+    // parseLanguageLearningSummary from @eduagent/schemas before trusting
+    // this $type<…> cast (TS-only, no runtime guarantee) — same rationale
+    // as llmSummary above.
+    languageLearningSummary: jsonb(
+      'language_learning_summary',
+    ).$type<LanguageSessionSummaryData | null>(),
   },
   (table) => [
     index('session_summaries_session_profile_idx').on(

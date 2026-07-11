@@ -3146,7 +3146,24 @@
       "exchanges_other": "Completaste {{count}} intercambios"
     },
     "a11yContinueLearning": "Continuar aprendiendo",
-    "a11yContinueToHome": "Continuar al inicio"
+    "a11yContinueToHome": "Continuar al inicio",
+    "languagePractice": {
+      "title": "Práctica de idioma",
+      "scenario": "Hoy practicaste {{scenario}}",
+      "newWords": "Palabras nuevas: {{words}}",
+      "strengthenedWords": "Reforzaste: {{words}}",
+      "grammarPattern": "Enfoque gramatical: {{patterns}}",
+      "comprehension": "Respondiste correctamente {{correct}}/{{total}} preguntas de comprensión",
+      "speakingAttempts_one": "Hablaste {{count}} vez",
+      "speakingAttempts_other": "Hablaste {{count}} veces",
+      "fluencyResult": "Prueba de fluidez: {{correct}}/{{total}}",
+      "nextRecommendation": {
+        "meaning_input": "La próxima vez: más práctica de lectura y comprensión auditiva",
+        "meaning_output": "La próxima vez: más práctica de expresión oral y escrita",
+        "language_focus": "La próxima vez: trabajaremos en patrones gramaticales",
+        "fluency": "La próxima vez: un sprint rápido de fluidez"
+      }
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -4331,7 +4348,8 @@
       "emptyTitle": "Aún no hay aprendices disponibles",
       "emptyDescription": "Primero, añade un niño a tu cuenta. Luego, vuelve para empezar a apoyarlo.",
       "addChildAction": "Añadir un niño",
-      "closeLabel": "Cerrar"
+      "closeLabel": "Cerrar",
+      "existingTeenOption": "Vincular a un familiar existente (13+)"
     }
   },
   "visibility": {
@@ -4404,7 +4422,13 @@
       "revoking": "Finalizando uso compartido...",
       "revoked": "El uso compartido está finalizando. El mentor verá un aviso.",
       "revokeErrorTitle": "No se pudo dejar de compartir",
-      "missingActor": "No pudimos identificar a la persona activa."
+      "missingActor": "No pudimos identificar a la persona activa.",
+      "relationLabel": "Relación",
+      "pickerTitle": "¿Con quién quieres compartir tu progreso?",
+      "pickerManagedEmpty": "Aún no hay niños elegibles.",
+      "pickerExistingTeenOption": "Familiar existente (13+)",
+      "existingTeenUnavailableTitle": "Aún no disponible",
+      "existingTeenUnavailableMessage": "La opción de invitar a un familiar existente aún no está disponible. Vuelve a intentarlo pronto."
     }
   },
   "supporterColdStart": {

@@ -53,6 +53,7 @@ function loadWorkflow(name: string): Record<string, unknown> {
 type Job = {
   name?: string;
   if?: unknown;
+  env?: Record<string, unknown>;
   needs?: unknown;
   strategy?: Record<string, unknown>;
   steps?: Array<Record<string, unknown>>;
@@ -410,6 +411,129 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(runner).not.toMatch(/maestro test apps\/mobile\/e2e\/flows\//);
   });
 
+  it('boots an embedded test release APK instead of the dev-client launcher', () => {
+    const cacheStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Cache E2E release APK',
+    );
+    const buildStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Build E2E release APK',
+    );
+    const ndkStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Install Android NDK with retry',
+    );
+    const manualBundleStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Bundle JS for cached APK',
+    );
+    const routerPatchStep = mobileMaestro.steps?.find(
+      (step) =>
+        step.name === 'Patch expo-router context files for offline bundling',
+    );
+    const workflowScripts = (mobileMaestro.steps ?? [])
+      .map((step) => (typeof step.run === 'string' ? step.run : ''))
+      .join('\n');
+    const runner = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/scripts/run-ci-maestro.sh'),
+      'utf8',
+    );
+
+    expect(mobileMaestro.env?.NODE_ENV).toBe('test');
+    expect(mobileMaestro.env?.EXPO_PUBLIC_E2E).toBe('true');
+    expect(mobileMaestro.env?.EXPO_PUBLIC_API_URL).toBe('http://10.0.2.2:8787');
+    expect(cacheStep?.with).toMatchObject({
+      path: 'apps/mobile/android/app/build/outputs/apk/release/app-release.apk',
+    });
+    expect(String((cacheStep?.with as Record<string, unknown>)?.key)).toContain(
+      'apk-e2e-release-',
+    );
+    expect(String(buildStep?.run)).toContain('assembleRelease');
+    expect(String(buildStep?.run)).toContain('-Xmx4096m');
+    expect(String(buildStep?.run)).toContain('--max-workers=2');
+    expect(String(buildStep?.run)).not.toContain(
+      '-x createBundleReleaseJsAndAssets',
+    );
+    expect(String(ndkStep?.run)).toContain('for attempt in 1 2 3');
+    expect(String(ndkStep?.run)).toContain(
+      '"$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006"',
+    );
+    expect(String(ndkStep?.run)).toContain('"ndk;27.0.12077973"');
+    expect(manualBundleStep?.if).toBe(
+      "steps.apk-cache.outputs.cache-hit == 'true'",
+    );
+    expect(manualBundleStep?.env).toMatchObject({ NODE_ENV: 'production' });
+    expect(buildStep?.env).toMatchObject({ NODE_ENV: 'production' });
+    expect(routerPatchStep).toBeUndefined();
+    expect(workflowScripts).not.toContain('EXPO_ROUTER_APP_ROOT');
+    expect(workflowScripts).not.toContain('assembleDebug');
+    expect(runner).toContain(
+      'android/app/build/outputs/apk/release/app-release.apk',
+    );
+    expect(runner).toContain('adb logcat -c');
+    expect(runner).toContain(
+      'adb shell am start -W -n "$APP_ID/.MainActivity"',
+    );
+    expect(runner).toContain('wait_for_entry_screen');
+    expect(runner).toContain('launch-logcat.txt');
+    expect(runner).not.toContain(
+      'android/app/build/outputs/apk/debug/app-debug.apk',
+    );
+
+    const appLaunchFlow = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/app-launch.yaml'),
+      'utf8',
+    );
+    expect(appLaunchFlow).toContain('_setup/nav-welcome-to-sign-in.yaml');
+  });
+
+  it('gives the local seed API the staging Clerk credentials needed for real sign-in users', () => {
+    const installDopplerStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Install Doppler CLI',
+    );
+    const writeVarsStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Write wrangler .dev.vars for API',
+    );
+    const writeVarsEnv = (writeVarsStep?.env ?? {}) as Record<string, unknown>;
+    const writeVarsScript = String(writeVarsStep?.run ?? '');
+
+    expect(String(installDopplerStep?.run)).toContain('DOPPLER_VERSION=');
+    expect(String(installDopplerStep?.run)).toContain('sha256sum -c -');
+    expect(writeVarsEnv.DOPPLER_TOKEN).toBe('${{ secrets.DOPPLER_TOKEN_STG }}');
+    expect(writeVarsScript).toContain('doppler run -p mentomate -c stg');
+    expect(writeVarsScript).toContain('CLERK_SECRET_KEY');
+    expect(writeVarsScript).toContain('CLERK_JWKS_URL');
+    expect(writeVarsScript).toContain('CLERK_AUDIENCE');
+    expect(writeVarsScript).toContain('SEED_PASSWORD');
+    expect(writeVarsScript).toContain('TEST_SEED_SECRET');
+    expect(writeVarsScript).not.toContain('${{ secrets.');
+  });
+
+  it('allows the release APK to reach the local HTTP API only in E2E builds', () => {
+    const appConfig = JSON.parse(
+      readFileSync(join(repoRoot, 'apps/mobile/app.json'), 'utf8'),
+    ) as { expo: { plugins: Array<string | [string, unknown]> } };
+    const pluginNames = appConfig.expo.plugins.map((plugin) =>
+      Array.isArray(plugin) ? plugin[0] : plugin,
+    );
+    const {
+      applyE2ECleartextPolicy,
+    } = require('../apps/mobile/plugins/withE2ECleartextForTests');
+
+    expect(pluginNames).toContain('./plugins/withE2ECleartextForTests');
+
+    const productionManifest = {
+      application: [{ $: { 'android:usesCleartextTraffic': 'true' } }],
+    };
+    applyE2ECleartextPolicy(productionManifest, false);
+    expect(
+      productionManifest.application[0].$['android:usesCleartextTraffic'],
+    ).toBeUndefined();
+
+    const e2eManifest = { application: [{ $: {} }] };
+    applyE2ECleartextPolicy(e2eManifest, true);
+    expect(e2eManifest.application[0].$['android:usesCleartextTraffic']).toBe(
+      'true',
+    );
+  });
+
   it('keeps every pr-blocking flow in the explicit PR plan', () => {
     const plan = loadPlan('pr');
 
@@ -498,6 +622,7 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
       '#!/usr/bin/env bash',
       'case "$*" in',
       '  "exec-out screencap -p") printf fake-png ;;',
+      '  "exec-out cat /sdcard/ci-maestro-entry.xml") printf \'<node resource-id="welcome-chooser"/>\' ;;',
       '  "logcat -d -t 500") printf fake-logcat ;;',
       'esac',
       '',

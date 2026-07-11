@@ -10,8 +10,16 @@ tags:
   - pr-blocking
   - smoke
 ---
-# seed-and-run.sh has already launched the app and landed it on the
-# sign-in screen before Maestro starts. Just wait for it to settle.
+# A cleared release APK opens the audience chooser before auth. Walk that
+# first-run path when present; returning installs may already be at sign-in.
+- runFlow:
+    when:
+      visible:
+        id: "welcome-chooser"
+    file: _setup/nav-welcome-to-sign-in.yaml
+
+# The CI runner has already launched the embedded APK; the conditional
+# first-run walk above leaves both clean and returning installs at sign-in.
 - extendedWaitUntil:
     visible:
       id: "sign-in-button"
