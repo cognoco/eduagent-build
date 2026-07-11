@@ -2580,7 +2580,7 @@ export async function prepareExchangeContext(
   }
   const languageSessionState =
     effectivePedagogyMode === 'four_strands'
-      ? buildLanguageSessionState({
+      ? await buildLanguageSessionState({
           exchangeCount: session.exchangeCount,
           events,
           learnerMessage: userMessage,
@@ -2596,6 +2596,13 @@ export async function prepareExchangeContext(
             ),
           knownWords: knownVocabularyRows.map((row) => row.term).slice(0, 8),
           targetWords: targetVocabularyRows.map((row) => row.term).slice(0, 8),
+          interests:
+            learningProfile && Array.isArray(learningProfile.interests)
+              ? (learningProfile.interests as string[])
+              : undefined,
+          birthYear: profile.birthYear,
+          birthMonth: profile.birthMonth,
+          birthDay: profile.birthDay,
         })
       : undefined;
   const effectiveEvaluateDifficultyRung =

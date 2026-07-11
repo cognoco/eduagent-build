@@ -1,5 +1,7 @@
 import {
   streamLanguageLearningActivitySchema,
+  computeAgeBracketFromDate,
+  type AgeBracket,
   type CefrLevel,
   type InputMode,
   type LanguageActivityTelemetry,
@@ -15,6 +17,7 @@ import {
 } from '@eduagent/schemas';
 
 import { SUPPORTED_LANGUAGES } from '../data/languages';
+import { generateGradedInputContent } from './graded-input-generation';
 
 export const LANGUAGE_STRANDS = [
   'meaning_input',
@@ -279,29 +282,87 @@ function buildSeedPassage(
   }
 }
 
-function buildGradedInputArtifact(input: {
+async function buildGradedInputArtifact(input: {
   modality: LanguageActivityModality;
   languageCode?: string;
   cefrLevel?: CefrLevel | null;
   knownWords?: string[];
   targetWords?: string[];
-}): LanguageGradedInputArtifact {
+  interests?: string[];
+  birthYear?: number | null;
+  birthMonth?: number | null;
+  birthDay?: number | null;
+}): Promise<LanguageGradedInputArtifact> {
   const knownWords = cleanTerms(input.knownWords, 6);
   const targetWords = cleanTerms(input.targetWords, 3);
+  // The artifact's own modality is a narrower type ('reading' | 'listening')
+  // than the enclosing activity's modality ('text' | 'voice' | 'listening') —
+  // keep them distinct rather than reusing one variable for both.
+  const modality: 'reading' | 'listening' =
+    input.modality === 'listening' ? 'listening' : 'reading';
+
+  // Server-owned known-word estimate: computed from vocabulary counts, never
+  // from the LLM's own self-report, regardless of whether `text` below comes
+  // from the LLM or the deterministic fallback (see docs/plans/2026-07-02-4-strands.md
+  // audit — "the LLM's own number is trusted" is a documented weakness this
+  // deliberately avoids repeating).
+  const denominator = Math.max(1, knownWords.length + targetWords.length);
+  const estimate = Number((knownWords.length / denominator).toFixed(2));
+  const knownWordEstimate = Math.min(1, Math.max(0, estimate));
+
+  // Fail-closed age bracket, matching the minor-safety gate pattern used
+  // elsewhere in session-exchange.ts: an unknown/non-finite birthYear never
+  // silently lets a generation call route to a provider excluded for minors.
+  const ageBracket: AgeBracket = Number.isFinite(input.birthYear)
+    ? computeAgeBracketFromDate(
+        input.birthYear as number,
+        input.birthMonth ?? undefined,
+        input.birthDay ?? undefined,
+      )
+    : 'child';
+
+  const generated = await generateGradedInputContent({
+    languageCode: input.languageCode,
+    cefrLevel: input.cefrLevel,
+    knownWords,
+    targetWords,
+    modality,
+    interests: input.interests,
+    ageBracket,
+  });
+
+  if (generated) {
+    return {
+      type: 'graded_input',
+      modality,
+      cefrLevel: input.cefrLevel ?? 'A1',
+      knownWordRatioTarget: 0.96,
+      knownWordEstimate,
+      targetWords,
+      text: generated.text,
+      comprehensionQuestions: generated.comprehensionQuestions.map(
+        (question, index) => ({
+          id: `gist-${index + 1}`,
+          prompt: question.prompt,
+          answerHint: question.answerHint,
+        }),
+      ),
+      audioEnabled: modality === 'listening',
+    };
+  }
+
   const seedWords =
     knownWords.length > 0 || targetWords.length > 0
       ? [...knownWords.slice(0, 6), ...targetWords]
       : starterWordsForLanguage(input.languageCode);
   const text = buildSeedPassage(input.languageCode, seedWords);
-  const denominator = Math.max(1, knownWords.length + targetWords.length);
-  const estimate = Number((knownWords.length / denominator).toFixed(2));
 
   return {
     type: 'graded_input',
-    modality: input.modality === 'listening' ? 'listening' : 'reading',
+    modality,
     cefrLevel: input.cefrLevel ?? 'A1',
     knownWordRatioTarget: 0.96,
-    knownWordEstimate: Math.min(1, Math.max(0, estimate)),
+    knownWordEstimate,
     targetWords,
     text,
     comprehensionQuestions: [
@@ -311,7 +372,7 @@ function buildGradedInputArtifact(input: {
         answerHint: text,
       },
     ],
-    audioEnabled: input.modality === 'listening',
+    audioEnabled: modality === 'listening',
   };
 }
 
@@ -497,7 +558,7 @@ export function chooseNextLanguageStrand(input: {
   }, LANGUAGE_STRANDS[0]);
 }
 
-export function buildLanguageActivityTelemetry(input: {
+export async function buildLanguageActivityTelemetry(input: {
   strand: LanguageStrand;
   inputMode?: InputMode;
   languageCode?: string;
@@ -506,7 +567,11 @@ export function buildLanguageActivityTelemetry(input: {
   targetWords?: string[];
   targetGrammar?: string[];
   meaningOutputTurnIndex?: number;
-}): LanguageActivityTelemetry {
+  interests?: string[];
+  birthYear?: number | null;
+  birthMonth?: number | null;
+  birthDay?: number | null;
+}): Promise<LanguageActivityTelemetry> {
   const activityTypeByStrand: Record<LanguageStrand, LanguageActivityType> = {
     meaning_input: 'graded_input',
     meaning_output: 'free_response',
@@ -533,12 +598,16 @@ export function buildLanguageActivityTelemetry(input: {
   };
 
   if (input.strand === 'meaning_input') {
-    activity.gradedInput = buildGradedInputArtifact({
+    activity.gradedInput = await buildGradedInputArtifact({
       modality,
       languageCode: input.languageCode,
       cefrLevel: input.cefrLevel,
       knownWords: input.knownWords,
       targetWords: input.targetWords,
+      interests: input.interests,
+      birthYear: input.birthYear,
+      birthMonth: input.birthMonth,
+      birthDay: input.birthDay,
     });
   }
 
@@ -553,7 +622,7 @@ export function buildLanguageActivityTelemetry(input: {
   return activity;
 }
 
-export function buildLanguageSessionState(input: {
+export async function buildLanguageSessionState(input: {
   exchangeCount: number;
   events: Array<{ eventType: string; metadata: unknown }>;
   learnerMessage?: string;
@@ -563,7 +632,11 @@ export function buildLanguageSessionState(input: {
   knownWords?: string[];
   targetWords?: string[];
   targetGrammar?: string[];
-}): LanguageSessionState {
+  interests?: string[];
+  birthYear?: number | null;
+  birthMonth?: number | null;
+  birthDay?: number | null;
+}): Promise<LanguageSessionState> {
   const sessionStrandCounts = getLanguageStrandCounts(input.events);
   const previousComprehension = input.learnerMessage
     ? evaluatePendingGradedInputAnswer({
@@ -583,7 +656,7 @@ export function buildLanguageSessionState(input: {
     activeStrand,
     sessionStrandCounts,
     previousComprehension,
-    nextActivity: buildLanguageActivityTelemetry({
+    nextActivity: await buildLanguageActivityTelemetry({
       strand: activeStrand,
       inputMode: input.inputMode,
       languageCode: input.languageCode,
@@ -592,6 +665,10 @@ export function buildLanguageSessionState(input: {
       targetWords: input.targetWords,
       targetGrammar: input.targetGrammar,
       meaningOutputTurnIndex: sessionStrandCounts.meaning_output,
+      interests: input.interests,
+      birthYear: input.birthYear,
+      birthMonth: input.birthMonth,
+      birthDay: input.birthDay,
     }),
   };
 }
