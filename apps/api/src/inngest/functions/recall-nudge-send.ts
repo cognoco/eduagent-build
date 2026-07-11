@@ -58,6 +58,14 @@ export const recallNudgeSend = inngest.createFunction(
       // serialize on the lock and the second caller observes the first's
       // row. Mirrors the BUG-838 fix in daily-reminder-send.ts.
       //
+      // [WI-1461] dedupTypes shares this bucket with review-due-send's
+      // 'review_reminder' type: recall-nudge.ts and review-due-scan.ts scan
+      // the same overdue-retention-card population, so without a shared
+      // bucket a profile eligible for both crons could get both pushes the
+      // same day for the same overdue cards. Whichever send handler's
+      // transaction commits first consumes the day's review-family slot;
+      // this is deliberately first-wins, not recall_nudge-preferred.
+      //
       // Fail closed on DB error: skip this nudge cycle rather than risk
       // exceeding the rate-limit ceiling (spam). captureException makes the
       // failure queryable in Sentry so we can measure transient DB hiccup
@@ -68,7 +76,11 @@ export const recallNudgeSend = inngest.createFunction(
           db,
           profileId,
           'recall_nudge',
-          { hours: 24, maxCount: 1 },
+          {
+            hours: 24,
+            maxCount: 1,
+            dedupTypes: ['recall_nudge', 'review_reminder'],
+          },
         );
       } catch (err) {
         captureException(err, {

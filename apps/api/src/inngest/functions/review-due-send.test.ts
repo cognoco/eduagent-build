@@ -284,7 +284,12 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
       mockDb,
       'p-dup',
       'review_reminder',
-      { hours: 24, maxCount: 1 },
+      // [WI-1461] shared dedup bucket with recall_nudge — see settings.ts
+      {
+        hours: 24,
+        maxCount: 1,
+        dedupTypes: ['recall_nudge', 'review_reminder'],
+      },
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(result).toEqual({
