@@ -28,11 +28,10 @@ jest.mock(
   }),
 );
 
-// [WI-1441] Settings hooks fetch over the network via React Query (no real
-// backend in the jest environment) — same gc1-allow rationale as the
-// established precedent in app/(app)/more/notifications.test.tsx, which mocks
-// this same module for the same reason. Kept minimal: only the two exports
-// this hook actually calls.
+// [WI-1441] Pattern A: spread the real module (its other exports fetch over
+// the network via React Query and are unused here) and override only the two
+// hooks this file actually calls, so the mock is exercised as a targeted
+// override rather than a full-module replacement.
 let mockNotifPrefs:
   | {
       reviewReminders: boolean;
@@ -43,13 +42,11 @@ let mockNotifPrefs:
     }
   | undefined;
 const mockUpdateMutate = jest.fn();
-jest.mock(
-  './use-settings' /* gc1-allow: settings hooks fetch from API via React Query; see notifications.test.tsx precedent */,
-  () => ({
-    useNotificationSettings: () => ({ data: mockNotifPrefs }),
-    useUpdateNotificationSettings: () => ({ mutate: mockUpdateMutate }),
-  }),
-);
+jest.mock('./use-settings', () => ({
+  ...jest.requireActual('./use-settings'),
+  useNotificationSettings: () => ({ data: mockNotifPrefs }),
+  useUpdateNotificationSettings: () => ({ mutate: mockUpdateMutate }),
+}));
 
 const mockSecureGet = SecureStore.getItemAsync as jest.Mock;
 const mockSecureSet = SecureStore.setItemAsync as jest.Mock;
