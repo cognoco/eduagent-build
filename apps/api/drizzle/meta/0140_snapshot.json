@@ -1,5 +1,5 @@
 {
-  "id": "79267462-0821-4402-936e-38a4be210927",
+  "id": "ccd8cefc-185a-42bb-bc13-88c6e0c3b7d7",
   "prevId": "bbb7a464-6292-4550-9f41-f6a49e7fbaa9",
   "version": "7",
   "dialect": "postgresql",
@@ -6918,6 +6918,12 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "language_learning_summary": {
+          "name": "language_learning_summary",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -11228,21 +11234,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "support_visibility_audit_events_contract_idx": {
-          "name": "support_visibility_audit_events_contract_idx",
-          "columns": [
-            {
-              "expression": "contract_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -11613,21 +11604,6 @@
           "columns": [
             {
               "expression": "supportership_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "support_visibility_notices_contract_idx": {
-          "name": "support_visibility_notices_contract_idx",
-          "columns": [
-            {
-              "expression": "contract_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

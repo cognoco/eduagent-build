@@ -1,2 +1,0 @@
-CREATE INDEX "support_visibility_audit_events_contract_idx" ON "support_visibility_audit_events" USING btree ("contract_id");--> statement-breakpoint
-CREATE INDEX "support_visibility_notices_contract_idx" ON "support_visibility_notices" USING btree ("contract_id");

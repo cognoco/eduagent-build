@@ -86,6 +86,9 @@ filter_files() {
 #   eval=<bool>          matrix demands the LLM eval harness (Tier 1)
 #   unit=<bool>          matrix demands the API unit suite for a cross-package
 #                        read that nx affected cannot see (i18n-cross-package)
+#   database=<bool>      matrix demands the @eduagent/database package suite
+#                        (db-migrations class — nx affected can't see a
+#                        drizzle-only diff as affecting packages/database)
 #   docs_only=<bool>     PR diff is limited to docs/editor metadata paths
 # Fail-open invariant: if no diff base resolves, the router cannot prove a
 # slow suite unaffected, so it demands them ALL — never silently skips.
@@ -99,11 +102,12 @@ emit_github_output() {
       echo "integration=true"
       echo "eval=true"
       echo "unit=true"
+      echo "database=true"
       echo "docs_only=false"
     } >> "$out"
     return 0
   fi
-  local classes integration=false eval_needed=false unit=false docs_only=true entry cmd f
+  local classes integration=false eval_needed=false unit=false database=false docs_only=true entry cmd f
   classes=$(join_unique_classes | tr ' ' ',')
   while IFS= read -r f; do
     [[ -z "$f" ]] && continue
@@ -118,6 +122,9 @@ emit_github_output() {
   # api unit tests via `nx affected`, so don't double-run them here.
   case ",${classes}," in
     *,i18n-cross-package,*) unit=true ;;
+  esac
+  case ",${classes}," in
+    *,db-migrations,*) database=true ;;
   esac
   if [[ ${#SLOW_CMDS[@]} -gt 0 ]]; then
     for entry in "${SLOW_CMDS[@]}"; do
@@ -143,6 +150,7 @@ emit_github_output() {
     echo "integration=${integration}"
     echo "eval=${eval_needed}"
     echo "unit=${unit}"
+    echo "database=${database}"
     echo "docs_only=${docs_only}"
   } >> "$out"
 }

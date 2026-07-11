@@ -20,7 +20,11 @@ import {
   getLanguageStrandCounts,
 } from '../../services/language-session-engine';
 import { extractVocabularyFromTranscript } from '../../services/vocabulary-extract';
-import { upsertExtractedVocabulary } from '../../services/vocabulary';
+import {
+  upsertExtractedVocabulary,
+  normalizeVocabTerm,
+} from '../../services/vocabulary';
+import { computeLanguageSessionSummary } from '../../services/language-session-summary';
 import { createPendingSessionSummary } from '../../services/summaries';
 import { recordSessionActivity } from '../../services/streaks';
 import {
@@ -57,10 +61,12 @@ import {
   membership,
   memoryFacts,
   person,
+  practiceActivityEvents,
   retentionCards,
   sessionEvents,
   sessionSummaries,
   subjects,
+  vocabulary,
   type Database,
 } from '@eduagent/database';
 import { projectAiResponseContent } from '../../services/llm/project-response';
@@ -71,6 +77,7 @@ import {
   computeAgeBracketFromDate,
   sessionCompletedEventSchema,
   verificationTypeSchema,
+  type LanguageSessionSummaryWord,
 } from '@eduagent/schemas';
 import { NonRetriableError } from 'inngest';
 import {
@@ -314,6 +321,13 @@ interface VocabularyRetentionStepResult extends StepOutcome {
   nextLanguageProgress: Awaited<
     ReturnType<typeof getCurrentLanguageProgress>
   > | null;
+  // [WI-1553] Vocabulary extracted this session, classified against the
+  // pre-upsert term set so the session-end summary can distinguish
+  // brand-new terms from ones the learner already knew. Threaded through the
+  // step result for the same BUG-181 replay-safety reason as the progress
+  // fields above. Empty when the step is skipped/no vocabulary extracted.
+  newWords: LanguageSessionSummaryWord[];
+  strengthenedWords: LanguageSessionSummaryWord[];
 }
 
 // Close reasons that indicate no user engagement — SM-2 fallback should not apply.
@@ -755,6 +769,8 @@ export const sessionCompleted = inngest.createFunction(
             status: 'skipped' as const,
             previousLanguageProgress: null,
             nextLanguageProgress: null,
+            newWords: [],
+            strengthenedWords: [],
           };
         }
 
@@ -764,6 +780,8 @@ export const sessionCompleted = inngest.createFunction(
         let stepNext: Awaited<
           ReturnType<typeof getCurrentLanguageProgress>
         > | null = null;
+        const stepNewWords: LanguageSessionSummaryWord[] = [];
+        const stepStrengthenedWords: LanguageSessionSummaryWord[] = [];
 
         const isolated = await runIsolated(
           'update-vocabulary-retention',
@@ -827,6 +845,36 @@ export const sessionCompleted = inngest.createFunction(
               return;
             }
 
+            // [WI-1553] Classify against the pre-upsert term set so the
+            // session-end summary can tell new vocabulary from strengthened
+            // vocabulary. Must run BEFORE upsertExtractedVocabulary's
+            // ON CONFLICT — after the upsert every term "already exists".
+            const normalizedExtractedTerms = extractedVocabulary.map((item) =>
+              normalizeVocabTerm(item.term),
+            );
+            const existingTerms = await db.query.vocabulary.findMany({
+              where: and(
+                eq(vocabulary.profileId, profileId),
+                eq(vocabulary.subjectId, subjectId),
+                inArray(vocabulary.termNormalized, normalizedExtractedTerms),
+              ),
+              columns: { termNormalized: true },
+            });
+            const existingTermSet = new Set(
+              existingTerms.map((row) => row.termNormalized),
+            );
+            for (const item of extractedVocabulary) {
+              const word: LanguageSessionSummaryWord = {
+                term: item.term,
+                type: item.type,
+              };
+              if (existingTermSet.has(normalizeVocabTerm(item.term))) {
+                stepStrengthenedWords.push(word);
+              } else {
+                stepNewWords.push(word);
+              }
+            }
+
             const quality = Math.max(
               0,
               Math.min(5, completionQualityRating ?? 3),
@@ -862,6 +910,8 @@ export const sessionCompleted = inngest.createFunction(
           ...isolated,
           previousLanguageProgress: stepPrevious,
           nextLanguageProgress: stepNext,
+          newWords: stepNewWords,
+          strengthenedWords: stepStrengthenedWords,
         };
       },
     )) as unknown as VocabularyRetentionStepResult;
@@ -1056,6 +1106,127 @@ export const sessionCompleted = inngest.createFunction(
           await writeCoachingCardCache(db, profileId, card);
         }),
       ),
+    );
+
+    // [WI-1553] Step 2a: Compute + persist the four_strands session-end
+    // learning summary. Must run after write-coaching-card (the
+    // session_summaries row must already exist to update). Reuses
+    // vocabularyOutcome's new/strengthened classification (already resolved
+    // earlier in this scope) rather than re-deriving it — no second LLM
+    // call. Soft-fails via runIsolated: a missing language summary must
+    // never block the rest of the post-session pipeline.
+    outcomes.push(
+      await step.run('compute-language-session-summary', async () => {
+        if (!subjectId) {
+          return {
+            step: 'compute-language-session-summary',
+            status: 'skipped' as const,
+          };
+        }
+        return runIsolated(
+          'compute-language-session-summary',
+          profileId,
+          async () => {
+            const db = getStepDatabase();
+            const subject = await db.query.subjects.findFirst({
+              where: and(
+                eq(subjects.id, subjectId),
+                eq(subjects.profileId, profileId),
+              ),
+            });
+            if (
+              !subject ||
+              subject.pedagogyMode !== 'four_strands' ||
+              !subject.languageCode
+            ) {
+              return;
+            }
+
+            const [summaryRow] = await db
+              .select({ id: sessionSummaries.id })
+              .from(sessionSummaries)
+              .where(
+                and(
+                  eq(sessionSummaries.sessionId, sessionId),
+                  eq(sessionSummaries.profileId, profileId),
+                ),
+              )
+              .limit(1);
+            if (!summaryRow) {
+              // [logging sweep] structured logger so PII fields land as JSON context
+              logger.warn(
+                '[session-completed] compute-language-session-summary: no session_summaries row — skipped',
+                { sessionId, profileId },
+              );
+              return;
+            }
+
+            const events = await db.query.sessionEvents.findMany({
+              where: and(
+                eq(sessionEvents.sessionId, sessionId),
+                eq(sessionEvents.profileId, profileId),
+              ),
+              orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
+            });
+
+            const topicTitle = topicId
+              ? await loadTopicTitle(db, topicId, profileId)
+              : null;
+
+            // Fluency-drill totals recorded this session (session-exchange.ts
+            // stamps metadata.sessionId on each practice_activity_events row
+            // — see the recordSessionPracticeActivityEvent call site).
+            const fluencyRows = await db
+              .select({
+                score: practiceActivityEvents.score,
+                total: practiceActivityEvents.total,
+              })
+              .from(practiceActivityEvents)
+              .where(
+                and(
+                  eq(practiceActivityEvents.profileId, profileId),
+                  eq(practiceActivityEvents.activityType, 'fluency_drill'),
+                  sql`${practiceActivityEvents.metadata}->>'sessionId' = ${sessionId}`,
+                ),
+              );
+            const fluencyDrillTotals =
+              fluencyRows.length > 0
+                ? fluencyRows.reduce(
+                    (acc, row) => ({
+                      correct: acc.correct + (row.score ?? 0),
+                      total: acc.total + (row.total ?? 0),
+                    }),
+                    { correct: 0, total: 0 },
+                  )
+                : null;
+
+            const summary = computeLanguageSessionSummary({
+              events,
+              topicTitle,
+              newWords: vocabularyOutcome.newWords,
+              strengthenedWords: vocabularyOutcome.strengthenedWords,
+              fluencyDrillTotals,
+              // WI-1552's persisted cross-session pointer — not recomputed
+              // from this session's events (see plan doc for rationale).
+              nextRecommendationStrand:
+                subject.nextLanguagePracticePointer?.strand ?? null,
+            });
+
+            await db
+              .update(sessionSummaries)
+              .set({
+                languageLearningSummary: summary,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(sessionSummaries.id, summaryRow.id),
+                  eq(sessionSummaries.profileId, profileId),
+                ),
+              );
+          },
+        );
+      }),
     );
 
     // Step 2b: Generate parent-facing session recap fields [PEH-S2]

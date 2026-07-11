@@ -187,6 +187,47 @@ export type LanguageNextPracticePointer = z.infer<
   typeof languageNextPracticePointerSchema
 >;
 
+// WI-1553: four_strands session-end learning summary — derived entirely from
+// session_events at session-completed time (no LLM calls). Persisted as
+// session_summaries.language_learning_summary (additive jsonb column) and
+// surfaced via sessionSummarySchema.languageLearningSummary. Every field is
+// nullable/empty-array so the mobile UI can positively omit unavailable data
+// rather than render a negative placeholder (docs/plans/2026-07-11-wi1553-
+// session-end-summary.md, AC2). Reuses languageStrandNameSchema above for
+// nextRecommendationStrand — that pointer is read from the already-persisted
+// subjects.next_language_practice_pointer (WI-1552), never recomputed here.
+export const languageSessionSummaryWordSchema = z.object({
+  term: z.string().min(1),
+  type: vocabTypeSchema,
+});
+export type LanguageSessionSummaryWord = z.infer<
+  typeof languageSessionSummaryWordSchema
+>;
+
+export const languageSessionSummarySchema = z.object({
+  practicedScenario: z.string().min(1).nullable(),
+  newWords: z.array(languageSessionSummaryWordSchema),
+  strengthenedWords: z.array(languageSessionSummaryWordSchema),
+  grammarPatterns: z.array(z.string()),
+  comprehension: z
+    .object({
+      correct: z.number().int().nonnegative(),
+      total: z.number().int().nonnegative(),
+    })
+    .nullable(),
+  speakingAttempts: z.number().int().nonnegative(),
+  fluency: z
+    .object({
+      correct: z.number().int().nonnegative(),
+      total: z.number().int().nonnegative(),
+    })
+    .nullable(),
+  nextRecommendationStrand: languageStrandNameSchema.nullable(),
+});
+export type LanguageSessionSummaryData = z.infer<
+  typeof languageSessionSummarySchema
+>;
+
 export const languageProgressSchema = z.object({
   subjectId: z.string().uuid(),
   languageCode: languageCodeSchema,

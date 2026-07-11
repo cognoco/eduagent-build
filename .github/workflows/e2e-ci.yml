@@ -227,6 +227,9 @@ jobs:
       CI: true
       NX_DAEMON: false
       NX_ISOLATE_PLUGINS: false
+      EXPO_PUBLIC_E2E: 'true'
+      EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
+      SENTRY_DISABLE_AUTO_UPLOAD: 'true'
       # Expo inlines EXPO_PUBLIC_* vars at JS bundle time.
       # Clerk publishable key is needed for auth screens to render.
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
@@ -255,12 +258,15 @@ jobs:
       # ── APK cache: skip the ~20 min native build when native config is unchanged ──
       # Key covers ONLY native-affecting files (not JS source). On cache hit,
       # we re-bundle fresh JS and inject it into the cached APK, saving ~15 min.
-      - name: Cache debug APK
+      # This must be a release-variant APK: debug variants include Expo's
+      # development-client launcher and boot into its server picker instead of
+      # the embedded MentoMate bundle (caught by the exact-main WI-1652 run).
+      - name: Cache E2E release APK
         id: apk-cache
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5
         with:
-          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-          key: apk-debug-${{ hashFiles('apps/mobile/app.json', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'apps/mobile/assets/**', 'pnpm-lock.yaml') }}
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          key: apk-e2e-release-${{ hashFiles('apps/mobile/app.json', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'apps/mobile/assets/**', 'pnpm-lock.yaml') }}
 
       # --- Phase 1: strict pnpm install + schema migrate ---
       # [BUG-243] Use drizzle-kit migrate (not push) for the Maestro DB —
@@ -291,15 +297,39 @@ jobs:
       - name: Build schemas package
         run: pnpm exec tsc --build packages/schemas/tsconfig.lib.json
 
+      # The seed service must create real users in the same Clerk instance as
+      # the preview publishable key embedded in the APK. Read all seed secrets
+      # from Doppler staging, matching the trusted Playwright workflow, so the
+      # local API never falls back to database-only fake Clerk identities.
+      - name: Install Doppler CLI
+        run: |
+          DOPPLER_VERSION="3.76.0"
+          DOPPLER_ARCHIVE="doppler_${DOPPLER_VERSION}_linux_amd64.tar.gz"
+          DOPPLER_SHA256="04f1ff30ed162d7af1dba7f11ad6a37ef35099de86a7ec6e261b64b1b337a3f3"
+          curl -fsSLO "https://github.com/DopplerHQ/cli/releases/download/${DOPPLER_VERSION}/${DOPPLER_ARCHIVE}"
+          echo "${DOPPLER_SHA256}  ${DOPPLER_ARCHIVE}" | sha256sum -c -
+          sudo tar -xzf "${DOPPLER_ARCHIVE}" -C /usr/local/bin doppler
+          doppler --version
+
       # Write .dev.vars so wrangler dev can pass secrets into the Workers runtime.
       # wrangler dev runs in an isolated V8 sandbox — it does NOT inherit shell
       # env vars. It reads non-secret bindings from wrangler.toml [vars] and
       # secret bindings from .dev.vars in the project directory.
       - name: Write wrangler .dev.vars for API
         run: |
-          printf "DATABASE_URL=%s\nNODE_ENV=test\nTEST_SEED_SECRET=%s\n" "$DATABASE_URL" "$TEST_SEED_SECRET" > apps/api/.dev.vars
+          if [ -z "${DOPPLER_TOKEN:-}" ]; then
+            echo "::error title=Doppler token missing::DOPPLER_TOKEN_STG is required to create real Clerk seed users."
+            exit 1
+          fi
+          doppler run -p mentomate -c stg --command "
+            umask 077
+            printf 'DATABASE_URL=%s\nNODE_ENV=test\nTEST_SEED_SECRET=%s\nCLERK_SECRET_KEY=%s\nCLERK_JWKS_URL=%s\nCLERK_AUDIENCE=%s\nSEED_PASSWORD=%s\n' \
+              \"\$DATABASE_URL\" \"\$TEST_SEED_SECRET\" \"\$CLERK_SECRET_KEY\" \
+              \"\$CLERK_JWKS_URL\" \"\$CLERK_AUDIENCE\" \"\$SEED_PASSWORD\" \
+              > apps/api/.dev.vars
+          "
         env:
-          TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
 
       # Start API server in background (NODE_ENV=test enables __test/* routes)
       - name: Start API server (background)
@@ -322,6 +352,23 @@ jobs:
         working-directory: apps/mobile
         run: npx expo prebuild --platform android --no-install
 
+      # Gradle auto-installs this NDK when absent, but a transient corrupt
+      # archive then fails the whole shard without retry. Install it explicitly
+      # so the network boundary is bounded and retried before the native build.
+      - name: Install Android NDK with retry
+        if: steps.apk-cache.outputs.cache-hit != 'true'
+        run: |
+          for attempt in 1 2 3; do
+            if "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.1.12297006" "ndk;27.0.12077973"; then
+              exit 0
+            fi
+            echo "::warning::NDK install attempt ${attempt}/3 failed"
+            if [ "$attempt" -lt 3 ]; then
+              sleep "$((attempt * 5))"
+            fi
+          done
+          exit 1
+
       # Cache Gradle build outputs to avoid 25-minute native recompilation.
       # Key includes gradle files + native dependency versions so cache
       # invalidates when native deps change.
@@ -338,33 +385,9 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      # expo-router's _ctx*.js files use require.context(process.env.EXPO_ROUTER_APP_ROOT).
-      # require.context is evaluated at COMPILE TIME by Metro's static analysis —
-      # it rejects dynamic expressions like process.env.*. The full Expo CLI
-      # pipeline has a Babel plugin that replaces these with string literals,
-      # but export:embed skips that step. We must inline them ourselves.
-      - name: Patch expo-router context files for offline bundling
-        run: |
-          # require.context resolves paths relative to the FILE that contains
-          # the call, not relative to projectRoot. In the pnpm store, _ctx.android.js
-          # lives deep in node_modules/.pnpm/expo-router@.../node_modules/expo-router/,
-          # so a relative "./src/app" would resolve to a non-existent directory there.
-          # Use an absolute path instead — require.context is compile-time only,
-          # so the absolute CI path is resolved by Metro during bundling and never
-          # evaluated on the device at runtime.
-          APP_ROOT="$(cd apps/mobile && pwd)/src/app"
-          echo "Patching EXPO_ROUTER_APP_ROOT → $APP_ROOT"
-          find node_modules/.pnpm -path "*/expo-router/_ctx*.js" -exec \
-            sed -i "s|process\.env\.EXPO_ROUTER_APP_ROOT|\"$APP_ROOT\"|g" {} +
-          find node_modules/.pnpm -path "*/expo-router/_ctx*.js" -exec \
-            sed -i 's|process\.env\.EXPO_ROUTER_IMPORT_MODE|"lazy"|g' {} +
-          # Verify the patch worked
-          echo "--- Patched _ctx.android.js (first match) ---"
-          find node_modules/.pnpm -path "*/expo-router/_ctx.android.js" -exec head -3 {} \; -quit
-
-      # Bundle JS into the APK so the app works without a Metro dev server.
-      # Debug builds normally fetch JS from Metro at runtime, but in CI
-      # there is no Metro server. Pre-bundling embeds the JS in the APK.
+      # On a cache hit, produce the fresh JS bundle that will replace the stale
+      # one in the cached release APK. On a cache miss, Gradle's release bundle
+      # task performs this work as part of assembleRelease instead.
       #
       # Key decisions:
       # - Direct node path (not npx expo): npx resolves to the hoisted
@@ -372,8 +395,15 @@ jobs:
       #   The direct path + working-directory keeps cwd = apps/mobile.
       # - --dev false: dev mode tries to open DevTools WebSocket connections
       #   which crash in embedded (offline) APKs.
-      - name: Bundle JS for offline APK
+      - name: Bundle JS for cached APK
+        if: steps.apk-cache.outputs.cache-hit == 'true'
         working-directory: apps/mobile
+        env:
+          # NODE_ENV=test makes babel-preset-expo deliberately skip the
+          # EXPO_ROUTER_APP_ROOT transform, yielding an empty route context.
+          # Build the device bundle like EAS while EXPO_PUBLIC_E2E keeps the
+          # deterministic test hooks enabled.
+          NODE_ENV: production
         run: |
           mkdir -p android/app/src/main/assets
 
@@ -390,7 +420,7 @@ jobs:
       - name: Inject fresh JS into cached APK
         if: steps.apk-cache.outputs.cache-hit == 'true'
         run: |
-          APK="$(pwd)/apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk"
+          APK="$(pwd)/apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
           BUNDLE="$(pwd)/apps/mobile/android/app/src/main/assets/index.android.bundle"
 
           echo "APK size before: $(stat -c%s "$APK") bytes"
@@ -428,11 +458,17 @@ jobs:
           echo "APK size after: $(stat -c%s "$APK") bytes"
 
       # ── On cache MISS: full native build ──
-      # Compile debug APK via Gradle (includes the pre-bundled JS)
-      - name: Build debug APK
+      # Compile a release-variant APK so Expo's debug-only development launcher
+      # is absent and MainActivity boots the embedded bundle directly. Gradle's
+      # release bundle task inherits NODE_ENV=test + EXPO_PUBLIC_E2E=true from
+      # the job; it must remain in the task graph because Android resource
+      # packaging consumes its generated providers.
+      - name: Build E2E release APK
         if: steps.apk-cache.outputs.cache-hit != 'true'
         working-directory: apps/mobile/android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        env:
+          NODE_ENV: production
+        run: ./gradlew -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m" assembleRelease --no-daemon --max-workers=2 --stacktrace
 
       # ── Test execution — always runs ──
 

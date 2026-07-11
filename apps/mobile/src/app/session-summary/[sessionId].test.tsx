@@ -226,6 +226,22 @@ let mockSessionSummaryData: {
   baseXp?: number | null;
   reflectionBonusXp?: number | null;
   purgedAt?: string | null;
+  // [WI-1553] four_strands session-end learning summary — additive.
+  languageLearningSummary?: {
+    practicedScenario: string | null;
+    newWords: Array<{ term: string; type: 'word' | 'chunk' }>;
+    strengthenedWords: Array<{ term: string; type: 'word' | 'chunk' }>;
+    grammarPatterns: string[];
+    comprehension: { correct: number; total: number } | null;
+    speakingAttempts: number;
+    fluency: { correct: number; total: number } | null;
+    nextRecommendationStrand:
+      | 'meaning_input'
+      | 'meaning_output'
+      | 'language_focus'
+      | 'fluency'
+      | null;
+  } | null;
 } | null = null;
 
 // Base summary fixture with all fields required by sessionSummaryGetResponseSchema.
@@ -1270,6 +1286,100 @@ describe('SessionSummaryScreen', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
       expect(screen.queryByTestId('view-transcript-cta')).toBeNull();
+    });
+  });
+
+  // [WI-1553] four_strands session-end language learning summary.
+  describe('language practice card', () => {
+    it('renders the card with rich-data fields when languageLearningSummary is present', async () => {
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440010',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'ordered food in French',
+        aiFeedback: null,
+        status: 'submitted',
+        languageLearningSummary: {
+          practicedScenario: 'order food at a cafe',
+          newWords: [{ term: 'croissant', type: 'word' }],
+          strengthenedWords: [{ term: 'bonjour', type: 'word' }],
+          grammarPatterns: ['polite requests: je voudrais'],
+          comprehension: { correct: 1, total: 1 },
+          speakingAttempts: 2,
+          fluency: { correct: 4, total: 5 },
+          nextRecommendationStrand: 'fluency',
+        },
+      };
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('language-practice-card');
+      });
+      screen.getByText(/order food at a cafe/);
+      screen.getByText(/croissant/);
+      screen.getByText(/bonjour/);
+      screen.getByText(/polite requests: je voudrais/);
+      screen.getByText(/1\/1/);
+      screen.getByText(/4\/5/);
+    });
+
+    it('omits the card entirely for a sparse/non-language summary (no negative placeholders)', async () => {
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440011',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'a regular non-language session',
+        aiFeedback: null,
+        status: 'submitted',
+        languageLearningSummary: null,
+      };
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('summary-submitted');
+      });
+      expect(screen.queryByTestId('language-practice-card')).toBeNull();
+    });
+
+    // [F3 — Phase-4 review] AC2 regression shape: a single summary object
+    // with SOME fields present and SOME null/empty. Every present field must
+    // render and every absent field must be positively omitted — no "0 new
+    // words" / empty-parens / "0/0" placeholder copy alongside the present
+    // fields.
+    it('renders only the present fields and omits the rest for a partial summary', async () => {
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440012',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'practiced listening only',
+        aiFeedback: null,
+        status: 'submitted',
+        languageLearningSummary: {
+          practicedScenario: null,
+          newWords: [],
+          strengthenedWords: [],
+          grammarPatterns: ['articles: le/la'],
+          comprehension: null,
+          speakingAttempts: 0,
+          fluency: null,
+          nextRecommendationStrand: 'meaning_input',
+        },
+      };
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('language-practice-card');
+      });
+      // Present fields render.
+      screen.getByText(/articles: le\/la/);
+      screen.getByText(/more reading and listening practice/);
+      // Absent fields are positively omitted, not rendered as placeholders.
+      expect(screen.queryByText(/Today you practiced/)).toBeNull();
+      expect(screen.queryByText(/New words:/)).toBeNull();
+      expect(screen.queryByText(/You strengthened:/)).toBeNull();
+      expect(screen.queryByText(/comprehension questions/)).toBeNull();
+      expect(screen.queryByText(/You spoke/)).toBeNull();
+      expect(screen.queryByText(/Fluency check:/)).toBeNull();
     });
   });
 

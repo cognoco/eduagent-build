@@ -990,6 +990,50 @@ describe('sessionSummarySchema', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  // [WI-1553] AC4 — additive field, omittable/nullable for legacy rows and
+  // non-language sessions.
+  it('accepts a summary with languageLearningSummary omitted (legacy row)', () => {
+    const result = sessionSummarySchema.safeParse({
+      id: UUID,
+      sessionId: UUID,
+      content: 'Summary',
+      aiFeedback: null,
+      status: 'accepted',
+      closingLine: null,
+      learnerRecap: null,
+      nextTopicId: null,
+      nextTopicTitle: null,
+      nextTopicReason: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a summary with a populated languageLearningSummary', () => {
+    const result = sessionSummarySchema.safeParse({
+      id: UUID,
+      sessionId: UUID,
+      content: 'Summary',
+      aiFeedback: null,
+      status: 'accepted',
+      closingLine: null,
+      learnerRecap: null,
+      nextTopicId: null,
+      nextTopicTitle: null,
+      nextTopicReason: null,
+      languageLearningSummary: {
+        practicedScenario: 'order food at a cafe',
+        newWords: [],
+        strengthenedWords: [],
+        grammarPatterns: [],
+        comprehension: null,
+        speakingAttempts: 0,
+        fluency: null,
+        nextRecommendationStrand: null,
+      },
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
