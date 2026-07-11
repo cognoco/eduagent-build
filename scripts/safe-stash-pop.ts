@@ -63,9 +63,17 @@ export function parseArgs(argv: string[]): ParsedArgs {
     if (!message) {
       throw new Error('missing value for -m <message>');
     }
+    if (rest.length > 2) {
+      throw new Error(
+        `unexpected extra argument(s): ${rest.slice(2).join(' ')}`,
+      );
+    }
     return { action, message };
   }
-  if (rest.length > 0) {
+  if (rest.length > 1) {
+    throw new Error(`unexpected extra argument(s): ${rest.slice(1).join(' ')}`);
+  }
+  if (rest.length === 1) {
     return { action, target: rest[0] };
   }
   return { action };
@@ -75,14 +83,21 @@ export class BareStashOpRefusedError extends Error {}
 export class NoMatchError extends Error {}
 export class AmbiguousMatchError extends Error {}
 
-/** Resolve parsed args + the current stash list to the single ref to act on. */
+/**
+ * Resolve parsed args + the current stash list to the single stash-commit SHA
+ * to act on. Always returns a SHA, never a `stash@{N}` index -- the index is
+ * a positional pointer into a stack that can shift between `listStashEntries`
+ * and the actual `git stash pop/apply` call (a concurrent session pushing or
+ * popping a stash), whereas a stash's commit SHA is stable and git resolves
+ * it atomically at execution time.
+ */
 export function resolveTarget(entries: StashEntry[], args: ParsedArgs): string {
   if (args.target) {
     const t = args.target;
     if (/^stash@\{\d+\}$/.test(t)) {
       const found = entries.find((e) => e.ref === t);
       if (!found) throw new NoMatchError(`no stash entry matches ref ${t}`);
-      return found.ref;
+      return found.sha;
     }
     const matches = entries.filter((e) => e.sha.startsWith(t));
     if (matches.length === 0) {
@@ -93,26 +108,73 @@ export function resolveTarget(entries: StashEntry[], args: ParsedArgs): string {
         `SHA ${t} matches ${matches.length} stash entries`,
       );
     }
-    return matches[0].ref;
+    return matches[0].sha;
   }
-  if (args.message) {
-    const matches = entries.filter((e) => e.message.includes(args.message!));
+  const message = args.message;
+  if (message) {
+    const matches = entries.filter((e) => e.message.includes(message));
     if (matches.length === 0) {
-      throw new NoMatchError(
-        `no stash entry message contains "${args.message}"`,
-      );
+      throw new NoMatchError(`no stash entry message contains "${message}"`);
     }
     if (matches.length > 1) {
       throw new AmbiguousMatchError(
-        `message "${args.message}" matches ${matches.length} stash entries -- be more specific`,
+        `message "${message}" matches ${matches.length} stash entries -- be more specific`,
       );
     }
-    return matches[0].ref;
+    return matches[0].sha;
   }
   throw new BareStashOpRefusedError(
     'refusing a bare git stash pop/apply -- worktrees share one stash stack; ' +
       'specify -m "<message-substring>" or an explicit stash@{N}/SHA target',
   );
+}
+
+export interface GitOpResult {
+  status: number;
+}
+
+/** `git stash apply` accepts a raw commit SHA directly -- no TOCTOU window. */
+export function applyStashBySha(cwd: string, sha: string): GitOpResult {
+  const res = spawnSync('git', ['stash', 'apply', sha], {
+    cwd,
+    stdio: 'inherit',
+  });
+  return { status: res.status ?? 1 };
+}
+
+/**
+ * `git stash pop`/`drop` refuse a raw commit SHA (only `apply` does) --
+ * verified empirically ("error: '<sha>' is not a stash reference") -- so
+ * popping by SHA cannot be a single git invocation. Implemented as
+ * apply(sha) [safe, SHA-addressed] followed by a drop whose `stash@{N}`
+ * index is re-resolved from a FRESH `listStashEntries` call matched by SHA
+ * immediately before the drop -- not the index captured at initial
+ * resolution time. This closes the TOCTOU window a stale index would leave
+ * open: if a concurrent session pushed/popped a stash in between, the
+ * target SHA's index may have shifted, but re-matching by SHA still finds
+ * the right entry. If the SHA is no longer on the stack at all (a
+ * concurrent session already popped/dropped that exact entry), refuse to
+ * drop anything rather than guess.
+ */
+export function popStashBySha(cwd: string, sha: string): GitOpResult {
+  const applyRes = applyStashBySha(cwd, sha);
+  if (applyRes.status !== 0) return applyRes;
+
+  const fresh = listStashEntries(cwd).find((e) => e.sha === sha);
+  if (!fresh) {
+    console.error('');
+    console.error(
+      `Applied ${sha.slice(0, 8)}, but it is no longer on the stash stack ` +
+        '(a concurrent session may have popped/dropped it) -- refusing to ' +
+        'drop a different entry. Check `git stash list` and drop manually if needed.',
+    );
+    return { status: 1 };
+  }
+  const dropRes = spawnSync('git', ['stash', 'drop', fresh.ref], {
+    cwd,
+    stdio: 'inherit',
+  });
+  return { status: dropRes.status ?? 1 };
 }
 
 function runCli(): void {
@@ -133,9 +195,9 @@ function runCli(): void {
     process.exit(1);
   }
 
-  let ref: string;
+  let sha: string;
   try {
-    ref = resolveTarget(entries, args);
+    sha = resolveTarget(entries, args);
   } catch (err) {
     console.error((err as Error).message);
     console.error('');
@@ -147,11 +209,16 @@ function runCli(): void {
     return;
   }
 
-  const res = spawnSync('git', ['stash', args.action, ref], {
-    cwd,
-    stdio: 'inherit',
-  });
-  process.exit(res.status ?? 1);
+  const resolved = entries.find((e) => e.sha === sha);
+  console.error(
+    `Resolved to ${resolved?.ref ?? '(unknown ref)'}  ${sha.slice(0, 8)}  ${resolved?.message ?? ''}`,
+  );
+
+  const result =
+    args.action === 'apply'
+      ? applyStashBySha(cwd, sha)
+      : popStashBySha(cwd, sha);
+  process.exit(result.status);
 }
 
 const invokedDirectly =

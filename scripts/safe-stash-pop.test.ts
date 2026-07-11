@@ -12,13 +12,15 @@
 // this repo's own (shared) stash stack.
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   listStashEntries,
   parseArgs,
   resolveTarget,
+  applyStashBySha,
+  popStashBySha,
   BareStashOpRefusedError,
   NoMatchError,
   AmbiguousMatchError,
@@ -100,26 +102,30 @@ describe('safe-stash-pop (WI-1798)', () => {
     expect(listStashEntries(repo)).toHaveLength(2);
   });
 
-  test('resolveTarget allows a correctly-targeted -m match', () => {
+  test('resolveTarget allows a correctly-targeted -m match, resolved to a SHA', () => {
     repo = makeRepoWithTwoStashes();
     const entries = listStashEntries(repo);
-    const ref = resolveTarget(entries, { action: 'pop', message: 'session-B' });
-    expect(ref).toBe('stash@{0}');
+    const sha = resolveTarget(entries, { action: 'pop', message: 'session-B' });
+    // Resolves to the matched entry's commit SHA, not its stash@{N} index --
+    // the index is a positional pointer that can shift under a concurrent
+    // session's stash push/pop between resolution and execution.
+    expect(sha).toBe(entries[0].sha);
+    expect(sha).not.toMatch(/^stash@/);
   });
 
-  test('resolveTarget allows an explicit stash@{N} target', () => {
+  test('resolveTarget allows an explicit stash@{N} target, resolved to a SHA', () => {
     repo = makeRepoWithTwoStashes();
     const entries = listStashEntries(repo);
-    const ref = resolveTarget(entries, { action: 'pop', target: 'stash@{1}' });
-    expect(ref).toBe('stash@{1}');
+    const sha = resolveTarget(entries, { action: 'pop', target: 'stash@{1}' });
+    expect(sha).toBe(entries[1].sha);
   });
 
   test('resolveTarget allows an explicit (abbreviated) SHA target', () => {
     repo = makeRepoWithTwoStashes();
     const entries = listStashEntries(repo);
     const sha8 = entries[1].sha.slice(0, 8);
-    const ref = resolveTarget(entries, { action: 'pop', target: sha8 });
-    expect(ref).toBe(entries[1].ref);
+    const sha = resolveTarget(entries, { action: 'pop', target: sha8 });
+    expect(sha).toBe(entries[1].sha);
   });
 
   test('resolveTarget refuses an ambiguous -m match', () => {
@@ -168,9 +174,61 @@ describe('safe-stash-pop (WI-1798)', () => {
       encoding: 'utf8',
     });
     expect(listStashEntries(repo)).toHaveLength(1);
-    const content = execFileSync('cat', [join(repo, 'file.txt')], {
-      encoding: 'utf8',
-    });
+    const content = readFileSync(join(repo, 'file.txt'), 'utf8');
     expect(content).toBe('session-a change\n');
+  });
+
+  test('parseArgs rejects unexpected extra positional arguments', () => {
+    expect(() => parseArgs(['pop', 'stash@{0}', 'extra'])).toThrow();
+    expect(() => parseArgs(['pop', '-m', 'msg', 'extra'])).toThrow();
+  });
+
+  test('applyStashBySha applies content without dropping the entry', () => {
+    repo = makeRepoWithTwoStashes();
+    const entries = listStashEntries(repo);
+    const target = entries[1]; // session-A
+    const result = applyStashBySha(repo, target.sha);
+    expect(result.status).toBe(0);
+    // Applying leaves the stash stack untouched -- still 2 entries.
+    expect(listStashEntries(repo)).toHaveLength(2);
+  });
+
+  test('popStashBySha applies content and drops exactly the targeted entry', () => {
+    repo = makeRepoWithTwoStashes();
+    const entries = listStashEntries(repo);
+    const target = entries[1]; // session-A, stash@{1}
+    const result = popStashBySha(repo, target.sha);
+    expect(result.status).toBe(0);
+    const remaining = listStashEntries(repo);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].sha).toBe(entries[0].sha); // session-B survives
+    expect(readFileSync(join(repo, 'file.txt'), 'utf8')).toBe(
+      'session-a change\n',
+    );
+  });
+
+  test('popStashBySha refuses to drop a different entry if the target was already removed concurrently', () => {
+    repo = makeRepoWithTwoStashes();
+    const entries = listStashEntries(repo);
+    const target = entries[1]; // session-A, stash@{1}
+
+    // Simulate a concurrent session already popping/dropping this exact
+    // entry between our `listStashEntries` read and our own pop call --
+    // the commit object still exists (dangling, not yet GC'd), so `apply`
+    // by SHA still succeeds, but the reflog entry is gone.
+    git(repo, ['stash', 'drop', target.ref]);
+    expect(listStashEntries(repo)).toHaveLength(1);
+
+    const result = popStashBySha(repo, target.sha);
+    // Apply-by-SHA against the dangling commit still succeeds...
+    expect(readFileSync(join(repo, 'file.txt'), 'utf8')).toBe(
+      'session-a change\n',
+    );
+    // ...but the drop step refuses (nothing left to safely drop) rather
+    // than removing the unrelated remaining entry (session-B).
+    expect(result.status).not.toBe(0);
+    const remaining = listStashEntries(repo);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].sha).toBe(entries[0].sha); // session-B untouched
   });
 });
