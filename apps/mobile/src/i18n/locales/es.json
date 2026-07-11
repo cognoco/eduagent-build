@@ -1040,6 +1040,11 @@
     "voiceToggle": {
       "a11yMute": "Silenciar voz de IA",
       "a11yUnmute": "Activar voz de IA"
+    },
+    "meaningOutput": {
+      "title": "Intenta decirlo",
+      "targetWords": "Intenta usar: {{words}}",
+      "dismissLabel": "Omitir ejercicio oral"
     }
   },
   "quiz": {

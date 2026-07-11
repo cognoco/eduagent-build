@@ -899,7 +899,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
               setFluencyDrill(result.fluencyDrill);
             }
             setLanguageLearning(
-              result.languageLearning?.gradedInput
+              result.languageLearning?.gradedInput ||
+                result.languageLearning?.meaningOutput
                 ? result.languageLearning
                 : null,
             );

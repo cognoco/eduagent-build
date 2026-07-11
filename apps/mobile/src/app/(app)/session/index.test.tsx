@@ -608,6 +608,14 @@ jest.mock(
         </View>
       );
     },
+    MeaningOutputCard: ({ activity }: { activity: any }) => {
+      const { View, Text } = require('react-native');
+      return (
+        <View testID="meaning-output-card">
+          <Text>{activity.meaningOutput?.prompt}</Text>
+        </View>
+      );
+    },
     QuotaExceededCard: ({
       details,
       isOwner,
@@ -1528,6 +1536,67 @@ describe('SessionScreen homework flow', () => {
       testScreen.getByTestId('graded-input-card');
       testScreen.getByText('Tengo agua en la mesa.');
       testScreen.getByText('What is on the table?');
+    });
+  });
+
+  it('renders a meaning-output task from the typed language-learning done payload [WI-1756]', async () => {
+    // Regression guard: languageLearning used to be dropped whenever
+    // gradedInput was absent (WI-1756 AC1) — this payload has no gradedInput
+    // key at all, only meaningOutput. Runs through the real (unmocked)
+    // useSessionStreaming hook, so this also proves the state-path fix
+    // end-to-end, not just in hook isolation.
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Spanish',
+      topicId: '11111111-1111-4111-8111-111111111111',
+      topicName: 'Ordering drinks',
+    });
+    mockStream.mockImplementationOnce(
+      async (
+        _message: string,
+        onChunk: (value: string) => void,
+        onDone: (result: Record<string, unknown>) => void | Promise<void>,
+      ) => {
+        onChunk('Tell me about your day.');
+        await onDone({
+          exchangeCount: 1,
+          escalationRung: 1,
+          aiEventId: 'event-meaning-output',
+          languageLearning: {
+            strand: 'meaning_output',
+            activityType: 'free_response',
+            modality: 'text',
+            targetWords: ['agua'],
+            targetGrammar: [],
+            meaningOutput: {
+              type: 'meaning_output',
+              taskType: 'personal_answer',
+              communicativeGoal:
+                'Share a true or imagined personal answer someone could respond to.',
+              prompt:
+                'Answer personally in one or two short sentences using agua.',
+              responseMode: 'short_answer',
+              targetWords: ['agua'],
+              targetGrammar: [],
+              retryExpectation: 'retry_after_feedback',
+              correctionExpectation: 'meaning_first_then_form',
+            },
+          },
+        });
+      },
+    );
+
+    const testScreen = renderSessionScreen();
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      testScreen.getByTestId('meaning-output-card');
+      testScreen.getByText(
+        'Answer personally in one or two short sentences using agua.',
+      );
     });
   });
 

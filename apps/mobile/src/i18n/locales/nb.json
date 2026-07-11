@@ -1040,6 +1040,11 @@
     "voiceToggle": {
       "a11yMute": "Demp AI-stemme",
       "a11yUnmute": "Slå på AI-stemme"
+    },
+    "meaningOutput": {
+      "title": "Prøv å si det",
+      "targetWords": "Prøv å bruke: {{words}}",
+      "dismissLabel": "Avvis taleoppgave"
     }
   },
   "quiz": {

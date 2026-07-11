@@ -1079,6 +1079,11 @@
     "voiceToggle": {
       "a11yMute": "Wycisz głos AI",
       "a11yUnmute": "Włącz głos AI"
+    },
+    "meaningOutput": {
+      "title": "Spróbuj to powiedzieć",
+      "targetWords": "Spróbuj użyć: {{words}}",
+      "dismissLabel": "Pomiń zadanie z mówienia"
     }
   },
   "quiz": {

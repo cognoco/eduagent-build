@@ -79,6 +79,23 @@ function formatLanguageSessionState(context: ExchangeContext): string {
         '- Use this exact passage as the input seed. You may lightly smooth grammar, but do not add unrelated vocabulary.',
       ]
     : [];
+  const meaningOutput = activity.meaningOutput;
+  const meaningOutputLines = meaningOutput
+    ? [
+        'Meaning-output task:',
+        `- Task type: ${meaningOutput.taskType}`,
+        `- Communicative goal: ${sanitizeXmlValue(
+          meaningOutput.communicativeGoal,
+          200,
+        )}`,
+        `- Task prompt given to the learner: ${sanitizeXmlValue(
+          meaningOutput.prompt,
+          300,
+        )}`,
+        `- Expected response mode: ${meaningOutput.responseMode}`,
+        "- Judge the learner's reply against this specific task. If it is incomplete, off-task, or malformed, give the corrected/model form, briefly explain why, and ask for a retry on the same task before moving on.",
+      ]
+    : [];
   const previousComprehension = state.previousComprehension;
   const previousComprehensionLines = previousComprehension
     ? [
@@ -110,6 +127,7 @@ function formatLanguageSessionState(context: ExchangeContext): string {
     `- Session strand counts: meaning_input=${counts.meaning_input}, meaning_output=${counts.meaning_output}, language_focus=${counts.language_focus}, fluency=${counts.fluency}.`,
     '- Follow this activity brief for the current turn. Do not switch strands unless the learner asks for something urgent or safety-related.',
     ...gradedInputLines,
+    ...meaningOutputLines,
     ...previousComprehensionLines,
   ].join('\n');
 }

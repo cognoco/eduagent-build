@@ -1040,6 +1040,11 @@
     "voiceToggle": {
       "a11yMute": "AIの音声をミュート",
       "a11yUnmute": "AIの音声のミュートを解除"
+    },
+    "meaningOutput": {
+      "title": "言ってみよう",
+      "targetWords": "使ってみよう: {{words}}",
+      "dismissLabel": "スピーキングタスクを閉じる"
     }
   },
   "quiz": {

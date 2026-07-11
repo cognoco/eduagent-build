@@ -25,6 +25,7 @@ import {
   getOpeningMessage,
   FluencyDrillStrip,
   GradedInputCard,
+  MeaningOutputCard,
   type ChatMessage,
 } from '../../../components/session';
 import { FirstSessionGreeting } from '../../../components/session/FirstSessionGreeting';
@@ -1487,6 +1488,12 @@ function SessionScreenInner() {
       onDismiss={() => setLanguageLearning(null)}
     />
   ) : null;
+  const meaningOutputCard = languageLearning?.meaningOutput ? (
+    <MeaningOutputCard
+      activity={languageLearning}
+      onDismiss={() => setLanguageLearning(null)}
+    />
+  ) : null;
   const firstSessionWrapUpCard = firstSessionWrapUp ? (
     <FirstSessionWrapUpCard
       value={firstSessionReflectionText}
@@ -1645,6 +1652,7 @@ function SessionScreenInner() {
         footer={
           <>
             {gradedInputCard}
+            {meaningOutputCard}
             {challengeOfferCard}
             {draftedNoteReview}
             <BookmarkNudgeTooltip
