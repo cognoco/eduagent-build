@@ -1506,7 +1506,6 @@
       "startTitle": "Começar {{subject}}"
     },
     "noteSignal": {
-      "verified": "Verificado",
       "verifiedAccessibilityLabel": "Verificado - as suas palavras foram confirmadas",
       "mentorAddition": "O mentor tem mais sobre este tópico.",
       "showMentorAdditionAccessibilityLabel": "Mostrar o que o mentor adicionou.",
@@ -1617,15 +1616,12 @@
     "inactiveFallbackBanner": {
       "message": "Não foi possível carregar as tuas matérias pausadas e arquivadas. Toca para tentar de novo — elas não desapareceram."
     },
-    "notStartedCount": "{{notStarted}} / {{total}} por começar",
     "chooseTopic": "Escolha um tópico",
     "provenanceFrom": "De {{name}}",
     "recentlyAdded": "Adicionado recentemente",
     "sessionCount_one": "{{count}} sessão",
     "sessionCount_other": "{{count}} sessões",
     "a11yClearSearch": "Limpar busca",
-    "a11yEditNote": "Editar anotação",
-    "a11yDeleteNote": "Excluir anotação",
     "a11yCloseTopicPicker": "Fechar seletor de tópicos",
     "myNotes": {
       "subtitleBookmarks_one": "1 resposta guardada",
@@ -1652,9 +1648,6 @@
       "thisTopicFallback": "este tópico",
       "addedFromChildNamed": "Adicionado da aprendizagem de {{name}}.",
       "addedFromChild": "Adicionado da aprendizagem de uma criança."
-    },
-    "collapsibleChapter": {
-      "a11yHeader": "{{title}}, {{notStarted}} de {{total}} tópicos não iniciados"
     },
     "inlineNote": {
       "a11yCollapse": "Nota para {{topic}}. {{source}}. Toque para recolher.",
@@ -3691,12 +3684,6 @@
       "crossContextPromptMessage": "Você está em uma sessão. Termine-a primeiro ou abra a atualização e saia do fluxo atual.",
       "stayHere": "Ficar aqui",
       "openUpdate": "Abrir atualização"
-    },
-    "guardianPrimer": {
-      "title": "Quer ficar a par?",
-      "message": "Podemos enviar um lembrete quando uma criança precisar da sua atenção. Pode alterar isto a qualquer momento nas Definições.",
-      "allow": "Permitir",
-      "notNow": "Agora não"
     }
   },
   "myNotes": {

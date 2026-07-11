@@ -11,7 +11,7 @@
 // success/skip rates and delayed-purge counts were completely invisible in the
 // Inngest dashboard. This module provides the observable terminus.
 //
-// Pattern mirrors ask-classification-observe.ts and ask-gate-observe.ts.
+// Pattern mirrors ask-classification-observe.ts.
 // ---------------------------------------------------------------------------
 
 import { z } from 'zod';

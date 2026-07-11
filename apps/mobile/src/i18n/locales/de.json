@@ -1479,7 +1479,6 @@
       "startTitle": "Mit {{subject}} starten"
     },
     "noteSignal": {
-      "verified": "Verifiziert",
       "verifiedAccessibilityLabel": "Verifiziert – deine Worte wurden bestätigt",
       "mentorAddition": "Der Mentor hat mehr zu diesem Thema.",
       "showMentorAdditionAccessibilityLabel": "Zeige, was der Mentor hinzugefügt hat.",
@@ -1590,15 +1589,12 @@
     "inactiveFallbackBanner": {
       "message": "Deine pausierten und archivierten Fächer konnten nicht geladen werden. Tippe zum Wiederholen – sie sind nicht weg."
     },
-    "notStartedCount": "{{notStarted}} / {{total}} nicht begonnen",
     "chooseTopic": "Wähle ein Thema",
     "provenanceFrom": "Von {{name}}",
     "recentlyAdded": "Kürzlich hinzugefügt",
     "sessionCount_one": "{{count}} Sitzung",
     "sessionCount_other": "{{count}} Sitzungen",
     "a11yClearSearch": "Suche löschen",
-    "a11yEditNote": "Notiz bearbeiten",
-    "a11yDeleteNote": "Notiz löschen",
     "a11yCloseTopicPicker": "Themenauswahl schließen",
     "myNotes": {
       "subtitleBookmarks_one": "1 gespeicherte Antwort",
@@ -1625,9 +1621,6 @@
       "thisTopicFallback": "dieses Thema",
       "addedFromChildNamed": "Aus {{name}}s Lernfortschritt hinzugefügt.",
       "addedFromChild": "Aus dem Lernfortschritt eines Kindes hinzugefügt."
-    },
-    "collapsibleChapter": {
-      "a11yHeader": "{{title}}, {{notStarted}} von {{total}} Themen nicht begonnen"
     },
     "inlineNote": {
       "a11yCollapse": "Notiz für {{topic}}. {{source}}. Zum Einklappen tippen.",
@@ -3691,12 +3684,6 @@
       "crossContextPromptMessage": "Du bist in einer Sitzung. Beende sie zuerst oder öffne das Update und verlasse den aktuellen Vorgang.",
       "stayHere": "Hier bleiben",
       "openUpdate": "Update öffnen"
-    },
-    "guardianPrimer": {
-      "title": "Auf dem Laufenden bleiben?",
-      "message": "Wir können dich benachrichtigen, wenn ein Kind deine Aufmerksamkeit braucht. Du kannst das jederzeit in den Einstellungen ändern.",
-      "allow": "Zulassen",
-      "notNow": "Nicht jetzt"
     }
   },
   "myNotes": {

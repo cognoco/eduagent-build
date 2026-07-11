@@ -1573,7 +1573,6 @@
       "deleteMessage": "Are you sure you want to delete this note?"
     },
     "noteSignal": {
-      "verified": "Verified",
       "verifiedAccessibilityLabel": "Verified - your words held up",
       "mentorAddition": "The mentor has more on this topic",
       "showMentorAdditionAccessibilityLabel": "Show what the mentor added",
@@ -1681,15 +1680,12 @@
       "a11yCollapseSessions": "Collapse past conversations",
       "a11yExpandSessions": "Expand past conversations"
     },
-    "notStartedCount": "{{notStarted}} / {{total}} not started",
     "chooseTopic": "Choose a topic",
     "provenanceFrom": "From {{name}}",
     "recentlyAdded": "Recently added",
     "sessionCount_one": "{{count}} session",
     "sessionCount_other": "{{count}} sessions",
     "a11yClearSearch": "Clear search",
-    "a11yEditNote": "Edit note",
-    "a11yDeleteNote": "Delete note",
     "a11yCloseTopicPicker": "Close topic picker",
     "myNotes": {
       "subtitleBookmarks_one": "1 saved reply",
@@ -1716,9 +1712,6 @@
       "thisTopicFallback": "this topic",
       "addedFromChildNamed": "Added from {{name}}'s learning.",
       "addedFromChild": "Added from a child's learning."
-    },
-    "collapsibleChapter": {
-      "a11yHeader": "{{title}}, {{notStarted}} of {{total}} topics not started"
     },
     "inlineNote": {
       "a11yCollapse": "Note for {{topic}}. {{source}}. Tap to collapse.",
@@ -3629,12 +3622,6 @@
       "crossContextPromptMessage": "You are in a session. Finish this first, or open the update and leave the current flow.",
       "stayHere": "Stay here",
       "openUpdate": "Open update"
-    },
-    "guardianPrimer": {
-      "title": "Stay in the loop?",
-      "message": "We can send a gentle nudge when a child needs your attention. You can change this anytime in Settings.",
-      "allow": "Allow",
-      "notNow": "Not now"
     }
   },
   "nudge": {

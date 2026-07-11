@@ -1479,7 +1479,6 @@
       "startTitle": "Start {{subject}}"
     },
     "noteSignal": {
-      "verified": "Verifisert",
       "verifiedAccessibilityLabel": "Verifisert – ordene dine holdt mål",
       "mentorAddition": "Mentoren har mer om dette emnet.",
       "showMentorAdditionAccessibilityLabel": "Vis hva mentoren la til.",
@@ -1590,15 +1589,12 @@
     "inactiveFallbackBanner": {
       "message": "Kunne ikke laste inn de pausede og arkiverte emnene dine. Trykk for å prøve igjen – de er ikke borte."
     },
-    "notStartedCount": "{{notStarted}} / {{total}} ikke startet",
     "chooseTopic": "Velg et tema",
     "provenanceFrom": "Fra {{name}}",
     "recentlyAdded": "Nylig lagt til",
     "sessionCount_one": "{{count}} økt",
     "sessionCount_other": "{{count}} økter",
     "a11yClearSearch": "Tøm søk",
-    "a11yEditNote": "Rediger notat",
-    "a11yDeleteNote": "Slett notat",
     "a11yCloseTopicPicker": "Lukk emnevelger",
     "myNotes": {
       "subtitleBookmarks_one": "1 lagret svar",
@@ -1625,9 +1621,6 @@
       "thisTopicFallback": "dette emnet",
       "addedFromChildNamed": "Lagt til fra {{name}}s læring.",
       "addedFromChild": "Lagt til fra et barns læring."
-    },
-    "collapsibleChapter": {
-      "a11yHeader": "{{title}}, {{notStarted}} av {{total}} emner ikke påbegynt"
     },
     "inlineNote": {
       "a11yCollapse": "Notat for {{topic}}. {{source}}. Trykk for å skjule.",
@@ -3691,12 +3684,6 @@
       "crossContextPromptMessage": "Du er i en økt. Fullfør denne først, eller åpne oppdateringen og forlat det du holder på med.",
       "stayHere": "Bli her",
       "openUpdate": "Åpne oppdatering"
-    },
-    "guardianPrimer": {
-      "title": "Holde deg oppdatert?",
-      "message": "Vi kan sende et lite varsel når et barn trenger din oppmerksomhet. Du kan endre dette når som helst i Innstillinger.",
-      "allow": "Tillat",
-      "notNow": "Ikke nå"
     }
   },
   "myNotes": {
