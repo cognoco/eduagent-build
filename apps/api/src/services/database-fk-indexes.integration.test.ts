@@ -460,4 +460,53 @@ describe('Integration: FK index coverage (BUG-393 / BUG-396 ratchet)', () => {
       });
     }
   });
+
+  // [WI-1002] The absorbed WI-1003 AC requires the two supporter-visibility
+  // contract_id FK indexes to be PARTIAL (WHERE contract_id IS NOT NULL) —
+  // contract_id is nullable and lookups always filter contract_id = $1, so the
+  // NULL rows are excluded. Assert the partial predicate is present, not just a
+  // leading-column index (a full index would also satisfy the ratchet above).
+  it('supporter-visibility contract_id FK indexes are partial (WHERE contract_id IS NOT NULL)', async () => {
+    const db = createIntegrationDb();
+
+    const partialIndexes = [
+      {
+        table: 'support_visibility_audit_events',
+        indexName: 'support_visibility_audit_events_contract_idx',
+      },
+      {
+        table: 'support_visibility_notices',
+        indexName: 'support_visibility_notices_contract_idx',
+      },
+    ];
+
+    const rows = await db.execute<{ indexname: string; indexdef: string }>(
+      sql.raw(`
+        SELECT indexname, indexdef
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND indexname IN (${partialIndexes.map((p) => `'${p.indexName}'`).join(', ')})
+      `),
+    );
+
+    const defByName = new Map(rows.rows.map((r) => [r.indexname, r.indexdef]));
+
+    for (const entry of partialIndexes) {
+      const indexdef = defByName.get(entry.indexName);
+      // Normalize whitespace so the predicate check is insensitive to how
+      // Postgres renders the WHERE clause.
+      const normalized = (indexdef ?? '').replace(/\s+/g, ' ').toLowerCase();
+      expect({
+        indexName: entry.indexName,
+        exists: indexdef !== undefined,
+        isPartialOnContractId: /where \(?contract_id is not null\)?/.test(
+          normalized,
+        ),
+      }).toEqual({
+        indexName: entry.indexName,
+        exists: true,
+        isPartialOnContractId: true,
+      });
+    }
+  });
 });
