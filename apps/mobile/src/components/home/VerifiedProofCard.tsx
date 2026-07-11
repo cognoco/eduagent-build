@@ -5,19 +5,20 @@ import type { VerifiedProofResponse } from '@eduagent/schemas';
 import { useVerifiedProof } from '../../hooks/use-dashboard';
 import { formatShortDate } from '../../lib/format-datetime';
 import { FAMILY_HOME_RETURN_TO } from '../../lib/navigation';
+import type { TranslateKey } from '../../i18n/types';
 
 type MasteryVerificationState = NonNullable<
   VerifiedProofResponse['masteryVerificationState']
 >;
 type RetentionStatus = NonNullable<VerifiedProofResponse['retentionStatus']>;
 
-const STATE_LABEL_KEYS: Record<MasteryVerificationState, string> = {
+const STATE_LABEL_KEYS: Record<MasteryVerificationState, TranslateKey> = {
   unverified: 'home.parent.verifiedProof.state.unverified',
   fresh: 'home.parent.verifiedProof.state.fresh',
   stale: 'home.parent.verifiedProof.state.stale',
 };
 
-const RETENTION_LABEL_KEYS: Record<RetentionStatus, string> = {
+const RETENTION_LABEL_KEYS: Record<RetentionStatus, TranslateKey> = {
   strong: 'home.parent.verifiedProof.retention.strong',
   fading: 'home.parent.verifiedProof.retention.fading',
   weak: 'home.parent.verifiedProof.retention.weak',
