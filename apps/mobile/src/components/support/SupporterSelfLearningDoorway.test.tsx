@@ -26,17 +26,15 @@ jest.mock('expo-router', () => ({
 
 let mockFetch: RoutedMockFetch;
 
-jest.mock(
-  '../../lib/api-client' /* gc1-allow: Clerk useAuth() external boundary; component test exercises real query + schema parsing over a routed Hono client */,
-  () => {
-    const {
-      createRoutedMockFetch,
-      mockApiClientFactory,
-    } = require('../../test-utils/mock-api-routes');
-    mockFetch = createRoutedMockFetch();
-    return mockApiClientFactory(mockFetch);
-  },
-);
+// prettier-ignore
+jest.mock(/* gc1-allow: Clerk useAuth() external boundary; component test exercises real query + schema parsing over a routed Hono client */ '../../lib/api-client', () => {
+  const {
+    createRoutedMockFetch,
+    mockApiClientFactory,
+  } = require('../../test-utils/mock-api-routes');
+  mockFetch = createRoutedMockFetch();
+  return mockApiClientFactory(mockFetch);
+});
 
 // resolveScopesForPerson (apps/api/src/services/scope-resolution.ts) never
 // emits a 'supporter' shape without at least one 'person' scope, and only
