@@ -427,6 +427,9 @@ export async function generateExport(
         content: projectSessionEmbeddingContent(serialized['content']),
       });
     }),
+    // Learning-only producer: do not parse or emit subscription rows here.
+    // generateExportV2 owns the typed subscription mapping and replaces this
+    // placeholder with rows that satisfy dataExportSubscriptionRowSchema.
     subscriptions: [],
     quotaPools: [],
     topUpCredits: [],
