@@ -499,6 +499,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(writeVarsEnv.DOPPLER_TOKEN).toBe('${{ secrets.DOPPLER_TOKEN_STG }}');
     expect(writeVarsScript).toContain('doppler run -p mentomate -c stg');
     expect(writeVarsScript).toContain('CLERK_SECRET_KEY');
+    expect(writeVarsScript).toContain('CLERK_JWKS_URL');
+    expect(writeVarsScript).toContain('CLERK_AUDIENCE');
     expect(writeVarsScript).toContain('SEED_PASSWORD');
     expect(writeVarsScript).toContain('TEST_SEED_SECRET');
     expect(writeVarsScript).not.toContain('${{ secrets.');
