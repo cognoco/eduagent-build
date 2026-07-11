@@ -10,6 +10,8 @@ export const OWN_LEARNING_RETURN_TO = 'own-learning';
 export const OWN_LEARNING_HREF = '/(app)/own-learning';
 export const PRACTICE_RETURN_TO = 'practice';
 export const PRACTICE_HREF = '/(app)/practice';
+export const JOURNAL_RETURN_TO = 'journal';
+export const JOURNAL_HREF = '/(app)/journal';
 export const FAMILY_RECAPS_RETURN_TO = 'family-recaps';
 export const FAMILY_RECAPS_HREF = '/(app)/recaps';
 export const FAMILY_PROGRESS_RETURN_TO = 'family-progress';
@@ -45,6 +47,7 @@ export function homeHrefForReturnTo(
   if (token === OWN_LEARNING_RETURN_TO) return OWN_LEARNING_HREF as Href;
   if (token === LEARNER_HOME_RETURN_TO) return LEARNER_HOME_HREF as Href;
   if (token === PRACTICE_RETURN_TO) return PRACTICE_HREF as Href;
+  if (token === JOURNAL_RETURN_TO) return JOURNAL_HREF as Href;
   if (token === FAMILY_RECAPS_RETURN_TO && id) {
     return {
       pathname: '/(app)/recaps/[recapId]',

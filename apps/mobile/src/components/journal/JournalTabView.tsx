@@ -26,6 +26,7 @@ import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 import { useMyReports, useMyWeeklyReports } from '../../hooks/use-my-reports';
 import { useNowFeed } from '../../hooks/use-now-feed';
 import { pushNowDeepLink } from '../../lib/now-deep-link';
+import { JOURNAL_RETURN_TO } from '../../lib/navigation';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
 import { classifyApiError, recoveryActions } from '../../lib/format-api-error';
 
@@ -967,7 +968,12 @@ function JournalPracticeSection(): React.ReactElement {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('journal.practice.openHub')}
-        onPress={() => router.push('/(app)/practice' as Href)}
+        onPress={() =>
+          router.push({
+            pathname: '/(app)/practice',
+            params: { returnTo: JOURNAL_RETURN_TO },
+          } as Href)
+        }
         testID="journal-practice-open-hub"
         className="min-h-[48px] items-center justify-center rounded-button bg-primary px-4 py-3"
       >

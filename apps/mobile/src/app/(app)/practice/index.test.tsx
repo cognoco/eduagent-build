@@ -82,8 +82,11 @@ jest.mock(
   '../../../lib/navigation' /* gc1-allow: imports expo-router Router type */,
   () => ({
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-    homeHrefForReturnTo: (returnTo: unknown) =>
-      returnTo === 'practice' ? '/(app)/practice' : '/(app)/home',
+    homeHrefForReturnTo: (returnTo: unknown) => {
+      if (returnTo === 'practice') return '/(app)/practice';
+      if (returnTo === 'journal') return '/(app)/journal';
+      return '/(app)/home';
+    },
     PRACTICE_RETURN_TO: 'practice',
   }),
 );
@@ -225,6 +228,19 @@ describe('PracticeScreen', () => {
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
       '/(app)/home',
+    );
+  });
+
+  it('routes the back button to Journal when launched from the Journal practice section', async () => {
+    mockSearchParams = { returnTo: 'journal' };
+
+    mount();
+    await waitFor(() => screen.getByTestId('practice-back'));
+
+    fireEvent.press(screen.getByTestId('practice-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/journal',
     );
   });
 
