@@ -156,7 +156,7 @@ run_flow() {
 
   set +e
   maestro test "${maestro_env[@]}" "apps/mobile/e2e/${flow}" \
-    --test-output-dir "$flow_output/"
+    --test-output-dir "$flow_output/" </dev/null
   local status=$?
   set -e
 
