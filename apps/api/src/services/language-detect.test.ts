@@ -173,6 +173,38 @@ describe('detectLanguageSubject', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // [WI-1755] Launch-guard regression examples — ambiguous topics that mention
+  // a supported language name (or nothing at all) must not route into
+  // four_strands language mode.
+  // ---------------------------------------------------------------------------
+
+  it('[WI-1755] handles "Spanish politics" where LLM says not language learning', async () => {
+    llmResponse({ isLanguageLearning: false, languageCode: null });
+
+    const result = await detectLanguageSubject('Spanish politics');
+
+    expect(mockRouteAndCall).toHaveBeenCalled();
+    expect(result).toBeNull();
+  });
+
+  it('[WI-1755] returns null for a Celsius/temperature question without calling the LLM', async () => {
+    const result = await detectLanguageSubject('Celsius');
+
+    expect(result).toBeNull();
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+  });
+
+  it('[WI-1755] still detects genuine target-language practice ("practice French")', async () => {
+    llmResponse({ isLanguageLearning: true, languageCode: 'fr' });
+
+    const result = await detectLanguageSubject('practice French');
+
+    expect(result).not.toBeNull();
+    expect(result!.code).toBe('fr');
+    expect(result!.pedagogyMode).toBe('four_strands');
+  });
+
+  // ---------------------------------------------------------------------------
   // [BUG-462] Break tests — LLM error is observable, fallback still returned
   // ---------------------------------------------------------------------------
 

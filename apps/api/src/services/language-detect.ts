@@ -22,7 +22,7 @@ Return ONLY JSON:
 
 Rules:
 - true only when the user is actually learning that language
-- false for history/culture topics like "French Revolution" or "Spanish Civil War"
+- false for history/culture/politics/current-events topics like "French Revolution", "Spanish Civil War", or "Spanish politics"
 - If a specific language is present, use its ISO 639-1 code
 - If unsure, return false`;
 
@@ -36,6 +36,23 @@ function entryToDetection(entry: LanguageEntry): LanguageDetection {
   };
 }
 
+// Pure prompt builder extracted so the eval-llm harness (flows/language-detect.ts)
+// can exercise the EXACT production prompt against the real LLM without a DB,
+// mirroring the buildSubjectClassifyMessages pattern (subject-classify.ts).
+export function buildLanguageDetectionMessages(
+  rawInput: string,
+): ChatMessage[] {
+  // [PROMPT-INJECT-8] rawInput is untrusted. Wrap + entity-encode so it
+  // cannot be read as a directive; matches subject-resolve.ts framing.
+  return [
+    { role: 'system', content: LANGUAGE_DETECTION_PROMPT },
+    {
+      role: 'user',
+      content: `<subject_text>${escapeXml(rawInput)}</subject_text>`,
+    },
+  ];
+}
+
 export async function detectLanguageSubject(
   rawInput: string,
 ): Promise<LanguageDetection | null> {
@@ -44,15 +61,7 @@ export async function detectLanguageSubject(
     return null;
   }
 
-  // [PROMPT-INJECT-8] rawInput is untrusted. Wrap + entity-encode so it
-  // cannot be read as a directive; matches subject-resolve.ts framing.
-  const messages: ChatMessage[] = [
-    { role: 'system', content: LANGUAGE_DETECTION_PROMPT },
-    {
-      role: 'user',
-      content: `<subject_text>${escapeXml(rawInput)}</subject_text>`,
-    },
-  ];
+  const messages = buildLanguageDetectionMessages(rawInput);
 
   try {
     // conversationLanguage not threaded: output is {lang} identification, not prose
