@@ -8,8 +8,23 @@
 // the actual top-level `account_id` assignment — not the whole file text — or
 // the sync skips as "unrendered" and returns ok/results-empty silently.
 
-const { isRenderedWranglerToml } = require('./sync-secrets.js') as {
+const {
+  buildWranglerBulkArgs,
+  findMissingSecretNames,
+  isRenderedWranglerToml,
+  shouldSkipSync,
+} = require('./sync-secrets.js') as {
+  buildWranglerBulkArgs: (
+    wranglerEnv: string | null,
+    workerName: string,
+    configPath?: string,
+  ) => string[];
+  findMissingSecretNames: (
+    expectedNames: string[],
+    actualNames: string[],
+  ) => string[];
   isRenderedWranglerToml: (toml: string) => boolean;
+  shouldSkipSync: (isRendered: boolean, configPath?: string) => boolean;
 };
 
 describe('[WI-1643] isRenderedWranglerToml', () => {
@@ -39,5 +54,54 @@ describe('[WI-1643] isRenderedWranglerToml', () => {
     const toml = 'name = "mentomate-api"';
 
     expect(isRenderedWranglerToml(toml)).toBe(true);
+  });
+});
+
+describe('[WI-1641] explicit CI target', () => {
+  it('does not silently skip an unrendered repo config when CI supplies an explicit config', () => {
+    expect(shouldSkipSync(false, '/tmp/wrangler-secret-sync.jsonc')).toBe(
+      false,
+    );
+  });
+
+  it('keeps the intentional local skip when no explicit config is supplied', () => {
+    expect(shouldSkipSync(false)).toBe(true);
+  });
+
+  it('targets the named production worker through the explicit config', () => {
+    expect(
+      buildWranglerBulkArgs(
+        'production',
+        'mentomate-api-prd',
+        '/tmp/wrangler-secret-sync.jsonc',
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        'secret',
+        'bulk',
+        '--name',
+        'mentomate-api-prd',
+        '--config',
+        '/tmp/wrangler-secret-sync.jsonc',
+      ]),
+    );
+  });
+
+  it('detects any Doppler-managed key stranded after bulk upload', () => {
+    expect(
+      findMissingSecretNames(
+        ['DATABASE_URL', 'ANALYTICS_HASH_KEY'],
+        ['DATABASE_URL'],
+      ),
+    ).toEqual(['ANALYTICS_HASH_KEY']);
+  });
+
+  it('allows unrelated Worker-only keys while verifying managed keys', () => {
+    expect(
+      findMissingSecretNames(
+        ['DATABASE_URL'],
+        ['DATABASE_URL', 'WORKER_ONLY_KEY'],
+      ),
+    ).toEqual([]);
   });
 });
