@@ -59,6 +59,16 @@ const INTERNAL_NON_PROSE_FILES: ReadonlySet<string> = new Set([
   'apps/api/src/services/session/topic-probe-extraction.ts',
   'apps/api/src/services/vocabulary-extract.ts',
   'apps/api/src/routes/test-seed.ts',
+  // Genuinely prose, but NOT learner-UI prose: this call generates the graded
+  // reading/listening artifact's body text in the learner's *target/study*
+  // language (languageCode), which is deliberately independent of — and often
+  // different from — their conversation/UI language. The router's
+  // `conversationLanguage` preamble instructs the model to write learner-facing
+  // prose (the envelope's `reply` field) in the UI language; threading it here
+  // would add a dangling, misleading language instruction to a prompt that has
+  // no `reply` field and must stay in the target language for the lesson to
+  // make sense. See WI-1547 plan (`_plan-WI-1547.md`) for the full rationale.
+  'apps/api/src/services/graded-input-generation.ts',
 ]);
 
 // Spec CRITICAL-B — per-SITE (file + line) exemption for wrapper-internal

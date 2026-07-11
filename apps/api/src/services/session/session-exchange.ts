@@ -101,6 +101,7 @@ import {
 import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
 import { getRetentionStatus, type RetentionState } from '../retention';
+import { extractInterestLabels } from '../graded-input-generation';
 import { createNoteForSession } from '../notes';
 import type {
   EscalationRung,
@@ -2580,7 +2581,7 @@ export async function prepareExchangeContext(
   }
   const languageSessionState =
     effectivePedagogyMode === 'four_strands'
-      ? buildLanguageSessionState({
+      ? await buildLanguageSessionState({
           exchangeCount: session.exchangeCount,
           events,
           learnerMessage: userMessage,
@@ -2596,6 +2597,12 @@ export async function prepareExchangeContext(
             ),
           knownWords: knownVocabularyRows.map((row) => row.term).slice(0, 8),
           targetWords: targetVocabularyRows.map((row) => row.term).slice(0, 8),
+          interests: learningProfile
+            ? extractInterestLabels(learningProfile.interests)
+            : undefined,
+          birthYear: profile.birthYear,
+          birthMonth: profile.birthMonth,
+          birthDay: profile.birthDay,
         })
       : undefined;
   const effectiveEvaluateDifficultyRung =

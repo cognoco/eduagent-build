@@ -6,6 +6,10 @@ import {
   getLanguageStrandCounts,
   isLikelyLanguageLearningIntent,
 } from './language-session-engine';
+import {
+  registerLlmProviderFixture,
+  llmStructuredJson,
+} from '../test-utils/llm-provider-fixtures';
 
 describe('isLikelyLanguageLearningIntent', () => {
   it.each([
@@ -109,9 +113,9 @@ describe('getLanguageStrandCounts', () => {
 });
 
 describe('buildLanguageActivityTelemetry', () => {
-  it('maps fluency strands to timed drill telemetry', () => {
+  it('maps fluency strands to timed drill telemetry', async () => {
     expect(
-      buildLanguageActivityTelemetry({
+      await buildLanguageActivityTelemetry({
         strand: 'fluency',
         inputMode: 'voice',
         targetWords: ['cafe'],
@@ -126,37 +130,181 @@ describe('buildLanguageActivityTelemetry', () => {
     });
   });
 
-  it('attaches a graded input artifact to meaning-focused input turns', () => {
-    const telemetry = buildLanguageActivityTelemetry({
-      strand: 'meaning_input',
-      inputMode: 'voice',
-      languageCode: 'fr',
-      cefrLevel: 'A1',
-      knownWords: ['bonjour', 'merci', 'cafe', 'eau'],
-      targetWords: ['pain'],
+  it('falls back to the deterministic passage when LLM generation fails', async () => {
+    // No birthYear given, so ageBracket fails closed to 'child'; the router's
+    // under-18 gate routes to `approvedTextFallbackConfig`, which prefers
+    // 'cerebras' first. Register the fixture under that id so this test
+    // actually exercises a registered provider's chat error, not a
+    // "no provider registered" throw that would produce the same fallback
+    // result via a different, untested mechanism.
+    const fixture = registerLlmProviderFixture({
+      id: 'cerebras',
+      chatError: new Error('llm unavailable'),
     });
+    try {
+      const telemetry = await buildLanguageActivityTelemetry({
+        strand: 'meaning_input',
+        inputMode: 'voice',
+        languageCode: 'fr',
+        cefrLevel: 'A1',
+        knownWords: ['bonjour', 'merci', 'cafe', 'eau'],
+        targetWords: ['pain'],
+      });
 
-    expect(telemetry.gradedInput).toEqual({
-      type: 'graded_input',
-      modality: 'listening',
-      cefrLevel: 'A1',
-      knownWordRatioTarget: 0.96,
-      knownWordEstimate: 0.8,
-      targetWords: ['pain'],
-      text: expect.stringContaining('bonjour'),
-      comprehensionQuestions: [
-        {
-          id: 'gist-1',
-          prompt: 'What is the main thing happening in this passage?',
-          answerHint: expect.stringContaining('bonjour'),
-        },
-      ],
-      audioEnabled: true,
-    });
+      expect(telemetry.gradedInput).toEqual({
+        type: 'graded_input',
+        modality: 'listening',
+        cefrLevel: 'A1',
+        knownWordRatioTarget: 0.96,
+        knownWordEstimate: 0.8,
+        targetWords: ['pain'],
+        text: expect.stringContaining('bonjour'),
+        comprehensionQuestions: [
+          {
+            id: 'gist-1',
+            prompt: 'What is the main thing happening in this passage?',
+            answerHint: expect.stringContaining('bonjour'),
+          },
+        ],
+        audioEnabled: true,
+      });
+    } finally {
+      fixture.dispose();
+    }
   });
 
-  it('does not attach graded input artifacts to non-input strands', () => {
-    const telemetry = buildLanguageActivityTelemetry({
+  it('uses LLM-generated passage content for a complete beginner with no known vocabulary', async () => {
+    const fixture = registerLlmProviderFixture({
+      chatResponse: llmStructuredJson({
+        text: 'Hola. Me llamo Ana.',
+        comprehensionQuestions: [
+          { prompt: 'Como se llama ella?', answerHint: 'Se llama Ana.' },
+        ],
+      }),
+    });
+    try {
+      const telemetry = await buildLanguageActivityTelemetry({
+        strand: 'meaning_input',
+        inputMode: 'text',
+        languageCode: 'es',
+        cefrLevel: 'A1',
+        knownWords: [],
+        targetWords: ['hola'],
+        // Adult birth year so the fail-closed age gate doesn't route this
+        // call away from the registered fixture provider (an unknown/absent
+        // birth year fails closed to 'child', which the router's under-18
+        // Gemini exclusion sends down a different, unregistered path).
+        birthYear: 1990,
+      });
+
+      expect(telemetry.gradedInput).toMatchObject({
+        type: 'graded_input',
+        modality: 'reading',
+        cefrLevel: 'A1',
+        knownWordEstimate: 0,
+        text: 'Hola. Me llamo Ana.',
+        comprehensionQuestions: [
+          {
+            id: 'gist-1',
+            prompt: 'Como se llama ella?',
+            answerHint: 'Se llama Ana.',
+          },
+        ],
+        audioEnabled: false,
+      });
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  it('uses LLM-generated passage content for a learner with known and target vocabulary', async () => {
+    const fixture = registerLlmProviderFixture({
+      chatResponse: llmStructuredJson({
+        text: 'Ana bebe agua y come pan.',
+        comprehensionQuestions: [
+          { prompt: 'Que bebe Ana?', answerHint: 'Ana bebe agua.' },
+        ],
+      }),
+    });
+    try {
+      const telemetry = await buildLanguageActivityTelemetry({
+        strand: 'meaning_input',
+        inputMode: 'text',
+        languageCode: 'es',
+        cefrLevel: 'A2',
+        knownWords: ['agua', 'pan'],
+        targetWords: ['bebe'],
+        birthYear: 1990,
+      });
+
+      expect(telemetry.gradedInput).toMatchObject({
+        type: 'graded_input',
+        modality: 'reading',
+        cefrLevel: 'A2',
+        knownWordEstimate: 0.67,
+        targetWords: ['bebe'],
+        text: 'Ana bebe agua y come pan.',
+        comprehensionQuestions: [
+          {
+            id: 'gist-1',
+            prompt: 'Que bebe Ana?',
+            answerHint: 'Ana bebe agua.',
+          },
+        ],
+      });
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  it('uses LLM-generated passage content for a minor via the approved under-18 provider path', async () => {
+    // No birthYear given, so ageBracket fails closed to 'child' — MentoMate's
+    // primary population. The router's under-18 gate routes this away from
+    // Gemini to `approvedTextFallbackConfig`, which prefers 'cerebras' first;
+    // register the success fixture under that id so this test proves the LLM
+    // path actually works end-to-end for a minor, not just an adult.
+    const fixture = registerLlmProviderFixture({
+      id: 'cerebras',
+      chatResponse: llmStructuredJson({
+        text: 'Ich trinke Wasser.',
+        comprehensionQuestions: [
+          {
+            prompt: 'Was trinkt die Person?',
+            answerHint: 'Sie trinkt Wasser.',
+          },
+        ],
+      }),
+    });
+    try {
+      const telemetry = await buildLanguageActivityTelemetry({
+        strand: 'meaning_input',
+        inputMode: 'text',
+        languageCode: 'de',
+        cefrLevel: 'A1',
+        knownWords: ['ich'],
+        targetWords: ['trinke', 'wasser'],
+      });
+
+      expect(telemetry.gradedInput).toMatchObject({
+        type: 'graded_input',
+        modality: 'reading',
+        cefrLevel: 'A1',
+        text: 'Ich trinke Wasser.',
+        comprehensionQuestions: [
+          {
+            id: 'gist-1',
+            prompt: 'Was trinkt die Person?',
+            answerHint: 'Sie trinkt Wasser.',
+          },
+        ],
+      });
+    } finally {
+      fixture.dispose();
+    }
+  });
+
+  it('does not attach graded input artifacts to non-input strands', async () => {
+    const telemetry = await buildLanguageActivityTelemetry({
       strand: 'meaning_output',
       targetWords: ['pain'],
       knownWords: ['bonjour'],
@@ -165,8 +313,8 @@ describe('buildLanguageActivityTelemetry', () => {
     expect(telemetry.gradedInput).toBeUndefined();
   });
 
-  it('attaches structured meaning-output metadata to output turns', () => {
-    const telemetry = buildLanguageActivityTelemetry({
+  it('attaches structured meaning-output metadata to output turns', async () => {
+    const telemetry = await buildLanguageActivityTelemetry({
       strand: 'meaning_output',
       inputMode: 'voice',
       targetWords: ['cafe', 'sugar'],
@@ -202,8 +350,8 @@ describe('buildLanguageActivityTelemetry', () => {
     [4, 'ask_question', 'question'],
   ] as const)(
     'selects meaning-output task %s as %s',
-    (meaningOutputTurnIndex, taskType, responseMode) => {
-      const telemetry = buildLanguageActivityTelemetry({
+    async (meaningOutputTurnIndex, taskType, responseMode) => {
+      const telemetry = await buildLanguageActivityTelemetry({
         strand: 'meaning_output',
         meaningOutputTurnIndex,
       });
@@ -275,16 +423,27 @@ describe('evaluatePendingGradedInputAnswer', () => {
 });
 
 describe('buildLanguageSessionState', () => {
-  it('threads graded input context through the server-selected next activity', () => {
-    const state = buildLanguageSessionState({
-      exchangeCount: 0,
-      events: [],
-      inputMode: 'text',
-      languageCode: 'es',
-      cefrLevel: 'A1',
-      knownWords: ['hola', 'gracias'],
-      targetWords: ['agua'],
+  it('threads graded input context through the server-selected next activity', async () => {
+    // Same fail-closed-to-'child' + 'cerebras'-first-fallback reasoning as
+    // the buildLanguageActivityTelemetry fallback test above.
+    const fixture = registerLlmProviderFixture({
+      id: 'cerebras',
+      chatError: new Error('llm unavailable'),
     });
+    let state;
+    try {
+      state = await buildLanguageSessionState({
+        exchangeCount: 0,
+        events: [],
+        inputMode: 'text',
+        languageCode: 'es',
+        cefrLevel: 'A1',
+        knownWords: ['hola', 'gracias'],
+        targetWords: ['agua'],
+      });
+    } finally {
+      fixture.dispose();
+    }
 
     expect(state.activeStrand).toBe('meaning_input');
     expect(state.nextActivity.gradedInput).toMatchObject({
@@ -297,8 +456,8 @@ describe('buildLanguageSessionState', () => {
     expect(state.nextActivity.gradedInput?.text).toContain('agua');
   });
 
-  it('threads meaning-output context through the strand-selected next activity without graded input', () => {
-    const state = buildLanguageSessionState({
+  it('threads meaning-output context through the strand-selected next activity without graded input', async () => {
+    const state = await buildLanguageSessionState({
       exchangeCount: 1,
       events: [
         {
@@ -349,8 +508,8 @@ describe('buildLanguageSessionState', () => {
     });
   });
 
-  it('routes a missed graded-input answer into language-focused repair', () => {
-    const state = buildLanguageSessionState({
+  it('routes a missed graded-input answer into language-focused repair', async () => {
+    const state = await buildLanguageSessionState({
       exchangeCount: 1,
       events: [
         {

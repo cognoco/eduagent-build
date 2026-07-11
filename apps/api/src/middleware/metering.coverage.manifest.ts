@@ -45,6 +45,7 @@ export const LLM_CALL_SITE_FILES: readonly string[] = [
   'apps/api/src/services/dictation/review.ts',
   'apps/api/src/services/exchanges.ts',
   'apps/api/src/services/filing.ts',
+  'apps/api/src/services/graded-input-generation.ts',
   'apps/api/src/services/language-detect.ts',
   'apps/api/src/services/learner-input.ts',
   'apps/api/src/services/learner-profile.ts',

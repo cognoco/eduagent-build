@@ -66,6 +66,8 @@ import { anthropicResponseFormatFlow } from './flows/anthropic-response-format';
 // [BUG-125] Snapshot coverage for the two prompt builders the pre-commit
 // hook was previously blind to. See flow files for context.
 import { languagePromptsFlow } from './flows/language-prompts';
+// [WI-1547] Snapshot coverage for the graded-input generation prompt.
+import { gradedInputPromptsFlow } from './flows/graded-input-prompts';
 import { adaptiveTeachingFlow } from './flows/adaptive-teaching';
 import { nowParkReturnFlow } from './flows/now-park-return';
 import { parkAndReturnRankingFlow } from './flows/park-and-return-ranking';
@@ -198,6 +200,7 @@ const FLOWS: FlowDefinition[] = [
   assessmentEvaluationFlow as FlowDefinition,
   anthropicResponseFormatFlow as FlowDefinition,
   languagePromptsFlow as FlowDefinition,
+  gradedInputPromptsFlow as FlowDefinition,
   adaptiveTeachingFlow as FlowDefinition,
   nowParkReturnFlow as FlowDefinition,
   parkAndReturnRankingFlow as FlowDefinition,
