@@ -128,6 +128,27 @@ jest.mock('../services/dashboard', () => {
   };
 });
 
+const mockGetLatestVerifiedProofForChild = jest
+  .fn()
+  .mockResolvedValue({ hasProof: false, quote: null });
+
+// [WI-1658] Route-unit test — shallow-mocking the parent-proof service is
+// intentional here (matches the weekly-report precedent above): the read
+// service does raw db.select()/join chains the shared route-test fake DB
+// isn't wired for. Integration coverage for the real DB read (assessments /
+// topic_notes / retentionCards join + the artifactSource-marker filter) lives
+// in parent-proof.integration.test.ts.
+jest.mock('../services/parent-proof', () => {
+  const actual = jest.requireActual(
+    '../services/parent-proof',
+  ) as typeof import('../services/parent-proof');
+  return {
+    ...actual,
+    getLatestVerifiedProofForChild: (...args: unknown[]) =>
+      mockGetLatestVerifiedProofForChild(...args),
+  };
+});
+
 const mockGetProgressSummary = jest.fn().mockResolvedValue({
   summary: null,
   generatedAt: null,
@@ -409,6 +430,74 @@ describe('dashboard routes', () => {
   });
 
   // -------------------------------------------------------------------------
+  // [WI-1658] GET /v1/dashboard/children/:profileId/verified-proof
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/dashboard/children/:profileId/verified-proof', () => {
+    it('returns 200 with the verified-proof shape for an owner requesting their own child', async () => {
+      mockGetLatestVerifiedProofForChild.mockResolvedValueOnce({
+        hasProof: true,
+        topicId: SUBJECT_ID,
+        topicTitle: 'Photosynthesis',
+        subjectId: SUBJECT_ID,
+        sessionId: TEST_SESSION_ID,
+        verifiedAt: new Date().toISOString(),
+        quote: 'Plants convert light into chemical energy.',
+        masteryVerificationState: 'fresh',
+        retentionStatus: 'strong',
+      });
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/verified-proof`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toMatchObject({
+        hasProof: true,
+        topicTitle: 'Photosynthesis',
+        quote: 'Plants convert light into chemical energy.',
+        masteryVerificationState: 'fresh',
+        retentionStatus: 'strong',
+      });
+      expect(mockGetLatestVerifiedProofForChild).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+      );
+    });
+
+    it('returns 200 with hasProof:false for a child with no verified assessment', async () => {
+      mockGetLatestVerifiedProofForChild.mockResolvedValueOnce({
+        hasProof: false,
+        quote: null,
+      });
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/verified-proof`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ hasProof: false, quote: null });
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/verified-proof`,
+        {},
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // GET /v1/dashboard/demo
   // -------------------------------------------------------------------------
 
@@ -638,6 +727,32 @@ describe('dashboard routes', () => {
       expect(params).toContain(PROFILE_ID);
     });
 
+    // [WI-1658 / BUG-744] verified-proof endpoint calls assertOwnerAndParentAccess
+    // directly at route entry — same IDOR contract as the memory route above.
+    it('[BREAK] GET /dashboard/children/:id/verified-proof returns 403 for unlinked parent', async () => {
+      mockFindFamilyLink.mockResolvedValueOnce(undefined);
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/verified-proof`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockFindFamilyLink).toHaveBeenCalledTimes(1);
+      expect(mockGetLatestVerifiedProofForChild).not.toHaveBeenCalled();
+
+      // Pin the actual UUIDs the route asked the family-link table about —
+      // catches a future refactor that drops or swaps the parent/child
+      // equality clauses (would still 403 here since the mock returns
+      // undefined, but would silently break the real IDOR contract).
+      const params = extractDrizzleParamValues(
+        mockFindFamilyLink.mock.calls[0]?.[0],
+      );
+      expect(params).toContain('test-profile-id');
+      expect(params).toContain(PROFILE_ID);
+    });
+
     it('GET /dashboard/children/:id/memory returns 200 for linked parent', async () => {
       // assertParentAccess succeeds (default mock)
       const res = await app.request(
@@ -744,6 +859,10 @@ describe('dashboard routes', () => {
       {
         label: 'GET /dashboard/children/:id/sessions/:sessionId',
         path: `/v1/dashboard/children/${PROFILE_ID}/sessions/${SUBJECT_ID}`,
+      },
+      {
+        label: 'GET /dashboard/children/:id/verified-proof',
+        path: `/v1/dashboard/children/${PROFILE_ID}/verified-proof`,
       },
       {
         label: 'GET /dashboard/children/:id/reports',
@@ -960,6 +1079,19 @@ describe('dashboard routes', () => {
       expect(res.status).toBe(403);
       const body = await res.json();
       expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    });
+
+    it('[BREAK] GET /dashboard/children/:id/verified-proof returns 403 for non-owner profile', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/verified-proof`,
+        { headers: NON_OWNER_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(mockGetLatestVerifiedProofForChild).not.toHaveBeenCalled();
     });
 
     it('[BREAK] GET /dashboard/children/:id/topics/:topicId/snapshot returns 403 for non-owner profile', async () => {

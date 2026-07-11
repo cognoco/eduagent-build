@@ -62,8 +62,10 @@ import {
   retentionCards,
   sessionEvents,
   subjects,
+  topicNotes,
   type Database,
 } from '@eduagent/database';
+import type { ChallengeRoundNoteDraftHint } from '@eduagent/schemas';
 import {
   applyRetentionUpdate,
   insertRetentionCardIfAbsent,
@@ -550,6 +552,62 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
     const rows = await readAssessmentsForSession(db, profileId, session.id);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.masteryChallengeVerifiedAt).not.toBeNull();
+  });
+
+  // [WI-1658] Real-DB persistence assertion for the verified-proof note. The
+  // unit-level gating tests (session-exchange-challenge-finalize.test.ts) use
+  // a fake Database with no topic_notes surface and assert only the gating
+  // decision via a boundary spy; this is the one place that exercises the
+  // real createNoteForSession / insertNoteWithCap write end-to-end.
+  it('[WI-1658] finalizeChallengeRoundIfReady with solid evaluations also persists a topic_notes row marked artifact_source challenge_drafted_note', async () => {
+    const { profileId, subjectId } = await seedProfileAndSubject(db);
+    const topicId = await seedCurriculumTopic(db, subjectId);
+    const answerEventId = generateUUIDv7();
+    const session = await seedDraftingSession(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+      answerEventId,
+    );
+    const meta = await readSessionChallengeRound(db, session.id);
+
+    const noteDraft: ChallengeRoundNoteDraftHint = {
+      content: 'Plants use sunlight to split water.',
+      source_concepts: ['photosynthesis'],
+      source_answer_event_ids: [answerEventId],
+    };
+
+    const result = await finalizeChallengeRoundIfReady(
+      db,
+      profileId,
+      session,
+      meta as Parameters<typeof finalizeChallengeRoundIfReady>[3],
+      noteDraft,
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.draftedNote?.body).toBe(
+      'Plants use sunlight to split water.',
+    );
+
+    const noteRows = await db
+      .select({
+        content: topicNotes.content,
+        artifactSource: topicNotes.artifactSource,
+      })
+      .from(topicNotes)
+      .where(
+        and(
+          eq(topicNotes.profileId, profileId),
+          eq(topicNotes.topicId, topicId),
+          eq(topicNotes.sessionId, session.id),
+        ),
+      );
+
+    expect(noteRows).toHaveLength(1);
+    expect(noteRows[0]!.artifactSource).toBe('challenge_drafted_note');
+    expect(noteRows[0]!.content).toBe('Plants use sunlight to split water.');
   });
 
   // -------------------------------------------------------------------------

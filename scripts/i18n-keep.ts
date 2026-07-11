@@ -348,6 +348,18 @@ const raw: readonly KeepPattern[] = [
       'apps/mobile/src/components/journal/JournalTabView.tsx:883',
   },
   {
+    pattern: 'home.parent.verifiedProof.state.*',
+    reason:
+      'selected via STATE_LABEL_KEYS[proof.masteryVerificationState] at ' +
+      'apps/mobile/src/components/home/VerifiedProofCard.tsx:73',
+  },
+  {
+    pattern: 'home.parent.verifiedProof.retention.*',
+    reason:
+      'selected via RETENTION_LABEL_KEYS[proof.retentionStatus] at ' +
+      'apps/mobile/src/components/home/VerifiedProofCard.tsx:76',
+  },
+  {
     pattern: 'more.accommodation.sectionHeader',
     reason:
       'consumed cross-package by the API app-help map (the help prompt + its ' +

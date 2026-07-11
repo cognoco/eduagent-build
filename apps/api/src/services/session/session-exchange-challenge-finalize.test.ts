@@ -48,6 +48,20 @@ jest.mock(
   }),
 );
 
+// [WI-1658] The fake Database above models only the surface finalize
+// historically touched (session metadata, assessments, needs_deepening_topics,
+// session_events) — it has no topic_notes surface. Real persistence of the
+// verified-proof note is covered by session-exchange.integration.test.ts
+// against a real DB; this spy exists only to assert the GATING decision (was
+// createNoteForSession called, and with what args) without expanding the fake
+// DB to model insertNoteWithCap's advisory-lock/cap/dedup transaction. The
+// real module loads fine in this environment, so only the one write function
+// is stubbed — everything else is the real ../notes implementation.
+jest.mock('../notes', () => ({
+  ...jest.requireActual('../notes'),
+  createNoteForSession: jest.fn(),
+}));
+
 import type { Database } from '@eduagent/database';
 import type {
   ChallengeRoundEvaluationItem,
@@ -64,6 +78,7 @@ import {
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import { captureException } from '../sentry';
 import { inngest } from '../../inngest/client';
+import { createNoteForSession } from '../notes';
 import {
   TEST_PROFILE_ID,
   TEST_SESSION_ID,
@@ -76,6 +91,9 @@ const mockCaptureException = captureException as jest.MockedFunction<
 >;
 const mockInngestSend = inngest.send as jest.MockedFunction<
   typeof inngest.send
+>;
+const mockCreateNoteForSession = createNoteForSession as jest.MockedFunction<
+  typeof createNoteForSession
 >;
 
 // ---------------------------------------------------------------------------
@@ -1147,6 +1165,204 @@ describe('finalizeChallengeRoundIfReady — note-draft guard uses DB-verified co
     expect(outcome).toBeNull();
     expect(state.masteryInserts).toHaveLength(0);
     expect(persistedChallengeState(state)?.state).toBe('drafting');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1658] Verified-proof note persistence — gating only (boundary spy).
+//
+// The fake Database above has no topic_notes surface, so real persistence is
+// asserted in session-exchange.integration.test.ts against a real DB. These
+// tests assert the GATING decision: createNoteForSession is called only when
+// the round is fully verified (decision.outcome === 'verified') AND the
+// drafted note has body content — never merely because a draft body exists,
+// which a MIXED round (one solid + one partial concept) can still produce
+// for its solid-sourced concept. That mixed-round case is exactly the
+// event-grain gap the Artifact Provenance Contract flags for partial rounds;
+// Ruling 2 sidesteps it by gating strictly on the fully-verified outcome.
+// ---------------------------------------------------------------------------
+
+describe('finalizeChallengeRoundIfReady — verified-proof note persistence (gating) [WI-1658]', () => {
+  // A solid concept whose real DB event content (defaultSessionEventRows)
+  // matches the draft exactly, plus a SEPARATE partial concept on a
+  // different answerEventId — the round is 'partial' overall (not every
+  // item solid) even though the drafted note, sourced only from the solid
+  // concept, still validates and produces body content.
+  const MIXED_EVALS: ChallengeRoundEvaluationItem[] = [
+    {
+      concept: 'photosynthesis',
+      result: 'solid',
+      evidence: 'Correctly described light-to-chemical energy conversion.',
+      answerEventId: ANSWER_EVENT_ID,
+      learnerQuote: 'Plants convert light into chemical energy.',
+    },
+    {
+      concept: 'chlorophyll',
+      result: 'partial',
+      evidence: 'Vague on where chlorophyll is located.',
+      answerEventId: '00000000-0000-4000-8000-000000000006',
+      learnerQuote: 'chlorophyll is green I think',
+      correction: 'Chlorophyll is located in chloroplasts.',
+    },
+  ];
+
+  const solidSourcedNoteDraft: ChallengeRoundNoteDraftHint = {
+    content: 'Plants convert light into chemical energy.',
+    source_concepts: ['photosynthesis'],
+    source_answer_event_ids: [ANSWER_EVENT_ID],
+  };
+
+  beforeEach(() => {
+    mockCaptureException.mockClear();
+    mockCreateNoteForSession.mockReset();
+    mockCreateNoteForSession.mockResolvedValue({} as never);
+  });
+
+  it('calls createNoteForSession with artifactSource challenge_drafted_note when the round is fully verified and the draft has body content', async () => {
+    const challengeRound = draftingState(SOLID_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+    const noteDraft: ChallengeRoundNoteDraftHint = {
+      content: 'Plants convert light into chemical energy.',
+      source_concepts: ['photosynthesis'],
+      source_answer_event_ids: [ANSWER_EVENT_ID],
+    };
+
+    const outcome = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      noteDraft,
+    );
+
+    expect(outcome?.draftedNote?.body).toBe(
+      'Plants convert light into chemical energy.',
+    );
+    expect(mockCreateNoteForSession).toHaveBeenCalledTimes(1);
+    expect(mockCreateNoteForSession).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        profileId: PROFILE_ID,
+        topicId: TOPIC_ID,
+        sessionId: SESSION_ID,
+        content: 'Plants convert light into chemical energy.',
+        artifactSource: 'challenge_drafted_note',
+      }),
+    );
+  });
+
+  it('does NOT call createNoteForSession when the outcome is partial, even though the mixed round still produces a body-bearing draft from its solid concept', async () => {
+    const challengeRound = draftingState(MIXED_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      // Both evaluation items' answerEventIds must be durable/readable for
+      // the pre-terminal-write validation to proceed — the default fixture
+      // only seeds the solid concept's event, so the partial concept's event
+      // must be seeded explicitly here too (see [WI-1427] test above).
+      sessionEventRows: [
+        {
+          id: ANSWER_EVENT_ID,
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+          eventType: 'user_message',
+          content: 'Plants convert light into chemical energy.',
+        },
+        {
+          id: '00000000-0000-4000-8000-000000000006',
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+          eventType: 'user_message',
+          content: 'chlorophyll is green I think',
+        },
+      ],
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    const outcome = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      solidSourcedNoteDraft,
+    );
+
+    // Sanity: the draft DOES have body content — proves this is a real
+    // regression guard, not a vacuous pass because nothing was drafted.
+    expect(outcome?.draftedNote?.body).toBe(
+      'Plants convert light into chemical energy.',
+    );
+    expect(mockCreateNoteForSession).not.toHaveBeenCalled();
+  });
+
+  it('does NOT call createNoteForSession when draftedNote.body is null (fallback draft)', async () => {
+    const challengeRound = draftingState(SOLID_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    // No noteDraft at all → buildValidatedDraft falls back to a null-body,
+    // fallbackPrompt draft.
+    const outcome = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      null,
+    );
+
+    expect(outcome?.draftedNote?.body).toBeNull();
+    expect(mockCreateNoteForSession).not.toHaveBeenCalled();
+  });
+
+  it('a createNoteForSession rejection does not throw out of finalizeChallengeRoundIfReady', async () => {
+    mockCreateNoteForSession.mockRejectedValueOnce(
+      new Error('note cap reached'),
+    );
+    const challengeRound = draftingState(SOLID_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+    const noteDraft: ChallengeRoundNoteDraftHint = {
+      content: 'Plants convert light into chemical energy.',
+      source_concepts: ['photosynthesis'],
+      source_answer_event_ids: [ANSWER_EVENT_ID],
+    };
+
+    const outcome = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      noteDraft,
+    );
+
+    // The terminal payload still comes back — a note-persistence failure must
+    // not fail the exchange (the verified fact is already durably recorded
+    // via the assessments write above this in the function).
+    expect(outcome?.challengeRoundVerdict).toBeDefined();
+    expect(outcome?.challengeRound?.state).toBe('complete');
+    expect(mockCaptureException).toHaveBeenCalled();
   });
 });
 

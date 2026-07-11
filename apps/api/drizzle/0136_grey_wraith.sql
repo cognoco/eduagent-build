@@ -1,0 +1,1 @@
+ALTER TABLE "topic_notes" ADD COLUMN "artifact_source" text;

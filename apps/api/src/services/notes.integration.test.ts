@@ -1,4 +1,5 @@
 import { resolve } from 'path';
+import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
@@ -326,6 +327,116 @@ describeIfDb('listAllNotes (integration)', () => {
     ).rejects.toThrow(/health or disability characterisation/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-1658] createNoteForSession — artifactSource marker
+// ---------------------------------------------------------------------------
+
+describeIfDb(
+  'createNoteForSession — artifactSource marker (integration)',
+  () => {
+    beforeAll(async () => {
+      db = createDatabase(process.env.DATABASE_URL!);
+    });
+
+    afterAll(async () => {
+      await cleanupSeededProfiles();
+    });
+
+    it('persists artifactSource when provided', async () => {
+      const { profileId } = await seedProfile();
+      const { subjectId, topicId } = await seedTopic(
+        profileId,
+        'Physics',
+        'Newton’s Laws',
+      );
+      const sessionId = await seedSession(profileId, subjectId, topicId);
+
+      await createNoteForSession(db, {
+        profileId,
+        topicId,
+        sessionId,
+        content: 'Verified concept quote.',
+        artifactSource: 'challenge_drafted_note',
+      });
+
+      const [row] = await db
+        .select({ artifactSource: topicNotes.artifactSource })
+        .from(topicNotes)
+        .where(eq(topicNotes.profileId, profileId));
+
+      expect(row?.artifactSource).toBe('challenge_drafted_note');
+    });
+
+    it('defaults artifactSource to null when omitted', async () => {
+      const { profileId } = await seedProfile();
+      const { subjectId, topicId } = await seedTopic(
+        profileId,
+        'Physics',
+        'Kinematics',
+      );
+      const sessionId = await seedSession(profileId, subjectId, topicId);
+
+      await createNoteForSession(db, {
+        profileId,
+        topicId,
+        sessionId,
+        content: 'Ordinary session-summary note.',
+      });
+
+      const [row] = await db
+        .select({ artifactSource: topicNotes.artifactSource })
+        .from(topicNotes)
+        .where(eq(topicNotes.profileId, profileId));
+
+      expect(row?.artifactSource).toBeNull();
+    });
+
+    it('regression: a marker on an otherwise-identical-content call is not swallowed by dedup', async () => {
+      // insertNoteWithCap's dedupeExactSessionContent match keys on
+      // (profileId, sessionId, topicId, content) and does not consider
+      // artifactSource. Seed a null-marker note first (e.g. the ordinary
+      // session-summary path), then call createNoteForSession again with the
+      // SAME tuple but a marker set (e.g. a same-turn Challenge-Round
+      // finalize) — the marked write must not be silently dropped by the dedup
+      // hit on the earlier null-marker row.
+      const { profileId } = await seedProfile();
+      const { subjectId, topicId } = await seedTopic(
+        profileId,
+        'Physics',
+        'Thermodynamics',
+      );
+      const sessionId = await seedSession(profileId, subjectId, topicId);
+      const content = 'Identical content from two callers.';
+
+      await createNoteForSession(db, {
+        profileId,
+        topicId,
+        sessionId,
+        content,
+      });
+      await createNoteForSession(db, {
+        profileId,
+        topicId,
+        sessionId,
+        content,
+        artifactSource: 'challenge_drafted_note',
+      });
+
+      const rows = await db
+        .select({ artifactSource: topicNotes.artifactSource })
+        .from(topicNotes)
+        .where(eq(topicNotes.profileId, profileId));
+
+      expect(
+        rows.some((r) => r.artifactSource === 'challenge_drafted_note'),
+      ).toBe(true);
+      // Prove both rows genuinely coexist — the dedup fix must not have
+      // instead started duplicating writes it used to correctly collapse.
+      expect(rows).toHaveLength(2);
+    });
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Cross-topic archive order — notes are globally ordered, not per-topic
