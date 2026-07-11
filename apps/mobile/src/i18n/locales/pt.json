@@ -4386,5 +4386,35 @@
       "revokeErrorTitle": "Não foi possível terminar a partilha",
       "missingActor": "Não conseguimos identificar a pessoa ativa."
     }
+  },
+  "supporterColdStart": {
+    "loadingTitle": "A verificar o seu centro de apoio...",
+    "errorTitle": "Não foi possível carregar o seu centro de apoio",
+    "errorMessage": "Tente novamente daqui a pouco.",
+    "addChild": {
+      "title": "Adicione o seu filho",
+      "message": "Verá os resumos, o progresso e as vitórias dele. E ele saberá sempre o que você vê.",
+      "cta": "Adicionar o meu filho"
+    },
+    "managed": {
+      "message": "{{name}} está a postos. Quando estiver pronto, entregue-lhe o telemóvel.",
+      "cta": "Mudar para {{name}}"
+    },
+    "granted": {
+      "message": "Ajude {{name}} a começar.",
+      "hint": "Os resumos e o progresso dele aparecerão aqui assim que começar.",
+      "cta": "Incentivar {{name}}",
+      "nudgeStep1": "O seu incentivo chegou a {{name}}. Ele ainda não começou — a maioria dos alunos começa na primeira semana.",
+      "nudgeStep2": "Da próxima vez que estiver com {{name}}, abram a primeira sessão lado a lado.",
+      "nudgeStep3": "Experimente você mesmo a experiência de aprendizagem — e ajude {{name}} a participar.",
+      "nudgeStep4": "Continue a aprender enquanto {{name}} encontra o seu momento."
+    }
+  },
+  "supporterSelfLearningDoorway": {
+    "loadingTitle": "A verificar o seu centro de apoio...",
+    "errorTitle": "Não foi possível carregar o seu centro de apoio",
+    "errorMessage": "Tente novamente daqui a pouco.",
+    "cta": "Aprenda algo você mesmo",
+    "hint": "Comece ou continue a sua própria aprendizagem."
   }
 }

@@ -4068,6 +4068,36 @@
       "closeLabel": "Close"
     }
   },
+  "supporterColdStart": {
+    "loadingTitle": "Checking your Support hub...",
+    "errorTitle": "Couldn't load your Support hub",
+    "errorMessage": "Try again in a moment.",
+    "addChild": {
+      "title": "Add your child",
+      "message": "You'll see their recaps, progress and wins. And they always know what you see.",
+      "cta": "Add my child"
+    },
+    "managed": {
+      "message": "{{name}} is all set. Whenever they're ready, hand them the phone.",
+      "cta": "Switch to {{name}}"
+    },
+    "granted": {
+      "message": "Help {{name}} get started.",
+      "hint": "Their recaps and progress will appear here once they begin.",
+      "cta": "Encourage {{name}}",
+      "nudgeStep1": "Your encouragement reached {{name}}. They haven't started yet — most learners start within the first week.",
+      "nudgeStep2": "Next time you're with {{name}}, open their first session side by side.",
+      "nudgeStep3": "Try the learning experience yourself — and help {{name}} get on board.",
+      "nudgeStep4": "Keep learning yourself while {{name}} finds their moment."
+    }
+  },
+  "supporterSelfLearningDoorway": {
+    "loadingTitle": "Checking your Support hub...",
+    "errorTitle": "Couldn't load your Support hub",
+    "errorMessage": "Try again in a moment.",
+    "cta": "Learn something yourself",
+    "hint": "Start or continue your own learning."
+  },
   "visibility": {
     "relation": {
       "parent": "parent",

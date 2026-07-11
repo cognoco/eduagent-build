@@ -4386,5 +4386,35 @@
       "revokeErrorTitle": "Freigabe konnte nicht beendet werden",
       "missingActor": "Wir konnten die aktive Person nicht identifizieren."
     }
+  },
+  "supporterColdStart": {
+    "loadingTitle": "Dein Support-Hub wird geprüft ...",
+    "errorTitle": "Dein Support-Hub konnte nicht geladen werden",
+    "errorMessage": "Versuche es gleich noch einmal.",
+    "addChild": {
+      "title": "Füge dein Kind hinzu",
+      "message": "Du siehst die Zusammenfassungen, Fortschritte und Erfolge deines Kindes. Und es weiß immer, was du siehst.",
+      "cta": "Mein Kind hinzufügen"
+    },
+    "managed": {
+      "message": "{{name}} ist startklar. Gib ihm/ihr das Handy, wenn es losgehen soll.",
+      "cta": "Zu {{name}} wechseln"
+    },
+    "granted": {
+      "message": "Hilf {{name}} beim Einstieg.",
+      "hint": "Die Zusammenfassungen und Fortschritte erscheinen hier, sobald es losgeht.",
+      "cta": "{{name}} ermutigen",
+      "nudgeStep1": "Deine Ermutigung hat {{name}} erreicht. {{name}} hat noch nicht angefangen – die meisten Lernenden starten in der ersten Woche.",
+      "nudgeStep2": "Wenn du das nächste Mal bei {{name}} bist, startet gemeinsam die erste Sitzung.",
+      "nudgeStep3": "Probiere die Lernerfahrung selbst aus – und hilf {{name}} beim Einstieg.",
+      "nudgeStep4": "Lerne selbst weiter, während {{name}} den richtigen Moment findet."
+    }
+  },
+  "supporterSelfLearningDoorway": {
+    "loadingTitle": "Dein Support-Hub wird geprüft ...",
+    "errorTitle": "Dein Support-Hub konnte nicht geladen werden",
+    "errorMessage": "Versuche es gleich noch einmal.",
+    "cta": "Lerne selbst etwas",
+    "hint": "Beginne oder setze dein eigenes Lernen fort."
   }
 }
