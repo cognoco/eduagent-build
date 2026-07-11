@@ -33,7 +33,7 @@ describe('SupportHubSubjectsTab', () => {
   });
 
   // WI-1393 A3: the Subjects empty state opens the eligible-person picker
-  // and forwards the selection so /(app)/link/new is reachable from here too.
+  // and forwards the selection so /(app)/link/initiate is reachable from here too.
   it('opens the eligible-person picker from the empty state and forwards the selection', () => {
     const onSelectEligiblePerson = jest.fn();
 
@@ -58,7 +58,7 @@ describe('SupportHubSubjectsTab', () => {
   });
 
   // WI-1393 AC2: zero eligible persons degrades to add-a-child, never a
-  // param-less push to /link/new.
+  // param-less push to /link/initiate.
   it('degrades the empty state to add-a-child when there are no eligible persons', () => {
     const onAddChildFallback = jest.fn();
     const onSelectEligiblePerson = jest.fn();

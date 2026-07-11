@@ -4348,7 +4348,8 @@
       "emptyTitle": "Noch keine Lernenden verfügbar",
       "emptyDescription": "Füge zuerst ein Kind zu deinem Konto hinzu und komm dann zurück, um es zu unterstützen.",
       "addChildAction": "Kind hinzufügen",
-      "closeLabel": "Schließen"
+      "closeLabel": "Schließen",
+      "existingTeenOption": "Bestehendes Familienmitglied (13+) verknüpfen"
     }
   },
   "visibility": {
@@ -4421,7 +4422,13 @@
       "revoking": "Freigabe wird beendet ...",
       "revoked": "Die Freigabe wird beendet. Der Unterstützer erhält eine Benachrichtigung.",
       "revokeErrorTitle": "Freigabe konnte nicht beendet werden",
-      "missingActor": "Wir konnten die aktive Person nicht identifizieren."
+      "missingActor": "Wir konnten die aktive Person nicht identifizieren.",
+      "relationLabel": "Beziehung",
+      "pickerTitle": "Mit wem möchtest du deinen Fortschritt teilen?",
+      "pickerManagedEmpty": "Noch keine berechtigten Kinder.",
+      "pickerExistingTeenOption": "Bestehendes Familienmitglied (13+)",
+      "existingTeenUnavailableTitle": "Noch nicht verfügbar",
+      "existingTeenUnavailableMessage": "Das Einladen eines bestehenden Familienmitglieds ist noch nicht verfügbar. Schau bald wieder vorbei."
     }
   },
   "supporterColdStart": {

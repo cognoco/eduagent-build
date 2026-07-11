@@ -4348,7 +4348,8 @@
       "emptyTitle": "Ingen elever tilgjengelig ennå",
       "emptyDescription": "Legg til et barn i kontoen din først, og kom så tilbake for å begynne å støtte dem.",
       "addChildAction": "Legg til et barn",
-      "closeLabel": "Lukk"
+      "closeLabel": "Lukk",
+      "existingTeenOption": "Koble til et eksisterende familiemedlem (13+)"
     }
   },
   "visibility": {
@@ -4421,7 +4422,13 @@
       "revoking": "Avslutter deling ...",
       "revoked": "Delingen avsluttes. Støttespilleren vil se et varsel.",
       "revokeErrorTitle": "Kunne ikke avslutte deling",
-      "missingActor": "Vi kunne ikke identifisere den aktive personen."
+      "missingActor": "Vi kunne ikke identifisere den aktive personen.",
+      "relationLabel": "Relasjon",
+      "pickerTitle": "Hvem vil du dele fremgangen din med?",
+      "pickerManagedEmpty": "Ingen kvalifiserte barn ennå.",
+      "pickerExistingTeenOption": "Eksisterende familiemedlem (13+)",
+      "existingTeenUnavailableTitle": "Ikke tilgjengelig ennå",
+      "existingTeenUnavailableMessage": "Å invitere et eksisterende familiemedlem er ikke tilgjengelig ennå. Sjekk tilbake snart."
     }
   },
   "supporterColdStart": {

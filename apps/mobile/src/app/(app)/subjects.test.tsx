@@ -254,9 +254,9 @@ describe('SubjectsScreen', () => {
     expect(screen.queryByText('Notes')).toBeNull();
   });
 
-  // WI-1393 A3: the Subjects empty-state anchor reaches /(app)/link/new with
+  // WI-1393 A3: the Subjects empty-state anchor reaches /(app)/link/initiate with
   // a supporteePersonId when an eligible managed person exists.
-  it('[WI-1393] pushes /(app)/link/new with supporteePersonId when the Subjects picker selects an eligible person', () => {
+  it('[WI-1393] pushes /(app)/link/initiate with supporteePersonId when the Subjects picker selects an eligible person', () => {
     // Real useEligibleManagedPersons: Liam is a linked child with no scope in
     // availableScopes (only Emma is), so he is the sole eligible person.
     mockScopeContext = {
@@ -271,7 +271,7 @@ describe('SubjectsScreen', () => {
     );
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/link/new',
+      pathname: '/(app)/link/initiate',
       params: {
         supporteePersonId: 'child-new',
         supporteeName: 'Liam',
@@ -281,7 +281,7 @@ describe('SubjectsScreen', () => {
   });
 
   // WI-1393 AC2: zero eligible managed persons must degrade to add-a-child,
-  // never a param-less push to /(app)/link/new.
+  // never a param-less push to /(app)/link/initiate.
   it('[WI-1393] degrades to add-a-child when there are zero eligible managed persons', () => {
     // Real useEligibleManagedPersons: owner has no linked children → no
     // eligible managed persons.
@@ -301,7 +301,7 @@ describe('SubjectsScreen', () => {
       params: { for: 'child' },
     });
     expect(mockPush).not.toHaveBeenCalledWith(
-      expect.objectContaining({ pathname: '/(app)/link/new' }),
+      expect.objectContaining({ pathname: '/(app)/link/initiate' }),
     );
   });
 });

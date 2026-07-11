@@ -4348,7 +4348,8 @@
       "emptyTitle": "学習者がまだいません",
       "emptyDescription": "まずアカウントにお子様を追加してください。その後、サポートを開始できます。",
       "addChildAction": "お子様を追加",
-      "closeLabel": "閉じる"
+      "closeLabel": "閉じる",
+      "existingTeenOption": "既存の家族（13歳以上）と連携する"
     }
   },
   "visibility": {
@@ -4421,7 +4422,13 @@
       "revoking": "共有を終了中...",
       "revoked": "共有を終了します。サポーターに通知が表示されます。",
       "revokeErrorTitle": "共有を終了できませんでした",
-      "missingActor": "アクティブなユーザーを特定できませんでした。"
+      "missingActor": "アクティブなユーザーを特定できませんでした。",
+      "relationLabel": "関係",
+      "pickerTitle": "進捗を誰と共有しますか？",
+      "pickerManagedEmpty": "対象となるお子様はまだいません。",
+      "pickerExistingTeenOption": "既存の家族メンバー（13歳以上）",
+      "existingTeenUnavailableTitle": "まだ利用できません",
+      "existingTeenUnavailableMessage": "既存の家族メンバーの招待機能はまだ利用できません。後ほどもう一度ご確認ください。"
     }
   },
   "supporterColdStart": {

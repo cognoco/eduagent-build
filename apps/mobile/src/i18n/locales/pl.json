@@ -4514,7 +4514,8 @@
       "emptyTitle": "Brak dostępnych uczniów",
       "emptyDescription": "Najpierw dodaj dziecko do swojego konta, a potem wróć tutaj, aby zacząć je wspierać.",
       "addChildAction": "Dodaj dziecko",
-      "closeLabel": "Zamknij"
+      "closeLabel": "Zamknij",
+      "existingTeenOption": "Połącz istniejącego członka rodziny (13+)"
     }
   },
   "visibility": {
@@ -4587,7 +4588,13 @@
       "revoking": "Kończenie udostępniania...",
       "revoked": "Udostępnianie kończy się. Osoba wspierająca zobaczy powiadomienie.",
       "revokeErrorTitle": "Błąd kończenia udostępniania",
-      "missingActor": "Nie mogliśmy zidentyfikować aktywnej osoby."
+      "missingActor": "Nie mogliśmy zidentyfikować aktywnej osoby.",
+      "relationLabel": "Relacja",
+      "pickerTitle": "Komu chcesz udostępniać swoje postępy?",
+      "pickerManagedEmpty": "Jeszcze brak uprawnionych dzieci.",
+      "pickerExistingTeenOption": "Istniejący członek rodziny (13+)",
+      "existingTeenUnavailableTitle": "Jeszcze niedostępne",
+      "existingTeenUnavailableMessage": "Zapraszanie istniejącego członka rodziny nie jest jeszcze dostępne. Sprawdź ponownie wkrótce."
     }
   },
   "supporterColdStart": {
