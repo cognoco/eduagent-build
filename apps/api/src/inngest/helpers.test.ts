@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 const mockCreateDatabase = jest.fn(
   (_databaseUrl: string, _options?: unknown) => ({
     kind: 'db',
@@ -31,7 +33,6 @@ jest.mock(
 
 import {
   closeStepDatabases,
-  enterWithEnvBindings,
   getStepAppUrl,
   getStepClerkSecretKey,
   getStepDatabase,
@@ -41,6 +42,7 @@ import {
   getStepRetentionPurgeEnabled,
   getStepSupportEmail,
   resetDatabaseUrl,
+  runWithInngestRequestContext,
   runWithStepDatabaseScope,
   setDatabaseUrl,
 } from './helpers';
@@ -79,6 +81,35 @@ describe('Inngest helpers', () => {
     expect(mockCloseDatabase).toHaveBeenCalledWith({ kind: 'db' });
   });
 
+  it('[WI-1850] runs a complete invocation without workerd-unsupported enterWith', async () => {
+    const enterWith = jest
+      .spyOn(AsyncLocalStorage.prototype, 'enterWith')
+      .mockImplementation(() => {
+        throw new Error('asyncLocalStorage.enterWith() is not implemented');
+      });
+    const databaseUrl =
+      'postgresql://user:pw@ep-worker.us-east-2.aws.neon.tech/db?sslmode=require';
+
+    const result = await runWithInngestRequestContext(
+      {
+        appUrl: 'https://worker.example.com',
+        supportEmail: 'worker@example.com',
+        databaseUrl,
+      },
+      async () => {
+        expect(getStepAppUrl()).toBe('https://worker.example.com');
+        expect(getStepSupportEmail()).toBe('worker@example.com');
+        expect(getStepDatabase()).toEqual({ kind: 'db' });
+        await new Promise((resolve) => setImmediate(resolve));
+        return getStepAppUrl();
+      },
+    );
+
+    expect(result).toBe('https://worker.example.com');
+    expect(enterWith).not.toHaveBeenCalled();
+    expect(mockCloseDatabase).toHaveBeenCalledTimes(1);
+  });
+
   // Env bindings were previously module-level singletons: the middleware
   // pass of a concurrently-arriving invocation could overwrite the values a
   // running invocation would read in its next step. The bindings now live in
@@ -87,8 +118,8 @@ describe('Inngest helpers', () => {
     /**
      * Runs `fn` inside its own setImmediate callback — a fresh async
      * resource, modelling how each Inngest invocation arrives as its own
-     * request with its own async root. enterWithEnvBindings inside one
-     * detached invocation must not leak into a sibling.
+     * request with its own async root. The request-scoped run() store inside
+     * one detached invocation must not leak into a sibling.
      */
     function runDetached<T>(fn: () => Promise<T>): Promise<T> {
       return new Promise<T>((resolve, reject) => {
@@ -103,16 +134,17 @@ describe('Inngest helpers', () => {
         {};
 
       const invocation = (id: string, appUrl: string, supportEmail: string) =>
-        runDetached(async () => {
-          enterWithEnvBindings({ appUrl, supportEmail });
-          // Yield so the other invocation's enterWithEnvBindings runs in
-          // between — with module-level singletons this would clobber ours.
-          await new Promise((resolve) => setImmediate(resolve));
-          reads[id] = {
-            appUrl: getStepAppUrl(),
-            supportEmail: getStepSupportEmail(),
-          };
-        });
+        runDetached(() =>
+          runWithInngestRequestContext({ appUrl, supportEmail }, async () => {
+            // Yield so the other invocation's context is active in between —
+            // with module-level singletons this would clobber ours.
+            await new Promise((resolve) => setImmediate(resolve));
+            reads[id] = {
+              appUrl: getStepAppUrl(),
+              supportEmail: getStepSupportEmail(),
+            };
+          }),
+        );
 
       await Promise.all([
         invocation('a', 'https://a.example.com', 'a@example.com'),
@@ -134,20 +166,25 @@ describe('Inngest helpers', () => {
         'postgresql://user:pw@ep-a.us-east-2.aws.neon.tech/db?sslmode=require';
 
       await Promise.all([
-        runDetached(async () => {
-          enterWithEnvBindings({ databaseUrl: url });
-          await new Promise((resolve) => setImmediate(resolve));
-          expect(getStepDatabase()).toEqual({ kind: 'db' });
-          expect(mockCreateDatabase).toHaveBeenCalledWith(url, {
-            cacheNeonPool: false,
-          });
-        }),
-        runDetached(async () => {
-          await new Promise((resolve) => setImmediate(resolve));
-          // No bindings in this invocation and no process.env fallback — the
-          // sibling's URL must NOT leak here.
-          expect(() => getStepDatabase()).toThrow(/DATABASE_URL not available/);
-        }),
+        runDetached(() =>
+          runWithInngestRequestContext({ databaseUrl: url }, async () => {
+            await new Promise((resolve) => setImmediate(resolve));
+            expect(getStepDatabase()).toEqual({ kind: 'db' });
+            expect(mockCreateDatabase).toHaveBeenCalledWith(url, {
+              cacheNeonPool: false,
+            });
+          }),
+        ),
+        runDetached(() =>
+          runWithInngestRequestContext({}, async () => {
+            await new Promise((resolve) => setImmediate(resolve));
+            // No bindings in this invocation and no process.env fallback —
+            // the sibling's URL must NOT leak here.
+            expect(() => getStepDatabase()).toThrow(
+              /DATABASE_URL not available/,
+            );
+          }),
+        ),
       ]);
     });
   });

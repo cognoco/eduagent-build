@@ -2,6 +2,8 @@
 // Inngest Route Tests
 // ---------------------------------------------------------------------------
 
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 jest.mock('../inngest', () => {
   const actual = jest.requireActual(
     '../inngest',
@@ -14,7 +16,18 @@ jest.mock('../inngest', () => {
 });
 
 jest.mock('inngest/hono', () => ({
-  serve: jest.fn().mockReturnValue((_c: unknown) => new Response('OK')),
+  serve: jest.fn(() => async () => {
+    const { getStepAppUrl, getStepSupportEmail } =
+      require('../inngest/helpers') as {
+        getStepAppUrl: () => string;
+        getStepSupportEmail: () => string;
+      };
+    await new Promise((resolve) => setImmediate(resolve));
+    return Response.json({
+      appUrl: getStepAppUrl(),
+      supportEmail: getStepSupportEmail(),
+    });
+  }),
 }));
 
 import { Hono } from 'hono';
@@ -66,5 +79,29 @@ describe('inngestRoute', () => {
     const res = await app.request('/v1/v1/inngest', { method: 'POST' });
 
     expect(res.status).toBe(404);
+  });
+
+  it('[WI-1850] binds Worker env for the complete serve handler without enterWith', async () => {
+    const enterWith = jest
+      .spyOn(AsyncLocalStorage.prototype, 'enterWith')
+      .mockImplementation(() => {
+        throw new Error('asyncLocalStorage.enterWith() is not implemented');
+      });
+
+    const response = await inngestRoute.request(
+      'https://api.mentomate.com/inngest',
+      { method: 'POST' },
+      {
+        APP_URL: 'https://staging.mentomate.com',
+        SUPPORT_EMAIL: 'staging-support@mentomate.com',
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      appUrl: 'https://staging.mentomate.com',
+      supportEmail: 'staging-support@mentomate.com',
+    });
+    expect(enterWith).not.toHaveBeenCalled();
   });
 });
