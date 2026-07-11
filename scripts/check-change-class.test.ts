@@ -204,6 +204,7 @@ describe('check-change-class.sh', () => {
     const flags = runRouter(repo);
     expect(flags.classes).toContain('db-migrations');
     expect(flags.integration).toBe('true');
+    expect(flags.database).toBe('true');
 
     const output = runChangeClass(repo, ['--branch'], {
       encoding: 'utf8',
@@ -254,6 +255,7 @@ describe('check-change-class.sh', () => {
     const flags = runRouter(repo);
     expect(flags.integration).toBe('false');
     expect(flags.eval).toBe('false');
+    expect(flags.database).toBe('false');
     expect(flags.docs_only).toBe('false');
   });
 
@@ -303,6 +305,7 @@ describe('check-change-class.sh', () => {
       expect(flags.integration).toBe('true');
       expect(flags.eval).toBe('true');
       expect(flags.unit).toBe('true');
+      expect(flags.database).toBe('true');
       expect(flags.docs_only).toBe('false');
     } finally {
       removeTempRepo(orphan);
