@@ -100,4 +100,54 @@ describe('useActivationLaunchEvents', () => {
       expect.anything(),
     );
   });
+
+  // [WI-1689 rework] day2_return hydration latch. Regression for: on a
+  // signed-in cold launch, useUser() can still be loading (userCreatedAt is
+  // null), so the OLD single combined ref latched itself on that first
+  // render and permanently skipped the day-2 check once createdAt hydrated
+  // on a later render. app_opened and day2_return must latch independently.
+  it('still fires day2_return exactly once when createdAt hydrates to a prior day on a later render', () => {
+    const reportActivationEvent = jest.fn();
+    const yesterday = new Date();
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
+    // Cold launch: signed in, Clerk's useUser() still loading (createdAt null).
+    // Explicitly typed so the `null` literal widens to the hook's real prop
+    // type instead of pinning `rerender`'s param type to exactly `null`.
+    const initialProps: {
+      isSignedIn: boolean;
+      userCreatedAt: Date | null | undefined;
+    } = { isSignedIn: true, userCreatedAt: null };
+
+    const { rerender } = renderHook(
+      (props: typeof initialProps) =>
+        useActivationLaunchEvents({ ...props, reportActivationEvent }),
+      { initialProps },
+    );
+
+    expect(reportActivationEvent).toHaveBeenCalledWith('app_opened', {
+      route: 'app_launch',
+    });
+    expect(reportActivationEvent).not.toHaveBeenCalledWith(
+      'day2_return',
+      expect.anything(),
+    );
+
+    // useUser() resolves on a later render, hydrating createdAt to a prior day.
+    rerender({ isSignedIn: true, userCreatedAt: yesterday });
+
+    expect(reportActivationEvent).toHaveBeenCalledWith('day2_return', {
+      route: 'app_launch',
+    });
+    expect(reportActivationEvent).toHaveBeenCalledTimes(2); // app_opened + day2_return
+    expect(
+      reportActivationEvent.mock.calls.filter(
+        ([eventType]) => eventType === 'day2_return',
+      ),
+    ).toHaveLength(1);
+
+    // A further re-render (same createdAt) must not fire it again.
+    rerender({ isSignedIn: true, userCreatedAt: yesterday });
+    expect(reportActivationEvent).toHaveBeenCalledTimes(2);
+  });
 });

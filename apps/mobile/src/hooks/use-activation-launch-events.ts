@@ -17,6 +17,13 @@ import type { ReportActivationEvent } from '../lib/activation-events';
  *
  * Extracted from ThemedApp (apps/mobile/src/app/_layout.tsx) so this
  * guard/gate/date-comparison logic is unit-testable in isolation.
+ *
+ * app_opened and day2_return latch independently. On a signed-in cold
+ * launch, `useUser()` can still be loading — if a single combined latch
+ * consumed itself before `userCreatedAt` existed, the day-2 check would be
+ * permanently skipped once the user object arrived on a later render. The
+ * day2_return latch only sets once it actually fires, so a later render
+ * carrying a hydrated `userCreatedAt` still gets evaluated.
  */
 export function useActivationLaunchEvents(params: {
   isSignedIn: boolean | undefined;
@@ -25,17 +32,21 @@ export function useActivationLaunchEvents(params: {
 }): void {
   const { isSignedIn, userCreatedAt, reportActivationEvent } = params;
   const hasReportedAppOpenRef = useRef(false);
+  const hasReportedDay2Ref = useRef(false);
 
   useEffect(() => {
-    if (hasReportedAppOpenRef.current) return;
     if (!isSignedIn) return;
-    hasReportedAppOpenRef.current = true;
-    reportActivationEvent('app_opened', { route: 'app_launch' });
 
-    if (userCreatedAt) {
+    if (!hasReportedAppOpenRef.current) {
+      hasReportedAppOpenRef.current = true;
+      reportActivationEvent('app_opened', { route: 'app_launch' });
+    }
+
+    if (!hasReportedDay2Ref.current && userCreatedAt) {
       const signupUtcDay = userCreatedAt.toISOString().slice(0, 10);
       const todayUtcDay = new Date().toISOString().slice(0, 10);
       if (todayUtcDay > signupUtcDay) {
+        hasReportedDay2Ref.current = true;
         reportActivationEvent('day2_return', { route: 'app_launch' });
       }
     }

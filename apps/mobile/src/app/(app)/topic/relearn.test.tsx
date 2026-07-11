@@ -746,6 +746,22 @@ describe('RelearnScreen', () => {
     expect(screen.queryByTestId('relearn-method-phase')).toBeNull();
   });
 
+  // [WI-1689 rework] entry-gate guard on review_card_seen: `phase` defaults
+  // to 'topics' synchronously on mount (see useState above) even when the
+  // entry gate blocks the route, so the seen-reporting effect runs in the
+  // same render that produces the Redirect below it. Assert it reports
+  // nothing for a blocked, overdue-topics-available render.
+  it('reports zero review_card_seen events when the entry gate blocks the route', () => {
+    mockIsParentProxy = true;
+
+    renderRelearn();
+
+    expect(mockReportActivationEvent).not.toHaveBeenCalledWith(
+      'review_card_seen',
+      expect.anything(),
+    );
+  });
+
   it('[WI-508] method cards are disabled and unreachable while a start is in-flight', async () => {
     // Drive the screen to the method phase via direct topic entry.
     mockSearchParams = {

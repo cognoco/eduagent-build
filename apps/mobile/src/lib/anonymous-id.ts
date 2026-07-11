@@ -11,15 +11,19 @@ import * as SecureStore from './secure-storage';
 import { ACTIVATION_ANONYMOUS_ID_KEY } from './secure-store-keys';
 
 let cachedAnonymousId: string | null = null;
+// In-flight resolution, shared by concurrent callers so they don't each read
+// an empty cache/store and generate a different UUID. Set synchronously
+// before the first await inside resolveAndCacheAnonymousId — see
+// getAnonymousId below.
+let inFlightResolution: Promise<string> | null = null;
 
 /** Test-only reset so each test starts from a clean cache. */
 export function __resetAnonymousIdCacheForTests(): void {
   cachedAnonymousId = null;
+  inFlightResolution = null;
 }
 
-export async function getAnonymousId(): Promise<string> {
-  if (cachedAnonymousId) return cachedAnonymousId;
-
+async function resolveAndCacheAnonymousId(): Promise<string> {
   const existing = await SecureStore.getItemAsync(ACTIVATION_ANONYMOUS_ID_KEY);
   if (existing) {
     cachedAnonymousId = existing;
@@ -30,4 +34,16 @@ export async function getAnonymousId(): Promise<string> {
   await SecureStore.setItemAsync(ACTIVATION_ANONYMOUS_ID_KEY, generated);
   cachedAnonymousId = generated;
   return generated;
+}
+
+export async function getAnonymousId(): Promise<string> {
+  if (cachedAnonymousId) return cachedAnonymousId;
+
+  if (!inFlightResolution) {
+    inFlightResolution = resolveAndCacheAnonymousId().finally(() => {
+      inFlightResolution = null;
+    });
+  }
+
+  return inFlightResolution;
 }

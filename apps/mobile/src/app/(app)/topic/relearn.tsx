@@ -408,6 +408,10 @@ export default function RelearnScreen() {
     return allSubjects;
   }, [allSubjects, selectedSubject]);
 
+  const blocked = useEntryGate('topic/relearn', {
+    for: isParentBridgeSource ? 'child' : 'self',
+  });
+
   // [WI-1689] review_card_seen — one impression per distinct topicId shown in
   // the topics phase (occurrenceId=topicId, not UTC-day bucketed, so several
   // distinct topics seen in one day each record). Assumption (team-lead ruled,
@@ -420,9 +424,14 @@ export default function RelearnScreen() {
   // actually rendered each time this effect runs — not a
   // list-mount-implies-all-seen approximation. Effect-driven (not fired during
   // render) and deduped per-mount via the ref so re-renders of an
-  // already-seen list don't re-report.
+  // already-seen list don't re-report. Guarded on the entry gate: when
+  // useEntryGate blocks the route (e.g. parent-proxy, a V1 contract denial),
+  // this effect can otherwise run before the Redirect below commits — never
+  // report impressions for a route the learner is about to be redirected out
+  // of.
   const seenTopicIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
+    if (blocked) return;
     if (phase !== 'topics') return;
     for (const subject of topicsToRender) {
       for (const topic of subject.topics) {
@@ -435,11 +444,7 @@ export default function RelearnScreen() {
         });
       }
     }
-  }, [phase, topicsToRender, reportActivationEvent]);
-
-  const blocked = useEntryGate('topic/relearn', {
-    for: isParentBridgeSource ? 'child' : 'self',
-  });
+  }, [blocked, phase, topicsToRender, reportActivationEvent]);
 
   if (blocked) {
     return <Redirect href="/(app)/home" />;
