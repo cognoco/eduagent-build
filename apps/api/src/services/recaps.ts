@@ -9,7 +9,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import type { RecapListItem } from '@eduagent/schemas';
+import type { RecapListItem, VerifiedProofReceipt } from '@eduagent/schemas';
 import { recapListItemSchema } from '@eduagent/schemas';
 import { ForbiddenError } from '../errors';
 
@@ -21,10 +21,7 @@ import {
 import { listProfileSessions } from './session/session-crud';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
-import {
-  getVerifiedProofForSessionTopic,
-  type VerifiedProofReceipt,
-} from './parent-proof';
+import { getVerifiedProofForSessionTopic } from './parent-proof';
 
 const logger = createLogger();
 

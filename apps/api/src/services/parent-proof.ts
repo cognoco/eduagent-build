@@ -7,12 +7,10 @@ import {
   topicNotes,
   type Database,
 } from '@eduagent/database';
+import type { VerifiedProofReceipt } from '@eduagent/schemas';
 import { assertParentAccess } from './family-access';
 import { assertChildDashboardDataVisible } from './dashboard';
-import {
-  resolveMasteryVerificationState,
-  type MasteryVerificationState,
-} from './challenge-round/verification';
+import { resolveMasteryVerificationState } from './challenge-round/verification';
 import { getRetentionStatus } from './retention';
 
 // [WI-1658 rework] Read-side quote age-out (AC4). WI-1194 cites this same
@@ -24,19 +22,6 @@ import { getRetentionStatus } from './retention';
 // only — past the window the quote reads back as null and the existing
 // degradation branch below renders the abstracted line instead.
 const QUOTE_AGE_OUT_DAYS = 30;
-
-export interface VerifiedProofReceipt {
-  hasProof: boolean;
-  topicId?: string;
-  topicTitle?: string;
-  subjectId?: string;
-  sessionId?: string;
-  verifiedAt?: string;
-  quote: string | null;
-  masteryVerificationState?: MasteryVerificationState;
-  retentionStatus?: 'strong' | 'fading' | 'weak' | 'forgotten';
-  nextReviewDate?: string;
-}
 
 /**
  * The verified artifact for one exact Recap session/topic. Unlike the home
