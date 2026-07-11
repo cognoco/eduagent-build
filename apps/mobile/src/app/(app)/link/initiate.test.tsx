@@ -33,12 +33,10 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
 
-jest.mock(
-  '../../../lib/scope-context' /* gc1-allow: route test fixes the active V2 scope without exercising provider persistence, mirroring mentor.test.tsx */,
-  () => ({
-    useScopeContext: () => mockScopeContext,
-  }),
-);
+jest.mock('../../../lib/scope-context', () => ({
+  ...jest.requireActual('../../../lib/scope-context'),
+  useScopeContext: () => mockScopeContext,
+}));
 
 // `visibilityContractSchema` requires UUID-shaped person ids; the mock
 // response fixture uses fixed UUIDs independent of the non-UUID
