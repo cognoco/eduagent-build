@@ -53,6 +53,7 @@ function loadWorkflow(name: string): Record<string, unknown> {
 type Job = {
   name?: string;
   if?: unknown;
+  env?: Record<string, unknown>;
   needs?: unknown;
   strategy?: Record<string, unknown>;
   steps?: Array<Record<string, unknown>>;
@@ -408,6 +409,43 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
     expect(runner).toContain('ci-maestro-plan.mjs');
     expect(runner).not.toMatch(/maestro test apps\/mobile\/e2e\/flows\//);
+  });
+
+  it('boots an embedded test release APK instead of the dev-client launcher', () => {
+    const cacheStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Cache E2E release APK',
+    );
+    const buildStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Build E2E release APK',
+    );
+    const workflowScripts = (mobileMaestro.steps ?? [])
+      .map((step) => (typeof step.run === 'string' ? step.run : ''))
+      .join('\n');
+    const runner = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/scripts/run-ci-maestro.sh'),
+      'utf8',
+    );
+
+    expect(mobileMaestro.env?.NODE_ENV).toBe('test');
+    expect(mobileMaestro.env?.EXPO_PUBLIC_E2E).toBe('true');
+    expect(mobileMaestro.env?.EXPO_PUBLIC_API_URL).toBe('http://10.0.2.2:8787');
+    expect(cacheStep?.with).toMatchObject({
+      path: 'apps/mobile/android/app/build/outputs/apk/release/app-release.apk',
+    });
+    expect(String((cacheStep?.with as Record<string, unknown>)?.key)).toContain(
+      'apk-e2e-release-',
+    );
+    expect(String(buildStep?.run)).toContain('assembleRelease');
+    expect(String(buildStep?.run)).toContain(
+      '-x createBundleReleaseJsAndAssets',
+    );
+    expect(workflowScripts).not.toContain('assembleDebug');
+    expect(runner).toContain(
+      'android/app/build/outputs/apk/release/app-release.apk',
+    );
+    expect(runner).not.toContain(
+      'android/app/build/outputs/apk/debug/app-debug.apk',
+    );
   });
 
   it('keeps every pr-blocking flow in the explicit PR plan', () => {

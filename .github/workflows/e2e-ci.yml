@@ -227,6 +227,9 @@ jobs:
       CI: true
       NX_DAEMON: false
       NX_ISOLATE_PLUGINS: false
+      EXPO_PUBLIC_E2E: 'true'
+      EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
+      SENTRY_DISABLE_AUTO_UPLOAD: 'true'
       # Expo inlines EXPO_PUBLIC_* vars at JS bundle time.
       # Clerk publishable key is needed for auth screens to render.
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
@@ -255,12 +258,15 @@ jobs:
       # ── APK cache: skip the ~20 min native build when native config is unchanged ──
       # Key covers ONLY native-affecting files (not JS source). On cache hit,
       # we re-bundle fresh JS and inject it into the cached APK, saving ~15 min.
-      - name: Cache debug APK
+      # This must be a release-variant APK: debug variants include Expo's
+      # development-client launcher and boot into its server picker instead of
+      # the embedded MentoMate bundle (caught by the exact-main WI-1652 run).
+      - name: Cache E2E release APK
         id: apk-cache
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5
         with:
-          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-          key: apk-debug-${{ hashFiles('apps/mobile/app.json', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'apps/mobile/assets/**', 'pnpm-lock.yaml') }}
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          key: apk-e2e-release-${{ hashFiles('apps/mobile/app.json', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'apps/mobile/assets/**', 'pnpm-lock.yaml') }}
 
       # --- Phase 1: strict pnpm install + schema migrate ---
       # [BUG-243] Use drizzle-kit migrate (not push) for the Maestro DB —
@@ -390,7 +396,7 @@ jobs:
       - name: Inject fresh JS into cached APK
         if: steps.apk-cache.outputs.cache-hit == 'true'
         run: |
-          APK="$(pwd)/apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk"
+          APK="$(pwd)/apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
           BUNDLE="$(pwd)/apps/mobile/android/app/src/main/assets/index.android.bundle"
 
           echo "APK size before: $(stat -c%s "$APK") bytes"
@@ -428,11 +434,15 @@ jobs:
           echo "APK size after: $(stat -c%s "$APK") bytes"
 
       # ── On cache MISS: full native build ──
-      # Compile debug APK via Gradle (includes the pre-bundled JS)
-      - name: Build debug APK
+      # Compile a release-variant APK so Expo's debug-only development launcher
+      # is absent and MainActivity boots the embedded bundle directly. The JS
+      # bundle above deliberately uses NODE_ENV=test + EXPO_PUBLIC_E2E=true;
+      # skip Gradle's release re-bundle so it cannot overwrite that test bundle
+      # with a NODE_ENV=production build.
+      - name: Build E2E release APK
         if: steps.apk-cache.outputs.cache-hit != 'true'
         working-directory: apps/mobile/android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleRelease -x createBundleReleaseJsAndAssets --no-daemon --stacktrace
 
       # ── Test execution — always runs ──
 

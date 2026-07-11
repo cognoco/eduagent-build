@@ -49,7 +49,7 @@ if [ "$FLOW_COUNT" -eq 0 ]; then
 fi
 echo "[ci-maestro] Selected shard $SHARD: $FLOW_COUNT of $TOTAL_FLOW_COUNT suite=$SUITE flows; seed-slot=$SEED_SLOT"
 
-adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r apps/mobile/android/app/build/outputs/apk/release/app-release.apk
 
 seed_flow() {
   local scenario="$1"
