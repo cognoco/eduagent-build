@@ -4,6 +4,7 @@ import BillingManageLanding from './manage';
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 const mockSwitchProfile = jest.fn();
+let mockShowBilling = false;
 let mockPayerPersonId = '00000000-0000-7000-a000-000000000001';
 let mockActiveProfile = {
   id: '00000000-0000-7000-a000-000000000002',
@@ -28,9 +29,15 @@ jest.mock(/* gc1-allow: profile seam */ '../../../lib/profile', () => ({
   }),
 }));
 
+// prettier-ignore
+jest.mock(/* gc1-allow: route capability seam */ '../../../hooks/use-navigation-contract', () => ({
+  useNavigationContract: () => ({ gates: { showBilling: mockShowBilling } }),
+}));
+
 describe('BillingManageLanding', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockShowBilling = false;
     mockPayerPersonId = '00000000-0000-7000-a000-000000000001';
     mockActiveProfile = {
       id: '00000000-0000-7000-a000-000000000002',
@@ -44,12 +51,21 @@ describe('BillingManageLanding', () => {
   });
 
   it('switches a child-active device to the canonical payer before seeding the full ancestor chain', async () => {
-    render(<BillingManageLanding />);
+    const rendered = render(<BillingManageLanding />);
 
     await waitFor(() =>
       expect(mockSwitchProfile).toHaveBeenCalledWith(mockPayerPersonId),
     );
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+
+    mockActiveProfile = { id: mockPayerPersonId, isOwner: true };
+    mockShowBilling = true;
+    rendered.rerender(<BillingManageLanding />);
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/more'),
+    );
     expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/more/account');
     expect(mockPush).toHaveBeenNthCalledWith(2, '/(app)/subscription');
   });
@@ -57,6 +73,7 @@ describe('BillingManageLanding', () => {
   it('does not switch when the canonical payer is already active', async () => {
     mockActiveProfile = { id: mockPayerPersonId, isOwner: true };
     mockProfiles = [mockActiveProfile];
+    mockShowBilling = true;
 
     render(<BillingManageLanding />);
 
@@ -83,10 +100,18 @@ describe('BillingManageLanding', () => {
       { id: mockPayerPersonId, isOwner: false },
     ];
 
-    render(<BillingManageLanding />);
+    const rendered = render(<BillingManageLanding />);
+
+    await waitFor(() =>
+      expect(mockSwitchProfile).toHaveBeenCalledWith(mockPayerPersonId),
+    );
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+
+    mockActiveProfile = { id: mockPayerPersonId, isOwner: false };
+    rendered.rerender(<BillingManageLanding />);
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/profiles'));
-    expect(mockSwitchProfile).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 
+import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { useProfile } from '../../../lib/profile';
 
 /**
@@ -17,6 +18,7 @@ export default function BillingManageLanding(): null {
     ? rawPayerPersonId[0]
     : rawPayerPersonId;
   const { activeProfile, profiles, switchProfile } = useProfile();
+  const navigationContract = useNavigationContract();
   const seededRef = useRef(false);
 
   useEffect(() => {
@@ -24,9 +26,7 @@ export default function BillingManageLanding(): null {
 
     const payerIsAvailable =
       typeof payerPersonId === 'string' &&
-      profiles.some(
-        (profile) => profile.id === payerPersonId && profile.isOwner === true,
-      );
+      profiles.some((profile) => profile.id === payerPersonId);
     if (!payerIsAvailable) {
       seededRef.current = true;
       router.replace('/profiles' as Href);
@@ -43,6 +43,11 @@ export default function BillingManageLanding(): null {
     };
 
     if (activeProfile?.id === payerPersonId) {
+      if (!navigationContract.gates.showBilling) {
+        seededRef.current = true;
+        router.replace('/profiles' as Href);
+        return;
+      }
       seedManageBillingStack();
       return;
     }
@@ -55,13 +60,19 @@ export default function BillingManageLanding(): null {
         }
         return;
       }
-      seedManageBillingStack();
     });
 
     return () => {
       cancelled = true;
     };
-  }, [activeProfile?.id, payerPersonId, profiles, router, switchProfile]);
+  }, [
+    activeProfile?.id,
+    navigationContract.gates.showBilling,
+    payerPersonId,
+    profiles,
+    router,
+    switchProfile,
+  ]);
 
   return null;
 }
