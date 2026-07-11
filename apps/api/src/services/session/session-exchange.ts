@@ -2633,26 +2633,20 @@ export async function prepareExchangeContext(
   // effectiveVocabularySubjectId as the known/target vocabulary reads above,
   // so both the explicit-subject and freeform-silent-classification paths
   // are covered.
-  const crossSessionPointerRow =
+  const crossSessionPointerSubject =
     effectivePedagogyMode === 'four_strands' &&
     session.exchangeCount === 0 &&
     effectiveVocabularySubjectId
-      ? await db
-          .select({ pointer: subjects.nextLanguagePracticePointer })
-          .from(subjects)
-          .where(
-            and(
-              eq(subjects.id, effectiveVocabularySubjectId),
-              eq(subjects.profileId, profileId),
-            ),
-          )
-          .limit(1)
-      : [];
+      ? await createScopedRepository(db, profileId).subjects.findFirst(
+          eq(subjects.id, effectiveVocabularySubjectId),
+        )
+      : undefined;
   const crossSessionPointer: LanguageNextPracticePointer | undefined =
     languageNextPracticePointerSchema
       .nullable()
       .catch(null)
-      .parse(crossSessionPointerRow[0]?.pointer ?? null) ?? undefined;
+      .parse(crossSessionPointerSubject?.nextLanguagePracticePointer ?? null) ??
+    undefined;
   const languageSessionState =
     effectivePedagogyMode === 'four_strands'
       ? await buildLanguageSessionState({
