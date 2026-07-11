@@ -2,6 +2,7 @@ import {
   buildLanguageActivityTelemetry,
   buildLanguageSessionState,
   chooseNextLanguageStrand,
+  computeNextPracticePointer,
   evaluatePendingGradedInputAnswer,
   getLanguageStrandCounts,
   isLikelyLanguageLearningIntent,
@@ -67,6 +68,84 @@ describe('chooseNextLanguageStrand', () => {
         },
       }),
     ).toBe('fluency');
+  });
+
+  // WI-1552 (AC4c): no cross-session pointer must be byte-for-byte the old
+  // exchangeCount === 0 behavior.
+  it('falls back to meaning_input at session start when no cross-session pointer is given', () => {
+    expect(
+      chooseNextLanguageStrand({ exchangeCount: 0, priorCounts: {} }),
+    ).toBe('meaning_input');
+  });
+
+  // WI-1552 (AC1/AC4a): a persisted cross-session pointer seeds the first
+  // exchange of a new session.
+  it('seeds the first exchange from a cross-session pointer when present', () => {
+    expect(
+      chooseNextLanguageStrand({
+        exchangeCount: 0,
+        priorCounts: {},
+        crossSessionPointer: computeNextPracticePointer({
+          meaning_input: 3,
+          meaning_output: 0,
+          language_focus: 2,
+          fluency: 2,
+        }),
+      }),
+    ).toBe('meaning_output');
+  });
+
+  it('ignores the cross-session pointer once the session has its own exchanges', () => {
+    expect(
+      chooseNextLanguageStrand({
+        exchangeCount: 4,
+        priorCounts: {
+          meaning_input: 1,
+          meaning_output: 3,
+          language_focus: 1,
+          fluency: 1,
+        },
+        crossSessionPointer: computeNextPracticePointer({
+          meaning_input: 3,
+          meaning_output: 0,
+          language_focus: 2,
+          fluency: 2,
+        }),
+      }),
+    ).toBe('meaning_input');
+  });
+});
+
+describe('computeNextPracticePointer', () => {
+  it('picks the least-practiced strand and cites the counts in the reason', () => {
+    const pointer = computeNextPracticePointer({
+      meaning_input: 3,
+      meaning_output: 0,
+      language_focus: 2,
+      fluency: 2,
+    });
+    expect(pointer.strand).toBe('meaning_output');
+    expect(pointer.reason).toContain('meaning_input=3');
+    expect(pointer.reason).toContain('meaning_output=0');
+    expect(pointer.reason).toContain('language_focus=2');
+    expect(pointer.reason).toContain('fluency=2');
+    expect(pointer.sessionStrandCounts).toEqual({
+      meaning_input: 3,
+      meaning_output: 0,
+      language_focus: 2,
+      fluency: 2,
+    });
+    expect(() => new Date(pointer.computedAt).toISOString()).not.toThrow();
+  });
+
+  it('ties break to meaning_input, matching the loop-order default', () => {
+    const pointer = computeNextPracticePointer({
+      meaning_input: 0,
+      meaning_output: 0,
+      language_focus: 0,
+      fluency: 0,
+    });
+    expect(pointer.strand).toBe('meaning_input');
   });
 });
 
@@ -454,6 +533,31 @@ describe('buildLanguageSessionState', () => {
     });
     expect(state.nextActivity.gradedInput?.text).toContain('hola');
     expect(state.nextActivity.gradedInput?.text).toContain('agua');
+  });
+
+  // WI-1552 (AC1/AC4a): seeding the first exchange of a new session from a
+  // persisted cross-session pointer, simulating "session two" reading back
+  // what "session one" computed at close.
+  it('seeds activeStrand at session start from a cross-session pointer', async () => {
+    const priorSessionPointer = computeNextPracticePointer({
+      meaning_input: 4,
+      meaning_output: 3,
+      language_focus: 0,
+      fluency: 3,
+    });
+    expect(priorSessionPointer.strand).toBe('language_focus');
+
+    const state = await buildLanguageSessionState({
+      exchangeCount: 0,
+      events: [],
+      inputMode: 'text',
+      languageCode: 'es',
+      cefrLevel: 'A1',
+      crossSessionPointer: priorSessionPointer,
+    });
+
+    expect(state.activeStrand).toBe('language_focus');
+    expect(state.nextActivity.gradedInput).toBeUndefined();
   });
 
   it('threads meaning-output context through the strand-selected next activity without graded input', async () => {

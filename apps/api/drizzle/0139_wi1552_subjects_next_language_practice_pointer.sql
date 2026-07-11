@@ -1,0 +1,1 @@
+ALTER TABLE "subjects" ADD COLUMN "next_language_practice_pointer" jsonb;

@@ -374,6 +374,13 @@ const raw: readonly KeepPattern[] = [
       'stale-idle de-escalation copy selected via NUDGE_KEY_BY_STEP[card.staleIdleStep] at ' +
       'apps/mobile/src/components/support/SupporterColdStart.tsx:87',
   },
+  {
+    // WI-1552: cross-session next-practice continue entry point.
+    pattern: 'progress.subject.continuePracticeStrand*',
+    reason:
+      'selected via STRAND_COPY_KEYS[strand] → strandCopyKey(strand) at ' +
+      'apps/mobile/src/app/(app)/progress/[subjectId]/index.tsx:599',
+  },
 ];
 
 export const KEEP_PATTERNS: readonly KeepPattern[] = raw.map((p) =>

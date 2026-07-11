@@ -203,6 +203,7 @@ function makeSubjectRow(
     urgencyBoostUntil: null,
     urgencyBoostReason: null,
     bookSuggestionsLastGenerationAttemptedAt: null,
+    nextLanguagePracticePointer: null,
   };
 }
 

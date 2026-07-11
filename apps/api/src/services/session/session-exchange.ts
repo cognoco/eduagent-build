@@ -35,6 +35,7 @@ import type {
   ReviewCalibrationRequestedEvent,
   LanguageActivityTelemetry,
   LanguageComprehensionEvaluation,
+  LanguageNextPracticePointer,
 } from '@eduagent/schemas';
 import {
   computeAgeBracket,
@@ -49,6 +50,7 @@ import {
   challengeRoundSessionStateSchema,
   extractedInterviewSignalsSchema,
   isUnambiguouslyAdult,
+  languageNextPracticePointerSchema,
 } from '@eduagent/schemas';
 import { persistUserMessageOnly } from './persist-user-message-only';
 import {
@@ -2624,6 +2626,33 @@ export async function prepareExchangeContext(
   if (effectivePedagogyMode === 'four_strands') {
     verificationType = undefined;
   }
+  // WI-1552: cross-session next-practice pointer, read back from the subject
+  // row to seed the strand choice at the FIRST exchange of a new session
+  // (chooseNextLanguageStrand only consults it when exchangeCount === 0, so
+  // there is no point querying on later exchanges). Uses the same
+  // effectiveVocabularySubjectId as the known/target vocabulary reads above,
+  // so both the explicit-subject and freeform-silent-classification paths
+  // are covered.
+  const crossSessionPointerRow =
+    effectivePedagogyMode === 'four_strands' &&
+    session.exchangeCount === 0 &&
+    effectiveVocabularySubjectId
+      ? await db
+          .select({ pointer: subjects.nextLanguagePracticePointer })
+          .from(subjects)
+          .where(
+            and(
+              eq(subjects.id, effectiveVocabularySubjectId),
+              eq(subjects.profileId, profileId),
+            ),
+          )
+          .limit(1)
+      : [];
+  const crossSessionPointer: LanguageNextPracticePointer | undefined =
+    languageNextPracticePointerSchema
+      .nullable()
+      .catch(null)
+      .parse(crossSessionPointerRow[0]?.pointer ?? null) ?? undefined;
   const languageSessionState =
     effectivePedagogyMode === 'four_strands'
       ? await buildLanguageSessionState({
@@ -2648,6 +2677,7 @@ export async function prepareExchangeContext(
           birthYear: profile.birthYear,
           birthMonth: profile.birthMonth,
           birthDay: profile.birthDay,
+          crossSessionPointer,
         })
       : undefined;
   const effectiveEvaluateDifficultyRung =

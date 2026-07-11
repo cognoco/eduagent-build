@@ -63,6 +63,7 @@ describe('useLanguageProgress', () => {
         level: 'A1',
         sublevel: '3',
       },
+      nextPractice: null,
     };
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(progressData), { status: 200 }),
@@ -98,6 +99,7 @@ describe('useLanguageProgress', () => {
       currentSublevel: null,
       currentMilestone: null,
       nextMilestone: null,
+      nextPractice: null,
     };
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(progressData), { status: 200 }),
@@ -141,6 +143,7 @@ describe('useLanguageProgress', () => {
           currentSublevel: '1',
           currentMilestone: null,
           nextMilestone: null,
+          nextPractice: null,
         }),
         { status: 200 },
       ),

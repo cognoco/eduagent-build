@@ -13,6 +13,7 @@ import {
   type LanguageMeaningOutputArtifact,
   type LanguageMeaningOutputResponseMode,
   type LanguageMeaningOutputTaskType,
+  type LanguageNextPracticePointer,
   type LanguageStrand,
 } from '@eduagent/schemas';
 
@@ -575,18 +576,44 @@ export function evaluatePendingGradedInputAnswer(input: {
   };
 }
 
-export function chooseNextLanguageStrand(input: {
-  exchangeCount: number;
-  priorCounts: Partial<LanguageStrandCounts>;
-}): LanguageStrand {
-  if (input.exchangeCount === 0) {
-    return 'meaning_input';
-  }
-
-  const counts = { ...emptyCounts(), ...input.priorCounts };
+function leastUsedStrand(counts: LanguageStrandCounts): LanguageStrand {
   return LANGUAGE_STRANDS.reduce<LanguageStrand>((best, candidate) => {
     return counts[candidate] < counts[best] ? candidate : best;
   }, LANGUAGE_STRANDS[0]);
+}
+
+export function chooseNextLanguageStrand(input: {
+  exchangeCount: number;
+  priorCounts: Partial<LanguageStrandCounts>;
+  // WI-1552: cross-session pointer persisted at the end of a prior session
+  // (see computeNextPracticePointer below). Only consulted at the first
+  // exchange of a session — once priorCounts start accumulating within this
+  // session, the existing least-used-strand balancing takes over unchanged.
+  // Undefined/omitted preserves the pre-WI-1552 behavior exactly (AC4c).
+  crossSessionPointer?: LanguageNextPracticePointer;
+}): LanguageStrand {
+  if (input.exchangeCount === 0) {
+    return input.crossSessionPointer?.strand ?? 'meaning_input';
+  }
+
+  const counts = { ...emptyCounts(), ...input.priorCounts };
+  return leastUsedStrand(counts);
+}
+
+// WI-1552: computes the next-practice pointer persisted at session-completed
+// time (apps/api/src/inngest/functions/session-completed.ts) for four_strands
+// subjects. `reason` is safe debug metadata (strand counts only) — never
+// rendered verbatim in the mobile UI.
+export function computeNextPracticePointer(
+  sessionStrandCounts: LanguageStrandCounts,
+): LanguageNextPracticePointer {
+  const strand = leastUsedStrand(sessionStrandCounts);
+  return {
+    strand,
+    reason: `least-practiced strand from the prior session (meaning_input=${sessionStrandCounts.meaning_input}, meaning_output=${sessionStrandCounts.meaning_output}, language_focus=${sessionStrandCounts.language_focus}, fluency=${sessionStrandCounts.fluency})`,
+    sessionStrandCounts,
+    computedAt: new Date().toISOString(),
+  };
 }
 
 export async function buildLanguageActivityTelemetry(input: {
@@ -667,6 +694,10 @@ export async function buildLanguageSessionState(input: {
   birthYear?: number | null;
   birthMonth?: number | null;
   birthDay?: number | null;
+  // WI-1552: pointer read back from the subject's persisted state (set at the
+  // end of a prior session). Only affects the choice at exchangeCount === 0 —
+  // see chooseNextLanguageStrand.
+  crossSessionPointer?: LanguageNextPracticePointer;
 }): Promise<LanguageSessionState> {
   const sessionStrandCounts = getLanguageStrandCounts(input.events);
   const previousComprehension = input.learnerMessage
@@ -684,6 +715,7 @@ export async function buildLanguageSessionState(input: {
       : chooseNextLanguageStrand({
           exchangeCount: input.exchangeCount,
           priorCounts: sessionStrandCounts,
+          crossSessionPointer: input.crossSessionPointer,
         });
 
   return {
