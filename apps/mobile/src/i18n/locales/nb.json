@@ -4320,7 +4320,8 @@
       "emptyTitle": "Ingen elever tilgjengelig ennå",
       "emptyDescription": "Legg til et barn i kontoen din først, og kom så tilbake for å begynne å støtte dem.",
       "addChildAction": "Legg til et barn",
-      "closeLabel": "Lukk"
+      "closeLabel": "Lukk",
+      "existingTeenOption": "Koble til et eksisterende familiemedlem (13+)"
     }
   },
   "visibility": {

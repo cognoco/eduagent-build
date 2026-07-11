@@ -17,6 +17,8 @@ interface SupportHubSubjectsTabProps {
   onSelectEligiblePerson?: (person: EligibleManagedPerson) => void;
   /** WI-1393 — 0-eligible degrade: guides the owner to add a child first. */
   onAddChildFallback?: () => void;
+  /** [WI-1137 Codex P2] navigates to `/(app)/link/initiate` param-less. */
+  onSelectExistingTeen?: () => void;
 }
 
 export function SupportHubSubjectsTab({
@@ -25,6 +27,7 @@ export function SupportHubSubjectsTab({
   eligiblePersons = [],
   onSelectEligiblePerson,
   onAddChildFallback,
+  onSelectExistingTeen,
 }: SupportHubSubjectsTabProps): React.ReactElement {
   const { t } = useTranslation();
   const [isPickerVisible, setIsPickerVisible] = useState(false);
@@ -37,6 +40,11 @@ export function SupportHubSubjectsTab({
   const handleAddChild = (): void => {
     setIsPickerVisible(false);
     onAddChildFallback?.();
+  };
+
+  const handleSelectExistingTeen = (): void => {
+    setIsPickerVisible(false);
+    onSelectExistingTeen?.();
   };
 
   return (
@@ -102,6 +110,7 @@ export function SupportHubSubjectsTab({
           eligiblePersons={eligiblePersons}
           onSelectPerson={handleSelectPerson}
           onAddChild={handleAddChild}
+          onSelectExistingTeen={handleSelectExistingTeen}
           onClose={() => setIsPickerVisible(false)}
         />
       ) : null}

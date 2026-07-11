@@ -17,6 +17,7 @@ import { useSubjectsIndex } from '../../hooks/use-subjects-index';
 import {
   pushAddChildForSupport,
   pushLinkInitiateForManagedPerson,
+  pushLinkInitiatePicker,
 } from '../../lib/navigation';
 import { useScopeContext } from '../../lib/scope-context';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
@@ -77,6 +78,7 @@ export default function SubjectsScreen(): React.ReactElement {
     const handleSelectEligiblePerson = (person: EligibleManagedPerson): void =>
       pushLinkInitiateForManagedPerson(router, person);
     const handleAddChildFallback = (): void => pushAddChildForSupport(router);
+    const handleSelectExistingTeen = (): void => pushLinkInitiatePicker(router);
 
     return (
       <SupportHubSubjectsTab
@@ -87,6 +89,7 @@ export default function SubjectsScreen(): React.ReactElement {
         eligiblePersons={eligiblePersons}
         onSelectEligiblePerson={handleSelectEligiblePerson}
         onAddChildFallback={handleAddChildFallback}
+        onSelectExistingTeen={handleSelectExistingTeen}
       />
     );
   }

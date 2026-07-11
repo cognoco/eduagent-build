@@ -237,3 +237,13 @@ export function pushAddChildForSupport(router: Pick<Router, 'push'>): void {
     params: { for: 'child' },
   } as Href);
 }
+
+/**
+ * [WI-1137 Codex P2] Push `/(app)/link/initiate` param-less so that screen's
+ * own inline picker (managed-child list + the join-my-family existing-teen
+ * entry, WI-1753) takes over. Distinct from `pushLinkInitiateForManagedPerson`,
+ * which always pre-fills a specific managed child and bypasses the picker.
+ */
+export function pushLinkInitiatePicker(router: Pick<Router, 'push'>): void {
+  router.push('/(app)/link/initiate' as Href);
+}

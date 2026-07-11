@@ -4320,7 +4320,8 @@
       "emptyTitle": "Nenhum aprendiz disponível ainda",
       "emptyDescription": "Primeiro, adicione uma criança à sua conta e depois volte para começar a apoiá-la.",
       "addChildAction": "Adicionar uma criança",
-      "closeLabel": "Fechar"
+      "closeLabel": "Fechar",
+      "existingTeenOption": "Vincular um familiar existente (13+)"
     }
   },
   "visibility": {

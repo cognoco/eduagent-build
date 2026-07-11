@@ -4074,6 +4074,7 @@
       "emptyTitle": "No learners available yet",
       "emptyDescription": "Add a child to your account first, then come back to start supporting them.",
       "addChildAction": "Add a child",
+      "existingTeenOption": "Link an existing family member (13+)",
       "closeLabel": "Close"
     }
   },

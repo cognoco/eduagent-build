@@ -4484,7 +4484,8 @@
       "emptyTitle": "Brak dostępnych uczniów",
       "emptyDescription": "Najpierw dodaj dziecko do swojego konta, a potem wróć tutaj, aby zacząć je wspierać.",
       "addChildAction": "Dodaj dziecko",
-      "closeLabel": "Zamknij"
+      "closeLabel": "Zamknij",
+      "existingTeenOption": "Połącz istniejącego członka rodziny (13+)"
     }
   },
   "visibility": {

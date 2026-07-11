@@ -4320,7 +4320,8 @@
       "emptyTitle": "学習者がまだいません",
       "emptyDescription": "まずアカウントにお子様を追加してください。その後、サポートを開始できます。",
       "addChildAction": "お子様を追加",
-      "closeLabel": "閉じる"
+      "closeLabel": "閉じる",
+      "existingTeenOption": "既存の家族（13歳以上）と連携する"
     }
   },
   "visibility": {

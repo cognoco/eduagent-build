@@ -4320,7 +4320,8 @@
       "emptyTitle": "Noch keine Lernenden verfügbar",
       "emptyDescription": "Füge zuerst ein Kind zu deinem Konto hinzu und komm dann zurück, um es zu unterstützen.",
       "addChildAction": "Kind hinzufügen",
-      "closeLabel": "Schließen"
+      "closeLabel": "Schließen",
+      "existingTeenOption": "Bestehendes Familienmitglied (13+) verknüpfen"
     }
   },
   "visibility": {

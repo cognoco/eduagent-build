@@ -493,4 +493,25 @@ describe('MentorScreen', () => {
       expect.objectContaining({ pathname: '/(app)/link/initiate' }),
     );
   });
+
+  // [WI-1137 Codex P2] the join-my-family existing-teen path must be
+  // reachable from the SupportHub picker regardless of eligible-child count
+  // — it must not be nested under, or gated by, the zero-eligible degrade.
+  it('[WI-1137] reaches /(app)/link/initiate param-less via the "link an existing family member" option', () => {
+    mockScopeContext = {
+      activeScope: { kind: 'supporter-hub' },
+      availableScopes: [],
+      setActiveScope: jest.fn(),
+    };
+
+    renderMentorScreen({
+      profile: NAMED_PROFILES.guardian,
+      profiles: [NAMED_PROFILES.guardian, NAMED_PROFILES.linkedChild],
+    });
+
+    fireEvent.press(screen.getByTestId('support-hub-mentor-empty-add'));
+    fireEvent.press(screen.getByTestId('support-person-picker-existing-teen'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/link/initiate');
+  });
 });

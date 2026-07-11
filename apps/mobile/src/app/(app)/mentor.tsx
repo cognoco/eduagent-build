@@ -38,6 +38,7 @@ import { hasFirstRealState } from '../../lib/first-real-state';
 import {
   pushAddChildForSupport,
   pushLinkInitiateForManagedPerson,
+  pushLinkInitiatePicker,
 } from '../../lib/navigation';
 import { pushNowDeepLink } from '../../lib/now-deep-link';
 import { useScopeContext } from '../../lib/scope-context';
@@ -395,6 +396,7 @@ export default function MentorScreen(): React.ReactElement {
   const handleSelectEligiblePerson = (person: EligibleManagedPerson): void =>
     pushLinkInitiateForManagedPerson(router, person);
   const handleAddChildFallback = (): void => pushAddChildForSupport(router);
+  const handleSelectExistingTeen = (): void => pushLinkInitiatePicker(router);
 
   if (activeScope.kind === 'supporter-hub') {
     return (
@@ -406,6 +408,7 @@ export default function MentorScreen(): React.ReactElement {
         eligiblePersons={eligiblePersons}
         onSelectEligiblePerson={handleSelectEligiblePerson}
         onAddChildFallback={handleAddChildFallback}
+        onSelectExistingTeen={handleSelectExistingTeen}
       />
     );
   }
