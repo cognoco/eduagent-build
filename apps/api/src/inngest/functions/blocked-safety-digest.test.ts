@@ -1,14 +1,17 @@
 const mockCaptureException = jest.fn();
 
-jest.mock('../../services/sentry', () => {
-  const actual = jest.requireActual(
-    '../../services/sentry',
-  ) as typeof import('../../services/sentry');
-  return {
-    ...actual,
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-  };
-});
+jest.mock(
+  '../../services/sentry' /* gc1-allow: sentry boundary — @sentry/cloudflare requires a Worker-scoped client unavailable in Node.js tests */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/sentry',
+    ) as typeof import('../../services/sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
+);
 
 jest.mock(/* gc1-allow: Inngest boundary */ '../client', () => ({
   inngest: {
