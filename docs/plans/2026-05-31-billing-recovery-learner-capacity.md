@@ -9,11 +9,14 @@ gap_ids: [billing-3, billing-4, notif-3]
 
 # Billing Recovery and Learner Capacity - Implementation Plan
 
-> **STATUS (2026-06-27):** PARKED — nothing shipped; the T1/T2 do-now carve was deferred. Re-triage before acting.
+> **STATUS (2026-07-11):** PARTIALLY IMPLEMENTED — the T1/T2 payment-failure
+> recovery slice shipped in [PR #2039](https://github.com/cognoco/eduagent-build/pull/2039)
+> ([squash commit `9e6cc091f`](https://github.com/cognoco/eduagent-build/commit/9e6cc091ff7f01b52e69200462d2f2524426be78)).
+> T0 and T3-T6 remain parked; this document does not authorize that work.
 
 > ## ⏸️ STATUS — PARKED (last reviewed 2026-06-08)
 >
-> **Do not implement yet.** Waiting on the identity/backend rework
+> **Do not implement the remaining parked tasks yet.** They are waiting on the identity/backend rework
 > ([`_wip/identity-foundation/`](../../_wip/identity-foundation/ROADMAP.md)) to land.
 >
 > **Already classified** (the old "Classification pending" note is resolved —
@@ -43,6 +46,83 @@ plane. RevenueCat billing issues need proactive in-app/push/email notification
 with a manage-billing path. Child quota exhaustion needs a real out-of-app
 parent alert and an owner action that grants capacity without forcing every
 single-child Plus family into the full Family tier.
+
+## Implemented Decision — T1/T2 Payment-Failure Recovery
+
+This section is the durable specification for the T1/T2 slice absorbed by
+**WI-1780 (Billing-failure UX: payment-failed notification + past-due banner)**.
+It records the behavior that landed in PR #2039; the older task text below is
+retained as historical planning context for the still-parked bundle. This
+implements [MMT-ADR-0004](../adr/MMT-ADR-0004-mobile-iap-revenuecat-stripe-dormant.md)'s
+requirement that mobile grace periods come from platform entitlement state,
+not a fixed application-owned window.
+
+### NowCard type and priority
+
+- A payment failure creates a durable `billing_alert` row, deduplicated by the
+  source event ID. Only the insert winner fans out push and email
+  (`apps/api/src/services/billing/payment-failed-alert.ts:14-38`,
+  `apps/api/src/inngest/functions/payment-failed-observe.ts:72-94`).
+- The V2 Mentor feed exposes the newest alert as a `billing_alert` NowCard only
+  while its canonical subscription is `past_due`, only in the payer's self
+  scope, and removes it after recovery. The candidate includes the effective
+  access state, subscription-period deadline, and the full
+  More → Account → Subscription chain
+  (`apps/api/src/services/now-feed.ts:545-603`).
+- `billing_alert` has absolute feed priority `-1`; lower numbers sort first, so
+  it precedes unfinished-session priority `0` and every learning candidate.
+  This is deliberate: payment recovery must not be displaced by study work
+  (`apps/api/src/services/now-feed.ts:63-73,143-165,204-224`). The mobile
+  `useNowFeed` hook requests this server-ranked self feed for the active profile
+  (`apps/mobile/src/hooks/use-now-feed.ts:30-58`).
+- At most one billing card is returned: alerts are ordered by occurrence time
+  and ID descending, then limited to one
+  (`apps/api/src/services/now-feed.ts:545-570`).
+
+### User-visible behavior
+
+- **Push:** the payer receives “Payment needs attention” / “Update your payment
+  method to restore your MentoMate plan.” The transactional push bypasses the
+  engagement daily cap and push-preference check, and carries the canonical
+  payer person ID for safe routing
+  (`apps/api/src/inngest/functions/payment-failed-observe.ts:110-127`).
+- **Email:** the payer receives “Action needed: update your MentoMate payment,”
+  an explanation that the latest payment failed, and a Manage Billing deep link
+  (`apps/api/src/services/notifications/email.ts:302-314`,
+  `apps/api/src/inngest/functions/payment-failed-observe.ts:152-172`).
+- **NowCard:** V2 Mentor shows “Payment needs attention” with a “Manage billing”
+  CTA. While paid access remains current, it states the period-end deadline;
+  if no valid deadline is available it truthfully says access is still active.
+  If access has fallen back, it says the account is using free access and that
+  updating payment restores the plan
+  (`apps/mobile/src/i18n/locales/en.json:3006-3012`,
+  `apps/mobile/src/components/mentor/NowCard.tsx:108-149`).
+- **Dismissal and recovery:** an active billing card has no Complete or Dismiss
+  control and ignores locally dismissed keys. It remains until the subscription
+  leaves `past_due`, at which point the server stops returning it
+  (`apps/mobile/src/components/mentor/NowCard.tsx:166-194`,
+  `apps/mobile/src/components/mentor/NowCardStack.tsx:82-92`,
+  `apps/api/src/services/now-feed.ts:557-566`).
+- **Manage Billing:** the in-app CTA pushes More → Account → Subscription
+  (`apps/mobile/src/lib/now-deep-link.ts:25-27,72-83`). Push/email taps first use
+  the payer-aware landing route. It validates the canonical payer, switches
+  from a child profile when necessary, re-checks billing capability, then seeds
+  the same full ancestor chain; unavailable, tampered, or failed switches go to
+  profile selection (`apps/mobile/src/lib/notification-tap-navigation.ts:49-57`,
+  `apps/mobile/src/app/(app)/billing/manage.tsx:11-78`).
+
+### Acceptance criteria and evidence
+
+| Criterion | Landed behavior | Committed evidence |
+|---|---|---|
+| Absorbed T1 AC1 — payer push + new `payment_failed` email + in-app row + owner-gated full-chain link | The handler persists first, resolves `subscription.payerPersonId`, sends both typed channels, and routes through the payer-aware landing or the in-app full chain. | `apps/api/src/inngest/functions/payment-failed-observe.test.ts:114-153`; `apps/api/src/services/notifications/email.test.ts:29-44`; `apps/mobile/src/app/(app)/billing/manage.test.tsx:60-123`; `apps/mobile/src/lib/now-deep-link.test.ts:122-139` |
+| Absorbed T1 AC2 — `skipDailyCap`; no silent delivery failure | Push uses `skipDailyCap: true` and `bypassPreferenceCheck: true`. Push/email outcomes are persisted, and every failed channel emits the PII-free `app/billing.alert_delivery_failed` event. | `apps/api/src/inngest/functions/payment-failed-observe.ts:110-150,174-205`; `apps/api/src/inngest/functions/payment-failed-observe.test.ts:155-205,247-281` |
+| Absorbed T1 AC3 — red/green regression and one deduped alert/fan-out | The source-event unique insert is the fan-out gate. Unit and real-database tests prove a losing invocation sends neither channel, concurrent inserts yield one row, and two handler invocations produce one push and one email. | `apps/api/src/inngest/functions/payment-failed-observe.test.ts:207-242`; `apps/api/src/services/billing/payment-failed-alert.integration.test.ts:168-189,284-329`; `apps/api/drizzle/0137_workable_greymalkin.sql:20-21` |
+| Absorbed T2 AC1 — record NowCard type and priority in `useNowFeed` | `billing_alert` is a shared NowCard kind and server-ranked at `-1`, ahead of every learning card; `useNowFeed` consumes that self feed. | This Implemented Decision; `packages/schemas/src/now-feed.ts:3-9`; `apps/api/src/services/now-feed.ts:63-73,143-165`; `apps/api/src/services/now-feed.test.ts:40-50`; `apps/mobile/src/hooks/use-now-feed.ts:30-58` |
+| Absorbed T2 AC2 — payer sees past-due deadline/access state and Manage Billing CTA | The latest active alert supplies `deadlineAt`, `accessState`, and the billing chain; the card renders current-access/deadline or free-fallback copy plus the CTA. | `apps/api/src/services/now-feed.ts:545-603`; `apps/mobile/src/components/mentor/NowCard.tsx:108-164`; `apps/mobile/src/components/mentor/NowCardStack.test.tsx:188-240` |
+| Absorbed T2 AC3 — active state cannot be permanently hidden | Billing cards bypass local-dismiss filtering and render neither Dismiss nor Complete; resolving `past_due` removes the card server-side. | `apps/mobile/src/components/mentor/NowCardStack.tsx:82-92`; `apps/mobile/src/components/mentor/NowCardStack.test.tsx:160-185`; `apps/api/src/services/billing/payment-failed-alert.integration.test.ts:248-283` |
+| Absorbed T2 AC4 — non-payers never see the billing card | The query is pinned to `subscription.payerPersonId`; the real-database test proves the child self feed has no billing alert. | `apps/api/src/services/now-feed.ts:545-566`; `apps/api/src/services/billing/payment-failed-alert.integration.test.ts:248-283` |
+| Whole-bundle AC — one deduped payer push/email/in-app recovery moment, working owner-safe link, V2 past-due card until resolved | The T1/T2 behaviors above execute from the same durable alert. The integration suite proves one fan-out per source event, payer-only highest-priority presentation, and disappearance after recovery; navigation tests prove the full owner-safe chain. | `apps/api/src/services/billing/payment-failed-alert.integration.test.ts:168-189,248-329`; `apps/mobile/src/app/(app)/billing/manage.test.tsx:60-123`; [PR #2039](https://github.com/cognoco/eduagent-build/pull/2039), [commit `9e6cc091f`](https://github.com/cognoco/eduagent-build/commit/9e6cc091ff7f01b52e69200462d2f2524426be78) |
 
 ## Dependency / Precondition (review finding HIGH-1)
 
@@ -424,4 +504,3 @@ mobile surfaces (`ChildPaywall.tsx`, `ParentHomeScreen.tsx`,
   owner-gating, and logged-out / wrong-profile landing; Failure-Modes row added.
 - **EU-MED-5** — past-due banner now states the grace deadline / next-retry date
   and current access state; Failure-Modes row added.
-
