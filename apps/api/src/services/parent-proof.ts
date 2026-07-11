@@ -35,6 +35,121 @@ export interface VerifiedProofReceipt {
   quote: string | null;
   masteryVerificationState?: MasteryVerificationState;
   retentionStatus?: 'strong' | 'fading' | 'weak' | 'forgotten';
+  nextReviewDate?: string;
+}
+
+/**
+ * The verified artifact for one exact Recap session/topic. Unlike the home
+ * card's child-latest receipt, `hasProof` requires both a Challenge-verified
+ * assessment and a kept `challenge_drafted_note` row. The note body is the
+ * only quote source; this resolver never reads `session_events` or any
+ * unmarked note. Past the 30-day read window the artifact remains eligible but
+ * its quote is suppressed, preserving topic/date/state co-presentation.
+ */
+export async function getVerifiedProofForSessionTopic(
+  db: Database,
+  childProfileId: string,
+  sessionId: string,
+  topicId: string,
+): Promise<VerifiedProofReceipt> {
+  const [verified] = await db
+    .select({
+      topicId: assessments.topicId,
+      subjectId: assessments.subjectId,
+      sessionId: assessments.sessionId,
+      verifiedAt: assessments.masteryChallengeVerifiedAt,
+      topicTitle: curriculumTopics.title,
+    })
+    .from(assessments)
+    .innerJoin(curriculumTopics, eq(curriculumTopics.id, assessments.topicId))
+    .where(
+      and(
+        eq(assessments.profileId, childProfileId),
+        eq(assessments.sessionId, sessionId),
+        eq(assessments.topicId, topicId),
+        isNotNull(assessments.masteryChallengeVerifiedAt),
+      ),
+    )
+    .orderBy(desc(assessments.masteryChallengeVerifiedAt))
+    .limit(1);
+
+  if (!verified || !verified.sessionId || !verified.verifiedAt) {
+    return { hasProof: false, quote: null };
+  }
+
+  const [noteRows, weakSpotRows, retentionCardRows] = await Promise.all([
+    db
+      .select({ content: topicNotes.content, createdAt: topicNotes.createdAt })
+      .from(topicNotes)
+      .where(
+        and(
+          eq(topicNotes.profileId, childProfileId),
+          eq(topicNotes.topicId, topicId),
+          eq(topicNotes.sessionId, sessionId),
+          eq(topicNotes.artifactSource, 'challenge_drafted_note'),
+        ),
+      )
+      .orderBy(desc(topicNotes.createdAt))
+      .limit(1),
+    db
+      .select({
+        status: needsDeepeningTopics.status,
+        createdAt: needsDeepeningTopics.createdAt,
+      })
+      .from(needsDeepeningTopics)
+      .where(
+        and(
+          eq(needsDeepeningTopics.profileId, childProfileId),
+          eq(needsDeepeningTopics.topicId, topicId),
+        ),
+      ),
+    db
+      .select()
+      .from(retentionCards)
+      .where(
+        and(
+          eq(retentionCards.profileId, childProfileId),
+          eq(retentionCards.topicId, topicId),
+        ),
+      )
+      .limit(1),
+  ]);
+
+  const note = noteRows[0];
+  if (!note) {
+    return { hasProof: false, quote: null };
+  }
+
+  const quoteAgeOutCutoff = new Date();
+  quoteAgeOutCutoff.setUTCDate(
+    quoteAgeOutCutoff.getUTCDate() - QUOTE_AGE_OUT_DAYS,
+  );
+  const retentionCard = retentionCardRows[0];
+
+  return {
+    hasProof: true,
+    topicId: verified.topicId,
+    topicTitle: verified.topicTitle,
+    subjectId: verified.subjectId,
+    sessionId: verified.sessionId,
+    verifiedAt: verified.verifiedAt.toISOString(),
+    quote:
+      note.createdAt.getTime() >= quoteAgeOutCutoff.getTime()
+        ? note.content
+        : null,
+    masteryVerificationState: resolveMasteryVerificationState({
+      verifiedAt: verified.verifiedAt,
+      newWeakSpotRows: weakSpotRows,
+    }),
+    retentionStatus: retentionCard
+      ? getRetentionStatus({
+          ...retentionCard,
+          lastReviewedAt: retentionCard.lastReviewedAt?.toISOString() ?? null,
+          nextReviewAt: retentionCard.nextReviewAt?.toISOString() ?? null,
+        })
+      : undefined,
+    nextReviewDate: retentionCard?.nextReviewAt?.toISOString(),
+  };
 }
 
 /**

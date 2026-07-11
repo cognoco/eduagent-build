@@ -35,6 +35,24 @@ export const recapListItemSchema = z.object({
   // recap *generation* path is unchanged. Powers the home card's "Coming up" line.
   nextTopicTitle: z.string().nullable().default(null),
   nextTopicReason: z.string().nullable().default(null),
+  // Verified proof is additive + nullable: null when this session/topic has no
+  // explicitly marked Challenge-drafted note, and defaulted so older API
+  // responses remain readable by newer mobile builds.
+  verifiedProof: z
+    .object({
+      topicId: z.string().uuid(),
+      topicTitle: z.string(),
+      subjectId: z.string().uuid().nullable(),
+      verifiedAt: z.string(),
+      verificationState: z.enum(['unverified', 'fresh', 'stale']),
+      retentionStatus: z
+        .enum(['strong', 'fading', 'weak', 'forgotten'])
+        .nullable(),
+      nextReviewDate: z.string().nullable(),
+      quote: z.string().nullable(),
+    })
+    .nullable()
+    .default(null),
 });
 export type RecapListItem = z.infer<typeof recapListItemSchema>;
 

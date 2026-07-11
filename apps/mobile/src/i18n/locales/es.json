@@ -3304,7 +3304,11 @@
     "detailPending": "Este resumen aún se está preparando.",
     "tryAsking": "Intenta preguntar",
     "openChildSession": "Abrir sesión del niño",
-    "emptyCtaStartSession": "Iniciar una sesión"
+    "emptyCtaStartSession": "Iniciar una sesión",
+    "verifiedProof": {
+      "holdsStrong": "sigue vigente",
+      "recheckDue": "próxima revisión: {{date}}"
+    }
   },
   "addToMyLearning": {
     "tip": "Guarda una copia de este tema en tu propia Biblioteca sin cambiar el aprendizaje de tu hijo.",

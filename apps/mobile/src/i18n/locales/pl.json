@@ -3448,7 +3448,11 @@
     "detailPending": "To podsumowanie jest wciąż przygotowywane.",
     "tryAsking": "Spróbuj zapytać",
     "openChildSession": "Otwórz sesję dziecka",
-    "emptyCtaStartSession": "Rozpocznij sesję"
+    "emptyCtaStartSession": "Rozpocznij sesję",
+    "verifiedProof": {
+      "holdsStrong": "nadal ważne",
+      "recheckDue": "do ponownej weryfikacji {{date}}"
+    }
   },
   "addToMyLearning": {
     "tip": "Zapisz kopię tego tematu w swojej Bibliotece, nie zmieniając nauki dziecka.",

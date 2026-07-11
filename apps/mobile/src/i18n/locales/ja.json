@@ -3304,7 +3304,11 @@
     "detailPending": "このまとめはまだ準備中です。",
     "tryAsking": "質問してみる",
     "openChildSession": "子どものセッションを開く",
-    "emptyCtaStartSession": "セッションを開始する"
+    "emptyCtaStartSession": "セッションを開始する",
+    "verifiedProof": {
+      "holdsStrong": "有効",
+      "recheckDue": "{{date}}に再確認予定"
+    }
   },
   "addToMyLearning": {
     "tip": "お子様の学習内容を変更せずに、このトピックのコピーを自分のライブラリに保存します。",
