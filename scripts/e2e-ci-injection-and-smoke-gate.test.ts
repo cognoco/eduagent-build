@@ -442,6 +442,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'apk-e2e-release-',
     );
     expect(String(buildStep?.run)).toContain('assembleRelease');
+    expect(String(buildStep?.run)).toContain('-Xmx4096m');
+    expect(String(buildStep?.run)).toContain('--max-workers=2');
     expect(String(buildStep?.run)).not.toContain(
       '-x createBundleReleaseJsAndAssets',
     );
@@ -457,9 +459,21 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(runner).toContain(
       'android/app/build/outputs/apk/release/app-release.apk',
     );
+    expect(runner).toContain('adb logcat -c');
+    expect(runner).toContain(
+      'adb shell am start -W -n "$APP_ID/.MainActivity"',
+    );
+    expect(runner).toContain('wait_for_entry_screen');
+    expect(runner).toContain('launch-logcat.txt');
     expect(runner).not.toContain(
       'android/app/build/outputs/apk/debug/app-debug.apk',
     );
+
+    const appLaunchFlow = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/app-launch.yaml'),
+      'utf8',
+    );
+    expect(appLaunchFlow).toContain('_setup/nav-welcome-to-sign-in.yaml');
   });
 
   it('keeps every pr-blocking flow in the explicit PR plan', () => {
@@ -550,6 +564,7 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
       '#!/usr/bin/env bash',
       'case "$*" in',
       '  "exec-out screencap -p") printf fake-png ;;',
+      '  "exec-out cat /sdcard/ci-maestro-entry.xml") printf \'<node resource-id="welcome-chooser"/>\' ;;',
       '  "logcat -d -t 500") printf fake-logcat ;;',
       'esac',
       '',

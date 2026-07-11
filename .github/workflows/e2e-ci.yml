@@ -460,7 +460,7 @@ jobs:
       - name: Build E2E release APK
         if: steps.apk-cache.outputs.cache-hit != 'true'
         working-directory: apps/mobile/android
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        run: ./gradlew -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m" assembleRelease --no-daemon --max-workers=2 --stacktrace
 
       # ── Test execution — always runs ──
 

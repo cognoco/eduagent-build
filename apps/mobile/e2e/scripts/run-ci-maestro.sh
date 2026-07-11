@@ -8,6 +8,7 @@ SHARD="${MAESTRO_CI_SHARD:?MAESTRO_CI_SHARD is required}"
 SEED_SLOT="${E2E_SEED_SLOT:-native-0${SHARD}}"
 HOST_API_URL="${CI_SEED_API_URL:-http://localhost:8787}"
 DEVICE_API_URL="${API_URL:-http://10.0.2.2:8787}"
+APP_ID="com.mentomate.app"
 PLAN_FILE="$(mktemp)"
 ACTIVE_SEED=0
 
@@ -98,6 +99,29 @@ reset_seed() {
   ACTIVE_SEED=0
 }
 
+wait_for_entry_screen() {
+  local flow_output="$1"
+  local elapsed=0
+  local hierarchy
+
+  while [ "$elapsed" -lt 45 ]; do
+    if adb shell uiautomator dump /sdcard/ci-maestro-entry.xml >/dev/null 2>&1; then
+      hierarchy=$(adb exec-out cat /sdcard/ci-maestro-entry.xml 2>/dev/null || true)
+      if printf '%s' "$hierarchy" | grep -Eq 'welcome-chooser|sign-in-button'; then
+        echo "[ci-maestro] Embedded app entry screen ready after ${elapsed}s"
+        return 0
+      fi
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+
+  echo "[ci-maestro] ERROR: embedded app did not reach a pre-auth entry screen" >&2
+  adb shell dumpsys activity activities > "$flow_output/launch-activity.txt" 2>&1 || true
+  adb logcat -d -v threadtime > "$flow_output/launch-logcat.txt" 2>&1 || true
+  return 1
+}
+
 run_flow() {
   local scenario="$1"
   local flow="$2"
@@ -118,15 +142,18 @@ run_flow() {
     maestro_env+=(-e "SCENARIO=${scenario}")
   fi
 
-  adb shell am force-stop com.mentomate.app >/dev/null 2>&1 || true
-  adb shell pm clear com.mentomate.app >/dev/null 2>&1 || true
-  adb shell pm grant com.mentomate.app android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || true
-  adb shell pm grant com.mentomate.app android.permission.CAMERA >/dev/null 2>&1 || true
-  adb shell pm grant com.mentomate.app android.permission.RECORD_AUDIO >/dev/null 2>&1 || true
-  adb shell am start -n com.mentomate.app/.MainActivity >/dev/null
-  sleep 5
-
   mkdir -p "$flow_output"
+  adb shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
+  adb shell pm clear "$APP_ID" >/dev/null 2>&1 || true
+  adb shell pm grant "$APP_ID" android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || true
+  adb shell pm grant "$APP_ID" android.permission.CAMERA >/dev/null 2>&1 || true
+  adb shell pm grant "$APP_ID" android.permission.RECORD_AUDIO >/dev/null 2>&1 || true
+  adb logcat -c
+  adb shell am start -W -n "$APP_ID/.MainActivity"
+  if ! wait_for_entry_screen "$flow_output"; then
+    return 1
+  fi
+
   set +e
   maestro test "${maestro_env[@]}" "apps/mobile/e2e/${flow}" \
     --test-output-dir "$flow_output/"
