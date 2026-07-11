@@ -8,6 +8,7 @@ import {
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
+  deliverBlockedSafetyDigestBucket,
   listUndeliveredClosedBlockedSafetyBuckets,
   recordBlockedSafetyDigestEvent,
 } from './blocked-safety-digest';
@@ -115,5 +116,42 @@ describe('[WI-1691] blocked-safety digest atomic dedupe (integration)', () => {
     await expect(
       listUndeliveredClosedBlockedSafetyBuckets(db, '2100-01-01'),
     ).resolves.toEqual([]);
+  });
+
+  it('serializes concurrent delivery attempts and sends one digest', async () => {
+    await recordBlockedSafetyDigestEvent(
+      db,
+      {
+        name: 'app/safety.suitability_blocked',
+        eventId: eventIds[0]!,
+        timestamp: NOW.toISOString(),
+      },
+      NOW,
+    );
+    const [digestBucket] = await db
+      .select()
+      .from(blockedSafetyDailyBuckets)
+      .where(eq(blockedSafetyDailyBuckets.bucketDate, BUCKET_DATE));
+    expect(digestBucket).toBeDefined();
+
+    const send = jest.fn(async () => {
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 50));
+      return { sent: true, messageId: 'email-1' };
+    });
+    const config = { to: 'operator@example.test' };
+
+    await expect(
+      Promise.all([
+        deliverBlockedSafetyDigestBucket(db, digestBucket!, config, send, NOW),
+        deliverBlockedSafetyDigestBucket(db, digestBucket!, config, send, NOW),
+      ]),
+    ).resolves.toEqual([{ delivered: true }, { delivered: true }]);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    const [deliveredBucket] = await db
+      .select()
+      .from(blockedSafetyDailyBuckets)
+      .where(eq(blockedSafetyDailyBuckets.bucketDate, BUCKET_DATE));
+    expect(deliveredBucket?.deliveredAt).toEqual(NOW);
   });
 });

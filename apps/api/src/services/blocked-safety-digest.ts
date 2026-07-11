@@ -92,63 +92,76 @@ export async function deliverBlockedSafetyDigestBucket(
   send: SendDigestEmail = sendEmail,
   now: Date = new Date(),
 ): Promise<{ delivered: true } | { delivered: false; reason: 'empty' }> {
-  const total =
-    bucket.dangerousProcedureBlockedCount +
-    bucket.minorPiiEchoRedactedCount +
-    bucket.suitabilityBlockedCount;
-  if (total === 0) return { delivered: false, reason: 'empty' };
+  return db.transaction(async (tx) => {
+    // Serialize every delivery attempt for this UTC bucket. The lock is held
+    // through send + mark so an overlapping replay re-reads deliveredAt only
+    // after the winner commits and skips the duplicate email.
+    const [current] = await tx
+      .select()
+      .from(blockedSafetyDailyBuckets)
+      .where(eq(blockedSafetyDailyBuckets.bucketDate, bucket.bucketDate))
+      .for('update');
 
-  const result = await send(
-    {
-      to: config.to,
-      subject: `Blocked-safety digest — ${bucket.bucketDate} UTC`,
-      body: [
-        'Blocked-safety operator digest',
-        `UTC date: ${bucket.bucketDate}`,
-        `Dangerous procedure blocks: ${bucket.dangerousProcedureBlockedCount}`,
-        `Minor PII echo redactions: ${bucket.minorPiiEchoRedactedCount}`,
-        `Suitability blocks: ${bucket.suitabilityBlockedCount}`,
-      ].join('\n'),
-      type: 'blocked_safety_digest',
-    },
-    {
-      resendApiKey: config.resendApiKey,
-      emailFrom: config.emailFrom,
-      idempotencyKey: buildEmailIdempotencyKey(
-        'blocked-safety-digest',
-        bucket.bucketDate,
-      ),
-      db,
-    },
-  );
+    if (!current) {
+      throw new Error('blocked-safety digest bucket was not found');
+    }
+    if (current.deliveredAt) return { delivered: true };
 
-  if (!result.sent) {
-    throw new Error(
-      `blocked-safety digest email failed: ${result.reason ?? 'unknown'}`,
+    const total =
+      current.dangerousProcedureBlockedCount +
+      current.minorPiiEchoRedactedCount +
+      current.suitabilityBlockedCount;
+    if (total === 0) return { delivered: false, reason: 'empty' };
+
+    const result = await send(
+      {
+        to: config.to,
+        subject: `Blocked-safety digest — ${current.bucketDate} UTC`,
+        body: [
+          'Blocked-safety operator digest',
+          `UTC date: ${current.bucketDate}`,
+          `Dangerous procedure blocks: ${current.dangerousProcedureBlockedCount}`,
+          `Minor PII echo redactions: ${current.minorPiiEchoRedactedCount}`,
+          `Suitability blocks: ${current.suitabilityBlockedCount}`,
+        ].join('\n'),
+        type: 'blocked_safety_digest',
+      },
+      {
+        resendApiKey: config.resendApiKey,
+        emailFrom: config.emailFrom,
+        idempotencyKey: buildEmailIdempotencyKey(
+          'blocked-safety-digest',
+          current.bucketDate,
+        ),
+        // Keep suppression lookup on the root handle: a caught SQL error on
+        // the transaction handle would still poison this delivery transaction.
+        db,
+      },
     );
-  }
 
-  const marked = await db
-    .update(blockedSafetyDailyBuckets)
-    .set({ deliveredAt: now })
-    .where(
-      and(
-        eq(blockedSafetyDailyBuckets.bucketDate, bucket.bucketDate),
-        isNull(blockedSafetyDailyBuckets.deliveredAt),
-      ),
-    )
-    .returning({ bucketDate: blockedSafetyDailyBuckets.bucketDate });
+    if (!result.sent) {
+      throw new Error(
+        `blocked-safety digest email failed: ${result.reason ?? 'unknown'}`,
+      );
+    }
 
-  if (marked.length !== 1) {
-    const current = await db.query.blockedSafetyDailyBuckets.findFirst({
-      where: eq(blockedSafetyDailyBuckets.bucketDate, bucket.bucketDate),
-      columns: { deliveredAt: true },
-    });
-    if (current?.deliveredAt) return { delivered: true };
-    throw new Error('blocked-safety digest bucket was not marked delivered');
-  }
+    const marked = await tx
+      .update(blockedSafetyDailyBuckets)
+      .set({ deliveredAt: now })
+      .where(
+        and(
+          eq(blockedSafetyDailyBuckets.bucketDate, current.bucketDate),
+          isNull(blockedSafetyDailyBuckets.deliveredAt),
+        ),
+      )
+      .returning({ bucketDate: blockedSafetyDailyBuckets.bucketDate });
 
-  return { delivered: true };
+    if (marked.length !== 1) {
+      throw new Error('blocked-safety digest bucket was not marked delivered');
+    }
+
+    return { delivered: true };
+  });
 }
 
 export async function listUndeliveredClosedBlockedSafetyBuckets(
