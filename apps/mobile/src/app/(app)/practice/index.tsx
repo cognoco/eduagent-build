@@ -392,7 +392,7 @@ export default function PracticeScreen(): React.ReactElement {
 
   const handleBack = () => {
     if (returnTo === JOURNAL_RETURN_TO) {
-      router.replace(JOURNAL_HREF as Href);
+      router.replace(JOURNAL_HREF);
       return;
     }
 

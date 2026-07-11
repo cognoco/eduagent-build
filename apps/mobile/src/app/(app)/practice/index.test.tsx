@@ -82,15 +82,8 @@ jest.mock(
 jest.mock(
   '../../../lib/navigation' /* gc1-allow: imports expo-router Router type */,
   () => ({
+    ...jest.requireActual('../../../lib/navigation'),
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-    homeHrefForReturnTo: (returnTo: unknown) => {
-      if (returnTo === 'practice') return '/(app)/practice';
-      if (returnTo === 'journal') return '/(app)/journal';
-      return '/(app)/home';
-    },
-    JOURNAL_HREF: '/(app)/journal',
-    JOURNAL_RETURN_TO: 'journal',
-    PRACTICE_RETURN_TO: 'practice',
   }),
 );
 
