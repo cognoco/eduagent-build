@@ -1,5 +1,6 @@
 import {
   buildSystemPrompt,
+  buildSystemPromptSegments,
   allowsGeneralKnowledgeSource,
 } from './exchange-prompts';
 import type { ExchangeContext } from './exchanges';
@@ -1353,5 +1354,97 @@ describe('review callback opener (RR-1)', () => {
     // line (sanitizeXmlValue strips \n to space, not to empty), but no
     // literal \nSYSTEM: line-break injection survives.
     expect(prompt).not.toContain('\nSYSTEM:');
+  });
+});
+
+describe('buildSystemPromptSegments — cache-friendly stable prefix (WI-1779)', () => {
+  const baseTopic = {
+    topicTitle: 'Photosynthesis',
+    topicDescription: 'How plants turn sunlight into energy.',
+  } as const;
+
+  it('round-trips: buildSystemPrompt === stablePrefix + volatileSuffix', () => {
+    const ctx = makeContext(baseTopic);
+    const { stablePrefix, volatileSuffix } = buildSystemPromptSegments(ctx);
+    const joined = volatileSuffix
+      ? `${stablePrefix}\n\n${volatileSuffix}`
+      : stablePrefix;
+    expect(buildSystemPrompt(ctx)).toBe(joined);
+  });
+
+  it('keeps stable rules in the prefix and per-turn content in the suffix', () => {
+    const { stablePrefix, volatileSuffix } = buildSystemPromptSegments(
+      makeContext(baseTopic),
+    );
+    // Stable, universal rule blocks belong in the cached prefix.
+    for (const anchor of [
+      'SAFETY — NON-NEGOTIABLE RULES',
+      'ANTI-FABRICATION',
+      'PRIVATE FACTUALITY CONTRACT',
+      'FINAL FACT CHECK',
+    ]) {
+      expect(stablePrefix).toContain(anchor);
+      expect(volatileSuffix).not.toContain(anchor);
+    }
+    // Turn-volatile content belongs in the suffix, never the cached prefix.
+    // Anchor on markers unique to the emitted blocks — the stable factuality
+    // rules mention "<source_pack>" by name, so the closing tag is the reliable
+    // signal that the actual pack was emitted here.
+    for (const anchor of ['</source_pack>', 'RESPONSE FORMAT — CRITICAL']) {
+      expect(volatileSuffix).toContain(anchor);
+      expect(stablePrefix).not.toContain(anchor);
+    }
+  });
+
+  it('stable prefix is byte-identical when only turn-volatile fields change', () => {
+    // A standard learning session: hold the session-stable inputs fixed
+    // (subject, topic, birthYear, mode) and vary only the fields that move
+    // turn to turn. The cached prefix must not change, or providers re-write
+    // the cache every turn.
+    const stable = { ...baseTopic, sessionType: 'learning' as const };
+
+    const turn1 = buildSystemPromptSegments(
+      makeContext({
+        ...stable,
+        escalationRung: 1,
+        exchangeCount: 0,
+        correctStreak: 0,
+        sourceEvidence: [
+          {
+            id: 'learner_message',
+            kind: 'learner_message',
+            reliability: 'learner_provided',
+            label: 'Current learner message',
+            excerpt: 'what is chlorophyll',
+            reliableForFacts: false,
+          },
+        ],
+      }),
+    );
+
+    const turn2 = buildSystemPromptSegments(
+      makeContext({
+        ...stable,
+        escalationRung: 4,
+        exchangeCount: 6,
+        correctStreak: 5,
+        extractedSignalsToReflect: { goals: 'pass biology exam' },
+        sourceEvidence: [
+          {
+            id: 'learner_message',
+            kind: 'learner_message',
+            reliability: 'learner_provided',
+            label: 'Current learner message',
+            excerpt: 'so the light reactions happen in the thylakoid?',
+            reliableForFacts: false,
+          },
+        ],
+      }),
+    );
+
+    expect(turn2.stablePrefix).toBe(turn1.stablePrefix);
+    // And the volatile suffixes genuinely differ (proves the varied content
+    // landed in the suffix, not that both are empty).
+    expect(turn2.volatileSuffix).not.toBe(turn1.volatileSuffix);
   });
 });
