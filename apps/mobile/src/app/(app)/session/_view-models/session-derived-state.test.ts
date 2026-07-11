@@ -4,6 +4,7 @@ import {
   countPersistedAiResponses,
   deriveSessionSubjectState,
   getLatestAiMessageId,
+  getLatestBookmarkableEventId,
   getLearnerTurnCount,
 } from './session-derived-state';
 
@@ -100,6 +101,57 @@ describe('session-derived-state', () => {
     ];
 
     expect(countPersistedAiResponses(messages)).toBe(1);
+  });
+
+  it('has no bookmarkable event when there are no messages', () => {
+    expect(
+      getLatestBookmarkableEventId({ messages: [], isStreaming: false }),
+    ).toBeNull();
+  });
+
+  it('has no bookmarkable event while streaming', () => {
+    expect(
+      getLatestBookmarkableEventId({
+        messages: [
+          { id: 'ai-1', role: 'assistant', content: 'First', eventId: 'evt-1' },
+        ],
+        isStreaming: true,
+      }),
+    ).toBeNull();
+  });
+
+  it('has no bookmarkable event when the latest AI message has not persisted yet', () => {
+    expect(
+      getLatestBookmarkableEventId({
+        messages: [{ id: 'ai-1', role: 'assistant', content: 'First' }],
+        isStreaming: false,
+      }),
+    ).toBeNull();
+  });
+
+  it('returns the eventId of the latest non-streaming assistant message', () => {
+    expect(
+      getLatestBookmarkableEventId({
+        messages: [
+          { id: 'ai-1', role: 'assistant', content: 'First', eventId: 'evt-1' },
+          { id: 'user-1', role: 'user', content: 'Question' },
+          {
+            id: 'ai-streaming',
+            role: 'assistant',
+            content: 'Still coming',
+            streaming: true,
+            eventId: 'evt-streaming',
+          },
+          {
+            id: 'ai-2',
+            role: 'assistant',
+            content: 'Second',
+            eventId: 'evt-2',
+          },
+        ],
+        isStreaming: false,
+      }),
+    ).toBe('evt-2');
   });
 
   it('prefers classified subject over route subject', () => {

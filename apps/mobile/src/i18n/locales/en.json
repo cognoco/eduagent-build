@@ -879,7 +879,9 @@
     "notePrompt": {
       "writeNote": "Write a note",
       "saveFailedTitle": "Could not save note",
-      "summaryPlaceholder": "What should we remember from this session?"
+      "summaryPlaceholder": "What should we remember from this session?",
+      "keepThis": "Save this reply",
+      "keepPending": "One sec…"
     },
     "parkingLot": {
       "title": "Parking lot",

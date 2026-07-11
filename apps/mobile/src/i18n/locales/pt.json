@@ -846,7 +846,9 @@
     "notePrompt": {
       "writeNote": "Escrever uma nota",
       "saveFailedTitle": "Não foi possível salvar a nota",
-      "summaryPlaceholder": "O que devemos lembrar desta sessão?"
+      "summaryPlaceholder": "O que devemos lembrar desta sessão?",
+      "keepThis": "Salvar esta resposta",
+      "keepPending": "Um segundo..."
     },
     "parkingLot": {
       "title": "Estacionamento",

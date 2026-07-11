@@ -819,7 +819,9 @@
     "notePrompt": {
       "writeNote": "Notiz schreiben",
       "saveFailedTitle": "Notiz konnte nicht gespeichert werden",
-      "summaryPlaceholder": "Was sollen wir uns aus dieser Sitzung merken?"
+      "summaryPlaceholder": "Was sollen wir uns aus dieser Sitzung merken?",
+      "keepThis": "Antwort speichern",
+      "keepPending": "Einen Moment…"
     },
     "parkingLot": {
       "title": "Parkplatz",

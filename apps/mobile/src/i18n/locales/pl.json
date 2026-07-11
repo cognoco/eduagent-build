@@ -852,7 +852,9 @@
     "notePrompt": {
       "writeNote": "Napisz notatkę",
       "saveFailedTitle": "Nie można zapisać notatki",
-      "summaryPlaceholder": "Co powinniśmy zapamiętać z tej sesji?"
+      "summaryPlaceholder": "Co powinniśmy zapamiętać z tej sesji?",
+      "keepThis": "Zapisz tę odpowiedź",
+      "keepPending": "Sekundka…"
     },
     "parkingLot": {
       "title": "Przechowalnia",

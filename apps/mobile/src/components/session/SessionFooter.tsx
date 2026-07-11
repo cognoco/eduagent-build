@@ -25,6 +25,12 @@ export interface SessionFooterProps {
   userMessageCount: number;
   showQuestionCount: boolean;
   showBookLink: boolean;
+  /** WI-1451: latest bookmarkable AI reply's eventId in a topicless (freeform)
+   *  session, or null before one exists yet. */
+  bookmarkableEventId: string | null;
+  keepPending: boolean;
+  keepSaved: boolean;
+  onKeepNow: (eventId: string) => void;
 }
 
 export function SessionFooter({
@@ -42,6 +48,10 @@ export function SessionFooter({
   userMessageCount,
   showQuestionCount,
   showBookLink,
+  bookmarkableEventId,
+  keepPending,
+  keepSaved,
+  onKeepNow,
 }: SessionFooterProps) {
   const { t } = useTranslation();
   return (
@@ -87,6 +97,33 @@ export function SessionFooter({
             {t('session.notePrompt.writeNote')}
           </Text>
         </Pressable>
+      ) : null}
+      {notePromptOffered && !topicId && !keepSaved ? (
+        bookmarkableEventId ? (
+          <Pressable
+            className="bg-primary/10 rounded-lg px-4 py-3 mx-4 mb-2 flex-row items-center"
+            onPress={() => onKeepNow(bookmarkableEventId)}
+            disabled={keepPending}
+            testID="session-freeform-keep-prompt"
+            accessibilityRole="button"
+            accessibilityLabel={t('session.notePrompt.keepThis')}
+          >
+            <Ionicons
+              name="bookmark-outline"
+              size={18}
+              color={colors.primary}
+            />
+            <Text className="text-body text-primary font-semibold ml-2">
+              {t('session.notePrompt.keepThis')}
+            </Text>
+          </Pressable>
+        ) : (
+          <View className="px-4 mb-2" testID="session-freeform-keep-deferred">
+            <Text className="text-body-sm text-text-secondary">
+              {t('session.notePrompt.keepPending')}
+            </Text>
+          </View>
+        )
       ) : null}
       {showNoteInput && topicId ? (
         <View className="px-4 mb-2">
