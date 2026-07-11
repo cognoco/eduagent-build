@@ -5,6 +5,7 @@ import {
   type ChatResult,
   type ChatStreamResult,
   type EscalationRung,
+  type LlmUsage,
   type ModelConfig,
   type RouteResult,
   type StreamResult,
@@ -165,6 +166,25 @@ const LEARNER_FACING_FLOWS: ReadonlySet<string> = new Set([
   'summaries.generate',
 ]);
 
+// WI-1827 — prompt-cache usage fields, spread into the llm.stop_reason line
+// only when usage was captured so the log shape is unperturbed for the common
+// no-usage call. A prompt-prefix regression surfaces here as
+// cache_read_input_tokens dropping across the log stream.
+function usageLogFields(usage: LlmUsage | undefined): Record<string, number> {
+  if (!usage) return {};
+  const fields: Record<string, number> = {};
+  if (usage.inputTokens != null) fields.input_tokens = usage.inputTokens;
+  if (usage.outputTokens != null) fields.output_tokens = usage.outputTokens;
+  if (usage.cacheCreationInputTokens != null) {
+    fields.cache_creation_input_tokens = usage.cacheCreationInputTokens;
+  }
+  if (usage.cacheReadInputTokens != null) {
+    fields.cache_read_input_tokens = usage.cacheReadInputTokens;
+  }
+  if (usage.cachedTokens != null) fields.cached_tokens = usage.cachedTokens;
+  return fields;
+}
+
 function logStopReason(fields: {
   provider: string;
   model: string;
@@ -175,6 +195,7 @@ function logStopReason(fields: {
   flow?: string;
   sessionId?: string;
   responseChars?: number;
+  usage?: LlmUsage;
 }): void {
   logger.info('llm.stop_reason', {
     provider: fields.provider,
@@ -189,6 +210,8 @@ function logStopReason(fields: {
     // WI-1505 — environment tag so an external log/metrics pipeline can sum
     // this line by (provider, environment) for aggregate daily spend/volume.
     environment: llmEnvironment,
+    // WI-1827 — cache-usage tokens (only when present).
+    ...usageLogFields(fields.usage),
   });
 }
 
@@ -1593,6 +1616,7 @@ export async function routeAndCall(
         flow: _options?.flow,
         sessionId: _options?.sessionId,
         responseChars: result.content.length,
+        usage: result.usage,
       });
       return {
         response: result.content,
@@ -1738,6 +1762,7 @@ async function attemptProvider(
       flow: metricContext.flow,
       sessionId: metricContext.sessionId,
       responseChars: result.content.length,
+      usage: result.usage,
     });
     return {
       response: result.content,
@@ -1795,6 +1820,7 @@ async function* wrapStreamWithCircuitBreaker(
   circuitKey: string,
   capability: LlmCapability,
   innerStopReasonPromise: Promise<StopReason>,
+  innerUsagePromise: Promise<LlmUsage | undefined>,
   fallbackConfig: ModelConfig | null,
   messages: ChatMessage[],
   metricContext: {
@@ -1803,6 +1829,10 @@ async function* wrapStreamWithCircuitBreaker(
     sessionId?: string;
   },
   onStopReason: (r: StopReason) => void,
+  // WI-1827 — usage of whichever provider drove the successful stream (primary
+  // OR fallback), mirroring onStopReason so the logged cache metadata matches
+  // the provider that actually produced the bytes.
+  onUsage: (u: LlmUsage | undefined) => void,
   onFallback?: () => void,
 ): AsyncIterable<string> {
   let chunksYielded = 0;
@@ -1855,10 +1885,12 @@ async function* wrapStreamWithCircuitBreaker(
           fallbackCircuitKey,
           capability,
           fallbackResult.stopReasonPromise,
+          fallbackResult.usagePromise ?? Promise.resolve(undefined),
           null, // no further fallback
           messages,
           metricContext,
           onStopReason,
+          onUsage,
         );
         let signalled = false;
         for await (const chunk of fallbackStream) {
@@ -1875,6 +1907,9 @@ async function* wrapStreamWithCircuitBreaker(
 
     recordSuccess(circuitKey);
     recordVolumeMetric(providerId);
+    // Forward usage before the stop reason: the router logs on the stop-reason
+    // promise, so usage must already be settled when that fires (WI-1827).
+    onUsage(await innerUsagePromise);
     onStopReason(await innerStopReasonPromise);
     forwardedStopReason = true;
   } catch (err) {
@@ -1935,10 +1970,12 @@ async function* wrapStreamWithCircuitBreaker(
           fallbackCircuitKey,
           capability,
           fallbackResult.stopReasonPromise,
+          fallbackResult.usagePromise ?? Promise.resolve(undefined),
           null, // no further fallback
           messages,
           metricContext,
           onStopReason,
+          onUsage,
         );
         let signalled = false;
         for await (const chunk of fallbackStream) {
@@ -1957,9 +1994,13 @@ async function* wrapStreamWithCircuitBreaker(
     throw err;
   } finally {
     // Safety net: if we errored before forwarding a stop reason (mid-stream
-    // failure, no fallback available), resolve the outer promise to 'unknown'
-    // so anyone awaiting stopReasonPromise does not hang.
-    if (!forwardedStopReason) onStopReason('unknown');
+    // failure, no fallback available), resolve the outer promises to
+    // 'unknown'/undefined so anyone awaiting stopReasonPromise or usagePromise
+    // does not hang.
+    if (!forwardedStopReason) {
+      onUsage(undefined);
+      onStopReason('unknown');
+    }
   }
 }
 
@@ -2051,6 +2092,12 @@ export async function routeAndStream(
     const stopReasonPromise = new Promise<StopReason>((resolve) => {
       resolveStop = resolve;
     });
+    // WI-1827 — usage of whichever provider drove the stream, resolved by the
+    // wrapper's onUsage before the stop reason so it is settled when we log.
+    let resolveUsage!: (u: LlmUsage | undefined) => void;
+    const usagePromise = new Promise<LlmUsage | undefined>((resolve) => {
+      resolveUsage = resolve;
+    });
     const primaryResult = normalizeStreamResult(
       provider.chatStream(safeMessages, config),
     );
@@ -2060,6 +2107,7 @@ export async function routeAndStream(
       circuitKey,
       capability,
       primaryResult.stopReasonPromise,
+      primaryResult.usagePromise ?? Promise.resolve(undefined),
       fallbackConfig,
       safeMessages,
       {
@@ -2068,6 +2116,7 @@ export async function routeAndStream(
         sessionId: options?.sessionId,
       },
       resolveStop,
+      resolveUsage,
       () => {
         fallbackFired = true;
       },
@@ -2075,9 +2124,11 @@ export async function routeAndStream(
     // [LLM-TRUNCATE-01] Emit metric once stream drains. `fallbackFired` is
     // checked so the log reports the provider that actually produced the
     // bytes, not the originally-selected one. responseChars is omitted for
-    // streaming (wrapper does not buffer the full reply).
+    // streaming (wrapper does not buffer the full reply). WI-1827 — cache
+    // usage is already settled (onUsage fires before onStopReason).
     stopReasonPromise
-      .then((stopReason) => {
+      .then(async (stopReason) => {
+        const usage = await usagePromise.catch(() => undefined);
         const effectiveConfig =
           fallbackFired && fallbackConfig ? fallbackConfig : config;
         logStopReason({
@@ -2089,6 +2140,7 @@ export async function routeAndStream(
           conversationLanguage: options?.conversationLanguage,
           flow: options?.flow,
           sessionId: options?.sessionId,
+          usage,
         });
       })
       .catch(() => {
@@ -2170,6 +2222,11 @@ async function attemptStreamProvider(
   const stopReasonPromise = new Promise<StopReason>((resolve) => {
     resolveStop = resolve;
   });
+  // WI-1827 — usage promise mirroring stopReasonPromise (see routeAndStream).
+  let resolveUsage!: (u: LlmUsage | undefined) => void;
+  const usagePromise = new Promise<LlmUsage | undefined>((resolve) => {
+    resolveUsage = resolve;
+  });
   const providerResult = normalizeStreamResult(
     provider.chatStream(messages, config),
   );
@@ -2179,6 +2236,7 @@ async function attemptStreamProvider(
     circuitKey,
     metricContext.capability,
     providerResult.stopReasonPromise,
+    providerResult.usagePromise ?? Promise.resolve(undefined),
     null, // no further fallback
     messages,
     {
@@ -2187,10 +2245,12 @@ async function attemptStreamProvider(
       sessionId: metricContext.sessionId,
     },
     resolveStop,
+    resolveUsage,
   );
   // [LLM-TRUNCATE-01] Metric emission on drain.
   stopReasonPromise
-    .then((stopReason) => {
+    .then(async (stopReason) => {
+      const usage = await usagePromise.catch(() => undefined);
       logStopReason({
         provider: config.provider,
         model: config.model,
@@ -2200,6 +2260,7 @@ async function attemptStreamProvider(
         conversationLanguage: metricContext.conversationLanguage,
         flow: metricContext.flow,
         sessionId: metricContext.sessionId,
+        usage,
       });
     })
     .catch(() => {

@@ -228,3 +228,41 @@ describe('Cerebras Provider', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Best-effort prompt-cache usage (WI-1827)
+// ---------------------------------------------------------------------------
+
+describe('Cerebras Provider — usage (WI-1827)', () => {
+  const provider = createCerebrasProvider('test-key');
+
+  beforeEach(() => mockFetch.mockReset());
+
+  it('surfaces prompt_tokens_details.cached_tokens as usage.cachedTokens', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [
+          {
+            message: { content: '{"reply":"hi","signals":{}}' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens_details: { cached_tokens: 256 } },
+      }),
+      text: async () => '',
+    });
+
+    const result = await provider.chat(MESSAGES, CFG);
+    expect(result.usage).toEqual({ cachedTokens: 256 });
+  });
+
+  it('omits usage when cached_tokens is absent', async () => {
+    mockFetch.mockResolvedValueOnce(
+      okResponse('{"reply":"hi","signals":{}}', 'stop'),
+    );
+    const result = await provider.chat(MESSAGES, CFG);
+    expect(result.usage).toBeUndefined();
+  });
+});

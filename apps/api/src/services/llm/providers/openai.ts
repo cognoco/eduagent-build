@@ -5,6 +5,7 @@ import {
   type ChatMessage,
   type ChatResult,
   type ChatStreamResult,
+  type LlmUsage,
   type ModelConfig,
   type MessagePart,
 } from '../types';
@@ -108,6 +109,23 @@ function isContentFilterFinishReason(reason: string | undefined): boolean {
   return reason === 'content_filter';
 }
 
+/**
+ * Best-effort prompt-cache usage for OpenAI-compatible providers (OpenAI,
+ * Cerebras). Surfaces `usage.prompt_tokens_details.cached_tokens` when present,
+ * omits it entirely otherwise — never throws (WI-1827). Exported so the
+ * Cerebras adapter (same wire format) reuses it.
+ */
+export function toOpenAICompatLlmUsage(
+  raw:
+    | { prompt_tokens_details?: { cached_tokens?: number | null } | null }
+    | undefined
+    | null,
+): LlmUsage | undefined {
+  const cached = raw?.prompt_tokens_details?.cached_tokens;
+  if (typeof cached !== 'number') return undefined;
+  return { cachedTokens: cached };
+}
+
 function createOpenAIContentFilterError(): SafetyFilterError {
   return new SafetyFilterError(
     'The response was blocked by content safety filters. Please try rephrasing your question.',
@@ -185,6 +203,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
       return {
         content: text,
         stopReason: normalizeStopReason('openai', choice?.finish_reason),
+        usage: toOpenAICompatLlmUsage(data.usage),
       };
     },
 

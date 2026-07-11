@@ -5,6 +5,7 @@ import {
   type ChatMessage,
   type ChatResult,
   type ChatStreamResult,
+  type LlmUsage,
   type ModelConfig,
   type MessagePart,
 } from '../types';
@@ -84,6 +85,44 @@ export function toAnthropicContent(
 // free-text and a downstream parse failure.
 const JSON_ONLY_DIRECTIVE =
   'Respond with a single JSON object only. No prose, no markdown, no code fences.';
+
+// ---------------------------------------------------------------------------
+// Usage / prompt-cache metadata (WI-1827)
+// ---------------------------------------------------------------------------
+
+/** Anthropic's `usage` wire shape (native Messages API), all fields optional. */
+interface AnthropicUsage {
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+}
+
+/**
+ * Map Anthropic's snake_case `usage` block to the normalized {@link LlmUsage}.
+ * Copies only numeric fields (so `null`/absent become undefined) and preserves
+ * `0` verbatim — `cache_read_input_tokens: 0` is the prompt-prefix regression
+ * signal. Returns undefined when nothing numeric is present, so an empty usage
+ * block reads as "absent" rather than an empty object.
+ */
+export function toAnthropicLlmUsage(
+  raw: AnthropicUsage | undefined | null,
+): LlmUsage | undefined {
+  if (!raw) return undefined;
+  const usage: LlmUsage = {};
+  if (typeof raw.input_tokens === 'number')
+    usage.inputTokens = raw.input_tokens;
+  if (typeof raw.output_tokens === 'number') {
+    usage.outputTokens = raw.output_tokens;
+  }
+  if (typeof raw.cache_creation_input_tokens === 'number') {
+    usage.cacheCreationInputTokens = raw.cache_creation_input_tokens;
+  }
+  if (typeof raw.cache_read_input_tokens === 'number') {
+    usage.cacheReadInputTokens = raw.cache_read_input_tokens;
+  }
+  return Object.keys(usage).length > 0 ? usage : undefined;
+}
 
 /**
  * Convert internal ChatMessage[] to Anthropic format.
@@ -233,6 +272,7 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
       return {
         content: text,
         stopReason: normalizeStopReason('anthropic', data.stop_reason),
+        usage: toAnthropicLlmUsage(data.usage),
       };
     },
 
@@ -241,9 +281,19 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
       const stopReasonPromise = new Promise<StopReason>((resolve) => {
         resolveStop = resolve;
       });
+      // WI-1827: usage-carrying promise mirroring stopReasonPromise. Resolves
+      // in the same finally so awaiting callers never hang, even on error.
+      let resolveUsage!: (u: LlmUsage | undefined) => void;
+      const usagePromise = new Promise<LlmUsage | undefined>((resolve) => {
+        resolveUsage = resolve;
+      });
 
       async function* generate(): AsyncIterable<string> {
         let rawStopReason: string | undefined;
+        // Anthropic emits usage across two SSE events: message_start carries
+        // input + cache_creation/cache_read tokens; the terminal message_delta
+        // carries the final output_tokens. Accumulate both into one LlmUsage.
+        let usageAcc: LlmUsage | undefined;
         const { system, messages: anthropicMessages } = toAnthropicFormat(
           messages,
           config.responseFormat,
@@ -312,22 +362,35 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
                       text?: string;
                       stop_reason?: string;
                     };
+                    // message_start carries the initial usage (input +
+                    // cache_creation/cache_read tokens) under message.usage.
+                    message?: { usage?: AnthropicUsage };
+                    // message_delta carries the final output_tokens under a
+                    // top-level usage sibling of `delta`.
+                    usage?: AnthropicUsage;
                   };
 
                   // Anthropic streams content_block_delta events with text,
                   // and a terminal message_delta event whose delta carries
-                  // stop_reason. Capture both.
+                  // stop_reason. Capture both, plus usage from message_start
+                  // and message_delta (WI-1827).
                   if (
                     event.type === 'content_block_delta' &&
                     event.delta?.type === 'text_delta' &&
                     event.delta.text
                   ) {
                     yield event.delta.text;
-                  } else if (
-                    event.type === 'message_delta' &&
-                    event.delta?.stop_reason
-                  ) {
-                    rawStopReason = event.delta.stop_reason;
+                  } else if (event.type === 'message_start') {
+                    const startUsage = toAnthropicLlmUsage(
+                      event.message?.usage,
+                    );
+                    if (startUsage) usageAcc = { ...usageAcc, ...startUsage };
+                  } else if (event.type === 'message_delta') {
+                    if (event.delta?.stop_reason) {
+                      rawStopReason = event.delta.stop_reason;
+                    }
+                    const deltaUsage = toAnthropicLlmUsage(event.usage);
+                    if (deltaUsage) usageAcc = { ...usageAcc, ...deltaUsage };
                   }
                 } catch {
                   // Log malformed chunks so SSE format changes are detectable
@@ -341,11 +404,14 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
             reader.releaseLock();
           }
         } finally {
+          // Resolve usage before the stop reason so a router that logs on
+          // stopReasonPromise finds usage already settled (WI-1827).
+          resolveUsage(usageAcc);
           resolveStop(normalizeStopReason('anthropic', rawStopReason));
         }
       }
 
-      return makeChatStreamResult(generate(), stopReasonPromise);
+      return makeChatStreamResult(generate(), stopReasonPromise, usagePromise);
     },
   };
 }
