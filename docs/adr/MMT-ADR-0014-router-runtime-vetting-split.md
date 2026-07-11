@@ -182,3 +182,7 @@ The detailed migration SQL is out of scope for this ADR (that is the `data-model
 - The MMT-ADR-0013 amendment scope's migration SQL. The amendment *scope* is in MMT-ADR-0013; this ADR adds the `allowed_models` table to that scope.
 - The router ADR's runtime implementation (the actual code in `apps/api/src/services/llm/router.ts`). This ADR is the *shape*; the implementation is post-walkthrough.
 - The Workspace-for-Education walkthrough amendment (if any). Per §7, this ADR is open to amendment by the walkthrough's R-1 / R-2 / R-3 rulings.
+
+## Implementation status
+
+**2026-07-11 — prod cutover executed (WI-1685).** `LLM_ROUTING_V2_ENABLED=true` in production, alongside `JUDGE_FRAMEWORK_ENABLED`/`JUDGE_ENFORCEMENT_ENABLED` (WI-1686) — the Gemini/Vertex exclusion (§7, Supersession) and the 3-param runtime key (§1) are now live on production traffic, not just staged behind the flag. Staging validation evidence (routing confirmation across all live-LLM quality gates, systematic-vs-legacy-baseline A/B isolating pre-existing content drift from routing-caused regressions, provider/latency spot-check): WI-1685. Current model set + open safety gates: `docs/registers/llm-models/master.md`.
