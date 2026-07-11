@@ -2384,4 +2384,75 @@ describe('LLM Router', () => {
       expect(cfg.provider).toBe('gemini');
     });
   });
+
+  // [WI-1800] The WI-1052 under-18 Gemini-ban gate is over-broad: in the legacy
+  // path it fires BEFORE the capability==='judge' branch, so a minor's
+  // Challenge Round grading call resolves to the generic text fallback
+  // (approvedTextFallbackConfig) instead of the vetted GRADER_MODEL via
+  // resolveGraderConfig. resolveGraderConfig never returns Gemini by
+  // construction (§10.1), so the gate protects against nothing for judge
+  // calls while silently swapping the vetted grader for an unvetted model.
+  //
+  // Break test pattern: RED on current code (resolves to the cerebras/openai
+  // text fallback), GREEN once the judge branch is evaluated before/exempt
+  // from the under-18 gate.
+  describe('[WI-1800] judge capability must not be hijacked by the under-18 Gemini-ban gate (legacy path)', () => {
+    beforeEach(() => {
+      _clearProviders();
+      _resetCircuits();
+      setLlmRoutingV2Enabled(false);
+      // Prod-like registered set for the legacy path, Gemini absent
+      // (post-retirement) — cerebras is what approvedTextFallbackConfig
+      // resolves to first, which is the hijacked (buggy) outcome.
+      registerProvider(createMockProvider('cerebras'));
+      registerProvider(createMockProvider('anthropic'));
+      registerProvider(createMockProvider('openai'));
+    });
+
+    afterAll(() => {
+      _clearProviders();
+      _resetCircuits();
+      setLlmRoutingV2Enabled(false);
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('adolescent + capability judge resolves to the vetted GRADER_MODEL, not the generic text fallback', () => {
+      const cfg = getModelConfigForTest(1, {
+        llmTier: 'standard',
+        capability: 'judge',
+        ageBracket: 'adolescent',
+      });
+
+      // RED (current code): cfg.provider === 'cerebras' via
+      // approvedTextFallbackConfig — the hijacked path.
+      // GREEN (fixed code): cfg.provider === 'anthropic', cfg.model ===
+      // GRADER_MODEL — the vetted grader, non-reasoning.
+      expect(cfg.provider).toBe('anthropic');
+      expect(cfg.model).toBe(GRADER_MODEL);
+      expect(cfg.reasoningEffort).toBeUndefined();
+    });
+
+    it('child + capability judge resolves to the vetted GRADER_MODEL, not the generic text fallback', () => {
+      const cfg = getModelConfigForTest(1, {
+        llmTier: 'standard',
+        capability: 'judge',
+        ageBracket: 'child',
+      });
+
+      expect(cfg.provider).toBe('anthropic');
+      expect(cfg.model).toBe(GRADER_MODEL);
+      expect(cfg.reasoningEffort).toBeUndefined();
+    });
+
+    it('adult + capability judge is unaffected (variant c — regression guard)', () => {
+      const cfg = getModelConfigForTest(1, {
+        llmTier: 'standard',
+        capability: 'judge',
+        ageBracket: 'adult',
+      });
+
+      expect(cfg.provider).toBe('anthropic');
+      expect(cfg.model).toBe(GRADER_MODEL);
+    });
+  });
 });

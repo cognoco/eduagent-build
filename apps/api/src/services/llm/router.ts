@@ -841,23 +841,13 @@ function getModelConfig(
     return getModelConfigV2(rung, llmTier, capability);
   }
 
-  // [WI-1052] Under-18 learners are policy-banned from Gemini (MMT-ADR-0016
-  // §1.5). With V2 off (production today) the legacy branches below otherwise
-  // prefer Gemini for the gemini_only policy, the default path, AND a
-  // preferred-provider 'gemini' hint — each with no age check, leaking minors to
-  // a banned vendor. Gate them all here, before any Gemini selection, routing
-  // minors to an approved non-Gemini provider (fails closed if none registered).
-  // This also covers a minor's grader/judge request: the under-18 gate runs
-  // before the judge branch below, so a minor never reaches Gemini grader
-  // selection. Adults and age-unknown system calls (subject classification,
-  // language detection) fall through and keep existing behavior.
-  if (isUnder18AgeBracket(ageBracket)) {
-    return approvedTextFallbackConfig(rung, llmTier);
-  }
-
-  // Legacy path: judge capability is tier/age/region-blind (ADR-0016 §2).
-  // Derive tutor vendor via a recursive text-routing call (not circular —
-  // the recursive call uses 'text' capability, never re-enters this branch).
+  // Legacy path: judge capability is tier/age/region-blind (ADR-0016 §2), and
+  // resolveGraderConfig never returns Gemini by construction (§10.1) — so it
+  // is exempt from (evaluated before) the under-18 gate below. A minor's
+  // Challenge Round grading call must resolve to the vetted grader, not the
+  // generic text fallback (WI-1800). Derive tutor vendor via a recursive
+  // text-routing call (not circular — the recursive call uses 'text'
+  // capability, never re-enters this branch).
   if (capability === 'judge') {
     const tutorConfig = getModelConfig(
       rung,
@@ -867,6 +857,21 @@ function getModelConfig(
       'text',
     );
     return resolveGraderConfig(tutorConfig.provider);
+  }
+
+  // [WI-1052] Under-18 learners are policy-banned from Gemini (MMT-ADR-0016
+  // §1.5). With V2 off (production today) the legacy branches below otherwise
+  // prefer Gemini for the gemini_only policy, the default path, AND a
+  // preferred-provider 'gemini' hint — each with no age check, leaking minors to
+  // a banned vendor. Gate them all here, before any Gemini selection, routing
+  // minors to an approved non-Gemini provider (fails closed if none registered).
+  // The judge branch above is exempt from this gate — resolveGraderConfig never
+  // returns Gemini by construction (§10.1), so a minor never reaches Gemini
+  // grader selection even without this gate covering judge calls (WI-1800).
+  // Adults and age-unknown system calls (subject classification, language
+  // detection) fall through and keep existing behavior.
+  if (isUnder18AgeBracket(ageBracket)) {
+    return approvedTextFallbackConfig(rung, llmTier);
   }
 
   if (providerPolicy === 'gemini_only') {
