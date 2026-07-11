@@ -691,6 +691,7 @@ export const piiKindSchema = z.enum([
 export type PiiKind = z.infer<typeof piiKindSchema>;
 
 export const minorPiiEchoRedactedEventSchema = z.object({
+  eventId: z.string().uuid(),
   profileId: z.string().min(1),
   sessionId: z.string().optional(),
   flow: z.string().min(1),
@@ -705,4 +706,35 @@ export const minorPiiEchoRedactedEventSchema = z.object({
 });
 export type MinorPiiEchoRedactedEvent = z.infer<
   typeof minorPiiEchoRedactedEventSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Blocked-safety daily digest ingestion projection (WI-1691)
+//
+// The three source events carry operational metadata for their existing
+// observability use. The digest consumer closes that payload to event identity
+// only: no profile/session identifiers, model metadata, flags, or PII kinds
+// cross into first-party digest persistence or email.
+// ---------------------------------------------------------------------------
+const blockedSafetyDigestIdentityShape = {
+  eventId: z.string().uuid(),
+  timestamp: isoDateField,
+};
+
+export const blockedSafetyDigestEventSchema = z.discriminatedUnion('name', [
+  z.object({
+    name: z.literal('app/safety.dangerous_procedure_blocked'),
+    ...blockedSafetyDigestIdentityShape,
+  }),
+  z.object({
+    name: z.literal('app/safety.minor_pii_echo_redacted'),
+    ...blockedSafetyDigestIdentityShape,
+  }),
+  z.object({
+    name: z.literal('app/safety.suitability_blocked'),
+    ...blockedSafetyDigestIdentityShape,
+  }),
+]);
+export type BlockedSafetyDigestEvent = z.infer<
+  typeof blockedSafetyDigestEventSchema
 >;

@@ -12,6 +12,7 @@ import {
   sessionPurgeDelayedEventSchema,
   summaryReconciliationRequeuedEventSchema,
   topicProbeRequestedEventSchema,
+  blockedSafetyDigestEventSchema,
   minorPiiEchoRedactedEventSchema,
 } from './inngest-events.js';
 
@@ -482,6 +483,7 @@ describe('[WI-1348] minorPiiEchoRedactedEventSchema', () => {
 
   it('accepts a valid kinds+count payload', () => {
     const result = minorPiiEchoRedactedEventSchema.safeParse({
+      eventId: validUuid,
       profileId: validUuid,
       sessionId: validUuid,
       flow: 'exchange.process',
@@ -498,6 +500,7 @@ describe('[WI-1348] minorPiiEchoRedactedEventSchema', () => {
     // A caller that mistakenly tried to ship the raw values must not leak them:
     // the schema has no field for them, so parse drops the extra key entirely.
     const parsed = minorPiiEchoRedactedEventSchema.parse({
+      eventId: validUuid,
       profileId: validUuid,
       flow: 'session-exchange.stream',
       model: 'deterministic:minor_pii_echo',
@@ -516,6 +519,7 @@ describe('[WI-1348] minorPiiEchoRedactedEventSchema', () => {
 
   it('rejects an unknown PII kind', () => {
     const result = minorPiiEchoRedactedEventSchema.safeParse({
+      eventId: validUuid,
       profileId: validUuid,
       flow: 'exchange.process',
       model: 'deterministic:minor_pii_echo',
@@ -526,12 +530,61 @@ describe('[WI-1348] minorPiiEchoRedactedEventSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('requires profileId, model, and timestamp', () => {
+  it('requires eventId, profileId, model, and timestamp', () => {
     const result = minorPiiEchoRedactedEventSchema.safeParse({
       flow: 'exchange.process',
       redactedKinds: [],
       redactedCount: 0,
     });
     expect(result.success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1691] Blocked-safety daily digest ingestion projection
+// ---------------------------------------------------------------------------
+
+describe('[WI-1691] blockedSafetyDigestEventSchema', () => {
+  const eventNames = [
+    'app/safety.dangerous_procedure_blocked',
+    'app/safety.minor_pii_echo_redacted',
+    'app/safety.suitability_blocked',
+  ] as const;
+  const eventId = '00000000-0000-4000-8000-000000000169';
+  const timestamp = '2026-07-11T00:15:00.000Z';
+
+  it.each(eventNames)('accepts the closed %s digest projection', (name) => {
+    expect(
+      blockedSafetyDigestEventSchema.safeParse({ name, eventId, timestamp })
+        .success,
+    ).toBe(true);
+  });
+
+  it.each(eventNames)('rejects missing or invalid event IDs for %s', (name) => {
+    expect(
+      blockedSafetyDigestEventSchema.safeParse({ name, timestamp }).success,
+    ).toBe(false);
+    expect(
+      blockedSafetyDigestEventSchema.safeParse({
+        name,
+        eventId: 'not-a-uuid',
+        timestamp,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('strips every field outside the digest-safe event identity', () => {
+    const parsed = blockedSafetyDigestEventSchema.parse({
+      name: eventNames[0],
+      eventId,
+      timestamp,
+      profileId: 'profile-private',
+      sessionId: 'session-private',
+      model: 'model-private',
+      message: 'learner-private-content',
+    });
+
+    expect(parsed).toEqual({ name: eventNames[0], eventId, timestamp });
+    expect(JSON.stringify(parsed)).not.toContain('private');
   });
 });

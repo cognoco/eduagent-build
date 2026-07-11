@@ -120,6 +120,10 @@ import { accountSecurityNotification } from './functions/account-security-notifi
 import { accountReclaimAttempt } from './functions/account-reclaim-attempt';
 import { supportershipRevocation } from './functions/supportership-revocation';
 import { graduationNarration } from './functions/graduation-narration';
+import {
+  blockedSafetyDigestDelivery,
+  blockedSafetyDigestIngest,
+} from './functions/blocked-safety-digest';
 
 export {
   inngest,
@@ -212,6 +216,8 @@ export {
   accountReclaimAttempt,
   supportershipRevocation,
   graduationNarration,
+  blockedSafetyDigestIngest,
+  blockedSafetyDigestDelivery,
 };
 
 // All Inngest functions to register with the serve handler
@@ -306,4 +312,6 @@ export const functions = [
   accountReclaimAttempt,
   supportershipRevocation,
   graduationNarration,
+  blockedSafetyDigestIngest,
+  blockedSafetyDigestDelivery,
 ];

@@ -8,7 +8,13 @@
 // safety event and the envelope plumbing that feeds it.
 // ---------------------------------------------------------------------------
 
-import { parseExchangeEnvelope, emitCrisisRedirectEvent } from './exchanges';
+import {
+  emitCrisisRedirectEvent,
+  emitDangerousProcedureBlockedEvent,
+  emitMinorPiiEchoRedactedEvent,
+  emitSuitabilityBlockedEvent,
+  parseExchangeEnvelope,
+} from './exchanges';
 
 // Inngest dispatch surface — the external Inngest boundary (a real dispatch
 // here would fire a network send), kept in the sanctioned `jest.requireActual`
@@ -163,6 +169,86 @@ describe('emitCrisisRedirectEvent', () => {
         flow: 'exchange.process',
       }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('[WI-1691] blocked-safety digest event identity', () => {
+  it('gives all three blocked-safety events a stable UUID without content fields', async () => {
+    await emitDangerousProcedureBlockedEvent({
+      sessionId: 'sess-dangerous',
+      profileId: 'prof-dangerous',
+      flow: 'session-exchange.stream',
+      provider: 'openai',
+      model: 'tutor-model',
+    });
+    await emitMinorPiiEchoRedactedEvent({
+      sessionId: 'sess-pii',
+      profileId: 'prof-pii',
+      flow: 'session-exchange.stream',
+      provider: 'openai',
+      redactedKinds: ['name'],
+      redactedCount: 1,
+    });
+    await emitSuitabilityBlockedEvent({
+      sessionId: 'sess-suitability',
+      profileId: 'prof-suitability',
+      flow: 'session-exchange.stream',
+      provider: 'openai',
+      model: 'tutor-model',
+      flags: ['age_inappropriate'],
+    });
+
+    expect(mockInngestSend).toHaveBeenCalledTimes(3);
+    expect(warnSpy).toHaveBeenCalledTimes(3);
+    const expectedKeys = [
+      [
+        'eventId',
+        'sessionId',
+        'profileId',
+        'flow',
+        'provider',
+        'model',
+        'timestamp',
+      ],
+      [
+        'eventId',
+        'profileId',
+        'sessionId',
+        'flow',
+        'provider',
+        'model',
+        'redactedKinds',
+        'redactedCount',
+        'timestamp',
+      ],
+      [
+        'eventId',
+        'sessionId',
+        'profileId',
+        'flow',
+        'provider',
+        'model',
+        'tutorModel',
+        'flags',
+        'timestamp',
+      ],
+    ];
+    for (const [index, [payload]] of mockInngestSend.mock.calls.entries()) {
+      const event = payload as { data: Record<string, unknown> };
+      expect(event.data['eventId']).toEqual(
+        expect.stringMatching(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        ),
+      );
+      expect(event.data).not.toHaveProperty('message');
+      expect(event.data).not.toHaveProperty('reply');
+      expect(event.data).not.toHaveProperty('content');
+      expect(event.data).not.toHaveProperty('redactedValues');
+      expect(Object.keys(event.data).sort()).toEqual(
+        expectedKeys[index]!.sort(),
+      );
+      expect(warnSpy.mock.calls[index]?.[0]).toContain(event.data['eventId']);
+    }
   });
 });
 

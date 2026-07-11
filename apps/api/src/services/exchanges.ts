@@ -196,7 +196,9 @@ export async function emitDangerousProcedureBlockedEvent(context: {
   provider?: string;
   model?: string;
 }): Promise<void> {
+  const eventId = crypto.randomUUID();
   logger.warn('safety.dangerous_procedure_blocked', {
+    event_id: eventId,
     flow: context.flow,
     session_id: context.sessionId,
     profile_id: context.profileId,
@@ -206,13 +208,12 @@ export async function emitDangerousProcedureBlockedEvent(context: {
   await safeSend(
     () =>
       inngest.send({
-        // orphan-allow: observability-only safety marker (WI-1154). The
-        // learner-facing response (safe harm-education refusal) already
-        // replaced the leaked reply server-side; this event exists so ops can
-        // query "dangerous-procedure blocks per week" and monitor the gate's
-        // fire rate. No downstream handler is required or intended.
+        // The learner-facing response already replaced the leaked reply. The
+        // metadata-only digest consumer counts this event for operators;
+        // safeSend keeps its dispatch non-core to the learner response.
         name: 'app/safety.dangerous_procedure_blocked',
         data: {
+          eventId,
           sessionId: context.sessionId,
           profileId: context.profileId,
           flow: context.flow,
@@ -248,7 +249,9 @@ export async function emitMinorPiiEchoRedactedEvent(context: {
   redactedKinds: PiiKind[];
   redactedCount: number;
 }): Promise<void> {
+  const eventId = crypto.randomUUID();
   logger.warn('safety.minor_pii_echo_redacted', {
+    event_id: eventId,
     flow: context.flow,
     session_id: context.sessionId,
     profile_id: context.profileId,
@@ -259,10 +262,11 @@ export async function emitMinorPiiEchoRedactedEvent(context: {
   await safeSend(
     () =>
       inngest.send({
-        // orphan-allow: observability-only safety marker (WI-1348). No
-        // downstream handler is required or intended.
+        // The metadata-only digest consumer counts this redaction event for
+        // operators; safeSend keeps its dispatch non-core to the learner response.
         name: 'app/safety.minor_pii_echo_redacted',
         data: {
+          eventId,
           profileId: context.profileId,
           sessionId: context.sessionId,
           flow: context.flow,
@@ -296,7 +300,9 @@ export async function emitSuitabilityBlockedEvent(context: {
   model?: string;
   flags: JudgeFlagCategory[];
 }): Promise<void> {
+  const eventId = crypto.randomUUID();
   logger.warn('safety.suitability_blocked', {
+    event_id: eventId,
     flow: context.flow,
     session_id: context.sessionId,
     profile_id: context.profileId,
@@ -307,13 +313,12 @@ export async function emitSuitabilityBlockedEvent(context: {
   await safeSend(
     () =>
       inngest.send({
-        // orphan-allow: observability-only safety marker (WI-1365). The
-        // learner-facing response (safe refusal) already replaced the blocked
-        // reply server-side; this event exists so ops can query
-        // "suitability blocks per week" and monitor the enforcing gate's fire
-        // rate + false-positive risk. No downstream handler is required.
+        // The learner-facing response already replaced the blocked reply. The
+        // metadata-only digest consumer counts this event for operators;
+        // safeSend keeps its dispatch non-core to the learner response.
         name: 'app/safety.suitability_blocked',
         data: {
+          eventId,
           sessionId: context.sessionId,
           profileId: context.profileId,
           flow: context.flow,
