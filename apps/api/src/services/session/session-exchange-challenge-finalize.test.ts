@@ -1049,11 +1049,21 @@ describe('finalizeChallengeRoundIfReady — rejects writes for a topic not owned
   // verified/partial get for free (see the two tests above) never runs for
   // reteach. The cooldown upsert sits unconditionally after that call inside
   // the same try block, so it becomes the first (and only) write on this
-  // path. Documented current behavior (flagged to the shepherd 2026-07-11):
-  // finalize succeeds and DOES write a cooldown row even for a topic not
-  // owned by the profile — not a cross-tenant leak (profileId is always the
-  // caller's own id; the row is keyed on profileId+topicId), but an asymmetry
-  // vs. the solid/partial paths, which refuse to write anything at all.
+  // path.
+  //
+  // Ruled (shepherd, 2026-07-11): asserted here as deliberate, documented
+  // behavior rather than fixed in this WI — a real gap, but low severity and
+  // out of scope for "write the cooldown":
+  //   - Not a cross-tenant leak: `profileId` in the write is always the
+  //     authenticated caller's own id (the row's unique key is
+  //     profileId+topicId, and profileId is never attacker-controlled here).
+  //   - Inert: a cooldown row for a topic outside the profile's curriculum
+  //     suppresses offers that could never fire for that profile anyway, so
+  //     the write has no observable product effect.
+  // Tracked as WI-1811 (P3) for a separate ruling on whether to add the
+  // ownership guard uniformly. Do NOT add findOwnedCurriculumTopic here
+  // without that separate WI (option B — guard this write — was explicitly
+  // rejected as out of scope here).
   it('reteach + topic not owned — still succeeds and writes a cooldown row (documented asymmetry)', async () => {
     const challengeRound = draftingState(RETEACH_EVALS);
     const state: FakeDbState = {

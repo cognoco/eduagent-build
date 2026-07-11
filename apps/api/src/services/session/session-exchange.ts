@@ -1155,6 +1155,15 @@ export async function finalizeChallengeRoundIfReady(
     // [WI-1804] Write the completion cooldown for every real outcome (RR-8:
     // a just-completed topic was immediately re-offerable). `invalid` (no
     // usable evaluation signal) writes nothing — same as today.
+    //
+    // NOTE: unlike the markMasteryVerified branch above, this write is NOT
+    // gated by findOwnedCurriculumTopic on the `reteach` path — reteach's
+    // reviewTargets is always empty, so persistChallengeRoundReviewTargets
+    // early-returns before reaching its ownership check. Do not assume that
+    // check protects this write for every outcome; see the "reteach + topic
+    // not owned" test in session-exchange-challenge-finalize.test.ts for the
+    // ruled rationale (profile-scoped write, inert for an out-of-curriculum
+    // topic); tracked follow-up is WI-1811.
     if (decision.outcome !== 'invalid') {
       const lastOutcome = COMPLETION_COOLDOWN_OUTCOME_CODE[decision.outcome];
       await db
