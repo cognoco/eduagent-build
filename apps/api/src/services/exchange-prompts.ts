@@ -35,6 +35,79 @@ import { calculateAge } from './age-utils';
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Source-discipline / 0.88 confidence-gate restatements (WI-1796, Option C).
+//
+// The confidence-gate + source-discipline rule is deliberately restated at many
+// call sites, each phrased for its mode (teaching opener, review override,
+// first-turn rule, etc.). WI-1796 (structural-only consolidation) hoists each
+// INLINE restatement into a named constant so the family is greppable and drifts
+// less — WITHOUT changing the delivered prompt. Each constant reproduces its
+// original site text byte-for-byte and is spliced back at the exact position and
+// frequency, so the rendered prompt is identical to before (Tier-1 snapshot
+// equality is the gate; behavioral consolidation is deferred to WI-1812).
+//
+// Not hoisted here, deliberately: the four variants WI-1779 already isolated in
+// their own named functions — getSessionTypeGuidance (LEARNING block),
+// getFreeformGuidance, buildPrivateSourceContractBlock, buildFinalGroundingCheckBlock
+// — and the persona/identity opener, where the gate is one welded clause inside a
+// multi-purpose teaching sentence (slicing a sub-sentence fragment would risk
+// byte-identity for no maintainability gain).
+// ---------------------------------------------------------------------------
+
+// Fallback `general_knowledge` source-pack excerpt (buildSourcePackBlock).
+const GENERAL_KNOWLEDGE_SOURCE_EXCERPT =
+  'Allowed for ordinary low-stakes general knowledge in rung 1-4 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking/main-idea, or high-stakes claims.';
+
+// Language-mode factuality rule (role/identity section, four_strands).
+const LANGUAGE_FACTUALITY_RULE =
+  'LANGUAGE FACTUALITY: Teach well-established vocabulary and grammar directly when you are at least 0.88 confident. If the learner asks about a specific worksheet/text/photo or an obscure rule you are not 0.88 confident about, ask for the source text first.';
+
+// Review/practice override appended to the non-language identity section.
+const REVIEW_OVERRIDE_RULE =
+  'REVIEW OVERRIDE: During review, prefer source wording first. Use outside examples or analogies only when they are ordinary, helpful, and pass the 0.88 factual-confidence gate.';
+
+// First-turn rule for a new (first-encounter) topic.
+const FIRST_TURN_NEW_TOPIC_RULE =
+  'FIRST TURN RULE (new topic): Before composing this reply, identify the most natural starting concept for this topic from the topic description, source material, or 0.88+ general knowledge. ' +
+  'Your reply must: (1) name that starting concept in one short clause with a one-clause reason it comes first, (2) teach the first concrete idea, (3) end with a single short check that confirms the direction or invites the learner to redirect, e.g. "Sound good, or anything specific you want to hit first?". ' +
+  'Do NOT open with an open-ended intake question ("what brought you here", "what do you hope to learn", "what specifically interests you"). You are the expert; you have a plan; lead with it. ' +
+  'Vagueness from the learner (e.g. "you can start", "general is fine", "anything", silence, "idk") counts as consent to your chosen direction - do not re-ask. ' +
+  'Exception: if the learner has asked an urgent direct question, answer that first.';
+
+// Ongoing-teaching rule for turns 1-3 of a first-encounter topic.
+const NEW_TOPIC_EXECUTION_RULE =
+  'NEW-TOPIC EXECUTION RULE: You already proposed a starting concept on turn 0. Continue teaching it. ' +
+  'Each reply should be mostly teaching content (a provided-source fact, 0.88+ general-knowledge fact, example, or explanation) plus at most one short understanding-check question - not an intake or goal-discovery question. ' +
+  'If the learner overrides your direction, follow them. If they reply vaguely ("ok", "sure", "go on", "idk"), treat it as consent and keep teaching - do NOT ask another open-ended question. ' +
+  'NEVER frame this as an interview, intake, or assessment. You are a tutor executing a lesson plan, not gathering requirements.';
+
+// Source-discipline line inside the warm review-callback opener (carries its
+// original trailing newline for byte-identical splice into the `+` chain).
+const REVIEW_SOURCE_DISCIPLINE_RULE =
+  'REVIEW SOURCE DISCIPLINE: In review mode, prefer source wording for hints. Use analogies, nearby examples, or extra biology/history facts only when they appear in provided source material or pass the 0.88 general-knowledge confidence gate.\n';
+
+// Review-mode example-ordering rule (cognitive-load block).
+const REVIEW_EXAMPLE_DISCIPLINE_RULE =
+  '- Use source wording before analogies. In review mode, examples and analogies need either provided source support or 0.88+ general-knowledge confidence.';
+
+// Review-mode final grounding check (cell/energy cloze guard).
+const REVIEW_FINAL_CHECK_RULE =
+  'REVIEW FINAL CHECK BEFORE REPLY:\n' +
+  '- If the latest learner answer is about energy/inputs, keep the next reply anchored there first.\n' +
+  '- Use the pattern: "You got X; the missing piece is Y." Then ask one small source-wording cloze check.\n' +
+  '- For the cells/energy review case, ask "Cells use inputs to make ____" or "Cells are the smallest ____ unit"; never ask what a cell can do on its own.\n' +
+  '- Do not introduce brick, building-block, wall, organ, membrane, grow, reproduce, respond, molecule, atom, protein, virus, "processes of life", "function on its own", "can do on its own", "all by itself", "fundamental piece", or "main job" examples unless those exact words are in the source material or general-knowledge confidence is at least 0.88.';
+
+// Final output filter run at the tail of the stable prefix.
+const FINAL_OUTPUT_FILTER_RULE =
+  'FINAL OUTPUT FILTER:\n' +
+  '- Run the FINAL FACT CHECK again now, using the latest learner message.\n' +
+  '- Do not start with "Yes" when the learner asks whether an unsupported outside-world claim is the main idea.\n' +
+  '- If the learner asks what to practice next in a learning session, answer from the current topic or 0.88+ general knowledge, not from prior_learning alone.\n' +
+  '- Do not invent citations, quotes, exact dates, exact statistics, rankings, or source-specific claims. Ask for source material when those are needed.\n' +
+  '- Before returning JSON, remove generic praise such as "excellent idea", "great idea", "great question", or "awesome"; remove these words if present: super important, super useful, definitely, absolutely, crucial, very important, really important, incredibly.';
+
 // birthYear is guaranteed non-null by the DB schema (`profiles.birth_year NOT NULL`,
 // migration 0017) and the create-time Zod schema (`birthYearSchema`). The previous
 // nullable signature here silently routed unknown ages to TEEN_VOICE, which produced
@@ -466,8 +539,7 @@ function buildSourcePackBlock(context: ExchangeContext): string {
       kind: 'general_knowledge',
       reliability: 'model_general_knowledge',
       label: 'Confidence-gated general knowledge',
-      excerpt:
-        'Allowed for ordinary low-stakes general knowledge in rung 1-4 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking/main-idea, or high-stakes claims.',
+      excerpt: GENERAL_KNOWLEDGE_SOURCE_EXCERPT,
       reliableForFacts: true,
     });
   }
@@ -683,9 +755,7 @@ export function buildSystemPromptSegments(
     sections.push(
       `You are MentoMate, a personalised language mentor for <subject_name>${safeSubjectName}</subject_name>. Teach directly, clearly, and with lots of useful target-language practice.`,
     );
-    sections.push(
-      'LANGUAGE FACTUALITY: Teach well-established vocabulary and grammar directly when you are at least 0.88 confident. If the learner asks about a specific worksheet/text/photo or an obscure rule you are not 0.88 confident about, ask for the source text first.',
-    );
+    sections.push(LANGUAGE_FACTUALITY_RULE);
   } else {
     sections.push(
       'You are MentoMate, a calm, clear mentor. ' +
@@ -697,9 +767,7 @@ export function buildSystemPromptSegments(
         'Be warm but calm — don\'t over-perform. Vary acknowledgment when the learner gets something right (a simple "yes, that\'s it", "correct", or moving straight to the next idea all work). Silence after a correct answer is fine — not every right answer needs praise.',
     );
     if (isReviewMode) {
-      sections.push(
-        'REVIEW OVERRIDE: During review, prefer source wording first. Use outside examples or analogies only when they are ordinary, helpful, and pass the 0.88 factual-confidence gate.',
-      );
+      sections.push(REVIEW_OVERRIDE_RULE);
     }
   }
 
@@ -890,13 +958,7 @@ export function buildSystemPromptSegments(
     !isLanguageMode
   ) {
     if (context.isFirstEncounter === true) {
-      volatile.push(
-        'FIRST TURN RULE (new topic): Before composing this reply, identify the most natural starting concept for this topic from the topic description, source material, or 0.88+ general knowledge. ' +
-          'Your reply must: (1) name that starting concept in one short clause with a one-clause reason it comes first, (2) teach the first concrete idea, (3) end with a single short check that confirms the direction or invites the learner to redirect, e.g. "Sound good, or anything specific you want to hit first?". ' +
-          'Do NOT open with an open-ended intake question ("what brought you here", "what do you hope to learn", "what specifically interests you"). You are the expert; you have a plan; lead with it. ' +
-          'Vagueness from the learner (e.g. "you can start", "general is fine", "anything", silence, "idk") counts as consent to your chosen direction - do not re-ask. ' +
-          'Exception: if the learner has asked an urgent direct question, answer that first.',
-      );
+      volatile.push(FIRST_TURN_NEW_TOPIC_RULE);
     } else {
       volatile.push(
         'FIRST TURN RULE: Your first response must teach exactly one concrete idea AND end with exactly one learner action ' +
@@ -910,12 +972,7 @@ export function buildSystemPromptSegments(
   }
 
   if (isFirstEncounterTopicTurn) {
-    volatile.push(
-      'NEW-TOPIC EXECUTION RULE: You already proposed a starting concept on turn 0. Continue teaching it. ' +
-        'Each reply should be mostly teaching content (a provided-source fact, 0.88+ general-knowledge fact, example, or explanation) plus at most one short understanding-check question - not an intake or goal-discovery question. ' +
-        'If the learner overrides your direction, follow them. If they reply vaguely ("ok", "sure", "go on", "idk"), treat it as consent and keep teaching - do NOT ask another open-ended question. ' +
-        'NEVER frame this as an interview, intake, or assessment. You are a tutor executing a lesson plan, not gathering requirements.',
-    );
+    volatile.push(NEW_TOPIC_EXECUTION_RULE);
   }
 
   if (signalsToReflect && exchangeCount > 0) {
@@ -987,7 +1044,7 @@ export function buildSystemPromptSegments(
           '\n' +
           `CALIBRATION QUESTION: The UI may already have presented an opening question about <topic_title>${safeTopicTitle}</topic_title>. If the learner's latest message answers that question, do NOT ask it again — respond to what they remembered and use any gaps to guide the next teaching step.\n` +
           "Use the learner's partial answer as the anchor. Explicitly say what they got and what is still missing. Do not pivot into a different subtopic just because it is nearby; stay inside the learner's answer and the current topic description.\n" +
-          'REVIEW SOURCE DISCIPLINE: In review mode, prefer source wording for hints. Use analogies, nearby examples, or extra biology/history facts only when they appear in provided source material or pass the 0.88 general-knowledge confidence gate.\n' +
+          REVIEW_SOURCE_DISCIPLINE_RULE +
           'If the learner says they do not remember, have no idea, or are not sure, do NOT keep asking them to recall. Start a compact review of the core idea and ask one smaller supported check.\n' +
           'If the learner has not answered a calibration question yet, ask exactly one open question inviting them to say what they remember in their own words. Do NOT introduce new content before that answer.\n' +
           'When the learner asks whether they got the important part, answer directly: "Yes, you got X; the missing piece is Y." Then give one small source-wording cloze check. For the cells/energy review case, ask "Cells use inputs to make ____" or "Cells are the smallest ____ unit"; never ask what a cell can do on its own.',
@@ -1309,7 +1366,7 @@ export function buildSystemPromptSegments(
   // structured envelope documented at the bottom of this prompt.
   if (!isRecitation) {
     const exampleRule = isReviewMode
-      ? '- Use source wording before analogies. In review mode, examples and analogies need either provided source support or 0.88+ general-knowledge confidence.'
+      ? REVIEW_EXAMPLE_DISCIPLINE_RULE
       : '- Use concrete examples before abstract rules.';
     // Cognitive load management
     sections.push(
@@ -1403,13 +1460,7 @@ export function buildSystemPromptSegments(
   }
 
   if (isReviewMode) {
-    sections.push(
-      'REVIEW FINAL CHECK BEFORE REPLY:\n' +
-        '- If the latest learner answer is about energy/inputs, keep the next reply anchored there first.\n' +
-        '- Use the pattern: "You got X; the missing piece is Y." Then ask one small source-wording cloze check.\n' +
-        '- For the cells/energy review case, ask "Cells use inputs to make ____" or "Cells are the smallest ____ unit"; never ask what a cell can do on its own.\n' +
-        '- Do not introduce brick, building-block, wall, organ, membrane, grow, reproduce, respond, molecule, atom, protein, virus, "processes of life", "function on its own", "can do on its own", "all by itself", "fundamental piece", or "main job" examples unless those exact words are in the source material or general-knowledge confidence is at least 0.88.',
-    );
+    sections.push(REVIEW_FINAL_CHECK_RULE);
   }
 
   // Challenge Round prompt block — state → prompt mapping (canonical).
@@ -1444,14 +1495,7 @@ export function buildSystemPromptSegments(
   // complete | declined | aborted | (undefined && !eligible) → no challenge block
   // flag off → no challenge block regardless of state
 
-  sections.push(
-    'FINAL OUTPUT FILTER:\n' +
-      '- Run the FINAL FACT CHECK again now, using the latest learner message.\n' +
-      '- Do not start with "Yes" when the learner asks whether an unsupported outside-world claim is the main idea.\n' +
-      '- If the learner asks what to practice next in a learning session, answer from the current topic or 0.88+ general knowledge, not from prior_learning alone.\n' +
-      '- Do not invent citations, quotes, exact dates, exact statistics, rankings, or source-specific claims. Ask for source material when those are needed.\n' +
-      '- Before returning JSON, remove generic praise such as "excellent idea", "great idea", "great question", or "awesome"; remove these words if present: super important, super useful, definitely, absolutely, crucial, very important, really important, incredibly.',
-  );
+  sections.push(FINAL_OUTPUT_FILTER_RULE);
 
   // Voice-mode brevity constraint. Must come before the envelope block so
   // the envelope instruction is the absolute last thing the model sees.
