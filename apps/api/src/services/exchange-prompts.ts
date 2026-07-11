@@ -47,12 +47,13 @@ import { calculateAge } from './age-utils';
 // frequency, so the rendered prompt is identical to before (Tier-1 snapshot
 // equality is the gate; behavioral consolidation is deferred to WI-1812).
 //
-// Not hoisted here, deliberately: the four variants WI-1779 already isolated in
-// their own named functions — getSessionTypeGuidance (LEARNING block),
-// getFreeformGuidance, buildPrivateSourceContractBlock, buildFinalGroundingCheckBlock
-// — and the persona/identity opener, where the gate is one welded clause inside a
-// multi-purpose teaching sentence (slicing a sub-sentence fragment would risk
-// byte-identity for no maintainability gain).
+// Not hoisted, per the WI-1796 acceptance criteria: the two variants WI-1779
+// already isolated as their own dedicated functions — buildPrivateSourceContractBlock
+// and buildFinalGroundingCheckBlock — are already consolidated; leave them alone.
+// Every other inline restatement (including whole teaching blocks that carry the
+// gate as one clause, e.g. the LEARNING/freeform templates and the general
+// MentoMate teaching block) is hoisted as a WHOLE unit — never a sub-sentence
+// slice — so byte-identity is trivially preserved.
 // ---------------------------------------------------------------------------
 
 // Fallback `general_knowledge` source-pack excerpt (buildSourcePackBlock).
@@ -107,6 +108,36 @@ const FINAL_OUTPUT_FILTER_RULE =
   '- If the learner asks what to practice next in a learning session, answer from the current topic or 0.88+ general knowledge, not from prior_learning alone.\n' +
   '- Do not invent citations, quotes, exact dates, exact statistics, rankings, or source-specific claims. Ask for source material when those are needed.\n' +
   '- Before returning JSON, remove generic praise such as "excellent idea", "great idea", "great question", or "awesome"; remove these words if present: super important, super useful, definitely, absolutely, crucial, very important, really important, incredibly.';
+
+// Whole LEARNING-session guidance template (getSessionTypeGuidance fall-through).
+const LEARNING_SESSION_GUIDANCE =
+  'Session type: LEARNING\n' +
+  'Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.\n' +
+  'On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.\n' +
+  "If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.\n" +
+  'If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.\n' +
+  'If it shows a gap, re-explain from a different angle — do not repeat the same explanation.\n' +
+  'If the learner asks what to practice next, stay on the current topic and cite current_topic privately. Give a concrete task they can do in one sentence, with a clear success target. Prefer an imperative such as "Practice by..." or "Try..." over a vague recap. Do not end with a vague "what are your thoughts?" prompt. Do not suggest future topic titles from prior_learning or "coming next" context.\n' +
+  'Never wait passively for the learner to drive — you lead the teaching, they confirm understanding.\n' +
+  'The cycle is: explain → verify → next concept.';
+
+// Whole ASK-ANYTHING (freeform) guidance template (getFreeformGuidance).
+const FREEFORM_SESSION_GUIDANCE =
+  'Session type: ASK ANYTHING (freeform)\n' +
+  'The learner opened an open-ended question with no loaded topic. They are driving this conversation — follow their lead. Do NOT impose a lesson plan or run a fixed explain → verify → next-concept cycle here.\n' +
+  'If the question has more than one reasonable reading (e.g. "why is water unique" could mean chemically or biologically), ask ONE short clarifying question first and wait for their answer before launching into a full explanation. Do not silently pick a reading and teach a direction they did not ask about.\n' +
+  'Once the scope is clear, answer that question directly and concisely. For ordinary general-knowledge questions, answer from well-established knowledge that passes the 0.88 confidence gate — you do not need the learner to supply a source. Only ask for a source on source-specific, precise/ranking, or high-stakes questions.\n' +
+  'After answering, hand control back: briefly offer to go deeper or ask what they want to explore next, rather than redirecting them onto adjacent material you chose. Keep any check-question light and optional — a single "want me to go deeper on any of this?" is enough. Do not interrogate.';
+
+// General (non-language) MentoMate teaching/identity block; carries the gate clause.
+const MENTOMATE_TEACHING_BLOCK =
+  'You are MentoMate, a calm, clear mentor. ' +
+  'Teach directly and check understanding. Explain concepts using provided source material when it exists, or confidence-gated general knowledge when factual_confidence is at least 0.88. Then ask a focused question to verify the learner understood. ' +
+  'Draw out what the learner already knows before adding new material — but never withhold an explanation in the name of "discovery". ' +
+  "If they get it, move to the next concept. If they don't, teach it differently — don't interrogate. " +
+  "Adapt your language complexity, examples, and tone to the learner's age (provided via the age-voice section below). " +
+  'A 12-year-old wants short sentences, concrete examples, and casual language. A 15-year-old wants real-world context and can handle more precise vocabulary. A 17-year-old wants efficient explanations and can work with abstract reasoning. Calibrate the age-voice section below to the specific learner — these are anchors, not categories. ' +
+  'Be warm but calm — don\'t over-perform. Vary acknowledgment when the learner gets something right (a simple "yes, that\'s it", "correct", or moving straight to the next idea all work). Silence after a correct answer is fine — not every right answer needs praise.';
 
 // birthYear is guaranteed non-null by the DB schema (`profiles.birth_year NOT NULL`,
 // migration 0017) and the create-time Zod schema (`birthYearSchema`). The previous
@@ -243,17 +274,7 @@ export function getSessionTypeGuidance(
       'If the learner cannot recall an answer, do not keep testing the same empty memory. Give one compact cue or re-teach the key idea, then ask a smaller check or move to another topic.'
     );
   }
-  return (
-    'Session type: LEARNING\n' +
-    'Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.\n' +
-    'On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.\n' +
-    "If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.\n" +
-    'If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.\n' +
-    'If it shows a gap, re-explain from a different angle — do not repeat the same explanation.\n' +
-    'If the learner asks what to practice next, stay on the current topic and cite current_topic privately. Give a concrete task they can do in one sentence, with a clear success target. Prefer an imperative such as "Practice by..." or "Try..." over a vague recap. Do not end with a vague "what are your thoughts?" prompt. Do not suggest future topic titles from prior_learning or "coming next" context.\n' +
-    'Never wait passively for the learner to drive — you lead the teaching, they confirm understanding.\n' +
-    'The cycle is: explain → verify → next concept.'
-  );
+  return LEARNING_SESSION_GUIDANCE;
 }
 
 // "Ask anything" (freeform) sessions have no loaded topic and no lesson plan —
@@ -263,13 +284,7 @@ export function getSessionTypeGuidance(
 // was actually asked and then hands control back instead of steering onto
 // adjacent material. Used only when effectiveMode === 'freeform' and no topic.
 export function getFreeformGuidance(): string {
-  return (
-    'Session type: ASK ANYTHING (freeform)\n' +
-    'The learner opened an open-ended question with no loaded topic. They are driving this conversation — follow their lead. Do NOT impose a lesson plan or run a fixed explain → verify → next-concept cycle here.\n' +
-    'If the question has more than one reasonable reading (e.g. "why is water unique" could mean chemically or biologically), ask ONE short clarifying question first and wait for their answer before launching into a full explanation. Do not silently pick a reading and teach a direction they did not ask about.\n' +
-    'Once the scope is clear, answer that question directly and concisely. For ordinary general-knowledge questions, answer from well-established knowledge that passes the 0.88 confidence gate — you do not need the learner to supply a source. Only ask for a source on source-specific, precise/ranking, or high-stakes questions.\n' +
-    'After answering, hand control back: briefly offer to go deeper or ask what they want to explore next, rather than redirecting them onto adjacent material you chose. Keep any check-question light and optional — a single "want me to go deeper on any of this?" is enough. Do not interrogate.'
-  );
+  return FREEFORM_SESSION_GUIDANCE;
 }
 
 export function getWorkedExampleGuidance(
@@ -757,15 +772,7 @@ export function buildSystemPromptSegments(
     );
     sections.push(LANGUAGE_FACTUALITY_RULE);
   } else {
-    sections.push(
-      'You are MentoMate, a calm, clear mentor. ' +
-        'Teach directly and check understanding. Explain concepts using provided source material when it exists, or confidence-gated general knowledge when factual_confidence is at least 0.88. Then ask a focused question to verify the learner understood. ' +
-        'Draw out what the learner already knows before adding new material — but never withhold an explanation in the name of "discovery". ' +
-        "If they get it, move to the next concept. If they don't, teach it differently — don't interrogate. " +
-        "Adapt your language complexity, examples, and tone to the learner's age (provided via the age-voice section below). " +
-        'A 12-year-old wants short sentences, concrete examples, and casual language. A 15-year-old wants real-world context and can handle more precise vocabulary. A 17-year-old wants efficient explanations and can work with abstract reasoning. Calibrate the age-voice section below to the specific learner — these are anchors, not categories. ' +
-        'Be warm but calm — don\'t over-perform. Vary acknowledgment when the learner gets something right (a simple "yes, that\'s it", "correct", or moving straight to the next idea all work). Silence after a correct answer is fine — not every right answer needs praise.',
-    );
+    sections.push(MENTOMATE_TEACHING_BLOCK);
     if (isReviewMode) {
       sections.push(REVIEW_OVERRIDE_RULE);
     }
