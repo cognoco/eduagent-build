@@ -84,10 +84,19 @@ function isWranglerAuthenticated() {
 // place, so `wrangler secret bulk` would POST to /accounts/__CF_ACCOUNT_ID__/…
 // and fail with a cryptic "could not route" error. Detect that and skip
 // cleanly — Worker secrets are a CI/deploy concern, not a local-setup one.
+// Only the actual `account_id = "…"` assignment decides rendered-ness. The
+// file's comments also mention __CF_ACCOUNT_ID__, so a whole-text scan would
+// misread a rendered local config as unrendered and silently no-op the sync.
+function isRenderedWranglerToml(toml) {
+  const assignment = toml.match(/^\s*account_id\s*=\s*"([^"]*)"/m);
+  if (!assignment) return true;
+  return assignment[1] !== '__CF_ACCOUNT_ID__';
+}
+
 function isWranglerConfigRendered() {
   try {
     const toml = fs.readFileSync(path.join(API_DIR, 'wrangler.toml'), 'utf-8');
-    return !toml.includes('__CF_ACCOUNT_ID__');
+    return isRenderedWranglerToml(toml);
   } catch {
     // If we can't read the config, don't block — let wrangler surface its own
     // error rather than silently skipping for the wrong reason.
@@ -240,8 +249,9 @@ function syncSecrets(targets) {
   return { ok, results };
 }
 
-// Export for use as a module (called by setup-env.js)
-module.exports = { syncSecrets };
+// Export for use as a module (called by setup-env.js);
+// isRenderedWranglerToml is exported for the regression test.
+module.exports = { syncSecrets, isRenderedWranglerToml };
 
 // CLI entry point — only runs when called directly
 if (require.main === module) {
