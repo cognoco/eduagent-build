@@ -46,7 +46,12 @@ import {
   buildValidatedBirthDate,
   locationToJurisdiction,
 } from './identity-graph';
-import { getOwnerProfileV2, jurisdictionToLocation } from './profile-v2';
+import {
+  birthMonthDayFromDate,
+  birthYearFromDate,
+  getOwnerProfileV2,
+  jurisdictionToLocation,
+} from './profile-v2';
 import { createDirectConsentGrant } from './consent-v2';
 import { calculateAgeFromParts } from '../age-utils';
 
@@ -216,12 +221,15 @@ export async function createChildProfileV2(
       consented = true;
     }
 
+    const { birthMonth, birthDay } = birthMonthDayFromDate(childRow.birthDate);
     return {
       id: childRow.id,
       accountId: organizationId, // account.id = organization.id
       displayName: childRow.displayName,
       avatarUrl: childRow.avatarUrl ?? null,
-      birthYear: Number(childRow.birthDate.slice(0, 4)),
+      birthYear: birthYearFromDate(childRow.birthDate),
+      birthMonth,
+      birthDay,
       location: jurisdictionToLocation(childRow.residenceJurisdiction),
       isOwner: false,
       hasPremiumLlm: false,

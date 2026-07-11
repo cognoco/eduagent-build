@@ -70,9 +70,12 @@ const BOUNDARY_FILES: readonly LegitimateRawNavigationGateFile[] = [
     file: 'apps/mobile/src/lib/navigation-contract.ts',
     category: 'boundary',
     reason:
-      'boundary: resolveNavigationContract is the sole owner of raw owner/proxy decisions.',
+      'boundary: resolveNavigationContract is the sole owner of raw owner/proxy decisions. ' +
+      '[WI-1259] isAdultOwner reads profile.isOwner before the exact-birth-date bracket ' +
+      'so the client owner-gate matches the server exact-date decision — one added ' +
+      'owner-read in this boundary file (the single owner-decision point).',
     expectedFindings: {
-      'profile-owner-read': 3,
+      'profile-owner-read': 4,
       'proxy-state-read': 24,
     },
   },
