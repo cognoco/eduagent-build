@@ -232,15 +232,8 @@ async function readSessionChallengeRound(
   profileId: string,
   sessionId: string,
 ): Promise<ChallengeRoundSessionState> {
-  const [row] = await db
-    .select({ metadata: learningSessions.metadata })
-    .from(learningSessions)
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId),
-      ),
-    );
+  const repo = createScopedRepository(db, profileId);
+  const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
   const meta = row?.metadata as Record<string, unknown> | undefined;
   return meta?.challengeRound as unknown as ChallengeRoundSessionState;
 }
@@ -250,17 +243,13 @@ async function readAssessmentsForSession(
   profileId: string,
   sessionId: string,
 ): Promise<{ masteryChallengeVerifiedAt: Date | null }[]> {
-  return db
-    .select({
-      masteryChallengeVerifiedAt: assessments.masteryChallengeVerifiedAt,
-    })
-    .from(assessments)
-    .where(
-      and(
-        eq(assessments.profileId, profileId),
-        eq(assessments.sessionId, sessionId),
-      ),
-    );
+  const repo = createScopedRepository(db, profileId);
+  const rows = await repo.assessments.findMany(
+    eq(assessments.sessionId, sessionId),
+  );
+  return rows.map((row) => ({
+    masteryChallengeVerifiedAt: row.masteryChallengeVerifiedAt,
+  }));
 }
 
 /** Mark a session `completed` so it never competes for a Now-feed
