@@ -40,7 +40,8 @@ export interface EmailPayload {
     | 'monthly_progress'
     | 'security_notification'
     | 'account_reclaim'
-    | 'payment_failed';
+    | 'payment_failed'
+    | 'blocked_safety_digest';
 }
 
 export interface EmailOptions {
