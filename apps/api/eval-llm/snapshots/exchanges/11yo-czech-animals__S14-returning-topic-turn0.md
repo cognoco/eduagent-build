@@ -134,7 +134,7 @@ Subject: <subject_name>Languages</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -264,15 +264,3 @@ Start a learning session about Czech reading comprehension.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-```
-{
-  "reply": "Czech reading comprehension involves understanding texts written in the Czech language. One important skill in reading comprehension is being able to identify the main idea of a text. The main idea is the central point or message that the author wants to communicate. It helps you grasp what the text is really about. For example, if you read a story about a horse helping a farmer, the main idea could be about friendship between animals and humans. \n\nNow, can you think of a main idea from a story or article you've read recently in Czech? Share it with me!",
-  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
-  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
-  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Initial teaching on Czech reading comprehension.", "factual_confidence": 1.0 },
-  "confidence": "high"
-}
-```

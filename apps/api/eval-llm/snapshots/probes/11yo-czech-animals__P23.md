@@ -136,7 +136,7 @@ Subject: <subject_name>Languages</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -276,15 +276,3 @@ Dobře. Řekni mi něco o zlomcích.
 - topicTitle: Czech reading comprehension
 - sourceEvidence: learner_message:context, current_topic:reliable, general_knowledge:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-```
-{
-  "reply": "Zlomek je způsob, jak vyjádřit část celku. Například, pokud máš 1 pizzu a rozkrájíš ji na 4 stejné kousky, každý kousek je 1/4 pizzy. Číslo nahoře (čitatel) ukazuje, kolik částí máme, a číslo dole (jmenovatel) ukazuje, na kolik částí je celek rozdělený. \n\nTeď se zamysli: kolik kousků pizzy bys měl, kdyby jsi měl 2 zlomky, 1/4 z jedné pizzy a 1/4 z druhé pizzy? Kolik by to bylo spolu?",
-  "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false },
-  "ui_hints": { "note_prompt": { "show": false, "post_session": false } },
-  "private_sources": { "relied_on": ["current_topic"], "insufficient": false, "reason": "Basic explanation of fractions.", "factual_confidence": 1.0 },
-  "confidence": "high"
-}
-```

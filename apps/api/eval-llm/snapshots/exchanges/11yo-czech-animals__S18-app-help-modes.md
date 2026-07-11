@@ -175,7 +175,7 @@ Subject: <subject_name>Languages</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -304,9 +304,3 @@ What's the difference between Explorer and Challenge mode?
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-```
-{"reply":"Explorer mode is for exploring topics and learning at your own pace. You can ask any questions and choose what you want to focus on. Challenge mode, on the other hand, is more structured. It tests your knowledge with quizzes and checks your understanding. You get to see how well you're doing and where you might need more practice. \n\nIf you have more specific questions about what each mode offers, feel free to ask!","signals":{ "partial_progress": false, "needs_deepening": false, "understanding_check": false, "crisis_redirect": false },"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":[],"insufficient":true,"reason":"No reliable support for the detail requested.","factual_confidence":0.0},"confidence":"low"}
-```

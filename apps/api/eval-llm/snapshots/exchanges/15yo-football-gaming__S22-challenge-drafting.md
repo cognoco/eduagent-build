@@ -156,7 +156,7 @@ Subject: <subject_name>Mathematics</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -300,9 +300,3 @@ I'd start from the definition and work through an example.
 - History turns: 3, exchangeCount: 9
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-```
-{ "reply": "Great approach! Let's begin with the basics. An **algebra equation** is like a mathematical statement where two expressions are equal. It usually has a variable, like \\( x \\), which represents an unknown number we want to find.\n\nHere's an example: \\( 2x + 3 = 7 \\).\n\nTo solve it, you need to isolate \\( x \\) by making sure it's on one side of the equation. You can do this by subtracting 3 from both sides: \\( 2x + 3 - 3 = 7 - 3 \\), which simplifies to \\( 2x = 4 \\).\n\nFinally, you divide both sides by 2 to get \\( x = 2 \\). So, \\( x \\) is 2 because that's the value that makes the equation true.\n\nWant to try another example or is there anything else in algebra equations you'd like to explore?", "signals": { "partial_progress": false, "needs_deepening": false, "understanding_check": true, "crisis_redirect": false }, "ui_hints": { "note_prompt": { "show": false, "post_session": false } }, "private_sources": { "relied_on": [ "current_topic", "general_knowledge" ], "insufficient": false, "reason": "Using general knowledge and related topic information for algebra equation basics.", "factual_confidence": 0.9 }, "confidence": "high" }
-```

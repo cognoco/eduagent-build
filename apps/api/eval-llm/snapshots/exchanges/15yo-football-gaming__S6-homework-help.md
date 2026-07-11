@@ -270,9 +270,3 @@ Can you help me with this homework question? "algebra equations — find the val
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-```
-{"reply":"Sure! To find the value of x in an algebra equation, you'll want to isolate x on one side. For example, if your equation is `2x + 4 = 10`, you can first subtract 4 from both sides to get `2x = 6`. Then, divide by 2, so x = 3. \n\nWhat equation are you working with?","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":false,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["current_topic"],"insufficient":false,"reason":"","factual_confidence":1.0},"confidence":"high"}
-```

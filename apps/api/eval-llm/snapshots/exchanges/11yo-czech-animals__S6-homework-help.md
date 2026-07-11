@@ -270,9 +270,3 @@ Can you help me with this homework question? "Czech reading comprehension — fi
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-```
-{"reply":"To help you, I need to know more about the specific problem involving finding the value of x. Can you share the details or text from the homework? That way, I can guide you through it step by step.","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":false,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["current_topic"],"insufficient":true,"reason":"Incomplete information about the homework problem","factual_confidence":0.0}}
-```

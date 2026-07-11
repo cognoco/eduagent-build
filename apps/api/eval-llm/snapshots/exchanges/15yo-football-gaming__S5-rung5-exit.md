@@ -155,7 +155,7 @@ Subject: <subject_name>Mathematics</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -290,9 +290,3 @@ Signal guidance:
 - History turns: 5, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-```
-{"reply":"Alright, let's break it down step-by-step together. We'll go through a specific example and see if that helps.\n\nSuppose we have a polynomial like this: `x^2 + 5x + 6`.\n\n**Step 1:** We want to find two numbers that multiply to the constant term (6) and add up to the coefficient of the middle term (5). Here, the numbers 2 and 3 work because 2 * 3 = 6 and 2 + 3 = 5.\n\n**Step 2:** Use those numbers to rewrite the middle term: instead of `5x`, write it as `2x + 3x`.\n\n**Step 3:** You'll have `x^2 + 2x + 3x + 6`. Group the terms: `(x^2 + 2x) + (3x + 6)`.\n\n**Step 4:** Factor each group: from the first group, take out `x`, and from the second, take out `3`:\n\\[ x(x + 2) + 3(x + 2) \\]\n\n**Step 5:** Notice the common factor `(x + 2)`. Factor it out:\n\\[ (x + 2)(x + 3) \\]\n\nThe original polynomial `x^2 + 5x + 6` factors into `(x + 2)(x + 3)`.\n\nNow, you try it with this final step! If you follow Step 4 again on your example, does it click into place?\n\nShall we experiment with another polynomial or have a go with this setup first?","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":true,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["current_topic"],"insufficient":false,"reason":"Break down polynomial factoring step-by-step with a full example except final step.","factual_confidence":1.0},"confidence":"high"}
-```

@@ -155,7 +155,7 @@ Subject: <subject_name>Science</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -290,9 +290,3 @@ Signal guidance:
 - History turns: 5, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-```
-{"reply":"Let's break it down into smaller steps using an example together. Suppose we're dividing 123 by 4.\n\n1. **Set it up**: Write 123 inside the division bracket, and 4 on the outside.\n2. **Divide**: First, see if 4 fits into the first digit of 123 (which is 1). Since 4 is bigger, it doesn't fit, so move to the first two digits: 12.\n3. **How many times?**: Ask how many times 4 fits into 12. It goes 3 times. Write 3 above the division bracket.\n4. **Multiply**: Multiply 3 by 4, giving 12, and write it underneath 12.\n5. **Subtract**: Subtract 12 from 12, leaving 0.\n6. **Bring down**: Bring down the next digit, which is 3.\n7. **Repeat**: Ask how many times 4 fits into 3. It doesn't, so put 0 up top and bring down the remainder.\n\nThe answer is 30 with a remainder of 3, or 30.75 if you turn the remainder into a decimal.\n\nWant to try a similar example on your own?","signals":{"partial_progress":true,"needs_deepening":false,"understanding_check":false,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["deterministic_reasoning","general_knowledge"],"insufficient":false,"reason":"Explained step-by-step example of long division for better understanding.","factual_confidence":0.95},"confidence":"high"}
-```

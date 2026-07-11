@@ -144,7 +144,7 @@ Subject: <subject_name>Languages</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -286,9 +286,3 @@ Start a learning session about Spanish present tense verbs.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-```
-{"reply":"Let's dive into Spanish present tense verbs! In Spanish, verbs change forms based on who is doing the action and when it's happening. Present tense is used to talk about actions happening right now.  \nFor example, the verb \"hablar\" means \"to speak.\" If I want to say \"I speak,\" I say \"yo hablo.\" The endings change depending on the subject. Here are some common subject pronouns and how the verb \"hablar\" changes:\n- Yo (I) → hablo  \n- Tú (you, informal) → hablas  \n- Él/Ella/Usted (he/she/you, formal) → habla  \n- Nosotros (we) → hablamos  \n- Ellos/Ellas/Ustedes (they/you all) → hablan  \n\nAre you familiar with any Spanish verbs, or would you like to start with the basics?","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":false,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["current_topic"],"insufficient":false,"reason":"basic explanation of Spanish present tense verbs","factual_confidence":1.0},"confidence":"high"}
-```

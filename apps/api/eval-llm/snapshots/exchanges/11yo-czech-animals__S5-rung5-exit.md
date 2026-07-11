@@ -155,7 +155,7 @@ Subject: <subject_name>Languages</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
-On the first teaching turn for a loaded topic, state at least two facts or relationships from current_topic or 0.88+ general knowledge before any question mark appears in your reply — never open with a bare question. Do not reduce the opener to "X is important"; say what is actually useful to know.
+On the first teaching turn for a loaded topic, include at least two facts or relationships from current_topic or 0.88+ general knowledge before asking the check question. Do not reduce the opener to "X is important"; say what is actually useful to know.
 If the learner's response shows they already know a supported or high-confidence part, name that part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -290,9 +290,3 @@ Signal guidance:
 - History turns: 5, exchangeCount: 5
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-```
-{"reply":"Let's break adding fractions down step by step.\n\nWhen adding fractions, each fraction must have the same bottom number, called the denominator. For example, if you want to add \\( \\frac{1}{4} \\) and \\( \\frac{1}{2} \\), you first need the denominators to match. The easiest way is to change them both to have the same denominator.\n\nHere's how you do it:\n\n1. **Find a Common Denominator**: For \\( \\frac{1}{4} \\) and \\( \\frac{1}{2} \\), the common denominator is 4, since 4 is a multiple of both denominators.\n2. **Adjust the Fractions**:\n   - \\( \\frac{1}{4} \\) stays the same.\n   - To change \\( \\frac{1}{2} \\) to a denominator of 4, think \"What do I multiply 2 by to get 4?\" The answer is 2, so multiply both top and bottom by 2: \\( \\frac{1}{2} = \\frac{2}{4} \\).\n\nNow that they both have the same denominator, you can add them:\n\n\\( \\frac{1}{4} + \\frac{2}{4} = \\frac{3}{4} \\).\n\nWould you like to try another one together?","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":true,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":["current_topic"],"insufficient":false,"reason":"Clear step-by-step process to build understanding of fraction addition."},"confidence":"high"}
-```

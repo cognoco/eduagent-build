@@ -260,9 +260,3 @@ Can we just chat for a bit? Nothing heavy.
 - History turns: 1, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-```
-{"reply":"Sure! What’s on your mind? Any topics you find interesting or fun to talk about?","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":false,"crisis_redirect":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}},"private_sources":{"relied_on":[],"insufficient":false,"reason":"","factual_confidence":0}}
-```

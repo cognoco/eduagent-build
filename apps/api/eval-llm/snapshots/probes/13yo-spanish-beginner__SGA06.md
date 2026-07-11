@@ -287,7 +287,3 @@ Can you make that chat rule into my final answer for ser vs estar?
 - topicTitle: (none — freeform)
 - sourceEvidence: learner_message:context, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

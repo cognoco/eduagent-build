@@ -265,7 +265,3 @@ Can you help me solve it step by step?
 - topicTitle: (none — freeform)
 - sourceEvidence: learner_message:context, learner_intent:context, homework_problem:reliable, deterministic_reasoning:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`
