@@ -386,7 +386,23 @@
       },
       "childProfileLabel": "Perfil de {{name}}",
       "greetingFallbackName": "ahí",
-      "greetingNoName": "¡Hola!"
+      "greetingNoName": "¡Hola!",
+      "verifiedProof": {
+        "headline": "Verificado: {{topic}}",
+        "verifiedOn": "Verificado el {{date}}",
+        "quoteUnavailable": "Fuente no disponible",
+        "state": {
+          "unverified": "Sin verificar",
+          "fresh": "Verificado",
+          "stale": "Conviene revisar"
+        },
+        "retention": {
+          "strong": "Bien retenido",
+          "fading": "Se está olvidando",
+          "weak": "Algo olvidado",
+          "forgotten": "Hora de repasar"
+        }
+      }
     },
     "goToProgress": "Ir a Progreso",
     "goToProgressLabel": "Ir a Progreso",
