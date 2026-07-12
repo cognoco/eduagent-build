@@ -41,77 +41,34 @@ export function recitationPolishAddedFact(response: string): boolean {
   return RECITATION_UNSUPPORTED_POLISH_RE.test(segment);
 }
 
-// Splits a reply into sentences on sentence-ending punctuation.
-const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+/;
-function replySentences(reply: string): string[] {
-  return reply
-    .split(SENTENCE_SPLIT_RE)
-    .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence.length > 0);
-}
+// Fail-statuses on the private source audit that indicate the reply was not
+// backed by a valid reliable-source trail.
+export const SOURCE_AUDIT_FAIL_STATUSES = new Set([
+  'parse_failed',
+  'missing_private_sources',
+  'unsupported_sources',
+  'missing_reliable_source',
+]);
 
-// Splits a (non-interrogative) sentence into clauses on comma, semicolon,
-// colon, or a spaced dash — the punctuation a reply uses to tack a fact onto
-// a conversational opener ("Sure, 3·5+5 = 20.", "Go ahead — the answer is
-// 20.").
-const CLAUSE_SPLIT_RE = /\s*[,;:]\s*|\s+[—–]\s+/;
-function sentenceClauses(sentence: string): string[] {
-  return sentence
-    .split(CLAUSE_SPLIT_RE)
-    .map((clause) => clause.trim())
-    .filter((clause) => clause.length > 0);
-}
-
-// A clause carries no factual assertion only when it is ENTIRELY one of
-// these known setup/invitation/acknowledgement shapes (optionally with a
-// trailing "." or "!") — matched in full, not as a prefix. Full-clause
-// matching is what closes the prefix bypass: "Sure, 3·5+5 = 20." splits
-// into "Sure" (matches) and "3·5+5 = 20." (does not match, since it has
-// extra content after the recognized token), so the sentence is correctly
-// flagged instead of the whole sentence being waved through because it
-// merely STARTED with "Sure".
-const NO_CLAIM_CLAUSE_RE =
-  /^(?:sure|great|okay|ok|awesome|nice|no problem|of course|alright|perfect|your turn|take your time|let'?s (?:start|begin|go|try)|i'?m (?:listening|ready)|i am (?:listening|ready)|whenever you'?re ready|when you'?re ready|go ahead(?: and recite it(?: for me| to me)?)?)[.!]*$/i;
-
-// True when the reply contains a declarative sentence carrying a factual
-// assertion — a sentence with at least one clause that isn't a full match
-// for NO_CLAIM_CLAUSE_RE (e.g. "The mitochondria is the powerhouse of the
-// cell.", "3·5+5 = 20."). Question sentences never assert a claim. Any
-// clause not recognized as purely invitational is treated as an assertion —
-// this errs toward flagging (a false positive here is a safe, self-surfacing
-// gate failure; a false negative would let a real claim through ungrounded).
-function replyAssertsFactualClaim(reply: string): boolean {
-  return replySentences(reply).some((sentence) => {
-    if (sentence.endsWith('?')) return false;
-    return sentenceClauses(sentence).some(
-      (clause) => !NO_CLAIM_CLAUSE_RE.test(clause),
-    );
-  });
-}
-
-// A turn makes no factual claim when its source audit reports
-// missing_reliable_source AND the model emitted no factual_confidence (which
-// per the prompt contract is only ever emitted for general_knowledge
-// reliance — its absence alone doesn't prove no claim was made) AND the
-// reply itself is non-assertive (setup/invitation or question only).
-// Setup/greeting/prompt turns hit this (recitation "go ahead and recite it
-// for me — I'm listening", a language-immersion opener question); a
-// declarative factual assertion with no relied_on and no factual_confidence
-// (e.g. "3·5+5 = 20.") must NOT be skipped. WI-1823 ruling 2a — the skip
-// keys on the no-claim signal, not on relied_on being empty; closing the
-// carve-out hole where a forgotten relied_on masqueraded as "no claim".
-export function sourceAuditNoFactualClaim(
-  audit: {
-    status: string;
-    factualConfidence?: number;
-  },
-  reply: string,
+// WI-1823 pivot (operator-ruled Option A): source_audit fail-status is now
+// gated on TURN IDENTITY, never on reply content. The prior content
+// heuristic (sourceAuditNoFactualClaim — a sentence/clause classifier trying
+// to prove a reply "makes no factual claim") kept admitting new bypass
+// phrasings under adversarial review (bare fact, conversational-prefix fact,
+// em-dash-appended fact, fact framed as a question) because a regex can't be
+// both conservative and reliable against arbitrary reply phrasing. Source
+// discipline now applies unconditionally to every TEACHING turn regardless
+// of how the reply is worded; only turns whose AUTHORED PURPOSE is not to
+// teach a sourced fact (setup/greeting/opener/meta — marked
+// `exemptSourceAudit: true` on the RunDefinition turn in
+// enduser-session-pass.ts) are exempt from the gate. The exemption decision
+// takes no reply text at all, so reply phrasing structurally cannot affect
+// it.
+export function sourceAuditGateFires(
+  status: string,
+  exemptSourceAudit: boolean | undefined,
 ): boolean {
-  return (
-    audit.status === 'missing_reliable_source' &&
-    audit.factualConfidence == null &&
-    !replyAssertsFactualClaim(reply)
-  );
+  return SOURCE_AUDIT_FAIL_STATUSES.has(status) && exemptSourceAudit !== true;
 }
 
 // The four-strands correction turn must land on "en mi opinión".

@@ -23,9 +23,7 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { visibilityRoutes } from './visibility';
 import * as linkingCeremonyService from '../services/linking-ceremony';
 import {
-  deleteLegacyAccountsForTest,
   deleteV2IdentitiesForTest,
-  ensureLegacyProfileAnchorForTest,
   ensureV2IdentityForLegacyProfileTest,
 } from '../test-utils/legacy-identity-anchors';
 
@@ -109,15 +107,6 @@ async function seedProfile(database: Database, label: string): Promise<string> {
   seededAccountIds.push(accountId);
   seededProfileIds.push(profileId);
 
-  await ensureLegacyProfileAnchorForTest(database, {
-    accountId,
-    profileId,
-    clerkUserId,
-    email,
-    displayName: `Visibility ${label}`,
-    birthYear: 2010,
-    isOwner: true,
-  });
   await ensureV2IdentityForLegacyProfileTest(database, {
     accountId,
     profileId,
@@ -225,7 +214,6 @@ async function cleanup(database: Database): Promise<void> {
     accountIds: seededAccountIds,
     profileIds: seededProfileIds,
   });
-  await deleteLegacyAccountsForTest(database, seededAccountIds);
   seededSupportershipIds.length = 0;
   seededAccountIds.length = 0;
   seededProfileIds.length = 0;
@@ -289,37 +277,5 @@ describe('Integration: GET /visibility/reports/:personId/shared-record', () => {
       code: ERROR_CODES.FORBIDDEN,
       message: 'This support link is not active.',
     });
-  });
-
-  // [WI-1201 red-green-revert] Regression guard proving the 403 above is
-  // load-bearing: bypassing findAcceptedContractForSupportee -- the only
-  // gate standing between an unlinked supporter and the supportee's
-  // shared-record -- must leak the exact same facts a linked supporter
-  // sees. If this ever returns non-200 for the bypassed case, or a 200 for
-  // the unlinked supporter once the spy is restored, the contract-scoping
-  // gate has regressed.
-  it('would leak the supportee shared-record to the unlinked supporter if the contract-scoping gate were bypassed', async () => {
-    const spy = jest
-      .spyOn(linkingCeremonyService, 'findAcceptedContractForSupportee')
-      .mockResolvedValue({
-        supportershipId: contract.supportershipId,
-      } as VisibilityContract);
-
-    try {
-      const bypassed = await makeApp(db, unlinkedSupporterPersonId).request(
-        `/v1/visibility/reports/${supporteePersonId}/shared-record`,
-      );
-      expect(bypassed.status).toBe(200);
-      const bypassedBody = sharedRecordSchema.parse(await bypassed.json());
-      expect(bypassedBody.supportershipId).toBe(contract.supportershipId);
-      expect(bypassedBody.supporterView.facts.length).toBeGreaterThan(0);
-    } finally {
-      spy.mockRestore();
-    }
-
-    const restored = await makeApp(db, unlinkedSupporterPersonId).request(
-      `/v1/visibility/reports/${supporteePersonId}/shared-record`,
-    );
-    expect(restored.status).toBe(403);
   });
 });

@@ -26,9 +26,7 @@ import {
   regenerateLanguageCurriculum,
 } from './language-curriculum';
 import {
-  deleteLegacyAccountsForTest,
   deleteV2IdentitiesForTest,
-  ensureLegacyProfileAnchorForTest,
   ensureV2IdentityForLegacyProfileTest,
 } from '../test-utils/legacy-identity-anchors';
 
@@ -65,7 +63,6 @@ async function cleanupTestAccounts() {
     accountIds: accountId ? [accountId] : [],
     profileIds: profileId ? [profileId] : [],
   });
-  await deleteLegacyAccountsForTest(db, accountId ? [accountId] : []);
   accountId = '';
   profileId = '';
 }
@@ -79,15 +76,6 @@ beforeAll(async () => {
   accountId = generateUUIDv7();
   profileId = generateUUIDv7();
 
-  await ensureLegacyProfileAnchorForTest(db, {
-    accountId,
-    profileId,
-    clerkUserId: ACCOUNT.clerkUserId,
-    email: ACCOUNT.email,
-    displayName: 'Language Learner',
-    birthYear: 2010,
-    isOwner: true,
-  });
   await ensureV2IdentityForLegacyProfileTest(db, {
     accountId,
     profileId,

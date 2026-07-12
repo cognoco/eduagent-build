@@ -45,7 +45,7 @@ jest.mock('../../inngest/client', () => {
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { and, eq, like, sql } from 'drizzle-orm';
+import { and, eq, like } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   assessments,
@@ -71,11 +71,7 @@ import {
   applyRetentionUpdate,
   insertRetentionCardIfAbsent,
 } from '../apply-retention-update';
-import {
-  deleteV2IdentitiesForTest,
-  ensureLegacyProfileAnchorForTest,
-  legacyIdentityTableExistsForTest,
-} from '../../test-utils/legacy-identity-anchors';
+import { deleteV2IdentitiesForTest } from '../../test-utils/legacy-identity-anchors';
 import {
   _resetCircuits,
   registerProvider,
@@ -100,8 +96,6 @@ loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 
 const hasDatabaseUrl = !!process.env.DATABASE_URL;
 const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
-
-const RUN_ID = generateUUIDv7();
 
 // ---------------------------------------------------------------------------
 // LLM fixtures
@@ -248,18 +242,6 @@ async function seedProfileAndSubject(
   const idx = ++seedCounter;
   const accountId = generateUUIDv7();
   const profileId = generateUUIDv7();
-  const clerkUserId = `clerk_grader_integ_${RUN_ID}_${idx}`;
-  const email = `grader-integ-${RUN_ID}-${idx}@test.invalid`;
-
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId,
-    accountId,
-    displayName: `Grader Tester ${idx}`,
-    birthYear: 2006, // Under 18 → ageBracket='teen'
-    isOwner: true,
-    clerkUserId,
-    email,
-  });
 
   // [WI-867] v2 identity graph — loadProfileRowByIdV2 reads person unconditionally.
   await db
@@ -496,14 +478,6 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
         accountIds: seededV2AccountIds,
         profileIds: seededV2ProfileIds,
       });
-    }
-    // Cascade-delete test accounts; related rows follow FK ON DELETE CASCADE.
-    // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete, same
-    // conditional cleanup as before.
-    if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-      await db.execute(
-        sql`DELETE FROM accounts WHERE clerk_user_id LIKE ${`clerk_grader_integ_${RUN_ID}%`}`,
-      );
     }
     // Unregister only our providers — leave the shared registry intact for
     // other suites in this worker.

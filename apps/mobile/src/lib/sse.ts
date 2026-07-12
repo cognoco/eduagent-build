@@ -16,6 +16,7 @@ import {
   maybeReplayResponseSchema,
   type ChallengeRoundSessionState,
   type StreamLanguageMeaningOutput,
+  type StreamLanguageSpeakingPractice,
 } from '@eduagent/schemas';
 import {
   BadRequestError,
@@ -84,18 +85,25 @@ export interface LanguageGradedInputEvent {
 
 export type LanguageMeaningOutputEvent = StreamLanguageMeaningOutput;
 
+// WI-1777: derived (not hand-redeclared) — the WI-1756 rework this repo
+// already paid for once, applied from the start here.
+export type LanguageSpeakingPracticeEvent = StreamLanguageSpeakingPractice;
+
 export interface LanguageLearningActivityEvent {
   strand: 'meaning_input' | 'meaning_output' | 'language_focus' | 'fluency';
   activityType:
     | 'graded_input'
     | 'free_response'
     | 'correction_retry'
-    | 'timed_drill';
+    | 'timed_drill'
+    | 'repeat_after_me'
+    | 'shadowing';
   modality: 'text' | 'voice' | 'listening';
   targetWords: string[];
   targetGrammar: string[];
   gradedInput?: LanguageGradedInputEvent;
   meaningOutput?: LanguageMeaningOutputEvent;
+  speakingPractice?: LanguageSpeakingPracticeEvent;
 }
 
 export interface ChallengeRoundOfferEvent {

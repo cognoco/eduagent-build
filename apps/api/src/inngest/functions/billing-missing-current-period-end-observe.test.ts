@@ -43,6 +43,8 @@ interface MissingCurrentPeriodEndEventData {
   subscriptionId?: string;
   stripeSubscriptionId?: string;
   timestamp?: string;
+  payerEmail?: string;
+  learnerName?: string;
 }
 
 async function invokeHandler(data: MissingCurrentPeriodEndEventData) {
@@ -85,6 +87,8 @@ describe('billingMissingCurrentPeriodEndObserve [WI-1429]', () => {
       subscriptionId: 'sub-2',
       stripeSubscriptionId: 'stripe-sub-2',
       timestamp: '2026-07-08T00:00:00.000Z',
+      payerEmail: 'payer@example.test',
+      learnerName: 'Private Learner',
     });
 
     expect(consoleErrorSpy).toHaveBeenCalled();
@@ -111,6 +115,7 @@ describe('billingMissingCurrentPeriodEndObserve [WI-1429]', () => {
         level: 'error',
         tags: expect.objectContaining({
           surface: 'billing',
+          signal: 'missing-current-period-end',
           event: 'missing_current_period_end',
         }),
         extra: expect.objectContaining({
@@ -121,6 +126,12 @@ describe('billingMissingCurrentPeriodEndObserve [WI-1429]', () => {
           eventTimestamp: '2026-07-08T00:00:00.000Z',
         }),
       }),
+    );
+    expect(JSON.stringify(captureMessageSpy.mock.calls)).not.toContain(
+      'payer@example.test',
+    );
+    expect(JSON.stringify(captureMessageSpy.mock.calls)).not.toContain(
+      'Private Learner',
     );
   });
 });

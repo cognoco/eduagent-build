@@ -23,7 +23,13 @@ describe('SpeakingPracticeCard', () => {
     expect(onPlayTarget).toHaveBeenCalledTimes(1);
   });
 
-  it('shows transcript comparison when speech text is available', () => {
+  // WI-1777 Phase-4 finding M1: without server feedback, the card must show
+  // ONLY the raw transcript — no verdict, no missing/extra words — even when
+  // the transcript happens to match the target word-for-word. Rendering a
+  // client-computed verdict here is exactly the divergent-two-scorer bug the
+  // single-scorer design exists to prevent (see SpeakingPracticeActivity,
+  // which only ever supplies these props from the server's response).
+  it('shows the raw transcript with no verdict when no server feedback is supplied (interim/recording state)', () => {
     render(
       <SpeakingPracticeCard
         targetText={targetText}
@@ -34,11 +40,66 @@ describe('SpeakingPracticeCard', () => {
     );
 
     screen.getByText('I would like a cup of tea');
-    screen.getByText('Matched');
+    expect(screen.queryByText('Matched')).toBeNull();
     expect(screen.queryByTestId('speaking-practice-missing')).toBeNull();
+    expect(screen.queryByTestId('speaking-practice-extra')).toBeNull();
   });
 
-  it('displays missing words and a retry prompt', () => {
+  it('shows no verdict even when the transcript is empty or partial and no server feedback exists', () => {
+    render(
+      <SpeakingPracticeCard
+        targetText={targetText}
+        transcript="I like cup tea"
+        onPlayTarget={jest.fn()}
+        onRecordPress={jest.fn()}
+        onRetry={jest.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId('speaking-practice-missing')).toBeNull();
+    expect(screen.queryByText('Matched')).toBeNull();
+  });
+
+  // WI-1777: server-authoritative feedback is the ONLY source of verdict
+  // rendering — single scorer, so the render always matches what was
+  // persisted.
+  it('renders server-supplied missing/extra words', () => {
+    render(
+      <SpeakingPracticeCard
+        targetText={targetText}
+        transcript="I like cup tea and coffee"
+        onPlayTarget={jest.fn()}
+        onRecordPress={jest.fn()}
+        missingWords={['would']}
+        extraWords={['coffee']}
+        isComplete={false}
+      />,
+    );
+
+    screen.getByText('Try again: would');
+    screen.getByText('Extra: coffee');
+    expect(screen.queryByText('Matched')).toBeNull();
+  });
+
+  it('shows matched when server feedback reports isComplete with no missing/extra words', () => {
+    render(
+      <SpeakingPracticeCard
+        targetText={targetText}
+        transcript="I would like a cup of tea"
+        onPlayTarget={jest.fn()}
+        onRecordPress={jest.fn()}
+        missingWords={[]}
+        extraWords={[]}
+        isComplete={true}
+      />,
+    );
+
+    screen.getByText('Matched');
+    expect(screen.queryByTestId('speaking-practice-missing')).toBeNull();
+    expect(screen.queryByTestId('speaking-practice-extra')).toBeNull();
+  });
+
+  it('displays server-supplied missing words with a retry prompt', () => {
     const onRetry = jest.fn();
 
     render(
@@ -48,6 +109,9 @@ describe('SpeakingPracticeCard', () => {
         onPlayTarget={jest.fn()}
         onRecordPress={jest.fn()}
         onRetry={onRetry}
+        missingWords={['would', 'a', 'of']}
+        extraWords={[]}
+        isComplete={false}
       />,
     );
 

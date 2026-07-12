@@ -79,10 +79,7 @@ import {
   _resetCircuits,
 } from '../../apps/api/src/services/llm';
 import { registerLlmProviderFixture } from '../../apps/api/src/test-utils/llm-provider-fixtures';
-import {
-  ensureLegacyProfileAnchorForTest,
-  ensureV2IdentityForLegacyProfileTest,
-} from '../../apps/api/src/test-utils/legacy-identity-anchors';
+import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 const TEST_ENV = buildIntegrationEnv();
 const SUBJECT_AUTH_USER_ID = 'integration-subject-user';
@@ -703,13 +700,6 @@ describe('Integration: DELETE /v1/subjects/:id', () => {
     });
     const childProfileId = generateUUIDv7();
     const db = getIntegrationDb();
-    await ensureLegacyProfileAnchorForTest(db, {
-      profileId: childProfileId,
-      accountId: ownerProfile.accountId,
-      displayName: 'Proxy Child',
-      birthYear: 2013,
-      isOwner: false,
-    });
     await ensureV2IdentityForLegacyProfileTest(db, {
       accountId: ownerProfile.accountId,
       profileId: childProfileId,

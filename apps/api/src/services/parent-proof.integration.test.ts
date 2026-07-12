@@ -22,7 +22,6 @@ import {
 } from '@eduagent/database';
 import { ForbiddenError } from '../errors';
 import { getLatestVerifiedProofForChild } from './parent-proof';
-import { ensureLegacyProfileAnchorForTest } from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -62,13 +61,6 @@ async function seedProfile(input: {
     })
     .returning({ id: person.id });
   personIds.push(p!.id);
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: p!.id,
-    accountId: orgId,
-    displayName: input.displayName,
-    birthYear: 2010,
-    isOwner: input.isOwner ?? true,
-  });
 
   await db.insert(membership).values({
     personId: p!.id,

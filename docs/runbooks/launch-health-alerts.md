@@ -28,6 +28,53 @@ The LLM fallback signal added by WI-1500 deliberately omits prompt content,
 provider error bodies, and `sessionId`. Its searchable dimensions are limited
 to provider, fallback provider, capability, reason, circuit key, and flow.
 
+## Sentry project routing invariant
+
+The Cloudflare API Worker must send errors to the `mentomate-api` Sentry
+project. Mobile clients and mobile preview builds send errors to
+`mentomate-mobile`; the two DSNs are not interchangeable even though both are
+valid Sentry credentials.
+
+`pnpm secrets:sync` validates the project ID embedded in `SENTRY_DSN` before it
+uploads any Doppler values to a Worker. A mismatch or malformed DSN is a hard
+failure before deployment. The diagnostic may contain the public project IDs,
+but must never print the DSN or its public key.
+
+If the guard fails:
+
+1. stop the deployment rather than bypassing the sync;
+2. correct the affected Doppler configuration to use the `mentomate-api` DSN;
+3. rerun the normal secret-sync and deployment workflow;
+4. emit a safe staging API synthetic and confirm it appears in
+   `mentomate-api`, not `mentomate-mobile`;
+5. verify that no new staging-API errors reach `mentomate-mobile` during the
+   agreed observation window.
+
+## Sentry ingestion-capacity invariant
+
+Every Sentry-backed alert in this runbook is blind when the organization has
+exhausted its error-event quota. Transaction ingestion uses a separate quota,
+so continuing traces do not prove that errors or alert events are accepted.
+
+Before relying on Sentry during a launch window, the accountable operator must
+verify all of the following without copying credentials or payment details into
+the evidence record:
+
+1. the organization has either an active paid plan with remaining error quota
+   or a non-zero on-demand error budget;
+2. the organization is not suspended or past due;
+3. a controlled error probe reports accepted events rather than only
+   `rate_limited` outcomes;
+4. one safe synthetic creates an issue and exercises an `[LH]` alert rule to
+   its configured destination.
+
+If the error quota is exhausted, treat every Sentry rule as unavailable even
+when its configuration still appears active. Restore capacity through the
+Operator Queue financial-action gate, confirm ingestion with the controlled
+probe, and only then use Sentry delivery as launch-health evidence. Record the
+chosen plan or budget and the before/after probe on the governing Work Item;
+never record API tokens, DSNs, card details, or invoices in this runbook.
+
 ## Alert summary
 
 Thresholds use rolling windows. A threshold is evaluated only in production;
@@ -73,6 +120,19 @@ for `status = 'past_due'`, their provider-updated timestamp, and grace deadline.
 The warning catches a recovery that has remained unresolved for 24 hours; the
 page catches any row that crosses its grace deadline without returning to an
 active/free terminal state.
+
+Sentry filters:
+
+```text
+surface:billing signal:payment-failed
+surface:billing signal:alert-delivery-failed
+surface:billing signal:missing-current-period-end
+surface:billing signal:trial-expiry-failed
+```
+
+Use the first two filters for the payment-recovery warn/page rules above. The
+period-end and trial-expiry filters are separate billing-integrity signals and
+must not be collapsed into payment-decline volume.
 
 ### First response
 

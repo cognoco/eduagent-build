@@ -950,6 +950,52 @@ describe('useSessionStreaming', () => {
       expect(opts.setLanguageLearning).toHaveBeenCalledWith(languageLearning);
     });
 
+    it('surfaces speaking-practice activity from a completed language turn [WI-1777]', async () => {
+      // Regression guard: the allowlist gate must include `speakingPractice`
+      // or the entire languageLearning state update is silently dropped —
+      // the exact WI-1756 bug pattern, applied to the new artifact field.
+      // This object has no `gradedInput`/`meaningOutput` key at all.
+      const languageLearning = {
+        strand: 'fluency',
+        activityType: 'repeat_after_me',
+        modality: 'voice',
+        targetWords: [],
+        targetGrammar: [],
+        speakingPractice: {
+          type: 'repeat_after_me',
+          targetText: 'I like coffee.',
+          locale: 'en-US',
+          modality: 'voice',
+          retryGuidance: 'retry_same_target',
+        },
+      };
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (
+            _text: string,
+            onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+          ) => {
+            onChunk('Repeat after me.');
+            await onComplete({
+              aiEventId: 'ai-event-speaking-practice',
+              exchangeCount: 1,
+              escalationRung: 0,
+              expectedResponseMinutes: 5,
+              languageLearning,
+            });
+          },
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('Hola');
+      });
+
+      expect(opts.setLanguageLearning).toHaveBeenCalledWith(languageLearning);
+    });
+
     it('shows error message when session creation fails', async () => {
       const opts = makeOpts({ effectiveSubjectId: '' });
       const { result } = renderHook(() => useSessionStreaming(opts as any));

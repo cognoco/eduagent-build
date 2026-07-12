@@ -40,6 +40,7 @@ export const billingAlertDeliveryFailedObserve = inngest.createFunction(
       level: 'error',
       tags: {
         surface: 'billing',
+        signal: 'alert-delivery-failed',
         channel: data.channel,
         reason: data.reason,
       },

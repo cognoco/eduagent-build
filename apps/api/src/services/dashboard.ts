@@ -75,6 +75,7 @@ import {
 import {
   assertChargeNotCredentialed,
   assertParentAccess,
+  filterUncredentialedCharges,
 } from './family-access';
 import {
   familyV2ChildReadProof,
@@ -762,6 +763,7 @@ export async function getChildrenForParent(
     });
     childProfileIds = orgMembers.map((m) => m.personId);
   }
+  childProfileIds = await filterUncredentialedCharges(db, childProfileIds);
   if (childProfileIds.length === 0) return [];
   const allChildSubjects = await db.query.subjects.findMany({
     where: inArray(subjects.profileId, childProfileIds),

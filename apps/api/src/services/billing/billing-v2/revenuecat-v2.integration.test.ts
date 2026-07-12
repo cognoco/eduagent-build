@@ -39,7 +39,6 @@ import { getTierConfig } from '../../subscription';
 import { updateSubscriptionFromRevenuecatWebhookV2 } from './revenuecat-v2';
 import { handleInitialPurchaseV2 } from './revenuecat-webhook-handler-v2';
 import type { RevenueCatEvent } from '../revenuecat-shared';
-import { legacyIdentityTableExistsForTest } from '../../../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -147,29 +146,8 @@ const RUN = !!process.env.DATABASE_URL;
         roles: ['admin', 'learner'],
       });
 
-      // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP);
-      // after M-REPOINT, `subscriptions.accountId` targets `organization`
-      // directly (see below), so this mirror (same id as the org, the
-      // "reseed identity contract") is a no-op there instead of hard-failing.
-      // [WI-1139] Legacy `accounts`/`subscriptions` Drizzle defs removed —
-      // raw SQL inserts, same conditional seed as before.
-      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-        await db.execute(sql`
-          INSERT INTO accounts (id, clerk_user_id, email)
-          VALUES (${org!.id}, ${`${clerkUserId}_legacy`}, ${`legacy_${email}`})
-        `);
-        createdAccountIds.push(org!.id);
-      }
-
       const subId = generateUUIDv7();
       seededSubIds.push(subId);
-
-      if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-        await db.execute(sql`
-          INSERT INTO subscriptions (id, account_id, tier, status)
-          VALUES (${subId}, ${org!.id}, 'family', 'active')
-        `);
-      }
 
       await db.insert(subscription).values({
         id: subId,
@@ -280,37 +258,8 @@ const RUN = !!process.env.DATABASE_URL;
         roles: ['admin', 'learner'],
       });
 
-      // [WI-1128] Legacy `accounts`/`profiles` may already be dropped
-      // (post-M-DROP); after M-REPOINT, `subscriptions.accountId` targets
-      // `organization` directly (see below) and `profile_quota_usage.profileId`
-      // targets `person` directly, so these legacy mirrors are a no-op there
-      // instead of hard-failing. Id-aligned to the org/person (the "reseed
-      // identity contract") — same convention as seedAlignedSubscription.
-      // [WI-1139] Legacy `accounts`/`profiles`/`subscriptions` Drizzle defs
-      // removed — raw SQL inserts, same conditional seed as before.
-      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-        await db.execute(sql`
-          INSERT INTO accounts (id, clerk_user_id, email)
-          VALUES (${org!.id}, ${`${clerkUserId}_legacy`}, ${`legacy_${email}`})
-        `);
-        createdAccountIds.push(org!.id);
-      }
-      if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-        await db.execute(sql`
-          INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner)
-          VALUES (${personRow!.id}, ${org!.id}, 'Owner', 1990, true)
-        `);
-      }
-
       const subId = generateUUIDv7();
       seededSubIds.push(subId);
-
-      if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-        await db.execute(sql`
-          INSERT INTO subscriptions (id, account_id, tier, status)
-          VALUES (${subId}, ${org!.id}, 'free', 'active')
-        `);
-      }
 
       await db.insert(subscription).values({
         id: subId,

@@ -31,7 +31,7 @@
  */
 
 import { resolve } from 'path';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { loadDatabaseEnv } from '../../packages/test-utils/src';
 import {
   assessments,
@@ -53,11 +53,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import {
-  deleteV2IdentitiesForTest,
-  ensureLegacyProfileAnchorForTest,
-  legacyIdentityTableExistsForTest,
-} from '../../apps/api/src/test-utils/legacy-identity-anchors';
+import { deleteV2IdentitiesForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { finalizeChallengeRoundIfReady } from '../../apps/api/src/services/session/session-exchange';
 import { mapSessionRow } from '../../apps/api/src/services/session/session-events';
 import { getLatestVerifiedProofForChild } from '../../apps/api/src/services/parent-proof';
@@ -85,8 +81,6 @@ loadDatabaseEnv(resolve(__dirname, '../..'));
 const hasDatabaseUrl = !!process.env.DATABASE_URL;
 const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
 
-const RUN_ID = generateUUIDv7();
-
 // ---------------------------------------------------------------------------
 // Seed helpers — modeled on
 // apps/api/src/services/session/session-exchange.integration.test.ts:236-416
@@ -102,18 +96,6 @@ async function seedProfileAndSubject(
   const idx = ++seedCounter;
   const accountId = generateUUIDv7();
   const profileId = generateUUIDv7();
-  const clerkUserId = `clerk_wi1666_${RUN_ID}_${idx}`;
-  const email = `wi1666-${RUN_ID}-${idx}@test.invalid`;
-
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId,
-    accountId,
-    displayName: `Loop Tester ${idx}`,
-    birthYear: 2006,
-    isOwner: true,
-    clerkUserId,
-    email,
-  });
 
   await db
     .insert(organization)
@@ -151,18 +133,6 @@ async function seedParentProfile(
 ): Promise<string> {
   const idx = ++seedCounter;
   const parentProfileId = generateUUIDv7();
-  const clerkUserId = `clerk_wi1666_${RUN_ID}_${idx}_parent`;
-  const email = `wi1666-${RUN_ID}-${idx}-parent@test.invalid`;
-
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: parentProfileId,
-    accountId,
-    displayName: `Loop Parent ${idx}`,
-    birthYear: 1980,
-    isOwner: true,
-    clerkUserId,
-    email,
-  });
 
   await db.insert(person).values({
     id: parentProfileId,
@@ -403,11 +373,6 @@ describeIfDb('Verified-learning loop (WI-1666, S8)', () => {
         accountIds: seededV2AccountIds,
         profileIds: seededV2ProfileIds,
       });
-    }
-    if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-      await db.execute(
-        sql`DELETE FROM accounts WHERE clerk_user_id LIKE ${`clerk_wi1666_${RUN_ID}%`}`,
-      );
     }
   });
 

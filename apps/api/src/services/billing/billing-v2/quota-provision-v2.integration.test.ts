@@ -1,6 +1,6 @@
 import { resolve } from 'path';
 
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
   createDatabase,
   membership,
@@ -14,7 +14,6 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 import { getTierConfig } from '../../subscription';
 import { inngest } from '../../../inngest/client';
-import { legacyIdentityTableExistsForTest } from '../../../test-utils/legacy-identity-anchors';
 import {
   getOrProvisionProfileQuotaUsageV2,
   resolveProfileQuotaRoleV2,
@@ -42,13 +41,6 @@ async function seedOrganization(index: number) {
     .values({ name: ORG_NAMES[index]! })
     .returning();
 
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.execute(sql`
-      INSERT INTO accounts (id, clerk_user_id, email)
-      VALUES (${row!.id}, ${`${ORG_NAMES[index]}-clerk`}, ${`${ORG_NAMES[index]}@integration.test`})
-    `);
-  }
-
   return row!;
 }
 
@@ -75,13 +67,6 @@ async function seedPerson(input: {
     roles: input.isOwner ? ['admin', 'learner'] : ['learner'],
   });
 
-  if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-    await db.execute(sql`
-      INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner, archived_at)
-      VALUES (${row!.id}, ${input.organizationId}, ${input.displayName}, ${input.isOwner ? 1990 : 2016}, ${input.isOwner}, ${input.archivedAt ?? null})
-    `);
-  }
-
   return row!;
 }
 
@@ -105,13 +90,6 @@ async function seedSubscription(input: {
       periodEndAt: new Date('2026-07-01T00:00:00.000Z'),
     })
     .returning();
-
-  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.execute(sql`
-      INSERT INTO subscriptions (id, account_id, tier, status)
-      VALUES (${row!.id}, ${input.organizationId}, ${tier}, ${status})
-    `);
-  }
 
   return row!;
 }
@@ -174,15 +152,6 @@ async function cleanup() {
     await db.delete(person).where(inArray(person.id, personIds));
   }
   await db.delete(organization).where(inArray(organization.id, orgIds));
-
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.execute(
-      sql`DELETE FROM accounts WHERE id IN (${sql.join(
-        orgIds.map((id) => sql`${id}::uuid`),
-        sql`, `,
-      )})`,
-    );
-  }
 }
 
 describe('quota-provision-v2 (integration)', () => {

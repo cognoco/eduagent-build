@@ -1,7 +1,7 @@
 import { resolve } from 'path';
 
 import { Hono } from 'hono';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
   createDatabase,
   membership,
@@ -18,7 +18,6 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import type { Account } from '../services/account';
 import { getTierConfig } from '../services/subscription';
 import { inngest } from '../inngest/client';
-import { legacyIdentityTableExistsForTest } from '../test-utils/legacy-identity-anchors';
 import { meteringMiddleware, type MeteringEnv } from './metering';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -42,12 +41,6 @@ async function seedOrganization(index: number) {
     .insert(organization)
     .values({ name: ORG_NAMES[index]! })
     .returning();
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.execute(sql`
-      INSERT INTO accounts (id, clerk_user_id, email)
-      VALUES (${row!.id}, ${`${ORG_NAMES[index]}-clerk`}, ${`${ORG_NAMES[index]}@integration.test`})
-    `);
-  }
   return row!;
 }
 
@@ -70,12 +63,6 @@ async function seedPerson(input: {
     personId: row!.id,
     roles: input.isOwner ? ['admin', 'learner'] : ['learner'],
   });
-  if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-    await db.execute(sql`
-      INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner)
-      VALUES (${row!.id}, ${input.organizationId}, ${input.displayName}, ${input.isOwner ? 1990 : 2016}, ${input.isOwner})
-    `);
-  }
   return row!;
 }
 
@@ -96,12 +83,6 @@ async function seedPlusSubscription(input: {
       periodEndAt: new Date('2026-07-01T00:00:00.000Z'),
     })
     .returning();
-  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.execute(sql`
-      INSERT INTO subscriptions (id, account_id, tier, status)
-      VALUES (${sub!.id}, ${input.organizationId}, 'plus', 'active')
-    `);
-  }
   await db.insert(quotaPools).values({
     subscriptionId: sub!.id,
     monthlyLimit: plus.monthlyQuota,
@@ -234,14 +215,6 @@ async function cleanup() {
     await db.delete(person).where(inArray(person.id, personIds));
   }
   await db.delete(organization).where(inArray(organization.id, orgIds));
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.execute(
-      sql`DELETE FROM accounts WHERE id IN (${sql.join(
-        orgIds.map((id) => sql`${id}::uuid`),
-        sql`, `,
-      )})`,
-    );
-  }
 }
 
 describe('meteringMiddleware per-profile v2 live path (integration)', () => {

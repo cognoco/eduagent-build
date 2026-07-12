@@ -39,7 +39,6 @@ import {
 } from '../../../../tests/integration/helpers';
 import {
   deleteV2IdentitiesForTest,
-  ensureLegacyProfileAnchorForTest,
   ensureV2IdentityForLegacyProfileTest,
 } from '../test-utils/legacy-identity-anchors';
 import { cloneTopicFromChild, undoCloneFromChild } from './family-bridge';
@@ -126,25 +125,7 @@ async function seedFamily(): Promise<Fixture> {
   const adultId = randomUUID();
   const childId = randomUUID();
 
-  // [WI-867] v2 identity graph is unconditional. Learning tables still FK to
-  // profiles.id so legacy anchors are also needed.
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: adultId,
-    accountId,
-    displayName: 'Parent',
-    birthYear: 1985,
-    isOwner: true,
-    email: EMAIL,
-    clerkUserId: CLERK_USER_ID,
-  });
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: childId,
-    accountId,
-    displayName: 'Ada',
-    birthYear: 2013,
-    isOwner: false,
-  });
-
+  // [WI-867] v2 identity graph is unconditional.
   await ensureV2IdentityForLegacyProfileTest(db, {
     accountId,
     profileId: adultId,
