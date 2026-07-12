@@ -23,6 +23,10 @@ export const notificationTypeSchema = z.enum([
   'dictation_review',
   'session_filing_failed',
   'nudge',
+  // [WI-1753] AC-6: teen self-cancel nudge after a family join — they keep an
+  // active store subscription while the parent now pays the family seat. No
+  // structured data payload (falls into noDataPayloadSchema).
+  'store_cancel_nudge',
   // [WI-179] Re-uses the rate-limit / notification-log table to track outbox
   // spillover requests per profile. NOT a user-visible notification — never
   // dispatched via push/email. The shared `notification_log` table provides

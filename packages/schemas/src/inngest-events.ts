@@ -41,6 +41,23 @@ export type BillingAlertDeliveryFailedEvent = z.infer<
   typeof billingAlertDeliveryFailedEventSchema
 >;
 
+// [WI-1753] AC-6: dispatched post-commit by the family-join accept path when an
+// existing teen who joins a parent's family still holds an ACTIVE store
+// subscription — their own store sub keeps billing while the parent now pays the
+// family seat. The consumer nudges the teen to self-cancel; no server refund is
+// possible (store-delegated billing). The store ref is captured BEFORE the
+// org-of-one subscription teardown; only the RevenueCat original-app-user id is
+// carried (store product/platform columns are unpopulated — see billing explore).
+export const familyJoinStoreCancelNudgeRequestedEventSchema = z.object({
+  teenPersonId: z.string().uuid(),
+  familyOrgId: z.string().uuid(),
+  revenuecatOriginalAppUserId: z.string().min(1),
+  timestamp: isoDateField.optional(),
+});
+export type FamilyJoinStoreCancelNudgeRequestedEvent = z.infer<
+  typeof familyJoinStoreCancelNudgeRequestedEventSchema
+>;
+
 export const filingTimedOutEventSchema = z.object({
   sessionId: z.string().uuid(),
   profileId: z.string().uuid(),

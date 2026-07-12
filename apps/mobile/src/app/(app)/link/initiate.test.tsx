@@ -10,6 +10,7 @@ import {
   extractJsonBody,
   fetchCallsMatching,
 } from '../../../test-utils/mock-api-routes';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 jest.mock(
   'react-i18next',
@@ -204,6 +205,59 @@ describe('InitiateLinkScreen', () => {
     );
     screen.getByTestId('visibility-link-initiate-picker');
   });
+
+  it('with MODE_NAV_V2 enabled, sends a family-join invite for an existing teen and shows a neutral (anti-enum) confirmation', async () => {
+    const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
+    try {
+      const InitiateLinkScreen = require('./initiate').default;
+      const rendered = renderScreen(<InitiateLinkScreen />, {
+        profile: NAMED_PROFILES.guardian,
+        profiles: [NAMED_PROFILES.guardian],
+        routes: { '/family-join/invite': { status: 'sent' } },
+      });
+      cleanupRender = rendered.cleanup;
+      const { routedFetch } = rendered;
+
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-picker-existing-teen'),
+      );
+      // V2 on → the real invite form, not the "unavailable" placeholder.
+      screen.getByTestId('visibility-link-initiate-existing-teen-invite');
+      expect(
+        screen.queryByTestId(
+          'visibility-link-initiate-existing-teen-unavailable',
+        ),
+      ).toBeNull();
+
+      fireEvent.changeText(
+        screen.getByTestId('visibility-link-initiate-existing-teen-email'),
+        'teen@example.com',
+      );
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-existing-teen-submit'),
+      );
+
+      await waitFor(() =>
+        expect(
+          fetchCallsMatching(routedFetch, '/family-join/invite'),
+        ).toHaveLength(1),
+      );
+      const body = extractJsonBody<{ invitedEmail: string }>(
+        fetchCallsMatching(routedFetch, '/family-join/invite')[0]?.init,
+      );
+      expect(body).toEqual({ invitedEmail: 'teen@example.com' });
+
+      // Neutral confirmation — never confirms/denies the account exists.
+      await waitFor(() =>
+        screen.getByTestId('visibility-link-initiate-existing-teen-sent'),
+      );
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        original;
+    }
+  }, 10_000);
 
   it('shows an empty-state message when there are zero eligible managed children', () => {
     renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });

@@ -113,6 +113,17 @@ export const person = pgTable(
     defaultAppContext: text('default_app_context'),
     /** Operational lifecycle marker (NOT consent state — inv 2). */
     archivedAt: timestamp('archived_at', { withTimezone: true }),
+    /**
+     * `migration-pending` interim marker (MMT-ADR-0010 / data-model §6.4).
+     * NULL in steady state; set to the interim's start time while a family-join
+     * / account-consolidation is in flight (membership repointed, org-of-one
+     * not yet decommissioned), cleared on success. Its nullable nature IS the
+     * crash-recovery signal (inv 25): a non-null value on a person whose
+     * org-of-one teardown never completed marks a resumable interim.
+     */
+    migrationPendingAt: timestamp('migration_pending_at', {
+      withTimezone: true,
+    }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -885,6 +896,93 @@ export const consentRequest = pgTable(
     check('consent_request_resend_count_check', sql`${table.resendCount} >= 0`),
     check(
       'consent_request_recipient_change_count_check',
+      sql`${table.recipientChangeCount} >= 0`,
+    ),
+  ],
+).enableRLS();
+
+// ---------------------------------------------------------------------------
+// WI-1753 — family_join_invite (cross-account existing-teen family join).
+//
+// The pre-accept WORKFLOW row for the "join-my-family v1" invite: a parent
+// (the inviter, an adult owner of their family org) invites an existing solo
+// teen by email; the teen later ACCEPTS via the emailed token, repointing their
+// membership into the family org (see services/identity-v2/family-join-v2.ts).
+//
+// R2 key (orchestrator ruling 2026-07-12): the natural key is
+// (inviter_person_id, family_org_id) with invited_email a MUTABLE recipient
+// field — one outstanding invite slot per (parent, family), retargetable. This
+// exactly mirrors consent_request's (charge, purpose, org, basis) key with
+// guardian_email mutable, so the WI-374 atomic compare-and-increment abuse caps
+// (resend_count / recipient_change_count, enforced in requestConsentV2's
+// setWhere) carry over 1:1. resend_count caps same-email resends;
+// recipient_change_count caps retargeting to a different email.
+//
+// ANTI-ENUM (AC-1): the invite WRITE never branches on whether invited_email
+// matches a real account — the row is keyed to the parent's intent, the email
+// is sent out-of-band regardless, and teen resolution happens only at ACCEPT
+// time. So this table's existence/shape leaks nothing about who has an account.
+//
+// Strictly additive: new table, FKs new→existing (person/organization), no ALTER
+// of any existing object.
+// ---------------------------------------------------------------------------
+export const familyJoinInvite = pgTable(
+  'family_join_invite',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    /** The inviting parent — adult owner/admin of the family org (route-gated). */
+    inviterPersonId: uuid('inviter_person_id')
+      .notNull()
+      .references(() => person.id, { onDelete: 'cascade' }),
+    /** The family org the invited teen will join. */
+    familyOrgId: uuid('family_org_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    /**
+     * The out-of-band recipient. NOT NULL: an invite always names a recipient
+     * (there is no pre-`pending` state as consent_request has), so the
+     * initial-assignment (NULL) branch of the consent upsert does not apply here.
+     */
+    invitedEmail: text('invited_email').notNull(),
+    status: text('status').notNull().default('pending'),
+    /** crypto.randomUUID(); NULL outside an open invite cycle. */
+    token: text('token'),
+    tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
+    resendCount: integer('resend_count').notNull().default(0),
+    recipientChangeCount: integer('recipient_change_count')
+      .notNull()
+      .default(0),
+    /** Set when the teen accepts (single in-row terminal transition). */
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // R2 natural key: one outstanding invite slot per (parent, family org).
+    uniqueIndex('family_join_invite_inviter_org_unique').on(
+      table.inviterPersonId,
+      table.familyOrgId,
+    ),
+    // token-lookup hot path (accept route), mirrors consent_request_token_idx:
+    index('family_join_invite_token_idx')
+      .on(table.token)
+      .where(sql`${table.token} IS NOT NULL`),
+    check(
+      'family_join_invite_status_check',
+      sql`${table.status} IN ('pending','accepted')`,
+    ),
+    check(
+      'family_join_invite_resend_count_check',
+      sql`${table.resendCount} >= 0`,
+    ),
+    check(
+      'family_join_invite_recipient_change_count_check',
       sql`${table.recipientChangeCount} >= 0`,
     ),
   ],

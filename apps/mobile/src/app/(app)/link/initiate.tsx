@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +12,9 @@ import {
 import { ErrorFallback } from '../../../components/common';
 import { assertOk } from '../../../lib/assert-ok';
 import { useApiClient } from '../../../lib/api-client';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { formatApiError } from '../../../lib/format-api-error';
+import { useThemeColors } from '../../../lib/theme';
 import {
   useEligibleManagedPersons,
   type EligibleManagedPerson,
@@ -132,7 +134,14 @@ export default function InitiateLinkScreen(): React.ReactElement {
         contentInsetAdjustmentBehavior="automatic"
         testID="visibility-link-initiate-screen"
       >
-        <ExistingTeenUnavailable onBack={() => setTarget(null)} />
+        {/* [WI-1753] The real cross-account invite flow is gated behind
+            MODE_NAV_V2_ENABLED; other environments keep the "not yet available"
+            placeholder so the shipped production behavior does not change. */}
+        {FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? (
+          <ExistingTeenInvite onBack={() => setTarget(null)} />
+        ) : (
+          <ExistingTeenUnavailable onBack={() => setTarget(null)} />
+        )}
       </ScrollView>
     );
   }
@@ -249,6 +258,129 @@ function SupporteePicker({
       >
         <Text className="text-body font-semibold text-text-primary">
           {t('visibility.link.pickerExistingTeenOption')}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// [WI-1753] Cross-account existing-teen invite (join-my-family v1). ANTI-ENUM
+// (AC-1): the endpoint returns a byte-identical neutral ack regardless of
+// whether the email matches an account, so the confirmation copy is deliberately
+// neutral ("if that email belongs to a MentoMate account…") — it never confirms
+// or denies that an account exists. The invite disclosure copy is subject to the
+// AC-1 operator disclosure review.
+function ExistingTeenInvite({
+  onBack,
+}: {
+  onBack: () => void;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const client = useApiClient();
+  const colors = useThemeColors();
+  const [email, setEmail] = useState('');
+
+  const inviteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await client['family-join'].invite.$post({
+        json: { invitedEmail: email.trim() },
+      });
+      await assertOk(res);
+    },
+  });
+
+  if (inviteMutation.isSuccess) {
+    return (
+      <View
+        className="rounded-card border border-border bg-surface p-4"
+        testID="visibility-link-initiate-existing-teen-sent"
+      >
+        <Text className="text-h3 font-semibold text-text-primary">
+          {t('visibility.link.existingTeenInviteSentTitle')}
+        </Text>
+        <Text className="mt-2 text-body text-text-secondary">
+          {t('visibility.link.existingTeenInviteSentMessage')}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('common.goBack')}
+          className="mt-4 min-h-[44px] items-center justify-center rounded-button border border-border px-4 py-2"
+          onPress={onBack}
+          testID="visibility-link-initiate-existing-teen-done"
+        >
+          <Text className="text-body-sm font-semibold text-text-secondary">
+            {t('common.goBack')}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const canSubmit = email.trim().length > 0 && !inviteMutation.isPending;
+
+  return (
+    <View
+      className="rounded-card border border-border bg-surface p-4"
+      testID="visibility-link-initiate-existing-teen-invite"
+    >
+      <Text className="text-h3 font-semibold text-text-primary">
+        {t('visibility.link.existingTeenInviteTitle')}
+      </Text>
+      <Text className="mt-2 text-body text-text-secondary">
+        {t('visibility.link.existingTeenInviteMessage')}
+      </Text>
+      <Text className="mt-4 mb-1 text-body-sm font-semibold text-text-secondary">
+        {t('visibility.link.existingTeenInviteEmailLabel')}
+      </Text>
+      <TextInput
+        className="rounded-input bg-background px-4 py-3 text-body text-text-primary"
+        placeholder={t('visibility.link.existingTeenInviteEmailPlaceholder')}
+        placeholderTextColor={colors.muted}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        value={email}
+        onChangeText={setEmail}
+        editable={!inviteMutation.isPending}
+        testID="visibility-link-initiate-existing-teen-email"
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('visibility.link.existingTeenInviteAction')}
+        disabled={!canSubmit}
+        className={`mt-4 min-h-[48px] items-center justify-center rounded-button px-4 py-3 ${
+          canSubmit ? 'bg-primary' : 'bg-primary/50'
+        }`}
+        onPress={() => inviteMutation.mutate()}
+        testID="visibility-link-initiate-existing-teen-submit"
+      >
+        <Text className="text-body font-semibold text-text-inverse">
+          {inviteMutation.isPending
+            ? t('visibility.link.existingTeenInviteSending')
+            : t('visibility.link.existingTeenInviteAction')}
+        </Text>
+      </Pressable>
+      {inviteMutation.isError ? (
+        <ErrorFallback
+          title={t('visibility.link.existingTeenInviteErrorTitle')}
+          message={formatApiError(inviteMutation.error)}
+          primaryAction={{
+            label: t('common.tryAgain'),
+            onPress: () => inviteMutation.mutate(),
+            testID: 'visibility-link-initiate-existing-teen-retry',
+          }}
+          testID="visibility-link-initiate-existing-teen-error"
+        />
+      ) : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('common.goBack')}
+        className="mt-4 min-h-[44px] items-center justify-center rounded-button border border-border px-4 py-2"
+        onPress={onBack}
+        testID="visibility-link-initiate-existing-teen-back"
+      >
+        <Text className="text-body-sm font-semibold text-text-secondary">
+          {t('common.goBack')}
         </Text>
       </Pressable>
     </View>

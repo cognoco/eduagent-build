@@ -573,6 +573,19 @@ export async function getDailyNotificationCount(
 }
 
 /**
+ * The notification_log-backed helpers operate on the LOGGABLE subset of push
+ * types. `store_cancel_nudge` (WI-1753 AC-6) is a push-only, cap-exempt,
+ * Inngest-idempotent notification that is intentionally never written to
+ * notification_log — so the DB `notification_type` enum deliberately omits it,
+ * and these helpers exclude it from their accepted type. (The push sender in
+ * services/notifications.ts guards the log write for it accordingly.)
+ */
+type LoggableNotificationType = Exclude<
+  NotificationPayload['type'],
+  'store_cancel_nudge'
+>;
+
+/**
  * Server-side only — called exclusively from services/notifications.ts (Inngest pipeline).
  * The profileId originates from a trusted internal notification payload, not user input.
  * No accountId guard required.
@@ -580,7 +593,7 @@ export async function getDailyNotificationCount(
 export async function logNotification(
   db: Database,
   profileId: string,
-  type: NotificationPayload['type'],
+  type: LoggableNotificationType,
   ticketId?: string,
 ): Promise<void> {
   await db.insert(notificationLog).values({
@@ -596,7 +609,7 @@ export async function logNotification(
 export async function getRecentNotificationCount(
   db: Database,
   profileId: string,
-  type: NotificationPayload['type'],
+  type: LoggableNotificationType,
   hours: number,
 ): Promise<number> {
   const since = new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -638,11 +651,11 @@ export async function getRecentNotificationCount(
 export async function checkAndLogRateLimitInternal(
   db: Database,
   profileId: string,
-  type: NotificationPayload['type'],
+  type: LoggableNotificationType,
   opts: {
     hours: number;
     maxCount: number;
-    dedupTypes?: NotificationPayload['type'][];
+    dedupTypes?: LoggableNotificationType[];
   },
 ): Promise<boolean> {
   const dedupTypes = opts.dedupTypes ?? [type];
@@ -687,7 +700,7 @@ export async function checkAndLogRateLimit(
   db: Database,
   profileId: string,
   accountId: string,
-  type: NotificationPayload['type'],
+  type: LoggableNotificationType,
   rateLimitOpts: { hours: number; maxCount: number },
   opts?: IdentityV2Opts,
 ): Promise<boolean> {

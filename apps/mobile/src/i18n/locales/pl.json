@@ -4608,7 +4608,16 @@
       "pickerManagedEmpty": "Jeszcze brak uprawnionych dzieci.",
       "pickerExistingTeenOption": "Istniejący członek rodziny (13+)",
       "existingTeenUnavailableTitle": "Jeszcze niedostępne",
-      "existingTeenUnavailableMessage": "Zapraszanie istniejącego członka rodziny nie jest jeszcze dostępne. Sprawdź ponownie wkrótce."
+      "existingTeenUnavailableMessage": "Zapraszanie istniejącego członka rodziny nie jest jeszcze dostępne. Sprawdź ponownie wkrótce.",
+      "existingTeenInviteTitle": "Zaproś istniejącego członka rodziny",
+      "existingTeenInviteMessage": "Wpisz adres e-mail, którego Twoje dziecko używa w MentoMate. Wyślemy mu zaproszenie do przeniesienia konta do Twojego planu rodzinnego — jego historia nauki zostanie zachowana.",
+      "existingTeenInviteEmailLabel": "Adres e-mail w MentoMate",
+      "existingTeenInviteEmailPlaceholder": "nazwa@przyklad.com",
+      "existingTeenInviteAction": "Wyślij zaproszenie",
+      "existingTeenInviteSending": "Wysyłanie…",
+      "existingTeenInviteSentTitle": "Zaproszenie wysłane",
+      "existingTeenInviteSentMessage": "Jeśli ten e-mail jest powiązany z kontem MentoMate, wysłaliśmy zaproszenie. Poproś o otwarcie MentoMate i zaakceptowanie go.",
+      "existingTeenInviteErrorTitle": "Nie udało się wysłać zaproszenia"
     }
   },
   "supporterColdStart": {

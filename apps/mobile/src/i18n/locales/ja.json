@@ -4438,7 +4438,16 @@
       "pickerManagedEmpty": "対象となるお子様はまだいません。",
       "pickerExistingTeenOption": "既存の家族メンバー（13歳以上）",
       "existingTeenUnavailableTitle": "まだ利用できません",
-      "existingTeenUnavailableMessage": "既存の家族メンバーの招待機能はまだ利用できません。後ほどもう一度ご確認ください。"
+      "existingTeenUnavailableMessage": "既存の家族メンバーの招待機能はまだ利用できません。後ほどもう一度ご確認ください。",
+      "existingTeenInviteTitle": "既存のメンバーを招待",
+      "existingTeenInviteMessage": "お子様がMentoMateで使用しているメールアドレスを入力してください。ファミリープランにアカウントを移行するための招待メールを送信します。学習履歴はそのまま引き継がれます。",
+      "existingTeenInviteEmailLabel": "お子様のMentoMateメールアドレス",
+      "existingTeenInviteEmailPlaceholder": "namae@example.jp",
+      "existingTeenInviteAction": "招待を送信",
+      "existingTeenInviteSending": "送信中…",
+      "existingTeenInviteSentTitle": "招待を送信しました",
+      "existingTeenInviteSentMessage": "そのメールアドレスがMentoMateアカウントに登録されている場合、招待を送信しました。お子様にMentoMateを開いて招待を承認するようお伝えください。",
+      "existingTeenInviteErrorTitle": "招待を送信できませんでした"
     }
   },
   "supporterColdStart": {

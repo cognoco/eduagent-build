@@ -4438,7 +4438,16 @@
       "pickerManagedEmpty": "Ingen kvalifiserte barn ennå.",
       "pickerExistingTeenOption": "Eksisterende familiemedlem (13+)",
       "existingTeenUnavailableTitle": "Ikke tilgjengelig ennå",
-      "existingTeenUnavailableMessage": "Å invitere et eksisterende familiemedlem er ikke tilgjengelig ennå. Sjekk tilbake snart."
+      "existingTeenUnavailableMessage": "Å invitere et eksisterende familiemedlem er ikke tilgjengelig ennå. Sjekk tilbake snart.",
+      "existingTeenInviteTitle": "Inviter et eksisterende familiemedlem",
+      "existingTeenInviteMessage": "Skriv inn e-postadressen tenåringen din bruker for MentoMate. Vi sender dem en invitasjon til å flytte kontoen sin over til familieabonnementet ditt – læringshistorikken deres blir med.",
+      "existingTeenInviteEmailLabel": "Deres MentoMate-e-post",
+      "existingTeenInviteEmailPlaceholder": "navn@eksempel.com",
+      "existingTeenInviteAction": "Send invitasjon",
+      "existingTeenInviteSending": "Sender …",
+      "existingTeenInviteSentTitle": "Invitasjon er på vei",
+      "existingTeenInviteSentMessage": "Hvis e-postadressen tilhører en MentoMate-konto, har vi sendt dem en invitasjon. Be dem om å åpne MentoMate og godta den.",
+      "existingTeenInviteErrorTitle": "Kunne ikke sende invitasjon"
     }
   },
   "supporterColdStart": {

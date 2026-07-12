@@ -4438,7 +4438,16 @@
       "pickerManagedEmpty": "Ainda não há crianças elegíveis.",
       "pickerExistingTeenOption": "Membro da família existente (13+)",
       "existingTeenUnavailableTitle": "Ainda não disponível",
-      "existingTeenUnavailableMessage": "Convidar um membro da família existente ainda não está disponível. Volta em breve."
+      "existingTeenUnavailableMessage": "Convidar um membro da família existente ainda não está disponível. Volta em breve.",
+      "existingTeenInviteTitle": "Convidar um membro da família existente",
+      "existingTeenInviteMessage": "Insira o e-mail que o seu adolescente usa no MentoMate. Enviaremos um convite para mover a conta dele para o seu plano familiar — o histórico de aprendizagem dele será mantido.",
+      "existingTeenInviteEmailLabel": "E-mail do MentoMate",
+      "existingTeenInviteEmailPlaceholder": "nome@exemplo.com",
+      "existingTeenInviteAction": "Enviar convite",
+      "existingTeenInviteSending": "A enviar…",
+      "existingTeenInviteSentTitle": "Convite a caminho",
+      "existingTeenInviteSentMessage": "Se esse e-mail pertencer a uma conta MentoMate, enviámos um convite. Peça-lhe para abrir o MentoMate e aceitá-lo.",
+      "existingTeenInviteErrorTitle": "Não foi possível enviar o convite"
     }
   },
   "supporterColdStart": {
