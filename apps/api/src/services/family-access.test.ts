@@ -25,6 +25,10 @@ import {
   assertOwnerProfile,
 } from './family-access';
 import { ForbiddenError } from '../errors';
+import {
+  createDatabaseModuleMock,
+  seedCredentialedLogins,
+} from '../test-utils/database-module';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -166,6 +170,18 @@ describe('assertChargeNotCredentialed', () => {
     await expect(
       assertChargeNotCredentialed(dbWithCredential(true), CHILD_ID),
     ).rejects.toThrow(ForbiddenError);
+  });
+
+  it('supports explicit credentialed-login seeds on the shared mock database', async () => {
+    const { db } = createDatabaseModuleMock();
+    seedCredentialedLogins(db, [CHILD_ID]);
+
+    await expect(
+      assertChargeNotCredentialed(db as unknown as Database, CHILD_ID),
+    ).rejects.toThrow(ForbiddenError);
+    await expect(
+      assertChargeNotCredentialed(db as unknown as Database, UNRELATED_ID),
+    ).resolves.toBeUndefined();
   });
 });
 

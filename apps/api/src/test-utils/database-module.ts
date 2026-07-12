@@ -55,7 +55,10 @@ function makeV2IdentityQuery(): Record<
   return {
     login: {
       findFirst: jest.fn().mockResolvedValue(loginRow),
-      findMany: jest.fn().mockResolvedValue([loginRow]),
+      // findFirst resolves the canonical caller identity. findMany is for
+      // person-set presence reads and defaults to no credentialed logins;
+      // production has no login.findMany call sites.
+      findMany: jest.fn().mockResolvedValue([]),
     },
     // resolveIdentityV2 requires EXACTLY ONE membership (≠1 → null) — one row.
     membership: {
@@ -67,6 +70,94 @@ function makeV2IdentityQuery(): Record<
       findMany: jest.fn().mockResolvedValue([organizationRow]),
     },
   };
+}
+
+type LoginPresenceRow = { personId: string };
+
+function boundStringValues(expression: unknown): string[] {
+  if (!expression || typeof expression !== 'object') return [];
+  const chunks = (expression as { queryChunks?: unknown[] }).queryChunks;
+  if (!Array.isArray(chunks)) return [];
+
+  const values: string[] = [];
+  for (const chunk of chunks) {
+    if (chunk && typeof chunk === 'object') {
+      const value = (chunk as { value?: unknown }).value;
+      if (typeof value === 'string') values.push(value);
+      // inArray may bind its ids as one array-valued param — flatten so
+      // every queried id participates in the match.
+      else if (Array.isArray(value)) {
+        for (const entry of value) {
+          if (typeof entry === 'string') values.push(entry);
+        }
+      }
+    }
+  }
+  return values;
+}
+
+/**
+ * Seed the login-presence reads used by credentialed-charge guards.
+ *
+ * Query-API reads return every seeded row. Select-chain reads support the
+ * production `eq(login.personId, personId)` and
+ * `inArray(login.personId, personIds)` shapes by matching their bound
+ * strings; other where-clause semantics are not interpreted. Tests should
+ * therefore seed only the person ids relevant to the assertion.
+ */
+export function seedCredentialedLogins(
+  db: MockDatabaseRecord,
+  personIds: string[],
+): void {
+  const { login: loginTable } = jest.requireActual<
+    typeof import('@eduagent/database')
+  >('@eduagent/database');
+  const rows: LoginPresenceRow[] = personIds.map((personId) => ({ personId }));
+  const originalQuery = db.query as Record<string | symbol, unknown>;
+  const originalLogin = originalQuery.login as Record<string, unknown>;
+  const seededLogin = {
+    ...originalLogin,
+    findMany: jest.fn().mockResolvedValue(rows),
+  };
+
+  db.query = new Proxy(originalQuery, {
+    get(target, prop) {
+      return prop === 'login' ? seededLogin : target[prop];
+    },
+  });
+
+  const originalSelect = db.select as (...args: unknown[]) => unknown;
+  db.select = jest.fn((...args: unknown[]) => ({
+    from(table: unknown) {
+      if (table !== loginTable) {
+        return (originalSelect.apply(db, args) as {
+          from(target: unknown): unknown;
+        }).from(table);
+      }
+
+      let selectedRows = rows;
+      const chain: PromiseLike<LoginPresenceRow[]> & {
+        where(expression: unknown): typeof chain;
+        limit(count: number): typeof chain;
+      } = {
+        where(expression) {
+          const queriedIds = new Set(boundStringValues(expression));
+          selectedRows = queriedIds.size
+            ? rows.filter((row) => queriedIds.has(row.personId))
+            : rows;
+          return chain;
+        },
+        limit(count) {
+          selectedRows = selectedRows.slice(0, count);
+          return chain;
+        },
+        then(onfulfilled, onrejected) {
+          return Promise.resolve(selectedRows).then(onfulfilled, onrejected);
+        },
+      };
+      return chain;
+    },
+  }));
 }
 
 /**
