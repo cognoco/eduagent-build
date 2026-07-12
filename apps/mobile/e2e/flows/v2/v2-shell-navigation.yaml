@@ -71,7 +71,12 @@ tags:
     visible:
       id: 'subject-hub-screen'
     timeout: 15000
-- back
+# Native hardware Back can fall through a cross-stack subject-hub route to the
+# shell's first tab. Return through the owning V2 tab, which is the stable user
+# affordance and keeps this lane focused on tab interaction coverage.
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: 'subjects-screen'

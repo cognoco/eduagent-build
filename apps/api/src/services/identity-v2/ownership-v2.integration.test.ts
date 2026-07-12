@@ -25,11 +25,15 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
   guardianship,
+  login,
   membership,
   organization,
   person,
   type Database,
 } from '@eduagent/database';
+import { ForbiddenError } from '@eduagent/schemas';
+import { upsertNotificationPrefs } from '../settings';
+import { deleteMemoryItem } from '../learner-profile';
 import {
   verifyPersonOwnershipV2,
   verifyPersonIsOrgAdminV2,
@@ -116,6 +120,21 @@ const RUN = !!process.env.DATABASE_URL;
       await db
         .insert(guardianship)
         .values({ guardianPersonId, chargePersonId });
+    }
+
+    /**
+     * Credential a person: insert a `login` row bound to them. Canon derives
+     * "credentialed" from Login presence (domain-model.md §4, MMT-ADR-0008:
+     * `op(G, C) ⇐ … ∧ (C has no Login)`) — the login row IS the signal, not
+     * `person.has_own_account` (the birthday-crossing correlate). Cleanup rides
+     * the person delete (login.person_id is ON DELETE CASCADE).
+     */
+    async function seedLogin(personId: string): Promise<void> {
+      await db.insert(login).values({
+        personId,
+        clerkUserId: `test_clerk_${personId}`,
+        email: `wi787-${personId}@example.test`,
+      });
     }
 
     // -----------------------------------------------------------------------
@@ -264,6 +283,113 @@ const RUN = !!process.env.DATABASE_URL;
       });
       // adminB is an admin of org B, but org A's caller must see false.
       expect(await verifyPersonIsOrgAdminV2(db, adminB, orgA)).toBe(false);
+    });
+
+    // -----------------------------------------------------------------------
+    // WI-787 — guardian-write suppression for credentialed charges.
+    // Policy (ruled 2026-07-11, OPQ-32): BLOCKED BY DEFAULT — a guardian's
+    // write authority over a charge is suppressed once the charge holds their
+    // own Login (canon: domain-model.md §4 MMT-ADR-0008 `op(G, C) ⇐ … ∧ (C has
+    // no Login)`; ontology.md inv 8). Exceptions arrive only as future named
+    // capabilities with provenance (WI-1765). The denial must surface as a
+    // ForbiddenError (HTTP 403 at the boundary), never a generic 500.
+    // Negative-path break tests (HIGH): the exact attack is a guardian
+    // supplying their credentialed charge's id on the two v2 write surfaces.
+    // -----------------------------------------------------------------------
+    it('[AUTHZ] denies a guardian writing a CREDENTIALED charge (login present) with ForbiddenError', async () => {
+      const org = await seedOrg('Org');
+      const guardian = await seedMember(org, {
+        name: 'Guardian',
+        roles: ['admin'],
+      });
+      const charge = await seedMember(org, {
+        name: 'Credentialed Charge',
+        roles: ['learner'],
+      });
+      await grantGuardianEdge(guardian, charge);
+      await seedLogin(charge);
+      await expect(
+        verifyPersonOwnershipV2(db, charge, org, guardian),
+      ).rejects.toThrow(ForbiddenError);
+    });
+
+    it('[AUTHZ] still allows a guardian writing a MANAGED charge (no login)', async () => {
+      const org = await seedOrg('Org');
+      const guardian = await seedMember(org, {
+        name: 'Guardian',
+        roles: ['admin'],
+      });
+      const charge = await seedMember(org, {
+        name: 'Managed Charge',
+        roles: ['learner'],
+      });
+      await grantGuardianEdge(guardian, charge);
+      await expect(
+        verifyPersonOwnershipV2(db, charge, org, guardian),
+      ).resolves.toBeUndefined();
+    });
+
+    it('[AUTHZ] a credentialed charge still writes their OWN data (self path unaffected)', async () => {
+      const org = await seedOrg('Org');
+      const cred = await seedMember(org, {
+        name: 'Credentialed Self',
+        roles: ['learner'],
+      });
+      await seedLogin(cred);
+      await expect(
+        verifyPersonOwnershipV2(db, cred, org, cred),
+      ).resolves.toBeUndefined();
+    });
+
+    it('[AUTHZ] settings surface: upsertNotificationPrefs denies guardian → credentialed charge (WI-787 variant 1)', async () => {
+      const org = await seedOrg('Org');
+      const guardian = await seedMember(org, {
+        name: 'Guardian',
+        roles: ['admin'],
+      });
+      const charge = await seedMember(org, {
+        name: 'Credentialed Charge',
+        roles: ['learner'],
+      });
+      await grantGuardianEdge(guardian, charge);
+      await seedLogin(charge);
+      await expect(
+        upsertNotificationPrefs(
+          db,
+          charge,
+          org,
+          { reviewReminders: true, dailyReminders: false, pushEnabled: false },
+          { callerPersonId: guardian },
+        ),
+      ).rejects.toThrow(ForbiddenError);
+    });
+
+    it('[AUTHZ] learner-profile surface: deleteMemoryItem denies guardian → credentialed charge (WI-787 variant 2)', async () => {
+      const org = await seedOrg('Org');
+      const guardian = await seedMember(org, {
+        name: 'Guardian',
+        roles: ['admin'],
+      });
+      const charge = await seedMember(org, {
+        name: 'Credentialed Charge',
+        roles: ['learner'],
+      });
+      await grantGuardianEdge(guardian, charge);
+      await seedLogin(charge);
+      await expect(
+        deleteMemoryItem(
+          db,
+          charge,
+          org,
+          'interests',
+          'chess',
+          false,
+          undefined,
+          {
+            callerPersonId: guardian,
+          },
+        ),
+      ).rejects.toThrow(ForbiddenError);
     });
   },
 );

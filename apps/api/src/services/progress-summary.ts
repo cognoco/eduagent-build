@@ -12,7 +12,10 @@ import type {
 
 import { routeAndCall, type ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
-import { assertParentAccess } from './family-access';
+import {
+  assertChargeNotCredentialed,
+  assertParentAccess,
+} from './family-access';
 import { createLogger } from './logger';
 
 export const INACTIVITY_THRESHOLDS = {
@@ -262,6 +265,7 @@ export async function getProgressSummary(
   childProfileId: string,
 ): Promise<ProgressSummary> {
   await assertParentAccess(db, requesterProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
 
   const stored = await db.query.progressSummaries.findFirst({
     where: eq(progressSummaries.profileId, childProfileId),

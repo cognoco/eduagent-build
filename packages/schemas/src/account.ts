@@ -39,6 +39,9 @@ export type DataExportRow = z.infer<typeof dataExportRowSchema>;
 export const dataExportSubscriptionRowSchema = z.object({
   id: z.string().uuid(),
   accountId: z.string().uuid(),
+  payerPersonId: z.string().uuid(),
+  storeProductId: z.string().nullable(),
+  storePlatform: z.string().nullable(),
   stripeCustomerId: z.string().nullable(),
   stripeSubscriptionId: z.string().nullable(),
   tier: subscriptionTierSchema,
@@ -58,6 +61,56 @@ export const dataExportSubscriptionRowSchema = z.object({
 export type DataExportSubscriptionRow = z.infer<
   typeof dataExportSubscriptionRowSchema
 >;
+
+/**
+ * Human-readable metadata for the approved subscription fields in an account
+ * export. The literal schema makes wording changes an explicit contract change
+ * instead of allowing the route parser to accept arbitrary or missing labels.
+ */
+export const DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS = {
+  payerPersonId: {
+    label: 'Person responsible for payment',
+    description:
+      'The identifier of the person responsible for the subscription payment relationship.',
+  },
+  storeProductId: {
+    label: 'Store product',
+    description:
+      'The product identifier assigned by the app store for this subscription, when applicable.',
+  },
+  storePlatform: {
+    label: 'Store platform',
+    description:
+      'The app-store platform that supplied this subscription, when applicable.',
+  },
+} as const;
+
+export const dataExportSubscriptionFieldDescriptionsSchema = z.object({
+  payerPersonId: z.object({
+    label: z.literal(
+      DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS.payerPersonId.label,
+    ),
+    description: z.literal(
+      DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS.payerPersonId.description,
+    ),
+  }),
+  storeProductId: z.object({
+    label: z.literal(
+      DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS.storeProductId.label,
+    ),
+    description: z.literal(
+      DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS.storeProductId.description,
+    ),
+  }),
+  storePlatform: z.object({
+    label: z.literal(
+      DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS.storePlatform.label,
+    ),
+    description: z.literal(
+      DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS.storePlatform.description,
+    ),
+  }),
+});
 
 /**
  * [WI-978] Assessments export row — learning-data-sensitive table tightened.
@@ -658,6 +711,7 @@ export const dataExportSchema = z.object({
   }),
   profiles: z.array(publicProfileSchema),
   consentStates: z.array(dataExportConsentSchema),
+  subscriptionFieldDescriptions: dataExportSubscriptionFieldDescriptionsSchema,
   // GDPR Article 15 — all personal data.
   // [BUG-206] Each table is `dataExportRowSchema` (centralised passthrough)
   // instead of the previous inline `z.record(z.string(), z.unknown())`.

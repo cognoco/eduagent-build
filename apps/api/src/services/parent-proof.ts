@@ -8,7 +8,10 @@ import {
   type Database,
 } from '@eduagent/database';
 import type { VerifiedProofReceipt } from '@eduagent/schemas';
-import { assertParentAccess } from './family-access';
+import {
+  assertChargeNotCredentialed,
+  assertParentAccess,
+} from './family-access';
 import { assertChildDashboardDataVisible } from './dashboard';
 import { resolveMasteryVerificationState } from './challenge-round/verification';
 import { getRetentionStatus } from './retention';
@@ -161,6 +164,7 @@ export async function getLatestVerifiedProofForChild(
   childProfileId: string,
 ): Promise<VerifiedProofReceipt> {
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChargeNotCredentialed(db, childProfileId);
   await assertChildDashboardDataVisible(db, childProfileId);
 
   const [latest] = await db

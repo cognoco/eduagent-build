@@ -45,6 +45,7 @@ import {
   markWeeklyReportViewed,
 } from '../services/weekly-report';
 import {
+  assertChargeNotCredentialed,
   assertOwnerAndParentAccess,
   assertOwnerProfile,
   assertParentAccess,
@@ -211,7 +212,11 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       // Defense-in-depth: route-entry parent-link check before the service.
       // getChildTopicSnapshotForParent also runs the same guard.
       await assertParentAccess(db, parentProfileId, childProfileId);
-
+      // [WI-787] Credentialed-charge suppression stays INSIDE this try so its
+      // ForbiddenError is audit-logged and converted to 404 like the
+      // parent-link denial — on this IDOR-hidden route topic existence must
+      // stay hidden, so a credentialed charge surfaces as 404, not 403.
+      await assertChargeNotCredentialed(db, childProfileId);
       const snapshot = await getChildTopicSnapshotForParent(
         db,
         parentProfileId,
@@ -300,6 +305,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [CR-2026-05-19-H1] assertOwnerAndParentAccess: isOwner gate + IDOR guard
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
+    await assertChargeNotCredentialed(db, childProfileId);
     await assertChildDashboardDataVisible(db, childProfileId);
 
     const projection = await getMemoryProjection(db, childProfileId, {

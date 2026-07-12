@@ -77,7 +77,7 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   (id) => sanitizeSecureStoreKey(`permissionSetupSeen_${id}`),
   // use-post-session-notification-ask.ts — one-shot post-session notification primer flag.
   notificationFirstAskKey,
-  // use-guardian-notification-ask.ts — one-shot parent-home notification primer flag.
+  // Legacy parent-home notification primer — retain its existing-install purge path.
   guardianNotificationAskKey,
   // session/index.tsx — one-shot mentor-born ceremony for managed child learners.
   mentorBirthSeenKey,

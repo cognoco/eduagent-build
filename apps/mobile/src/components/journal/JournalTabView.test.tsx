@@ -301,7 +301,10 @@ describe('JournalTabView', () => {
     screen.getByTestId('journal-practice-past-activity');
 
     fireEvent.press(screen.getByTestId('journal-practice-open-hub'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/practice',
+      params: { returnTo: 'journal' },
+    });
   });
 
   it('lists past practice activity of every type with topic as the headline', () => {

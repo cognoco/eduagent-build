@@ -9,7 +9,10 @@ import {
   type Database,
 } from '@eduagent/database';
 
-import { assertParentAccess } from './family-access';
+import {
+  assertChargeNotCredentialed,
+  assertParentAccess,
+} from './family-access';
 import { isGdprProcessingAllowedV2 } from './identity-v2/consent-status-v2';
 import { createLogger } from './logger';
 import { sendPushNotification } from './notifications';
@@ -86,6 +89,7 @@ export async function createNudge(
 ): Promise<{ nudge: Nudge; pushSent: boolean }> {
   const now = params.now ?? new Date();
   await assertParentAccess(db, params.fromProfileId, params.toProfileId);
+  await assertChargeNotCredentialed(db, params.toProfileId);
 
   // null means no consent_states row exists — which for the post-profile-create
   // state happens when consent isn't required for this profile's age (17+).
