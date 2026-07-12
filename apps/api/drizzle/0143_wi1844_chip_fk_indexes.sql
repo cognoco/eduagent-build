@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS "supporter_encouragement_chips_subject_id_idx" ON "supporter_encouragement_chips" USING btree ("subject_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "supporter_encouragement_chips_topic_id_idx" ON "supporter_encouragement_chips" USING btree ("topic_id");
