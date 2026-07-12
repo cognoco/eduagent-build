@@ -205,6 +205,11 @@ function tokenizeAnswerTerms(value: string): string[] {
   return terms;
 }
 
+// WI-1815 (F3): bounded one-turn recency guard, mirroring
+// findPendingMeaningOutputTask below — only the single most recent AI turn
+// is consulted, never walked further back. Without this, a learner reply
+// could be evaluated against a graded-input question from an arbitrarily
+// older turn even after the session had moved on to other activities.
 function findLatestGradedInputEvent(
   events: Array<{ eventType: string; metadata: unknown }>,
 ): LanguageActivityTelemetry | null {
@@ -215,15 +220,14 @@ function findLatestGradedInputEvent(
     }
     const metadata = event.metadata;
     if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
-      continue;
+      return null;
     }
     const parsed = streamLanguageLearningActivitySchema.safeParse(
       (metadata as { languageLearning?: unknown }).languageLearning,
     );
-    if (!parsed.success || !parsed.data.gradedInput) {
-      continue;
-    }
-    return parsed.data as LanguageActivityTelemetry;
+    return parsed.success && parsed.data.gradedInput
+      ? (parsed.data as LanguageActivityTelemetry)
+      : null;
   }
   return null;
 }
@@ -233,9 +237,9 @@ function findLatestGradedInputEvent(
 // strand has rotated away and the brief is gone. This re-surfaces it for
 // exactly the one answer turn, so the tutor is anchored to the specific task
 // the learner is replying to. Recency-guarded by construction (only the
-// single most recent AI turn is consulted, never walked further back),
-// unlike findLatestGradedInputEvent above — deliberately not reused/extended
-// here (F3, out of scope for this WI).
+// single most recent AI turn is consulted, never walked further back) — the
+// same bounded pattern findLatestGradedInputEvent above now also follows
+// (WI-1815, F3).
 function findPendingMeaningOutputTask(
   events: Array<{ eventType: string; metadata: unknown }>,
 ): LanguageMeaningOutputArtifact | undefined {
