@@ -803,9 +803,11 @@
       "listening": "Listening...",
       "transcriptLabel": "You said",
       "matched": "Matched",
+      "extraWords": "Extra: {{words}}",
       "retryWithMissingWords": "Try again: {{words}}",
       "retry": "Retry",
-      "retryLabel": "Retry speaking attempt"
+      "retryLabel": "Retry speaking attempt",
+      "attemptError": "Couldn't save that attempt. Try recording again."
     },
     "chatShell": {
       "aiDisclosure": "You're talking to an AI mentor",

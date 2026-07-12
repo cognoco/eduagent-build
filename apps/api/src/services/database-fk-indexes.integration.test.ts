@@ -364,7 +364,6 @@ describe('Integration: FK index coverage (BUG-393 / BUG-396 ratchet)', () => {
       // subject_id: FK cascade; hot read is profile-scoped (profile_id indexed
       // by 0086). Deferred.
       'teaching_preferences::subject_id',
-
     ]);
 
     const db = createIntegrationDb();

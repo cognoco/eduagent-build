@@ -22,6 +22,7 @@ import {
   progressSummaries,
   milestones,
   pendingNotices,
+  speakingPracticeAttempts,
 } from './schema/index.js';
 import { createScopedRepository } from './repository.js';
 import type { Database } from './client.js';
@@ -402,6 +403,39 @@ describe('createScopedRepository', () => {
       expect(repo).toHaveProperty('quizRounds');
       expect(repo).toHaveProperty('quizMissedItems');
       expect(repo).toHaveProperty('pendingNotices');
+      expect(repo).toHaveProperty('speakingPracticeAttempts');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // speakingPracticeAttempts (WI-1777)
+  // ---------------------------------------------------------------------------
+
+  describe('speakingPracticeAttempts.findMany', () => {
+    it('auto-injects profileId filter', async () => {
+      const { db, findMany } = createMockDb();
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+
+      await repo.speakingPracticeAttempts.findMany();
+
+      expect(findMany).toHaveBeenCalledWith({
+        where: eq(speakingPracticeAttempts.profileId, TEST_PROFILE_ID),
+      });
+    });
+
+    it('composes profileId with extra condition', async () => {
+      const { db, findMany } = createMockDb();
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+      const extra = sql`1 = 1`;
+
+      await repo.speakingPracticeAttempts.findMany(extra);
+
+      expect(findMany).toHaveBeenCalledWith({
+        where: and(
+          eq(speakingPracticeAttempts.profileId, TEST_PROFILE_ID),
+          extra,
+        ),
+      });
     });
   });
 

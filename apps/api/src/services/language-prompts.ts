@@ -96,6 +96,22 @@ function formatLanguageSessionState(context: ExchangeContext): string {
         "- Judge the learner's reply against this specific task. If it is incomplete, off-task, or malformed, give the corrected/model form, briefly explain why, and ask for a retry on the same task before moving on.",
       ]
     : [];
+  // WI-1777: repeat-after-me/shadowing. Deterministic client-side
+  // transcript-comparison feedback is computed server-side and shown to the
+  // learner by the mobile app — the LLM never grades this turn.
+  const speakingPractice = activity.speakingPractice;
+  const speakingPracticeLines = speakingPractice
+    ? [
+        'Speaking practice artifact:',
+        `- Mode: ${speakingPractice.type}`,
+        `- Target sentence (already shown to the learner, do not invent a new one): ${sanitizeXmlValue(
+          speakingPractice.targetText,
+          200,
+        )}`,
+        `- Locale: ${speakingPractice.locale}`,
+        '- The learner will repeat this sentence aloud. Transcript-comparison feedback is computed server-side and shown to the learner by the mobile app — you do not need to grade it. Encourage a retry on the same target if they ask for help.',
+      ]
+    : [];
   const previousMeaningOutputTask = state.previousMeaningOutputTask;
   const previousMeaningOutputLines = previousMeaningOutputTask
     ? [
@@ -141,6 +157,7 @@ function formatLanguageSessionState(context: ExchangeContext): string {
     '- Follow this activity brief for the current turn. Do not switch strands unless the learner asks for something urgent or safety-related.',
     ...gradedInputLines,
     ...meaningOutputLines,
+    ...speakingPracticeLines,
     ...previousMeaningOutputLines,
     ...previousComprehensionLines,
   ].join('\n');

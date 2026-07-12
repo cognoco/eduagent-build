@@ -806,7 +806,9 @@
       "matched": "Pasuje",
       "retryWithMissingWords": "Spróbuj ponownie: {{words}}",
       "retry": "Ponów",
-      "retryLabel": "Ponów próbę mówienia"
+      "retryLabel": "Ponów próbę mówienia",
+      "extraWords": "Dodatkowo: {{words}}",
+      "attemptError": "Nie udało się zapisać tej próby. Spróbuj nagrać ponownie."
     },
     "chatShell": {
       "aiDisclosure": "Rozmawiasz z mentorem AI",
