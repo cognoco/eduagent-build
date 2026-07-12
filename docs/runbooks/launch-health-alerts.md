@@ -28,6 +28,28 @@ The LLM fallback signal added by WI-1500 deliberately omits prompt content,
 provider error bodies, and `sessionId`. Its searchable dimensions are limited
 to provider, fallback provider, capability, reason, circuit key, and flow.
 
+## Sentry project routing invariant
+
+The Cloudflare API Worker must send errors to the `mentomate-api` Sentry
+project. Mobile clients and mobile preview builds send errors to
+`mentomate-mobile`; the two DSNs are not interchangeable even though both are
+valid Sentry credentials.
+
+`pnpm secrets:sync` validates the project ID embedded in `SENTRY_DSN` before it
+uploads any Doppler values to a Worker. A mismatch or malformed DSN is a hard
+failure before deployment. The diagnostic may contain the public project IDs,
+but must never print the DSN or its public key.
+
+If the guard fails:
+
+1. stop the deployment rather than bypassing the sync;
+2. correct the affected Doppler configuration to use the `mentomate-api` DSN;
+3. rerun the normal secret-sync and deployment workflow;
+4. emit a safe staging API synthetic and confirm it appears in
+   `mentomate-api`, not `mentomate-mobile`;
+5. verify that no new staging-API errors reach `mentomate-mobile` during the
+   agreed observation window.
+
 ## Alert summary
 
 Thresholds use rolling windows. A threshold is evaluated only in production;
