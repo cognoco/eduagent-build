@@ -415,6 +415,7 @@ export const filingTimedOutObserve = inngest.createFunction(
     );
     captureException(escalation, {
       profileId,
+      tags: { surface: 'filing', signal: 'unrecoverable' },
       extra: {
         sessionId,
         snapshot,

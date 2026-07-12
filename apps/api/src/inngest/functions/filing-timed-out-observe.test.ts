@@ -340,6 +340,12 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
 
     // captureException MUST be called.
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { surface: 'filing', signal: 'unrecoverable' },
+      }),
+    );
   });
 
   // -------------------------------------------------------------------------

@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
+const mockCaptureMessage = jest.fn();
 jest.mock(
   '../../services/sentry' /* gc1-allow: observer test asserts captureException escalation on schema drift */,
   () => {
@@ -12,6 +13,7 @@ jest.mock(
     return {
       ...actual,
       captureException: (...args: unknown[]) => mockCaptureException(...args),
+      captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
     };
   },
 );
@@ -99,6 +101,14 @@ describe('emailBouncedObserve [PR-17-P1]', () => {
       emailId: 'msg-abc-123',
     });
     expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalledWith('email.bounced.received', {
+      level: 'warning',
+      tags: { surface: 'email', signal: 'bounced' },
+      extra: {
+        emailId: 'msg-abc-123',
+        eventTimestamp: '2026-05-12T00:00:00.000Z',
+      },
+    });
   });
 
   it('returns logged status with complained payload', async () => {
@@ -114,6 +124,12 @@ describe('emailBouncedObserve [PR-17-P1]', () => {
       type: 'email.complained',
       emailId: 'msg-def-456',
     });
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'email.complained.received',
+      expect.objectContaining({
+        tags: { surface: 'email', signal: 'complained' },
+      }),
+    );
   });
 
   it('[BREAK] emits a warn-level structured log so bounce events are queryable', async () => {
@@ -201,6 +217,7 @@ describe('emailBouncedObserve [PR-17-P1]', () => {
         message: expect.stringContaining('invalid event payload'),
       }),
       expect.objectContaining({
+        tags: { surface: 'email', signal: 'schema-drift' },
         extra: expect.objectContaining({
           issues: expect.any(Array),
         }),

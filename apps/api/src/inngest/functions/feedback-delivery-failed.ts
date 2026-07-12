@@ -60,6 +60,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       captureException(
         new Error('feedback-delivery-failed: invalid event payload'),
         {
+          tags: { surface: 'feedback', signal: 'schema-drift' },
           extra: {
             surface: 'feedback-delivery-failed',
             reason: 'invalid_payload',
@@ -143,6 +144,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
             'feedback-delivery-failed: missing event.id — using retryId idempotency key',
           ),
           {
+            tags: { surface: 'feedback', signal: 'idempotency-fallback' },
             extra: {
               surface: 'feedback-delivery-failed',
               reason: 'missing_event_id',
@@ -177,6 +179,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
         );
         captureException(err, {
           profileId,
+          tags: { surface: 'feedback', signal: 'delivery-failed' },
           extra: { category: queued.category, reason: result.reason },
         });
         logger.warn('[feedback-delivery-failed] retry still failed', {
