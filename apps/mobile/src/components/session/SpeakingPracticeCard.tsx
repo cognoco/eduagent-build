@@ -6,6 +6,11 @@ import { useThemeColors } from '../../lib/theme';
 
 export interface SpeakingPracticeCardProps {
   targetText: string;
+  // WI-1777 rework: selects the learner-facing instruction copy — distinct
+  // per mode so shadowing reads as its own exercise (speak along with the
+  // audio) rather than a relabeled repeat-after-me. Defaults to
+  // 'repeat_after_me' to preserve existing callers/tests that don't pass it.
+  mode?: 'repeat_after_me' | 'shadowing';
   transcript?: string;
   isListening?: boolean;
   isSpeaking?: boolean;
@@ -30,6 +35,7 @@ export interface SpeakingPracticeCardProps {
 
 export function SpeakingPracticeCard({
   targetText,
+  mode = 'repeat_after_me',
   transcript = '',
   isListening = false,
   isSpeaking = false,
@@ -61,7 +67,9 @@ export function SpeakingPracticeCard({
             {t('session.speakingPractice.title')}
           </Text>
           <Text className="mt-0.5 text-caption text-text-secondary">
-            {t('session.speakingPractice.subtitle')}
+            {mode === 'shadowing'
+              ? t('session.speakingPractice.subtitleShadowing')
+              : t('session.speakingPractice.subtitle')}
           </Text>
         </View>
         <View className="flex-row items-center gap-2">

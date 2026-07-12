@@ -96,6 +96,30 @@ describe('SpeakingPracticeActivity', () => {
     screen.getByText('I would like a cup of tea.');
   });
 
+  // WI-1777 rework: the server's activityType/speakingPractice.type
+  // (previously always 'repeat_after_me') now genuinely alternates to
+  // 'shadowing' — confirm this component renders the shadowing-specific
+  // instruction, not the repeat-after-me one, when that's what it receives.
+  it('renders the shadowing instruction when the activity selects the shadowing mode', () => {
+    const shadowingActivity: LanguageLearningActivityEvent = {
+      ...makeActivity(),
+      activityType: 'shadowing',
+      speakingPractice: {
+        ...makeActivity().speakingPractice!,
+        type: 'shadowing',
+      },
+    };
+    render(
+      <SpeakingPracticeActivity
+        activity={shadowingActivity}
+        sessionId="session-1"
+        subjectId="subject-1"
+      />,
+    );
+    screen.getByText('Speak along with the audio, a beat behind');
+    expect(screen.queryByText('Repeat the line')).toBeNull();
+  });
+
   it('submits an attempt exactly once when recording stops with a transcript', async () => {
     mockMutateAsync.mockResolvedValue({
       attemptNumber: 1,

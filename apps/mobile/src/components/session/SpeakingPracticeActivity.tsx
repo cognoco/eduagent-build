@@ -126,6 +126,7 @@ export function SpeakingPracticeActivity({
     <>
       <SpeakingPracticeCard
         targetText={speakingPractice.targetText}
+        mode={speakingPractice.type}
         transcript={transcript}
         isListening={isListening}
         isSpeaking={isSpeaking}

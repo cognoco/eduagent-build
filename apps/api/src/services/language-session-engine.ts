@@ -589,10 +589,15 @@ function pickRepeatAfterMeSentence(
 }
 
 // WI-1777: one shape serves both `repeat_after_me` and `shadowing` — `mode`
-// selection is a hook for future work (see `selectSpeakingPracticeMode`
-// below), always `repeat_after_me` in this MVP.
-function selectSpeakingPracticeMode(): 'repeat_after_me' | 'shadowing' {
-  return 'repeat_after_me';
+// selection alternates deterministically by fluency-turn index so every
+// beginner learner exercises both modes across a session: even turns get
+// `repeat_after_me`, odd turns get `shadowing`. No randomness — same turn
+// index always yields the same mode (mirrors `pickRepeatAfterMeSentence`'s
+// `Math.abs(turnIndex) % ...` pattern above).
+function selectSpeakingPracticeMode(
+  turnIndex: number,
+): 'repeat_after_me' | 'shadowing' {
+  return Math.abs(turnIndex) % 2 === 0 ? 'repeat_after_me' : 'shadowing';
 }
 
 function buildSpeakingPracticeArtifact(input: {
@@ -600,7 +605,7 @@ function buildSpeakingPracticeArtifact(input: {
   fluencyTurnIndex?: number;
 }): LanguageSpeakingPracticeArtifact {
   return {
-    type: selectSpeakingPracticeMode(),
+    type: selectSpeakingPracticeMode(input.fluencyTurnIndex ?? 0),
     targetText: pickRepeatAfterMeSentence(
       input.languageCode,
       input.fluencyTurnIndex ?? 0,
@@ -751,7 +756,7 @@ export async function buildLanguageActivityTelemetry(input: {
     input.strand === 'fluency' &&
     (input.cefrLevel === 'A1' || input.cefrLevel === 'A2');
   const activityType: LanguageActivityType = isBeginnerFluency
-    ? selectSpeakingPracticeMode()
+    ? selectSpeakingPracticeMode(input.fluencyTurnIndex ?? 0)
     : activityTypeByStrand[input.strand];
   const modality =
     activityType === 'repeat_after_me' || activityType === 'shadowing'

@@ -292,6 +292,50 @@ describe('buildLanguageActivityTelemetry', () => {
     );
   });
 
+  // WI-1777 rework (reviewer bounce): the AC promises Four Strands can
+  // select BOTH repeat_after_me AND shadowing, but selectSpeakingPracticeMode
+  // was hardcoded to always return repeat_after_me — shadowing was defined
+  // in the schema but unreachable. This exercises the real production
+  // selection path (buildLanguageActivityTelemetry, not a stub) and asserts
+  // it alternates deterministically by fluency-turn index, so both modes
+  // — top-level activityType and the nested speakingPractice.type must
+  // agree — are genuinely reachable across a session.
+  it('alternates speaking-practice mode by fluency turn index: even turns select repeat_after_me, odd turns select shadowing', async () => {
+    const evenTurn = await buildLanguageActivityTelemetry({
+      strand: 'fluency',
+      languageCode: 'es',
+      cefrLevel: 'A1',
+      fluencyTurnIndex: 0,
+      targetWords: [],
+      targetGrammar: [],
+    });
+    const oddTurn = await buildLanguageActivityTelemetry({
+      strand: 'fluency',
+      languageCode: 'es',
+      cefrLevel: 'A1',
+      fluencyTurnIndex: 1,
+      targetWords: [],
+      targetGrammar: [],
+    });
+    const nextEvenTurn = await buildLanguageActivityTelemetry({
+      strand: 'fluency',
+      languageCode: 'es',
+      cefrLevel: 'A1',
+      fluencyTurnIndex: 2,
+      targetWords: [],
+      targetGrammar: [],
+    });
+
+    expect(evenTurn.activityType).toBe('repeat_after_me');
+    expect(evenTurn.speakingPractice?.type).toBe('repeat_after_me');
+
+    expect(oddTurn.activityType).toBe('shadowing');
+    expect(oddTurn.speakingPractice?.type).toBe('shadowing');
+
+    expect(nextEvenTurn.activityType).toBe('repeat_after_me');
+    expect(nextEvenTurn.speakingPractice?.type).toBe('repeat_after_me');
+  });
+
   it('falls back to the deterministic passage when LLM generation fails', async () => {
     // No birthYear given, so ageBracket fails closed to 'child'; the router's
     // under-18 gate routes to `approvedTextFallbackConfig`, which prefers
