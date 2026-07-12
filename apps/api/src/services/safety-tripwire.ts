@@ -259,18 +259,24 @@ export function tripwireResponse(
 // model ever sees the picture (exchanges.ts). If OCR itself fails we must NOT
 // fall through and hand an unscreened image to the model — the floor would be
 // silently defeated. Instead we fail SAFE: refuse this turn's image with a
-// neutral, non-accusatory message and let the learner continue with text.
-// This is a generic "couldn't screen it" response, NOT a catastrophic-category
-// hit, so it intentionally lives outside CatastrophicCategory.
+// non-accusatory uncertainty message, local support resources, and a text retry.
+// This is a generic "couldn't screen it" response rather than a claimed
+// catastrophic-category hit, so it intentionally lives outside
+// CatastrophicCategory while still activating the conservative resource path.
 // ---------------------------------------------------------------------------
 
 /** Marker recorded in the ExchangeResult.model field for the fail-safe path. */
 export const IMAGE_UNSCREENED_MODEL = 'deterministic:image_unscreened';
 
-/** Neutral safe reply when an attached image could not be screened (OCR error). */
-export function imageUnscreenedResponse(): string {
+/** Safe reply with local resources when an attached image cannot be screened. */
+export function imageUnscreenedResponse(
+  conversationLanguage: ConversationLanguage = 'en',
+): string {
+  const helplineResourceUrl = HELPLINE_RESOURCE_URLS[conversationLanguage];
   return (
     "I couldn't check that image just now, so I can't open it. " +
+    'If it is about you or someone else being unsafe, use ' +
+    `[Find A Helpline](${helplineResourceUrl}) to find verified support in your country. ` +
     'Please type your question instead, or try the photo again in a moment.'
   );
 }

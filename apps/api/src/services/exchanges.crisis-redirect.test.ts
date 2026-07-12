@@ -14,7 +14,12 @@ import {
   emitMinorPiiEchoRedactedEvent,
   emitSuitabilityBlockedEvent,
   parseExchangeEnvelope,
+  processExchange,
+  streamExchange,
 } from './exchanges';
+import type { ExchangeContext, ImageData } from './exchanges';
+import { resetOcrProvider, setOcrProvider, type OcrProvider } from './ocr';
+import type { OcrResult } from '@eduagent/schemas';
 
 // Inngest dispatch surface — the external Inngest boundary (a real dispatch
 // here would fire a network send), kept in the sanctioned `jest.requireActual`
@@ -102,6 +107,68 @@ describe('parseExchangeEnvelope — crisis_redirect plumbing', () => {
     const parsed = parseExchangeEnvelope('plain prose, not an envelope');
     expect(parsed.envelopeParseFailed).toBe(true);
     expect(parsed.crisisRedirect).toBe(false);
+  });
+});
+
+describe('image-screening uncertainty — crisis resource telemetry', () => {
+  const context: ExchangeContext = {
+    sessionId: 'sess-image-unscreened',
+    profileId: 'prof-image-unscreened',
+    subjectName: 'Mathematics',
+    topicTitle: 'Geometry',
+    topicDescription: 'Triangles',
+    sessionType: 'learning',
+    escalationRung: 1,
+    exchangeHistory: [],
+    birthYear: new Date().getFullYear() - 14,
+    conversationLanguage: 'de',
+  };
+  const imageData: ImageData = {
+    base64: Buffer.from('image').toString('base64'),
+    mimeType: 'image/jpeg',
+  };
+  const failingOcr: OcrProvider = {
+    async extractText(): Promise<OcrResult> {
+      throw new Error('OCR unavailable');
+    },
+  };
+
+  afterEach(() => {
+    resetOcrProvider();
+  });
+
+  it('[BREAK] alarms on direct image-screening uncertainty without sending content', async () => {
+    setOcrProvider(failingOcr);
+
+    await processExchange(context, 'can you read this?', imageData);
+
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/safety.crisis_redirect_fired',
+        data: expect.objectContaining({
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: 'exchange.process.safety.image_unscreened',
+        }),
+      }),
+    );
+  });
+
+  it('[BREAK] alarms on streamed image-screening uncertainty without sending content', async () => {
+    setOcrProvider(failingOcr);
+
+    await streamExchange(context, 'can you read this?', imageData);
+
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/safety.crisis_redirect_fired',
+        data: expect.objectContaining({
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: 'exchange.stream.safety.image_unscreened',
+        }),
+      }),
+    );
   });
 });
 
