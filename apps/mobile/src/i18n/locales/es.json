@@ -773,7 +773,9 @@
       "matched": "Coincide",
       "retryWithMissingWords": "Inténtalo otra vez: {{words}}",
       "retry": "Reintentar",
-      "retryLabel": "Reintentar intento hablado"
+      "retryLabel": "Reintentar intento hablado",
+      "extraWords": "Extra: {{words}}",
+      "attemptError": "No se pudo guardar ese intento. Vuelve a grabar."
     },
     "chatShell": {
       "aiDisclosure": "Estás hablando con un mentor de IA",

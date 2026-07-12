@@ -84,6 +84,7 @@ import { bookSuggestionRoutes } from './routes/book-suggestions';
 import { topicSuggestionRoutes } from './routes/topic-suggestions';
 import { learnerProfileRoutes } from './routes/learner-profile';
 import { dictationRoutes } from './routes/dictation';
+import { speakingPracticeRoutes } from './routes/speaking-practice';
 import { quizRoutes } from './routes/quiz';
 import { feedbackRoutes } from './routes/feedback';
 import { supportRoutes } from './routes/support';
@@ -387,6 +388,7 @@ const routes = api
   .route('/', topicSuggestionRoutes)
   .route('/', learnerProfileRoutes)
   .route('/', dictationRoutes)
+  .route('/', speakingPracticeRoutes)
   .route('/', quizRoutes)
   .route('/', feedbackRoutes)
   .route('/support', supportRoutes)

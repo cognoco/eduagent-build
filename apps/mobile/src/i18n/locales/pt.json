@@ -800,7 +800,9 @@
       "matched": "Corresponde",
       "retryWithMissingWords": "Tente novamente: {{words}}",
       "retry": "Tentar novamente",
-      "retryLabel": "Tentar a fala novamente"
+      "retryLabel": "Tentar a fala novamente",
+      "extraWords": "Extra: {{words}}",
+      "attemptError": "Não foi possível salvar a tentativa. Tente gravar novamente."
     },
     "chatShell": {
       "aiDisclosure": "Você está falando com um mentor de IA",

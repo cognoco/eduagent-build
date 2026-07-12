@@ -31,3 +31,4 @@ export * from './supporter-feed';
 export * from './visibility-contract';
 export * from './activation-events';
 export * from './safety-digest';
+export * from './speaking-practice';

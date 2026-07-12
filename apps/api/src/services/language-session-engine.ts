@@ -14,10 +14,11 @@ import {
   type LanguageMeaningOutputResponseMode,
   type LanguageMeaningOutputTaskType,
   type LanguageNextPracticePointer,
+  type LanguageSpeakingPracticeArtifact,
   type LanguageStrand,
 } from '@eduagent/schemas';
 
-import { SUPPORTED_LANGUAGES } from '../data/languages';
+import { SUPPORTED_LANGUAGES, getLanguageByCode } from '../data/languages';
 import { generateGradedInputContent } from './graded-input-generation';
 
 export const LANGUAGE_STRANDS = [
@@ -509,6 +510,103 @@ function buildMeaningOutputArtifact(input: {
   };
 }
 
+// WI-1777: short, single-sentence targets for repeat-after-me/shadowing —
+// deliberately NOT `buildSeedPassage` (that emits three sentences, which
+// would make transcript-comparison scoring noisy for a verbatim-repeat
+// exercise). Deterministic, no LLM: same code list/switch shape as
+// `starterWordsForLanguage`/`buildSeedPassage` above, defaulting to English
+// for any language code not in this table.
+const DEFAULT_REPEAT_AFTER_ME_SENTENCES: readonly [string, ...string[]] = [
+  'Hello, how are you.',
+  'I like coffee.',
+  'I live in a big house.',
+];
+
+const REPEAT_AFTER_ME_SENTENCES: Record<
+  string,
+  readonly [string, ...string[]]
+> = {
+  es: ['Hola, como estas.', 'Me gusta el cafe.', 'Vivo en una casa grande.'],
+  fr: [
+    'Bonjour, comment ca va.',
+    "J'aime le cafe.",
+    "J'habite dans une grande maison.",
+  ],
+  de: [
+    'Hallo, wie geht es dir.',
+    'Ich mag Kaffee.',
+    'Ich wohne in einem grossen Haus.',
+  ],
+  it: ['Ciao, come stai.', 'Mi piace il caffe.', 'Vivo in una casa grande.'],
+  pt: [
+    'Ola, como voce esta.',
+    'Eu gosto de cafe.',
+    'Eu moro em uma casa grande.',
+  ],
+  nb: [
+    'Hei, hvordan har du det.',
+    'Jeg liker kaffe.',
+    'Jeg bor i et stort hus.',
+  ],
+  nl: [
+    'Hallo, hoe gaat het met je.',
+    'Ik hou van koffie.',
+    'Ik woon in een groot huis.',
+  ],
+  sv: ['Hej, hur mar du.', 'Jag gillar kaffe.', 'Jag bor i ett stort hus.'],
+  da: [
+    'Hej, hvordan har du det.',
+    'Jeg kan lide kaffe.',
+    'Jeg bor i et stort hus.',
+  ],
+  ro: [
+    'Buna, ce mai faci.',
+    'Imi place cafeaua.',
+    'Locuiesc intr-o casa mare.',
+  ],
+  id: ['Halo, apa kabar.', 'Saya suka kopi.', 'Saya tinggal di rumah besar.'],
+  ms: ['Helo, apa khabar.', 'Saya suka kopi.', 'Saya tinggal di rumah besar.'],
+  sw: [
+    'Habari, hujambo.',
+    'Ninapenda kahawa.',
+    'Ninaishi katika nyumba kubwa.',
+  ],
+};
+
+function pickRepeatAfterMeSentence(
+  languageCode: string | undefined,
+  turnIndex: number,
+): string {
+  const sentences =
+    (languageCode ? REPEAT_AFTER_ME_SENTENCES[languageCode] : undefined) ??
+    DEFAULT_REPEAT_AFTER_ME_SENTENCES;
+  const index = Math.abs(turnIndex) % sentences.length;
+  return sentences[index] ?? sentences[0];
+}
+
+// WI-1777: one shape serves both `repeat_after_me` and `shadowing` — `mode`
+// selection is a hook for future work (see `selectSpeakingPracticeMode`
+// below), always `repeat_after_me` in this MVP.
+function selectSpeakingPracticeMode(): 'repeat_after_me' | 'shadowing' {
+  return 'repeat_after_me';
+}
+
+function buildSpeakingPracticeArtifact(input: {
+  languageCode?: string;
+  fluencyTurnIndex?: number;
+}): LanguageSpeakingPracticeArtifact {
+  return {
+    type: selectSpeakingPracticeMode(),
+    targetText: pickRepeatAfterMeSentence(
+      input.languageCode,
+      input.fluencyTurnIndex ?? 0,
+    ),
+    locale: getLanguageByCode(input.languageCode ?? '')?.sttLocale ?? 'en-US',
+    modality: 'voice',
+    retryGuidance: 'retry_same_target',
+  };
+}
+
 export function getLanguageStrandCounts(
   events: Array<{ eventType: string; metadata: unknown }>,
 ): LanguageStrandCounts {
@@ -625,6 +723,10 @@ export async function buildLanguageActivityTelemetry(input: {
   targetWords?: string[];
   targetGrammar?: string[];
   meaningOutputTurnIndex?: number;
+  // WI-1777: session-scoped fluency-turn counter, threaded the same way as
+  // `meaningOutputTurnIndex` above — picks which deterministic target
+  // sentence rotates in across a session's fluency turns.
+  fluencyTurnIndex?: number;
   interests?: string[];
   birthYear?: number | null;
   birthMonth?: number | null;
@@ -636,20 +738,33 @@ export async function buildLanguageActivityTelemetry(input: {
     language_focus: 'correction_retry',
     fluency: 'timed_drill',
   };
+  // WI-1777: "beginner speaking practice" narrows to an explicit A1/A2
+  // cefrLevel — an unset/null cefrLevel is NOT treated as beginner here, so
+  // fluency turns with no known level keep today's exact `timed_drill`
+  // behavior (verified against the existing "maps fluency strands to timed
+  // drill telemetry" test, which calls this with no cefrLevel at all).
+  const isBeginnerFluency =
+    input.strand === 'fluency' &&
+    (input.cefrLevel === 'A1' || input.cefrLevel === 'A2');
+  const activityType: LanguageActivityType = isBeginnerFluency
+    ? selectSpeakingPracticeMode()
+    : activityTypeByStrand[input.strand];
   const modality =
-    input.strand === 'meaning_input'
-      ? input.inputMode === 'voice'
-        ? 'listening'
-        : 'text'
-      : input.inputMode === 'voice'
-        ? 'voice'
-        : 'text';
+    activityType === 'repeat_after_me' || activityType === 'shadowing'
+      ? 'voice'
+      : input.strand === 'meaning_input'
+        ? input.inputMode === 'voice'
+          ? 'listening'
+          : 'text'
+        : input.inputMode === 'voice'
+          ? 'voice'
+          : 'text';
 
   const targetWords = input.targetWords?.slice(0, 8) ?? [];
   const targetGrammar = input.targetGrammar?.slice(0, 8) ?? [];
   const activity: LanguageActivityTelemetry = {
     strand: input.strand,
-    activityType: activityTypeByStrand[input.strand],
+    activityType,
     modality,
     targetWords,
     targetGrammar,
@@ -674,6 +789,13 @@ export async function buildLanguageActivityTelemetry(input: {
       meaningOutputTurnIndex: input.meaningOutputTurnIndex,
       targetWords,
       targetGrammar,
+    });
+  }
+
+  if (isBeginnerFluency) {
+    activity.speakingPractice = buildSpeakingPracticeArtifact({
+      languageCode: input.languageCode,
+      fluencyTurnIndex: input.fluencyTurnIndex,
     });
   }
 
@@ -732,6 +854,7 @@ export async function buildLanguageSessionState(input: {
       targetWords: input.targetWords,
       targetGrammar: input.targetGrammar,
       meaningOutputTurnIndex: sessionStrandCounts.meaning_output,
+      fluencyTurnIndex: sessionStrandCounts.fluency,
       interests: input.interests,
       birthYear: input.birthYear,
       birthMonth: input.birthMonth,

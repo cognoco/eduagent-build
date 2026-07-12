@@ -191,6 +191,16 @@ export class VocabularyNotFoundError extends Error {
   }
 }
 
+// WI-1777: write-side ownership guard for speaking-practice attempts —
+// mirrors SubjectNotFoundError's shape for the sessionId ownership check.
+export class LearningSessionNotFoundError extends Error {
+  constructor() {
+    super('Learning session not found');
+    this.name = 'LearningSessionNotFoundError';
+    Object.setPrototypeOf(this, LearningSessionNotFoundError.prototype);
+  }
+}
+
 export class TopicNotSkippedError extends Error {
   constructor() {
     super('Topic is not skipped');

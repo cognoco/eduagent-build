@@ -13,6 +13,7 @@ const {
   findMissingSecretNames,
   isRenderedWranglerToml,
   shouldSkipSync,
+  validateApiSentryProject,
 } = require('./sync-secrets.js') as {
   buildWranglerBulkArgs: (
     wranglerEnv: string | null,
@@ -25,7 +26,60 @@ const {
   ) => string[];
   isRenderedWranglerToml: (toml: string) => boolean;
   shouldSkipSync: (isRendered: boolean, configPath?: string) => boolean;
+  validateApiSentryProject: (secrets: Record<string, string>) => {
+    valid: boolean;
+    expectedProjectId: string;
+    actualProjectId?: string;
+    reason?: string;
+  };
 };
+
+describe('[WI-1920] API Worker Sentry project identity', () => {
+  it('accepts the mentomate-api Sentry project', () => {
+    expect(
+      validateApiSentryProject({
+        SENTRY_DSN:
+          'https://public-key@example.ingest.sentry.io/4511717632704592',
+      }),
+    ).toMatchObject({
+      valid: true,
+      expectedProjectId: '4511717632704592',
+      actualProjectId: '4511717632704592',
+    });
+  });
+
+  it('rejects the mentomate-mobile Sentry project', () => {
+    expect(
+      validateApiSentryProject({
+        SENTRY_DSN:
+          'https://public-key@example.ingest.sentry.io/4511082906452048',
+      }),
+    ).toMatchObject({
+      valid: false,
+      expectedProjectId: '4511717632704592',
+      actualProjectId: '4511082906452048',
+      reason: 'wrong-project',
+    });
+  });
+
+  it('rejects a malformed Sentry DSN without echoing it', () => {
+    const result = validateApiSentryProject({ SENTRY_DSN: 'not-a-dsn' });
+
+    expect(result).toMatchObject({
+      valid: false,
+      expectedProjectId: '4511717632704592',
+      reason: 'invalid-dsn',
+    });
+    expect(JSON.stringify(result)).not.toContain('not-a-dsn');
+  });
+
+  it('allows an absent optional Sentry DSN', () => {
+    expect(validateApiSentryProject({})).toEqual({
+      valid: true,
+      expectedProjectId: '4511717632704592',
+    });
+  });
+});
 
 describe('[WI-1643] isRenderedWranglerToml', () => {
   it('treats a rendered account_id assignment as rendered even when comments mention the placeholder', () => {

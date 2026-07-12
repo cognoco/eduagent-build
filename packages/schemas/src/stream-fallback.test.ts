@@ -249,6 +249,58 @@ describe('streamDoneFrameSchema', () => {
     expect(legacy.languageLearning?.gradedInput).toBeUndefined();
   });
 
+  it('parses speaking-practice activity metadata (WI-1777)', () => {
+    const result = streamDoneFrameSchema.parse({
+      type: 'done',
+      exchangeCount: 3,
+      escalationRung: 1,
+      languageLearning: {
+        strand: 'fluency',
+        activityType: 'repeat_after_me',
+        modality: 'voice',
+        targetWords: [],
+        targetGrammar: [],
+        speakingPractice: {
+          type: 'repeat_after_me',
+          targetText: 'I would like a cup of tea.',
+          locale: 'en-US',
+          modality: 'voice',
+          retryGuidance: 'retry_same_target',
+        },
+      },
+    });
+
+    expect(result.languageLearning?.speakingPractice).toMatchObject({
+      type: 'repeat_after_me',
+      targetText: 'I would like a cup of tea.',
+      locale: 'en-US',
+    });
+  });
+
+  it('rejects speaking-practice metadata missing required targetText', () => {
+    expect(() =>
+      streamDoneFrameSchema.parse({
+        type: 'done',
+        exchangeCount: 3,
+        escalationRung: 1,
+        languageLearning: {
+          strand: 'fluency',
+          activityType: 'shadowing',
+          modality: 'voice',
+          targetWords: [],
+          targetGrammar: [],
+          speakingPractice: {
+            type: 'shadowing',
+            targetText: '',
+            locale: 'en-US',
+            modality: 'voice',
+            retryGuidance: 'retry_same_target',
+          },
+        },
+      }),
+    ).toThrow();
+  });
+
   it('rejects a frame with the wrong type literal', () => {
     expect(() =>
       streamDoneFrameSchema.parse({

@@ -54,6 +54,11 @@ const ENV_MAP = {
 const EXCLUDE_PREFIXES = ['DOPPLER_', 'EXPO_', 'CLOUDFLARE_', 'SENTRY_AUTH_'];
 const EXCLUDE_EXACT = ['EXPO_TOKEN', 'API_ORIGIN'];
 
+// Sentry project IDs are public routing identifiers, not credentials. Pinning
+// the API project here prevents a valid DSN for another MentoMate surface from
+// silently routing Worker errors into that project's quota and issue stream.
+const API_SENTRY_PROJECT_ID = '4511717632704592';
+
 const DOPPLER_CLI =
   process.platform === 'win32' ? 'C:\\Tools\\doppler\\doppler.exe' : 'doppler';
 
@@ -146,6 +151,46 @@ function filterSecrets(secrets) {
     }
   }
   return { filtered, excluded };
+}
+
+function validateApiSentryProject(secrets) {
+  const dsn = secrets.SENTRY_DSN;
+  if (!dsn) {
+    return { valid: true, expectedProjectId: API_SENTRY_PROJECT_ID };
+  }
+
+  let actualProjectId;
+  try {
+    const url = new URL(dsn);
+    const pathSegments = url.pathname.split('/').filter(Boolean);
+    actualProjectId = pathSegments.at(-1);
+    if (!actualProjectId || !/^\d+$/.test(actualProjectId)) {
+      return {
+        valid: false,
+        expectedProjectId: API_SENTRY_PROJECT_ID,
+        reason: 'invalid-dsn',
+      };
+    }
+  } catch {
+    return {
+      valid: false,
+      expectedProjectId: API_SENTRY_PROJECT_ID,
+      reason: 'invalid-dsn',
+    };
+  }
+
+  return actualProjectId === API_SENTRY_PROJECT_ID
+    ? {
+        valid: true,
+        expectedProjectId: API_SENTRY_PROJECT_ID,
+        actualProjectId,
+      }
+    : {
+        valid: false,
+        expectedProjectId: API_SENTRY_PROJECT_ID,
+        actualProjectId,
+        reason: 'wrong-project',
+      };
 }
 
 function buildWranglerBulkArgs(wranglerEnv, workerName, configPath) {
@@ -255,6 +300,17 @@ function syncEnvironment(envKey, configPath) {
   const { filtered, excluded } = filterSecrets(secrets);
   const syncCount = Object.keys(filtered).length;
 
+  const sentryProject = validateApiSentryProject(filtered);
+  if (!sentryProject.valid) {
+    const actual = sentryProject.actualProjectId || 'unparseable';
+    console.error(
+      `\x1b[31m[sync]\x1b[0m Refusing ${envKey} Worker secret sync: ` +
+        `SENTRY_DSN targets project ${actual}; expected API project ` +
+        sentryProject.expectedProjectId,
+    );
+    return false;
+  }
+
   console.log(
     `  Downloaded: ${totalCount} keys, syncing: ${syncCount}, excluded: ${excluded.length}`,
   );
@@ -353,6 +409,7 @@ module.exports = {
   isRenderedWranglerToml,
   shouldSkipSync,
   syncSecrets,
+  validateApiSentryProject,
 };
 
 // CLI entry point — only runs when called directly
