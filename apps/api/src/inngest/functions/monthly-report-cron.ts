@@ -162,14 +162,14 @@ export const monthlyReportCron = inngest.createFunction(
               ),
             )
         : [];
-      const uncredentialedChargeIds = new Set(
+      const managedChargeIds = new Set(
         await filterUncredentialedCharges(
           db,
           guardianshipRows.map((row) => row.childProfileId),
         ),
       );
       const linkedPairs = guardianshipRows
-        .filter((row) => uncredentialedChargeIds.has(row.childProfileId))
+        .filter((row) => managedChargeIds.has(row.childProfileId))
         .map((row) => ({
           parentId: row.parentProfileId,
           childId: row.childProfileId,
