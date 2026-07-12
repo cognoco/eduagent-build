@@ -211,10 +211,17 @@ function updateEasJson(
       continue;
     }
 
-    // Filter to EXPO_PUBLIC_* + allowlisted vars, skip empty values.
+    // Partition the managed vars Doppler returned this run by their intent
+    // (WI-1852, blank-means-clear semantics):
+    //   present with a value -> managedVars  (write / overwrite it)
+    //   present but empty ''  -> blankedVars  (CLEAR it from eas.json — an
+    //                            explicit blank in Doppler unsets the baked value)
+    //   absent from payload   -> neither      (preserved by the merge below; the
+    //                            WI-1311 preserve-by-default fix — absent != empty)
     // EAS_JSON_DENYLIST keys are secrets and must NEVER be written to committed
     // eas.json — they come from EAS Environment Variables at build time.
     const managedVars = {};
+    const blankedVars = new Set();
     for (const [key, value] of Object.entries(secrets)) {
       if (EAS_JSON_DENYLIST.includes(key)) {
         continue;
@@ -222,6 +229,8 @@ function updateEasJson(
       if (key.startsWith('EXPO_PUBLIC_') || EAS_EXTRA_VARS.includes(key)) {
         if (value !== '') {
           managedVars[key] = value;
+        } else {
+          blankedVars.add(key);
         }
       }
     }
@@ -243,6 +252,17 @@ function updateEasJson(
 
       for (const [key, value] of Object.entries(existingEnv)) {
         if (EAS_JSON_DENYLIST.includes(key)) {
+          continue;
+        }
+        // WI-1852: Doppler explicitly blanked this managed var this run —
+        // clear it from the baked eas.json rather than preserving the stale
+        // value. (A managed key ABSENT from Doppler falls through to the
+        // preserve-by-default path below; only an explicit '' clears.)
+        if (blankedVars.has(key)) {
+          console.log(
+            `\x1b[33m[Doppler]\x1b[0m   clearing ${key} (blanked in Doppler ` +
+              `${envKey})`,
+          );
           continue;
         }
         mergedEnv[key] = value;

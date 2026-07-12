@@ -433,6 +433,8 @@ Mobile builds contain **no server secrets**. Public config splits between two si
 
 These are synced from Doppler (`stg` → development/preview, `prd` → production) into `eas.json` by `pnpm env:sync`. Since `eas.json` is committed, run `pnpm env:sync` and commit the result after changing values in Doppler. `scripts/setup-env.js` filters out any key in `EAS_JSON_DENYLIST` (see Sink 2), so legacy secret entries get stripped on the next run.
 
+**Blank-means-clear (WI-1852).** The sync treats a managed var by its state in the current Doppler download: a **value** is written; an **explicit empty string** clears the baked `eas.json` value (blanking a var in Doppler removes it from builds); and a var **absent** from the download is preserved (the WI-1311 preserve-by-default fix). Absent ≠ empty — only an explicit blank clears. To remove a managed var from builds, blank it in Doppler and re-run `pnpm env:sync`; to leave builds untouched, remove the key from Doppler entirely.
+
 #### Sink 2 — EAS Environment Variables (client-side secrets)
 
 These are **not** in the committed `eas.json`. They are stored as EAS Environment Variables on the Expo project and injected by EAS Build at build time. They are still publishable (mobile bundles are reverse-engineerable), but keeping them out of git avoids accidental rotation pain and limits blast radius if a fork or leak occurs.
