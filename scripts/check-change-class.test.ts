@@ -232,7 +232,7 @@ describe('check-change-class.sh', () => {
     const output = runChangeClass(repo, ['--branch'], {
       encoding: 'utf8',
     });
-    expect(output).toContain('pnpm db:migrate:dev');
+    expect(output).toContain('pnpm db:push:dev');
     expect(output).toContain('pnpm exec nx run @eduagent/database:test');
     expect(output).toContain('pnpm test:api:integration');
   });

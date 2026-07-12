@@ -75,9 +75,6 @@ pnpm run db:push:dev
 # Generate migration
 pnpm run db:generate:dev
 
-# Apply migration
-pnpm run db:migrate:dev
-
 # Open Drizzle Studio
 pnpm run db:studio:dev
 ```

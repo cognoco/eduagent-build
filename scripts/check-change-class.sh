@@ -256,7 +256,7 @@ fi
 # ── DB Migrations ────────────────────────────────────────────────────────
 if hit '^apps/api/drizzle/(.*\.sql|meta/.*)$'; then
   CLASSES+=("db-migrations")
-  add_cmd fast  "pnpm db:migrate:dev"        "Apply migration to dev DB"
+  add_cmd fast  "pnpm db:push:dev"           "Apply schema to dev DB (dev is push-only, never migrate)"
   add_cmd fast  "pnpm exec nx run @eduagent/database:test" "Database package tests (RLS coverage)"
   add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
   note "db-migrations: Apply migration BEFORE deploying code that reads new columns"
