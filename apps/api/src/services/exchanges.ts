@@ -1665,8 +1665,8 @@ function buildTripwireEnvelope(
  *
  * FAIL-SAFE: if OCR errors we must NOT fall through to the conversational
  * model (that would silently defeat the floor). We return `image_unscreened`
- * so the caller refuses the image with a neutral message — matching the
- * "silent recovery without escalation is banned" rule on safety paths.
+ * so the caller refuses the image, shows local support resources, and emits
+ * the metadata-only operator alarm required for safety uncertainty.
  */
 type ImageScreenResult =
   | { kind: 'clean' }
@@ -1732,7 +1732,7 @@ async function screenImageForCatastrophicContent(
 
 /** Non-streaming ExchangeResult for the image-could-not-be-screened fail-safe. */
 function buildImageUnscreenedResult(context: ExchangeContext): ExchangeResult {
-  const response = imageUnscreenedResponse();
+  const response = imageUnscreenedResponse(context.conversationLanguage);
   return {
     response,
     newEscalationRung: context.escalationRung,
@@ -1748,10 +1748,12 @@ function buildImageUnscreenedResult(context: ExchangeContext): ExchangeResult {
 }
 
 /** Synthetic envelope for the streaming image-unscreened fail-safe. */
-function buildImageUnscreenedEnvelope(): string {
+function buildImageUnscreenedEnvelope(
+  conversationLanguage: ExchangeContext['conversationLanguage'],
+): string {
   return JSON.stringify({
-    reply: imageUnscreenedResponse(),
-    signals: {},
+    reply: imageUnscreenedResponse(conversationLanguage),
+    signals: { crisis_redirect: true },
     confidence: 'high',
   });
 }
@@ -1826,6 +1828,11 @@ export async function processExchange(
       return buildTripwireResult(screen.category, context);
     }
     if (screen.kind === 'unscreened') {
+      await emitCrisisRedirectEvent({
+        sessionId: context.sessionId,
+        profileId: context.profileId,
+        flow: 'exchange.process.safety.image_unscreened',
+      });
       return buildImageUnscreenedResult(context);
     }
   }
@@ -2111,9 +2118,14 @@ export async function streamExchange(
       );
     }
     if (screen.kind === 'unscreened') {
+      await emitCrisisRedirectEvent({
+        sessionId: context.sessionId,
+        profileId: context.profileId,
+        flow: 'exchange.stream.safety.image_unscreened',
+      });
       return buildSafeStreamResult(
-        imageUnscreenedResponse(),
-        buildImageUnscreenedEnvelope(),
+        imageUnscreenedResponse(context.conversationLanguage),
+        buildImageUnscreenedEnvelope(context.conversationLanguage),
         IMAGE_UNSCREENED_MODEL,
       );
     }
