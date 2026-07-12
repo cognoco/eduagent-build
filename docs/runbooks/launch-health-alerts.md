@@ -50,6 +50,31 @@ If the guard fails:
 5. verify that no new staging-API errors reach `mentomate-mobile` during the
    agreed observation window.
 
+## Sentry ingestion-capacity invariant
+
+Every Sentry-backed alert in this runbook is blind when the organization has
+exhausted its error-event quota. Transaction ingestion uses a separate quota,
+so continuing traces do not prove that errors or alert events are accepted.
+
+Before relying on Sentry during a launch window, the accountable operator must
+verify all of the following without copying credentials or payment details into
+the evidence record:
+
+1. the organization has either an active paid plan with remaining error quota
+   or a non-zero on-demand error budget;
+2. the organization is not suspended or past due;
+3. a controlled error probe reports accepted events rather than only
+   `rate_limited` outcomes;
+4. one safe synthetic creates an issue and exercises an `[LH]` alert rule to
+   its configured destination.
+
+If the error quota is exhausted, treat every Sentry rule as unavailable even
+when its configuration still appears active. Restore capacity through the
+Operator Queue financial-action gate, confirm ingestion with the controlled
+probe, and only then use Sentry delivery as launch-health evidence. Record the
+chosen plan or budget and the before/after probe on the governing Work Item;
+never record API tokens, DSNs, card details, or invoices in this runbook.
+
 ## Alert summary
 
 Thresholds use rolling windows. A threshold is evaluated only in production;
