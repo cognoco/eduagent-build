@@ -416,8 +416,13 @@ const fluencyDrillSchema = z.preprocess(
       delete normalized['score'];
     }
 
+    // A 0/0 score is meaningless — no drill has been graded yet. Template-
+    // following models (e.g. gpt-oss-120b) emit the response-format template's
+    // `score` field even when STARTING a drill (active:true), producing
+    // score:{correct:0,total:0}; total:0 then violates score.total >= 1 and
+    // fails the whole envelope. Strip an all-zero score regardless of `active`
+    // (was previously stripped only when active===false — WI-1823).
     if (
-      normalized['active'] === false &&
       normalized['score'] &&
       typeof normalized['score'] === 'object' &&
       !Array.isArray(normalized['score']) &&

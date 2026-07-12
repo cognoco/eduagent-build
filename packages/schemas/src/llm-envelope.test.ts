@@ -283,6 +283,29 @@ describe('llmResponseEnvelopeSchema', () => {
     expect(parsed.ui_hints?.fluency_drill?.score).toBeUndefined();
   });
 
+  it('[WI-1823] accepts fluency_drill active=true with degenerate 0/0 score (strips it)', () => {
+    // Captured four-strands t5 drill-start payload: a template-following model
+    // (gpt-oss-120b) emits the `score` field the response-format template shows
+    // even when STARTING a drill, producing score:{correct:0,total:0}. total:0
+    // violates score.total >= 1. Before the fix the all-zero score was only
+    // stripped when active=false, so an active=true drill-start failed
+    // llmResponseEnvelopeSchema.safeParse → schema_violation. The 0/0 score is
+    // meaningless at drill start; strip it regardless of active.
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'Ready — 30 second drill with porque, pero, entonces. Go!',
+      ui_hints: {
+        fluency_drill: {
+          active: true,
+          duration_s: 30,
+          score: { correct: 0, total: 0 },
+        },
+      },
+    });
+    expect(parsed.ui_hints?.fluency_drill?.active).toBe(true);
+    expect(parsed.ui_hints?.fluency_drill?.duration_s).toBe(30);
+    expect(parsed.ui_hints?.fluency_drill?.score).toBeUndefined();
+  });
+
   it('removes fluency_drill.duration_s when active=false and duration_s=0', () => {
     const parsed = llmResponseEnvelopeSchema.parse({
       reply: 'Test',

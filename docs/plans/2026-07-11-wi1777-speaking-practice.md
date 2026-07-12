@@ -245,7 +245,7 @@ is the actual, verified single-scorer invariant: one code path computes a
 score (server), one prop group carries it, and the card has no other way to
 produce a verdict.
 
-### 5. Database — new table, migration 0143 (additive only)
+### 5. Database — new table, migration 0144 (additive only)
 
 `packages/database/src/schema/speaking-practice.ts` (new file), modeled on
 `sessionEvents`'s triple-FK + cascade-delete + composite-index shape (the
@@ -309,7 +309,7 @@ UI only allows one recording at a time), so this is accepted as-is rather
 than adding a client idempotency key (the dictation `completionKey` pattern)
 that the AC doesn't call for.
 
-Migration `apps/api/drizzle/0143_wi1777_speaking_practice_attempts.sql`,
+Migration `apps/api/drizzle/0144_wi1777_speaking_practice_attempts.sql`,
 generated via `pnpm run db:generate:dev` (single `CREATE TABLE`, additive,
 matching the immutable-forward-migration convention). No `## Rollback`
 section needed (create-only, no data-loss surface — matches the WI-1552
@@ -498,7 +498,7 @@ this key).
 - [x] T2: Server selection — `buildLanguageActivityTelemetry`'s conditional fluency branch + `buildSpeakingPracticeArtifact()` (`apps/api/src/services/language-session-engine.ts`). Test: beginner fluency (A1/A2) → `repeat_after_me` artifact; unset-cefrLevel and B1+ fluency → unchanged `timed_drill`/no-artifact behavior (regression — an existing test asserts this for unset cefrLevel specifically, so `null`/`undefined` is explicitly excluded from the beginner gate).
 - [x] T3: Prompt — `speakingPracticeLines` block (`apps/api/src/services/language-prompts.ts`). Ran `pnpm eval:llm`: 476 snapshots, zero tracked drift (no existing fixture persona/activity exercises a beginner-fluency repeat_after_me turn, so the new conditional block is inert on current fixtures — a harness-written zero-drift receipt is the accepted outcome per `AGENTS.md`). Correctness of the new block's exact text is covered directly by a `language-prompts.test.ts` unit test instead of a new eval fixture (scope-narrowed from the original plan text below).
 - [x] T4: Scoring module — `apps/api/src/services/speaking-practice/scoring.ts`. Tests: punctuation, casing, diacritics, word order, empty transcript, empty target, multiplicity/dedup-regression. (Non-Latin/Japanese target is moot in practice — `apps/api/src/data/languages.ts`'s `SUPPORTED_LANGUAGES` list, the only source of `languageCode` reaching this scorer, has no `ja` entry; the Unicode-aware normalizer is still the right general-purpose choice.)
-- [x] T5: DB schema + migration 0143 + repository sub-factory. Test: read-back through `createScopedRepository` (integration test, not run locally — see T6). Discovered during verification: RLS coverage requires the ENABLE + CREATE POLICY statements in the SAME migration (added to `0143_wi1777_speaking_practice_attempts.sql`) and a manifest entry in `apps/api/src/services/database-rls-coverage.ts`'s `PROFILE_SCOPED_TABLES` (a second, API-side RLS guard beyond `packages/database`'s scanner) — both required, neither was "automatic" as originally assumed; both are now green. Renumbered 0142→0143 during the post-PR rebase onto main (WI-1002's `0142_supporter_contract_fk_indexes_partial` landed first and took the slot); snapshot regenerated via `pnpm run db:generate:dev` against main's cumulative schema.
+- [x] T5: DB schema + migration 0144 + repository sub-factory. Test: read-back through `createScopedRepository` (integration test, not run locally — see T6). Discovered during verification: RLS coverage requires the ENABLE + CREATE POLICY statements in the SAME migration (added to `0144_wi1777_speaking_practice_attempts.sql`) and a manifest entry in `apps/api/src/services/database-rls-coverage.ts`'s `PROFILE_SCOPED_TABLES` (a second, API-side RLS guard beyond `packages/database`'s scanner) — both required, neither was "automatic" as originally assumed; both are now green. Renumbered twice during post-PR rebases onto main, each time because a landed PR took the slot first: 0142→0143 (WI-1002's `0142_supporter_contract_fk_indexes_partial`), then 0143→0144 (WI-1844's `0143_wi1844_chip_fk_indexes`). Snapshot regenerated both times via `pnpm run db:generate:dev` against main's cumulative schema.
 - [x] T6: Route + service (`speaking-practice.ts` route + service). Tests: ownership/profile-scoping (cross-profile subject AND cross-profile session separately rejected), attempt-number increments across retries, response schema, whole-bundle vertical (select → build artifact → POST → read back via `createScopedRepository` → assert response matches persisted row). Integration test (`attempt.integration.test.ts`) requires `DATABASE_URL`/Doppler; could not run against a real DB in this sandbox (a pnpm/corepack version-resolution mismatch breaks the nested `doppler run` invocation in this environment) — typecheck/lint clean, CI is the authoritative gate for this suite per `AGENTS.md`.
 - [x] T7: Mobile — `sse.ts` derivation, `use-session-streaming.ts` gate extension (regression test first, red→green, confirmed), `SpeakingPracticeActivity.tsx` wrapper, `session/index.tsx` wiring (keyed by target text so a new turn's target rotation forces a fresh transcript/feedback state, while retry on the same target never remounts), `SpeakingPracticeCard.tsx` server-feedback props (single scorer — see §4) + i18n keys. Tests: mobile rendering from live session metadata (activity present/absent), submit-once-per-stop, retry preserves target, extraWords display, mutation-failure user-visible error path (added during lint — `local/require-mutate-error-handling`).
 - [x] T8: i18n — `en.json` keys (`extraWords`, `attemptError`), `pnpm translate` (6 locales), baseline rebuild. `check:i18n`/`check:i18n:orphans`/`check:i18n:jsx-literals`/`manual-plural-guard.test.ts` all clean.
@@ -527,6 +527,6 @@ matches the persisted row exactly (single-scorer invariant from §4).
 
 ## Rollback
 
-Migration 0143 only creates a new table — no rollback procedure needed; a
+Migration 0144 only creates a new table — no rollback procedure needed; a
 revert is `DROP TABLE speaking_practice_attempts` with no data-loss impact on
 any other table (nothing else references it).

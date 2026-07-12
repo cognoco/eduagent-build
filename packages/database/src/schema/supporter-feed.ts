@@ -109,6 +109,8 @@ export const supporterEncouragementChips = pgTable(
     index('supporter_encouragement_chips_supportership_idx').on(
       table.supportershipId,
     ),
+    index('supporter_encouragement_chips_subject_id_idx').on(table.subjectId),
+    index('supporter_encouragement_chips_topic_id_idx').on(table.topicId),
     check(
       'supporter_encouragement_chips_source_check',
       sql`${table.source} IN ('kickstart','co_learning_payoff')`,

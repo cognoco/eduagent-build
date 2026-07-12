@@ -364,13 +364,6 @@ describe('Integration: FK index coverage (BUG-393 / BUG-396 ratchet)', () => {
       // subject_id: FK cascade; hot read is profile-scoped (profile_id indexed
       // by 0086). Deferred.
       'teaching_preferences::subject_id',
-
-      // supporter_encouragement_chips ————————————————————————————————————————
-      // subject_id, topic_id: nullable set-null FKs; chip reads are keyed by
-      // supportee/supporter person ids (both indexed by 0120); cascade fires
-      // only on subject/topic deletion. Deferred follow-up: WI-1844.
-      'supporter_encouragement_chips::subject_id',
-      'supporter_encouragement_chips::topic_id',
     ]);
 
     const db = createIntegrationDb();
