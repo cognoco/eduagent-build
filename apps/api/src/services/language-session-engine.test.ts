@@ -801,6 +801,48 @@ describe('buildLanguageSessionState', () => {
     expect(state.activeStrand).toBe('fluency');
   });
 
+  it('yields no comprehension verdict when there is no graded-input event anywhere in history [WI-1815/F3]', async () => {
+    const meaningOutputOnlyEvent = {
+      eventType: 'ai_response',
+      metadata: {
+        languageLearning: {
+          strand: 'meaning_output',
+          activityType: 'free_response',
+          modality: 'text',
+          targetWords: ['agua'],
+          targetGrammar: [],
+          meaningOutput: {
+            type: 'meaning_output',
+            taskType: 'personal_answer',
+            communicativeGoal:
+              'Share a true or imagined personal answer someone could respond to.',
+            prompt:
+              'Answer personally in one or two short sentences using agua.',
+            responseMode: 'short_answer',
+            targetWords: ['agua'],
+            targetGrammar: [],
+            retryExpectation: 'retry_after_feedback',
+            correctionExpectation: 'meaning_first_then_form',
+          },
+        },
+      },
+    };
+
+    const state = await buildLanguageSessionState({
+      exchangeCount: 1,
+      events: [meaningOutputOnlyEvent],
+      learnerMessage: 'Yo bebo agua.',
+      inputMode: 'text',
+      languageCode: 'es',
+      cefrLevel: 'A1',
+      knownWords: ['agua'],
+      targetWords: ['agua'],
+    });
+
+    expect(state.previousComprehension).toBeUndefined();
+    expect(state.activeStrand).not.toBe('language_focus');
+  });
+
   it('re-surfaces the just-presented meaning-output task for exactly one answer turn [WI-1756]', async () => {
     const meaningOutputEvent = {
       eventType: 'ai_response',
