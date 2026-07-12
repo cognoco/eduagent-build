@@ -134,37 +134,52 @@ describe('recitationPolishAddedFact (scoped to polished segment — WI-1823 ruli
 });
 
 describe('sourceAuditNoFactualClaim (source_audit no-claim skip — WI-1823 ruling 2a)', () => {
-  // Captured verify1 recitation t1: setup prompt asking what to recite. The
-  // model asserted no fact, so it emitted no factual_confidence.
+  // Captured verify1 recitation t1: setup prompt inviting the learner to
+  // recite first. The model asserted no fact, so it emitted no
+  // factual_confidence, and the reply itself is a pure invitation.
   const recitationSetup = {
     status: 'missing_reliable_source',
     factualConfidence: undefined,
   };
-  // Captured verify1 four-strands t1: language-immersion opener (greeting +
-  // example + question). Empty relied_on, no factual_confidence.
+  const recitationSetupReply = "Go ahead and recite it for me — I'm listening.";
+  // Captured verify1 four-strands t1: language-immersion opener, a question
+  // in the target language. Empty relied_on, no factual_confidence.
   const immersionOpener = { status: 'missing_reliable_source' };
-  // Captured verify1 homework t3: correct arithmetic check ("3·5+5=20"). The
-  // model asserted a fact and reported factualConfidence — MUST still fire.
-  const homeworkVerification = {
+  const immersionOpenerReply = '¿Qué te gustaría practicar hoy?';
+  // The realistic dangerous case Codex P1 caught: the model FORGOT to
+  // populate relied_on for a source-specific factual claim, so status is
+  // missing_reliable_source and factual_confidence is ABSENT (it is only
+  // ever emitted for general_knowledge reliance per the prompt contract,
+  // apps/api/src/services/exchange-prompts.ts:578 — its absence here does
+  // NOT mean no claim was made). The reply is a declarative factual
+  // assertion, so this must NOT be skipped.
+  const forgottenSourceAudit = {
     status: 'missing_reliable_source',
-    factualConfidence: 1,
+    factualConfidence: undefined,
   };
+  const forgottenSourceReply = '3·5+5 = 20.';
 
-  it('skips a contentless recitation setup turn (no factual_confidence)', () => {
-    expect(sourceAuditNoFactualClaim(recitationSetup)).toBe(true);
+  it('skips a contentless recitation setup turn (invitation, no factual_confidence)', () => {
+    expect(
+      sourceAuditNoFactualClaim(recitationSetup, recitationSetupReply),
+    ).toBe(true);
   });
 
-  it('skips a language-immersion opener (empty relied_on, no factual_confidence)', () => {
-    expect(sourceAuditNoFactualClaim(immersionOpener)).toBe(true);
+  it('skips a language-immersion opener (question, empty relied_on, no factual_confidence)', () => {
+    expect(
+      sourceAuditNoFactualClaim(immersionOpener, immersionOpenerReply),
+    ).toBe(true);
   });
 
-  it('does NOT skip a homework verification that asserted a fact', () => {
-    expect(sourceAuditNoFactualClaim(homeworkVerification)).toBe(false);
+  it('does NOT skip a declarative factual assertion with no relied_on and no factual_confidence', () => {
+    expect(
+      sourceAuditNoFactualClaim(forgottenSourceAudit, forgottenSourceReply),
+    ).toBe(false);
   });
 
   it('does NOT skip other fail statuses even without factual_confidence', () => {
-    expect(sourceAuditNoFactualClaim({ status: 'unsupported_sources' })).toBe(
-      false,
-    );
+    expect(
+      sourceAuditNoFactualClaim({ status: 'unsupported_sources' }, ''),
+    ).toBe(false);
   });
 });

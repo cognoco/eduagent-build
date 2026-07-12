@@ -877,7 +877,7 @@ function analyzeTurn(input: {
     });
   } else if (
     SOURCE_AUDIT_FAIL_STATUSES.has(input.sourceAudit.status) &&
-    !sourceAuditNoFactualClaim(input.sourceAudit)
+    !sourceAuditNoFactualClaim(input.sourceAudit, response)
   ) {
     issues.push({
       severity: 'fail',

@@ -41,20 +41,58 @@ export function recitationPolishAddedFact(response: string): boolean {
   return RECITATION_UNSUPPORTED_POLISH_RE.test(segment);
 }
 
+// Splits a reply into sentences on sentence-ending punctuation.
+const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+/;
+function replySentences(reply: string): string[] {
+  return reply
+    .split(SENTENCE_SPLIT_RE)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 0);
+}
+
+// Sentences that only invite/prepare the learner (setup, "I'm listening")
+// carry no factual assertion, whatever follows the invitational phrase.
+const NO_CLAIM_SENTENCE_RE =
+  /^(?:go ahead|i'?m (?:listening|ready)|i am (?:listening|ready)|whenever you'?re ready|when you'?re ready|take your time|your turn|sure|great|okay|ok|awesome|nice|no problem|of course|let'?s (?:start|begin|go|try))\b/i;
+
+// True when the reply contains a declarative sentence that isn't a question
+// and isn't purely invitational — i.e. it asserts something that needs
+// grounding (e.g. "The mitochondria is the powerhouse of the cell.",
+// "3·5+5 = 20.").
+// ponytail: sentence-level, not clause-level — an invitational sentence that
+// smuggles in a fact via em dash ("Go ahead — the answer is 20.") is not
+// caught. The two real legitimately-skipped shapes (recitation-setup
+// invitations, immersion-opener questions) don't do this; a genuine miss
+// here is a gap to close if it shows up in captured evidence.
+function replyAssertsFactualClaim(reply: string): boolean {
+  return replySentences(reply).some(
+    (sentence) =>
+      !sentence.endsWith('?') && !NO_CLAIM_SENTENCE_RE.test(sentence),
+  );
+}
+
 // A turn makes no factual claim when its source audit reports
-// missing_reliable_source AND the model emitted no factual_confidence — it
-// asserted nothing that needs grounding. Setup/greeting/prompt turns hit this
-// (recitation "what would you like to recite?", a language-immersion opener
-// question); a homework verification that asserts "3·5+5=20" reports
-// factualConfidence and is NOT skipped. WI-1823 ruling 2a — the skip keys on
-// the no-claim signal, not on relied_on being empty.
-export function sourceAuditNoFactualClaim(audit: {
-  status: string;
-  factualConfidence?: number;
-}): boolean {
+// missing_reliable_source AND the model emitted no factual_confidence (which
+// per the prompt contract is only ever emitted for general_knowledge
+// reliance — its absence alone doesn't prove no claim was made) AND the
+// reply itself is non-assertive (setup/invitation or question only).
+// Setup/greeting/prompt turns hit this (recitation "go ahead and recite it
+// for me — I'm listening", a language-immersion opener question); a
+// declarative factual assertion with no relied_on and no factual_confidence
+// (e.g. "3·5+5 = 20.") must NOT be skipped. WI-1823 ruling 2a — the skip
+// keys on the no-claim signal, not on relied_on being empty; closing the
+// carve-out hole where a forgotten relied_on masqueraded as "no claim".
+export function sourceAuditNoFactualClaim(
+  audit: {
+    status: string;
+    factualConfidence?: number;
+  },
+  reply: string,
+): boolean {
   return (
     audit.status === 'missing_reliable_source' &&
-    audit.factualConfidence == null
+    audit.factualConfidence == null &&
+    !replyAssertsFactualClaim(reply)
   );
 }
 
