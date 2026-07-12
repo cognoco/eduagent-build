@@ -74,25 +74,40 @@ function makeV2IdentityQuery(): Record<
 
 type LoginPresenceRow = { personId: string };
 
+// A drizzle bound parameter: `value` holds the caller's value and `encoder`
+// the column driver. Distinguishes real params from StringChunk, whose
+// `value` is an array of raw SQL fragments ('', ' in ', …) that must never
+// be treated as queried ids.
+function isBoundParam(chunk: unknown): chunk is { value: unknown } {
+  return (
+    !!chunk && typeof chunk === 'object' && 'value' in chunk && 'encoder' in chunk
+  );
+}
+
 function boundStringValues(expression: unknown): string[] {
   if (!expression || typeof expression !== 'object') return [];
   const chunks = (expression as { queryChunks?: unknown[] }).queryChunks;
   if (!Array.isArray(chunks)) return [];
 
   const values: string[] = [];
-  for (const chunk of chunks) {
-    if (chunk && typeof chunk === 'object') {
-      const value = (chunk as { value?: unknown }).value;
+  const collect = (chunk: unknown): void => {
+    // inArray nests one Param per id inside a plain array chunk — recurse.
+    if (Array.isArray(chunk)) {
+      chunk.forEach(collect);
+      return;
+    }
+    if (isBoundParam(chunk)) {
+      const { value } = chunk;
       if (typeof value === 'string') values.push(value);
-      // inArray may bind its ids as one array-valued param — flatten so
-      // every queried id participates in the match.
+      // An array-valued param (array-bound inArray shape).
       else if (Array.isArray(value)) {
         for (const entry of value) {
           if (typeof entry === 'string') values.push(entry);
         }
       }
     }
-  }
+  };
+  chunks.forEach(collect);
   return values;
 }
 

@@ -200,6 +200,9 @@ function buildMockDb(
     .fn()
     .mockReturnValue({ onConflictDoNothing: mockOnConflictDoNothing });
   const mockInsert = jest.fn().mockReturnValue({ values: mockInsertValues });
+  const mockSelectWhere = jest.fn().mockResolvedValue([]);
+  const mockSelectFrom = jest.fn().mockReturnValue({ where: mockSelectWhere });
+  const mockSelect = jest.fn().mockReturnValue({ from: mockSelectFrom });
 
   const db = {
     query: {
@@ -280,6 +283,7 @@ function buildMockDb(
       ...extraQueryOverrides,
     },
     insert: mockInsert,
+    select: mockSelect,
     _mockInsert: mockInsert,
     _mockInsertValues: mockInsertValues,
     _mockOnConflictDoNothing: mockOnConflictDoNothing,
@@ -758,7 +762,15 @@ function buildMonthlyMockDb(
     .mockResolvedValue([{ conversationLanguage: null }]);
   const mockSelectWhere = jest.fn().mockReturnValue({ limit: mockSelectLimit });
   const mockSelectFrom = jest.fn().mockReturnValue({ where: mockSelectWhere });
-  const mockSelect = jest.fn().mockReturnValue({ from: mockSelectFrom });
+  const mockSelect = jest
+    .fn()
+    .mockImplementation((fields: Record<string, unknown>) => ({
+      from: 'personId' in fields
+        ? jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
+          })
+        : mockSelectFrom,
+    }));
 
   return {
     query: {
