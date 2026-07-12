@@ -18,7 +18,7 @@ status: in-progress
 - `apps/api/src/inngest/functions/inngest-function-failed-observe.ts` (new fleet observer)
 - `apps/api/src/inngest/functions/inngest-function-failed-observe.test.ts` (new behavior/privacy contract)
 - `apps/api/src/inngest/index.ts` (register the observer)
-- Existing launch-health observers and their focused tests: challenge-round finalization, transcript purge, notification suppression, email bounce/complaint, feedback delivery, Ask classification, and filing timeout/resolution
+- Existing launch-health observers and their focused tests: challenge-round finalization, transcript purge, notification suppression, email bounce/complaint, feedback delivery, and filing timeout/resolution
 - `docs/runbooks/launch-health-alerts.md` (real Sentry tag filters and fleet fallback)
 
 ## Out of scope

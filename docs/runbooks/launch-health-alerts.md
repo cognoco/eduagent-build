@@ -41,7 +41,7 @@ channel. `Page` routes to the accountable launch operator.
 | 3. Challenge grader | Sentry `surface:challenge-round signal:finalize-failed` | One failure in 24 hours | Three failures in 1 hour |
 | 4. Notification delivery | Sentry `surface:notification signal:suppressed`; `surface:email`; `surface:feedback signal:delivery-failed` | Three suppressions/bounces/retries in 1 hour | One `surface:email signal:complained` or terminal feedback-retry failure, or ten combined failures in 1 hour |
 | 5. Deletion and retention | Sentry `surface:transcript-purge signal:delayed`; `surface:transcript-purge signal:function-failed`; `app/consent.revocation.failed` | Any delayed purge or retrying revocation failure | Any terminal purge or consent-revocation failure; delayed purge count at least 10 |
-| 6. Ask classification and stranded filing | Sentry `surface:ask-classification`; `surface:filing` | Any classification failure or filing auto-retry | Five classification failures or three unrecoverable filings in 1 hour |
+| 6. Stranded filing | Sentry `surface:filing` | Any filing auto-retry | Three unrecoverable filings in 1 hour |
 
 Every bucket also has the fleet-wide terminal-failure backstop:
 
@@ -233,22 +233,18 @@ surface:transcript-purge signal:function-failed
 - `apps/api/src/inngest/functions/transcript-purge-observe.test.ts`
 - `apps/api/src/inngest/functions/consent-revocation.test.ts`
 
-## 6. Ask classification and stranded filing
+## 6. Stranded filing
 
 ### Meaning
 
-The live Ask observability events are
-`app/ask.classification_completed`, `app/ask.classification_skipped`, and
-`app/ask.classification_failed`. The older `app/ask.gate_decision` and
-`app/ask.gate_timeout` names are not emitted and must not be used in alert
-rules. A filing auto-retry or unrecoverable resolution means an ended learning
-session did not reach its expected Library destination on the primary path.
+The old `app/ask.gate_decision` and `app/ask.gate_timeout` surfaces were removed
+with the superseded session-depth gate and must not be used in alert rules. A
+filing auto-retry or unrecoverable resolution means an ended learning session
+did not reach its expected Library destination on the primary path.
 
 Sentry filters:
 
 ```text
-surface:ask-classification signal:failed
-surface:ask-classification signal:skipped
 surface:filing signal:auto-retry-attempted
 surface:filing signal:resolved resolution:unrecoverable
 surface:filing signal:unrecoverable
@@ -256,18 +252,15 @@ surface:filing signal:unrecoverable
 
 ### First response
 
-1. Compare classification failure/skip volume with the previous 24-hour
-   baseline and group only by the tagged coarse outcome.
-2. For classification failures, inspect the `ask-silent-classify` run and its
-   upstream LLM/database dependencies without forwarding its error text.
-3. For `app/session.filing_timed_out`, inspect the recovery attempt and the
+1. Compare filing retry/unrecoverable volume with the previous 24-hour baseline
+   and group only by the tagged coarse outcome.
+2. For `app/session.filing_timed_out`, inspect the recovery attempt and the
    eventual `app/session.filing_resolved` event before replaying.
-4. Do not inspect or post learner reasoning text; the observer intentionally
+3. Do not inspect or post learner reasoning text; the observer intentionally
    records only reason presence/length.
 
 ### Evidence
 
-- `apps/api/src/inngest/functions/ask-classification-observe.test.ts`
 - `apps/api/src/inngest/functions/filing-observe.test.ts`
 - `apps/api/src/inngest/functions/filing-timed-out-observe.test.ts`
 - `apps/api/src/inngest/functions/filing-stranded-backfill.test.ts`

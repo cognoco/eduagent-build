@@ -18,7 +18,7 @@
 
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
-import { captureException, captureMessage } from '../../services/sentry';
+import { captureException } from '../../services/sentry';
 import {
   classificationCompletedEventSchema,
   classificationSkippedEventSchema,
@@ -45,7 +45,6 @@ export const askClassificationCompletedObserve = inngest.createFunction(
           '[ask-classification-completed] invalid event payload — schema drift or bad event',
         ),
         {
-          tags: { surface: 'ask-classification', signal: 'schema-drift' },
           extra: {
             issues: parsed.error.issues,
             rawData: summarizeRawPayload(event.data),
@@ -87,7 +86,6 @@ export const askClassificationSkippedObserve = inngest.createFunction(
           '[ask-classification-skipped] invalid event payload — schema drift or bad event',
         ),
         {
-          tags: { surface: 'ask-classification', signal: 'schema-drift' },
           extra: {
             issues: parsed.error.issues,
             rawData: summarizeRawPayload(event.data),
@@ -102,18 +100,6 @@ export const askClassificationSkippedObserve = inngest.createFunction(
       exchangeCount: data.exchangeCount ?? 0,
       reason: data.reason ?? 'unknown',
       topConfidence: data.topConfidence ?? null,
-    });
-    captureMessage('ask.classification_skipped', {
-      level: 'warning',
-      tags: {
-        surface: 'ask-classification',
-        signal: 'skipped',
-      },
-      extra: {
-        sessionId: data.sessionId ?? null,
-        exchangeCount: data.exchangeCount ?? 0,
-        topConfidence: data.topConfidence ?? null,
-      },
     });
     return {
       status: 'logged' as const,
@@ -141,7 +127,6 @@ export const askClassificationFailedObserve = inngest.createFunction(
           '[ask-classification-failed] invalid event payload — schema drift or bad event',
         ),
         {
-          tags: { surface: 'ask-classification', signal: 'schema-drift' },
           extra: {
             issues: parsed.error.issues,
             rawData: summarizeRawPayload(event.data),
@@ -158,14 +143,6 @@ export const askClassificationFailedObserve = inngest.createFunction(
       sessionId: data.sessionId ?? 'unknown',
       exchangeCount: data.exchangeCount ?? 0,
       error: data.error ?? 'unknown',
-    });
-    captureMessage('ask.classification_failed', {
-      level: 'error',
-      tags: { surface: 'ask-classification', signal: 'failed' },
-      extra: {
-        sessionId: data.sessionId ?? null,
-        exchangeCount: data.exchangeCount ?? 0,
-      },
     });
     return {
       status: 'logged' as const,

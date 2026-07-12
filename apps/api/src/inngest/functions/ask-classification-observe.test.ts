@@ -3,7 +3,6 @@
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
-const mockCaptureMessage = jest.fn();
 jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
@@ -11,7 +10,6 @@ jest.mock('../../services/sentry', () => {
   return {
     ...actual,
     captureException: (...args: unknown[]) => mockCaptureException(...args),
-    captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
   };
 });
 
@@ -100,7 +98,6 @@ describe('ask classification observe handlers (BUG-836 / F-SVC-002)', () => {
         subjectName: 'Math',
         confidence: 0.92,
       });
-      expect(mockCaptureMessage).not.toHaveBeenCalled();
     });
   });
 
@@ -131,16 +128,6 @@ describe('ask classification observe handlers (BUG-836 / F-SVC-002)', () => {
         reason: 'below_threshold',
         topConfidence: 0.4,
       });
-      expect(mockCaptureMessage).toHaveBeenCalledWith(
-        'ask.classification_skipped',
-        expect.objectContaining({
-          level: 'warning',
-          tags: {
-            surface: 'ask-classification',
-            signal: 'skipped',
-          },
-        }),
-      );
     });
   });
 
@@ -176,13 +163,6 @@ describe('ask classification observe handlers (BUG-836 / F-SVC-002)', () => {
         exchangeCount: 7,
         error: 'classifySubject threw: timeout',
       });
-      expect(mockCaptureMessage).toHaveBeenCalledWith(
-        'ask.classification_failed',
-        expect.objectContaining({
-          level: 'error',
-          tags: { surface: 'ask-classification', signal: 'failed' },
-        }),
-      );
     });
   });
 
