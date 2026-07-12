@@ -14,9 +14,7 @@ import {
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  deleteLegacyAccountsForTest,
   deleteV2IdentitiesForTest,
-  ensureLegacyProfileAnchorForTest,
   ensureV2IdentityForLegacyProfileTest,
 } from '../test-utils/legacy-identity-anchors';
 import {
@@ -69,15 +67,6 @@ async function seedTopic(
   seededAccountIds.push(accountId);
   seededProfileIds.push(profileId);
 
-  await ensureLegacyProfileAnchorForTest(database, {
-    accountId,
-    profileId,
-    clerkUserId,
-    email,
-    displayName: `Apply Retention ${label}`,
-    birthYear: 2010,
-    isOwner: true,
-  });
   await ensureV2IdentityForLegacyProfileTest(database, {
     accountId,
     profileId,
@@ -136,7 +125,6 @@ async function cleanupByPrefix(database: Database): Promise<void> {
     accountIds: seededAccountIds,
     profileIds: seededProfileIds,
   });
-  await deleteLegacyAccountsForTest(database, seededAccountIds);
   seededAccountIds.length = 0;
   seededProfileIds.length = 0;
 }
@@ -478,7 +466,9 @@ describe('T10 — cross-writer lifecycle', () => {
         .limit(1)
     )[0];
     if (!afterStamp1) throw new Error('card missing after first stamp');
-    expect(afterStamp1.masteredAt?.toISOString()).toBe(masteredAt.toISOString());
+    expect(afterStamp1.masteredAt?.toISOString()).toBe(
+      masteredAt.toISOString(),
+    );
 
     // Second stamp must be a no-op (masteredAtNull guard blocks)
     const laterAt = new Date('2026-06-16T10:00:00.000Z');

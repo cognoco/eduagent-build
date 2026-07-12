@@ -24,9 +24,7 @@ import {
 } from './curriculum';
 import type { GeneratedBookTopic } from '@eduagent/schemas';
 import {
-  deleteLegacyAccountsForTest,
   deleteV2IdentitiesForTest,
-  ensureLegacyProfileAnchorForTest,
   ensureV2IdentityForLegacyProfileTest,
 } from '../test-utils/legacy-identity-anchors';
 
@@ -59,7 +57,6 @@ async function cleanupByPrefix(database: Database): Promise<void> {
     accountIds: seededAccountIds,
     profileIds: seededProfileIds,
   });
-  await deleteLegacyAccountsForTest(database, seededAccountIds);
   seededAccountIds.length = 0;
   seededProfileIds.length = 0;
 }
@@ -76,25 +73,6 @@ async function seedProfiles(database: Database, suffix = generateUUIDv7()) {
 
   seededAccountIds.push(ownerAccountId, attackerAccountId);
   seededProfileIds.push(ownerProfileId, attackerProfileId);
-
-  await ensureLegacyProfileAnchorForTest(database, {
-    accountId: ownerAccountId,
-    profileId: ownerProfileId,
-    clerkUserId: ownerClerkUserId,
-    email: ownerEmail,
-    displayName: 'Claim Owner',
-    birthYear: 2011,
-    isOwner: true,
-  });
-  await ensureLegacyProfileAnchorForTest(database, {
-    accountId: attackerAccountId,
-    profileId: attackerProfileId,
-    clerkUserId: attackerClerkUserId,
-    email: attackerEmail,
-    displayName: 'Claim Attacker',
-    birthYear: 2011,
-    isOwner: true,
-  });
 
   await ensureV2IdentityForLegacyProfileTest(database, {
     accountId: ownerAccountId,

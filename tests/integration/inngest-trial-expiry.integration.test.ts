@@ -9,7 +9,7 @@
  * - Expo Push API (mockExpoPush)
  */
 
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import {
   generateUUIDv7,
   login,
@@ -23,7 +23,6 @@ import {
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
 import { clearFetchCalls, getFetchCalls } from './fetch-interceptor';
-import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { mockExpoPush } from './external-mocks';
 import { trialExpiry } from '../../apps/api/src/inngest/functions/trial-expiry';
 import { trialNotificationSend } from '../../apps/api/src/inngest/functions/trial-notification-send';
@@ -108,26 +107,7 @@ async function seedSubscriptionWithQuota(input: {
   const db = createIntegrationDb();
   const subscriptionId = generateUUIDv7();
 
-  // [WI-1347] Legacy `subscriptions` may already be dropped; quota_pools no
-  // longer FKs to it (repointed onto v2 `subscription` by 0129 M-REPOINT), so
-  // this dual-write is an id-aligned anchor only — a no-op post-drop.
-  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
-  // same conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.execute(sql`
-      INSERT INTO subscriptions (
-        id, account_id, tier, status, trial_ends_at, current_period_start, current_period_end
-      )
-      VALUES (
-        ${subscriptionId}, ${input.accountId}, ${input.tier}, ${input.status},
-        ${input.trialEndsAt.toISOString()}::timestamptz,
-        '2026-04-01T00:00:00.000Z'::timestamptz, '2026-05-01T00:00:00.000Z'::timestamptz
-      )
-    `);
-  }
-
   // [WI-867] v2 subscription row — always seeded (flag collapsed to v2-only).
-  // REUSES the same id as the legacy anchor above (when seeded).
   const [subscription] = await db
     .insert(subscriptionV2)
     .values({
@@ -294,47 +274,6 @@ beforeEach(async () => {
     emails: [JUST_EXPIRED_EMAIL, EXTENDED_EMAIL, WARNING_EMAIL],
     clerkUserIds: [JUST_EXPIRED_USER_ID, EXTENDED_USER_ID, WARNING_USER_ID],
   });
-
-  // The trial-expiry function queries ALL subscriptions in the DB matching
-  // date-range criteria. Orphaned subscriptions from crashed/interrupted runs
-  // (whose orgs were deleted but whose legacy `subscriptions` rows somehow
-  // survived) can inflate the counts. Clean up any orphaned extended-expired
-  // subscriptions that fall in the same date window this test seeds for
-  // EXTENDED_USER_ID. [WI-1128] `subscriptions.accountId` was repointed onto
-  // `organization.id` by the 0129 M-REPOINT migration, so resolve org ids the
-  // same way as above rather than via the dropped legacy `accounts` table.
-  const db = createIntegrationDb();
-  const now = new Date();
-  const targetDate = new Date(now);
-  targetDate.setUTCDate(targetDate.getUTCDate() - 14);
-  const dayStart = new Date(
-    targetDate.toISOString().slice(0, 10) + 'T00:00:00.000Z',
-  );
-  const dayEnd = new Date(
-    targetDate.toISOString().slice(0, 10) + 'T23:59:59.999Z',
-  );
-  const orphanCandidateOrgIds = await resolveTestOrgIds([
-    JUST_EXPIRED_USER_ID,
-    EXTENDED_USER_ID,
-    WARNING_USER_ID,
-  ]);
-  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL delete,
-  // same conditional cleanup as before.
-  if (
-    orphanCandidateOrgIds.length > 0 &&
-    (await legacyIdentityTableExistsForTest(db, 'subscriptions'))
-  ) {
-    await db.execute(sql`
-      DELETE FROM subscriptions
-      WHERE account_id IN (${sql.join(
-        orphanCandidateOrgIds.map((id) => sql`${id}::uuid`),
-        sql`, `,
-      )})
-        AND status = 'expired'
-        AND trial_ends_at >= ${dayStart.toISOString()}::timestamptz
-        AND trial_ends_at <= ${dayEnd.toISOString()}::timestamptz
-    `);
-  }
 });
 
 afterAll(async () => {

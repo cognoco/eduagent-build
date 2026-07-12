@@ -5,7 +5,7 @@
  * This suite targets the mock-heavy quota, top-up, and RevenueCat paths.
  */
 
-import { asc, eq, inArray, sql } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import {
   generateUUIDv7,
   membership,
@@ -37,7 +37,6 @@ import {
 } from '../../apps/api/src/services/billing/billing-v2';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 import { cleanupAccounts, createIntegrationDb } from './helpers';
-import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 const TEST_ACCOUNTS = [
   {
@@ -105,23 +104,9 @@ async function cleanupOrgAccounts() {
     await db.delete(person).where(inArray(person.id, personIds));
   }
   await db.delete(organization).where(inArray(organization.id, orgIds));
-  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); its
-  // `subscriptions` row (same id as the org) cascades away via the
-  // M-REPOINT'd account_id->organization FK when the org itself is deleted
-  // above.
-  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL delete, same
-  // conditional cleanup as before.
-  if (
-    (await legacyIdentityTableExistsForTest(db, 'accounts')) &&
-    orgIds.length > 0
-  ) {
-    await db.execute(
-      sql`DELETE FROM accounts WHERE id IN (${sql.join(
-        orgIds.map((id) => sql`${id}::uuid`),
-        sql`, `,
-      )})`,
-    );
-  }
+  // [WI-1128] Legacy `accounts` is dropped (post-M-DROP); its `subscriptions`
+  // row (same id as the org) cascades away via the M-REPOINT'd
+  // account_id->organization FK when the org itself is deleted above.
 }
 
 // [WI-1239 / 779-strip] v2 dual-store seeding. decrementQuota /
@@ -208,41 +193,19 @@ async function cleanupV2() {
 
 async function seedAccount(index: number) {
   const db = createIntegrationDb();
-  const account = TEST_ACCOUNTS[index]!;
   const [org] = await db
     .insert(organization)
     .values({ name: ORG_NAMES[index]! })
     .returning();
-  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); after
-  // M-REPOINT, `subscriptions.accountId` targets `organization` directly, so
-  // this mirror (same id as the org, the "reseed identity contract") is a
-  // no-op there instead of hard-failing.
-  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL insert, same
-  // conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.execute(sql`
-      INSERT INTO accounts (id, clerk_user_id, email)
-      VALUES (${org!.id}, ${account.clerkUserId}, ${account.email})
-    `);
-  }
   return org!;
 }
 
-async function seedOwnerProfile(accountId: string, displayName: string) {
-  const db = createIntegrationDb();
+async function seedOwnerProfile(_accountId: string, _displayName: string) {
   // [WI-1128] Generated here (not via the legacy `profiles` insert's
   // defaultFn) so the id is available even when `profiles` is gated off
   // (post-M-DROP) — callers always follow up with seedV2Counterpart, which
   // creates the v2 `person` row under this SAME id.
   const id = generateUUIDv7();
-  // [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL insert, same
-  // conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-    await db.execute(sql`
-      INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner)
-      VALUES (${id}, ${accountId}, ${displayName}, 1990, true)
-    `);
-  }
   return { id };
 }
 
@@ -302,30 +265,6 @@ async function seedSubscriptionWithQuota(input: {
         input.lastRevenuecatEventTimestampMs ?? null,
     })
     .returning();
-
-  // [WI-1347] Mirror into legacy `subscriptions` under the SAME id, gated —
-  // `subscriptions` IS on the WI-1306/0130 drop list despite the prior
-  // comment here; createSubscription/ensureFreeSubscription (tested below)
-  // are transitively dead (see docs/_archive/retired-code.md), so this
-  // anchor self-inerts once the table is dropped.
-  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
-  // same conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.execute(sql`
-      INSERT INTO subscriptions (
-        id, account_id, tier, status, current_period_start, current_period_end,
-        trial_ends_at, last_revenuecat_event_id, last_revenuecat_event_timestamp_ms
-      )
-      VALUES (
-        ${subscriptionV2Row!.id}, ${input.accountId}, ${input.tier}, ${input.status ?? 'active'},
-        ${(input.currentPeriodStart ?? new Date('2026-04-01T00:00:00.000Z')).toISOString()}::timestamptz,
-        ${(input.currentPeriodEnd ?? new Date('2026-05-01T00:00:00.000Z')).toISOString()}::timestamptz,
-        ${input.trialEndsAt ? input.trialEndsAt.toISOString() : null},
-        ${input.lastRevenuecatEventId ?? null},
-        ${input.lastRevenuecatEventTimestampMs ?? null}
-      )
-    `);
-  }
 
   const [quotaPool] = await db
     .insert(quotaPools)
