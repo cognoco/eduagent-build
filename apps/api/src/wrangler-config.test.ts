@@ -96,6 +96,22 @@ describe('wrangler.toml config guards', () => {
     });
   });
 
+  describe('[WI-1865] deployed Inngest mode', () => {
+    it('explicitly selects cloud mode in staging and production', () => {
+      const stagingVars = getTableSection(content, 'env.staging.vars');
+      const productionVars = getTableSection(content, 'env.production.vars');
+
+      expect(stagingVars).toMatch(/^INNGEST_DEV\s*=\s*"false"/m);
+      expect(productionVars).toMatch(/^INNGEST_DEV\s*=\s*"false"/m);
+    });
+
+    it('does not force cloud mode for local development', () => {
+      const localVars = getTableSection(content, 'vars');
+
+      expect(localVars).not.toMatch(/^INNGEST_DEV\s*=/m);
+    });
+  });
+
   describe('[CFG-4] root kv_namespaces preview_id !== id', () => {
     function getRootSection(toml: string): string {
       const firstEnvIdx = toml.search(/^\[env\./m);
