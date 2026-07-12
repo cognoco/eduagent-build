@@ -103,4 +103,50 @@ describe('inngestFunctionFailedObserve', () => {
       );
     });
   });
+
+  function getFleetFailureProbe() {
+    const { functions } = require('../index') as {
+      functions: Array<{
+        opts?: { id?: string; retries?: number };
+        trigger?: unknown;
+        fn?: (args: { event: { data: unknown } }) => Promise<unknown>;
+      }>;
+    };
+    return functions.find(
+      (fn) => fn.opts?.id === 'synthetic-fleet-failure-probe',
+    );
+  }
+
+  it('registers a retries-zero fleet-failure probe', () => {
+    const probe = getFleetFailureProbe();
+
+    expect(probe).toBeDefined();
+    expect(probe?.opts).toEqual(
+      expect.objectContaining({
+        id: 'synthetic-fleet-failure-probe',
+        retries: 0,
+      }),
+    );
+    expect(probe?.trigger).toEqual({
+      event: 'app/ops.synthetic_fleet_failure_probe_requested',
+    });
+  });
+
+  it('fails only for the exact PII-free probe payload', async () => {
+    const probe = getFleetFailureProbe();
+
+    await expect(
+      probe?.fn?.({ event: { data: { probeId: 'wi-1907' } } }),
+    ).rejects.toThrow('Synthetic fleet failure probe (WI-1907)');
+    await expect(
+      probe?.fn?.({
+        event: {
+          data: {
+            probeId: 'wi-1907',
+            learnerText: 'must never reach a failing run',
+          },
+        },
+      }),
+    ).resolves.toEqual({ status: 'ignored', reason: 'invalid_payload' });
+  });
 });
