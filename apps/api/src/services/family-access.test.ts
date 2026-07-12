@@ -23,6 +23,7 @@ import {
   assertCanManageOwnConsent,
   assertOwnerAndParentAccess,
   assertOwnerProfile,
+  filterUncredentialedCharges,
 } from './family-access';
 import { ForbiddenError } from '../errors';
 import {
@@ -182,6 +183,34 @@ describe('assertChargeNotCredentialed', () => {
     await expect(
       assertChargeNotCredentialed(db as unknown as Database, UNRELATED_ID),
     ).resolves.toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// filterUncredentialedCharges — WI-1863 batch presence filter for the
+// aggregate parent surfaces (dashboard root, weekly digest, monthly report).
+// ---------------------------------------------------------------------------
+
+describe('filterUncredentialedCharges', () => {
+  it('[WI-1863] drops credentialed charges, keeps managed charges, preserves order', async () => {
+    const { db } = createDatabaseModuleMock();
+    seedCredentialedLogins(db, [CHILD_ID]);
+
+    await expect(
+      filterUncredentialedCharges(db as unknown as Database, [
+        UNRELATED_ID,
+        CHILD_ID,
+        PARENT_ID,
+      ]),
+    ).resolves.toEqual([UNRELATED_ID, PARENT_ID]);
+  });
+
+  it('[WI-1863] returns [] for empty input without touching the database', async () => {
+    const select = jest.fn();
+    await expect(
+      filterUncredentialedCharges({ select } as unknown as Database, []),
+    ).resolves.toEqual([]);
+    expect(select).not.toHaveBeenCalled();
   });
 });
 
