@@ -1,5 +1,5 @@
 // @inngest-admin: cross-profile
-import { count, lt } from 'drizzle-orm';
+import { count, lt, sql } from 'drizzle-orm';
 import { activationEvents, type Database } from '@eduagent/database';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
@@ -34,7 +34,7 @@ export const ACTIVATION_RETENTION_DELAYED_EVENT =
 export interface ActivationRetentionResult {
   /** Rows counted as eligible (createdAt < 90-day cutoff) before the delete. */
   eligibleCount: number;
-  /** Rows the delete actually removed (.returning() length). */
+  /** Rows the delete actually removed (counted in SQL, not materialized). */
   deletedCount: number;
   /** Rows past the 121-day SLA, counted before the delete (a subset). */
   delayedCount: number;
@@ -81,11 +81,40 @@ export async function purgeAgedActivationEvents(
     .where(lt(activationEvents.createdAt, cutoff));
   const eligibleCount = Number(eligibleRow?.value ?? 0);
 
-  const deleted = await db
-    .delete(activationEvents)
-    .where(lt(activationEvents.createdAt, cutoff))
-    .returning({ id: activationEvents.id });
-  const deletedCount = deleted.length;
+  // The deleted count is aggregated in SQL, never materialized row-by-row. A
+  // `.returning({ id })` would drag one UUID per purged row back into the
+  // worker just to call .length on the array — and the FIRST production run is
+  // the worst case: activation_events has never been purged, so run #1 deletes
+  // the entire historical backlog (including high-volume app_opened telemetry)
+  // in one statement. That is exactly the run where materializing every id can
+  // exceed the response/memory limit and fail the purge.
+  const deletedResult = await db.execute(sql`
+    WITH deleted AS (
+      DELETE FROM ${activationEvents}
+      WHERE ${activationEvents.createdAt} < ${cutoff}
+      RETURNING 1
+    )
+    SELECT count(*)::int AS count FROM deleted
+  `);
+  // Drizzle's execute() return shape is driver-dependent and not part of its
+  // stable surface: neon-serverless returns { rows: [...] }, some adapters
+  // return the rows array directly (same normalization as
+  // services/book-suggestion-generation.ts).
+  const deletedRows =
+    (deletedResult as unknown as { rows?: Array<{ count: unknown }> }).rows ??
+    (deletedResult as unknown as Array<{ count: unknown }>);
+  // execute() bypasses drizzle's column mappers, so the count arrives untyped.
+  // Coerce like delayedCount above, then fail closed: a NaN here would make the
+  // AC-2 eligible/deleted comparison below report a phantom mismatch on a run
+  // that actually succeeded, so an unreadable count must throw, not be guessed.
+  const deletedCount = Number(
+    (Array.isArray(deletedRows) ? deletedRows[0]?.count : undefined) ?? NaN,
+  );
+  if (!Number.isFinite(deletedCount)) {
+    throw new Error(
+      'activation-events-retention: purge returned an unexpected Drizzle result shape — could not read the deleted-row count',
+    );
+  }
 
   return {
     eligibleCount,
