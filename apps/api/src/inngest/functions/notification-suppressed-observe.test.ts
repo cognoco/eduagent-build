@@ -13,16 +13,19 @@
 
 const mockCaptureException = jest.fn();
 const mockCaptureMessage = jest.fn();
-jest.mock('../../services/sentry', () => {
-  const actual = jest.requireActual(
-    '../../services/sentry',
-  ) as typeof import('../../services/sentry');
-  return {
-    ...actual,
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-    captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
-  };
-});
+jest.mock(
+  '../../services/sentry' /* gc1-allow: observer test asserts captureException/captureMessage escalation on schema drift and suppression */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/sentry',
+    ) as typeof import('../../services/sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+      captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
+    };
+  },
+);
 
 const mockLoggerWarn = jest.fn();
 const mockLoggerError = jest.fn();
