@@ -26,6 +26,7 @@ import {
 } from '@eduagent/schemas';
 import { login } from '@eduagent/database';
 
+import { buildFamilyJoinStoreCancelKey } from '../../services/dedupe-key';
 import { createLogger } from '../../services/logger';
 import {
   formatFamilyJoinStoreCancelEmail,
@@ -99,7 +100,7 @@ export const familyJoinStoreCancelNudge = inngest.createFunction(
         db,
         resendApiKey: getStepResendApiKey(),
         emailFrom: getStepEmailFrom(),
-        idempotencyKey: `family-join-store-cancel:${teenPersonId}`,
+        idempotencyKey: buildFamilyJoinStoreCancelKey(teenPersonId),
       });
     });
 

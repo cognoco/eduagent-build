@@ -21,7 +21,8 @@ import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 
 import type { AuthUser } from '../middleware/auth';
-import { requireProfileId } from '../middleware/profile-scope';
+import type { ProfileMeta } from '../middleware/profile-scope';
+import { withProfile } from '../route-utils/route-context';
 import { BadRequestError, NotFoundError, RateLimitedError } from '../errors';
 import {
   initiateFamilyJoinInvite,
@@ -65,6 +66,8 @@ const acceptBodySchema = z.object({
 
 type FamilyJoinRouteEnv = {
   Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
     API_ORIGIN?: string;
@@ -73,6 +76,7 @@ type FamilyJoinRouteEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
     callerPersonId: string | undefined;
   };
 };
@@ -81,12 +85,14 @@ function withCaller(c: Context<FamilyJoinRouteEnv>): {
   db: Database;
   callerPersonId: string;
 } {
-  requireProfileId(c.get('profileId'));
+  // withProfile performs the validated profileId unwrap — route handlers must
+  // not inline that unwrap themselves (route-context.guard ratchet).
+  const { db } = withProfile(c);
   const callerPersonId = c.get('callerPersonId');
   if (!callerPersonId) {
     throw new BadRequestError('Identity v2 caller person is required.');
   }
-  return { db: c.get('db'), callerPersonId };
+  return { db, callerPersonId };
 }
 
 export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
