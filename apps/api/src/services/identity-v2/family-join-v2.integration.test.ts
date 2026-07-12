@@ -41,6 +41,7 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
   consentGrant,
+  familyJoinInvite,
   guardianship,
   login,
   membership,
@@ -75,12 +76,17 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
   const personIds: string[] = [];
   const orgIds: string[] = [];
   const subIds: string[] = [];
+  const inviteIds: string[] = [];
 
   beforeAll(() => {
     db = createDatabase(process.env.DATABASE_URL!);
   });
 
   afterEach(async () => {
+    // Invites first — family_join_invite FKs the inviter person.
+    for (const iid of inviteIds) {
+      await db.delete(familyJoinInvite).where(eq(familyJoinInvite.id, iid));
+    }
     for (const sid of subIds) {
       await db
         .delete(profileQuotaUsage)
@@ -117,6 +123,7 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     personIds.length = 0;
     orgIds.length = 0;
     subIds.length = 0;
+    inviteIds.length = 0;
   });
 
   // A fresh identity graph IS a solo org-of-one: org + owner person (admin+learner
@@ -150,6 +157,67 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     };
   }
 
+  // Every accept REDEEMS an invite: acceptFamilyJoin claims the invite row
+  // atomically inside its transaction (single-use), so each accept needs a real
+  // pending invite row. The (inviter, family-org) unique means one slot per
+  // inviter — a second invite into the same family org needs a different inviter.
+  async function seedInvite(args: {
+    inviterPersonId: string;
+    familyOrgId: string;
+  }): Promise<string> {
+    const [row] = await db
+      .insert(familyJoinInvite)
+      .values({
+        inviterPersonId: args.inviterPersonId,
+        familyOrgId: args.familyOrgId,
+        invitedEmail: `wi1753-${randomUUID()}@test.local`,
+        status: 'pending',
+        token: randomUUID(),
+        tokenExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      })
+      .returning({ id: familyJoinInvite.id });
+    if (!row) throw new Error('seed invite insert did not return a row');
+    inviteIds.push(row.id);
+    return row.id;
+  }
+
+  /** Retarget a seeded plan's tier/status/period — drives the capacity gate. */
+  async function setPlan(
+    subId: string,
+    plan: { planTier: string; status: string; periodEndAt?: Date },
+  ): Promise<void> {
+    await db
+      .update(subscription)
+      .set({
+        planTier: plan.planTier,
+        status: plan.status,
+        ...(plan.periodEndAt ? { periodEndAt: plan.periodEndAt } : {}),
+      })
+      .where(eq(subscription.id, subId));
+  }
+
+  /**
+   * Add a bare extra person to an org. The capacity gate counts PERSONS in the
+   * org (getProfileCountForSubscriptionV2), so this is how a plan is driven to
+   * its seat cap.
+   */
+  async function addPersonToOrg(orgId: string): Promise<void> {
+    const [p] = await db
+      .insert(person)
+      .values({
+        displayName: `Filler-${randomUUID().slice(0, 8)}`,
+        birthDate: '1990-01-01',
+        residenceJurisdiction: 'EU',
+        conversationLanguage: 'en',
+      })
+      .returning({ id: person.id });
+    if (!p) throw new Error('filler person insert did not return a row');
+    personIds.push(p.id);
+    await db
+      .insert(membership)
+      .values({ personId: p.id, organizationId: orgId, roles: ['learner'] });
+  }
+
   async function readMembershipOrg(personId: string): Promise<string | null> {
     const row = await db.query.membership.findFirst({
       where: eq(membership.personId, personId),
@@ -174,6 +242,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
 
       const result = await acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
+        inviteId: await seedInvite({
+          inviterPersonId: family.personId,
+          familyOrgId: family.orgId,
+        }),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -222,6 +294,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
 
       await acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
+        inviteId: await seedInvite({
+          inviterPersonId: family.personId,
+          familyOrgId: family.orgId,
+        }),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -255,6 +331,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
 
     await acceptFamilyJoin(db, {
       teenPersonId: teen.personId,
+      inviteId: await seedInvite({
+        inviterPersonId: family.personId,
+        familyOrgId: family.orgId,
+      }),
       familyOrgId: family.orgId,
       parentPersonId: family.personId,
       optInSupportership: true,
@@ -279,6 +359,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
 
     await acceptFamilyJoin(db, {
       teenPersonId: teen.personId,
+      inviteId: await seedInvite({
+        inviterPersonId: family.personId,
+        familyOrgId: family.orgId,
+      }),
       familyOrgId: family.orgId,
       parentPersonId: family.personId,
       optInSupportership: false,
@@ -315,6 +399,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
 
       const result = await acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
+        inviteId: await seedInvite({
+          inviterPersonId: family.personId,
+          familyOrgId: family.orgId,
+        }),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -333,9 +421,18 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     },
   );
 
-  // Idempotent double-accept: a repeated accept is a clean no-op success.
+  // Idempotent double-accept: an accept by a teen who is ALREADY in the family
+  // org is a clean no-op success. This is now necessarily a SECOND invite — the
+  // same invite cannot be redeemed twice (see the single-use tests below), and
+  // the (inviter, family-org) unique means a second invite into the same org
+  // comes from a different inviter (e.g. the other parent re-invites a teen who
+  // has already joined).
   itGraph('is idempotent on a repeated accept', async () => {
     const family = await seedGraph({ birthYear: 1990, displayName: 'Parent' });
+    const otherParent = await seedGraph({
+      birthYear: 1990,
+      displayName: 'Other parent',
+    });
     const teen = await seedGraph({
       birthYear: CAPABLE_BIRTH_YEAR,
       displayName: 'Teen',
@@ -343,12 +440,20 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
 
     await acceptFamilyJoin(db, {
       teenPersonId: teen.personId,
+      inviteId: await seedInvite({
+        inviterPersonId: family.personId,
+        familyOrgId: family.orgId,
+      }),
       familyOrgId: family.orgId,
       parentPersonId: family.personId,
       optInSupportership: false,
     });
     const second = await acceptFamilyJoin(db, {
       teenPersonId: teen.personId,
+      inviteId: await seedInvite({
+        inviterPersonId: otherParent.personId,
+        familyOrgId: family.orgId,
+      }),
       familyOrgId: family.orgId,
       parentPersonId: family.personId,
       optInSupportership: false,
@@ -366,6 +471,8 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     await expect(
       acceptFamilyJoin(db, {
         teenPersonId: samePerson,
+        // Never read — the self-join guard throws before the transaction opens.
+        inviteId: randomUUID(),
         familyOrgId: randomUUID(),
         parentPersonId: samePerson,
         optInSupportership: false,
@@ -397,6 +504,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
       await expect(
         acceptFamilyJoin(db, {
           teenPersonId: teen.personId,
+          inviteId: await seedInvite({
+            inviterPersonId: family.personId,
+            familyOrgId: family.orgId,
+          }),
           familyOrgId: family.orgId,
           parentPersonId: family.personId,
           optInSupportership: false,
@@ -426,6 +537,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     await expect(
       acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
+        inviteId: await seedInvite({
+          inviterPersonId: family.personId,
+          familyOrgId: family.orgId,
+        }),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -452,6 +567,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     await expect(
       acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
+        inviteId: await seedInvite({
+          inviterPersonId: family.personId,
+          familyOrgId: family.orgId,
+        }),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -470,6 +589,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     await expect(
       acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
+        inviteId: await seedInvite({
+          inviterPersonId: family.personId,
+          familyOrgId: family.orgId,
+        }),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -501,11 +624,208 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     await expect(
       acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
+        inviteId: await seedInvite({
+          inviterPersonId: family.personId,
+          familyOrgId: family.orgId,
+        }),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
       }),
     ).rejects.toThrow(ConflictError);
+    expect(await readMembershipOrg(teen.personId)).toBe(teen.orgId);
+  });
+
+  // ---- Single-use: one invite token redeems exactly once. ----
+
+  // THE TOCTOU REGRESSION. Two different authenticated teens race the SAME
+  // invite token. Both clear the route's `resolveFamilyJoinInviteByToken` read
+  // (it is advisory), so single-use can only be enforced by the in-transaction
+  // claim. Before the fix — which consumed the invite AFTER a successful accept —
+  // both accepts committed and one token repointed TWO teens.
+  //
+  // The family plan is deliberately raised to `family` (4 seats) so it has room
+  // for BOTH teens: capacity therefore cannot be what stops the second one, and
+  // a pass here can only mean the invite claim did its job.
+  itGraph(
+    'admits exactly one teen when two race the same invite token',
+    async () => {
+      const family = await seedGraph({
+        birthYear: 1990,
+        displayName: 'Parent',
+      });
+      await setPlan(family.subId, { planTier: 'family', status: 'active' });
+      const teenA = await seedGraph({
+        birthYear: CAPABLE_BIRTH_YEAR,
+        displayName: 'Teen A',
+      });
+      const teenB = await seedGraph({
+        birthYear: CAPABLE_BIRTH_YEAR,
+        displayName: 'Teen B',
+      });
+
+      // ONE invite, redeemed concurrently by two different teens.
+      const inviteId = await seedInvite({
+        inviterPersonId: family.personId,
+        familyOrgId: family.orgId,
+      });
+
+      const settled = await Promise.allSettled([
+        acceptFamilyJoin(db, {
+          teenPersonId: teenA.personId,
+          inviteId,
+          familyOrgId: family.orgId,
+          parentPersonId: family.personId,
+          optInSupportership: false,
+        }),
+        acceptFamilyJoin(db, {
+          teenPersonId: teenB.personId,
+          inviteId,
+          familyOrgId: family.orgId,
+          parentPersonId: family.personId,
+          optInSupportership: false,
+        }),
+      ]);
+
+      const fulfilled = settled.filter((s) => s.status === 'fulfilled');
+      const rejected = settled.filter((s) => s.status === 'rejected');
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(
+        ConflictError,
+      );
+
+      // Exactly ONE teen was repointed into the family org...
+      const orgA = await readMembershipOrg(teenA.personId);
+      const orgB = await readMembershipOrg(teenB.personId);
+      expect([orgA, orgB].filter((o) => o === family.orgId)).toHaveLength(1);
+
+      // ...and the loser is untouched in their OWN org-of-one (full rollback —
+      // never orphaned, never half-joined).
+      const loserOrg = orgA === family.orgId ? orgB : orgA;
+      const loserOwnOrg = orgA === family.orgId ? teenB.orgId : teenA.orgId;
+      expect(loserOrg).toBe(loserOwnOrg);
+
+      // The invite is terminal and its token is burned.
+      const invite = await db.query.familyJoinInvite.findFirst({
+        where: eq(familyJoinInvite.id, inviteId),
+      });
+      expect(invite?.status).toBe('accepted');
+      expect(invite?.token).toBeNull();
+    },
+  );
+
+  // The sequential twin of the race: a redeemed invite is terminal.
+  itGraph('refuses a second redemption of an already-used invite', async () => {
+    const family = await seedGraph({ birthYear: 1990, displayName: 'Parent' });
+    await setPlan(family.subId, { planTier: 'family', status: 'active' });
+    const teenA = await seedGraph({
+      birthYear: CAPABLE_BIRTH_YEAR,
+      displayName: 'Teen A',
+    });
+    const teenB = await seedGraph({
+      birthYear: CAPABLE_BIRTH_YEAR,
+      displayName: 'Teen B',
+    });
+    const inviteId = await seedInvite({
+      inviterPersonId: family.personId,
+      familyOrgId: family.orgId,
+    });
+
+    await acceptFamilyJoin(db, {
+      teenPersonId: teenA.personId,
+      inviteId,
+      familyOrgId: family.orgId,
+      parentPersonId: family.personId,
+      optInSupportership: false,
+    });
+
+    await expect(
+      acceptFamilyJoin(db, {
+        teenPersonId: teenB.personId,
+        inviteId,
+        familyOrgId: family.orgId,
+        parentPersonId: family.personId,
+        optInSupportership: false,
+      }),
+    ).rejects.toThrow(ConflictError);
+
+    // teen B never moved.
+    expect(await readMembershipOrg(teenB.personId)).toBe(teenB.orgId);
+  });
+
+  // ---- Family-plan capacity: a seat must actually exist BEFORE the repoint. ----
+
+  // A plan at its per-tier cap has no seat. Before the fix the accept only
+  // checked that SOME subscription row existed, so a full plan repointed the
+  // teen's membership and only then failed on the quota insert.
+  itGraph('refuses when the family plan is at its seat cap', async () => {
+    const family = await seedGraph({ birthYear: 1990, displayName: 'Parent' });
+    const teen = await seedGraph({
+      birthYear: CAPABLE_BIRTH_YEAR,
+      displayName: 'Teen',
+    });
+
+    // family tier seats 4. Parent + 3 fillers = 4 → full.
+    await setPlan(family.subId, { planTier: 'family', status: 'active' });
+    await addPersonToOrg(family.orgId);
+    await addPersonToOrg(family.orgId);
+    await addPersonToOrg(family.orgId);
+
+    await expect(
+      acceptFamilyJoin(db, {
+        teenPersonId: teen.personId,
+        inviteId: await seedInvite({
+          inviterPersonId: family.personId,
+          familyOrgId: family.orgId,
+        }),
+        familyOrgId: family.orgId,
+        parentPersonId: family.personId,
+        optInSupportership: false,
+      }),
+    ).rejects.toThrow(ConflictError);
+
+    // No half-mutation: the teen is still a solo org-of-one, org intact.
+    expect(await readMembershipOrg(teen.personId)).toBe(teen.orgId);
+    expect(
+      await db.query.organization.findFirst({
+        where: eq(organization.id, teen.orgId),
+      }),
+    ).toBeDefined();
+  });
+
+  // An EXPIRED plan confers only its fallback tier, whatever it was sold as.
+  // Here the plan is `family` (4 seats) but expired, so resolveEffectiveAccessTier
+  // collapses it to free (2 seats) and the org's 2 persons already fill it. The
+  // same org on an ACTIVE family plan admits the teen (the happy path above) —
+  // so it is the EXPIRY, not the head-count, that refuses here.
+  itGraph('refuses when the family plan has expired', async () => {
+    const family = await seedGraph({ birthYear: 1990, displayName: 'Parent' });
+    const teen = await seedGraph({
+      birthYear: CAPABLE_BIRTH_YEAR,
+      displayName: 'Teen',
+    });
+
+    await setPlan(family.subId, {
+      planTier: 'family',
+      status: 'expired',
+      periodEndAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    });
+    await addPersonToOrg(family.orgId); // parent + 1 = 2 = the free-tier cap
+
+    await expect(
+      acceptFamilyJoin(db, {
+        teenPersonId: teen.personId,
+        inviteId: await seedInvite({
+          inviterPersonId: family.personId,
+          familyOrgId: family.orgId,
+        }),
+        familyOrgId: family.orgId,
+        parentPersonId: family.personId,
+        optInSupportership: false,
+      }),
+    ).rejects.toThrow(ConflictError);
+
     expect(await readMembershipOrg(teen.personId)).toBe(teen.orgId);
   });
 });

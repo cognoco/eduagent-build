@@ -273,15 +273,25 @@ export async function resolveFamilyJoinInviteByToken(
 }
 
 /**
- * Mark an invite accepted — the single in-row terminal transition, guarded by an
- * atomic `status='pending'` predicate so a concurrent accept cannot re-consume
- * it. Best-effort single-use for v1 (the join itself already committed).
+ * CLAIM an invite — the single in-row terminal transition. A conditional update
+ * guarded by `status='pending'`: the row is claimed ONLY if this statement is
+ * the one that flips it, which the returned rowcount reports. Callers MUST treat
+ * `false` as "someone else already redeemed this token" and abort.
+ *
+ * Single-use is enforced by WHERE, not by a prior read: a stale
+ * `resolveFamilyJoinInviteByToken` result can never authorize a second
+ * redemption, because the claim re-evaluates `status` at write time. Callers
+ * pass a `tx` so the claim shares the accept transaction — the claim is then
+ * serialized by that tx's family-org advisory lock, and a later rollback
+ * releases the token rather than stranding it. This is the same
+ * compare-and-set discipline the invite caps use in `initiateFamilyJoinInvite`'s
+ * `setWhere`.
  */
-export async function consumeFamilyJoinInvite(
+export async function claimFamilyJoinInvite(
   db: Database,
   inviteId: string,
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const claimed = await db
     .update(familyJoinInvite)
     .set({
       status: 'accepted',
@@ -294,7 +304,10 @@ export async function consumeFamilyJoinInvite(
         eq(familyJoinInvite.id, inviteId),
         eq(familyJoinInvite.status, 'pending'),
       ),
-    );
+    )
+    .returning({ id: familyJoinInvite.id });
+
+  return claimed.length === 1;
 }
 
 /** The R2 natural key: one outstanding invite slot per (inviter, family-org). */

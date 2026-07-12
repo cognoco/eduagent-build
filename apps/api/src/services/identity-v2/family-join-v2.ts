@@ -53,7 +53,9 @@ import { BadRequestError, ConflictError, ForbiddenError } from '../../errors';
 import { inngest } from '../../inngest/client';
 import { checkConsentRequiredFromDate } from '../consent';
 import { getSubscriptionByAccountIdV2 } from '../billing/billing-v2/subscription-core-v2';
+import { canAddProfileV2 } from '../billing/billing-v2/family-v2';
 import { provisionProfileQuotaUsageV2 } from '../billing/billing-v2/quota-provision-v2';
+import { claimFamilyJoinInvite } from './family-join-invite';
 import { safeSend } from '../safe-non-core';
 import {
   consentPersonLockKey,
@@ -77,6 +79,12 @@ const ACCEPT_REQUIRES_SELF_CONSENT_CAPABLE = true;
 export interface AcceptFamilyJoinInput {
   /** The accepting teen — person.id === profile.id (the authenticated caller). */
   teenPersonId: string;
+  /**
+   * The invite being redeemed (from the resolved token). Claimed atomically
+   * INSIDE the accept transaction — see step (0). The caller must NOT consume it
+   * separately.
+   */
+  inviteId: string;
   /** The inviting parent's existing family org (from the validated invite). */
   familyOrgId: string;
   /** The inviting parent (from the validated invite) — supportership supporter. */
@@ -125,8 +133,13 @@ export async function acceptFamilyJoin(
   db: Database,
   input: AcceptFamilyJoinInput,
 ): Promise<AcceptFamilyJoinResult> {
-  const { teenPersonId, familyOrgId, parentPersonId, optInSupportership } =
-    input;
+  const {
+    teenPersonId,
+    inviteId,
+    familyOrgId,
+    parentPersonId,
+    optInSupportership,
+  } = input;
 
   if (teenPersonId === parentPersonId) {
     throw new BadRequestError('A teen cannot join their own account.');
@@ -148,6 +161,22 @@ export async function acceptFamilyJoin(
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${familyOrgId}))`,
       );
+
+      // (0) CLAIM the invite — the FIRST mutation, inside the critical section.
+      // The route's `resolveFamilyJoinInviteByToken` read is advisory only: two
+      // teens racing the same token both pass it, so single-use cannot be
+      // enforced there. It is enforced HERE, by a conditional
+      // `status='pending'` update whose rowcount decides who won. Both racers
+      // redeem the SAME token, hence the same invite and the same familyOrgId,
+      // so they serialize on the org lock taken just above; the loser's claim
+      // then re-reads the committed row, sees 'accepted', matches zero rows and
+      // aborts before touching membership. Claiming INSIDE the tx (rather than
+      // consuming after it, as v1 did) also means any later precondition failure
+      // rolls the claim back — a failed accept releases the token instead of
+      // burning it.
+      if (!(await claimFamilyJoinInvite(tx, inviteId))) {
+        throw new ConflictError('This family invite has already been used.');
+      }
 
       // (1) Re-read the teen's membership UNDER the lock (TOCTOU-safe). The
       // membership_person_id_unique index guarantees at most one row.
@@ -220,13 +249,25 @@ export async function acceptFamilyJoin(
         );
       }
 
-      // (5) Precondition: the family org must have an active subscription to seat
-      // the teen against (they will ride it as a dependent quota satellite).
+      // (5) Precondition: the family plan must have a SEAT for the teen.
+      // A subscription row existing is not that precondition — it proves nothing
+      // about the plan's tier or its remaining capacity. `canAddProfileV2`
+      // resolves the plan's EFFECTIVE access tier (so an expired or downgraded
+      // plan collapses to the tier it actually confers, not the one it was sold
+      // as) and compares the org's current profile count against that tier's
+      // cap. Without it an at-capacity or expired plan reached the quota insert
+      // in step (9) with the membership already repointed. Gated here, BEFORE any
+      // mutation, so a seatless plan fails cleanly rather than half-joining.
+      // Mirrors createChildProfileV2 (the add-child path), which gates on the
+      // same predicate under the same per-org advisory lock.
       const familySub = await getSubscriptionByAccountIdV2(tx, familyOrgId);
       if (!familySub) {
         throw new ConflictError(
           'Target family org has no active subscription.',
         );
+      }
+      if (!(await canAddProfileV2(tx, familySub.id))) {
+        throw new ConflictError('Target family plan has no remaining seats.');
       }
 
       // (6) `person.migration_pending_at` is deliberately NOT written on this path.

@@ -24,7 +24,6 @@ import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { BadRequestError, NotFoundError, RateLimitedError } from '../errors';
 import {
-  consumeFamilyJoinInvite,
   initiateFamilyJoinInvite,
   resolveFamilyJoinInviteByToken,
   resolveFamilyJoinInviter,
@@ -152,19 +151,18 @@ export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
       const { token, optInSupportership } = c.req.valid('json');
 
       // TODO(WI-1753 AC-1 accept-authorization — human security gate): accept is
-      // token-possession only for v1. TWO residual questions are parked for the
+      // token-possession only for v1. ONE residual question is parked for the
       // AC-1 review and MUST be ruled before close:
       //   (a) email-equality — should the authenticated teen's login email be
       //       required to equal the invite's invited_email? Token-possession
       //       proves inbox access; email-equality is stricter but breaks when the
       //       teen's MentoMate login differs from the invited address.
-      //   (b) single-token-multiple-teen — a forwarded token could currently
-      //       admit multiple different authenticated teens (each repoints their
-      //       own membership). Atomic token consumption INSIDE acceptFamilyJoin's
-      //       transaction would close the window, but that entangles
-      //       token-consumption with the backed-up accept core and is deferred to
-      //       the same review. For v1 we consume the invite (atomic pending-guard)
-      //       AFTER a successful accept — best-effort single-use.
+      // The former (b) — single-token-MULTIPLE-teen — is CLOSED: the invite is now
+      // claimed atomically inside acceptFamilyJoin's transaction (a conditional
+      // `status='pending'` update whose rowcount decides the winner), so a
+      // forwarded token admits exactly one teen even under a concurrent race. This
+      // token lookup is therefore advisory: it classifies the 404 and supplies the
+      // invite, but it does NOT authorize the redemption — the in-tx claim does.
       // NOTE (constant-time): resolveFamilyJoinInviteByToken uses an exact indexed
       // lookup, NOT a constant-time compare. The token is a 122-bit
       // crypto.randomUUID; a DB index-timing differential does not measurably
@@ -177,12 +175,11 @@ export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
 
       const result = await acceptFamilyJoin(db, {
         teenPersonId: callerPersonId,
+        inviteId: invite.inviteId,
         familyOrgId: invite.familyOrgId,
         parentPersonId: invite.inviterPersonId,
         optInSupportership,
       });
-
-      await consumeFamilyJoinInvite(db, invite.inviteId);
 
       return c.json({
         familyOrgId: result.familyOrgId,
