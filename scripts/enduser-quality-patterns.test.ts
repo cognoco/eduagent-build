@@ -182,4 +182,42 @@ describe('sourceAuditNoFactualClaim (source_audit no-claim skip — WI-1823 ruli
       sourceAuditNoFactualClaim({ status: 'unsupported_sources' }, ''),
     ).toBe(false);
   });
+
+  // Reviewer rework: the prefix-anchored version of this check treated any
+  // sentence STARTING with an invitational token as fully non-assertive,
+  // regardless of what followed. That let a prefixed or dash-appended fact
+  // bypass the gate. These pin the closed hole — each must NOT be skipped.
+  const noAudit = {
+    status: 'missing_reliable_source',
+    factualConfidence: undefined,
+  };
+
+  it('does NOT skip a conversational-prefix-wrapped factual assertion ("Sure, ...")', () => {
+    expect(sourceAuditNoFactualClaim(noAudit, 'Sure, 3·5+5 = 20.')).toBe(false);
+  });
+
+  it('does NOT skip a conversational-prefix-wrapped factual assertion ("Great — ...")', () => {
+    expect(
+      sourceAuditNoFactualClaim(
+        noAudit,
+        'Great — Roman roads made trade faster.',
+      ),
+    ).toBe(false);
+  });
+
+  it('does NOT skip a fact smuggled after an invitation via em-dash', () => {
+    expect(
+      sourceAuditNoFactualClaim(noAudit, 'Go ahead — the answer is 20.'),
+    ).toBe(false);
+  });
+
+  it('still skips a bare acknowledgement with no fact ("Sure!")', () => {
+    expect(sourceAuditNoFactualClaim(noAudit, 'Sure!')).toBe(true);
+  });
+
+  it('still skips a pure invitation with a trailing readiness clause', () => {
+    expect(
+      sourceAuditNoFactualClaim(noAudit, "Great, whenever you're ready."),
+    ).toBe(true);
+  });
 });
