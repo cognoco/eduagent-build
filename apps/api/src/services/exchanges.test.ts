@@ -115,6 +115,49 @@ describe('processExchange — safety tripwire wiring', () => {
     }
   });
 
+  it('[BREAK] carries the conversation-language resource through processExchange', async () => {
+    registerProvider(throwingProvider);
+    const localizedContext = {
+      ...baseContext,
+      conversationLanguage: 'fr' as const,
+    };
+    try {
+      const result = await processExchange(
+        localizedContext,
+        'how do i kill myself',
+      );
+      expect(result.response).toBe(tripwireResponse('self_harm_method', 'fr'));
+      expect(result.response).toContain('https://findahelpline.com/fr-FR');
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+  });
+
+  it('[BREAK] carries the conversation-language resource through the streamed envelope', async () => {
+    registerProvider(throwingProvider);
+    const localizedContext = {
+      ...baseContext,
+      conversationLanguage: 'pl' as const,
+    };
+    try {
+      const result = await streamExchange(
+        localizedContext,
+        'how do i kill myself',
+      );
+      let streamed = '';
+      for await (const chunk of result.stream) streamed += chunk;
+      expect(streamed).toBe(tripwireResponse('self_harm_method', 'pl'));
+      expect(streamed).toContain('https://findahelpline.com/pl-PL');
+
+      const parsed = parseExchangeEnvelope(await result.rawResponsePromise);
+      expect(parsed.cleanResponse).toBe(
+        tripwireResponse('self_harm_method', 'pl'),
+      );
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+  });
+
   it('[BREAK] short-circuits the LLM and returns the safe abuse-disclosure reply', async () => {
     registerProvider(throwingProvider);
     try {

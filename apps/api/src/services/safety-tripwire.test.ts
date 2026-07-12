@@ -216,6 +216,34 @@ describe('detectCatastrophicSafetyTrigger — NEGATIVE (must NOT fire)', () => {
 });
 
 describe('tripwireResponse', () => {
+  const localizedHelplineCases = [
+    ['en', 'https://findahelpline.com/'],
+    ['cs', 'https://findahelpline.com/cs-CZ'],
+    ['es', 'https://findahelpline.com/es-ES'],
+    ['fr', 'https://findahelpline.com/fr-FR'],
+    ['de', 'https://findahelpline.com/de-DE'],
+    ['it', 'https://findahelpline.com/it-IT'],
+    ['pt', 'https://findahelpline.com/pt-PT'],
+    ['pl', 'https://findahelpline.com/pl-PL'],
+    ['ja', 'https://findahelpline.com/ja-JP'],
+    ['nb', 'https://findahelpline.com/countries/no'],
+  ] as const;
+
+  it.each(localizedHelplineCases)(
+    'self_harm_method response links to the verified %s helpline resource',
+    (language, resourceUrl) => {
+      expect(tripwireResponse('self_harm_method', language)).toContain(
+        resourceUrl,
+      );
+    },
+  );
+
+  it('defaults to the English helpline resource when conversation language is absent', () => {
+    expect(tripwireResponse('self_harm_method')).toContain(
+      'https://findahelpline.com/',
+    );
+  });
+
   it('self_harm_method response points to a trusted adult and a helpline', () => {
     const msg = tripwireResponse('self_harm_method');
     expect(msg).toMatch(/trusted adult/i);
@@ -229,10 +257,11 @@ describe('tripwireResponse', () => {
   });
 
   it('abuse_disclosure response validates, absolves fault, and routes to a trusted adult + helpline', () => {
-    const msg = tripwireResponse('abuse_disclosure');
+    const msg = tripwireResponse('abuse_disclosure', 'es');
     expect(msg).toMatch(/not your fault/i);
     expect(msg).toMatch(/adult you trust/i);
     expect(msg).toMatch(/helpline/i);
+    expect(msg).toContain('https://findahelpline.com/es-ES');
   });
 
   it('abuse_disclosure response does NOT default the learner to a parent or guardian (perpetrator may be the caregiver)', () => {
