@@ -196,6 +196,12 @@ function buildProgressMetrics(
 async function seedProfile(input: {
   displayName: string;
   timezone?: string | null;
+  // [WI-1863] Managed charges have no login row; a login makes the person a
+  // credentialed charge, which the digest fan-out now suppresses. Child seeds
+  // pass credentialed:false so they model the managed-charge state the digest
+  // assertions are about; parents keep their login (email/push resolution
+  // reads db.query.login.findFirst for the recipient).
+  credentialed?: boolean;
 }): Promise<{ accountId: string; profileId: string }> {
   const idx = ++seedCounter;
   const clerkUserId = `clerk_weekly_push_${RUN_ID}_${idx}`;
@@ -216,13 +222,15 @@ async function seedProfile(input: {
       residenceJurisdiction: 'ROW',
     })
     .returning({ id: person.id });
-  const loginId = generateUUIDv7();
-  await db.insert(login).values({
-    id: loginId,
-    personId: p!.id,
-    clerkUserId,
-    email,
-  });
+  if (input.credentialed !== false) {
+    const loginId = generateUUIDv7();
+    await db.insert(login).values({
+      id: loginId,
+      personId: p!.id,
+      clerkUserId,
+      email,
+    });
+  }
   await db.insert(membership).values({
     personId: p!.id,
     organizationId: org!.id,
@@ -483,6 +491,7 @@ describe('weekly progress push integration', () => {
     const { profileId: queuedChildId } = await seedProfile({
       displayName: 'Queued Child',
       timezone: matchingTimezone,
+      credentialed: false,
     });
     const { profileId: skippedParentId } = await seedProfile({
       displayName: 'Skipped Parent',
@@ -491,6 +500,7 @@ describe('weekly progress push integration', () => {
     const { profileId: skippedChildId } = await seedProfile({
       displayName: 'Skipped Child',
       timezone: nonMatchingTimezone,
+      credentialed: false,
     });
 
     await seedWeeklyPushPrefs(queuedParentId);
@@ -537,6 +547,7 @@ describe('weekly progress push integration', () => {
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Emma',
       timezone: 'UTC',
+      credentialed: false,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
     await seedWeeklyPushPrefs(parentProfileId);
@@ -669,6 +680,7 @@ describe('weekly progress push integration', () => {
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Emma',
       timezone: 'UTC',
+      credentialed: false,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
     await seedWeeklyPushPrefs(parentProfileId);
@@ -736,6 +748,7 @@ describe('weekly progress push integration', () => {
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Emma',
       timezone: 'UTC',
+      credentialed: false,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
     await seedWeeklyEmailPrefs(parentProfileId);
@@ -796,10 +809,12 @@ describe('weekly progress push integration', () => {
     const { profileId: childWithDataId } = await seedProfile({
       displayName: 'Alice',
       timezone: 'UTC',
+      credentialed: false,
     });
     const { profileId: childWithoutDataId } = await seedProfile({
       displayName: 'Bob',
       timezone: 'UTC',
+      credentialed: false,
     });
 
     await seedFamilyLink(parentProfileId, childWithDataId);

@@ -11,6 +11,7 @@ import {
   generateUUIDv7,
   guardianship,
   learningSessions,
+  login,
   membership,
   organization,
   person,
@@ -593,6 +594,7 @@ afterAll(async () => {
       .delete(consentRequest)
       .where(eq(consentRequest.chargePersonId, pid));
     await db.delete(consentGrant).where(eq(consentGrant.chargePersonId, pid));
+    await db.delete(login).where(eq(login.personId, pid));
     await db.delete(membership).where(eq(membership.personId, pid));
     await db.delete(person).where(eq(person.id, pid));
   }
@@ -1919,6 +1921,57 @@ describe('dashboard service integration', () => {
     const parentBProfileIds = childrenForParentB.map((c) => c.profileId);
     expect(parentAProfileIds).not.toContain(childB);
     expect(parentBProfileIds).not.toContain(childA);
+  });
+
+  it('[WI-1863] omits a credentialed charge from getChildrenForParent while retaining a managed charge', async () => {
+    // A charge with their own login row is "credentialed": guardians must not
+    // see them through managed-child surfaces (MMT-ADR-0008; OPQ-32). This
+    // exercises the real getChildrenForParent wiring against the login table —
+    // both children get identical activity, so an omission is attributable
+    // only to the login row.
+    const { profileId: parentId, orgId } = await seedProfile({
+      displayName: 'Suppression Parent',
+      birthYear: 1975,
+    });
+    const { profileId: credentialedChildId } = await seedProfile({
+      displayName: 'Credentialed Child',
+      birthYear: 2010,
+      orgId,
+    });
+    const { profileId: managedChildId } = await seedProfile({
+      displayName: 'Managed Child',
+      birthYear: 2012,
+      orgId,
+    });
+    await seedFamilyLink(parentId, credentialedChildId);
+    await seedFamilyLink(parentId, managedChildId);
+    await db.insert(login).values({
+      id: generateUUIDv7(),
+      personId: credentialedChildId,
+      clerkUserId: `clerk_dashboard_${RUN_ID}_credentialed`,
+      email: `dashboard-credentialed-${RUN_ID}@test.invalid`,
+    });
+
+    const now = getStableMidWeekNow();
+    for (const childId of [credentialedChildId, managedChildId]) {
+      const subjectId = await seedSubject({
+        profileId: childId,
+        name: `Suppression Subject ${childId.slice(0, 8)}`,
+      });
+      await seedSession({
+        profileId: childId,
+        subjectId,
+        startedAt: subtractDays(now, 1),
+        exchangeCount: 3,
+      });
+    }
+
+    const children = await getChildrenForParent(db, parentId, {
+      identityV2Enabled: true,
+    });
+
+    expect(children.map((c) => c.profileId)).toEqual([managedChildId]);
+    expect(children[0]!.displayName).toBe('Managed Child');
   });
 
   it('profile boundary: getChildDetail throws ForbiddenError when parent is not linked to child', async () => {
