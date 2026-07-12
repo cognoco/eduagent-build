@@ -11989,7 +11989,18 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "speaking_practice_attempts_profile_session_target_attempt_uq": {
+          "name": "speaking_practice_attempts_profile_session_target_attempt_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "session_id",
+            "target_text",
+            "attempt_number"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

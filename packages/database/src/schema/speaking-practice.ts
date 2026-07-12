@@ -7,6 +7,7 @@ import {
   jsonb,
   timestamp,
   index,
+  unique,
 } from 'drizzle-orm/pg-core';
 import { person } from './identity';
 import { subjects } from './subjects';
@@ -51,6 +52,16 @@ export const speakingPracticeAttempts = pgTable(
     index('speaking_practice_attempts_profile_created_idx').on(
       table.profileId,
       table.createdAt,
+    ),
+    // WI-1777 review rework: closes a read-then-write race on attemptNumber
+    // — two concurrent submits for the same (profile, session, target) could
+    // both read the same prior count and both insert the same attemptNumber.
+    // The service retries on violation of this constraint (attempt.ts).
+    unique('speaking_practice_attempts_profile_session_target_attempt_uq').on(
+      table.profileId,
+      table.sessionId,
+      table.targetText,
+      table.attemptNumber,
     ),
   ],
 );

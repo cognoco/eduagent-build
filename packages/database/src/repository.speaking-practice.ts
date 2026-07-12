@@ -46,6 +46,13 @@ export function createSpeakingPracticeRepository(
           );
         return Number(rows[0]?.count ?? 0);
       },
+      /**
+       * Inserts an attempt row, silently dropping (not throwing) on a
+       * (profileId, sessionId, targetText, attemptNumber) collision — the
+       * WI-1777 review-rework fix for the countByTarget-then-insert race.
+       * Returns `undefined` when the collision suppressed the insert, so the
+       * caller (attempt.ts) can re-derive attemptNumber and retry.
+       */
       async insert(values: {
         sessionId: string;
         subjectId: string;
@@ -61,6 +68,14 @@ export function createSpeakingPracticeRepository(
         const [row] = await db
           .insert(speakingPracticeAttempts)
           .values({ profileId, ...values })
+          .onConflictDoNothing({
+            target: [
+              speakingPracticeAttempts.profileId,
+              speakingPracticeAttempts.sessionId,
+              speakingPracticeAttempts.targetText,
+              speakingPracticeAttempts.attemptNumber,
+            ],
+          })
           .returning();
         return row;
       },

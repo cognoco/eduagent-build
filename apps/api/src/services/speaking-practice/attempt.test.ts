@@ -99,3 +99,114 @@ describe('recordSpeakingPracticeAttempt — cross-subject session mismatch (WI-1
     expect(whereText).toContain('subject_id');
   });
 });
+
+// ---------------------------------------------------------------------------
+// WI-1777 review rework (SHOULD_FIX): countByTarget-then-insert race on
+// attemptNumber. Two concurrent submits for the same (profile, session,
+// targetText) can both read the same prior count and both try to insert the
+// same attemptNumber; the unique constraint added to the migration makes the
+// losing insert a no-op (onConflictDoNothing) instead of a thrown error, and
+// attempt.ts retries with a re-derived count. These tests duck-type the raw
+// `db.select`/`db.insert`/`db.transaction` calls that createScopedRepository
+// makes (no jest.mock of internal modules — GC1/GC6) so the retry can be
+// driven deterministically instead of relying on real concurrent timing.
+// ---------------------------------------------------------------------------
+describe('recordSpeakingPracticeAttempt — attemptNumber conflict retry (WI-1777 SHOULD_FIX)', () => {
+  function makeFakeDb(
+    insertResults: Array<{ attemptNumber: number } | undefined>,
+  ) {
+    const insertedAttemptNumbers: number[] = [];
+    let insertCallIndex = 0;
+    // Rows "visible" to countByTarget — bumped after every insert attempt,
+    // whether it's our own row landing or a conflict (which, per
+    // onConflictDoNothing semantics, means a concurrent submit's row landed
+    // instead). Either way there's one more row at the (session, target) pair
+    // by the time the next countByTarget call runs.
+    let visibleCount = 0;
+
+    const fakeDb = {
+      query: {
+        subjects: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ id: SUBJECT_ID, profileId: PROFILE_ID }),
+        },
+        learningSessions: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ id: SESSION_ID, subjectId: SUBJECT_ID }),
+        },
+      },
+      transaction: async (cb: (tx: unknown) => unknown) => cb(fakeDb),
+      select: () => ({
+        from: () => ({
+          where: async () => [{ count: String(visibleCount) }],
+        }),
+      }),
+      insert: () => ({
+        values: (v: { attemptNumber: number }) => {
+          insertedAttemptNumbers.push(v.attemptNumber);
+          return {
+            onConflictDoNothing: () => ({
+              returning: async () => {
+                const result = insertResults[insertCallIndex];
+                insertCallIndex += 1;
+                visibleCount += 1;
+                return result ? [result] : [];
+              },
+            }),
+          };
+        },
+      }),
+    };
+    return { fakeDb, insertedAttemptNumbers };
+  }
+
+  it('retries with a re-derived attemptNumber when the first insert loses the race', async () => {
+    const { fakeDb, insertedAttemptNumbers } = makeFakeDb([
+      undefined, // lost the race for attemptNumber 1
+      { attemptNumber: 2 },
+    ]);
+
+    const response = await recordSpeakingPracticeAttempt(
+      fakeDb as unknown as Database,
+      PROFILE_ID,
+      {
+        sessionId: SESSION_ID,
+        subjectId: SUBJECT_ID,
+        mode: 'repeat_after_me',
+        targetText: 'I would like a cup of tea.',
+        transcript: 'I like cup tea',
+        locale: 'en-US',
+      },
+    );
+
+    expect(response.attemptNumber).toBe(2);
+    // Proves the retry re-derived attemptNumber (1, then 2) rather than
+    // silently reusing the slot that just lost the race.
+    expect(insertedAttemptNumbers).toEqual([1, 2]);
+  });
+
+  it('throws once every retry loses the race, instead of silently returning a corrupted result', async () => {
+    const { fakeDb, insertedAttemptNumbers } = makeFakeDb([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+
+    await expect(
+      recordSpeakingPracticeAttempt(fakeDb as unknown as Database, PROFILE_ID, {
+        sessionId: SESSION_ID,
+        subjectId: SUBJECT_ID,
+        mode: 'repeat_after_me',
+        targetText: 'I would like a cup of tea.',
+        transcript: 'I like cup tea',
+        locale: 'en-US',
+      }),
+    ).rejects.toThrow(/exhausted/i);
+
+    expect(insertedAttemptNumbers).toHaveLength(5);
+  });
+});

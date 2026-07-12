@@ -20,6 +20,12 @@ import { scoreSpeakingPracticeAttempt } from './scoring';
 // separately-computed client-facing estimate.
 // ---------------------------------------------------------------------------
 
+// WI-1777 review rework (SHOULD_FIX): bound on the countByTarget-then-insert
+// retry loop below. Each retry only fires when a concurrent submit won the
+// race for the current attemptNumber slot — a handful of learners hammering
+// the same target concurrently, never an unbounded contention scenario.
+const MAX_ATTEMPT_NUMBER_RETRIES = 5;
+
 export async function recordSpeakingPracticeAttempt(
   db: Database,
   profileId: string,
@@ -60,29 +66,36 @@ export async function recordSpeakingPracticeAttempt(
   const row = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
     const repo = createScopedRepository(txDb, profileId);
-    // Best-effort attempt numbering (§ see plan doc) — not a gapless/race-proof
-    // sequence, only an ordering signal; the UI allows one recording at a time
-    // so concurrent submits for the same target are not the expected path.
-    const priorCount = await repo.speakingPracticeAttempts.countByTarget(
-      input.sessionId,
-      input.targetText,
-    );
-    const inserted = await repo.speakingPracticeAttempts.insert({
-      sessionId: input.sessionId,
-      subjectId: input.subjectId,
-      mode: input.mode,
-      targetText: input.targetText,
-      transcript: input.transcript,
-      locale: input.locale,
-      attemptNumber: priorCount + 1,
-      lexicalMatchScore: score.lexicalMatchScore,
-      missingWords: score.missingWords,
-      extraWords: score.extraWords,
-    });
-    if (!inserted) {
-      throw new Error('Speaking-practice attempt insert did not return a row');
+    // attemptNumber is derived from a count-then-insert read, which races
+    // under concurrent submits for the same (profile, session, targetText):
+    // two submits can both read the same prior count and both try to insert
+    // the same attemptNumber. The unique constraint on
+    // (profileId, sessionId, targetText, attemptNumber) makes the losing
+    // insert a no-op (onConflictDoNothing) instead of corrupting the numbering,
+    // and we retry with a fresh count — by then the winner's row is visible,
+    // so the retry reads the correct next attemptNumber.
+    for (let retry = 0; retry < MAX_ATTEMPT_NUMBER_RETRIES; retry++) {
+      const priorCount = await repo.speakingPracticeAttempts.countByTarget(
+        input.sessionId,
+        input.targetText,
+      );
+      const inserted = await repo.speakingPracticeAttempts.insert({
+        sessionId: input.sessionId,
+        subjectId: input.subjectId,
+        mode: input.mode,
+        targetText: input.targetText,
+        transcript: input.transcript,
+        locale: input.locale,
+        attemptNumber: priorCount + 1,
+        lexicalMatchScore: score.lexicalMatchScore,
+        missingWords: score.missingWords,
+        extraWords: score.extraWords,
+      });
+      if (inserted) return inserted;
     }
-    return inserted;
+    throw new Error(
+      `Speaking-practice attempt insert exhausted ${MAX_ATTEMPT_NUMBER_RETRIES} retries on attemptNumber conflict`,
+    );
   });
 
   return {
