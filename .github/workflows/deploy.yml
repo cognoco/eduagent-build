@@ -305,11 +305,15 @@ jobs:
           DOPPLER_TOKEN_PRD: ${{ secrets.DOPPLER_TOKEN_PRD }}
           SKIP_DOPPLER_SYNC: ${{ secrets.SKIP_DOPPLER_SYNC }}
         run: |
+          DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           if [ "${SKIP_DOPPLER_SYNC:-false}" = "true" ]; then
+            if [ "$DEPLOY_ENV" = "production" ]; then
+              echo "::error title=Production retention gate unverifiable::SKIP_DOPPLER_SYNC cannot be used for production because RETENTION_PURGE_ENABLED must be true and verified from Doppler before deployment."
+              exit 1
+            fi
             echo "::warning title=Doppler→Worker sync explicitly skipped::SKIP_DOPPLER_SYNC=true was set as a workflow secret. Worker secrets were NOT synced — operator must have run \`pnpm secrets:sync\` locally for this deploy."
             exit 0
           fi
-          DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           # Map wrangler env names to Doppler config short names + pick the per-config token.
           # Doppler Developer plan uses config-scoped service tokens (not project-scoped service
           # accounts), so each env carries its own secret. Production deploys will hard-fail until
@@ -332,6 +336,17 @@ jobs:
           echo "${DOPPLER_SHA256}  ${DOPPLER_ARCHIVE}" | sha256sum -c -
           sudo tar -xzf "${DOPPLER_ARCHIVE}" -C /usr/local/bin doppler
           doppler --version
+          if [ "$SYNC_TARGET" = "prd" ]; then
+            RETENTION_PURGE_VALUE="$(doppler secrets get RETENTION_PURGE_ENABLED --plain --config "$SYNC_TARGET" 2>/dev/null)" || {
+              echo "::error title=Production retention gate FAILED::Could not read RETENTION_PURGE_ENABLED from the production Doppler config."
+              exit 1
+            }
+            if [ "$RETENTION_PURGE_VALUE" != "true" ]; then
+              echo "::error title=Production retention gate FAILED::RETENTION_PURGE_ENABLED must be true in the production Doppler config."
+              exit 1
+            fi
+            echo "Production retention gate passed."
+          fi
           pnpm secrets:sync "$SYNC_TARGET"
 
       - name: Deploy to Cloudflare Workers
