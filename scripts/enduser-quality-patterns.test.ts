@@ -9,7 +9,7 @@ import {
   LEARNING_SOURCE_POINT_RE,
   RECITATION_UNSUPPORTED_POLISH_RE,
   recitationPolishAddedFact,
-  sourceAuditNoFactualClaim,
+  sourceAuditGateFires,
 } from './enduser-quality-patterns';
 
 const learningSourcePointCount = (text: string): number =>
@@ -133,91 +133,86 @@ describe('recitationPolishAddedFact (scoped to polished segment — WI-1823 ruli
   });
 });
 
-describe('sourceAuditNoFactualClaim (source_audit no-claim skip — WI-1823 ruling 2a)', () => {
-  // Captured verify1 recitation t1: setup prompt inviting the learner to
-  // recite first. The model asserted no fact, so it emitted no
-  // factual_confidence, and the reply itself is a pure invitation.
-  const recitationSetup = {
-    status: 'missing_reliable_source',
-    factualConfidence: undefined,
-  };
-  const recitationSetupReply = "Go ahead and recite it for me — I'm listening.";
-  // Captured verify1 four-strands t1: language-immersion opener, a question
-  // in the target language. Empty relied_on, no factual_confidence.
-  const immersionOpener = { status: 'missing_reliable_source' };
-  const immersionOpenerReply = '¿Qué te gustaría practicar hoy?';
-  // The realistic dangerous case Codex P1 caught: the model FORGOT to
-  // populate relied_on for a source-specific factual claim, so status is
-  // missing_reliable_source and factual_confidence is ABSENT (it is only
-  // ever emitted for general_knowledge reliance per the prompt contract,
-  // apps/api/src/services/exchange-prompts.ts:578 — its absence here does
-  // NOT mean no claim was made). The reply is a declarative factual
-  // assertion, so this must NOT be skipped.
-  const forgottenSourceAudit = {
-    status: 'missing_reliable_source',
-    factualConfidence: undefined,
-  };
-  const forgottenSourceReply = '3·5+5 = 20.';
+describe('sourceAuditGateFires (WI-1823 pivot: turn-identity allowlist, ruled Option A)', () => {
+  // The reviewer kept constructing new bypass phrasings against the prior
+  // content heuristic (bare fact, conversational-prefix fact, em-dash fact,
+  // fact framed as a question) — a regex classifying reply CONTENT can't be
+  // both conservative and reliable against arbitrary phrasing. The fix
+  // drops content inspection entirely: sourceAuditGateFires takes only the
+  // audit status and a per-turn `exemptSourceAudit` boolean set on the
+  // RunDefinition turn (turn identity), never the reply text. These tests
+  // exercise every phrasing the reviewer previously used to defeat the old
+  // heuristic — the point is that on a non-exempt (teaching) turn, phrasing
+  // is now irrelevant: the gate fires purely because the turn isn't marked
+  // exempt, regardless of what the reply happened to say.
 
-  it('skips a contentless recitation setup turn (invitation, no factual_confidence)', () => {
-    expect(
-      sourceAuditNoFactualClaim(recitationSetup, recitationSetupReply),
-    ).toBe(true);
+  it('does NOT fire on an exempt (non-teaching) turn — e.g. recitation setup, "Go ahead and recite it for me — I\'m listening."', () => {
+    expect(sourceAuditGateFires('missing_reliable_source', true)).toBe(false);
   });
 
-  it('skips a language-immersion opener (question, empty relied_on, no factual_confidence)', () => {
-    expect(
-      sourceAuditNoFactualClaim(immersionOpener, immersionOpenerReply),
-    ).toBe(true);
+  it('does NOT fire on an exempt turn — e.g. immersion opener, "¿Qué te gustaría practicar hoy?"', () => {
+    expect(sourceAuditGateFires('missing_reliable_source', true)).toBe(false);
   });
 
-  it('does NOT skip a declarative factual assertion with no relied_on and no factual_confidence', () => {
-    expect(
-      sourceAuditNoFactualClaim(forgottenSourceAudit, forgottenSourceReply),
-    ).toBe(false);
+  // Follow-up correction: four-strands turn 1 ("Start with a tiny example I
+  // can understand") is a model-generated illustrative language example —
+  // there is no reliable source to cite for a novel demonstration sentence,
+  // so missing_reliable_source there is expected and benign, same principle
+  // as the other three exempt turns. This also preserves the exact
+  // pre-existing skip behavior for that turn under the new code.
+  it('does NOT fire on an exempt turn — e.g. four-strands illustrative example opener, "En mi opinión, estudiar es útil."', () => {
+    expect(sourceAuditGateFires('missing_reliable_source', true)).toBe(false);
   });
 
-  it('does NOT skip other fail statuses even without factual_confidence', () => {
-    expect(
-      sourceAuditNoFactualClaim({ status: 'unsupported_sources' }, ''),
-    ).toBe(false);
+  // Non-exempt (teaching) turn: fires regardless of reply phrasing. The
+  // function signature takes no reply text, so these comments document what
+  // the (irrelevant) reply would have been in each previously-defeated case.
+  it('fires on a non-exempt turn with a bare factual reply ("3·5+5 = 20.")', () => {
+    expect(sourceAuditGateFires('missing_reliable_source', undefined)).toBe(
+      true,
+    );
   });
 
-  // Reviewer rework: the prefix-anchored version of this check treated any
-  // sentence STARTING with an invitational token as fully non-assertive,
-  // regardless of what followed. That let a prefixed or dash-appended fact
-  // bypass the gate. These pin the closed hole — each must NOT be skipped.
-  const noAudit = {
-    status: 'missing_reliable_source',
-    factualConfidence: undefined,
-  };
-
-  it('does NOT skip a conversational-prefix-wrapped factual assertion ("Sure, ...")', () => {
-    expect(sourceAuditNoFactualClaim(noAudit, 'Sure, 3·5+5 = 20.')).toBe(false);
+  it('fires on a non-exempt turn with a conversational-prefix-wrapped fact ("Sure, 3·5+5 = 20.")', () => {
+    expect(sourceAuditGateFires('missing_reliable_source', false)).toBe(true);
   });
 
-  it('does NOT skip a conversational-prefix-wrapped factual assertion ("Great — ...")', () => {
-    expect(
-      sourceAuditNoFactualClaim(
-        noAudit,
-        'Great — Roman roads made trade faster.',
-      ),
-    ).toBe(false);
+  it('fires on a non-exempt turn with a fact smuggled after an invitation via em-dash ("Go ahead — the answer is 20.")', () => {
+    expect(sourceAuditGateFires('missing_reliable_source', undefined)).toBe(
+      true,
+    );
   });
 
-  it('does NOT skip a fact smuggled after an invitation via em-dash', () => {
-    expect(
-      sourceAuditNoFactualClaim(noAudit, 'Go ahead — the answer is 20.'),
-    ).toBe(false);
+  it('fires on a non-exempt turn with the fact framed as a question ("Did you know Roman roads made trade faster?")', () => {
+    expect(sourceAuditGateFires('missing_reliable_source', undefined)).toBe(
+      true,
+    );
   });
 
-  it('still skips a bare acknowledgement with no fact ("Sure!")', () => {
-    expect(sourceAuditNoFactualClaim(noAudit, 'Sure!')).toBe(true);
+  it('fires on a non-exempt turn with the fact framed as an invitation-question ("Ready to discuss how Roman roads made trade faster?")', () => {
+    expect(sourceAuditGateFires('missing_reliable_source', undefined)).toBe(
+      true,
+    );
   });
 
-  it('still skips a pure invitation with a trailing readiness clause', () => {
-    expect(
-      sourceAuditNoFactualClaim(noAudit, "Great, whenever you're ready."),
-    ).toBe(true);
+  it('fires on other fail statuses on a non-exempt turn', () => {
+    expect(sourceAuditGateFires('unsupported_sources', undefined)).toBe(true);
+  });
+
+  it('does not fire on a non-fail status even on a non-exempt turn (proper reliable-source trail)', () => {
+    expect(sourceAuditGateFires('ok', undefined)).toBe(false);
+  });
+
+  // Red-green anchor: an exempt turn stays exempt only because of the
+  // marker, not because of anything about the status — flip the marker off
+  // and the SAME fail-status now fires. This is the property the red-green
+  // proof in the commit message exercises against the actual gate wiring in
+  // enduser-session-pass.ts (revert the exemptSourceAudit marker on the
+  // recitation-setup turn, confirm it newly fails, restore).
+  it('the same fail-status fires once the exempt marker is removed', () => {
+    expect(sourceAuditGateFires('missing_reliable_source', true)).toBe(false);
+    expect(sourceAuditGateFires('missing_reliable_source', undefined)).toBe(
+      true,
+    );
   });
 });

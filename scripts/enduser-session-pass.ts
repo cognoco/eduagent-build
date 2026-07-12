@@ -44,7 +44,7 @@ import {
   FOUR_STRANDS_EXPLAINS_EN_RE,
   LEARNING_SOURCE_POINT_RE,
   recitationPolishAddedFact,
-  sourceAuditNoFactualClaim,
+  sourceAuditGateFires,
 } from './enduser-quality-patterns';
 
 type Mode =
@@ -100,6 +100,11 @@ interface LearnerProfileVariant {
 interface TurnPlan {
   message: string;
   homeworkMode?: 'help_me' | 'check_answer';
+  // WI-1823 pivot: marks a turn whose authored purpose is NOT to teach a
+  // sourced fact (setup/greeting/opener/meta) — exempts it from the
+  // source_audit fail-status gate. Turn identity, never reply content. See
+  // sourceAuditGateFires in enduser-quality-patterns.ts.
+  exemptSourceAudit?: true;
 }
 
 interface RunDefinition {
@@ -274,7 +279,13 @@ const runDefinitions: RunDefinition[] = [
         message:
           'I think empires grow mostly by conquering land. Is that the main idea?',
       },
-      { message: 'Can you quiz me with one question?' },
+      {
+        // WI-1823 turn allowlist: pure quiz-prompt turn — the learner asked
+        // to be quizzed with one question, so the assistant's authored job
+        // is to ask, not teach a new sourced fact.
+        message: 'Can you quiz me with one question?',
+        exemptSourceAudit: true,
+      },
       {
         message:
           'My answer: roads helped move armies and trade, so the empire stayed connected.',
@@ -333,7 +344,11 @@ const runDefinitions: RunDefinition[] = [
     rawInput: 'Review the due Biology topic with recall first.',
     turns: ({ topicTitle }) => [
       {
+        // WI-1823 turn allowlist: "ask me something first" — the assistant's
+        // authored job is to pose a recall question, not teach a new
+        // sourced fact.
         message: `I am ready to review ${topicTitle ?? 'this topic'}. Ask me something first.`,
+        exemptSourceAudit: true,
       },
       { message: 'I remember it has something to do with cells and energy.' },
       { message: 'Can you give me a hint instead of the answer?' },
@@ -359,8 +374,13 @@ const runDefinitions: RunDefinition[] = [
     rawInput: 'I want to practice reciting a short history explanation aloud.',
     turns: () => [
       {
+        // WI-1823 turn allowlist: recitation setup turn — the assistant's
+        // authored job is to invite the learner to recite first, not
+        // provide the answer (RECITATION_SETUP_PREMATURE_MODEL_RE already
+        // encodes this expectation).
         message:
           'I want to recite a short explanation of why Roman roads mattered.',
+        exemptSourceAudit: true,
       },
       {
         message:
@@ -389,8 +409,18 @@ const runDefinitions: RunDefinition[] = [
       'Spanish practice using Four Strands: I need useful input, output practice, direct grammar correction, and a short fluency drill with connectors.',
     turns: () => [
       {
+        // WI-1823 turn allowlist: illustrative language-example turn — the
+        // assistant's job is to give ONE model-generated demonstration
+        // sentence using the connectors, not assert a fact from the
+        // curriculum topic source. There is no reliable source to cite for
+        // a novel example sentence, so missing_reliable_source here is
+        // expected and benign. (Distinct from four-strands turns 2-4, which
+        // correct/confirm the learner's attempt against the topic's own
+        // connector-meaning definitions — that IS sourceable, so those stay
+        // non-exempt.)
         message:
           'I want to practice Spanish connectors for giving opinions. Start with a tiny example I can understand.',
+        exemptSourceAudit: true,
       },
       {
         message: 'Mi opinión, estudiar es útil porque ayuda, pero es difícil.',
@@ -404,8 +434,12 @@ const runDefinitions: RunDefinition[] = [
           'En mi opinión, estudiar es útil porque ayuda, pero es difícil.',
       },
       {
+        // WI-1823 turn allowlist: fluency-drill launch turn — the
+        // assistant's authored job is to frame/activate a timed drill
+        // (ui_hints.fluency_drill), not teach a new sourced fact.
         message:
           'Can we do a 30 second fluency drill with porque, pero, and entonces?',
+        exemptSourceAudit: true,
       },
     ],
   },
@@ -704,12 +738,6 @@ const FOUR_STRANDS_OUTPUT_PROMPT_RE =
   /\b(?:try|retry|write|say|make|give me|your turn|repeat|answer)\b[^.?!]*(?:Spanish|sentence|frase|oraci[oó]n|porque|pero|entonces|en mi opini[oó]n)/i;
 const FOUR_STRANDS_FLUENCY_RE =
   /\b(?:fluency|30\s*(?:second|s|sec)|timer|timed|as many|quick)\b/i;
-const SOURCE_AUDIT_FAIL_STATUSES = new Set([
-  'parse_failed',
-  'missing_private_sources',
-  'unsupported_sources',
-  'missing_reliable_source',
-]);
 const SOURCE_BOUND_TRIPWIRE_TERMS: Array<{
   response: RegExp;
   source: RegExp;
@@ -849,6 +877,7 @@ function analyzeTurn(input: {
   envelopeParseFailureReason?: string;
   sourceAudit?: ExchangeSourceAudit;
   fluencyDrill?: FluencyDrillAnnotation;
+  exemptSourceAudit?: true;
 }): QualityIssue[] {
   const issues: QualityIssue[] = [];
   const { definition, turnIndex, response } = input;
@@ -876,8 +905,7 @@ function analyzeTurn(input: {
       snippet: snippet(response),
     });
   } else if (
-    SOURCE_AUDIT_FAIL_STATUSES.has(input.sourceAudit.status) &&
-    !sourceAuditNoFactualClaim(input.sourceAudit, response)
+    sourceAuditGateFires(input.sourceAudit.status, input.exemptSourceAudit)
   ) {
     issues.push({
       severity: 'fail',
@@ -1383,6 +1411,7 @@ async function runMode(
       envelopeParseFailureReason: result.envelopeParseFailureReason,
       sourceAudit: result.sourceAudit,
       fluencyDrill: result.fluencyDrill,
+      exemptSourceAudit: planned.exemptSourceAudit,
     });
 
     turns.push({
