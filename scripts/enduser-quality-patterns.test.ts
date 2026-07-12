@@ -154,6 +154,16 @@ describe('sourceAuditGateFires (WI-1823 pivot: turn-identity allowlist, ruled Op
     expect(sourceAuditGateFires('missing_reliable_source', true)).toBe(false);
   });
 
+  // Follow-up correction: four-strands turn 1 ("Start with a tiny example I
+  // can understand") is a model-generated illustrative language example —
+  // there is no reliable source to cite for a novel demonstration sentence,
+  // so missing_reliable_source there is expected and benign, same principle
+  // as the other three exempt turns. This also preserves the exact
+  // pre-existing skip behavior for that turn under the new code.
+  it('does NOT fire on an exempt turn — e.g. four-strands illustrative example opener, "En mi opinión, estudiar es útil."', () => {
+    expect(sourceAuditGateFires('missing_reliable_source', true)).toBe(false);
+  });
+
   // Non-exempt (teaching) turn: fires regardless of reply phrasing. The
   // function signature takes no reply text, so these comments document what
   // the (irrelevant) reply would have been in each previously-defeated case.

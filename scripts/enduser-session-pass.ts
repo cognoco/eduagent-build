@@ -409,8 +409,18 @@ const runDefinitions: RunDefinition[] = [
       'Spanish practice using Four Strands: I need useful input, output practice, direct grammar correction, and a short fluency drill with connectors.',
     turns: () => [
       {
+        // WI-1823 turn allowlist: illustrative language-example turn — the
+        // assistant's job is to give ONE model-generated demonstration
+        // sentence using the connectors, not assert a fact from the
+        // curriculum topic source. There is no reliable source to cite for
+        // a novel example sentence, so missing_reliable_source here is
+        // expected and benign. (Distinct from four-strands turns 2-4, which
+        // correct/confirm the learner's attempt against the topic's own
+        // connector-meaning definitions — that IS sourceable, so those stay
+        // non-exempt.)
         message:
           'I want to practice Spanish connectors for giving opinions. Start with a tiny example I can understand.',
+        exemptSourceAudit: true,
       },
       {
         message: 'Mi opinión, estudiar es útil porque ayuda, pero es difícil.',
