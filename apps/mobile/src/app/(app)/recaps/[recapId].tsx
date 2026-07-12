@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ErrorFallback, TimeoutLoader } from '../../../components/common';
 import { AddToMyLearningButton } from '../../../components/family/AddToMyLearningButton';
+import { VerifiedProofBlock } from '../../../components/family/VerifiedProofBlock';
 import { RequireFamilyContext } from '../../../components/guards/RequireFamilyContext';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { useRecap } from '../../../hooks/use-recaps';
@@ -162,6 +163,27 @@ export default function RecapDetailScreen(): React.ReactElement {
                   t('recaps.detailPending')}
               </Text>
             </View>
+
+            {recapQuery.data.verifiedProof ? (
+              <View
+                className="mt-3 rounded-card border border-border bg-surface px-4 py-4"
+                testID="recap-detail-verified-proof"
+              >
+                <VerifiedProofBlock
+                  topicTitle={recapQuery.data.verifiedProof.topicTitle}
+                  verifiedAt={recapQuery.data.verifiedProof.verifiedAt}
+                  quote={recapQuery.data.verifiedProof.quote}
+                  verificationState={
+                    recapQuery.data.verifiedProof.verificationState
+                  }
+                  retentionStatus={
+                    recapQuery.data.verifiedProof.retentionStatus
+                  }
+                  nextReviewDate={recapQuery.data.verifiedProof.nextReviewDate}
+                  showRetentionAffordances
+                />
+              </View>
+            ) : null}
 
             {recapQuery.data.conversationPrompt ? (
               <View className="mt-3 rounded-card border border-border bg-surface px-4 py-4">

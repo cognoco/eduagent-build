@@ -50,7 +50,14 @@ jest.mock(
   },
 );
 
-import type { Database } from '@eduagent/database';
+import {
+  assessments,
+  needsDeepeningTopics,
+  retentionCards,
+  sessionSummaries,
+  topicNotes,
+  type Database,
+} from '@eduagent/database';
 
 import { ForbiddenError } from '../errors';
 import {
@@ -90,6 +97,16 @@ function sessionRow(sessionId: string) {
     narrative: null,
     conversationPrompt: null,
     engagementSignal: null,
+  } as Awaited<
+    ReturnType<typeof import('./dashboard').getChildSessions>
+  >[number];
+}
+
+function topicSessionRow(sessionId: string) {
+  return {
+    ...sessionRow(sessionId),
+    topicId: 'd0000000-0000-4000-8000-000000000001',
+    topicTitle: 'Fractions',
   } as Awaited<
     ReturnType<typeof import('./dashboard').getChildSessions>
   >[number];
@@ -152,6 +169,43 @@ function fakeDbReturning(rows: unknown[]): Database {
   chain['leftJoin'] = jest.fn(() => chain);
   chain['where'] = jest.fn(async () => rows);
   return chain as unknown as Database;
+}
+
+function fakeProofDb(rowsByTable: Map<unknown, unknown[]>): Database {
+  return {
+    select: jest.fn(() => {
+      let rows: unknown[] = [];
+      const chain: Record<string, unknown> = {};
+      chain['from'] = jest.fn((table: unknown) => {
+        rows = rowsByTable.get(table) ?? [];
+        return chain;
+      });
+      chain['innerJoin'] = jest.fn(() => chain);
+      chain['leftJoin'] = jest.fn(() => chain);
+      chain['where'] = jest.fn(() => chain);
+      chain['orderBy'] = jest.fn(() => chain);
+      chain['limit'] = jest.fn(async () => rows);
+      chain['then'] = (
+        resolve: (value: unknown[]) => unknown,
+        reject: (reason: unknown) => unknown,
+      ) => Promise.resolve(rows).then(resolve, reject);
+      return chain;
+    }),
+    // Scoped-repository path used by getVerifiedProofForSessionTopic for the
+    // weak-spot and retention-card reads; serve from the same seeded map.
+    query: {
+      needsDeepeningTopics: {
+        findMany: jest.fn(
+          async () => rowsByTable.get(needsDeepeningTopics) ?? [],
+        ),
+      },
+      retentionCards: {
+        findFirst: jest.fn(
+          async () => (rowsByTable.get(retentionCards) ?? [])[0],
+        ),
+      },
+    },
+  } as unknown as Database;
 }
 
 describe('listRecapsForParent — next-topic enrichment', () => {
@@ -334,6 +388,117 @@ describe('getRecapForParent — per-child ForbiddenError isolation', () => {
     await expect(getRecapForParent(db, PARENT_ID, RECAP_ID)).rejects.toThrow(
       'boom',
     );
+  });
+});
+
+describe('getRecapForParent — verified-proof enrichment', () => {
+  const verifiedAt = new Date('2026-07-10T10:00:00.000Z');
+  const nextReviewAt = new Date('2026-07-17T10:00:00.000Z');
+
+  beforeEach(() => {
+    mockGetChildrenForParent.mockResolvedValue([
+      childRow(VISIBLE_CHILD, 'Visible'),
+    ]);
+    mockGetChildSessionDetail.mockResolvedValue(topicSessionRow(RECAP_ID));
+  });
+
+  function proofDb(noteCreatedAt = new Date()): Database {
+    return fakeProofDb(
+      new Map<unknown, unknown[]>([
+        [sessionSummaries, []],
+        [
+          assessments,
+          [
+            {
+              topicId: topicSessionRow(RECAP_ID).topicId,
+              topicTitle: 'Fractions',
+              subjectId: topicSessionRow(RECAP_ID).subjectId,
+              sessionId: RECAP_ID,
+              verifiedAt,
+            },
+          ],
+        ],
+        [
+          topicNotes,
+          [
+            {
+              content: 'Equivalent fractions name the same amount.',
+              createdAt: noteCreatedAt,
+            },
+          ],
+        ],
+        [needsDeepeningTopics, []],
+        [
+          retentionCards,
+          [
+            {
+              topicId: topicSessionRow(RECAP_ID).topicId,
+              easeFactor: 2.5,
+              intervalDays: 30,
+              repetitions: 2,
+              failureCount: 0,
+              consecutiveSuccesses: 2,
+              xpStatus: 'verified',
+              lastReviewedAt: new Date(),
+              nextReviewAt,
+            },
+          ],
+        ],
+      ]),
+    );
+  }
+
+  it('populates verified proof from the session topic marked artifact', async () => {
+    const recap = await getRecapForParent(proofDb(), PARENT_ID, RECAP_ID);
+
+    expect(recap?.verifiedProof).toEqual({
+      topicId: topicSessionRow(RECAP_ID).topicId,
+      topicTitle: 'Fractions',
+      subjectId: topicSessionRow(RECAP_ID).subjectId,
+      verifiedAt: verifiedAt.toISOString(),
+      verificationState: 'fresh',
+      retentionStatus: 'strong',
+      nextReviewDate: nextReviewAt.toISOString(),
+      quote: 'Equivalent fractions name the same amount.',
+    });
+  });
+
+  it('leaves verified proof null and preserves the recap when no verified assessment exists', async () => {
+    const noProofDb = fakeProofDb(
+      new Map<unknown, unknown[]>([
+        [sessionSummaries, []],
+        [assessments, []],
+      ]),
+    );
+
+    const recap = await getRecapForParent(noProofDb, PARENT_ID, RECAP_ID);
+
+    expect(recap).toMatchObject({
+      recapId: RECAP_ID,
+      childProfileId: VISIBLE_CHILD,
+      topicTitle: 'Fractions',
+      narrative: null,
+      verifiedProof: null,
+    });
+  });
+
+  it('keeps proof metadata but nulls an aged marked-note quote', async () => {
+    const agedCreatedAt = new Date();
+    agedCreatedAt.setUTCDate(agedCreatedAt.getUTCDate() - 31);
+
+    const recap = await getRecapForParent(
+      proofDb(agedCreatedAt),
+      PARENT_ID,
+      RECAP_ID,
+    );
+
+    expect(recap?.verifiedProof).toMatchObject({
+      topicId: topicSessionRow(RECAP_ID).topicId,
+      verifiedAt: verifiedAt.toISOString(),
+      verificationState: 'fresh',
+      nextReviewDate: nextReviewAt.toISOString(),
+      quote: null,
+    });
   });
 });
 

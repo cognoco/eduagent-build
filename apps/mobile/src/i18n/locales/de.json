@@ -3314,7 +3314,11 @@
     "detailPending": "Dieser Rückblick wird noch vorbereitet.",
     "tryAsking": "Versuche zu fragen",
     "openChildSession": "Kindersitzung öffnen",
-    "emptyCtaStartSession": "Sitzung starten"
+    "emptyCtaStartSession": "Sitzung starten",
+    "verifiedProof": {
+      "holdsStrong": "ist stichhaltig",
+      "recheckDue": "Erneute Prüfung fällig am {{date}}"
+    }
   },
   "addToMyLearning": {
     "tip": "Speichere eine Kopie dieses Themas in deiner eigenen Bibliothek, ohne das Lernen deines Kindes zu beeinflussen.",

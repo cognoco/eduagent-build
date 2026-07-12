@@ -3314,7 +3314,11 @@
     "detailPending": "Dette sammendraget forberedes fortsatt.",
     "tryAsking": "Prøv å spørre",
     "openChildSession": "Åpne barnets økt",
-    "emptyCtaStartSession": "Start en økt"
+    "emptyCtaStartSession": "Start en økt",
+    "verifiedProof": {
+      "holdsStrong": "holder fortsatt",
+      "recheckDue": "skal sjekkes på nytt {{date}}"
+    }
   },
   "addToMyLearning": {
     "tip": "Lagre en kopi av dette emnet i ditt eget bibliotek uten å påvirke barnets læring.",

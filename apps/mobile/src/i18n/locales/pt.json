@@ -3314,7 +3314,11 @@
     "detailPending": "Este resumo ainda está sendo preparado.",
     "tryAsking": "Tente perguntar",
     "openChildSession": "Abrir sessão da criança",
-    "emptyCtaStartSession": "Iniciar uma sessão"
+    "emptyCtaStartSession": "Iniciar uma sessão",
+    "verifiedProof": {
+      "holdsStrong": "continua válido",
+      "recheckDue": "revisão agendada para {{date}}"
+    }
   },
   "addToMyLearning": {
     "tip": "Salve uma cópia deste tópico em sua própria Biblioteca sem alterar o aprendizado do seu filho.",

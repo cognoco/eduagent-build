@@ -3351,6 +3351,10 @@
     "detailPending": "This recap is still being prepared.",
     "tryAsking": "Try asking",
     "openChildSession": "Open child session",
+    "verifiedProof": {
+      "holdsStrong": "holds strong",
+      "recheckDue": "due for a re-check on {{date}}"
+    },
     "emptyCtaStartSession": "Start a session"
   },
   "addToMyLearning": {
