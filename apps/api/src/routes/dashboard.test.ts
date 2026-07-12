@@ -15,6 +15,7 @@ import {
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 import { personScope } from '../test-utils/identity-v2-scope-mock';
+import { filterUncredentialedCharges } from '../services/family-access';
 
 const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 const mockFindFamilyLink = jest.fn().mockResolvedValue({
@@ -46,7 +47,20 @@ mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
 
 jest.mock(
   '@eduagent/database' /* gc1-allow: route unit test — DB middleware injected via mock; real DB covered by route integration / e2e tests */,
-  () => mockDatabaseModule.module,
+  () => {
+    const actual = jest.requireActual(
+      '@eduagent/database',
+    ) as typeof import('@eduagent/database');
+    return {
+      ...actual,
+      createDatabase: (...args: unknown[]) =>
+        mockDatabaseModule.createDatabase(...args),
+      closeDatabase: (...args: unknown[]) =>
+        mockDatabaseModule.closeDatabase(...args),
+      withProfileScope: (...args: unknown[]) =>
+        (mockDatabaseModule.module['withProfileScope'] as jest.Mock)(...args),
+    };
+  },
 );
 
 const mockFindOrCreateAccount = jest.fn().mockResolvedValue({
@@ -252,6 +266,59 @@ describe('dashboard routes', () => {
       const body = await res.json();
       expect(body.children).toEqual([]);
       expect(body.demoMode).toBe(false);
+    });
+
+    it('[WI-1863] omits a credentialed charge while retaining an uncredentialed charge', async () => {
+      const credentialedChargeId = '10000000-0000-4000-8000-000000000001';
+      const managedChargeId = '10000000-0000-4000-8000-000000000002';
+      const loginRows = [{ personId: credentialedChargeId }];
+      const filterDb = {
+        select: jest.fn(() => ({
+          from: jest.fn(() => ({
+            where: jest.fn().mockResolvedValue(loginRows),
+          })),
+        })),
+      };
+      const visibleIds = await filterUncredentialedCharges(filterDb as never, [
+        credentialedChargeId,
+        managedChargeId,
+      ]);
+      const managedChild = {
+        profileId: managedChargeId,
+        displayName: 'Managed child',
+        consentStatus: 'CONSENTED' as const,
+        respondedAt: null,
+        summary: 'Managed child learning summary',
+        sessionsThisWeek: 1,
+        sessionsLastWeek: 0,
+        totalTimeThisWeek: 10,
+        totalTimeLastWeek: 0,
+        exchangesThisWeek: 2,
+        exchangesLastWeek: 0,
+        trend: 'up' as const,
+        subjects: [],
+        guidedVsImmediateRatio: 0,
+        retentionTrend: 'stable' as const,
+        totalSessions: 1,
+        currentlyWorkingOn: [],
+        progress: null,
+        currentStreak: 1,
+        longestStreak: 1,
+        totalXp: 0,
+      };
+      mockGetChildrenForParent.mockResolvedValueOnce(
+        visibleIds.includes(managedChargeId) ? [managedChild] : [],
+      );
+
+      const res = await app.request(
+        '/v1/dashboard',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.children).toEqual([managedChild]);
     });
 
     it('returns 400 when authenticated but missing X-Profile-Id header', async () => {

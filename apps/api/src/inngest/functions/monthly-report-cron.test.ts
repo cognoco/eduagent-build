@@ -73,6 +73,7 @@ const mockSelectFromFamilyLinksWhere = jest.fn();
 // edge rows (guardianPersonId → parentId, chargePersonId → childId). Empty by
 // default; the v2 wiring test seeds it.
 const mockSelectFromGuardianshipWhere = jest.fn().mockResolvedValue([]);
+const mockSelectFromLoginWhere = jest.fn().mockResolvedValue([]);
 
 // i18n Phase 1 — db.select({conversationLanguage}).from(profiles).where(...).limit(1)
 // used to resolve the parent's conversation_language for report prose.
@@ -143,6 +144,9 @@ const mockSelectFrom = jest.fn().mockImplementation((table: unknown) => {
   }
   if (table === personTableMock) {
     return { where: mockSelectFromPersonWhere };
+  }
+  if (table === loginTableMock) {
+    return { where: mockSelectFromLoginWhere };
   }
   return { where: mockSelectFromFamilyLinksWhere };
 });
@@ -571,6 +575,7 @@ beforeEach(() => {
   // [WI-777] v2-path chains default empty; the v2 wiring test seeds them.
   mockSelectDistinctLearningSessionsWhere.mockResolvedValue([]);
   mockSelectFromGuardianshipWhere.mockResolvedValue([]);
+  mockSelectFromLoginWhere.mockResolvedValue([]);
   // [WI-867] person-select chain: db.select({conversationLanguage}).from(person).where(...).limit(1).
   mockSelectFromPersonLimit.mockResolvedValue([]);
   mockSelectFromPersonWhere.mockReturnValue({
@@ -753,6 +758,27 @@ describe('monthlyReportCron', () => {
       const { result } = await executeCronSteps();
 
       expect(result).toMatchObject({ status: 'completed', queuedPairs: 1 });
+    });
+
+    it('[WI-1863] skips credentialed charges while retaining managed charges', async () => {
+      mockSelectDistinctWhere.mockResolvedValue([
+        { childProfileId: CHILD_ID_1 },
+        { childProfileId: CHILD_ID_2 },
+      ]);
+      mockSelectFromGuardianshipWhere.mockResolvedValue([
+        { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
+        { parentProfileId: PARENT_ID_2, childProfileId: CHILD_ID_2 },
+      ]);
+      mockSelectFromLoginWhere.mockResolvedValue([{ personId: CHILD_ID_1 }]);
+
+      const { runner, result } = await executeCronSteps();
+
+      expect(result).toMatchObject({ status: 'completed', queuedPairs: 1 });
+      expect(runner.sendEventCalls[0]?.payload).toEqual([
+        expect.objectContaining({
+          data: { parentId: PARENT_ID_2, childId: CHILD_ID_2 },
+        }),
+      ]);
     });
 
     it('includes eligible self-managed profiles alongside linked child pairs', async () => {

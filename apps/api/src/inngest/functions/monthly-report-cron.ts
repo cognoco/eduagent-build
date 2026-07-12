@@ -59,6 +59,7 @@ import {
   progressMetricsSchema,
 } from '@eduagent/schemas';
 import { parseConversationLanguage } from '../../services/llm';
+import { filterUncredentialedCharges } from '../../services/family-access';
 
 // [BUG-848] Validate the JSONB `metrics` column at runtime instead of casting.
 // Older snapshot rows may have a different shape from what current code
@@ -147,25 +148,32 @@ export const monthlyReportCron = inngest.createFunction(
       const activeChildIds = activeRows.map((r) => r.childProfileId);
       // Parent/child pairs for active children: v2 = active guardianship edges
       // whose charge is an active child; legacy = family_links rows.
-      const linkedPairs = activeChildIds.length
-        ? (
-            await db
-              .select({
-                parentProfileId: guardianship.guardianPersonId,
-                childProfileId: guardianship.chargePersonId,
-              })
-              .from(guardianship)
-              .where(
-                and(
-                  inArray(guardianship.chargePersonId, activeChildIds),
-                  isNull(guardianship.revokedAt),
-                ),
-              )
-          ).map((l) => ({
-            parentId: l.parentProfileId,
-            childId: l.childProfileId,
-          }))
+      const guardianshipRows = activeChildIds.length
+        ? await db
+            .select({
+              parentProfileId: guardianship.guardianPersonId,
+              childProfileId: guardianship.chargePersonId,
+            })
+            .from(guardianship)
+            .where(
+              and(
+                inArray(guardianship.chargePersonId, activeChildIds),
+                isNull(guardianship.revokedAt),
+              ),
+            )
         : [];
+      const uncredentialedChargeIds = new Set(
+        await filterUncredentialedCharges(
+          db,
+          guardianshipRows.map((row) => row.childProfileId),
+        ),
+      );
+      const linkedPairs = guardianshipRows
+        .filter((row) => uncredentialedChargeIds.has(row.childProfileId))
+        .map((row) => ({
+          parentId: row.parentProfileId,
+          childId: row.childProfileId,
+        }));
 
       const selfWin = {
         start: lastMonthStart,

@@ -5,7 +5,7 @@
 // that expose parent-scoped endpoints (e.g., learner-profile child routes).
 // Route files must not import ORM primitives or schema tables directly.
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { login, type Database } from '@eduagent/database';
 import { ForbiddenError } from '../errors';
 import { calculateAge } from './age-utils';
@@ -82,6 +82,20 @@ export async function assertChargeNotCredentialed(
       'Guardians cannot access a credentialed charge through managed-child surfaces.',
     );
   }
+}
+
+export async function filterUncredentialedCharges(
+  db: Database,
+  personIds: string[],
+): Promise<string[]> {
+  if (personIds.length === 0) return [];
+
+  const credentialedRows = await db
+    .select({ personId: login.personId })
+    .from(login)
+    .where(inArray(login.personId, personIds));
+  const credentialedIds = new Set(credentialedRows.map((row) => row.personId));
+  return personIds.filter((personId) => !credentialedIds.has(personId));
 }
 
 /**

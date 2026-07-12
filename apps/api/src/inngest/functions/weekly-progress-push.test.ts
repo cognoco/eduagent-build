@@ -29,6 +29,7 @@ const mockWeeklyReportOnConflictDoNothing = jest
 const mockWeeklyReportInsertValues = jest.fn().mockReturnValue({
   onConflictDoNothing: mockWeeklyReportOnConflictDoNothing,
 });
+const mockCredentialedLoginRows = jest.fn().mockResolvedValue([]);
 const mockDb = {
   query: {
     familyLinks: { findMany: jest.fn().mockResolvedValue([]) },
@@ -61,20 +62,23 @@ const mockDb = {
   // Also supports select().from().where() for the min(grantedAt) sub-query
   // inside reduceBasisState (consent-status-v2.ts:216) that runs when a
   // consentGrant row exists but no consentRequest row (CONSENTED / WITHDRAWN).
-  select: jest.fn(() => ({
-    from: () => ({
-      // Direct .where() for min(grantedAt) aggregate queries.
-      where: async (): Promise<Array<{ minGrantedAt: string | null }>> => [
-        { minGrantedAt: null },
-      ],
-      innerJoin: () => ({
-        innerJoin: () => ({
-          where: async (): Promise<
-            Array<{ profileId: string; timezone: string }>
-          > => [],
-        }),
-      }),
-    }),
+  select: jest.fn((selection?: Record<string, unknown>) => ({
+    from: () =>
+      selection?.['personId']
+        ? { where: mockCredentialedLoginRows }
+        : {
+            // Direct .where() for min(grantedAt) aggregate queries.
+            where: async (): Promise<
+              Array<{ minGrantedAt: string | null }>
+            > => [{ minGrantedAt: null }],
+            innerJoin: () => ({
+              innerJoin: () => ({
+                where: async (): Promise<
+                  Array<{ profileId: string; timezone: string }>
+                > => [],
+              }),
+            }),
+          },
   })),
   // [L7-F3] selectDistinct({parentProfileId}).from(familyLinks) — the
   // post-N+1 query path. Derives the row set from familyLinks.findMany so
@@ -361,6 +365,7 @@ beforeEach(() => {
   // WI-867: reset v2 login.findFirst seam (send-email step parent email)
   mockDb.query.login.findFirst.mockReset();
   mockDb.query.login.findFirst.mockResolvedValue(null);
+  mockCredentialedLoginRows.mockResolvedValue([]);
   // WI-867: reset GDPR v2 seams (isGdprProcessingAllowedV2 reads these).
   // Default null membership → function returns true early (no consent gate).
   mockDb.query.membership.findFirst.mockReset();
@@ -377,17 +382,20 @@ beforeEach(() => {
   //   (a) timezone: person→membership→organization (TWO innerJoins)
   //   (b) min(consentGrant.grantedAt) in reduceBasisState (direct .where, no joins)
   // Per-test overrides supply rows via mockReturnValue.
-  mockDb.select.mockReturnValue({
-    from: () => ({
-      // Direct .where() for aggregate queries (e.g. min(grantedAt) in consent-status-v2).
-      where: async (): Promise<Array<{ minGrantedAt: string | null }>> => [
-        { minGrantedAt: null },
-      ],
-      innerJoin: () => ({
-        innerJoin: () => ({ where: async () => [] }),
-      }),
-    }),
-  });
+  mockDb.select.mockImplementation((selection?: Record<string, unknown>) => ({
+    from: () =>
+      selection?.['personId']
+        ? { where: mockCredentialedLoginRows }
+        : {
+            // Direct .where() for aggregate queries (e.g. min(grantedAt) in consent-status-v2).
+            where: async (): Promise<
+              Array<{ minGrantedAt: string | null }>
+            > => [{ minGrantedAt: null }],
+            innerJoin: () => ({
+              innerJoin: () => ({ where: async () => [] }),
+            }),
+          },
+  }));
   mockDb.insert.mockReturnValue({ values: mockWeeklyReportInsertValues });
   mockWeeklyReportInsertValues.mockReturnValue({
     onConflictDoNothing: mockWeeklyReportOnConflictDoNothing,
@@ -1182,6 +1190,60 @@ describe('weekly progress generate practice summary', () => {
     expect(prepared).not.toHaveProperty('childSummaries');
     expect(prepared).not.toHaveProperty('struggleLines');
     expect(prepared).not.toHaveProperty('parentEmail');
+  });
+
+  it('[WI-1863] skips credentialed charges while retaining managed charges', async () => {
+    jest.useFakeTimers({ now: new Date('2026-05-13T12:00:00.000Z') });
+    mockDb.query.person.findFirst.mockResolvedValue({ id: PARENT_ID });
+    mockDb.query.guardianship.findMany.mockResolvedValue([
+      { chargePersonId: CHILD_ID },
+      { chargePersonId: CHILD_ID_2 },
+    ]);
+    mockCredentialedLoginRows.mockResolvedValue([{ personId: CHILD_ID }]);
+    mockGetLatestSnapshot.mockResolvedValue({
+      snapshotDate: '2026-05-13',
+      metrics: CURRENT_METRICS,
+    });
+    mockGetLatestSnapshotOnOrBefore.mockResolvedValue({
+      snapshotDate: '2026-05-06',
+      metrics: PREVIOUS_METRICS,
+    });
+
+    let prepared: unknown;
+    const stopAfterPrepare = new Error('stop after prepare');
+    const step = {
+      run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
+        if (name === 'prepare-weekly-progress-digest') {
+          prepared = await fn();
+          throw stopAfterPrepare;
+        }
+        return fn();
+      }),
+    };
+    const handler = (
+      weeklyProgressPushGenerate as unknown as {
+        fn: (ctx: {
+          event: { data: Record<string, unknown>; name: string };
+          step: typeof step;
+        }) => Promise<unknown>;
+      }
+    ).fn;
+
+    await expect(
+      handler({
+        event: {
+          data: { parentId: PARENT_ID },
+          name: 'app/weekly-progress-push.generate',
+        },
+        step,
+      }),
+    ).rejects.toThrow(stopAfterPrepare);
+
+    expect(prepared).toEqual(
+      expect.objectContaining({
+        childDigests: [expect.objectContaining({ childProfileId: CHILD_ID_2 })],
+      }),
+    );
   });
 
   it('[WI-86] skips weekly push and email when parent is archived after preparation', async () => {

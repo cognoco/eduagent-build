@@ -34,6 +34,7 @@ import {
   getAllActiveGuardianPersonIds,
   getChargePersonIds,
 } from '../../services/identity-v2/guardianship';
+import { filterUncredentialedCharges } from '../../services/family-access';
 import {
   listEligibleSelfReportPersonIdsV2,
   listEligibleSelfReportPersonIdsAtLocalHour9V2,
@@ -583,11 +584,13 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             : null;
 
           // Parent's children: active guardianship charges (v2 always-on).
-          const links = (await getChargePersonIds(db, parentId)).map(
-            (childProfileId) => ({
-              childProfileId,
-            }),
+          const chargePersonIds = await filterUncredentialedCharges(
+            db,
+            await getChargePersonIds(db, parentId),
           );
+          const links = chargePersonIds.map((childProfileId) => ({
+            childProfileId,
+          }));
           if (links.length === 0) {
             if (selfReportResult?.status === 'completed') {
               return {
