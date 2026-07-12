@@ -15,9 +15,7 @@ import {
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  deleteLegacyAccountsForTest,
   deleteV2IdentitiesForTest,
-  ensureLegacyProfileAnchorForTest,
   ensureV2IdentityForLegacyProfileTest,
 } from '../test-utils/legacy-identity-anchors';
 import { stampMasteryOnVerify } from './retention-mastery';
@@ -61,15 +59,6 @@ async function seedFixture(
   seededAccountIds.push(accountId);
   seededProfileIds.push(profileId);
 
-  await ensureLegacyProfileAnchorForTest(database, {
-    accountId,
-    profileId,
-    clerkUserId,
-    email,
-    displayName: `Mastery Test ${label}`,
-    birthYear: 2010,
-    isOwner: true,
-  });
   await ensureV2IdentityForLegacyProfileTest(database, {
     accountId,
     profileId,
@@ -128,7 +117,6 @@ async function cleanupByPrefix(database: Database): Promise<void> {
     accountIds: seededAccountIds,
     profileIds: seededProfileIds,
   });
-  await deleteLegacyAccountsForTest(database, seededAccountIds);
   seededAccountIds.length = 0;
   seededProfileIds.length = 0;
 }
@@ -280,10 +268,11 @@ describe('stampMasteryOnVerify — real DB', () => {
   });
 
   it('does NOT stamp book when a sibling topic has no mastered card', async () => {
-    const { profileId, topicId: topic1Id, bookId } = await seedFixture(
-      db,
-      'book-partial',
-    );
+    const {
+      profileId,
+      topicId: topic1Id,
+      bookId,
+    } = await seedFixture(db, 'book-partial');
 
     // Seed a second topic in the same book — no card seeded for it
     // (find curriculum and book from the fixture, then add sibling topic)

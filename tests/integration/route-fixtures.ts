@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   assessments,
   consentGrant,
@@ -32,24 +32,8 @@ import {
   type TestJWTClaims,
 } from './test-keys';
 import { createIntegrationDb } from './helpers';
-import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 const TEST_CONSENT_PURPOSE = 'platform_use';
-
-// [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL lookup for the
-// one column (`account_id`) the two fallback sites below need.
-async function findLegacyProfileAccountId(
-  db: Database,
-  profileId: string,
-): Promise<string | undefined> {
-  const raw = (await db.execute(sql`
-    SELECT account_id AS "accountId" FROM profiles WHERE id = ${profileId}
-  `)) as unknown;
-  const rows = Array.isArray(raw)
-    ? (raw as Array<{ accountId: string }>)
-    : ((raw as { rows?: Array<{ accountId: string }> }).rows ?? []);
-  return rows[0]?.accountId;
-}
 
 function consentTypeToBasis(consentType: 'GDPR' | 'COPPA') {
   return consentType === 'COPPA'
@@ -67,39 +51,7 @@ export async function ensureV2ProfileAnchorForTest(
     location?: 'EU' | 'US' | 'OTHER' | null;
   },
 ): Promise<{ accountId?: string }> {
-  // [WI-1128] Legacy `profiles` may already be dropped (post-M-DROP); this
-  // read is only a best-effort default-backfill for callers that omit
-  // displayName/birthYear/location/accountId, so skip it (fall through to the
-  // literal fallbacks below) when the table is gone instead of hard-failing.
-  // [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL select.
-  const legacyProfile = (await legacyIdentityTableExistsForTest(db, 'profiles'))
-    ? await (async () => {
-        const raw = (await db.execute(sql`
-          SELECT account_id AS "accountId", display_name AS "displayName",
-                 birth_year AS "birthYear", location
-          FROM profiles WHERE id = ${input.profileId}
-        `)) as unknown;
-        const rows = Array.isArray(raw)
-          ? (raw as Array<{
-              accountId: string;
-              displayName: string;
-              birthYear: number;
-              location: string | null;
-            }>)
-          : ((
-              raw as {
-                rows?: Array<{
-                  accountId: string;
-                  displayName: string;
-                  birthYear: number;
-                  location: string | null;
-                }>;
-              }
-            ).rows ?? []);
-        return rows[0];
-      })()
-    : undefined;
-  const accountId = input.accountId ?? legacyProfile?.accountId;
+  const accountId = input.accountId;
 
   if (accountId) {
     await db
@@ -115,10 +67,9 @@ export async function ensureV2ProfileAnchorForTest(
     .insert(person)
     .values({
       id: input.profileId,
-      displayName:
-        input.displayName ?? legacyProfile?.displayName ?? 'Test Learner',
-      birthDate: `${input.birthYear ?? legacyProfile?.birthYear ?? 2005}-01-01`,
-      residenceJurisdiction: input.location ?? legacyProfile?.location ?? 'EU',
+      displayName: input.displayName ?? 'Test Learner',
+      birthDate: `${input.birthYear ?? 2005}-01-01`,
+      residenceJurisdiction: input.location ?? 'EU',
     })
     .onConflictDoNothing();
 
@@ -232,11 +183,9 @@ export async function createProfileViaRoute(input: {
   // [WI-1145] Resolve accountId robustly across the flag/collapse transition.
   // The create route is v2-unconditional post-WI-867-collapse (always builds the
   // identity graph: organization/person/login/membership, account_id ==
-  // organization.id by the reseed); pre-collapse flag-off it writes only legacy
-  // `profiles`/`accounts`. Read the v2 store first (membership for the created
-  // person — person.id == profile.id), then fall back to legacy `profiles`, so
-  // this fixture resolves the created owner regardless of which store the
-  // product wrote — and stays correct after 867 rebases on top of this change.
+  // organization.id by the reseed). Read the v2 store (membership for the
+  // created person — person.id == profile.id) to resolve the created owner's
+  // accountId.
   const membershipRow = await db.query.membership.findFirst({
     where: eq(membership.personId, apiProfile.id),
     columns: { organizationId: true },
@@ -245,22 +194,9 @@ export async function createProfileViaRoute(input: {
     return { ...apiProfile, accountId: membershipRow.organizationId };
   }
 
-  // [WI-1128] Legacy `profiles` fallback — may already be dropped
-  // (post-M-DROP); skip it there instead of hard-failing. The route is
-  // v2-unconditional (see comment above), so this path is a pre-collapse-flag
-  // safety net, not the expected route in current runs.
-  if (!(await legacyIdentityTableExistsForTest(db, 'profiles'))) {
-    throw new Error(
-      `createProfileViaRoute: profile ${apiProfile.id} not found in v2 (membership) store after create, and legacy 'profiles' is unavailable to fall back to`,
-    );
-  }
-  const legacyAccountId = await findLegacyProfileAccountId(db, apiProfile.id);
-  if (!legacyAccountId) {
-    throw new Error(
-      `createProfileViaRoute: profile ${apiProfile.id} not found in v2 (membership) or legacy (profiles) store after create`,
-    );
-  }
-  return { ...apiProfile, accountId: legacyAccountId };
+  throw new Error(
+    `createProfileViaRoute: profile ${apiProfile.id} not found in v2 (membership) store after create, and legacy 'profiles' is unavailable to fall back to`,
+  );
 }
 
 export async function seedDirectChildProfileForTest(input: {
@@ -430,24 +366,11 @@ export async function setSubscriptionTierForProfile(
 ): Promise<void> {
   const db = createIntegrationDb();
 
-  // [WI-1145] Resolve the org/account robustly (membership first — account_id ==
-  // organization.id by the reseed; then legacy profiles), then update BOTH the
-  // legacy `subscriptions` row and the v2 `subscription` row so the product
-  // resolves the same tier whichever store it reads (the route's
-  // createIdentityGraph seeds both rows with the same id at owner bootstrap).
+  // [WI-1145] Resolve the org/account (membership — account_id ==
+  // organization.id by the reseed), then update the v2 `subscription` row.
   const accountId = await resolveAccountId(db, profileId);
   if (!accountId) {
     throw new Error(`Account not found for tier seed: ${profileId}`);
-  }
-
-  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL update,
-  // gated behind tableExists so this no-ops once the table is dropped
-  // (WI-1306), matching the accounts/profiles legacy-anchor helpers.
-  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.execute(sql`
-      UPDATE subscriptions SET tier = ${tier}, status = ${status}, updated_at = now()
-      WHERE account_id = ${accountId}
-    `);
   }
 
   await db
@@ -456,10 +379,8 @@ export async function setSubscriptionTierForProfile(
     .where(eq(subscriptionV2.organizationId, accountId));
 }
 
-// [WI-1145] Shared account/organization resolver for the seed helpers. The
-// legacy `profiles.account_id` and the v2 `membership.organization_id` are the
-// same id by the reseed invariant; read whichever store is populated (v2 first)
-// so a helper resolves correctly pre- and post-WI-867-collapse.
+// [WI-1145] Shared account/organization resolver for the seed helpers —
+// resolves membership.organization_id for the given profile.
 export async function resolveAccountId(
   db: Database,
   profileId: string,
@@ -469,12 +390,7 @@ export async function resolveAccountId(
     columns: { organizationId: true },
   });
   if (membershipRow) return membershipRow.organizationId;
-  // [WI-1128] Legacy `profiles` fallback — may already be dropped
-  // (post-M-DROP); skip it there instead of hard-failing.
-  if (!(await legacyIdentityTableExistsForTest(db, 'profiles'))) {
-    return undefined;
-  }
-  return findLegacyProfileAccountId(db, profileId);
+  return undefined;
 }
 
 export async function seedSubject(

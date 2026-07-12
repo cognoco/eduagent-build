@@ -19,9 +19,7 @@ import {
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  deleteLegacyAccountsForTest,
   deleteV2IdentitiesForTest,
-  ensureLegacyProfileAnchorForTest,
   ensureV2IdentityForLegacyProfileTest,
 } from '../test-utils/legacy-identity-anchors';
 import {
@@ -77,15 +75,6 @@ async function seedFixture(
   seededAccountIds.push(accountId);
   seededProfileIds.push(profileId);
 
-  await ensureLegacyProfileAnchorForTest(database, {
-    accountId,
-    profileId,
-    clerkUserId,
-    email,
-    displayName: `Now Feed Test ${label}`,
-    birthYear: 2010,
-    isOwner: true,
-  });
   await ensureV2IdentityForLegacyProfileTest(database, {
     accountId,
     profileId,
@@ -150,7 +139,6 @@ async function cleanupByPrefix(database: Database): Promise<void> {
     accountIds: seededAccountIds,
     profileIds: seededProfileIds,
   });
-  await deleteLegacyAccountsForTest(database, seededAccountIds);
   seededAccountIds.length = 0;
   seededProfileIds.length = 0;
 }

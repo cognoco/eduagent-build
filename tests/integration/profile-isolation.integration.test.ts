@@ -30,7 +30,6 @@ import { buildAuthHeaders } from './test-keys';
 import { resolveAccountId } from './route-fixtures';
 
 import { app } from '../../apps/api/src/index';
-import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 const TEST_ENV = buildIntegrationEnv();
 
@@ -110,14 +109,6 @@ async function seedFamilySubscription(profileId: string) {
 
   // Account creation auto-provisions a 'plus' trial subscription,
   // so we UPDATE the existing row to 'family' tier instead of inserting.
-  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL update,
-  // same conditional behavior as before.
-  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.execute(sql`
-      UPDATE subscriptions SET tier = 'family', status = 'active'
-      WHERE account_id = ${accountId}
-    `);
-  }
 
   // [WI-1145] Update the v2 subscription unconditionally (dual-store consistency) —
   // the product reads subscription-v2 unconditionally post-collapse.

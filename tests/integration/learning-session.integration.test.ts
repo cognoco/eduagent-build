@@ -10,7 +10,7 @@
  * - LLM provider — via shared provider fixture (real routeAndCall dispatch)
  */
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   login,
   membership,
@@ -33,7 +33,6 @@ import {
   createIntegrationDb,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
-import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
 import {
@@ -94,8 +93,7 @@ async function loadAccount(): Promise<{ id: string } | undefined> {
   const db = createIntegrationDb();
   // [WI-1145] Resolve the owner's org/account v2-first — the create route writes
   // login/membership unconditionally post-WI-867 collapse (legacy `accounts` empty
-  // on the flag-off main lane). Fall back to legacy `accounts` pre-collapse. Only
-  // `.id` is consumed downstream.
+  // on the flag-off main lane). Only `.id` is consumed downstream.
   const loginRow = await db.query.login.findFirst({
     where: eq(login.clerkUserId, AUTH_USER_ID),
     columns: { personId: true },
@@ -108,16 +106,7 @@ async function loadAccount(): Promise<{ id: string } | undefined> {
     if (membershipRow) return { id: membershipRow.organizationId };
   }
 
-  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL select.
-  if (!(await legacyIdentityTableExistsForTest(db, 'accounts')))
-    return undefined;
-  const raw = (await db.execute(sql`
-    SELECT id FROM accounts WHERE clerk_user_id = ${AUTH_USER_ID}
-  `)) as unknown;
-  const rows = Array.isArray(raw)
-    ? (raw as Array<{ id: string }>)
-    : ((raw as { rows?: Array<{ id: string }> }).rows ?? []);
-  return rows[0];
+  return undefined;
 }
 
 async function seedSubject(
@@ -254,29 +243,12 @@ async function loadSubscriptionAndQuota(profileId: string) {
   // [WI-1145] Resolve the subscription v2-first — the owner bootstrap writes
   // subscription-v2 unconditionally post-WI-867 collapse (legacy `subscriptions`
   // empty on the flag-off main lane). Only `.id` is consumed downstream.
-  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL select.
-  const legacySub = (await legacyIdentityTableExistsForTest(
-    db,
-    'subscriptions',
-  ))
-    ? await (async () => {
-        const raw = (await db.execute(sql`
-          SELECT id FROM subscriptions WHERE account_id = ${account!.id}
-        `)) as unknown;
-        const rows = Array.isArray(raw)
-          ? (raw as Array<{ id: string }>)
-          : ((raw as { rows?: Array<{ id: string }> }).rows ?? []);
-        return rows[0] ?? null;
-      })()
-    : null;
-  const [v2Sub] = legacySub
-    ? []
-    : await db
-        .select({ id: subscriptionV2.id })
-        .from(subscriptionV2)
-        .where(eq(subscriptionV2.organizationId, account!.id))
-        .limit(1);
-  const subscription = legacySub ?? v2Sub;
+  const [v2Sub] = await db
+    .select({ id: subscriptionV2.id })
+    .from(subscriptionV2)
+    .where(eq(subscriptionV2.organizationId, account!.id))
+    .limit(1);
+  const subscription = v2Sub;
   expect(subscription).not.toBeNull();
 
   // [WI-1347] profileQuota may be legitimately absent here: with the legacy

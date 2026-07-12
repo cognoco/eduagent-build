@@ -38,10 +38,6 @@ import {
   countGuidedMetrics,
   countGuidedMetricsBatch,
 } from './session/session-analytics';
-import {
-  deleteLegacyAccountsForTest,
-  ensureLegacyProfileAnchorForTest,
-} from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -164,13 +160,6 @@ async function seedProfile(input: {
     })
     .returning({ id: person.id });
   personIds.push(p!.id);
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: p!.id,
-    accountId: orgId,
-    displayName: input.displayName,
-    birthYear,
-    isOwner: input.isOwner ?? true,
-  });
 
   await db.insert(membership).values({
     personId: p!.id,
@@ -585,7 +574,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await deleteLegacyAccountsForTest(db, orgIds);
   for (const pid of personIds) {
     await db.delete(guardianship).where(eq(guardianship.guardianPersonId, pid));
     await db.delete(guardianship).where(eq(guardianship.chargePersonId, pid));

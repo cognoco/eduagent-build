@@ -13,18 +13,12 @@
  *
  * No internal mocks — real DB, real services.
  *
- * Seeding uses the identity-v2 pattern (organization + person +
- * ensureLegacyProfileAnchorForTest + membership), mirroring
- * dashboard.integration.test.ts. The legacy raw-`accounts` insert harness
- * (retention-data.integration.test.ts) fails on the post-identity-v2 staging
- * DB where the `accounts` table no longer exists;
- * ensureLegacyProfileAnchorForTest is schema-drift-tolerant (it inserts into
- * `accounts` only when that table is present) so this suite runs on both
- * staging (Neon) and CI (locally-migrated Postgres).
+ * Seeding uses the identity-v2 pattern (organization + person + membership),
+ * mirroring dashboard.integration.test.ts.
  */
 
 import { resolve } from 'path';
-import { inArray, sql } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import {
   createDatabase,
   curricula,
@@ -41,11 +35,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
-import {
-  deleteV2IdentitiesForTest,
-  ensureLegacyProfileAnchorForTest,
-  legacyIdentityTableExistsForTest,
-} from '../test-utils/legacy-identity-anchors';
+import { deleteV2IdentitiesForTest } from '../test-utils/legacy-identity-anchors';
 import { getReviewCallbackContext } from './review-callback';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -93,14 +83,6 @@ async function seedTopicWithSession(label: string): Promise<SeededTopic> {
     })
     .returning({ id: person.id });
   profileIds.push(p!.id);
-
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId: p!.id,
-    accountId: org!.id,
-    displayName: `RR Callback ${label}`,
-    birthYear: 2010,
-    isOwner: true,
-  });
 
   await db.insert(membership).values({
     personId: p!.id,
@@ -191,19 +173,6 @@ afterAll(async () => {
       .delete(learningSessions)
       .where(inArray(learningSessions.profileId, profileIds));
     await db.delete(subjects).where(inArray(subjects.profileId, profileIds));
-    // [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL delete, same
-    // conditional cleanup as before.
-    if (
-      (await legacyIdentityTableExistsForTest(db, 'profiles')) &&
-      profileIds.length > 0
-    ) {
-      await db.execute(
-        sql`DELETE FROM profiles WHERE id IN (${sql.join(
-          profileIds.map((id) => sql`${id}::uuid`),
-          sql`, `,
-        )})`,
-      );
-    }
   }
   // Tear down the v2 identity graph (membership, login, person, organization).
   await deleteV2IdentitiesForTest(db, { accountIds: orgIds, profileIds });

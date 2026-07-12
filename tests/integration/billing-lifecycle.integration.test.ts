@@ -9,7 +9,7 @@
  * - Stripe SDK wrapper
  */
 
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
   generateUUIDv7,
   login,
@@ -17,37 +17,7 @@ import {
   profileQuotaUsage,
   quotaPools,
   subscription as subscriptionV2,
-  type Database,
 } from '@eduagent/database';
-
-// [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL helper for
-// the one column (`stripe_customer_id`, `cancelled_at`) the two flag-off
-// fallback assertions below need.
-async function findLegacySubscriptionByAccountId(
-  db: Database,
-  accountId: string,
-): Promise<
-  { stripeCustomerId: string | null; cancelledAt: Date | null } | undefined
-> {
-  const raw = (await db.execute(sql`
-    SELECT stripe_customer_id AS "stripeCustomerId", cancelled_at AS "cancelledAt"
-    FROM subscriptions WHERE account_id = ${accountId}
-  `)) as unknown;
-  const rows = Array.isArray(raw)
-    ? (raw as Array<{
-        stripeCustomerId: string | null;
-        cancelledAt: Date | null;
-      }>)
-    : ((
-        raw as {
-          rows?: Array<{
-            stripeCustomerId: string | null;
-            cancelledAt: Date | null;
-          }>;
-        }
-      ).rows ?? []);
-  return rows[0];
-}
 
 import {
   buildIntegrationEnv,
@@ -103,11 +73,7 @@ jest.mock(
 );
 
 import { app } from '../../apps/api/src/index';
-import {
-  ensureV2IdentityForLegacyProfileTest,
-  ensureLegacyProfileAnchorForTest,
-  legacyIdentityTableExistsForTest,
-} from '../../apps/api/src/test-utils/legacy-identity-anchors';
+import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { findOwnerPersonId } from '../../apps/api/src/services/identity-v2/helpers';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 
@@ -131,16 +97,6 @@ async function seedAccount() {
   const db = createIntegrationDb();
   const accountId = generateUUIDv7();
   const profileId = generateUUIDv7();
-
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId,
-    accountId,
-    displayName: 'Billing Owner',
-    birthYear: 1990,
-    isOwner: true,
-    clerkUserId: AUTH_USER_ID,
-    email: AUTH_EMAIL,
-  });
 
   // [WI-1145] Seed the v2 identity graph unconditionally — the collapsed account
   // middleware resolves the owner via v2 (login/membership) post-WI-867 collapse and
@@ -191,24 +147,6 @@ async function seedSubscription(
   const db = createIntegrationDb();
   const tier = overrides?.tier ?? 'plus';
   const subId = generateUUIDv7();
-
-  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
-  // same conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.execute(sql`
-      INSERT INTO subscriptions (
-        id, account_id, tier, status, stripe_customer_id, stripe_subscription_id,
-        current_period_start, current_period_end
-      )
-      VALUES (
-        ${subId}, ${accountId}, ${tier}, ${overrides?.status ?? 'active'},
-        ${overrides?.stripeCustomerId ?? 'cus_existing'},
-        ${overrides?.stripeSubscriptionId ?? 'sub_existing'},
-        '2026-04-01T00:00:00.000Z'::timestamptz,
-        ${(overrides?.currentPeriodEnd ?? new Date('2026-05-01T00:00:00.000Z')).toISOString()}::timestamptz
-      )
-    `);
-  }
 
   // [WI-1145] Seed the v2 subscription UNCONDITIONALLY (was gated on
   // isIdentityV2Enabled()), with the SAME id as the legacy row. Billing GET
@@ -489,12 +427,7 @@ describe('Integration: billing lifecycle routes', () => {
     const v2Checkout = await checkoutDb.query.subscription.findFirst({
       where: eq(subscriptionV2.organizationId, account.id),
     });
-    const legacyCheckout = (await legacyIdentityTableExistsForTest(
-      checkoutDb,
-      'subscriptions',
-    ))
-      ? await findLegacySubscriptionByAccountId(checkoutDb, account.id)
-      : undefined;
+    const legacyCheckout = undefined;
     expect(
       v2Checkout?.stripeCustomerId === 'cus_checkout' ||
         legacyCheckout?.stripeCustomerId === 'cus_checkout',
@@ -542,12 +475,7 @@ describe('Integration: billing lifecycle routes', () => {
     const v2Cancel = await cancelDb.query.subscription.findFirst({
       where: eq(subscriptionV2.organizationId, account.id),
     });
-    const legacyCancel = (await legacyIdentityTableExistsForTest(
-      cancelDb,
-      'subscriptions',
-    ))
-      ? await findLegacySubscriptionByAccountId(cancelDb, account.id)
-      : undefined;
+    const legacyCancel = undefined;
     expect((v2Cancel?.cancelledAt ?? legacyCancel?.cancelledAt) != null).toBe(
       true,
     );

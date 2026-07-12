@@ -5,7 +5,7 @@
  * Daily and monthly reset logic stays real.
  */
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   generateUUIDv7,
   membership,
@@ -17,10 +17,7 @@ import {
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
 import { quotaReset } from '../../apps/api/src/inngest/functions/quota-reset';
-import {
-  ensureV2IdentityForLegacyProfileTest,
-  legacyIdentityTableExistsForTest,
-} from '../../apps/api/src/test-utils/legacy-identity-anchors';
+import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 
 const FREE_USER_ID = 'integration-quota-reset-free';
@@ -33,18 +30,6 @@ const FAMILY_EMAIL = 'integration-quota-reset-family@integration.test';
 async function seedAccount(clerkUserId: string, email: string) {
   const db = createIntegrationDb();
   const accountId = generateUUIDv7();
-
-  // [WI-1128] `accounts` is dropped (post-M-DROP); gate the raw legacy
-  // insert on table existence — the v2 identity graph below is the real
-  // anchor post-drop.
-  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL insert, same
-  // conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
-    await db.execute(sql`
-      INSERT INTO accounts (id, clerk_user_id, email)
-      VALUES (${accountId}, ${clerkUserId}, ${email})
-    `);
-  }
 
   // [WI-867] v2 identity always seeded (flag collapsed to v2-only).
   await ensureV2IdentityForLegacyProfileTest(db, {
@@ -72,15 +57,6 @@ async function seedSubscriptionWithQuota(input: {
 }) {
   const db = createIntegrationDb();
   const subscriptionId = generateUUIDv7();
-
-  // [WI-1139] Legacy `subscriptions` Drizzle def removed — raw SQL insert,
-  // same conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
-    await db.execute(sql`
-      INSERT INTO subscriptions (id, account_id, tier, status, current_period_start, current_period_end)
-      VALUES (${subscriptionId}, ${input.accountId}, ${input.tier}, 'active', '2026-04-01T00:00:00.000Z'::timestamptz, '2026-05-01T00:00:00.000Z'::timestamptz)
-    `);
-  }
 
   // [WI-867] v2 subscription always seeded (flag collapsed to v2-only).
   const ownerMembership = await db.query.membership.findFirst({

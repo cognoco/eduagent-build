@@ -86,7 +86,6 @@ import {
   executeDeletionV2,
   scheduleDeletionV2,
 } from '../../apps/api/src/services/identity-v2/deletion-v2';
-import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 import { app } from '../../apps/api/src/index';
 
@@ -111,32 +110,9 @@ async function loadDeletionState(accountId: string): Promise<{
     where: eq(organization.id, accountId),
     columns: { deletionScheduledAt: true, deletionCancelledAt: true },
   });
-  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); gate on
-  // table existence — the v2 `organization` row above is the real anchor.
-  // [WI-1139] Legacy `accounts` Drizzle def removed — raw SQL select.
-  const acctRow = (await legacyIdentityTableExistsForTest(db, 'accounts'))
-    ? await (async () => {
-        const raw = (await db.execute(sql`
-          SELECT deletion_scheduled_at AS "deletionScheduledAt",
-                 deletion_cancelled_at AS "deletionCancelledAt"
-          FROM accounts WHERE id = ${accountId}
-        `)) as unknown;
-        const rows = Array.isArray(raw)
-          ? (raw as Array<{
-              deletionScheduledAt: Date | null;
-              deletionCancelledAt: Date | null;
-            }>)
-          : ((
-              raw as {
-                rows?: Array<{
-                  deletionScheduledAt: Date | null;
-                  deletionCancelledAt: Date | null;
-                }>;
-              }
-            ).rows ?? []);
-        return rows[0];
-      })()
-    : undefined;
+  // [WI-1128] Legacy `accounts` is dropped (post-M-DROP) — the v2
+  // `organization` row above is the real anchor.
+  const acctRow = undefined;
   if (!orgRow && !acctRow) return null;
   return {
     deletionScheduledAt:
@@ -193,32 +169,11 @@ async function createOwnerProfileRecord(): Promise<{
     return { profileId, accountId: membershipRow.organizationId };
   }
 
-  // [WI-1128] Legacy `profiles` fallback — may already be dropped
-  // (post-M-DROP); skip it there instead of hard-failing. The create route is
-  // v2-unconditional, so this path is a pre-collapse-flag safety net, not the
-  // expected route in current runs.
-  if (!(await legacyIdentityTableExistsForTest(db, 'profiles'))) {
-    throw new Error(
-      `Profile not found in v2 (membership) store after create, and legacy 'profiles' is unavailable to fall back to: ${profileId}`,
-    );
-  }
-
-  // [WI-1139] Legacy `profiles` Drizzle def removed — raw SQL select.
-  const raw = (await db.execute(sql`
-    SELECT account_id AS "accountId" FROM profiles WHERE id = ${profileId}
-  `)) as unknown;
-  const rows = Array.isArray(raw)
-    ? (raw as Array<{ accountId: string }>)
-    : ((raw as { rows?: Array<{ accountId: string }> }).rows ?? []);
-  const row = rows[0];
-
-  if (!row) {
-    throw new Error(
-      `Profile not found in v2 (membership) or legacy (profiles) after create: ${profileId}`,
-    );
-  }
-
-  return { profileId, accountId: row.accountId };
+  // [WI-1128] Legacy `profiles` fallback is dropped (post-M-DROP); no
+  // fallback remains once v2 membership resolution fails.
+  throw new Error(
+    `Profile not found in v2 (membership) store after create, and legacy 'profiles' is unavailable to fall back to: ${profileId}`,
+  );
 }
 
 beforeEach(async () => {

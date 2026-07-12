@@ -14,19 +14,13 @@
  * Real:   JWT verification, Database, consent service, notification service plumbing
  */
 
-import { sql } from 'drizzle-orm';
-import {
-  buildIntegrationEnv,
-  cleanupAccounts,
-  createIntegrationDb,
-} from './helpers';
+import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 import { mockResendEmail } from './external-mocks';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { getFetchCalls, clearFetchCalls } from './fetch-interceptor';
 
 import { app } from '../../apps/api/src/index';
-import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 // --- Constants ---
 const CONSENT_USER_ID = 'integration-consent-email';
@@ -136,16 +130,6 @@ describe('Integration: Consent email delivery', () => {
   it('returns emailStatus "failed" when RESEND_API_KEY is missing from env', async () => {
     // No RESEND_API_KEY — reproduces the stale-secret bug
     const env = buildIntegrationEnv();
-
-    // Clean up consent state from previous test so the insert isn't a resend
-    const db = createIntegrationDb();
-    // [WI-1139] Legacy `consent_states` Drizzle def removed — raw SQL
-    // delete, same conditional cleanup as before.
-    if (await legacyIdentityTableExistsForTest(db, 'consent_states')) {
-      await db.execute(
-        sql`DELETE FROM consent_states WHERE profile_id = ${childProfileId}`,
-      );
-    }
 
     const res = await app.request(
       '/v1/consent/request',

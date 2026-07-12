@@ -28,7 +28,7 @@
  *        but is a harmless no-op here
  */
 
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import {
   guardianship,
   generateUUIDv7,
@@ -42,10 +42,7 @@ import {
   sessionSummaries,
   needsDeepeningTopics,
 } from '@eduagent/database';
-import {
-  ensureV2IdentityForLegacyProfileTest,
-  legacyIdentityTableExistsForTest,
-} from '../../apps/api/src/test-utils/legacy-identity-anchors';
+import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { registerProvider } from '../../apps/api/src/services/llm';
 import { createMockProvider } from '../../apps/api/src/services/llm/test-utils';
 import { getChildSessionDetail } from '../../apps/api/src/services/dashboard';
@@ -284,9 +281,6 @@ async function seedParentLink(childProfileId: string) {
   // [WI-1145] Seed the parent's v2 identity + guardianship edge to the child
   // unconditionally — the pipeline's parent/guardian reads resolve via v2 on the
   // post-collapse flag-off main lane (child person seeded by seedScenario).
-  // Dual-writes the gated legacy accounts/profiles anchor internally — the
-  // familyLinks insert below depends on that legacy profiles row existing, so
-  // it must run AFTER this call.
   await ensureV2IdentityForLegacyProfileTest(db, {
     accountId,
     profileId,
@@ -296,15 +290,6 @@ async function seedParentLink(childProfileId: string) {
     email: PARENT_AUTH_EMAIL,
     isOwner: true,
   });
-
-  // [WI-1139] Legacy `family_links` Drizzle def removed — raw SQL insert,
-  // same conditional seed as before.
-  if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
-    await db.execute(sql`
-      INSERT INTO family_links (id, parent_profile_id, child_profile_id)
-      VALUES (${generateUUIDv7()}, ${profileId}, ${childProfileId})
-    `);
-  }
 
   await db.insert(guardianship).values({
     guardianPersonId: profileId,

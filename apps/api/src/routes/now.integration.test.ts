@@ -26,9 +26,7 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 import { nowRoutes } from './now';
 import {
-  deleteLegacyAccountsForTest,
   deleteV2IdentitiesForTest,
-  ensureLegacyProfileAnchorForTest,
   ensureV2IdentityForLegacyProfileTest,
 } from '../test-utils/legacy-identity-anchors';
 
@@ -91,15 +89,6 @@ async function seedProfile(database: Database, label: string): Promise<string> {
   seededAccountIds.push(accountId);
   seededProfileIds.push(profileId);
 
-  await ensureLegacyProfileAnchorForTest(database, {
-    accountId,
-    profileId,
-    clerkUserId,
-    email,
-    displayName: `Now ${label}`,
-    birthYear: 2010,
-    isOwner: true,
-  });
   await ensureV2IdentityForLegacyProfileTest(database, {
     accountId,
     profileId,
@@ -312,7 +301,6 @@ async function cleanup(database: Database): Promise<void> {
     accountIds: seededAccountIds,
     profileIds: seededProfileIds,
   });
-  await deleteLegacyAccountsForTest(database, seededAccountIds);
   seededSupportershipIds.length = 0;
   seededAccountIds.length = 0;
   seededProfileIds.length = 0;

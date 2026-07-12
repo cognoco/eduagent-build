@@ -29,8 +29,6 @@ import {
 } from '@eduagent/database';
 import {
   ensureV2IdentityForLegacyProfileTest,
-  ensureLegacyProfileAnchorForTest,
-  deleteLegacyAccountsForTest,
   deleteV2IdentitiesForTest,
 } from '../test-utils/legacy-identity-anchors';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
@@ -94,7 +92,6 @@ async function cleanup() {
     });
     accountIds = [...new Set(membershipRows.map((r) => r.organizationId))];
   }
-  await deleteLegacyAccountsForTest(db, accountIds);
   await deleteV2IdentitiesForTest(db, { accountIds, profileIds });
 }
 
@@ -110,16 +107,6 @@ async function seedAccountAndProfile(emailIndex: 0 | 1): Promise<SeedAccount> {
   const clerkUserId = `${PREFIX}-clerk-${emailIndex}`;
   const accountId = generateUUIDv7();
   const profileId = generateUUIDv7();
-
-  await ensureLegacyProfileAnchorForTest(db, {
-    profileId,
-    accountId,
-    displayName: `Learner ${emailIndex}`,
-    birthYear: 2010,
-    isOwner: true,
-    clerkUserId,
-    email,
-  });
 
   // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
   await ensureV2IdentityForLegacyProfileTest(db, {
