@@ -1,6 +1,7 @@
 # Flow A-MFA-2: Sign-in MFA — TOTP (authenticator app) branch
 #
-# BLOCKED: Same infrastructure gap as sign-in-mfa-email-code.yaml.
+# BLOCKED (OPQ-26): Same operator-owned fixture gap as
+# sign-in-mfa-email-code.yaml; this placeholder is deliberately non-executable.
 # TOTP enrollment requires calling Clerk's Admin API to set up TOTP on a test
 # user — the seeder does not yet support this. Additionally, TOTP codes rotate
 # every 30 seconds (RFC 6238); a Maestro flow cannot generate them without
@@ -30,8 +31,10 @@ appId: com.mentomate.app
 tags:
   - weekly
   - auth
+  - blocked
+  - manual
 ---
 # Placeholder: flow body will be written once infrastructure is unblocked.
 - launchApp:
-    appId: "com.mentomate.app"
+    appId: 'com.mentomate.app'
     stopApp: false
