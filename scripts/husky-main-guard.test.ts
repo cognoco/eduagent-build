@@ -19,6 +19,26 @@ import { join } from 'node:path';
 const COMMIT_GUARD = join(__dirname, 'husky-main-commit-guard.sh');
 const PUSH_GUARD = join(__dirname, 'husky-main-push-guard.sh');
 
+/**
+ * Clones process.env with every GIT_* key stripped. Prevents an ambient
+ * GIT_DIR (e.g. exported by husky during pre-push -> nx -> jest) from
+ * leaking into these child git processes and redirecting them at the
+ * ambient repo instead of the mkdtemp fixtures passed as `cwd` (WI-1345
+ * sweep). Same pattern as scripts/check-merge-invariant.test.ts's
+ * childGitEnv(). Does not affect this suite's own git-dir/worktree
+ * semantics: git computes GIT_DIR for `worktree add`/hook invocation from
+ * `cwd`, not from an inherited env var.
+ */
+function childGitEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GIT_')) {
+      delete env[key];
+    }
+  }
+  return env;
+}
+
 /** Run a git command, returning combined stdout+stderr. Throws on non-zero. */
 function git(cwd: string, args: string[], input?: string): string {
   const out = execFileSync('git', args, {
@@ -26,6 +46,7 @@ function git(cwd: string, args: string[], input?: string): string {
     input,
     encoding: 'utf8',
     stdio: ['pipe', 'pipe', 'pipe'],
+    env: childGitEnv(),
   });
   return out ?? '';
 }
@@ -38,6 +59,7 @@ function expectGitToFail(cwd: string, args: string[], input?: string): string {
       input,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: childGitEnv(),
     });
   } catch (err) {
     const e = err as { stdout?: string; stderr?: string };

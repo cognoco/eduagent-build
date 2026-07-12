@@ -65,6 +65,7 @@ import { resolvePriceId } from '../services/billing-pricing';
 import { readSubscriptionStatus } from '../services/kv';
 import { apiError, notFound } from '../errors';
 import {
+  assertChargeNotCredentialed,
   assertOwnerProfile,
   assertCallerIsAccountOwner,
 } from '../services/family-access';
@@ -1043,6 +1044,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         c,
         'Only the family owner can remove a profile from the family subscription.',
       );
+      await assertChargeNotCredentialed(db, profileId);
 
       const subscription = await getSubscriptionByAccountIdV2(db, account.id);
       if (!subscription) {

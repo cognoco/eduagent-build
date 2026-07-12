@@ -193,19 +193,7 @@ export async function findOwnerPersonScope(
 export async function getOwnerProfileV2(
   db: Database,
   organizationId: string,
-): Promise<
-  | (Profile & {
-      // [WI-367] Additive-only: exact birth-date parts for gating callers
-      // (e.g. child-profile-v2.ts's adult-owner gate) that need
-      // calculateAgeFromParts instead of year-only math. Not part of the
-      // Profile response schema — any route that serializes this through
-      // profileResponseSchema.parse() has these fields stripped (the schema
-      // is not .strict(), so z.object() drops unknown keys by default).
-      birthMonth?: number | null;
-      birthDay?: number | null;
-    })
-  | null
-> {
+): Promise<Profile | null> {
   const ownerRow = await db
     .select({
       personId: person.id,
@@ -347,13 +335,16 @@ export async function getProfileV2(
     organizationId,
     DEFAULT_CONSENT_PURPOSE,
   );
+  const { birthMonth, birthDay } = birthMonthDayFromDate(row.birthDate);
 
   return {
     id: row.id,
     accountId: organizationId, // account.id = organization.id
     displayName: row.displayName,
     avatarUrl: row.avatarUrl ?? null,
-    birthYear: Number(row.birthDate.slice(0, 4)),
+    birthYear: birthYearFromDate(row.birthDate),
+    birthMonth,
+    birthDay,
     location: jurisdictionToLocation(row.residenceJurisdiction),
     isOwner,
     hasPremiumLlm: deriveHasPremiumLlm(),
@@ -549,12 +540,15 @@ export async function listProfilesV2(
     const hasFamilyLinks = isOwner
       ? guardianHasEdge.has(row.id)
       : chargeGrantedAt !== null;
+    const { birthMonth, birthDay } = birthMonthDayFromDate(row.birthDate);
     return {
       id: row.id,
       accountId: organizationId, // account.id = organization.id
       displayName: row.displayName,
       avatarUrl: row.avatarUrl ?? null,
       birthYear: birthYearFromDate(row.birthDate),
+      birthMonth,
+      birthDay,
       location: jurisdictionToLocation(row.residenceJurisdiction),
       isOwner,
       hasPremiumLlm: deriveHasPremiumLlm(),

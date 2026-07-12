@@ -589,6 +589,34 @@ describe('resolveNavigationContract gates', () => {
     expect(contract.canEnter('recaps')).toBe(false);
   });
 
+  it('does not make an owner family-capable before their 18th birthday', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-11T00:00:00Z'));
+
+    try {
+      const boundaryOwner = makeProfile({
+        id: '00000000-0000-7000-a000-000000000104',
+        birthYear: 2008,
+        birthMonth: 12,
+        birthDay: 31,
+        defaultAppContext: 'family',
+        hasFamilyLinks: true,
+      });
+
+      const contract = resolveNavigationContract(
+        makeContext({
+          activeProfile: boundaryOwner,
+          appContext: 'family',
+          profiles: [boundaryOwner, child],
+        }),
+      );
+
+      expect(contract.isFamilyCapable).toBe(false);
+      expect(contract.shape).toBe('study');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('keeps Add to my learning hidden when V1 navigation is disabled', () => {
     const contract = resolveNavigationContract(
       makeContext({

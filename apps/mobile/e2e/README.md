@@ -36,6 +36,9 @@ pnpm test:e2e:smoke
 # Run a single flow
 maestro test apps/mobile/e2e/flows/app-launch.yaml
 
+# Run the trusted V2 native publish-readiness lane in GitHub Actions
+gh workflow run e2e-ci.yml -f maestro_suite=v2
+
 # Record a flow interactively
 pnpm test:e2e:record
 ```
@@ -82,4 +85,9 @@ e2e/
 - The `app-launch.yaml` flow uses `clearState: true` to test cold-start behavior.
 - Authenticated flows require a signed-in user. In CI, use a test seeding endpoint
   or a setup flow in `_setup/` to handle authentication before running other flows.
+- The `v2` workflow-dispatch suite is intentionally separate from `pr` and
+  `nightly`: it builds a one-shard release bundle with
+  `EXPO_PUBLIC_ENABLE_MODE_NAV_V2=true`, then exercises Mentor, Subjects, and
+  Journal. Run it as the native gate before a V2 publish; it is not an automatic
+  pull-request gate because the secret-backed Android job executes only trusted code.
 - See `docs/e2e-testing-strategy.md` for the full testing strategy and CI plan.

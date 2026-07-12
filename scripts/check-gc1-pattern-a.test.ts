@@ -455,4 +455,111 @@ describe('checkFile — integration', () => {
     ].join('\n');
     expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
   });
+
+  // WI-1355 variant (a): gc1-allow trails the specifier on the SAME line,
+  // inside a genuinely multi-line jest.mock( call. Found diagnosing PR 1842
+  // (3 false violations) — the captured `content` slice ended at the
+  // specifier literal's own end, so a comment after it on that line fell
+  // outside the slice GC1_ALLOW.test() inspects.
+  it('allows a multiline internal mock with gc1-allow trailing the specifier on the same line', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      '+jest.mock(',
+      "+  './services/foo', // gc1-allow: unit-test boundary",
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo', // gc1-allow: unit-test boundary",
+      '  () => ({ bar: jest.fn() })',
+      ');',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
+  // WI-1355 variant (b): gc1-allow sits on its OWN line, immediately after
+  // the specifier line, before the factory function begins.
+  it('allows a multiline internal mock with gc1-allow on its own line immediately after the specifier', () => {
+    const diff = [
+      '@@ -0,0 +1,5 @@',
+      '+jest.mock(',
+      "+  './services/foo',",
+      '+  // gc1-allow: unit-test boundary',
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo',",
+      '  // gc1-allow: unit-test boundary',
+      '  () => ({ bar: jest.fn() })',
+      ');',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
+  // WI-1355 rework (adversarial review, round 1): the widened window must not
+  // turn into a bare substring search. A comment that merely MENTIONS
+  // "gc1-allow" in passing prose — not a genuine `gc1-allow: <reason>`
+  // directive — must not bypass the ratchet for a real violation.
+  it('blocks a NEW multiline non-Pattern-A mock with an incidental gc1-allow mention on the following line', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      '+jest.mock(',
+      "+  './services/foo',",
+      '+  // note: this codebase used to require gc1-allow tags everywhere, ugh',
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo',",
+      '  // note: this codebase used to require gc1-allow tags everywhere, ugh',
+      '  () => ({ bar: jest.fn() })',
+      ');',
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
+
+  // WI-1355 rework: reproduces the reviewer's exact repro shape — a long
+  // filler comment block (10 lines) with an incidental "gc1-allow" mention
+  // buried in the last line. Must still flag: the window is capped to at
+  // most one line past the specifier, AND the match is anchored to a
+  // genuine directive, so neither the window's reach nor the substring test
+  // can smuggle this past the ratchet.
+  it('blocks a NEW multiline non-Pattern-A mock with gc1-allow buried in a long filler comment block', () => {
+    const fillerLines = [
+      '  // filler line 1',
+      '  // filler line 2',
+      '  // filler line 3',
+      '  // filler line 4',
+      '  // filler line 5',
+      '  // filler line 6',
+      '  // filler line 7',
+      '  // filler line 8',
+      '  // filler line 9',
+      '  // filler line 10 mentions gc1-allow only in passing prose',
+    ];
+    const diff = [
+      `@@ -0,0 +1,${3 + fillerLines.length} @@`,
+      '+jest.mock(',
+      "+  './services/foo',",
+      ...fillerLines.map((l) => '+' + l),
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo',",
+      ...fillerLines,
+      '  () => ({ bar: jest.fn() })',
+      ');',
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
 });

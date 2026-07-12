@@ -1575,7 +1575,6 @@
       "deleteMessage": "Are you sure you want to delete this note?"
     },
     "noteSignal": {
-      "verified": "Verified",
       "verifiedAccessibilityLabel": "Verified - your words held up",
       "mentorAddition": "The mentor has more on this topic",
       "showMentorAdditionAccessibilityLabel": "Show what the mentor added",
@@ -1683,15 +1682,12 @@
       "a11yCollapseSessions": "Collapse past conversations",
       "a11yExpandSessions": "Expand past conversations"
     },
-    "notStartedCount": "{{notStarted}} / {{total}} not started",
     "chooseTopic": "Choose a topic",
     "provenanceFrom": "From {{name}}",
     "recentlyAdded": "Recently added",
     "sessionCount_one": "{{count}} session",
     "sessionCount_other": "{{count}} sessions",
     "a11yClearSearch": "Clear search",
-    "a11yEditNote": "Edit note",
-    "a11yDeleteNote": "Delete note",
     "a11yCloseTopicPicker": "Close topic picker",
     "myNotes": {
       "subtitleBookmarks_one": "1 saved reply",
@@ -1718,9 +1714,6 @@
       "thisTopicFallback": "this topic",
       "addedFromChildNamed": "Added from {{name}}'s learning.",
       "addedFromChild": "Added from a child's learning."
-    },
-    "collapsibleChapter": {
-      "a11yHeader": "{{title}}, {{notStarted}} of {{total}} topics not started"
     },
     "inlineNote": {
       "a11yCollapse": "Note for {{topic}}. {{source}}. Tap to collapse.",
@@ -2370,6 +2363,23 @@
       "continuePracticeStrandLanguageFocus": "Next up: grammar & vocabulary practice",
       "continuePracticeStrandFluency": "Next up: a timed fluency drill",
       "continuePracticeCta": "Continue",
+      "strandBalanceTitle": "Recent practice balance",
+      "strandSessionsSampled": "{{count}} recent session",
+      "strandSessionsSampled_other": "{{count}} recent sessions",
+      "strandMeaningInput": "Meaning-focused input",
+      "strandMeaningOutput": "Meaning-focused output",
+      "strandLanguageFocus": "Language-focused learning",
+      "strandFluency": "Fluency development",
+      "skillProfileTitle": "Skill profile",
+      "skillVocabulary": "Vocabulary",
+      "skillGrammar": "Grammar",
+      "skillReading": "Reading",
+      "skillListening": "Listening",
+      "skillSpeaking": "Speaking",
+      "skillFluency": "Fluency",
+      "skillEvidenceCount": "{{count}} activity",
+      "skillEvidenceCount_other": "{{count}} activities",
+      "viewCefrVocabulary": "Browse CEFR vocabulary",
       "retentionTitle": "Memory check",
       "retentionLoadError": "We couldn't load what needs review right now.",
       "retryRetention": "Retry loading review status",
@@ -3343,6 +3353,10 @@
     "detailPending": "This recap is still being prepared.",
     "tryAsking": "Try asking",
     "openChildSession": "Open child session",
+    "verifiedProof": {
+      "holdsStrong": "holds strong",
+      "recheckDue": "due for a re-check on {{date}}"
+    },
     "emptyCtaStartSession": "Start a session"
   },
   "addToMyLearning": {
@@ -3631,12 +3645,6 @@
       "crossContextPromptMessage": "You are in a session. Finish this first, or open the update and leave the current flow.",
       "stayHere": "Stay here",
       "openUpdate": "Open update"
-    },
-    "guardianPrimer": {
-      "title": "Stay in the loop?",
-      "message": "We can send a gentle nudge when a child needs your attention. You can change this anytime in Settings.",
-      "allow": "Allow",
-      "notNow": "Not now"
     }
   },
   "nudge": {

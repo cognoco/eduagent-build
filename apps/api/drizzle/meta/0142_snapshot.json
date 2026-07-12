@@ -1,5 +1,5 @@
 {
-  "id": "d841c6c9-9043-4d9c-83f3-24eca7c770be",
+  "id": "171dc541-9958-4fdf-8e13-f511f955e8b3",
   "prevId": "7c22cfd0-41ce-4eb8-9b9b-2ca34651d746",
   "version": "7",
   "dialect": "postgresql",
@@ -11246,6 +11246,7 @@
             }
           ],
           "isUnique": false,
+          "where": "\"support_visibility_audit_events\".\"contract_id\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -11640,6 +11641,7 @@
             }
           ],
           "isUnique": false,
+          "where": "\"support_visibility_notices\".\"contract_id\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -11803,163 +11805,6 @@
           "value": "\"blocked_safety_digest_receipts\".\"event_name\" IN ('app/safety.dangerous_procedure_blocked', 'app/safety.minor_pii_echo_redacted', 'app/safety.suitability_blocked')"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.speaking_practice_attempts": {
-      "name": "speaking_practice_attempts",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "session_id": {
-          "name": "session_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "subject_id": {
-          "name": "subject_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mode": {
-          "name": "mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "target_text": {
-          "name": "target_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "transcript": {
-          "name": "transcript",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "locale": {
-          "name": "locale",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "attempt_number": {
-          "name": "attempt_number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "lexical_match_score": {
-          "name": "lexical_match_score",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "missing_words": {
-          "name": "missing_words",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "extra_words": {
-          "name": "extra_words",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "speaking_practice_attempts_session_id_idx": {
-          "name": "speaking_practice_attempts_session_id_idx",
-          "columns": [
-            {
-              "expression": "session_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "speaking_practice_attempts_profile_created_idx": {
-          "name": "speaking_practice_attempts_profile_created_idx",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "speaking_practice_attempts_session_id_learning_sessions_id_fk": {
-          "name": "speaking_practice_attempts_session_id_learning_sessions_id_fk",
-          "tableFrom": "speaking_practice_attempts",
-          "tableTo": "learning_sessions",
-          "columnsFrom": ["session_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "speaking_practice_attempts_profile_id_person_id_fk": {
-          "name": "speaking_practice_attempts_profile_id_person_id_fk",
-          "tableFrom": "speaking_practice_attempts",
-          "tableTo": "person",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "speaking_practice_attempts_subject_id_subjects_id_fk": {
-          "name": "speaking_practice_attempts_subject_id_subjects_id_fk",
-          "tableFrom": "speaking_practice_attempts",
-          "tableTo": "subjects",
-          "columnsFrom": ["subject_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     }
   },

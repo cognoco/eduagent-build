@@ -1481,7 +1481,6 @@
       "startTitle": "{{subject}}を始める"
     },
     "noteSignal": {
-      "verified": "確認済み",
       "verifiedAccessibilityLabel": "確認済み - あなたの回答は正解でした",
       "mentorAddition": "このトピックに関するメンターからの追加情報",
       "showMentorAdditionAccessibilityLabel": "メンターが追加した内容を表示",
@@ -1592,15 +1591,12 @@
     "inactiveFallbackBanner": {
       "message": "一時停止中・アーカイブ済みの科目を読み込めませんでした。タップして再試行 — データは消えていません。"
     },
-    "notStartedCount": "{{notStarted}} / {{total}} 未開始",
     "chooseTopic": "トピックを選択",
     "provenanceFrom": "{{name}}より",
     "recentlyAdded": "最近追加された項目",
     "sessionCount_one": "{{count}} セッション",
     "sessionCount_other": "{{count}} セッション",
     "a11yClearSearch": "検索をクリア",
-    "a11yEditNote": "ノートを編集",
-    "a11yDeleteNote": "ノートを削除",
     "a11yCloseTopicPicker": "トピック選択を閉じる",
     "myNotes": {
       "subtitleBookmarks_one": "保存済みの返信1件",
@@ -1627,9 +1623,6 @@
       "thisTopicFallback": "このトピック",
       "addedFromChildNamed": "{{name}}の学習から追加されました。",
       "addedFromChild": "お子さんの学習から追加されました。"
-    },
-    "collapsibleChapter": {
-      "a11yHeader": "{{title}}、{{total}}トピック中{{notStarted}}トピックが未開始"
     },
     "inlineNote": {
       "a11yCollapse": "{{topic}}のメモ。{{source}}。タップして折りたたむ。",
@@ -2252,7 +2245,24 @@
       "loadingTitle": "進捗を検索中...",
       "loadingMessage": "この科目のセッション、復習、保存された単語をまとめています。",
       "startedTopicsCount_one": "{{count}}個のトピックを開始",
-      "startedTopicsCount_other": "{{count}}個のトピックを開始"
+      "startedTopicsCount_other": "{{count}}個のトピックを開始",
+      "strandBalanceTitle": "最近の学習バランス",
+      "strandSessionsSampled": "最近のセッション{{count}}件",
+      "strandSessionsSampled_other": "最近のセッション{{count}}件",
+      "strandMeaningInput": "意味重視のインプット",
+      "strandMeaningOutput": "意味重視のアウトプット",
+      "strandLanguageFocus": "言語形式重視の学習",
+      "strandFluency": "流暢さの育成",
+      "skillProfileTitle": "スキルプロフィール",
+      "skillVocabulary": "語彙",
+      "skillGrammar": "文法",
+      "skillReading": "リーディング",
+      "skillListening": "リスニング",
+      "skillSpeaking": "スピーキング",
+      "skillFluency": "流暢さ",
+      "skillEvidenceCount": "アクティビティ{{count}}件",
+      "skillEvidenceCount_other": "アクティビティ{{count}}件",
+      "viewCefrVocabulary": "CEFRの語彙を閲覧"
     },
     "vocabulary": {
       "pageTitle": "あなたの語彙",
@@ -3306,7 +3316,11 @@
     "detailPending": "このまとめはまだ準備中です。",
     "tryAsking": "質問してみる",
     "openChildSession": "子どものセッションを開く",
-    "emptyCtaStartSession": "セッションを開始する"
+    "emptyCtaStartSession": "セッションを開始する",
+    "verifiedProof": {
+      "holdsStrong": "有効",
+      "recheckDue": "{{date}}に再確認予定"
+    }
   },
   "addToMyLearning": {
     "tip": "お子様の学習内容を変更せずに、このトピックのコピーを自分のライブラリに保存します。",
@@ -3693,12 +3707,6 @@
       "crossContextPromptMessage": "現在セッション中です。先にこちらを完了するか、アップデートを開いて現在のセッションを終了してください。",
       "stayHere": "このままにする",
       "openUpdate": "アップデートを開く"
-    },
-    "guardianPrimer": {
-      "title": "最新情報を受け取りますか？",
-      "message": "お子様があなたの助けを必要としているときに、そっとお知らせを送信できます。この設定はいつでも設定で変更できます。",
-      "allow": "許可する",
-      "notNow": "後で"
     }
   },
   "myNotes": {

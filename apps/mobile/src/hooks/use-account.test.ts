@@ -1,5 +1,6 @@
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
+import { DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS } from '@eduagent/schemas';
 import {
   createHookWrapper,
   createTestProfile,
@@ -269,6 +270,8 @@ describe('useExportData', () => {
       account: { email: 'user@example.com', createdAt: '2026-01-01T00:00:00Z' },
       profiles: [],
       consentStates: [],
+      subscriptionFieldDescriptions:
+        DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
       exportedAt: '2026-02-17T00:00:00Z',
     };
     mockFetch.mockResolvedValueOnce(

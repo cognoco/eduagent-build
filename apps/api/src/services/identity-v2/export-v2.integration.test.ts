@@ -34,6 +34,7 @@
 
 import { resolve } from 'path';
 import { eq } from 'drizzle-orm';
+import { DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS } from '@eduagent/schemas';
 import {
   consentGrant,
   createDatabase,
@@ -111,7 +112,7 @@ describeIfPostDrop('generateExportV2 (integration)', () => {
       .insert(person)
       .values({
         displayName: 'Owner',
-        birthDate: '1980-01-01',
+        birthDate: '1980-06-15',
         residenceJurisdiction: 'EU',
       })
       .returning();
@@ -185,6 +186,12 @@ describeIfPostDrop('generateExportV2 (integration)', () => {
     expect(result.account.email).toBe(ownerEmail);
     // (c) the child appears in the v2 profiles export.
     expect(result.profiles.map((p) => p.id)).toContain(child!.id);
+    const ownerProfile = result.profiles.find((p) => p.id === owner!.id);
+    expect(ownerProfile?.birthMonth).toBe(6);
+    expect(ownerProfile?.birthDay).toBe(15);
+    const childProfile = result.profiles.find((p) => p.id === child!.id);
+    expect(childProfile?.birthMonth).toBeNull();
+    expect(childProfile?.birthDay).toBeNull();
     // (d) the learning half ran: the seeded subject is in the export.
     expect(
       result.subjects.some(
@@ -283,6 +290,8 @@ describeIfDb('generateExportV2 subscription mapping [WI-1161]', () => {
       planTier: 'plus',
       status: 'active',
       payerPersonId: owner!.id,
+      storeProductId: 'com.mentomate.plus.monthly',
+      storePlatform: 'APP_STORE',
       periodStartAt: periodStart,
       periodEndAt: periodEnd,
       stripeCustomerId: `cus_export_${owner!.id}`,
@@ -298,6 +307,9 @@ describeIfDb('generateExportV2 subscription mapping [WI-1161]', () => {
       currentPeriodStart?: string | null;
       currentPeriodEnd?: string | null;
       stripeCustomerId?: string | null;
+      payerPersonId?: string;
+      storeProductId?: string | null;
+      storePlatform?: string | null;
       organizationId?: string;
       planTier?: string;
     };
@@ -307,6 +319,12 @@ describeIfDb('generateExportV2 subscription mapping [WI-1161]', () => {
     expect(row.currentPeriodStart).toBe(periodStart.toISOString());
     expect(row.currentPeriodEnd).toBe(periodEnd.toISOString());
     expect(row.stripeCustomerId).toBe(`cus_export_${owner!.id}`);
+    expect(row.payerPersonId).toBe(owner!.id);
+    expect(row.storeProductId).toBe('com.mentomate.plus.monthly');
+    expect(row.storePlatform).toBe('APP_STORE');
+    expect(result.subscriptionFieldDescriptions).toEqual(
+      DATA_EXPORT_SUBSCRIPTION_FIELD_DESCRIPTIONS,
+    );
     // Raw v2 field names are stripped by the schema parse (not leaked):
     expect(row.organizationId).toBeUndefined();
     expect(row.planTier).toBeUndefined();

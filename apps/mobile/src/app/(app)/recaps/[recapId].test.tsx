@@ -128,7 +128,19 @@ const RECAP_DATA = {
   startedAt: '2026-05-20T10:00:00Z',
   exchangeCount: 5,
   topicId: 'topic-001',
+  verifiedProof: null,
 };
+
+const VERIFIED_PROOF = {
+  topicId: 'topic-001',
+  topicTitle: 'Fractions',
+  subjectId: 'subject-001',
+  verifiedAt: '2026-07-10T10:00:00.000Z',
+  verificationState: 'fresh',
+  retentionStatus: 'strong',
+  nextReviewDate: '2026-07-17T10:00:00.000Z',
+  quote: 'Equivalent fractions name the same amount.',
+} as const;
 
 describe('RecapDetailScreen', () => {
   beforeEach(() => {
@@ -211,6 +223,51 @@ describe('RecapDetailScreen', () => {
     it('renders the back button', () => {
       render(<RecapDetailScreen />);
       expect(screen.getByTestId('recap-detail-back')).toBeTruthy();
+    });
+
+    it('renders the verified-proof block with quote and retention state', () => {
+      mockUseRecap.mockReturnValue({
+        data: { ...RECAP_DATA, verifiedProof: VERIFIED_PROOF },
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<RecapDetailScreen />);
+
+      expect(screen.getByTestId('recap-detail-verified-proof')).toBeTruthy();
+      expect(
+        screen.getByText('“Equivalent fractions name the same amount.”'),
+      ).toBeTruthy();
+      expect(screen.getByText('recaps.verifiedProof.holdsStrong')).toBeTruthy();
+      expect(
+        screen.getByText(/^recaps\.verifiedProof\.recheckDue:/),
+      ).toBeTruthy();
+    });
+
+    it('renders no verified-proof block when the response field is null', () => {
+      render(<RecapDetailScreen />);
+
+      expect(screen.queryByTestId('recap-detail-verified-proof')).toBeNull();
+    });
+
+    it('renders the abstracted line when an aged proof has no quote', () => {
+      mockUseRecap.mockReturnValue({
+        data: {
+          ...RECAP_DATA,
+          verifiedProof: { ...VERIFIED_PROOF, quote: null },
+        },
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<RecapDetailScreen />);
+
+      expect(screen.getByTestId('recap-detail-verified-proof')).toBeTruthy();
+      expect(
+        screen.getByText('home.parent.verifiedProof.quoteUnavailable'),
+      ).toBeTruthy();
     });
   });
 

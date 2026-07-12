@@ -19,6 +19,7 @@ import type { Database } from '@eduagent/database';
 import {
   hasParentAccess,
   assertParentAccess,
+  assertChargeNotCredentialed,
   assertCanManageOwnConsent,
   assertOwnerAndParentAccess,
   assertOwnerProfile,
@@ -65,6 +66,16 @@ function dbWithLink(_parentId: string, _childId: string): Database {
 /** Mock DB where NO guardianship edge exists (findFirst returns undefined). */
 function dbWithoutLink(): Database {
   return makeDb(undefined);
+}
+
+function dbWithCredential(credentialed: boolean): Database {
+  const limit = jest
+    .fn()
+    .mockResolvedValue(credentialed ? [{ personId: CHILD_ID }] : []);
+  const where = jest.fn().mockReturnValue({ limit });
+  const from = jest.fn().mockReturnValue({ where });
+  const select = jest.fn().mockReturnValue({ from });
+  return { select } as unknown as Database;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,6 +152,20 @@ describe('assertParentAccess', () => {
     await expect(
       assertParentAccess(db, PARENT_ID, CHILD_ID),
     ).resolves.not.toThrow();
+  });
+});
+
+describe('assertChargeNotCredentialed', () => {
+  it('resolves when the charge has no Login row', async () => {
+    await expect(
+      assertChargeNotCredentialed(dbWithCredential(false), CHILD_ID),
+    ).resolves.toBeUndefined();
+  });
+
+  it('[BREAK / WI-787] throws ForbiddenError when the charge has a Login row', async () => {
+    await expect(
+      assertChargeNotCredentialed(dbWithCredential(true), CHILD_ID),
+    ).rejects.toThrow(ForbiddenError);
   });
 });
 

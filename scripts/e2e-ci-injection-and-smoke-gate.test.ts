@@ -363,7 +363,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     readFileSync(join(repoRoot, 'apps/mobile/e2e/config.yaml'), 'utf8'),
   ) as { flows?: string[] };
 
-  function loadPlan(suite: 'pr' | 'nightly') {
+  function loadPlan(suite: 'pr' | 'nightly' | 'v2') {
     const result = spawnSync(
       'node',
       [
@@ -409,6 +409,27 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
     expect(runner).toContain('ci-maestro-plan.mjs');
     expect(runner).not.toMatch(/maestro test apps\/mobile\/e2e\/flows\//);
+  });
+
+  it('executes every planned shard entry even when Maestro consumes stdin', () => {
+    const harness = createMaestroHarness(0);
+    const expectedFlows = loadPlan('pr').filter(
+      (entry) => entry.shard === 1,
+    ).length;
+
+    try {
+      const result = runCiMaestro(harness, {
+        FAKE_MAESTRO_DRAIN_STDIN: '1',
+      });
+      const invocations = readFileSync(harness.maestroMarker, 'utf8')
+        .trim()
+        .split('\n');
+
+      expect(result.status).toBe(0);
+      expect(invocations).toHaveLength(expectedFlows);
+    } finally {
+      rmSync(harness.root, { recursive: true, force: true });
+    }
   });
 
   it('boots an embedded test release APK instead of the dev-client launcher', () => {
@@ -560,6 +581,70 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(plan.every(({ shard }) => shard >= 1 && shard <= 8)).toBe(true);
   });
 
+  it('[WI-1400] defines a V2-only native publish-readiness suite with interaction coverage', () => {
+    const plan = loadPlan('v2');
+    const workflowRaw = loadWorkflowRaw('e2e-ci.yml');
+    const flow = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-shell-navigation.yaml'),
+      'utf8',
+    );
+    const signInSetup = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/_setup/seed-and-sign-in.yaml'),
+      'utf8',
+    );
+    const conventions = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/CONVENTIONS.md'),
+      'utf8',
+    );
+
+    expect(plan).toEqual([
+      {
+        flow: 'flows/v2/v2-shell-navigation.yaml',
+        scenario: 'learning-active',
+        shard: 1,
+      },
+    ]);
+    expect(workflowRaw).toContain('- v2');
+    expect(workflowRaw).toContain('EXPO_PUBLIC_ENABLE_MODE_NAV_V2:');
+    expect(workflowRaw).toContain("inputs.maestro_suite == 'v2'");
+    expect(signInSetup).toMatch(/id: ['"]mentor-screen['"]/);
+    expect(conventions).toContain('`v2`');
+
+    for (const selector of [
+      'tab-mentor',
+      'tab-subjects',
+      'tab-journal',
+      'mentor-screen',
+      'mentor-bar-homework-chip',
+      'camera-view',
+      'close-button',
+      'subjects-screen',
+      'subjects-browse-row-${SUBJECT_ID}',
+      'subject-hub-screen',
+      'journal-screen',
+      'journal-tab-practice',
+      'journal-practice-section',
+      'journal-practice-open-hub',
+      'practice-screen',
+      'practice-back',
+    ]) {
+      expect(flow).toContain(selector);
+    }
+    for (const legacyTab of [
+      'tab-home',
+      'tab-my-learning',
+      'tab-library',
+      'tab-recaps',
+      'tab-progress',
+      'tab-more',
+    ]) {
+      expect(flow).toMatch(new RegExp(`id: ['"]${legacyTab}['"]`));
+    }
+    expect(flow.match(/assertNotVisible:/g)).toHaveLength(6);
+    expect(flow.match(/id: ['"]tab-subjects['"]/g)).toHaveLength(3);
+    expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
+  });
+
   it('keeps the generated Android APK free of the duplicate OSGI manifest', () => {
     const appConfig = JSON.parse(
       readFileSync(join(repoRoot, 'apps/mobile/app.json'), 'utf8'),
@@ -614,7 +699,13 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
   mkdirSync(binDir, { recursive: true });
   writeFileSync(
     maestro,
-    '#!/usr/bin/env bash\ntouch "$FAKE_MAESTRO_MARKER"\nexit "$FAKE_MAESTRO_EXIT"\n',
+    [
+      '#!/usr/bin/env bash',
+      'printf "ran\\n" >> "$FAKE_MAESTRO_MARKER"',
+      'if [ "${FAKE_MAESTRO_DRAIN_STDIN:-0}" = "1" ]; then cat >/dev/null; fi',
+      'exit "$FAKE_MAESTRO_EXIT"',
+      '',
+    ].join('\n'),
   );
   writeFileSync(
     adb,

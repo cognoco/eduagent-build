@@ -113,7 +113,7 @@ export const PROFILE_SCOPED_TABLES: readonly string[] = [
   // policy is `profile_id IS NULL OR profile_id = current_setting(...)` — the
   // NULL-admitting variant of the standard profile_id predicate.
   'activation_events',
-  // Added migration 0142 (WI-1777): speaking_practice_attempts_profile_isolation
+  // Added migration 0143 (WI-1777): speaking_practice_attempts_profile_isolation
   // policy, in the same migration that creates the table.
   'speaking_practice_attempts',
 ] as const;

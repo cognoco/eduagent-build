@@ -54,7 +54,6 @@ import {
   submitSummary,
   syncHomeworkState,
   setSessionInputMode,
-  evaluateSessionDepth,
   getResumeNudgeCandidate,
   claimSessionForFilingRetry,
   markSessionKeptOutOfLibrary,
@@ -79,7 +78,6 @@ import {
   NoInterleavedTopicsError,
 } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
-import { getPersonAgeBracket } from '../services/identity-v2/helpers';
 import {
   markPersisted,
   MAX_IDEMPOTENCY_KEY_LENGTH,
@@ -133,7 +131,7 @@ async function recordFirstSessionStarted(
 // [BUG-CONT-DEPTH-SWEEP] DONE: every /:sessionId endpoint in this file now
 // applies zValidator('param', sessionIdParamsSchema) for consistent UUID
 // validation and early rejection of malformed IDs (verified 2026-06-09 — all
-// of GET /sessions/:sessionId, /transcript, /evaluate-depth, /recall-bridge,
+// of GET /sessions/:sessionId, /transcript, /recall-bridge,
 // /close, /messages, /stream, /summary, etc. carry the param validator).
 
 // retryFilingParamsSchema was byte-identical to sessionIdParamsSchema; consolidated.
@@ -582,73 +580,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       );
       if (!transcript) return notFound(c, 'Session not found');
       return c.json(transcript);
-    },
-  )
-
-  .post(
-    '/sessions/:sessionId/evaluate-depth',
-    zValidator('param', sessionIdParamsSchema),
-    async (c) => {
-      assertNotProxyMode(c);
-      const { db, profileId } = withProfile(c);
-      const sessionId = c.req.valid('param').sessionId;
-      const transcript = await getSessionTranscript(db, profileId, sessionId);
-      if (!transcript) return notFound(c, 'Session not found');
-      if (transcript.archived) {
-        return apiError(
-          c,
-          410,
-          ERROR_CODES.SESSION_ARCHIVED,
-          'Session transcript has been archived',
-        );
-      }
-
-      const ageBracket = await getPersonAgeBracket(db, profileId);
-      const result = await evaluateSessionDepth(transcript, { ageBracket });
-      const learnerWordCount = transcript.exchanges.reduce((sum, exchange) => {
-        if (exchange.role !== 'user') return sum;
-        return sum + exchange.content.split(/\s+/).filter(Boolean).length;
-      }, 0);
-
-      // [A-1] [BUG-653] Observability events — consumed by ask-gate-observe.ts.
-      // safeSend isolates the dispatch: the depth result is already in hand and is
-      // what the client asked for; a dispatch hiccup must not fail the request.
-      // Both events are independent calls so a failure on the first does not
-      // suppress the second.
-      await safeSend(
-        () =>
-          inngest.send({
-            name: 'app/ask.gate_decision',
-            data: {
-              sessionId,
-              meaningful: result.meaningful,
-              reason: result.reason,
-              method: result.method,
-              exchangeCount: transcript.session.exchangeCount,
-              learnerWordCount,
-              topicCount: result.topics.length,
-            },
-          }),
-        'ask.gate_decision',
-        { sessionId, profileId, method: result.method },
-      );
-
-      if (result.method === 'fail_open') {
-        await safeSend(
-          () =>
-            inngest.send({
-              name: 'app/ask.gate_timeout',
-              data: {
-                sessionId,
-                exchangeCount: transcript.session.exchangeCount,
-              },
-            }),
-          'ask.gate_timeout',
-          { sessionId, profileId },
-        );
-      }
-
-      return c.json(result);
     },
   )
 

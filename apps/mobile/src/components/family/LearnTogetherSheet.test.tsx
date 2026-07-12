@@ -145,6 +145,7 @@ function recapWithTopic(): RecapListItem {
     engagementSignal: null,
     nextTopicTitle: null,
     nextTopicReason: null,
+    verifiedProof: null,
   };
 }
 

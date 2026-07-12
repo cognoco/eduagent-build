@@ -110,6 +110,21 @@ jest.mock(
           'progress.subject.continuePracticeStrandFluency':
             'Next up: a timed fluency drill',
           'progress.subject.continuePracticeCta': 'Continue',
+          'progress.subject.strandBalanceTitle': 'Recent practice balance',
+          'progress.subject.strandSessionsSampled': `${opts?.count ?? ''} sessions sampled`,
+          'progress.subject.strandMeaningInput': 'Meaning input',
+          'progress.subject.strandMeaningOutput': 'Meaning output',
+          'progress.subject.strandLanguageFocus': 'Language focus',
+          'progress.subject.strandFluency': 'Fluency',
+          'progress.subject.skillProfileTitle': 'Skill profile',
+          'progress.subject.skillVocabulary': 'Vocabulary',
+          'progress.subject.skillGrammar': 'Grammar',
+          'progress.subject.skillReading': 'Reading',
+          'progress.subject.skillListening': 'Listening comprehension practice',
+          'progress.subject.skillSpeaking': 'Speaking',
+          'progress.subject.skillFluency': 'Fluency',
+          'progress.subject.skillEvidenceCount': `${opts?.count ?? ''} activities`,
+          'progress.subject.viewCefrVocabulary': 'Browse CEFR vocabulary',
           'progress.subject.retentionTitle': 'Current retention',
           'progress.subject.retentionLoadError':
             "We couldn't load retention data right now.",
@@ -362,6 +377,8 @@ function makeLanguageProgress(
     // fixtures that don't care about it still parse; tests targeting the
     // continue-practice entry point override it explicitly.
     nextPractice: null,
+    strandBalance: null,
+    skillProfile: null,
     ...progress,
     currentMilestone,
     nextMilestone,
@@ -1020,6 +1037,116 @@ describe('ProgressSubjectScreen', () => {
             `/subjects/${SUBJECT_ID}/cefr-progress`,
           ).length,
         ).toBeGreaterThan(before);
+      });
+    });
+
+    describe('Four Strands balance and skill profile', () => {
+      const evidenceData = {
+        ...milestoneData,
+        strandBalance: {
+          counts: {
+            meaning_input: 6,
+            meaning_output: 3,
+            language_focus: 4,
+            fluency: 2,
+          },
+          sessionsSampled: 3,
+        },
+        skillProfile: [
+          { skill: 'vocabulary', progress: 0.5, evidenceCount: 25 },
+          { skill: 'grammar', progress: null, evidenceCount: 4 },
+          { skill: 'listening', progress: 0.75, evidenceCount: 8 },
+          { skill: 'speaking', progress: null, evidenceCount: 6 },
+          { skill: 'fluency', progress: 0.625, evidenceCount: 8 },
+        ],
+      };
+
+      it('renders all recent strand counts and evidence-backed skill rows', async () => {
+        mount({
+          subjects: [languageSubject],
+          languageProgress: evidenceData,
+        });
+
+        await screen.findByTestId('language-strand-balance');
+        screen.getByText('Recent practice balance');
+        screen.getByText('Meaning input');
+        screen.getByText('Meaning output');
+        screen.getByText('Language focus');
+        screen.getByTestId('language-skill-profile');
+        screen.getByText('Vocabulary');
+        screen.getByText('Grammar');
+        screen.getByText('Listening comprehension practice');
+        screen.getByText('Speaking');
+        expect(screen.queryByText('Reading')).toBeNull();
+      });
+
+      it('gives the long skill label the shrink-and-wrap contract that prevents small-phone clipping', async () => {
+        mount({
+          subjects: [languageSubject],
+          languageProgress: evidenceData,
+        });
+
+        const label = await screen.findByText(
+          'Listening comprehension practice',
+        );
+        const skillRow = screen.getByTestId('language-skill-listening');
+        // Small-phone anti-clip contract: the longest skill label must shrink
+        // within its row (flex-1 + min-w-0) rather than clip or force
+        // horizontal overflow, and its row must wrap rather than overflow when
+        // label + trailing content cannot sit side by side at a narrow width.
+        // This is the stack-appropriate guard for AC4 — the layout is pure
+        // flexbox with no width branch, so RN/jest (no Yoga pass) cannot
+        // measure pixel overflow; this pins the classes that make Yoga wrap.
+        expect(label.props.className).toContain('flex-1');
+        expect(label.props.className).toContain('min-w-0');
+        // react-test-renderer v19 ships no .d.ts, so the predicate parameter is
+        // effectively `any`; a structural annotation silences noImplicitAny
+        // without `any` (same pattern as practice/index.test.tsx).
+        type RNTestNode = { props?: Record<string, unknown> };
+        const wrappingRows = skillRow.findAll(
+          (node: RNTestNode) =>
+            typeof node.props?.className === 'string' &&
+            node.props.className.includes('flex-wrap'),
+        );
+        expect(wrappingRows.length).toBeGreaterThan(0);
+      });
+
+      it('hides both sections when recent evidence is sparse', async () => {
+        mount({
+          subjects: [languageSubject],
+          languageProgress: {
+            ...milestoneData,
+            strandBalance: null,
+            skillProfile: null,
+          },
+        });
+
+        await screen.findByTestId('cefr-milestone-card');
+        expect(screen.queryByTestId('language-strand-balance')).toBeNull();
+        expect(screen.queryByTestId('language-skill-profile')).toBeNull();
+      });
+
+      it('leaves non-language subjects without language evidence sections', async () => {
+        mount({ subjects: [fullSubject], languageProgressError: true });
+
+        await screen.findByTestId('progress-subject-resume');
+        expect(screen.queryByTestId('language-strand-balance')).toBeNull();
+        expect(screen.queryByTestId('language-skill-profile')).toBeNull();
+      });
+
+      it('opens the CEFR vocabulary browser through the full ancestor route', async () => {
+        mount({
+          subjects: [languageSubject],
+          languageProgress: evidenceData,
+        });
+
+        const link = await screen.findByTestId('cefr-vocabulary-browser-link');
+        fireEvent.press(link);
+
+        expect(mockPush).toHaveBeenCalledWith({
+          pathname: '/(app)/vocabulary/[subjectId]',
+          params: { subjectId: SUBJECT_ID },
+        });
       });
     });
 

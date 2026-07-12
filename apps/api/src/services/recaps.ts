@@ -9,7 +9,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import type { RecapListItem } from '@eduagent/schemas';
+import type { RecapListItem, VerifiedProofReceipt } from '@eduagent/schemas';
 import { recapListItemSchema } from '@eduagent/schemas';
 import { ForbiddenError } from '../errors';
 
@@ -21,6 +21,7 @@ import {
 import { listProfileSessions } from './session/session-crud';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
+import { getVerifiedProofForSessionTopic } from './parent-proof';
 
 const logger = createLogger();
 
@@ -33,6 +34,14 @@ interface NextTopic {
   nextTopicReason: string | null;
 }
 
+type RecapVerifiedProof = NonNullable<RecapListItem['verifiedProof']>;
+
+interface ProofLookup {
+  childProfileId: string;
+  sessionId: string;
+  topicId: string | null;
+}
+
 const NO_NEXT_TOPIC: NextTopic = {
   nextTopicTitle: null,
   nextTopicReason: null,
@@ -42,6 +51,7 @@ function toRecapItem(
   child: DashboardChildSummary,
   session: Awaited<ReturnType<typeof getChildSessions>>[number],
   nextTopic: NextTopic = NO_NEXT_TOPIC,
+  verifiedProof: RecapVerifiedProof | null = null,
 ): RecapListItem {
   return {
     recapId: session.sessionId,
@@ -64,6 +74,7 @@ function toRecapItem(
     engagementSignal: session.engagementSignal,
     nextTopicTitle: nextTopic.nextTopicTitle,
     nextTopicReason: nextTopic.nextTopicReason,
+    verifiedProof,
   };
 }
 
@@ -72,6 +83,7 @@ function profileSessionToRecapItem(
   displayName: string,
   session: Awaited<ReturnType<typeof listProfileSessions>>['sessions'][number],
   nextTopic: NextTopic = NO_NEXT_TOPIC,
+  verifiedProof: RecapVerifiedProof | null = null,
 ): RecapListItem {
   return {
     recapId: session.sessionId,
@@ -94,7 +106,69 @@ function profileSessionToRecapItem(
     engagementSignal: session.engagementSignal,
     nextTopicTitle: nextTopic.nextTopicTitle,
     nextTopicReason: nextTopic.nextTopicReason,
+    verifiedProof,
   };
+}
+
+function toRecapVerifiedProof(
+  receipt: VerifiedProofReceipt,
+): RecapVerifiedProof | null {
+  if (
+    !receipt.hasProof ||
+    !receipt.topicId ||
+    !receipt.topicTitle ||
+    !receipt.verifiedAt ||
+    !receipt.masteryVerificationState
+  ) {
+    return null;
+  }
+
+  return {
+    topicId: receipt.topicId,
+    topicTitle: receipt.topicTitle,
+    subjectId: receipt.subjectId ?? null,
+    verifiedAt: receipt.verifiedAt,
+    verificationState: receipt.masteryVerificationState,
+    retentionStatus: receipt.retentionStatus ?? null,
+    nextReviewDate: receipt.nextReviewDate ?? null,
+    quote: receipt.quote,
+  };
+}
+
+/**
+ * Session-keyed additive enrichment. Each lookup remains pinned to the exact
+ * child/session/topic tuple; failures degrade to null so proof cannot break or
+ * alter the existing Recap surface.
+ */
+async function loadVerifiedProofMap(
+  db: Database,
+  lookups: ProofLookup[],
+): Promise<Map<string, RecapVerifiedProof>> {
+  const entries = await Promise.all(
+    lookups.map(async ({ childProfileId, sessionId, topicId }) => {
+      if (!topicId) return null;
+
+      try {
+        const receipt = await getVerifiedProofForSessionTopic(
+          db,
+          childProfileId,
+          sessionId,
+          topicId,
+        );
+        const proof = toRecapVerifiedProof(receipt);
+        return proof ? ([sessionId, proof] as const) : null;
+      } catch (error) {
+        // Proof enrichment is additive — a failure degrades the recap to no
+        // verified block rather than failing the list — but the failure must
+        // stay visible, or a production-wide proof outage reads as "no
+        // verified assessment" with zero signal.
+        captureException(error);
+        return null;
+      }
+    }),
+  );
+
+  return new Map(entries.filter((entry) => entry !== null));
 }
 
 /**
@@ -235,10 +309,26 @@ export async function listRecapsForParent(
     nextTopicBySession = new Map();
   }
 
+  const verifiedProofBySession = await loadVerifiedProofMap(
+    db,
+    sessionsByChild.flatMap(({ child, sessions }) =>
+      sessions.map((session) => ({
+        childProfileId: child.profileId,
+        sessionId: session.sessionId,
+        topicId: session.topicId,
+      })),
+    ),
+  );
+
   return sessionsByChild
     .flatMap(({ child, sessions }) =>
       sessions.map((session) =>
-        toRecapItem(child, session, nextTopicBySession.get(session.sessionId)),
+        toRecapItem(
+          child,
+          session,
+          nextTopicBySession.get(session.sessionId),
+          verifiedProofBySession.get(session.sessionId),
+        ),
       ),
     )
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
@@ -322,12 +412,22 @@ export async function listRecapsForProfile(
     nextTopicBySession = new Map();
   }
 
+  const verifiedProofBySession = await loadVerifiedProofMap(
+    db,
+    page.sessions.map((session) => ({
+      childProfileId: profileId,
+      sessionId: session.sessionId,
+      topicId: session.topicId,
+    })),
+  );
+
   const items = page.sessions.map((session) =>
     profileSessionToRecapItem(
       profileId,
       profile?.displayName ?? 'Learner',
       session,
       nextTopicBySession.get(session.sessionId),
+      verifiedProofBySession.get(session.sessionId),
     ),
   );
 
@@ -374,7 +474,21 @@ export async function getRecapForParent(
   for (let i = 0; i < children.length; i += 1) {
     const session = sessions[i];
     const child = children[i];
-    if (session && child) return toRecapItem(child, session);
+    if (session && child) {
+      const verifiedProofBySession = await loadVerifiedProofMap(db, [
+        {
+          childProfileId: child.profileId,
+          sessionId: session.sessionId,
+          topicId: session.topicId,
+        },
+      ]);
+      return toRecapItem(
+        child,
+        session,
+        undefined,
+        verifiedProofBySession.get(session.sessionId),
+      );
+    }
   }
 
   return null;

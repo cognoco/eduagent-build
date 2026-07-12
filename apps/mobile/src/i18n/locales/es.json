@@ -1481,7 +1481,6 @@
       "startTitle": "Empezar {{subject}}"
     },
     "noteSignal": {
-      "verified": "Verificado",
       "verifiedAccessibilityLabel": "Verificado: tus palabras se han confirmado",
       "mentorAddition": "El mentor tiene más sobre este tema.",
       "showMentorAdditionAccessibilityLabel": "Mostrar lo que añadió el mentor.",
@@ -1592,15 +1591,12 @@
     "inactiveFallbackBanner": {
       "message": "No se pudieron cargar tus asignaturas pausadas y archivadas. Toca para reintentar — no han desaparecido."
     },
-    "notStartedCount": "{{notStarted}} / {{total}} sin empezar",
     "chooseTopic": "Elige un tema",
     "provenanceFrom": "De {{name}}",
     "recentlyAdded": "Añadido recientemente",
     "sessionCount_one": "{{count}} sesión",
     "sessionCount_other": "{{count}} sesiones",
     "a11yClearSearch": "Borrar búsqueda",
-    "a11yEditNote": "Editar nota",
-    "a11yDeleteNote": "Eliminar nota",
     "a11yCloseTopicPicker": "Cerrar selector de temas",
     "myNotes": {
       "subtitleBookmarks_one": "1 respuesta guardada",
@@ -1627,9 +1623,6 @@
       "thisTopicFallback": "este tema",
       "addedFromChildNamed": "Añadido del aprendizaje de {{name}}.",
       "addedFromChild": "Añadido del aprendizaje de un niño/a."
-    },
-    "collapsibleChapter": {
-      "a11yHeader": "{{title}}, {{notStarted}} de {{total}} temas sin empezar"
     },
     "inlineNote": {
       "a11yCollapse": "Nota para {{topic}}. {{source}}. Toca para contraer.",
@@ -2252,7 +2245,24 @@
       "loadingTitle": "Buscando tu progreso...",
       "loadingMessage": "Estamos reuniendo sesiones, repasos y palabras guardadas para esta materia.",
       "startedTopicsCount_one": "{{count}} tema empezado",
-      "startedTopicsCount_other": "{{count}} temas empezados"
+      "startedTopicsCount_other": "{{count}} temas empezados",
+      "strandBalanceTitle": "Balance de práctica reciente",
+      "strandSessionsSampled": "{{count}} sesión reciente",
+      "strandSessionsSampled_other": "{{count}} sesiones recientes",
+      "strandMeaningInput": "Input enfocado en significado",
+      "strandMeaningOutput": "Output enfocado en significado",
+      "strandLanguageFocus": "Aprendizaje centrado en el idioma",
+      "strandFluency": "Desarrollo de la fluidez",
+      "skillProfileTitle": "Perfil de habilidad",
+      "skillVocabulary": "Vocabulario",
+      "skillGrammar": "Gramática",
+      "skillReading": "Lectura",
+      "skillListening": "Escucha",
+      "skillSpeaking": "Habla",
+      "skillFluency": "Fluidez",
+      "skillEvidenceCount": "{{count}} actividad",
+      "skillEvidenceCount_other": "{{count}} actividades",
+      "viewCefrVocabulary": "Explorar vocabulario del MCER"
     },
     "vocabulary": {
       "pageTitle": "Tu Vocabulario",
@@ -3306,7 +3316,11 @@
     "detailPending": "Este resumen aún se está preparando.",
     "tryAsking": "Intenta preguntar",
     "openChildSession": "Abrir sesión del niño",
-    "emptyCtaStartSession": "Iniciar una sesión"
+    "emptyCtaStartSession": "Iniciar una sesión",
+    "verifiedProof": {
+      "holdsStrong": "sigue vigente",
+      "recheckDue": "próxima revisión: {{date}}"
+    }
   },
   "addToMyLearning": {
     "tip": "Guarda una copia de este tema en tu propia Biblioteca sin cambiar el aprendizaje de tu hijo.",
@@ -3693,12 +3707,6 @@
       "crossContextPromptMessage": "Estás en una sesión. Termínala primero o abre la actualización y sal del flujo actual.",
       "stayHere": "Quedarse aquí",
       "openUpdate": "Abrir actualización"
-    },
-    "guardianPrimer": {
-      "title": "¿Quieres estar al día?",
-      "message": "Podemos enviarte un aviso cuando un niño necesite tu atención. Puedes cambiarlo cuando quieras en Ajustes.",
-      "allow": "Permitir",
-      "notNow": "Ahora no"
     }
   },
   "myNotes": {

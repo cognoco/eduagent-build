@@ -497,6 +497,162 @@ describe('SignInScreen', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Phone-code 2FA — fixture-independent contract coverage
+  // ---------------------------------------------------------------------------
+
+  it('[WI-1849] selects and prepares a phone-code factor, then exposes resend', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [
+        {
+          strategy: 'phone_code',
+          phoneNumberId: 'phone_123',
+          safeIdentifier: '+47 ••• •• 321',
+        },
+      ],
+    });
+    mockPrepareSecondFactor.mockResolvedValue(undefined);
+
+    render(<SignInScreen />);
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => {
+      expect(mockPrepareSecondFactor).toHaveBeenCalledWith({
+        strategy: 'phone_code',
+        phoneNumberId: 'phone_123',
+      });
+    });
+    expect(
+      screen.getByText(/We sent a verification code to/),
+    ).toHaveTextContent(/\+47 ••• •• 321/);
+    screen.getByTestId('sign-in-resend-code');
+
+    fireEvent.press(screen.getByTestId('sign-in-resend-code'));
+    await waitFor(() => {
+      expect(mockPrepareSecondFactor).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('[WI-1849] verifies a phone-code factor and activates its session', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [
+        {
+          strategy: 'phone_code',
+          phoneNumberId: 'phone_123',
+          safeIdentifier: '+47 ••• •• 321',
+        },
+      ],
+    });
+    mockPrepareSecondFactor.mockResolvedValue(undefined);
+    mockAttemptSecondFactor.mockResolvedValue({
+      status: 'complete',
+      createdSessionId: 'sess_phone_ok',
+    });
+    mockSetActive.mockResolvedValue(undefined);
+
+    render(<SignInScreen />);
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => screen.getByTestId('sign-in-verify-code'));
+    fireEvent.changeText(screen.getByTestId('sign-in-verify-code'), '654321');
+    fireEvent.press(screen.getByTestId('sign-in-verify-button'));
+
+    await waitFor(() => {
+      expect(mockAttemptSecondFactor).toHaveBeenCalledWith({
+        strategy: 'phone_code',
+        code: '654321',
+      });
+      expect(mockSetActive).toHaveBeenCalledWith({ session: 'sess_phone_ok' });
+    });
+  });
+
+  it('[WI-1849] keeps phone-code sign-in recoverable when prepare fails', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [
+        {
+          strategy: 'phone_code',
+          phoneNumberId: 'phone_123',
+          safeIdentifier: '+47 ••• •• 321',
+        },
+      ],
+    });
+    mockPrepareSecondFactor.mockRejectedValueOnce(
+      new Error('Phone factor unavailable'),
+    );
+
+    render(<SignInScreen />);
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => screen.getByTestId('sign-in-verification-offer'));
+    expect(screen.queryByTestId('sign-in-verify-code')).toBeNull();
+
+    mockPrepareSecondFactor.mockResolvedValueOnce(undefined);
+    fireEvent.press(screen.getByTestId('sign-in-start-verification'));
+    await waitFor(() => screen.getByTestId('sign-in-verify-code'));
+    expect(mockPrepareSecondFactor).toHaveBeenLastCalledWith({
+      strategy: 'phone_code',
+      phoneNumberId: 'phone_123',
+    });
+  });
+
+  it('[WI-1849] surfaces phone-code verification and resend errors', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'needs_second_factor',
+      createdSessionId: null,
+      supportedSecondFactors: [
+        {
+          strategy: 'phone_code',
+          phoneNumberId: 'phone_123',
+          safeIdentifier: '+47 ••• •• 321',
+        },
+      ],
+    });
+    mockPrepareSecondFactor.mockResolvedValueOnce(undefined);
+    mockAttemptSecondFactor.mockRejectedValue({
+      errors: [{ longMessage: 'Incorrect phone verification code' }],
+    });
+
+    render(<SignInScreen />);
+    fireEvent.changeText(
+      screen.getByTestId('sign-in-email'),
+      'test@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
+    fireEvent.press(screen.getByTestId('sign-in-button'));
+
+    await waitFor(() => screen.getByTestId('sign-in-verify-code'));
+    fireEvent.changeText(screen.getByTestId('sign-in-verify-code'), '000000');
+    fireEvent.press(screen.getByTestId('sign-in-verify-button'));
+    await waitFor(() => screen.getByText('Incorrect phone verification code'));
+
+    mockPrepareSecondFactor.mockRejectedValueOnce({
+      errors: [{ longMessage: 'Could not resend phone code' }],
+    });
+    fireEvent.press(screen.getByTestId('sign-in-resend-code'));
+    await waitFor(() => screen.getByText('Could not resend phone code'));
+  });
+
+  // ---------------------------------------------------------------------------
   // TOTP (authenticator app) 2FA
   // ---------------------------------------------------------------------------
 

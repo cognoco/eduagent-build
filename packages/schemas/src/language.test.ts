@@ -552,6 +552,8 @@ describe('languageProgressSchema', () => {
     currentMilestone: null,
     nextMilestone: null,
     nextPractice: null,
+    strandBalance: null,
+    skillProfile: null,
   };
 
   it('accepts progress with all nullable fields null', () => {
@@ -559,6 +561,58 @@ describe('languageProgressSchema', () => {
     expect(parsed.currentLevel).toBeNull();
     expect(parsed.currentMilestone).toBeNull();
     expect(parsed.nextMilestone).toBeNull();
+    expect(parsed.strandBalance).toBeNull();
+    expect(parsed.skillProfile).toBeNull();
+  });
+
+  it('round-trips strand balance and evidence-backed skill progress', () => {
+    const parsed = languageProgressSchema.parse({
+      ...validProgress,
+      strandBalance: {
+        counts: {
+          meaning_input: 5,
+          meaning_output: 3,
+          language_focus: 4,
+          fluency: 2,
+        },
+        sessionsSampled: 3,
+      },
+      skillProfile: [
+        {
+          skill: 'vocabulary',
+          progress: 0.5,
+          evidenceCount: 25,
+        },
+        {
+          skill: 'speaking',
+          progress: null,
+          evidenceCount: 7,
+        },
+      ],
+    });
+
+    expect(parsed.strandBalance).toEqual({
+      counts: {
+        meaning_input: 5,
+        meaning_output: 3,
+        language_focus: 4,
+        fluency: 2,
+      },
+      sessionsSampled: 3,
+    });
+    expect(parsed.skillProfile).toEqual([
+      { skill: 'vocabulary', progress: 0.5, evidenceCount: 25 },
+      { skill: 'speaking', progress: null, evidenceCount: 7 },
+    ]);
+  });
+
+  it('rejects out-of-range skill progress', () => {
+    const result = languageProgressSchema.safeParse({
+      ...validProgress,
+      skillProfile: [{ skill: 'fluency', progress: 1.1, evidenceCount: 1 }],
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it('accepts progress with currentLevel set', () => {

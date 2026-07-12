@@ -1,0 +1,112 @@
+# WI-1400: V2 native shell interaction lane
+#
+# Runs only in the explicit `v2` workflow-dispatch suite because the V2 shell
+# flag is baked into the release bundle. The ordinary PR/nightly APK posture
+# remains unchanged.
+appId: com.mentomate.app
+tags:
+  - v2
+  - navigation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'learning-active'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+
+# V2-only chrome: all three V2 tabs exist and every legacy tab is absent.
+- assertVisible:
+    id: 'tab-mentor'
+- assertVisible:
+    id: 'tab-subjects'
+- assertVisible:
+    id: 'tab-journal'
+- assertNotVisible:
+    id: 'tab-home'
+- assertNotVisible:
+    id: 'tab-my-learning'
+- assertNotVisible:
+    id: 'tab-library'
+- assertNotVisible:
+    id: 'tab-recaps'
+- assertNotVisible:
+    id: 'tab-progress'
+- assertNotVisible:
+    id: 'tab-more'
+
+# Mentor action: open homework capture, verify its native body, then return.
+- tapOn:
+    id: 'mentor-bar-homework-chip'
+- extendedWaitUntil:
+    visible:
+      id: 'camera-view'
+    timeout: 15000
+- tapOn:
+    id: 'close-button'
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+
+# Subjects action: open the seeded subject hub and return to the V2 tab.
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-browse-row-${SUBJECT_ID}'
+    timeout: 15000
+- tapOn:
+    id: 'subjects-browse-row-${SUBJECT_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'subject-hub-screen'
+    timeout: 15000
+# Native hardware Back can fall through a cross-stack subject-hub route to the
+# shell's first tab. Return through the owning V2 tab, which is the stable user
+# affordance and keeps this lane focused on tab interaction coverage.
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+
+# Journal action: select Practice, open its hub, then return to Journal.
+- tapOn:
+    id: 'tab-journal'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- tapOn:
+    id: 'journal-tab-practice'
+- extendedWaitUntil:
+    visible:
+      id: 'journal-practice-section'
+    timeout: 15000
+- tapOn:
+    id: 'journal-practice-open-hub'
+- extendedWaitUntil:
+    visible:
+      id: 'practice-screen'
+    timeout: 15000
+- tapOn:
+    id: 'practice-back'
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-journal'

@@ -16,8 +16,30 @@ const BASH =
     ? 'C:\\Program Files\\Git\\bin\\bash.exe'
     : 'bash';
 
+/**
+ * Clones the given base env (default: process.env) with every GIT_* key
+ * stripped. Prevents an ambient GIT_DIR (e.g. exported by husky during
+ * pre-push -> nx -> jest) from leaking into these child git/bash processes
+ * and redirecting them at the ambient repo instead of the mkdtemp fixture
+ * passed as `cwd` (WI-1345 sweep). Same pattern as
+ * scripts/check-merge-invariant.test.ts's childGitEnv().
+ */
+function childGitEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...base };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GIT_')) {
+      delete env[key];
+    }
+  }
+  return env;
+}
+
 function git(repo: string, args: string[]): void {
-  execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+  execFileSync('git', args, {
+    cwd: repo,
+    stdio: 'ignore',
+    env: childGitEnv(),
+  });
 }
 
 function runChangeClass(
@@ -36,6 +58,7 @@ function runChangeClass(
   return execFileSync(BASH, ['-c', command], {
     cwd: repo,
     ...options,
+    env: childGitEnv(options.env),
   });
 }
 
@@ -214,6 +237,21 @@ describe('check-change-class.sh', () => {
     expect(output).toContain('pnpm test:api:integration');
   });
 
+  it('routes meta-only drizzle diffs (no .sql file) through db migrations (WI-1846)', () => {
+    mkdirSync(join(repo, 'apps', 'api', 'drizzle', 'meta'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(repo, 'apps', 'api', 'drizzle', 'meta', '0999_snapshot.json'),
+      '{}\n',
+    );
+    git(repo, ['add', '.']);
+
+    const flags = runRouter(repo);
+    expect(flags.classes).toContain('db-migrations');
+    expect(flags.database).toBe('true');
+  });
+
   it('emits eval=true when prompt builders are touched, including services/llm subdirectories', () => {
     mkdirSync(
       join(repo, 'apps', 'api', 'src', 'services', 'llm', 'providers'),
@@ -237,6 +275,38 @@ describe('check-change-class.sh', () => {
     const flags = runRouter(repo);
     expect(flags.classes).toContain('llm-prompts');
     expect(flags.eval).toBe('true');
+  });
+
+  // ── llm-routing class command resolves to a real script (WI-1795) ───────
+  // The llm-routing class emits a `pnpm <script>` command that gates the
+  // premium-routing pass. A regression that names an unregistered script makes
+  // --run fail/no-op and misleads a human reading the advisory output. Pin that
+  // the emitted script name is actually registered in package.json.
+  it('routes llm-routing changes to a registered package.json script', () => {
+    mkdirSync(join(repo, 'apps', 'api', 'src', 'services'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(repo, 'apps', 'api', 'src', 'services', 'subscription.ts'),
+      'export const s = 1;\n',
+    );
+    git(repo, ['add', '.']);
+
+    const output = String(
+      runChangeClass(repo, ['--branch'], { encoding: 'utf8' }),
+    );
+    expect(output).toContain('llm-routing');
+
+    // Extract the `pnpm <script>` the class schedules and assert it resolves to
+    // a real, invocable target in the repo's package.json.
+    const match = output.match(/pnpm (test:llm:[\w-]+)/);
+    expect(match).not.toBeNull();
+    const scriptName = match![1];
+
+    const pkg = JSON.parse(
+      readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
+    );
+    expect(pkg.scripts[scriptName]).toBeDefined();
   });
 
   it('emits integration=true for a lockfile-only change (dependencies class)', () => {
@@ -371,5 +441,63 @@ describe('check-change-class.sh', () => {
     expect(command).toContain('jest --config jest.config.cjs');
     expect(command).toContain('**/src/**/*.test.ts');
     expect(command).toContain('\\.integration\\.test\\.ts$');
+  });
+
+  // WI-1345 sweep: this file's git()/runChangeClass() spawn real git/bash
+  // processes against a mkdtemp fixture repo. Confirm an ambient GIT_DIR
+  // leak (as husky exports during pre-push -> nx -> jest) does not redirect
+  // those writes at the ambient repo. Uses only disposable mkdtemp fixtures,
+  // never the real worktree or shared checkout.
+  it('does not mutate an ambient repo when GIT_DIR leaks into the env', () => {
+    const ambientRepo = mkdtempSync(join(tmpdir(), 'wi1345-ambient-ccc-'));
+    try {
+      git(ambientRepo, ['init', '-q', '-b', 'main']);
+      git(ambientRepo, ['config', 'user.email', 'ambient@example.com']);
+      git(ambientRepo, ['config', 'user.name', 'Ambient']);
+      writeFileSync(join(ambientRepo, 'ambient.txt'), 'ambient content\n');
+      git(ambientRepo, ['add', '.']);
+      git(ambientRepo, ['commit', '-q', '-m', 'ambient initial commit']);
+
+      const ambientConfigPath = join(ambientRepo, '.git', 'config');
+      const headBefore = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ambientRepo,
+        encoding: 'utf8',
+        env: childGitEnv(),
+      }).trim();
+      const configBefore = readFileSync(ambientConfigPath, 'utf8');
+
+      const savedGitDir = process.env.GIT_DIR;
+      process.env.GIT_DIR = join(ambientRepo, '.git');
+      try {
+        writeFileSync(
+          join(repo, 'src', 'unclassified.ts'),
+          'export const a = 4;\n',
+        );
+        const output = runChangeClass(repo, ['--branch'], {
+          encoding: 'utf8',
+        });
+        // The check must still resolve against `repo` (cwd), not the
+        // poisoned ambient GIT_DIR.
+        expect(output).toContain('typescript');
+      } finally {
+        if (savedGitDir === undefined) {
+          delete process.env.GIT_DIR;
+        } else {
+          process.env.GIT_DIR = savedGitDir;
+        }
+      }
+
+      const headAfter = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ambientRepo,
+        encoding: 'utf8',
+        env: childGitEnv(),
+      }).trim();
+      const configAfter = readFileSync(ambientConfigPath, 'utf8');
+
+      expect(headAfter).toBe(headBefore);
+      expect(configAfter).toBe(configBefore);
+    } finally {
+      rmSync(ambientRepo, { recursive: true, force: true });
+    }
   });
 });

@@ -16,9 +16,26 @@ import {
 
 const FIVE_MIN_MS = 5 * 60_000;
 
+function createSessionStorageDouble() {
+  const values = new Map<string, string>();
+  return {
+    getItem: jest.fn((key: string) => values.get(key) ?? null),
+    setItem: jest.fn((key: string, value: string) => {
+      values.set(key, value);
+    }),
+    removeItem: jest.fn((key: string) => {
+      values.delete(key);
+    }),
+  };
+}
+
 describe('rememberPendingAuthRedirect / peekPendingAuthRedirect', () => {
   afterEach(() => {
     clearPendingAuthRedirect();
+    Object.defineProperty(globalThis, 'window', {
+      value: undefined,
+      configurable: true,
+    });
   });
 
   it('returns the normalised path immediately after writing', () => {
@@ -31,6 +48,60 @@ describe('rememberPendingAuthRedirect / peekPendingAuthRedirect', () => {
     rememberPendingAuthRedirect('/library');
     clearPendingAuthRedirect();
     expect(peekPendingAuthRedirect()).toBeNull();
+  });
+
+  it('[WI-1849] persists, reloads, and clears a web redirect through sessionStorage', () => {
+    const sessionStorage = createSessionStorageDouble();
+    Object.defineProperty(globalThis, 'window', {
+      value: { sessionStorage },
+      configurable: true,
+    });
+
+    jest.resetModules();
+    const firstLoad =
+      require('./pending-auth-redirect') as typeof import('./pending-auth-redirect');
+    firstLoad.rememberPendingAuthRedirect('/quiz?round=2');
+    expect(sessionStorage.setItem).toHaveBeenCalledWith(
+      'mentomate_pending_auth_redirect',
+      expect.stringContaining('/(app)/quiz?round=2'),
+    );
+
+    // A fresh module instance has no in-memory record and must replay from the
+    // browser-owned storage written before the simulated reload.
+    jest.resetModules();
+    const afterReload =
+      require('./pending-auth-redirect') as typeof import('./pending-auth-redirect');
+    expect(afterReload.peekPendingAuthRedirect()).toBe('/(app)/quiz?round=2');
+
+    afterReload.clearPendingAuthRedirect();
+    expect(sessionStorage.removeItem).toHaveBeenCalledWith(
+      'mentomate_pending_auth_redirect',
+    );
+
+    jest.resetModules();
+    const afterClearReload =
+      require('./pending-auth-redirect') as typeof import('./pending-auth-redirect');
+    expect(afterClearReload.peekPendingAuthRedirect()).toBeNull();
+  });
+
+  it('[WI-1849] removes malformed browser records instead of replaying them', () => {
+    const sessionStorage = createSessionStorageDouble();
+    sessionStorage.setItem(
+      'mentomate_pending_auth_redirect',
+      JSON.stringify({ path: 42, savedAt: Date.now() }),
+    );
+    Object.defineProperty(globalThis, 'window', {
+      value: { sessionStorage },
+      configurable: true,
+    });
+
+    jest.resetModules();
+    const afterReload =
+      require('./pending-auth-redirect') as typeof import('./pending-auth-redirect');
+    expect(afterReload.peekPendingAuthRedirect()).toBeNull();
+    expect(sessionStorage.removeItem).toHaveBeenCalledWith(
+      'mentomate_pending_auth_redirect',
+    );
   });
 });
 
