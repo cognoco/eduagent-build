@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   SubjectNotFoundError,
   LearningSessionNotFoundError,
@@ -37,8 +37,16 @@ export async function recordSpeakingPracticeAttempt(
   if (!subject) {
     throw new SubjectNotFoundError();
   }
+  // Also require the session to belong to the SAME subject as input.subjectId
+  // — a profile can own two subjects, each with its own session, and without
+  // this the independent ownership checks above would both pass for a
+  // cross-subject (subjectId, sessionId) pair, persisting a row whose
+  // denormalized subject_id doesn't match the session it's attached to.
   const session = await ownershipRepo.sessions.findFirst(
-    eq(learningSessions.id, input.sessionId),
+    and(
+      eq(learningSessions.id, input.sessionId),
+      eq(learningSessions.subjectId, input.subjectId),
+    ),
   );
   if (!session) {
     throw new LearningSessionNotFoundError();

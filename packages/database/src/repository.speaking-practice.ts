@@ -33,7 +33,7 @@ export function createSpeakingPracticeRepository(
         targetText: string,
       ): Promise<number> {
         const rows = await db
-          .select({ count: sql<number>`count(*)` })
+          .select({ count: sql<string>`count(*)` })
           .from(speakingPracticeAttempts)
           .where(
             scopedWhere(

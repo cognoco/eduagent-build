@@ -97,8 +97,8 @@ function formatLanguageSessionState(context: ExchangeContext): string {
       ]
     : [];
   // WI-1777: repeat-after-me/shadowing. Deterministic client-side
-  // transcript-comparison feedback is computed and shown by the client — the
-  // LLM never grades this turn.
+  // transcript-comparison feedback is computed server-side and shown to the
+  // learner by the mobile app — the LLM never grades this turn.
   const speakingPractice = activity.speakingPractice;
   const speakingPracticeLines = speakingPractice
     ? [
@@ -109,7 +109,7 @@ function formatLanguageSessionState(context: ExchangeContext): string {
           200,
         )}`,
         `- Locale: ${speakingPractice.locale}`,
-        '- The learner will repeat this sentence aloud. Transcript-comparison feedback is computed and shown by the client — you do not need to grade it. Encourage a retry on the same target if they ask for help.',
+        '- The learner will repeat this sentence aloud. Transcript-comparison feedback is computed server-side and shown to the learner by the mobile app — you do not need to grade it. Encourage a retry on the same target if they ask for help.',
       ]
     : [];
   const previousMeaningOutputTask = state.previousMeaningOutputTask;
