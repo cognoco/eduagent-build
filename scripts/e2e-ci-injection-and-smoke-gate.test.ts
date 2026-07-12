@@ -581,6 +581,32 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(plan.every(({ shard }) => shard >= 1 && shard <= 8)).toBe(true);
   });
 
+  it('[WI-1406] keeps native MFA placeholders explicitly non-executable until OPQ-26 fixtures exist', () => {
+    const nightlyFlows = new Set(loadPlan('nightly').map(({ flow }) => flow));
+    const placeholders = [
+      'flows/auth/sign-in-mfa-email-code.yaml',
+      'flows/auth/sign-in-mfa-totp.yaml',
+      'flows/auth/sign-in-mfa-phone.yaml',
+      'flows/auth/sign-in-mfa-backup-code.yaml',
+    ];
+
+    for (const flow of placeholders) {
+      const source = readFileSync(
+        join(repoRoot, 'apps/mobile/e2e', flow),
+        'utf8',
+      );
+      const header = parseYaml(source.split(/^---$/m)[0] ?? '') as {
+        tags?: string[];
+      };
+
+      expect(header.tags).toEqual(
+        expect.arrayContaining(['auth', 'blocked', 'manual']),
+      );
+      expect(source).toContain('OPQ-26');
+      expect(nightlyFlows).not.toContain(flow);
+    }
+  });
+
   it('[WI-1400] defines a V2-only native publish-readiness suite with interaction coverage', () => {
     const plan = loadPlan('v2');
     const workflowRaw = loadWorkflowRaw('e2e-ci.yml');
