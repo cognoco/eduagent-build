@@ -195,8 +195,6 @@ export const streamLanguageLearningActivitySchema = z.object({
     'correction_retry',
     'timed_drill',
     'repeat_after_me',
-    // TODO WI-1777-follow: shadowing mode — server selectSpeakingPracticeMode()
-    // stub does not yet emit this; path is inert until then.
     'shadowing',
   ]),
   modality: z.enum(['text', 'voice', 'listening']),

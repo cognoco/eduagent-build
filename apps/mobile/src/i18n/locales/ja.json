@@ -764,6 +764,7 @@
     "speakingPractice": {
       "title": "まねして言う",
       "subtitle": "文をくり返す",
+      "subtitleShadowing": "音声と一緒に、少し遅れて話す",
       "playAudioLabel": "目標文を再生",
       "stopAudioLabel": "音声を停止",
       "startRecordingLabel": "発話を始める",
