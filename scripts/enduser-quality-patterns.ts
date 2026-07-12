@@ -50,25 +50,43 @@ function replySentences(reply: string): string[] {
     .filter((sentence) => sentence.length > 0);
 }
 
-// Sentences that only invite/prepare the learner (setup, "I'm listening")
-// carry no factual assertion, whatever follows the invitational phrase.
-const NO_CLAIM_SENTENCE_RE =
-  /^(?:go ahead|i'?m (?:listening|ready)|i am (?:listening|ready)|whenever you'?re ready|when you'?re ready|take your time|your turn|sure|great|okay|ok|awesome|nice|no problem|of course|let'?s (?:start|begin|go|try))\b/i;
+// Splits a (non-interrogative) sentence into clauses on comma, semicolon,
+// colon, or a spaced dash — the punctuation a reply uses to tack a fact onto
+// a conversational opener ("Sure, 3·5+5 = 20.", "Go ahead — the answer is
+// 20.").
+const CLAUSE_SPLIT_RE = /\s*[,;:]\s*|\s+[—–]\s+/;
+function sentenceClauses(sentence: string): string[] {
+  return sentence
+    .split(CLAUSE_SPLIT_RE)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause.length > 0);
+}
 
-// True when the reply contains a declarative sentence that isn't a question
-// and isn't purely invitational — i.e. it asserts something that needs
-// grounding (e.g. "The mitochondria is the powerhouse of the cell.",
-// "3·5+5 = 20.").
-// ponytail: sentence-level, not clause-level — an invitational sentence that
-// smuggles in a fact via em dash ("Go ahead — the answer is 20.") is not
-// caught. The two real legitimately-skipped shapes (recitation-setup
-// invitations, immersion-opener questions) don't do this; a genuine miss
-// here is a gap to close if it shows up in captured evidence.
+// A clause carries no factual assertion only when it is ENTIRELY one of
+// these known setup/invitation/acknowledgement shapes (optionally with a
+// trailing "." or "!") — matched in full, not as a prefix. Full-clause
+// matching is what closes the prefix bypass: "Sure, 3·5+5 = 20." splits
+// into "Sure" (matches) and "3·5+5 = 20." (does not match, since it has
+// extra content after the recognized token), so the sentence is correctly
+// flagged instead of the whole sentence being waved through because it
+// merely STARTED with "Sure".
+const NO_CLAIM_CLAUSE_RE =
+  /^(?:sure|great|okay|ok|awesome|nice|no problem|of course|alright|perfect|your turn|take your time|let'?s (?:start|begin|go|try)|i'?m (?:listening|ready)|i am (?:listening|ready)|whenever you'?re ready|when you'?re ready|go ahead(?: and recite it(?: for me| to me)?)?)[.!]*$/i;
+
+// True when the reply contains a declarative sentence carrying a factual
+// assertion — a sentence with at least one clause that isn't a full match
+// for NO_CLAIM_CLAUSE_RE (e.g. "The mitochondria is the powerhouse of the
+// cell.", "3·5+5 = 20."). Question sentences never assert a claim. Any
+// clause not recognized as purely invitational is treated as an assertion —
+// this errs toward flagging (a false positive here is a safe, self-surfacing
+// gate failure; a false negative would let a real claim through ungrounded).
 function replyAssertsFactualClaim(reply: string): boolean {
-  return replySentences(reply).some(
-    (sentence) =>
-      !sentence.endsWith('?') && !NO_CLAIM_SENTENCE_RE.test(sentence),
-  );
+  return replySentences(reply).some((sentence) => {
+    if (sentence.endsWith('?')) return false;
+    return sentenceClauses(sentence).some(
+      (clause) => !NO_CLAIM_CLAUSE_RE.test(clause),
+    );
+  });
 }
 
 // A turn makes no factual claim when its source audit reports
