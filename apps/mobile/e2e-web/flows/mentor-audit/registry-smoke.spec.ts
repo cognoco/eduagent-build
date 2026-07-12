@@ -94,6 +94,16 @@ for (const [registryName, scenario] of entries) {
       await expect(
         mutatedPage.getByTestId(scenario.landingTestId),
       ).toBeVisible();
+      if (scenario.storageStateMutator === 'session-revoked') {
+        await expect(
+          mutatedPage.getByTestId('session-expired-banner'),
+        ).toHaveCount(0);
+      }
+      if (scenario.storageStateMutator === 'session-expired') {
+        await expect(
+          mutatedPage.getByTestId('session-revoked-banner'),
+        ).toHaveCount(0);
+      }
       await newContext.close();
       // Verify the seed result is still available for downstream debugging.
       // `seedAndSignIn` appends a random suffix and `buildSeedEmail` hashes
