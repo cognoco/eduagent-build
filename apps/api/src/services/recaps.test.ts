@@ -191,6 +191,20 @@ function fakeProofDb(rowsByTable: Map<unknown, unknown[]>): Database {
       ) => Promise.resolve(rows).then(resolve, reject);
       return chain;
     }),
+    // Scoped-repository path used by getVerifiedProofForSessionTopic for the
+    // weak-spot and retention-card reads; serve from the same seeded map.
+    query: {
+      needsDeepeningTopics: {
+        findMany: jest.fn(
+          async () => rowsByTable.get(needsDeepeningTopics) ?? [],
+        ),
+      },
+      retentionCards: {
+        findFirst: jest.fn(
+          async () => (rowsByTable.get(retentionCards) ?? [])[0],
+        ),
+      },
+    },
   } as unknown as Database;
 }
 

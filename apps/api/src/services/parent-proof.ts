@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, isNotNull } from 'drizzle-orm';
 import {
   assessments,
+  createScopedRepository,
   curriculumTopics,
   needsDeepeningTopics,
   retentionCards,
@@ -65,7 +66,12 @@ export async function getVerifiedProofForSessionTopic(
     return { hasProof: false, quote: null };
   }
 
-  const [noteRows, weakSpotRows, retentionCardRows] = await Promise.all([
+  // The note read keeps direct db access — an orderBy(desc) + limit(1) pair
+  // the scoped repo's findFirst/findMany cannot express (sanctioned deviation).
+  // The single-table weak-spot and retention-card reads go through the scoped
+  // repository, which pins profileId for us.
+  const repo = createScopedRepository(db, childProfileId);
+  const [noteRows, weakSpotRows, retentionCard] = await Promise.all([
     db
       .select({ content: topicNotes.content, createdAt: topicNotes.createdAt })
       .from(topicNotes)
@@ -79,28 +85,10 @@ export async function getVerifiedProofForSessionTopic(
       )
       .orderBy(desc(topicNotes.createdAt))
       .limit(1),
-    db
-      .select({
-        status: needsDeepeningTopics.status,
-        createdAt: needsDeepeningTopics.createdAt,
-      })
-      .from(needsDeepeningTopics)
-      .where(
-        and(
-          eq(needsDeepeningTopics.profileId, childProfileId),
-          eq(needsDeepeningTopics.topicId, topicId),
-        ),
-      ),
-    db
-      .select()
-      .from(retentionCards)
-      .where(
-        and(
-          eq(retentionCards.profileId, childProfileId),
-          eq(retentionCards.topicId, topicId),
-        ),
-      )
-      .limit(1),
+    repo.needsDeepeningTopics.findMany(
+      eq(needsDeepeningTopics.topicId, topicId),
+    ),
+    repo.retentionCards.findFirst(eq(retentionCards.topicId, topicId)),
   ]);
 
   const note = noteRows[0];
@@ -112,7 +100,6 @@ export async function getVerifiedProofForSessionTopic(
   quoteAgeOutCutoff.setUTCDate(
     quoteAgeOutCutoff.getUTCDate() - QUOTE_AGE_OUT_DAYS,
   );
-  const retentionCard = retentionCardRows[0];
 
   return {
     hasProof: true,

@@ -35,6 +35,21 @@ function fakeDbByTable(rowsByTable: Map<unknown, unknown[]>): Database {
       ) => Promise.resolve(rows).then(resolve, reject);
       return chain;
     }),
+    // Scoped-repository path: the weak-spot and retention-card reads now go
+    // through db.query.<table>.findMany/findFirst; serve them from the same
+    // seeded rows map keyed by table.
+    query: {
+      needsDeepeningTopics: {
+        findMany: jest.fn(
+          async () => rowsByTable.get(needsDeepeningTopics) ?? [],
+        ),
+      },
+      retentionCards: {
+        findFirst: jest.fn(
+          async () => (rowsByTable.get(retentionCards) ?? [])[0],
+        ),
+      },
+    },
   } as unknown as Database;
 }
 
