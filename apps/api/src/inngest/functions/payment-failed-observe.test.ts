@@ -47,7 +47,12 @@ jest.mock(/* gc1-allow: registration boundary */ '../client', () => ({
 }));
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import * as sentryService from '../../services/sentry';
 import { paymentFailedObserve } from './payment-failed-observe';
+
+const captureMessageSpy = jest
+  .spyOn(sentryService, 'captureMessage')
+  .mockImplementation(() => undefined);
 
 const SUBSCRIPTION_ID = '00000000-0000-7000-a000-000000000010';
 const PAYER_PERSON_ID = '00000000-0000-7000-a000-000000000011';
@@ -80,6 +85,7 @@ async function runHandler(
 
 beforeEach(() => {
   jest.clearAllMocks();
+  captureMessageSpy.mockClear();
   mockRecordPaymentFailedAlert.mockResolvedValue({
     alertId: ALERT_ID,
     inserted: true,
@@ -98,6 +104,10 @@ beforeEach(() => {
   });
   mockSendEmail.mockResolvedValue({ sent: true, messageId: 'email-1' });
   mockRecordBillingAlertDeliveryOutcome.mockResolvedValue(undefined);
+});
+
+afterAll(() => {
+  captureMessageSpy.mockRestore();
 });
 
 describe('paymentFailedObserve', () => {
@@ -154,6 +164,31 @@ describe('paymentFailedObserve', () => {
       push: { sent: true },
       email: { sent: true },
     });
+  });
+
+  it('emits a PII-free payment-failed Sentry signal after validation', async () => {
+    await runHandler({
+      accountId: '00000000-0000-7000-a000-000000000099',
+      learnerName: 'Private Learner',
+    });
+
+    expect(captureMessageSpy).toHaveBeenCalledWith('billing.payment_failed', {
+      level: 'error',
+      tags: {
+        surface: 'billing',
+        signal: 'payment-failed',
+        source: 'stripe',
+      },
+      extra: {
+        attempt: 2,
+        eventTimestamp: '2026-07-11T10:00:00.000Z',
+      },
+    });
+    const sentryPayload = JSON.stringify(captureMessageSpy.mock.calls);
+    expect(sentryPayload).not.toContain('00000000-0000-7000-a000-000000000099');
+    expect(sentryPayload).not.toContain('Private Learner');
+    expect(sentryPayload).not.toContain(SUBSCRIPTION_ID);
+    expect(sentryPayload).not.toContain(PAYER_PERSON_ID);
   });
 
   it('records and emits a PII-free escalation for every channel failure reason', async () => {
@@ -245,6 +280,7 @@ describe('paymentFailedObserve', () => {
 
     expect(result).toEqual({ status: 'schema_error' });
     expect(mockRecordPaymentFailedAlert).not.toHaveBeenCalled();
+    expect(captureMessageSpy).not.toHaveBeenCalled();
   });
 
   it('records and escalates no_email without calling the email provider', async () => {

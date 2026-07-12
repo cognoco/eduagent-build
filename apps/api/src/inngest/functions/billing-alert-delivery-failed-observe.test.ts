@@ -82,6 +82,7 @@ describe('billingAlertDeliveryFailedObserve', () => {
         level: 'error',
         tags: {
           surface: 'billing',
+          signal: 'alert-delivery-failed',
           channel: 'push',
           reason: 'no_push_token',
         },

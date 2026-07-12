@@ -74,6 +74,19 @@ The warning catches a recovery that has remained unresolved for 24 hours; the
 page catches any row that crosses its grace deadline without returning to an
 active/free terminal state.
 
+Sentry filters:
+
+```text
+surface:billing signal:payment-failed
+surface:billing signal:alert-delivery-failed
+surface:billing signal:missing-current-period-end
+surface:billing signal:trial-expiry-failed
+```
+
+Use the first two filters for the payment-recovery warn/page rules above. The
+period-end and trial-expiry filters are separate billing-integrity signals and
+must not be collapsed into payment-decline volume.
+
 ### First response
 
 1. Inspect the `payment-failed-observe` and

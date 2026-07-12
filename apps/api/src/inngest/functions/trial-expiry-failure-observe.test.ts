@@ -47,6 +47,8 @@ interface FailureEventData {
   trialId: string;
   reason: string;
   timestamp: string;
+  payerEmail?: string;
+  learnerName?: string;
 }
 
 async function invokeHandler(data: FailureEventData) {
@@ -114,6 +116,8 @@ describe('trialExpiryFailureObserve (BUG-843 / F-SVC-011)', () => {
       trialId: 'sub-3',
       reason: 'DB constraint violation',
       timestamp: '2026-04-27T00:00:00.000Z',
+      payerEmail: 'payer@example.test',
+      learnerName: 'Private Learner',
     });
 
     expect(captureMessageSpy).toHaveBeenCalledWith(
@@ -122,6 +126,7 @@ describe('trialExpiryFailureObserve (BUG-843 / F-SVC-011)', () => {
         level: 'error',
         tags: expect.objectContaining({
           surface: 'billing',
+          signal: 'trial-expiry-failed',
           event: 'trial_expiry_failed',
           step: 'process-expired-trials',
         }),
@@ -131,6 +136,12 @@ describe('trialExpiryFailureObserve (BUG-843 / F-SVC-011)', () => {
           eventTimestamp: '2026-04-27T00:00:00.000Z',
         }),
       }),
+    );
+    expect(JSON.stringify(captureMessageSpy.mock.calls)).not.toContain(
+      'payer@example.test',
+    );
+    expect(JSON.stringify(captureMessageSpy.mock.calls)).not.toContain(
+      'Private Learner',
     );
   });
 });

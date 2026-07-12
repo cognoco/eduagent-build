@@ -12,6 +12,7 @@ import {
   type PaymentFailureSource,
 } from '../../services/billing/payment-failed-alert';
 import { createLogger } from '../../services/logger';
+import { captureMessage } from '../../services/sentry';
 import {
   formatPaymentFailedEmail,
   sendEmail,
@@ -81,6 +82,18 @@ export const paymentFailedObserve = inngest.createFunction(
       subscriptionId: data.subscriptionId,
       attempt: data.attempt ?? null,
       eventTimestamp: occurredAt.toISOString(),
+    });
+    captureMessage('billing.payment_failed', {
+      level: 'error',
+      tags: {
+        surface: 'billing',
+        signal: 'payment-failed',
+        source,
+      },
+      extra: {
+        attempt: data.attempt ?? null,
+        eventTimestamp: occurredAt.toISOString(),
+      },
     });
 
     const persisted = await step.run('persist-billing-alert', async () => {
