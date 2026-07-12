@@ -51,6 +51,7 @@ Age posture (per `data-model.md` §2A.5 + ROADMAP age-floor thread): **13+ conse
 | 13 | **Background jobs / events** | payloads (`person_id`, org id) | Durable async (the unified daily sweep, deletion, purge, reports — `MMT-ADR-0009`) | Contract; Consent | **Inngest** | US | Per Inngest DPA |
 | 14 | **Deletion audit** | `person_retain.deletion_audit`: who/when/why deleted | Prove lawful erasure | Legal obligation | Neon | — | Retain-tier; `retention_period` seam (counsel fills) |
 | 15 | **BYOK waitlist** *(if live)* | `byok_waitlist`: email only | Waitlist | Consent | Neon | — | **Not in the identity carve-out** — explicit erasure implemented in the delete flow (`deletion-v2.ts:543`, code-verified 2026-07-04) |
+| 16 | **Push notifications** | Expo push tokens (device-bound, person-scoped), notification payloads (nudges, session/weekly-progress summaries) | Re-engagement and progress notifications | *Legal basis to confirm at DPO sign-off* (OS-level opt-in present) | **Expo push service** -> Apple APNs / Google FCM | US | Token life of device registration; payloads transient. *(Row added 2026-07-12 during DPO-package prep — live in `apps/api/src/services/notifications.ts` but previously missing from this register.)* |
 
 ## Policy-engine tables (mostly NOT personal data — recorded for completeness)
 
@@ -60,7 +61,7 @@ Age posture (per `data-model.md` §2A.5 + ROADMAP age-floor thread): **13+ conse
 ## Sub-processors (infrastructure)
 
 - **Neon** (DB hosting), **Cloudflare Workers** (API compute).
-- Each named recipient (Clerk, Voyage, RevenueCat, Resend, Sentry, Inngest, LLM provider(s)) is a **processor** requiring a signed DPA on a business/enterprise tier (A11) and a US-transfer check (A12).
+- Each named recipient (Clerk, Voyage, RevenueCat, Resend, Sentry, Inngest, Expo push, LLM provider(s)) is a **processor** requiring a signed DPA on a business/enterprise tier (A11) and a US-transfer check (A12).
 
 ## Known open items (also tracked in the DPIA)
 
