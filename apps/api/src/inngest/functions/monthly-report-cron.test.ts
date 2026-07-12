@@ -2,10 +2,8 @@
 // Monthly Report Cron — Tests
 // ---------------------------------------------------------------------------
 
-import {
-  createDatabaseModuleMock,
-  createTransactionalMockDb,
-} from '../../test-utils/database-module';
+import { createDatabaseModuleMock } from '../../test-utils/database-module';
+import { createMockDb } from '@eduagent/test-utils';
 import {
   createInngestStepRunner,
   type InngestStepRunnerOptions,
@@ -159,58 +157,67 @@ const mockInsertValues = jest
   .mockReturnValue({ onConflictDoNothing: mockOnConflictDoNothing });
 const mockInsert = jest.fn().mockReturnValue({ values: mockInsertValues });
 
-const mockMonthlyReportDb = createTransactionalMockDb({
-  query: {
-    familyLinks: {
-      findMany: jest.fn().mockResolvedValue([]),
-      findFirst: jest.fn().mockResolvedValue({ id: 'link-1' }),
+const mockMonthlyReportDb = Object.assign(
+  createMockDb() as Record<string, unknown>,
+  {
+    query: {
+      familyLinks: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue({ id: 'link-1' }),
+      },
+      guardianship: {
+        // [WI-867] Default truthy — most generate tests need isGuardianOf to pass.
+        // The IDOR guard test overrides to null via mockResolvedValueOnce.
+        findFirst: jest.fn().mockResolvedValue({ id: 'edge-1' }),
+      },
+      profiles: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      // [WI-777] v2 active-filter read (db.query.person.findMany) + generate-step
+      // person lookups. Default empty/null; the v2 cron wiring test seeds findMany.
+      person: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      // Consent gate added by email digest channel spec (2026-05-08).
+      // Default: null row → no restriction (pre-consent-flow accounts, CONSENTED presumed).
+      consentStates: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      // login/membership: TYPE carriers for the per-test override sites
+      // below. At runtime, on the marked createMockDb() base,
+      // createDatabaseModuleMock's identity-graph proxy serves the canonical
+      // v2 owner graph for the three identity tables and bypasses these
+      // literals — overrides via db.query.login.findFirst.mockResolvedValue
+      // land on the proxied graph mocks, not these.
+      membership: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      login: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      // Learning profile struggles: default empty (no watch-line).
+      learningProfiles: {
+        findFirst: jest.fn().mockResolvedValue({ struggles: [] }),
+      },
+      // Notification prefs for email channel gate.
+      notificationPreferences: {
+        findFirst: jest.fn().mockResolvedValue({
+          weeklyProgressEmail: false,
+          monthlyProgressEmail: false,
+        }),
+      },
+      // Parent email lookup.
+      accounts: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
     },
-    guardianship: {
-      // [WI-867] Default truthy — most generate tests need isGuardianOf to pass.
-      // The IDOR guard test overrides to null via mockResolvedValueOnce.
-      findFirst: jest.fn().mockResolvedValue({ id: 'edge-1' }),
-    },
-    profiles: {
-      findFirst: jest.fn().mockResolvedValue(null),
-      findMany: jest.fn().mockResolvedValue([]),
-    },
-    // [WI-777] v2 active-filter read (db.query.person.findMany) + generate-step
-    // person lookups. Default empty/null; the v2 cron wiring test seeds findMany.
-    person: {
-      findFirst: jest.fn().mockResolvedValue(null),
-      findMany: jest.fn().mockResolvedValue([]),
-    },
-    // Consent gate added by email digest channel spec (2026-05-08).
-    // Default: null row → no restriction (pre-consent-flow accounts, CONSENTED presumed).
-    consentStates: {
-      findFirst: jest.fn().mockResolvedValue(null),
-    },
-    membership: {
-      findFirst: jest.fn().mockResolvedValue(null),
-    },
-    login: {
-      findFirst: jest.fn().mockResolvedValue(null),
-    },
-    // Learning profile struggles: default empty (no watch-line).
-    learningProfiles: {
-      findFirst: jest.fn().mockResolvedValue({ struggles: [] }),
-    },
-    // Notification prefs for email channel gate.
-    notificationPreferences: {
-      findFirst: jest.fn().mockResolvedValue({
-        weeklyProgressEmail: false,
-        monthlyProgressEmail: false,
-      }),
-    },
-    // Parent email lookup.
-    accounts: {
-      findFirst: jest.fn().mockResolvedValue(null),
-    },
+    selectDistinct: mockSelectDistinct,
+    select: mockSelect,
+    insert: mockInsert,
   },
-  selectDistinct: mockSelectDistinct,
-  select: mockSelect,
-  insert: mockInsert,
-});
+);
 
 const mockDatabaseModule = createDatabaseModuleMock({
   db: mockMonthlyReportDb,

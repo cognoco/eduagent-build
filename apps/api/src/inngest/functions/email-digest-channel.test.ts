@@ -144,6 +144,7 @@ jest.mock(
 );
 
 import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity-summary-fixture';
+import { createMockDb } from '@eduagent/test-utils';
 // WI-867: seeds v2 GDPR consent chain (membership+consentGrant+consentRequest) on db.query Proxy
 import { seedConsentState } from '../../test-utils/consent-seed';
 
@@ -200,11 +201,8 @@ function buildMockDb(
     .fn()
     .mockReturnValue({ onConflictDoNothing: mockOnConflictDoNothing });
   const mockInsert = jest.fn().mockReturnValue({ values: mockInsertValues });
-  const mockSelectWhere = jest.fn().mockResolvedValue([]);
-  const mockSelectFrom = jest.fn().mockReturnValue({ where: mockSelectWhere });
-  const mockSelect = jest.fn().mockReturnValue({ from: mockSelectFrom });
 
-  const db = {
+  const db = Object.assign(createMockDb() as Record<string, unknown>, {
     query: {
       familyLinks: {
         findMany: jest.fn().mockResolvedValue(childLinks),
@@ -283,11 +281,10 @@ function buildMockDb(
       ...extraQueryOverrides,
     },
     insert: mockInsert,
-    select: mockSelect,
     _mockInsert: mockInsert,
     _mockInsertValues: mockInsertValues,
     _mockOnConflictDoNothing: mockOnConflictDoNothing,
-  };
+  });
 
   return db;
 }
@@ -772,7 +769,7 @@ function buildMonthlyMockDb(
         : mockSelectFrom,
     }));
 
-  return {
+  return Object.assign(createMockDb() as Record<string, unknown>, {
     query: {
       familyLinks: {
         findFirst: jest.fn().mockResolvedValue({ id: 'link-001' }),
@@ -838,7 +835,7 @@ function buildMonthlyMockDb(
     },
     insert: mockInsert,
     select: mockSelect,
-  };
+  });
 }
 
 beforeEach(() => {

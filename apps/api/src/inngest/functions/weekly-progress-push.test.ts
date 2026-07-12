@@ -11,6 +11,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createMockDb } from '@eduagent/test-utils';
 
 const mockCaptureException = jest.fn();
 jest.mock('../../services/sentry', () => {
@@ -30,7 +31,7 @@ const mockWeeklyReportInsertValues = jest.fn().mockReturnValue({
   onConflictDoNothing: mockWeeklyReportOnConflictDoNothing,
 });
 const mockCredentialedLoginRows = jest.fn().mockResolvedValue([]);
-const mockDb = {
+const mockDb = Object.assign(createMockDb() as Record<string, unknown>, {
   query: {
     familyLinks: { findMany: jest.fn().mockResolvedValue([]) },
     consentStates: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -99,7 +100,7 @@ const mockDb = {
       return distinct;
     },
   })),
-};
+});
 jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
