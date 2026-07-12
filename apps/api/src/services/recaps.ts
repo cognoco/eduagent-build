@@ -157,7 +157,12 @@ async function loadVerifiedProofMap(
         );
         const proof = toRecapVerifiedProof(receipt);
         return proof ? ([sessionId, proof] as const) : null;
-      } catch {
+      } catch (error) {
+        // Proof enrichment is additive — a failure degrades the recap to no
+        // verified block rather than failing the list — but the failure must
+        // stay visible, or a production-wide proof outage reads as "no
+        // verified assessment" with zero signal.
+        captureException(error);
         return null;
       }
     }),
