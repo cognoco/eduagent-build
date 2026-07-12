@@ -490,7 +490,6 @@ cd apps/mobile && pnpm exec tsc --noEmit
 # Database
 pnpm run db:push:dev
 pnpm run db:generate:dev
-pnpm run db:migrate:dev
 pnpm run db:studio:dev
 
 # LLM Eval Harness

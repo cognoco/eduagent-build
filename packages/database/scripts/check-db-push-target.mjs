@@ -87,7 +87,7 @@ function blocked(reason) {
       '     pnpm db:push:dev            (from the repo root)\n' +
       '\n' +
       '   To apply schema changes to staging or production:\n' +
-      '     pnpm db:migrate:dev         (dev)\n' +
+      '     pnpm db:push:dev            (dev)\n' +
       '     drizzle-kit migrate         (stg/prd — via the deploy workflow)\n' +
       '\n' +
       '   If you are running without Doppler (no stg creds loaded), set:\n' +

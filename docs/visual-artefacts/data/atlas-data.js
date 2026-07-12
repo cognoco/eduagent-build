@@ -1821,7 +1821,7 @@ globalThis.MENTOMATE_ATLAS_DATA = {
       inbound: ['database-package'],
       dataTouched: ['database schema', 'migration files'],
       repoPaths: [paths.deployment, 'packages/database/package.json'],
-      operations: ['pnpm run db:generate, db:migrate:dev, staging/prod migration steps.'],
+      operations: ['pnpm run db:generate, db:push:dev, staging/prod migration steps.'],
       risks: ['Worker deploy before migration can cause `column does not exist` 500s.'],
       relatedBoards: ['delivery-quality'],
     }),
