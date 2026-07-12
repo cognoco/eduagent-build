@@ -27,7 +27,7 @@ import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
 import { ErrorFallback } from '../../components/common';
 import { ModeSwitcher } from '../../components/chrome/ModeSwitcher';
 import { ScopeChip } from '../../components/chrome/ScopeChip';
-import { AccountAvatar } from '../../components/account/AccountAvatar';
+import { AccountAvatar } from '../../components/chrome/AccountAvatar';
 import { goBackOrReplace } from '../../lib/navigation';
 import { ScopeContextProvider } from '../../lib/scope-context';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
