@@ -119,6 +119,14 @@ function boundStringValues(expression: unknown): string[] {
  * `inArray(login.personId, personIds)` shapes by matching their bound
  * strings; other where-clause semantics are not interpreted. Tests should
  * therefore seed only the person ids relevant to the assertion.
+ *
+ * Drizzle coupling: the predicate matcher above reads drizzle's internal
+ * `queryChunks` structure — verify after a drizzle upgrade (the shared-mock
+ * demo test in family-access.test.ts breaks if the shape changes).
+ *
+ * Call once per db instance: a second call wraps the first call's `select`
+ * replacement as its delegate, nesting mock chains. Re-seed by building a
+ * fresh mock db instead.
  */
 export function seedCredentialedLogins(
   db: MockDatabaseRecord,
@@ -219,6 +227,12 @@ function seedV2IdentityGraph(db: MockDatabaseRecord): void {
  * the eventual migration to real DB-backed integration tests cheaper:
  * each suite can later delete one helper usage instead of unwinding a bespoke
  * inline module factory.
+ *
+ * Rule (WI-1911): new API unit suites build their db mock on this factory
+ * (or on `createMockDb()` with targeted overrides) — never a hand-rolled
+ * bare `db` object literal. Bespoke mocks break independently every time a
+ * shared code path gains a data read; the remaining legacy ones are tracked
+ * for consolidation in WI-1921.
  */
 export function createDatabaseModuleMock<TDb extends MockDatabaseRecord>(
   options: CreateDatabaseModuleMockOptions<TDb> = {},
