@@ -185,11 +185,18 @@ const mockMonthlyReportDb = Object.assign(
       consentStates: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
-      // login / membership / organization are NOT listed here: on the marked
-      // createMockDb() base, createDatabaseModuleMock's identity-graph proxy
-      // serves the canonical v2 owner graph for those three tables and
-      // bypasses literal keys. Tests override them through the proxied path
-      // (db.query.login.findFirst.mockResolvedValue...), as several below do.
+      // login/membership: TYPE carriers for the per-test override sites
+      // below. At runtime, on the marked createMockDb() base,
+      // createDatabaseModuleMock's identity-graph proxy serves the canonical
+      // v2 owner graph for the three identity tables and bypasses these
+      // literals — overrides via db.query.login.findFirst.mockResolvedValue
+      // land on the proxied graph mocks, not these.
+      membership: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      login: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       // Learning profile struggles: default empty (no watch-line).
       learningProfiles: {
         findFirst: jest.fn().mockResolvedValue({ struggles: [] }),
