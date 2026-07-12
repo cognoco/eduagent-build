@@ -95,7 +95,13 @@ const INNGEST_BUILTIN_PREFIXES = ['inngest/'];
  * `every event-triggered handler has a production dispatcher` test below passes
  * directly and the entry was removed from this set.
  */
-const KNOWN_PENDING_INVERSE_ORPHANS = new Set<string>(['app/person.graduated']);
+const KNOWN_PENDING_INVERSE_ORPHANS = new Set<string>([
+  'app/person.graduated',
+  // OPQ-90 Option B authorizes one direct Inngest Event API dispatch for the
+  // production fleet-failure proof. WI-1907 owns both that dispatch and
+  // removal of this temporary probe immediately after evidence is captured.
+  'app/ops.synthetic_fleet_failure_probe_requested',
+]);
 
 function shouldScanFile(absPath: string): boolean {
   const rel = path.relative(REPO_ROOT, absPath).replace(/\\/g, '/');
