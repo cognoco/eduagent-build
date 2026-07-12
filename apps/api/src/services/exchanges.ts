@@ -1634,9 +1634,12 @@ export function applySourceAuditSafetyFallback(
  * orphan fallback. `crisis_redirect` is set true so any envelope-aware consumer
  * sees the same signal the model would have emitted.
  */
-function buildTripwireEnvelope(category: CatastrophicCategory): string {
+function buildTripwireEnvelope(
+  category: CatastrophicCategory,
+  conversationLanguage: ExchangeContext['conversationLanguage'],
+): string {
   return JSON.stringify({
-    reply: tripwireResponse(category),
+    reply: tripwireResponse(category, conversationLanguage),
     signals: { crisis_redirect: true },
     confidence: 'high',
   });
@@ -1762,7 +1765,7 @@ function buildTripwireResult(
   category: CatastrophicCategory,
   context: ExchangeContext,
 ): ExchangeResult {
-  const response = tripwireResponse(category);
+  const response = tripwireResponse(category, context.conversationLanguage);
   return {
     response,
     newEscalationRung: context.escalationRung,
@@ -2080,8 +2083,8 @@ export async function streamExchange(
       flow: `exchange.stream.tripwire.${inputTrip.category}`,
     });
     return buildSafeStreamResult(
-      tripwireResponse(inputTrip.category),
-      buildTripwireEnvelope(inputTrip.category),
+      tripwireResponse(inputTrip.category, context.conversationLanguage),
+      buildTripwireEnvelope(inputTrip.category, context.conversationLanguage),
       `deterministic:${inputTrip.category}`,
     );
   }
@@ -2102,8 +2105,8 @@ export async function streamExchange(
         flow: `exchange.stream.tripwire.image.${screen.category}`,
       });
       return buildSafeStreamResult(
-        tripwireResponse(screen.category),
-        buildTripwireEnvelope(screen.category),
+        tripwireResponse(screen.category, context.conversationLanguage),
+        buildTripwireEnvelope(screen.category, context.conversationLanguage),
         `deterministic:${screen.category}`,
       );
     }
