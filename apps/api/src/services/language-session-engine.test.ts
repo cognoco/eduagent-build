@@ -499,6 +499,45 @@ describe('evaluatePendingGradedInputAnswer', () => {
       matchedTerms: [],
     });
   });
+
+  it('does not score a stale graded-input question once a newer turn has moved on [WI-1815/F3]', () => {
+    // Bounded one-turn recency, mirroring findPendingMeaningOutputTask: only
+    // the single most recent AI turn is consulted. The graded-input question
+    // here is no longer the immediately-preceding presented activity, so it
+    // must not be scored against this answer.
+    const laterMeaningOutputEvent = {
+      eventType: 'ai_response',
+      metadata: {
+        languageLearning: {
+          strand: 'meaning_output',
+          activityType: 'free_response',
+          modality: 'text',
+          targetWords: ['agua'],
+          targetGrammar: [],
+          meaningOutput: {
+            type: 'meaning_output',
+            taskType: 'personal_answer',
+            communicativeGoal:
+              'Share a true or imagined personal answer someone could respond to.',
+            prompt:
+              'Answer personally in one or two short sentences using agua.',
+            responseMode: 'short_answer',
+            targetWords: ['agua'],
+            targetGrammar: [],
+            retryExpectation: 'retry_after_feedback',
+            correctionExpectation: 'meaning_first_then_form',
+          },
+        },
+      },
+    };
+
+    expect(
+      evaluatePendingGradedInputAnswer({
+        events: [priorInputEvent, laterMeaningOutputEvent],
+        learnerMessage: 'She wants water.',
+      }),
+    ).toBeUndefined();
+  });
 });
 
 describe('buildLanguageSessionState', () => {
@@ -666,6 +705,102 @@ describe('buildLanguageSessionState', () => {
     });
   });
 
+  it('does not force language-focused repair from a stale graded-input question once a newer turn has moved on [WI-1815/F3]', async () => {
+    const olderGradedInputEvent = {
+      eventType: 'ai_response',
+      metadata: {
+        languageLearning: {
+          strand: 'meaning_input',
+          activityType: 'graded_input',
+          modality: 'text',
+          targetWords: ['agua'],
+          targetGrammar: [],
+          gradedInput: {
+            type: 'graded_input',
+            modality: 'reading',
+            cefrLevel: 'A1',
+            knownWordRatioTarget: 0.96,
+            knownWordEstimate: 0.67,
+            targetWords: ['agua'],
+            text: 'Ana quiere agua.',
+            comprehensionQuestions: [
+              {
+                id: 'gist-1',
+                prompt: 'What does Ana want?',
+                answerHint: 'Ana wants water',
+              },
+            ],
+            audioEnabled: false,
+          },
+        },
+      },
+    };
+    // Interstitial language_focus turn so leastUsedStrand's natural tie-break
+    // (LANGUAGE_STRANDS order) can't coincidentally land on 'language_focus'
+    // too, which would make the assertion below pass for the wrong reason.
+    const interstitialLanguageFocusEvent = {
+      eventType: 'ai_response',
+      metadata: {
+        languageLearning: {
+          strand: 'language_focus',
+          activityType: 'correction_retry',
+          modality: 'text',
+          targetWords: ['agua'],
+          targetGrammar: [],
+        },
+      },
+    };
+    const laterMeaningOutputEvent = {
+      eventType: 'ai_response',
+      metadata: {
+        languageLearning: {
+          strand: 'meaning_output',
+          activityType: 'free_response',
+          modality: 'text',
+          targetWords: ['agua'],
+          targetGrammar: [],
+          meaningOutput: {
+            type: 'meaning_output',
+            taskType: 'personal_answer',
+            communicativeGoal:
+              'Share a true or imagined personal answer someone could respond to.',
+            prompt:
+              'Answer personally in one or two short sentences using agua.',
+            responseMode: 'short_answer',
+            targetWords: ['agua'],
+            targetGrammar: [],
+            retryExpectation: 'retry_after_feedback',
+            correctionExpectation: 'meaning_first_then_form',
+          },
+        },
+      },
+    };
+
+    const state = await buildLanguageSessionState({
+      exchangeCount: 3,
+      events: [
+        olderGradedInputEvent,
+        interstitialLanguageFocusEvent,
+        laterMeaningOutputEvent,
+      ],
+      // Answers the older graded-input question's hint, but that question is
+      // no longer the immediately-preceding presented activity — it must not
+      // be scored, and must not force activeStrand to language_focus.
+      learnerMessage: 'She is going home.',
+      inputMode: 'text',
+      languageCode: 'es',
+      cefrLevel: 'A1',
+      knownWords: ['Ana'],
+      targetWords: ['agua'],
+    });
+
+    expect(state.previousComprehension).toBeUndefined();
+    // With meaning_input=1, language_focus=1, meaning_output=1, fluency=0,
+    // the least-used strand is unambiguously 'fluency' — so this proves
+    // activeStrand followed normal rotation, not a forced language_focus.
+    expect(state.activeStrand).toBe('fluency');
+  });
+
   it('re-surfaces the just-presented meaning-output task for exactly one answer turn [WI-1756]', async () => {
     const meaningOutputEvent = {
       eventType: 'ai_response',
@@ -712,9 +847,9 @@ describe('buildLanguageSessionState', () => {
 
   it('does not re-surface a meaning-output task once a newer turn has moved on [WI-1756]', async () => {
     // Bounded recency by construction: findPendingMeaningOutputTask consults
-    // only the single most recent AI turn, never walking further back —
-    // unlike the pre-existing findLatestGradedInputEvent (F3, out of scope
-    // for this WI) — so an older meaning-output task never bleeds into a
+    // only the single most recent AI turn, never walking further back — the
+    // same bounded pattern findLatestGradedInputEvent now also follows
+    // (WI-1815, F3) — so an older meaning-output task never bleeds into a
     // later, unrelated turn.
     const staleMeaningOutputEvent = {
       eventType: 'ai_response',
