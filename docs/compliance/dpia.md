@@ -45,7 +45,7 @@ See [`ropa.md`](ropa.md) for the full register (synced to built-state framing 20
 5. **Erasure = re-home-then-delete** (`data-model.md` §6.1): `consent_grant` → `consent_receipt`; write `deletion_audit`; create `financial_record`; then drop `person` + all learning data; erase the external Clerk identity; erase the out-of-model `byok_waitlist` email. `consent_grant ON DELETE RESTRICT` forces the re-home first — the structural fix for the legacy consent-receipt-destruction defect (`I-C1`). **Implemented and code-verified (2026-07-04, re-checked 2026-07-10):** re-home + `deletion_audit` writes in `apps/api/src/services/identity-v2/deletion-v2.ts`; external Clerk-identity erasure after the DB cascade via `deleteClerkUser` (`apps/api/src/inngest/functions/account-deletion.ts:202`); `byok_waitlist` erasure (`deletion-v2.ts:543`).
 
 ### 2.4 Recipients / processors
-Clerk, LLM provider(s), Voyage, RevenueCat + Apple/Google, Resend, Sentry, Inngest, Neon, Cloudflare. Each requires a signed DPA on a business/enterprise route (A11) and a US-transfer assessment (A12).
+Clerk, LLM provider(s), Voyage, RevenueCat + Apple/Google, Resend, Sentry, Inngest, Neon, Cloudflare, Expo push service (-> Apple APNs / Google FCM; live in `apps/api/src/services/notifications.ts`, added to this register 2026-07-12). Each requires a signed DPA on a business/enterprise route (A11) and a US-transfer assessment (A12).
 
 ## 3. Consultation
 - **DPO:** `[to be recorded — the DPO owns and signs this DPIA]`.
