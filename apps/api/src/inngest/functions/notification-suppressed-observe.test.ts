@@ -12,6 +12,7 @@
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
+const mockCaptureMessage = jest.fn();
 jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
@@ -19,6 +20,7 @@ jest.mock('../../services/sentry', () => {
   return {
     ...actual,
     captureException: (...args: unknown[]) => mockCaptureException(...args),
+    captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
   };
 });
 
@@ -91,6 +93,15 @@ describe('notificationSuppressedObserve', () => {
       }),
     );
     expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalledWith('notification.suppressed', {
+      level: 'warning',
+      tags: {
+        surface: 'notification',
+        signal: 'suppressed',
+        notificationType: 'daily_reminder',
+      },
+      extra: { eventTimestamp: expect.any(String) },
+    });
   });
 
   // Break test for the silent-recovery fix. Pre-fix the handler returned
@@ -105,6 +116,7 @@ describe('notificationSuppressedObserve', () => {
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
+        tags: { surface: 'notification', signal: 'schema-drift' },
         extra: expect.objectContaining({
           context: 'notification-suppressed-observe:invalid_payload',
         }),

@@ -138,6 +138,10 @@ describe('challengeRoundFinalizeFailed', () => {
       expect.objectContaining({ message: 'challenge round finalize failed' }),
       expect.objectContaining({
         profileId: VALID_PAYLOAD.profileId,
+        tags: {
+          surface: 'challenge-round',
+          signal: 'finalize-failed',
+        },
         extra: expect.objectContaining({
           surface: 'challenge-round.finalize.failed.observer',
           sessionId: VALID_PAYLOAD.sessionId,

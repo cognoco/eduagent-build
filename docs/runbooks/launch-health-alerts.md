@@ -38,10 +38,21 @@ channel. `Page` routes to the accountable launch operator.
 | --- | --- | --- | --- |
 | 1. Payment recovery | `app/payment.failed`; `app/billing.alert_delivery_failed`; aged `subscriptions.status=past_due` | Any payment failure, failed notification channel, or past-due row older than 24 hours | Three payment failures in 15 minutes, one billing-alert delivery failure, or any past-due row beyond its grace deadline |
 | 2. LLM routing | Structured fallback logs plus `llm.stop_reason`; Sentry `surface=llm-router`, `signal=provider-fallback` | Fallback rate greater than 2% over 15 minutes with at least 20 calls | Fallback rate greater than 10% over 15 minutes with at least 20 calls, or any `primary-circuit-open` signal |
-| 3. Challenge grader | `app/challenge-round.finalize.failed` | One failure in 24 hours | Three failures in 1 hour |
-| 4. Notification delivery | `app/notification.suppressed`; `app/email.bounced`; `app/feedback.delivery_failed` | Three suppressions/bounces/retries in 1 hour | One complaint or terminal feedback-retry failure, or ten combined failures in 1 hour |
-| 5. Deletion and retention | Sentry `surface=transcript-purge-on-failure`; `app/session.purge.delayed`; `app/consent.revocation.failed` | Any delayed purge or retrying revocation failure | Any terminal purge or consent-revocation failure; delayed purge count at least 10 |
-| 6. Privacy gate and filing | `app/ask.gate_decision`; `app/ask.gate_timeout`; `app/session.filing_timed_out` | Any timeout, or denial rate greater than 20% over 1 hour with at least 10 decisions | Five timeouts or three stranded filings in 1 hour |
+| 3. Challenge grader | Sentry `surface:challenge-round signal:finalize-failed` | One failure in 24 hours | Three failures in 1 hour |
+| 4. Notification delivery | Sentry `surface:notification signal:suppressed`; `surface:email`; `surface:feedback signal:delivery-failed` | Three suppressions/bounces/retries in 1 hour | One `surface:email signal:complained` or terminal feedback-retry failure, or ten combined failures in 1 hour |
+| 5. Deletion and retention | Sentry `surface:transcript-purge signal:delayed`; `surface:transcript-purge signal:function-failed`; `app/consent.revocation.failed` | Any delayed purge or retrying revocation failure | Any terminal purge or consent-revocation failure; delayed purge count at least 10 |
+| 6. Ask classification and stranded filing | Sentry `surface:ask-classification`; `surface:filing` | Any classification failure or filing auto-retry | Five classification failures or three unrecoverable filings in 1 hour |
+
+Every bucket also has the fleet-wide terminal-failure backstop:
+
+```text
+surface:inngest-fleet signal:function-failed
+```
+
+Group that query by `functionId`. It catches terminal failures even when a
+function has no bucket-specific observer; the bucket-specific tags above carry
+the more useful operational meaning when both events exist. The fleet observer
+copies no failed-event payload and no provider error message into Sentry.
 
 The retention thresholds inherit the more detailed definitions in
 [`retention-slo-alerts.md`](retention-slo-alerts.md). If the two runbooks appear
@@ -132,6 +143,12 @@ claim for retry after the mastery/deepening write failed. One isolated failure
 is recoverable; repeated failures mean Challenge outcomes are not being
 persisted reliably.
 
+Sentry filter:
+
+```text
+surface:challenge-round signal:finalize-failed
+```
+
 ### First response
 
 1. Inspect `challenge-round-finalize-failed` runs and group by coarse error
@@ -160,6 +177,15 @@ This bucket joins failures that otherwise appear in separate providers:
 One complaint pages immediately. A bounce or suppression spike usually means a
 provider, address-quality, or notification-log problem.
 
+Sentry filters:
+
+```text
+surface:notification signal:suppressed
+surface:email signal:bounced
+surface:email signal:complained
+surface:feedback signal:delivery-failed
+```
+
 ### First response
 
 1. Split complaints, bounces, suppressions, and retry failures.
@@ -180,10 +206,16 @@ provider, address-quality, or notification-log problem.
 ### Meaning
 
 Retention is successful only when purges and consent-driven deletion complete.
-Retrying errors warn; terminal errors page. `app/session.purge.delayed` uses its
-payload count, while terminal transcript failures use the Sentry surface
-`transcript-purge-on-failure`. Consent revocation terminal failures emit
-`app/consent.revocation.failed`.
+Retrying errors warn; terminal errors page. Delayed and terminal transcript
+purges are filterable by real Sentry tags. Consent revocation terminal failures
+emit `app/consent.revocation.failed`.
+
+Sentry filters:
+
+```text
+surface:transcript-purge signal:delayed
+surface:transcript-purge signal:function-failed
+```
 
 ### First response
 
@@ -201,22 +233,33 @@ payload count, while terminal transcript failures use the Sentry surface
 - `apps/api/src/inngest/functions/transcript-purge-observe.test.ts`
 - `apps/api/src/inngest/functions/consent-revocation.test.ts`
 
-## 6. Privacy gate and stranded filing
+## 6. Ask classification and stranded filing
 
 ### Meaning
 
-`app/ask.gate_decision` exposes the aggregate allow/deny outcome of the Ask
-gate; `app/ask.gate_timeout` identifies evaluation timeouts. A high denial rate
-can indicate an overly strict or broken privacy/meaningfulness gate. A filing
-timeout means an ended learning session did not reach its expected Library
-destination within the recovery window.
+The live Ask observability events are
+`app/ask.classification_completed`, `app/ask.classification_skipped`, and
+`app/ask.classification_failed`. The older `app/ask.gate_decision` and
+`app/ask.gate_timeout` names are not emitted and must not be used in alert
+rules. A filing auto-retry or unrecoverable resolution means an ended learning
+session did not reach its expected Library destination on the primary path.
+
+Sentry filters:
+
+```text
+surface:ask-classification signal:failed
+surface:ask-classification signal:skipped
+surface:filing signal:auto-retry-attempted
+surface:filing signal:resolved resolution:unrecoverable
+surface:filing signal:unrecoverable
+```
 
 ### First response
 
-1. Compare denial rate with the previous 24-hour baseline and group only by
-   method/coarse outcome.
-2. For timeouts, inspect the gate evaluator and its upstream LLM/database
-   dependencies.
+1. Compare classification failure/skip volume with the previous 24-hour
+   baseline and group only by the tagged coarse outcome.
+2. For classification failures, inspect the `ask-silent-classify` run and its
+   upstream LLM/database dependencies without forwarding its error text.
 3. For `app/session.filing_timed_out`, inspect the recovery attempt and the
    eventual `app/session.filing_resolved` event before replaying.
 4. Do not inspect or post learner reasoning text; the observer intentionally
@@ -224,7 +267,8 @@ destination within the recovery window.
 
 ### Evidence
 
-- `apps/api/src/inngest/functions/ask-gate-observe.test.ts`
+- `apps/api/src/inngest/functions/ask-classification-observe.test.ts`
+- `apps/api/src/inngest/functions/filing-observe.test.ts`
 - `apps/api/src/inngest/functions/filing-timed-out-observe.test.ts`
 - `apps/api/src/inngest/functions/filing-stranded-backfill.test.ts`
 

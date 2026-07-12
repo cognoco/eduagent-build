@@ -29,7 +29,7 @@ import {
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
-import { captureException } from '../../services/sentry';
+import { captureException, captureMessage } from '../../services/sentry';
 
 const logger = createLogger();
 
@@ -55,6 +55,7 @@ export const sessionFilingResolvedObserve = inngest.createFunction(
           '[session-filing-resolved] invalid event payload — schema drift or bad event',
         ),
         {
+          tags: { surface: 'filing', signal: 'schema-drift' },
           extra: {
             issues: parsed.error.issues,
             rawData: summarizeRawPayload(event.data),
@@ -63,8 +64,22 @@ export const sessionFilingResolvedObserve = inngest.createFunction(
       );
       return { status: 'schema_error' as const };
     }
-    const data = parsed.data;
 
+    const data = parsed.data;
+    if (data.resolution === 'unrecoverable') {
+      captureMessage('session.filing_resolved', {
+        level: 'error',
+        tags: {
+          surface: 'filing',
+          signal: 'resolved',
+          resolution: data.resolution,
+        },
+        extra: {
+          sessionId: data.sessionId,
+          eventTimestamp: data.timestamp,
+        },
+      });
+    }
     // Level varies by resolution:
     //   unrecoverable -> error (session data permanently un-filed)
     //   late_completion / retry_succeeded / recovered / recovered_after_window -> info
@@ -110,6 +125,7 @@ export const filingAutoRetryAttemptedObserve = inngest.createFunction(
           '[filing-auto-retry-attempted] invalid event payload — schema drift or bad event',
         ),
         {
+          tags: { surface: 'filing', signal: 'schema-drift' },
           extra: {
             issues: parsed.error.issues,
             rawData: summarizeRawPayload(event.data),
@@ -127,6 +143,15 @@ export const filingAutoRetryAttemptedObserve = inngest.createFunction(
       profileId: data.profileId,
       attemptNumber: data.attemptNumber,
       receivedAt: new Date().toISOString(),
+    });
+    captureMessage('filing.auto_retry_attempted', {
+      level: 'warning',
+      tags: { surface: 'filing', signal: 'auto-retry-attempted' },
+      extra: {
+        sessionId: data.sessionId,
+        attemptNumber: data.attemptNumber,
+        eventTimestamp: data.timestamp,
+      },
     });
 
     return {

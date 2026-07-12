@@ -558,6 +558,10 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       const [err, ctx] = mockCaptureException.mock.calls[0];
       expect(err).toBeInstanceOf(Error);
       expect(ctx.profileId).toBe('p-1');
+      expect(ctx.tags).toEqual({
+        surface: 'feedback',
+        signal: 'delivery-failed',
+      });
       expect(ctx.extra.reason).toBe('network_error');
     });
   });

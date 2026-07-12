@@ -72,6 +72,7 @@ import { orphanPersistFailed } from './functions/orphan-persist-failed';
 import { subjectPrewarmCurriculum } from './functions/subject-prewarm-curriculum';
 import { subjectRetryCurriculum } from './functions/subject-retry-curriculum';
 import { notificationSuppressedObserve } from './functions/notification-suppressed-observe';
+import { inngestFunctionFailedObserve } from './functions/inngest-function-failed-observe';
 import {
   learnerRecapRegenerate,
   sessionSummaryCreate,
@@ -178,6 +179,7 @@ export {
   subjectPrewarmCurriculum,
   subjectRetryCurriculum,
   notificationSuppressedObserve,
+  inngestFunctionFailedObserve,
   sessionSummaryCreate,
   sessionSummaryRegenerate,
   learnerRecapRegenerate,
@@ -272,6 +274,7 @@ export const functions = [
   subjectPrewarmCurriculum,
   subjectRetryCurriculum,
   notificationSuppressedObserve,
+  inngestFunctionFailedObserve,
   sessionSummaryCreate,
   sessionSummaryRegenerate,
   learnerRecapRegenerate,

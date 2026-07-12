@@ -184,6 +184,7 @@ describe('transcriptPurgeCron', () => {
         message: expect.stringContaining('1 session(s) past day-37'),
       }),
       expect.objectContaining({
+        tags: { surface: 'transcript-purge', signal: 'delayed' },
         extra: expect.objectContaining({
           surface: 'transcript-purge-delayed',
           delayedCount: 1,
@@ -238,6 +239,7 @@ describe('transcriptPurgeCron', () => {
         message: expect.stringContaining('2 session(s) past day-37'),
       }),
       expect.objectContaining({
+        tags: { surface: 'transcript-purge', signal: 'delayed' },
         extra: expect.objectContaining({
           surface: 'transcript-purge-delayed',
           delayedCount: 2,
@@ -432,6 +434,7 @@ describe('transcriptPurgeHandlerOnFailure', () => {
         message: expect.stringContaining('all retries exhausted'),
       }),
       expect.objectContaining({
+        tags: { surface: 'transcript-purge', signal: 'function-failed' },
         extra: expect.objectContaining({
           surface: 'transcript-purge-on-failure',
           profileId: '00000000-0000-7000-8000-000000000001',

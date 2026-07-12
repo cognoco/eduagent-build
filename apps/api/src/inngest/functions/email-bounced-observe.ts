@@ -28,7 +28,7 @@ import {
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
-import { captureException } from '../../services/sentry';
+import { captureException, captureMessage } from '../../services/sentry';
 
 const logger = createLogger();
 
@@ -50,6 +50,7 @@ export const emailBouncedObserve = inngest.createFunction(
           '[email-bounced] invalid event payload — schema drift or bad event',
         ),
         {
+          tags: { surface: 'email', signal: 'schema-drift' },
           extra: {
             issues: parseResult.error.issues,
             rawData: summarizeRawPayload(event.data),
@@ -75,6 +76,17 @@ export const emailBouncedObserve = inngest.createFunction(
       emailId: data.emailId ?? null,
       eventTimestamp: data.timestamp ?? null,
       receivedAt: new Date().toISOString(),
+    });
+    captureMessage(logMessage, {
+      level: 'warning',
+      tags: {
+        surface: 'email',
+        signal: data.type === 'email.complained' ? 'complained' : 'bounced',
+      },
+      extra: {
+        emailId: data.emailId ?? null,
+        eventTimestamp: data.timestamp ?? null,
+      },
     });
 
     return {
