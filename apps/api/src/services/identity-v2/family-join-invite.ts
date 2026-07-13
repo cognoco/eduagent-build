@@ -74,8 +74,6 @@ export interface InitiateFamilyJoinInviteInput {
   familyOrgId: string;
   /** The out-of-band recipient the parent typed. */
   invitedEmail: string;
-  /** Base app URL for the token link. */
-  appUrl: string;
   emailOptions?: EmailOptions;
 }
 
@@ -163,9 +161,12 @@ export async function initiateFamilyJoinInvite(
     );
   }
 
-  const tokenUrl = `${input.appUrl}/v1/family-join?token=${token}`;
+  // The invite email carries NO action link (operator ruling 2026-07-12) — the
+  // accept surface it would have to point at does not exist yet. The token is
+  // still minted and stored on the row above; only its DELIVERY is deferred to
+  // the accept-surface work. See formatFamilyJoinInviteEmail.
   const emailResult = await sendEmail(
-    formatFamilyJoinInviteEmail(input.invitedEmail, tokenUrl),
+    formatFamilyJoinInviteEmail(input.invitedEmail),
     input.emailOptions,
   );
 

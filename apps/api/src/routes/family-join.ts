@@ -70,7 +70,6 @@ type FamilyJoinRouteEnv = {
     CLERK_JWKS_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
-    API_ORIGIN?: string;
   };
   Variables: {
     user: AuthUser;
@@ -124,16 +123,13 @@ export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
         callerPersonId,
       );
 
-      const apiOrigin = c.env.API_ORIGIN;
-      if (!apiOrigin) {
-        throw new Error('API_ORIGIN env var is required');
-      }
-
+      // No API_ORIGIN needed: the invite email carries no action link (operator
+      // ruling 2026-07-12 — the accept surface it would point at does not exist
+      // yet). The env binding returns when the accept surface lands.
       await initiateFamilyJoinInvite(db, {
         inviterPersonId: callerPersonId,
         familyOrgId,
         invitedEmail,
-        appUrl: apiOrigin,
         emailOptions: {
           resendApiKey: c.env.RESEND_API_KEY,
           emailFrom: c.env.EMAIL_FROM,
