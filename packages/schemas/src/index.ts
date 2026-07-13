@@ -8,6 +8,7 @@ export * from './health';
 // Profiles
 export * from './profiles';
 export * from './consent';
+export * from './family-join';
 export * from './account';
 
 // Onboarding & Curriculum (Epic 1)

@@ -47,3 +47,15 @@ export function buildLegacyEmailIdempotencyKey(
 export function buildStripeCustomerCreateKey(ownerId: string): string {
   return joinDedupeKey(['customer-create', encodeDedupeSegment(ownerId)], '-');
 }
+
+/**
+ * Resend idempotency key for the WI-1753 family-join store-cancel nudge. Keyed
+ * on the teen alone: one nudge per teen who joined a family while still carrying
+ * their own store subscription, however many times the event is retried.
+ */
+export function buildFamilyJoinStoreCancelKey(teenPersonId: string): string {
+  return joinDedupeKey(
+    ['family-join-store-cancel', encodeDedupeSegment(teenPersonId)],
+    ':',
+  );
+}

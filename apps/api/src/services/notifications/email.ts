@@ -41,6 +41,8 @@ export interface EmailPayload {
     | 'security_notification'
     | 'account_reclaim'
     | 'payment_failed'
+    | 'family_join_store_cancel'
+    | 'family_join_invite'
     | 'blocked_safety_digest';
 }
 
@@ -311,5 +313,58 @@ export function formatPaymentFailedEmail(
       'We could not process your latest MentoMate payment. Open MentoMate to review your payment method and restore your plan:\n\n' +
       manageBillingUrl,
     type: 'payment_failed',
+  };
+}
+
+// TODO(WI-1753 operator gate: AC-6 disclosure copy) — placeholder subject/body.
+// The final disclosure wording (double-charge warning + self-cancel steps) is a
+// pre-close operator gate and must be reviewed before this ships to a real teen.
+export function formatFamilyJoinStoreCancelEmail(to: string): EmailPayload {
+  return {
+    to,
+    subject: 'Cancel your MentoMate subscription to avoid a double charge',
+    body:
+      "You've joined a family plan, so MentoMate is now paid for you. You still " +
+      'have your own separate subscription that will keep charging until you ' +
+      'cancel it in the App Store or Google Play. Open your store subscription ' +
+      'settings to cancel it — your learning history and family access are ' +
+      'unaffected.',
+    type: 'family_join_store_cancel',
+  };
+}
+
+// TODO(WI-1753 operator gate: AC-1 invite disclosure copy) — placeholder
+// subject/body. The final wording is a pre-close operator gate and must be
+// reviewed before this ships to a real recipient. ANTI-ENUM (AC-1): this email
+// is sent to the typed address REGARDLESS of whether it matches an account, so
+// the copy must not confirm or deny that a MentoMate account exists — it invites
+// the reader to open the app and accept IF they have one.
+//
+// NO ACTION LINK (operator ruling 2026-07-12). This email deliberately carries
+// NO url. It used to emit `${API_ORIGIN}/v1/family-join?token=…`, a route
+// NOTHING serves — the recipient clicked it and got nothing. The accept surface
+// (an entry point that lands an authenticated teen in the accept flow) does not
+// exist yet: there is no in-app accept screen, and no universal-/app-links
+// config, so no emailed url can reach one. Rather than ship a link to a route
+// nobody implements, the invite stands on its copy alone until the accept
+// surface lands as its own tracked work.
+// CONSEQUENCE, stated plainly: the email therefore delivers no invite token, so
+// the join is NOT completable end-to-end today. Restoring token delivery (a
+// served link, or a code the app can consume) is part of the accept-surface
+// work, together with the deferred AC-1 accept-authorization question
+// (token-possession vs. email-equality) and the copy gate above.
+// GUARDED BY family-join-invite-email.guard.test.ts: every url this email emits
+// must resolve to a route the API actually serves — re-adding an unserved link
+// fails that test.
+export function formatFamilyJoinInviteEmail(to: string): EmailPayload {
+  return {
+    to,
+    subject: "You've been invited to a MentoMate family",
+    body:
+      'A MentoMate parent has invited you to join their family plan. If you ' +
+      'already use MentoMate, open the app and accept the invitation to move ' +
+      'your account onto their family plan — your learning history stays with ' +
+      'you.',
+    type: 'family_join_invite',
   };
 }
