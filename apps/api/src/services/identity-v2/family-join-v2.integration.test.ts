@@ -36,7 +36,7 @@
 
 import { resolve } from 'path';
 import { randomUUID } from 'crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
@@ -164,7 +164,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
   async function seedInvite(args: {
     inviterPersonId: string;
     familyOrgId: string;
-  }): Promise<string> {
+    /** Override the expiry — a past Date seeds an already-expired token. */
+    tokenExpiresAt?: Date;
+  }): Promise<{ inviteId: string; inviteToken: string }> {
+    const token = randomUUID();
     const [row] = await db
       .insert(familyJoinInvite)
       .values({
@@ -172,13 +175,27 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
         familyOrgId: args.familyOrgId,
         invitedEmail: `wi1753-${randomUUID()}@test.local`,
         status: 'pending',
-        token: randomUUID(),
-        tokenExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        token,
+        tokenExpiresAt:
+          args.tokenExpiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       })
       .returning({ id: familyJoinInvite.id });
     if (!row) throw new Error('seed invite insert did not return a row');
     inviteIds.push(row.id);
-    return row.id;
+    return { inviteId: row.id, inviteToken: token };
+  }
+
+  /**
+   * Rotate an invite's token, as a resend/retarget does. Returns the NEW token;
+   * the previously-issued one is now superseded and must no longer redeem.
+   */
+  async function rotateInviteToken(inviteId: string): Promise<string> {
+    const next = randomUUID();
+    await db
+      .update(familyJoinInvite)
+      .set({ token: next, updatedAt: sql`now()` })
+      .where(eq(familyJoinInvite.id, inviteId));
+    return next;
   }
 
   /** Retarget a seeded plan's tier/status/period — drives the capacity gate. */
@@ -242,10 +259,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
 
       const result = await acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
-        inviteId: await seedInvite({
+        ...(await seedInvite({
           inviterPersonId: family.personId,
           familyOrgId: family.orgId,
-        }),
+        })),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -294,10 +311,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
 
       await acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
-        inviteId: await seedInvite({
+        ...(await seedInvite({
           inviterPersonId: family.personId,
           familyOrgId: family.orgId,
-        }),
+        })),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -331,10 +348,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
 
     await acceptFamilyJoin(db, {
       teenPersonId: teen.personId,
-      inviteId: await seedInvite({
+      ...(await seedInvite({
         inviterPersonId: family.personId,
         familyOrgId: family.orgId,
-      }),
+      })),
       familyOrgId: family.orgId,
       parentPersonId: family.personId,
       optInSupportership: true,
@@ -359,10 +376,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
 
     await acceptFamilyJoin(db, {
       teenPersonId: teen.personId,
-      inviteId: await seedInvite({
+      ...(await seedInvite({
         inviterPersonId: family.personId,
         familyOrgId: family.orgId,
-      }),
+      })),
       familyOrgId: family.orgId,
       parentPersonId: family.personId,
       optInSupportership: false,
@@ -399,10 +416,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
 
       const result = await acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
-        inviteId: await seedInvite({
+        ...(await seedInvite({
           inviterPersonId: family.personId,
           familyOrgId: family.orgId,
-        }),
+        })),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -440,20 +457,20 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
 
     await acceptFamilyJoin(db, {
       teenPersonId: teen.personId,
-      inviteId: await seedInvite({
+      ...(await seedInvite({
         inviterPersonId: family.personId,
         familyOrgId: family.orgId,
-      }),
+      })),
       familyOrgId: family.orgId,
       parentPersonId: family.personId,
       optInSupportership: false,
     });
     const second = await acceptFamilyJoin(db, {
       teenPersonId: teen.personId,
-      inviteId: await seedInvite({
+      ...(await seedInvite({
         inviterPersonId: otherParent.personId,
         familyOrgId: family.orgId,
-      }),
+      })),
       familyOrgId: family.orgId,
       parentPersonId: family.personId,
       optInSupportership: false,
@@ -504,10 +521,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
       await expect(
         acceptFamilyJoin(db, {
           teenPersonId: teen.personId,
-          inviteId: await seedInvite({
+          ...(await seedInvite({
             inviterPersonId: family.personId,
             familyOrgId: family.orgId,
-          }),
+          })),
           familyOrgId: family.orgId,
           parentPersonId: family.personId,
           optInSupportership: false,
@@ -537,10 +554,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     await expect(
       acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
-        inviteId: await seedInvite({
+        ...(await seedInvite({
           inviterPersonId: family.personId,
           familyOrgId: family.orgId,
-        }),
+        })),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -567,10 +584,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     await expect(
       acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
-        inviteId: await seedInvite({
+        ...(await seedInvite({
           inviterPersonId: family.personId,
           familyOrgId: family.orgId,
-        }),
+        })),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -589,10 +606,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     await expect(
       acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
-        inviteId: await seedInvite({
+        ...(await seedInvite({
           inviterPersonId: family.personId,
           familyOrgId: family.orgId,
-        }),
+        })),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -624,10 +641,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     await expect(
       acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
-        inviteId: await seedInvite({
+        ...(await seedInvite({
           inviterPersonId: family.personId,
           familyOrgId: family.orgId,
-        }),
+        })),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -665,7 +682,7 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
       });
 
       // ONE invite, redeemed concurrently by two different teens.
-      const inviteId = await seedInvite({
+      const { inviteId, inviteToken } = await seedInvite({
         inviterPersonId: family.personId,
         familyOrgId: family.orgId,
       });
@@ -674,6 +691,7 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
         acceptFamilyJoin(db, {
           teenPersonId: teenA.personId,
           inviteId,
+          inviteToken,
           familyOrgId: family.orgId,
           parentPersonId: family.personId,
           optInSupportership: false,
@@ -681,6 +699,7 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
         acceptFamilyJoin(db, {
           teenPersonId: teenB.personId,
           inviteId,
+          inviteToken,
           familyOrgId: family.orgId,
           parentPersonId: family.personId,
           optInSupportership: false,
@@ -727,7 +746,7 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
       birthYear: CAPABLE_BIRTH_YEAR,
       displayName: 'Teen B',
     });
-    const inviteId = await seedInvite({
+    const { inviteId, inviteToken } = await seedInvite({
       inviterPersonId: family.personId,
       familyOrgId: family.orgId,
     });
@@ -735,6 +754,7 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     await acceptFamilyJoin(db, {
       teenPersonId: teenA.personId,
       inviteId,
+      inviteToken,
       familyOrgId: family.orgId,
       parentPersonId: family.personId,
       optInSupportership: false,
@@ -744,6 +764,7 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
       acceptFamilyJoin(db, {
         teenPersonId: teenB.personId,
         inviteId,
+        inviteToken,
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -753,6 +774,97 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     // teen B never moved.
     expect(await readMembershipOrg(teenB.personId)).toBe(teenB.orgId);
   });
+
+  // ---- Token binding: the claim authorizes on the PRESENTED token, not the id. ----
+  //
+  // The claim's WHERE is the whole authorization. Matching on `id` + `status`
+  // alone left two holes, both exercised below as negative break-tests: a token
+  // the invite no longer carries (rotated away by a resend/retarget) and a token
+  // past its expiry would each still redeem, because a pending row keeps its id.
+
+  itGraph(
+    'refuses a SUPERSEDED token — a resend rotates the token, and the old one cannot redeem',
+    async () => {
+      const family = await seedGraph({
+        birthYear: 1990,
+        displayName: 'Parent',
+      });
+      const teen = await seedGraph({
+        birthYear: CAPABLE_BIRTH_YEAR,
+        displayName: 'Teen',
+      });
+      const { inviteId, inviteToken: staleToken } = await seedInvite({
+        inviterPersonId: family.personId,
+        familyOrgId: family.orgId,
+      });
+
+      // The parent resends/retargets: the row keeps its id and stays 'pending',
+      // but now carries a DIFFERENT token. `staleToken` is revoked.
+      const freshToken = await rotateInviteToken(inviteId);
+      expect(freshToken).not.toBe(staleToken);
+
+      await expect(
+        acceptFamilyJoin(db, {
+          teenPersonId: teen.personId,
+          inviteId,
+          inviteToken: staleToken,
+          familyOrgId: family.orgId,
+          parentPersonId: family.personId,
+          optInSupportership: false,
+        }),
+      ).rejects.toThrow(ConflictError);
+
+      // The revoked token repointed nothing — the teen is still in their own org.
+      expect(await readMembershipOrg(teen.personId)).toBe(teen.orgId);
+
+      // …and the invite is untouched: still pending, still redeemable by the
+      // token the recipient actually holds. A rejected stale token must not
+      // burn the live invite.
+      const row = await db.query.familyJoinInvite.findFirst({
+        where: eq(familyJoinInvite.id, inviteId),
+      });
+      expect(row?.status).toBe('pending');
+      expect(row?.token).toBe(freshToken);
+    },
+  );
+
+  itGraph(
+    'refuses an EXPIRED token even while the invite is pending',
+    async () => {
+      const family = await seedGraph({
+        birthYear: 1990,
+        displayName: 'Parent',
+      });
+      const teen = await seedGraph({
+        birthYear: CAPABLE_BIRTH_YEAR,
+        displayName: 'Teen',
+      });
+      // Pending, correct token — but its expiry is in the past.
+      const { inviteId, inviteToken } = await seedInvite({
+        inviterPersonId: family.personId,
+        familyOrgId: family.orgId,
+        tokenExpiresAt: new Date(Date.now() - 60_000),
+      });
+
+      await expect(
+        acceptFamilyJoin(db, {
+          teenPersonId: teen.personId,
+          inviteId,
+          inviteToken,
+          familyOrgId: family.orgId,
+          parentPersonId: family.personId,
+          optInSupportership: false,
+        }),
+      ).rejects.toThrow(ConflictError);
+
+      // No repoint, and the expired invite was not consumed.
+      expect(await readMembershipOrg(teen.personId)).toBe(teen.orgId);
+      const row = await db.query.familyJoinInvite.findFirst({
+        where: eq(familyJoinInvite.id, inviteId),
+      });
+      expect(row?.status).toBe('pending');
+    },
+  );
 
   // ---- Family-plan capacity: a seat must actually exist BEFORE the repoint. ----
 
@@ -775,10 +887,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     await expect(
       acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
-        inviteId: await seedInvite({
+        ...(await seedInvite({
           inviterPersonId: family.personId,
           familyOrgId: family.orgId,
-        }),
+        })),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,
@@ -816,10 +928,10 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     await expect(
       acceptFamilyJoin(db, {
         teenPersonId: teen.personId,
-        inviteId: await seedInvite({
+        ...(await seedInvite({
           inviterPersonId: family.personId,
           familyOrgId: family.orgId,
-        }),
+        })),
         familyOrgId: family.orgId,
         parentPersonId: family.personId,
         optInSupportership: false,

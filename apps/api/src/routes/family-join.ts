@@ -178,6 +178,11 @@ export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
       const result = await acceptFamilyJoin(db, {
         teenPersonId: callerPersonId,
         inviteId: invite.inviteId,
+        // The RAW presented token — re-matched at claim time inside the accept
+        // transaction. The read above cannot authorize the redemption on its own:
+        // a concurrent resend/retarget can rotate the token, or it can expire,
+        // between that read and the write.
+        inviteToken: token,
         familyOrgId: invite.familyOrgId,
         parentPersonId: invite.inviterPersonId,
         optInSupportership,

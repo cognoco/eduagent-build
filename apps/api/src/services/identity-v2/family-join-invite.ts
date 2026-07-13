@@ -275,22 +275,31 @@ export async function resolveFamilyJoinInviteByToken(
 
 /**
  * CLAIM an invite — the single in-row terminal transition. A conditional update
- * guarded by `status='pending'`: the row is claimed ONLY if this statement is
- * the one that flips it, which the returned rowcount reports. Callers MUST treat
- * `false` as "someone else already redeemed this token" and abort.
+ * guarded by `status='pending'` AND the presented token AND its expiry: the row
+ * is claimed ONLY if this statement is the one that flips it, which the returned
+ * rowcount reports. Callers MUST treat `false` as "this token cannot redeem this
+ * invite" and abort.
  *
- * Single-use is enforced by WHERE, not by a prior read: a stale
- * `resolveFamilyJoinInviteByToken` result can never authorize a second
- * redemption, because the claim re-evaluates `status` at write time. Callers
- * pass a `tx` so the claim shares the accept transaction — the claim is then
- * serialized by that tx's family-org advisory lock, and a later rollback
- * releases the token rather than stranding it. This is the same
- * compare-and-set discipline the invite caps use in `initiateFamilyJoinInvite`'s
- * `setWhere`.
+ * Every authorization predicate is re-evaluated at WRITE time, never inherited
+ * from a prior read. A stale `resolveFamilyJoinInviteByToken` result can
+ * therefore authorize nothing on its own:
+ *   - `status='pending'` — a second redemption of the same token loses the race.
+ *   - `token = presentedToken` — a resend/retarget rotates this column, so a
+ *     holder of the SUPERSEDED token is rejected even though the invite row is
+ *     still pending. Matching on `id` alone would accept them, which would mean
+ *     resend/retarget did not actually revoke.
+ *   - `token_expires_at > now()` — an EXPIRED token is rejected at the write,
+ *     not merely at the advisory read, so expiry cannot be raced either.
+ *
+ * Callers pass a `tx` so the claim shares the accept transaction — the claim is
+ * then serialized by that tx's family-org advisory lock, and a later rollback
+ * releases the token rather than stranding it. This is the same compare-and-set
+ * discipline the invite caps use in `initiateFamilyJoinInvite`'s `setWhere`.
  */
 export async function claimFamilyJoinInvite(
   db: Database,
   inviteId: string,
+  presentedToken: string,
 ): Promise<boolean> {
   const claimed = await db
     .update(familyJoinInvite)
@@ -304,6 +313,8 @@ export async function claimFamilyJoinInvite(
       and(
         eq(familyJoinInvite.id, inviteId),
         eq(familyJoinInvite.status, 'pending'),
+        eq(familyJoinInvite.token, presentedToken),
+        sql`${familyJoinInvite.tokenExpiresAt} > now()`,
       ),
     )
     .returning({ id: familyJoinInvite.id });

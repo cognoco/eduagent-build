@@ -85,6 +85,13 @@ export interface AcceptFamilyJoinInput {
    * separately.
    */
   inviteId: string;
+  /**
+   * The RAW token the caller actually presented. Re-checked at claim time against
+   * the invite row (token equality + expiry), so a superseded token (rotated away
+   * by a concurrent resend/retarget) or an expired one cannot redeem — the
+   * route's token read is advisory and cannot enforce this.
+   */
+  inviteToken: string;
   /** The inviting parent's existing family org (from the validated invite). */
   familyOrgId: string;
   /** The inviting parent (from the validated invite) — supportership supporter. */
@@ -136,6 +143,7 @@ export async function acceptFamilyJoin(
   const {
     teenPersonId,
     inviteId,
+    inviteToken,
     familyOrgId,
     parentPersonId,
     optInSupportership,
@@ -163,19 +171,29 @@ export async function acceptFamilyJoin(
       );
 
       // (0) CLAIM the invite — the FIRST mutation, inside the critical section.
-      // The route's `resolveFamilyJoinInviteByToken` read is advisory only: two
-      // teens racing the same token both pass it, so single-use cannot be
-      // enforced there. It is enforced HERE, by a conditional
-      // `status='pending'` update whose rowcount decides who won. Both racers
-      // redeem the SAME token, hence the same invite and the same familyOrgId,
-      // so they serialize on the org lock taken just above; the loser's claim
-      // then re-reads the committed row, sees 'accepted', matches zero rows and
-      // aborts before touching membership. Claiming INSIDE the tx (rather than
-      // consuming after it, as v1 did) also means any later precondition failure
-      // rolls the claim back — a failed accept releases the token instead of
-      // burning it.
-      if (!(await claimFamilyJoinInvite(tx, inviteId))) {
-        throw new ConflictError('This family invite has already been used.');
+      // The route's `resolveFamilyJoinInviteByToken` read is advisory only: it
+      // classifies the 404 and supplies the ids, but it CANNOT authorize the
+      // redemption, because anything it observed may have changed by the time we
+      // write. Authorization happens HERE, in one conditional update whose
+      // rowcount decides who won — matching on status, the PRESENTED token, and
+      // its expiry:
+      //   - two teens racing the same token both pass the advisory read; both
+      //     redeem the same invite, hence the same familyOrgId, so they serialize
+      //     on the org lock taken just above. The loser re-reads the committed
+      //     row, sees 'accepted', matches zero rows, and aborts before touching
+      //     membership.
+      //   - a holder of a token that a concurrent resend/retarget has since
+      //     ROTATED AWAY fails the `token` match — matching on `inviteId` alone
+      //     would admit them, i.e. resend would not actually revoke.
+      //   - an EXPIRED token fails the expiry match at write time, so expiry
+      //     cannot be raced against the advisory read either.
+      // Claiming INSIDE the tx (rather than consuming after it, as v1 did) also
+      // means any later precondition failure rolls the claim back — a failed
+      // accept releases the token instead of burning it.
+      if (!(await claimFamilyJoinInvite(tx, inviteId, inviteToken))) {
+        throw new ConflictError(
+          'This family invite is no longer valid — it may have been used, resent, or expired.',
+        );
       }
 
       // (1) Re-read the teen's membership UNDER the lock (TOCTOU-safe). The
