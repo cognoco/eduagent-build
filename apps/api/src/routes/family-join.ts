@@ -17,8 +17,11 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import { z } from 'zod';
 import type { Database } from '@eduagent/database';
+import {
+  familyJoinAcceptRequestSchema,
+  familyJoinInviteRequestSchema,
+} from '@eduagent/schemas';
 
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
@@ -55,15 +58,6 @@ export function __resetFamilyJoinInviteRateLimit(): void {
   familyJoinInviteLimiter.reset();
 }
 
-const inviteBodySchema = z.object({
-  invitedEmail: z.string().email(),
-});
-
-const acceptBodySchema = z.object({
-  token: z.string().min(1),
-  optInSupportership: z.boolean(),
-});
-
 type FamilyJoinRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
@@ -97,7 +91,7 @@ function withCaller(c: Context<FamilyJoinRouteEnv>): {
 export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
   .post(
     '/family-join/invite',
-    zValidator('json', inviteBodySchema),
+    zValidator('json', familyJoinInviteRequestSchema),
     async (c) => {
       const { db, callerPersonId } = withCaller(c);
 
@@ -147,7 +141,7 @@ export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
   )
   .post(
     '/family-join/accept',
-    zValidator('json', acceptBodySchema),
+    zValidator('json', familyJoinAcceptRequestSchema),
     async (c) => {
       const { db, callerPersonId } = withCaller(c);
       const { token, optInSupportership } = c.req.valid('json');

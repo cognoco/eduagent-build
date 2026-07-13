@@ -228,6 +228,45 @@ const APP_URL = 'https://example.test';
       30_000,
     );
 
+    // recipient_change_count is an INDEPENDENT abuse control from resend_count:
+    // retargeting the invite to a different address each time never increments
+    // resendCount (it resets it to 0), so the resend cap above cannot bound it.
+    // Without its own cap, one (inviter, family-org) slot could be walked across
+    // unlimited distinct addresses — the distinct-email bombing hole the R2 key
+    // was chosen to close. This is that cap's boundary.
+    itGraph(
+      'atomic recipient-change cap: the initial invite + 3 retargets succeed, the 4th retarget is rate-limited',
+      async () => {
+        const { personId, orgId } = await seedInviter();
+        const retarget = () =>
+          initiateFamilyJoinInvite(db, {
+            inviterPersonId: personId,
+            familyOrgId: orgId,
+            // a DIFFERENT recipient every call — a change, never a resend.
+            invitedEmail: `retarget_${randomUUID()}@example.test`,
+            appUrl: APP_URL,
+          });
+
+        // initial invite + 3 recipient changes (change_count 0 → 3) all allowed.
+        await retarget();
+        await retarget();
+        await retarget();
+        await retarget();
+        const row = await db.query.familyJoinInvite.findFirst({
+          where: eq(familyJoinInvite.familyOrgId, orgId),
+          columns: { recipientChangeCount: true, resendCount: true },
+        });
+        expect(row?.recipientChangeCount).toBe(3);
+        // Each change reset the resend counter — proving the two caps are
+        // genuinely independent and the resend cap never bounded this path.
+        expect(row?.resendCount).toBe(0);
+
+        // 4th retarget (would be change_count 4) is capped.
+        await expect(retarget()).rejects.toBeInstanceOf(RateLimitedError);
+      },
+      30_000,
+    );
+
     itGraph(
       'terminal guard: an accepted slot cannot be re-invited',
       async () => {
