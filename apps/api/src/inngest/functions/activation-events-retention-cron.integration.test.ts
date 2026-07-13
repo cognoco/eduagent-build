@@ -269,6 +269,16 @@ describe('activation_events retention cron wrapper — delayed signal (integrati
 
       const result = await handler({ step });
 
+      // The handler's purge ran on the TRANSACTION handle, not a committed
+      // connection. Only this transaction can see the row seeded above, so its
+      // deletion is what proves the redirect reached the wrapper's own binding.
+      // The tripwire before the call proves the module export is patched; this
+      // proves the HANDLER consumed it. Without this assertion, a redirect that
+      // silently missed could run the global purge against committed data, then
+      // satisfy every assertion below from ambient delayed rows while the seeded
+      // row sat untouched — green test, real rows deleted.
+      expect(await survivorIds(tx)).not.toContain(slaBreachId);
+
       // The wrapper reached the delayed branch off a real, seeded, aged row.
       expect(result.delayed).toBeGreaterThanOrEqual(1);
       expect(runNames()).toEqual(
