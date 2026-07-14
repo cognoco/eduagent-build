@@ -171,6 +171,7 @@ type Bindings = {
   // Feature flags
   EMPTY_REPLY_GUARD_ENABLED?: string;
   RETENTION_PURGE_ENABLED?: string;
+  FAMILY_JOIN_ENABLED?: string;
   MEMORY_FACTS_READ_ENABLED?: string;
   MEMORY_FACTS_RELEVANCE_RETRIEVAL?: string;
   MEMORY_FACTS_DEDUP_ENABLED?: string;
