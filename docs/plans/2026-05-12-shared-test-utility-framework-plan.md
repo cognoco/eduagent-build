@@ -1,13 +1,15 @@
 # Shared Test Utility Framework Plan
 
-> **STATUS (2026-06-27):** Framework U1-U8 shipped; the 3 follow-up cleanup batches (migrating existing suites onto it) not started.
+> **STATUS (code-rechecked 2026-07-14):** Keep active. Framework U1-U8 exists;
+> existing-suite cleanup remains. Refresh the generated inventory before using
+> the historical batch counts or file lists below.
 
 > **Status (2026-05-25):** Phases 0–4 (framework U1–U8) shipped and verified — Inngest step runner, transport capture, LLM provider fixtures, local DB harness, mobile `screen-render.tsx`, native-shims catalog, Node-based mock guard, and the regenerable CSV inventory are all live. **Batches 1–3 not started** — these are the actual cleanup work using the framework (Batch 1: ratchet integration tests; Batch 2: session-completion Inngest; Batch 3: mobile query/profile). **Resume here:** Batch 1 — convert remaining integration tests in `apps/api/` to use U1 (Inngest step runner) + U2 (transport capture) instead of internal mocks. No new blockers; framework is ready to consume.
 
 **Date:** 2026-05-12  
 **Status:** Framework established; follow-up cleanup remains  
-**Related:** `docs/plans/2026-05-12-internal-mock-cleanup-inventory.md`
-**Archived agent tracker:** `docs/plans/2026-05-12-shared-test-utilities-agent-tracker.md`
+**Related:** `docs/_archive/plans/done/2026-05-12-internal-mock-cleanup-inventory.md`  
+**Archived agent tracker:** `docs/_archive/plans/done/2026-05-12-shared-test-utilities-agent-tracker.md`
 
 ## Goal
 

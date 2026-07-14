@@ -1,6 +1,6 @@
 # AUDIT-{ID} — {short title}
 
-**Date:** 2026-05-02
+**Date:** {YYYY-MM-DD}
 **Auditor:** {fork name}
 **Scope:** {one-sentence scope statement, copied from the current tracker or work item}
 **Status:** RECON COMPLETE (read-only — no fixes applied)
@@ -10,11 +10,11 @@
 
 ## TL;DR
 
-{2-4 sentences: what was checked, headline finding, anticipated severity, whether SCHEMA-2 (or other Track B items) is blocked or unblocked by what was found.}
+{2-4 sentences: what was checked, headline finding, anticipated severity, and whether linked work is blocked or unblocked.}
 
 ## Severity
 
-**{GREEN | YELLOW | YELLOW-RED | RED}** — {one-line justification grounded in a CLAUDE.md rule or concrete impact.}
+**{GREEN | YELLOW | YELLOW-RED | RED}** — {one-line justification grounded in `AGENTS.md`, current canon, or concrete impact.}
 
 ## Methodology
 
@@ -30,7 +30,7 @@
 
 - **Severity:** {GREEN | YELLOW | YELLOW-RED | RED}
 - **Files:** `path/to/file.ts:line` (one or many; include line numbers when feasible)
-- **Evidence:** {concrete proof — counts, exact grep matches, file excerpts ≤15 words. Link CLAUDE.md rule by name.}
+- **Evidence:** {concrete proof — counts, exact search matches, file excerpts ≤15 words. Link the applicable `AGENTS.md` rule by name.}
 - **Why it matters:** {downstream impact, connection to non-negotiable rules, or risk if left untreated}
 - **Anticipated effort:** {minutes / hours / multi-PR}
 - **Suggested track:** {B | C | already-shipped | not-actionable}
