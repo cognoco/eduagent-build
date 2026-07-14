@@ -26,7 +26,6 @@ import {
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { withProfile } from '../route-utils/route-context';
-import { isFamilyJoinEnabled } from '../config';
 import { BadRequestError, NotFoundError, RateLimitedError } from '../errors';
 import {
   initiateFamilyJoinInvite,
@@ -65,7 +64,6 @@ type FamilyJoinRouteEnv = {
     CLERK_JWKS_URL?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
-    FAMILY_JOIN_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;
@@ -76,20 +74,12 @@ type FamilyJoinRouteEnv = {
   };
 };
 
-/**
- * [WI-1753] Launch gate. Family-join stays dark until BOTH remaining gates clear:
- * the accept-authorization security review and the invite-copy operator sign-off.
- *
- * Refuses with 404, not 403: a 403 would confirm the endpoint exists. This feature's
- * entire design premise is that it leaks nothing about who or what is present, so the
- * disabled surface should not advertise itself either. Fail-closed — anything other
- * than the literal 'true' keeps it dark.
- */
-function assertFamilyJoinEnabled(c: Context<FamilyJoinRouteEnv>): void {
-  if (!isFamilyJoinEnabled(c.env.FAMILY_JOIN_ENABLED)) {
-    throw new NotFoundError('Not found.');
-  }
-}
+// [WI-1753] The launch gate (FAMILY_JOIN_ENABLED) lives in
+// middleware/family-join-gate.ts, mounted ahead of the global stack in index.ts —
+// NOT here. A handler-level check runs after auth, database, account resolution
+// and this route's zValidator have all already answered, so it cannot make the
+// surface dark: probes still get 401/400 and the server still does identity work
+// for a switched-off feature. See that middleware for the full rationale.
 
 function withCaller(c: Context<FamilyJoinRouteEnv>): {
   db: Database;
@@ -110,7 +100,6 @@ export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
     '/family-join/invite',
     zValidator('json', familyJoinInviteRequestSchema),
     async (c) => {
-      assertFamilyJoinEnabled(c);
       const { db, callerPersonId } = withCaller(c);
 
       // AC-1 rate-limit parity (same limiter shape as the consent surface).
@@ -161,7 +150,6 @@ export const familyJoinRoutes = new Hono<FamilyJoinRouteEnv>()
     '/family-join/accept',
     zValidator('json', familyJoinAcceptRequestSchema),
     async (c) => {
-      assertFamilyJoinEnabled(c);
       const { db, callerPersonId } = withCaller(c);
       const { token, optInSupportership } = c.req.valid('json');
 
