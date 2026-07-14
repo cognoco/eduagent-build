@@ -74,6 +74,13 @@ type FamilyJoinRouteEnv = {
   };
 };
 
+// [WI-1753] The launch gate (FAMILY_JOIN_ENABLED) lives in
+// middleware/family-join-gate.ts, mounted ahead of the global stack in index.ts —
+// NOT here. A handler-level check runs after auth, database, account resolution
+// and this route's zValidator have all already answered, so it cannot make the
+// surface dark: probes still get 401/400 and the server still does identity work
+// for a switched-off feature. See that middleware for the full rationale.
+
 function withCaller(c: Context<FamilyJoinRouteEnv>): {
   db: Database;
   callerPersonId: string;
