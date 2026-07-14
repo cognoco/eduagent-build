@@ -12,9 +12,9 @@ Detailed flow pages live under [`master-directory/`](master-directory/README.md)
 
 ## Related documents
 
-- [`docs/specs/2026-05-21-navigation-contract.md`](../specs/2026-05-21-navigation-contract.md) — target navigation contract (`resolveNavigationContract`, `study` / `family` shapes). Flow pages cite it when their audience access depends on the contract.
-- [`docs/specs/2026-05-23-freeform-library-filing.md`](../specs/2026-05-23-freeform-library-filing.md) and [`docs/plans/2026-05-23-freeform-library-filing-plan.md`](../plans/2026-05-23-freeform-library-filing-plan.md) — freeform session history vs Library filing contract. Flow pages must not claim upstream Ask First / Unsorted auto-subject is delivered until that separate work lands.
-- [`docs/audience-matrix.md`](../audience-matrix.md) — current-state inventory of scattered gating (F1–F14). Flow pages that touch gated surfaces (home, more, account, privacy, progress) should cite the matrix.
+- [Archived navigation-contract design](../_archive/specs/Done/2026-05-21-navigation-contract.md) — historical `study` / `family` shape rationale; current code owns behavior.
+- [Archived freeform Library-filing spec](../_archive/specs/Done/2026-05-23-freeform-library-filing.md) and [completed plan](../_archive/plans/done/2026-05-23-freeform-library-filing-plan.md) — historical freeform session history vs Library filing contract.
+- [`audience-matrix.md`](audience-matrix.md) — historical F1–F14 scattered-gating snapshot, retained for the parked flow pages and pending V2/identity refresh.
 - [`master-directory/README.md`](master-directory/README.md) — schema and grouping for the per-flow detail pages.
 - `CLAUDE.md` — authoritative for **current** profile shapes and `isOwner` gating rules.
 
@@ -77,7 +77,7 @@ These rows have deep flow pages. The complete register below still tracks every 
 | HOME-03 | [`master-directory/home/HOME-03.md`](master-directory/home/HOME-03.md) | `Family-only` | Draft | Parent-mode navigation target; current V0 differs from FULL Recaps shape. |
 | HOME-07 | [`master-directory/home/HOME-07.md`](master-directory/home/HOME-07.md) | `Family-only` | Draft | Add-first-child is setup and must not trap adults away from Study. |
 | HOME-08 | [`master-directory/home/HOME-08.md`](master-directory/home/HOME-08.md) | `Shared different scope` | Draft | Home timeout recovery differs between Study-safe and Family-safe contexts. |
-| SUBJECT-03 | [`master-directory/subject/SUBJECT-03.md`](master-directory/subject/SUBJECT-03.md) | `Study-only` | Draft | Chat classifier miss creates/resolves an active-learner subject; this is not Library filing. |
+| SUBJECT-03 | [Archived superseded narrative](../_archive/flows/2026-07-14-stale-flow-cleanup/master-directory/subject/SUBJECT-03.md) | `Study-only` | Superseded | Classifier misses now resolve inline; the old create-subject navigation path is dead. |
 | SUBJECT-05 | [`master-directory/subject/SUBJECT-05.md`](master-directory/subject/SUBJECT-05.md) | `Shared different scope` | Draft | Subject clarification can be reused only with explicit child scoping; filed Library topics still belong to subjects. |
 | LEARN-01 | [`master-directory/learn/LEARN-01.md`](master-directory/learn/LEARN-01.md) | `Study-only` | Draft | Ask Anything saves session history; meaningful freeform chats may later file into Library. |
 | LEARN-07 | [`master-directory/learn/LEARN-07.md`](master-directory/learn/LEARN-07.md) | `Shared different scope` | Draft | Learner summary/reflection vs mentor child session recap. |
@@ -149,7 +149,7 @@ This register mirrors every flow ID currently listed in mobile-app-flow-inventor
 | HOME-08 | Home loading-timeout fallback | [master-directory/home/HOME-08.md](master-directory/home/HOME-08.md) | `Shared different scope` | Draft |
 | SUBJECT-01 | Create subject from learner home | Not created | TBD | Not mapped |
 | SUBJECT-02 | Create subject from library empty state | Not created | TBD | Not mapped |
-| SUBJECT-03 | Create subject from chat when classifier cannot match an existing subject | [master-directory/subject/SUBJECT-03.md](master-directory/subject/SUBJECT-03.md) | `Study-only` | Draft |
+| SUBJECT-03 | Create subject from chat when classifier cannot match an existing subject | [Archived superseded narrative](../_archive/flows/2026-07-14-stale-flow-cleanup/master-directory/subject/SUBJECT-03.md) | `Study-only` | Superseded |
 | SUBJECT-04 | Create subject from homework | Not created | TBD | Not mapped |
 | SUBJECT-05 | Subject resolution and clarification suggestions | [master-directory/subject/SUBJECT-05.md](master-directory/subject/SUBJECT-05.md) | `Shared different scope` | Draft |
 | SUBJECT-06 | Broad subject flow: create a broad subject, then pick a book | Not created | TBD | Not mapped |

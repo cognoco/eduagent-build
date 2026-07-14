@@ -6,7 +6,7 @@
 
 > **What this is / is not.** This note is **engineering evidence feeding the DPO/counsel launch decision** — it is not itself the C-5 launch gate. The go/no-go below is an engineering-readiness verdict; the legal go/no-go is the DPO's on a signed DPIA.
 
-**Artifacts reviewed:** `docs/compliance/dpia.md`, `docs/compliance/ropa.md`, `docs/compliance/identity-compliance-register.md`, `docs/privacy-policy.html`, `docs/screenshots_and_store_info/app-privacy-data-safety-worksheet.md`, `docs/audit/2026-06-07-data-retention-and-erasure-audit.md`. Code: `apps/api/src/services/identity-v2/*`, `apps/api/src/services/llm/router.ts`, `apps/api/src/middleware/account.ts`, `apps/api/src/routes/{account,homework}.ts`, `packages/schemas/src/age.ts`, `packages/database/src/schema/*`, mobile hooks.
+**Artifacts reviewed:** `docs/compliance/dpia.md`, `docs/compliance/ropa.md`, `docs/compliance/identity-compliance-register.md`, `docs/compliance/privacy-policy.html`, `docs/screenshots_and_store_info/app-privacy-data-safety-worksheet.md`, `docs/audit/2026-06-07-data-retention-and-erasure-audit.md`. Code: `apps/api/src/services/identity-v2/*`, `apps/api/src/services/llm/router.ts`, `apps/api/src/middleware/account.ts`, `apps/api/src/routes/{account,homework}.ts`, `packages/schemas/src/age.ts`, `packages/database/src/schema/*`, mobile hooks.
 
 ---
 

@@ -730,4 +730,4 @@ Basis of the cross-subject `interleaved` session type. **In code:**
 - **Screens** — same convention applies (`‹audience›-‹surface›-screen`); add when
   screen names start colliding.
 - Navigation/identity vocabulary (tab shapes, proxy mode) lives in `CLAUDE.md` /
-  `docs/audience-matrix.md`; pull it in here if it ever causes a "note"/"star"-class mix-up.
+  `docs/flows/audience-matrix.md`; pull it in here if it ever causes a "note"/"star"-class mix-up.

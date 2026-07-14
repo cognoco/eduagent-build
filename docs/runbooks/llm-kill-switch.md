@@ -1,5 +1,7 @@
 # Runbook: LLM Aggregate Spend Guardrail + Traffic Kill Switch
 
+> **SAFETY CORRECTION (2026-07-14): DO NOT COPY THE KV COMMANDS UNTIL THE TARGET IS PROVEN.** Render the target environment's Wrangler config from Doppler, confirm the Worker and `SUBSCRIPTION_KV` namespace in Cloudflare, use remote targeting, capture a before-read, obtain operator approval, then write and verify with an after-read. Never hand-type a namespace ID from a placeholder config. KV propagation is not guaranteed to be immediate; verify from the served environment before declaring recovery.
+
 **WI-1505.** Operator procedure for the aggregate LLM spend/volume
 observability signal and the emergency kill switch that stops or degrades
 learner-facing LLM traffic without a mobile app release or an API worker
@@ -66,27 +68,24 @@ binding in the Cloudflare dashboard: Workers & Pages → KV).
 **Turn ON (block/degrade LLM traffic):**
 
 ```bash
-wrangler kv key put --namespace-id <SUBSCRIPTION_KV_NAMESPACE_ID> "llm:kill-switch" "1"
+wrangler kv key put --remote --namespace-id <VERIFIED_TARGET_NAMESPACE_ID> "llm:kill-switch" "1"
 ```
 
 **Turn OFF (resume traffic):**
 
 ```bash
-wrangler kv key delete --namespace-id <SUBSCRIPTION_KV_NAMESPACE_ID> "llm:kill-switch"
+wrangler kv key delete --remote --namespace-id <VERIFIED_TARGET_NAMESPACE_ID> "llm:kill-switch"
 ```
 
 Either command is a plain KV write — no deploy, no CI run, no mobile release.
-It takes effect on the **next** request each Worker isolate receives (the
-read happens in `llmMiddleware` on every request; there is no boot-time
-caching of this flag). In practice this is effectively immediate — Cloudflare
-KV writes propagate to the edge within seconds, and Worker isolates are
-short-lived, so within a request or two every isolate is reading the new
-value.
+The read occurs in `llmMiddleware` on every request, but KV propagation may lag.
+Verify both the remote KV read and served behavior; do not infer global edge
+propagation from one request.
 
 To confirm the current state without changing it:
 
 ```bash
-wrangler kv key get --namespace-id <SUBSCRIPTION_KV_NAMESPACE_ID> "llm:kill-switch"
+wrangler kv key get --remote --namespace-id <VERIFIED_TARGET_NAMESPACE_ID> "llm:kill-switch"
 ```
 
 (Prefer a value round-trip through Doppler-scoped `wrangler` config rather

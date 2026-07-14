@@ -1,5 +1,7 @@
 # NativeWind Windows Runbook
 
+> **STATUS UPDATE (2026-07-14): PATCH CURRENT; LAUNCH COMMANDS CORRECTED FOR POWERSHELL + DEV CLIENT.**
+
 ## Purpose
 
 This runbook captures the Windows-specific NativeWind 4.2.1 fixes for
@@ -47,18 +49,20 @@ This bypasses the virtual module path-key mismatch seen on Windows.
 
 For Windows Android emulator sessions:
 
-```bash
-EXPO_NO_DEPENDENCY_VALIDATION=1 REACT_NATIVE_PACKAGER_HOSTNAME=localhost npx expo start --port 8081 --clear
+```powershell
+Set-Location apps/mobile
+$env:EXPO_NO_DEPENDENCY_VALIDATION = '1'
+$env:REACT_NATIVE_PACKAGER_HOSTNAME = 'localhost'
+pnpm exec expo start --dev-client --port 8081 --clear
 adb reverse tcp:8081 tcp:8081
-adb shell am force-stop host.exp.exponent
-adb shell am start -n host.exp.exponent/.experience.HomeActivity
-adb shell am start -a android.intent.action.VIEW -d "exp://localhost:8081" host.exp.exponent
+adb shell am force-stop com.mentomate.app
+adb shell monkey -p com.mentomate.app 1
 ```
 
 Notes:
 
 - `--clear` makes the first bundle request slow because Metro rebuilds caches.
-- Expo Go can cache an error state; force-stop before relaunching.
+- The normal app path uses the Expo development client (`com.mentomate.app`), not the Expo Go package.
 - `EXPO_NO_DEPENDENCY_VALIDATION=1` avoids the Metro dependency-validation
   crash seen with this setup.
 - `REACT_NATIVE_PACKAGER_HOSTNAME=localhost` is required for emulator

@@ -1,4 +1,4 @@
-> **STATUS: ACTIVE** — rebuilt from source 2026-06-09 by a 26-agent end-to-end code audit. Code is ground truth; where the prior edition diverged, the row is corrected and tagged [was: ...].
+> **STATUS (2026-07-14): RETAINED, REFRESH REQUIRED — NOT COMPLETE CURRENT CANON.** The June V0/V1 inventory remains useful historical coverage, but it omits the V2 Mentor/Subjects/Journal shell, the 13+ identity floor, link/family/support flows, verified-proof surfaces, and later routes. Use current route/contract/tests for implementation claims until this inventory is rebuilt.
 > **Re-verified 2026-06-09** by a 33-agent static code-audit (every flow ID's claims checked against `apps/mobile/src`, `apps/api/src`, the flag files, and `e2e/flows/**`): ~280 rows, 240+ confirmed accurate. 8 rows corrected — 2 substantive (LEARN-50 Challenge Round flag is API-side not mobile; BILLING-06 `child-paywall.yaml` is PARKED/out-of-manifest, unit-tested only), 1 medium (PARENT-24 `ParentTransitionNotice` is SecureStore-only, no notice POST), 5 minor (AUTH-01 intro-seen write, AUTH-17 banner-render cite, SUBJECT-07 retry count, SUBJECT-18 phantom entry, HOME-02 var name). Completeness sweep found no undocumented production user-facing flow (dev-only E2E seed routes intentionally excluded).
 > **Update 2026-06-10** — four audit-flagged issues fixed in code and reflected in the rows above + Gaps table: **QUIZ-16** (discovery card now starts the round via `/quiz/launch` instead of dumping on the picker), **LEARN-29** (self report mark-viewed routes added — `viewedAt` now persists, NEW badge clears), **LEARN-32** (library shows an honest `library-inactive-fallback-banner` instead of silently dropping paused/archived subjects), **ACCOUNT-06/08** (accommodation screen retitled "Your learning preferences"). Commits `b1be478f4`, `55e0f2e6b`, `e8dde7032` on `new-llm`.
 > **Update 2026-06-18 (WI-825)** — subject onboarding rows now spell out the current post-create split: broad subjects route to the pick-book topic-interest step, language subjects route to native-language/CEFR setup, and first focused subjects route through `/ready`. J-09 browser coverage exercises all three branches.
@@ -400,7 +400,7 @@ Quota model (verified `apps/api/src/services/subscription.ts:43-118`): free 100/
 
 ## Current Gaps and Next Candidates
 
-Known gating/correctness gaps found by the audit (verify against `docs/audience-matrix.md` before fixing):
+Known gating/correctness gaps found by the June audit (historical cross-check: `docs/flows/audience-matrix.md`; verify current code before fixing):
 
 | Area | Current state | Next action |
 | --- | --- | --- |

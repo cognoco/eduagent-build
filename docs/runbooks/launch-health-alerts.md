@@ -1,5 +1,7 @@
 # Launch Health Alerts — Runbook
 
+> **STATUS UPDATE (2026-07-14): CODE-BACKED, CONSOLE PROOF STILL EXTERNAL.** Add `surface:activation-events-retention signal:delayed|function-failed` to the deletion/retention alert bucket and verify delivery synthetically. Repository code cannot prove that Sentry/Inngest console rules are configured or deliver successfully.
+
 This is the launch-week operating view for silent failures. The MVP is alert
 rules plus a responder runbook, not a new dashboard or customer-facing admin
 surface.
@@ -87,7 +89,7 @@ channel. `Page` routes to the accountable launch operator.
 | 2. LLM routing | Structured fallback logs plus `llm.stop_reason`; Sentry `surface=llm-router`, `signal=provider-fallback` | Fallback rate greater than 2% over 15 minutes with at least 20 calls | Fallback rate greater than 10% over 15 minutes with at least 20 calls, or any `primary-circuit-open` signal |
 | 3. Challenge grader | Sentry `surface:challenge-round signal:finalize-failed` | One failure in 24 hours | Three failures in 1 hour |
 | 4. Notification delivery | Sentry `surface:notification signal:suppressed`; `surface:email`; `surface:feedback signal:delivery-failed` | Three suppressions/bounces/retries in 1 hour | One `surface:email signal:complained` or terminal feedback-retry failure, or ten combined failures in 1 hour |
-| 5. Deletion and retention | Sentry `surface:transcript-purge signal:delayed`; `surface:transcript-purge signal:function-failed`; `app/consent.revocation.failed` | Any delayed purge or retrying revocation failure | Any terminal purge or consent-revocation failure; delayed purge count at least 10 |
+| 5. Deletion and retention | Sentry `surface:transcript-purge signal:delayed|function-failed`; `surface:activation-events-retention signal:delayed|function-failed`; `app/consent.revocation.failed` | Any delayed purge/activation-retention signal or retrying revocation failure | Any terminal purge, activation-retention, or consent-revocation failure; delayed count at least 10 |
 | 6. Stranded filing | Sentry `surface:filing` | Any filing auto-retry | Three unrecoverable filings in 1 hour |
 
 Every bucket also has the fleet-wide terminal-failure backstop:
@@ -275,6 +277,8 @@ Sentry filters:
 ```text
 surface:transcript-purge signal:delayed
 surface:transcript-purge signal:function-failed
+surface:activation-events-retention signal:delayed
+surface:activation-events-retention signal:function-failed
 ```
 
 ### First response
@@ -287,6 +291,8 @@ surface:transcript-purge signal:function-failed
    verify the database outcome through the scoped service path.
 4. Do not enable or change retention clocks from this runbook. Those values and
    the production purge flag remain counsel/operator actions.
+5. For activation retention, inspect/rerun `activation-events-retention-cron`
+   and verify the 90-day delete and 121-day breach counts after recovery.
 
 ### Evidence
 

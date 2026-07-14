@@ -7,9 +7,11 @@ inputDocuments:
 
 # MentoMate - Epic Breakdown
 
+> **ROLE UPDATE (2026-07-14): LEGACY EPIC/FR CORPUS + FROZEN `ARCH-N` REGISTER.** This file is not current implementation or MVP-scope canon. For current behavior use code/tests; for architectural rulings use ADRs; for launch scope use the ratified MVP definition and active plans. Retained because live ADR and acceptance-criteria references still depend on its stable identifiers.
+
 ## Overview
 
-This document is the **canonical spec** for all epics and stories. It describes *what* each feature is and its acceptance criteria. It is NOT an implementation tracker — for current build status, see the latest dated plan in `docs/plans/`.
+This document preserves the legacy epic/story requirements corpus and stable identifiers. It is not an implementation tracker or a complete current product specification.
 
 Detailed design specs for later epics live in `docs/specs/`.
 
@@ -447,7 +449,7 @@ Completed specs are in `docs/_archive/specs/Done/`. Active/in-progress specs are
 | 14 | Human agency & feedback | Stories in this file | DONE |
 | 15 | Visible progress (snapshots, milestones, journey screen, reports) | `_archive/specs/Done/2026-04-07-epic-15-visible-progress-design.md` | DONE |
 | 16 | Adaptive memory (learner profiles, mentor memory, accommodations) | `_archive/specs/Done/2026-04-07-epic-16-adaptive-memory-design.md` | DONE |
-| 17 | Voice-first learning (server STT/TTS, pronunciation, hands-free) | `specs/2026-04-07-epic-17-voice-first-design.md` | NOT STARTED |
+| 17 | Voice-first learning (server STT/TTS, pronunciation, hands-free) | `_archive/specs/2026-07-14-stale-spec-cleanup/2026-04-07-epic-17-voice-first-design.md` | SUPERSEDED — fresh spec required before revival |
 | 18 | LLM Tuning — Structured Output, Personalization & Reliability | `_archive/specs/Done/2026-04-18-llm-*.md` (3 files) | DONE |
 | — | Conversation-first learning flow | `_archive/specs/Done/2026-04-08-conversation-first-learning-flow-design.md` | DONE |
 | — | Adaptive home screen | `_archive/specs/Done/2026-04-04-adaptive-home-screen-design.md` | DONE |
@@ -6068,7 +6070,7 @@ Build a persistent learner memory layer that adapts session style and content ov
 Make voice the default learning modality rather than an optional input method. Age-aware voice suggestions, VAD mode, voice persistence across sessions, server-side STT (Whisper/Deepgram) for better children's speech accuracy, server-side streaming TTS for natural voice personas, voice-optimized LLM prompting (shorter responses), pronunciation practice, verbal recall sessions, hands-free continuous conversation mode.
 
 **FRs covered:** FR243-FR261 (19 FRs) | **Stories:** 17.1-17.9
-**Detailed spec:** `docs/specs/2026-04-07-epic-17-voice-first-design.md`
+**Historical spec:** `docs/_archive/specs/2026-07-14-stale-spec-cleanup/2026-04-07-epic-17-voice-first-design.md` — superseded; not execution-ready.
 
 **Dependencies:** Epic 8 (basic voice infrastructure), Epic 6 (language pronunciation)
 

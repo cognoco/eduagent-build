@@ -1,5 +1,7 @@
 # Activation Funnel Queries (WI-1762)
 
+> **STATUS UPDATE (2026-07-14): QUERIES CURRENT; MANUAL RETENTION PROCEDURE RETIRED.** The live daily `activation-events-retention-cron` performs the 90-day deletion and emits 121-day delayed/terminal signals. Operators must monitor or rerun that durable job; do not execute an independent manual production DELETE from this runbook.
+
 Supported first-party query surface for closed-beta activation review. Events land in the `activation_events` table in the environment-specific Neon database. No third-party analytics sink is part of MVP.
 
 The authoritative row shape is `packages/database/src/schema/activation-events.ts`. Despite its historical column name, `activation_events.profile_id` has a direct foreign key to `person.id`; identity-capacity joins below therefore use the person-keyed v2 tables directly.
@@ -287,38 +289,7 @@ If a review needs row-level debugging, treat it as an incident investigation und
 
 ## Retention
 
-**Raw-row retention: delete after 90 days; 121-day retention SLA.** The monthly manual purge may add at most 31 days of scheduled operational lag. Any row older than 121 days is a retention SLA breach, not an allowed extension. This supports early 30/60/90-day comparisons while making missed operations visible. Aggregated review notes may be retained with launch evidence because they contain no row identifiers.
-
-Automation is outside this WI. Until a durable purge job exists, the launch operator owns a monthly manual purge in the target environment. Capture fixed cutoffs and run both preflight counts before approving the mutation:
-
-```psql
-SELECT now() - interval '90 days' AS retention_cutoff \gset
-SELECT now() - interval '121 days' AS breach_cutoff \gset
-
-SELECT count(*) AS retention_sla_breach_rows
-FROM activation_events
-WHERE created_at < :'breach_cutoff'::timestamptz;
-
-SELECT count(*) AS rows_eligible_for_deletion
-FROM activation_events
-WHERE created_at < :'retention_cutoff'::timestamptz;
-```
-
-A nonzero breach count requires an operations incident record. Review the eligible count and obtain mutation approval before continuing. Then run the delete promptly in a bounded transaction:
-
-```psql
-BEGIN;
-SET LOCAL idle_in_transaction_session_timeout = '5min';
-
-WITH deleted AS (
-  DELETE FROM activation_events
-  WHERE created_at < :'retention_cutoff'::timestamptz
-  RETURNING 1
-)
-SELECT count(*) AS deleted_rows FROM deleted;
-```
-
-`COMMIT` is an explicit operator decision only when `deleted_rows` equals the preflight eligible count; otherwise type `ROLLBACK`. Do not leave the session idle while deciding. Record the cutoff, execution timestamp, and deleted-row count in the beta operations log.
+**Raw-row retention: delete after 90 days; 121-day retention SLA.** The durable `activation-events-retention-cron` runs daily at 04:00 UTC. A delayed signal or terminal failure requires checking its Inngest run, database connectivity, and the `surface:activation-events-retention` Sentry events. Rerun the failed durable function after correcting the cause. Any direct production mutation requires a separate incident procedure and explicit approval; it is not normal funnel-reporting work.
 
 ## Interpretation limits
 

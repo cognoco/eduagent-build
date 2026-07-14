@@ -1,5 +1,7 @@
 # Audience Matrix — Scattered Gating Snapshot
 
+> **STATUS (2026-07-14): RETAINED HISTORICAL GATING SNAPSHOT; REFRESH REQUIRED.** This May F1–F14 scaffold predates the current navigation contract, V2 shell, identity convergence, link/visibility flows, and the exact 13+ floor. Use current route/service guards and tests for implementation claims. Moved from `docs/audience-matrix.md` because it is a flow/authorization map, not a legal-compliance artifact.
+
 > **Reconstructed scaffold (2026-05-22).** The original `docs/audience-matrix.md` was lost — it was created in another agent's working tree on 2026-05-21 and wiped by a stash cycle before any git operation captured it (not in any commit, dangling blob, or worktree on disk).
 >
 > This scaffold rebuilds the doc from references in the earlier draft of `docs/specs/2026-05-21-navigation-contract.md` (dangling commit `e6287097`). All file:line citations below are extracted from that draft and re-verified against current HEAD — but the original severity labels (F1–F14) are *inferred* from the navigation-contract's "5 of 14 findings addressed" callout. Re-derive F-numbers from a fresh audit if precision matters.
@@ -10,8 +12,8 @@
 
 ## Related documents
 
-- [`docs/specs/2026-05-21-navigation-contract.md`](specs/2026-05-21-navigation-contract.md) — **paired target spec.** Defines `resolveNavigationContract(ctx)` (the function this matrix's F5/F6/F7/F8/F11 sites migrate to).
-- [`docs/flows/flow-master-directory.md`](flows/flow-master-directory.md) — flow register. Each flow page in `flows/master-directory/` cites this matrix when it touches a gated surface (home, more, account, privacy, progress).
+- [Archived navigation-contract design](../_archive/specs/Done/2026-05-21-navigation-contract.md) — historical target rationale for `resolveNavigationContract(ctx)`; current code owns behavior.
+- [`flow-master-directory.md`](flow-master-directory.md) — parked flow register. Each flow page cites this matrix when it touches a gated surface.
 - `CLAUDE.md` — "Profile Shapes" section is authoritative for **current** tab shapes (`guardian` / `learner`) and the rule that `home.tsx` does not branch (the `ParentHomeScreen` decision lives inside `LearnerScreen.tsx`). The matrix below reflects this rule.
 
 ---

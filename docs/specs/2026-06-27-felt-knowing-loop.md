@@ -1,12 +1,14 @@
 # Felt-Knowing Loop — Writable Notes, Freeform Binding & Evidence Citation
 
+> **STATUS UPDATE (2026-07-14): PARTIALLY SHIPPED.** Writable subject/topic notes and freeform “keep this” are live. The evidence-citation substrate, prompt injection, and rendered citations remain unbuilt; the older paper-only and sibling-status text below is historical.
+
 **Status:** Draft / paper-only · 2026-06-27 · **Branch:** `main` (baseline for all citations)
 **Parent vision:** [The Forever Notebook](./2026-06-08-forever-notebook-north-star.md) — "the mentor remembers, and what you keep is the proof."
 **Sibling specs (this spec sequences on them; it does NOT re-own their segments):**
-- [Memory Task — Review Continuity, Retrieval Log & Unified Relearn Queue](./2026-06-08-memory-task-review-continuity.md) — owns the review opener, `retrieval_events`, **`evidence_links` + `LearnerSource` (slice 2a, R6)**, the `taskType` catalog (slice 2b, R7), and the relearn queue. Tier 1 is **in active implementation** (worktrees `review-continuity-opener` / `review-continuity-buildables`); slice 2a (`evidence_links`) is **decided, not built**.
-- [Journal Redesign — 5-Button Landing, Reuse-First](./2026-06-27-journal-redesign.md) — owns the V2 Journal-tab **read/browse** surface: the merged notes+bookmarks list with filter chips (`JournalNotesArchive`), sessions, practice history, reports, memory.
+- [Memory Task — Review Continuity, Retrieval Log & Unified Relearn Queue](../_archive/specs/Done/2026-06-08-memory-task-review-continuity.md) — historical owner of the review opener, `retrieval_events`, **`evidence_links` + `LearnerSource` (slice 2a, R6)**, the `taskType` catalog (slice 2b, R7), and the relearn queue.
+- [Journal Redesign — 5-Button Landing, Reuse-First](../_archive/specs/2026-07-14-stale-spec-cleanup/2026-06-27-journal-redesign.md) — shipped historical design for the V2 Journal-tab **read/browse** surface.
 
-**Orientation:** [`docs/plans/v2-plan/00-STATE-OF-PLAY.md`](../plans/v2-plan/00-STATE-OF-PLAY.md) §5–§6.
+**Historical orientation:** [`00-STATE-OF-PLAY.md`](../_archive/plans/2026-07-14-superseded/v2-plan/00-STATE-OF-PLAY.md) §5–§6.
 
 ---
 

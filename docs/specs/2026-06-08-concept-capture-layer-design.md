@@ -1,5 +1,7 @@
 # Concept-Capture Layer — Additive Concept-Grain Mastery
 
+> **STATUS UPDATE (2026-07-14): PARTIALLY SHIPPED.** Concept capture is enabled; the schema, Challenge write path, API read side, and topic/book note signals are live. The older parked/rename narrative below is historical. Concept-targeted review and note-correctness notification remain open.
+
 > **STATUS (2026-06-27):** PARKED — migration 0107 is reference-only; the profiles→person rename (MMT-ADR-0012 one-time reset) has not yet executed (profiles table still exists), so the tables aren't live. Write side gated `CONCEPT_CAPTURE_ENABLED=false`. Read side (API /notes/concept-mastery + mobile NoteDisplay star/additions) is wired and works once tables exist. Scope items 5 (concept-targeted review) + 6 (note-correctness notification) not built. NEXT: re-home concepts/concept_mastery into the post-reset baseline (FKs→person), regenerate the migration, flip the flag.
 
 > **⚠️ MECHANISM CORRECTION (2026-06-27).** The STATUS line above and the "Dependency

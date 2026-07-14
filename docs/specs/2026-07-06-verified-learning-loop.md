@@ -1,12 +1,14 @@
 # Verified-Learning Loop — Loop Map & Slice Plan (WI-1657)
 
+> **STATUS UPDATE (2026-07-14): ACTIVE CONTRACT; IMPLEMENTATION MAP NEEDS REFRESH.** Pending-review promotion, retention scheduling, mastery-axis coverage, verified artifacts, parent proof receipts, and the loop integration pack are live. Evidence citations, calibration, and low-stakes re-prove remain follow-ups already captured by dedicated work.
+
 **Status:** Draft — AC1 deliverable of WI-1657 (Define and ship the full verified-learning loop) · 2026-07-06
 **Branch baseline for citations:** `main` @ `54501f7fb` (all file:line read from code 2026-07-06, not from docs)
 **Relates:**
 
 - `docs/specs/2026-06-27-felt-knowing-loop.md` — owns the note-authoring / freeform-keep / citation glue (segments it owns are *sequenced*, not re-owned, here)
 - `docs/_archive/specs/Done/2026-06-08-memory-task-review-continuity.md` — Tier 1 shipped (`retrieval_events`, review opener); slice 2a (`evidence_links` + `LearnerSource`) decided, not built
-- `docs/specs/2026-06-03-review-relearn-findings-and-high-impact-todos.md` — RR-N register this spec maps onto WIs
+- `docs/_archive/specs/2026-07-14-stale-spec-cleanup/2026-06-03-review-relearn-findings-and-high-impact-todos.md` — historical RR-N register this spec mapped onto work items
 - `docs/_archive/plans/done/2026-05-30-topic-mastery-three-states.md` — shipped Untouched → Learning → Mastered model
 - `docs/plans/v2-plan/00-STATE-OF-PLAY.md` §5–§6 — the "knows-me" loop orientation
 - `docs/adr/MMT-ADR-0031-challenge-verification-and-sm2-are-complementary-mastery-axes.md` — proposed axes ruling for S4 / WI-1469

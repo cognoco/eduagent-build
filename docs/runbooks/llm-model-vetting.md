@@ -1,5 +1,7 @@
 # Runbook — LLM model vetting
 
+> **STATUS (2026-07-14): POLICY RETAINED; EXECUTABLE REFRESH REQUIRED.** Before using this as an admission gate, define whether the change is a new model/provider tuple, a retained-model capability recheck, or compliance-only. Add exact current `eval:llm --live --openrouter-model` commands (including reasoning/provider options), flow/call budgets, safety resampling, latency/pricing evidence, and a master-register↔vetting-record CI check. Both compliance and capability halves are mandatory for a new admission/tuple change, not for every descriptive retained-role edit.
+
 **Type:** L3 operational procedure. **Governs:** the `llm-models` register
 (`docs/registers/llm-models/`). **Backing ADRs:** `MMT-ADR-0014` (vetting/routing
 split + admission gate), `MMT-ADR-0016` (safety/judge architecture), `MMT-ADR-0013`

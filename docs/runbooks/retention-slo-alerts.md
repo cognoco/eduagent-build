@@ -1,5 +1,7 @@
 # Retention SLO Alerts — Runbook
 
+> **SAFETY CORRECTION (2026-07-14): SUMMARY/RECONCILIATION PROCEDURES RETAINED; PURGE REMEDIATION UPDATED.** Canonical purge tags and paging live in `launch-health-alerts.md`. Never disable `RETENTION_PURGE_ENABLED` in production (deploy hard-gates it true), and never set `purgedAt` manually—the purge service must actually remove/transform the governed data before completion is recorded.
+
 > **Note:** Dashboard configuration (Inngest alert rules, Sentry alert rules) must be manually configured — see thresholds below. The code-side instrumentation (event emission + `captureException`) is complete as of this runbook.
 
 ## Alert Summary Table
@@ -62,7 +64,7 @@ The failure rate is computed as: `app/session.transcript.purge` events dispatche
 1. Check Sentry for `surface: transcript-purge-on-failure` entries.
 2. Check Voyage AI status (API key rotation, quota exhaustion).
 3. Failed sessions remain in the purge queue — `summaryGeneratedAt` is still past the 30-day cutoff so they will be re-picked by tomorrow's `transcriptPurgeCron` (05:00 UTC).
-4. If Voyage AI is down for an extended period, temporarily set `RETENTION_PURGE_ENABLED=false` in Doppler to halt the queue.
+4. Do not disable the production purge flag. Correct the active routing/provider or database failure, then rerun the durable purge function and verify the database outcome.
 
 ---
 
@@ -87,7 +89,7 @@ A count ≥ 1 warrants investigation; ≥ 10 means the reconciliation cron (`sum
 1. Check Inngest for `app/session.purge.delayed` event payload — inspect `sessionIds` field.
 2. Check Sentry for `surface: transcript-purge-delayed` entries.
 3. For each delayed session, query `session_summaries` by `sessionId` to confirm `llmSummary` / `learnerRecap` are null.
-4. If the sessions have zero `exchangeCount` in `learning_sessions`, they likely have no transcript — these are safe to manually mark `purgedAt = now()` after review.
+4. If sessions have zero exchanges, verify their actual governed-data state through the purge service; do not manually assert `purgedAt`.
 5. For sessions with transcript content, manually trigger `app/session.summary.regenerate` via Inngest dashboard.
 
 ---

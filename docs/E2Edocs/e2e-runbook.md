@@ -441,7 +441,7 @@ For ACCOUNT-19 and ACCOUNT-20:
 
 1. Implement Clerk testing-token support in `seedAndSignIn` helper.
 2. Add `j26-auth02-signup.spec.ts` and `j27-auth06-forgot-password.spec.ts` specs using `testing_token` bypass.
-3. Update `e2e-flow-coverage-audit-2026-05-13.md` AUTH-02/03/06 rows from `DEFERRED:CLERK-1` to covered.
+3. Record AUTH-02/03/06 coverage in the current E2E manifest and `docs/flows/INDEX.md`; the May 2026 audit is archived historical evidence.
 4. AUTH-14: add network-intercept spec once AUTH-02 baseline is stable.
 5. ACCOUNT-19/20: add `consent-pending-underage` seed + `j28-account19-consent-underage.spec.ts`.
 6. Remove or update this runbook section once all rows move to covered.

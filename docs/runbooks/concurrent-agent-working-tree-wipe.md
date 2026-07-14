@@ -1,5 +1,7 @@
 # Runbook: Concurrent-agent working-tree wipe / zeroing
 
+> **SAFETY CORRECTION (2026-07-14): DO NOT USE BLANKET `git restore .`, `git checkout -- .`, OR THE OLD TL;DR.** A shared tree may contain legitimate edits from several sessions; index presence does not prove every unstaged change is disposable. Capture the exact path list, identify owners, stop the writer, and restore only confirmed zeroed paths from the correct source. New work belongs in `.worktrees/<branch>` via `.agents/skills/worktree-setup/SKILL.md`.
+
 **Class:** Local data-integrity incident (working tree only)
 **Severity:** High if you have uncommitted work; Low if the tree was clean
 **Scope:** Recoverable in almost all cases — `HEAD` and the git index are normally untouched
@@ -131,14 +133,16 @@ proceed.
 
 ## 5. Recover
 
-### 5A. Clean restore (the normal case — lossless)
+### 5A. Selective restore after ownership confirmation
 
 Once the wiper is stopped and the count is stable:
 
 ```powershell
-# Restore every tracked file from the index (== HEAD when nothing was staged).
-git restore .
-# Equivalent older syntax: git checkout -- .
+# Record the affected paths and inspect each working/index/HEAD state.
+git status --porcelain=v1 > recovery-paths.txt
+
+# After the owner confirms a specific zeroed path is disposable, restore only it.
+git restore --worktree -- "path/to/confirmed-zeroed-file"
 
 # Verify: modified count should drop to ~0 (only genuinely-changed files remain).
 git status --porcelain=v1 | Measure-Object -Line
@@ -147,8 +151,8 @@ git status --porcelain=v1 | Measure-Object -Line
 (Get-Item "apps/api/eval-llm/runner.ts").Length    # back to its real size
 ```
 
-`git restore .` discards the 0-byte working files and rewrites them from the
-index. Because the 0-byte versions contain nothing, **no real work is lost**.
+Never extrapolate one safe path to the whole tree. Repeat the evidence and owner
+check per path; preserve staged work and any non-zero unstaged variant.
 
 ### 5B. Salvage genuinely-uncommitted edits (only if Step 3 said so)
 
@@ -210,7 +214,7 @@ last resort, not the primary path.
 1. git status --porcelain=v1 | Measure-Object -Line     # how bad
 2. git cat-file -s HEAD:<file>  &&  git cat-file -s :<file>   # HEAD/index safe?
 3. STOP the other agent/process. Confirm count is stable.
-4. git restore .                                         # lossless restore
+4. restore only owner-confirmed zeroed paths             # never blanket restore
 5. pnpm env:sync                                         # rebuild .dev.vars
 6. typecheck + git status to confirm
 ```

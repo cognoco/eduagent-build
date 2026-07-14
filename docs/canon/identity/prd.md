@@ -322,7 +322,7 @@ crosswalk; CONTEXT ✗/⚠ entries):
 
 **Two-vocabulary risk:** until the crosswalk is executed, `resolveNavigationContract` (new) and
 `resolveTabShape`/`isOwner` (old) describe the same humans incompatibly. The clean cut should land
-`resolveNavigationContract` consuming the new role set, with the audience-matrix (`docs/audience-matrix.md`)
+`resolveNavigationContract` consuming the new role set, with the historical audience snapshot (`docs/flows/audience-matrix.md`)
 sites as the checklist — not leave both alive.
 
 ---

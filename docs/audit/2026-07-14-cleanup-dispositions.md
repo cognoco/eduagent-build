@@ -58,7 +58,7 @@ for owner-assigned work.
 | Durable assessment resume | Mid-round durable resume for quiz/dictation remains unproven. | Current quiz/dictation services and routes | **Reproduce/define expected behavior before filing.** |
 | Web E2E gate | Staging Playwright smoke remains advisory pending stability; no current two-green full-suite evidence was found. | `.github/workflows/e2e-web.yml`; `apps/mobile/playwright.config.ts` | **Create one stabilization/hard-gate decision item or explicitly accept advisory status.** |
 | E2E umbrella residue | Old cleanup scripts remain; Clerk testing-token comments conflict; proposed Inngest coverage map was never created. | Current E2E scripts/config | **Decide each residual; do not keep the May umbrella proposal active.** |
-| Navigation documentation | Audience matrix still describes the removed in-`LearnerScreen` home branch. | `apps/mobile/src/app/(app)/home.tsx` branches on `navigationContract.home.screen`; `AGENTS.md` is current. | **Correct or retire `docs/audience-matrix.md`.** |
+| Navigation documentation | Audience matrix still describes the removed in-`LearnerScreen` home branch. | `apps/mobile/src/app/(app)/home.tsx` branches on `navigationContract.home.screen`; `AGENTS.md` is current. | **Moved to `docs/flows/audience-matrix.md`; retained with a refresh-required warning.** |
 | Quote retention | Verbatim learner content still survives the transcript purge. | `apps/api/src/services/transcript-purge.ts`; `docs/compliance/ropa.md` | Already captured by WI-1194 and compliance records. |
 
 ## Security follow-up

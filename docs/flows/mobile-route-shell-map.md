@@ -1,5 +1,7 @@
 # Mobile Route Shell Map
 
+> **STATUS (2026-07-14): SNAPSHOT STALE; REGENERATION REQUIRED.** The same counting rule now finds 100 route screens rather than 96, and the map predates newer link, billing, V2 shell, and support routing surfaces.
+
 Snapshot: 2026-06-30. Source of truth is the Expo Router filesystem under
 `apps/mobile/src/app/**`, plus the shell gates in
 `apps/mobile/src/hooks/use-navigation-contract.ts`,

@@ -1,5 +1,7 @@
 # Learning Path Flows — End-User Perspective
 
+> **STATUS (2026-07-14): RETAINED, MAJOR REFRESH REQUIRED.** This unique end-to-end map predates the live V2 shell/support scopes, identity convergence, enabled concept capture, current homework/freeform filing, and Journal history. Its embedding-consent warning is resolved. Interleaved and recall-test front-door decisions remain open.
+
 Complete, code-true trace of every learning path in MentoMate — from the first tap (for a **learner** or a **supporter**) through every downstream side-effect (challenge rounds, learner-note saving, LLM note review, LLM session summary, LLM memory, retention/quiz/review inputs).
 
 > **Verification note (2026-06-09).** This document was reconstructed directly from source (`apps/mobile/src/app/(app)/**`, `apps/api/src/**`, `packages/schemas/src/**`) by an 18-agent end-to-end audit, not from the previous edition of this file. Where the prior doc diverged from code, the code wins and the drift is flagged inline as **[was: …]**. File:line citations are current as of this date; re-verify after any nav-contract, session-exchange, or post-session-pipeline change.
@@ -43,7 +45,7 @@ Two parallel shells coexist, selected by `MODE_NAV_V1_ENABLED` (V1 guardian rede
 | Supporter (owner + child, family mode) | `FAMILY_TABS` = home, **recaps**, progress, more | `FAMILY_MODE_TABS` = home, progress, more (3) | **`LEGACY_GUARDIAN_TABS`** = home, own-learning, library, progress, more (5) |
 | Parent-proxy | `PROXY_TABS` = home, library, progress (no `more`) | `PARENT_PROXY_TABS` (3) | `PARENT_PROXY_TABS` (3) |
 
-> **Hard constraint (preserved).** The V1-off + V0-off branch returns `LEGACY_GUARDIAN_TABS` (5 tabs) for the production guardian (`navigation-contract.ts:273-283`). This is the shipped production shape and must not regress when V1 lands. See `docs/specs/2026-05-21-navigation-contract.md`.
+> **Historical constraint (preserved for the parked V0/V1 map).** The V1-off + V0-off branch returns `LEGACY_GUARDIAN_TABS` (5 tabs). See the [archived navigation-contract design](../_archive/specs/Done/2026-05-21-navigation-contract.md); current environment flags and code decide the active shell.
 >
 > **Labeling nuance.** V1-off explicit Study mode uses the contract's study fall-through shape, not the V0 helper as an implementation source. The resulting learner tab set matches the legacy learner shape, but docs should avoid implying the V0 helper owns that branch.
 
