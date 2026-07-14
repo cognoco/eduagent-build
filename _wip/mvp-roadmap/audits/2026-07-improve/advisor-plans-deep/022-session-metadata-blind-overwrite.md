@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `advisor-plans-deep/README.md`.
+> in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md`.
 >
 > **Drift check (run first)**:
 > `git diff --stat 8c049b93f..HEAD -- apps/api/src/services/session/session-exchange.ts apps/api/src/services/session/session-crud.ts`
@@ -370,7 +370,7 @@ ALL must hold:
 - [ ] The comment at `:481` no longer names the deleted function
 - [ ] `CHALLENGE_ROUND_RUNTIME_ENABLED` still defaults to `'false'` (untouched)
 - [ ] No `@ts-expect-error`, no cast, no `eslint-disable` introduced
-- [ ] `advisor-plans-deep/README.md` status row updated
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md` status row updated
 
 ## STOP conditions
 

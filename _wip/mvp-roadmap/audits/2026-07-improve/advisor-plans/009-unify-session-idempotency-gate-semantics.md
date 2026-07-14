@@ -3,7 +3,7 @@
 > **Executor instructions**: Follow step by step; run every verification and
 > confirm the expected result. Honor "STOP conditions". This touches a money
 > path — the guard test is mandatory. When done, update the status row in
-> `advisor-plans/README.md`.
+> `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md`.
 >
 > **Drift check (run first)**: `git diff --stat 8c049b93f..HEAD -- apps/api/src/middleware/metering.ts apps/api/src/middleware/idempotency.ts apps/api/src/routes/sessions.ts`
 > On any change, compare excerpts to live code; mismatch → STOP.
@@ -122,7 +122,7 @@ Add a test (in `metering.test.ts` or `metering.integration.test.ts`) that stubs 
 - [ ] The structured metric/event on KV failure is still emitted.
 - [ ] `pnpm exec nx run api:typecheck`, `api:lint`, `api:integration-api` pass.
 - [ ] Only in-scope files modified (`git status`).
-- [ ] `advisor-plans/README.md` status row updated.
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md` status row updated.
 
 ## STOP conditions
 

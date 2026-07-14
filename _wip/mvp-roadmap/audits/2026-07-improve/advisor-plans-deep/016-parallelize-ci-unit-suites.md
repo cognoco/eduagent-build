@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `advisor-plans-deep/README.md`.
+> in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md`.
 >
 > **Drift check (run first)**:
 > `git diff --stat 8c049b93f..HEAD -- package.json apps/mobile/jest.config.cjs apps/api/jest.config.cjs .github/workflows/mobile-ci.yml`
@@ -239,12 +239,12 @@ Exactly one of these two must hold, and you must state which:
 - [ ] Suite/test counts identical to the serial baseline (nothing silently skipped)
 - [ ] `--forceExit` and `workerIdleMemoryLimit` unchanged
 - [ ] Nothing added to `tools/quarantine/`
-- [ ] `advisor-plans-deep/README.md` status row updated
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md` status row updated
 
 **Outcome B — parallelism rejected, constraint documented:**
 - [ ] The working tree is reverted to the serial scripts
 - [ ] A written finding lists the specific tests that fail in parallel and the shared state causing it
-- [ ] `advisor-plans-deep/README.md` row set to `REJECTED` with the one-line reason
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md` row set to `REJECTED` with the one-line reason
 - [ ] Nothing added to `tools/quarantine/`
 
 ## STOP conditions

@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `advisor-plans-deep/README.md`.
+> in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md`.
 >
 > **Drift check (run first)**:
 > `git diff --stat 8c049b93f..HEAD -- apps/api/src/services/progress.ts apps/api/src/services/curriculum.ts packages/database/src/schema/subjects.ts`
@@ -246,7 +246,7 @@ ALL must hold:
 - [ ] The new test provably fails when the `orderBy` is removed (Step 3 performed)
 - [ ] Every `curricula.findFirst` / `findMany` in the repo is either version-ordered or documented version-insensitive (Step 4)
 - [ ] No schema or migration file modified
-- [ ] `advisor-plans-deep/README.md` status row updated
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md` status row updated
 
 ## STOP conditions
 

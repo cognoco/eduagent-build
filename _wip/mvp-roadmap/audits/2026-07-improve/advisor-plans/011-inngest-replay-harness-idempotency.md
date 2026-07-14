@@ -2,7 +2,7 @@
 
 > **Executor instructions**: Follow step by step; run every verification. Honor
 > "STOP conditions". When done, update the status row in
-> `advisor-plans/README.md`.
+> `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md`.
 >
 > **Drift check (run first)**: `git diff --stat 8c049b93f..HEAD -- apps/api/src/inngest/functions/_test-harness.ts`
 > On any change, compare the excerpt to live code; mismatch → STOP.
@@ -120,7 +120,7 @@ If, after Step 1, the shortlist is empty (every side effect is already idempoten
 - [ ] No new internal mocks (external boundaries only, with `gc1-allow` reasons).
 - [ ] `pnpm exec nx run api:typecheck` exits 0; touched function tests pass.
 - [ ] Only in-scope files modified (`git status`).
-- [ ] `advisor-plans/README.md` status row updated.
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md` status row updated.
 
 ## STOP conditions
 

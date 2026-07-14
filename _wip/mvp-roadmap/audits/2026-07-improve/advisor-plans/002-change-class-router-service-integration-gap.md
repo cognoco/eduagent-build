@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `advisor-plans/README.md`.
+> in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md`.
 >
 > **Drift check (run first)**: `git diff --stat 8c049b93f..HEAD -- scripts/check-change-class.sh docs/change-classes.md`
 > If either file changed since this plan was written, compare the "Current
@@ -157,7 +157,7 @@ ALL must hold:
 - [ ] `docs/change-classes.md` documents the new class and the barrel fix.
 - [ ] `shellcheck scripts/check-change-class.sh` introduces no NEW warnings (compare against a pre-change run).
 - [ ] Only the two in-scope files are modified (`git status`).
-- [ ] `advisor-plans/README.md` status row updated.
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md` status row updated.
 
 ## STOP conditions
 

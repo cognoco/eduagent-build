@@ -5,7 +5,7 @@
 > anything in "STOP conditions" occurs, stop and report — do not improvise.
 > This is a security fix; the negative-path break test in the Test plan is
 > mandatory, not optional. When done, update the status row in
-> `advisor-plans/README.md`.
+> `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md`.
 >
 > **Drift check (run first)**: `git diff --stat 8c049b93f..HEAD -- apps/api/src/services/family-access.ts apps/api/src/routes/consent.ts apps/api/src/routes/dashboard.ts apps/api/src/routes/recaps.ts apps/api/src/routes/curriculum.ts apps/api/src/routes/onboarding.ts apps/api/src/routes/settings.ts apps/api/src/routes/notifications.ts`
 > If any changed, compare the excerpts below against live code before
@@ -176,7 +176,7 @@ ALL must hold:
 - [ ] The break test exists in `consent.test.ts`, passes, and provably fails when the revoke-handler gate is removed (red-green-revert recorded).
 - [ ] `pnpm exec nx run api:integration-api` passes.
 - [ ] No files outside the in-scope list are modified (`git status`).
-- [ ] `advisor-plans/README.md` status row updated.
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md` status row updated.
 
 ## STOP conditions
 

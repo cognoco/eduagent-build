@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `advisor-plans/README.md`.
+> in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md`.
 >
 > **Drift check (run first)**: `git diff --stat 8c049b93f..HEAD -- apps/api/src/services/curriculum.ts apps/api/src/services/curriculum.test.ts packages/schemas/src/subjects.ts`
 > If any of those files changed since this plan was written, compare the
@@ -188,7 +188,7 @@ ALL must hold:
 - [ ] `pnpm exec nx run api:lint` exits 0
 - [ ] The `switch (request.signal)` in `adaptCurriculumFromPerformance` has a `default` branch containing a `never`-typed assignment
 - [ ] `git status` shows changes only to the two in-scope files
-- [ ] `advisor-plans/README.md` status row updated
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md` status row updated
 
 ## STOP conditions
 

@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `advisor-plans-deep/README.md`.
+> in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md`.
 >
 > **Drift check (run first)**:
 > `git diff --stat 8c049b93f..HEAD -- packages/schemas/src/age.ts apps/mobile/src/components/home/ParentHomeScreen.tsx apps/mobile/src/components/home/LearnerScreen.tsx apps/mobile/src/lib/navigation-contract.ts`
@@ -350,7 +350,7 @@ ALL must hold:
 - [ ] `isAdultOwner` contains **no** `- profile.birthYear` arithmetic: `grep -n "profile.birthYear >=" packages/schemas/src/age.ts` returns nothing
 - [ ] Every `isAdultOwner(` call site in `apps/mobile/src` supplies `birthMonth`/`birthDay` where the profile carries them
 - [ ] `computeAgeBracket` (the year-only function) still exists and is untouched
-- [ ] `advisor-plans-deep/README.md` status row updated
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md` status row updated
 
 ## STOP conditions
 

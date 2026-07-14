@@ -2,7 +2,7 @@
 
 > **Executor instructions**: Follow step by step; run every verification and
 > confirm the expected result. Honor "STOP conditions". When done, update the
-> status row in `advisor-plans/README.md`.
+> status row in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md`.
 >
 > **Drift check (run first)**: `git diff --stat 8c049b93f..HEAD -- apps/api/src/services/rate-limit.ts`
 > On any change, compare the excerpt to live code; mismatch → STOP.
@@ -127,7 +127,7 @@ Steps 1–3 are the test plan. Structural pattern: `services/age-utils.test.ts` 
 - [ ] `pnpm exec nx run api:typecheck` exits 0.
 - [ ] No internal mocks (the module is pure; nothing to mock).
 - [ ] Only `rate-limit.test.ts` added (`git status`).
-- [ ] `advisor-plans/README.md` status row updated.
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md` status row updated.
 
 ## STOP conditions
 

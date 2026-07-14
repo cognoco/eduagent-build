@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `advisor-plans-deep/README.md`.
+> in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md`.
 >
 > **Drift check (run first)**:
 > `git diff --stat 8c049b93f..HEAD -- apps/mobile/src/lib/query-persister.ts apps/mobile/src/lib/sign-out-cleanup.ts apps/mobile/src/app/_layout.tsx apps/mobile/src/lib/query-keys.ts`
@@ -342,7 +342,7 @@ ALL must hold:
 - [ ] `ASYNCSTORAGE_PREFIX_WIPE` contains the scoped cache prefix, and a test proves sign-out removes `eduagent-query-cache::<id>` keys
 - [ ] `buildPersisterKey` is unchanged (BUG-357 scoping intact)
 - [ ] The PR description lists every excluded key root with its free-text justification
-- [ ] `advisor-plans-deep/README.md` status row updated
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md` status row updated
 
 ## STOP conditions
 

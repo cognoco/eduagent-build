@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `advisor-plans-deep/README.md`.
+> in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md`.
 >
 > **Drift check (run first)**:
 > `git diff --stat 8c049b93f..HEAD -- apps/api/src/services/llm/router.ts apps/api/src/config.ts`
@@ -376,7 +376,7 @@ ALL must hold:
 - [ ] All four production call sites (`router.ts` ~1649, ~1689, ~2080, ~2161) pass the age through
 - [ ] The break test provably fails when the gate is reverted (Step 4 performed, result stated in PR description)
 - [ ] Test 5 (adult still reaches gemini on the legacy path) passes — proving adult routing is unchanged
-- [ ] `advisor-plans-deep/README.md` status row updated
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md` status row updated
 
 ## STOP conditions
 

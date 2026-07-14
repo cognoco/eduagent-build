@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `advisor-plans-deep/README.md`.
+> in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md`.
 >
 > **Drift check (run first)**:
 > `git diff --stat 8c049b93f..HEAD -- packages/schemas/src/llm-envelope.ts apps/api/src/services/evaluate.ts`
@@ -344,7 +344,7 @@ ALL must hold:
 - [ ] A malformed `evaluate_assessment` no longer fails the envelope (test 1 proves it, and it provably fails when reverted — Step 5)
 - [ ] `challengeRoundEvaluationItemSchema`'s `answerEventId` and `learnerQuote` are **still required** (`grep -A6 'challengeRoundEvaluationItemSchema = z.object' packages/schemas/src/llm-envelope.ts` shows no `.optional()` on either)
 - [ ] `apps/api/src/services/evaluate.ts` is **unmodified**
-- [ ] `advisor-plans-deep/README.md` status row updated
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md` status row updated
 
 ## STOP conditions
 

@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `advisor-plans-deep/README.md`.
+> in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md`.
 >
 > **Drift check (run first)**:
 > `git diff --stat 8c049b93f..HEAD -- apps/api/src/services/notifications.ts apps/api/src/inngest/functions/weekly-progress-push.ts`
@@ -336,7 +336,7 @@ ALL must hold:
 - [ ] The email-retry test still passes — retry-safety not sacrificed
 - [ ] `notifications.ts` is **unchanged** (`sent: true` and the Sentry escalation intact)
 - [ ] Step 4's sweep of `getRecentNotificationCount` callers is reported
-- [ ] `advisor-plans-deep/README.md` status row updated
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md` status row updated
 
 ## STOP conditions
 

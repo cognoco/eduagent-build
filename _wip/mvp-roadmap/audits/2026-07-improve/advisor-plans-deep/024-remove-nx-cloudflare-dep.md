@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `advisor-plans-deep/README.md`.
+> in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md`.
 >
 > **Drift check (run first)**:
 > `git diff --stat 8c049b93f..HEAD -- package.json nx.json apps/api/project.json`
@@ -310,7 +310,7 @@ ALL must hold:
 - [ ] All six doc lines reconciled to describe the real (`wrangler`) mechanism
 - [ ] `rg -n 'naxodev'` (excluding the lockfile) matches only the historical audit doc
 - [ ] No change to `apps/api/project.json`, to any workflow, or to the deploy pipeline
-- [ ] `advisor-plans-deep/README.md` status row updated
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md` status row updated
 
 ## STOP conditions
 

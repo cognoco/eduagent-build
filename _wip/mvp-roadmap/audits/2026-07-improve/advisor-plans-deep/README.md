@@ -1,5 +1,11 @@
 # Implementation Plans — master index (plans 001–024)
 
+> **Base path for both plan directories:** `_wip/mvp-roadmap/audits/2026-07-improve/`.
+> Everywhere below, `advisor-plans/` means
+> `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/` and `advisor-plans-deep/`
+> means `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/` — the short
+> form is used for readability once this is established.
+
 **This is the single reconciled index for _both_ plan directories.** Plans are
 numbered **monotonically across the whole repo**: `advisor-plans/` holds 001–012,
 `advisor-plans-deep/` holds 013–024. A plan number now identifies exactly one file.
@@ -14,7 +20,7 @@ numbered **monotonically across the whole repo**: `advisor-plans/` holds 001–0
 > renumbered to **013–020**, and four new plans added as **021–024**. If you hold a
 > reference to an old "deep plan 00N", add 12.
 >
-> ⚠️ **`advisor-plans/README.md` is now a stale partial index** — it lists only
+> ⚠️ **`_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md` is now a stale partial index** — it lists only
 > 001–012 and does not know this set exists. **This file supersedes it.** Replacing
 > it with a pointer here is a one-line follow-up (see ACTIONS in the handover).
 
@@ -53,7 +59,7 @@ cheap and useful.
 ### `advisor-plans/` — the earlier `apps/api` quick runs (001–012)
 
 Reproduced here for a single view. Their own dependency notes live in
-`advisor-plans/README.md` and still apply — in particular **002 first**, because
+`_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md` and still apply — in particular **002 first**, because
 the CI change-class router will not run tests added by 006/008 until 002 widens it.
 
 | Plan | Title | Priority | Effort | Depends on | Status |

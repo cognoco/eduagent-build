@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `advisor-plans-deep/README.md`.
+> in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md`.
 >
 > **Drift check (run first)**:
 > `git diff --stat 8c049b93f..HEAD -- apps/mobile/src/hooks/use-homework-ocr.ts`
@@ -336,7 +336,7 @@ ALL must hold:
 - [ ] The OCR-throws case is covered and passes
 - [ ] The "do not delete while displayed" guard test passes
 - [ ] Cleanup failures cannot fail a user-facing OCR (every `deleteAsync` is `idempotent` **and** `.catch()`-guarded)
-- [ ] `advisor-plans-deep/README.md` status row updated
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md` status row updated
 
 ## STOP conditions
 

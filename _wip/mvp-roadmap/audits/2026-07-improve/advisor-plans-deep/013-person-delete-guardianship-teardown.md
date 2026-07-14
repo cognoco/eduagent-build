@@ -4,7 +4,7 @@
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
 > report — do not improvise. When done, update the status row for this plan
-> in `advisor-plans-deep/README.md`.
+> in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md`.
 >
 > **Drift check (run first)**:
 > `git diff --stat 8c049b93f..HEAD -- apps/api/src/services/identity-v2/deletion-v2.ts packages/database/src/schema/identity.ts`
@@ -364,7 +364,7 @@ ALL must hold:
       `grep -c "delete(guardianship)" apps/api/src/services/identity-v2/deletion-v2.ts` returns **5** (1 pre-existing in `executeDeletionV2` + 4 new)
 - [ ] MMT-ADR-0026 carries the amendment paragraph
 - [ ] No schema/migration file was modified (`git status` shows nothing under `apps/api/drizzle/`)
-- [ ] `advisor-plans-deep/README.md` status row updated
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans-deep/README.md` status row updated
 
 ## STOP conditions
 

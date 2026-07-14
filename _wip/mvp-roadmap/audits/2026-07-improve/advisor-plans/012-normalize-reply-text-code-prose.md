@@ -2,7 +2,7 @@
 
 > **Executor instructions**: This change touches learner-visible LLM output —
 > the eval-harness step is mandatory. Follow step by step; honor "STOP
-> conditions". When done, update the status row in `advisor-plans/README.md`.
+> conditions". When done, update the status row in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md`.
 >
 > **Drift check (run first)**: `git diff --stat 8c049b93f..HEAD -- apps/api/src/services/llm/envelope.ts apps/api/src/services/exchanges.ts`
 > On any change, compare excerpts to live code; mismatch → STOP.
@@ -120,7 +120,7 @@ Run `pnpm eval:llm` (Tier 1). If the change shifts any snapshot, confirm the shi
 - [ ] `pnpm exec nx run api:typecheck` exits 0; envelope tests pass.
 - [ ] `pnpm eval:llm` shows no unintended drift; any snapshot change is intentional and committed per the eval workflow (snapshots NOT polluted by a stray `--live` run).
 - [ ] Only in-scope files modified (`git status`).
-- [ ] `advisor-plans/README.md` status row updated.
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md` status row updated.
 
 ## STOP conditions
 

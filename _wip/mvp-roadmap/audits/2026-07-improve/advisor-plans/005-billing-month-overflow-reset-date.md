@@ -2,7 +2,7 @@
 
 > **Executor instructions**: Follow step by step; run every verification and
 > confirm the expected result. Honor "STOP conditions". When done, update the
-> status row in `advisor-plans/README.md`.
+> status row in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md`.
 >
 > **Drift check (run first)**: `git diff --stat 8c049b93f..HEAD -- apps/api/src/services/billing/`
 > On any change to the cited files, compare excerpts to live code; mismatch → STOP.
@@ -144,7 +144,7 @@ Replace each `X.setMonth(X.getMonth() + 1)` (and the top-up `+ TOP_UP_EXPIRY_MON
 - [ ] New overflow-matrix test exists and passes (incl. leap-year Feb).
 - [ ] `pnpm exec nx run api:typecheck`, `api:lint`, `api:integration-api` all pass.
 - [ ] Only in-scope files modified (`git status`).
-- [ ] `advisor-plans/README.md` status row updated.
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md` status row updated.
 
 ## STOP conditions
 

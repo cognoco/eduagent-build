@@ -2,7 +2,7 @@
 
 > **Executor instructions**: Follow step by step; run every verification and
 > confirm the expected result. Honor "STOP conditions". When done, update the
-> status row in `advisor-plans/README.md`.
+> status row in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md`.
 >
 > **Drift check (run first)**: `git diff --stat 8c049b93f..HEAD -- apps/api/src/routes/family-join.ts apps/api/src/routes/speaking-practice.ts`
 > On any change, compare excerpts to live code; mismatch → STOP.
@@ -132,7 +132,7 @@ Covered by Steps 1–2. Structural pattern: `apps/api/src/routes/feedback.test.t
 - [ ] `pnpm exec nx run api:typecheck` exits 0; new tests pass; `api:integration-api` passes.
 - [ ] The PostToolUse jest-mock hook reports no new internal mocks on the created test files.
 - [ ] Only in-scope files modified (`git status`).
-- [ ] `advisor-plans/README.md` status row updated.
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md` status row updated.
 
 ## STOP conditions
 

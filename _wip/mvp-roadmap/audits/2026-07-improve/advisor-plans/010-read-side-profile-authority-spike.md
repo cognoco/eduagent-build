@@ -4,7 +4,7 @@
 > second**. Do the investigation in Step 1 and write the findings doc BEFORE
 > touching any handler. If the investigation contradicts this plan's
 > assumptions, STOP and report rather than proceeding. When done, update the
-> status row in `advisor-plans/README.md`.
+> status row in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md`.
 >
 > **Drift check (run first)**: `git diff --stat 8c049b93f..HEAD -- apps/api/src/middleware/profile-scope.ts apps/api/src/middleware/proxy-guard.ts apps/api/src/routes/notes.ts apps/api/src/services/family-access.ts`
 > On any change, compare excerpts to live code; mismatch → STOP.
@@ -67,7 +67,7 @@ Reusable primitives (verify exact signatures during the spike):
 ## Scope
 
 **In scope**:
-- `advisor-plans/010-findings.md` (create) — the spike output: the enumerated read surface, the exact authority rule, and the chosen enforcement point.
+- `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/010-findings.md` (create) — the spike output: the enumerated read surface, the exact authority rule, and the chosen enforcement point.
 - After the spike is reviewed: a new shared check (e.g. `assertCanReadProfile(caller, targetProfileId)` in `services/family-access.ts` or a read-side middleware) and its application at the profile-scoped read boundary.
 - A guard/ratchet test for new read routes.
 - Co-located tests.
@@ -87,13 +87,13 @@ Reusable primitives (verify exact signatures during the spike):
 
 ### Step 1 (SPIKE — do this first, write the doc, then pause for review if a reviewer is available)
 
-Investigate and write `advisor-plans/010-findings.md` answering:
+Investigate and write `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/010-findings.md` answering:
 1. **Enumerate the read surface**: every route handler that consumes `c.get('profileId')` for another person's data without a caller-identity/guardian check. Start from `rg -n "requireProfileId\(c.get\('profileId'\)\)" apps/api/src/routes` and classify each as (a) self-only data, (b) guardian-readable child data, (c) both.
 2. **Define the authority rule precisely**: a caller may read target profile P iff `callerPersonId` is P's own person, OR the caller has a guardianship edge over P, OR the caller is an org admin. Confirm the exact guardian-edge lookup (the function used at child creation) and that a legitimate guardian reading a managed child passes it.
 3. **Choose the enforcement point**: a single read-side middleware at the profile-scope boundary vs. a per-handler `assertCanReadProfile(c, targetProfileId)`. Recommend one, with the trade-off (middleware = uniform but must know which routes are "read another person's data"; per-handler = explicit but must not be forgotten → needs a ratchet).
 4. **List routes that would break** if the rule were applied naively (e.g. a guardian dashboard that legitimately reads a child) and how the rule accommodates them.
 
-**Verify**: `advisor-plans/010-findings.md` exists and answers all four questions with `file:line` evidence. If the investigation shows the gap is NOT reachable (e.g. all such reads already carry a guardian check you missed), STOP and report — the finding is refuted.
+**Verify**: `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/010-findings.md` exists and answers all four questions with `file:line` evidence. If the investigation shows the gap is NOT reachable (e.g. all such reads already carry a guardian check you missed), STOP and report — the finding is refuted.
 
 ### Step 2: Implement the shared read-authority check
 
@@ -123,14 +123,14 @@ If the enforcement is per-handler, add a forward-only guard test (pattern: `safe
 
 ## Done criteria
 
-- [ ] `advisor-plans/010-findings.md` enumerates the read surface, the rule, the enforcement point, and the guardian-accommodation, with evidence.
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/010-findings.md` enumerates the read surface, the rule, the enforcement point, and the guardian-accommodation, with evidence.
 - [ ] `assertCanReadProfile` (or the chosen mechanism) exists with a passing unit test.
 - [ ] `notes.ts` peer reads are rejected (403); self + guardian reads still pass; break test recorded red-green-revert.
 - [ ] The enumerated read surface is covered (or a scoped subset is, with the remainder tracked in the findings doc).
 - [ ] A ratchet/coverage guard exists for new read routes.
 - [ ] `pnpm exec nx run api:typecheck`, `api:lint`, `api:integration-api` pass.
 - [ ] Only in-scope files modified (`git status`).
-- [ ] `advisor-plans/README.md` status row updated.
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md` status row updated.
 
 ## STOP conditions
 

@@ -2,7 +2,7 @@
 
 > **Executor instructions**: Follow step by step; run every verification and
 > confirm the expected result. Honor "STOP conditions". When done, update the
-> status row in `advisor-plans/README.md`.
+> status row in `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md`.
 >
 > **Drift check (run first)**: `git diff --stat 8c049b93f..HEAD -- apps/api/src/services/language-detect.ts apps/api/src/index.ts apps/api/src/middleware/profile-scope.ts`
 > On any change, compare excerpts to live code; mismatch → STOP.
@@ -125,7 +125,7 @@ Update `profile-scope.ts:28` to point at the now-implemented `beforeSend` (so th
 - [ ] A test proves the fallback capture omits `rawInput`; a test proves `beforeSend` redacts a denylisted key.
 - [ ] `pnpm exec nx run api:typecheck` and `api:lint` exit 0.
 - [ ] Only in-scope files modified (`git status`).
-- [ ] `advisor-plans/README.md` status row updated.
+- [ ] `_wip/mvp-roadmap/audits/2026-07-improve/advisor-plans/README.md` status row updated.
 
 ## STOP conditions
 
