@@ -106,6 +106,14 @@ const envSchema = z.object({
   // summary-generation pipeline has baked in production long enough.
   RETENTION_PURGE_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // [WI-1753] Family-join (cross-account existing-teen join) stays dark until
+  // BOTH remaining gates clear: the accept-authorization security review
+  // (token-possession vs. email-equality) and the invite-copy operator sign-off.
+  // The accept surface itself does not exist yet either (WI-1927), so there is
+  // no user path to these routes — but "no UI path" is not a security control,
+  // and this flag is. Default OFF; flip only when both gates are ruled.
+  FAMILY_JOIN_ENABLED: z.enum(['true', 'false']).default('false'),
+
   // Memory architecture Phase 1 — keep reads on legacy JSONB until backfill
   // and semantic parity gates pass. Dual-write is code-driven, this flag only
   // controls prompt/read reconstruction.
@@ -273,6 +281,11 @@ export function isNodeTestEnv(): boolean {
 }
 
 export function isMemoryFactsReadEnabled(value: string | undefined): boolean {
+  return value === 'true';
+}
+
+/** [WI-1753] Fail-closed: anything other than the literal 'true' keeps family-join dark. */
+export function isFamilyJoinEnabled(value: string | undefined): boolean {
   return value === 'true';
 }
 

@@ -27,6 +27,7 @@ import {
 
 import { envValidationMiddleware } from './middleware/env-validation';
 import { maintenanceGateMiddleware } from './middleware/maintenance';
+import { familyJoinGateMiddleware } from './middleware/family-join-gate';
 import { authMiddleware } from './middleware/auth';
 import { databaseMiddleware } from './middleware/database';
 import {
@@ -171,6 +172,7 @@ type Bindings = {
   // Feature flags
   EMPTY_REPLY_GUARD_ENABLED?: string;
   RETENTION_PURGE_ENABLED?: string;
+  FAMILY_JOIN_ENABLED?: string;
   MEMORY_FACTS_READ_ENABLED?: string;
   MEMORY_FACTS_RELEVANCE_RETRIEVAL?: string;
   MEMORY_FACTS_DEDUP_ENABLED?: string;
@@ -317,6 +319,15 @@ api.use('*', envValidationMiddleware);
 // stage 1) the signed /v1/inngest endpoint stay exempt so the Inngest drain
 // can complete.
 api.use('*', maintenanceGateMiddleware);
+
+// [WI-1753] Family-join launch gate — 404s /v1/family-join/* unless
+// FAMILY_JOIN_ENABLED === 'true'. Mounted BEFORE auth/database/account (and
+// therefore before the route's zValidator) so a disabled surface is genuinely
+// dark: an unauthenticated probe gets 404 rather than 401, malformed JSON gets
+// 404 rather than 400, and no DB/identity work runs for a switched-off feature.
+// A handler-level check runs too late to close any of those. Inert once the
+// flag is on.
+api.use('*', familyJoinGateMiddleware);
 
 // Auth middleware — runs before all routes; public paths are skipped internally
 api.use('*', authMiddleware);
