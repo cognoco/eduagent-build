@@ -1761,7 +1761,7 @@ globalThis.MENTOMATE_ATLAS_DATA = {
     }),
     node('playwright-web', 'Playwright web E2E', 'quality', 'Current', 'Expo web E2E slice and smoke coverage through Playwright.', {
       repoPaths: ['apps/mobile/e2e-web', '.github/workflows/e2e-web.yml'],
-      relatedDocs: ['apps/mobile/e2e-web/testid-audit.md'],
+      relatedDocs: ['apps/mobile/e2e-web/README.md'],
       relatedBoards: ['delivery-quality'],
     }),
     node('maestro-mobile', 'Maestro mobile E2E', 'quality', 'Current', 'Black-box mobile E2E flows with runbook caveats and direct CLI path guidance.', {

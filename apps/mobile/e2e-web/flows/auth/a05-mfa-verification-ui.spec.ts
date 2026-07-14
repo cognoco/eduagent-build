@@ -52,7 +52,7 @@ test.describe('[AUTH-05] MFA verification UI inventory', () => {
      * outcome: this test only validates the *form* testIDs are present, not
      * the verify screen.
      *
-     * For the verify screen testIDs, see the testid-audit.md update below.
+     * The assertions below are the executable source of truth for the verify-screen selectors.
      */
     await setupClerkTestingToken({ page });
     await page.goto('/sign-in', { waitUntil: 'commit' });

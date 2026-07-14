@@ -24,4 +24,4 @@ Added end-to-end dictation history persistence: source sentences are now stored 
 ## Caveats / Follow-ups
 
 - GC6 deferred: `complete.test.tsx` has one pre-existing internal mock (`use-dictation-api`) converted to Pattern A in this PR; full drain to real QueryClient requires a separate spike.
-- Plan file `_plan-WI-902.md` references migration `0125` (renamed to `0126` after numbering collision with main); minor doc drift, no functional impact.
+- The historical plan named migration `0125`; the landed implementation uses `0126` after a numbering collision with main. Commit `dd58d9bdb` and the current schema are authoritative.
