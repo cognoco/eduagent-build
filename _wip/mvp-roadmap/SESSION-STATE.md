@@ -1,4 +1,16 @@
-# mvp-roadmap session state — checkpoint 2026-07-10 (session 2 close)
+# mvp-roadmap session state — checkpoint 2026-07-15 (lockdown sitting close)
+
+## CURRENT MANDATE (operator, 2026-07-15 — ACTIVE, read first)
+
+**LOCKDOWN SITTING CLOSED — backlog fully scoped; execution posture next.** Ruling records: `2026-07-15-lockdown-lane-load-preread.md` (LD1–LD5 block at top), `2026-07-15-full-backlog-disposition-sweep.md` (§A/§B rulings inline), `2026-07-15-legal-dependency-plan.md` (§5 OPQ reconciliation), `2026-07-15-consolidated-scope-inventory.md` (sittings 1–2).
+
+**Rulings this sitting:** LD1 split → **WS-54 Store, Billing & Release** (12 ship-chain items out of Launch Readiness). LD2 Option 1 → §3 spine + legal-dependency register adopted, clocks start week of 07-15; 14 Cosmo `Blocked by` edges live (three gates: WI-1577, WI-1335, WI-1506 — counsel blocks gates, not dev). WI-1559 AND WI-1111 both re-bucketed to counsel (operator: not internally rulable) — both ride the **OPQ-22 packet; its dispatch = the DPIA-path clock-start**. OPQ reconciliation ruled: wholly-operator legal items got rows **OPQ-102..115** (standing rule: wholly-operator item ⇒ OPQ row at capture); deadlines 07-24 on OPQ-102 (DPO) + OPQ-110 (DPA loops). LD3 fix-now (WI-1986; WI-1902 → V2 finalization). LD4 **superseded by the full-backlog disposition sweep** — operator rejected priority-as-scoping (sequence: deliver-at-all? → MVP/post-MVP → deps → grouping; P-labels have no scoping authority). Sweep: 116 never-ruled items → **MVP 50 / pen 62 / closed 3 / Zuzka 1**; 112 placements executed, 0 failures. WI-1898 split (floor MVP Safety & Eval; WI-2115 → pen). WI-1292 ruled MVP window (triple gate unchanged). Closes: WI-1452 Duplicate→WI-1704 (hand-applied Refining→Closed per lifecycle.md:92, operator-ruled), WI-1867 + WI-2013 Cancelled umbrellas. LD5 stands (no effort ceremony).
+
+**Jørn's new clock-starts (deadlined 07-24):** OPQ-22 dispatch (carries WI-1559 entity + WI-1111 Art 9 — the whole DPIA path waits on it) · OPQ-102 DPO engagement · OPQ-110 DPA/TIA vendor loops. **Zuzka:** OPQ-117 (WI-1897 cap-hit UX: all-in vs split, Hex rec split) + existing 40 etc. **Parked:** Quartet Runtime lane retirement (WI-1708 + WI-546 need a ZDX-reboot home; 17 closed items' lane attribution at stake — rec: rename+close lane, don't trash). **Next session:** Stream-2/Wave-0 kickoff + batch shepherding under the new lane map; sweep's 81 Ready/Exec/InReview items presumed IN by stage-gate (operator may veto).
+
+---
+
+# (superseded) mvp-roadmap session state — checkpoint 2026-07-10 (session 2 close)
 
 ## CURRENT MANDATE (operator, 2026-07-11/12 — ACTIVE, read first)
 
