@@ -21,7 +21,6 @@ Everything upstream of those three gates — the entire Compliance-Eng chain, id
 | WI | What | Note |
 |---|---|---|
 | WI-1111 | Art 9 health/learning-disability ruling | **Substantively ruled OUT 2026-06-08** — remaining work is documenting + telling the DPO. Unblocks DPIA scope |
-| WI-1559 | Controller legal-entity mismatch | Pure company decision (which entity, which jurisdiction) + 3 doc edits. Gates DPIA sign-off, policy publication, and WI-1577 AC-4 |
 | WI-1110 | UK GDPR representative | The *decision* (serve UK at launch?) is internal; falls away if UK excluded. If IN: off-the-shelf service, fast |
 | WI-1115 | Store country availability + hard-blocks | Console settings only; needs the launch-market ruling (same ruling as WI-1110) |
 | WI-2064 | Consent-withdrawal bearer-token threat posture | Internal security ruling (owner + AC); engineering follows. STRICT docs tier (R1) |
@@ -37,6 +36,7 @@ Everything upstream of those three gates — the entire Compliance-Eng chain, id
 | WI-1108 | Breach response plan | One page + counsel review |
 | WI-1109 | Privacy policy finalization + child summary | Draft exists (`docs/privacy-policy.html`); needs WI-1559 entity + WI-1105 DPO contact; counsel review then publish |
 | WI-1192 | Art 28 DPAs + per-vendor TIAs | **External-calendar risk** — vendor signature loops are the least controllable multi-party tail. Carries OWD-T8b close criterion |
+| WI-1194 | Counsel-approved retention periods (OPQ-24) | **Added at lockdown (2026-07-15, OPQ reconciliation)** — missed by the lane-scoped first pass: sits in Compliance-Eng, but its production retention values, purge and dormancy sweep are counsel-gated per category. The counsel dependency is intra-item (its own AC), so no WI→WI edge — OPQ-24 is the tracking vehicle |
 
 ### Bucket 3 — other legal rulings — lead time: EXTERNAL-CALENDAR
 
@@ -45,6 +45,7 @@ Everything upstream of those three gates — the entire Compliance-Eng chain, id
 | WI-1659 | EU AI Act classification memo + obligation matrix | Specialist counsel question (may not be the GDPR counsel). Its go/no-go note feeds WI-1577; its matrix may mint follow-up WIs — a scope-discovery risk |
 | WI-1663 | AI Act technical file / QMS skeleton | Mostly internal drafting, counsel review at the end; post-classification follow-on, no MVP gate edge |
 | WI-1764 | Locale-correct crisis helpline content | Counsel packet answers (Q3, OPQ-22) determine jurisdictions + mandatory-reporting floor; then content sourcing. Feeds the shipped WI-1690 surface; must exist before real families use the app → gates WI-1506 |
+| WI-1559 | Controller legal-entity ruling | **Re-bucketed at lockdown (2026-07-15): not internally rulable** — corporate-structure counsel question (which entity, which jurisdiction), distinct from the GDPR/COPPA counsel set. Already routed: the OPQ-22 counsel packet carries the controller-entity question. Still gates DPIA sign-off, policy publication, WI-1577 AC-4 |
 
 *(T8c consent-floor question: accepted-as-governed under WI-1114 per sitting-1 R2 — no separate row.)*
 
@@ -76,7 +77,7 @@ No edges: WI-1110 (falls away or trivially parallel), WI-1663, WI-1664 (no MVP-g
 | When | Action | Why |
 |---|---|---|
 | **Now (this week)** | Engage DPO retainer (WI-1105) | First segment of the longest pole; DPIA/ROPA/policy all queue behind it |
-| **Now (this week)** | Rule WI-1559 entity + document WI-1111 Art 9 | Days of internal work that de-risks weeks of counsel work — the DPIA and policy can't finalize without them |
+| **Now (this week)** | Dispatch the OPQ-22 counsel packet (carries the WI-1559 entity question) + document WI-1111 Art 9 | The DPIA and policy can't finalize without the entity answer — now counsel-gated, so the packet's dispatch date IS the clock start |
 | **Now (this week)** | Kick off WI-1192 vendor DPA loops | Least controllable tail; every week of delay is a week of calendar risk |
 | **Next** | Commission WI-1659 AI-Act memo | Specialist counsel; also the scope-discovery risk — the earlier the matrix exists, the earlier any surprise WIs surface |
 | **Next** | Send counsel packet questions gating WI-1764 (Q3, OPQ-22) | Content sourcing is fast once jurisdictions are known |
@@ -91,3 +92,11 @@ No edges: WI-1110 (falls away or trivially parallel), WI-1663, WI-1664 (no MVP-g
 - **Batch C — the paper track:** buckets 2–3 run on their own calendar into WI-1577/WI-1335/WI-1506. **Only these three gates wait.** Everything in Batch A can be *done and verified* before the last DPA signature lands.
 
 **Bottom line:** with the clocks started this week, the plausible critical path to store submission is WI-1105 → WI-1106 → WI-1577 → WI-1335 (DPO engagement + DPIA sign-off), with WI-1192 vendor loops as the wildcard. Dev is never the thing waiting — unless the DPIA triggers Datatilsynet prior consultation, in which case everything about the launch date reopens.
+
+## 5 · Operator Queue reconciliation (ruled 2026-07-15, lockdown sitting)
+
+The 2026-07-11 gate sweep filed OPQ rows only for human gates *embedded in agent work* — the wholly-operator legal items fell through (only OPQ-22 packet, OPQ-41 helplines, OPQ-24 retention existed). **Ruled: Option 1 — every legal-track item gets an OPQ row; the OPQ is the operator's single working queue; this register + the Cosmo `Blocked by` edges remain the dependency SoR.**
+
+Filed: **OPQ-102..115** — WI-1105→102, WI-1106→103, WI-1107→104, WI-1108→105, WI-1109→106, WI-1110→107, WI-1115→108, WI-1114→109, WI-1192→110, WI-1659→111, WI-1663→112, WI-1664→113, WI-2064→114, WI-1111→115. Deadlines set on the two clock-starts (OPQ-102 DPO engagement, OPQ-110 DPA-loop kickoff: 2026-07-24). WI-1559 has no separate row — the OPQ-22 counsel packet already carries the entity question.
+
+**Standing rule going forward:** a new Compliance-Legal (or otherwise wholly-operator) work item gets an OPQ row filed at capture — lane membership doesn't exempt it from the queue.
