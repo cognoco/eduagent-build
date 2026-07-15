@@ -1,6 +1,6 @@
 ---
 title: "S2-03 — docs/canon/principles.md Extraction Draft"
-status: DRAFT (Wave-0 paper artifact — NOT applied)
+status: "RULED (content still NOT applied — lands via WI-2052/S2-04). All four §5 boundary calls confirmed as drafted (operator, 2026-07-15 sitting 2): B1 MOVE, B2 STAY (next lever), B3 STAY (follow-on candidates), B4 future-slice candidate. Rider: standing routing rule (new canon-shaped content → principles.md first) written into AGENTS.md preamble at landing. WI-2051 starts from this draft. Ruling record: slice plan § RULINGS."
 date: 2026-07-14
 repo: cognoco/eduagent-build
 stream: Stream 2 — Deferred Estate-Canon Drain (PRG-20)

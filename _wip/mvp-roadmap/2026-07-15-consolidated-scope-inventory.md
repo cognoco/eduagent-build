@@ -18,6 +18,18 @@ Presented as six batches R1–R6; each ruled individually.
 - **R6 — PRG-20: opened for Wave 0 ONLY.** S2-01 → **WI-2065**, S2-02 → **WI-2066** (captured, Stream-2 workstream). S2-05 onward gated behind sitting 2. S2-05..S2-16 capture deferred to sitting 2 (their dispositions hang on D1).
 - **Deferred to sitting 2** (~30 min, after Wave 0): D1 (census MoSCoW), D2 (borderline ADR calls incl. brand/voice home), D3 (mapping approval).
 
+---
+
+## § SITTING-2 RULING RECORD (operator, 2026-07-15, same day)
+
+Sitting 2 ran immediately — the Wave-0 prep artifacts turned out to already exist (delivered 2026-07-14 by a parallel session under the paper-only dispatch ruling; see the slice plan's cross-session reconciliation note). Four batches, each ruled individually. **The Stream-2 D-gate is now CLOSED** (all of D1–D7 ruled).
+
+- **D1 — census MoSCoW: accepted as proposed** (58 rows, 19/31/4/4 strict-rule table; every row carries an explicit MMT-ADR-0000 §II.1 gate verdict). Riders: ARCH-N ~13 promote rows fold into the S2-06/07 authoring batches; the newly-discovered UX-1..19/AD1..7 sibling registers get a follow-up sweep riding WI-2065.
+- **D2 — all nine borderline calls as the annex recommends.** Upgrades: row 53 (crisis-disclosure `se-032`) and row 54 (13+/launch-posture) → MUST — working count **21 MUST / 29 SHOULD**. Downgrades: row 21 (no-jargon copy) → prose in UX-spec voice section, no ADR; row 25 (clerk-js web3) → dropped, stays canon prose. Verify-first: brand 3-way contradiction → **WI-2080** (spike) before rows 5/40 draft; MMT-ADR-0002 overlap check before row 36. 0.88 gate = cited parameter inside ONE envelope ADR (overrides the slice plan's older pre-baked rec — the census was the better-informed doc). Mechanics: ADR-0020 RLS falsehood corrected in place + data-model.md §2B.1 same change-set (rider on WI-752); ARCH-3 = third "wrong pointer" Part III case. **Heuristic amendment ruled**: multi-source-consistent + self-flagged ADR-candidate + irreversible ⇒ MUST (rides WI-757's ADR-0000 change-set, with the Part III third case and the §I.4 diagram amendment naming compliance/ + audit/).
+- **D3 — mapping approved**: bulk as tabled; 7 judgment calls as recommended (audience-matrix → `registers/audience-matrix/`; flows reclassified out of assets → `registers/flows/` lockstep; project_context.md stays at root as named exception — 7 CI path couplings; screenshots_and_store_info → `compliance/store/` whole; visual-artefacts scripts bundled with outputs; future-app-options→specs, ux-todos→plans, Strategy_analysis+analysis/→_archive; spine-frontmatter rot folds into S2-11 execution; jest-config dangling docs/superpowers citations → **WI-2081**).
+- **D4-residual — all four boundary calls as drafted**: B1 Known Exceptions MOVE; B2 Schema/Deploy STAY (next-cheapest lever); B3 three rule-lists STAY (follow-on candidates once principles.md has an owner); B4 Profile Shapes = future-slice candidate. Rider on WI-2052: standing routing rule (new canon-shaped content → principles.md first) written into the AGENTS.md preamble at landing.
+- **Wave WIs minted and placed** (Stream-2 workstream, Backlog): S2-05..S2-16 → **WI-2068..2079**; **WI-2080** (brand spike); **WI-2081** (jest fix, Dev-Infra). Every slice-plan row now has a Cosmo owner; PRG-20 open for all waves; sequencing per D5/D7 unchanged.
+
 ## Sources (read in full)
 
 1. **One-way-door risk register** — `docs/audit/2026-07-12-one-way-door-risk-register.md` (2026-07-12) — 14 lock-in risks + 6 under-recorded-decision gaps.

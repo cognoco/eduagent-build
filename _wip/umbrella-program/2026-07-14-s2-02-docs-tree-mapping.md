@@ -1,6 +1,6 @@
 ---
 title: S2-02 — Docs-tree reorg mapping table (MentoMate Stream-2 estate-canon drain)
-status: DRAFT — Wave-0 paper artifact; not executed
+status: "APPROVED — D3 ruled (operator, 2026-07-15 sitting 2): bulk as tabled + all 7 §7 judgment calls as recommended (audience-matrix → registers/, flows → registers/ lockstep, project_context.md stays root, screenshots → compliance/store/ whole, visual-artefacts scripts bundled, §5 small-file targets, rot item i folds into execution, item ii → WI-2081). Execution = WI-2074 (S2-11, Wave 3 per D7) + WI-2076 (S2-13). §I.4 diagram amendment (+compliance/ +audit/) rides WI-757. Ruling record: slice plan § RULINGS."
 wave: Wave-0
 date: 2026-07-14
 provenance: >

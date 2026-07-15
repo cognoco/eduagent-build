@@ -1,6 +1,6 @@
 ---
 title: "S2-01 — The Controlled Decision Census"
-status: "DRAFT — Wave-0 paper artifact, MentoMate Stream-2 estate-canon drain"
+status: "RULED — D1 accepted as proposed + D2 all-nine-as-annex (operator, 2026-07-15 sitting 2). Working count: 21 MUST / 29 SHOULD / 3 NICE / 5 SKIP-or-dropped (rows 53/54 → MUST; row 21 → prose-NICE; row 25 → dropped). Riders: ARCH-N promotes fold into S2-06/07 (WI-2069/2070); UX-N/AD-N sweep rides WI-2065; brand rows 5/40 blocked on WI-2080; heuristic tie-break + Part III third case ride WI-757. Ruling record: slice plan § RULINGS."
 date: 2026-07-14
 provenance: >
   Produced as the S2-01 Wave-0 deliverable named in

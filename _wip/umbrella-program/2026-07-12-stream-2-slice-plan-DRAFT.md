@@ -73,13 +73,20 @@ directional with tracked drift — the census classifies docs against this bar. 
 
 | Decision | Status |
 |---|---|
-| **D1** MoSCoW ruling | **UNRULED** — artifact available (S2-01); rule at sitting 2 |
-| **D2** borderline significance calls | **UNRULED** — artifact available (S2-01 §3, **9** borderline entries); rule at sitting 2 |
-| **D3** docs-tree mapping approval | **UNRULED** — artifact available (S2-02, **11** judgment calls); rule at sitting 2 |
-| **D4** principles.md boundary | ✅ **RULED Option 1** (approach: extract + trigger-bearing pointers → WI-2051/2052); the S2-03 draft's **4 boundary calls** go to sitting 2 alongside D2 |
+| **D1** MoSCoW ruling | ✅ **RULED 2026-07-15 (sitting 2): census accepted as proposed** (strict-rule table stands, contested rows resolved at D2) + riders: ARCH-N promote rows fold into the S2-06/07 authoring batches; UX-1..19/AD1..7 follow-up sweep rides WI-2065 |
+| **D2** borderline significance calls | ✅ **RULED 2026-07-15 (sitting 2): all nine as the annex recommends.** Rows 53+54 → MUST (working count 21/29); row 21 → prose-NICE, row 25 → dropped; 0.88 gate = parameter inside ONE envelope ADR (overrides this plan's older pre-baked rec); brand → verification WI (WI-2080) before any drafting, home = UX-spec canon section (resolves D6 row 5); ADR-0002 overlap check before row-36 drafting; ADR-0020 corrected in place via WI-752; ARCH-3 = third "wrong pointer" case; MoSCoW tie-break clause + Part III third case + §I.4 diagram (+compliance/+audit/) amendments ride WI-757 |
+| **D3** docs-tree mapping approval | ✅ **RULED 2026-07-15 (sitting 2): mapping approved** — bulk as tabled + all 7 judgment calls as recommended: audience-matrix → `registers/audience-matrix/`, flows → `registers/flows/` (lockstep), project_context.md stays at root (named exception), screenshots→`compliance/store/` whole, visual-artefacts scripts bundled with outputs, 4 small unhomed per §5, spine-frontmatter rot folds into S2-11, jest-config dangling citations → WI-2081 |
+| **D4** principles.md boundary | ✅ **RULED Option 1** (approach: extract + trigger-bearing pointers → WI-2051/2052); **4 boundary calls RULED 2026-07-15 (sitting 2), all as drafted**: B1 Known Exceptions MOVE, B2 Schema/Deploy STAY (next lever), B3 three rule-lists STAY (follow-on candidates), B4 Profile Shapes = future-slice candidate; rider: standing routing rule (canon-shaped content → principles.md first) written into AGENTS.md preamble at WI-2052 landing |
 | **D5** governance before backfill | ✅ **RULED YES** |
-| **D6** WI-387 "or"-targets | ✅ **RULED** — row 1 → `ux-design-specification.md`; row 8 → `PRD.md`; row 5 → deferred into D2 |
+| **D6** WI-387 "or"-targets | ✅ **RULED** — row 1 → `ux-design-specification.md`; row 8 → `PRD.md`; row 5 → per D2: UX-spec canon section, after WI-2080 verification |
 | **D7** reorg timing | ✅ **RULED** — reorg **after** the ADR-backfill batches |
+
+**D-gate CLOSED 2026-07-15 (sitting 2, mvp-plan session).** All seven decisions ruled; PRG-20
+now open for all waves. Wave WIs minted: S2-05..S2-16 → **WI-2068..2079** (in order), plus
+**WI-2080** (brand-preset verification spike, D2 annex #2) and **WI-2081** (jest-config
+dangling-citation fix, D3 §6). With Wave 0 (WI-2065/2066), S2-03/04 (WI-2051/2052), and the
+Wave-1 folds (WI-752/757/895–900), every slice-plan row now has a Cosmo owner. Sequencing
+unchanged: Wave 1 (757/896 first per D5) → Wave 2 → Wave 3 → Wave 4.
 
 **Wave-0 artifacts (delivered 2026-07-14, this repo):**
 `_wip/umbrella-program/2026-07-14-s2-01-decision-census.md` ·
