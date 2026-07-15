@@ -41,7 +41,7 @@ HITL is ordinary review-gate traffic.
 > Assisted/Auto. Each decision below arrives at the gate with its Wave-0 prep artifact
 > and a recommendation; you rule, we execute.
 
-### RULINGS — status 2026-07-14
+### RULINGS — consolidated status (2026-07-14 + sitting-1 2026-07-15)
 
 **Wave-0 dispatch — APPROVED** (Zuzka, 2026-07-14, OQ Approval row):
 > "dispatch Wave-0 now for the three paper-only artifacts: S2-01 controlled decision
@@ -58,12 +58,25 @@ HITL is ordinary review-gate traffic.
 > the ADR-backfill batches to avoid citation churn. D1–D4 remain explicitly unruled pending
 > the approved Wave-0 artifacts from OPQ-94; this OPQ remains Open."
 
+**Sitting-1 additions** (operator, 2026-07-15, mvp-plan session — see
+`_wip/mvp-roadmap/2026-07-15-consolidated-scope-inventory.md` § SITTING-1 RULING RECORD):
+D4 ruled Option 1 (2026-07-14, mvp-plan session): extract rule catalogs to
+`docs/canon/principles.md` with trigger-bearing pointers left in AGENTS.md — captured
+as **WI-2051** (S2-03 draft) + **WI-2052** (S2-04 land); WI-1856 reconciled
+Closed/Duplicate, its two constraints carried on the WIs. R5 re-confirmed D5/D6/D7
+identically to the 2026-07-14 partial ruling. R6 re-confirmed PRG-20 = Wave 0 ONLY and
+minted Cosmo tracking: S2-01 → **WI-2065**, S2-02 → **WI-2066**. The MVP docs bar was
+ruled tiered (R1): compliance/safety canon strict as-built (DPIA, ROPA, privacy policy,
+identity/deletion canon, LLM-safety register, age/consent gating docs); all else
+directional with tracked drift — the census classifies docs against this bar. OWD drain
+**T10/T11 dissolve into S2-01** (collision C1).
+
 | Decision | Status |
 |---|---|
-| **D1** MoSCoW ruling | **UNRULED** — artifact now available (S2-01) |
-| **D2** borderline significance calls | **UNRULED** — artifact now available (S2-01 §3, **9** borderline entries) |
-| **D3** docs-tree mapping approval | **UNRULED** — artifact now available (S2-02, **11** judgment calls) |
-| **D4** principles.md boundary | **UNRULED** — artifact now available (S2-03, **4** boundary calls) |
+| **D1** MoSCoW ruling | **UNRULED** — artifact available (S2-01); rule at sitting 2 |
+| **D2** borderline significance calls | **UNRULED** — artifact available (S2-01 §3, **9** borderline entries); rule at sitting 2 |
+| **D3** docs-tree mapping approval | **UNRULED** — artifact available (S2-02, **11** judgment calls); rule at sitting 2 |
+| **D4** principles.md boundary | ✅ **RULED Option 1** (approach: extract + trigger-bearing pointers → WI-2051/2052); the S2-03 draft's **4 boundary calls** go to sitting 2 alongside D2 |
 | **D5** governance before backfill | ✅ **RULED YES** |
 | **D6** WI-387 "or"-targets | ✅ **RULED** — row 1 → `ux-design-specification.md`; row 8 → `PRD.md`; row 5 → deferred into D2 |
 | **D7** reorg timing | ✅ **RULED** — reorg **after** the ADR-backfill batches |
@@ -71,6 +84,14 @@ HITL is ordinary review-gate traffic.
 **Wave-0 artifacts (delivered 2026-07-14, this repo):**
 `_wip/umbrella-program/2026-07-14-s2-01-decision-census.md` ·
 `…-s2-02-docs-tree-mapping.md` · `…-s2-03-principles-extraction-draft.md`
+
+> **Cross-session reconciliation note (2026-07-15):** WI-2065/WI-2066 were captured
+> before this session learned the 2026-07-14 paper artifacts already existed. Read
+> their ACs against those artifacts: the WIs track **verification + finalization +
+> docs-bar classification** of the existing census/mapping (and the T10/T11
+> absorption for WI-2065), not greenfield authoring. Same for WI-2051 vs the
+> existing S2-03 extraction draft. **Sitting 2 (D1/D2/D3 + D4 boundary calls) is
+> unblocked NOW** — its prep artifacts exist.
 
 | # | Decision | Prep artifact (Wave 0) | Recommendation |
 |---|---|---|---|

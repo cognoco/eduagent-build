@@ -91,3 +91,4 @@ Out of scope:
 
 - Code deletion is **not reversible** by a flag — rollback is `git revert` of the Phase B PR, which restores the adapter, the legacy path, and the `LLM_ROUTING_V2_ENABLED` flag (still defaulting off → legacy Gemini path). For this to be a viable rollback, the Gemini Doppler key must still exist at revert time; do not delete it until Phase B has itself soaked. No data is lost by the revert (routing-only change).
 - `FALLBACK_FORBIDDEN` is intentionally retained after deletion: it is the standing prohibition-floor that keeps Gemini/Vertex unselectable even if a future provider row is mis-added.
+- **Re-admission (one-way-door drain T9 note, 2026-07-15):** any future re-admission of Gemini/Vertex to runtime requires a new vetting row, a new policy row, and a fresh eval baseline — it is a new-provider onboarding, not a revert.
