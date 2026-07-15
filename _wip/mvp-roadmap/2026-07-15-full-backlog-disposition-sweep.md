@@ -10,12 +10,20 @@
 
 **Method:** 5 parallel reviewers, each grounding every call in the ratified MVP capability tree (`docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md`, IN/DEGRADED/OUT/FILL semantics) + RUNWAY.md; Priority ignored throughout; truncated descriptions fetched in full from Cosmo where ambiguous. ⚠ = reviewer flagged low/medium confidence (24 of 116) — worth a second look before batch-accept.
 
-**Proposed totals:** MVP 46 · Post-MVP pen 63 · Close 4 · Operator calls 3.
+**RULED + EXECUTED 2026-07-15 (batch-accept with one exception).** Final totals: **MVP 50** (46 + WI-1378 close-rejected + WI-1292 + WI-1898-floor + WI-1870 flipped at batch-accept to Core Learning Loop) · **Post-MVP pen 62** (+ WI-2115, the WI-1898 recovery/FP slice, captured to the pen) · **Closed 3** (WI-1452 Duplicate→WI-1704; WI-1867, WI-2013 Cancelled umbrellas — completeness checks passed) · **Zuzka 1** (WI-1897 → OPQ-117). Execution: 112 placements (61 triage, 51 workstream patches), 0 failures. Every open MentoMate item now carries an explicit in/out ruling, a stage-gate rationale, or a named escalation.
+
+**Original proposed totals:** MVP 46 · Post-MVP pen 63 · Close 4 · Operator calls 3.
 MVP additions by lane: Launch Readiness 9 · Core Learning Loop 8 · Safety & Eval 7 · Dev-Infra & Tooling 7 · Compliance-Eng 5 · Mobile UX & Nav 3 · Supporter & Linking 3 · Identity Cutover 2 · Store Billing & Release 2.
 
 **Supersedes:** the pre-read §4 LD4 table. Sweep deltas vs that table: WI-1897 → operator call (was Mobile UX), WI-1899 → post-MVP (was Core Learning Loop), WI-1808 → post-MVP (was Dev-Infra), WI-2013 → close as umbrella (was deliberately-unassigned). WI-1807/1826/1900/1901 → Safety & Eval and WI-1864 → Dev-Infra are confirmed by the sweep.
 
 ### A · Operator calls (3)
+
+> **WI-1292 ruling (2026-07-15): Option 1 — MVP window, Identity Cutover lane.** Scoping only: the HELD triple gate (fresh PITR snapshot + catalog spot-check + explicit operator confirmation at apply time) is unchanged; sequenced after WI-1306, preferably after WI-2056 (PITR runbook) exists. Note: item re-scoped 2026-07-03 — dev-branch apply only; prod/staging already clean.
+>
+> **WI-1898 ruling (2026-07-15): Option 2 — SPLIT.** Floor slice (block-copy audit + graceful judge-unavailable fallback) → MVP, Safety & Eval. Recovery affordance + FP instrumentation → Post-MVP pen (FP-proxy event may ride WI-1901 if trivial). No safety gate weakened — recovery UX only. Split executed with the batch.
+>
+> **WI-1897 ruling (2026-07-15): ESCALATED TO ZUZKA (product).** Operator narrowed to Option 1 (all-in-MVP, Mobile UX & Nav) vs Option 2 (split: cap-hit floor → MVP; parent value-handoff card + funnel → pen, tree-kill-adjacency noted). Hex recommendation: Option 2. Zuzka escalations collected at end of sitting.
 
 | WI | Stage | Current lane | Item | Question |
 |---|---|---|---|---|
@@ -24,6 +32,8 @@ MVP additions by lane: Launch Readiness 9 · Core Learning Loop 8 · Safety & Ev
 | WI-1292 | Backlog | Identity Cutover | Apply 0130 legacy-table DROP (HELD, irreversible) | Irreversible legacy-table drop: execute pre-launch while cheap (zero users) or defer post-launch once identity spine lands? |
 
 ### B · Close proposals (4)
+
+> **§B ruling (2026-07-15): approved as recommended.** WI-1452 close as duplicate-of WI-1704 (executes the 2026-07-10 tree ruling). WI-1867 + WI-2013 close as retired umbrellas, each behind a close-time completeness check (untracked findings get captured first). **WI-1378 close REJECTED on fact-check** — the test file exists on main and the broken-guard premise is live; reclassified MVP → Identity Cutover. Closes execute via the governed triage/review path citing this sitting — no agent-asserted closes.
 
 | WI | Stage | Current lane | Item | Why close |
 |---|---|---|---|---|
