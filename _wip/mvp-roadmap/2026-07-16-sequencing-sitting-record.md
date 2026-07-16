@@ -28,12 +28,14 @@
 
 ## Wave-1 batch formation (kickoff sitting #1, 2026-07-16 — operator-ruled)
 
-Premise-check done (11:30Z: gates unchanged, no new arrivals, zero live claims). Human-gate audit run over all 21 members (full desc+AC review) before ruling; operator confirmed composition. **First four real Delivery Batch pages minted** (Batches DB, Status=Formed):
+Premise-check done (11:30Z: gates unchanged, no new arrivals, zero live claims). Human-gate audit run over all 21 members (full desc+AC review) before ruling; operator confirmed composition. **First four real Delivery Batch pages minted:**
 
-- **MM-B1 Preview vehicle** — WI-2118/2119/2120. Restores the QA vehicle; everything QA-shaped queues behind it. Known handoff point: WI-2119 if fix is a Clerk dashboard-only toggle → stop and file operator ask.
-- **MM-B2 CI & gates unblock** — WI-1807/1992/1809/1813/1862/1874/2081. AC-author first for WI-1862/1813; one live baseline reseed.
-- **MM-B3 Deletion & PII hygiene** — WI-1442/1985/1987/1988/1990/2058. Hard order: WI-2058 last (Blocked-by edge on WI-1985 wired); WI-2058 close = operator ratification (STRICT R1 deletion canon).
-- **MM-B4 Safety floor** — WI-1986/1826/1877/1880/2004. AC-author first for WI-1826; WI-1986 refine-note (accelerate legacy-selector deletion if scheduled); no gate/threshold weakened.
+- **BID-1 Preview vehicle** — WI-2118/2119/2120. Restores the QA vehicle; everything QA-shaped queues behind it. Known handoff point: WI-2119 if fix is a Clerk dashboard-only toggle → stop and file operator ask.
+- **BID-2 CI & gates unblock** — WI-1807/1992/1809/1813/1862/1874/2081. AC-author first for WI-1862/1813; one live baseline reseed.
+- **BID-3 Deletion & PII hygiene** — WI-1442/1985/1987/1988/1990/2058. Hard order: WI-2058 last (Blocked-by edge on WI-1985 wired); WI-2058 close = operator ratification (STRICT R1 deletion canon).
+- **BID-4 Safety floor** — WI-1986/1826/1877/1880/2004. AC-author first for WI-1826; WI-1986 refine-note (accelerate legacy-selector deletion if scheduled); no gate/threshold weakened.
+
+**Batch-object refinements (operator-ruled same day, relayed to ZDX; operator instructs the ZDX program directly — no separate ZDX ruling):** names = bare descriptive slugs (no project prefix / manual B-numbers / dates — BID + relations carry identity and attribution); Status lifecycle = `Draft → Ready → Running → Done` + `Cancelled` ("Formed" dropped); readiness-doctrine amendment — relation-gates are query-cleared, `Gated by — note` holds (capacity, external milestones) are judgment-cleared at the Ready→Running flip, note preserved as record; Project + Initiative relations added to the Batches DB (Workstreams pattern) and wired to MentoMate on all four. **All four batches: Status=Ready, HELD via `Gated by — note` — no dispatch until the designated ZDX-stream milestone; operator lifts explicitly.**
 
 Excluded at premise-check: WI-1196 (ruling-gated by OPQ-97), WI-1194 (counsel-gated, stage anomaly noted), WI-1764 (Awaiting Info), parked/blocked items. Held for round two: WI-1650, WI-1864 (investigation-heavy), Identity cluster (WI-1989/2006/2055/2056 — canon wording deserves operator eyes), WI-1898/1900 (different safety surfaces). Factory drain handled separately per operator. Clock-starts (OPQ-22/102/110) deferred — operator not ready this sitting.
 
