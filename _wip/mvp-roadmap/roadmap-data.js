@@ -1,5 +1,5 @@
 window.ROADMAP_DATA = {
-  "generated": "2026-07-16T10:22Z",
+  "generated": "2026-07-16T11:13Z",
   "opq": [
     {
       "opq": "OPQ-11",
@@ -1886,10 +1886,12 @@ window.ROADMAP_DATA = {
     {
       "wi": "WI-1897",
       "n": 1897,
-      "name": "Cap-hit UX: graceful daily-limit landing + parent value-handoff card (core conversion moment)",
-      "stage": "Captured",
+      "name": "Cap-hit UX MVP floor: graceful daily-limit landing (rescoped per OPQ-117)",
+      "stage": "Backlog",
       "priority": "P2",
-      "lanes": []
+      "lanes": [
+        "Core Learning Loop"
+      ]
     },
     {
       "wi": "WI-1898",
@@ -2917,6 +2919,16 @@ window.ROADMAP_DATA = {
       "priority": "P2",
       "lanes": [
         "QA Fix Factory"
+      ]
+    },
+    {
+      "wi": "WI-2150",
+      "n": 2150,
+      "name": "Parent value-handoff card + cap-hit purchase funnel (split from WI-1897, post-MVP)",
+      "stage": "Backlog",
+      "priority": "P2",
+      "lanes": [
+        "Post-MVP pen"
       ]
     }
   ]
