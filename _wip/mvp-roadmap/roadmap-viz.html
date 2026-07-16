@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MentoMate MVP — roadmap comprehension views (2026-07-16)</title>
+<style>
+:root[data-theme="dark"]{--bg:#14161a;--panel:#1d2026;--panel2:#23262e;--ink:#e6e8ee;--mut:#9aa0ad;--line:#343945;
+  --b1:#e0a83c;--b2:#5b9bd5;--b3:#c678dd;--gate:#e06c75;--go:#7fb069;--wave1:#7fb069;--wave2:#5b9bd5;--track:#8a8f9c;--badge:#3a2f1a}
+:root[data-theme="light"]{--bg:#f5f5f2;--panel:#ffffff;--panel2:#eef0f3;--ink:#23262e;--mut:#5c6270;--line:#d5d8df;
+  --b1:#b07d1a;--b2:#2f6fad;--b3:#8e44ad;--gate:#c0392b;--go:#4a7a3a;--wave1:#4a7a3a;--wave2:#2f6fad;--track:#6a7080;--badge:#f4e6c8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:16px 20px 60px}
+h1{font-size:19px;margin:0 0 2px} h2{font-size:15px;margin:18px 0 8px}
+.mut{color:var(--mut)} .small{font-size:12px}
+.banner{border:1px solid var(--b1);background:var(--badge);border-radius:8px;padding:8px 12px;margin:10px 0;font-size:12.5px}
+.topbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.tabs button,.theme{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 14px;cursor:pointer;font-size:13px}
+.tabs button.on{border-color:var(--ink);font-weight:600}
+.view{display:none}.view.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.chip{display:inline-block;border-radius:5px;padding:1px 7px;margin:2px 3px 2px 0;font-size:12px;border:1px solid var(--line);background:var(--panel2)}
+.chip.b1{border-color:var(--b1)} .chip.b2{border-color:var(--b2)} .chip.b3{border-color:var(--b3)}
+.badge{font-size:11px;border-radius:4px;padding:0 5px;margin-left:5px;background:var(--panel2);border:1px solid var(--line);color:var(--mut)}
+.badge.dl{border-color:var(--gate);color:var(--gate);font-weight:600}
+.flow{display:flex;gap:8px;align-items:stretch;overflow-x:auto;padding:6px 0}
+.flow .arrow{align-self:center;font-size:22px;color:var(--mut);flex:0 0 auto}
+.gatecard{min-width:250px;max-width:300px;border:1.5px solid var(--gate);border-radius:10px;background:var(--panel);padding:9px 11px;flex:0 0 auto}
+.gatecard h3{margin:0 0 3px;font-size:13.5px;color:var(--gate)}
+.gatecard .down{border-top:1px dashed var(--line);margin-top:7px;padding-top:6px;font-size:12px;color:var(--mut)}
+.launch{border-color:var(--go)} .launch h3{color:var(--go)}
+.buckets{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin:8px 0}
+.bk{border-radius:10px;border:1.5px solid var(--line);background:var(--panel);padding:9px 11px}
+.bk h3{margin:0 0 4px;font-size:13.5px}
+.bk.b1{border-color:var(--b1)} .bk.b1 h3{color:var(--b1)}
+.bk.b2{border-color:var(--b2)} .bk.b2 h3{color:var(--b2)}
+.bk.b3{border-color:var(--b3)} .bk.b3 h3{color:var(--b3)}
+.bk li{margin:3px 0;font-size:12.5px;list-style:none}
+.bk ul{margin:4px 0;padding:0}
+table.rm{border-collapse:collapse;width:100%;margin-top:6px}
+table.rm th,table.rm td{border:1px solid var(--line);padding:7px 9px;vertical-align:top;font-size:12.5px}
+table.rm th{background:var(--panel2);text-align:left;font-size:12px}
+table.rm td.who{white-space:nowrap;font-weight:600;background:var(--panel);width:130px}
+.w1{border-left:3px solid var(--wave1);padding-left:6px;margin:3px 0}
+.w2{border-left:3px solid var(--wave2);padding-left:6px;margin:3px 0}
+.wtag{font-size:10.5px;font-weight:700;border-radius:3px;padding:0 4px;margin-right:4px}
+.wtag.one{background:var(--wave1);color:#fff}.wtag.two{background:var(--wave2);color:#fff}
+tr.track td{background:var(--panel);border-left:3px solid var(--track)}
+details{margin:2px 0} summary{cursor:pointer;color:var(--mut);font-size:12px}
+details li{font-size:12px;margin:1px 0;list-style:none}
+details ul{margin:3px 0;padding-left:10px}
+.stage{color:var(--mut);font-size:11px}
+.neg{border:1px dashed var(--go);border-radius:10px;padding:9px 12px;margin-top:12px;background:var(--panel)}
+.neg h3{margin:0 0 4px;font-size:13.5px;color:var(--go)}
+.cols{display:flex;gap:14px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>MentoMate MVP — roadmap comprehension views</h1>
+  <span class="mut small" id="gen"></span>
+  <span style="flex:1"></span>
+  <span class="tabs"><button id="tabA" class="on">A · HITL impact flow</button><button id="tabB">B · Phase roadmap</button></span>
+  <button class="theme" id="themeBtn">☀ light</button>
+</div>
+<div class="banner">⚠ <b>Comprehension artifact — no plan authority.</b> Standing orders (sequencing sitting 2026-07-16): this is a map, not the terrain; it is not a plan-of-record unless explicitly promoted. Before <i>every</i> batch kickoff: re-verify premises (gate status, human clocks, QA arrivals, parallel-session landings) and reorganize if warranted. Live state is Cosmo; regenerate with <code>bash viz-export.sh</code>.</div>
+
+<!-- ═══════════ VIEW A ═══════════ -->
+<div class="view on" id="viewA">
+  <h2>Human-in-the-loop buckets → what they actually block</h2>
+  <p class="mut small" style="margin:2px 0 8px">Core finding (legal register §0): <b>counsel blocks gates, not dev</b>. All 16 legal items converge on three gate items; nothing upstream of the gates waits on paper.</p>
+  <div class="buckets" id="buckets"></div>
+  <h2>The gate chain</h2>
+  <div class="flow" id="flow"></div>
+  <div class="neg" id="negspace"></div>
+</div>
+
+<!-- ═══════════ VIEW B ═══════════ -->
+<div class="view" id="viewB">
+  <h2>Phase × executor roadmap <span class="mut small">(phases bounded only by gates — SEQ-1)</span></h2>
+  <table class="rm" id="rmtable"></table>
+  <p class="mut small">Wave overlay (SEQ-2, re-decidable at each premise-check): <span class="wtag one">W1</span> opens now — Dev-Infra unblockers, Compliance-Eng chain (paces Phase-1 exit), Identity Cutover, Safety &amp; Eval floor, first factory drain. <span class="wtag two">W2</span> opens at the first premise-check — the rest of the feasible set. Waves are capacity lenses over Phase 1, not batches; batches are formed at kickoff sittings by co-execution affinity (SEQ-6) as Delivery Batch pages (ZDX-ruled live 2026-07-16).</p>
+</div>
+
+<script src="roadmap-data.js"></script>
+<script>
+const D = window.ROADMAP_DATA;
+document.getElementById('gen').textContent = 'data: ' + D.generated + ' · ' + D.items.length + ' open items · ' + D.opq.length + ' open OPQ rows';
+
+/* theme */
+const tb=document.getElementById('themeBtn'), root=document.documentElement;
+function setTheme(t){root.dataset.theme=t;tb.textContent=t==='dark'?'☀ light':'☾ dark';localStorage.setItem('mm-viz-theme',t);}
+setTheme(localStorage.getItem('mm-viz-theme')||'dark');
+tb.onclick=()=>setTheme(root.dataset.theme==='dark'?'light':'dark');
+
+/* tabs */
+const tA=document.getElementById('tabA'),tB=document.getElementById('tabB');
+function show(v){document.getElementById('viewA').classList.toggle('on',v==='A');document.getElementById('viewB').classList.toggle('on',v==='B');tA.classList.toggle('on',v==='A');tB.classList.toggle('on',v==='B');}
+tA.onclick=()=>show('A'); tB.onclick=()=>show('B');
+
+const byWi=Object.fromEntries(D.items.map(i=>[i.wi,i]));
+const opqBy=w=>D.opq.filter(o=>o.title.includes(w));
+function itemName(wi){const it=byWi[wi];return it?it.name:'(closed/not found)';}
+function wiChip(wi,bucket,short){
+  const it=byWi[wi]; const o=D.opq.filter(x=>x.title.includes(wi));
+  let b=o.map(x=>` <span class="badge${x.deadline?' dl':''}">${x.opq}${x.deadline?' ⏰'+x.deadline.slice(5):''}</span>`).join('');
+  return `<span class="chip ${bucket||''}" title="${it?it.name.replace(/"/g,'&quot;'):''}">${wi}${short?'':' '+(it?it.name.slice(0,46)+(it.name.length>46?'…':''):'')}${b}</span>`;
+}
+
+/* ---- static ruling config (source: legal register 2026-07-15 + sequencing sitting 2026-07-16) ---- */
+const BUCKETS=[
+ {cls:'b1',name:'Bucket 1 — internal rulings (days)',who:'Jørn / internal',wis:['WI-1110','WI-1115','WI-2064','WI-1664']},
+ {cls:'b2',name:'Bucket 2 — GDPR/COPPA formalities (weeks)',who:'DPO + GDPR counsel — clock-starts: OPQ-102 (DPO), OPQ-110 (DPAs), OPQ-24/25 (retention)',wis:['WI-1105','WI-1106','WI-1107','WI-1108','WI-1109','WI-1192','WI-1194']},
+ {cls:'b3',name:'Bucket 3 — other legal (external calendar)',who:'Specialist counsel — vehicle: OPQ-22 packet (entity + Art 9 + crisis duties)',wis:['WI-1659','WI-1663','WI-1764','WI-1559','WI-1111']}
+];
+const BCLS={};BUCKETS.forEach(b=>b.wis.forEach(w=>BCLS[w]=b.cls));
+const GATES=[
+ {wi:'WI-1577',title:'FINAL GATE — launch compliance closure',feeders:['WI-1106','WI-1107','WI-1108','WI-1109','WI-1192','WI-1659','WI-1559','WI-2064'],
+  down:'Passing ends Phase 1 (Full Parallel). Everything submission-side queues behind this single item.'},
+ {wi:'WI-1335',title:'Store submission',feeders:['WI-1114','WI-1115','WI-1577'],
+  down:'Store review cycles run; approval ends Phase 2 (Submission).'},
+ {wi:'WI-1506',title:'Closed beta',feeders:['WI-1764'],
+  down:'Real families in the app (beta gate carries: no open launch-blocking QA findings). Exit → public-launch decision.'}
+];
+/* upstream-of-gate edges shown inside bucket lists */
+const INNER_EDGES={'WI-1105':'→ WI-1106, WI-1109','WI-1111':'→ WI-1106 (DPIA scope)','WI-1559':'→ WI-1106, WI-1109, WI-1577','WI-1109':'→ WI-1114, WI-1577'};
+
+/* View A: buckets */
+document.getElementById('buckets').innerHTML=BUCKETS.map(b=>`
+ <div class="bk ${b.cls}"><h3>${b.name}</h3><div class="mut small">${b.who}</div>
+ <ul>${b.wis.map(w=>`<li>${wiChip(w,b.cls)} ${INNER_EDGES[w]?`<span class="mut small">${INNER_EDGES[w]}</span>`:''}</li>`).join('')}</ul></div>`).join('');
+
+/* View A: gate chain */
+let flow='';
+GATES.forEach((g,i)=>{
+ flow+=`<div class="gatecard"><h3>${g.wi} · ${g.title}</h3>
+   <div class="small mut">consumes:</div>
+   <div>${g.feeders.map(f=>wiChip(f,BCLS[f],true)).join('')}</div>
+   <div class="down">${g.down}</div></div>`;
+ flow+='<div class="arrow">→</div>';
+});
+flow+=`<div class="gatecard launch"><h3>PUBLIC LAUNCH</h3><div class="small">Operator decision after beta exit. No further legal feeders.</div></div>`;
+document.getElementById('flow').innerHTML=flow;
+
+/* View A: negative space */
+const LEGAL_LANES=new Set(['Compliance — Legal & External','Post-MVP pen']);
+const devItems=D.items.filter(i=>i.lanes.length&&!i.lanes.some(l=>LEGAL_LANES.has(l)||/post-mvp/i.test(l)));
+const laneCounts={};devItems.forEach(i=>i.lanes.forEach(l=>{laneCounts[l]=(laneCounts[l]||0)+1;}));
+document.getElementById('negspace').innerHTML=`<h3>The negative space — runs regardless (${devItems.length} open items, zero counsel input)</h3>
+ <div class="small mut">Every lane below executes at full speed while the paper rolls in; counsel touches only the three gate cards above.</div>
+ <div style="margin-top:5px">${Object.entries(laneCounts).sort((a,b)=>b[1]-a[1]).map(([l,c])=>`<span class="chip">${l} · ${c}</span>`).join('')}</div>`;
+
+/* ---- View B ---- */
+const W1=['Dev-Infra & Tooling','Compliance — Engineering','Identity Cutover','Safety & Eval','QA Fix Factory'];
+const W2=['Core Learning Loop','Mobile UX & Navigation','Supporter & Linking','Four Strands Language Learning','Store, Billing & Release'];
+function laneCell(lanes,wave){
+ return lanes.map(l=>{
+  const items=D.items.filter(i=>i.lanes.includes(l));
+  if(!items.length)return '';
+  return `<div class="${wave==='1'?'w1':'w2'}"><span class="wtag ${wave==='1'?'one':'two'}">W${wave}</span><b>${l}</b> · ${items.length}
+   <details><summary>items</summary><ul>${items.map(i=>`<li>${i.wi} ${i.name.slice(0,70)} <span class="stage">${i.stage}${i.priority?' · '+i.priority:''}</span></li>`).join('')}</ul></details></div>`;
+ }).join('');
+}
+function laneOnly(l){const items=D.items.filter(i=>i.lanes.includes(l));
+ return `<b>${l}</b> · ${items.length} <details><summary>items</summary><ul>${items.map(i=>`<li>${i.wi} ${i.name.slice(0,70)} <span class="stage">${i.stage}</span></li>`).join('')}</ul></details>`;}
+const opqRows=ids=>ids.map(id=>{const o=D.opq.find(x=>x.opq===id);return o?`<div class="small">· <b>${o.opq}</b>${o.deadline?` <span class="badge dl">⏰ ${o.deadline}</span>`:''} ${o.title.slice(0,80)}</div>`:''}).join('');
+const penCount=D.items.filter(i=>i.lanes.some(l=>/post-mvp/i.test(l))).length;
+
+document.getElementById('rmtable').innerHTML=`
+<tr><th style="width:130px"></th>
+ <th>PHASE 1 · Full Parallel <span class="mut">— ends when WI-1577 FINAL GATE passes</span></th>
+ <th style="width:22%">PHASE 2 · Submission <span class="mut">— ends at store approval</span></th>
+ <th style="width:20%">PHASE 3 · Beta &amp; Launch</th></tr>
+<tr><td class="who">Counsel / DPO</td>
+ <td>DPO engagement → DPIA · ROPA · breach plan · policy review · DPA/TIA loops · AI-Act memo · OPQ-22 packet answers (entity, Art 9, crisis duties)${opqRows(['OPQ-102','OPQ-110','OPQ-24'])}</td>
+ <td>Nothing new — paper already consumed by WI-1577</td>
+ <td>—</td></tr>
+<tr><td class="who">Jørn (operator)</td>
+ <td><b>Kickoff sitting (committed):</b> clock-starts OPQ-22 / OPQ-102 / OPQ-110 + operator-row burn-down (${D.opq.length} rows open) · premise-check before each batch · internal rulings (Bucket 1)</td>
+ <td>Store console actions (country config, declarations sign-off, submission)${opqRows(['OPQ-60'])}</td>
+ <td>Beta cohort go / public-launch decision</td></tr>
+<tr><td class="who">Zuzka (product)</td>
+ <td><b>Kickoff sitting (committed):</b>${opqRows(['OPQ-40','OPQ-117','OPQ-118'])}</td>
+ <td>Store listing copy review</td>
+ <td>Beta feedback triage (scope authority for Q2 items)</td></tr>
+<tr><td class="who">Agent fleet</td>
+ <td>${laneCell(W1,'1')}${laneCell(W2,'2')}<div class="small mut" style="margin-top:4px">Launch Readiness (~${(D.items.filter(i=>i.lanes.includes('Launch Readiness'))).length} items) continues in flight — not wave-managed.</div></td>
+ <td>Release hardening · store-review fix turnaround · ${laneOnly('Launch Readiness')}</td>
+ <td>Beta-blocking QA findings only (factory drains the rest off-path)</td></tr>
+<tr class="track"><td class="who">∥ Stream 2</td><td colspan="3">${laneOnly('Stream 2 — Estate-Canon Drain (PRG-20)')} — autonomous, own D-gate cadence (OPQ-95); not phase-coupled</td></tr>
+<tr class="track"><td class="who">∥ V2 tail</td><td colspan="3">${laneOnly('V2 finalization')} — S5/S6 + soak gates; single launch coupling = WI-2059 release-ADR edge</td></tr>
+<tr class="track"><td class="who">∥ QA factory</td><td colspan="3">${laneOnly('QA Fix Factory')} — severity-gated intake (SEQ-5); rolling drain batches off the critical path; unfixed at beta → severity re-look → pen</td></tr>
+<tr class="track"><td class="who">Pen (off-axis)</td><td colspan="3"><b>Post-MVP pen</b> · ${penCount} items — unsequenced by design; promotion only via explicit scope ruling at a premise-check (never drift)</td></tr>`;
+</script>
+</body>
+</html>
