@@ -26,6 +26,17 @@
 
 **Post-sitting addendum (2026-07-16): QA intake executed.** WS-55 "QA Fix Factory" created (`39f8bce9-1f7c-815f-a63d-ff48aef9b6f1`). 30 unrouted arrivals ruled and placed: 7 → Core Learning Loop (WI-2094/2095/2098/2099/2100/2107/2114), 3 → Supporter & Linking (WI-2123/2125/2126, joining WI-2127/2128 placed by a parallel session), 3 → Dev-Infra & Tooling (WI-2118/2119/2120, Wave-1 material — preview builds are the QA vehicle), WI-2104 closed duplicate of WI-2103, WI-2112 → OPQ-118 (Zuzka, Challenge redefinition), 15 → WS-55 factory. Cross-estate factory lane considered and declined (per-project lanes + estate-daemon-as-query; finding F4/F5 in the ZDX doc above). **WI-1897 split executed** (OPQ-117 closed — Zuzka ruled Option 2, 2026-07-15): WI-1897 rescoped to the MVP graceful cap-hit floor → Core Learning Loop; parent value-handoff card + purchase funnel minted as WI-2150 → pen (distinct product review required before build; parent cap banners and child-to-parent purchase nudges remain ruled out).
 
+## Wave-1 batch formation (kickoff sitting #1, 2026-07-16 — operator-ruled)
+
+Premise-check done (11:30Z: gates unchanged, no new arrivals, zero live claims). Human-gate audit run over all 21 members (full desc+AC review) before ruling; operator confirmed composition. **First four real Delivery Batch pages minted** (Batches DB, Status=Formed):
+
+- **MM-B1 Preview vehicle** — WI-2118/2119/2120. Restores the QA vehicle; everything QA-shaped queues behind it. Known handoff point: WI-2119 if fix is a Clerk dashboard-only toggle → stop and file operator ask.
+- **MM-B2 CI & gates unblock** — WI-1807/1992/1809/1813/1862/1874/2081. AC-author first for WI-1862/1813; one live baseline reseed.
+- **MM-B3 Deletion & PII hygiene** — WI-1442/1985/1987/1988/1990/2058. Hard order: WI-2058 last (Blocked-by edge on WI-1985 wired); WI-2058 close = operator ratification (STRICT R1 deletion canon).
+- **MM-B4 Safety floor** — WI-1986/1826/1877/1880/2004. AC-author first for WI-1826; WI-1986 refine-note (accelerate legacy-selector deletion if scheduled); no gate/threshold weakened.
+
+Excluded at premise-check: WI-1196 (ruling-gated by OPQ-97), WI-1194 (counsel-gated, stage anomaly noted), WI-1764 (Awaiting Info), parked/blocked items. Held for round two: WI-1650, WI-1864 (investigation-heavy), Identity cluster (WI-1989/2006/2055/2056 — canon wording deserves operator eyes), WI-1898/1900 (different safety surfaces). Factory drain handled separately per operator. Clock-starts (OPQ-22/102/110) deferred — operator not ready this sitting.
+
 ## Next actions (post-sitting)
 1. QA-factory lane creation + intake of the 33 (two-question proposals → operator batch-accept).
 2. Visualization (comprehension artifact — carries the standing-order banner): View A = HITL impact flow (3 buckets → OPQ/WI → gates → collapsed downstream, with the "runs regardless" negative space); View B = phase×swimlane roadmap, tracks as bands, wave overlay on the Phase-1 feasible set. Interactive HTML in `_wip/mvp-roadmap/` from a re-runnable export + mermaid fallback doc.
