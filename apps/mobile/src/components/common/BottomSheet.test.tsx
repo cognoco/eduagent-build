@@ -7,20 +7,47 @@
  * structural and behavioural properties instead.
  */
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import type { ComponentProps } from 'react';
 import { Platform, Pressable, ScrollView, Text, TextInput } from 'react-native';
 
 import { BottomSheet } from './BottomSheet';
 
 const onClose = jest.fn();
 
+type BottomSheetProps = ComponentProps<typeof BottomSheet>;
+
+function assertAccessibleLabelTypeContract(): void {
+  // @ts-expect-error every sheet must provide an accessible dialog name
+  const missingDialogLabel: BottomSheetProps = {
+    visible: true,
+    onClose,
+    children: null,
+  };
+  // @ts-expect-error dismissible sheets must provide a localized backdrop label
+  const missingBackdropLabel: BottomSheetProps = {
+    visible: true,
+    onClose,
+    children: null,
+    accessibilityLabel: 'Topic picker',
+    backdropDismissible: true,
+  };
+
+  void missingDialogLabel;
+  void missingBackdropLabel;
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
 describe('BottomSheet', () => {
+  it('requires accessible dialog and dismissible-backdrop labels in its type contract', () => {
+    assertAccessibleLabelTypeContract();
+  });
+
   it('renders children when visible=true', () => {
     render(
-      <BottomSheet visible onClose={onClose}>
+      <BottomSheet visible onClose={onClose} accessibilityLabel="Test sheet">
         <Text testID="child">Sheet content</Text>
       </BottomSheet>,
     );
@@ -30,7 +57,11 @@ describe('BottomSheet', () => {
 
   it('does not render children when visible=false', () => {
     render(
-      <BottomSheet visible={false} onClose={onClose}>
+      <BottomSheet
+        visible={false}
+        onClose={onClose}
+        accessibilityLabel="Test sheet"
+      >
         <Text testID="child">Sheet content</Text>
       </BottomSheet>,
     );
@@ -39,7 +70,12 @@ describe('BottomSheet', () => {
 
   it('forwards testID to the surface container', () => {
     render(
-      <BottomSheet visible onClose={onClose} testID="my-sheet">
+      <BottomSheet
+        visible
+        onClose={onClose}
+        accessibilityLabel="Test sheet"
+        testID="my-sheet"
+      >
         <Text>Content</Text>
       </BottomSheet>,
     );
@@ -128,7 +164,7 @@ describe('BottomSheet', () => {
       // Without backdropDismissible, the backdrop is a non-pressable View.
       // Pressing a child should never fire onClose.
       render(
-        <BottomSheet visible onClose={onClose}>
+        <BottomSheet visible onClose={onClose} accessibilityLabel="Test sheet">
           <Text testID="inner">Inner content</Text>
         </BottomSheet>,
       );
@@ -144,6 +180,7 @@ describe('BottomSheet', () => {
           visible
           onClose={onClose}
           backdropDismissible
+          backdropAccessibilityLabel="Close topic picker"
           accessibilityLabel="Topic picker"
           testID="sheet-surface"
         >
@@ -157,7 +194,7 @@ describe('BottomSheet', () => {
         </BottomSheet>,
       );
 
-      const backdrop = screen.getByLabelText('Close');
+      const backdrop = screen.getByLabelText('Close topic picker');
       const dialog = screen.getByRole('dialog', { name: 'Topic picker' });
       const action = screen.getByRole('button', { name: 'Choose Algebra' });
 
@@ -171,30 +208,46 @@ describe('BottomSheet', () => {
       );
     });
 
-    it('renders a pressable backdrop', () => {
+    it('renders a pressable backdrop with its caller-provided label', () => {
       render(
-        <BottomSheet visible onClose={onClose} backdropDismissible>
+        <BottomSheet
+          visible
+          onClose={onClose}
+          accessibilityLabel="Test sheet"
+          backdropDismissible
+          backdropAccessibilityLabel="Close test sheet"
+        >
           <Text>Content</Text>
         </BottomSheet>,
       );
-      // The backdrop Pressable has accessibilityRole="button"
-      // getByLabelText finds the close button by its default label.
-      screen.getByLabelText('Close');
+      screen.getByLabelText('Close test sheet');
     });
 
     it('calls onClose when backdrop is pressed', () => {
       render(
-        <BottomSheet visible onClose={onClose} backdropDismissible>
+        <BottomSheet
+          visible
+          onClose={onClose}
+          accessibilityLabel="Test sheet"
+          backdropDismissible
+          backdropAccessibilityLabel="Close test sheet"
+        >
           <Text>Content</Text>
         </BottomSheet>,
       );
-      fireEvent.press(screen.getByLabelText('Close'));
+      fireEvent.press(screen.getByLabelText('Close test sheet'));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     it('does NOT call onClose when pressing inside the content area', () => {
       render(
-        <BottomSheet visible onClose={onClose} backdropDismissible>
+        <BottomSheet
+          visible
+          onClose={onClose}
+          accessibilityLabel="Test sheet"
+          backdropDismissible
+          backdropAccessibilityLabel="Close test sheet"
+        >
           <Text testID="inner">Inner content</Text>
         </BottomSheet>,
       );
@@ -209,6 +262,7 @@ describe('BottomSheet', () => {
           visible
           onClose={onClose}
           backdropDismissible
+          backdropAccessibilityLabel="Close topic picker"
           accessibilityLabel="Topic picker"
         >
           <ScrollView testID="sheet-scroll">
@@ -238,6 +292,7 @@ describe('BottomSheet', () => {
         <BottomSheet
           visible
           onClose={onClose}
+          accessibilityLabel="Topic picker"
           backdropDismissible
           backdropAccessibilityLabel="Close topic picker"
         >

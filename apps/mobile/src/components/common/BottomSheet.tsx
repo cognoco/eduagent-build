@@ -1,7 +1,7 @@
 import type React from 'react';
 import { Modal, Platform, Pressable, View } from 'react-native';
 
-interface BottomSheetProps {
+interface BottomSheetBaseProps {
   /** Controls Modal visibility. */
   visible: boolean;
   /** Called when the user presses the hardware back button (Android) or the
@@ -14,26 +14,28 @@ interface BottomSheetProps {
   /** testID forwarded to the surface container (the white rounded card). */
   testID?: string;
   /** Accessible name for the dialog surface. */
-  accessibilityLabel?: string;
-  /**
-   * Whether tapping the semi-transparent backdrop dismisses the sheet.
-   * Defaults to false (matches the NudgeActionSheet / LearnTogetherSheet
-   * pattern). Set to true for sheets where backdrop dismiss is expected
-   * (TopicPickerSheet, TopicDetailSheet pattern).
-   */
-  backdropDismissible?: boolean;
-  /**
-   * Accessibility label for the backdrop Pressable when backdropDismissible is
-   * true. Defaults to "Close". Provide a localised string when the sheet uses
-   * a translatable label (e.g. `t('library.a11yCloseTopicPicker')`).
-   */
-  backdropAccessibilityLabel?: string;
+  accessibilityLabel: string;
   /**
    * Modal animation type. Defaults to 'slide'.
    * Use 'fade' to match legacy NudgeActionSheet / LearnTogetherSheet behaviour.
    */
   animationType?: 'slide' | 'fade' | 'none';
 }
+
+type BottomSheetProps = BottomSheetBaseProps &
+  (
+    | {
+        /** Enables dismissal by the semi-transparent backdrop. */
+        backdropDismissible: true;
+        /** Localized accessible name for the backdrop close action. */
+        backdropAccessibilityLabel: string;
+      }
+    | {
+        /** Defaults to false for sheets that require an explicit close action. */
+        backdropDismissible?: false;
+        backdropAccessibilityLabel?: never;
+      }
+  );
 
 /**
  * Shared bottom-sheet primitive — WI-1080.
@@ -58,7 +60,7 @@ export function BottomSheet({
   testID,
   accessibilityLabel,
   backdropDismissible = false,
-  backdropAccessibilityLabel = 'Close',
+  backdropAccessibilityLabel,
   animationType = 'slide',
 }: BottomSheetProps): React.ReactElement {
   const backdrop = backdropDismissible ? (
