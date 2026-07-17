@@ -1038,6 +1038,14 @@ function getFallbackConfig(
     return getFallbackConfigV2(primary, llmTier, capability);
   }
 
+  const shared = {
+    responseFormat: primary.responseFormat,
+    // [BUG-895] Carry the tutor-prose language onto the fallback config so a
+    // fallback adapter localizes synthesized replies (e.g. a bare refusal)
+    // the same way the primary would.
+    conversationLanguage: primary.conversationLanguage,
+  } satisfies Pick<ModelConfig, 'responseFormat' | 'conversationLanguage'>;
+
   // [WI-1986] Under-18 learners are policy-banned from Gemini (MMT-ADR-0016
   // §1.5) — the same gate getModelConfig applies to the PRIMARY selection
   // (see isUnder18AgeBracket above). This legacy fallback selector took no
@@ -1047,22 +1055,19 @@ function getFallbackConfig(
   // BEFORE the gemini_only check and every Gemini-selecting branch below, so
   // no policy or provider combination can route a minor to Gemini/Vertex on
   // this path. Fails closed (throws) if no approved text provider is
-  // registered — mirrors the primary-path gate exactly.
+  // registered — mirrors the primary-path gate exactly. [WI-1986 rework]
+  // `shared` is defined above this gate (was below it) and spread LAST so the
+  // under-18 fallback preserves responseFormat/conversationLanguage from the
+  // primary exactly like every other branch below — the original fix
+  // returned approvedTextFallbackConfig(...) raw, silently dropping the JSON
+  // envelope flag and the tutor-prose language for a minor's fallback.
   if (isUnder18AgeBracket(ageBracket)) {
-    return approvedTextFallbackConfig(rung, llmTier);
+    return { ...approvedTextFallbackConfig(rung, llmTier), ...shared };
   }
 
   if (providerPolicy === 'gemini_only') {
     return null;
   }
-
-  const shared = {
-    responseFormat: primary.responseFormat,
-    // [BUG-895] Carry the tutor-prose language onto the fallback config so a
-    // fallback adapter localizes synthesized replies (e.g. a bare refusal)
-    // the same way the primary would.
-    conversationLanguage: primary.conversationLanguage,
-  } satisfies Pick<ModelConfig, 'responseFormat' | 'conversationLanguage'>;
 
   if (primary.provider === 'anthropic' && providers.has('gemini')) {
     const isLight = rung <= 2;
