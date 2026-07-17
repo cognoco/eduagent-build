@@ -11,7 +11,7 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
-import { captureException } from './services/sentry';
+import { captureException, scrubSentryEvent } from './services/sentry';
 import { CircuitOpenError } from './services/llm';
 import { isTransientDatabaseError } from './services/transient-db-retry';
 import {
@@ -633,6 +633,10 @@ export default Sentry.withSentry(
     dsn: (env as unknown as Bindings).SENTRY_DSN,
     tracesSampleRate:
       (env as unknown as Bindings).ENVIRONMENT === 'production' ? 0.1 : 1.0,
+    // [WI-1990] Defense-in-depth PII backstop — strips denylisted keys
+    // (learner free-text, names, etc.) from extra/contexts before an event
+    // leaves the API. Not a substitute for call-site discipline.
+    beforeSend: scrubSentryEvent,
   }),
   // Hono's app.fetch signature is compatible but not structurally identical
   // to ExportedHandler — cast via unknown to bridge the gap.
