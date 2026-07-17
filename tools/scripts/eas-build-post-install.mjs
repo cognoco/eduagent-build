@@ -64,6 +64,23 @@ if (existsSync(npmrcPath)) {
   );
 }
 
+// Preflight (WI-2120): EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is an EAS Environment
+// Variable (Sink 2, docs/deployment-and-secrets.md), not a committed eas.json
+// value — a missing per-environment entry silently ships a build where Clerk
+// auth can't initialize. Fail the build here, before any artifact exists,
+// rather than after upload.
+if (process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()) {
+  console.log('[eas-build-post-install] OK: EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is set');
+} else {
+  console.error(
+    '[eas-build-post-install] ERROR: EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is empty. ' +
+      'Set it via `eas env:create --environment <env> --name EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ' +
+      "--value '<pk_...>' --visibility plaintext` (see docs/deployment-and-secrets.md " +
+      '"Sink 2 — EAS Environment Variables").'
+  );
+  hasErrors = true;
+}
+
 if (hasErrors) {
   console.error(
     '[eas-build-post-install] Some workspace dependencies are missing. ' +
