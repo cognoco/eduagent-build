@@ -36,7 +36,7 @@ import {
 
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { setActiveProfileId, resetAuthExpiredGuard } from './api-client';
-import { buildPersisterKey } from './query-persister';
+import { buildPersisterKey, LEGACY_CACHE_KEY } from './query-persister';
 
 // Mock dependencies that signOutWithCleanup touches so the test is
 // self-contained and order-of-calls is verifiable via invocationCallOrder.
@@ -456,7 +456,60 @@ describe('signOutWithCleanup — deterministic scoped-cache removal [WI-1987]', 
     expect(await AsyncStorage.getItem(otherUserKey)).toBe('other-user-data');
   });
 
-  it('does not throw when clerkUserId is omitted (no scoped key to target)', async () => {
+  // [WI-1987 rework] Pre-rework, this branch only asserted the call didn't
+  // throw — it did not verify anything was actually removed from disk. The
+  // reviewer correctly flagged that as unverified: the pre-rework code
+  // skipped removal entirely in this branch and fell back to the racy
+  // queryClient.clear() + persister-throttle path, and "does not throw"
+  // cannot distinguish "removed deterministically" from "silently did
+  // nothing". This now asserts the scoped cache is ACTUALLY gone.
+  it('deterministically removes the on-disk scoped cache when clerkUserId is omitted (auth-expired / profile-load-timeout paths)', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+    // The signing-out session's own scoped key — unknown by name since
+    // clerkUserId isn't available, exactly like the real auth-expired path.
+    const unknownSessionKey = buildPersisterKey('some-user-we-cant-identify');
+    await AsyncStorage.setItem(
+      unknownSessionKey,
+      'pre-sign-out-snapshot-with-transcript',
+    );
+
+    await signOutWithCleanup({
+      clerkSignOut: makeClerkSignOut(),
+      queryClient: makeQueryClient(),
+      profileIds: [],
+      // clerkUserId omitted — identity not yet loaded.
+    });
+
+    expect(await AsyncStorage.getItem(unknownSessionKey)).toBeNull();
+  });
+
+  it('[break-test] full-sweep fallback removes EVERY scoped cache and the legacy unscoped key when clerkUserId is omitted', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+    const keyA = buildPersisterKey('user-a');
+    const keyB = buildPersisterKey('user-b');
+    await AsyncStorage.setItem(keyA, 'user-a-cache-with-transcript');
+    await AsyncStorage.setItem(keyB, 'user-b-cache-with-transcript');
+    await AsyncStorage.setItem(LEGACY_CACHE_KEY, 'pre-BUG-357-unscoped-blob');
+    // A sibling key that is NOT a persister cache must survive the sweep —
+    // the fallback targets only the persister's own key namespace.
+    await AsyncStorage.setItem('unrelated-app-key', 'keep-me');
+
+    await signOutWithCleanup({
+      clerkSignOut: makeClerkSignOut(),
+      queryClient: makeQueryClient(),
+      profileIds: [],
+      // clerkUserId omitted.
+    });
+
+    expect(await AsyncStorage.getItem(keyA)).toBeNull();
+    expect(await AsyncStorage.getItem(keyB)).toBeNull();
+    expect(await AsyncStorage.getItem(LEGACY_CACHE_KEY)).toBeNull();
+    expect(await AsyncStorage.getItem('unrelated-app-key')).toBe('keep-me');
+  });
+
+  it('does not throw when clerkUserId is omitted and there is nothing on disk to remove', async () => {
     const scope = makeScopeMock();
     (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
 
@@ -515,16 +568,19 @@ describe('signOutWithCleanup — clerkSignOut hard timeout [BUG-771]', () => {
       clerkSignOut: hangingClerkSignOut,
       queryClient: makeQueryClient(),
       profileIds: [],
+      // clerkUserId omitted, same as the real auth-expired path this test
+      // simulates — cleanup now awaits the [WI-1987] full-sweep fallback
+      // (AsyncStorage.getAllKeys + multiRemove) before reaching the
+      // clerkSignOut race, so `advanceTimersByTimeAsync` (which interleaves
+      // pending microtasks between timer ticks) replaces the old fixed
+      // two-microtask flush + sync `advanceTimersByTime` — that fixed flush
+      // undercounted once cleanup grew an extra async storage round-trip.
     });
     // Attach the rejection handler synchronously so Jest doesn't see an
     // unhandled promise rejection between advancing fake timers and the
     // awaited expect below.
     const settled = promise.catch((e) => e);
-    // Cleanup runs in microtasks first; flush microtasks before tripping the
-    // timer race so clerkSignOut has actually been invoked.
-    await Promise.resolve();
-    await Promise.resolve();
-    jest.advanceTimersByTime(CLERK_SIGNOUT_TIMEOUT_MS + 50);
+    await jest.advanceTimersByTimeAsync(CLERK_SIGNOUT_TIMEOUT_MS + 50);
     const err = await settled;
     expect(err).toBeInstanceOf(ClerkSignOutTimeoutError);
     // Break test: removing the timeout race in sign-out.ts would make this
@@ -544,9 +600,9 @@ describe('signOutWithCleanup — clerkSignOut hard timeout [BUG-771]', () => {
       profileIds: [],
     }).catch(() => undefined);
 
-    await Promise.resolve();
-    await Promise.resolve();
-    jest.advanceTimersByTime(CLERK_SIGNOUT_TIMEOUT_MS + 50);
+    // See rationale in the previous test — advanceTimersByTimeAsync flushes
+    // the [WI-1987] full-sweep fallback's async storage calls too.
+    await jest.advanceTimersByTimeAsync(CLERK_SIGNOUT_TIMEOUT_MS + 50);
     await settled;
 
     expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
@@ -578,9 +634,9 @@ describe('signOutWithCleanup — clerkSignOut hard timeout [BUG-771]', () => {
       profileIds: [],
     }).catch(() => undefined);
 
-    await Promise.resolve();
-    await Promise.resolve();
-    jest.advanceTimersByTime(CLERK_SIGNOUT_TIMEOUT_MS + 50);
+    // See rationale two tests up — advanceTimersByTimeAsync flushes the
+    // [WI-1987] full-sweep fallback's async storage calls too.
+    await jest.advanceTimersByTimeAsync(CLERK_SIGNOUT_TIMEOUT_MS + 50);
     await settled;
 
     // The finally block must still run so the next user's 401s are not

@@ -34,7 +34,10 @@ import type { QueryClient } from '@tanstack/react-query';
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { clearTransitionState } from './auth-transition';
 import { clearPendingAuthRedirect } from './pending-auth-redirect';
-import { buildPersisterKey } from './query-persister';
+import {
+  buildPersisterKey,
+  removeAllScopedPersisterCaches,
+} from './query-persister';
 import {
   setActiveProfileId,
   setProxyMode,
@@ -117,8 +120,15 @@ export async function signOutWithCleanup(
   // left the full pre-sign-out cache — including session transcripts — on
   // disk permanently. Removing the key directly here closes that window;
   // cleanup completing means the scoped blob is gone, independent of the
-  // persister's throttle timer. No-op (skipped) when clerkUserId is
-  // unavailable — see the param doc above.
+  // persister's throttle timer.
+  //
+  // [WI-1987 rework] The no-clerkUserId branch used to skip this entirely
+  // and fall back to the racy queryClient.clear() + persister-throttle path
+  // — the exact crash window this fix exists to close, left open on the
+  // auth-expired / profile-load-timeout paths. It now sweeps every scoped
+  // persister key on disk via `removeAllScopedPersisterCaches` — we can't
+  // compute the one targeted key without a clerkUserId, so we remove them
+  // all instead of leaving any of them to the throttle.
   if (clerkUserId) {
     await AsyncStorage.removeItem(buildPersisterKey(clerkUserId)).catch(() => {
       // Non-fatal — same policy as clearProfileSecureStorageOnSignOut below:
@@ -126,14 +136,17 @@ export async function signOutWithCleanup(
     });
   } else {
     // [WI-1987] clerkUserId is unavailable (identity not yet loaded — e.g.
-    // auth-expired 401 handler, profile-load-timeout), so the deterministic
-    // scoped removal above is skipped and we fall back to the racy
-    // queryClient.clear() + persister-throttle path. Breadcrumb so this
-    // fallback is observable in production rather than silently occurring.
+    // auth-expired 401 handler, profile-load-timeout). Breadcrumb so this
+    // fallback path is observable in production.
     Sentry.addBreadcrumb({
       category: 'auth',
       level: 'warning',
-      message: 'sign-out: scoped persister removal skipped (no clerkUserId)',
+      message:
+        'sign-out: scoped persister removal used full-sweep fallback (no clerkUserId)',
+    });
+    await removeAllScopedPersisterCaches().catch(() => {
+      // Non-fatal — same policy as clearProfileSecureStorageOnSignOut below:
+      // better to continue sign-out than abort over one storage failure.
     });
   }
 

@@ -433,8 +433,9 @@ function ScopedPersistProvider({ children }: { children: React.ReactNode }) {
         // start. Keyed to Updates.updateId (per-OTA + per-build). See
         // getQueryCacheBuster() for why runtimeVersion is not used.
         buster: getQueryCacheBuster(),
-        // [WI-1987] Exclude transcript/PII queries (session-transcript) from
-        // the AsyncStorage mirror — see shouldPersistQuery for the denylist.
+        // [WI-1987] Default-deny: only verified prose/PII-free query-key
+        // roots reach the AsyncStorage mirror — see shouldPersistQuery for
+        // the allowlist.
         dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
       }}
       onSuccess={() => {
