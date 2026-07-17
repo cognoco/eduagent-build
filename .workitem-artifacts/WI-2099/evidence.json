@@ -29,8 +29,13 @@
       "acRef": "AC-4",
       "description": "Immutable machine-readable RED, GREEN, production-only REVERT, and RESTORE outputs plus the complete validation and adversarial-review record are preserved.",
       "pointer": "docs/evidence/WI-2099/report.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "A comprehensive independent Opus review found no actionable issue and verified persistence, idempotency, ordering, and non-Mentor isolation; origin/main 3b0fa933 merged without conflict and the complete verification set plus final GREEN passed afterward.",
+      "pointer": "docs/evidence/WI-2099/report.md"
     }
   ],
-  "noiseBaselineVersion": "2026-07-17",
+  "noiseBaselineVersion": "2026-07-18",
   "redGreenPointer": "docs/evidence/WI-2099/report.md"
 }

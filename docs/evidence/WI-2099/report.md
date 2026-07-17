@@ -149,6 +149,38 @@ The integration runner required `--forceExit` because the existing integration
 harness retains an open handle after Jest completes. Assertions and cleanup
 completed, and the runner exited with the test results shown above.
 
+## Independent review, latest-main merge, and final verification
+
+The comprehensive independent Opus review returned **no actionable findings**.
+It independently verified persisted opener ownership, deterministic
+idempotency, opener-before-follow-up ordering, and isolation of non-Mentor
+entry paths. Its optional suggestion to add another `index.test.tsx` case was
+not implemented: the coordination instruction explicitly excluded it, and the
+review identified no behavior defect requiring a production or test change. A
+separate concurrency-focused Opus review was still in progress at the
+coordination handoff and is not represented as a completed result here.
+
+`origin/main` at `3b0fa9337fb60cef7bba8383314b7a61c0abc54b` was fetched and
+merged history-preservingly with `--no-commit --no-ff`. The automatic merge had
+no conflicts. Relative to that main revision, the WI changes remain limited to
+four mobile production files, the persisted-session integration test, and WI
+evidence/completion artifacts. `git diff --name-only origin/main` contains no
+`apps/api`, `packages/schemas`, database schema, or migration path.
+
+Post-merge verification on Node `v24.18.0` and pnpm `10.19.0`:
+
+- Exact six-case command: `pnpm test:integration --runTestsByPath tests/integration/learning-session.integration.test.ts --runInBand --testNamePattern='V2 Mentor opening exchange persistence' --silent --forceExit` — exit 0; 1 suite passed; 6 passed, 16 skipped, 22 total.
+- Targeted mobile command: `pnpm exec jest --config apps/mobile/jest.config.cjs --runInBand --runTestsByPath apps/mobile/src/components/session/use-session-streaming.test.ts apps/mobile/src/components/session/use-subject-classification.test.ts 'apps/mobile/src/app/(app)/session/index.test.tsx' --silent` — exit 0; 3 suites passed; 139 tests passed.
+- Full impacted integration file: `pnpm test:integration --runTestsByPath tests/integration/learning-session.integration.test.ts --runInBand --silent --forceExit` — exit 0; 1 suite passed; 22 tests passed.
+- `pnpm exec nx run @eduagent/mobile:typecheck --skip-nx-cache` — exit 0; mobile and all six dependency targets succeeded in a fresh run.
+- `pnpm exec nx run @eduagent/mobile:lint --skip-nx-cache` — exit 0; 0 errors and the existing 51-warning baseline.
+- `pnpm prepush` — exit 0; `tsc --build` succeeded.
+- `pnpm format:check` — exit 0; all three configured targets succeeded.
+
+Final GREEN repeated the exact six-case selection with Jest JSON output: 1
+suite passed; 6 passed, 16 skipped, 22 total. The full machine-readable result
+is [final-green-main-3b0fa933.json](final-green-main-3b0fa933.json).
+
 ## Environment
 
 Only Node `v24.18.0` and pnpm `10.19.0` were available; no Node 22 binary or
@@ -188,4 +220,3 @@ outbox and blocks later turns rather than confirming an incomplete exchange.
 Subsequent replay can hydrate the assistant once it exists. Recovering a
 server-side turn that permanently stopped after only its learner event would
 require a backend idempotency contract change, which this item forbids.
-

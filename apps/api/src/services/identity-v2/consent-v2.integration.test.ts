@@ -16,7 +16,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   byokWaitlist,
@@ -46,13 +46,16 @@ import {
   createPendingConsentRequest,
   getOrgMemberDisplayNameV2,
   processConsentResponseV2,
+  recordAdultSelfConsentV2,
   requestConsentV2,
   resendConsentV2,
   restoreConsentByToken,
   restoreConsentV2,
   revokeConsentV2,
+  withdrawAdultSelfConsentV2,
   withdrawConsentByToken,
 } from './consent-v2';
+import { CONSENT_PURPOSE_LLM_DISCLOSURE } from './consent-status-v2';
 import {
   consentPersonLockKey,
   deleteArchivedPersonIfStillEligibleV2,
@@ -2167,6 +2170,108 @@ const COPPA = 'coppa_parental_consent';
             orgId,
           ),
         ).toBeNull();
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // [WI-1193] Adult self-consent — record + independent-purpose withdrawal
+    // -------------------------------------------------------------------------
+    describe('[WI-1193] recordAdultSelfConsentV2 + withdrawAdultSelfConsentV2', () => {
+      it('records a CONSENTED grant for EACH purpose, basis=adult_self_consent', async () => {
+        const orgId = await seedOrg();
+        const adultId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+        });
+
+        await recordAdultSelfConsentV2(db, adultId, orgId);
+
+        const grants = await db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, adultId),
+        });
+        expect(grants).toHaveLength(2);
+        expect(grants.map((g) => g.purpose).sort()).toEqual([
+          CONSENT_PURPOSE_LLM_DISCLOSURE,
+          PURPOSE,
+        ]);
+        for (const g of grants) {
+          expect(g.lawfulBasis).toBe('adult_self_consent');
+          expect(g.granted).toBe(true);
+          expect(g.withdrawnAt).toBeNull();
+        }
+      });
+
+      // RED pre-fix: withdrawing llm_disclosure with the guardian-authorized,
+      // purpose-blind revokeConsentV2/stampWithdrawal core would either throw
+      // (no guardian edge exists for a self-registered adult) or — if that guard
+      // were bypassed — stamp withdrawn_at on the FIRST-found grant regardless of
+      // purpose, since currentGrant() there hardcodes DEFAULT_CONSENT_PURPOSE.
+      // GREEN: withdrawAdultSelfConsentV2 is purpose-scoped, so withdrawing one
+      // purpose leaves the other's grant CONSENTED (AC2 "independently
+      // recorded and revocable").
+      it('[AC2] withdrawing ONE purpose leaves the other purpose CONSENTED', async () => {
+        const orgId = await seedOrg();
+        const adultId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+        });
+        await recordAdultSelfConsentV2(db, adultId, orgId);
+
+        const result = await withdrawAdultSelfConsentV2(
+          db,
+          adultId,
+          orgId,
+          CONSENT_PURPOSE_LLM_DISCLOSURE,
+        );
+        expect(result.withdrawnAt).toBeInstanceOf(Date);
+
+        const llmGrant = await db.query.consentGrant.findFirst({
+          where: and(
+            eq(consentGrant.chargePersonId, adultId),
+            eq(consentGrant.purpose, CONSENT_PURPOSE_LLM_DISCLOSURE),
+          ),
+        });
+        expect(llmGrant?.withdrawnAt).not.toBeNull();
+
+        const platformGrant = await db.query.consentGrant.findFirst({
+          where: and(
+            eq(consentGrant.chargePersonId, adultId),
+            eq(consentGrant.purpose, PURPOSE),
+          ),
+        });
+        expect(platformGrant?.withdrawnAt).toBeNull();
+        expect(platformGrant?.granted).toBe(true);
+      });
+
+      it('is idempotent: withdrawing an already-withdrawn purpose returns the existing withdrawnAt', async () => {
+        const orgId = await seedOrg();
+        const adultId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+        });
+        await recordAdultSelfConsentV2(db, adultId, orgId);
+
+        const first = await withdrawAdultSelfConsentV2(
+          db,
+          adultId,
+          orgId,
+          PURPOSE,
+        );
+        const second = await withdrawAdultSelfConsentV2(
+          db,
+          adultId,
+          orgId,
+          PURPOSE,
+        );
+        expect(second.withdrawnAt).toEqual(first.withdrawnAt);
+      });
+
+      it('throws ConsentRecordNotFoundError for a purpose that was never granted', async () => {
+        const orgId = await seedOrg();
+        const adultId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+        });
+
+        await expect(
+          withdrawAdultSelfConsentV2(db, adultId, orgId, 'never_granted'),
+        ).rejects.toThrow(ConsentRecordNotFoundError);
       });
     });
   },
