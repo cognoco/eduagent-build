@@ -4,7 +4,7 @@ date: 2026-07-17
 profile: code
 work_items: [WI-2094]
 spec: _wip/mvp-roadmap/refinements/refine-BID-13-mentor.md
-status: in-progress
+status: complete
 ---
 
 # Route Valid Mentor Statements — Implementation Plan
@@ -18,7 +18,7 @@ In scope:
 - `apps/mobile/src/lib/bar-intent-match.ts` — distinguish substantive declaratives from uncertain navigation/ambiguity without broadening the closed route catalog.
 - `apps/mobile/src/app/(app)/mentor.tsx` — route matcher outcomes and render learner-scope clarification state.
 - `apps/mobile/src/app/(app)/mentor.test.tsx` — behavior-first coverage at the input/send/navigation boundary, including the 360px interaction case; convert its three pre-existing shadow internal mocks to `jest.requireActual()` plus targeted overrides under GC6.
-- `docs/evidence/WI-2094-mentor-statements-red-green.md` — immutable baseline/candidate/revert/restore SHAs, exact commands, and raw outputs.
+- `docs/evidence/WI-2094/` — immutable baseline/candidate/revert/restore SHAs, exact commands, and raw outputs.
 - `.workitem-artifacts/WI-2094/completion-summary.md` and `.workitem-artifacts/WI-2094/evidence.json` — AC-mapped completion drafts for the shepherd.
 - This plan.
 
@@ -29,11 +29,11 @@ Out of scope:
 
 ## Tasks
 
-- [ ] T1: Add learner Mentor boundary regressions before production changes — done when targeted Jest fails on the clean baseline because both exact neon declaratives do not navigate and ambiguous/unsupported inputs do not reveal clarification; the suite also covers arrow press, keyboard submit, editing then submit, exact freeform params, question behavior, a closed-catalog jump, and interactive 360px scroll containment.
-- [ ] T2: Implement the minimum routing and clarification behavior — done when the T1 suite passes with exact `rawInput`, deterministic jumps unchanged, and uncertain submissions producing a visible `mentor-bar-clarification` state.
-- [ ] T3: Preserve regression detection with immutable RED/GREEN/REVERT/RESTORE runs — done when a disposable production-fix revert commit reproduces the original failures, the restored candidate passes, and the evidence file names every immutable SHA and retains raw command output.
-- [ ] T4: Verify the complete mobile change surface — done when all impacted suites plus `pnpm exec nx run @eduagent/mobile:typecheck`, `pnpm exec nx run @eduagent/mobile:lint`, `pnpm prepush`, and `pnpm format:check` exit zero; Node 24 versus the requested Node 22 is recorded if no Node 22 runtime is available.
-- [ ] T5: Review and hand off — done when the deep runtime-assumption review finds no unresolved blocker, Cosmo draft artifacts pass local validation, and the repo commit skill commits and pushes only the scoped files to `origin/WI-2094` with hooks enabled and no PR.
+- [x] T1: Add learner Mentor boundary regressions before production changes — done when targeted Jest fails on the clean baseline because both exact neon declaratives do not navigate and ambiguous/unsupported inputs do not reveal clarification; the suite also covers arrow press, keyboard submit, editing then submit, exact freeform params, question behavior, a closed-catalog jump, and interactive 360px scroll containment.
+- [x] T2: Implement the minimum routing and clarification behavior — done when the T1 suite passes with exact `rawInput`, deterministic jumps unchanged, and uncertain submissions producing a visible `mentor-bar-clarification` state.
+- [x] T3: Preserve regression detection with immutable RED/GREEN/REVERT/RESTORE runs — done when a disposable production-fix revert commit reproduces the original failures, the restored candidate passes, and the evidence file names every immutable SHA and retains raw command output.
+- [x] T4: Verify the complete mobile change surface — done when all impacted suites plus `pnpm exec nx run @eduagent/mobile:typecheck`, `pnpm exec nx run @eduagent/mobile:lint`, `pnpm prepush`, and `pnpm format:check` exit zero; Node 24 versus the requested Node 22 is recorded if no Node 22 runtime is available.
+- [x] T5: Review and hand off — done when the deep runtime-assumption review finds no unresolved code blocker, the Cosmo draft artifacts conform to the documented manifest and summary schemas, and the repo commit skill commits and pushes only the scoped files to `origin/WI-2094` with hooks enabled and no PR.
 
 ## Tests
 
