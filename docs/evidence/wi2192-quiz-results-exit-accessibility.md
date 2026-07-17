@@ -2,119 +2,191 @@
 
 **Item:** WI-2192 — Expose quiz-results exit actions as accessible buttons
 
+**Reviewed candidate before browser rework:**
+`230b63e4ff63e28dfe095d73e61d14e1077a8e53`
+
+**Rework base merged from `origin/main`:**
+`3b0fa9337fb60cef7bba8383314b7a61c0abc54b`
+
+**Browser-rework implementation candidate:**
+`a0da9e01639c2987acf4ce601bea3f3af5e52cd8`
+
 **Runtime:** Node 24.18.0 locally (the repository declares Node 22.x; CI is the
 binding runtime check).
 
-**Focused command:**
+## Production-coupled browser coverage
+
+The named defect case is:
+`quiz-results exits are real named buttons with exact-once web activation`.
+
+It renders `QuizResultsContent` from the production results route through the
+guarded `/quiz/dev-only/results` route in the real quiz stack. Keeping the host
+inside that stack is load-bearing: the real `QuizFlowProvider` state survives the
+Play Again navigation to `/quiz/launch`. The host only exists when the web export
+sets `EXPO_PUBLIC_E2E=true`; other builds redirect it to Home.
+
+The test uses Chromium and the actual React Native Web DOM. It checks:
+
+- exactly three buttons in DOM/testID order: Play Again, Done, View History;
+- unique localized role/name lookup and the existing localized History hint;
+- Tab focus order and a non-suppressed visible focus outline;
+- Enter, Space, and pointer activation for every action;
+- one exact recorded `push`/`replace` call plus the observable destination URL;
+- `aria-disabled=true` after activation and suppression of a forced second
+  keyboard/pointer activation.
+
+The freeze-mode matrix supplies nine exact-once/disabled steps. The delegating
+matrix supplies nine real-router destination steps. The old synthetic
+`createDOMProps`/`PressResponder` proxy test was deleted because it stayed green
+when production semantics were reverted.
+
+Focused browser command (port 19016 avoided another session's local server):
 
 ```sh
-CI=1 pnpm exec jest --config apps/mobile/jest.config.cjs \
-  --runInBand --no-coverage --runTestsByPath \
-  'apps/mobile/src/app/(app)/quiz/results.test.tsx' \
-  'apps/mobile/src/app/(app)/quiz/results.web.test.ts'
+CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 E2E_ENV=staging \
+  PLAYWRIGHT_WEB_PORT=19016 \
+  PLAYWRIGHT_BASE_URL=http://127.0.0.1:19016 \
+  PLAYWRIGHT_API_URL=https://api-stg.mentomate.com \
+  EXPO_PUBLIC_API_URL=https://api-stg.mentomate.com \
+  doppler run --project mentomate --config stg -- \
+  pnpm exec playwright test -c apps/mobile/playwright.config.ts \
+  --project=smoke-accessibility --workers=1 --retries=0 --reporter=list
+```
+
+Final restored output:
+
+```text
+✓ setup: seed onboarding-complete and capture solo-learner storage state
+✓ setup: seed parent-multi-child and capture owner-with-children storage state
+✓ smoke-accessibility: quiz-results exits are real named buttons with exact-once web activation
+3 passed (2.1m)
 ```
 
 ## Acceptance-criteria map
 
-- **AC-1 — localized role/name, focus order, and visible focus:** the three
-  production `Pressable`s expose localized button names in source
-  (`apps/mobile/src/app/(app)/quiz/results.tsx:267`, `:281`, `:295`). The native
-  contract test checks the role/name/order and History hint
-  (`apps/mobile/src/app/(app)/quiz/results.test.tsx:236`). The React Native Web
-  proxy checks the resulting button role, accessible name, tab order, and that no
-  inline style suppresses the focus outline
-  (`apps/mobile/src/app/(app)/quiz/results.web.test.ts:140`).
-- **AC-2 — exactly-once activation and repeat suppression:** one shared
-  synchronous navigation lock guards all three handlers
-  (`apps/mobile/src/app/(app)/quiz/results.tsx:100`), and all three controls expose
-  their disabled state while navigation is in flight (`:267`, `:281`, `:295`).
-  Native tests attempt two presses on every exit and assert one intended route
-  (`apps/mobile/src/app/(app)/quiz/results.test.tsx:283`). The web proxy exercises
-  all three controls through Enter, Space, and pointer activation with exact-one
-  router assertions (`apps/mobile/src/app/(app)/quiz/results.web.test.ts:180`) and
-  verifies disabled keyboard/pointer suppression (`:207`). On native platforms,
-  VoiceOver and TalkBack button activation and touch share the same guarded
-  `Pressable.onPress` handlers.
-- **AC-3 — preserve rendering and deep links:** the existing missed/perfect score
-  and celebration variants remain covered at
-  `apps/mobile/src/app/(app)/quiz/results.test.tsx:131` and `:191`; the Practice
-  return target remains covered at `:314`. The existing Play Again and Done route
-  regressions remain covered at `:431` and `:477`. The focused suite remained
-  green with all of these tests included.
-- **AC-4 — load-bearing regression tests:** native role/name/disabled/router
-  assertions live in `apps/mobile/src/app/(app)/quiz/results.test.tsx:236`; web
-  role/name/keyboard/pointer assertions live in
-  `apps/mobile/src/app/(app)/quiz/results.web.test.ts:140`. The captured cycles
-  below prove those assertions fail when their production behavior is absent.
+- **AC-1 — localized role/name, focus order, and visible focus:** production
+  semantics are in `apps/mobile/src/app/(app)/quiz/results.tsx`. Native
+  role/name/order/hint assertions are in
+  `apps/mobile/src/app/(app)/quiz/results.test.tsx`. Real DOM role/name/order,
+  Tab-order, and visible-focus assertions are in
+  `apps/mobile/e2e-web/flows/accessibility/quiz-results-exits.spec.ts`.
+- **AC-2 — exactly-once activation and repeat suppression:** the synchronous
+  shared navigation lock and disabled state are in
+  `apps/mobile/src/app/(app)/quiz/results.tsx`. Native duplicate-press coverage is
+  in `apps/mobile/src/app/(app)/quiz/results.test.tsx`. The browser matrix in
+  `apps/mobile/e2e-web/flows/accessibility/quiz-results-exits.spec.ts` proves
+  Enter, Space, and pointer behavior for all three actions, exact calls, real
+  destinations, disabled state, and repeat suppression.
+- **AC-3 — preserve rendering and deep links:** existing missed/perfect score,
+  celebration, Play Again, Done, and Practice return-target cases remain in
+  `apps/mobile/src/app/(app)/quiz/results.test.tsx`. The browser host delegates
+  through the real Expo router from the real quiz layout and observes
+  `/quiz/launch`, `/practice`, and `/quiz/history?returnTo=practice`.
+- **AC-4 — load-bearing regression tests:** native coverage is in
+  `apps/mobile/src/app/(app)/quiz/results.test.tsx`; production-coupled web
+  coverage is in
+  `apps/mobile/e2e-web/flows/accessibility/quiz-results-exits.spec.ts`; the
+  captured unchanged-test cycles below prove both semantics and locking are
+  load-bearing.
 
 No locale files changed: all labels and the History hint reuse existing translation
 keys.
 
-## Cycle 1 — semantic button contract
+## Browser RED → GREEN → revert-RED → restore-GREEN
 
-### RED — roles and names absent
+The Playwright spec remained unchanged throughout these source-only reversions.
 
-With the production `Pressable`s unchanged and the new tests present, the native
-role query failed while the web framework proxy passed:
+### Semantics RED
 
-```text
-FAIL @eduagent/mobile apps/mobile/src/app/(app)/quiz/results.test.tsx
-  Unable to find an element with role: button
-PASS @eduagent/mobile apps/mobile/src/app/(app)/quiz/results.web.test.ts
-
-Test Suites: 1 failed, 1 passed, 2 total
-Tests:       1 failed, 20 passed, 21 total
-```
-
-### GREEN — semantic props applied
+Removing only the three production role/name props (and the History hint) left the
+screen visible but made the same browser test fail at its first DOM contract:
 
 ```text
-PASS @eduagent/mobile apps/mobile/src/app/(app)/quiz/results.test.tsx
-PASS @eduagent/mobile apps/mobile/src/app/(app)/quiz/results.web.test.ts
-
-Test Suites: 2 passed, 2 total
-Tests:       21 passed, 21 total
+Locator: getByTestId('quiz-results-screen').getByRole('button')
+Expected: 3
+Received: 0
+1 failed, 2 setup tests passed
 ```
 
-### REVERT → RED, then RESTORE → GREEN
-
-Removing only the new production accessibility props reproduced the same missing
-button-role failure (`1 failed, 20 passed`). Restoring them returned both suites to
-green (`21 passed`). Tests were unchanged during the revert.
-
-## Cycle 2 — navigation lock and disabled state
-
-### RED — repeat suppression absent
-
-With the semantic props retained but before the navigation lock existed, all three
-new native cases observed no disabled state:
+Restoring only those semantics returned the full real-browser matrix to green:
 
 ```text
-FAIL @eduagent/mobile apps/mobile/src/app/(app)/quiz/results.test.tsx
-  Expected: true
-  Received: undefined
-PASS @eduagent/mobile apps/mobile/src/app/(app)/quiz/results.web.test.ts
-
-Test Suites: 1 failed, 1 passed, 2 total
-Tests:       3 failed, 21 passed, 24 total
+3 passed (2.0m)
 ```
 
-### GREEN — lock and disabled state applied
+### Navigation-lock revert RED
+
+With roles and names still present, removing only the synchronous navigation lock
+left the button query green but failed the disabled contract after Enter:
 
 ```text
-PASS @eduagent/mobile apps/mobile/src/app/(app)/quiz/results.test.tsx
-PASS @eduagent/mobile apps/mobile/src/app/(app)/quiz/results.web.test.ts
-
-Test Suites: 2 passed, 2 total
-Tests:       24 passed, 24 total
+Locator: getByRole('button', { name: 'Play Again' })
+Expected aria-disabled: "true"
+Received: null
+Step: Play Again: Enter disables repeats
+1 failed, 2 setup tests passed
 ```
 
-### REVERT → RED, then RESTORE → GREEN
+Restoring the lock returned the unchanged test to final green:
 
-Removing only the navigation lock, disabled props, and guarded History handler made
-the three disabled-state assertions fail (`3 failed, 21 passed`). Restoring the
-production behavior returned both suites to green (`24 passed`). Tests were unchanged
-during the revert.
+```text
+3 passed (2.1m)
+```
 
-Together, both cycles establish red → green → revert-red → restore-green for the
-semantic and exact-once behavior required by WI-2192.
+This is the required production-coupled semantics RED → GREEN → lock-revert RED →
+restore GREEN sequence. Both isolated production removals fail the same named
+browser case.
+
+## Native and repository verification
+
+Initial native TDD, before the browser rework, captured a missing-role RED and
+three missing-disabled-state REDs. The final focused native results suite is green:
+
+```text
+PASS apps/mobile/src/app/(app)/quiz/results.test.tsx
+Test Suites: 1 passed, 1 total
+Tests:       13 passed, 13 total
+```
+
+The final verification commands and outputs are:
+
+```text
+pnpm exec tsc --build
+  PASS (no output)
+
+node --test apps/mobile/e2e-web/helpers/serve-exported-web-env.test.mjs
+  2 passed
+
+pnpm exec jest --config apps/mobile/jest.config.cjs --runInBand \
+  --runTestsByPath apps/mobile/src/app/screen-navigation.test.ts \
+  'apps/mobile/src/app/(app)/quiz/results.test.tsx'
+  2 suites passed; 100 tests passed
+
+pnpm exec jest --config apps/mobile/jest.config.cjs --runInBand \
+  --forceExit --silent
+  483 suites passed; 5,822 tests passed
+
+pnpm check:i18n:orphans
+  Checked 584 files; no findings
+
+pnpm check:i18n
+  All translation files are up to date
+
+pnpm exec eslint apps/mobile
+  0 errors; 48 pre-existing warnings
+
+pnpm exec prettier --check <changed files>
+  All matched files use Prettier code style
+```
+
+The first routed full mobile run reported `482 passed, 1 failed` suites and
+`5,821 passed, 1 failed` tests. The sole failure was the new guarded host using an
+`actualRouter.replace` local name that the static screen-navigation audit does not
+recognize. Renaming that local to the canonical `router.replace` fixed the audit;
+the targeted rerun above passed all 100 results-plus-navigation-audit tests, and
+the final full rerun passed all 483 suites and 5,822 tests.
+
+The first pushed candidate's pre-push gate also passed TypeScript, 88 API suites
+(2,347 tests passed, 1 skipped), the then-focused two mobile suites (24 tests), and
+i18n checks. Final rework push-hook evidence is recorded by the push that follows
+the implementation commit.
