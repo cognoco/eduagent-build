@@ -9,6 +9,7 @@ import {
   myConsentStatusSchema,
   childConsentStatusSchema,
   consentActionResultSchema,
+  selfConsentWithdrawRequestSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -41,6 +42,7 @@ import {
   processConsentResponseV2,
   revokeChildConsentV2,
   restoreChildConsentV2,
+  withdrawAdultSelfConsentV2,
   getProfileConsentStateV2,
   getOrgMemberDisplayNameV2,
 } from '../services/identity-v2/consent-v2';
@@ -554,6 +556,45 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       throw error;
     }
   })
+
+  // [WI-1193 AC2] Authenticated self-service withdrawal of ONE adult
+  // self-consent purpose. The caller withdraws their OWN consent
+  // (chargePersonId = the caller's own profile), so authentication is the only
+  // gate — an adult acts on their own lawful basis, no owner/guardian check.
+  // Purposes are independently revocable: withdrawing one purpose never touches
+  // the other's grant. This is the user-reachable path that makes the
+  // per-purpose grants (AC2) actually revocable.
+  .put(
+    '/consent/self/withdraw',
+    zValidator('json', selfConsentWithdrawRequestSchema),
+    async (c) => {
+      const db = c.get('db');
+      const { profileId: chargePersonId } = withProfile(c);
+      const account = requireAccount(c.get('account'));
+      const { purpose } = c.req.valid('json');
+
+      try {
+        await withdrawAdultSelfConsentV2(
+          db,
+          chargePersonId,
+          account.id,
+          purpose,
+        );
+
+        return c.json(
+          consentActionResultSchema.parse({
+            message: 'Consent withdrawn for the selected purpose.',
+            consentStatus: 'WITHDRAWN',
+          }),
+        );
+      } catch (error) {
+        if (error instanceof ConsentRecordNotFoundError) {
+          return notFound(c, error.message);
+        }
+        throw error;
+      }
+    },
+  )
 
   .put('/consent/:childProfileId/restore', async (c) => {
     const db = c.get('db');
