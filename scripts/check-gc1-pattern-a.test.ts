@@ -524,12 +524,61 @@ describe('checkFile — integration', () => {
     expect(v[0].reason).toBe('missing-pattern-a');
   });
 
+  // WI-1809: the WI-1355 window only reached the specifier's line plus at
+  // most one following comment-only line, so a gc1-allow comment placed
+  // deeper in a multi-line factory body was invisible to the checker even
+  // though it is a genuine, well-formed annotation. Real-world shape: three
+  // executor rework cycles in one day (2026-07-11, PRs #2052/#2070/#2055)
+  // hit this before the mock factory even got past its opening lines. The
+  // scan must now cover the whole jest.mock CallExpression span.
+  it('allows a multiline internal mock with gc1-allow inside the factory body', () => {
+    const diff = [
+      '@@ -0,0 +1,6 @@',
+      "+jest.mock('./services/foo', () => ({",
+      '+  // gc1-allow: unit-test boundary',
+      '+  bar: jest.fn(),',
+      '+}));',
+    ].join('\n');
+    const staged = [
+      "jest.mock('./services/foo', () => ({",
+      '  // gc1-allow: unit-test boundary',
+      '  bar: jest.fn(),',
+      '}));',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
+  // WI-1809: same footgun, but the escape hatch trails the closing `);` of a
+  // genuinely multi-line call (jest.mock( and the specifier on separate
+  // lines) rather than the specifier itself.
+  it('allows a multiline internal mock with gc1-allow trailing the closing paren', () => {
+    const diff = [
+      '@@ -0,0 +1,6 @@',
+      '+jest.mock(',
+      "+  './services/foo',",
+      '+  () => ({',
+      '+    bar: jest.fn(),',
+      '+  }),',
+      '+); // gc1-allow: unit-test boundary',
+    ].join('\n');
+    const staged = [
+      'jest.mock(',
+      "  './services/foo',",
+      '  () => ({',
+      '    bar: jest.fn(),',
+      '  }),',
+      '); // gc1-allow: unit-test boundary',
+    ].join('\n');
+    expect(checkFile('a.test.ts', diff, staged)).toEqual([]);
+  });
+
   // WI-1355 rework: reproduces the reviewer's exact repro shape — a long
   // filler comment block (10 lines) with an incidental "gc1-allow" mention
-  // buried in the last line. Must still flag: the window is capped to at
-  // most one line past the specifier, AND the match is anchored to a
-  // genuine directive, so neither the window's reach nor the substring test
-  // can smuggle this past the ratchet.
+  // buried in the last line. Must still flag: the widened window (WI-1809:
+  // now the whole CallExpression span) only helps a GENUINE directive — the
+  // match stays anchored to "// gc1-allow:" as the first token of its own
+  // comment, so a wider reach cannot smuggle an incidental mention past the
+  // ratchet.
   it('blocks a NEW multiline non-Pattern-A mock with gc1-allow buried in a long filler comment block', () => {
     const fillerLines = [
       '  // filler line 1',
