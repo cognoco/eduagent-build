@@ -1,22 +1,22 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-27T22:31:28.847Z",
+  "updatedAt": "2026-07-17T13:38:51.496Z",
   "provenance": "update-baseline",
   "learnerModel": "meta-llama/llama-3.3-70b-instruct",
   "mentorModel": "openai/gpt-oss-120b",
-  "graderModel": "gpt-4o-mini",
-  "scenarioCount": 20,
+  "graderModel": "claude-sonnet-4-6",
+  "scenarioCount": 34,
   "rates": {
     "outcome": {
-      "verified": 0.25,
-      "partial": 0.75,
-      "reteach": 0,
+      "verified": 0.35294117647058826,
+      "partial": 0.5882352941176471,
+      "reteach": 0.058823529411764705,
       "invalid": 0
     },
-    "masteryVerified": 0.25,
-    "underCredit": 0.15,
-    "signalEmissionByMentor": {
-      "production-routing": 0.7
+    "masteryVerified": 0.35294117647058826,
+    "underCredit": 0.058823529411764705,
+    "signalEmissionByGrader": {
+      "production-routing": 1
     }
   }
 }
