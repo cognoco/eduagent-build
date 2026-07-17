@@ -853,8 +853,13 @@ async function ownerLogin(
  * Re-home a single person's live consent grants to the retain-tier and delete
  * the live rows — the §6.1 pattern, inside an existing transaction. A no-op when
  * the person has no grants. retention_period left NULL (counsel-owned).
+ *
+ * [WI-1193] Exported: consent-v2.ts's processConsentResponseV2 deny branch also
+ * hard-deletes a person and must re-home first (see that call site) — every
+ * `tx.delete(person)` on a live person needs this precondition, not only the
+ * four functions in this file that already call it.
  */
-async function rehomeGrantsTx(
+export async function rehomeGrantsTx(
   tx: Parameters<Parameters<Database['transaction']>[0]>[0],
   personId: string,
 ): Promise<void> {

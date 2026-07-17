@@ -62,6 +62,7 @@ import {
 } from './consent-status-v2';
 import {
   consentPersonLockKey,
+  rehomeGrantsTx,
   writeFinancialRecordsTx,
   type SubscriptionSnapshot,
 } from './deletion-v2';
@@ -744,7 +745,17 @@ export async function processConsentResponseV2(
         .delete(subscriptionTable)
         .where(eq(subscriptionTable.payerPersonId, chargePersonId));
 
-      // Deny cascade-deletes the person (FK cascades handle child data).
+      // [WI-1193] consent_grant.charge_person_id is ON DELETE RESTRICT, not
+      // CASCADE — a denied person who already holds live consent_grant rows
+      // (e.g. an adult_self_consent pair from bootstrap, or any other basis)
+      // would FK-violate the delete below. Re-home them to consent_receipt
+      // first, exactly like deletion-v2.ts's four person-scoped delete paths
+      // (§6.1: grants are never erased, only migrated). A no-op when the
+      // person has no grants — the ordinary managed-child deny (never
+      // approved, so no grant exists) is unaffected.
+      await rehomeGrantsTx(tx, chargePersonId);
+      // Deny cascade-deletes the person (remaining FK cascades handle the
+      // rest of the person's child data).
       await tx.delete(person).where(eq(person.id, chargePersonId));
     });
 

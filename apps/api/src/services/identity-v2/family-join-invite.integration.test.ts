@@ -28,6 +28,7 @@ import { randomUUID } from 'crypto';
 import { and, eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
+  consentGrant,
   createDatabase,
   familyJoinInvite,
   login,
@@ -99,6 +100,13 @@ const APP_URL = 'https://example.test';
         await db
           .delete(profileQuotaUsage)
           .where(eq(profileQuotaUsage.profileId, pid));
+        // [WI-1193] An ADULT_BIRTH_YEAR/TEEN_BIRTH_YEAR seed now holds
+        // consent_grant rows (adult self-consent, written at createIdentityGraph
+        // bootstrap) — RESTRICT on both charge_person_id and organization_id, so
+        // these must go before the person/organization deletes below.
+        await db
+          .delete(consentGrant)
+          .where(eq(consentGrant.chargePersonId, pid));
         await db.delete(membership).where(eq(membership.personId, pid));
         await db.delete(login).where(eq(login.personId, pid));
       }
