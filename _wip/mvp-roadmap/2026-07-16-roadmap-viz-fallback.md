@@ -1,6 +1,6 @@
 # Roadmap visualization — mermaid fallback (2026-07-16)
 
-> ⚠ **Comprehension artifact — no plan authority** (standing orders, sequencing sitting 2026-07-16). Map, not terrain: premise-check before every batch kickoff. Live state is Cosmo. Interactive version: `roadmap-viz.html` (regenerate data with `bash viz-export.sh`).
+> ⚠ **Comprehension artifact — no plan authority** (standing orders, sequencing sitting 2026-07-16). Map, not terrain: premise-check before every batch kickoff. Live state is Cosmo. Interactive version: `roadmap-viz.html` (regenerate data with `bash viz-export.sh`). Refreshed at the 2026-07-17 premise-check (`2026-07-17-premise-check-record.md`): OPQ vocabulary v3, OPQ-107/117/118 ruled, dispatch model D2.
 
 ## View A — HITL buckets → gate chain
 
@@ -9,7 +9,7 @@ Counsel blocks **gates, not dev** (legal register §0). Deadline badges: ⏰ = O
 ```mermaid
 flowchart LR
   subgraph B1["Bucket 1 — internal rulings (days)"]
-    WI1110["WI-1110 UK rep? (OPQ-107)"]
+    WI1110["WI-1110 UK Art-27 rep — OPQ-107 RULED 07-17: UK IN, procure (external)"]
     WI1115["WI-1115 country config (OPQ-108)"]
     WI2064["WI-2064 bearer-token posture (OPQ-114)"]
     WI1664["WI-1664 AI-Act tripwire (OPQ-113, no MVP edge)"]
@@ -54,7 +54,7 @@ flowchart LR
   G1506 --> LAUNCH(["PUBLIC LAUNCH — operator decision"])
 ```
 
-**Negative space:** ~155 open items across Dev-Infra, Compliance-Eng, Identity Cutover, Safety & Eval, Core Learning Loop, Mobile UX, Supporter & Linking, Four Strands, Store/Billing, Launch Readiness, Stream 2, V2 tail, QA factory run at full speed with **zero counsel input**. (No edges: WI-1110 falls away or trivially parallel; WI-1663/1664 have no MVP-gated downstream.)
+**Negative space:** ~155 open items across Dev-Infra, Compliance-Eng, Identity Cutover, Safety & Eval, Core Learning Loop, Mobile UX, Supporter & Linking, Four Strands, Store/Billing, Launch Readiness, Stream 2, V2 tail, QA factory run at full speed with **zero counsel input**. (No edges: WI-1110 is now an off-the-shelf procurement, trivially parallel; WI-1663/1664 have no MVP-gated downstream.)
 
 ## View B — phase × executor (gate-bounded phases, SEQ-1)
 
@@ -62,7 +62,7 @@ flowchart LR
 |---|---|---|---|
 | **Counsel/DPO** | DPO → DPIA · ROPA · breach · policy · DPAs · AI-Act memo · OPQ-22 packet | — (paper consumed by gate) | — |
 | **Jørn** | Kickoff sitting: clock-starts OPQ-22/102/110 + row burn-down; Bucket-1 rulings; premise-check per batch | Console actions, submission (OPQ-60) | Beta go / launch decision |
-| **Zuzka** | Kickoff sitting: OPQ-40 (gates 5 trust builds), OPQ-118 (Challenge) | Listing copy | Beta feedback (scope authority) |
+| **Zuzka** | Kickoff sitting: D1 internal tiers — 15 rows incl. OPQ-40 (gates 5 trust builds), OPQ-115 (Art 9), store-console long-leads; OPQ-117/118 ruled ✓ | Listing copy | Beta feedback (scope authority) |
 | **Fleet W1** | Dev-Infra (preview fixes W1-critical) · Compliance-Eng (paces exit) · Identity Cutover · Safety & Eval · factory drain | Release hardening, review-fix turnaround | Beta-blocking QA only |
 | **Fleet W2** *(at first premise-check)* | Core Learning Loop · Mobile UX & Nav · Supporter & Linking · Four Strands · Store/Billing agent-side | ↑ | ↑ |
 | **∥ Stream 2** | autonomous, D-gate cadence (OPQ-95) — not phase-coupled | | |
@@ -70,4 +70,4 @@ flowchart LR
 | **∥ QA factory** | severity-gated intake (SEQ-5); rolling drains; unfixed at beta → severity re-look → pen | | |
 | **Pen (off-axis)** | ~84 items, unsequenced; promotion only by explicit ruling at a premise-check | | |
 
-Waves are capacity lenses over Phase 1's feasible set, not batches; batches form at kickoff sittings by co-execution affinity (SEQ-6) as **Delivery Batch pages** (ZDX ruled live 2026-07-16 — Batches DB `39f8bce9-1f7c-8103-987c-de2ace74ac8a`).
+Waves are a comprehension lens only — **no standing Wave-2 trigger** (D2, 2026-07-17 premise-check). Dispatch model: BID-1 + BID-2 in parallel at hold-lift; each subsequent batch kickoff is a joint operator+PM decision on observed throughput/capacity. Batches form at kickoff sittings by co-execution affinity (SEQ-6) as **Delivery Batch pages** (ZDX ruled live 2026-07-16 — Batches DB `39f8bce9-1f7c-8103-987c-de2ace74ac8a`; BID-1..4 Ready + HELD).

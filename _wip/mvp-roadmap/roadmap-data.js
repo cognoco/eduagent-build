@@ -1,244 +1,235 @@
 window.ROADMAP_DATA = {
-  "generated": "2026-07-16T11:13Z",
+  "generated": "2026-07-17T12:12Z",
   "opq": [
     {
       "opq": "OPQ-11",
       "title": "WI-1503 device run + WI-1506 closed-beta family run",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-22",
       "title": "Route counsel packet to counsel (D2 denial-retention + A-03 crisis duties + WI-1559 controller entity + WI-155",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-24",
       "title": "WI-1194 — obtain counsel-approved retention periods",
       "type": "Action",
+      "status": "Open",
       "deadline": "2026-07-25"
     },
     {
       "opq": "OPQ-25",
       "title": "WI-1194 — enable and verify the production retention purge",
       "type": "Action",
+      "status": "Open",
       "deadline": "2026-07-25"
     },
     {
       "opq": "OPQ-37",
       "title": "WI-1341 - store credentials, EAS access + Config-T go-ahead",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-40",
       "title": "WI-1767 — trust-package design pass (Zuzka)",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-41",
       "title": "WI-1764 — source locale-correct crisis-helpline content (counsel-gated)",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-50",
       "title": "Batch 2 — human copy review of machine-authored i18n keys across 7 locales",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-51",
       "title": "Batch 2 — device voice QA (TTS/STT) for cs/ja/pl/en locales",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-55",
       "title": "Batch 4 end-of-batch HITL device/staging pass (incl. WI-1689 AC-8 six-flow check)",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-58",
       "title": "WI-1754 — run ONE Challenge Round end-to-end on a cohort profile (closes AC5 under the amended event-based win",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-59",
       "title": "WI-1337 — upload FCM V1 service-account credential to EAS (Android push)",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-60",
       "title": "WI-1335 — Play Console app record, store listing, Data Safety form (long-lead)",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-61",
       "title": "WI-1328 — RevenueCat production setup: Play products + goog_ key + preflight re-tighten (after WI-1335)",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-71",
       "title": "V0-retirement ruling (mentor-is-the-app spec s13 S6 gate - IRREVERSIBLE, removes flag-flip rollback)",
       "type": "Decision",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-82",
       "title": "Provision agent-usable Stripe management access (restricted key + stripe CLI) - fleet-wide",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-89",
       "title": "WI-1920 — restore staging Sentry smoke authentication",
       "type": "Infra",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-90",
       "title": "WI-1907 — authorize production deploy and capture production fleet-failure proof",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-92",
       "title": "WI-1833 — grant production telemetry read access for live judge verification",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-95",
       "title": "Rule the Stream-2 D-gate (D5/D6/D7 now; D1–D4 after Wave-0 artifacts)",
       "type": "Decision",
-      "deadline": ""
-    },
-    {
-      "opq": "OPQ-96",
-      "title": "Cosmo lifecycle does not support a Work Item spanning two repos — the gate silently reviews only one",
-      "type": "Decision",
-      "deadline": ""
-    },
-    {
-      "opq": "OPQ-97",
-      "title": "RLS v2 SELECT semantics: S5 says \"own-rows SELECT\", the HELD SQL and every client say read-all — rule before B",
-      "type": "Decision",
-      "deadline": ""
-    },
-    {
-      "opq": "OPQ-98",
-      "title": "Registration-membership checking makes every registry addition a lockstep fleet redeploy — and a lagging super",
-      "type": "Decision",
-      "deadline": ""
-    },
-    {
-      "opq": "OPQ-99",
-      "title": "CodeRabbit's org plan is exhausted — it reports GREEN checks without reviewing, and now blocks every Cosmo clo",
-      "type": "Action",
-      "deadline": ""
-    },
-    {
-      "opq": "OPQ-100",
-      "title": "F2 — Nexus main has no branch protection → CI-gate promotes every advisory lane to blocking",
-      "type": "Decision",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-102",
       "title": "WI-1105 — engage outsourced DPO (retainer)",
       "type": "Action",
+      "status": "Open",
       "deadline": "2026-07-24"
     },
     {
       "opq": "OPQ-103",
       "title": "WI-1106 — DPIA production + DPO/counsel sign-off",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-104",
       "title": "WI-1107 — ROPA register (DPO/consultant templating)",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-105",
       "title": "WI-1108 — breach response plan (72h Datatilsynet) + counsel review",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-106",
       "title": "WI-1109 — finalize + publish privacy policy + child-readable summary",
       "type": "Action",
-      "deadline": ""
-    },
-    {
-      "opq": "OPQ-107",
-      "title": "WI-1110 — serve UK at launch? (if yes: engage UK GDPR representative)",
-      "type": "Decision",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-108",
       "title": "WI-1115 — store country availability + hard-blocks (console config)",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-109",
       "title": "WI-1114 — store age-rating + kids/privacy declarations (both consoles)",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-110",
       "title": "WI-1192 — sign Art 28 DPAs (business/no-training tier) + per-vendor TIAs",
       "type": "Action",
+      "status": "Open",
       "deadline": "2026-07-24"
     },
     {
       "opq": "OPQ-111",
       "title": "WI-1659 — commission EU AI Act classification memo + obligation matrix",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-112",
       "title": "WI-1663 — AI Act technical file / QMS skeleton",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-113",
       "title": "WI-1664 — school/institutional AI Act deployment tripwire",
       "type": "Action",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-114",
       "title": "WI-2064 — rule consent-withdrawal bearer-token threat posture (owner + AC)",
       "type": "Decision",
+      "status": "Open",
       "deadline": ""
     },
     {
       "opq": "OPQ-115",
       "title": "WI-1111 — confirm + document the Art 9 OUT ruling; notify DPO",
       "type": "Decision",
-      "deadline": ""
-    },
-    {
-      "opq": "OPQ-118",
-      "title": "Rule Challenge redefinition: deeper active learning vs recall quiz (WI-2112)",
-      "type": "Decision",
+      "status": "Open",
       "deadline": ""
     }
   ],
@@ -289,9 +280,7 @@ window.ROADMAP_DATA = {
       "name": "Amend MMT-ADR-0000 — crystal-clear reconstruct-vs-launder + L3-in-passing-only + operator sign-off + no feature-PR ADRs",
       "stage": "Backlog",
       "priority": "P2",
-      "lanes": [
-        "Post-MVP pen"
-      ]
+      "lanes": []
     },
     {
       "wi": "WI-779",
@@ -319,9 +308,7 @@ window.ROADMAP_DATA = {
       "name": "A — Amend MMT-ADR-0000 §II.6: shift-left ADR-provenance (ratified why; needs human-Architecture sign-off; gates B–E)",
       "stage": "Backlog",
       "priority": "",
-      "lanes": [
-        "Post-MVP pen"
-      ]
+      "lanes": []
     },
     {
       "wi": "WI-897",
@@ -329,9 +316,7 @@ window.ROADMAP_DATA = {
       "name": "B — Layer 1: AGENTS.md doctrine rule — specs implement decisions, run §II.1 before writing a spec, ADR-first/lockstep",
       "stage": "Backlog",
       "priority": "",
-      "lanes": [
-        "Post-MVP pen"
-      ]
+      "lanes": []
     },
     {
       "wi": "WI-898",
@@ -339,9 +324,7 @@ window.ROADMAP_DATA = {
       "name": "C — Layer 2: override superpowers brainstorming to inject the §II.1 gate + hierarchy (decisions spawn ADRs, specs point at them)",
       "stage": "Backlog",
       "priority": "",
-      "lanes": [
-        "Post-MVP pen"
-      ]
+      "lanes": []
     },
     {
       "wi": "WI-899",
@@ -349,9 +332,7 @@ window.ROADMAP_DATA = {
       "name": "D — Layer 3: /refine ADR-gate — run the §II.1 five-trigger test at refine; flag ADR-class; require linked ADR before Ready (shared ZDX toolchain, coordinate w/ Nexus)",
       "stage": "Backlog",
       "priority": "",
-      "lanes": [
-        "Post-MVP pen"
-      ]
+      "lanes": []
     },
     {
       "wi": "WI-900",
@@ -359,9 +340,7 @@ window.ROADMAP_DATA = {
       "name": "E — Layer 4: move check-decision-adr-link from CI to pre-commit (local immediate enforcement; CI stays backstop)",
       "stage": "Backlog",
       "priority": "",
-      "lanes": [
-        "Post-MVP pen"
-      ]
+      "lanes": []
     },
     {
       "wi": "WI-904",
@@ -1267,7 +1246,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-1753",
       "n": 1753,
       "name": "Cross-account existing-teen family join (join-my-family v1 enabler)",
-      "stage": "In Review",
+      "stage": "Refining",
       "priority": "P1",
       "lanes": [
         "Supporter & Linking"
@@ -1800,7 +1779,7 @@ window.ROADMAP_DATA = {
       "stage": "Backlog",
       "priority": "P3",
       "lanes": [
-        "Post-MVP pen"
+        "Churn-hotspot refactoring"
       ]
     },
     {
@@ -1810,7 +1789,7 @@ window.ROADMAP_DATA = {
       "stage": "Backlog",
       "priority": "P3",
       "lanes": [
-        "Post-MVP pen"
+        "Churn-hotspot refactoring"
       ]
     },
     {
@@ -1820,7 +1799,7 @@ window.ROADMAP_DATA = {
       "stage": "Backlog",
       "priority": "P3",
       "lanes": [
-        "Post-MVP pen"
+        "Churn-hotspot refactoring"
       ]
     },
     {
@@ -1830,7 +1809,7 @@ window.ROADMAP_DATA = {
       "stage": "Backlog",
       "priority": "P3",
       "lanes": [
-        "Post-MVP pen"
+        "Churn-hotspot refactoring"
       ]
     },
     {
@@ -1840,14 +1819,14 @@ window.ROADMAP_DATA = {
       "stage": "Backlog",
       "priority": "P3",
       "lanes": [
-        "Post-MVP pen"
+        "Churn-hotspot refactoring"
       ]
     },
     {
       "wi": "WI-1893",
       "n": 1893,
       "name": "Stale config.ts comment claims judge flags Production stays off while both are true in prd",
-      "stage": "Captured",
+      "stage": "Ready",
       "priority": "P3",
       "lanes": [
         "Post-MVP pen"
@@ -1957,7 +1936,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-1906",
       "n": 1906,
       "name": "Decouple prod Anthropic org from staging's shared credit pool (or add budget alerting)",
-      "stage": "Captured",
+      "stage": "Refining",
       "priority": "P3",
       "lanes": [
         "Post-MVP pen"
@@ -2017,8 +1996,8 @@ window.ROADMAP_DATA = {
       "wi": "WI-1927",
       "n": 1927,
       "name": "Family-join accept surface — emailed invite has no entry point (WI-1753 follow-up)",
-      "stage": "Backlog",
-      "priority": "P2",
+      "stage": "Refining",
+      "priority": "P1",
       "lanes": [
         "Supporter & Linking"
       ]
@@ -2307,7 +2286,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-2036",
       "n": 2036,
       "name": "Implement true speak-along shadowing with device audio concurrency",
-      "stage": "Captured",
+      "stage": "Refining",
       "priority": "P3",
       "lanes": [
         "Post-MVP pen"
@@ -2617,7 +2596,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-2094",
       "n": 2094,
       "name": "Route valid Mentor statements instead of silently ignoring send",
-      "stage": "Backlog",
+      "stage": "Ready",
       "priority": "P1",
       "lanes": [
         "Core Learning Loop"
@@ -2657,7 +2636,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-2099",
       "n": 2099,
       "name": "Preserve the opening Mentor exchange when starting a session",
-      "stage": "Backlog",
+      "stage": "Ready",
       "priority": "P1",
       "lanes": [
         "Core Learning Loop"
@@ -2777,9 +2756,11 @@ window.ROADMAP_DATA = {
       "wi": "WI-2112",
       "n": 2112,
       "name": "Redefine Challenge as deeper active learning instead of a recall quiz",
-      "stage": "Captured",
+      "stage": "Backlog",
       "priority": "P1",
-      "lanes": []
+      "lanes": [
+        "Core Learning Loop"
+      ]
     },
     {
       "wi": "WI-2113",
@@ -2895,7 +2876,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-2127",
       "n": 2127,
       "name": "Complete visibility consent after family-join supportership opt-in",
-      "stage": "Captured",
+      "stage": "Refining",
       "priority": "P1",
       "lanes": [
         "Supporter & Linking"
@@ -2905,7 +2886,7 @@ window.ROADMAP_DATA = {
       "wi": "WI-2128",
       "n": 2128,
       "name": "Bind joined learner credentials to their own person instead of the family owner",
-      "stage": "Captured",
+      "stage": "Refining",
       "priority": "P0",
       "lanes": [
         "Supporter & Linking"
@@ -2929,6 +2910,486 @@ window.ROADMAP_DATA = {
       "priority": "P2",
       "lanes": [
         "Post-MVP pen"
+      ]
+    },
+    {
+      "wi": "WI-2176",
+      "n": 2176,
+      "name": "Keep the Support-hub scope selector clear of the avatar and page heading on small phones",
+      "stage": "Backlog",
+      "priority": "P2",
+      "lanes": [
+        "QA Fix Factory"
+      ]
+    },
+    {
+      "wi": "WI-2177",
+      "n": 2177,
+      "name": "Make the canonical V2 parity test command portable to native Windows",
+      "stage": "Backlog",
+      "priority": "P2",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2178",
+      "n": 2178,
+      "name": "Use the active app theme behind fixed V2 chrome on pushed screens",
+      "stage": "Backlog",
+      "priority": "P2",
+      "lanes": [
+        "QA Fix Factory"
+      ]
+    },
+    {
+      "wi": "WI-2179",
+      "n": 2179,
+      "name": "Prevent AccountAvatar from intercepting the Subject Hub manage action",
+      "stage": "Backlog",
+      "priority": "P1",
+      "lanes": [
+        "Mobile UX & Navigation"
+      ]
+    },
+    {
+      "wi": "WI-2182",
+      "n": 2182,
+      "name": "Separate BottomSheet backdrop dismissal from interactive sheet content",
+      "stage": "Backlog",
+      "priority": "P1",
+      "lanes": [
+        "QA Fix Factory"
+      ]
+    },
+    {
+      "wi": "WI-2183",
+      "n": 2183,
+      "name": "Provide a real recovery path when saved-summary AI feedback fails",
+      "stage": "Backlog",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2184",
+      "n": 2184,
+      "name": "Show newly completed topic sessions in Topic Hub history",
+      "stage": "Ready",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2185",
+      "n": 2185,
+      "name": "Reserve fixed V2 chrome space before pushed-screen content",
+      "stage": "Ready",
+      "priority": "P2",
+      "lanes": [
+        "QA Fix Factory"
+      ]
+    },
+    {
+      "wi": "WI-2186",
+      "n": 2186,
+      "name": "Align Reports empty-state timing with weekly and monthly delivery",
+      "stage": "Ready",
+      "priority": "P3",
+      "lanes": [
+        "QA Fix Factory"
+      ]
+    },
+    {
+      "wi": "WI-2187",
+      "n": 2187,
+      "name": "Make owner-global Account settings unambiguous under learner scope",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "QA Fix Factory"
+      ]
+    },
+    {
+      "wi": "WI-2188",
+      "n": 2188,
+      "name": "Give every link-initiation step an explicit in-app exit",
+      "stage": "Ready",
+      "priority": "P2",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2189",
+      "n": 2189,
+      "name": "Route V2 Family settings to a family-scoped destination",
+      "stage": "Ready",
+      "priority": "P2",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2190",
+      "n": 2190,
+      "name": "Persist quiz answers in the shape required by round-detail reads",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2191",
+      "n": 2191,
+      "name": "Remove nested interactive controls from the Practice quick-quiz card",
+      "stage": "Ready",
+      "priority": "P2",
+      "lanes": [
+        "QA Fix Factory"
+      ]
+    },
+    {
+      "wi": "WI-2192",
+      "n": 2192,
+      "name": "Expose quiz-results exit actions as accessible buttons",
+      "stage": "Ready",
+      "priority": "P2",
+      "lanes": [
+        "QA Fix Factory"
+      ]
+    },
+    {
+      "wi": "WI-2193",
+      "n": 2193,
+      "name": "Advance recitation after a valid title-only first turn",
+      "stage": "Ready",
+      "priority": "P2",
+      "lanes": [
+        "Four Strands Language Learning"
+      ]
+    },
+    {
+      "wi": "WI-2194",
+      "n": 2194,
+      "name": "Use one Family quota denominator across subscription usage surfaces",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Store, Billing & Release"
+      ]
+    },
+    {
+      "wi": "WI-2196",
+      "n": 2196,
+      "name": "Allow creating the correct homework subject when other subjects exist",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2197",
+      "n": 2197,
+      "name": "Route supporter notifications through V2 scope chips and Journal instead of legacy Family Recaps",
+      "stage": "Refining",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2198",
+      "n": 2198,
+      "name": "Reconcile the canonical mobile flow inventory and E2E manifests with the V2 shell",
+      "stage": "Backlog",
+      "priority": "P2",
+      "lanes": [
+        "V2 finalization"
+      ]
+    },
+    {
+      "wi": "WI-2215",
+      "n": 2215,
+      "name": "Route V2 Subjects Add into the create-subject round trip",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Mobile UX & Navigation"
+      ]
+    },
+    {
+      "wi": "WI-2216",
+      "n": 2216,
+      "name": "Enable voice capture on the V2 Mentor input",
+      "stage": "Ready",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2217",
+      "n": 2217,
+      "name": "Supply scoped topic and session indexes before Mentor flow dispatch",
+      "stage": "Backlog",
+      "priority": "P2",
+      "lanes": [
+        "Post-MVP pen"
+      ]
+    },
+    {
+      "wi": "WI-2218",
+      "n": 2218,
+      "name": "Reuse interleaved retrieval behind V2 quick-check batching",
+      "stage": "Backlog",
+      "priority": "P3",
+      "lanes": [
+        "Post-MVP pen"
+      ]
+    },
+    {
+      "wi": "WI-2219",
+      "n": 2219,
+      "name": "Make Practice recovery browse routes V2-shell aware",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "V2 finalization"
+      ]
+    },
+    {
+      "wi": "WI-2220",
+      "n": 2220,
+      "name": "Carry the active app shell into production app-help prompt composition",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "V2 finalization"
+      ]
+    },
+    {
+      "wi": "WI-2221",
+      "n": 2221,
+      "name": "Design a composed Mentor capability context over navigation, scope, and deep-link contracts",
+      "stage": "Refining",
+      "priority": "P3",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2222",
+      "n": 2222,
+      "name": "Consolidate Mentor capability contract tests and targeted E2E",
+      "stage": "Ready",
+      "priority": "P2",
+      "lanes": [
+        "Core Learning Loop"
+      ]
+    },
+    {
+      "wi": "WI-2223",
+      "n": 2223,
+      "name": "Make support.hub deep links select Support-hub scope before navigation",
+      "stage": "Backlog",
+      "priority": "P2",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2224",
+      "n": 2224,
+      "name": "Rule the V2 permanent subject-deletion policy and reachable surface",
+      "stage": "Backlog",
+      "priority": "P3",
+      "lanes": [
+        "Post-MVP pen"
+      ]
+    },
+    {
+      "wi": "WI-2225",
+      "n": 2225,
+      "name": "Preserve non-authorizing supporter intent through signup and cold start",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2226",
+      "n": 2226,
+      "name": "Wire and correct landed supporter cold-start and self-learning doorways in V2",
+      "stage": "Refining",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2228",
+      "n": 2228,
+      "name": "Expand and gate the existing V2 E2E release lane across Maestro and Playwright",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2229",
+      "n": 2229,
+      "name": "Add inviter-side lifecycle controls for existing-teen family-join invites",
+      "stage": "Backlog",
+      "priority": "P2",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2230",
+      "n": 2230,
+      "name": "Add a person-scope supporter-to-own-Mentor conversation",
+      "stage": "Backlog",
+      "priority": "P3",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2231",
+      "n": 2231,
+      "name": "Fix V2 profile and consent exits and cover the first Mentor session",
+      "stage": "Refining",
+      "priority": "P1",
+      "lanes": [
+        "V2 finalization"
+      ]
+    },
+    {
+      "wi": "WI-2232",
+      "n": 2232,
+      "name": "Rehome existing durable reports and recaps into person Journal",
+      "stage": "Refining",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2233",
+      "n": 2233,
+      "name": "Expose the supportee-side shared-record mirror in Me Journal",
+      "stage": "Refining",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2234",
+      "n": 2234,
+      "name": "Extend V2 E2E for returning learner feed, resume, and Mentor return",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2235",
+      "n": 2235,
+      "name": "Make current visibility-contract review and credentialized unlink lifecycle reachable",
+      "stage": "Refining",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2236",
+      "n": 2236,
+      "name": "Extend V2 E2E for Mentor homework capture and same-session return",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2237",
+      "n": 2237,
+      "name": "Gate supporter scopes and structural reads on accepted visibility",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2238",
+      "n": 2238,
+      "name": "Cover V2 Subjects browse, Subject Hub, and first-subject creation",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2239",
+      "n": 2239,
+      "name": "Cover the V2 Journal paper trail end to end",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2240",
+      "n": 2240,
+      "name": "Cover V2 avatar account administration and exit paths end to end",
+      "stage": "Ready",
+      "priority": "P2",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2241",
+      "n": 2241,
+      "name": "Add supportership-aware V2 seeds and cover scope preservation and privacy",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Launch Readiness"
+      ]
+    },
+    {
+      "wi": "WI-2242",
+      "n": 2242,
+      "name": "Make V2 supporter first-edge onboarding reachable and cover the link ceremony",
+      "stage": "Ready",
+      "priority": "P1",
+      "lanes": [
+        "Supporter & Linking"
+      ]
+    },
+    {
+      "wi": "WI-2243",
+      "n": 2243,
+      "name": "Wire the V2 supporter self-learning doorway and cover Me-scope persistence",
+      "stage": "Backlog",
+      "priority": "P2",
+      "lanes": [
+        "Supporter & Linking"
       ]
     }
   ]

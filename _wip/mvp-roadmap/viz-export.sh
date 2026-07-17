@@ -38,10 +38,11 @@ curl -s -X POST "https://api.notion.com/v1/data_sources/08b3ab36-709d-44af-b78c-
 curl -s -X POST "https://api.notion.com/v1/data_sources/$OPQ_DS/query" \
   -H "Authorization: Bearer $NOTION_TOKEN" -H "Notion-Version: 2025-09-03" \
   -H "Content-Type: application/json" \
-  -d '{"filter":{"property":"Status","select":{"equals":"Open"}},"page_size":100}' | san \
+  -d '{"filter":{"or":[{"property":"Status","select":{"equals":"Open"}},{"property":"Status","select":{"equals":"Processed"}}]},"page_size":100}' | san \
   | jq '[.results[] | {opq:("OPQ-"+(.properties.ID.unique_id.number|tostring)),
         title:(([.properties.Item.title[].plain_text]|join(""))[0:110]),
         type:(.properties.Type.select.name//""),
+        status:(.properties.Status.select.name//""),
         deadline:(.properties.Deadline.date.start//"")}] | sort_by(.opq|ltrimstr("OPQ-")|tonumber)' > "$TMP/opq.json"
 
 # --- assemble ---

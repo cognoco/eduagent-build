@@ -79,7 +79,7 @@ details ul{margin:3px 0;padding-left:10px}
 <div class="view" id="viewB">
   <h2>Phase × executor roadmap <span class="mut small">(phases bounded only by gates — SEQ-1)</span></h2>
   <table class="rm" id="rmtable"></table>
-  <p class="mut small">Wave overlay (SEQ-2, re-decidable at each premise-check): <span class="wtag one">W1</span> opens now — Dev-Infra unblockers, Compliance-Eng chain (paces Phase-1 exit), Identity Cutover, Safety &amp; Eval floor, first factory drain. <span class="wtag two">W2</span> opens at the first premise-check — the rest of the feasible set. Waves are capacity lenses over Phase 1, not batches; batches are formed at kickoff sittings by co-execution affinity (SEQ-6) as Delivery Batch pages (ZDX-ruled live 2026-07-16).</p>
+  <p class="mut small">Wave overlay = <b>comprehension lens only</b> (D2, premise-check 2026-07-17 — no standing Wave-2 trigger). Dispatch model: <b>BID-1 Preview vehicle + BID-2 CI &amp; gates dispatch at hold-lift, in parallel</b>; every subsequent batch kickoff is a joint operator+PM decision informed by observed lane throughput/capacity. <span class="wtag one">W1</span>/<span class="wtag two">W2</span> tint below only groups the feasible set for reading. Batches are formed at kickoff sittings by co-execution affinity (SEQ-6) as Delivery Batch pages; BID-1..4 formed 2026-07-16, Ready + HELD.</p>
 </div>
 
 <script src="roadmap-data.js"></script>
@@ -103,13 +103,13 @@ const opqBy=w=>D.opq.filter(o=>o.title.includes(w));
 function itemName(wi){const it=byWi[wi];return it?it.name:'(closed/not found)';}
 function wiChip(wi,bucket,short){
   const it=byWi[wi]; const o=D.opq.filter(x=>x.title.includes(wi));
-  let b=o.map(x=>` <span class="badge${x.deadline?' dl':''}">${x.opq}${x.deadline?' ⏰'+x.deadline.slice(5):''}</span>`).join('');
+  let b=o.map(x=>` <span class="badge${x.deadline?' dl':''}">${x.opq}${x.deadline?' ⏰'+x.deadline.slice(5):''}${x.status==='Processed'?' ✓ruled':''}</span>`).join('');
   return `<span class="chip ${bucket||''}" title="${it?it.name.replace(/"/g,'&quot;'):''}">${wi}${short?'':' '+(it?it.name.slice(0,46)+(it.name.length>46?'…':''):'')}${b}</span>`;
 }
 
 /* ---- static ruling config (source: legal register 2026-07-15 + sequencing sitting 2026-07-16) ---- */
 const BUCKETS=[
- {cls:'b1',name:'Bucket 1 — internal rulings (days)',who:'Jørn / internal',wis:['WI-1110','WI-1115','WI-2064','WI-1664']},
+ {cls:'b1',name:'Bucket 1 — internal rulings (days)',who:'Jørn / internal — OPQ-107 ruled 07-17: UK IN → WI-1110 becomes external Art-27-rep procurement',wis:['WI-1110','WI-1115','WI-2064','WI-1664']},
  {cls:'b2',name:'Bucket 2 — GDPR/COPPA formalities (weeks)',who:'DPO + GDPR counsel — clock-starts: OPQ-102 (DPO), OPQ-110 (DPAs), OPQ-24/25 (retention)',wis:['WI-1105','WI-1106','WI-1107','WI-1108','WI-1109','WI-1192','WI-1194']},
  {cls:'b3',name:'Bucket 3 — other legal (external calendar)',who:'Specialist counsel — vehicle: OPQ-22 packet (entity + Art 9 + crisis duties)',wis:['WI-1659','WI-1663','WI-1764','WI-1559','WI-1111']}
 ];
@@ -176,11 +176,11 @@ document.getElementById('rmtable').innerHTML=`
  <td>Nothing new — paper already consumed by WI-1577</td>
  <td>—</td></tr>
 <tr><td class="who">Jørn (operator)</td>
- <td><b>Kickoff sitting (committed):</b> clock-starts OPQ-22 / OPQ-102 / OPQ-110 + operator-row burn-down (${D.opq.length} rows open) · premise-check before each batch · internal rulings (Bucket 1)</td>
+ <td><b>Kickoff sitting (committed, by 07-21 backstop):</b> clock-starts OPQ-22 / OPQ-102 / OPQ-110 + operator-row burn-down (${D.opq.length} rows open) · D1 internal tiers (2026-07-17 record)${opqRows(['OPQ-114','OPQ-25'])}</td>
  <td>Store console actions (country config, declarations sign-off, submission)${opqRows(['OPQ-60'])}</td>
  <td>Beta cohort go / public-launch decision</td></tr>
 <tr><td class="who">Zuzka (product)</td>
- <td><b>Kickoff sitting (committed):</b>${opqRows(['OPQ-40','OPQ-117','OPQ-118'])}</td>
+ <td><b>Kickoff sitting (committed):</b> D1 internal tiers — 15 Zuzka rows (2026-07-17 record)${opqRows(['OPQ-40','OPQ-115','OPQ-58'])}<div class="small mut">OPQ-117/118 ruled ✓</div></td>
  <td>Store listing copy review</td>
  <td>Beta feedback triage (scope authority for Q2 items)</td></tr>
 <tr><td class="who">Agent fleet</td>
