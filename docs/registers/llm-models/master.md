@@ -112,11 +112,15 @@ The layered safety model (① input sanitization → ② router safety preamble 
 `MMT-ADR-0016`. These are the **still-open** operational gates lifted from the
 2026-06-05 safety audit; H1/H2/H3 are **closed** on `ongoing` (Gemini block-reason
 leak mapped terminal; crisis-redirect now emits a structured Inngest event;
-adversarial safety battery wired into `eval-llm`).
+adversarial safety battery wired into `eval-llm`). **H4 is closed** as of
+**WI-1826**: `runSuitabilityJudge()` (`apps/api/src/services/policy-engine/judge-suitability.ts`)
+now passes `capability: 'judge'` to `routeAndCall`, so both live judge call
+sites (Challenge-Round grader and the suitability judge) resolve the vetted
+judge/grader routing path (`resolveGraderConfig`, `router.ts`) — the
+capability-adoption step the register itself flagged as H4's last open item.
 
 | Gate | What's owed | Why it's open now |
 |---|---|---|
-| **H4 — provider safety net** | The judge (layer ③ replacement) must be live before flag-flip. Removing Gemini deletes the only configured provider-side classifier; OpenAI is detection-only, Anthropic/Cerebras/Mistral are prompt-only. | **Partially advanced (2026-06-26):** a tier/age-blind `capability: 'judge'` routing path is now callable for the grader flow (`CHALLENGE_ROUND_GRADER_ENABLED`). The judge is no longer scaffold-only. H4 remains open until the judge is on in production ahead of the V2 minor-traffic cutover. Suitability judge adopts the same capability next, completing H4. **2026-07-11 cutover:** `JUDGE_FRAMEWORK_ENABLED` + `JUDGE_ENFORCEMENT_ENABLED` set alongside `LLM_ROUTING_V2_ENABLED` in prd (WI-1685/WI-1686), so the judge is live in production at the same instant V2 goes live — no uncovered window. `runSuitabilityJudge()` (`apps/api/src/services/policy-engine/judge-suitability.ts`) still calls `routeAndCall` without `capability: 'judge'` — the capability-adoption step from the register's own "next" framing remains the open completion item, tracked as **WI-1826**. |
 | **H5 — output moderation** | A final output-content check (moderation pass or lightweight classifier) on the displayed reply. | Deferrable while Gemini's classifier guarded the main lane; **launch-relevant once Gemini is removed**. Scope after the judge lands. |
 | **H7 — safety observability** | A queryable safety-incident metric/dashboard (blocks per day, crisis redirects per week). | Crisis-redirect events now fire (H2); the aggregate dashboard does not exist yet. |
 | **Self-harm escalation** | **Ruled 2026-06-23: log-only.** Crisis redirect → structured `app/safety.crisis_redirect_fired` Inngest event (already shipped); **no guardian notification.** Option (b) guardian-notify is not foreclosed but is not being built. | Settled — no further decision owed; H7 dashboard surfaces these events. |

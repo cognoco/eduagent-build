@@ -110,6 +110,22 @@ describe('runSuitabilityJudge', () => {
     expect(options?.ageBracket).toBe('adolescent');
   });
 
+  // WI-1826 — the suitability judge must resolve the vetted judge/grader
+  // routing path (resolveGraderConfig via router.ts's capability==='judge'
+  // branch), not the generic text-tier V2 matrix, mirroring the live
+  // Challenge-Round grader (challenge-round/grader.ts, capability:'judge').
+  // routeAndCall is mocked at the external boundary here (GC1-compliant), so
+  // this test asserts what runSuitabilityJudge passes INTO routeAndCall; the
+  // router-side proof that capability:'judge' resolves the judge-capability
+  // model/provider set (not the text-tier default) lives in
+  // llm/router.test.ts ("judge capability routing" / "[WI-1800]" suites).
+  it('routes through the judge-capability path (capability:judge), not the text-tier default', async () => {
+    mockRouteAndCall.mockResolvedValue(routeResult(VALID_VERDICT_JSON));
+    await runSuitabilityJudge(baseInput);
+    const [, , options] = mockRouteAndCall.mock.calls[0]!;
+    expect(options?.capability).toBe('judge');
+  });
+
   it('routes the judge to OpenAI when the tutor itself is Anthropic', async () => {
     mockRouteAndCall.mockResolvedValue(routeResult(VALID_VERDICT_JSON));
     await runSuitabilityJudge({ ...baseInput, tutorVendor: 'anthropic' });

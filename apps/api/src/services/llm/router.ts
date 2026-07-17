@@ -1028,6 +1028,7 @@ function getFallbackConfig(
   providerPolicy: LlmProviderPolicy = 'default',
   llmTier: LLMTier = 'standard',
   capability: LlmCapability = 'text',
+  ageBracket?: AgeBracket,
 ): ModelConfig | null {
   // V2 cutover: compliance-driven, allow-list fallback (MMT-ADR-0016 §1.5 +
   // §10.1). Never returns Gemini/Vertex; fails closed when no compliant
@@ -1035,6 +1036,20 @@ function getFallbackConfig(
   // gemini_only target is banned).
   if (routingV2Enabled) {
     return getFallbackConfigV2(primary, llmTier, capability);
+  }
+
+  // [WI-1986] Under-18 learners are policy-banned from Gemini (MMT-ADR-0016
+  // §1.5) — the same gate getModelConfig applies to the PRIMARY selection
+  // (see isUnder18AgeBracket above). This legacy fallback selector took no
+  // ageBracket parameter and returned Gemini unconditionally when the primary
+  // failed, so a minor whose Anthropic/OpenAI primary errored was routed to
+  // Gemini on every environment with V2 off (the default — config.ts). Gate
+  // BEFORE the gemini_only check and every Gemini-selecting branch below, so
+  // no policy or provider combination can route a minor to Gemini/Vertex on
+  // this path. Fails closed (throws) if no approved text provider is
+  // registered — mirrors the primary-path gate exactly.
+  if (isUnder18AgeBracket(ageBracket)) {
+    return approvedTextFallbackConfig(rung, llmTier);
   }
 
   if (providerPolicy === 'gemini_only') {
@@ -1192,6 +1207,7 @@ export function getFallbackConfigForTest(
     providerPolicy?: LlmProviderPolicy;
     llmTier?: LLMTier;
     capability?: LlmCapability;
+    ageBracket?: AgeBracket;
   },
 ): ModelConfig | null {
   return getFallbackConfig(
@@ -1200,6 +1216,7 @@ export function getFallbackConfigForTest(
     opts?.providerPolicy,
     opts?.llmTier,
     opts?.capability,
+    opts?.ageBracket,
   );
 }
 
@@ -1652,6 +1669,7 @@ export async function routeAndCall(
         _options?.providerPolicy,
         _options?.llmTier,
         capability,
+        _options?.ageBracket,
       );
       if (!fallbackConfig) throw err;
 
@@ -1692,6 +1710,7 @@ export async function routeAndCall(
     _options?.providerPolicy,
     _options?.llmTier,
     capability,
+    _options?.ageBracket,
   );
   if (fallbackConfig) {
     logger.warn('[llm] Primary provider circuit open, using fallback', {
@@ -2083,6 +2102,7 @@ export async function routeAndStream(
       options?.providerPolicy,
       options?.llmTier,
       capability,
+      options?.ageBracket,
     );
     // NOTE: recordSuccess/recordFailure fire during iteration, not here,
     // because chatStream() returns a lazy AsyncIterable — the actual HTTP
@@ -2164,6 +2184,7 @@ export async function routeAndStream(
     options?.providerPolicy,
     options?.llmTier,
     capability,
+    options?.ageBracket,
   );
   if (fallbackConfig) {
     logger.warn('[llm] Primary stream circuit open, using fallback', {

@@ -260,7 +260,7 @@ Data subjects: **adult Subscription-administrator/owner** (`isOwner`/`admin`), *
 | --- | --- | --- |
 | **Clerk JWT auth** — Zod-validated, alg allowlist (HS* excluded), JWKS rotation, exp/nbf/iat + skew, audience+issuer checks; 503 (not 401) on JWKS failure (`middleware/auth.ts`, `middleware/jwt.ts`). | Robust authentication. | ☒ Implemented |
 | **App-layer data isolation** (scoped repo + parent-chain pin, e.g. `session/session-topic.ts:17-47`). | Primary confidentiality control. | ☒ Implemented |
-| **Postgres RLS** — policies written & applied to 40+ tables (`0027_enable_rls.sql`, coverage `database-rls-coverage.ts`) **but inert at runtime**: app connects as `neondb_owner` (bypasses RLS) and the GUC setter is wired into ~1 real service. | **No active DB-layer defence-in-depth.** A `scopedWhere` bug is not backstopped. | ☒ Planned / Partial (PARKED) |
+| **Postgres RLS** — policies written & applied to 40+ tables (`0027_enable_rls.sql`, coverage `database-rls-coverage.ts`) **but inert at runtime**: app connects as `neondb_owner` (bypasses RLS) and the GUC setter is wired into ~1 real service. | **No active DB-layer defence-in-depth.** A `scopedWhere` bug is not backstopped. | ☒ Decided — Branch B (OPQ-30, 2026-07-14): app-layer-only formally accepted for launch, not activated. See [`rls-risk-acceptance-memo.md`](rls-risk-acceptance-memo.md) |
 | **Secrets via Doppler + typed config** — Zod-validated env, prod keys hard-fail at boot, eslint bans raw `process.env` (`config.ts`, `eslint.config.mjs:385-489`). | Strong secret hygiene. | ☒ Implemented |
 | **Sentry PII handling** — opaque IDs only, no name/email; minor-gated off on device (`sentry.ts`); CI guard bans raw-content forwarding. **No `beforeSend` field scrubber.** | Defensible but not field-level redaction. | ☒ Partially implemented |
 | **Encryption** — TLS in transit (platform), Neon at-rest (platform), device SecureStore → Keychain/Keystore (`secure-storage.ts:24`; web falls back to plaintext localStorage, dev-only). | Standard transport/at-rest + native key storage. | ☒ Implemented (native) |
@@ -332,7 +332,7 @@ A standard **likelihood × severity** matrix (each 1–4: Low / Medium / High / 
 | 4 | Record an **accountable lawful-basis + terms-accepted** fact (incl. adults); split consent purposes | §2.1.a gap | Art 5(2)/7(1) accountability | ☒ Planned |
 | 5 | Add an **in-chat "AI mentor" disclosure** indicator (Art 50, due 2 Aug 2026) | R9 | Point-of-interaction transparency | ☒ Planned |
 | 6 | Confirm **`RETENTION_PURGE_ENABLED=true`** in prod Doppler; add a launch-readiness check | R7 | Verifies transcripts actually purge | ☒ Planned |
-| 7 | Activate **DB-layer RLS** (app_user role + GUC setter) for defence-in-depth, or formally accept app-layer-only with a tracked remediation | R2, R4(transcript leak) | Backstops a scoping bug | ☒ Planned |
+| 7 | Activate **DB-layer RLS** (app_user role + GUC setter) for defence-in-depth, or formally accept app-layer-only with a tracked remediation | R2, R4(transcript leak) | Governance decision recorded; does not itself backstop a scoping bug | ☒ Done — Branch B ruled (OPQ-30, 2026-07-14): app-layer-only formally accepted, RLS not activated. See [`rls-risk-acceptance-memo.md`](rls-risk-acceptance-memo.md) |
 | 8 | Set **`retention_period`** values (counsel) + add an **account dormancy sweep** | §2.2.a gaps | Storage limitation | ☒ Planned |
 | 9 | Appoint **DPO**; sign DPIA; publish privacy-policy pre-publish TODOs | governance | Launch gate | ☒ Planned |
 
@@ -341,7 +341,7 @@ A standard **likelihood × severity** matrix (each 1–4: Low / Medium / High / 
 | # | Reassessed risk | Measures applied | Residual L | Residual S | Residual level | Acceptable? |
 | --- | --- | --- | --- | --- | --- | --- |
 | R1 | Incidental Art 9 | #2 + no-disclosure-of-transcript | Low | High | Low–Med | Yes (DPO to confirm) |
-| R2 | Cross-profile access | #7 | Low | High | Low | Yes |
+| R2 | Cross-profile access | #7 (accepted, not a technical mitigation — RLS stays inert) | Low–Med | High | Med–High (unchanged from inherent) | Conditional — formally accepted per `rls-risk-acceptance-memo.md`, tracked remediation trigger |
 | R4 | US-vendor transfer | #1 | Low | High | Low | Yes once DPAs signed |
 | R5/R7 | Quote survival / notice | #3 + #6 | Low | Med | Low | Yes |
 | R6 | Age assurance | (self-declared accepted at 13+ launch) | Med | Med | Med | DPO call |
@@ -377,7 +377,7 @@ Based on the assessment:
 - **Condition 3 — Lawful-basis accountability:** a recorded lawful-basis + terms-accepted fact (incl. adults). *(The live v2 cutover that closes I-C1 is confirmed enabled, 2026-06-30 — no longer an open item.)*
 - **Condition 4 — Retention truth:** `RETENTION_PURGE_ENABLED=true` confirmed in prod; verbatim-quote age-out built or tracked; `retention_period` values set; dormancy sweep planned.
 - **Condition 5 — Minimisation & transparency:** no-clinical-copy guard extended to LLM-written fields; in-chat Art 50 AI disclosure (by 2 Aug 2026).
-- **Condition 6 — Security:** DB-layer RLS activated **or** app-layer-only formally accepted with a tracked remediation.
+- **Condition 6 — Security:** ☒ **MET** — app-layer-only isolation formally accepted (Branch B, OPQ-30, ruled 2026-07-14) with a tracked remediation trigger; DB-layer RLS is not activated. See the signed [`rls-risk-acceptance-memo.md`](rls-risk-acceptance-memo.md).
 
 **Art 36 prior consultation with Datatilsynet:** expected **not required** if the residual risks are reduced to acceptable by the measures above; required only if a High residual risk survives mitigation. **DPO call.**
 

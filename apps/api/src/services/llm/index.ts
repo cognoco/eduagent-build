@@ -62,3 +62,4 @@ export type {
   TextPart,
   InlineDataPart,
 } from './types';
+export { escapeXml } from './sanitize';
