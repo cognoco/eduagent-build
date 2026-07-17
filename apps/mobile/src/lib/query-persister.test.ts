@@ -291,6 +291,24 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(shouldPersistQuery(retention)).toBe(true);
   });
 
+  // [independent re-audit finding] A segment-0-only 'profile'/'profiles'
+  // allow-rule lets ANY differently-shaped query rooted at those words slip
+  // through — not just the audited 2-element queryKeys.profiles.active /
+  // queryKeys.profiles.list factory shapes. scope-context.tsx's real query
+  // (['profile', activeProfileId, 'scopes'], supporterScopeListSchema ->
+  // personScopeDescriptorSchema.displayName — a linked person's name, PII)
+  // is exactly that: same first segment, unaudited shape, never checked.
+  it("excludes the scope-context 'profile'/'scopes' query (unaudited shape, linked-person displayName PII) while still persisting the audited 2-element profile/profiles factory shapes", () => {
+    const scopesQuery = makeSuccessfulQuery(['profile', 'profile-1', 'scopes']);
+    expect(shouldPersistQuery(scopesQuery)).toBe(false);
+
+    const activeProfile = makeSuccessfulQuery(['profile', 'profile-1']);
+    expect(shouldPersistQuery(activeProfile)).toBe(true);
+
+    const profilesList = makeSuccessfulQuery(['profiles', 'user-1']);
+    expect(shouldPersistQuery(profilesList)).toBe(true);
+  });
+
   it('persists verified-clean progress sub-queries (metrics/enums/ids only)', () => {
     const overview = makeSuccessfulQuery([
       'progress',

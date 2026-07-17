@@ -166,8 +166,6 @@ export const PERSISTABLE_QUERY_KEY_ROOTS: ReadonlySet<string> = new Set([
   'subscription-family', // familySubscriptionSchema — billing counters + member displayName
   'subscription-status', // subscriptionStatusResponseSchema — billing enums/counters
   'revenuecat', // RevenueCat SDK CustomerInfo/Offerings — third-party billing entitlement data
-  'profiles', // publicProfileSchema — identity fields (displayName, birthYear, ...), no free text beyond the profile's own name
-  'profile', // same publicProfileSchema, singular "active profile" key
   'settings', // notification/celebration/withdrawal/analogy/language prefs — booleans/enums/locale strings
 ]);
 
@@ -226,6 +224,23 @@ function isPersistableLibraryQuery(key: readonly unknown[]): boolean {
   return key[0] === 'library' && key[1] === 'retention';
 }
 
+/**
+ * [WI-1987 re-audit finding] `queryKeys.profiles.list` (`['profiles',
+ * userId]`) and `queryKeys.profiles.active` (`['profile', profileId]`) are
+ * both exactly 2-element `publicProfileSchema`-backed keys — clean. But
+ * `'profile'`/`'profiles'` are common enough words that an UNAUDITED query
+ * can collide on segment-0 alone: `scope-context.tsx`'s
+ * `['profile', activeProfileId, 'scopes']` is a real, different-shaped query
+ * (`supporterScopeListSchema` → `personScopeDescriptorSchema.displayName`, a
+ * linked person's name — PII) that a segment-0-only rule would silently
+ * allow. Constrain the allow-rule to the EXACT 2-element factory shape so any
+ * other 'profile'/'profiles'-rooted query — audited or not — falls through
+ * to default-deny.
+ */
+function isPersistableProfileQuery(key: readonly unknown[]): boolean {
+  return key.length === 2 && (key[0] === 'profiles' || key[0] === 'profile');
+}
+
 // `dashboard` (queryKeys.dashboard.* — the parent-facing child views) is
 // excluded WHOLESALE, not surgically: `dashboard.root` and `childDetail`
 // both embed the full `dashboardChildSchema`, which carries `summary`,
@@ -264,7 +279,8 @@ export function shouldPersistQuery(query: Query): boolean {
     (typeof firstSegment === 'string' &&
       PERSISTABLE_QUERY_KEY_ROOTS.has(firstSegment)) ||
     isPersistableProgressQuery(key) ||
-    isPersistableLibraryQuery(key);
+    isPersistableLibraryQuery(key) ||
+    isPersistableProfileQuery(key);
   if (!allowed) return false;
   return defaultShouldDehydrateQuery(query);
 }
