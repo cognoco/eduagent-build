@@ -97,6 +97,45 @@ test('guard exits 0 when DOPPLER_CONFIG is absent and DB_PUSH_LOCAL_DEV=1', () =
   assert.match(stdout, /DB_PUSH_LOCAL_DEV=1 override accepted/);
 });
 
+// ── DB_PUSH_LOCAL_DEV escape must still check the resolved host (WI-1874) ────
+
+test('guard exits 1 when DB_PUSH_LOCAL_DEV=1 but DATABASE_URL resolves to a stg/neon.tech host', () => {
+  // pnpm env:sync writes staging credentials into .env.development.local, which
+  // drizzle-kit auto-loads. A dev who sets DB_PUSH_LOCAL_DEV=1 intending to hit
+  // local Postgres, but still has stg creds present, must not be allowed
+  // through — that's the exact April-2026 stg push-drift incident.
+  const { status, stderr } = runGuard({
+    DOPPLER_CONFIG: undefined,
+    DB_PUSH_LOCAL_DEV: '1',
+    DATABASE_URL: 'postgres://stguser:stgpass@ep-example-stg.neon.tech/mydb',
+  });
+  assert.equal(status, 1, 'expected exit 1 — escape must not push to a neon.tech host');
+  assert.match(stderr, /drizzle-kit push is blocked/);
+  assert.match(stderr, /localhost/);
+  assert.ok(!stderr.includes('stguser'), 'username must not appear in output');
+  assert.ok(!stderr.includes('stgpass'), 'password must not appear in output');
+});
+
+test('guard exits 0 when DB_PUSH_LOCAL_DEV=1 and DATABASE_URL resolves to localhost', () => {
+  const { status, stdout } = runGuard({
+    DOPPLER_CONFIG: undefined,
+    DB_PUSH_LOCAL_DEV: '1',
+    DATABASE_URL: 'postgres://postgres:postgres@localhost:5432/mydb',
+  });
+  assert.equal(status, 0, 'expected exit 0 — localhost is the intended local-dev target');
+  assert.match(stdout, /DB_PUSH_LOCAL_DEV=1 override accepted/);
+});
+
+test('guard exits 0 when DB_PUSH_LOCAL_DEV=1 and DATABASE_URL resolves to 127.0.0.1', () => {
+  const { status, stdout } = runGuard({
+    DOPPLER_CONFIG: undefined,
+    DB_PUSH_LOCAL_DEV: '1',
+    DATABASE_URL: 'postgres://postgres:postgres@127.0.0.1:5432/mydb',
+  });
+  assert.equal(status, 0, 'expected exit 0 — 127.0.0.1 is the intended local-dev target');
+  assert.match(stdout, /DB_PUSH_LOCAL_DEV=1 override accepted/);
+});
+
 // ── Credential redaction ──────────────────────────────────────────────────────
 
 test('guard redacts credentials in DATABASE_URL before logging (stg config)', () => {
