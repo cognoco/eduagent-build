@@ -109,6 +109,27 @@ Exact final targeted command:
 rtk pnpm exec jest --runTestsByPath '/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2094/apps/mobile/src/app/(app)/mentor.test.tsx' --runInBand --no-coverage --json --outputFile='/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2094/docs/evidence/WI-2094/review-cycle-1-post-merge-green.json'
 ```
 
+## Latest main integration and final validation
+
+On 2026-07-18, a fresh `git fetch origin` resolved `origin/main` to `3b0fa9337fb60cef7bba8383314b7a61c0abc54b`. Its delta from the previously integrated main revision was confined to four unrelated API retention/review-calibration files. The published WI history was preserved: merge commit `acbb98591a5d71968b848b32ce8cb37b0420cba8` has parents `cd1e0872722329b357f141c8be62b8894317d84f` and `3b0fa9337fb60cef7bba8383314b7a61c0abc54b`.
+
+The merge was clean: `git diff --diff-filter=U --name-only` and `git diff --check` both returned no output. It introduced no mobile delta relative to `cd1e0872722329b357f141c8be62b8894317d84f`. Before and after the merge, `mentor.tsx` retained blob `2d315e02a12d9850c1c645a3d34ae6e1840f7a26`, `bar-intent-match.ts` retained blob `3af7c5037d2ad369c41aa37141a9c5c72c1b49bc`, and their stable production patch ID against main remained `3250cf41775ca5a6b63c264c34e220e92484f118`. No production or test behavior was changed during this integration.
+
+Fresh pre-PR validation against the integrated tree:
+
+- Impacted Jest command: `pnpm exec jest --runTestsByPath <absolute mentor.test.tsx> <absolute MentorInputBar.test.tsx> <absolute bar-intent-match.test.ts> <absolute bar-intent-match.adversarial.test.ts> --runInBand --no-coverage` — exit 0; 4 suites passed; 66 tests passed; 0 snapshots.
+- `pnpm exec nx run @eduagent/mobile:typecheck` — exit 0; the mobile target and six dependencies succeeded; Nx reused cached output for all seven tasks.
+- `pnpm exec nx run @eduagent/mobile:lint` — exit 0; 0 errors and the unchanged 51-warning baseline; Nx reused cached output. No internal-mock warning points at the changed Mentor test.
+- `pnpm prepush` — exit 0; `tsc --build` succeeded. The only pre-command diagnostic was the recorded Node 22 engine warning under Node `v24.18.0` and pnpm `10.19.0`.
+- `pnpm format:check` — exit 0; all three configured projects succeeded with cached Nx output.
+- Final targeted GREEN — exit 0; 1 suite and 32 tests passed; 0 snapshots. Machine-readable output: [latest-main-post-merge-green.json](latest-main-post-merge-green.json).
+
+Exact latest final targeted command:
+
+```bash
+rtk pnpm exec jest --runTestsByPath '/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2094/apps/mobile/src/app/(app)/mentor.test.tsx' --runInBand --no-coverage --json --outputFile='/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2094/docs/evidence/WI-2094/latest-main-post-merge-green.json'
+```
+
 ## Environment and device check
 
 Only Node `v24.18.0` and pnpm `10.19.0` were available; no `node22`, mise, fnm, or Volta executable was present. The repository requested Node 22 and emitted an engine warning under Node 24. The targeted tests, typecheck, lint, pre-push TypeScript build, and formatting checks all succeeded, so no result indicates that the engine mismatch affected this change.
