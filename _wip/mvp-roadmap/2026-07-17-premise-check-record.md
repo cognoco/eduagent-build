@@ -55,3 +55,13 @@ Excluded as external-dependent (22, 24, 102–106, 110, 111) or non-Phase-1 (41,
 ## Next
 
 Hold stands. At lift: BID-1+BID-2 parallel dispatch (final mode confirmation at lift). Round-two formation agenda: Compliance-Eng remainder (incl. WI-1196), Identity cluster (WI-1989/2006/2055/2056 — operator eyes on canon wording), WI-1650/1864 (pre-refined by then), factory drain mode (operator-reserved). WI-1906 becomes an OPQ row if it ever leaves the pen. Zuzka + Jørn process D1 tiers ASAP; external initiations (OPQ-22 send, OPQ-102 retainer) remain the schedule lever.
+
+---
+
+## Dispatch addendum (2026-07-17, same day — HOLD LIFTED, PoC EXECUTION OPEN)
+
+**ZDX milestone reached** (PoC execution authorized). Governing protocol: **Interim Delivery Protocol** — v0 (PM role: queue ownership, DoR gate, review-verdict monitoring, fences, EOD digest, deviations→findings) + v1 RELAY 2 (batch agents: Quartet shepherd+orchestrator hybrid persona scoped to ONE Delivery Batch; gate-verify → Ready→Running flip with `Run by` as claim; DoR before execute; per-WI worktrees; pre-PR adversarial review; **authorized to merge own green-checked PRs to main — operator-confirmed** since no PM↔shepherd comms channel exists; `/cosmo:execute complete` post-merge; reviewer on Lancre; >30-min Reviewing/Awaiting-Info = stuck; deviations→Cosmo WIs).
+
+Reconciliations ruled at adoption: claimant scheme = RELAY 2's role-first form (`shepherd:claude:mm-preview-vehicle`, `shepherd:claude:mm-ci-gates`; PM = `pm:claude:mentomate`); v0's "lane" read as "batch" (batches are cross-lane by ruled doctrine); `Run by` already existed on the Batches DB (nexus P4.6 R4).
+
+**Lift executed:** operator lifted for **everything** — the milestone hold is void on all four batches; dated lift lines appended to all four `Gated by — note` fields (originals preserved per doctrine). BID-1 + BID-2: dispatched — kickoff relays handed to both shepherds by the operator (manual relay); entry gates verified (zero `Gated by` relations; note-gate judged clear by PM). **BID-3/BID-4: lifted but NOT dispatched** — shepherd assignment awaits the joint operator+PM decision per D2. PM monitor armed over the 10 member items + batch pages (stage/claim deltas, rework bounces, >30-min stuck alerts, main-branch movement). EOD per-lane digest starts tonight.
