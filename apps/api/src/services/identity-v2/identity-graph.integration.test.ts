@@ -25,6 +25,7 @@ import { resolve } from 'path';
 import { eq, sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
+  consentGrant,
   createDatabase,
   generateUUIDv7,
   login,
@@ -99,6 +100,12 @@ async function cleanupByClerk(
       await db.execute(sql`DELETE FROM accounts WHERE id = ${orgId}`);
     }
   }
+  // [WI-1193] consent_grant.charge_person_id/organization_id are ON DELETE
+  // RESTRICT — an adult bootstrap now writes rows here, so they must go before
+  // the person/organization deletes below.
+  await db
+    .delete(consentGrant)
+    .where(eq(consentGrant.chargePersonId, personId));
   await db.delete(membership).where(eq(membership.personId, personId));
   await db.delete(login).where(eq(login.clerkUserId, clerkUserId));
   await db.delete(person).where(eq(person.id, personId));
@@ -231,6 +238,50 @@ async function cleanupByClerk(
     expect(ownerUsage?.role).toBe('owner');
     expect(ownerUsage?.usedThisMonth).toBe(0);
     expect(ownerUsage?.usedToday).toBe(0);
+
+    // [WI-1193 AC1/AC2] A self-registered adult owner (birthYear 1990 → age
+    // ~35-36) gets a persisted lawful-basis + terms-accepted fact per purpose:
+    // one CONSENTED consent_grant row for EACH of platform_use/llm_disclosure,
+    // basis='adult_self_consent' — the "adult who never needed consent" gap
+    // this WI closes.
+    const grants = await db.query.consentGrant.findMany({
+      where: eq(consentGrant.chargePersonId, graph.personId),
+    });
+    expect(grants).toHaveLength(2);
+    const purposes = grants.map((g) => g.purpose).sort();
+    expect(purposes).toEqual(['llm_disclosure', 'platform_use']);
+    for (const g of grants) {
+      expect(g.lawfulBasis).toBe('adult_self_consent');
+      expect(g.granted).toBe(true);
+      expect(g.withdrawnAt).toBeNull();
+      expect(g.organizationId).toBe(graph.organizationId);
+    }
+  });
+
+  it('[WI-1193] does NOT record adult self-consent for a self-registered owner under 18', async () => {
+    // A 15-year-old self-registering as owner passes the >= 13 minimum-age gate
+    // (createIdentityGraph's only age check) but is not a true adult by the
+    // codebase's 18+ threshold — pre-existing gap (no consent workflow exists
+    // for a guardian-less self-registered teen); this WI does not resolve it,
+    // it only must not mis-record them as an adult.
+    const clerkUserId = uniqueClerk();
+    const email = `teen_owner_${generateUUIDv7()}@test.local`;
+    const currentYear = new Date().getUTCFullYear();
+
+    const graph = await createIdentityGraph(db, {
+      clerkUserId,
+      verifiedEmail: email,
+      displayName: 'Teen Owner',
+      birthYear: currentYear - 15,
+      birthMonth: 1,
+      birthDay: 1,
+      location: 'US',
+    });
+
+    const grants = await db.query.consentGrant.findMany({
+      where: eq(consentGrant.chargePersonId, graph.personId),
+    });
+    expect(grants).toHaveLength(0);
   });
 
   it('is idempotent on a repeated clerk id (login_clerk_user_id_unique replay)', async () => {
