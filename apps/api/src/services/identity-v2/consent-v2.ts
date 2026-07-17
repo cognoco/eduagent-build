@@ -463,14 +463,16 @@ export interface ProcessConsentResponseV2Result {
  * replay/expiry, then:
  *   - approve → tx: request → 'approved' + INSERT consent_grant(granted=true)
  *     + back-link consent_grant_id. (NEVER creates a guardianship edge.)
- *   - deny    → tx: request → 'denied' + [WI-1138] if this person owns a
- *     subscription (a consent-exempt Stripe checkout can complete while
- *     consent is still pending), snapshot + write deletion_audit/
- *     financial_record BEFORE deleting it, so a payer-deny leaves a
- *     forensic trail instead of a silent leak + delete payer subscription
- *     + cascade-delete the person. Post-commit (outside the tx), cancel the
- *     snapshotted Stripe subscription if any, escalating on failure rather
- *     than blocking the (already-committed) deny.
+ *   - deny    → tx: request → 'denied' + [WI-1442] write ONE deletion_audit
+ *     row unconditionally BEFORE the person delete below (the sole surviving
+ *     GDPR proof-of-consent-denial once the person/request cascade away) +
+ *     [WI-1138] if this person owns a subscription (a consent-exempt Stripe
+ *     checkout can complete while consent is still pending), snapshot +
+ *     ALSO write financial_record BEFORE deleting it, so a payer-deny leaves
+ *     a tax/chargeback trail too + delete payer subscription + cascade-delete
+ *     the person. Post-commit (outside the tx), cancel the snapshotted Stripe
+ *     subscription if any, escalating on failure rather than blocking the
+ *     (already-committed) deny.
  *
  * The atomic status transition's WHERE prevents the TOCTOU double-submit race.
  */
@@ -599,19 +601,30 @@ export async function processConsentResponseV2(
         },
       });
 
-      // Only a payer-deny gets an audit trail; an ordinary managed-child
-      // deny (no subscription row) stays a true no-op — zero new writes.
+      // [WI-1442] deny hard-deletes the person below (cascade), so the
+      // deletion_audit row is the ONLY surviving proof this erasure happened
+      // — the consent_request row cascades away with the person, and
+      // consent_grant is a no-op re-home target here (ON DELETE RESTRICT on
+      // consent_grant.charge_person_id fail-safes: if a live grant existed
+      // the person delete below would abort the tx before this could ever
+      // run under-audited). Written unconditionally, matching deletion-v2.ts's
+      // own unconditional Step 4 audit write — WI-1138's subscription gate
+      // below is a billing-scope boundary (financial_record is payer-only),
+      // not a GDPR-proof-of-consent boundary.
+      await tx.insert(deletionAudit).values({
+        personId: chargePersonId,
+        // Anonymous token-click, no authenticated actor.
+        deletedBy: null,
+        // The consent-response token is addressed to
+        // request.guardianEmail, so this is guardian-initiated even when
+        // the denied person is also the payer.
+        reason: 'guardian_initiated',
+        retentionPeriod: null,
+      });
+
+      // Only a payer-deny gets a financial_record — an ordinary managed-child
+      // deny (no subscription row) writes no tax/chargeback retain rows.
       if (payerSubscriptions.length > 0) {
-        await tx.insert(deletionAudit).values({
-          personId: chargePersonId,
-          // Anonymous token-click, no authenticated actor.
-          deletedBy: null,
-          // The consent-response token is addressed to
-          // request.guardianEmail, so this is guardian-initiated even when
-          // the denied person is also the payer.
-          reason: 'guardian_initiated',
-          retentionPeriod: null,
-        });
         // [WI-1138 review] Reuse the ONE canonical financial-record write
         // (tax + chargeback retain-tier pair, §4.9 COUNSEL-OWNED) instead of
         // a narrower tax-only insert — the pairing is not a per-caller

@@ -289,8 +289,10 @@ const COPPA = 'coppa_parental_consent';
     // complete while consent is still pending, e.g. a teen owner-payer), so
     // external billing kept charging after a GDPR-erasure-adjacent deletion.
     // Covers all four AC variants: (a) live Stripe sub, (b) null Stripe sub,
-    // (c) no sub at all (ordinary managed-child deny — must stay a true
-    // no-op), (d) Stripe cancel failure (must escalate, never block the
+    // (c) no sub at all (ordinary managed-child deny — financial_record stays
+    // a true no-op; [WI-1442] deletion_audit is NOT — every deny hard-deletes
+    // a person, so the audit row is unconditional, matching deletion-v2.ts's
+    // own Step 4), (d) Stripe cancel failure (must escalate, never block the
     // already-committed deny).
     // -------------------------------------------------------------------------
     describe('[WI-1138] processConsentResponseV2(deny) — payer subscription teardown', () => {
@@ -416,7 +418,7 @@ const COPPA = 'coppa_parental_consent';
         expect(stripeCancel).not.toHaveBeenCalled();
       });
 
-      it('(c) no subscription at all (ordinary managed-child deny): zero new deletion_audit/financial_record rows — the fix does not widen scope to every deny', async () => {
+      it('(c) [WI-1442] no subscription at all (ordinary managed-child deny): ONE deletion_audit row still written (GDPR proof-of-consent-denial — the person is hard-deleted regardless of billing), zero financial_record rows (billing-scoped, WI-1138 stays a true no-op)', async () => {
         const orgId = await seedOrg();
         const childId = await seedPerson(orgId);
         await createPendingConsentRequest(db, childId, orgId, 'GDPR');
@@ -437,7 +439,9 @@ const COPPA = 'coppa_parental_consent';
         const audits = await db.query.deletionAudit.findMany({
           where: eq(deletionAudit.personId, childId),
         });
-        expect(audits).toHaveLength(0);
+        expect(audits).toHaveLength(1);
+        expect(audits[0]?.reason).toBe('guardian_initiated');
+        expect(audits[0]?.deletedBy).toBeNull();
         const records = await db.query.financialRecord.findMany({
           where: eq(financialRecord.personId, childId),
         });
