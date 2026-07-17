@@ -6,7 +6,10 @@ const path = require('path');
 const ciDefaults = process.env.CI
   ? {
       silent: true,
-      reporters: ['default', path.join(__dirname, '..', '..', 'jest-ci-reporter.cjs')],
+      reporters: [
+        'default',
+        path.join(__dirname, '..', '..', 'scripts', 'jest-ci-reporter.cjs'),
+      ],
     }
   : {};
 
