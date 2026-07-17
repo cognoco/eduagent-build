@@ -49,6 +49,32 @@ export function buildPersisterKey(userId: string | null | undefined): string {
 }
 
 /**
+ * [WI-1987 rework] Deterministic fallback purge for sign-out paths that
+ * don't have a `clerkUserId` to build a targeted key from (auth-expired,
+ * profile-load-timeout — see sign-out.ts). Since we can't compute WHICH
+ * scoped key belongs to the signing-out session, this removes every scoped
+ * persister key on disk (plus the pre-BUG-357 unscoped legacy key) rather
+ * than falling back to `queryClient.clear()` + the persister's throttled
+ * (2s) write — the fallback the previous version of this fix left in place,
+ * which is exactly the crash-window race BUG-357 closed for the
+ * known-clerkUserId case. A device that has signed in as more than one
+ * Clerk user loses every account's offline-paint cache when this runs, not
+ * just the signing-out one — an acceptable cost for guaranteeing no scoped
+ * cache (which may hold learner prose) survives an auth-expired sign-out on
+ * disk.
+ */
+export async function removeAllScopedPersisterCaches(): Promise<void> {
+  const keys = await AsyncStorage.getAllKeys();
+  const targets = keys.filter(
+    (key) =>
+      key === LEGACY_CACHE_KEY || key.startsWith(SCOPED_CACHE_KEY_PREFIX),
+  );
+  if (targets.length > 0) {
+    await AsyncStorage.multiRemove(targets);
+  }
+}
+
+/**
  * Cache buster keyed to the running JS bundle.
  *
  * `PersistQueryClientProvider` rehydrates the dehydrated cache from disk
@@ -89,45 +115,156 @@ export function createScopedPersister(userId: string | null | undefined) {
 }
 
 // ---------------------------------------------------------------------------
-// [WI-1987] Dehydration denylist
+// [WI-1987, reworked] Dehydration ALLOWLIST (default-deny)
 //
-// Without a `shouldDehydrateQuery` filter, `PersistQueryClientProvider`
-// persists EVERY successful query to AsyncStorage — including session
-// transcripts (`['session-transcript', mode, sessionId, profileId]`, see
-// queryKeys.sessions.transcript in query-keys.ts), which hold real
-// learner/mentor chat text (sessionTranscriptSchema.exchanges in
-// packages/schemas/src/sessions.ts). AsyncStorage is unencrypted on-device
-// storage, so this wrote full chat transcripts to plaintext disk. Add a new
-// query-key prefix here for any future query whose data is a raw transcript
-// or other sensitive PII that must never be written to disk.
+// Original fix: without a `shouldDehydrateQuery` filter,
+// `PersistQueryClientProvider` persists EVERY successful query to
+// AsyncStorage (unencrypted on-device storage) — including session
+// transcripts (sessionTranscriptSchema.exchanges), so real learner/mentor
+// chat text was written to plaintext disk. A first pass added a denylist for
+// `session-transcript` / `session-summary` / `parking-lot` (matched on
+// queryKey[0]). Review bounced that pass: it missed sibling prose-bearing
+// families (`recaps`/`journal-recaps` — displaySummary/highlight/narrative/
+// conversationPrompt/learner quote; `my-reports`/dashboard reports —
+// highlights/nextSteps), and a re-audit of every family in query-keys.ts
+// (plus the inline-literal keys outside it) found the leak is systemic:
+// `rawInput` (the learner's verbatim raw text) and generated
+// summary/narrative/guidance/quote fields are threaded through most
+// progress/dashboard/session response shapes — including the ordinary
+// `['subjects', profileId]` list query and the parent dashboard ROOT query,
+// not just the screens named in review. A denylist fails open: every new
+// query family is persisted by default until someone remembers to add it
+// here, and this audit alone found four independent waves of misses in one
+// pass. An allowlist fails closed: an unlisted family just doesn't paint
+// on cold start (mild, self-correcting) instead of silently writing prose to
+// disk (the actual bug, undetectable without an audit like this one).
 //
-// Also denylisted (same audit pass):
-// - `session-summary` (queryKeys.sessions.summary, used by useSessionSummary
-//   in use-sessions.ts) — AI paraphrase/quotes of the session (content,
-//   aiFeedback, closingLine, learnerRecap).
-// - `parking-lot` (queryKeys.sessions.parkingLot AND topicParkingLot, both
-//   used in use-sessions.ts — they share the same first queryKey segment) —
-//   verbatim child-typed questions.
+// So: `shouldPersistQuery` now denies by default and only persists query-key
+// roots verified end-to-end (packages/schemas/src/*.ts, read in full) to
+// carry ONLY structural metadata — numeric metrics, uuids, enums, dates, and
+// curriculum-authored titles (topic/subject/book names picked by the
+// curriculum, not typed by the learner). Add a new root here ONLY after
+// reading its response schema and confirming no field is learner-authored
+// free text, mentor/LLM-generated prose, or a
+// rawInput/summary/narrative/highlight/quote/guidance-shaped string.
 // ---------------------------------------------------------------------------
-export const NEVER_PERSIST_QUERY_KEY_PREFIXES: ReadonlySet<string> = new Set([
-  'session-transcript',
-  'session-summary',
-  'parking-lot',
+
+/**
+ * Query-key roots (`queryKey[0]`) verified fully clean of learner/mentor
+ * prose and `rawInput`. See file-level comment above for the standard each
+ * entry must meet.
+ */
+export const PERSISTABLE_QUERY_KEY_ROOTS: ReadonlySet<string> = new Set([
+  'book-sessions', // bookSessionSchema — id/topicId/topicTitle/chapter/exchangeCount/createdAt
+  'topic-sessions', // topicSessionSchema — id/sessionType/durationSeconds/createdAt
+  'subject-sessions', // subjectSessionSchema — ids/titles/sessionType/durationSeconds/createdAt
+  'retention', // retentionCardSchema(+topicTitle/bookId) + teachingPreferenceResponseDataSchema — scores/dates/enums
+  'language-progress', // languageProgressSchema — levels/milestone ids+titles, no prose
+  'vocabulary', // vocabularySchema — curated term/translation flashcard data, not learner narrative
+  'subscription', // subscriptionSchema — billing tier/limits/dates
+  'usage', // usageSchema — billing counters
+  'subscription-family', // familySubscriptionSchema — billing counters + member displayName
+  'subscription-status', // subscriptionStatusResponseSchema — billing enums/counters
+  'revenuecat', // RevenueCat SDK CustomerInfo/Offerings — third-party billing entitlement data
+  'profiles', // publicProfileSchema — identity fields (displayName, birthYear, ...), no free text beyond the profile's own name
+  'profile', // same publicProfileSchema, singular "active profile" key
+  'settings', // notification/celebration/withdrawal/analogy/language prefs — booleans/enums/locale strings
 ]);
 
 /**
- * `dehydrateOptions.shouldDehydrateQuery` for the scoped persister. Excludes
- * denylisted query-key prefixes; otherwise defers to react-query's default
- * (persist successful queries only) so every other query's existing
- * offline-paint behavior is unchanged.
+ * `progress` (queryKeys.progress.*) mixes safe aggregate-metric queries with
+ * prose-bearing ones under the same `queryKey[0]`. The `'profile'`-scoped
+ * sub-queries (profileSessions/profileReports/profileWeeklyReports/
+ * profileReportDetail/profileWeeklyReportDetail) are the self-view mirror of
+ * the dashboard child queries below and carry the same
+ * displaySummary/highlight/narrative/conversationPrompt/highlights/nextSteps
+ * fields; `topicProgress` carries `summaryExcerpt`. Only the segment-2
+ * values below (and the two fixed-literal `'topic'` sub-queries that do NOT
+ * carry summaryExcerpt) are allowed — everything else under `'progress'`,
+ * including `'profile'` and the variable-topicId shape of `'topic'`, is
+ * excluded by omission.
+ */
+const PERSISTABLE_PROGRESS_SEGMENT2: ReadonlySet<string> = new Set([
+  'subject', // subjectProgressSchema — counts/enums/dates
+  'overview', // progressOverviewResponseSchema — counts/enums, subjects: subjectProgressSchema[]
+  'continue', // continueSuggestionSchema — ids/titles only
+  'resume-target', // learningResumeTargetSchema — ids/titles/enum + short system `reason` string
+  'review-summary', // reviewSummaryResponseSchema — counts + nextReviewTopicSchema (ids/titles)
+  'overdue-topics', // overdueTopicsResponseSchema — counts + overdueTopicSchema (ids/titles/enums)
+  'inventory', // knowledgeInventorySchema — counts + currentlyWorkingOn (topic titles)
+  'history', // progressHistorySchema — dates + numeric dataPoints
+  'milestones', // milestoneRecordSchema — enum/counts + metadata: { subjectName } only (verified at the one call site, milestone-detection.ts)
+]);
+
+function isPersistableProgressQuery(key: readonly unknown[]): boolean {
+  if (key[0] !== 'progress') return false;
+  const segment2 = key[2];
+  if (
+    typeof segment2 === 'string' &&
+    PERSISTABLE_PROGRESS_SEGMENT2.has(segment2)
+  ) {
+    return true;
+  }
+  // activeSessionForTopic (['progress', mode, 'topic', topicId, 'active-session', profileId])
+  // and resolveTopicSubject (segment4 'resolve') are clean; topicProgress
+  // (['progress', mode, 'topic', subjectId, topicId, profileId], segment4 = a
+  // variable topicId, never one of these two literals) carries
+  // `summaryExcerpt` and must fall through to excluded.
+  return (
+    segment2 === 'topic' &&
+    (key[4] === 'active-session' || key[4] === 'resolve')
+  );
+}
+
+/**
+ * `library.retention` (retentionCardWithMetaSchema — clean) shares
+ * `queryKey[0]` with `library.conceptMastery`
+ * (`mentorAdditions: z.array(z.string())` — mentor-generated prose about the
+ * learner's demonstrated concept mastery). Only `retention` is allowed.
+ */
+function isPersistableLibraryQuery(key: readonly unknown[]): boolean {
+  return key[0] === 'library' && key[1] === 'retention';
+}
+
+// `dashboard` (queryKeys.dashboard.* — the parent-facing child views) is
+// excluded WHOLESALE, not surgically: `dashboard.root` and `childDetail`
+// both embed the full `dashboardChildSchema`, which carries `summary`,
+// per-subject `rawInput`, and (nested under `progress`) `guidance`; the
+// explicitly-named `childSessions`/`childSessionDetail` carry
+// displaySummary/highlight/narrative/conversationPrompt; `childReports*`
+// carry highlights/nextSteps/childName; `childMemory` carries curated memory
+// statements plus parent free-text contributions; `childVerifiedProof`
+// carries a learner quote. With the family this saturated, a partial
+// allowlist would be one schema-change away from silently regressing —
+// nothing under `'dashboard'` is allowlisted.
+//
+// Likewise NOT allowlisted, by omission (all inline-literal or factory keys
+// verified prose/PII-bearing, listed here only for reviewer traceability —
+// none of this is enforced by name, only by absence from the allow rules
+// above): `session-transcript`, `session-summary`, `parking-lot` (verbatim
+// chat/questions), `session` (queryKeys.sessions.detail — learningSessionSchema
+// carries `rawInput`), `recaps` / `journal-recaps` (recapListItemSchema —
+// displaySummary/highlight/narrative/conversationPrompt/verifiedProof.quote),
+// `my-reports` (self-scope mirror of dashboard reports — highlights/nextSteps),
+// `learner-profile` (learningProfileSchema.communicationNotes — free-text
+// notes), `subjects` (subjectSchema.rawInput — the learner's raw
+// subject-creation text), `resume-nudge` (topicHint — not independently
+// verified prose-free, excluded conservatively).
+
+/**
+ * `dehydrateOptions.shouldDehydrateQuery` for the scoped persister.
+ * Default-deny: persists only query keys matching one of the allow rules
+ * above; every other successful query — known-bad, unaudited, or a family
+ * added after this file was last reviewed — is excluded by default.
  */
 export function shouldPersistQuery(query: Query): boolean {
-  const [firstSegment] = query.queryKey;
-  if (
-    typeof firstSegment === 'string' &&
-    NEVER_PERSIST_QUERY_KEY_PREFIXES.has(firstSegment)
-  ) {
-    return false;
-  }
+  const key = query.queryKey;
+  const firstSegment = key[0];
+  const allowed =
+    (typeof firstSegment === 'string' &&
+      PERSISTABLE_QUERY_KEY_ROOTS.has(firstSegment)) ||
+    isPersistableProgressQuery(key) ||
+    isPersistableLibraryQuery(key);
+  if (!allowed) return false;
   return defaultShouldDehydrateQuery(query);
 }

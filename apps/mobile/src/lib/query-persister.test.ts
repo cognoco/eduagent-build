@@ -116,15 +116,20 @@ describe('persisted cache invalidation across bundle versions (boot-crash regres
 });
 
 // ---------------------------------------------------------------------------
-// [WI-1987] Dehydration denylist — transcript/PII queries never hit disk
+// [WI-1987, reworked] Dehydration ALLOWLIST — default-deny closes the class
 //
 // Pre-fix, persistOptions passed no shouldDehydrateQuery, so the persister's
 // default (defaultShouldDehydrateQuery: persist every successful query)
 // wrote EVERY query to AsyncStorage — including ['session-transcript', ...],
 // which holds real learner/mentor chat text (packages/schemas/src/sessions.ts
-// sessionTranscriptSchema.exchanges). shouldPersistQuery adds an explicit
-// denylist so transcript queries are excluded while every other query keeps
-// its existing offline-paint behavior.
+// sessionTranscriptSchema.exchanges). A first pass added a denylist for
+// session-transcript/session-summary/parking-lot; review bounced it because
+// a denylist fails OPEN — every new/overlooked query-key family persists by
+// default. shouldPersistQuery is now default-DENY: a query only persists if
+// its key matches a verified-clean allow rule (query-persister.ts). The red
+// case that proves the class is closed is the DEFAULT-DENY case below — an
+// arbitrary/unaudited key must NOT persist, full stop — plus spot-checks of
+// the specific families the two review rounds named.
 // ---------------------------------------------------------------------------
 
 describe('shouldPersistQuery [WI-1987]', () => {
@@ -133,6 +138,11 @@ describe('shouldPersistQuery [WI-1987]', () => {
     client.setQueryData(queryKey as unknown[], { some: 'data' });
     return client.getQueryCache().find({ queryKey })!;
   }
+
+  it('DEFAULT-DENY: an arbitrary/unaudited query key does not persist', () => {
+    const query = makeSuccessfulQuery(['some-brand-new-query-nobody-audited']);
+    expect(shouldPersistQuery(query)).toBe(false);
+  });
 
   it('excludes session-transcript queries (real chat text) from persistence', () => {
     const query = makeSuccessfulQuery([
@@ -174,26 +184,177 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(shouldPersistQuery(topicParkingLot)).toBe(false);
   });
 
-  it('persists an ordinary successful query (default behavior preserved)', () => {
-    const query = makeSuccessfulQuery(['subjects', USER]);
-    expect(shouldPersistQuery(query)).toBe(true);
+  it("excludes session detail queries (learningSessionSchema.rawInput — the learner's raw typed text)", () => {
+    const query = makeSuccessfulQuery([
+      'session',
+      'study',
+      'session-1',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(query)).toBe(false);
+  });
+
+  it('excludes recaps and journal-recaps queries (displaySummary/highlight/narrative/conversationPrompt/learner quote)', () => {
+    const recaps = makeSuccessfulQuery(['recaps', 'study', 'profile-1', null]);
+    expect(shouldPersistQuery(recaps)).toBe(false);
+
+    const journalRecaps = makeSuccessfulQuery([
+      'journal-recaps',
+      'profile-1',
+      10,
+    ]);
+    expect(shouldPersistQuery(journalRecaps)).toBe(false);
+  });
+
+  it('excludes my-reports queries, both monthly and weekly (highlights/nextSteps)', () => {
+    const monthly = makeSuccessfulQuery(['my-reports', 'monthly', 'profile-1']);
+    expect(shouldPersistQuery(monthly)).toBe(false);
+
+    const weekly = makeSuccessfulQuery(['my-reports', 'weekly', 'profile-1']);
+    expect(shouldPersistQuery(weekly)).toBe(false);
+  });
+
+  it('excludes learner-profile queries (communicationNotes free text)', () => {
+    const query = makeSuccessfulQuery(['learner-profile', 'profile-1']);
+    expect(shouldPersistQuery(query)).toBe(false);
+  });
+
+  it("excludes the subjects list query (subjectSchema.rawInput — the learner's raw subject-creation text)", () => {
+    const query = makeSuccessfulQuery(['subjects', USER, false]);
+    expect(shouldPersistQuery(query)).toBe(false);
+  });
+
+  it('excludes every dashboard.* query wholesale, including the root/childDetail/childSessions/childReports/childMemory/childVerifiedProof shapes', () => {
+    const shapes: readonly unknown[][] = [
+      ['dashboard', 'family', 'profile-1'],
+      ['dashboard', 'family', 'child', 'child-1'],
+      ['dashboard', 'family', 'child', 'child-1', 'sessions'],
+      ['dashboard', 'family', 'child', 'child-1', 'session', 'session-1'],
+      ['dashboard', 'family', 'child', 'child-1', 'reports'],
+      ['dashboard', 'family', 'child', 'child-1', 'report', 'report-1'],
+      ['dashboard', 'family', 'child', 'child-1', 'weekly-reports'],
+      ['dashboard', 'family', 'child', 'child-1', 'weekly-report', 'report-1'],
+      ['dashboard', 'family', 'child', 'child-1', 'memory'],
+      ['dashboard', 'family', 'child', 'child-1', 'verified-proof'],
+    ];
+    for (const key of shapes) {
+      expect(shouldPersistQuery(makeSuccessfulQuery(key))).toBe(false);
+    }
+  });
+
+  it('excludes progress.profile* queries (self-view mirror of dashboard reports/sessions) and topicProgress (summaryExcerpt)', () => {
+    const profileSessions = makeSuccessfulQuery([
+      'progress',
+      'study',
+      'profile',
+      'profile-1',
+      'sessions',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(profileSessions)).toBe(false);
+
+    const profileReports = makeSuccessfulQuery([
+      'progress',
+      'study',
+      'profile',
+      'profile-1',
+      'reports',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(profileReports)).toBe(false);
+
+    const topicProgress = makeSuccessfulQuery([
+      'progress',
+      'study',
+      'topic',
+      'subject-1',
+      'topic-1',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(topicProgress)).toBe(false);
+  });
+
+  it('excludes library.conceptMastery (mentorAdditions prose) but allows library.retention (clean)', () => {
+    const conceptMastery = makeSuccessfulQuery([
+      'library',
+      'concept-mastery',
+      'profile-1',
+      ['topic-1'],
+    ]);
+    expect(shouldPersistQuery(conceptMastery)).toBe(false);
+
+    const retention = makeSuccessfulQuery([
+      'library',
+      'retention',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(retention)).toBe(true);
+  });
+
+  it('persists verified-clean progress sub-queries (metrics/enums/ids only)', () => {
+    const overview = makeSuccessfulQuery([
+      'progress',
+      'study',
+      'overview',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(overview)).toBe(true);
+
+    const activeSessionForTopic = makeSuccessfulQuery([
+      'progress',
+      'study',
+      'topic',
+      'topic-1',
+      'active-session',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(activeSessionForTopic)).toBe(true);
+  });
+
+  it('persists other verified-clean query-key roots (retention, vocabulary, settings, subscription, profiles, ...)', () => {
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery(['retention', 'subject', 'subject-1', 'profile-1']),
+      ),
+    ).toBe(true);
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery(['vocabulary', 'profile-1', 'subject-1']),
+      ),
+    ).toBe(true);
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery(['settings', 'notifications', 'profile-1']),
+      ),
+    ).toBe(true);
+    expect(
+      shouldPersistQuery(makeSuccessfulQuery(['subscription', 'profile-1'])),
+    ).toBe(true);
+    expect(
+      shouldPersistQuery(makeSuccessfulQuery(['profiles', 'user-1'])),
+    ).toBe(true);
   });
 
   it('does not persist a non-success query, same as the default (e.g. errored)', () => {
     const client = new QueryClient();
-    client.setQueryData(['subjects', USER], { some: 'data' });
+    client.setQueryData(['retention', 'subject', 'subject-1', USER], {
+      some: 'data',
+    });
     const query = client
       .getQueryCache()
-      .find({ queryKey: ['subjects', USER] })!;
+      .find({ queryKey: ['retention', 'subject', 'subject-1', USER] })!;
     // Force the query into an error state — defaultShouldDehydrateQuery only
     // persists 'success' status queries.
     query.setState({ status: 'error', error: new Error('boom') });
     expect(shouldPersistQuery(query)).toBe(false);
   });
 
-  it('[integration] persistQueryClientSave writes ordinary data but drops transcript/summary/parking-lot data to AsyncStorage', async () => {
+  it('[integration] persistQueryClientSave writes allowlisted data but drops transcript/summary/parking-lot/recap/report/dashboard/subjects data to AsyncStorage', async () => {
     const client = new QueryClient();
-    client.setQueryData(['subjects', USER], [{ id: 's1' }]);
+    client.setQueryData(
+      ['retention', 'subject', 'subject-1', USER],
+      [{ id: 's1' }],
+    );
     client.setQueryData(['session-transcript', 'study', 'session-1', USER], {
       session: { sessionId: 'session-1' },
       exchanges: [{ role: 'learner', text: 'my real chat message' }],
@@ -207,6 +368,22 @@ describe('shouldPersistQuery [WI-1987]', () => {
     client.setQueryData(
       ['parking-lot', 'study', 'session-1', USER],
       [{ id: 'q1', text: 'why does the sky look blue at sunset' }],
+    );
+    client.setQueryData(
+      ['journal-recaps', USER, 10],
+      [{ displaySummary: 'a private recap of the session' }],
+    );
+    client.setQueryData(
+      ['my-reports', 'monthly', USER],
+      [{ highlights: ['a private highlight about the learner'] }],
+    );
+    client.setQueryData(
+      ['dashboard', 'family', 'child', 'child-1', 'sessions'],
+      [{ narrative: 'a private narrative about the child session' }],
+    );
+    client.setQueryData(
+      ['subjects', USER, false],
+      [{ rawInput: 'the raw text the learner typed to create this subject' }],
     );
 
     await persistQueryClientSave({
@@ -224,6 +401,10 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(raw).not.toContain('session-summary');
     expect(raw).not.toContain('why does the sky look blue at sunset');
     expect(raw).not.toContain('parking-lot');
-    expect(raw).toContain('subjects');
+    expect(raw).not.toContain('a private recap of the session');
+    expect(raw).not.toContain('a private highlight about the learner');
+    expect(raw).not.toContain('a private narrative about the child session');
+    expect(raw).not.toContain('the raw text the learner typed');
+    expect(raw).toContain('retention');
   });
 });
