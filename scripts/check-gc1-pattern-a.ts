@@ -179,34 +179,32 @@ function findAddedMockCallsFromSource(
         const firstArg = node.arguments[0];
         const specifier = firstArg ? getStringLiteralText(firstArg) : null;
         if (specifier?.startsWith('./') || specifier?.startsWith('../')) {
-          let end = firstArg ? firstArg.getEnd() : node.getEnd();
+          let end: number;
           if (getLineNumber(sourceFile, node.getEnd()) === line) {
-            // Preserve the existing same-line escape hatch:
+            // Single-line call: widen through the rest of the physical line
+            // to catch the existing same-line escape hatch:
             // `jest.mock('./foo', () => ({})); // gc1-allow: reason`.
             const lineEnd = stagedSrc.indexOf('\n', node.getEnd());
             end = lineEnd === -1 ? stagedSrc.length : lineEnd;
           } else {
-            // Multi-line call: a `gc1-allow` escape hatch may trail the
-            // specifier on its own physical line, or sit on its own line
-            // immediately after the specifier, before the factory body.
-            // Widen `end` through the rest of the specifier's line, then AT
-            // MOST one immediately-following comment-only line — no further
-            // (WI-1355 rework, round 1 adversarial review: an unbounded
-            // walk-forward handed arbitrarily long factory-body comments to
-            // a bare substring test, so any comment merely mentioning
-            // "gc1-allow" — anywhere in the factory body — bypassed the
-            // ratchet for a genuinely non-Pattern-A mock).
-            const cursor = stagedSrc.indexOf('\n', end);
-            end = cursor === -1 ? stagedSrc.length : cursor;
-            if (cursor !== -1) {
-              const nextCursor = stagedSrc.indexOf('\n', cursor + 1);
-              const lineEndPos =
-                nextCursor === -1 ? stagedSrc.length : nextCursor;
-              const trimmed = stagedSrc.slice(cursor + 1, lineEndPos).trim();
-              if (trimmed.startsWith('//') || trimmed.startsWith('/*')) {
-                end = lineEndPos;
-              }
-            }
+            // Multi-line call: a previous fix (WI-1355) widened `end` only
+            // through the specifier's line plus at most one immediately-
+            // following comment-only line, so a `gc1-allow` comment placed
+            // anywhere else in the call — inside the factory body, or
+            // trailing the closing `);` — was invisible to the checker even
+            // though it is a genuine, well-formed annotation (WI-1809: cost
+            // three executor rework cycles in one day, 2026-07-11). Cover the
+            // ENTIRE CallExpression span instead, then widen through the rest
+            // of the closing physical line to catch a trailing same-line
+            // comment after `);`. GC1_ALLOW stays anchored to "// gc1-allow:"
+            // / "/* gc1-allow:" as the first token of its own comment, so
+            // widening the window does not reopen the buried-mention false
+            // positive the WI-1355 round-1 review guarded against — a
+            // comment that merely mentions "gc1-allow" in passing prose still
+            // fails the anchor regardless of how much of the call it sees.
+            const callEnd = node.getEnd();
+            const lineEnd = stagedSrc.indexOf('\n', callEnd);
+            end = lineEnd === -1 ? stagedSrc.length : lineEnd;
           }
           sites.push({
             line,
