@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +16,8 @@ export default function QuizResultsScreen(): React.ReactElement {
   const colors = useThemeColors();
   const { activityType, completionResult, returnTo, round } = useQuizFlow();
   const practiceReturnParams = returnTo === 'practice' ? { returnTo } : {};
+  const navigationStartedRef = useRef(false);
+  const [isNavigating, setIsNavigating] = useState(false);
   // [BUG-777 / M-15] Pin the FIRST non-null round we see so a "Play Again"
   // press — which sets a NEW round into context BEFORE this screen unmounts
   // — can't cause a render flash where questionPrompt's 'Question' fallback
@@ -95,7 +97,16 @@ export default function QuizResultsScreen(): React.ReactElement {
     }
   }
 
+  function beginNavigation(): boolean {
+    if (navigationStartedRef.current) return false;
+    navigationStartedRef.current = true;
+    setIsNavigating(true);
+    return true;
+  }
+
   function handlePlayAgain() {
+    if (!beginNavigation()) return;
+
     // [BUG-925 fix] Do NOT mutate completionResult here. On web, setting it
     // null inside the handler causes the QuizFlowProvider re-render to
     // interleave with router.replace's internal state update, and the
@@ -114,6 +125,8 @@ export default function QuizResultsScreen(): React.ReactElement {
   }
 
   function handleDone() {
+    if (!beginNavigation()) return;
+
     // [BUG-925 fix] Always replace to /practice, never router.back(). When
     // canGoBack() is true (the common case after a normal quiz flow),
     // router.back() lands on /quiz/play with stale/null round state, where
@@ -125,6 +138,15 @@ export default function QuizResultsScreen(): React.ReactElement {
     // the handler causes the same QuizFlowProvider/router-update interleave
     // that broke Play Again on web.
     router.replace('/(app)/practice' as Href);
+  }
+
+  function handleViewHistory() {
+    if (!beginNavigation()) return;
+
+    router.push({
+      pathname: '/(app)/quiz/history',
+      params: practiceReturnParams,
+    } as Href);
   }
 
   return (
@@ -242,6 +264,10 @@ export default function QuizResultsScreen(): React.ReactElement {
       <View className="mt-10 w-full gap-3">
         <Pressable
           onPress={handlePlayAgain}
+          disabled={isNavigating}
+          accessibilityRole="button"
+          accessibilityLabel={t('quiz.results.playAgain')}
+          accessibilityState={{ disabled: isNavigating }}
           className="min-h-[48px] items-center justify-center rounded-button bg-primary px-6 py-3"
           testID="quiz-results-play-again"
         >
@@ -252,6 +278,10 @@ export default function QuizResultsScreen(): React.ReactElement {
 
         <Pressable
           onPress={handleDone}
+          disabled={isNavigating}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.done')}
+          accessibilityState={{ disabled: isNavigating }}
           className="min-h-[48px] items-center justify-center rounded-button bg-surface-elevated px-6 py-3"
           testID="quiz-results-done"
         >
@@ -262,12 +292,12 @@ export default function QuizResultsScreen(): React.ReactElement {
 
         <Pressable
           testID="quiz-results-history"
-          onPress={() =>
-            router.push({
-              pathname: '/(app)/quiz/history',
-              params: practiceReturnParams,
-            } as Href)
-          }
+          disabled={isNavigating}
+          accessibilityRole="button"
+          accessibilityLabel={t('quiz.results.viewHistory')}
+          accessibilityHint={t('practiceHub.history.hintOpenHistory')}
+          accessibilityState={{ disabled: isNavigating }}
+          onPress={handleViewHistory}
         >
           <Text className="text-primary mt-2">
             {t('quiz.results.viewHistory')}

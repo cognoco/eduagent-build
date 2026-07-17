@@ -42,9 +42,17 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock(
   '../../../components/common/BrandCelebration' /* gc1-allow: native-boundary; BrandCelebration uses native animation/SVG modules in JSDOM */,
   () => ({
+    ...jest.requireActual('../../../components/common/BrandCelebration'),
     BrandCelebration: () => null,
   }),
 );
+
+beforeEach(() => {
+  mockRouterPush.mockClear();
+  mockRouterReplace.mockClear();
+  mockRouterBack.mockClear();
+  mockCanGoBack = false;
+});
 
 interface SeedInput {
   round: QuizRoundResponse;
@@ -225,6 +233,84 @@ describe('QuizResultsScreen — [F-040] missed-question cards', () => {
     });
   });
 
+  it('exposes the three localized exit actions as native buttons in logical order', () => {
+    const round = buildCapitalsRound();
+
+    renderWithFlow({
+      round,
+      completionResult: {
+        score: 4,
+        total: 4,
+        xpEarned: 50,
+        celebrationTier: 'perfect',
+        droppedResults: 0,
+        questionResults: [],
+      },
+    });
+
+    const exitButtons = screen.getAllByRole('button');
+    expect(exitButtons.map((button) => button.props.testID)).toEqual([
+      'quiz-results-play-again',
+      'quiz-results-done',
+      'quiz-results-history',
+    ]);
+
+    const playAgain = screen.getByRole('button', { name: 'Play Again' });
+    const done = screen.getByRole('button', { name: 'Done' });
+    const history = screen.getByRole('button', { name: 'View History' });
+
+    expect(playAgain.props.accessibilityLabel).toBe('Play Again');
+    expect(done.props.accessibilityLabel).toBe('Done');
+    expect(history.props.accessibilityLabel).toBe('View History');
+    expect(history.props.accessibilityHint).toBe('Opens quiz history');
+  });
+
+  it.each([
+    [
+      'Play Again',
+      'quiz-results-play-again',
+      mockRouterReplace,
+      '/(app)/quiz/launch',
+    ],
+    ['Done', 'quiz-results-done', mockRouterReplace, '/(app)/practice'],
+    [
+      'View History',
+      'quiz-results-history',
+      mockRouterPush,
+      { pathname: '/(app)/quiz/history', params: {} },
+    ],
+  ] as const)(
+    '%s disables every exit after activation and navigates exactly once',
+    (_label, testID, expectedRouter, expectedRoute) => {
+      renderWithFlow({
+        round: buildCapitalsRound(),
+        completionResult: {
+          score: 4,
+          total: 4,
+          xpEarned: 50,
+          celebrationTier: 'perfect',
+          droppedResults: 0,
+          questionResults: [],
+        },
+      });
+      mockRouterPush.mockClear();
+      mockRouterReplace.mockClear();
+      mockRouterBack.mockClear();
+
+      fireEvent.press(screen.getByTestId(testID));
+
+      const activatedButton = screen.getByTestId(testID);
+      expect(activatedButton.props.accessibilityState).toEqual({
+        disabled: true,
+      });
+
+      fireEvent.press(activatedButton);
+
+      expect(expectedRouter).toHaveBeenCalledTimes(1);
+      expect(expectedRouter).toHaveBeenCalledWith(expectedRoute);
+    },
+  );
+
   it('opens history with Practice return target when quiz came from Practice', () => {
     renderWithFlow({
       round: buildCapitalsRound(),
@@ -241,6 +327,7 @@ describe('QuizResultsScreen — [F-040] missed-question cards', () => {
 
     fireEvent.press(screen.getByTestId('quiz-results-history'));
 
+    expect(mockRouterPush).toHaveBeenCalledTimes(1);
     expect(mockRouterPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz/history',
       params: { returnTo: 'practice' },
