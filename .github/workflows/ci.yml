@@ -340,6 +340,9 @@ jobs:
       # DOPPLER_CONFIG without DB_PUSH_LOCAL_DEV, guard allows dev config and
       # the DB_PUSH_LOCAL_DEV opt-in, credential redaction in error output, and
       # the wiring of predb:push + -c dev in package.json scripts.
+      # WI-1874: the DB_PUSH_LOCAL_DEV=1 escape also blocks a resolved
+      # DATABASE_URL whose host is not localhost/127.0.0.1 (e.g. leftover stg
+      # creds from pnpm env:sync), and allows localhost/127.0.0.1.
       # Lives under packages/database/scripts/ so Jest's testMatch doesn't see it.
       - name: packages/database/scripts node:test guards (db:push guard)
         if: steps.scope.outputs.docs_only != 'true'

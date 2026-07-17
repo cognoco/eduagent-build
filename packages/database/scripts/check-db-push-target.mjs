@@ -40,6 +40,12 @@
  * (e.g. a clean checkout with a manually written .env.local pointing at a local
  * Postgres). It is NOT for bypassing the check when Doppler is configured.
  *
+ * The opt-in alone is not sufficient: `.env.development.local` may still be
+ * sitting on disk with stg credentials in it (from an earlier `pnpm env:sync`)
+ * even though the dev intends to hit local Postgres. So when DATABASE_URL is
+ * set under this escape, its host must resolve to localhost/127.0.0.1 — any
+ * other host (in particular a `*.neon.tech` stg/prd host) is blocked (WI-1874).
+ *
  * Historical context
  * ------------------
  * `drizzle-kit push` was used to set up the staging database initially (before
@@ -52,8 +58,13 @@
  *
  * Exit codes:
  *   0 — DOPPLER_CONFIG="dev"; or DOPPLER_CONFIG absent AND DB_PUSH_LOCAL_DEV=1
- *   1 — DOPPLER_CONFIG is stg/prd/unknown; or absent without DB_PUSH_LOCAL_DEV=1
+ *       AND (DATABASE_URL unset OR its host is localhost/127.0.0.1)
+ *   1 — DOPPLER_CONFIG is stg/prd/unknown; or absent without DB_PUSH_LOCAL_DEV=1;
+ *       or absent with DB_PUSH_LOCAL_DEV=1 but DATABASE_URL resolves to a
+ *       non-local host
  */
+
+import { extractHost, hostMatchesEnvironment } from './verify-db-target-lib.mjs';
 
 const dopplerConfig = process.env.DOPPLER_CONFIG;
 
@@ -107,6 +118,34 @@ if (dopplerConfig === undefined || dopplerConfig === '') {
         '   DB_PUSH_LOCAL_DEV=1 if you are on a local Postgres with no Doppler.',
     );
   }
+
+  // The opt-in alone doesn't prove DATABASE_URL actually points at local
+  // Postgres — .env.development.local may still hold stg creds from an
+  // earlier `pnpm env:sync`. If DATABASE_URL is set, its host must be
+  // localhost/127.0.0.1; anything else (in particular *.neon.tech) is blocked.
+  const databaseUrl = process.env.DATABASE_URL;
+  if (databaseUrl) {
+    const host = extractHost(databaseUrl);
+    const isLocalHost =
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      Boolean(host?.startsWith('localhost:')) ||
+      Boolean(host?.startsWith('127.0.0.1:'));
+
+    if (!isLocalHost) {
+      const neonCheck = hostMatchesEnvironment({ host: host ?? '', wrongEnvSubstring: 'neon.tech' });
+      blocked(
+        'DB_PUSH_LOCAL_DEV=1 is set, but DATABASE_URL resolves to host "' +
+          (host ?? '(unparseable)') +
+          '", not localhost/127.0.0.1.' +
+          (neonCheck.status === 'mismatch' ? ' ' + neonCheck.reason + '.' : '') +
+          ' pnpm env:sync writes staging credentials into .env.development.local,\n' +
+          '   which drizzle-kit auto-loads — this looks like it would push to a\n' +
+          '   non-local database. Point DATABASE_URL at your local Postgres instance.',
+      );
+    }
+  }
+
   console.log('✓ drizzle-kit push: no Doppler config — DB_PUSH_LOCAL_DEV=1 override accepted');
   process.exit(0);
 }
