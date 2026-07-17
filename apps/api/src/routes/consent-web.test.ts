@@ -103,8 +103,13 @@ function makeDb(opts: {
     // payer's subscription(s) via tx.query.subscription.findMany before
     // deleting. None of these fixtures seed a subscription (ordinary
     // managed-child deny), so this stays empty — matching the no-op path.
+    // [WI-1193] The deny branch also re-homes any live consent_grant rows
+    // (rehomeGrantsTx) via tx.query.consentGrant.findMany before the person
+    // delete. None of these fixtures seed a grant (the child was never
+    // approved), so this stays empty too — rehomeGrantsTx no-ops on empty.
     query: {
       subscription: { findMany: jest.fn().mockResolvedValue([]) },
+      consentGrant: { findMany: jest.fn().mockResolvedValue([]) },
     },
   };
   return {
