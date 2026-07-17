@@ -13,6 +13,7 @@ import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import {
   evaluateRecallQuality,
+  getOpenTopicWeakConcepts,
   rowToRetentionState,
 } from '../../services/retention-data';
 import {
@@ -153,10 +154,24 @@ export async function handleReviewCalibrationGrade({
       );
       if (!learnerMessageRow?.content) return { outcome: 'skip' };
 
+      // [WI-1454] Concept-targeted review: query the topic's open weak concepts
+      // BEFORE constructing the recall grade scope (AC-1). This is the live
+      // due-topic-review grading path (Now-feed retention_due card → mode=review
+      // session → this calibration grade). When open weak concepts exist the
+      // grader focuses on them; when none exist it grades the whole topic as
+      // before (AC-3). SM-2 scheduling below is untouched (AC-4).
+      const focusConcepts = await getOpenTopicWeakConcepts(
+        db,
+        profileId,
+        topicId,
+        eventAt,
+      );
+
       const grade = await evaluateRecallQuality(
         learnerMessageRow.content,
         topic.topicTitle,
         topic.topicDescription ?? undefined,
+        focusConcepts,
       );
 
       if (!grade.graded) {
