@@ -55,6 +55,7 @@ import {
   type StripeClientLike,
 } from '../billing/store-teardown';
 import {
+  ADULT_SELF_CONSENT_PURPOSES,
   type ConsentBasis,
   DEFAULT_CONSENT_PURPOSE,
   resolveLatestConsentStatusAnyBasis,
@@ -207,6 +208,107 @@ export async function createDirectConsentGrant(
     snapshotAgeAtGrant: snapshot.ageAtGrant ?? null,
     snapshotJurisdictionAtGrant: snapshot.jurisdictionAtGrant ?? null,
   });
+}
+
+// ---------------------------------------------------------------------------
+// (2b) [WI-1193] Adult self-consent — record + independent-purpose withdraw.
+//
+// An adult (age >= 18) self-registering as the account owner has no guardian
+// to consent on their behalf and no email workflow to run — the signup action
+// itself is the terms-acceptance/consent event (mirrors createDirectConsentGrant's
+// "no email workflow" reasoning above). This writes ONE CONSENTED consent_grant
+// per purpose in ADULT_SELF_CONSENT_PURPOSES (AC2 purpose split — each purpose
+// is its own row, so withdrawing one never touches the other), basis =
+// 'adult_self_consent'. No consent_request row is written (there is no pre-grant
+// workflow for this basis — see the ConsentBasis doc comment).
+//
+// Withdrawal is deliberately NOT `stampWithdrawal`/`revokeConsentV2`: those are
+// GUARDIAN-authorized (isGuardianOf) and purpose-blind (hardcoded to
+// DEFAULT_CONSENT_PURPOSE) — neither fits here. An adult withdrawing their OWN
+// consent has no guardian to check (authority = caller IS chargePersonId,
+// enforced by the route/caller, same as the other self-service onboarding
+// paths) and must be able to withdraw ONE purpose independently of the other
+// (AC2 "revocable"), so this is a small, self-contained core rather than a
+// purpose parameter threaded through the guardian-authorized functions.
+// ---------------------------------------------------------------------------
+
+/**
+ * [WI-1193 AC1/AC2] Write the adult self-consent grants — one CONSENTED row per
+ * ADULT_SELF_CONSENT_PURPOSES purpose, basis='adult_self_consent'. Called once,
+ * inside the identity-graph bootstrap transaction, for a self-registered adult
+ * owner. `db` may be a transaction handle (passed through unchanged, same
+ * pattern as createDirectConsentGrant).
+ */
+export async function recordAdultSelfConsentV2(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+): Promise<void> {
+  const now = new Date();
+  await db.insert(consentGrant).values(
+    ADULT_SELF_CONSENT_PURPOSES.map((purpose) => ({
+      chargePersonId,
+      organizationId,
+      purpose,
+      lawfulBasis: 'adult_self_consent' as const,
+      granted: true,
+      grantedAt: now,
+      auditFact: { source: 'adult_self_signup' },
+    })),
+  );
+}
+
+/**
+ * [WI-1193 AC2] Self-service withdrawal of ONE purpose's adult self-consent,
+ * independent of any other purpose the same adult holds. The single sanctioned
+ * in-row transition — stamp `withdrawn_at` (+ prior_value=true, audit_fact) on
+ * the current grant for (chargePersonId, purpose, organizationId,
+ * 'adult_self_consent') — mirroring `stampWithdrawal`'s shape, but purpose-aware
+ * and with no guardian check (the caller IS the consenting adult). Idempotent: a
+ * second withdrawal of an already-withdrawn purpose returns the existing
+ * `withdrawnAt`. Throws `ConsentRecordNotFoundError` if the purpose was never
+ * granted for this person.
+ */
+export async function withdrawAdultSelfConsentV2(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+  purpose: string,
+): Promise<RevokeConsentV2Result> {
+  const current = await db.query.consentGrant.findFirst({
+    where: and(
+      eq(consentGrant.chargePersonId, chargePersonId),
+      eq(consentGrant.purpose, purpose),
+      eq(consentGrant.organizationId, organizationId),
+      eq(consentGrant.lawfulBasis, 'adult_self_consent'),
+    ),
+    orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
+    columns: { id: true, withdrawnAt: true },
+  });
+  if (!current) {
+    throw new ConsentRecordNotFoundError();
+  }
+  if (current.withdrawnAt) {
+    return { chargePersonId, withdrawnAt: current.withdrawnAt };
+  }
+
+  const now = new Date();
+  await db
+    .update(consentGrant)
+    .set({
+      withdrawnAt: now,
+      priorValue: true,
+      auditFact: { source: 'adult_self_withdrawal' },
+    })
+    .where(
+      and(
+        eq(consentGrant.id, current.id),
+        eq(consentGrant.chargePersonId, chargePersonId),
+        isNull(consentGrant.withdrawnAt),
+      ),
+    );
+
+  return { chargePersonId, withdrawnAt: now };
 }
 
 // ---------------------------------------------------------------------------
