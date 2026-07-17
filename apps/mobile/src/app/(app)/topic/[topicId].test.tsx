@@ -433,6 +433,80 @@ describe('TopicDetailScreen action buttons', () => {
     },
   );
 
+  it('resumes an existing shared resume target from a challenge.start deep link, instead of starting a fresh session', async () => {
+    // evaluateChallengeReadiness() gates on the CURRENT session's live
+    // exchangeCount/streak (apps/api/src/services/challenge-round/trigger.ts).
+    // Force-starting a new session would discard that state, so a
+    // challenge.start deep link must resume an already-active session the
+    // same way the default (non-deep-link) study CTA does (F-4), not bypass
+    // it.
+    const target = {
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicTitle: 'Algebra',
+      sessionId: null,
+      resumeFromSessionId: SESSION_ID,
+      resumeKind: 'recent_topic',
+      lastActivityAt: '2026-02-15T09:00:00.000Z',
+      reason: 'Continue Algebra',
+    };
+    setupRoutes({
+      completionStatus: 'in_progress',
+      activeSessionId: SESSION_ID,
+      resumeTarget: target,
+    });
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: SUBJECT_ID,
+      topicId: TOPIC_ID,
+      mode: 'challenge',
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('study-cta');
+    });
+    fireEvent.press(screen.getByTestId('study-cta'));
+
+    expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
+      expect.anything(),
+      target,
+    );
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('carries the active sessionId when a challenge.start deep link has an active session but no shared resume target', async () => {
+    setupRoutes({
+      completionStatus: 'in_progress',
+      activeSessionId: SESSION_ID,
+      resumeTarget: null,
+    });
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: SUBJECT_ID,
+      topicId: TOPIC_ID,
+      mode: 'challenge',
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('study-cta');
+    });
+    fireEvent.press(screen.getByTestId('study-cta'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        topicId: TOPIC_ID,
+        topicName: 'Algebra',
+        sessionId: SESSION_ID,
+      },
+    });
+  });
+
   it('shows "Review this topic" as CTA for in_progress topics', async () => {
     setupRoutes({
       completionStatus: 'in_progress',

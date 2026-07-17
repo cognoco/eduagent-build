@@ -472,15 +472,33 @@ export default function TopicDetailScreen() {
     // [WI-2112] Challenge Round is not a standalone screen — it is an
     // in-session offer/accept flow (useChallengeRound) gated server-side by
     // evaluateChallengeReadiness(), which only ever offers a Challenge Round
-    // when sessionType === 'learning'. Route into that same learning session
-    // path so the existing Challenge Round machinery can trigger, instead of
-    // the unrelated recall-test recall quiz.
+    // when sessionType === 'learning' and the CURRENT session has
+    // accumulated enough exchanges/streak. Resume an already-active session
+    // for this topic when one exists (same F-4 resume behavior as the
+    // default path below) so in-progress eligibility state isn't discarded;
+    // otherwise start a fresh learning session anchored to the topic.
+    // Either way this routes into the one path where the existing Challenge
+    // Round machinery can trigger, instead of the unrelated recall-test
+    // recall quiz.
     if (deepLinkMode === 'challenge' && topicId) {
-      return () =>
+      return () => {
+        if (resumeTarget) {
+          pushLearningResumeTarget(router, resumeTarget);
+          return;
+        }
         router.push({
           pathname: '/(app)/session',
-          params: { mode: 'learning', subjectId, topicId, topicName },
+          params: {
+            mode: 'learning',
+            subjectId,
+            topicId,
+            topicName,
+            ...(activeSession?.sessionId && {
+              sessionId: activeSession.sessionId,
+            }),
+          },
         } as Href);
+      };
     }
 
     if (!topicProgress) return noop;
