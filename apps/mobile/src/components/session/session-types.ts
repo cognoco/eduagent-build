@@ -70,6 +70,8 @@ export interface PendingSubjectResolution {
     base64: string;
     mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
   };
+  /** Preserve exact-once semantics while an opening Mentor turn waits. */
+  initialMentorOpener?: boolean;
   /** When the classifier cannot match an enrolled subject, it suggests a new one */
   suggestedSubjectName?: string | null;
   /** Rich suggestions from subjects.resolve — shown as tappable cards */

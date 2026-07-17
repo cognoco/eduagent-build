@@ -1,0 +1,41 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "The V2 freeform Mentor route opener is authoritative for learning_sessions.raw_input and is sent through the existing subject-resolution, session-creation, outbox, stream, and event-persistence path before later input.",
+      "pointer": "apps/mobile/src/components/session/use-session-streaming.ts:384"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Allocated session IDs are backfilled into route state and restoration reconciles canonical transcript plus deterministic outbox state.",
+      "pointer": "apps/mobile/src/app/(app)/session/index.tsx:587"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The deterministic mentor-opener:<sessionId> key and opener marker prevent remount, retry, outbox-drain, and server-replay duplication while preserving learner/Mentor ordering before a Yes follow-up.",
+      "pointer": "apps/mobile/src/components/session/use-session-streaming.ts:71"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The real persisted-session regression verifies question and declarative openers, Yes follow-up, exact-once ordering, and non-empty Mentor replies without implementation-call assertions.",
+      "pointer": "tests/integration/learning-session.integration.test.ts:616"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "The real persistence path covers delayed subject creation, retry/restart replay, an already-created session, already-persisted hydration, and downstream transcript rehydration.",
+      "pointer": "tests/integration/learning-session.integration.test.ts:674"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Immutable machine-readable RED, GREEN, production-only REVERT, and RESTORE outputs plus the complete validation and adversarial-review record are preserved.",
+      "pointer": "docs/evidence/WI-2099/report.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "A comprehensive independent Opus review found no actionable issue and verified persistence, idempotency, ordering, and non-Mentor isolation; origin/main 3b0fa933 merged without conflict and the complete verification set plus final GREEN passed afterward.",
+      "pointer": "docs/evidence/WI-2099/report.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-18",
+  "redGreenPointer": "docs/evidence/WI-2099/report.md"
+}

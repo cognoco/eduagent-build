@@ -10,7 +10,9 @@
  * - LLM provider — via shared provider fixture (real routeAndCall dispatch)
  */
 
-import { and, eq } from 'drizzle-orm';
+import * as React from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { and, asc, eq } from 'drizzle-orm';
 import {
   login,
   membership,
@@ -39,6 +41,71 @@ import {
   llmEnvelopeReply,
   registerLlmProviderFixture,
 } from '../../apps/api/src/test-utils/llm-provider-fixtures';
+import type { ChatMessage } from '../../apps/mobile/src/components/session/ChatShell';
+import {
+  mentorOpenerIdempotencyKey,
+  useSessionStreaming,
+} from '../../apps/mobile/src/components/session/use-session-streaming';
+import {
+  enqueue,
+  getOutboxEntry,
+} from '../../apps/mobile/src/lib/message-outbox';
+import {
+  parseSSEStream,
+  type StreamFallbackReason,
+} from '../../apps/mobile/src/lib/sse';
+
+// External native boundaries only. The real message outbox, mobile session
+// orchestration, Hono routes, idempotency middleware, and database all remain
+// live in the tests below.
+jest.mock('@react-native-async-storage/async-storage', () => {
+  const storage = require('@react-native-async-storage/async-storage/jest/async-storage-mock');
+  return { __esModule: true, default: storage };
+});
+jest.mock('expo-crypto', () => ({
+  randomUUID: () => crypto.randomUUID(),
+}));
+jest.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+jest.mock('expo-secure-store', () => ({
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
+  getItemAsync: jest.fn(async () => null),
+  setItemAsync: jest.fn(async () => undefined),
+  deleteItemAsync: jest.fn(async () => undefined),
+}));
+jest.mock('expo-localization', () => ({
+  getLocales: () => [{ languageCode: 'en', languageTag: 'en-US' }],
+}));
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { expoConfig: { hostUri: 'localhost' } },
+}));
+jest.mock('@clerk/expo', () => ({
+  useAuth: () => ({ getToken: jest.fn(async () => null) }),
+}));
+jest.mock('i18next', () => {
+  const instance = {
+    changeLanguage: jest.fn(async () => undefined),
+    init: jest.fn(async () => undefined),
+    language: 'en',
+    on: jest.fn(),
+    t: jest.fn((key: string) => key),
+    use: jest.fn(),
+  };
+  instance.use.mockReturnValue(instance);
+  return {
+    __esModule: true,
+    createInstance: () => instance,
+    default: instance,
+  };
+});
+jest.mock('@sentry/react-native', () => ({
+  addBreadcrumb: jest.fn(),
+  captureException: jest.fn(),
+  getClient: jest.fn(() => null),
+  getCurrentScope: jest.fn(() => ({ clear: jest.fn() })),
+  init: jest.fn(),
+  setUser: jest.fn(),
+}));
 
 // Controllable mock provider — overrides the default mock registered in setup.ts.
 // Avoids jest.mock on an internal service (AGENTS.md rule: no internal mocks in
@@ -232,7 +299,265 @@ async function loadSessionEvents(sessionId: string) {
   const db = createIntegrationDb();
   return db.query.sessionEvents.findMany({
     where: eq(sessionEvents.sessionId, sessionId),
+    orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
   });
+}
+
+type MobileStreamMessage = Parameters<
+  typeof useSessionStreaming
+>[0]['streamMessage'];
+
+function buildRealMobileStream(profileId: string): MobileStreamMessage {
+  return async (message, onChunk, onDone, overrideSessionId, options) => {
+    if (!overrideSessionId) {
+      throw new Error('Expected the mobile session hook to allocate a session');
+    }
+
+    const headers = new Headers(
+      buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }, profileId),
+    );
+    headers.set('Accept', 'text/event-stream');
+    if (options?.idempotencyKey) {
+      headers.set('Idempotency-Key', options.idempotencyKey);
+    }
+
+    const response = await app.request(
+      `/v1/sessions/${overrideSessionId}/stream`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ message }),
+      },
+      TEST_ENV,
+    );
+    expect(response.status).toBe(200);
+
+    if (response.headers.get('Idempotency-Replay') === 'true') {
+      options?.onReplay?.(await response.json());
+      return;
+    }
+
+    let accumulated = '';
+    let fallback:
+      | { reason: StreamFallbackReason; fallbackText: string }
+      | undefined;
+    for await (const event of parseSSEStream(response)) {
+      if (event.type === 'chunk') {
+        accumulated += event.content;
+        onChunk(accumulated);
+      } else if (event.type === 'replace') {
+        accumulated = event.content;
+        onChunk(accumulated);
+      } else if (event.type === 'fallback') {
+        fallback = {
+          reason: event.reason,
+          fallbackText: event.fallbackText,
+        };
+      } else if (event.type === 'done') {
+        await onDone({
+          exchangeCount: event.exchangeCount,
+          escalationRung: event.escalationRung ?? 0,
+          expectedResponseMinutes: event.expectedResponseMinutes,
+          aiEventId: event.aiEventId,
+          fallback,
+        });
+      } else if (event.type === 'error') {
+        throw new Error(event.message);
+      }
+    }
+  };
+}
+
+async function renderRealMobileSession(input: {
+  profileId: string;
+  subjectId?: string;
+  rawInput: string;
+  activeSessionId?: string;
+  mentorOpenerAlreadyPersisted?: boolean;
+}) {
+  (
+    globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+  ).IS_REACT_ACT_ENVIRONMENT = true;
+  const renderer = require('react-test-renderer') as {
+    act: (callback: () => void | Promise<void>) => Promise<void>;
+    create: (element: React.ReactElement) => { unmount: () => void };
+  };
+  let currentHook: ReturnType<typeof useSessionStreaming> | null = null;
+  let currentSessionId = input.activeSessionId ?? null;
+  let messageId = 0;
+  const silenceTimerRef: React.MutableRefObject<ReturnType<
+    typeof setTimeout
+  > | null> = { current: null };
+
+  function Harness() {
+    const [activeSessionId, setActiveSessionId] = React.useState<string | null>(
+      input.activeSessionId ?? null,
+    );
+    const [messages, setMessages] = React.useState<ChatMessage[]>([]);
+    currentSessionId = activeSessionId;
+    currentHook = useSessionStreaming({
+      activeSessionId,
+      setActiveSessionId,
+      effectiveSubjectId: input.subjectId ?? '',
+      effectiveSubjectName: 'Integration subject',
+      effectiveMode: 'freeform',
+      topicId: undefined,
+      topicName: undefined,
+      inputMode: 'text',
+      rawInput: input.rawInput,
+      hasInitialMentorOpener: true,
+      mentorOpenerAlreadyPersisted: input.mentorOpenerAlreadyPersisted ?? false,
+      resumeFromSessionId: undefined,
+      gaps: undefined,
+      verificationType: undefined,
+      normalizedOcrText: undefined,
+      homeworkCaptureSource: undefined,
+      messages,
+      setMessages,
+      setIsStreaming: jest.fn(),
+      setExchangeCount: jest.fn(),
+      setEscalationRung: jest.fn(),
+      setQuotaError: jest.fn(),
+      setNotePromptOffered: jest.fn(),
+      setShowNoteInput: jest.fn(),
+      setResponseHistory: jest.fn(),
+      setHomeworkProblemsState: jest.fn(),
+      setFluencyDrill: jest.fn(),
+      setLanguageLearning: jest.fn(),
+      setChallengeRound: jest.fn(),
+      setChallengeOffer: jest.fn(),
+      setDraftedNote: jest.fn(),
+      setLowConfidenceMessageId: jest.fn(),
+      homeworkProblemsState: [],
+      currentProblemIndex: 0,
+      activeHomeworkProblem: undefined,
+      homeworkMode: undefined,
+      subjectId: input.subjectId,
+      classifiedSubject: null,
+      isStreaming: false,
+      sessionExpired: false,
+      quotaError: null,
+      draftText: '',
+      notePromptOffered: false,
+      animationCleanupRef: { current: null },
+      silenceTimerRef,
+      lastAiAtRef: { current: null },
+      lastExpectedMinutesRef: { current: 10 },
+      lastRetryPayloadRef: { current: null },
+      trackerStateRef: { current: {} as never },
+      imageBase64Ref: { current: null },
+      imageMimeTypeRef: { current: null },
+      activeProfileId: input.profileId,
+      apiClient: {
+        subjects: {
+          ':subjectId': {
+            sessions: {
+              $post: async ({
+                param,
+                json,
+              }: {
+                param: { subjectId: string };
+                json: Record<string, unknown>;
+              }) =>
+                app.request(
+                  `/v1/subjects/${param.subjectId}/sessions`,
+                  {
+                    method: 'POST',
+                    headers: buildAuthHeaders(
+                      { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+                      input.profileId,
+                    ),
+                    body: JSON.stringify(json),
+                  },
+                  TEST_ENV,
+                ),
+            },
+          },
+        },
+      } as never,
+      startSession: {
+        mutateAsync: async (sessionInput: Record<string, unknown>) => ({
+          session: await startSession(
+            input.profileId,
+            sessionInput.subjectId as string,
+            sessionInput,
+          ),
+        }),
+      } as never,
+      streamMessage: buildRealMobileStream(input.profileId),
+      recordSystemPrompt: { mutateAsync: jest.fn() } as never,
+      trackExchange: jest.fn(() => null) as never,
+      trigger: jest.fn() as never,
+      createLocalMessageId: (prefix) => `${prefix}-${++messageId}`,
+      responseHistory: [],
+    });
+    return null;
+  }
+
+  let mounted!: { unmount: () => void };
+  await renderer.act(async () => {
+    mounted = renderer.create(React.createElement(Harness));
+  });
+
+  return {
+    act: renderer.act,
+    get hook() {
+      if (!currentHook) throw new Error('Mobile session hook did not render');
+      return currentHook;
+    },
+    get sessionId() {
+      return currentSessionId;
+    },
+    async unmount() {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      await renderer.act(async () => mounted.unmount());
+    },
+  };
+}
+
+async function loadTranscript(profileId: string, sessionId: string) {
+  const response = await app.request(
+    `/v1/sessions/${sessionId}/transcript`,
+    {
+      headers: buildAuthHeaders(
+        { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+        profileId,
+      ),
+    },
+    TEST_ENV,
+  );
+  expect(response.status).toBe(200);
+  return response.json();
+}
+
+type PersistedTranscript = {
+  archived: false;
+  exchanges: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    eventId: string;
+  }>;
+};
+
+function expectCanonicalExchangeOrder(
+  transcript: PersistedTranscript,
+  userInputs: string[],
+): void {
+  expect(transcript.archived).toBe(false);
+  expect(transcript.exchanges.map((exchange) => exchange.role)).toEqual(
+    userInputs.flatMap(() => ['user', 'assistant']),
+  );
+  expect(
+    transcript.exchanges
+      .filter((exchange) => exchange.role === 'user')
+      .map((exchange) => exchange.content),
+  ).toEqual(userInputs);
+  for (const exchange of transcript.exchanges) {
+    expect(exchange.eventId).toEqual(expect.any(String));
+    if (exchange.role === 'assistant') {
+      expect(exchange.content.trim().length).toBeGreaterThan(0);
+    }
+  }
 }
 
 async function loadSubscriptionAndQuota(profileId: string) {
@@ -272,6 +597,7 @@ async function loadSubscriptionAndQuota(profileId: string) {
 
 beforeEach(async () => {
   clearFetchCalls();
+  await AsyncStorage.clear();
   await cleanupAccounts({
     emails: [AUTH_EMAIL],
     clerkUserIds: [AUTH_USER_ID],
@@ -286,6 +612,253 @@ afterAll(async () => {
 });
 
 describe('Integration: Learning Session Lifecycle', () => {
+  describe('V2 Mentor opening exchange persistence', () => {
+    it('persists a question opener before a Yes follow-up in exact order and rehydrates the downstream transcript', async () => {
+      const profileId = await createOwnerProfile();
+      const subject = await seedSubject(profileId, { name: 'Physics' });
+      const opener = 'Why do apples fall toward the ground?';
+      const mobile = await renderRealMobileSession({
+        profileId,
+        subjectId: subject.id,
+        rawInput: opener,
+      });
+
+      try {
+        await mobile.act(async () => {
+          await mobile.hook.continueWithMessage('Yes');
+        });
+
+        expect(mobile.sessionId).toEqual(expect.any(String));
+        const persistedSession = await loadSession(mobile.sessionId!);
+        expect(persistedSession?.rawInput).toBe(opener);
+
+        const transcript = (await loadTranscript(
+          profileId,
+          mobile.sessionId!,
+        )) as PersistedTranscript;
+        expectCanonicalExchangeOrder(transcript, [opener, 'Yes']);
+      } finally {
+        await mobile.unmount();
+      }
+    });
+
+    it('persists a declarative opener as the first canonical exchange', async () => {
+      const profileId = await createOwnerProfile();
+      const subject = await seedSubject(profileId, { name: 'History' });
+      const opener = 'I want to understand why the Roman Republic ended.';
+      const mobile = await renderRealMobileSession({
+        profileId,
+        subjectId: subject.id,
+        rawInput: opener,
+      });
+
+      try {
+        await mobile.act(async () => {
+          await mobile.hook.continueWithMessage(opener, {
+            initialMentorOpener: true,
+          });
+        });
+
+        const persistedSession = await loadSession(mobile.sessionId!);
+        expect(persistedSession?.rawInput).toBe(opener);
+        const transcript = (await loadTranscript(
+          profileId,
+          mobile.sessionId!,
+        )) as PersistedTranscript;
+        expectCanonicalExchangeOrder(transcript, [opener]);
+      } finally {
+        await mobile.unmount();
+      }
+    });
+
+    it('preserves the opener when subject creation is delayed until after entry', async () => {
+      const profileId = await createOwnerProfile();
+      const opener = 'Teach me how watercolor pigments mix on wet paper.';
+      const mobile = await renderRealMobileSession({
+        profileId,
+        rawInput: opener,
+      });
+
+      try {
+        const createdSubject = await seedSubject(profileId, {
+          name: 'Watercolor painting',
+        });
+        await mobile.act(async () => {
+          await mobile.hook.continueWithMessage(opener, {
+            initialMentorOpener: true,
+            sessionSubjectId: createdSubject.id,
+            sessionSubjectName: createdSubject.name,
+          });
+        });
+
+        const persistedSession = await loadSession(mobile.sessionId!);
+        expect(persistedSession).toMatchObject({
+          subjectId: createdSubject.id,
+          rawInput: opener,
+        });
+        const transcript = (await loadTranscript(
+          profileId,
+          mobile.sessionId!,
+        )) as PersistedTranscript;
+        expectCanonicalExchangeOrder(transcript, [opener]);
+      } finally {
+        await mobile.unmount();
+      }
+    });
+
+    it('replays a pending opener after retry and restart with one deterministic event pair', async () => {
+      const profileId = await createOwnerProfile();
+      const subject = await seedSubject(profileId, { name: 'Chemistry' });
+      const opener = 'Why does salt dissolve in water?';
+      const firstMount = await renderRealMobileSession({
+        profileId,
+        subjectId: subject.id,
+        rawInput: opener,
+      });
+      let sessionId = '';
+
+      try {
+        await firstMount.act(async () => {
+          await firstMount.hook.continueWithMessage(opener, {
+            initialMentorOpener: true,
+          });
+        });
+        sessionId = firstMount.sessionId!;
+      } finally {
+        await firstMount.unmount();
+      }
+
+      const openerKey = mentorOpenerIdempotencyKey(sessionId);
+      const pendingEntry = await enqueue({
+        profileId,
+        flow: 'session',
+        surfaceKey: sessionId,
+        content: opener,
+        id: openerKey,
+        metadata: { sessionId },
+      });
+      const restarted = await renderRealMobileSession({
+        profileId,
+        subjectId: subject.id,
+        rawInput: opener,
+        activeSessionId: sessionId,
+      });
+
+      try {
+        await restarted.act(async () => {
+          await restarted.hook.continueWithMessage(opener, {
+            initialMentorOpener: true,
+            existingEntry: pendingEntry,
+          });
+        });
+
+        const events = await loadSessionEvents(sessionId);
+        expect(
+          events.filter((event) => event.eventType === 'user_message'),
+        ).toEqual([
+          expect.objectContaining({ content: opener, clientId: openerKey }),
+        ]);
+        expect(
+          events.filter((event) => event.eventType === 'ai_response'),
+        ).toHaveLength(1);
+        expect(
+          await getOutboxEntry(profileId, 'session', openerKey),
+        ).toBeNull();
+        const transcript = (await loadTranscript(
+          profileId,
+          sessionId,
+        )) as PersistedTranscript;
+        expectCanonicalExchangeOrder(transcript, [opener]);
+      } finally {
+        await restarted.unmount();
+      }
+    });
+
+    it('adds a missing opener to an already-created session without replacing its raw input', async () => {
+      const profileId = await createOwnerProfile();
+      const subject = await seedSubject(profileId, { name: 'Biology' });
+      const opener = 'How do cells turn food into usable energy?';
+      const existingSession = await startSession(profileId, subject.id, {
+        rawInput: opener,
+      });
+      const mobile = await renderRealMobileSession({
+        profileId,
+        subjectId: subject.id,
+        rawInput: opener,
+        activeSessionId: existingSession.id,
+      });
+
+      try {
+        await mobile.act(async () => {
+          await mobile.hook.continueWithMessage(opener, {
+            initialMentorOpener: true,
+          });
+        });
+
+        const persistedSession = await loadSession(existingSession.id);
+        expect(persistedSession?.rawInput).toBe(opener);
+        const transcript = (await loadTranscript(
+          profileId,
+          existingSession.id,
+        )) as PersistedTranscript;
+        expectCanonicalExchangeOrder(transcript, [opener]);
+      } finally {
+        await mobile.unmount();
+      }
+    });
+
+    it('hydrates an already-persisted opener and appends later input without duplication', async () => {
+      const profileId = await createOwnerProfile();
+      const subject = await seedSubject(profileId, { name: 'Astronomy' });
+      const opener = 'Explain how astronomers measure the distance to stars.';
+      const firstMount = await renderRealMobileSession({
+        profileId,
+        subjectId: subject.id,
+        rawInput: opener,
+      });
+      let sessionId = '';
+
+      try {
+        await firstMount.act(async () => {
+          await firstMount.hook.continueWithMessage(opener, {
+            initialMentorOpener: true,
+          });
+        });
+        sessionId = firstMount.sessionId!;
+      } finally {
+        await firstMount.unmount();
+      }
+
+      const restored = await renderRealMobileSession({
+        profileId,
+        subjectId: subject.id,
+        rawInput: opener,
+        activeSessionId: sessionId,
+        mentorOpenerAlreadyPersisted: true,
+      });
+      try {
+        await restored.act(async () => {
+          await restored.hook.continueWithMessage(
+            'Can you give me an example?',
+          );
+        });
+
+        const persistedSession = await loadSession(sessionId);
+        expect(persistedSession?.rawInput).toBe(opener);
+        const transcript = (await loadTranscript(
+          profileId,
+          sessionId,
+        )) as PersistedTranscript;
+        expectCanonicalExchangeOrder(transcript, [
+          opener,
+          'Can you give me an example?',
+        ]);
+      } finally {
+        await restored.unmount();
+      }
+    });
+  });
+
   describe('POST /v1/subjects/:subjectId/sessions', () => {
     it('starts a real learning session and records the session_start event', async () => {
       const profileId = await createOwnerProfile();
