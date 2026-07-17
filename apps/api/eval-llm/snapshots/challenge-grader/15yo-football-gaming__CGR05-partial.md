@@ -103,3 +103,19 @@ Learner's answer:
 - BAKE-OFF: run --flow challenge-grader --live --openrouter-model <slug> for each candidate.
 - Candidates: anthropic/claude-sonnet-4-6 (default), anthropic/claude-haiku-4-5 (demotion candidate).
 - After run: git checkout -- apps/api/eval-llm/snapshots
+
+## Live LLM response
+
+```
+{
+  "items": [
+    {
+      "concept": "photosynthesis",
+      "result": "partial",
+      "evidence": "The answer mentions sunlight and water, key elements of photosynthesis, but lacks detail on the process and the production of glucose and oxygen.",
+      "learnerQuote": "Plants use sunlight to make food. They also take in water.",
+      "correction": "Include details about how plants convert sunlight and water into glucose and oxygen through photosynthesis."
+    }
+  ]
+}
+```

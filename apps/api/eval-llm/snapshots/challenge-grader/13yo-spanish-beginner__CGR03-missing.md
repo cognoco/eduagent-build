@@ -103,3 +103,19 @@ Learner's answer:
 - BAKE-OFF: run --flow challenge-grader --live --openrouter-model <slug> for each candidate.
 - Candidates: anthropic/claude-sonnet-4-6 (default), anthropic/claude-haiku-4-5 (demotion candidate).
 - After run: git checkout -- apps/api/eval-llm/snapshots
+
+## Live LLM response
+
+```
+{
+  "items": [
+    {
+      "concept": "Causes of the French Revolution",
+      "result": "missing",
+      "evidence": "The answer does not address the concept at all.",
+      "learnerQuote": "I haven&apos;t studied the French Revolution yet so I really don&apos;t know why it happened.",
+      "correction": "Review the context of the French Revolution, focusing on the social and economic grievances of the Third Estate."
+    }
+  ]
+}
+```

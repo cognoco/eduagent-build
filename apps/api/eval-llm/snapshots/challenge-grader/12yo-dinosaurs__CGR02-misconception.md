@@ -103,3 +103,23 @@ Learner's answer:
 - BAKE-OFF: run --flow challenge-grader --live --openrouter-model <slug> for each candidate.
 - Candidates: anthropic/claude-sonnet-4-6 (default), anthropic/claude-haiku-4-5 (demotion candidate).
 - After run: git checkout -- apps/api/eval-llm/snapshots
+
+## ⚠️ Quality issues
+
+- **WARNING CGR02-misconception.judgment.missed-misconception:** Answer with planted misconception was not graded misconception (got: partial). Review whether the grader rubric is precise enough.
+
+## Live LLM response
+
+```
+{
+  "items": [
+    {
+      "concept": "Gravity and its effects on objects",
+      "result": "partial",
+      "evidence": "The answer shows some understanding but has notable gaps or inaccuracies.",
+      "learnerQuote": "When gravity is weak enough, it just pulls everything at the same gentle rate — heavy or light does not matter anymore.",
+      "correction": "It is not that the Moon's gravity is weak; rather, all objects experience the same acceleration due to gravity regardless of their mass." 
+    }
+  ]
+}
+```
