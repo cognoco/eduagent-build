@@ -611,4 +611,91 @@ describe('checkFile — integration', () => {
     expect(v).toHaveLength(1);
     expect(v[0].reason).toBe('missing-pattern-a');
   });
+
+  // WI-1809 reviewer finding: the widened CallExpression-span scan is a TEXT
+  // regex, so it cannot distinguish a real comment from comment-shaped text
+  // inside a string literal. A factory property whose STRING VALUE happens to
+  // read `'// gc1-allow: ...'` must not satisfy the escape hatch — only a
+  // genuine `//` or `/*` comment counts.
+  it('blocks a NEW non-Pattern-A mock whose factory contains a gc1-allow-shaped STRING LITERAL (not a real comment)', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      "+jest.mock('./services/foo', () => ({",
+      '+  bar: jest.fn(),',
+      "+  note: '// gc1-allow: documentation example only',",
+      '+}));',
+    ].join('\n');
+    const staged = [
+      "jest.mock('./services/foo', () => ({",
+      '  bar: jest.fn(),',
+      "  note: '// gc1-allow: documentation example only',",
+      '}));',
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
+
+  // Same STRING-not-COMMENT scenario as above, but via a template literal
+  // instead of a single-quoted string — the reviewer's mandate names both
+  // literal kinds. The parser folds a template literal with no
+  // interpolation into one NoSubstitutionTemplateLiteral token, so it's
+  // opaque to the structural comment scan exactly like a string literal.
+  it('blocks a NEW non-Pattern-A mock whose factory contains a gc1-allow-shaped TEMPLATE LITERAL (not a real comment)', () => {
+    const diff = [
+      '@@ -0,0 +1,4 @@',
+      "+jest.mock('./services/foo', () => ({",
+      '+  bar: jest.fn(),',
+      '+  note: `// gc1-allow: documentation example only`,',
+      '+}));',
+    ].join('\n');
+    const staged = [
+      "jest.mock('./services/foo', () => ({",
+      '  bar: jest.fn(),',
+      '  note: `// gc1-allow: documentation example only`,',
+      '}));',
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
+
+  // Adversarial self-review finding: the AST walk that replaced the text
+  // regex must not widen the escape hatch's REACH in the process of fixing
+  // its BLINDNESS to string literals. A gc1-allow comment sitting on the
+  // line immediately ABOVE `jest.mock(` — outside the call's own span and
+  // outside the pre-WI-1809 text-slice window — must not satisfy the escape
+  // hatch for an unrelated, non-Pattern-A mock below it.
+  it('blocks a NEW non-Pattern-A mock when gc1-allow sits on the line ABOVE jest.mock(', () => {
+    const diff = [
+      '@@ -0,0 +1,2 @@',
+      '+// gc1-allow: intended for something else entirely',
+      "+jest.mock('./services/foo', () => ({ bar: jest.fn() }));",
+    ].join('\n');
+    const staged = [
+      '// gc1-allow: intended for something else entirely',
+      "jest.mock('./services/foo', () => ({ bar: jest.fn() }));",
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
+
+  // Same reach concern, trailing side: a gc1-allow comment on the line AFTER
+  // the closing `);` — its own statement, not a trailing comment on the
+  // mock's line — must not satisfy the escape hatch either.
+  it('blocks a NEW non-Pattern-A mock when gc1-allow sits on the line AFTER the closing );', () => {
+    const diff = [
+      '@@ -0,0 +1,2 @@',
+      "+jest.mock('./services/foo', () => ({ bar: jest.fn() }));",
+      '+// gc1-allow: intended for something else entirely',
+    ].join('\n');
+    const staged = [
+      "jest.mock('./services/foo', () => ({ bar: jest.fn() }));",
+      '// gc1-allow: intended for something else entirely',
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
 });
