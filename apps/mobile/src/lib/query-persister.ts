@@ -202,7 +202,7 @@ export const PERSISTABLE_QUERY_KEY_ROOTS: ReadonlySet<string> = new Set([
   'language-progress', // languageProgressSchema — levels/milestone ids+titles from the static per-language milestone library (language-curriculum.ts), no learner text
   'subscription', // subscriptionSchema — billing tier/limits/dates
   'subscription-status', // subscriptionStatusResponseSchema — billing enums/counters
-  'revenuecat', // RevenueCat SDK CustomerInfo — NOT zod-validated (raw SDK type), but the CustomerInfo shape (entitlements/expiration dates/originalAppUserId) carries no name/free-text fields per the SDK type; verified by type inspection, not schema
+  'revenuecat', // RevenueCat SDK — NOT zod-validated (raw SDK types), verified by type inspection: customerInfo (entitlements/activeSubscriptions/originalAppUserId/dates) carries no name/free-text; offerings (serverDescription/metadata) is RevenueCat-dashboard-authored business config, not learner/family-typed. No learner PII on either shape.
 ]);
 
 /**
@@ -263,8 +263,8 @@ function isPersistableLibraryQuery(key: readonly unknown[]): boolean {
  *   - `topic` (topicRetentionResponseSchema — a single nullable
  *     retentionCardSchema, no title fields at all) — clean.
  *   - `evaluate-eligibility` (evaluateEligibilitySchema — topicTitle
- *     (LLM-generated) + scores/enums + an optional system `reason` string
- *     that is never populated by the current route) — clean.
+ *     (LLM-generated) + scores/enums + a system `reason` string populated
+ *     only with fixed server strings, never learner/LLM content) — clean.
  *   - `teaching-preference` (teachingPreferenceResponseDataSchema —
  *     `nativeLanguage: z.string().nullable()`, an unconstrained free-text
  *     field the settings PUT route accepts verbatim, same taint as
