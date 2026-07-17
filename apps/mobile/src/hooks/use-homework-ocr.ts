@@ -113,6 +113,67 @@ async function resizeImage(uri: string): Promise<string> {
   return result.uri;
 }
 
+// [WI-1988] Homework captures are photos of a minor's handwriting written to
+// unencrypted device cache. Every write site (the stable copy + each resized
+// intermediate) must have a matching, best-effort delete — a failed cleanup
+// must never break the OCR flow itself, only get reported.
+async function deleteFileSafely(uri: string | null | undefined): Promise<void> {
+  if (!uri) return;
+  try {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
+  } catch (err) {
+    console.error('[OCR] Failed to delete cached homework capture file:', err);
+    Sentry.captureException(err, {
+      tags: { component: 'use-homework-ocr', action: 'cache-cleanup' },
+    });
+  }
+}
+
+// Crash/orphan safety net: if the app is killed mid-capture (before a normal
+// success/replacement/unmount cleanup runs), the stable copy is left behind
+// under our own `homework-*.jpg` naming. Sweep it on the next mount rather
+// than relying on OS cache eviction, which is a size/pressure policy, not a
+// retention policy for a minor's photo.
+const ORPHAN_SWEEP_TTL_MS = 24 * 60 * 60 * 1000;
+const HOMEWORK_CACHE_FILE_PATTERN = /^homework-\d+\.jpg$/;
+
+async function sweepOrphanedHomeworkCaptures(): Promise<void> {
+  const dir = FileSystem.cacheDirectory;
+  if (!dir) return;
+
+  let names: string[];
+  try {
+    names = await FileSystem.readDirectoryAsync(dir);
+  } catch {
+    return;
+  }
+
+  const now = Date.now();
+  await Promise.all(
+    names
+      .filter((name) => HOMEWORK_CACHE_FILE_PATTERN.test(name))
+      .map(async (name) => {
+        const uri = `${dir}${name}`;
+        try {
+          const info = await FileSystem.getInfoAsync(uri);
+          const modifiedMs =
+            info.exists && 'modificationTime' in info && info.modificationTime
+              ? info.modificationTime * 1000
+              : null;
+          // Unknown mtime (exists but modificationTime unpopulated) must not
+          // be treated as infinitely old — that would delete a fresh,
+          // in-flight capture. Leave it for a later sweep, same as the
+          // unreadable-info case below.
+          if (modifiedMs != null && now - modifiedMs > ORPHAN_SWEEP_TTL_MS) {
+            await deleteFileSafely(uri);
+          }
+        } catch {
+          // Best-effort: an unreadable orphan is left for the next sweep.
+        }
+      }),
+  );
+}
+
 const OCR_DEVICE_TIMEOUT_MS = 20_000;
 const OCR_SERVER_TIMEOUT_MS = 15_000;
 
@@ -170,20 +231,26 @@ function getLocalConfidence(result: unknown): number | undefined {
 
 async function recognizeText(imageUri: string): Promise<RecognizedTextResult> {
   const resizedUri = await resizeImage(imageUri);
-  const result = await Promise.race([
-    TextRecognition.recognize(resizedUri),
-    new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error('On-device text recognition timed out')),
-        OCR_DEVICE_TIMEOUT_MS,
+  try {
+    const result = await Promise.race([
+      TextRecognition.recognize(resizedUri),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('On-device text recognition timed out')),
+          OCR_DEVICE_TIMEOUT_MS,
+        ),
       ),
-    ),
-  ]);
-  const text = result.text?.trim();
-  return {
-    text: text || null,
-    confidence: getLocalConfidence(result),
-  };
+    ]);
+    const text = result.text?.trim();
+    return {
+      text: text || null,
+      confidence: getLocalConfidence(result),
+    };
+  } finally {
+    // [WI-1988] The resized intermediate is single-use — nothing after this
+    // call needs the file itself, only the extracted text/confidence.
+    await deleteFileSafely(resizedUri);
+  }
 }
 
 // [BUG-681 / I-16] Accept an optional external AbortSignal so a user-initiated
@@ -197,70 +264,79 @@ async function recognizeTextServerSide(
   externalSignal?: AbortSignal,
 ): Promise<RecognizedTextResult> {
   const uploadUri = await resizeImage(imageUri);
-  const formData = new FormData();
-  formData.append('image', {
-    uri: uploadUri,
-    name: `homework-${Date.now()}.jpg`,
-    type: 'image/jpeg',
-  } as unknown as Blob);
-
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  if (profileId) {
-    headers['X-Profile-Id'] = profileId;
-  }
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), OCR_SERVER_TIMEOUT_MS);
-  // Forward an already-aborted external signal immediately, and listen for
-  // future aborts. We do not remove the listener on completion — the
-  // controller is short-lived (one fetch); the closure GCs with it.
-  if (externalSignal) {
-    if (externalSignal.aborted) {
-      controller.abort();
-    } else {
-      externalSignal.addEventListener('abort', () => controller.abort(), {
-        once: true,
-      });
-    }
-  }
-  let response: Response;
   try {
-    // [CR-2026-05-21-156] Wrap so network-layer rejections become typed
-    // NetworkError instead of raw TypeError. format-api-error.ts classifies
-    // typed errors directly; the legacy TypeError string-match branch was
-    // removed as part of this fix.
-    response = await fetchOrThrowNetworkError(`${getApiUrl()}/v1/ocr`, {
-      method: 'POST',
-      headers,
-      body: formData,
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeoutId);
-  }
+    const formData = new FormData();
+    formData.append('image', {
+      uri: uploadUri,
+      name: `homework-${Date.now()}.jpg`,
+      type: 'image/jpeg',
+    } as unknown as Blob);
 
-  if (!response || !response.ok) {
-    // Throw typed UpstreamError so the caller can branch on status. A bare
-    // Error caused every 4xx/5xx (401 auth lapse, 413 too large, 429 rate-limit)
-    // to surface the same generic "couldn't read clearly" message via the
-    // catch-all fallback, hiding real problems.
-    const status = response?.status ?? 0;
-    throw new UpstreamError(
-      `Server OCR failed (${status || 'unknown'})`,
-      'OCR_UPSTREAM',
-      status,
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    if (profileId) {
+      headers['X-Profile-Id'] = profileId;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      OCR_SERVER_TIMEOUT_MS,
     );
-  }
+    // Forward an already-aborted external signal immediately, and listen for
+    // future aborts. We do not remove the listener on completion — the
+    // controller is short-lived (one fetch); the closure GCs with it.
+    if (externalSignal) {
+      if (externalSignal.aborted) {
+        controller.abort();
+      } else {
+        externalSignal.addEventListener('abort', () => controller.abort(), {
+          once: true,
+        });
+      }
+    }
+    let response: Response;
+    try {
+      // [CR-2026-05-21-156] Wrap so network-layer rejections become typed
+      // NetworkError instead of raw TypeError. format-api-error.ts classifies
+      // typed errors directly; the legacy TypeError string-match branch was
+      // removed as part of this fix.
+      response = await fetchOrThrowNetworkError(`${getApiUrl()}/v1/ocr`, {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
-  const payload = await parseJson(response, ocrResultSchema, 'POST /v1/ocr');
-  const text = payload.text?.trim();
-  return {
-    text: text || null,
-    confidence: payload.confidence,
-  };
+    if (!response || !response.ok) {
+      // Throw typed UpstreamError so the caller can branch on status. A bare
+      // Error caused every 4xx/5xx (401 auth lapse, 413 too large, 429 rate-limit)
+      // to surface the same generic "couldn't read clearly" message via the
+      // catch-all fallback, hiding real problems.
+      const status = response?.status ?? 0;
+      throw new UpstreamError(
+        `Server OCR failed (${status || 'unknown'})`,
+        'OCR_UPSTREAM',
+        status,
+      );
+    }
+
+    const payload = await parseJson(response, ocrResultSchema, 'POST /v1/ocr');
+    const text = payload.text?.trim();
+    return {
+      text: text || null,
+      confidence: payload.confidence,
+    };
+  } finally {
+    // [WI-1988] The upload intermediate is single-use — the request body
+    // already read it; nothing after this needs the file.
+    await deleteFileSafely(uploadUri);
+  }
 }
 
 export function useHomeworkOcr(): UseHomeworkOcrResult {
@@ -279,13 +355,24 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
   // [I-16] Guard state setters so recognizeText completing after unmount
   // (or after cancel()) doesn't call setState on an unmounted component.
   const mountedRef = useRef(true);
+  // [WI-1988] Set by resolveSuccess/acceptServerRead right before returning
+  // true; process()/retry() read it once runOcr settles to decide whether
+  // the stable cache copy can be deleted.
+  const succeededRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
+    // [WI-1988] Crash/orphan safety net — best-effort, never blocks mount.
+    void sweepOrphanedHomeworkCaptures();
     return () => {
       mountedRef.current = false;
       cancelRef.current?.abort();
       cancelRef.current = null;
+      // [WI-1988] A capture still tracked at unmount (mid-flight or left
+      // over from an error, kept alive for retry()) would otherwise never
+      // get cleaned up once the screen is gone.
+      void deleteFileSafely(currentUriRef.current);
+      currentUriRef.current = null;
     };
   }, []);
 
@@ -337,6 +424,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       setSource(source);
       setStatus('done');
       trackHomeworkOcrGateAccepted({ source, ...metrics });
+      succeededRef.current = true;
       return true;
     },
     [],
@@ -356,6 +444,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       source: 'server',
       ...buildGateMetrics(recognized.text, recognized.confidence),
     });
+    succeededRef.current = true;
     return true;
   }, []);
 
@@ -533,8 +622,25 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
     [acceptServerRead, finishAsError, resolveSuccess, tryServerFallback],
   );
 
+  // [WI-1988] After a successful OCR/upload, the stable cache copy has
+  // served its purpose (the text is already captured into state) and must
+  // be deleted. Shared by process() and retry() — both call runOcr() and
+  // both need the same post-success cleanup.
+  const cleanupIfSucceeded = useCallback(async () => {
+    if (!succeededRef.current) return;
+    succeededRef.current = false;
+    await deleteFileSafely(currentUriRef.current);
+    currentUriRef.current = null;
+  }, []);
+
   const process = useCallback(
     async (uri: string) => {
+      // [WI-1988] Replacement: a prior capture's stable copy (left over
+      // from an in-flight or errored attempt) is superseded by this new
+      // one — delete it before starting fresh.
+      await deleteFileSafely(currentUriRef.current);
+      currentUriRef.current = null;
+
       // M-03: wrap copyToCache in try/catch so failures set error state
       let stableUri: string;
       try {
@@ -549,14 +655,16 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       }
       currentUriRef.current = stableUri;
       await runOcr(stableUri, false);
+      await cleanupIfSucceeded();
     },
-    [runOcr],
+    [runOcr, cleanupIfSucceeded],
   );
 
   const retry = useCallback(async () => {
     if (!currentUriRef.current) return;
     await runOcr(currentUriRef.current, true);
-  }, [runOcr]);
+    await cleanupIfSucceeded();
+  }, [runOcr, cleanupIfSucceeded]);
 
   return {
     text,
