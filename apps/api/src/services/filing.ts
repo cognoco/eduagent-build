@@ -372,7 +372,9 @@ export async function fileToLibrary(
       extra: {
         surface: 'filing',
         reason: 'invalid_json',
-        jsonStrSample: jsonStr.slice(0, 200),
+        // [WI-1990] Length only — a slice of the LLM's filing JSON can
+        // echo learner-entered content. Never send raw content.
+        jsonStrLength: jsonStr.length,
       },
     });
     throw err;

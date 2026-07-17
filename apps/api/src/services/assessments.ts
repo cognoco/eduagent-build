@@ -740,7 +740,9 @@ function parseQuickCheckResult(response: string): QuickCheckResult {
         extra: {
           surface: 'assessments-quick-check',
           reason: 'invalid_json',
-          jsonStrSample: jsonStr.slice(0, 200),
+          // [WI-1990] Length only — a slice of the LLM's quick-check JSON
+          // can echo learner-entered content. Never send raw content.
+          jsonStrLength: jsonStr.length,
         },
       });
       assessmentsLogger.warn(
@@ -803,7 +805,9 @@ function parseAssessmentEvaluation(
           extra: {
             surface: 'assessments-evaluation',
             reason: 'invalid_schema',
-            jsonStrSample: jsonStr.slice(0, 200),
+            // [WI-1990] Length only — a slice of the LLM's evaluation JSON
+            // can echo learner-entered content. Never send raw content.
+            jsonStrLength: jsonStr.length,
           },
         });
         assessmentsLogger.warn(
@@ -859,7 +863,9 @@ function parseAssessmentEvaluation(
         extra: {
           surface: 'assessments-evaluation',
           reason: 'invalid_json',
-          jsonStrSample: jsonStr.slice(0, 200),
+          // [WI-1990] Length only — a slice of the LLM's evaluation JSON
+          // can echo learner-entered content. Never send raw content.
+          jsonStrLength: jsonStr.length,
         },
       });
       assessmentsLogger.warn(

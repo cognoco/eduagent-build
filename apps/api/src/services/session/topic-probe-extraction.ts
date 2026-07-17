@@ -150,7 +150,9 @@ export async function extractSignalsFromExchangeHistory(
       extra: {
         surface: 'topic-probe-signal-extraction',
         reason: 'invalid_json',
-        jsonStrSample: jsonStr.slice(0, 200),
+        // [WI-1990] Length only — a slice of the LLM's extraction JSON
+        // can echo learner-entered content. Never send raw content.
+        jsonStrLength: jsonStr.length,
       },
     });
     return defaultExtractedSignals(exchangeHistory);
