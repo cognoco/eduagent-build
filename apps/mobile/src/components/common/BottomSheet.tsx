@@ -13,6 +13,8 @@ interface BottomSheetProps {
   children: React.ReactNode;
   /** testID forwarded to the surface container (the white rounded card). */
   testID?: string;
+  /** Accessible name for the dialog surface. */
+  accessibilityLabel?: string;
   /**
    * Whether tapping the semi-transparent backdrop dismisses the sheet.
    * Defaults to false (matches the NudgeActionSheet / LearnTogetherSheet
@@ -54,32 +56,20 @@ export function BottomSheet({
   onClose,
   children,
   testID,
+  accessibilityLabel,
   backdropDismissible = false,
   backdropAccessibilityLabel = 'Close',
   animationType = 'slide',
 }: BottomSheetProps): React.ReactElement {
-  const surface = (
-    <View testID={testID} className="rounded-t-3xl overflow-hidden">
-      {children}
-    </View>
-  );
-
   const backdrop = backdropDismissible ? (
     <Pressable
-      className="flex-1 justify-end bg-black/40"
+      className="absolute inset-0 bg-black/40"
       onPress={onClose}
       accessibilityRole="button"
       accessibilityLabel={backdropAccessibilityLabel}
-    >
-      <Pressable
-        onPress={(e) => e?.stopPropagation?.()}
-        accessibilityRole="none"
-      >
-        {surface}
-      </Pressable>
-    </Pressable>
+    />
   ) : (
-    <View className="flex-1 justify-end bg-black/40">{surface}</View>
+    <View className="absolute inset-0 bg-black/40" />
   );
 
   return (
@@ -90,7 +80,17 @@ export function BottomSheet({
       onRequestClose={onClose}
       accessibilityViewIsModal
     >
-      {backdrop}
+      <View className="flex-1 justify-end">
+        {backdrop}
+        <View
+          testID={testID}
+          className="rounded-t-3xl overflow-hidden"
+          role="dialog"
+          accessibilityLabel={accessibilityLabel}
+        >
+          {children}
+        </View>
+      </View>
     </Modal>
   );
 }

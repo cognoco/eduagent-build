@@ -1,5 +1,10 @@
 import type { CurriculumTopic } from '@eduagent/schemas';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import { Text } from 'react-native';
 
 import type { HubTopic } from './_view-models/subject-hub-state';
@@ -30,6 +35,33 @@ function hubTopic(description: string | null): HubTopic {
 }
 
 describe('TopicDetailSheet', () => {
+  it('names the dialog, keeps topic actions independent, and closes once from the backdrop', () => {
+    const onClose = jest.fn();
+    const onStudyTopic = jest.fn();
+    render(
+      <TopicDetailSheet
+        topic={hubTopic('Photosynthesis turns light into sugar.')}
+        notes={[]}
+        canStudy
+        onClose={onClose}
+        onStudyTopic={onStudyTopic}
+      />,
+    );
+
+    expect(screen.getByLabelText('Photosynthesis').props.role).toBe('dialog');
+
+    fireEvent.press(screen.getByText('subjectHub.sheet.study'));
+    expect(onStudyTopic).toHaveBeenCalledWith('topic-1');
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.press(
+      screen.getAllByLabelText('subjectHub.sheet.close', {
+        includeHiddenElements: true,
+      })[0],
+    );
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('renders title, description before mastery, notes, and study actions', () => {
     render(
       <TopicDetailSheet
@@ -118,8 +150,8 @@ describe('TopicDetailSheet', () => {
 // ---------------------------------------------------------------------------
 
 describe('TopicDetailSheet — writable notes (WI-1118)', () => {
-  it('renders the add input and submits a trimmed note bound to the focused topic', () => {
-    const onAddNote = jest.fn();
+  it('renders the add input and submits a trimmed note bound to the focused topic', async () => {
+    const onAddNote = jest.fn().mockResolvedValue(undefined);
     render(
       <TopicDetailSheet
         topic={hubTopic('Photosynthesis turns light into sugar.')}
@@ -145,6 +177,11 @@ describe('TopicDetailSheet — writable notes (WI-1118)', () => {
 
     // The draft is trimmed and bound to THIS topic's id.
     expect(onAddNote).toHaveBeenCalledWith('topic-1', 'remember mitosis');
+    await waitFor(() => {
+      expect(screen.getByTestId('subject-hub-notes-input').props.value).toBe(
+        '',
+      );
+    });
   });
 
   it('stays read-only (no add input) when no onAddNote handler is wired', () => {

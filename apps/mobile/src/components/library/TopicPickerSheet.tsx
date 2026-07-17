@@ -33,6 +33,7 @@ export function TopicPickerSheet({
       onClose={onClose}
       backdropDismissible
       backdropAccessibilityLabel={t('library.a11yCloseTopicPicker')}
+      accessibilityLabel={t('library.chooseTopic')}
       testID="topic-picker-modal"
     >
       <View className="bg-background px-5 pt-5 pb-8">

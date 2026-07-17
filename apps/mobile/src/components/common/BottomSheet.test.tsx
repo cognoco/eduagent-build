@@ -7,7 +7,7 @@
  * structural and behavioural properties instead.
  */
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput } from 'react-native';
 
 import { BottomSheet } from './BottomSheet';
 
@@ -46,9 +46,9 @@ describe('BottomSheet', () => {
     screen.getByTestId('my-sheet');
   });
 
-  it('calls onClose on hardware back (onRequestClose) — always wired', () => {
-    // Modal.onRequestClose is the Android back-button handler. BottomSheet
-    // must wire it unconditionally so sheets are dismissible on Android.
+  it('calls onClose once for Escape or Android back (onRequestClose) and keeps modal focus containment', () => {
+    // Modal.onRequestClose is the cross-platform request-close seam used by
+    // Android Back and, where supported, web Escape handling.
     const { UNSAFE_getByType } = render(
       <BottomSheet visible onClose={onClose}>
         <Text>Content</Text>
@@ -58,9 +58,28 @@ describe('BottomSheet', () => {
     const modal = UNSAFE_getByType(Modal);
     modal.props.onRequestClose?.();
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(modal.props.accessibilityViewIsModal).toBe(true);
   });
 
   describe('backdropDismissible=false (default)', () => {
+    it('does not expose a backdrop close action', () => {
+      render(
+        <BottomSheet
+          visible
+          onClose={onClose}
+          accessibilityLabel="Required action"
+          testID="non-dismissible-sheet"
+        >
+          <Text>Content</Text>
+        </BottomSheet>,
+      );
+
+      expect(screen.queryByLabelText('Close')).toBeNull();
+      expect(screen.getByTestId('non-dismissible-sheet').props.role).toBe(
+        'dialog',
+      );
+    });
+
     it('does NOT call onClose when pressing inside the content area', () => {
       // Without backdropDismissible, the backdrop is a non-pressable View.
       // Pressing a child should never fire onClose.
@@ -75,6 +94,39 @@ describe('BottomSheet', () => {
   });
 
   describe('backdropDismissible=true', () => {
+    it('[WI-2182] keeps the backdrop button and named dialog as accessible siblings', () => {
+      render(
+        <BottomSheet
+          visible
+          onClose={onClose}
+          backdropDismissible
+          accessibilityLabel="Topic picker"
+          testID="sheet-surface"
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Choose Algebra"
+            testID="inner-action"
+          >
+            <Text>Algebra</Text>
+          </Pressable>
+        </BottomSheet>,
+      );
+
+      const backdrop = screen.getByLabelText('Close');
+      const surface = screen.getByTestId('sheet-surface');
+      screen.getByTestId('inner-action');
+
+      expect(surface.props.role).toBe('dialog');
+      expect(surface.props.accessibilityLabel).toBe('Topic picker');
+      expect(backdrop.findAllByProps({ testID: 'sheet-surface' })).toHaveLength(
+        0,
+      );
+      expect(backdrop.findAllByProps({ testID: 'inner-action' })).toHaveLength(
+        0,
+      );
+    });
+
     it('renders a pressable backdrop', () => {
       render(
         <BottomSheet visible onClose={onClose} backdropDismissible>
@@ -103,6 +155,37 @@ describe('BottomSheet', () => {
         </BottomSheet>,
       );
       fireEvent.press(screen.getByTestId('inner'));
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('does not dismiss for child press, typing, scroll, or touch gestures inside the dialog', () => {
+      const onAction = jest.fn();
+      render(
+        <BottomSheet
+          visible
+          onClose={onClose}
+          backdropDismissible
+          accessibilityLabel="Topic picker"
+        >
+          <ScrollView testID="sheet-scroll">
+            <TextInput testID="sheet-input" value="" onChangeText={jest.fn()} />
+            <Pressable testID="sheet-action" onPress={onAction}>
+              <Text>Choose topic</Text>
+            </Pressable>
+          </ScrollView>
+        </BottomSheet>,
+      );
+
+      fireEvent.press(screen.getByTestId('sheet-action'));
+      fireEvent.changeText(screen.getByTestId('sheet-input'), 'algebra');
+      fireEvent.scroll(screen.getByTestId('sheet-scroll'), {
+        nativeEvent: { contentOffset: { x: 0, y: 24 } },
+      });
+      fireEvent(screen.getByTestId('sheet-scroll'), 'touchStart');
+      fireEvent(screen.getByTestId('sheet-scroll'), 'touchMove');
+      fireEvent(screen.getByTestId('sheet-scroll'), 'touchEnd');
+
+      expect(onAction).toHaveBeenCalledTimes(1);
       expect(onClose).not.toHaveBeenCalled();
     });
 
