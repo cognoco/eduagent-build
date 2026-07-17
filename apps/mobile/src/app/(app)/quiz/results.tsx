@@ -9,9 +9,17 @@ import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
 import { rewardVariantForActivity } from './_quiz-utils';
 
-export default function QuizResultsScreen(): React.ReactElement {
+export interface QuizResultsNavigation {
+  push: (href: Href) => void;
+  replace: (href: Href) => void;
+}
+
+export function QuizResultsContent({
+  router,
+}: {
+  router: QuizResultsNavigation;
+}): React.ReactElement {
   const { t } = useTranslation();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { activityType, completionResult, returnTo, round } = useQuizFlow();
@@ -306,4 +314,9 @@ export default function QuizResultsScreen(): React.ReactElement {
       </View>
     </ScrollView>
   );
+}
+
+export default function QuizResultsScreen(): React.ReactElement {
+  const router = useRouter();
+  return <QuizResultsContent router={router} />;
 }
