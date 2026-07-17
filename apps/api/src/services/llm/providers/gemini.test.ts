@@ -73,6 +73,19 @@ function mockStreamResponse(sseData: string, status = 200): Response {
 let provider: LLMProvider;
 let fetchSpy: jest.SpyInstance;
 
+// [WI-1862] On this host (confirmed: Node v26.3.0; CI runs Node 22 and does not
+// reproduce), `jest.useFakeTimers()` followed by `jest.useRealTimers()` — the
+// exact sequence the "throws on mid-stream stall" test below performs — leaves
+// `globalThis.setTimeout`/`clearTimeout` as `undefined` instead of restoring the
+// real functions. That poisoned global then leaks into every later test in this
+// file, throwing `clearTimeout is not defined` from the unrelated
+// `readWithTimeout()` cleanup in gemini.ts. Reproduced independently of this
+// file's code with a bare `jest.useFakeTimers(); jest.useRealTimers();` — not a
+// gemini.ts defect. Restore the real timer functions after every test so a
+// poisoned global never leaks past the test that poisoned it.
+const REAL_SET_TIMEOUT = globalThis.setTimeout;
+const REAL_CLEAR_TIMEOUT = globalThis.clearTimeout;
+
 beforeEach(() => {
   provider = createGeminiProvider(TEST_API_KEY);
   fetchSpy = jest.spyOn(globalThis, 'fetch');
@@ -80,6 +93,12 @@ beforeEach(() => {
 
 afterEach(() => {
   fetchSpy.mockRestore();
+  if (typeof globalThis.setTimeout !== 'function') {
+    globalThis.setTimeout = REAL_SET_TIMEOUT;
+  }
+  if (typeof globalThis.clearTimeout !== 'function') {
+    globalThis.clearTimeout = REAL_CLEAR_TIMEOUT;
+  }
 });
 
 describe('Gemini Provider', () => {
