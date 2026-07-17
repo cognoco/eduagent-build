@@ -332,6 +332,64 @@ describe('SignUpScreen', () => {
     ).toEqual(expect.objectContaining({ busy: false, disabled: false }));
   });
 
+  // [WI-2119] AC-2 regression guard: retry succeeds after the security
+  // service recovers. Extends the timeout test above — after the button
+  // re-enables post-timeout, the user presses sign-up again; this asserts
+  // signUp.create() is re-invoked and the flow proceeds to email
+  // verification, not that the button merely stays clickable.
+  it('[WI-2119] retries and reaches email verification after the security service recovers', async () => {
+    jest.useFakeTimers();
+    mockCreate.mockImplementation(neverResolves);
+
+    render(<SignUpScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-up-email'),
+      'new@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('sign-up-password'), 'secure123');
+    fireEvent.press(screen.getByTestId('sign-up-button'));
+
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledWith({
+        emailAddress: 'new@example.com',
+        password: 'secure123',
+      });
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(SIGN_UP_CAPTCHA_TIMEOUT_MS);
+      await Promise.resolve();
+    });
+
+    // Service unavailable: button re-enables so the user can retry.
+    expect(
+      screen.getByTestId('sign-up-button').props.accessibilityState,
+    ).toEqual(expect.objectContaining({ busy: false, disabled: false }));
+
+    // Service recovers.
+    jest.useRealTimers();
+    mockCreate.mockResolvedValue(undefined);
+    mockPrepareVerification.mockResolvedValue(undefined);
+
+    fireEvent.press(screen.getByTestId('sign-up-button'));
+
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+    });
+
+    await waitFor(() => {
+      expect(mockPrepareVerification).toHaveBeenCalledWith({
+        strategy: 'email_code',
+      });
+    });
+
+    await waitFor(() => {
+      screen.getByTestId('sign-up-code');
+      screen.getByTestId('sign-up-verify-button');
+    });
+  });
+
   // [WI-2119] Regression guard for the mount-lifecycle timeout bug: a real
   // Chromium sign-up hung ~20s and surfaced "The security service did not
   // respond in time" because Clerk's interactive CAPTCHA challenge can render
