@@ -27,12 +27,16 @@
  *
  * No-Doppler escape
  * -----------------
- * `pnpm env:sync` (`scripts/setup-env.js`) writes stg secrets to
+ * `pnpm env:sync` (`scripts/setup-env.js`) writes stg secrets to the repo-root
  * `.env.development.local` (DOPPLER_CONFIG = 'stg' is hard-coded in that
- * script). Drizzle-kit auto-loads `.env*` files from ancestor directories, so a
- * bare `drizzle-kit push` without Doppler would pick up stg credentials and
- * reach staging. Allowing `DOPPLER_CONFIG=undefined` silently would therefore
- * be unsafe. Instead, the no-Doppler case requires an explicit opt-in:
+ * script). Allowing `DOPPLER_CONFIG=undefined` silently would be unsafe if
+ * `DATABASE_URL` were already present in the process environment pointing at
+ * stg/prd — from a leftover `doppler run` shell, a manually exported var, or a
+ * bare `.env` file placed in `packages/database/` (drizzle-kit's bundled
+ * dotenv auto-loads a bare `.env` from its cwd, which is `packages/database`
+ * for every `db:push` invocation path in this repo — it does NOT read the
+ * root `.env.development.local`; verified WI-1874). Instead, the no-Doppler
+ * case requires an explicit opt-in:
  *
  *   DB_PUSH_LOCAL_DEV=1 pnpm --filter @eduagent/database run db:push
  *
@@ -40,11 +44,11 @@
  * (e.g. a clean checkout with a manually written .env.local pointing at a local
  * Postgres). It is NOT for bypassing the check when Doppler is configured.
  *
- * The opt-in alone is not sufficient: `.env.development.local` may still be
- * sitting on disk with stg credentials in it (from an earlier `pnpm env:sync`)
- * even though the dev intends to hit local Postgres. So when DATABASE_URL is
- * set under this escape, its host must resolve to localhost/127.0.0.1 — any
- * other host (in particular a `*.neon.tech` stg/prd host) is blocked (WI-1874).
+ * The opt-in alone is not sufficient: `DATABASE_URL` may already be set in the
+ * process environment pointing at stg/prd for any of the reasons above. So
+ * when DATABASE_URL is set under this escape, its host must resolve to
+ * localhost/127.0.0.1 — any other host (in particular a `*.neon.tech` stg/prd
+ * host) is blocked (WI-1874).
  *
  * Historical context
  * ------------------
@@ -108,8 +112,9 @@ function blocked(reason) {
 }
 
 if (dopplerConfig === undefined || dopplerConfig === '') {
-  // No Doppler — could be a bare invocation that auto-loaded .env.development.local
-  // (which contains stg credentials via pnpm env:sync). Require an explicit opt-in.
+  // No Doppler — DATABASE_URL could already be set in the process env from a
+  // leftover doppler-run shell, an exported var, or a bare packages/database/.env
+  // file (which drizzle-kit's bundled dotenv does auto-load). Require an explicit opt-in.
   if (!process.env.DB_PUSH_LOCAL_DEV) {
     blocked(
       'DOPPLER_CONFIG is not set. pnpm env:sync writes stg credentials to\n' +
@@ -139,9 +144,8 @@ if (dopplerConfig === undefined || dopplerConfig === '') {
           (host ?? '(unparseable)') +
           '", not localhost/127.0.0.1.' +
           (neonCheck.status === 'mismatch' ? ' ' + neonCheck.reason + '.' : '') +
-          ' pnpm env:sync writes staging credentials into .env.development.local,\n' +
-          '   which drizzle-kit auto-loads — this looks like it would push to a\n' +
-          '   non-local database. Point DATABASE_URL at your local Postgres instance.',
+          ' DATABASE_URL is already set in the process environment and does not\n' +
+          '   point at a local database. Point DATABASE_URL at your local Postgres instance.',
       );
     }
   }
