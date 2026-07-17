@@ -11,20 +11,6 @@ import { BottomSheet } from './BottomSheet';
 
 jest.mock('react-native', () => jest.requireActual('react-native-web'));
 
-function pressKeyboardKey(element: HTMLElement, key: 'Enter' | ' '): void {
-  element.focus();
-  element.dispatchEvent(
-    new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key }),
-  );
-  element.dispatchEvent(
-    new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key }),
-  );
-  // jsdom does not execute the browser's default keyboard activation for a
-  // native <button>. RN web intentionally delegates to that default, so issue
-  // the click jsdom omits after the real key events have traversed the tree.
-  element.click();
-}
-
 describe('BottomSheet web accessibility structure', () => {
   let host: HTMLDivElement;
   let opener: HTMLButtonElement;
@@ -96,6 +82,8 @@ describe('BottomSheet web accessibility structure', () => {
     expect(surface).not.toBeNull();
     expect(action).not.toBeNull();
     expect(input).not.toBeNull();
+    expect(backdrop?.tagName).toBe('BUTTON');
+    expect(action?.tagName).toBe('BUTTON');
     expect(backdrop?.parentElement).toBe(surface?.parentElement);
     expect(backdrop?.contains(surface ?? null)).toBe(false);
     expect(backdrop?.contains(action ?? null)).toBe(false);
@@ -114,16 +102,8 @@ describe('BottomSheet web accessibility structure', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
 
     onClose.mockClear();
-    await act(async () => pressKeyboardKey(backdrop!, 'Enter'));
-    expect(onClose).toHaveBeenCalledTimes(1);
-    onClose.mockClear();
-    await act(async () => pressKeyboardKey(backdrop!, ' '));
-    expect(onClose).toHaveBeenCalledTimes(1);
-
-    onClose.mockClear();
-    await act(async () => pressKeyboardKey(action!, 'Enter'));
-    await act(async () => pressKeyboardKey(action!, ' '));
-    expect(onAction).toHaveBeenCalledTimes(2);
+    await act(async () => action!.click());
+    expect(onAction).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
 
     await act(async () =>
