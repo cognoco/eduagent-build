@@ -138,6 +138,17 @@ describe('AccountScreen', () => {
     active.result.getByTestId('change-password-row');
   });
 
+  it('leaves native top-inset ownership to the enclosing More Stack header', () => {
+    active = renderScreen(<AccountScreen />, {
+      profile: ownerProfile,
+      routes: defaultRoutes,
+    });
+
+    const scroll = active.result.getByTestId('more-account-scroll');
+    expect(scroll.props.contentContainerStyle).toEqual({ paddingBottom: 24 });
+    expect(scroll.props.contentContainerStyle.paddingTop).toBeUndefined();
+  });
+
   it('navigates to /profiles when profile row is pressed', () => {
     active = renderScreen(<AccountScreen />, {
       profile: ownerProfile,

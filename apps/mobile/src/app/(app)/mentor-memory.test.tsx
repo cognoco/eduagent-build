@@ -45,11 +45,17 @@ let mockProfileData: unknown = {
 
 let mockActiveProfileBirthYear: number | undefined;
 let mockIsExplicitProxyMode = false;
+let mockSafeAreaTop = 0;
 
 const mockPlatformAlert = jest.fn();
 
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({
+    top: mockSafeAreaTop,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  }),
 }));
 
 const mockRouter = {
@@ -220,7 +226,18 @@ describe('MentorMemoryScreen — interests null guard', () => {
     mockSearchParams = {};
     mockIsParentProxy = false;
     mockModeNavV1Enabled = false;
+    mockSafeAreaTop = 0;
     jest.clearAllMocks();
+  });
+
+  it('renders its identity surface after the native top safe area', async () => {
+    mockSafeAreaTop = 47;
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    expect(await screen.findByTestId('mentor-memory-screen')).toHaveStyle({
+      paddingTop: 47,
+    });
   });
 
   it('does not crash when profile.interests is undefined', () => {

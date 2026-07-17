@@ -274,7 +274,11 @@ export default function MentorMemoryScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+      testID="mentor-memory-screen"
+    >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={handleBack}

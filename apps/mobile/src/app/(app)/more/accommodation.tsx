@@ -123,7 +123,11 @@ export default function AccommodationScreen(): React.ReactElement {
     : t('more.learningPreferences.screenTitle');
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+      testID="accommodation-screen"
+    >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={handleBack}

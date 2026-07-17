@@ -15,6 +15,7 @@ export default function MoreLayout(): React.JSX.Element {
       initialRouteName="index"
       screenOptions={{
         headerStyle: { backgroundColor: colors.background },
+        headerTransparent: false,
         headerTintColor: colors.textPrimary,
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.background },

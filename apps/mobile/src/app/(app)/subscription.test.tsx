@@ -25,6 +25,7 @@ import type { Profile, Subscription } from '@eduagent/schemas';
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+let mockSafeAreaTop = 0;
 
 // Captures the useFocusEffect callback so tests can simulate screen focus.
 // Must be declared before jest.mock factory so the factory closure captures it.
@@ -55,7 +56,12 @@ jest.mock(
 jest.mock(
   'react-native-safe-area-context', // gc1-allow: native-boundary — requires native insets unavailable in Jest
   () => ({
-    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+    useSafeAreaInsets: () => ({
+      top: mockSafeAreaTop,
+      bottom: 0,
+      left: 0,
+      right: 0,
+    }),
   }),
 );
 
@@ -437,6 +443,7 @@ describe('SubscriptionScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     capturedFocusEffect = null;
+    mockSafeAreaTop = 0;
     // Reset RevenueCat hook state
     mockOfferings = null;
     mockOfferingsLoading = false;
@@ -520,6 +527,16 @@ describe('SubscriptionScreen', () => {
           headers: { 'Content-Type': 'application/json' },
         }),
     );
+  });
+
+  it('renders its identity surface after the native top safe area', async () => {
+    mockSafeAreaTop = 47;
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(await screen.findByTestId('subscription-screen')).toHaveStyle({
+      paddingTop: 47,
+    });
   });
 
   // -------------------------------------------------------------------------

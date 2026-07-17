@@ -23,6 +23,7 @@ const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn();
 let mockSearchParams: Record<string, string | undefined> = {};
+let mockSafeAreaTop = 0;
 
 jest.mock('expo-router' /* gc1-allow: native-boundary */, () => ({
   useRouter: () => ({
@@ -48,7 +49,12 @@ jest.mock(
 jest.mock(
   'react-native-safe-area-context' /* gc1-allow: native-boundary — requires native insets */,
   () => ({
-    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+    useSafeAreaInsets: () => ({
+      top: mockSafeAreaTop,
+      bottom: 0,
+      left: 0,
+      right: 0,
+    }),
   }),
 );
 
@@ -119,6 +125,7 @@ describe('AccommodationScreen', () => {
 
   beforeEach(() => {
     mockSearchParams = {};
+    mockSafeAreaTop = 0;
   });
 
   afterEach(() => {
@@ -140,6 +147,18 @@ describe('AccommodationScreen', () => {
     active.result.getByTestId('accommodation-mode-short-burst');
     active.result.getByTestId('accommodation-mode-audio-first');
     active.result.getByTestId('accommodation-mode-predictable');
+  });
+
+  it('renders its identity surface after the native top safe area', async () => {
+    mockSafeAreaTop = 47;
+    active = renderScreen(<AccommodationScreen />, {
+      profile: owner,
+      routes: modeRoute('none'),
+    });
+
+    expect(
+      await active.result.findByTestId('accommodation-screen'),
+    ).toHaveStyle({ paddingTop: 47 });
   });
 
   it('PATCHes accommodation mode when a card is pressed', async () => {

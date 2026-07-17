@@ -42,14 +42,24 @@ const mockClerkSignOut = jest.fn();
 const mockTabs = Object.assign(
   ({
     children,
+    screenOptions,
     ...props
   }: {
     children?: React.ReactNode;
-    screenOptions?: unknown;
+    screenOptions?: (input: { route: { name: string } }) => {
+      sceneStyle?: unknown;
+    };
   }) => {
     const { View } = require('react-native');
+    const pathname =
+      String(mockUsePathname() ?? '/mentor').split('?')[0] ?? '/mentor';
+    const activeRootRoute = pathname.split('/').filter(Boolean)[0] ?? 'mentor';
+    const activeOptions = screenOptions?.({
+      route: { name: activeRootRoute },
+    });
     return (
-      <View testID="tabs" {...props}>
+      <View testID="tabs" screenOptions={screenOptions} {...props}>
+        <View testID="active-root-scene" style={activeOptions?.sceneStyle} />
         {children}
       </View>
     );
@@ -972,12 +982,19 @@ describe('AppLayout', () => {
     }
   });
 
-  it.each([
-    { caseName: '360x760 web', safeAreaTop: 0 },
-    { caseName: 'native safe area', safeAreaTop: 47 },
-  ])(
-    'reserves the complete fixed v2 chrome once for pushed routes on $caseName',
-    async ({ safeAreaTop }) => {
+  it.each(
+    [
+      '/mentor-memory',
+      '/more/accommodation',
+      '/subscription',
+      '/more/account',
+    ].flatMap((pathname) => [
+      { pathname, surface: '360x760 web', safeAreaTop: 0 },
+      { pathname, surface: 'native safe area', safeAreaTop: 47 },
+    ]),
+  )(
+    'renders $pathname below the complete fixed v2 chrome once on $surface',
+    async ({ pathname, safeAreaTop }) => {
       const flags = require('../../lib/feature-flags') as {
         FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
       };
@@ -992,48 +1009,63 @@ describe('AppLayout', () => {
           left: 0,
           right: 0,
         };
-        mockUsePathname.mockReturnValue('/mentor-memory');
+        mockUsePathname.mockReturnValue(pathname);
 
         renderLayout();
 
-        const avatarShell = await screen.findByTestId('account-avatar-shell', {
+        const activeScene = await screen.findByTestId('active-root-scene');
+        const avatarShell = screen.getByTestId('account-avatar-shell', {
           includeHiddenElements: true,
         });
         const avatarTop = Math.max(safeAreaTop, 24) + 8;
         expect(avatarShell).toHaveStyle({ top: avatarTop });
 
-        const tabs = await screen.findByTestId('tabs');
-        const screenOptions = tabs.props.screenOptions as ({
-          route,
-        }: {
-          route: { name: string };
-        }) => { sceneStyle: { paddingTop: number } };
         const expectedPushedPadding = avatarTop + 44 - safeAreaTop;
+        expect(activeScene).toHaveStyle({
+          paddingTop: expectedPushedPadding,
+        });
+      } finally {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = original;
+      }
+    },
+  );
 
-        for (const routeName of [
-          'mentor-memory',
-          'more/accommodation',
-          'subscription',
-          'more',
-        ]) {
-          const scenePadding = screenOptions({
-            route: { name: routeName },
-          }).sceneStyle.paddingTop;
-          expect(scenePadding).toBe(expectedPushedPadding);
-          expect(scenePadding + safeAreaTop).toBe(avatarTop + 44);
-        }
+  it.each(
+    [
+      { pathname: '/mentor', routeKind: 'top-level tab' },
+      { pathname: '/account', routeKind: 'full-screen account' },
+      { pathname: '/session', routeKind: 'full-screen session' },
+    ].flatMap(({ pathname, routeKind }) => [
+      { pathname, routeKind, surface: '360x760 web', safeAreaTop: 0 },
+      { pathname, routeKind, surface: 'native safe area', safeAreaTop: 47 },
+    ]),
+  )(
+    'does not duplicate v2 chrome clearance for $routeKind on $surface',
+    async ({ pathname, routeKind, safeAreaTop }) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+        mockSafeAreaInsets = {
+          top: safeAreaTop,
+          bottom: 0,
+          left: 0,
+          right: 0,
+        };
+        mockUsePathname.mockReturnValue(pathname);
 
-        for (const routeName of ['mentor', 'subjects', 'journal']) {
-          expect(
-            screenOptions({ route: { name: routeName } }).sceneStyle.paddingTop,
-          ).toBe(Math.max(safeAreaTop, 24));
-        }
+        renderLayout();
 
-        for (const routeName of ['account', 'session']) {
-          expect(
-            screenOptions({ route: { name: routeName } }).sceneStyle.paddingTop,
-          ).toBe(0);
-        }
+        expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
+          paddingTop:
+            routeKind === 'top-level tab' ? Math.max(safeAreaTop, 24) : 0,
+        });
       } finally {
         (
           flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
@@ -1063,17 +1095,9 @@ describe('AppLayout', () => {
         nativeEvent: { layout: { height: 64 } },
       });
 
-      const tabs = await screen.findByTestId('tabs');
-      const screenOptions = tabs.props.screenOptions as ({
-        route,
-      }: {
-        route: { name: string };
-      }) => { sceneStyle: { paddingTop: number } };
-      const scenePadding = screenOptions({
-        route: { name: 'more/accommodation' },
-      }).sceneStyle.paddingTop;
-
-      expect(scenePadding + mockSafeAreaInsets.top).toBe(47 + 8 + 64);
+      expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
+        paddingTop: 72,
+      });
     } finally {
       (
         flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
@@ -1107,17 +1131,9 @@ describe('AppLayout', () => {
 
         renderLayout();
 
-        const tabs = await screen.findByTestId('tabs');
-        const screenOptions = tabs.props.screenOptions as ({
-          route,
-        }: {
-          route: { name: string };
-        }) => { sceneStyle: { paddingTop: number } };
-
-        expect(
-          screenOptions({ route: { name: 'mentor-memory' } }).sceneStyle
-            .paddingTop,
-        ).toBe(0);
+        expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
+          paddingTop: 0,
+        });
         expect(
           screen.queryByTestId('account-avatar-shell', {
             includeHiddenElements: true,
