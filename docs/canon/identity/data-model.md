@@ -347,9 +347,10 @@ recorded per `MMT-ADR-0020`, not a silent overwrite.
    ─────────────────────────────────           ────────────────────────────────────
    person              ─────────drop────►       consent_receipt   (← from consent_grant)
    membership          ─────────drop────►       deletion_audit    (← write at delete-time)
-   subscription        ───────survives────►     financial_record  (← per-person refs)
-   guardianship        ───────survives────►     (the org's subscription row continues
-   supportership       ───────survives────►      to live on the organization)
+   subscription        ───────survives────►     financial_record  (← per-person refs;
+                                                  the org's subscription row lives on)
+   guardianship        ──────torn down─────►     (severed before the person drops,
+   supportership       ──────torn down─────►      both directions — WI-1985)
    consent_grant       ─────migrate on drop─►   (only `consent_receipt` survives;
    all learning data    ─────────drop────►       the live `consent_grant` row is gone)
 ```
@@ -358,13 +359,15 @@ The key asymmetry: **the live consent record moves, the receipt stays.** `consen
 row; `consent_receipt` is the durable artifact. The `charge_person_id ON DELETE RESTRICT` on
 `consent_grant` enforces "you can't hard-delete a person with active grants — re-home them first."
 
-**The "survives" column above is the *person-granularity* delete** — dropping one `person` while their
-org and the other humans on their edges live on. There is a second granularity: a **whole-org /
-whole-account erasure** (the GDPR Art-17 path, `executeDeletionV2`), which removes the `organization`
-**and every person in it**. On that path the otherwise-surviving relationship edges cannot survive — the
-person on (at least) one end is gone — so the erasure **tears down every `guardianship` and
-`supportership` edge incident to the org's persons** (both directions) in the same transaction, before the
-persons drop. A **cross-org** edge (a guardian/supporter who lives in another org) has only its **edge
+**The retain/drop split above is the *person-granularity* delete** — dropping one `person` while their
+org and the *counterpart* humans on their edges live on. The person-scoped delete paths (`deletePersonV2`
+and the consent-gated erasure sweeps) **tear down every `guardianship` and `supportership` edge incident
+to that person** (both directions) in the same transaction, before the person row drops (WI-1985): the
+edge to an erased person cannot survive, though the counterpart human does. (`subscription` still survives
+a person-scoped delete — it is org-anchored.) The same teardown scales up at the second granularity: a
+**whole-org / whole-account erasure** (the GDPR Art-17 path, `executeDeletionV2`), which removes the
+`organization` **and every person in it**, **tears down every `guardianship` and `supportership` edge
+incident to the org's persons** (both directions) in the same transaction, before the persons drop. A **cross-org** edge (a guardian/supporter who lives in another org) has only its **edge
 row** removed; the out-of-org counterpart person and their org are untouched. `subscription` DB rows are **torn down** in the same erasure transaction (Step G1, WI-849 Gap 1), so a
 *subscribed* org's erasure now succeeds. The Stripe/RC store-cancellation is deferred to WI-885. See
 **MMT-ADR-0026** (and §6.1).
@@ -501,9 +504,11 @@ The forward-only ratchet installs against the new baseline: it cannot regress to
 
 > **Two deletion granularities (MMT-ADR-0026).** The "consent_grant blocked by RESTRICT" row above is the
 > *person-granularity* contract — the RESTRICT FKs on `guardianship`/`supportership`/`subscription` are
-> load-bearing and a single-person delete leaves those edges intact. The *whole-org erasure* row is the
-> second granularity: it removes the org and all its persons, so the incident relationship edges are torn
-> down rather than preserved. The legacy `accounts`-row erasure that an earlier audit posited (WI-849
+> load-bearing: they force the caller to sever/re-home first. A single-person delete now **tears down the
+> erased person's incident `guardianship`/`supportership` edges** in-transaction before the person drops
+> (WI-1985; the counterpart human is untouched); only `subscription` survives a person-scoped delete
+> (org-anchored). The *whole-org erasure* row is the second granularity: it removes the org and all its
+> persons, so the incident relationship edges are torn down rather than preserved. The legacy `accounts`-row erasure that an earlier audit posited (WI-849
 > Gap 2) does **not** apply on the v2-live environments — the legacy `accounts`/`profiles` tables were
 > dropped by the MMT-ADR-0012 baseline reset, so there is no legacy row to leave behind on the v2 path.
 
