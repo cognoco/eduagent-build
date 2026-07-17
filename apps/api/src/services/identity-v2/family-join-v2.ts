@@ -358,7 +358,12 @@ export async function acceptFamilyJoin(
       await tx
         .update(consentGrant)
         .set({ organizationId: familyOrgId })
-        .where(eq(consentGrant.organizationId, orgOfOneId));
+        .where(
+          and(
+            eq(consentGrant.organizationId, orgOfOneId),
+            eq(consentGrant.chargePersonId, teenPersonId),
+          ),
+        );
       // DELETE the org-of-one subscription (satisfies its payer + org RESTRICT;
       // subscription_payers + profile_quota_usage + quota_pools cascade off it).
       await tx

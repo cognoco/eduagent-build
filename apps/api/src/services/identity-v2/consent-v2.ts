@@ -301,7 +301,11 @@ export async function withdrawAdultSelfConsentV2(
       auditFact: { source: 'adult_self_withdrawal' },
     })
     .where(
-      and(eq(consentGrant.id, current.id), isNull(consentGrant.withdrawnAt)),
+      and(
+        eq(consentGrant.id, current.id),
+        eq(consentGrant.chargePersonId, chargePersonId),
+        isNull(consentGrant.withdrawnAt),
+      ),
     );
 
   return { chargePersonId, withdrawnAt: now };

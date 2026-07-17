@@ -39,7 +39,10 @@ import {
   membership,
   type Database,
 } from '@eduagent/database';
-import type { ConsentStatus } from '@eduagent/schemas';
+import type {
+  ConsentStatus,
+  ConsentAccountabilityRecord,
+} from '@eduagent/schemas';
 
 /** The default (and original) consent purpose — general platform use. */
 export const DEFAULT_CONSENT_PURPOSE = 'platform_use';
@@ -732,16 +735,6 @@ export function consentGateSatisfiedSql(personColumn: ReturnType<typeof sql>) {
 // ---------------------------------------------------------------------------
 // [WI-1193] Accountability report (AC3 — GDPR Art 5(2)/7(1))
 // ---------------------------------------------------------------------------
-
-/** One purpose's current consent state, as surfaced to an accountability report. */
-export interface ConsentAccountabilityRecord {
-  purpose: string;
-  lawfulBasis: string;
-  granted: boolean;
-  /** The moment consent (or terms acceptance, for `adult_self_consent`) was given. */
-  termsAcceptedAt: Date;
-  withdrawnAt: Date | null;
-}
 
 /**
  * [WI-1193 AC3] The CURRENT consent_grant row per (purpose, lawful_basis) for a

@@ -81,3 +81,17 @@ export const consentActionResultSchema = z.object({
   consentStatus: consentStatusSchema,
 });
 export type ConsentActionResult = z.infer<typeof consentActionResultSchema>;
+
+// [WI-1193 AC3] One purpose's current consent state, as surfaced to the
+// accountability report the api service's getConsentAccountabilityV2 returns
+// (GDPR Art 5(2)/7(1)). Client-facing (returned by an exported service
+// function), so the contract lives here — the service and the follow-up
+// accountability route share ONE definition instead of drifting.
+export interface ConsentAccountabilityRecord {
+  purpose: string;
+  lawfulBasis: string;
+  granted: boolean;
+  /** The moment consent (or terms acceptance, for `adult_self_consent`) was given. */
+  termsAcceptedAt: Date;
+  withdrawnAt: Date | null;
+}
