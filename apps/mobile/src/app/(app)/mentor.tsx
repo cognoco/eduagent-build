@@ -109,7 +109,6 @@ function LearnerMentorScreen(): React.ReactElement {
   >(new Set());
   const [showOverflow, setShowOverflow] = useState(false);
   const [showLightPractice, setShowLightPractice] = useState(false);
-  const [showBarClarification, setShowBarClarification] = useState(false);
   const overflow = useNowOverflow(showOverflow);
   const feed = nowFeed.data ?? nowFeed.fallbackFeed ?? undefined;
   const firstRealState = hasFirstRealState({
@@ -175,14 +174,12 @@ function LearnerMentorScreen(): React.ReactElement {
       })),
     });
     if (result.kind === 'jump') {
-      setShowBarClarification(false);
       pushNowDeepLink(router, result.deepLink, {
         subjectHubTarget: 'v2-subject-hub',
       });
       return;
     }
     if (result.kind === 'mentor') {
-      setShowBarClarification(false);
       router.push({
         pathname: '/(app)/session',
         params: {
@@ -194,7 +191,7 @@ function LearnerMentorScreen(): React.ReactElement {
       } as Href);
       return;
     }
-    setShowBarClarification(true);
+    setShowLightPractice(true);
   };
 
   const handleLightPractice = (route: LightPracticeRoute): void => {
@@ -309,7 +306,6 @@ function LearnerMentorScreen(): React.ReactElement {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        testID="mentor-scroll"
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 16 }}
         keyboardShouldPersistTaps="handled"
@@ -360,18 +356,6 @@ function LearnerMentorScreen(): React.ReactElement {
             onOpenHomework={() => pushMentorHomeworkCamera(router)}
             onTranscript={handleSubmitText}
           />
-
-          {showBarClarification ? (
-            <View
-              testID="mentor-bar-clarification"
-              accessibilityLiveRegion="polite"
-              className="rounded-xl border border-border bg-surface-elevated px-4 py-3"
-            >
-              <Text className="text-body-sm text-text-secondary">
-                {t('subject.clarifyLabel')}
-              </Text>
-            </View>
-          ) : null}
 
           {showLightPractice || (feed?.cards.length ?? 0) <= 1 ? (
             <LightPracticeAffordance

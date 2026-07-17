@@ -49,12 +49,6 @@ function hasQuestionShape(text: string): boolean {
   return /[?]$/.test(text) || /^(why|how|what|when|where|who)\b/.test(text);
 }
 
-function hasNavigationCommandShape(text: string): boolean {
-  return /^(open|show|go to|take me to|bring me to|navigate to|resume|continue|view|see|review|practice|challenge|test)\b/.test(
-    text,
-  );
-}
-
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -102,7 +96,7 @@ function resolveNameInText<T extends { id: string; name: string }>(
 function resolveByNameIndex(
   value: string,
   nameIndex: BarIntentNameIndex,
-): BarIntentResult | 'ambiguous' | null {
+): BarIntentResult | null {
   // Question-shaped input must not be intercepted as a navigation jump —
   // let it fall through to the mentor path so typed questions reach rawInput.
   if (hasQuestionShape(value)) return null;
@@ -112,7 +106,7 @@ function resolveByNameIndex(
 
   // Ambiguous = cannot commit to a single target → uncertain
   if (subjectResult === 'ambiguous' || topicResult === 'ambiguous') {
-    return 'ambiguous';
+    return null;
   }
 
   const subject = subjectResult === 'not-found' ? null : subjectResult;
@@ -269,9 +263,6 @@ export function matchBarIntent(
 
   if (nameIndex) {
     const nlResult = resolveByNameIndex(value, nameIndex);
-    if (nlResult === 'ambiguous') {
-      return { kind: 'uncertain', text: trimmed };
-    }
     if (nlResult !== null) return nlResult;
   }
 
@@ -285,9 +276,5 @@ export function matchBarIntent(
     return { kind: 'mentor', text: trimmed };
   }
 
-  if (hasNavigationCommandShape(value)) {
-    return { kind: 'uncertain', text: trimmed };
-  }
-
-  return { kind: 'mentor', text: trimmed };
+  return { kind: 'uncertain', text: trimmed };
 }
