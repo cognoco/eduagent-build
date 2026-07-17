@@ -45,7 +45,14 @@ function importedDatabaseNames(): string[] {
       `${SOURCE_PATH} no longer imports from '@eduagent/database' — update this guard`,
     );
   }
-  return importDecl.getNamedImports().map((named) => named.getName());
+  // Skip type-only specifiers (`import { type Foo } from ...` or a
+  // type-only whole import) — they don't exist at runtime, so checking them
+  // against the imported module's runtime values would false-fail.
+  if (importDecl.isTypeOnly()) return [];
+  return importDecl
+    .getNamedImports()
+    .filter((named) => !named.isTypeOnly())
+    .map((named) => named.getName());
 }
 
 describe('enduser-session-pass.ts seed-path database imports', () => {
