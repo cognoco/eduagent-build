@@ -77,6 +77,7 @@ export async function runSuitabilityJudge(
   let response: string;
   try {
     const result = await routeAndCall(messages, JUDGE_RUNG, {
+      capability: 'judge',
       flow: JUDGE_SUITABILITY_FLOW,
       preferredProvider,
       ageBracket: input.ageBracket,
