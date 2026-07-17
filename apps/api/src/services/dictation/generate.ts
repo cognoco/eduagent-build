@@ -234,11 +234,17 @@ export async function generateDictation(
   try {
     const parsed = JSON.parse(jsonStr);
     return generateDictationOutputSchema.parse(parsed);
-  } catch (parseErr) {
+  } catch {
+    // [WI-1990 rework] Do NOT pass the raw JSON.parse/Zod error to
+    // captureException — V8's SyntaxError message embeds a literal snippet
+    // of the malformed text (`Unexpected token 'S', "Sure! Here"...`), and
+    // jsonStr here is dictation content. Synthesize a content-free error
+    // carrying only length metadata, matching the
+    // services/llm/providers/errors.ts pattern.
     captureException(
-      parseErr instanceof Error
-        ? parseErr
-        : new Error('Dictation generate parse failed'),
+      new Error('Dictation generate parse failed', {
+        cause: { jsonStrLength: jsonStr.length },
+      }),
       { requestPath: 'services/dictation/generate' },
     );
     throw new UpstreamLlmError(

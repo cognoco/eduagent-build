@@ -11,7 +11,11 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
-import { captureException, scrubSentryEvent } from './services/sentry';
+import {
+  captureException,
+  scrubSentryEvent,
+  dropConsoleBreadcrumb,
+} from './services/sentry';
 import { CircuitOpenError } from './services/llm';
 import { isTransientDatabaseError } from './services/transient-db-retry';
 import {
@@ -637,6 +641,12 @@ export default Sentry.withSentry(
     // (learner free-text, names, etc.) from extra/contexts before an event
     // leaves the API. Not a substitute for call-site discipline.
     beforeSend: scrubSentryEvent,
+    // [WI-1990 rework] The SDK's default consoleIntegration() turns every
+    // console.* call into a breadcrumb with the raw args embedded in a
+    // string (message / data.arguments) — content a key-based scrubber
+    // can't reach. Drop console breadcrumbs entirely; see
+    // dropConsoleBreadcrumb's doc comment in services/sentry.ts.
+    beforeBreadcrumb: dropConsoleBreadcrumb,
   }),
   // Hono's app.fetch signature is compatible but not structurally identical
   // to ExportedHandler — cast via unknown to bridge the gap.

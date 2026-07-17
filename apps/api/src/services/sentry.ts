@@ -80,11 +80,23 @@ export function captureMessage(
 
 /**
  * Denylist of key names known to carry learner free-text (chat messages,
- * homework content) or other identifying data if it slips into a Sentry
- * event's `extra`/`contexts` despite call-site discipline. Call sites must
- * never pass raw learner text to `captureException`'s `extra` in the first
- * place — this is the defense-in-depth backstop `profile-scope.ts`'s
- * documented age-gated PII-scrubbing control refers to [WI-1990].
+ * homework content, raw/sampled LLM output that can echo learner input) or
+ * other identifying data if it slips into a Sentry event's `extra`/
+ * `contexts` despite call-site discipline. Call sites must never pass raw
+ * learner text to `captureException`'s `extra` in the first place — this is
+ * the defense-in-depth backstop `profile-scope.ts`'s documented age-gated
+ * PII-scrubbing control refers to [WI-1990].
+ *
+ * The LLM-output-sample entries (`jsonStrSample`, `rawSnippet`,
+ * `responsePreview`, `jsonStr`, `rawResponse`, `chunk`) exist because the
+ * codebase's own non-Sentry `logger.warn` call sites already use these exact
+ * field names for truncated raw-LLM-response slices (see
+ * `services/llm/providers/*.ts`, `services/curriculum.ts`,
+ * `services/session-recap.ts`, `services/llm/envelope.ts`,
+ * `services/monthly-report.ts`) — if one of those patterns is ever copied
+ * into a `captureException`/`captureMessage` call, this denylist makes the
+ * new site safe by default rather than relying on the copy-paste being
+ * caught in review.
  */
 const PII_DENYLIST_KEYS = new Set([
   'rawInput',
@@ -96,23 +108,110 @@ const PII_DENYLIST_KEYS = new Set([
   'messages',
   'content',
   'homeworkText',
+  // [WI-1990 rework] LLM-response-sample fields — see class-level rationale
+  // above. `jsonStrSample` was the confirmed leak (7 sibling call sites).
+  'jsonStrSample',
+  'rawSnippet',
+  'responsePreview',
+  'jsonStr',
+  'rawResponse',
+  'chunk',
 ]);
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Recursively strips denylisted keys from `obj`, descending into nested
+ * plain objects and arrays so a denylisted field is caught no matter how
+ * deep it is nested inside `extra`/`contexts` (or a breadcrumb's `data`).
+ */
+function scrubValue(value: unknown): unknown {
+  if (isPlainObject(value)) {
+    return scrubKeys(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(scrubValue);
+  }
+  return value;
+}
 
 function scrubKeys(obj: Record<string, unknown>): Record<string, unknown> {
   const scrubbed: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     if (!PII_DENYLIST_KEYS.has(key)) {
-      scrubbed[key] = value;
+      scrubbed[key] = scrubValue(value);
     }
   }
   return scrubbed;
 }
 
 /**
- * `beforeSend` scrubber for the API's Sentry init — strips denylisted
- * PII-bearing keys from `event.extra` and every `event.contexts` entry
- * before the event leaves the process. Defense-in-depth, not a substitute
- * for call-site discipline. [WI-1990]
+ * Matches the quoted literal snippet V8 embeds in a JSON.parse SyntaxError
+ * message once it recognizes the input isn't JSON, e.g.:
+ *   Unexpected token 'S', "Sure! Here'sthe answer to your..." is not valid JSON
+ * Older/other V8 shapes (`Unexpected token S in JSON at position 0`,
+ * `Unexpected end of JSON input`) carry no quoted snippet and are left as-is
+ * — only content actually embedded in quotes is redacted.
+ */
+const QUOTED_SNIPPET_PATTERN = /"[^"]*"/g;
+
+/**
+ * Recognizes the message shapes V8's JSON.parse throws for malformed input —
+ * the surface this backstop targets. Matched on message content, not
+ * `exception.type`, because a call site that already wraps the raw error
+ * (`new Error('parse failed', { cause: err })`) or re-throws under a
+ * different constructor still carries the same telltale phrase in `.message`.
+ */
+function isJsonParseSyntaxErrorMessage(value: string): boolean {
+  return (
+    value.includes('is not valid JSON') ||
+    value.includes('Unexpected end of JSON input') ||
+    (value.includes('Unexpected token') && value.includes('JSON')) ||
+    value.includes('Unexpected non-whitespace character after JSON')
+  );
+}
+
+/**
+ * Redacts the quoted snippet (if any) out of a recognized JSON.parse
+ * SyntaxError message, leaving the structural part intact for grouping.
+ */
+function redactJsonParseSyntaxErrorValue(value: string): string {
+  return value.replace(QUOTED_SNIPPET_PATTERN, '"[redacted]"');
+}
+
+/**
+ * `beforeSend` scrubber for the API's Sentry init — recursively strips
+ * denylisted PII-bearing keys from `event.extra`, every `event.contexts`
+ * entry, and every breadcrumb's `data`; also redacts any `JSON.parse`
+ * SyntaxError-shaped `exception.value` (see rationale below) before the
+ * event leaves the process. Defense-in-depth, not a substitute for
+ * call-site discipline. [WI-1990]
+ *
+ * [WI-1990 rework] `exception.type`/`exception.value` is the one Sentry
+ * event surface neither the key-based `extra`/`contexts`/breadcrumb
+ * scrubbing above nor `dropConsoleBreadcrumb` touches — it's not a keyed
+ * field and it's not a breadcrumb. `JSON.parse(malformedText)` throws a
+ * `SyntaxError` whose `.message` embeds a literal snippet of the malformed
+ * text (V8: `Unexpected token 'S', "Sure! Here'sthe answer"... is not valid
+ * JSON`); passing that error straight to `captureException` — as 5 sibling
+ * sites did before this rework (dictation/{prepare-homework,review,
+ * generate}.ts, quiz/generate-round.ts x2) — puts a slice of the LLM's raw
+ * response (which routinely echoes learner homework/quiz-answer content)
+ * directly into `exception.value`, unreachable by a scrubber that only
+ * rewrites `extra`/`contexts`/breadcrumb `data`. Those 5 sites were fixed at
+ * the source (they now synthesize a content-free `Error` carrying only a
+ * length in `cause`, per `services/llm/providers/errors.ts`'s established
+ * pattern — `cause` is a plain object, not an `Error`, so Sentry's default
+ * `linkedErrorsIntegration` — which only chains `cause` when it's itself an
+ * `Error` instance — never surfaces it). This redaction is the forward
+ * guard: a future 6th site that copies the pre-fix pattern (hands the raw
+ * `JSON.parse`/`schema.parse` catch error to `captureException`) is safe by
+ * default. Redacting the quoted snippet, rather than dropping the whole
+ * value, is also a grouping IMPROVEMENT, not a tradeoff — the raw snippet is
+ * high-cardinality (every malformed response groups as a new issue); the
+ * redacted structural message groups correctly.
  */
 export function scrubSentryEvent<T extends Sentry.ErrorEvent>(event: T): T {
   if (event.extra) {
@@ -125,7 +224,54 @@ export function scrubSentryEvent<T extends Sentry.ErrorEvent>(event: T): T {
       }
     }
   }
+  if (event.breadcrumbs) {
+    event.breadcrumbs = event.breadcrumbs.map((crumb) =>
+      crumb.data ? { ...crumb, data: scrubKeys(crumb.data) } : crumb,
+    );
+  }
+  if (event.exception?.values) {
+    event.exception.values = event.exception.values.map((exceptionValue) =>
+      typeof exceptionValue.value === 'string' &&
+      isJsonParseSyntaxErrorMessage(exceptionValue.value)
+        ? {
+            ...exceptionValue,
+            value: redactJsonParseSyntaxErrorValue(exceptionValue.value),
+          }
+        : exceptionValue,
+    );
+  }
   return event;
+}
+
+/**
+ * `beforeBreadcrumb` hook for the API's Sentry init — drops every breadcrumb
+ * the SDK's default `consoleIntegration()` produces from `console.*` calls.
+ *
+ * [WI-1990 rework] `@sentry/cloudflare`'s default integrations include
+ * `consoleIntegration()` (not opted into explicitly — it's on by default
+ * because `index.ts`'s `Sentry.withSentry()` init does not override
+ * `integrations`). It monkey-patches `console.*` and records every call as a
+ * breadcrumb shaped `{ category: 'console', message: <formatted args>,
+ * data: { arguments: <raw args>, logger: 'console' } }`. This app's
+ * `services/logger.ts` does `console.warn(JSON.stringify(entry))`, so the
+ * ENTIRE serialized structured-log entry — including any `rawSnippet`/
+ * `responsePreview`/`chunk`-style raw-LLM-output field a `logger.warn` call
+ * carries — lands as an opaque STRING inside `breadcrumb.message` and
+ * `breadcrumb.data.arguments[0]`. `scrubSentryEvent`'s key-based denylist
+ * cannot reach content buried inside a string, so the console breadcrumb is
+ * a full bypass of the scrubber — the vector must be killed at the source,
+ * not string-matched. Every `console.*` call anywhere in the API becomes a
+ * Sentry breadcrumb by default, so this drops the entire category rather
+ * than attempting to distinguish "safe" console calls from unsafe ones —
+ * the app already has structured logs (`services/logger.ts`, shipped via
+ * Cloudflare Workers Logpush) and Sentry events (`captureException`/
+ * `captureMessage`) for observability; console breadcrumbs on top of those
+ * are not load-bearing.
+ */
+export function dropConsoleBreadcrumb(
+  breadcrumb: Sentry.Breadcrumb,
+): Sentry.Breadcrumb | null {
+  return breadcrumb.category === 'console' ? null : breadcrumb;
 }
 
 /**

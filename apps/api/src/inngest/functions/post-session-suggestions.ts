@@ -218,7 +218,9 @@ Suggest exactly 2 new topic titles that would be natural next steps within this 
           extra: {
             surface: 'post-session-suggestions',
             reason: 'invalid_json',
-            jsonStrSample: jsonStr.slice(0, 200),
+            // [WI-1990] Length only — a slice of the LLM's suggestions JSON
+            // can echo learner-entered content. Never send raw content.
+            jsonStrLength: jsonStr.length,
           },
         });
         return {

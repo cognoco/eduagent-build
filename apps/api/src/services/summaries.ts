@@ -154,7 +154,9 @@ function parseSummaryEvaluation(response: string): SummaryEvaluation {
           extra: {
             surface: 'summary-evaluation',
             reason: 'invalid_schema',
-            jsonStrSample: jsonStr.slice(0, 200),
+            // [WI-1990] Length only — a slice of the LLM's evaluation JSON
+            // can echo the learner's summary text. Never send raw content.
+            jsonStrLength: jsonStr.length,
           },
         });
         summariesLogger.warn(
@@ -185,7 +187,9 @@ function parseSummaryEvaluation(response: string): SummaryEvaluation {
         extra: {
           surface: 'summary-evaluation',
           reason: 'invalid_json',
-          jsonStrSample: jsonStr.slice(0, 200),
+          // [WI-1990] Length only — a slice of the LLM's evaluation JSON
+          // can echo the learner's summary text. Never send raw content.
+          jsonStrLength: jsonStr.length,
         },
       });
       summariesLogger.warn(
