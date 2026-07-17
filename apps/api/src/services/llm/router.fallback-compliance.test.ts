@@ -171,3 +171,88 @@ describe('flag-off: V2 selector is inert (legacy fallback preserved)', () => {
     expect(fb?.provider).toBe('gemini');
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-1986] legacy fallback path never routes under-18 learners to Gemini.
+//
+// getFallbackConfig took no ageBracket parameter and returned Gemini
+// unconditionally on the legacy (V2-off) path when Gemini was registered —
+// the same class of bug WI-1052 fixed for getModelConfig's PRIMARY selection
+// (see router.test.ts's "[WI-1052] legacy path never routes under-18 learners
+// to Gemini" describe block). GEMINI_API_KEY is a required boot key, so this
+// branch is always live; production is safe only because
+// LLM_ROUTING_V2_ENABLED=true, which defaults to false (config.ts) — any
+// default-config environment, or an incident rollback of the flag, serves
+// Gemini to minors on primary failure.
+//
+// RED-GREEN (Fix Development Rules): the fix is the isUnder18AgeBracket(...)
+// gate added at the top of getFallbackConfig's legacy body (mirroring the
+// getModelConfig gate at router.ts:908). Remove that gate and the [BREAK]
+// test below FAILS — a 'child'/'adolescent' ageBracket with a failed
+// Anthropic/OpenAI primary and Gemini registered resolves to
+// `{ provider: 'gemini' }`. Restore the gate → green.
+// ---------------------------------------------------------------------------
+describe('[WI-1986] legacy fallback path never routes under-18 learners to Gemini', () => {
+  beforeEach(() => {
+    setLlmRoutingV2Enabled(false);
+  });
+
+  it('[BREAK] a minor (child) pairs with a failing Anthropic primary on the legacy path — never falls back to Gemini', () => {
+    // Prod-like: Gemini IS registered (required boot key) alongside an
+    // approved non-banned provider.
+    registerProvider(createMockProvider('gemini'));
+    registerProvider(createMockProvider('cerebras'));
+
+    const fb = getFallbackConfigForTest(primary('anthropic'), 1, {
+      ageBracket: 'child',
+    });
+
+    expect(fb?.provider).not.toBe('gemini');
+    expect(fb?.provider).not.toBe('vertex');
+    expect(fb?.provider).toBe('cerebras');
+  });
+
+  it('an adolescent pairs with a failing OpenAI primary on the legacy path — never falls back to Gemini', () => {
+    registerProvider(createMockProvider('gemini'));
+    registerProvider(createMockProvider('cerebras'));
+
+    const fb = getFallbackConfigForTest(primary('openai', 'gpt-4o'), 1, {
+      ageBracket: 'adolescent',
+    });
+
+    expect(fb?.provider).not.toBe('gemini');
+    expect(fb?.provider).toBe('cerebras');
+  });
+
+  it('a minor with no non-banned vendor registered fails closed (throws) rather than falling back to Gemini', () => {
+    // Only Gemini is registered — no approved text provider (cerebras /
+    // anthropic / openai) exists for approvedTextFallbackConfig to select.
+    registerProvider(createMockProvider('gemini'));
+
+    expect(() =>
+      getFallbackConfigForTest(primary('anthropic'), 1, {
+        ageBracket: 'child',
+      }),
+    ).toThrow(/no approved.*provider registered/i);
+  });
+
+  it('adult + failing Anthropic primary still falls back to Gemini on the legacy path (no regression)', () => {
+    registerProvider(createMockProvider('gemini'));
+    registerProvider(createMockProvider('cerebras'));
+
+    const fb = getFallbackConfigForTest(primary('anthropic'), 1, {
+      ageBracket: 'adult',
+    });
+
+    expect(fb?.provider).toBe('gemini');
+  });
+
+  it('age-unknown (no ageBracket, system calls) still falls back to Gemini on the legacy path (no regression)', () => {
+    registerProvider(createMockProvider('gemini'));
+    registerProvider(createMockProvider('cerebras'));
+
+    const fb = getFallbackConfigForTest(primary('anthropic'), 1);
+
+    expect(fb?.provider).toBe('gemini');
+  });
+});
