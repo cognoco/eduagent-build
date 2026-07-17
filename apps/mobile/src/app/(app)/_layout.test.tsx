@@ -972,6 +972,163 @@ describe('AppLayout', () => {
     }
   });
 
+  it.each([
+    { caseName: '360x760 web', safeAreaTop: 0 },
+    { caseName: 'native safe area', safeAreaTop: 47 },
+  ])(
+    'reserves the complete fixed v2 chrome once for pushed routes on $caseName',
+    async ({ safeAreaTop }) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+        mockSafeAreaInsets = {
+          top: safeAreaTop,
+          bottom: 0,
+          left: 0,
+          right: 0,
+        };
+        mockUsePathname.mockReturnValue('/mentor-memory');
+
+        renderLayout();
+
+        const avatarShell = await screen.findByTestId('account-avatar-shell', {
+          includeHiddenElements: true,
+        });
+        const avatarTop = Math.max(safeAreaTop, 24) + 8;
+        expect(avatarShell).toHaveStyle({ top: avatarTop });
+
+        const tabs = await screen.findByTestId('tabs');
+        const screenOptions = tabs.props.screenOptions as ({
+          route,
+        }: {
+          route: { name: string };
+        }) => { sceneStyle: { paddingTop: number } };
+        const expectedPushedPadding = avatarTop + 44 - safeAreaTop;
+
+        for (const routeName of [
+          'mentor-memory',
+          'more/accommodation',
+          'subscription',
+          'more',
+        ]) {
+          const scenePadding = screenOptions({
+            route: { name: routeName },
+          }).sceneStyle.paddingTop;
+          expect(scenePadding).toBe(expectedPushedPadding);
+          expect(scenePadding + safeAreaTop).toBe(avatarTop + 44);
+        }
+
+        for (const routeName of ['mentor', 'subjects', 'journal']) {
+          expect(
+            screenOptions({ route: { name: routeName } }).sceneStyle.paddingTop,
+          ).toBe(Math.max(safeAreaTop, 24));
+        }
+
+        for (const routeName of ['account', 'session']) {
+          expect(
+            screenOptions({ route: { name: routeName } }).sceneStyle.paddingTop,
+          ).toBe(0);
+        }
+      } finally {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = original;
+      }
+    },
+  );
+
+  it('keeps pushed content below chrome that grows for font scaling or long scope labels', async () => {
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    try {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = true;
+      mockSafeAreaInsets = { top: 47, bottom: 0, left: 0, right: 0 };
+      mockUsePathname.mockReturnValue('/more/accommodation');
+
+      renderLayout();
+
+      const scopeShell = await screen.findByTestId('scope-chip-shell', {
+        includeHiddenElements: true,
+      });
+      fireEvent(scopeShell, 'layout', {
+        nativeEvent: { layout: { height: 64 } },
+      });
+
+      const tabs = await screen.findByTestId('tabs');
+      const screenOptions = tabs.props.screenOptions as ({
+        route,
+      }: {
+        route: { name: string };
+      }) => { sceneStyle: { paddingTop: number } };
+      const scenePadding = screenOptions({
+        route: { name: 'more/accommodation' },
+      }).sceneStyle.paddingTop;
+
+      expect(scenePadding + mockSafeAreaInsets.top).toBe(47 + 8 + 64);
+    } finally {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = original;
+    }
+  });
+
+  it.each([
+    { caseName: 'flags-off', v0: false, v1: false },
+    { caseName: 'V0', v0: true, v1: false },
+    { caseName: 'V1', v0: true, v1: true },
+  ])(
+    'does not add v2 pushed-scene clearance to the $caseName shell',
+    async ({ v0, v1 }) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: {
+          MODE_NAV_V0_ENABLED: boolean;
+          MODE_NAV_V1_ENABLED: boolean;
+          MODE_NAV_V2_ENABLED: boolean;
+        };
+      };
+      const original = { ...flags.FEATURE_FLAGS };
+      try {
+        Object.assign(flags.FEATURE_FLAGS, {
+          MODE_NAV_V0_ENABLED: v0,
+          MODE_NAV_V1_ENABLED: v1,
+          MODE_NAV_V2_ENABLED: false,
+        });
+        mockSafeAreaInsets = { top: 47, bottom: 34, left: 0, right: 0 };
+        mockUsePathname.mockReturnValue('/mentor-memory');
+
+        renderLayout();
+
+        const tabs = await screen.findByTestId('tabs');
+        const screenOptions = tabs.props.screenOptions as ({
+          route,
+        }: {
+          route: { name: string };
+        }) => { sceneStyle: { paddingTop: number } };
+
+        expect(
+          screenOptions({ route: { name: 'mentor-memory' } }).sceneStyle
+            .paddingTop,
+        ).toBe(0);
+        expect(
+          screen.queryByTestId('account-avatar-shell', {
+            includeHiddenElements: true,
+          }),
+        ).toBeNull();
+      } finally {
+        Object.assign(flags.FEATURE_FLAGS, original);
+      }
+    },
+  );
+
   it('shows proxy banner and switches back to the owner profile', async () => {
     const switchProfile = jest.fn();
     mockUseProfile.mockReturnValue({
@@ -997,6 +1154,15 @@ describe('AppLayout', () => {
 
     // await: probe-state effect must resolve before the tabs+banner render.
     await screen.findByTestId('proxy-banner');
+    const tabs = await screen.findByTestId('tabs');
+    const screenOptions = tabs.props.screenOptions as ({
+      route,
+    }: {
+      route: { name: string };
+    }) => { sceneStyle: { paddingTop: number } };
+    expect(
+      screenOptions({ route: { name: 'mentor-memory' } }).sceneStyle.paddingTop,
+    ).toBe(0);
     // Exact match — a regression that breaks the {{name}} interpolation
     // ("Viewing as " with an empty/literal name) would slip past the broader
     // /Viewing as/ regex. test-setup.ts initializes i18next synchronously

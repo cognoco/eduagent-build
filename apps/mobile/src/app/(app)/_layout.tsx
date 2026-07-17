@@ -128,6 +128,8 @@ const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
 const DEFAULT_AUTH_REDIRECT_PATH = '/(app)/home';
 const PREVIEW_PROBE_TIMEOUT_MS = 2_500;
 const V2_CHROME_MIN_TOP_INSET = 24;
+const V2_CHROME_CONTROL_TOP_GAP = 8;
+const V2_CHROME_CONTROL_HEIGHT = 44;
 const V2_TAB_BAR_MIN_BOTTOM_INSET = 48;
 
 const iconMap: Record<
@@ -166,6 +168,12 @@ export default function AppLayout() {
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
+  const [scopeChipHeight, setScopeChipHeight] = React.useState(
+    V2_CHROME_CONTROL_HEIGHT,
+  );
+  const [accountAvatarHeight, setAccountAvatarHeight] = React.useState(
+    V2_CHROME_CONTROL_HEIGHT,
+  );
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -645,6 +653,11 @@ export default function AppLayout() {
   const chromeTopInset = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
     ? Math.max(insets.top, V2_CHROME_MIN_TOP_INSET)
     : insets.top;
+  const pushedSceneTopInset =
+    chromeTopInset +
+    V2_CHROME_CONTROL_TOP_GAP +
+    Math.max(scopeChipHeight, accountAvatarHeight) -
+    insets.top;
   const tabBarBottomInset = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
     ? Math.max(insets.bottom, V2_TAB_BAR_MIN_BOTTOM_INSET)
     : Math.max(insets.bottom, 24);
@@ -669,8 +682,16 @@ export default function AppLayout() {
           {showScopeChip ? (
             <View
               className="absolute left-4 z-40"
-              style={{ top: chromeTopInset + 8 }}
+              style={{ top: chromeTopInset + V2_CHROME_CONTROL_TOP_GAP }}
               testID="scope-chip-shell"
+              onLayout={(event) =>
+                setScopeChipHeight(
+                  Math.max(
+                    V2_CHROME_CONTROL_HEIGHT,
+                    Math.ceil(event.nativeEvent.layout.height),
+                  ),
+                )
+              }
             >
               <ScopeChip />
             </View>
@@ -678,8 +699,16 @@ export default function AppLayout() {
           {showAccountAvatar ? (
             <View
               className="absolute right-4 z-40"
-              style={{ top: chromeTopInset + 8 }}
+              style={{ top: chromeTopInset + V2_CHROME_CONTROL_TOP_GAP }}
               testID="account-avatar-shell"
+              onLayout={(event) =>
+                setAccountAvatarHeight(
+                  Math.max(
+                    V2_CHROME_CONTROL_HEIGHT,
+                    Math.ceil(event.nativeEvent.layout.height),
+                  ),
+                )
+              }
             >
               <AccountAvatar />
             </View>
@@ -703,14 +732,13 @@ export default function AppLayout() {
                 // An opaque sceneStyle prevents the previous tab from bleeding
                 // through when switching to a full-screen route (session, quiz, etc.).
                 //
-                // V2 tab scenes (mentor/subjects/journal) own their header row,
-                // but the shell renders no native header (headerShown:false) and
-                // the floating chrome (account avatar, scope chip) is absolutely
-                // positioned — it reserves no layout space. Without a top inset the
-                // screen's own header rides up under the status bar. Pad the scene
-                // down by chromeTopInset so the header aligns with the chrome band.
-                // Full-screen routes (session/quiz/etc.) manage their own layout, and
-                // proxy chrome uses the ProxyBanner for top spacing — both opt out.
+                // The floating V2 chrome (account avatar, scope chip) is absolutely
+                // positioned and reserves no layout space. Top-level tab scenes own
+                // their header row, so they retain the shell's safe-area inset.
+                // Pushed scenes already apply their own safe-area padding; reserve
+                // only the remaining fixed control band here so the safe area and
+                // chrome are each counted exactly once. Full-screen routes and proxy
+                // chrome manage their own top spacing and opt out.
                 sceneStyle: {
                   backgroundColor: isProxyChromeActive
                     ? proxyColors.sceneBackground
@@ -719,7 +747,9 @@ export default function AppLayout() {
                     FEATURE_FLAGS.MODE_NAV_V2_ENABLED &&
                     !isProxyChromeActive &&
                     !isFullScreen
-                      ? chromeTopInset
+                      ? isVisible
+                        ? chromeTopInset
+                        : pushedSceneTopInset
                       : 0,
                 },
                 tabBarStyle: isFullScreen
