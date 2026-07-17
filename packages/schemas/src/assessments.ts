@@ -379,10 +379,9 @@ export type TopicRetentionResponse = z.infer<
 
 // Recall test result — RemediationSchema is embedded here to avoid circular imports
 const recallRemediationSchema = z.object({
-  // [WI-1462] 'topic_parked' — the 2nd consecutive failure after the
-  // bounded re-teach off-ramp (RR-4); review-and-retest/relearn stay
-  // explicit fallback choices, not a forced library redirect.
-  action: z.literal('topic_parked'),
+  // Wire value stays 'redirect_to_library' for backward compat with clients
+  // built against the pre-WI-1462 contract — see offRampStage below.
+  action: z.literal('redirect_to_library'),
   topicId: z.string().uuid(),
   topicTitle: z.string(),
   // [SC-02] Use canonical enum (retentionStatusSchema) instead of bare z.string().
@@ -399,11 +398,18 @@ export const recallTestResultSchema = z.object({
   nextReviewAt: isoDateField,
   failureCount: z.number().int(),
   hint: z.string().optional(),
-  // [WI-1462] 're_teach' — 3rd failure, bounded same-flow off-ramp;
-  // 'topic_parked' — 4th+ failure, warm exit (see recallRemediationSchema).
-  failureAction: z
-    .enum(['feedback_only', 're_teach', 'topic_parked'])
-    .optional(),
+  // [WI-1462] Wire-compatible values only — unchanged from the pre-WI-1462
+  // contract so a client built against the old schema still parses this
+  // response. A client on the old schema that reaches the 3rd/4th failure
+  // sees exactly its old behavior (feedback_only retry, then a
+  // redirect_to_library remediation card) rather than a schema-parse error.
+  failureAction: z.enum(['feedback_only', 'redirect_to_library']).optional(),
+  // [WI-1462] Additive discriminator, new key — an old client's non-strict
+  // z.object simply ignores an unrecognized extra key, so this never breaks
+  // an old parse. Present alongside failureAction='redirect_to_library' to
+  // tell a client on the NEW schema whether this is the bounded 3rd-failure
+  // re-teach off-ramp or the 4th+-failure park.
+  offRampStage: z.enum(['re_teach', 'topic_parked']).optional(),
   remediation: recallRemediationSchema.optional(),
   cooldownActive: z.boolean().optional(),
   cooldownEndsAt: isoDateField.optional(),

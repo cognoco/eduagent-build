@@ -154,6 +154,19 @@ export default function RecallTestScreen() {
                   releaseSubmissionBlock();
                 },
               );
+            } else if (result.offRampStage === 're_teach') {
+              // [WI-1462 / RR-4] 3rd failure — bounded, same-flow re-teach
+              // off-ramp in a different style (warm copy, no punishment
+              // framing). Input stays enabled — no navigation yet.
+              // offRampStage is checked before failureAction: on the wire,
+              // failureAction still reports 'feedback_only' for this case
+              // (backward compat for a client without offRampStage).
+              cleanupRef.current = animateResponse(
+                result.hint ?? t('topic.recallTest.reTeach'),
+                setMessages,
+                setIsStreaming,
+                releaseSubmissionBlock,
+              );
             } else if (result.failureAction === 'feedback_only') {
               // Under 3 failures — encourage retry
               cleanupRef.current = animateResponse(
@@ -162,19 +175,11 @@ export default function RecallTestScreen() {
                 setIsStreaming,
                 releaseSubmissionBlock,
               );
-            } else if (result.failureAction === 're_teach') {
-              // [WI-1462 / RR-4] 3rd failure — bounded, same-flow re-teach
-              // off-ramp in a different style (warm copy, no punishment
-              // framing). Input stays enabled — no navigation yet.
-              cleanupRef.current = animateResponse(
-                result.hint ?? t('topic.recallTest.reTeach'),
-                setMessages,
-                setIsStreaming,
-                releaseSubmissionBlock,
-              );
-            } else if (result.failureAction === 'topic_parked') {
+            } else if (result.failureAction === 'redirect_to_library') {
               // [WI-1462 / RR-4] 2nd consecutive failure after re-teach —
               // exit warmly by parking the topic; show remediation card.
+              // (offRampStage is 'topic_parked' here; failureAction alone —
+              // its pre-WI-1462 wire value — is enough to route this branch.)
               cleanupRef.current = animateResponse(
                 t('topic.recallTest.needsReview'),
                 setMessages,
@@ -304,10 +309,10 @@ export default function RecallTestScreen() {
           if (token !== submissionTokenRef.current) return;
           setDontRememberPending(false);
           // [WI-1462 / RR-4] Trust the server-authoritative failureAction —
-          // it already reaches topic_parked at the 2nd consecutive failure
-          // after re-teach (bounded exactly at the 3rd/4th real failure), so
-          // no local dontRememberCount>=2 shortcut is needed.
-          if (result.failureAction === 'topic_parked') {
+          // it already reaches the parked state at the 2nd consecutive
+          // failure after re-teach (bounded exactly at the 3rd/4th real
+          // failure), so no local dontRememberCount>=2 shortcut is needed.
+          if (result.failureAction === 'redirect_to_library') {
             cleanupRef.current = animateResponse(
               t('topic.recallTest.dontRememberReviewPrompt'),
               setMessages,

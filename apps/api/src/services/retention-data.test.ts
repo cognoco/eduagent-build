@@ -44,6 +44,7 @@ jest.mock(
   },
 );
 
+import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import {
   createScopedRepository,
@@ -985,7 +986,11 @@ describe('processRecallTest', () => {
 
     expect(result.passed).toBe(false);
     expect(result.failureCount).toBe(3);
-    expect(result.failureAction).toBe('re_teach');
+    // [WI-1462] Wire-compatible failureAction stays 'feedback_only' (backward
+    // compat with a client on the pre-WI-1462 schema); the new offRampStage
+    // discriminator carries the re_teach distinction for a client that reads it.
+    expect(result.failureAction).toBe('feedback_only');
+    expect(result.offRampStage).toBe('re_teach');
     // Bounded off-ramp, same flow — no library/relearn navigation yet.
     expect(result.remediation).toBeUndefined();
     // Same-flow re-teach in a different style (AC-2): a topic-specific hint,
@@ -1024,9 +1029,12 @@ describe('processRecallTest', () => {
 
     expect(result.passed).toBe(false);
     expect(result.failureCount).toBe(4);
-    expect(result.failureAction).toBe('topic_parked');
+    // [WI-1462] Wire-compatible failureAction stays 'redirect_to_library'
+    // (backward compat); offRampStage carries the topic_parked distinction.
+    expect(result.failureAction).toBe('redirect_to_library');
+    expect(result.offRampStage).toBe('topic_parked');
     expect(result.remediation).toEqual(expect.objectContaining({}));
-    expect(result.remediation!.action).toBe('topic_parked');
+    expect(result.remediation!.action).toBe('redirect_to_library');
     expect(result.remediation!.topicId).toBe(topicId);
     expect(result.remediation!.topicTitle).toBe('Topic 1');
     expect(result.remediation!.retentionStatus).toBe('weak');
@@ -1040,6 +1048,85 @@ describe('processRecallTest', () => {
     expect(getRetentionStatus).toHaveBeenCalledWith(
       expect.objectContaining({ failureCount: 4 }),
     );
+  });
+
+  // [WI-1462] Backward-compat regression: a mobile client built against the
+  // pre-WI-1462 contract still has this schema shape frozen in its bundle.
+  // Assert the NEW response validates against it — proves an old client can
+  // still parse a 3rd/4th-failure response instead of throwing
+  // ApiResponseShapeError (parseJson's failure mode on a schema mismatch).
+  it('remains parseable by the pre-WI-1462 response schema (re_teach and topic_parked)', async () => {
+    const preWi1462Schema = z.object({
+      passed: z.boolean(),
+      masteryScore: z.number(),
+      xpChange: z.string(),
+      nextReviewAt: z.string(),
+      failureCount: z.number().int(),
+      hint: z.string().optional(),
+      failureAction: z
+        .enum(['feedback_only', 'redirect_to_library'])
+        .optional(),
+      remediation: z
+        .object({
+          action: z.literal('redirect_to_library'),
+          topicId: z.string().uuid(),
+          topicTitle: z.string(),
+          retentionStatus: z.string(),
+          failureCount: z.number().int(),
+          cooldownEndsAt: z.string(),
+          options: z.array(z.enum(['review_and_retest', 'relearn_topic'])),
+        })
+        .optional(),
+      cooldownActive: z.boolean().optional(),
+      cooldownEndsAt: z.string().optional(),
+    });
+
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.1,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 3,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 're_teach',
+    });
+    const reTeachResult = await processRecallTest(createMockDb(), profileId, {
+      topicId,
+      answer: 'Short',
+    });
+    expect(preWi1462Schema.safeParse(reTeachResult).success).toBe(true);
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.1,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 4,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'topic_parked',
+    });
+    (getRetentionStatus as jest.Mock).mockReturnValue('weak');
+    const parkedResult = await processRecallTest(createMockDb(), profileId, {
+      topicId,
+      answer: 'Short',
+    });
+    expect(preWi1462Schema.safeParse(parkedResult).success).toBe(true);
   });
 
   it('persists failureCount: 0 on successful recall (FR52-58 reset)', async () => {
@@ -1114,7 +1201,8 @@ describe('processRecallTest', () => {
     expect(result.remediation).toEqual(expect.objectContaining({}));
     expect(result.remediation!.topicId).toBe(topicId);
     expect(result.remediation!.topicTitle).toBe('Topic 1');
-    expect(result.remediation!.action).toBe('topic_parked');
+    // [WI-1462] Wire-compatible action value — backward compat.
+    expect(result.remediation!.action).toBe('redirect_to_library');
     expect(result.remediation!.retentionStatus).toBe('forgotten');
     expect(result.remediation!.failureCount).toBe(4);
   });

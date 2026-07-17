@@ -823,7 +823,9 @@ export async function getAssessmentEligibleTopics(
 const RETEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export interface RecallTestRemediation {
-  action: 'topic_parked';
+  // Wire value stays 'redirect_to_library' for backward compat with clients
+  // built against the pre-WI-1462 contract — see offRampStage below.
+  action: 'redirect_to_library';
   topicId: string;
   topicTitle: string;
   retentionStatus: string;
@@ -839,7 +841,12 @@ export interface RecallTestResponse {
   nextReviewAt: string;
   failureCount: number;
   hint?: string;
-  failureAction?: 'feedback_only' | 're_teach' | 'topic_parked';
+  // [WI-1462] Wire-compatible values only — see the matching comment on
+  // recallTestResultSchema in @eduagent/schemas.
+  failureAction?: 'feedback_only' | 'redirect_to_library';
+  // [WI-1462] Additive discriminator for a client on the NEW schema; an old
+  // client's non-strict response parse ignores this extra key.
+  offRampStage?: 're_teach' | 'topic_parked';
   remediation?: RecallTestRemediation;
   cooldownActive?: boolean;
   cooldownEndsAt?: string;
@@ -1191,13 +1198,32 @@ export async function processRecallTest(
     { profileId, topicId: input.topicId },
   );
 
+  // [WI-1462] Map the internal (feedback_only/re_teach/topic_parked) state to
+  // the wire-compatible failureAction ('feedback_only'/'redirect_to_library')
+  // plus the new additive offRampStage discriminator. A client on the
+  // pre-WI-1462 schema never sees 're_teach'/'topic_parked' on failureAction
+  // and safely ignores the unrecognized offRampStage key, so it degrades to
+  // its old (still correct) behavior instead of a schema-parse error.
+  const wireFailureAction: RecallTestResponse['failureAction'] =
+    result.failureAction === 're_teach'
+      ? 'feedback_only'
+      : result.failureAction === 'topic_parked'
+        ? 'redirect_to_library'
+        : result.failureAction;
+  const offRampStage: RecallTestResponse['offRampStage'] =
+    result.failureAction === 're_teach' ||
+    result.failureAction === 'topic_parked'
+      ? result.failureAction
+      : undefined;
+
   const response: RecallTestResponse = {
     passed: result.passed,
     masteryScore,
     xpChange: result.xpChange,
     nextReviewAt: result.newState.nextReviewAt ?? new Date().toISOString(),
     failureCount: result.newState.failureCount,
-    failureAction: result.failureAction,
+    failureAction: wireFailureAction,
+    offRampStage,
   };
 
   // [WI-1462] Also build a hint on a typed (non-dont_remember) answer that
@@ -1220,7 +1246,7 @@ export async function processRecallTest(
     ).toISOString();
 
     response.remediation = {
-      action: 'topic_parked',
+      action: 'redirect_to_library',
       topicId: input.topicId,
       topicTitle,
       retentionStatus,

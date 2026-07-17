@@ -203,7 +203,8 @@ describe('RecallTestScreen', () => {
       {
         passed: false,
         failureCount: 4,
-        failureAction: 'topic_parked',
+        failureAction: 'redirect_to_library',
+        offRampStage: 'topic_parked',
         remediation: {
           cooldownEndsAt: '2026-03-30T18:30:00.000Z',
           suggestionText: 'Review the topic again.',
@@ -249,7 +250,8 @@ describe('RecallTestScreen', () => {
       {
         passed: false,
         failureCount: 4,
-        failureAction: 'topic_parked',
+        failureAction: 'redirect_to_library',
+        offRampStage: 'topic_parked',
         remediation: {
           cooldownEndsAt: '2026-03-30T18:30:00.000Z',
           retentionStatus: 'forgotten',
@@ -273,7 +275,8 @@ describe('RecallTestScreen', () => {
       {
         passed: false,
         failureCount: 3,
-        failureAction: 're_teach',
+        failureAction: 'feedback_only',
+        offRampStage: 're_teach',
         hint: 'Here is a hint framed differently.',
       },
     ];
@@ -301,7 +304,8 @@ describe('RecallTestScreen', () => {
       {
         passed: false,
         failureCount: 4,
-        failureAction: 'topic_parked',
+        failureAction: 'redirect_to_library',
+        offRampStage: 'topic_parked',
         remediation: {
           cooldownEndsAt: '2026-03-30T18:30:00.000Z',
           retentionStatus: 'forgotten',
@@ -520,7 +524,8 @@ describe('RecallTestScreen', () => {
       {
         passed: false,
         failureCount: 4,
-        failureAction: 'topic_parked',
+        failureAction: 'redirect_to_library',
+        offRampStage: 'topic_parked',
         remediation: {
           cooldownEndsAt: '2026-03-30T18:30:00.000Z',
           retentionStatus: 'forgotten',
