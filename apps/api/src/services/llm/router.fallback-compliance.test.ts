@@ -255,4 +255,31 @@ describe('[WI-1986] legacy fallback path never routes under-18 learners to Gemin
 
     expect(fb?.provider).toBe('gemini');
   });
+
+  // [WI-1986 rework] The under-18 gate above returns
+  // approvedTextFallbackConfig(...) directly, BEFORE the `shared` object
+  // (responseFormat/conversationLanguage carried from primary) is applied to
+  // every other branch in this function. A minor's fallback config silently
+  // lost the JSON envelope flag and the tutor-prose language — see the
+  // regression finding on the original fix.
+  it('a minor fallback preserves responseFormat and conversationLanguage from the primary', () => {
+    registerProvider(createMockProvider('gemini'));
+    registerProvider(createMockProvider('cerebras'));
+
+    const childPrimary: ModelConfig = {
+      provider: 'anthropic',
+      model: 'x',
+      maxTokens: 8192,
+      responseFormat: 'json',
+      conversationLanguage: 'es',
+    };
+
+    const fb = getFallbackConfigForTest(childPrimary, 1, {
+      ageBracket: 'child',
+    });
+
+    expect(fb?.provider).not.toBe('gemini');
+    expect(fb?.responseFormat).toBe('json');
+    expect(fb?.conversationLanguage).toBe('es');
+  });
 });
