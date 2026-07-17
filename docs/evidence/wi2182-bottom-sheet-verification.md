@@ -13,26 +13,35 @@ sheet content.
 
 ## Provenance
 
-- **Verified base:** `3b0fa9337fb60cef7bba8383314b7a61c0abc54b`
-  (`origin/main` after the additive merge).
-- **Verified implementation candidate:**
+- **Verified implementation base:** `3b0fa9337fb60cef7bba8383314b7a61c0abc54b`
+  (`origin/main` after the additive implementation merge).
+- **PR base when the review fix was pushed:**
+  `be762cbc6392cb1622455fd2cdd4ac8ec27dcd3d`.
+- **Pre-review implementation candidate:**
   `9eb280d462a4df7cb12110282de2107ce225c17f`.
 - **Implementation commit added in review cycle 3:**
   `2898f76edb1e28e55c4379884024c17dade3e243`.
-- This document is a documentation-only descendant of the verified implementation
-  candidate. Review should use the submitted branch head while treating the exact
-  candidate above as the tree exercised by the post-merge commands below.
+- **Verified review-fix code candidate:**
+  `dec0a87ec463c66590a1210969b0f68eabad9ff3`.
+- This evidence update is a documentation-only descendant of the verified review-fix
+  code candidate. Review should use the submitted branch head while treating
+  `dec0a87ec463c66590a1210969b0f68eabad9ff3` as the exact code tree exercised by the
+  final commands below.
 
 ## Implementation and executable guards
 
-- `apps/mobile/src/components/common/BottomSheet.tsx:64` constructs the backdrop
-  independently; `apps/mobile/src/components/common/BottomSheet.tsx:93` renders it
+- `apps/mobile/src/components/common/BottomSheet.tsx:66` constructs the backdrop
+  independently; `apps/mobile/src/components/common/BottomSheet.tsx:95` renders it
   as a sibling of the sheet surface. The close seam remains
-  `apps/mobile/src/components/common/BottomSheet.tsx:80`.
-- `apps/mobile/src/components/common/BottomSheet.test.tsx:141` verifies the native
+  `apps/mobile/src/components/common/BottomSheet.tsx:82`.
+- `apps/mobile/src/components/common/BottomSheet.test.tsx:177` verifies the native
   accessibility-tree sibling contract, while
-  `apps/mobile/src/components/common/BottomSheet.test.tsx:205` verifies that child
+  `apps/mobile/src/components/common/BottomSheet.test.tsx:258` verifies that child
   press, input, scroll, and touch gestures do not dismiss the sheet.
+- `apps/mobile/src/components/common/BottomSheet.tsx:17` requires a dialog name, and
+  lines 26–37 require a caller-localized backdrop label exactly when backdrop
+  dismissal is enabled. The negative compile-time guard is at
+  `apps/mobile/src/components/common/BottomSheet.test.tsx:44`.
 - `apps/mobile/src/components/common/BottomSheet.web.test.tsx:35` renders the real
   `react-native-web` Modal. Lines 85–89 verify native HTML buttons and sibling
   ownership; lines 92–112 verify pointer dismissal, Escape, and independent child
@@ -190,6 +199,49 @@ Test Suites: 2 passed, 2 total
 Tests:       15 passed, 15 total
 ```
 
+## Review-fix RED → GREEN
+
+CodeRabbit identified the primitive's hardcoded English `'Close'` fallback. Claude
+had separately suggested making the dialog label a required TypeScript invariant.
+Before changing the source contract, two negative type cases were added and the
+following command was run:
+
+```bash
+pnpm exec tsc --build
+```
+
+The optional old contract produced the intended RED because both negative cases were
+incorrectly accepted:
+
+```text
+apps/mobile/src/components/common/BottomSheet.test.tsx(20,3): error TS2578:
+  Unused '@ts-expect-error' directive.
+apps/mobile/src/components/common/BottomSheet.test.tsx(26,3): error TS2578:
+  Unused '@ts-expect-error' directive.
+```
+
+The hardcoded fallback was then removed. `accessibilityLabel` is required for every
+sheet, and the discriminated prop union requires
+`backdropAccessibilityLabel: string` when `backdropDismissible: true`. All production
+callers already supplied localized values. The same TypeScript command exited 0.
+
+Focused review-fix verification:
+
+```text
+Test Suites: 8 passed, 8 total
+Tests:       59 passed, 59 total
+```
+
+The staged routed command and pre-push gate also exercised the exact review-fix code
+candidate:
+
+```text
+Staged route: 4 passed, 0 failed, 0 skipped
+Mobile unit: 485 suites passed; 5,829 tests passed
+Pre-push related mobile: 83 suites passed; 1,653 tests passed
+i18n orphan/staleness checks: passed
+```
+
 ## Additional verification
 
 Focused primitive and consumer coverage:
@@ -209,7 +261,7 @@ CI=1 pnpm exec jest --config apps/mobile/jest.config.cjs \
 
 ```text
 Test Suites: 8 passed, 8 total
-Tests:       58 passed, 58 total
+Tests:       59 passed, 59 total
 ```
 
 Type and lint checks:
@@ -217,6 +269,8 @@ Type and lint checks:
 ```bash
 pnpm exec tsc --build
 pnpm exec eslint \
+  apps/mobile/src/components/common/BottomSheet.tsx \
+  apps/mobile/src/components/common/BottomSheet.test.tsx \
   apps/mobile/src/components/common/BottomSheet.web.test.tsx \
   apps/mobile/src/app/dev-only/bottom-sheet-keyboard.tsx \
   apps/mobile/e2e-web/flows/journeys/j27-bottom-sheet-keyboard.spec.ts
@@ -225,16 +279,16 @@ pnpm exec eslint \
 Both exited 0. The touched tests contain no local-module mocks; the web unit test's
 only mock maps the external `react-native` package to `react-native-web`.
 
-The full post-merge routed command was:
+The full final routed command was:
 
 ```bash
-BASE_REF=origin/main CI=1 bash scripts/check-change-class.sh --run --branch
+CI=1 bash scripts/check-change-class.sh --staged --run
 ```
 
 ```text
 Change classes: typescript mobile-routes mobile-src i18n
 TypeScript build: passed
-Mobile unit: 485 suites passed; 5,828 tests passed
+Mobile unit: 485 suites passed; 5,829 tests passed
 i18n orphan check: Checked 584 files; no findings
 i18n staleness: All translation files are up to date
 Results: 4 passed, 0 failed, 0 skipped
