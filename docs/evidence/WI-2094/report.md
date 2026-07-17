@@ -90,6 +90,25 @@ The repair evaluates question shape before navigation uncertainty, limits keywor
 
 Jest emitted the repository's existing warnings for the unsupported `passWithNoTests` config option, stale `baseline-browser-mapping` data, Expo native modules in Jest, missing inlined `EXPO_OS`, and the i18n test log. None changed the exit status or assertions.
 
+## Review-cycle final integration and validation
+
+After the repair and evidence commits, `git fetch origin` resolved `origin/main` to `e25d73eaa6405f1b1a78b7a139aac83eb9f726d7`. The published WI branch was not rewritten: `origin/main` was merged with the history-preserving merge commit `29b8251172e73b202ee7cba3bbdef1a544b23023`, whose parents are review-cycle evidence commit `f20f107e7f4e0bb7c8bd70530193788f6c12e11d` and the fetched main revision. The merge was clean and touched only the incoming consent/identity files.
+
+Post-merge validation:
+
+- Impacted Jest command: `pnpm exec jest --runTestsByPath <absolute mentor.test.tsx> <absolute MentorInputBar.test.tsx> <absolute bar-intent-match.test.ts> <absolute bar-intent-match.adversarial.test.ts> --runInBand --no-coverage` — exit 0; 4 suites passed; 66 tests passed.
+- `pnpm exec nx run @eduagent/mobile:typecheck` — exit 0; the mobile target and six dependencies succeeded (Nx cache hit).
+- `pnpm exec nx run @eduagent/mobile:lint` — exit 0; 0 errors and the unchanged 51-warning baseline (Nx cache hit). No internal-mock warning points at the changed Mentor test.
+- `pnpm prepush` — exit 0; the observable rerun of `tsc --build` succeeded after the first invocation exceeded the command window while its compiler process was still running.
+- `pnpm format:check` — exit 0; the repository's three configured format targets succeeded.
+- Final targeted GREEN — exit 0; 1 suite and 32 tests passed. Machine-readable output: [review-cycle-1-post-merge-green.json](review-cycle-1-post-merge-green.json).
+
+Exact final targeted command:
+
+```bash
+rtk pnpm exec jest --runTestsByPath '/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2094/apps/mobile/src/app/(app)/mentor.test.tsx' --runInBand --no-coverage --json --outputFile='/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2094/docs/evidence/WI-2094/review-cycle-1-post-merge-green.json'
+```
+
 ## Environment and device check
 
 Only Node `v24.18.0` and pnpm `10.19.0` were available; no `node22`, mise, fnm, or Volta executable was present. The repository requested Node 22 and emitted an engine warning under Node 24. The targeted tests, typecheck, lint, pre-push TypeScript build, and formatting checks all succeeded, so no result indicates that the engine mismatch affected this change.
