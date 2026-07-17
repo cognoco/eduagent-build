@@ -179,8 +179,8 @@ describe('flag-off: V2 selector is inert (legacy fallback preserved)', () => {
 // unconditionally on the legacy (V2-off) path when Gemini was registered —
 // the same class of bug WI-1052 fixed for getModelConfig's PRIMARY selection
 // (see router.test.ts's "[WI-1052] legacy path never routes under-18 learners
-// to Gemini" describe block). GEMINI_API_KEY is a required boot key, so this
-// branch is always live; production is safe only because
+// to Gemini" describe block). The Gemini provider key is a required boot key,
+// so this branch is always live; production is safe only because
 // LLM_ROUTING_V2_ENABLED=true, which defaults to false (config.ts) — any
 // default-config environment, or an incident rollback of the flag, serves
 // Gemini to minors on primary failure.
