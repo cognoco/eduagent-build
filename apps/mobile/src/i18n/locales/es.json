@@ -1694,7 +1694,8 @@
       "dontRememberFallbackHint": "No pasa nada — veamos qué sí recuerdas. Aquí tienes una pequeña pista: piensa en la idea principal o el primer paso relacionado con este tema. ¿Te vuelve algo?",
       "dontRememberReviewPrompt": "Gracias por decirlo con sinceridad. Pasemos a repasar para que vuelva a sentirse manejable.",
       "gradingUnavailableTitle": "Recibí tu respuesta.",
-      "gradingUnavailableMessage": "No pude revisarla ahora mismo, pero tu respuesta está a salvo. Inténtalo de nuevo o vuelve más tarde."
+      "gradingUnavailableMessage": "No pude revisarla ahora mismo, pero tu respuesta está a salvo. Inténtalo de nuevo o vuelve más tarde.",
+      "reTeach": "Intentémoslo de otra forma: échale otro vistazo y vuelve a probar cuando te sientas listo. Sin prisa."
     },
     "lastStudied": "Estudiado por última vez {{when}}",
     "neverStudied": "Nunca estudiado",

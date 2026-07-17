@@ -823,7 +823,7 @@ export async function getAssessmentEligibleTopics(
 const RETEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export interface RecallTestRemediation {
-  action: 'redirect_to_library';
+  action: 'topic_parked';
   topicId: string;
   topicTitle: string;
   retentionStatus: string;
@@ -839,7 +839,7 @@ export interface RecallTestResponse {
   nextReviewAt: string;
   failureCount: number;
   hint?: string;
-  failureAction?: 'feedback_only' | 'redirect_to_library';
+  failureAction?: 'feedback_only' | 're_teach' | 'topic_parked';
   remediation?: RecallTestRemediation;
   cooldownActive?: boolean;
   cooldownEndsAt?: string;
@@ -1159,8 +1159,12 @@ export async function processRecallTest(
 
   // [Flow 2 / T5] Append the graded recall to the permanent log. Non-core:
   // a log failure is captured in Sentry but never aborts the recall response.
+  // [WI-1462] retrievalNextActionEnum keeps its existing 'redirect_to_library'
+  // value for the log — it is the closest existing bucket for "exited the
+  // direct-recall loop into remediation" and adding a dedicated enum value
+  // would require a schema migration this log-only field doesn't warrant.
   const recallNextAction: RetrievalNextAction =
-    result.failureAction === 'redirect_to_library'
+    result.failureAction === 'topic_parked'
       ? 'redirect_to_library'
       : result.passed
         ? 'advance'
@@ -1196,22 +1200,27 @@ export async function processRecallTest(
     failureAction: result.failureAction,
   };
 
+  // [WI-1462] Also build a hint on a typed (non-dont_remember) answer that
+  // lands on the 3rd-failure re-teach off-ramp — the same-flow, different-
+  // style teaching content AC-2 requires, not just the dont_remember path.
   if (
-    attemptMode === 'dont_remember' &&
-    result.failureAction !== 'redirect_to_library'
+    (attemptMode === 'dont_remember' &&
+      result.failureAction !== 'topic_parked') ||
+    result.failureAction === 're_teach'
   ) {
     response.hint = buildRecallHint(topicTitle, topic.topicDescription);
   }
 
-  // Add remediation data when redirect is triggered (3+ failures)
-  if (result.failureAction === 'redirect_to_library') {
+  // Add remediation data when the topic is parked (2nd consecutive failure
+  // after the re-teach off-ramp, i.e. the 4th+ failure — RR-4/AC-3)
+  if (result.failureAction === 'topic_parked') {
     const retentionStatus = getRetentionStatus(result.newState);
     const cooldownEndsAt = new Date(
       Date.now() + RETEST_COOLDOWN_MS,
     ).toISOString();
 
     response.remediation = {
-      action: 'redirect_to_library',
+      action: 'topic_parked',
       topicId: input.topicId,
       topicTitle,
       retentionStatus,

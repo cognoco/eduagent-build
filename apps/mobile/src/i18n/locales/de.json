@@ -1694,7 +1694,8 @@
       "dontRememberFallbackHint": "Das ist okay — schauen wir, woran du dich erinnerst. Ein kleiner Hinweis: Denk an die Hauptidee oder den ersten Schritt zu diesem Thema. Kommt etwas zurück?",
       "dontRememberReviewPrompt": "Danke, dass du das ehrlich sagst. Lass uns zur Wiederholung wechseln, damit es sich wieder machbar anfühlt.",
       "gradingUnavailableTitle": "Antwort erhalten.",
-      "gradingUnavailableMessage": "Ich konnte deine Antwort gerade nicht überprüfen, aber sie ist sicher. Versuch es erneut oder komm später darauf zurück."
+      "gradingUnavailableMessage": "Ich konnte deine Antwort gerade nicht überprüfen, aber sie ist sicher. Versuch es erneut oder komm später darauf zurück.",
+      "reTeach": "Probieren wir es mal anders: Schau es dir noch einmal an und versuch es dann erneut, wenn du bereit bist. Keine Eile."
     },
     "lastStudied": "Zuletzt gelernt {{when}}",
     "neverStudied": "Nie gelernt",

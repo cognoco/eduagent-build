@@ -162,8 +162,19 @@ export default function RecallTestScreen() {
                 setIsStreaming,
                 releaseSubmissionBlock,
               );
-            } else if (result.failureAction === 'redirect_to_library') {
-              // 3+ failures — show remediation card
+            } else if (result.failureAction === 're_teach') {
+              // [WI-1462 / RR-4] 3rd failure — bounded, same-flow re-teach
+              // off-ramp in a different style (warm copy, no punishment
+              // framing). Input stays enabled — no navigation yet.
+              cleanupRef.current = animateResponse(
+                result.hint ?? t('topic.recallTest.reTeach'),
+                setMessages,
+                setIsStreaming,
+                releaseSubmissionBlock,
+              );
+            } else if (result.failureAction === 'topic_parked') {
+              // [WI-1462 / RR-4] 2nd consecutive failure after re-teach —
+              // exit warmly by parking the topic; show remediation card.
               cleanupRef.current = animateResponse(
                 t('topic.recallTest.needsReview'),
                 setMessages,
@@ -292,10 +303,11 @@ export default function RecallTestScreen() {
         onSuccess: (result) => {
           if (token !== submissionTokenRef.current) return;
           setDontRememberPending(false);
-          if (
-            result.failureAction === 'redirect_to_library' ||
-            nextCount >= 2
-          ) {
+          // [WI-1462 / RR-4] Trust the server-authoritative failureAction —
+          // it already reaches topic_parked at the 2nd consecutive failure
+          // after re-teach (bounded exactly at the 3rd/4th real failure), so
+          // no local dontRememberCount>=2 shortcut is needed.
+          if (result.failureAction === 'topic_parked') {
             cleanupRef.current = animateResponse(
               t('topic.recallTest.dontRememberReviewPrompt'),
               setMessages,
@@ -314,6 +326,8 @@ export default function RecallTestScreen() {
             return;
           }
 
+          // feedback_only or re_teach — same-flow hint (re_teach's hint is
+          // the bounded, different-style off-ramp; input stays enabled).
           cleanupRef.current = animateResponse(
             result.hint ?? t('topic.recallTest.dontRememberFallbackHint'),
             setMessages,

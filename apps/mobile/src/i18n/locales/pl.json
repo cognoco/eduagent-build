@@ -1771,7 +1771,8 @@
       "dontRememberFallbackHint": "W porządku — zobaczmy, co pamiętasz. Mała podpowiedź: pomyśl o głównej idei albo pierwszym kroku związanym z tym tematem. Czy coś wraca?",
       "dontRememberReviewPrompt": "Dziękuję, że mówisz to szczerze. Przejdźmy do powtórki, żeby znów było to do opanowania.",
       "gradingUnavailableTitle": "Mam Twoją odpowiedź.",
-      "gradingUnavailableMessage": "W tej chwili nie mogę sprawdzić Twojej odpowiedzi, ale jest bezpieczna. Spróbuj ponownie lub wróć do tego później."
+      "gradingUnavailableMessage": "W tej chwili nie mogę sprawdzić Twojej odpowiedzi, ale jest bezpieczna. Spróbuj ponownie lub wróć do tego później.",
+      "reTeach": "Spróbujmy inaczej — spójrz jeszcze raz, a potem spróbuj ponownie, gdy poczujesz gotowość. Bez pośpiechu."
     },
     "lastStudied": "Ostatnia nauka {{when}}",
     "neverStudied": "Nigdy nie studiowano",
