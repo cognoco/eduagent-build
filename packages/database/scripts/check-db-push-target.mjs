@@ -15,6 +15,7 @@
  *   DOPPLER_CONFIG = "stg" or "prd" →  push is BLOCKED with a clear error
  *   DOPPLER_CONFIG = anything else  →  push is BLOCKED (unknown config = err on safe side)
  *   DOPPLER_CONFIG absent           →  push is BLOCKED unless DB_PUSH_LOCAL_DEV=1
+ *                                      AND DATABASE_URL is set to a local host
  *                                      (see "No-Doppler escape" below)
  *
  * This approach is stronger than hostname-substring matching because it does not
@@ -44,11 +45,17 @@
  * (e.g. a clean checkout with a manually written .env.local pointing at a local
  * Postgres). It is NOT for bypassing the check when Doppler is configured.
  *
- * The opt-in alone is not sufficient: `DATABASE_URL` may already be set in the
- * process environment pointing at stg/prd for any of the reasons above. So
- * when DATABASE_URL is set under this escape, its host must resolve to
- * localhost/127.0.0.1 — any other host (in particular a `*.neon.tech` stg/prd
- * host) is blocked (WI-1874).
+ * The opt-in alone is not sufficient. Two ways the escape is still refused
+ * (fail-closed, WI-1874):
+ *   - `DATABASE_URL` absent from the process env → BLOCKED. The target cannot
+ *     be verified, so the guard refuses rather than print an unverified accept.
+ *     This also closes the hand-placed bare-`.env` vector: drizzle-kit would
+ *     load such a file afterwards, but at guard time DATABASE_URL is still
+ *     absent, so the guard never has to read any file to be safe.
+ *   - `DATABASE_URL` set but its host is not localhost/127.0.0.1 (in particular
+ *     a `*.neon.tech` stg/prd host) → BLOCKED.
+ * Only a `DATABASE_URL` present AND resolving to localhost/127.0.0.1 is
+ * accepted under this escape.
  *
  * Historical context
  * ------------------
@@ -62,10 +69,10 @@
  *
  * Exit codes:
  *   0 — DOPPLER_CONFIG="dev"; or DOPPLER_CONFIG absent AND DB_PUSH_LOCAL_DEV=1
- *       AND (DATABASE_URL unset OR its host is localhost/127.0.0.1)
+ *       AND DATABASE_URL is set AND its host is localhost/127.0.0.1
  *   1 — DOPPLER_CONFIG is stg/prd/unknown; or absent without DB_PUSH_LOCAL_DEV=1;
- *       or absent with DB_PUSH_LOCAL_DEV=1 but DATABASE_URL resolves to a
- *       non-local host
+ *       or absent with DB_PUSH_LOCAL_DEV=1 but DATABASE_URL is absent from the
+ *       process env (fail-closed) or resolves to a non-local host
  */
 
 import { extractHost, hostMatchesEnvironment } from './verify-db-target-lib.mjs';
@@ -124,11 +131,27 @@ if (dopplerConfig === undefined || dopplerConfig === '') {
     );
   }
 
-  // The opt-in alone doesn't prove DATABASE_URL actually points at local
-  // Postgres — .env.development.local may still hold stg creds from an
-  // earlier `pnpm env:sync`. If DATABASE_URL is set, its host must be
-  // localhost/127.0.0.1; anything else (in particular *.neon.tech) is blocked.
+  // The opt-in alone doesn't prove the target is local. Fail closed (WI-1874):
+  // if DATABASE_URL is absent from the process env, the push target cannot be
+  // verified, so the guard BLOCKS — it must never print an acceptance for a
+  // target it did not check. (This also closes the hand-placed bare-`.env`
+  // vector without the guard reading any file: drizzle-kit would load such a
+  // file later, but at guard time DATABASE_URL is still absent, so we refuse.)
   const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    blocked(
+      'DB_PUSH_LOCAL_DEV=1 is set, but DATABASE_URL is not present in the\n' +
+        '   process environment, so the push target cannot be verified as local.\n' +
+        '   Export a local DATABASE_URL (host localhost or 127.0.0.1) first:\n' +
+        '     DATABASE_URL=postgres://postgres:postgres@localhost:5432/<db> \\\n' +
+        '       DB_PUSH_LOCAL_DEV=1 pnpm --filter @eduagent/database run db:push',
+    );
+  }
+
+  // DATABASE_URL is set: its host must be localhost/127.0.0.1 — anything else
+  // (in particular *.neon.tech) is blocked. The `if` is retained so that
+  // removing the fail-closed clause above cleanly reproduces the pre-WI-1874
+  // accept-on-unset behavior for red-green verification.
   if (databaseUrl) {
     const host = extractHost(databaseUrl);
     const isLocalHost =

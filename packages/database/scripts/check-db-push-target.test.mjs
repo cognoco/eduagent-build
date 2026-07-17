@@ -3,8 +3,10 @@
  *
  * Verifies:
  *  - Push is blocked when DOPPLER_CONFIG is stg, prd, or an unknown value.
- *  - Push is permitted when DOPPLER_CONFIG is absent (local dev without Doppler).
  *  - Push is permitted when DOPPLER_CONFIG=dev.
+ *  - No-Doppler escape (DB_PUSH_LOCAL_DEV=1): permitted only when DATABASE_URL
+ *    is set to a local host; blocked when DATABASE_URL is absent (fail-closed,
+ *    WI-1874) or resolves to a non-local host.
  *  - Credential redaction is applied before logging DATABASE_URL.
  *  - packages/database/package.json wires predb:push → check-db-push-target.mjs.
  *  - Root package.json db:push:dev invokes the package db:push script (not exec).
@@ -16,9 +18,10 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import os from 'node:os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const GUARD_SCRIPT = path.join(__dirname, 'check-db-push-target.mjs');
@@ -31,14 +34,21 @@ const ROOT_PKG_JSON = path.join(REPO_ROOT, 'package.json');
  * We deliberately strip DOPPLER_CONFIG from the inherited process env so that
  * a Doppler-wrapped test runner doesn't leak its own config into the test.
  */
-function runGuard(overrides = {}) {
+function runGuard(overrides = {}, spawnOpts = {}) {
   const env = { ...process.env, ...overrides };
   // Always remove DOPPLER_CONFIG from inherited env unless the test explicitly
   // sets it, so that a Doppler-wrapped test runner doesn't make all tests pass.
   if (!Object.prototype.hasOwnProperty.call(overrides, 'DOPPLER_CONFIG')) {
     delete env.DOPPLER_CONFIG;
   }
-  return spawnSync(process.execPath, [GUARD_SCRIPT], { env, encoding: 'utf8' });
+  // Likewise strip DATABASE_URL unless a test sets it explicitly. Absence is
+  // behaviorally significant now (fail-closed under DB_PUSH_LOCAL_DEV=1,
+  // WI-1874), so an ambient DATABASE_URL (a CI runner, a leftover doppler-run
+  // shell) must not leak in and flip an absence test to a set-host test.
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'DATABASE_URL')) {
+    delete env.DATABASE_URL;
+  }
+  return spawnSync(process.execPath, [GUARD_SCRIPT], { env, encoding: 'utf8', ...spawnOpts });
 }
 
 // ── Blocking cases ────────────────────────────────────────────────────────────
@@ -92,10 +102,41 @@ test('guard exits 0 when DOPPLER_CONFIG=dev', () => {
   assert.match(stdout, /dev Doppler config confirmed/);
 });
 
-test('guard exits 0 when DOPPLER_CONFIG is absent and DB_PUSH_LOCAL_DEV=1', () => {
-  const { status, stdout } = runGuard({ DOPPLER_CONFIG: undefined, DB_PUSH_LOCAL_DEV: '1' });
-  assert.equal(status, 0, 'expected exit 0 — explicit local-dev override accepted');
-  assert.match(stdout, /DB_PUSH_LOCAL_DEV=1 override accepted/);
+// ── Fail-closed: escape refuses an unverifiable target (WI-1874, Option B) ──
+
+test('guard exits 1 when DB_PUSH_LOCAL_DEV=1 but DATABASE_URL is absent from the env', () => {
+  // Fail closed: with no DATABASE_URL in the process env, the target cannot be
+  // verified as local, so the guard must BLOCK rather than print an acceptance
+  // for a case it did not check.
+  const { status, stderr } = runGuard({ DOPPLER_CONFIG: undefined, DB_PUSH_LOCAL_DEV: '1' });
+  assert.equal(status, 1, 'expected exit 1 — an unset DATABASE_URL is not verifiable');
+  assert.match(stderr, /drizzle-kit push is blocked/);
+  assert.match(stderr, /DATABASE_URL is not present in the/);
+});
+
+test('guard exits 1 under DB_PUSH_LOCAL_DEV=1 with a bare .env (neon URL) in cwd but DATABASE_URL absent from the env', () => {
+  // Proves the hand-placed-file vector is closed WITHOUT the guard reading any
+  // file: drizzle-kit's bundled dotenv would load this bare .env afterwards, but
+  // at guard time DATABASE_URL is still absent from the process env, so the
+  // fail-closed clause blocks first.
+  const tmpDir = mkdtempSync(path.join(os.tmpdir(), 'db-push-guard-'));
+  try {
+    writeFileSync(
+      path.join(tmpDir, '.env'),
+      'DATABASE_URL=postgres://stguser:stgpass@ep-example-stg.neon.tech/mydb\n',
+    );
+    const { status, stderr } = runGuard(
+      { DOPPLER_CONFIG: undefined, DB_PUSH_LOCAL_DEV: '1' },
+      { cwd: tmpDir },
+    );
+    assert.equal(status, 1, 'expected exit 1 — a bare .env in cwd must not open the escape');
+    assert.match(stderr, /drizzle-kit push is blocked/);
+    assert.match(stderr, /DATABASE_URL is not present in the/);
+    assert.ok(!stderr.includes('stguser'), 'the guard must not have read the bare .env');
+    assert.ok(!stderr.includes('neon.tech'), 'the guard must not have read the bare .env');
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 // ── DB_PUSH_LOCAL_DEV escape must still check the resolved host (WI-1874) ────
