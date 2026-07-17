@@ -1,0 +1,69 @@
+# MMT-ADR-0034 — A per-concept, low-stakes re-prove path for recovering strugglers
+
+**Status:** Proposed · 2026-07-17 · **Scope:** Weak-spot recovery for the Challenge Round struggle gate; `needs_deepening_topics` lifecycle · **Builds on:** MMT-ADR-0031 (Challenge verification and SM-2 retention are complementary mastery axes)
+
+> **A Proposed ADR promotes no rule into canon.** This decision is not in force: nothing here is binding on `architecture.md` or on implementation until an acceptance change-set lands, and that change-set must amend canon in lockstep. **Deciders:** drafted by an agent; awaiting sign-off from a human representing Architecture before this can move to Accepted — no such sign-off has been sought or given yet.
+
+## Context
+
+The server enforces a protective, all-or-nothing gate before it will offer the structured Challenge Round explain-back check: the eligibility evaluator refuses whenever the learner has any corroborated weak concept on the topic (`apps/api/src/services/challenge-round/trigger.ts:80`, `struggleStatus !== 'normal'`). `struggleStatus` is derived per-exchange from whether any `needs_deepening_topics` row with `status = 'active'` exists for that topic, further split into `blocked` when a retention card's `failureCount >= 3` (`apps/api/src/services/session/session-exchange.ts:2804-2809`).
+
+That gate exists because the Challenge Round itself is conservative and binary: `decideMasteryAndReview` (`apps/api/src/services/challenge-round/evaluation.ts:128-169`) only marks a topic verified when *every* evaluated concept scores `solid` — a single `partial` or `misconception` is enough to block verification regardless of how many concepts were solid. Offering that same instrument to a learner who already has an active weak spot would mean testing the most fragile learners with the instrument most likely to fail them.
+
+The gate is correct to keep, but it leaves recovering learners with no way back in except an existing passive mechanism: `updateNeedsDeepeningProgress` (`apps/api/src/services/retention-data.ts:1611-1650`), invoked once per completed session from the session-completion pipeline. It resolves a weak-spot row only after three consecutive ordinary learning sessions on that topic each score a spaced-repetition quality of 3 or higher (`canExitNeedsDeepening`, `EXIT_CONSECUTIVE_SUCCESSES = 3`, `apps/api/src/services/adaptive-teaching.ts:37,140-142`), and it resets that count to zero on a single below-threshold session. Two properties make this mechanism unsuitable as the *only* recovery path: it is topic-grain, not concept-grain — it looks up `records.find(d => d.status === 'active')`, i.e. the first active row for the topic, ignoring which specific concept the row names when more than one is active — and it requires three full ordinary sessions before anything changes, which is neither low-stakes nor a check-in a learner can complete in a single sitting.
+
+No mechanism today lets a learner explicitly attempt and clear a *single* named weak concept, get a low-stakes pass/no-pass result for that one concept, and leave the rest of the topic's weak spots untouched.
+
+## Decision
+
+Add a second, explicit recovery surface — a **per-concept micro re-prove** — that operates on one `needs_deepening_topics` row at a time and never routes through the standard Challenge Round evaluation path.
+
+1. **It is a server-owned eligibility + transition contract, not a new gate on the Challenge Round.** `evaluateChallengeReadiness` and its `struggleStatus !== 'normal'` check (`trigger.ts:80`) are unchanged by this decision. A learner can be simultaneously ineligible for the Challenge Round and eligible for a micro re-prove on one of their active weak concepts — the two surfaces are independent, and this decision does not touch the struggle gate.
+
+2. **Eligible rows are `needs_deepening_topics` rows with `status = 'active'`**, addressed individually by row id — the same corroborated rows that drive `struggleStatus`, never `pending_review` rows (those are a single, uncorroborated wobble still inside their expiry window, and offering a recovery check-in on a signal that has not yet been confirmed as a real pattern would be premature). A caller must name the specific row, not the topic, so the transition below lands on the concept the learner actually attempted rather than an arbitrary active row for the topic — a precision the existing topic-grain mechanism does not have.
+
+3. **A single successful attempt increments that row's own `consecutiveSuccessCount` and reuses the existing exit threshold.** The transition reuses `canExitNeedsDeepening` (`adaptive-teaching.ts:140-142`) unchanged: once the row's count reaches the existing threshold, the row moves to `resolved`; below it, the row stays `active` with the incremented count. This is deliberately the same counter and the same threshold the passive full-session mechanism already writes to — a micro re-prove success and a later good ordinary session are both genuine evidence of recovery for the same concept, and neither should have to start a separate counter over.
+
+4. **A weak or failed attempt is a no-op, never a setback.** Unlike the passive mechanism's reset-to-zero on one below-threshold session, a weak micro re-prove attempt does not decrement or reset `consecutiveSuccessCount`, does not write to `failureCount`, does not trigger a cooldown, and does not block a further attempt. The row simply stays exactly where it was. A learner can always retry, and can always keep learning the topic through ordinary sessions regardless of outcome — this mechanism only ever helps a learner exit `needs_deepening`, it never becomes a second way to get flagged or locked out.
+
+5. **Grading is single-concept, not topic-level, and must not write Challenge Round state.** The per-attempt evaluation may reuse the same solid/partial/missing/misconception vocabulary the Challenge Round evaluator uses for an individual concept (`evaluation.ts`'s per-item `result` classification), but it must not call `decideMasteryAndReview` or otherwise write `assessments.mastery_challenge_verified_at`. A micro re-prove success clears one row's struggle flag; it is not a Challenge verification and must not be presented, persisted, or read as one. It is a third, narrower signal that lives entirely inside `needs_deepening_topics` — it does not become a new implicit definition of "mastered" on either of the two established mastery axes (MMT-ADR-0031's Decision point 4).
+
+6. **This is a server contract; the learner-facing surface is out of scope here.** This decision defines the eligibility rule and the row transition. It does not choose where in the app a learner is offered a micro re-prove, what it looks or reads like, or how many attempts are shown per sitting — those are product/UX calls, tracked as a named follow-up below.
+
+### Owning seam
+
+The natural service home is a sibling module to the existing pending→active promotion service (`apps/api/src/services/needs-deepening/promotion.ts`), following the same shape: a pure eligibility/decision function plus an explicit, row-scoped `db.update(needsDeepeningTopics)` guarded by `profileId` and the row's own id — never a `.find()`-first-active lookup, which is precisely the imprecision this decision exists to avoid. The natural route home is alongside the two existing recovery-adjacent routes in `apps/api/src/routes/retention.ts` (`GET /subjects/:subjectId/needs-deepening`, `POST /retention/relearn`), which already own reading and full-topic recovery for this table.
+
+One concrete gap for the owning follow-up to close: the current read endpoint's response shape (`NeedsDeepeningStatus`, built in `getSubjectNeedsDeepening`, `retention-data.ts:1378-1383`) exposes only `topicId`, `status`, `consecutiveSuccessCount`, and `pendingExpiresAt` — it omits each row's own `id` and `concept`. A client cannot address a specific concept-level row today; the response shape must grow those two fields before a micro re-prove entry point can target one.
+
+## Consequences
+
+- The Challenge Round eligibility evaluator and its struggle gate are untouched by this decision — the protective, all-or-nothing instrument stays exactly as conservative as it is today.
+- A learner with several active weak concepts on one topic can clear them independently, one at a time, instead of needing all of them corroborated-then-resolved together through three full ordinary sessions.
+- Because a resolved row stops counting as counter-evidence for topic-level verification staleness (`resolveMasteryVerificationState`'s counter-evidence policy only counts `pending_review`/`active` rows), a micro re-prove success can also flip a topic's read-side verification state back from `stale` toward its prior verified reading — a correct and desirable side effect of the same row transition, not a separate write.
+- The passive full-session recovery mechanism is unchanged and keeps running in parallel; both mechanisms write the same counter on the same row, which is intentional (§Decision point 3), not a duplication to reconcile.
+- The pre-existing topic-grain imprecision in the passive mechanism (`updateNeedsDeepeningProgress`'s `.find()`-first-active lookup, `retention-data.ts:1623`) is not fixed by this decision — it is called out here as a known, adjacent gap for whoever implements the follow-up work to be aware of, not something this ADR resolves.
+- Follow-up implementation work is required before any of this is available to a learner (see Links).
+
+## Alternatives considered
+
+1. **Relax or bypass the standard struggle gate for recovering learners** (e.g. skip `struggleStatus !== 'normal'` when a "recovery attempt" flag is set). Rejected: this would expose the learners least able to withstand it to the exact all-or-nothing instrument (every concept must score `solid`) that produced their weak-spot rows in the first place. The gate is a shield, not a bug; special-casing it around a flag would weaken a protective invariant other code paths depend on being unconditional.
+
+2. **Route a recovering learner into a full guided-relearn session, then re-offer the standard Challenge Round afterward.** Rejected: this still terminates in the same all-or-nothing evaluation — it delays the high-stakes test rather than replacing it with a lower-stakes one — and it cannot clear a single concept independently of the rest of the topic, since the Challenge Round only ever evaluates and verifies at topic grain.
+
+3. **Rely on the existing passive full-session mechanism as the only recovery path; add no new explicit surface.** Rejected: three consecutive full ordinary sessions with a passing spaced-repetition score is a real commitment, not a low-stakes check-in a learner can complete once and know the outcome of immediately, and its topic-grain, first-active-row lookup cannot target one named concept when a topic has more than one active weak spot. It remains a valid complementary background signal (§Decision point 3) but does not by itself give a learner an explicit, bounded way to re-prove one concept.
+
+## Links
+
+- Named follow-up Work Items (not yet captured — for the shepherding session to file):
+  - **API/service**: implement the eligibility function, the row-scoped transition, the two new/extended fields on the needs-deepening read response, and the new route, per §Decision and §Owning seam above.
+  - **Mobile surface**: design and build the learner-facing entry point, flow, and copy for a micro re-prove attempt — explicitly out of scope for this decision (§Decision point 6).
+  - **Tests/evals**: unit coverage for the eligibility function and the row-scoped transition (specific-row targeting, no-op-on-weak-attempt, threshold-triggered resolution), plus LLM eval-harness coverage (`pnpm eval:llm`) for any new grading prompt the API follow-up introduces.
+- `apps/api/src/services/challenge-round/trigger.ts` — the unchanged struggle gate this decision leaves alone.
+- `apps/api/src/services/session/session-exchange.ts` — `struggleStatus` derivation this decision reads but does not modify.
+- `apps/api/src/services/needs-deepening/promotion.ts` — the sibling pending→active promotion service this decision's owning module should mirror in shape.
+- `apps/api/src/services/retention-data.ts` — `updateNeedsDeepeningProgress` (the passive mechanism this decision complements) and `getSubjectNeedsDeepening` (the read endpoint that needs the id/concept fields).
+- `apps/api/src/services/adaptive-teaching.ts` — `canExitNeedsDeepening` / `EXIT_CONSECUTIVE_SUCCESSES`, reused unchanged.
+- `apps/api/src/services/challenge-round/evaluation.ts` — `decideMasteryAndReview`'s per-item vocabulary, whose classification style may be reused but whose topic-verification side effects must not be.
+- `apps/api/src/services/challenge-round/verification.ts` — `resolveMasteryVerificationState`'s counter-evidence policy, which explains the Consequences staleness side effect.
+- `docs/adr/MMT-ADR-0031-challenge-verification-and-sm2-are-complementary-mastery-axes.md` — the mastery-axes rule this decision's grading constraint (§Decision point 5) conforms to.
