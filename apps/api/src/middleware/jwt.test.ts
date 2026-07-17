@@ -519,6 +519,19 @@ describe('[F-181] lookupJWKByKid forced re-fetch cooldown (DoS amplification)', 
 
   const originalFetch = globalThis.fetch;
 
+  // [WI-1862] On this host (confirmed: Node v26.3.0; CI runs Node 22 and does
+  // not reproduce), `jest.useRealTimers()` below — called after every test in
+  // this describe, including the one that calls `jest.useFakeTimers()` — does
+  // not reliably restore `globalThis.setTimeout`/`clearTimeout`; they come
+  // back `undefined` instead. That poisoned global then breaks the NEXT
+  // test's `fetchJWKS()` call, which throws `setTimeout is not defined` from
+  // its unrelated abort-timeout setup. Reproduced independently of jwt.ts with
+  // a bare `jest.useFakeTimers(); jest.useRealTimers();` sequence — not a
+  // jwt.ts defect. Restore the real timer functions after every test so a
+  // poisoned global never leaks past the test that poisoned it.
+  const REAL_SET_TIMEOUT = globalThis.setTimeout;
+  const REAL_CLEAR_TIMEOUT = globalThis.clearTimeout;
+
   beforeEach(() => {
     clearJWKSCache();
   });
@@ -526,6 +539,12 @@ describe('[F-181] lookupJWKByKid forced re-fetch cooldown (DoS amplification)', 
   afterEach(() => {
     globalThis.fetch = originalFetch;
     jest.useRealTimers();
+    if (typeof globalThis.setTimeout !== 'function') {
+      globalThis.setTimeout = REAL_SET_TIMEOUT;
+    }
+    if (typeof globalThis.clearTimeout !== 'function') {
+      globalThis.clearTimeout = REAL_CLEAR_TIMEOUT;
+    }
   });
 
   // Break test: a sequential stream of distinct bogus kids must NOT each force
