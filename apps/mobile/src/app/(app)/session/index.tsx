@@ -82,9 +82,11 @@ import {
   type PendingSubjectResolution,
 } from '../../../components/session/session-types';
 import {
+  mentorOpenerIdempotencyKey,
   useSessionStreaming,
   type ContinueMessageOptions,
 } from '../../../components/session/use-session-streaming';
+import { getOutboxEntry } from '../../../lib/message-outbox';
 import { ChallengeOfferCard } from '../../../components/session/ChallengeOfferCard';
 import { ChallengeRoundBanner } from '../../../components/session/ChallengeRoundBanner';
 import { DraftedNoteReview } from '../../../components/session/DraftedNoteReview';
@@ -560,6 +562,7 @@ function SessionScreenInner() {
   const lastAiAtRef = useRef<number | null>(null);
   const lastExpectedMinutesRef = useRef(10);
   const hasAutoSentRef = useRef(false);
+  const mentorOpenerLaunchKeyRef = useRef<string | null>(null);
   const hasHydratedRecoveryRef = useRef(false);
   const queuedProblemTextRef = useRef<string | null>(null);
   const localMessageIdRef = useRef(0);
@@ -579,6 +582,22 @@ function SessionScreenInner() {
   );
   const liveTranscript =
     transcript.data?.archived === false ? transcript.data : null;
+  const isV2MentorEntry =
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED && entrySource === 'mentor';
+  const mentorOpenerText =
+    isV2MentorEntry && effectiveMode === 'freeform' && rawInput?.trim().length
+      ? rawInput
+      : undefined;
+  const mentorOpenerAlreadyPersisted = !!(
+    mentorOpenerText &&
+    liveTranscript?.exchanges.some(
+      (exchange, index, exchanges) =>
+        exchange.role === 'user' &&
+        exchange.content === mentorOpenerText &&
+        exchanges[index + 1]?.role === 'assistant' &&
+        !exchanges[index + 1]?.isSystemPrompt,
+    )
+  );
 
   // Auto-resume the latest active/paused session when the user re-enters a
   // learning topic (e.g. tapping "Continue learning" on the topic screen,
@@ -611,6 +630,20 @@ function SessionScreenInner() {
     hasResolvedActiveSessionRef.current = true;
     router.setParams({ sessionId: resumedSessionId });
   }, [activeSessionLookup.data?.sessionId, shouldLookupActiveSession, router]);
+
+  // New sessions allocate their ID inside the streaming hook. Put that ID
+  // back into the route immediately so transcript hydration and restoration
+  // use the same canonical session after remount/retry.
+  useEffect(() => {
+    if (
+      !mentorOpenerText ||
+      !activeSessionId ||
+      routeSessionId === activeSessionId
+    ) {
+      return;
+    }
+    router.setParams({ sessionId: activeSessionId });
+  }, [activeSessionId, mentorOpenerText, routeSessionId, router]);
 
   useEffect(() => {
     const profileId = activeProfile?.id;
@@ -905,6 +938,8 @@ function SessionScreenInner() {
     topicName: topicName ?? undefined,
     inputMode,
     rawInput: rawInput ?? undefined,
+    hasInitialMentorOpener: !!mentorOpenerText,
+    mentorOpenerAlreadyPersisted,
     resumeFromSessionId: resumeFromSessionId ?? undefined,
     gaps,
     verificationType: routeVerificationType ?? undefined,
@@ -982,9 +1017,6 @@ function SessionScreenInner() {
   // scoped to the mentor entry (both freeform questions and homework/camera
   // launched from the mentor bar). Drives non-blocking, no-grid subject
   // resolution in useSubjectClassification and relaxes the composer gate below.
-  const isV2MentorEntry =
-    FEATURE_FLAGS.MODE_NAV_V2_ENABLED && entrySource === 'mentor';
-
   const {
     handleResolveSubject,
     handleCreateResolveSuggestion,
@@ -1022,6 +1054,77 @@ function SessionScreenInner() {
     animationCleanupRef,
     setIsStreaming,
   });
+
+  useEffect(() => {
+    const profileId = activeProfile?.id;
+    if (!profileId || !mentorOpenerText || sessionExpired) return;
+    if (mentorOpenerAlreadyPersisted) {
+      mentorOpenerLaunchKeyRef.current = `${profileId}:${mentorOpenerText}`;
+      return;
+    }
+    if (routeSessionId && transcript.isFetching && !transcript.data) return;
+    if (
+      isStreaming ||
+      pendingClassification ||
+      pendingSubjectResolution ||
+      quotaError
+    ) {
+      return;
+    }
+
+    const launchKey = `${profileId}:${mentorOpenerText}`;
+    if (mentorOpenerLaunchKeyRef.current === launchKey) return;
+    mentorOpenerLaunchKeyRef.current = launchKey;
+
+    void (async () => {
+      const sessionId = routeSessionId ?? activeSessionId;
+      if (sessionId) {
+        const existingEntry = await getOutboxEntry(
+          profileId,
+          'session',
+          mentorOpenerIdempotencyKey(sessionId),
+        );
+        await handleSend(mentorOpenerText, {
+          isAutoSent: true,
+          initialMentorOpener: true,
+          ...(effectiveSubjectId
+            ? { sessionSubjectId: effectiveSubjectId }
+            : {}),
+          ...(effectiveSubjectName
+            ? { sessionSubjectName: effectiveSubjectName }
+            : {}),
+          ...(existingEntry ? { existingEntry } : {}),
+        });
+        return;
+      }
+
+      await handleSend(mentorOpenerText, {
+        isAutoSent: true,
+        initialMentorOpener: true,
+      });
+    })().catch((error) => {
+      mentorOpenerLaunchKeyRef.current = null;
+      Sentry.captureException(error, {
+        tags: { screen: 'session', action: 'persist_mentor_opener' },
+      });
+    });
+  }, [
+    activeProfile?.id,
+    activeSessionId,
+    effectiveSubjectId,
+    effectiveSubjectName,
+    handleSend,
+    isStreaming,
+    mentorOpenerAlreadyPersisted,
+    mentorOpenerText,
+    pendingClassification,
+    pendingSubjectResolution,
+    quotaError,
+    routeSessionId,
+    sessionExpired,
+    transcript.data,
+    transcript.isFetching,
+  ]);
 
   useEffect(() => {
     if (!queuedProblemTextRef.current) {
