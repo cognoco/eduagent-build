@@ -18,7 +18,7 @@ import {
   type AgeBracket,
   type JudgeFlagCategory,
 } from '@eduagent/schemas';
-import { escapeXml } from '../llm/sanitize';
+import { escapeXml } from '../llm';
 import type { ChatMessage } from '../llm/types';
 
 export interface SuitabilityJudgeInput {
