@@ -298,10 +298,27 @@ describe('[WI-1986] legacy fallback path never routes under-18 learners to Gemin
 // drops `...shared` on ANY branch fails a row (the "fixed the named site, missed
 // the siblings" class that bounced two BID-3 items).
 //
-// RED-GREEN (guard proof): remove `...shared` from any covered return in
-// router.ts (e.g. the adult→Gemini branch or the V2 Mistral branch) → the
-// corresponding row below FAILS on responseFormat/conversationLanguage; restore
-// → green. Captured in the WI-2364 evidence artifacts.
+// RED-GREEN (guard proof) — VERBATIM captured `pnpm exec jest
+// router.fallback-compliance.test.ts` output. The guard is cross-branch:
+// deleting `...shared,` from a DISTINCT return site fails only that site's row
+// (Expected "json" / Received undefined), and restoring returns the suite to
+// green. Two distinct siblings the prior single-branch test never covered:
+//
+//   $ delete `...shared,` @ router.ts:1103  (legacy gpt-4o-mini branch)
+//     ✕ legacy Gemini primary, rung<=2 -> OpenAI gpt-4o-mini
+//       ● [WI-2364] ... > legacy Gemini primary, rung<=2 -> OpenAI gpt-4o-mini
+//         Expected: "json"
+//         Received: undefined
+//     Tests:       1 failed, 25 passed, 26 total
+//
+//   $ delete `...shared,` @ router.ts:1165  (V2 Mistral branch)
+//     ✕ V2 free Cerebras -> Mistral
+//       ● [WI-2364] ... > V2 free Cerebras -> Mistral
+//         Expected: "json"
+//         Received: undefined
+//     Tests:       1 failed, 25 passed, 26 total
+//
+//   $ restore both  ->  Tests:       26 passed, 26 total
 // ---------------------------------------------------------------------------
 describe('[WI-2364] fallback envelope invariant — every branch preserves responseFormat + conversationLanguage', () => {
   interface EnvelopeCase {
