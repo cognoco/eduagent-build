@@ -133,12 +133,14 @@ function makeOverdueData(totalOverdue = 4) {
             topicTitle: 'Algebra',
             overdueDays: 3,
             failureCount: 1,
+            retentionStatus: 'forgotten',
           },
           {
             topicId: 'topic-2',
             topicTitle: 'Fractions',
             overdueDays: 1,
             failureCount: 0,
+            retentionStatus: 'forgotten',
           },
         ],
       },
@@ -152,12 +154,14 @@ function makeOverdueData(totalOverdue = 4) {
             topicTitle: 'Cells',
             overdueDays: 4,
             failureCount: 2,
+            retentionStatus: 'forgotten',
           },
           {
             topicId: 'topic-4',
             topicTitle: 'Atoms',
             overdueDays: 2,
             failureCount: 0,
+            retentionStatus: 'forgotten',
           },
         ],
       },
@@ -256,6 +260,121 @@ describe('RelearnScreen', () => {
       route: 'topic.relearn',
       metadata: { occurrenceKind: 'topicId' },
     });
+  });
+
+  // [WI-1463 / AC-1, AC-2] Default order is SM-2 urgency band, then
+  // most-overdue, across ALL visible subjects — subject grouping must never
+  // demote a more urgent topic below a less urgent one in a bigger subject.
+  it('orders the default topic list by SM-2 urgency band across subjects, not subject grouping', async () => {
+    mockOverdueTopicsReturn = {
+      data: {
+        totalOverdue: 3,
+        subjects: [
+          {
+            subjectId: 'sub-1',
+            subjectName: 'Math',
+            overdueCount: 2,
+            topics: [
+              // Both Math topics are more overdue by raw days than Science's,
+              // but their band is weaker urgency (weak/fading, not
+              // forgotten). Band must still win.
+              {
+                topicId: 'topic-1',
+                topicTitle: 'Algebra',
+                overdueDays: 10,
+                failureCount: 0,
+                retentionStatus: 'fading',
+              },
+              {
+                topicId: 'topic-2',
+                topicTitle: 'Fractions',
+                overdueDays: 8,
+                failureCount: 0,
+                retentionStatus: 'weak',
+              },
+            ],
+          },
+          {
+            subjectId: 'sub-2',
+            subjectName: 'Science',
+            overdueCount: 1,
+            topics: [
+              // Fewer overdue days than either Math topic, but 'forgotten'
+              // band — must rank first despite Science having a smaller
+              // overdueCount than Math.
+              {
+                topicId: 'topic-3',
+                topicTitle: 'Cells',
+                overdueDays: 2,
+                failureCount: 3,
+                retentionStatus: 'forgotten',
+              },
+            ],
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: mockRefetch,
+    };
+
+    renderRelearn();
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-topics-phase');
+    });
+
+    const rows = screen
+      .getAllByTestId(/^relearn-topic-/)
+      .map((node) => node.props.testID);
+
+    expect(rows).toEqual([
+      'relearn-topic-topic-3',
+      'relearn-topic-topic-2',
+      'relearn-topic-topic-1',
+    ]);
+  });
+
+  // [WI-1463 / AC-3] Manual topic picking remains available as an override —
+  // tapping a topic other than the top-ranked one still starts relearn for
+  // that topic, not the recommended one.
+  it('lets the learner override the default order by tapping a lower-ranked topic', async () => {
+    renderRelearn();
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-topics-phase');
+    });
+
+    fireEvent.press(screen.getByTestId('relearn-topic-topic-2'));
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-method-phase');
+    });
+
+    expect(mockReportActivationEvent).toHaveBeenCalledWith(
+      'review_card_tapped',
+      {
+        occurrenceId: 'topic-2',
+        route: 'topic.relearn',
+        metadata: { occurrenceKind: 'topicId' },
+      },
+    );
+  });
+
+  // [WI-1463 / AC-4] The default-order copy communicates a system-suggested
+  // starting point with learner choice, not adult self-diagnosis framing.
+  // OWNER_PROFILE's birthYear (2010) makes this profile a minor, so the
+  // rendered copy is the "Young" variant — see buildCopy()/isMinor above.
+  it('renders system-suggested-order copy instead of self-diagnosis framing', async () => {
+    renderRelearn();
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-topics-phase');
+    });
+
+    screen.getByText(
+      "We've put these in order to start with — you can pick a different one.",
+    );
   });
 
   it('skips straight to the method phase for direct topic entry', async () => {

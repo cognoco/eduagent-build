@@ -210,17 +210,19 @@ export async function getOverdueTopicsGrouped(
     };
 
     entry.overdueCount += 1;
+    const band = bandForCard(card.lastReviewedAt, card.intervalDays);
     const topic: OverdueTopic = {
       topicId: card.topicId,
       topicTitle: card.topicTitle,
       overdueDays: toOverdueDays(now, card.nextReviewAt),
       failureCount: card.failureCount ?? 0,
       reason: 'overdue',
+      retentionStatus: band,
     };
     entry.topics.push(topic);
     topicLookup.set(card.topicId, topic);
     sortMeta.set(card.topicId, {
-      bandRank: BAND_RANK[bandForCard(card.lastReviewedAt, card.intervalDays)],
+      bandRank: BAND_RANK[band],
       flaggedRecencyMs: 0,
     });
 
@@ -254,6 +256,9 @@ export async function getOverdueTopicsGrouped(
       overdueDays: 0,
       failureCount: 0,
       reason: 'flagged_weak',
+      // Flagged-only rows have no SM-2 schedule to derive a band from — treat
+      // as 'forgotten' to match the BAND_RANK.forgotten assigned below.
+      retentionStatus: 'forgotten',
       ...(flagged.concept != null ? { concept: flagged.concept } : {}),
     };
     entry.topics.push(topic);

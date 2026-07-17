@@ -13,6 +13,7 @@ import {
 } from './snapshots';
 import { consentStatusSchema } from './consent';
 import { struggleStatusSchema } from './struggle-status';
+import { retentionStatusSchema } from './retention-status.ts';
 import { isoDateField } from './common';
 // [SC-04] Canonical session-type and engagement-signal enums — import instead of redefining inline.
 // Imported from the ./session-enums.ts leaf (not ./sessions) to avoid a circular
@@ -634,6 +635,14 @@ export const overdueTopicSchema = z.object({
   reason: z.enum(['overdue', 'flagged_weak', 'both']).optional(),
   // Concept label carried from a flagged needs-deepening row, when present.
   concept: z.string().optional(),
+  // [WI-1463] SM-2 retention band backing this topic's urgency (the same
+  // BAND_RANK classification services/overdue-topics.ts already sorts each
+  // subject's topics by). Exposed so the mobile relearn screen can present a
+  // single default order across ALL visible subjects — matching, not
+  // re-deriving, the server's per-subject worst-first ordering — instead of
+  // letting subject grouping demote an urgent topic in a small subject below
+  // a less-urgent one in a larger subject.
+  retentionStatus: retentionStatusSchema,
 });
 export type OverdueTopic = z.infer<typeof overdueTopicSchema>;
 

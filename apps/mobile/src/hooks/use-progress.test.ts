@@ -407,6 +407,7 @@ describe('useOverdueTopics', () => {
                   topicTitle: 'Algebra',
                   overdueDays: 3,
                   failureCount: 1,
+                  retentionStatus: 'forgotten',
                 },
               ],
             },
