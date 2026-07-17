@@ -65,6 +65,7 @@
   "private": true,
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
+    "@babel/plugin-transform-react-jsx": "7.27.1",
     "@babel/runtime": "~7.27.6",
     "@commitlint/cli": "^20.1.0",
     "@commitlint/config-conventional": "^20.0.0",
