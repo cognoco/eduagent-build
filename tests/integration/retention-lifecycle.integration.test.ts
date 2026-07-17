@@ -469,7 +469,11 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     const body = await res.json();
     expect(body.result.passed).toBe(false);
     expect(body.result.failureCount).toBe(3);
-    expect(body.result.failureAction).toBe('re_teach');
+    // [WI-1462] failureAction stays wire-compatible ('feedback_only') for a
+    // client on the pre-WI-1462 schema; offRampStage is the new additive
+    // discriminator a client on the new schema reads for the off-ramp.
+    expect(body.result.failureAction).toBe('feedback_only');
+    expect(body.result.offRampStage).toBe('re_teach');
     // Bounded, same-flow off-ramp — no forced library/relearn navigation yet.
     expect(body.result.remediation).toBeUndefined();
   });
@@ -507,9 +511,12 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     expect(body.result.passed).toBe(false);
     // Honest SM-2 state — the park is a warm exit, not a synthetic override.
     expect(body.result.failureCount).toBe(4);
-    expect(body.result.failureAction).toBe('topic_parked');
+    // [WI-1462] failureAction stays wire-compatible ('redirect_to_library')
+    // for backward compat; offRampStage carries the new distinction.
+    expect(body.result.failureAction).toBe('redirect_to_library');
+    expect(body.result.offRampStage).toBe('topic_parked');
     expect(body.result.remediation).toMatchObject({
-      action: 'topic_parked',
+      action: 'redirect_to_library',
       topicTitle: 'Introduction to Calculus',
     });
     // Review-and-retest/relearn remain explicit fallback choices (AC-4).
