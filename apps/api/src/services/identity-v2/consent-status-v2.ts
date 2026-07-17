@@ -39,21 +39,66 @@ import {
   membership,
   type Database,
 } from '@eduagent/database';
-import type { ConsentStatus } from '@eduagent/schemas';
+import type {
+  ConsentStatus,
+  ConsentAccountabilityRecord,
+} from '@eduagent/schemas';
 
-/** The default (and currently only) consent purpose. */
+/** The default (and original) consent purpose — general platform use. */
 export const DEFAULT_CONSENT_PURPOSE = 'platform_use';
 
 /**
- * The two regulatory bases the consent workflow runs per (mirroring the legacy
- * GDPR/COPPA dual-row coexistence). `requested_basis` on consent_request and
- * `lawful_basis` on consent_grant draw from the same value set.
+ * [WI-1193] The LLM-disclosure purpose — "per-purpose, separate consent for the
+ * LLM-disclosure purpose" per data-model.md §4.8 / MMT-ADR-0011 §3 (`inv 12/27`,
+ * `I-PB-B2a`). The canon anticipated this purpose since the consent_grant table
+ * was designed; this is its first writer. Independently recorded/revocable from
+ * `DEFAULT_CONSENT_PURPOSE` — same key shape (charge × purpose × org × basis),
+ * different `purpose` value.
  */
-export type ConsentBasis = 'gdpr_parental_consent' | 'coppa_parental_consent';
+export const CONSENT_PURPOSE_LLM_DISCLOSURE = 'llm_disclosure';
+
+/**
+ * [WI-1193] The purposes recorded for adult self-consent at signup (AC2 purpose
+ * split). Each is its own consent_grant row, independently withdrawable via
+ * `withdrawAdultSelfConsentV2` (consent-v2.ts) — withdrawing one never touches
+ * the other's row.
+ */
+export const ADULT_SELF_CONSENT_PURPOSES = [
+  DEFAULT_CONSENT_PURPOSE,
+  CONSENT_PURPOSE_LLM_DISCLOSURE,
+] as const;
+
+/**
+ * The regulatory/lawful bases the consent workflow runs per (mirroring the
+ * legacy GDPR/COPPA dual-row coexistence, plus the [WI-1193] adult self-consent
+ * basis). `requested_basis` on consent_request and `lawful_basis` on
+ * consent_grant draw from the same value set.
+ *
+ * `adult_self_consent`: an adult (age >= 18) processing their OWN data with no
+ * guardian in the picture — the general "data subject consent" lawful basis
+ * (maps to the ratified data-model's `art6_1_a` value; kept in this file's
+ * existing `<regime>_<who>_consent` naming style rather than the ADR's abstract
+ * article-citation naming — a documented, deliberate divergence, not drift).
+ * `consent_request` has NO writer for this basis (see createIdentityGraph /
+ * recordAdultSelfConsentV2 in consent-v2.ts): the acceptance IS the signup
+ * action, so there is no pre-grant workflow to model.
+ */
+export type ConsentBasis =
+  | 'gdpr_parental_consent'
+  | 'coppa_parental_consent'
+  | 'adult_self_consent';
 
 /**
  * Fixed basis priority for the AnyBasis tiebreak (GDPR first), matching the
  * §2.3a ordering rule. Lower index = higher priority.
+ *
+ * [WI-1193] Deliberately excludes `adult_self_consent`: this list is the
+ * bug-compatible legacy PARENTAL-consent reduction (see
+ * `resolveLatestConsentStatusAnyBasis` below) that existing dashboard/family
+ * call sites depend on verbatim. Adding the adult basis here would change
+ * their output for every adult who now holds a self-consent grant — callers
+ * that want the adult's status use the basis-explicit `resolveConsentStatus`
+ * with `basis: 'adult_self_consent'` instead.
  */
 const BASIS_PRIORITY: readonly ConsentBasis[] = [
   'gdpr_parental_consent',
@@ -685,4 +730,65 @@ export function consentGateSatisfiedSql(personColumn: ReturnType<typeof sql>) {
       )
     )
   )`;
+}
+
+// ---------------------------------------------------------------------------
+// [WI-1193] Accountability report (AC3 — GDPR Art 5(2)/7(1))
+// ---------------------------------------------------------------------------
+
+/**
+ * [WI-1193 AC3] The CURRENT consent_grant row per (purpose, lawful_basis) for a
+ * charge — lawful basis + terms-accepted timestamp (`grantedAt`, renamed here
+ * to `termsAcceptedAt` — the CONSENTED grant IS the terms-acceptance event) +
+ * accepted purposes, in ONE query, satisfying GDPR Art 5(2)/7(1) accountability
+ * (must be able to demonstrate consent on request).
+ *
+ * `DISTINCT ON (purpose, lawful_basis) ... ORDER BY purpose, lawful_basis,
+ * granted_at DESC, id DESC` reuses the exact (granted_at DESC, id DESC)
+ * tiebreak the reducer/window queries above use to pick the CURRENT grant per
+ * key — this is that windowing expressed as a single-query DISTINCT ON instead
+ * of per-basis round-trips, since a report spans every purpose/basis a charge
+ * has ever held, not one basis at a time.
+ */
+export async function getConsentAccountabilityV2(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+): Promise<ConsentAccountabilityRecord[]> {
+  const rows = (await db.execute(sql`
+    SELECT DISTINCT ON (purpose, lawful_basis)
+      purpose, lawful_basis, granted, granted_at, withdrawn_at
+    FROM consent_grant
+    WHERE charge_person_id = ${chargePersonId}
+      AND organization_id = ${organizationId}
+    ORDER BY purpose, lawful_basis, granted_at DESC, id DESC
+  `)) as unknown as
+    | Array<{
+        purpose: string;
+        lawful_basis: string;
+        granted: boolean;
+        granted_at: string | Date;
+        withdrawn_at: string | Date | null;
+      }>
+    | {
+        rows: Array<{
+          purpose: string;
+          lawful_basis: string;
+          granted: boolean;
+          granted_at: string | Date;
+          withdrawn_at: string | Date | null;
+        }>;
+      };
+  const list = Array.isArray(rows) ? rows : rows.rows;
+  // The Neon driver returns raw `db.execute` timestamp columns as ISO strings,
+  // not Date objects (the Drizzle query builder's type parsers don't apply to
+  // a bare `sql` execute) — coerce explicitly, same pattern as the
+  // `minGrantedAt` aggregate above.
+  return list.map((r) => ({
+    purpose: r.purpose,
+    lawfulBasis: r.lawful_basis,
+    granted: r.granted,
+    termsAcceptedAt: new Date(r.granted_at),
+    withdrawnAt: r.withdrawn_at ? new Date(r.withdrawn_at) : null,
+  }));
 }

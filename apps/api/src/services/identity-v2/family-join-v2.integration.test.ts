@@ -296,6 +296,71 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
     },
   );
 
+  // [WI-1193] CAPABLE_BIRTH_YEAR (18) is a genuine adult by the codebase's
+  // adult threshold, and createIdentityGraph now writes 'adult_self_consent'
+  // consent_grant rows for a self-registered adult owner at signup — so the
+  // accepting person here (self-consent-capable at 17+, admitting real 18+
+  // adults too) arrives holding their own consent grants. Before WI-1193's
+  // family-join-v2.ts fix, the teardown asserted zero consent_grant rows for
+  // the org-of-one and THREW ConflictError, refusing every such adult's join.
+  // GREEN: the grants survive, re-pointed at the family org — not stranded,
+  // not silently dropped (GDPR Art 5(2)/7(1) accountability).
+  itGraph(
+    '[WI-1193] an adult self-registered owner holding consent_grant rows joins cleanly — grants re-homed to the family org, not stranded',
+    async () => {
+      const family = await seedGraph({
+        birthYear: 1990,
+        displayName: 'Parent',
+      });
+      const adultTeen = await seedGraph({
+        birthYear: CAPABLE_BIRTH_YEAR,
+        displayName: 'Adult Teen',
+      });
+
+      // Precondition: the seed graph really did write the adult's own consent
+      // grants under the org-of-one (else this test would vacuously pass).
+      const preJoinGrants = await db.query.consentGrant.findMany({
+        where: eq(consentGrant.chargePersonId, adultTeen.personId),
+      });
+      expect(preJoinGrants.length).toBeGreaterThan(0);
+      for (const g of preJoinGrants) {
+        expect(g.organizationId).toBe(adultTeen.orgId);
+      }
+
+      await acceptFamilyJoin(db, {
+        teenPersonId: adultTeen.personId,
+        ...(await seedInvite({
+          inviterPersonId: family.personId,
+          familyOrgId: family.orgId,
+        })),
+        familyOrgId: family.orgId,
+        parentPersonId: family.personId,
+        optInSupportership: false,
+      });
+
+      // Grants survive, re-pointed at the family org — same rows (same count,
+      // same purposes/basis), not re-created and not left stranded.
+      const postJoinGrants = await db.query.consentGrant.findMany({
+        where: eq(consentGrant.chargePersonId, adultTeen.personId),
+      });
+      expect(postJoinGrants).toHaveLength(preJoinGrants.length);
+      for (const g of postJoinGrants) {
+        expect(g.organizationId).toBe(family.orgId);
+      }
+      expect(postJoinGrants.map((g) => g.id).sort()).toEqual(
+        preJoinGrants.map((g) => g.id).sort(),
+      );
+
+      // The org-of-one is still cleanly torn down (RESTRICT satisfied by the
+      // re-home, not by a delete).
+      expect(
+        await db.query.organization.findFirst({
+          where: eq(organization.id, adultTeen.orgId),
+        }),
+      ).toBeUndefined();
+    },
+  );
+
   // AC-3 (no auto-guardianship) + AC-4 (person_id stable).
   itGraph(
     'never writes a guardianship row and preserves the teen person id',
