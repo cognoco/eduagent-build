@@ -51,6 +51,10 @@ import {
 } from '@eduagent/database';
 import {
   cancelDeletionV2,
+  deleteArchivedPersonIfStillEligibleV2,
+  deletePersonIfConsentWithdrawnV2,
+  deletePersonIfNoConsentV2,
+  deletePersonV2,
   executeDeletionV2,
   scheduleDeletionV2,
 } from './deletion-v2';
@@ -439,6 +443,164 @@ const RUN = !!process.env.DATABASE_URL;
         columns: { id: true },
       });
       expect(outsiderRow).toBeDefined();
+    });
+
+    // -----------------------------------------------------------------------
+    // [WI-1985] Person-scoped deletes must ALSO tear down the erased person's
+    // guardianship/supportership edges — the same incident-scoped teardown the
+    // whole-org path does (Gap 3 above), but at single-person granularity. All
+    // four person-scoped delete functions end in `tx.delete(person)`; a managed
+    // child ALWAYS sits on a guardianship edge (as the charge), whose
+    // `charge_person_id ON DELETE RESTRICT` FK aborts the delete unless the edge
+    // is severed first. Without the fix every statutory auto-erasure pipeline
+    // (consent-withdrawal, day-30 no-consent, archived-cleanup) FK-violates and
+    // rolls back — erasure never completes for a managed child. The counterpart
+    // (the surviving guardian/supporter, in-org or cross-org) is untouched.
+    //
+    // Red-green-revert (recorded in the PR): reverting the shared
+    // `tearDownPersonEdgesTx` teardown makes ALL FOUR of these throw on the
+    // guardianship RESTRICT FK (RED); restoring it → 'deleted'/true (GREEN).
+    // -----------------------------------------------------------------------
+
+    describe('person-scoped deletes tear down edges (WI-1985)', () => {
+      const personExists = async (id: string): Promise<boolean> =>
+        !!(await db.query.person.findFirst({
+          where: eq(person.id, id),
+          columns: { id: true },
+        }));
+
+      /**
+       * A managed child in `orgId`: a person + membership + a guardianship edge
+       * from the org owner (guardian) to the child (charge). The child's
+       * `charge_person_id` RESTRICT FK is what blocks the person delete pre-fix.
+       */
+      async function seedManagedChild(
+        orgId: string,
+        ownerId: string,
+        opts: { archivedAt?: Date } = {},
+      ): Promise<string> {
+        const [child] = await db
+          .insert(person)
+          .values({
+            displayName: 'Managed Child',
+            birthDate: '2015-01-01',
+            residenceJurisdiction: 'EU',
+            ...(opts.archivedAt ? { archivedAt: opts.archivedAt } : {}),
+          })
+          .returning();
+        personIds.push(child!.id);
+        await db.insert(membership).values({
+          personId: child!.id,
+          organizationId: orgId,
+          roles: ['learner'],
+        });
+        await db.insert(guardianship).values({
+          guardianPersonId: ownerId,
+          chargePersonId: child!.id,
+        });
+        return child!.id;
+      }
+
+      it('[WI-1985 deletePersonV2] hard-deletes an edge-bearing managed child, severs its guardianship + supportership edges, and leaves the (in-org and cross-org) counterparts intact', async () => {
+        const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+        const childId = await seedManagedChild(orgId, ownerId);
+        // A CROSS-ORG supporter also supports the child; only the edge drops.
+        const outsiderId = await seedOutsidePerson('WI1985 Supporter');
+        await db.insert(supportership).values({
+          supporterPersonId: outsiderId,
+          supporteePersonId: childId,
+        });
+
+        // RED (pre-fix): tx.delete(person) aborts on the guardianship
+        // charge_person_id (and supportership supportee_person_id) RESTRICT FK
+        // and this throws. GREEN (with fix): both edges are severed first.
+        await deletePersonV2(db, childId, 'guardian_initiated', ownerId);
+
+        expect(await personExists(childId)).toBe(false);
+        // The surviving guardian and the cross-org supporter are untouched.
+        expect(await personExists(ownerId)).toBe(true);
+        expect(await personExists(outsiderId)).toBe(true);
+        // Both incident edges are gone.
+        const guardianEdge = await db.query.guardianship.findFirst({
+          where: eq(guardianship.chargePersonId, childId),
+          columns: { id: true },
+        });
+        expect(guardianEdge).toBeUndefined();
+        const supportEdge = await db.query.supportership.findFirst({
+          where: eq(supportership.supporteePersonId, childId),
+          columns: { id: true },
+        });
+        expect(supportEdge).toBeUndefined();
+        // The retain-tier audit row still lands.
+        const audit = await db.query.deletionAudit.findFirst({
+          where: eq(deletionAudit.personId, childId),
+          columns: { id: true },
+        });
+        expect(audit).toBeDefined();
+      });
+
+      it('[WI-1985 deletePersonIfConsentWithdrawnV2] deletes a consent-withdrawn managed child despite its guardianship edge', async () => {
+        const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+        const childId = await seedManagedChild(orgId, ownerId);
+        // A withdrawn GDPR grant so the consent predicate passes and the delete
+        // is reached (the FK, not the predicate, is what fails pre-fix).
+        await db.insert(consentGrant).values({
+          chargePersonId: childId,
+          organizationId: orgId,
+          purpose: 'platform_use',
+          lawfulBasis: 'gdpr_parental_consent',
+          granted: false,
+          grantedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          withdrawnAt: new Date(),
+        });
+
+        const deleted = await deletePersonIfConsentWithdrawnV2(db, childId);
+        expect(deleted).toBe(true);
+        expect(await personExists(childId)).toBe(false);
+        expect(await personExists(ownerId)).toBe(true);
+        const guardianEdge = await db.query.guardianship.findFirst({
+          where: eq(guardianship.chargePersonId, childId),
+          columns: { id: true },
+        });
+        expect(guardianEdge).toBeUndefined();
+      });
+
+      it('[WI-1985 deletePersonIfNoConsentV2] deletes a no-consent managed child despite its guardianship edge', async () => {
+        const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+        const childId = await seedManagedChild(orgId, ownerId);
+        // No consent grant at all → no current granted consent → eligible.
+
+        const deleted = await deletePersonIfNoConsentV2(db, childId);
+        expect(deleted).toBe(true);
+        expect(await personExists(childId)).toBe(false);
+        expect(await personExists(ownerId)).toBe(true);
+        const guardianEdge = await db.query.guardianship.findFirst({
+          where: eq(guardianship.chargePersonId, childId),
+          columns: { id: true },
+        });
+        expect(guardianEdge).toBeUndefined();
+      });
+
+      it('[WI-1985 deleteArchivedPersonIfStillEligibleV2] deletes an archived, retention-eligible managed child despite its guardianship edge', async () => {
+        const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+        // Archived well before the retention cutoff, no current grant → eligible.
+        const archivedAt = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+        const childId = await seedManagedChild(orgId, ownerId, { archivedAt });
+
+        const deleted = await deleteArchivedPersonIfStillEligibleV2(
+          db,
+          childId,
+          new Date(),
+        );
+        expect(deleted).toBe(true);
+        expect(await personExists(childId)).toBe(false);
+        expect(await personExists(ownerId)).toBe(true);
+        const guardianEdge = await db.query.guardianship.findFirst({
+          where: eq(guardianship.chargePersonId, childId),
+          columns: { id: true },
+        });
+        expect(guardianEdge).toBeUndefined();
+      });
     });
 
     // -----------------------------------------------------------------------
