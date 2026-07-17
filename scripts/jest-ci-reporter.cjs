@@ -5,7 +5,7 @@
 // compact end-of-log failure block. Designed to coexist with the default
 // reporter — it does NOT replace per-test PASS/FAIL output.
 //
-// Activated when CI=true. See docs/superpowers/specs/2026-05-14-ci-failure-readability-design.md.
+// Activated when CI=true.
 
 const fs = require('fs');
 const path = require('path');
