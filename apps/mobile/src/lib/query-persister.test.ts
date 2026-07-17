@@ -144,6 +144,36 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(shouldPersistQuery(query)).toBe(false);
   });
 
+  it('excludes session-summary queries (AI paraphrase/quotes) from persistence', () => {
+    const query = makeSuccessfulQuery([
+      'session-summary',
+      'study',
+      'session-1',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(query)).toBe(false);
+  });
+
+  it('excludes parking-lot queries (verbatim child-typed questions) from persistence, including the topic-parking-lot variant', () => {
+    const parkingLot = makeSuccessfulQuery([
+      'parking-lot',
+      'study',
+      'session-1',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(parkingLot)).toBe(false);
+
+    const topicParkingLot = makeSuccessfulQuery([
+      'parking-lot',
+      'study',
+      'topic',
+      'subject-1',
+      'topic-1',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(topicParkingLot)).toBe(false);
+  });
+
   it('persists an ordinary successful query (default behavior preserved)', () => {
     const query = makeSuccessfulQuery(['subjects', USER]);
     expect(shouldPersistQuery(query)).toBe(true);
@@ -161,13 +191,23 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(shouldPersistQuery(query)).toBe(false);
   });
 
-  it('[integration] persistQueryClientSave writes ordinary data but drops transcript data to AsyncStorage', async () => {
+  it('[integration] persistQueryClientSave writes ordinary data but drops transcript/summary/parking-lot data to AsyncStorage', async () => {
     const client = new QueryClient();
     client.setQueryData(['subjects', USER], [{ id: 's1' }]);
     client.setQueryData(['session-transcript', 'study', 'session-1', USER], {
       session: { sessionId: 'session-1' },
       exchanges: [{ role: 'learner', text: 'my real chat message' }],
     });
+    client.setQueryData(['session-summary', 'study', 'session-1', USER], {
+      content: 'AI paraphrase of the session',
+      aiFeedback: 'great work identifying the pattern',
+      closingLine: 'see you next time',
+      learnerRecap: 'I learned about fractions',
+    });
+    client.setQueryData(
+      ['parking-lot', 'study', 'session-1', USER],
+      [{ id: 'q1', text: 'why does the sky look blue at sunset' }],
+    );
 
     await persistQueryClientSave({
       queryClient: client,
@@ -179,6 +219,11 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(raw).not.toBeNull();
     expect(raw).not.toContain('my real chat message');
     expect(raw).not.toContain('session-transcript');
+    expect(raw).not.toContain('AI paraphrase of the session');
+    expect(raw).not.toContain('learnerRecap');
+    expect(raw).not.toContain('session-summary');
+    expect(raw).not.toContain('why does the sky look blue at sunset');
+    expect(raw).not.toContain('parking-lot');
     expect(raw).toContain('subjects');
   });
 });

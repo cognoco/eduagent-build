@@ -124,6 +124,17 @@ export async function signOutWithCleanup(
       // Non-fatal — same policy as clearProfileSecureStorageOnSignOut below:
       // better to continue sign-out than abort over one storage failure.
     });
+  } else {
+    // [WI-1987] clerkUserId is unavailable (identity not yet loaded — e.g.
+    // auth-expired 401 handler, profile-load-timeout), so the deterministic
+    // scoped removal above is skipped and we fall back to the racy
+    // queryClient.clear() + persister-throttle path. Breadcrumb so this
+    // fallback is observable in production rather than silently occurring.
+    Sentry.addBreadcrumb({
+      category: 'auth',
+      level: 'warning',
+      message: 'sign-out: scoped persister removal skipped (no clerkUserId)',
+    });
   }
 
   // [SEC-SENTRY-SCOPE] Wipe the Sentry scope so that any crash between

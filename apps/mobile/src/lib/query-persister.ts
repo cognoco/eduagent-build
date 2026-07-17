@@ -100,9 +100,19 @@ export function createScopedPersister(userId: string | null | undefined) {
 // storage, so this wrote full chat transcripts to plaintext disk. Add a new
 // query-key prefix here for any future query whose data is a raw transcript
 // or other sensitive PII that must never be written to disk.
+//
+// Also denylisted (same audit pass):
+// - `session-summary` (queryKeys.sessions.summary, used by useSessionSummary
+//   in use-sessions.ts) — AI paraphrase/quotes of the session (content,
+//   aiFeedback, closingLine, learnerRecap).
+// - `parking-lot` (queryKeys.sessions.parkingLot AND topicParkingLot, both
+//   used in use-sessions.ts — they share the same first queryKey segment) —
+//   verbatim child-typed questions.
 // ---------------------------------------------------------------------------
 export const NEVER_PERSIST_QUERY_KEY_PREFIXES: ReadonlySet<string> = new Set([
   'session-transcript',
+  'session-summary',
+  'parking-lot',
 ]);
 
 /**
