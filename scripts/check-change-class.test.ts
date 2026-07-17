@@ -318,6 +318,31 @@ describe('check-change-class.sh', () => {
     expect(flags.integration).toBe('true');
   });
 
+  // WI-1992: a service-only diff (apps/api/src/services/**, non-prompt) only
+  // ever scheduled test:api:unit, so the CI change-class router's `integration`
+  // output stayed false for exactly the class the audit's security-fix break
+  // tests need (tests/integration/ + apps/api/src/**/*.integration.test.ts
+  // never ran). Sibling classes (api-routes, api-middleware) already schedule
+  // both; api-services was the gap.
+  it('routes a service-only diff through the API integration suites (api-services class)', () => {
+    mkdirSync(join(repo, 'apps', 'api', 'src', 'services'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(repo, 'apps', 'api', 'src', 'services', 'streak.ts'),
+      'export const s = 1;\n',
+    );
+    git(repo, ['add', '.']);
+
+    const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+    expect(output).toContain('api-services');
+    expect(output).toContain('pnpm test:api:integration');
+
+    const flags = runRouter(repo);
+    expect(flags.classes).toContain('api-services');
+    expect(flags.integration).toBe('true');
+  });
+
   it('emits false flags for an unclassified-only change', () => {
     writeFileSync(join(repo, 'notes.txt'), 'hello\n');
     git(repo, ['add', '.']);

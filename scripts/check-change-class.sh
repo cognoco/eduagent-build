@@ -317,6 +317,7 @@ API_SVC=$(filter_files '^apps/api/src/services/' | grep -vE '(-prompts\.ts$|/llm
 if [[ -n "$API_SVC" ]]; then
   CLASSES+=("api-services")
   add_cmd fast  "pnpm test:api:unit"         "API unit tests"
+  add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
 fi
 
 # ── Identity-v2 Seam (WI-1305 / R6) ──────────────────────────────────────
