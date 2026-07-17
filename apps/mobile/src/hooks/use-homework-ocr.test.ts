@@ -81,6 +81,9 @@ jest.mock('expo-file-system/legacy', () => ({
   // gc1-allow: native-boundary
   cacheDirectory: 'file:///cache/',
   copyAsync: (...args: unknown[]) => mockCopyAsync(...args),
+  deleteAsync: (...args: unknown[]) => mockDeleteAsync(...args),
+  readDirectoryAsync: (...args: unknown[]) => mockReadDirectoryAsync(...args),
+  getInfoAsync: (...args: unknown[]) => mockGetInfoAsync(...args),
 }));
 
 // Simulate ML Kit native module being linked
@@ -89,6 +92,9 @@ NativeModules.TextRecognition = { recognize: jest.fn() };
 const mockRecognize = jest.fn();
 const mockManipulateAsync = jest.fn();
 const mockCopyAsync = jest.fn().mockResolvedValue(undefined);
+const mockDeleteAsync = jest.fn().mockResolvedValue(undefined);
+const mockReadDirectoryAsync = jest.fn().mockResolvedValue([]);
+const mockGetInfoAsync = jest.fn().mockResolvedValue({ exists: false });
 
 function createWrapper() {
   return createHookWrapper({
@@ -107,6 +113,12 @@ beforeEach(() => {
   mockManipulateAsync.mockReset();
   mockManipulateAsync.mockResolvedValue({ uri: 'file:///cache/resized.jpg' });
   mockCopyAsync.mockResolvedValue(undefined);
+  mockDeleteAsync.mockReset();
+  mockDeleteAsync.mockResolvedValue(undefined);
+  mockReadDirectoryAsync.mockReset();
+  mockReadDirectoryAsync.mockResolvedValue([]);
+  mockGetInfoAsync.mockReset();
+  mockGetInfoAsync.mockResolvedValue({ exists: false });
   formDataGlobal.FormData = MockFormData as unknown as typeof FormData;
   global.fetch = mockFetch as typeof fetch;
 });
@@ -185,6 +197,146 @@ describe('useHomeworkOcr', () => {
       [{ resize: { width: 1600 } }],
       { format: 'jpeg', compress: 0.9 },
     );
+  });
+
+  // [WI-1988] Homework capture files (the stable cache copy + resized OCR/
+  // upload intermediates) accumulate indefinitely in device cache unless the
+  // hook explicitly deletes them — OS cache eviction is not a retention
+  // policy, and these are photos of a minor's handwriting.
+  describe('cache cleanup (WI-1988)', () => {
+    it('leaves no homework capture file behind after a successful OCR read (happy path)', async () => {
+      mockManipulateAsync.mockResolvedValue({
+        uri: 'file:///cache/resized-local.jpg',
+      });
+      mockRecognize.mockResolvedValue({ text: 'Solve for x: 2x + 5 = 13' });
+
+      const { result } = renderHook(() => useHomeworkOcr(), {
+        wrapper: createWrapper(),
+      });
+
+      await act(async () => {
+        await result.current.process('file:///tmp/photo.jpg');
+      });
+
+      expect(result.current.status).toBe('done');
+      const stableUri = mockCopyAsync.mock.calls[0][0].to as string;
+
+      // Both files this capture wrote to cache — the stable copy from
+      // copyToCache() and the resized intermediate from resizeImage() —
+      // must have been deleted. Nothing is left in the cache.
+      expect(mockDeleteAsync).toHaveBeenCalledWith(stableUri, {
+        idempotent: true,
+      });
+      expect(mockDeleteAsync).toHaveBeenCalledWith(
+        'file:///cache/resized-local.jpg',
+        { idempotent: true },
+      );
+    });
+
+    it('deletes the previous stable copy when a new capture replaces it', async () => {
+      mockRecognize
+        .mockResolvedValueOnce({
+          text: Array.from({ length: 130 }, () => 'word').join(' '),
+        })
+        .mockResolvedValueOnce({ text: 'What is new text found' });
+
+      const { result } = renderHook(() => useHomeworkOcr(), {
+        wrapper: createWrapper(),
+      });
+
+      // First capture: no real homework cue and no fetch mock, so the
+      // server fallback also fails — it ends in 'error', which keeps the
+      // stable copy alive for retry() (matches the "process(newUri) DOES
+      // reset failCount" behavior above).
+      await act(async () => {
+        await result.current.process('file:///tmp/photo1.jpg');
+      });
+      expect(result.current.status).toBe('error');
+      const firstStableUri = mockCopyAsync.mock.calls[0][0].to as string;
+      expect(mockDeleteAsync).not.toHaveBeenCalledWith(firstStableUri, {
+        idempotent: true,
+      });
+
+      // Second capture replaces the first before it ever completed.
+      await act(async () => {
+        await result.current.process('file:///tmp/photo2.jpg');
+      });
+
+      expect(result.current.status).toBe('done');
+      expect(mockDeleteAsync).toHaveBeenCalledWith(firstStableUri, {
+        idempotent: true,
+      });
+    });
+
+    it('deletes the stable copy on unmount when OCR ended in error', async () => {
+      mockRecognize.mockResolvedValue({
+        text: Array.from({ length: 130 }, () => 'word').join(' '),
+      });
+      // No fetch mock => server fallback also fails => status ends
+      // 'error', leaving the stable copy live (kept around for retry()).
+
+      const { result, unmount } = renderHook(() => useHomeworkOcr(), {
+        wrapper: createWrapper(),
+      });
+
+      await act(async () => {
+        await result.current.process('file:///tmp/photo.jpg');
+      });
+      expect(result.current.status).toBe('error');
+
+      const stableUri = mockCopyAsync.mock.calls[0][0].to as string;
+      expect(mockDeleteAsync).not.toHaveBeenCalledWith(stableUri, {
+        idempotent: true,
+      });
+
+      unmount();
+
+      expect(mockDeleteAsync).toHaveBeenCalledWith(stableUri, {
+        idempotent: true,
+      });
+    });
+
+    it('sweeps orphaned homework cache files older than the TTL on mount', async () => {
+      mockReadDirectoryAsync.mockResolvedValue([
+        'homework-100.jpg', // stale — older than TTL
+        'homework-200.jpg', // fresh — within TTL
+        'unrelated-file.jpg', // not ours — must not be touched
+      ]);
+      const now = Date.now();
+      const staleModifiedSeconds = (now - 25 * 60 * 60 * 1000) / 1000;
+      const freshModifiedSeconds = (now - 1000) / 1000;
+      mockGetInfoAsync.mockImplementation(async (uri: string) => {
+        if (uri === 'file:///cache/homework-100.jpg') {
+          return { exists: true, modificationTime: staleModifiedSeconds };
+        }
+        if (uri === 'file:///cache/homework-200.jpg') {
+          return { exists: true, modificationTime: freshModifiedSeconds };
+        }
+        return { exists: false };
+      });
+
+      renderHook(() => useHomeworkOcr(), { wrapper: createWrapper() });
+
+      // The sweep is fire-and-forget on mount; flush its promise chain
+      // (readDirectoryAsync -> getInfoAsync -> deleteAsync) past a
+      // macrotask boundary so pending microtasks settle first.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(mockDeleteAsync).toHaveBeenCalledWith(
+        'file:///cache/homework-100.jpg',
+        { idempotent: true },
+      );
+      expect(mockDeleteAsync).not.toHaveBeenCalledWith(
+        'file:///cache/homework-200.jpg',
+        { idempotent: true },
+      );
+      expect(mockDeleteAsync).not.toHaveBeenCalledWith(
+        'file:///cache/unrelated-file.jpg',
+        { idempotent: true },
+      );
+    });
   });
 
   it('uses server vision OCR instead of a local non-homework dump', async () => {
