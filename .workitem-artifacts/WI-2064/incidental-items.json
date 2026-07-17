@@ -1,0 +1,9 @@
+[
+  {
+    "title": "Consent-withdrawal bearer token: server-side revocation + expiry",
+    "description": "Mitigation ruled mitigate-before-launch by WI-2064's threat posture (OPQ-114, T-10 in docs/compliance/2026-07-17-consent-withdrawal-bearer-token-threat-posture.md). The cw1 consent-withdrawal bearer token (apps/api/src/services/consent-withdrawal-token.ts) is stateless, non-expiring, and has no per-link revocation, so a leaked or forwarded link remains exploitable indefinitely and cannot be individually invalidated short of rotating the global CONSENT_WITHDRAWAL_TOKEN_SECRET (which invalidates every outstanding link at once). Required security property: a withdrawn or superseded link becomes unusable, and links expire. The specific mechanism (DB-backed revocation record vs. cache, TTL length, UX for an expired-but-otherwise-legitimate request) is left to the owning implementation Work Item — MMT-ADR-0029's 'Alternatives considered' #2 (a DB-stored, revocable withdrawal handle) is the nearest already-considered design and may inform it, but is not prescribed as the only valid approach. Any implementation must add focused unit/integration tests for expiry and revocation (per WI-2064 AC-6) and must not regress the existing idempotency/no-enumeration/rate-limiting behavior verified in consent-withdrawal-token.test.ts and consent-web.integration.test.ts. Origin: WI-2064.",
+    "type": "Task",
+    "priority": "P1",
+    "tags": ["security", "compliance", "consent-withdrawal"]
+  }
+]
