@@ -48,6 +48,7 @@ import { getTierConfig } from '../subscription';
 import { resolveIdentityV2, type ResolvedIdentityV2 } from './identity-resolve';
 import { checkConsentRequiredFromDate } from '../consent';
 import { ProfileValidationError } from '../profile';
+import { recordAdultSelfConsentV2 } from './consent-v2';
 
 const logger = createLogger();
 
@@ -312,6 +313,21 @@ export async function createIdentityGraph(
         organizationId: orgRow.id,
         roles: ['admin', 'learner'],
       });
+
+      // (6a) [WI-1193 AC1] Adult self-consent: a self-registered owner who is a
+      // true adult (age >= 18 — the codebase's established adult threshold, e.g.
+      // family-access.ts / child-profile-v2.ts's `adultOwnerGateEnabled` gate;
+      // NOT the GDPR-consent-required age-16 threshold `consentCheck` also
+      // carries) has no guardian to consent on their behalf, so record their own
+      // lawful-basis + terms-accepted fact here — this bootstrap IS the signup
+      // acceptance point. A self-registered OWNER aged 13-17 (self-consent-
+      // capable per `consentCheck.required === false` at 17, or even a
+      // GDPR-consent-required 13-16 owner, both allowed through the age gate
+      // above) gets NO consent recorded by this call — a pre-existing gap this
+      // WI does not resolve; see the PR description for the follow-up.
+      if (consentCheck.age >= 18) {
+        await recordAdultSelfConsentV2(txDb, personRow.id, orgRow.id);
+      }
 
       // (7) subscription — FR108 14-day plus trial, end-of-day in the org tz.
       const trialEndsAt = computeTrialEndDate(new Date(), orgRow.timezone);

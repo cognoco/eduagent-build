@@ -13,6 +13,7 @@ import {
   createProfileViaRoute,
   getIntegrationDb,
   seedConsentRequest,
+  seedDirectChildProfileForTest,
 } from './route-fixtures';
 
 import { app } from '../../apps/api/src/index';
@@ -215,7 +216,33 @@ describe('Integration: POST /v1/consent-page/confirm', () => {
   });
 
   it('denies consent and deletes the profile via the real cascade', async () => {
-    const profileId = await createProfileWithConsentToken('deny-confirm-token');
+    // [WI-1193] A realistic parental-consent-deny subject is a managed MINOR
+    // child awaiting emailed guardian consent — it holds NO consent_grant (a
+    // grant is written only on APPROVAL). The prior fixture created the profile
+    // as an adult owner, who now (WI-1193 AC1) holds adult_self_consent grants
+    // at signup; denying such a person is impossible in production — a
+    // self-registered adult has no guardian to deny for them — and the
+    // consent_grant RESTRICT FK correctly refused the delete. Per the WI-1442
+    // deny-abort guardrail, a denied person holding a live grant aborts; a real
+    // pending-consent child holds none, so the deny deletes cleanly.
+    const owner = await createProfileViaRoute({
+      app,
+      env: TEST_ENV,
+      user: CONSENT_WEB_USER,
+      displayName: 'Parent',
+      birthYear: 1990,
+    });
+    const child = await seedDirectChildProfileForTest({
+      parentProfileId: owner.id,
+      accountId: owner.accountId,
+      displayName: 'Emma',
+      birthYear: 2015,
+    });
+    await seedConsentRequest({
+      profileId: child.id,
+      token: 'deny-confirm-token',
+    });
+    const profileId = child.id;
 
     const res = await postConfirm({
       token: 'deny-confirm-token',
