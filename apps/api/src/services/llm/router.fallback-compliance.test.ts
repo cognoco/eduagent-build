@@ -6,7 +6,7 @@ import {
   ANTHROPIC_SONNET_MODEL,
 } from './router';
 import { createMockProvider } from './providers/mock';
-import type { ModelConfig } from './types';
+import type { ModelConfig, EscalationRung } from './types';
 
 // ---------------------------------------------------------------------------
 // T9 + T12 — under-18 fallback-compliance (MMT-ADR-0016 §1.5 / §10.1).
@@ -282,4 +282,162 @@ describe('[WI-1986] legacy fallback path never routes under-18 learners to Gemin
     expect(fb?.responseFormat).toBe('json');
     expect(fb?.conversationLanguage).toBe('es');
   });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2364] Cross-branch envelope invariant (follow-on to WI-1986).
+//
+// WI-1986 fixed the under-18 LEGACY branch silently dropping the shared
+// envelope (responseFormat + conversationLanguage) on fallback, guarded by a
+// single-branch test ('a minor fallback preserves…', above). The guaranteed
+// property is an INVARIANT, not a single site: EVERY fallback branch — legacy
+// (under-18, adult→Gemini, gemini-primary provider-fallback) and V2
+// (getFallbackConfigV2 compliant chain) — must carry responseFormat +
+// conversationLanguage from the primary. All branches spread `...shared` in
+// code today; this table guards each distinct spread site so a future edit that
+// drops `...shared` on ANY branch fails a row (the "fixed the named site, missed
+// the siblings" class that bounced two BID-3 items).
+//
+// RED-GREEN (guard proof): remove `...shared` from any covered return in
+// router.ts (e.g. the adult→Gemini branch or the V2 Mistral branch) → the
+// corresponding row below FAILS on responseFormat/conversationLanguage; restore
+// → green. Captured in the WI-2364 evidence artifacts.
+// ---------------------------------------------------------------------------
+describe('[WI-2364] fallback envelope invariant — every branch preserves responseFormat + conversationLanguage', () => {
+  interface EnvelopeCase {
+    name: string;
+    v2: boolean;
+    register: ModelConfig['provider'][];
+    primaryProvider: ModelConfig['provider'];
+    primaryModel?: string;
+    rung: EscalationRung;
+    opts?: Parameters<typeof getFallbackConfigForTest>[2];
+    expectProvider: ModelConfig['provider'];
+  }
+
+  const CASES: EnvelopeCase[] = [
+    // Legacy path (flag off)
+    {
+      name: 'legacy under-18 (child) -> approved non-Gemini text provider',
+      v2: false,
+      register: ['gemini', 'cerebras'],
+      primaryProvider: 'anthropic',
+      rung: 1,
+      opts: { ageBracket: 'child' },
+      expectProvider: 'cerebras',
+    },
+    {
+      name: 'legacy under-18 (adolescent) -> approved non-Gemini text provider',
+      v2: false,
+      register: ['gemini', 'cerebras'],
+      primaryProvider: 'openai',
+      rung: 1,
+      opts: { ageBracket: 'adolescent' },
+      expectProvider: 'cerebras',
+    },
+    {
+      name: 'legacy adult, Anthropic primary -> Gemini',
+      v2: false,
+      register: ['gemini', 'cerebras'],
+      primaryProvider: 'anthropic',
+      rung: 1,
+      opts: { ageBracket: 'adult' },
+      expectProvider: 'gemini',
+    },
+    {
+      name: 'legacy adult, OpenAI primary -> Gemini',
+      v2: false,
+      register: ['gemini', 'cerebras'],
+      primaryProvider: 'openai',
+      rung: 1,
+      opts: { ageBracket: 'adult' },
+      expectProvider: 'gemini',
+    },
+    {
+      name: 'legacy Gemini primary, rung<=2 -> OpenAI gpt-4o-mini',
+      v2: false,
+      register: ['openai'],
+      primaryProvider: 'gemini',
+      rung: 1,
+      expectProvider: 'openai',
+    },
+    {
+      name: 'legacy Gemini primary, rung>2 -> OpenAI gpt-4o',
+      v2: false,
+      register: ['openai'],
+      primaryProvider: 'gemini',
+      rung: 4,
+      expectProvider: 'openai',
+    },
+    {
+      name: 'legacy Gemini primary, only Anthropic -> Sonnet',
+      v2: false,
+      register: ['anthropic'],
+      primaryProvider: 'gemini',
+      rung: 1,
+      expectProvider: 'anthropic',
+    },
+    // V2 path (flag on)
+    {
+      name: 'V2 OpenAI primary -> Anthropic Sonnet',
+      v2: true,
+      register: ['gemini', 'anthropic'],
+      primaryProvider: 'openai',
+      primaryModel: 'gpt-5.4',
+      rung: 5,
+      opts: { llmTier: 'premium' },
+      expectProvider: 'anthropic',
+    },
+    {
+      name: 'V2 paid Cerebras -> OpenAI gpt-5-mini',
+      v2: true,
+      register: ['mistral', 'openai', 'anthropic'],
+      primaryProvider: 'cerebras',
+      rung: 1,
+      opts: { llmTier: 'standard' },
+      expectProvider: 'openai',
+    },
+    {
+      name: 'V2 free Cerebras -> Mistral',
+      v2: true,
+      register: ['mistral', 'openai', 'anthropic'],
+      primaryProvider: 'cerebras',
+      rung: 1,
+      opts: { llmTier: 'flash' },
+      expectProvider: 'mistral',
+    },
+  ];
+
+  it.each(CASES)(
+    '$name',
+    ({
+      v2,
+      register,
+      primaryProvider,
+      primaryModel,
+      rung,
+      opts,
+      expectProvider,
+    }) => {
+      setLlmRoutingV2Enabled(v2);
+      for (const p of register) registerProvider(createMockProvider(p));
+
+      const envelopePrimary: ModelConfig = {
+        provider: primaryProvider,
+        model: primaryModel ?? 'x',
+        maxTokens: 8192,
+        responseFormat: 'json',
+        conversationLanguage: 'es',
+      };
+
+      const fb = getFallbackConfigForTest(envelopePrimary, rung, opts);
+
+      // Row reaches its intended branch…
+      expect(fb).not.toBeNull();
+      expect(fb?.provider).toBe(expectProvider);
+      // …and that branch preserves the shared envelope carried from the primary (the invariant).
+      expect(fb?.responseFormat).toBe('json');
+      expect(fb?.conversationLanguage).toBe('es');
+    },
+  );
 });
