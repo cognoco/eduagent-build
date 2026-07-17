@@ -63,6 +63,7 @@ type TopicRouteParams = {
   topicId: string;
   bookId?: string;
   chapter?: string;
+  mode?: string;
 };
 const mockUseLocalSearchParams = jest.fn(
   (): TopicRouteParams => ({
@@ -373,6 +374,135 @@ describe('TopicDetailScreen action buttons', () => {
         subjectId: SUBJECT_ID,
         topicId: TOPIC_ID,
         topicName: 'Algebra',
+      },
+    });
+  });
+
+  // [WI-2112] challenge.start deep links (Now-feed cards, mentor-bar intents,
+  // and direct topic ?mode=challenge links all resolve to this same
+  // /(app)/topic/:topicId?mode=challenge route — see now-deep-link.ts and
+  // bar-intent-match.ts, both already covered for the upstream URL
+  // resolution) must enter the existing Challenge Round path (the
+  // sessionType==='learning' session where useChallengeRound/
+  // evaluateChallengeReadiness live), never the unrelated recall-test recall
+  // quiz. Covered across a non-literature and a literature (Sylvia Plath)
+  // subject per AC-7 — the dispatch is subject-agnostic, so only topicName
+  // varies.
+  it.each([
+    ['non-literature subject', 'Algebra'],
+    ['literature subject — Sylvia Plath', 'Sylvia Plath'],
+  ])(
+    'routes a challenge.start deep link into the Challenge Round session path, not recall-test (%s)',
+    async (_label, topicTitle) => {
+      setupRoutes({
+        progressOverride: {
+          ...DEFAULT_TOPIC_PROGRESS,
+          completionStatus: 'not_started',
+          title: topicTitle,
+        },
+      });
+      mockUseLocalSearchParams.mockReturnValue({
+        subjectId: SUBJECT_ID,
+        topicId: TOPIC_ID,
+        mode: 'challenge',
+      });
+
+      render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('study-cta');
+      });
+      fireEvent.press(screen.getByTestId('study-cta'));
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          subjectId: SUBJECT_ID,
+          topicId: TOPIC_ID,
+          topicName: topicTitle,
+        },
+      });
+      // In-session negative case: the deep-link dispatch must never resolve
+      // to the recall-test recall quiz.
+      expect(mockPush).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/topic/recall-test',
+        }),
+      );
+    },
+  );
+
+  it('resumes an existing shared resume target from a challenge.start deep link, instead of starting a fresh session', async () => {
+    // evaluateChallengeReadiness() gates on the CURRENT session's live
+    // exchangeCount/streak (apps/api/src/services/challenge-round/trigger.ts).
+    // Force-starting a new session would discard that state, so a
+    // challenge.start deep link must resume an already-active session the
+    // same way the default (non-deep-link) study CTA does (F-4), not bypass
+    // it.
+    const target = {
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicTitle: 'Algebra',
+      sessionId: null,
+      resumeFromSessionId: SESSION_ID,
+      resumeKind: 'recent_topic',
+      lastActivityAt: '2026-02-15T09:00:00.000Z',
+      reason: 'Continue Algebra',
+    };
+    setupRoutes({
+      completionStatus: 'in_progress',
+      activeSessionId: SESSION_ID,
+      resumeTarget: target,
+    });
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: SUBJECT_ID,
+      topicId: TOPIC_ID,
+      mode: 'challenge',
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('study-cta');
+    });
+    fireEvent.press(screen.getByTestId('study-cta'));
+
+    expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
+      expect.anything(),
+      target,
+    );
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('carries the active sessionId when a challenge.start deep link has an active session but no shared resume target', async () => {
+    setupRoutes({
+      completionStatus: 'in_progress',
+      activeSessionId: SESSION_ID,
+      resumeTarget: null,
+    });
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: SUBJECT_ID,
+      topicId: TOPIC_ID,
+      mode: 'challenge',
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('study-cta');
+    });
+    fireEvent.press(screen.getByTestId('study-cta'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: SUBJECT_ID,
+        topicId: TOPIC_ID,
+        topicName: 'Algebra',
+        sessionId: SESSION_ID,
       },
     });
   });
