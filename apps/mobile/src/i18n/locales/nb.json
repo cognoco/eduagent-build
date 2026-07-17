@@ -1695,7 +1695,8 @@
       "dontRememberFallbackHint": "Det går fint — la oss se hva du husker. Her er et lite hint: Tenk på hovedideen eller det første steget knyttet til dette emnet. Kommer noe tilbake?",
       "dontRememberReviewPrompt": "Takk for at du sier det ærlig. La oss gå over til repetisjon, så dette føles overkommelig igjen.",
       "gradingUnavailableTitle": "Svaret ditt er mottatt.",
-      "gradingUnavailableMessage": "Jeg kunne ikke sjekke det akkurat nå – svaret ditt er trygt. Prøv igjen, eller kom tilbake til det senere."
+      "gradingUnavailableMessage": "Jeg kunne ikke sjekke det akkurat nå – svaret ditt er trygt. Prøv igjen, eller kom tilbake til det senere.",
+      "reTeach": "La oss prøve dette på en annen måte – se over det en gang til, og prøv igjen når du er klar. Ingen hast."
     },
     "lastStudied": "Sist studert {{when}}",
     "neverStudied": "Aldri studert",

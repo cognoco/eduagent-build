@@ -379,7 +379,10 @@ export type TopicRetentionResponse = z.infer<
 
 // Recall test result — RemediationSchema is embedded here to avoid circular imports
 const recallRemediationSchema = z.object({
-  action: z.literal('redirect_to_library'),
+  // [WI-1462] 'topic_parked' — the 2nd consecutive failure after the
+  // bounded re-teach off-ramp (RR-4); review-and-retest/relearn stay
+  // explicit fallback choices, not a forced library redirect.
+  action: z.literal('topic_parked'),
   topicId: z.string().uuid(),
   topicTitle: z.string(),
   // [SC-02] Use canonical enum (retentionStatusSchema) instead of bare z.string().
@@ -396,7 +399,11 @@ export const recallTestResultSchema = z.object({
   nextReviewAt: isoDateField,
   failureCount: z.number().int(),
   hint: z.string().optional(),
-  failureAction: z.enum(['feedback_only', 'redirect_to_library']).optional(),
+  // [WI-1462] 're_teach' — 3rd failure, bounded same-flow off-ramp;
+  // 'topic_parked' — 4th+ failure, warm exit (see recallRemediationSchema).
+  failureAction: z
+    .enum(['feedback_only', 're_teach', 'topic_parked'])
+    .optional(),
   remediation: recallRemediationSchema.optional(),
   cooldownActive: z.boolean().optional(),
   cooldownEndsAt: isoDateField.optional(),

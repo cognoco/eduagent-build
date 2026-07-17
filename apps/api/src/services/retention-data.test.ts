@@ -956,7 +956,7 @@ describe('processRecallTest', () => {
     expect(result.hint).toContain("That's okay");
   });
 
-  it('returns redirect_to_library with remediation on 3+ failures', async () => {
+  it('returns re_teach with a hint and no remediation on the 3rd failure (WI-1462 / RR-4)', async () => {
     const card = mockRetentionCardRow();
     setupScopedRepo({ retentionCardFindFirst: card });
 
@@ -974,7 +974,44 @@ describe('processRecallTest', () => {
         lastReviewedAt: NOW.toISOString(),
       },
       xpChange: 'decayed',
-      failureAction: 'redirect_to_library',
+      failureAction: 're_teach',
+    });
+
+    const db = createMockDb();
+    const result = await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'Short',
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.failureCount).toBe(3);
+    expect(result.failureAction).toBe('re_teach');
+    // Bounded off-ramp, same flow — no library/relearn navigation yet.
+    expect(result.remediation).toBeUndefined();
+    // Same-flow re-teach in a different style (AC-2): a topic-specific hint,
+    // not just a generic retry prompt.
+    expect(result.hint).toContain("That's okay");
+  });
+
+  it('returns topic_parked with remediation on the 2nd consecutive failure after re-teach (4+ failures)', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.1,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 4,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'topic_parked',
     });
 
     (getRetentionStatus as jest.Mock).mockReturnValue('weak');
@@ -986,21 +1023,22 @@ describe('processRecallTest', () => {
     });
 
     expect(result.passed).toBe(false);
-    expect(result.failureCount).toBe(3);
-    expect(result.failureAction).toBe('redirect_to_library');
+    expect(result.failureCount).toBe(4);
+    expect(result.failureAction).toBe('topic_parked');
     expect(result.remediation).toEqual(expect.objectContaining({}));
-    expect(result.remediation!.action).toBe('redirect_to_library');
+    expect(result.remediation!.action).toBe('topic_parked');
     expect(result.remediation!.topicId).toBe(topicId);
     expect(result.remediation!.topicTitle).toBe('Topic 1');
     expect(result.remediation!.retentionStatus).toBe('weak');
-    expect(result.remediation!.failureCount).toBe(3);
+    expect(result.remediation!.failureCount).toBe(4);
     expect(typeof result.remediation!.cooldownEndsAt).toBe('string');
+    // Review-and-retest/relearn remain explicit fallback choices (AC-4).
     expect(result.remediation!.options).toEqual([
       'review_and_retest',
       'relearn_topic',
     ]);
     expect(getRetentionStatus).toHaveBeenCalledWith(
-      expect.objectContaining({ failureCount: 3 }),
+      expect.objectContaining({ failureCount: 4 }),
     );
   });
 
@@ -1062,7 +1100,7 @@ describe('processRecallTest', () => {
         lastReviewedAt: NOW.toISOString(),
       },
       xpChange: 'decayed',
-      failureAction: 'redirect_to_library',
+      failureAction: 'topic_parked',
     });
 
     (getRetentionStatus as jest.Mock).mockReturnValue('forgotten');
@@ -1076,7 +1114,7 @@ describe('processRecallTest', () => {
     expect(result.remediation).toEqual(expect.objectContaining({}));
     expect(result.remediation!.topicId).toBe(topicId);
     expect(result.remediation!.topicTitle).toBe('Topic 1');
-    expect(result.remediation!.action).toBe('redirect_to_library');
+    expect(result.remediation!.action).toBe('topic_parked');
     expect(result.remediation!.retentionStatus).toBe('forgotten');
     expect(result.remediation!.failureCount).toBe(4);
   });

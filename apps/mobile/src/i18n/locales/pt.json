@@ -1722,7 +1722,8 @@
       "dontRememberFallbackHint": "Tudo bem — vamos ver do que você se lembra. Aqui vai uma pequena dica: pense na ideia principal ou no primeiro passo ligado a este tema. Algo voltou?",
       "dontRememberReviewPrompt": "Obrigado por dizer isso com sinceridade. Vamos passar para a revisão para que isso volte a parecer viável.",
       "gradingUnavailableTitle": "Resposta recebida.",
-      "gradingUnavailableMessage": "Não consegui verificar agora, mas sua resposta está segura. Tente novamente ou volte mais tarde."
+      "gradingUnavailableMessage": "Não consegui verificar agora, mas sua resposta está segura. Tente novamente ou volte mais tarde.",
+      "reTeach": "Vamos tentar de uma forma diferente. Dê outra olhada e tente de novo quando estiver pronto. Sem pressa."
     },
     "lastStudied": "Estudado pela última vez {{when}}",
     "neverStudied": "Nunca estudado",

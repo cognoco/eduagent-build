@@ -215,8 +215,11 @@ export async function handleReviewCalibrationGrade({
         grade.quality,
         eventAt.toISOString(),
       );
+      // [WI-1462] retrievalNextActionEnum keeps its existing
+      // 'redirect_to_library' value for the topic_parked case — see the
+      // matching comment in retention-data.ts's processRecallTest.
       const nextAction: RetrievalNextAction =
-        evaluated.failureAction === 'redirect_to_library'
+        evaluated.failureAction === 'topic_parked'
           ? 'redirect_to_library'
           : evaluated.passed
             ? 'advance'

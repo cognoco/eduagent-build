@@ -1777,6 +1777,7 @@
       "openingMessage": "What comes to mind about this topic? Just share what you remember — anything you recall helps us start.",
       "successMessage": "Great work — your memory of this is solid! Head back to your Library whenever you're ready.",
       "partialResult": "Good effort! Think about the key concepts and try explaining again. What stands out most to you?",
+      "reTeach": "Let's try this a different way — take another look, then give it another go whenever you're ready. No rush.",
       "needsReview": "Almost there — a little more practice will lock this in. Let's find a better approach for you.",
       "dontRemember": "I don't remember",
       "stillStuck": "Still stuck",

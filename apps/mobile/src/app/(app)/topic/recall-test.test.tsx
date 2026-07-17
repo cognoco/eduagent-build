@@ -187,6 +187,7 @@ describe('RecallTestScreen', () => {
 
     expect(source).toContain("t('topic.recallTest.successMessage')");
     expect(source).toContain("t('topic.recallTest.partialResult')");
+    expect(source).toContain("t('topic.recallTest.reTeach')");
     expect(source).toContain("t('topic.recallTest.needsReview')");
     expect(source).not.toMatch(/animateResponse\(\s*['"`]/);
   });
@@ -201,8 +202,8 @@ describe('RecallTestScreen', () => {
       },
       {
         passed: false,
-        failureCount: 3,
-        failureAction: 'redirect_to_library',
+        failureCount: 4,
+        failureAction: 'topic_parked',
         remediation: {
           cooldownEndsAt: '2026-03-30T18:30:00.000Z',
           suggestionText: 'Review the topic again.',
@@ -243,12 +244,12 @@ describe('RecallTestScreen', () => {
     expect(screen.queryByTestId('recall-dont-remember-button')).toBeNull();
   });
 
-  it('shows remediation immediately when first result is redirect', async () => {
+  it('shows remediation immediately when first result is topic_parked', async () => {
     queuedRecallResults = [
       {
         passed: false,
-        failureCount: 3,
-        failureAction: 'redirect_to_library',
+        failureCount: 4,
+        failureAction: 'topic_parked',
         remediation: {
           cooldownEndsAt: '2026-03-30T18:30:00.000Z',
           retentionStatus: 'forgotten',
@@ -263,6 +264,61 @@ describe('RecallTestScreen', () => {
     await waitFor(() => {
       screen.getByTestId('remediation-card');
     });
+  });
+
+  // [WI-1462 / RR-4] The bounded re-teach off-ramp keeps the learner in the
+  // same flow — no remediation card, no navigation, input stays enabled.
+  it('shows the re-teach off-ramp on the 3rd failure without remediation or navigation', async () => {
+    queuedRecallResults = [
+      {
+        passed: false,
+        failureCount: 3,
+        failureAction: 're_teach',
+        hint: 'Here is a hint framed differently.',
+      },
+    ];
+
+    render(<RecallTestScreen />);
+
+    fireEvent.press(screen.getByTestId('mock-send-button'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Here is a hint framed differently.'),
+      ).toBeTruthy();
+    });
+
+    expect(screen.queryByTestId('remediation-card')).toBeNull();
+    expect(mockPush).not.toHaveBeenCalled();
+    // Input stays enabled — the learner can retry in the same flow.
+    expect(screen.getByTestId('mock-send-button')).toBeTruthy();
+  });
+
+  // [WI-1462 / RR-4] The 2nd consecutive failure after re-teach parks the
+  // topic without ever auto-navigating — review/relearn stay explicit taps.
+  it('parks the topic on the 4th failure without auto-navigating to Library', async () => {
+    queuedRecallResults = [
+      {
+        passed: false,
+        failureCount: 4,
+        failureAction: 'topic_parked',
+        remediation: {
+          cooldownEndsAt: '2026-03-30T18:30:00.000Z',
+          retentionStatus: 'forgotten',
+        },
+      },
+    ];
+
+    render(<RecallTestScreen />);
+
+    fireEvent.press(screen.getByTestId('mock-send-button'));
+
+    await waitFor(() => {
+      screen.getByTestId('remediation-card');
+    });
+
+    // The park is a warm exit, never an automatic redirect.
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('shows success message when text recall passes', async () => {
@@ -463,8 +519,8 @@ describe('RecallTestScreen', () => {
     queuedRecallResults = [
       {
         passed: false,
-        failureCount: 3,
-        failureAction: 'redirect_to_library',
+        failureCount: 4,
+        failureAction: 'topic_parked',
         remediation: {
           cooldownEndsAt: '2026-03-30T18:30:00.000Z',
           retentionStatus: 'forgotten',
