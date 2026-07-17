@@ -57,6 +57,7 @@ import { MentorBornCeremonyOverlay } from '../components/common/MentorBornCeremo
 import {
   createScopedPersister,
   getQueryCacheBuster,
+  shouldPersistQuery,
 } from '../lib/query-persister';
 import { shouldReportQueryErrorToSentry } from '../lib/query-error-reporting';
 import { getSentryQueryKeyTag } from '../lib/sentry-query-key';
@@ -432,6 +433,9 @@ function ScopedPersistProvider({ children }: { children: React.ReactNode }) {
         // start. Keyed to Updates.updateId (per-OTA + per-build). See
         // getQueryCacheBuster() for why runtimeVersion is not used.
         buster: getQueryCacheBuster(),
+        // [WI-1987] Exclude transcript/PII queries (session-transcript) from
+        // the AsyncStorage mirror — see shouldPersistQuery for the denylist.
+        dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
       }}
       onSuccess={() => {
         // [CCR finding, 2026-05-14] Drop legacy root keys after the

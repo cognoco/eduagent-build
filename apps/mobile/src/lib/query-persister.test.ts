@@ -9,6 +9,7 @@ import {
   buildPersisterKey,
   createScopedPersister,
   getQueryCacheBuster,
+  shouldPersistQuery,
 } from './query-persister';
 
 // expo-updates is a native module (external boundary) — mock it so each test
@@ -111,5 +112,73 @@ describe('persisted cache invalidation across bundle versions (boot-crash regres
     expect(fresh.getQueryData(['subjects', USER])).toEqual([
       { id: 's1', legacyShape: true },
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1987] Dehydration denylist — transcript/PII queries never hit disk
+//
+// Pre-fix, persistOptions passed no shouldDehydrateQuery, so the persister's
+// default (defaultShouldDehydrateQuery: persist every successful query)
+// wrote EVERY query to AsyncStorage — including ['session-transcript', ...],
+// which holds real learner/mentor chat text (packages/schemas/src/sessions.ts
+// sessionTranscriptSchema.exchanges). shouldPersistQuery adds an explicit
+// denylist so transcript queries are excluded while every other query keeps
+// its existing offline-paint behavior.
+// ---------------------------------------------------------------------------
+
+describe('shouldPersistQuery [WI-1987]', () => {
+  function makeSuccessfulQuery(queryKey: readonly unknown[]) {
+    const client = new QueryClient();
+    client.setQueryData(queryKey as unknown[], { some: 'data' });
+    return client.getQueryCache().find({ queryKey })!;
+  }
+
+  it('excludes session-transcript queries (real chat text) from persistence', () => {
+    const query = makeSuccessfulQuery([
+      'session-transcript',
+      'study',
+      'session-1',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(query)).toBe(false);
+  });
+
+  it('persists an ordinary successful query (default behavior preserved)', () => {
+    const query = makeSuccessfulQuery(['subjects', USER]);
+    expect(shouldPersistQuery(query)).toBe(true);
+  });
+
+  it('does not persist a non-success query, same as the default (e.g. errored)', () => {
+    const client = new QueryClient();
+    client.setQueryData(['subjects', USER], { some: 'data' });
+    const query = client
+      .getQueryCache()
+      .find({ queryKey: ['subjects', USER] })!;
+    // Force the query into an error state — defaultShouldDehydrateQuery only
+    // persists 'success' status queries.
+    query.setState({ status: 'error', error: new Error('boom') });
+    expect(shouldPersistQuery(query)).toBe(false);
+  });
+
+  it('[integration] persistQueryClientSave writes ordinary data but drops transcript data to AsyncStorage', async () => {
+    const client = new QueryClient();
+    client.setQueryData(['subjects', USER], [{ id: 's1' }]);
+    client.setQueryData(['session-transcript', 'study', 'session-1', USER], {
+      session: { sessionId: 'session-1' },
+      exchanges: [{ role: 'learner', text: 'my real chat message' }],
+    });
+
+    await persistQueryClientSave({
+      queryClient: client,
+      persister: createScopedPersister(USER),
+      dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+    });
+
+    const raw = await AsyncStorage.getItem(buildPersisterKey(USER));
+    expect(raw).not.toBeNull();
+    expect(raw).not.toContain('my real chat message');
+    expect(raw).not.toContain('session-transcript');
+    expect(raw).toContain('subjects');
   });
 });

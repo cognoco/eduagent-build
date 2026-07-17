@@ -28,11 +28,13 @@
 // than re-implementing the steps.
 // ---------------------------------------------------------------------------
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native';
 import type { QueryClient } from '@tanstack/react-query';
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { clearTransitionState } from './auth-transition';
 import { clearPendingAuthRedirect } from './pending-auth-redirect';
+import { buildPersisterKey } from './query-persister';
 import {
   setActiveProfileId,
   setProxyMode,
@@ -67,12 +69,12 @@ export interface SignOutWithCleanupParams {
    */
   profileIds: ReadonlyArray<string>;
   /**
-   * Clerk userId of the account being signed out. Currently unused by this
-   * function (the welcome intro moved pre-auth and is device-scoped, so its
-   * flag intentionally survives sign-out — see lib/intro-state.ts). The
-   * parameter is retained so existing call sites compile without churn and
-   * so a future user-scoped sign-out cleanup hook can plug back in without
-   * a signature change.
+   * Clerk userId of the account being signed out. [WI-1987] Used to derive
+   * and deterministically remove the scoped query-persister AsyncStorage key
+   * (`buildPersisterKey(clerkUserId)`) — see the removal step below. When
+   * omitted (identity not yet loaded, e.g. an early auth-expired path), the
+   * scoped key cannot be targeted and is left for the persister's own
+   * throttled write to eventually catch up, same as before this fix.
    */
   clerkUserId?: string;
 }
@@ -86,7 +88,7 @@ export interface SignOutWithCleanupParams {
 export async function signOutWithCleanup(
   params: SignOutWithCleanupParams,
 ): Promise<void> {
-  const { clerkSignOut, queryClient, profileIds } = params;
+  const { clerkSignOut, queryClient, profileIds, clerkUserId } = params;
 
   // Reset in-memory api-client identity FIRST so any request that fires
   // between here and the Clerk signOut resolution cannot ship a stale
@@ -106,6 +108,23 @@ export async function signOutWithCleanup(
   // check (profile.ts) can match a previous user's profile and propagate
   // their id back into the api-client module.
   queryClient.clear();
+
+  // [WI-1987] Deterministically remove the on-disk scoped persister cache.
+  // queryClient.clear() only empties the in-memory cache — the AsyncStorage
+  // mirror (query-persister.ts's createScopedPersister) only picks up the
+  // now-empty cache via its throttled (2s) subscription. Relying on that
+  // throttle to fire was the bug: a crash/force-quit within the ~2s window
+  // left the full pre-sign-out cache — including session transcripts — on
+  // disk permanently. Removing the key directly here closes that window;
+  // cleanup completing means the scoped blob is gone, independent of the
+  // persister's throttle timer. No-op (skipped) when clerkUserId is
+  // unavailable — see the param doc above.
+  if (clerkUserId) {
+    await AsyncStorage.removeItem(buildPersisterKey(clerkUserId)).catch(() => {
+      // Non-fatal — same policy as clearProfileSecureStorageOnSignOut below:
+      // better to continue sign-out than abort over one storage failure.
+    });
+  }
 
   // [SEC-SENTRY-SCOPE] Wipe the Sentry scope so that any crash between
   // sign-out and the next sign-in does not carry the previous user's

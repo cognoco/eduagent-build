@@ -25,6 +25,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import { defaultShouldDehydrateQuery, type Query } from '@tanstack/react-query';
 import * as Updates from 'expo-updates';
 
 /**
@@ -85,4 +86,38 @@ export function createScopedPersister(userId: string | null | undefined) {
     key: buildPersisterKey(userId),
     throttleTime: 2_000,
   });
+}
+
+// ---------------------------------------------------------------------------
+// [WI-1987] Dehydration denylist
+//
+// Without a `shouldDehydrateQuery` filter, `PersistQueryClientProvider`
+// persists EVERY successful query to AsyncStorage — including session
+// transcripts (`['session-transcript', mode, sessionId, profileId]`, see
+// queryKeys.sessions.transcript in query-keys.ts), which hold real
+// learner/mentor chat text (sessionTranscriptSchema.exchanges in
+// packages/schemas/src/sessions.ts). AsyncStorage is unencrypted on-device
+// storage, so this wrote full chat transcripts to plaintext disk. Add a new
+// query-key prefix here for any future query whose data is a raw transcript
+// or other sensitive PII that must never be written to disk.
+// ---------------------------------------------------------------------------
+export const NEVER_PERSIST_QUERY_KEY_PREFIXES: ReadonlySet<string> = new Set([
+  'session-transcript',
+]);
+
+/**
+ * `dehydrateOptions.shouldDehydrateQuery` for the scoped persister. Excludes
+ * denylisted query-key prefixes; otherwise defers to react-query's default
+ * (persist successful queries only) so every other query's existing
+ * offline-paint behavior is unchanged.
+ */
+export function shouldPersistQuery(query: Query): boolean {
+  const [firstSegment] = query.queryKey;
+  if (
+    typeof firstSegment === 'string' &&
+    NEVER_PERSIST_QUERY_KEY_PREFIXES.has(firstSegment)
+  ) {
+    return false;
+  }
+  return defaultShouldDehydrateQuery(query);
 }
