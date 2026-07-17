@@ -15,18 +15,8 @@
  * `cascadeUndoCreatedAncestors` in family-bridge.ts, called from within
  * `undoCloneFromChild`'s transaction callback).
  *
- * [WI-1193] The same tx-participant shape can need to be EXPORTED — a second
- * caller in a different file wants to reuse the helper rather than duplicate
- * its writes. Exported-ness doesn't change the invariant: the function still
- * receives an already-open `tx` and still relies on ITS CALLER to wrap the
- * whole sequence (never opens its own `.transaction()`). `EXEMPT_TX_PARTICIPANTS`
- * below names these by (file, function) — narrowly, not a blanket allowance —
- * so the guard keeps catching a genuine top-level writer that forgets
- * `db.transaction()` entirely.
- *
  * Forward-only ratchet: adding a new exported function with 2+ bare writes to
- * any of the four target files will fail CI before it lands, unless it is
- * added to `EXEMPT_TX_PARTICIPANTS` with the same justification as above.
+ * any of the four target files will fail CI before it lands.
  *
  * Sites guarded (wrapped by WI-1060):
  *   - executeDeletionV2         apps/api/src/services/identity-v2/deletion-v2.ts
@@ -38,9 +28,6 @@
  *   - undoCloneFromChild        apps/api/src/services/family-bridge.ts
  *   - persistChallengeRoundReviewTargets  (private — excluded by design)
  *                               apps/api/src/services/session/session-exchange.ts
- *   - rehomeGrantsTx            (exported tx-participant — see
- *                               EXEMPT_TX_PARTICIPANTS below [WI-1193])
- *                               apps/api/src/services/identity-v2/deletion-v2.ts
  */
 
 import * as path from 'path';
@@ -56,30 +43,6 @@ const TARGET_FILES = [
   'apps/api/src/services/family-bridge.ts',
   'apps/api/src/services/session/session-exchange.ts',
 ].map((f) => path.join(REPO_ROOT, f.split('/').join(path.sep)));
-
-/**
- * [WI-1193] Named, narrow exemptions for EXPORTED tx-participant helpers —
- * functions that receive an already-open `tx` and rely on their caller to
- * wrap the whole multi-write sequence (the same invariant the guard already
- * grants private helpers for free, see the file header). Each entry must be
- * individually justified here; this is not a blanket allowance.
- *
- *   - rehomeGrantsTx (deletion-v2.ts): re-homes a person's consent_grant rows
- *     to consent_receipt before a person delete. Originally private, used by
- *     4 functions in this file; exported for WI-1193 so
- *     consent-v2.ts's processConsentResponseV2 deny branch can reuse it
- *     instead of duplicating the re-home logic a third time. Every call site
- *     — the 4 in this file and the 1 in consent-v2.ts — already runs inside
- *     its own caller's db.transaction(); rehomeGrantsTx itself never opens one.
- */
-const EXEMPT_TX_PARTICIPANTS: ReadonlySet<string> = new Set([
-  'apps/api/src/services/identity-v2/deletion-v2.ts::rehomeGrantsTx',
-]);
-
-/** Keyed on the exact (repo-relative file, function name) pair — narrow by construction. */
-function isExemptTxParticipant(relFile: string, functionName: string): boolean {
-  return EXEMPT_TX_PARTICIPANTS.has(`${relFile}::${functionName}`);
-}
 
 if (!fs.existsSync(path.join(REPO_ROOT, 'apps/api'))) {
   throw new Error(
@@ -198,7 +161,7 @@ function scanFile(absPath: string): Violation[] {
     ) {
       const name = statement.name?.text ?? '<anonymous>';
       const writes = collectBareWrites(statement, sourceFile);
-      if (writes.length >= 2 && !isExemptTxParticipant(relFile, name)) {
+      if (writes.length >= 2) {
         violations.push({ file: relFile, functionName: name, writes });
       }
     }
@@ -348,25 +311,5 @@ describe('multi-write-tx guard — exported functions must wrap 2+ writes in db.
     };
     visit(sf);
     expect(bareCount).toBe(0);
-  });
-
-  // [WI-1193] Proves EXEMPT_TX_PARTICIPANTS is narrow-by-construction: it
-  // matches on the EXACT (file, function name) pair, not just a bare name or
-  // a whole file — a differently-named exported function with 2+ bare writes
-  // in the SAME file, or the exempted name in a DIFFERENT file, must still be
-  // caught. Without this, a careless broadening (e.g. matching by name only)
-  // could silently exempt a genuine future top-level-writer violation.
-  it('self-check: the tx-participant exemption is scoped to the exact (file, function) pair, not by name alone', () => {
-    const deletionV2Rel = 'apps/api/src/services/identity-v2/deletion-v2.ts';
-    expect(isExemptTxParticipant(deletionV2Rel, 'rehomeGrantsTx')).toBe(true);
-    expect(isExemptTxParticipant(deletionV2Rel, 'someOtherFunction')).toBe(
-      false,
-    );
-    expect(
-      isExemptTxParticipant(
-        'apps/api/src/services/linking-ceremony.ts',
-        'rehomeGrantsTx',
-      ),
-    ).toBe(false);
   });
 });
