@@ -245,6 +245,23 @@ describe('detectLanguageSubject', () => {
         }),
       );
     });
+
+    // [WI-1990] rawInput is learner-entered free text (can contain a child's
+    // name or personal phrasing) — it must never reach Sentry, even on the
+    // resilience-fallback path.
+    it('[WI-1990] does not forward learner-entered rawInput text to Sentry', async () => {
+      mockRouteAndCall.mockRejectedValueOnce(new Error('quota exceeded'));
+
+      const learnerText = 'learn Spanish with Alice from Springfield';
+      await detectLanguageSubject(learnerText);
+
+      const [, context] = mockCaptureException.mock.calls[0] as [
+        unknown,
+        { extra?: Record<string, unknown> } | undefined,
+      ];
+      expect(context?.extra).not.toHaveProperty('rawInput');
+      expect(JSON.stringify(context?.extra ?? {})).not.toContain(learnerText);
+    });
   });
 
   // Red-green proof [BUG-110]: revert to `.match(/\{[\s\S]*\}/)` and this

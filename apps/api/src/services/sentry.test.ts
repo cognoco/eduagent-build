@@ -1,4 +1,4 @@
-import { captureException, addBreadcrumb } from './sentry';
+import { captureException, addBreadcrumb, scrubSentryEvent } from './sentry';
 
 // ---------------------------------------------------------------------------
 // Mock @sentry/cloudflare
@@ -94,5 +94,67 @@ describe('addBreadcrumb', () => {
       category: 'db',
       level: 'error',
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// scrubSentryEvent [WI-1990] — beforeSend PII backstop
+// ---------------------------------------------------------------------------
+
+describe('scrubSentryEvent', () => {
+  it('strips denylisted keys from event.extra', () => {
+    const event = {
+      extra: {
+        rawInput: "child's homework: my name is Alice and I live at...",
+        messages: [{ role: 'user', content: 'chat transcript here' }],
+        responseLength: 42,
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.extra).not.toHaveProperty('rawInput');
+    expect(scrubbed.extra).not.toHaveProperty('messages');
+    expect(scrubbed.extra?.responseLength).toBe(42);
+  });
+
+  it('strips denylisted keys from every event.contexts entry', () => {
+    const event = {
+      contexts: {
+        state: { transcript: 'raw learner chat', sessionId: 'sess-1' },
+        app: { app_name: 'mentomate' },
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.contexts?.state).not.toHaveProperty('transcript');
+    expect(scrubbed.contexts?.state?.sessionId).toBe('sess-1');
+    expect(scrubbed.contexts?.app).toEqual({ app_name: 'mentomate' });
+  });
+
+  it('leaves an event with no extra/contexts unchanged', () => {
+    const event = {
+      message: 'unhandled error',
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed).toEqual(event);
+  });
+
+  it('leaves non-denylisted extra/context keys untouched', () => {
+    const event = {
+      extra: { context: 'language-detect.fallback', profileId: 'p-1' },
+      contexts: { profile: { profile_id: 'p-1' } },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.extra).toEqual({
+      context: 'language-detect.fallback',
+      profileId: 'p-1',
+    });
+    expect(scrubbed.contexts).toEqual({ profile: { profile_id: 'p-1' } });
   });
 });

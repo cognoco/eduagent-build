@@ -79,6 +79,56 @@ export function captureMessage(
 }
 
 /**
+ * Denylist of key names known to carry learner free-text (chat messages,
+ * homework content) or other identifying data if it slips into a Sentry
+ * event's `extra`/`contexts` despite call-site discipline. Call sites must
+ * never pass raw learner text to `captureException`'s `extra` in the first
+ * place — this is the defense-in-depth backstop `profile-scope.ts`'s
+ * documented age-gated PII-scrubbing control refers to [WI-1990].
+ */
+const PII_DENYLIST_KEYS = new Set([
+  'rawInput',
+  'name',
+  'firstName',
+  'lastName',
+  'birthDate',
+  'transcript',
+  'messages',
+  'content',
+  'homeworkText',
+]);
+
+function scrubKeys(obj: Record<string, unknown>): Record<string, unknown> {
+  const scrubbed: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (!PII_DENYLIST_KEYS.has(key)) {
+      scrubbed[key] = value;
+    }
+  }
+  return scrubbed;
+}
+
+/**
+ * `beforeSend` scrubber for the API's Sentry init — strips denylisted
+ * PII-bearing keys from `event.extra` and every `event.contexts` entry
+ * before the event leaves the process. Defense-in-depth, not a substitute
+ * for call-site discipline. [WI-1990]
+ */
+export function scrubSentryEvent<T extends Sentry.ErrorEvent>(event: T): T {
+  if (event.extra) {
+    event.extra = scrubKeys(event.extra);
+  }
+  if (event.contexts) {
+    for (const [key, context] of Object.entries(event.contexts)) {
+      if (context) {
+        event.contexts[key] = scrubKeys(context);
+      }
+    }
+  }
+  return event;
+}
+
+/**
  * Adds a breadcrumb to the current Sentry scope.
  */
 export function addBreadcrumb(
