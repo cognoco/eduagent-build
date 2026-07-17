@@ -148,10 +148,70 @@ function scrubKeys(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
+ * Matches the quoted literal snippet V8 embeds in a JSON.parse SyntaxError
+ * message once it recognizes the input isn't JSON, e.g.:
+ *   Unexpected token 'S', "Sure! Here'sthe answer to your..." is not valid JSON
+ * Older/other V8 shapes (`Unexpected token S in JSON at position 0`,
+ * `Unexpected end of JSON input`) carry no quoted snippet and are left as-is
+ * — only content actually embedded in quotes is redacted.
+ */
+const QUOTED_SNIPPET_PATTERN = /"[^"]*"/g;
+
+/**
+ * Recognizes the message shapes V8's JSON.parse throws for malformed input —
+ * the surface this backstop targets. Matched on message content, not
+ * `exception.type`, because a call site that already wraps the raw error
+ * (`new Error('parse failed', { cause: err })`) or re-throws under a
+ * different constructor still carries the same telltale phrase in `.message`.
+ */
+function isJsonParseSyntaxErrorMessage(value: string): boolean {
+  return (
+    value.includes('is not valid JSON') ||
+    value.includes('Unexpected end of JSON input') ||
+    (value.includes('Unexpected token') && value.includes('JSON')) ||
+    value.includes('Unexpected non-whitespace character after JSON')
+  );
+}
+
+/**
+ * Redacts the quoted snippet (if any) out of a recognized JSON.parse
+ * SyntaxError message, leaving the structural part intact for grouping.
+ */
+function redactJsonParseSyntaxErrorValue(value: string): string {
+  return value.replace(QUOTED_SNIPPET_PATTERN, '"[redacted]"');
+}
+
+/**
  * `beforeSend` scrubber for the API's Sentry init — recursively strips
  * denylisted PII-bearing keys from `event.extra`, every `event.contexts`
- * entry, and every breadcrumb's `data` before the event leaves the process.
- * Defense-in-depth, not a substitute for call-site discipline. [WI-1990]
+ * entry, and every breadcrumb's `data`; also redacts any `JSON.parse`
+ * SyntaxError-shaped `exception.value` (see rationale below) before the
+ * event leaves the process. Defense-in-depth, not a substitute for
+ * call-site discipline. [WI-1990]
+ *
+ * [WI-1990 rework] `exception.type`/`exception.value` is the one Sentry
+ * event surface neither the key-based `extra`/`contexts`/breadcrumb
+ * scrubbing above nor `dropConsoleBreadcrumb` touches — it's not a keyed
+ * field and it's not a breadcrumb. `JSON.parse(malformedText)` throws a
+ * `SyntaxError` whose `.message` embeds a literal snippet of the malformed
+ * text (V8: `Unexpected token 'S', "Sure! Here'sthe answer"... is not valid
+ * JSON`); passing that error straight to `captureException` — as 5 sibling
+ * sites did before this rework (dictation/{prepare-homework,review,
+ * generate}.ts, quiz/generate-round.ts x2) — puts a slice of the LLM's raw
+ * response (which routinely echoes learner homework/quiz-answer content)
+ * directly into `exception.value`, unreachable by a scrubber that only
+ * rewrites `extra`/`contexts`/breadcrumb `data`. Those 5 sites were fixed at
+ * the source (they now synthesize a content-free `Error` carrying only a
+ * length in `cause`, per `services/llm/providers/errors.ts`'s established
+ * pattern — `cause` is a plain object, not an `Error`, so Sentry's default
+ * `linkedErrorsIntegration` — which only chains `cause` when it's itself an
+ * `Error` instance — never surfaces it). This redaction is the forward
+ * guard: a future 6th site that copies the pre-fix pattern (hands the raw
+ * `JSON.parse`/`schema.parse` catch error to `captureException`) is safe by
+ * default. Redacting the quoted snippet, rather than dropping the whole
+ * value, is also a grouping IMPROVEMENT, not a tradeoff — the raw snippet is
+ * high-cardinality (every malformed response groups as a new issue); the
+ * redacted structural message groups correctly.
  */
 export function scrubSentryEvent<T extends Sentry.ErrorEvent>(event: T): T {
   if (event.extra) {
@@ -167,6 +227,17 @@ export function scrubSentryEvent<T extends Sentry.ErrorEvent>(event: T): T {
   if (event.breadcrumbs) {
     event.breadcrumbs = event.breadcrumbs.map((crumb) =>
       crumb.data ? { ...crumb, data: scrubKeys(crumb.data) } : crumb,
+    );
+  }
+  if (event.exception?.values) {
+    event.exception.values = event.exception.values.map((exceptionValue) =>
+      typeof exceptionValue.value === 'string' &&
+      isJsonParseSyntaxErrorMessage(exceptionValue.value)
+        ? {
+            ...exceptionValue,
+            value: redactJsonParseSyntaxErrorValue(exceptionValue.value),
+          }
+        : exceptionValue,
     );
   }
   return event;

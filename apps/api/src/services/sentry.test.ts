@@ -241,6 +241,78 @@ describe('scrubSentryEvent', () => {
     expect(crumb?.data).not.toHaveProperty('jsonStrSample');
     expect(crumb?.data?.sessionId).toBe('sess-1');
   });
+
+  // [WI-1990 rework] Third-vector red-green regression (independent re-audit
+  // finding): `JSON.parse(malformedText)` throws a SyntaxError whose
+  // `.message` embeds a literal snippet of the malformed text — the ONE
+  // Sentry event surface neither the key-based extra/contexts/breadcrumb
+  // scrubbing above nor `dropConsoleBreadcrumb` touches, because it lives in
+  // `exception.value`, not a keyed field or a breadcrumb. This is the ACTUAL
+  // message shape V8 throws (verified via `JSON.parse("Sure! Here")` in this
+  // repo's Node runtime): `Unexpected token 'S', "Sure! Here" is not valid
+  // JSON` — the quoted portion is a literal slice of the LLM response, which
+  // can echo learner homework/quiz-answer content (the exact shape the 5
+  // sibling `dictation`/`quiz` sites leaked before this rework). Before this
+  // fix, nothing redacted `event.exception.values[].value` and this
+  // assertion FAILED (the quoted snippet passed through unchanged); after
+  // adding the redaction it PASSES.
+  it('redacts the quoted snippet from a JSON.parse SyntaxError exception value', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'SyntaxError',
+            value:
+              "Unexpected token 'S', \"Sure! Here'sthe answer to your question, I think my mom said...\" is not valid JSON",
+          },
+        ],
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    const redactedValue = scrubbed.exception?.values?.[0]?.value;
+    expect(redactedValue).not.toContain('Sure! Here');
+    expect(redactedValue).not.toContain('my mom said');
+    expect(redactedValue).toBe(
+      'Unexpected token \'S\', "[redacted]" is not valid JSON',
+    );
+  });
+
+  it('leaves a JSON.parse SyntaxError value with no quoted snippet unchanged', () => {
+    const event = {
+      exception: {
+        values: [
+          { type: 'SyntaxError', value: 'Unexpected end of JSON input' },
+        ],
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.exception?.values?.[0]?.value).toBe(
+      'Unexpected end of JSON input',
+    );
+  });
+
+  it('leaves an unrelated exception value untouched', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'TypeError',
+            value: "Cannot read properties of undefined (reading 'foo')",
+          },
+        ],
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.exception?.values?.[0]?.value).toBe(
+      "Cannot read properties of undefined (reading 'foo')",
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
