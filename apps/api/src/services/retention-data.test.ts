@@ -84,6 +84,8 @@ import {
   updateNeedsDeepeningProgress,
   updateRetentionFromSession,
   evaluateRecallQuality,
+  buildRecallGradeMessages,
+  getOpenTopicWeakConcepts,
   ensureRetentionCard,
   getProfileOverdueCount,
   getAssessmentEligibleTopics,
@@ -256,6 +258,7 @@ function setupScopedRepo({
     consecutiveSuccessCount: number;
     pendingExpiresAt?: Date | null;
     profileId?: string;
+    concept?: string | null;
   }>,
   assessmentsFindMany = [] as Array<{
     id: string;
@@ -3079,5 +3082,212 @@ describe('getAssessmentEligibleTopics', () => {
     expect(result[0]!.activeAssessmentId).toBe('assessment-owned');
     expect(JSON.stringify(result)).not.toContain('Foreign Topic');
     expect(JSON.stringify(result)).not.toContain('assessment-foreign');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1454] Concept-targeted review — focus a due topic's recall on its open
+// weak concepts (needs_deepening_topics) while keeping SM-2 topic-grained.
+// ---------------------------------------------------------------------------
+
+describe('buildRecallGradeMessages — concept focus [WI-1454]', () => {
+  it('appends a focus_concepts block naming the weak concepts when focusConcepts is non-empty (AC-2)', () => {
+    const messages = buildRecallGradeMessages(
+      'my recall answer',
+      'Photosynthesis',
+      'How plants convert light to energy',
+      ['Calvin cycle', 'light-dependent reactions'],
+    );
+    const user = messages.find((m) => m.role === 'user');
+    expect(user).toBeDefined();
+    expect(user!.content).toContain('<focus_concepts>');
+    expect(user!.content).toContain('Calvin cycle');
+    expect(user!.content).toContain('light-dependent reactions');
+    // The grader is told to focus on those concepts rather than the whole topic.
+    expect(user!.content).toMatch(/focus your evaluation/i);
+    // Whole-topic signal is not dropped — title still present.
+    expect(user!.content).toContain('Photosynthesis');
+  });
+
+  it('is byte-identical to the whole-topic call when focusConcepts is empty or omitted (AC-3, eval no-drift)', () => {
+    const base = buildRecallGradeMessages('a', 'T', 'D');
+    expect(buildRecallGradeMessages('a', 'T', 'D', [])).toEqual(base);
+    expect(buildRecallGradeMessages('a', 'T', 'D', undefined)).toEqual(base);
+    const user = base.find((m) => m.role === 'user');
+    expect(user!.content).not.toContain('focus_concepts');
+  });
+
+  it('drops labels that sanitize to empty and keeps the rest', () => {
+    const messages = buildRecallGradeMessages('a', 'T', 'D', [
+      '   ',
+      'Osmosis',
+    ]);
+    const user = messages.find((m) => m.role === 'user');
+    expect(user!.content).toContain('<focus_concepts>Osmosis</focus_concepts>');
+  });
+});
+
+describe('getOpenTopicWeakConcepts [WI-1454]', () => {
+  // The scoped-repo boundary mock returns the injected rows verbatim, so these
+  // tests inject rows as already status/TTL-filtered (that predicate lives in
+  // the query, correct-by-construction, and is exercised by integration tests)
+  // and verify the JS concept extraction: distinct, trimmed, null-dropped.
+  const dbStub = {} as Database;
+
+  it('returns distinct, trimmed concept labels from the open rows (AC-1/AC-2)', async () => {
+    setupScopedRepo({
+      needsDeepeningFindMany: [
+        {
+          topicId,
+          subjectId,
+          status: 'pending_review',
+          consecutiveSuccessCount: 0,
+          concept: 'Calvin cycle',
+        },
+        {
+          topicId,
+          subjectId,
+          status: 'active',
+          consecutiveSuccessCount: 0,
+          concept: '  Calvin cycle  ', // duplicate after trim
+        },
+        {
+          topicId,
+          subjectId,
+          status: 'active',
+          consecutiveSuccessCount: 0,
+          concept: 'Osmosis',
+        },
+      ],
+    });
+    const concepts = await getOpenTopicWeakConcepts(dbStub, profileId, topicId);
+    expect(concepts).toEqual(['Calvin cycle', 'Osmosis']);
+  });
+
+  it('ignores rows with no concept label — topic-level signals yield no focus (AC-3)', async () => {
+    setupScopedRepo({
+      needsDeepeningFindMany: [
+        {
+          topicId,
+          subjectId,
+          status: 'active',
+          consecutiveSuccessCount: 0,
+          concept: null,
+        },
+        {
+          topicId,
+          subjectId,
+          status: 'active',
+          consecutiveSuccessCount: 0,
+        },
+      ],
+    });
+    expect(await getOpenTopicWeakConcepts(dbStub, profileId, topicId)).toEqual(
+      [],
+    );
+  });
+
+  it('returns [] when the topic has no open needs_deepening rows (AC-3)', async () => {
+    setupScopedRepo({ needsDeepeningFindMany: [] });
+    expect(await getOpenTopicWeakConcepts(dbStub, profileId, topicId)).toEqual(
+      [],
+    );
+  });
+});
+
+describe('processRecallTest — concept-targeted review [WI-1454]', () => {
+  // Capture the messages the grader receives so we can assert the recall scope,
+  // while returning a valid grade so processRecallTest proceeds past the gate.
+  function registerCapturingGrader(): { messages: ChatMessage[] | null } {
+    const captured: { messages: ChatMessage[] | null } = { messages: null };
+    const body =
+      '{"quality": 4, "verdict": "solid", "rationale": "ok", "misconception": null}';
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(messages: ChatMessage[]): Promise<ChatResult> {
+        captured.messages = messages;
+        return { content: body, stopReason: 'stop' };
+      },
+      chatStream(messages: ChatMessage[]): ChatStreamResult {
+        captured.messages = messages;
+        return makeChatStreamResult(
+          (async function* () {
+            yield body;
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
+      },
+    };
+    registerProvider(provider);
+    return captured;
+  }
+
+  function mockPassingSm2(): void {
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.6,
+        intervalDays: 10,
+        repetitions: 4,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-25T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+  }
+
+  it('focuses the recall grader on the topic’s open weak concepts when present (AC-1/AC-2), SM-2 still runs (AC-4)', async () => {
+    setupScopedRepo({
+      retentionCardFindFirst: mockRetentionCardRow(),
+      needsDeepeningFindMany: [
+        {
+          topicId,
+          subjectId,
+          status: 'pending_review',
+          consecutiveSuccessCount: 0,
+          concept: 'Light-dependent reactions',
+        },
+      ],
+    });
+    mockPassingSm2();
+    const captured = registerCapturingGrader();
+    const db = createMockDb();
+
+    await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'the light reactions happen in the thylakoid membrane',
+    });
+
+    // SM-2 scheduling still runs on the topic-grained card (AC-4).
+    expect(processRecallResult).toHaveBeenCalled();
+    // The grader was told to focus on the open weak concept (AC-1 ran the
+    // needs_deepening lookup before constructing the grade scope; AC-2 folded
+    // the concept into it).
+    const user = captured.messages?.find((m) => m.role === 'user');
+    expect(user?.content).toContain('<focus_concepts>');
+    expect(user?.content).toContain('Light-dependent reactions');
+  });
+
+  it('grades against the whole topic when there are no open weak concepts (AC-3)', async () => {
+    setupScopedRepo({
+      retentionCardFindFirst: mockRetentionCardRow(),
+      needsDeepeningFindMany: [],
+    });
+    mockPassingSm2();
+    const captured = registerCapturingGrader();
+    const db = createMockDb();
+
+    await processRecallTest(db, profileId, {
+      topicId,
+      answer: 'a whole-topic recall answer',
+    });
+
+    const user = captured.messages?.find((m) => m.role === 'user');
+    expect(user?.content).not.toContain('focus_concepts');
+    expect(user?.content).toContain('<topic_title>');
   });
 });
