@@ -569,7 +569,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     zValidator('json', selfConsentWithdrawRequestSchema),
     async (c) => {
       const db = c.get('db');
-      const chargePersonId = requireProfileId(c.get('profileId'));
+      const { profileId: chargePersonId } = withProfile(c);
       const account = requireAccount(c.get('account'));
       const { purpose } = c.req.valid('json');
 
