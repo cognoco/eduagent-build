@@ -89,7 +89,7 @@ function buildSystemPrompt(): string {
 // each in a named tag and entity-escape (escapeXml) so a crafted payload
 // cannot close the tag or be read as an instruction to the judge — a
 // successful injection here would bias the verdict toward "ok" and weaken
-// the safety net suitability-gate.ts consumes (WI-1877).
+// the safety net suitability-gate.ts consumes.
 function buildUserPrompt(input: SuitabilityJudgeInput): string {
   const languageLine = input.conversationLanguage
     ? `Conversation language: ${input.conversationLanguage}.`
