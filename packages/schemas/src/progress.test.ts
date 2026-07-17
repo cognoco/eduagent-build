@@ -1179,6 +1179,7 @@ describe('overdueTopicSchema', () => {
         topicTitle: 'Algebra',
         overdueDays: 5,
         failureCount: 2,
+        retentionStatus: 'forgotten',
       }).success,
     ).toBe(true);
   });
