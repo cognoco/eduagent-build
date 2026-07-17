@@ -138,6 +138,18 @@ The warnings are the existing mobile warning set. The runner also reported Node
 24 against the repository's requested Node 22 engine; all cited commands still
 completed with the statuses shown.
 
+## Post-integration verification
+
+`origin/main` at `acfe90399eb5b38f13db205e668de373ca783ce8` merged cleanly as
+`2e25f95225496710666fdaeab12f7438617ee8dd`. The merged tree then passed:
+
+```text
+Test Suites: 6 passed, 6 total
+Tests:       225 passed, 225 total
+NX Successfully ran target typecheck for project @eduagent/mobile and 6 tasks it depends on
+W-05 native top=47 four-route matrix: 3 passed (37.5s)
+```
+
 ## Final routed browser verification
 
 All final runs used a fresh exported web bundle, V2 flags, the staging API, and
