@@ -469,15 +469,17 @@ export default function TopicDetailScreen() {
           params: { mode: 'review', subjectId, topicId, topicName },
         } as Href);
     }
+    // [WI-2112] Challenge Round is not a standalone screen — it is an
+    // in-session offer/accept flow (useChallengeRound) gated server-side by
+    // evaluateChallengeReadiness(), which only ever offers a Challenge Round
+    // when sessionType === 'learning'. Route into that same learning session
+    // path so the existing Challenge Round machinery can trigger, instead of
+    // the unrelated recall-test recall quiz.
     if (deepLinkMode === 'challenge' && topicId) {
       return () =>
         router.push({
-          pathname: '/(app)/topic/recall-test',
-          params: {
-            topicId,
-            ...(subjectId && { subjectId }),
-            ...(topicName && { topicName }),
-          },
+          pathname: '/(app)/session',
+          params: { mode: 'learning', subjectId, topicId, topicName },
         } as Href);
     }
 

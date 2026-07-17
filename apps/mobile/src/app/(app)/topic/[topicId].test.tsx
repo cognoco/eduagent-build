@@ -63,6 +63,7 @@ type TopicRouteParams = {
   topicId: string;
   bookId?: string;
   chapter?: string;
+  mode?: string;
 };
 const mockUseLocalSearchParams = jest.fn(
   (): TopicRouteParams => ({
@@ -376,6 +377,61 @@ describe('TopicDetailScreen action buttons', () => {
       },
     });
   });
+
+  // [WI-2112] challenge.start deep links (Now-feed cards, mentor-bar intents,
+  // and direct topic ?mode=challenge links all resolve to this same
+  // /(app)/topic/:topicId?mode=challenge route — see now-deep-link.ts and
+  // bar-intent-match.ts, both already covered for the upstream URL
+  // resolution) must enter the existing Challenge Round path (the
+  // sessionType==='learning' session where useChallengeRound/
+  // evaluateChallengeReadiness live), never the unrelated recall-test recall
+  // quiz. Covered across a non-literature and a literature (Sylvia Plath)
+  // subject per AC-7 — the dispatch is subject-agnostic, so only topicName
+  // varies.
+  it.each([
+    ['non-literature subject', 'Algebra'],
+    ['literature subject — Sylvia Plath', 'Sylvia Plath'],
+  ])(
+    'routes a challenge.start deep link into the Challenge Round session path, not recall-test (%s)',
+    async (_label, topicTitle) => {
+      setupRoutes({
+        progressOverride: {
+          ...DEFAULT_TOPIC_PROGRESS,
+          completionStatus: 'not_started',
+          title: topicTitle,
+        },
+      });
+      mockUseLocalSearchParams.mockReturnValue({
+        subjectId: SUBJECT_ID,
+        topicId: TOPIC_ID,
+        mode: 'challenge',
+      });
+
+      render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('study-cta');
+      });
+      fireEvent.press(screen.getByTestId('study-cta'));
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          subjectId: SUBJECT_ID,
+          topicId: TOPIC_ID,
+          topicName: topicTitle,
+        },
+      });
+      // In-session negative case: the deep-link dispatch must never resolve
+      // to the recall-test recall quiz.
+      expect(mockPush).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/topic/recall-test',
+        }),
+      );
+    },
+  );
 
   it('shows "Review this topic" as CTA for in_progress topics', async () => {
     setupRoutes({
