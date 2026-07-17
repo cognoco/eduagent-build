@@ -429,9 +429,13 @@ export async function executeDeletionV2(
     // who sits on either end of an edge — active OR revoked — aborts the whole
     // transaction. A whole-org/whole-account erasure removes the org and all its
     // persons, so every relationship anchored on those persons ceases to exist;
-    // the edge rows must go with them. (Canon: data-model.md §3.2/§6.1 say these
-    // edges SURVIVE a single-person delete — that is the person-granularity path;
-    // the whole-org erasure path tears them down. See MMT-ADR-0026.)
+    // the edge rows must go with them. (MMT-ADR-0026 + data-model.md §3.2/§6.1
+    // originally scoped this teardown to the whole-org path, treating edges as
+    // SURVIVING a single-person delete; WI-1985 extended the same incident-scoped
+    // teardown to the person-scoped erasure paths — see tearDownPersonEdgesTx —
+    // because those paths genuinely erase the person, so an incident edge cannot
+    // survive there either. That ADR / data-model narrative claim is now stale;
+    // the lockstep ADR amendment is a tracked follow-up.)
     //
     // CROSS-ORG EDGES: an edge may reference a person OUTSIDE this org (a guardian
     // in another org; a supporter who supports an in-org charge). We delete an
@@ -581,6 +585,9 @@ export async function deletePersonV2(
       reason,
       retentionPeriod: null,
     });
+    // WI-1985 — sever incident guardianship/supportership edges before the drop
+    // (their charge/supportee RESTRICT FKs would otherwise abort the delete).
+    await tearDownPersonEdgesTx(tx, personId);
     await tx.delete(person).where(eq(person.id, personId));
   });
 }
@@ -647,6 +654,9 @@ export async function deletePersonIfConsentWithdrawnV2(
       reason: 'guardian_initiated',
       retentionPeriod: null,
     });
+    // WI-1985 — sever incident guardianship/supportership edges before the drop
+    // (their charge/supportee RESTRICT FKs would otherwise abort the delete).
+    await tearDownPersonEdgesTx(tx, personId);
     const deleted = await tx
       .delete(person)
       .where(eq(person.id, personId))
@@ -743,6 +753,9 @@ export async function deletePersonIfNoConsentV2(
       reason: 'abandonment',
       retentionPeriod: null,
     });
+    // WI-1985 — sever incident guardianship/supportership edges before the drop
+    // (their charge/supportee RESTRICT FKs would otherwise abort the delete).
+    await tearDownPersonEdgesTx(tx, personId);
     const deleted = await tx
       .delete(person)
       .where(eq(person.id, personId))
@@ -801,6 +814,9 @@ export async function deleteArchivedPersonIfStillEligibleV2(
       reason: 'abandonment',
       retentionPeriod: null,
     });
+    // WI-1985 — sever incident guardianship/supportership edges before the drop
+    // (their charge/supportee RESTRICT FKs would otherwise abort the delete).
+    await tearDownPersonEdgesTx(tx, personId);
     const deleted = await tx
       .delete(person)
       .where(eq(person.id, personId))
@@ -897,6 +913,47 @@ async function personExistsTx(
     columns: { id: true },
   });
   return !!row;
+}
+
+/**
+ * Tear down every guardianship + supportership edge INCIDENT to a person being
+ * erased, inside the deletion transaction, BEFORE the person row drops — the
+ * single-person granularity of the whole-org Step 2a teardown (WI-1985; see
+ * MMT-ADR-0026 for the whole-org decision this extends). Both edges' endpoint
+ * FKs are `ON DELETE RESTRICT` (identity.ts), so dropping a person who sits on
+ * either end of an edge — active OR revoked — aborts the whole transaction
+ * unless the incident edges go first. Without this, the statutory auto-erasure
+ * pipelines (consent-withdrawal, day-30 no-consent, archived-cleanup) FK-violate
+ * and roll back for any managed child (who always sits on a guardianship edge as
+ * the charge) — erasure never completes.
+ *
+ * Incident-scoped and bidirectional: an edge is severed when THIS person is on
+ * EITHER end; the counterpart person (the surviving guardian/supporter, in-org
+ * or cross-org) is NEVER touched — the relationship to the erased person ceases
+ * to exist, but the other human does not. There is no retain-tier obligation for
+ * a relationship edge (unlike consent_grant → consent_receipt), so a hard delete
+ * is correct (MMT-ADR-0026 Consequences).
+ */
+async function tearDownPersonEdgesTx(
+  tx: DeletionTx,
+  personId: string,
+): Promise<void> {
+  await tx
+    .delete(guardianship)
+    .where(
+      or(
+        eq(guardianship.guardianPersonId, personId),
+        eq(guardianship.chargePersonId, personId),
+      ),
+    );
+  await tx
+    .delete(supportership)
+    .where(
+      or(
+        eq(supportership.supporterPersonId, personId),
+        eq(supportership.supporteePersonId, personId),
+      ),
+    );
 }
 
 /**
