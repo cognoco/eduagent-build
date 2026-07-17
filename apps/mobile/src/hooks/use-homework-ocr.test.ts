@@ -337,6 +337,68 @@ describe('useHomeworkOcr', () => {
         { idempotent: true },
       );
     });
+
+    // [WI-1988 SF2] getInfoAsync's modificationTime is optional/platform-
+    // dependent in Expo's types. Treating an unavailable timestamp as "0"
+    // (1970) made a fresh, in-flight capture look infinitely old and get
+    // deleted on the very next mount's sweep. Unknown mtime must be left for
+    // a later sweep instead — same as the unreadable-info catch below it.
+    it('does not delete a sweep candidate whose modificationTime is unavailable', async () => {
+      mockReadDirectoryAsync.mockResolvedValue(['homework-300.jpg']);
+      mockGetInfoAsync.mockImplementation(async (uri: string) => {
+        if (uri === 'file:///cache/homework-300.jpg') {
+          // exists:true but modificationTime unpopulated — the exact shape
+          // some Expo platform builds return.
+          return { exists: true };
+        }
+        return { exists: false };
+      });
+
+      renderHook(() => useHomeworkOcr(), { wrapper: createWrapper() });
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(mockDeleteAsync).not.toHaveBeenCalledWith(
+        'file:///cache/homework-300.jpg',
+        { idempotent: true },
+      );
+    });
+  });
+
+  // [WI-1988 SF1] recognizeTextServerSide's finally block deletes the
+  // upload-resize intermediate. Previously unverified: both resize call
+  // sites shared the same mocked uri, so the upload-resize deletion was
+  // indistinguishable from the OCR-resize deletion, and no test exercised
+  // the server-side path with distinct mocked uris.
+  it('deletes the upload-resize intermediate after a server-side OCR call', async () => {
+    mockManipulateAsync
+      .mockResolvedValueOnce({ uri: 'file:///cache/resized-ocr-local.jpg' })
+      .mockResolvedValueOnce({ uri: 'file:///cache/resized-upload.jpg' });
+    mockRecognize.mockResolvedValue({ text: '' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify(serverOcrResult('Server-side OCR rescue text', 0.9)),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.process('file:///tmp/photo.jpg');
+    });
+
+    expect(result.current.status).toBe('done');
+    expect(result.current.source).toBe('server');
+    expect(mockManipulateAsync).toHaveBeenCalledTimes(2);
+    expect(mockDeleteAsync).toHaveBeenCalledWith(
+      'file:///cache/resized-upload.jpg',
+      { idempotent: true },
+    );
   });
 
   it('uses server vision OCR instead of a local non-homework dump', async () => {

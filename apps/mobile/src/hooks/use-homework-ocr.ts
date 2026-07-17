@@ -159,8 +159,12 @@ async function sweepOrphanedHomeworkCaptures(): Promise<void> {
           const modifiedMs =
             info.exists && 'modificationTime' in info && info.modificationTime
               ? info.modificationTime * 1000
-              : 0;
-          if (now - modifiedMs > ORPHAN_SWEEP_TTL_MS) {
+              : null;
+          // Unknown mtime (exists but modificationTime unpopulated) must not
+          // be treated as infinitely old — that would delete a fresh,
+          // in-flight capture. Leave it for a later sweep, same as the
+          // unreadable-info case below.
+          if (modifiedMs != null && now - modifiedMs > ORPHAN_SWEEP_TTL_MS) {
             await deleteFileSafely(uri);
           }
         } catch {
