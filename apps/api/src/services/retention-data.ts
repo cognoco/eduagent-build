@@ -260,7 +260,7 @@ export function buildRecallGradeMessages(
     safeFocus.length > 0
       ? `\n<focus_concepts>${safeFocus.join(
           '; ',
-        )}</focus_concepts>\nThe learner previously struggled with the concept(s) in <focus_concepts>. Focus your evaluation on whether their answer now demonstrates understanding of those specific concept(s) within this topic, rather than the topic as a whole.`
+        )}</focus_concepts>\nThe learner previously struggled with the concept(s) listed above. Focus your evaluation on whether their answer now demonstrates understanding of those specific concept(s) within this topic, rather than the topic as a whole.`
       : '';
   return [
     { role: 'system', content: RECALL_QUALITY_PROMPT },
@@ -907,28 +907,44 @@ export async function getOpenTopicWeakConcepts(
   topicId: string,
   now: Date = new Date(),
 ): Promise<string[]> {
-  const repo = createScopedRepository(db, profileId);
-  const rows = await repo.needsDeepeningTopics.findMany(
-    and(
-      eq(needsDeepeningTopics.topicId, topicId),
-      inArray(needsDeepeningTopics.status, ['active', 'pending_review']),
-      or(
-        isNull(needsDeepeningTopics.pendingExpiresAt),
-        gt(needsDeepeningTopics.pendingExpiresAt, now),
+  // Best-effort focus. Both grading callers mutate cooldown state BEFORE this
+  // lookup, so a failure here must never propagate — it would consume the
+  // learner's recall cooldown (or fail an Inngest step) without ever grading.
+  // On any lookup error, observe it and fall back to whole-topic recall.
+  try {
+    const repo = createScopedRepository(db, profileId);
+    const rows = await repo.needsDeepeningTopics.findMany(
+      and(
+        eq(needsDeepeningTopics.topicId, topicId),
+        inArray(needsDeepeningTopics.status, ['active', 'pending_review']),
+        or(
+          isNull(needsDeepeningTopics.pendingExpiresAt),
+          gt(needsDeepeningTopics.pendingExpiresAt, now),
+        ),
       ),
-    ),
-  );
+    );
 
-  const seen = new Set<string>();
-  const concepts: string[] = [];
-  for (const row of rows) {
-    const label = row.concept?.trim();
-    if (label && !seen.has(label)) {
-      seen.add(label);
-      concepts.push(label);
+    const seen = new Set<string>();
+    const concepts: string[] = [];
+    for (const row of rows) {
+      const label = row.concept?.trim();
+      if (label && !seen.has(label)) {
+        seen.add(label);
+        concepts.push(label);
+      }
     }
+    return concepts;
+  } catch (error) {
+    captureException(error, {
+      tags: { area: 'recall', op: 'weak_concepts_lookup' },
+      extra: { profileId, topicId },
+    });
+    logger.error(
+      '[recall] open weak-concept lookup failed; grading whole-topic',
+      { profileId, topicId },
+    );
+    return [];
   }
-  return concepts;
 }
 
 export async function processRecallTest(

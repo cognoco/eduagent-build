@@ -3193,6 +3193,17 @@ describe('getOpenTopicWeakConcepts [WI-1454]', () => {
       [],
     );
   });
+
+  it('falls back to [] (whole-topic recall) when the lookup fails, never throwing — the caller has already claimed the cooldown', async () => {
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      needsDeepeningTopics: {
+        findMany: jest.fn().mockRejectedValue(new Error('db unavailable')),
+      },
+    });
+    await expect(
+      getOpenTopicWeakConcepts(dbStub, profileId, topicId),
+    ).resolves.toEqual([]);
+  });
 });
 
 describe('processRecallTest — concept-targeted review [WI-1454]', () => {
