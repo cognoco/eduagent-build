@@ -54,6 +54,7 @@ jest.mock('../../lib/activation-events', () => ({
 const mockStartSSOFlow = jest.fn();
 
 const SignUpScreen = require('./sign-up').default;
+const { SIGN_UP_CAPTCHA_TIMEOUT_MS } = require('./sign-up');
 
 describe('SignUpScreen', () => {
   const mockCreate = jest.fn();
@@ -315,7 +316,10 @@ describe('SignUpScreen', () => {
     });
 
     await act(async () => {
-      jest.advanceTimersByTime(CLERK_REQUEST_TIMEOUT_MS);
+      // signUp.create() is given its own longer ceiling (WI-2119) because it
+      // can surface an interactive CAPTCHA challenge — see
+      // SIGN_UP_CAPTCHA_TIMEOUT_MS in sign-up.tsx.
+      jest.advanceTimersByTime(SIGN_UP_CAPTCHA_TIMEOUT_MS);
       await Promise.resolve();
     });
 
@@ -326,6 +330,54 @@ describe('SignUpScreen', () => {
     expect(
       screen.getByTestId('sign-up-button').props.accessibilityState,
     ).toEqual(expect.objectContaining({ busy: false, disabled: false }));
+  });
+
+  // [WI-2119] Regression guard for the mount-lifecycle timeout bug: a real
+  // Chromium sign-up hung ~20s and surfaced "The security service did not
+  // respond in time" because Clerk's interactive CAPTCHA challenge can render
+  // silently while signUp.create() is pending, with no in-app cue that the
+  // user needs to act. Without the fix, no such cue exists — the button just
+  // spins until the raw error appears. This test fails without the fix
+  // (no captcha hint ever renders) and passes with it.
+  it('[WI-2119] shows a captcha hint partway through a pending web sign-up, and clears it once settled', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'web',
+      configurable: true,
+      writable: true,
+    });
+    jest.useFakeTimers();
+    mockCreate.mockImplementation(neverResolves);
+
+    render(<SignUpScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-up-email'),
+      'new@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('sign-up-password'), 'secure123');
+    fireEvent.press(screen.getByTestId('sign-up-button'));
+
+    // No hint yet — signUp.create() only just fired.
+    expect(screen.queryByTestId('sign-up-captcha-hint')).toBeNull();
+
+    await act(async () => {
+      jest.advanceTimersByTime(5_000);
+      await Promise.resolve();
+    });
+
+    // Hint appears well before SIGN_UP_CAPTCHA_TIMEOUT_MS, while signUp.create()
+    // is still pending — this is the cue a human needs to notice and complete
+    // the challenge instead of just watching a spinner.
+    screen.getByTestId('sign-up-captcha-hint');
+
+    await act(async () => {
+      jest.advanceTimersByTime(SIGN_UP_CAPTCHA_TIMEOUT_MS - 5_000);
+      await Promise.resolve();
+    });
+
+    // Once the call settles (here: times out), the hint clears rather than
+    // lingering alongside the error message.
+    expect(screen.queryByTestId('sign-up-captcha-hint')).toBeNull();
   });
 
   it('[auth-sign-up-timeout] recovers when email verification preparation never resolves', async () => {

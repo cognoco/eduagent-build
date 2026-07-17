@@ -212,7 +212,8 @@
       "emailPlaceholder": "du@eksempel.com",
       "passwordPlaceholder": "Lag et passord",
       "signUpButton": "Registrer deg",
-      "signInButton": "Logg inn"
+      "signInButton": "Logg inn",
+      "captchaHint": "Hvis en verifisering vises ovenfor, fullfør den – vi fortsetter automatisk."
     },
     "forgotPassword": {
       "title": "Glemt passord?",

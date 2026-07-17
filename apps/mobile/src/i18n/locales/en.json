@@ -234,7 +234,8 @@
       "emailPlaceholder": "you@example.com",
       "passwordPlaceholder": "Create a password",
       "signUpButton": "Sign up",
-      "signInButton": "Sign in"
+      "signInButton": "Sign in",
+      "captchaHint": "If a verification check appears above, please complete it — we'll continue automatically."
     },
     "forgotPassword": {
       "title": "Forgot password?",
