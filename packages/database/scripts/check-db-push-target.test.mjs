@@ -75,8 +75,9 @@ test('guard exits 1 for any unknown DOPPLER_CONFIG value (err on the safe side)'
 });
 
 test('guard exits 1 when DOPPLER_CONFIG is absent and DB_PUSH_LOCAL_DEV is not set', () => {
-  // pnpm env:sync writes stg creds to .env.development.local; a bare push
-  // without Doppler may pick them up. Block by default; require explicit opt-in.
+  // Without Doppler, DATABASE_URL may already be set in the process env (a leftover
+  // doppler-run shell, an exported var, or a bare packages/database/.env). Block by
+  // default; require explicit opt-in.
   const { status, stderr } = runGuard({ DOPPLER_CONFIG: undefined });
   assert.equal(status, 1, 'expected exit 1 — no Doppler without override should be blocked');
   assert.match(stderr, /drizzle-kit push is blocked/);
@@ -100,10 +101,10 @@ test('guard exits 0 when DOPPLER_CONFIG is absent and DB_PUSH_LOCAL_DEV=1', () =
 // ── DB_PUSH_LOCAL_DEV escape must still check the resolved host (WI-1874) ────
 
 test('guard exits 1 when DB_PUSH_LOCAL_DEV=1 but DATABASE_URL resolves to a stg/neon.tech host', () => {
-  // pnpm env:sync writes staging credentials into .env.development.local, which
-  // drizzle-kit auto-loads. A dev who sets DB_PUSH_LOCAL_DEV=1 intending to hit
-  // local Postgres, but still has stg creds present, must not be allowed
-  // through — that's the exact April-2026 stg push-drift incident.
+  // A dev who sets DB_PUSH_LOCAL_DEV=1 intending to hit local Postgres, but has a
+  // staging DATABASE_URL already set in the process env, must not be allowed
+  // through — that's the exact April-2026 stg push-drift incident. (drizzle-kit
+  // loads only a bare .env from packages/database cwd, never repo-root .env.development.local.)
   const { status, stderr } = runGuard({
     DOPPLER_CONFIG: undefined,
     DB_PUSH_LOCAL_DEV: '1',
