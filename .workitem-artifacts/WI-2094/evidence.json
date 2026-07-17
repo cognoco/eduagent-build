@@ -2,17 +2,17 @@
   "claims": [
     {
       "acRef": "AC-1",
-      "description": "The root cause and production fix are identified at the deterministic matcher and learner send boundary, including replacement of the already-visible light-practice no-op with visible clarification state.",
+      "description": "The root causes and production fixes are identified at the deterministic matcher and learner send boundary, including the original light-practice no-op, broad keyword interception, and non-refreshing boolean clarification.",
       "pointer": "docs/evidence/WI-2094/report.md"
     },
     {
       "acRef": "AC-2",
-      "description": "Behavior-first boundary coverage proves both exact neon declaratives, arrow and keyboard submit, editing then submit, unchanged questions, closed-catalog jumps, ambiguous and unsupported commands, exact route params, and interactive 360px behavior.",
-      "pointer": "apps/mobile/src/app/(app)/mentor.test.tsx:344"
+      "description": "Behavior-first boundary coverage proves exact neon and learn-more declaratives, more questions, all submit mechanisms, editing then submit, literal and named closed-catalog jumps, consecutive clarification refresh, exact route params, and interactive 360px behavior.",
+      "pointer": "apps/mobile/src/app/(app)/mentor.test.tsx:365"
     },
     {
       "acRef": "AC-2",
-      "description": "Immutable machine-readable RED, GREEN, production-only REVERT, and RESTORE outputs plus all required validation results are preserved.",
+      "description": "Immutable machine-readable original RED, GREEN, production-only REVERT, RESTORE, and independent-review RED/GREEN outputs plus all required validation results are preserved.",
       "pointer": "docs/evidence/WI-2094/report.md"
     },
     {
