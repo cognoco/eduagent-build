@@ -173,6 +173,37 @@ export function scrubSentryEvent<T extends Sentry.ErrorEvent>(event: T): T {
 }
 
 /**
+ * `beforeBreadcrumb` hook for the API's Sentry init — drops every breadcrumb
+ * the SDK's default `consoleIntegration()` produces from `console.*` calls.
+ *
+ * [WI-1990 rework] `@sentry/cloudflare`'s default integrations include
+ * `consoleIntegration()` (not opted into explicitly — it's on by default
+ * because `index.ts`'s `Sentry.withSentry()` init does not override
+ * `integrations`). It monkey-patches `console.*` and records every call as a
+ * breadcrumb shaped `{ category: 'console', message: <formatted args>,
+ * data: { arguments: <raw args>, logger: 'console' } }`. This app's
+ * `services/logger.ts` does `console.warn(JSON.stringify(entry))`, so the
+ * ENTIRE serialized structured-log entry — including any `rawSnippet`/
+ * `responsePreview`/`chunk`-style raw-LLM-output field a `logger.warn` call
+ * carries — lands as an opaque STRING inside `breadcrumb.message` and
+ * `breadcrumb.data.arguments[0]`. `scrubSentryEvent`'s key-based denylist
+ * cannot reach content buried inside a string, so the console breadcrumb is
+ * a full bypass of the scrubber — the vector must be killed at the source,
+ * not string-matched. Every `console.*` call anywhere in the API becomes a
+ * Sentry breadcrumb by default, so this drops the entire category rather
+ * than attempting to distinguish "safe" console calls from unsafe ones —
+ * the app already has structured logs (`services/logger.ts`, shipped via
+ * Cloudflare Workers Logpush) and Sentry events (`captureException`/
+ * `captureMessage`) for observability; console breadcrumbs on top of those
+ * are not load-bearing.
+ */
+export function dropConsoleBreadcrumb(
+  breadcrumb: Sentry.Breadcrumb,
+): Sentry.Breadcrumb | null {
+  return breadcrumb.category === 'console' ? null : breadcrumb;
+}
+
+/**
  * Adds a breadcrumb to the current Sentry scope.
  */
 export function addBreadcrumb(

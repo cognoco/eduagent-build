@@ -1,4 +1,10 @@
-import { captureException, addBreadcrumb, scrubSentryEvent } from './sentry';
+import type * as Sentry from '@sentry/cloudflare';
+import {
+  captureException,
+  addBreadcrumb,
+  scrubSentryEvent,
+  dropConsoleBreadcrumb,
+} from './sentry';
 
 // ---------------------------------------------------------------------------
 // Mock @sentry/cloudflare
@@ -234,5 +240,80 @@ describe('scrubSentryEvent', () => {
     const crumb = scrubbed.breadcrumbs?.[0];
     expect(crumb?.data).not.toHaveProperty('jsonStrSample');
     expect(crumb?.data?.sessionId).toBe('sess-1');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dropConsoleBreadcrumb [WI-1990 rework] — beforeBreadcrumb console-vector guard
+// ---------------------------------------------------------------------------
+
+describe('dropConsoleBreadcrumb', () => {
+  // [WI-1990 rework] Red-green regression for the independent-re-audit finding
+  // the first sweep missed: @sentry/cloudflare's default `consoleIntegration()`
+  // turns every `console.*` call into a breadcrumb, and this app's
+  // `services/logger.ts` does `console.warn(JSON.stringify(entry))` — so a
+  // structured log entry carrying a raw-LLM-output field (e.g. `chunk` from
+  // `services/llm/providers/openai.ts`'s "malformed SSE chunk discarded"
+  // warning) lands as an opaque STRING inside `breadcrumb.message` and
+  // `breadcrumb.data.arguments[0]`, bypassing the key-based `scrubSentryEvent`
+  // denylist entirely (a denylist can strip a keyed field, not grep inside a
+  // string). This reproduces the ACTUAL shape `consoleIntegration()` produces
+  // (see @sentry/core's `addConsoleBreadcrumb`): `category: 'console'`,
+  // string `message`, and `data.arguments: [<raw args>]`. Before
+  // `dropConsoleBreadcrumb` existed, nothing dropped this breadcrumb and it
+  // reached Sentry unchanged (this assertion FAILS if the function is a
+  // passthrough); after wiring it as `beforeBreadcrumb`, every `category:
+  // 'console'` breadcrumb is dropped regardless of what content it carries
+  // (this assertion PASSES).
+  it('drops the exact breadcrumb shape produced by consoleIntegration() for a console.warn(JSON.stringify(logEntry)) call', () => {
+    const rawLogEntryJson = JSON.stringify({
+      timestamp: '2026-07-17T12:00:00.000Z',
+      level: 'warn',
+      message: '[llm:openai] malformed SSE chunk discarded',
+      context: {
+        event: 'openai.sse.malformed',
+        // The exact leak shape: a raw-LLM-output field embedded inside the
+        // JSON-stringified log entry, which is itself embedded inside the
+        // breadcrumb's message/arguments strings.
+        chunk: 'data: {"delta":"...the learner said their dad is in the...',
+      },
+    });
+
+    // Real @sentry/core consoleIntegration() breadcrumb shape — see
+    // node_modules/.../@sentry/core/build/esm/integrations/console.js
+    // addConsoleBreadcrumb().
+    const consoleBreadcrumb: Sentry.Breadcrumb = {
+      category: 'console',
+      level: 'warning',
+      message: rawLogEntryJson,
+      data: {
+        arguments: [rawLogEntryJson],
+        logger: 'console',
+      },
+    };
+
+    const result = dropConsoleBreadcrumb(consoleBreadcrumb);
+
+    expect(result).toBeNull();
+  });
+
+  it('leaves non-console breadcrumbs (e.g. addBreadcrumb() call sites) untouched', () => {
+    const breadcrumb: Sentry.Breadcrumb = {
+      category: 'idempotency',
+      level: 'info',
+      message: 'idempotency preflight skipped: profile missing',
+    };
+
+    const result = dropConsoleBreadcrumb(breadcrumb);
+
+    expect(result).toBe(breadcrumb);
+  });
+
+  it('leaves a breadcrumb with no category untouched', () => {
+    const breadcrumb: Sentry.Breadcrumb = { message: 'no category set' };
+
+    const result = dropConsoleBreadcrumb(breadcrumb);
+
+    expect(result).toBe(breadcrumb);
   });
 });
