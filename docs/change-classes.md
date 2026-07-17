@@ -27,7 +27,7 @@ is the cross-package suite under `tests/integration/`.
 | **inngest** | `apps/api/src/inngest/**` | — | `test:api:integration` | Verify dashboard sync after deploy |
 | **api-routes** | `apps/api/src/routes/**` | `test:api:unit` | `test:api:integration` | |
 | **api-middleware** | `apps/api/src/middleware/**` | `test:api:unit` | `test:api:integration` | Auth/billing changes need break tests |
-| **api-services** | `apps/api/src/services/**` (non-prompt) | `test:api:unit` | — | |
+| **api-services** | `apps/api/src/services/**` (non-prompt) | `test:api:unit` | `test:api:integration` | WI-1992: was unit-only, missing the integration/break-test coverage sibling classes (api-routes, api-middleware) already had |
 | **identity-v2-seam** | `apps/api/src/services/identity-v2/**` | — | `test:api:integration` | The identity-v2 ↔ shell seam (WI-1305/R6); caller-bound authority changes need a break test |
 | **mobile-routes** | `apps/mobile/src/app/**` | `test:mobile:unit` | — | `unstable_settings`; push ancestor chain |
 | **mobile-src** | `apps/mobile/src/**` (non-route, non-i18n) | `test:mobile:unit` | — | |

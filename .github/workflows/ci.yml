@@ -396,8 +396,9 @@ jobs:
       # Run API integration tests against real PostgreSQL.
       # PRs: routed by the change-class router (WI-452) — runs whenever the
       # matrix maps any touched class to integration tests (db-schema,
-      # db-migrations, inngest, api-routes, api-middleware, shared-schemas,
-      # shared-database, security-sensitive, test-infra, dependencies).
+      # db-migrations, inngest, api-routes, api-middleware, api-services,
+      # shared-schemas, shared-database, security-sensitive, test-infra,
+      # dependencies).
       # Push to main: keeps the original dorny paths-filter gate unchanged.
       - name: API integration tests
         if: >-
