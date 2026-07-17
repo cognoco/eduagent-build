@@ -13,8 +13,19 @@
 // are not silently swallowed. clerkSignOut() is wrapped in try/finally;
 // resetAuthExpiredGuard() is called in the finally block so it fires even
 // when clerkSignOut throws.
+//
+// [WI-1987] sign-out — deterministic scoped-cache removal
+//
+// queryClient.clear() only empties the in-memory cache. The scoped persister
+// (query-persister.ts) mirrors it to AsyncStorage on a 2s throttle — so
+// pre-fix, disk removal depended on that throttled write actually firing.
+// A crash/force-quit inside the ~2s window left the full pre-sign-out cache
+// (including session transcripts) on disk permanently. The fix removes the
+// scoped AsyncStorage key directly and deterministically, independent of the
+// persister's throttle timer.
 // ---------------------------------------------------------------------------
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native'; // gc1-allow: external boundary — Sentry SDK
 import type { QueryClient } from '@tanstack/react-query';
 import {
@@ -25,6 +36,7 @@ import {
 
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { setActiveProfileId, resetAuthExpiredGuard } from './api-client';
+import { buildPersisterKey } from './query-persister';
 
 // Mock dependencies that signOutWithCleanup touches so the test is
 // self-contained and order-of-calls is verifiable via invocationCallOrder.
@@ -350,6 +362,111 @@ describe('signOutWithCleanup — auth-expired guard reset [BUG-560]', () => {
 
     // resetAuthExpiredGuard fires in the finally block, after clerkSignOut resolves.
     expect(clerkOrder).toBeLessThan(guardResetOrder);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Deterministic scoped-cache removal [WI-1987]
+// ---------------------------------------------------------------------------
+
+describe('signOutWithCleanup — deterministic scoped-cache removal [WI-1987]', () => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  it('removes the scoped persister AsyncStorage key for the signing-out user', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+    const userId = 'user-123';
+    const key = buildPersisterKey(userId);
+    // Simulate a snapshot the persister wrote to disk during normal app use,
+    // shaped like a real persisted cache containing a transcript query.
+    await AsyncStorage.setItem(
+      key,
+      JSON.stringify({
+        clientState: {
+          queries: [
+            {
+              queryKey: ['session-transcript', 'study', 's1', 'p1'],
+              state: {
+                data: { exchanges: [{ text: 'my real chat message' }] },
+              },
+            },
+          ],
+        },
+      }),
+    );
+
+    await signOutWithCleanup({
+      clerkSignOut: makeClerkSignOut(),
+      queryClient: makeQueryClient(),
+      profileIds: [],
+      clerkUserId: userId,
+    });
+
+    expect(await AsyncStorage.getItem(key)).toBeNull();
+  });
+
+  // [break-test / crash-window] Pre-fix, disk removal depended entirely on
+  // queryClient.clear() triggering the persister's throttled (2s) AsyncStorage
+  // subscription. This test's queryClient is a bare mock with no real
+  // persister wired to it (see makeQueryClient()) — no throttled write can
+  // EVER happen here — and fake timers are never advanced, so zero time
+  // elapses. If signOutWithCleanup still depended on the persister's
+  // subscription firing, the pre-seeded blob would remain on disk forever.
+  // It does not, because the fix removes the key directly and synchronously
+  // within signOutWithCleanup's own awaited execution.
+  it('[crash-window break-test] removes the key without any throttle interval elapsing', async () => {
+    jest.useFakeTimers();
+    try {
+      const scope = makeScopeMock();
+      (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+      const userId = 'user-456';
+      const key = buildPersisterKey(userId);
+      await AsyncStorage.setItem(key, 'pre-sign-out-snapshot-with-transcript');
+
+      await signOutWithCleanup({
+        clerkSignOut: makeClerkSignOut(),
+        queryClient: makeQueryClient(),
+        profileIds: [],
+        clerkUserId: userId,
+      });
+
+      // No fake time was ever advanced — well inside the persister's 2s
+      // throttle window a crash could occur in — yet the key is already gone.
+      expect(await AsyncStorage.getItem(key)).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("does not remove a DIFFERENT user's scoped cache key", async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+    const otherUserKey = buildPersisterKey('other-user');
+    await AsyncStorage.setItem(otherUserKey, 'other-user-data');
+
+    await signOutWithCleanup({
+      clerkSignOut: makeClerkSignOut(),
+      queryClient: makeQueryClient(),
+      profileIds: [],
+      clerkUserId: 'signing-out-user',
+    });
+
+    expect(await AsyncStorage.getItem(otherUserKey)).toBe('other-user-data');
+  });
+
+  it('does not throw when clerkUserId is omitted (no scoped key to target)', async () => {
+    const scope = makeScopeMock();
+    (Sentry.getCurrentScope as jest.Mock).mockReturnValue(scope);
+
+    await expect(
+      signOutWithCleanup({
+        clerkSignOut: makeClerkSignOut(),
+        queryClient: makeQueryClient(),
+        profileIds: [],
+      }),
+    ).resolves.toBeUndefined();
   });
 });
 
