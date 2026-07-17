@@ -1,4 +1,5 @@
-import { fireEvent, screen } from '@testing-library/react-native';
+import { Dimensions } from 'react-native';
+import { fireEvent, screen, within } from '@testing-library/react-native';
 import type {
   NowCard,
   NowResponse,
@@ -28,7 +29,11 @@ let mockNowFeed: {
   isSlowFallback: boolean;
   refetch: jest.Mock;
 };
-let mockSubjectsCount = 1;
+let mockSubjects: Array<{
+  subjectId: string;
+  subjectName: string;
+  status: 'active';
+}>;
 let mockScopeContext: {
   activeScope: { kind: 'me' } | { kind: 'supporter-hub' } | PersonScope;
   availableScopes: PersonScope[];
@@ -40,33 +45,48 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock(
-  '../../hooks/use-now-feed' /* gc1-allow: route orchestration test pins external feed states; hook fetch/schema behavior is covered separately */,
-  () => ({
-    useNowFeed: () => mockNowFeed,
-    useNowOverflow: () => ({ data: undefined, isLoading: false }),
-  }),
+  '../../hooks/use-now-feed' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../hooks/use-now-feed',
+    ) as typeof import('../../hooks/use-now-feed');
+    return {
+      ...actual,
+      useNowFeed: () => mockNowFeed,
+      useNowOverflow: () => ({ data: undefined, isLoading: false }),
+    };
+  },
 );
 
 jest.mock(
-  '../../hooks/use-subjects-index' /* gc1-allow: route orchestration only needs active-subject count for cold-start gating */,
-  () => ({
-    useSubjectsIndex: () => ({
-      subjects: Array.from({ length: mockSubjectsCount }, (_, index) => ({
-        subjectId: `subject-${index}`,
-        status: 'active',
-      })),
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    }),
-  }),
+  '../../hooks/use-subjects-index' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../hooks/use-subjects-index',
+    ) as typeof import('../../hooks/use-subjects-index');
+    return {
+      ...actual,
+      useSubjectsIndex: () => ({
+        subjects: mockSubjects,
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      }),
+    };
+  },
 );
 
 jest.mock(
-  '../../lib/scope-context' /* gc1-allow: route branch test fixes the active V2 scope without exercising provider persistence */,
-  () => ({
-    useScopeContext: () => mockScopeContext,
-  }),
+  '../../lib/scope-context' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../lib/scope-context',
+    ) as typeof import('../../lib/scope-context');
+    return {
+      ...actual,
+      useScopeContext: () => mockScopeContext,
+    };
+  },
 );
 
 const MentorScreen = require('./mentor').default;
@@ -141,6 +161,27 @@ function renderMentorScreen(
   cleanupRender = rendered.cleanup;
 }
 
+function expectFreeformRoute(rawInput: string): void {
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/(app)/session',
+    params: {
+      entrySource: 'mentor',
+      returnTo: 'mentor',
+      mode: 'freeform',
+      rawInput,
+    },
+  });
+}
+
+function expectVisibleClarification(input?: string): void {
+  const clarification = screen.getByTestId('mentor-bar-clarification');
+  within(clarification).getByText('What exactly do you want to learn?');
+  if (input) {
+    within(clarification).getByText(input);
+  }
+  expect(clarification.props.accessibilityLiveRegion).toBe('polite');
+}
+
 describe('MentorScreen', () => {
   afterEach(() => {
     cleanupRender?.();
@@ -149,7 +190,13 @@ describe('MentorScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSubjectsCount = 1;
+    mockSubjects = [
+      {
+        subjectId: 'subject-0',
+        subjectName: 'Mathematics',
+        status: 'active',
+      },
+    ];
     mockNowFeed = {
       data: feed([card()]),
       fallbackFeed: null,
@@ -189,7 +236,6 @@ describe('MentorScreen', () => {
   it('shows the ask box and light practice instead of a dead-end on an empty feed', () => {
     // Real first state (a subject exists) but the now-feed is empty: the old
     // build showed a "Nothing needs you / Browse" card whose tap did nothing.
-    mockSubjectsCount = 1;
     mockNowFeed = {
       ...mockNowFeed,
       data: feed([]),
@@ -292,7 +338,7 @@ describe('MentorScreen', () => {
   });
 
   it('renders ColdStartCard in the anchor slot for a profile with no first real state', () => {
-    mockSubjectsCount = 0;
+    mockSubjects = [];
     mockNowFeed = {
       ...mockNowFeed,
       data: feed([]),
@@ -304,7 +350,7 @@ describe('MentorScreen', () => {
     expect(screen.queryByTestId('now-card-stack')).toBeNull();
   });
 
-  it('pushes deterministic route phrases through the closed now deep-link mapper', () => {
+  it('closed-catalog-jump — pushes deterministic route phrases through the closed mapper', () => {
     renderMentorScreen();
 
     fireEvent.changeText(
@@ -316,7 +362,92 @@ describe('MentorScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/subject-hub/spanish');
   });
 
-  it('carries a mentor-intent question into the session as rawInput (does not drop the typed text) [T25]', () => {
+  it('closed-catalog-named-subject-jump — routes a confident named subject to its hub', () => {
+    mockSubjects = [
+      {
+        subjectId: 'subject-maths',
+        subjectName: 'Maths',
+        status: 'active',
+      },
+    ];
+    renderMentorScreen();
+
+    fireEvent.changeText(
+      screen.getByTestId('mentor-bar-input'),
+      'resume my maths learning',
+    );
+    fireEvent.press(screen.getByTestId('mentor-bar-send'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/subject-hub/subject-maths');
+  });
+
+  describe('all submit mechanisms', () => {
+    it('declarative-would-like-neon — arrow press preserves exact freeform route params', () => {
+      renderMentorScreen();
+
+      fireEvent.changeText(
+        screen.getByTestId('mentor-bar-input'),
+        'I would like to learn about neon',
+      );
+      fireEvent.press(screen.getByTestId('mentor-bar-send'));
+
+      expectFreeformRoute('I would like to learn about neon');
+    });
+
+    it('declarative-teach-neon — keyboard submit preserves exact freeform route params', () => {
+      renderMentorScreen();
+
+      fireEvent.changeText(
+        screen.getByTestId('mentor-bar-input'),
+        'Teach me about neon',
+      );
+      fireEvent(screen.getByTestId('mentor-bar-input'), 'submitEditing');
+
+      expectFreeformRoute('Teach me about neon');
+    });
+
+    it('declarative-learn-more — routes exact raw input to freeform', () => {
+      renderMentorScreen();
+
+      fireEvent.changeText(
+        screen.getByTestId('mentor-bar-input'),
+        'I want to learn more about neon',
+      );
+      fireEvent.press(screen.getByTestId('mentor-bar-send'));
+
+      expectFreeformRoute('I want to learn more about neon');
+    });
+
+    it('question-more — routes exact raw input to freeform', () => {
+      renderMentorScreen();
+
+      fireEvent.changeText(
+        screen.getByTestId('mentor-bar-input'),
+        'what should I learn more about?',
+      );
+      fireEvent(screen.getByTestId('mentor-bar-input'), 'submitEditing');
+
+      expectFreeformRoute('what should I learn more about?');
+    });
+  });
+
+  it('editing then submit routes the latest text instead of the initial draft', () => {
+    renderMentorScreen();
+
+    const input = screen.getByTestId('mentor-bar-input');
+    fireEvent.changeText(input, 'Teach me about argon');
+    fireEvent.changeText(input, 'Teach me about neon');
+    fireEvent.press(screen.getByTestId('mentor-bar-send'));
+
+    expectFreeformRoute('Teach me about neon');
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({ rawInput: 'Teach me about argon' }),
+      }),
+    );
+  });
+
+  it('question-unchanged — carries the exact question into the freeform session [T25]', () => {
     renderMentorScreen();
 
     fireEvent.changeText(
@@ -325,15 +456,91 @@ describe('MentorScreen', () => {
     );
     fireEvent(screen.getByTestId('mentor-bar-input'), 'submitEditing');
 
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/session',
-      params: {
-        entrySource: 'mentor',
-        returnTo: 'mentor',
-        mode: 'freeform',
-        rawInput: 'what is photosynthesis?',
-      },
+    expectFreeformRoute('what is photosynthesis?');
+  });
+
+  it('ambiguous-progress — reveals clarification instead of silently doing nothing', () => {
+    renderMentorScreen();
+
+    expect(screen.queryByTestId('mentor-bar-clarification')).toBeNull();
+    fireEvent.changeText(
+      screen.getByTestId('mentor-bar-input'),
+      'show my progress',
+    );
+    fireEvent.press(screen.getByTestId('mentor-bar-send'));
+
+    expectVisibleClarification();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('unsupported-library — reveals clarification without expanding the route catalog', () => {
+    renderMentorScreen();
+
+    fireEvent.changeText(
+      screen.getByTestId('mentor-bar-input'),
+      'take me to the library',
+    );
+    fireEvent(screen.getByTestId('mentor-bar-input'), 'submitEditing');
+
+    expectVisibleClarification();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('consecutive-uncertain-refresh — visibly refreshes clarification for the second command', () => {
+    renderMentorScreen();
+
+    const input = screen.getByTestId('mentor-bar-input');
+    const send = screen.getByTestId('mentor-bar-send');
+    fireEvent.changeText(input, 'show my progress');
+    fireEvent.press(send);
+    expectVisibleClarification('show my progress');
+
+    fireEvent.changeText(input, 'take me to the library');
+    fireEvent.press(send);
+
+    const refreshed = screen.getByTestId('mentor-bar-clarification');
+    within(refreshed).getByText('take me to the library');
+    expect(within(refreshed).queryByText('show my progress')).toBeNull();
+    expect(refreshed.props.accessibilityLiveRegion).toBe('polite');
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it.each(['review', 'open dashboard'])(
+    '%s takes the explicit clarification path',
+    (input) => {
+      renderMentorScreen();
+
+      fireEvent.changeText(screen.getByTestId('mentor-bar-input'), input);
+      fireEvent.press(screen.getByTestId('mentor-bar-send'));
+
+      expectVisibleClarification();
+      expect(mockPush).not.toHaveBeenCalled();
+    },
+  );
+
+  it('small-screen-360 — keeps the ask action interactive inside the scroll container', () => {
+    const dimensions = jest.spyOn(Dimensions, 'get').mockReturnValue({
+      width: 360,
+      height: 720,
+      scale: 2,
+      fontScale: 1,
     });
+    try {
+      renderMentorScreen();
+
+      expect(Dimensions.get('window').width).toBe(360);
+      const scroll = screen.getByTestId('mentor-scroll');
+      const input = within(scroll).getByTestId('mentor-bar-input');
+      const send = within(scroll).getByTestId('mentor-bar-send');
+      expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+      expect(input.props.className).toContain('min-w-0');
+      fireEvent.changeText(input, 'Teach me about neon');
+      fireEvent.press(send);
+
+      expectFreeformRoute('Teach me about neon');
+    } finally {
+      dimensions.mockRestore();
+    }
   });
 
   it('uses cached feed on feed failure and keeps the screen usable', () => {
