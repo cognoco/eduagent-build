@@ -100,6 +100,10 @@ export type StagedMockSite = {
   line: number;
   content: string;
   specifier?: string;
+  // Structural gc1-allow signal (AST path only — see callSpanHasGc1Allow).
+  // Undefined on the diff-text-only path, which falls back to GC1_ALLOW.test
+  // against `content` in checkFile.
+  hasGc1Allow?: boolean;
 };
 
 function collectAddedNewFileLines(unifiedDiff: string): Set<number> {
@@ -152,6 +156,87 @@ function getStringLiteralText(node: ts.Expression): string | null {
     return (node as ts.NoSubstitutionTemplateLiteral).text;
   }
   return null;
+}
+
+// True iff a comment whose range lies WITHIN [windowStart, windowEnd) — the
+// same escape-hatch window `findAddedMockCallsFromSource` already computes
+// (call start through end of the relevant physical line) — carries a genuine
+// gc1-allow directive. Comments are found by walking the AST
+// (node.getChildren()) and reading each token's leading+trailing trivia via
+// ts.getLeadingCommentRanges / ts.getTrailingCommentRanges — this reuses the
+// PARSER's own disambiguation of `/` (regex vs. division vs. comment start)
+// and JSX text vs. tokens, so unlike a from-scratch scanner.scan()
+// token-stream re-scan of the whole file (tried first; it desyncs on any
+// .tsx file with JSX markup or a regex literal elsewhere in the source and
+// silently stops finding later comments — caught by sweeping the repo's 308
+// gc1-allow-annotated test files, 34 false-flagged), this approach cannot
+// misfire on JSX/regex-bearing source. GC1_ALLOW is tested against each
+// comment's OWN text, never raw source text, so comment-shaped text inside a
+// string/template literal (already folded into a single
+// StringLiteral/TemplateLiteral token by the parser) can never be misread as
+// a comment — the WI-1809 reviewer finding this fix addresses.
+//
+// The window clamp matters as much as the structural comment check: without
+// it, walking `call`'s full-start trivia and the statement's trailing trivia
+// picks up a `// gc1-allow` comment sitting on the line ABOVE `jest.mock(` or
+// on the line AFTER the closing `);` — both outside the escape hatch's
+// intended reach and neither honored by the pre-WI-1809 text-slice checker.
+function callSpanHasGc1Allow(
+  sourceFile: ts.SourceFile,
+  sourceText: string,
+  call: ts.CallExpression,
+  windowStart: number,
+  windowEnd: number,
+): boolean {
+  const seen = new Set<string>();
+  let found = false;
+
+  const checkAt = (pos: number): void => {
+    if (found) return;
+    // TS partitions the trivia at a boundary between "trailing" (same
+    // physical line as the preceding token — e.g. `'./foo', // gc1-allow`)
+    // and "leading" (its own line, block-attached to the following token —
+    // e.g. a rationale comment before the specifier) ranges. Neither call
+    // sees the other's half, so both are needed for full coverage.
+    const ranges = [
+      ...(ts.getLeadingCommentRanges(sourceText, pos) ?? []),
+      ...(ts.getTrailingCommentRanges(sourceText, pos) ?? []),
+    ];
+    for (const range of ranges) {
+      if (range.pos < windowStart || range.end > windowEnd) continue;
+      const key = `${range.pos}-${range.end}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (GC1_ALLOW.test(sourceText.slice(range.pos, range.end))) {
+        found = true;
+        return;
+      }
+    }
+  };
+
+  const visit = (n: ts.Node): void => {
+    if (found) return;
+    checkAt(n.getFullStart());
+    for (const child of n.getChildren(sourceFile)) {
+      if (found) return;
+      visit(child);
+    }
+  };
+  visit(call);
+
+  // A same-line trailing `// gc1-allow` after the closing `);` sits between
+  // the enclosing ExpressionStatement's `;` and whatever follows it — outside
+  // the CallExpression's own span — so check those boundaries too (still
+  // subject to the same windowEnd clamp above).
+  if (!found) {
+    checkAt(call.getEnd());
+    const stmt = call.parent;
+    if (ts.isExpressionStatement(stmt) && stmt.expression === call) {
+      checkAt(stmt.getEnd());
+    }
+  }
+
+  return found;
 }
 
 function findAddedMockCallsFromSource(
@@ -210,6 +295,13 @@ function findAddedMockCallsFromSource(
             line,
             content: stagedSrc.slice(start, end),
             specifier,
+            hasGc1Allow: callSpanHasGc1Allow(
+              sourceFile,
+              stagedSrc,
+              node,
+              start,
+              end,
+            ),
           });
         }
       }
@@ -324,8 +416,12 @@ export function checkFile(
   if (sites.length === 0) return [];
   const lines = stagedSrc.split('\n');
   const violations: Violation[] = [];
-  for (const { line, content, specifier } of sites) {
-    if (GC1_ALLOW.test(content)) continue;
+  for (const { line, content, specifier, hasGc1Allow } of sites) {
+    // AST path (checkFile always supplies stagedSrc, so this is the only path
+    // in practice) carries a structural hasGc1Allow; the diff-text-only path
+    // (findAddedMockLines called directly without stagedSrc) has none and
+    // falls back to the textual check.
+    if (hasGc1Allow ?? GC1_ALLOW.test(content)) continue;
     const spec = specifier ?? extractSpecifier(content);
     if (!spec) {
       violations.push({ file, line, content, reason: 'invalid-mock' });
