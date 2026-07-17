@@ -1430,6 +1430,260 @@ const COPPA = 'coppa_parental_consent';
     });
 
     // -------------------------------------------------------------------------
+    // [WI-1442 AC-4] Per-reachable-path retain-tier coverage — red-green.
+    //
+    // The (B) block above proves the whole-org path (executeDeletionV2)
+    // re-homes a live consent_grant to consent_receipt before the person
+    // drop. Reviewer finding on the first WI-1442 attempt: that is only ONE
+    // of the five reachable person/org-deleting paths. This block closes the
+    // gap for the remaining three re-home paths (deletePersonIfConsentWithdrawnV2,
+    // deletePersonIfNoConsentV2, deleteArchivedPersonIfStillEligibleV2 — all
+    // three share the `rehomeGrantsTx` helper in deletion-v2.ts) plus the
+    // fifth path (processConsentResponseV2's deny branch), which is the one
+    // path that genuinely does NOT re-home.
+    //
+    // Red-green-revert (recorded in the PR): the three re-home tests below
+    // were run against a temporarily neutered `rehomeGrantsTx` (body replaced
+    // with a no-op `return;`) — RED, all three throw because the person
+    // DELETE hits the still-present consent_grant.charge_person_id RESTRICT
+    // FK before any receipt exists. Restoring the helper → GREEN.
+    //
+    // The deny-path test is different in kind: deletion-v2.ts's own
+    // `rehomeGrantsTx` is never called there (see the "[WI-1442] deny
+    // hard-deletes the person below (cascade)..." comment in
+    // consent-v2.ts's processConsentResponseV2 deny branch). That is not an
+    // untested gap in the retain-tier pattern — it is a structural
+    // alternative: the `consent_grant.charge_person_id ON DELETE RESTRICT` FK
+    // (packages/database/src/schema/identity.ts, "charge_person_id ON DELETE
+    // RESTRICT: active grants must be re-homed first") fires unconditionally
+    // (RESTRICT does not care whether the grant is withdrawn) and aborts the
+    // WHOLE deny transaction — including the consent_request status flip and
+    // the deletion_audit insert — the instant a live grant of ANY basis
+    // exists for the denied person. A silent-delete-with-orphaned-grant is
+    // therefore impossible on this path by construction, not by discipline:
+    // there is no code path in processConsentResponseV2's deny branch that
+    // can commit a person delete while a live consent_grant row survives.
+    // AC-4's retain-tier obligation ("never destroy a live grant without
+    // retain-tier proof") holds here via abort-instead-of-destroy rather than
+    // re-home-then-destroy. There is nothing to red-green-revert in
+    // application code for this path — the guard is the FK itself, already
+    // covered structurally by the "RED guard: the consent_grant RESTRICT
+    // blocks a raw person-delete" test in the (B) block above; this test
+    // proves the SAME FK also protects the deny branch specifically.
+    // -------------------------------------------------------------------------
+
+    describe('[WI-1442 AC-4] per-reachable-path retain-tier coverage — red-green', () => {
+      it('deletePersonIfConsentWithdrawnV2 re-homes the live consent_grant to consent_receipt before the delete', async () => {
+        const orgId = await seedOrg();
+        const guardianId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+          displayName: 'Parent',
+        });
+        const childId = await seedPerson(orgId);
+        await seedGuardianEdge(guardianId, childId);
+        const withdrawnAt = new Date();
+        await db.insert(consentGrant).values({
+          chargePersonId: childId,
+          organizationId: orgId,
+          purpose: PURPOSE,
+          lawfulBasis: GDPR,
+          granted: true,
+          grantedAt: new Date(Date.now() - 60_000),
+          withdrawnAt,
+          priorValue: true,
+        });
+
+        const deleted = await deletePersonIfConsentWithdrawnV2(
+          db,
+          childId,
+          withdrawnAt,
+        );
+        expect(deleted).toBe(true);
+
+        // The receipt is the retain-tier proof-of-consent (§6.1).
+        const receipts = await db.query.consentReceipt.findMany({
+          where: eq(consentReceipt.personId, childId),
+        });
+        expect(receipts).toHaveLength(1);
+        expect(receipts[0]!.lawfulBasis).toBe(GDPR);
+        expect(receipts[0]!.granted).toBe(true);
+        expect(receipts[0]!.withdrawnAt).toBeTruthy();
+
+        // The live grant is gone (re-homed, not erased).
+        const grants = await db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, childId),
+        });
+        expect(grants).toHaveLength(0);
+
+        // The deletion_audit row is the companion retain-tier proof.
+        const audit = await db.query.deletionAudit.findFirst({
+          where: eq(deletionAudit.personId, childId),
+        });
+        expect(audit?.reason).toBe('guardian_initiated');
+
+        const personRow = await db.query.person.findFirst({
+          where: eq(person.id, childId),
+        });
+        expect(personRow).toBeUndefined();
+      });
+
+      it('deletePersonIfNoConsentV2 re-homes a live (withdrawn) consent_grant to consent_receipt before the day-30 delete', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId);
+        // Withdrawn → eligible for the no-consent predicate — but still a
+        // LIVE row in consent_grant (not yet re-homed) until the delete runs.
+        await db.insert(consentGrant).values({
+          chargePersonId: childId,
+          organizationId: orgId,
+          purpose: PURPOSE,
+          lawfulBasis: GDPR,
+          granted: true,
+          grantedAt: new Date(Date.now() - 60_000),
+          withdrawnAt: new Date(),
+          priorValue: true,
+        });
+
+        const deleted = await deletePersonIfNoConsentV2(db, childId);
+        expect(deleted).toBe(true);
+
+        const receipts = await db.query.consentReceipt.findMany({
+          where: eq(consentReceipt.personId, childId),
+        });
+        expect(receipts).toHaveLength(1);
+        expect(receipts[0]!.lawfulBasis).toBe(GDPR);
+
+        const grants = await db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, childId),
+        });
+        expect(grants).toHaveLength(0);
+
+        const audit = await db.query.deletionAudit.findFirst({
+          where: eq(deletionAudit.personId, childId),
+        });
+        expect(audit?.reason).toBe('abandonment');
+
+        const personRow = await db.query.person.findFirst({
+          where: eq(person.id, childId),
+        });
+        expect(personRow).toBeUndefined();
+      });
+
+      it('deleteArchivedPersonIfStillEligibleV2 re-homes a live (withdrawn) consent_grant to consent_receipt before the archived-cleanup delete', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId);
+        const archivedAt = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+        await db
+          .update(person)
+          .set({ archivedAt })
+          .where(eq(person.id, childId));
+        // Withdrawn → does not block the "current consent" eligibility check
+        // — but still a LIVE row in consent_grant until re-homed.
+        await db.insert(consentGrant).values({
+          chargePersonId: childId,
+          organizationId: orgId,
+          purpose: PURPOSE,
+          lawfulBasis: GDPR,
+          granted: true,
+          grantedAt: new Date(Date.now() - 120_000),
+          withdrawnAt: new Date(Date.now() - 90_000),
+          priorValue: true,
+        });
+        const retentionCutoff = new Date();
+
+        const deleted = await deleteArchivedPersonIfStillEligibleV2(
+          db,
+          childId,
+          retentionCutoff,
+        );
+        expect(deleted).toBe(true);
+
+        const receipts = await db.query.consentReceipt.findMany({
+          where: eq(consentReceipt.personId, childId),
+        });
+        expect(receipts).toHaveLength(1);
+        expect(receipts[0]!.lawfulBasis).toBe(GDPR);
+
+        const grants = await db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, childId),
+        });
+        expect(grants).toHaveLength(0);
+
+        const audit = await db.query.deletionAudit.findFirst({
+          where: eq(deletionAudit.personId, childId),
+        });
+        expect(audit?.reason).toBe('abandonment');
+
+        const personRow = await db.query.person.findFirst({
+          where: eq(person.id, childId),
+        });
+        expect(personRow).toBeUndefined();
+      });
+
+      it('processConsentResponseV2(deny): a pre-existing live consent_grant (a different basis) blocks the hard-delete at the FK RESTRICT — the whole deny transaction rolls back cleanly instead of orphaning the grant', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId);
+        // A pre-existing, live (never re-homed) GDPR grant — simulates a
+        // person who already holds a valid basis under GDPR while a SEPARATE
+        // COPPA request for the same person is being processed and denied.
+        await db.insert(consentGrant).values({
+          chargePersonId: childId,
+          organizationId: orgId,
+          purpose: PURPOSE,
+          lawfulBasis: GDPR,
+          granted: true,
+          grantedAt: new Date(),
+        });
+
+        await createPendingConsentRequest(db, childId, orgId, 'COPPA');
+        await requestConsentV2(db, {
+          chargePersonId: childId,
+          organizationId: orgId,
+          consentType: 'COPPA',
+          guardianEmail: 'parent@example.com',
+          childName: 'Kid',
+          appUrl: 'https://api.test',
+        });
+        const req = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, childId),
+          orderBy: (r, { desc }) => [desc(r.createdAt)],
+        });
+
+        // The deny branch's raw `tx.delete(person)` hits the consent_grant
+        // RESTRICT FK (the GDPR grant above is still live) and the whole
+        // transaction aborts.
+        await expect(
+          processConsentResponseV2(db, req!.token!, false),
+        ).rejects.toThrow();
+
+        // Nothing committed: person survives, the grant is untouched (NOT
+        // re-homed — proving this path really does rely on abort, not
+        // re-home), no deletion_audit, no consent_receipt, and the
+        // consent_request status flip rolled back too.
+        const personRow = await db.query.person.findFirst({
+          where: eq(person.id, childId),
+        });
+        expect(personRow).toBeTruthy();
+        const grants = await db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, childId),
+        });
+        expect(grants).toHaveLength(1);
+        expect(grants[0]!.lawfulBasis).toBe(GDPR);
+        const receipts = await db.query.consentReceipt.findMany({
+          where: eq(consentReceipt.personId, childId),
+        });
+        expect(receipts).toHaveLength(0);
+        const audits = await db.query.deletionAudit.findMany({
+          where: eq(deletionAudit.personId, childId),
+        });
+        expect(audits).toHaveLength(0);
+        const reqAfter = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.id, req!.id),
+        });
+        expect(reqAfter?.status).toBe('requested');
+      });
+    });
+
+    // -------------------------------------------------------------------------
     // Thread 1 (Codex P1): deletePersonIfNoConsentV2 request-generation guard.
     // A STALE day-30 auto-delete run (carrying the OLD requested_at) must NOT
     // delete a child who has since started a NEWER consent cycle. Mirrors the
