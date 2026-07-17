@@ -91,6 +91,10 @@ import { challengeGraderFlow } from './flows/challenge-grader';
 // builder snapshots + two-independent-model judge (model A pinned mentor,
 // model B independent OpenRouter judge). See flow file.
 import { reviewContinuityOpenerFlow } from './flows/review-continuity-opener';
+// [WI-1877 rework] Suitability-judge injection resistance — behavioral,
+// single-model live run proving a fenced learner-message directive cannot
+// flip an unsuitable reply's verdict to a clean "ok". See flow file.
+import { judgeSuitabilityFlow } from './flows/judge-suitability';
 import {
   listFlows,
   parseCliArgs,
@@ -212,6 +216,7 @@ const FLOWS: FlowDefinition[] = [
   challengeGraderFlow as FlowDefinition,
   reviewContinuityOpenerFlow as FlowDefinition,
   recallGraderFlow as FlowDefinition,
+  judgeSuitabilityFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {
