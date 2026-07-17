@@ -95,3 +95,15 @@ export interface ConsentAccountabilityRecord {
   termsAcceptedAt: Date;
   withdrawnAt: Date | null;
 }
+
+// [WI-1193 AC2] Body for the authenticated adult self-consent purpose-withdrawal
+// route (PUT /consent/self/withdraw). Each granular purpose is independently
+// revocable: the caller withdraws exactly ONE of their OWN self-consent
+// purposes, and withdrawing one never touches the other. The enum is the wire
+// contract mirror of the service's ADULT_SELF_CONSENT_PURPOSES.
+export const selfConsentWithdrawRequestSchema = z.object({
+  purpose: z.enum(['platform_use', 'llm_disclosure']),
+});
+export type SelfConsentWithdrawRequest = z.infer<
+  typeof selfConsentWithdrawRequestSchema
+>;
