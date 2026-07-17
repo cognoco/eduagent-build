@@ -48,7 +48,7 @@ describe('TopicDetailSheet', () => {
       />,
     );
 
-    expect(screen.getByLabelText('Photosynthesis').props.role).toBe('dialog');
+    screen.getByRole('dialog', { name: 'Photosynthesis' });
 
     fireEvent.press(screen.getByText('subjectHub.sheet.study'));
     expect(onStudyTopic).toHaveBeenCalledWith('topic-1');

@@ -1,5 +1,5 @@
 import type React from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Modal, Platform, Pressable, View } from 'react-native';
 
 interface BottomSheetProps {
   /** Controls Modal visibility. */
@@ -78,16 +78,29 @@ export function BottomSheet({
       transparent
       animationType={animationType}
       onRequestClose={onClose}
-      accessibilityViewIsModal
+      accessibilityViewIsModal={Platform.OS !== 'web' ? true : undefined}
+      accessibilityLabel={
+        Platform.OS === 'web' ? accessibilityLabel : undefined
+      }
     >
-      <View className="flex-1 justify-end">
+      <View
+        className="flex-1 justify-end"
+        accessibilityViewIsModal={Platform.OS === 'ios' ? true : undefined}
+        importantForAccessibility={
+          Platform.OS === 'android' ? 'yes' : undefined
+        }
+      >
         {backdrop}
-        <View
-          testID={testID}
-          className="rounded-t-3xl overflow-hidden"
-          role="dialog"
-          accessibilityLabel={accessibilityLabel}
-        >
+        <View testID={testID} className="rounded-t-3xl overflow-hidden">
+          {Platform.OS !== 'web' && accessibilityLabel ? (
+            <View
+              accessible
+              role="dialog"
+              accessibilityLabel={accessibilityLabel}
+              pointerEvents="none"
+              className="absolute inset-0"
+            />
+          ) : null}
           {children}
         </View>
       </View>

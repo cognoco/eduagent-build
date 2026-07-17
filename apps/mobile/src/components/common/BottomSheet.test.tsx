@@ -7,7 +7,7 @@
  * structural and behavioural properties instead.
  */
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { Pressable, ScrollView, Text, TextInput } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, TextInput } from 'react-native';
 
 import { BottomSheet } from './BottomSheet';
 
@@ -49,8 +49,8 @@ describe('BottomSheet', () => {
   it('calls onClose once for Escape or Android back (onRequestClose) and keeps modal focus containment', () => {
     // Modal.onRequestClose is the cross-platform request-close seam used by
     // Android Back and, where supported, web Escape handling.
-    const { UNSAFE_getByType } = render(
-      <BottomSheet visible onClose={onClose}>
+    const { UNSAFE_getByProps, UNSAFE_getByType } = render(
+      <BottomSheet visible onClose={onClose} accessibilityLabel="Content">
         <Text>Content</Text>
       </BottomSheet>,
     );
@@ -58,8 +58,54 @@ describe('BottomSheet', () => {
     const modal = UNSAFE_getByType(Modal);
     modal.props.onRequestClose?.();
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(modal.props.accessibilityViewIsModal).toBe(true);
+    expect(
+      UNSAFE_getByProps({ accessibilityViewIsModal: true }).props
+        .accessibilityViewIsModal,
+    ).toBe(true);
   });
+
+  it.each([
+    ['ios', 'accessibilityViewIsModal', true],
+    ['android', 'importantForAccessibility', 'yes'],
+  ] as const)(
+    'keeps %s modal containment on a non-grouping root while child actions remain independent',
+    (os, containmentProp, containmentValue) => {
+      const originalOS = Platform.OS;
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: os });
+
+      try {
+        const { UNSAFE_getByProps } = render(
+          <BottomSheet
+            visible
+            onClose={onClose}
+            accessibilityLabel="Topic picker"
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Choose Algebra"
+              testID="native-child-action"
+            >
+              <Text>Algebra</Text>
+            </Pressable>
+          </BottomSheet>,
+        );
+
+        const dialog = screen.getByRole('dialog', { name: 'Topic picker' });
+        screen.getByRole('button', { name: 'Choose Algebra' });
+        expect(
+          dialog.findAllByProps({ testID: 'native-child-action' }),
+        ).toHaveLength(0);
+        expect(
+          UNSAFE_getByProps({ [containmentProp]: containmentValue }),
+        ).toEqual(expect.anything());
+      } finally {
+        Object.defineProperty(Platform, 'OS', {
+          configurable: true,
+          value: originalOS,
+        });
+      }
+    },
+  );
 
   describe('backdropDismissible=false (default)', () => {
     it('does not expose a backdrop close action', () => {
@@ -75,9 +121,7 @@ describe('BottomSheet', () => {
       );
 
       expect(screen.queryByLabelText('Close')).toBeNull();
-      expect(screen.getByTestId('non-dismissible-sheet').props.role).toBe(
-        'dialog',
-      );
+      screen.getByRole('dialog', { name: 'Required action' });
     });
 
     it('does NOT call onClose when pressing inside the content area', () => {
@@ -114,11 +158,11 @@ describe('BottomSheet', () => {
       );
 
       const backdrop = screen.getByLabelText('Close');
-      const surface = screen.getByTestId('sheet-surface');
-      screen.getByTestId('inner-action');
+      const dialog = screen.getByRole('dialog', { name: 'Topic picker' });
+      const action = screen.getByRole('button', { name: 'Choose Algebra' });
 
-      expect(surface.props.role).toBe('dialog');
-      expect(surface.props.accessibilityLabel).toBe('Topic picker');
+      expect(dialog.findAllByProps({ testID: 'inner-action' })).toHaveLength(0);
+      expect(action).not.toBe(dialog);
       expect(backdrop.findAllByProps({ testID: 'sheet-surface' })).toHaveLength(
         0,
       );

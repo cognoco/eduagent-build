@@ -126,9 +126,7 @@ describe('TopicPickerSheet', () => {
       />,
     );
 
-    const dialog = screen.getByTestId('topic-picker-modal');
-    expect(dialog.props.role).toBe('dialog');
-    expect(dialog.props.accessibilityLabel).toBe('Choose a topic');
+    screen.getByRole('dialog', { name: 'Choose a topic' });
 
     fireEvent.press(screen.getByTestId('topic-picker-topic-1'));
     expect(onSelect).toHaveBeenCalledWith('topic-1');

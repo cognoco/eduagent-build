@@ -28,9 +28,7 @@ describe('SupportPersonPickerSheet', () => {
       />,
     );
 
-    const dialog = screen.getByTestId('support-person-picker-sheet');
-    expect(dialog.props.role).toBe('dialog');
-    expect(dialog.props.accessibilityLabel).toBe('Choose a learner');
+    screen.getByRole('dialog', { name: 'Choose a learner' });
 
     fireEvent.press(screen.getByTestId('support-person-picker-option-child-a'));
     expect(onSelectPerson).toHaveBeenCalledTimes(1);
