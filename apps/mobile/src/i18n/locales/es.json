@@ -212,7 +212,8 @@
       "emailPlaceholder": "tu@ejemplo.com",
       "passwordPlaceholder": "Crea una contraseña",
       "signUpButton": "Registrarse",
-      "signInButton": "Iniciar sesión"
+      "signInButton": "Iniciar sesión",
+      "captchaHint": "Si aparece una verificación arriba, complétala. Continuaremos automáticamente."
     },
     "forgotPassword": {
       "title": "¿Has olvidado la contraseña?",

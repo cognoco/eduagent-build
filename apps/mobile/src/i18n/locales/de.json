@@ -212,7 +212,8 @@
       "emailPlaceholder": "du@beispiel.de",
       "passwordPlaceholder": "Passwort erstellen",
       "signUpButton": "Registrieren",
-      "signInButton": "Anmelden"
+      "signInButton": "Anmelden",
+      "captchaHint": "Falls oben eine Verifizierung erscheint, schließe sie bitte ab – danach geht es automatisch weiter."
     },
     "forgotPassword": {
       "title": "Passwort vergessen?",

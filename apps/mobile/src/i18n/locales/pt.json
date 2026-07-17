@@ -212,7 +212,8 @@
       "emailPlaceholder": "voce@exemplo.com",
       "passwordPlaceholder": "Crie uma senha",
       "signUpButton": "Cadastrar-se",
-      "signInButton": "Entrar"
+      "signInButton": "Entrar",
+      "captchaHint": "Se aparecer uma verificação acima, conclua-a e continuaremos automaticamente."
     },
     "forgotPassword": {
       "title": "Esqueceu a senha?",

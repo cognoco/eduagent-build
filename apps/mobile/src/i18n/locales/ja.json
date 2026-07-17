@@ -212,7 +212,8 @@
       "emailPlaceholder": "mail@example.com",
       "passwordPlaceholder": "パスワードを作成",
       "signUpButton": "新規登録",
-      "signInButton": "ログイン"
+      "signInButton": "ログイン",
+      "captchaHint": "上に認証チェックが表示された場合は、完了してください。自動的に続行されます。"
     },
     "forgotPassword": {
       "title": "パスワードをお忘れですか？",
