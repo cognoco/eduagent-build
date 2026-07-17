@@ -97,6 +97,9 @@ Disposition classes used below: **Resolved by design** (mitigated, no residual r
 
 | | |
 |---|---|
+| Likelihood | n/a — eliminated by design (idempotent by construction; there is no window in which a replay produces a different mutation). |
+| Impact | n/a — a replay changes nothing beyond the first call. |
+| Blast radius | n/a. |
 | **Disposition** | **Resolved by design — no residual risk.** |
 | Rationale / verification | `stampWithdrawal`'s current-grant short-circuit returns the *existing* `withdrawnAt` on a repeat call without mutating (`consent-v2.ts:777-779`), and the UPDATE itself is separately guarded `isNull(consentGrant.withdrawnAt)` in its WHERE (791) so a race cannot double-stamp. Tested directly: "withdrawConsentByToken is idempotent (second call returns the same withdrawnAt, no new row)" (`consent-v2.integration.test.ts:609-618`). |
 | Accountable owner | Zuzana Kopečná. |
@@ -105,6 +108,9 @@ Disposition classes used below: **Resolved by design** (mitigated, no residual r
 
 | | |
 |---|---|
+| Likelihood | n/a — eliminated by design (no-op on an already-restored grant; race with the delete sweep is closed by the advisory lock, not merely made unlikely). |
+| Impact | n/a. |
+| Blast radius | n/a. |
 | **Disposition** | **Resolved by design — no residual risk.** |
 | Rationale / verification | `appendRestoreGrant` no-ops when the current grant is already un-withdrawn (`consent-v2.ts:907-910`); the whole check-and-append runs inside a per-person `pg_advisory_xact_lock` transaction (889-896) specifically to close the WI-583 race against the grace→delete sweep's own re-read (documented at 880-888) — whichever of restore/delete takes the lock first wins, the other re-reads committed state. |
 | Caveat | Verification here is by code inspection of the locking transaction plus the single-call restore test (`consent-v2.integration.test.ts:620-636`); no test exercises the actual concurrent-transaction interleaving (two simultaneous restore calls, or a restore racing the delete sweep, under load). This is a residual test-coverage gap, not a residual security risk — flagged for completeness, not blocking. |
@@ -128,6 +134,9 @@ Disposition classes used below: **Resolved by design** (mitigated, no residual r
 
 | | |
 |---|---|
+| Likelihood | n/a — eliminated by design (any tamper to payload or signature, wrong secret, or unknown version verifies to `null`; there is no exploitable path left to attempt). |
+| Impact | n/a. |
+| Blast radius | n/a. |
 | **Disposition** | **Resolved by design — no residual risk beyond T-9 (secret compromise).** |
 | Rationale / verification | HMAC-SHA256 over the *entire* encoded payload; constant-time comparison via `timingSafeEqual` with an explicit length pre-check to avoid both a thrown exception on mismatched lengths and a length-based timing signal (`consent-withdrawal-token.ts:63-68`). Comprehensively tested — wrong secret, a single tampered payload byte, a single tampered signature byte, a malformed token (no dot), an empty token, a correctly-signed-but-unknown version prefix (`cw2`), and a correctly-signed payload with the wrong field count — seven negative cases, all asserting `null` (`consent-withdrawal-token.test.ts:36-74`). |
 | Accountable owner | Zuzana Kopečná. |
@@ -136,6 +145,9 @@ Disposition classes used below: **Resolved by design** (mitigated, no residual r
 
 | | |
 |---|---|
+| Likelihood | n/a — eliminated by design (both ids are bound into one signed unit and independently re-pinned on read; there is no path to substitute either id). |
+| Impact | n/a. |
+| Blast radius | n/a. |
 | **Disposition** | **Resolved by design — no residual risk.** |
 | Rationale / verification | `chargePersonId` and `organizationId` are joined into **one** colon-delimited string *before* signing (`"cw1:${chargePersonId}:${organizationId}"`, `consent-withdrawal-token.ts:27`), so the HMAC covers both ids as a single unit — neither id can be swapped independently without invalidating the signature (proven directly by the tampered-payload test, which flips one character of the encoded payload and gets `null`: `consent-withdrawal-token.test.ts:41-48`). On the read side, `currentGrant`'s WHERE clause independently pins **both** `chargePersonId` **and** `organizationId` (plus `purpose` and the hardcoded `gdpr_parental_consent` basis) — `consent-v2.ts:1395-1401` — so even a token forged with a compromised secret for one (person, org) pair can only ever resolve that exact pair's own grant, never a different child's or a different organization's, and never the sibling COPPA-basis grant for the *same* child. |
 | Accountable owner | Zuzana Kopečná. |
@@ -210,7 +222,7 @@ No new code was written for this posture review; all evidence above is existing,
 | Role | Name | Scope of approval | Date |
 |---|---|---|---|
 | DPO (acting — no outsourced DPO appointed yet; the empty seat does not block this gate) | Jørn Jørgensen | Accepts the residual risk on T-1, T-2, T-3, T-6, T-9, T-11 as stated (operational responses and re-evaluation triggers as written); requires T-10's mitigation before the P0 mechanism is considered closed; rules the T-11 product-policy position. | 2026-07-17 |
-| Accountable engineering/security owner (sole author of the `cw1` path) | Zuzana Kopečná | Confirms the source-grounded description in §1 and the verification citations in §3–4 are accurate against the code as of this review. | 2026-07-17 |
+| Accountable engineering/security owner (sole author of the bearer-token mechanism — token file, wrapper functions, and web routes; git blame shows the shared internal helpers `stampWithdrawal`/`appendRestoreGrant`, including the advisory-lock race fix, were authored/patched by another contributor) | Zuzana Kopečná | Confirms the source-grounded description in §1 and the verification citations in §3–4 are accurate against the code as of this review. | 2026-07-17 |
 
 **Explicit acceptance statement (per AC-5):** one threat (T-10) is ruled mitigate-before-launch; every other threat above is accepted for MVP with the operational response and re-evaluation trigger stated in its row. This posture is **not** complete until T-10's follow-up implementation Work Item exists and is linked (tracked via `.workitem-artifacts/WI-2064/incidental-items.json` in this branch; the owning shepherd mints the Work Item).
 
