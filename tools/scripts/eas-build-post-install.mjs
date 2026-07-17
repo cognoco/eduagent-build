@@ -69,7 +69,7 @@ if (existsSync(npmrcPath)) {
 // value — a missing per-environment entry silently ships a build where Clerk
 // auth can't initialize. Fail the build here, before any artifact exists,
 // rather than after upload.
-if (process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+if (process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()) {
   console.log('[eas-build-post-install] OK: EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is set');
 } else {
   console.error(

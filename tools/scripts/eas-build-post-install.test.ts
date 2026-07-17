@@ -42,6 +42,15 @@ describe('eas-build-post-install EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY preflight', (
     );
   });
 
+  it('fails the build when the Clerk publishable key is whitespace-only', () => {
+    const result = runScript('   ');
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is empty',
+    );
+  });
+
   it('passes when the Clerk publishable key is present', () => {
     const result = runScript('pk_test_placeholder');
 
