@@ -53,7 +53,7 @@ Use this as a conservative mapping aid. "Draft disclosure posture" is not a fina
 | Identifiers | Clerk user ID, account/profile IDs, RevenueCat app user ID, push token. | Collected and linked. Used for account, app functionality, purchases, notifications, and diagnostics. | Whether any device IDs are collected by SDKs beyond app code. |
 | Diagnostics | Sentry, crash/error captures, breadcrumbs, performance transactions. | Collected where Sentry is enabled. Used for diagnostics and app quality. | Confirm production DSN, age gating, sample rates, and whether diagnostics are linked. |
 | Product interaction / usage | Session events, usage/quota, analytics breadcrumbs in Sentry, app flow data. | Collected and linked or pseudonymized depending on implementation. Used for app functionality, analytics, and diagnostics. | Final Apple "Usage Data" and Google "App activity" answers. |
-| Location | DB schema has optional `profiles.location`, but current create-profile flow reviewed here does not send location. | Do not mark current collection without confirming production/legacy data. | Check production rows and legacy flow history before store answer. |
+| Location | Not collected under identity-v2 — the legacy `profiles.location` column no longer exists (table dropped; the `person` table has no location/geo field — `packages/database/src/schema/identity.ts`). `person.residenceJurisdiction` is a distinct legal-jurisdiction value (for consent-regime routing), not physical location. | Not collected. | None (resolved 2026-07-17). |
 | Advertising data | No ad SDK found in reviewed package files. | Likely not collected for ads, pending final SDK review. | Legal/admin must confirm. |
 | Contacts/address book | No address book contact access found in reviewed facts. | Likely not collected, pending final review. | Confirm package/permission scan before final. |
 | Financial payment details | Native stores and RevenueCat handle purchases; API stores subscription/product/transaction status. | Do not claim raw card/payment details are collected by MentoMate unless admin confirms. | Confirm store/RevenueCat billing data disclosures. |
@@ -85,7 +85,7 @@ Production configuration and legal review must confirm the final list. Repo evid
 | Usage Data | Session events, quota usage, product interactions, app analytics breadcrumbs. | Legal/admin |
 | Diagnostics | Crash/error diagnostics and performance where Sentry is enabled. | Legal/admin |
 | Sensitive Info | Birth year/child data may need conservative disclosure even if not an Apple "Sensitive Info" category. | Legal/admin |
-| Location | Do not claim current collection from active flow without production/legacy confirmation. | Legal/admin |
+| Location | Not collected — the legacy `profiles.location` column no longer exists under identity-v2 (see Data Categories above). | Legal/admin |
 | Tracking | No ad SDK found in reviewed package files, but SDK/processors must be reviewed under Apple's tracking definition. | Legal/admin |
 
 ## Google Data Safety Mapping Aid
