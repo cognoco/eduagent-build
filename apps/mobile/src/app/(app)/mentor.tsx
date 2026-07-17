@@ -109,7 +109,10 @@ function LearnerMentorScreen(): React.ReactElement {
   >(new Set());
   const [showOverflow, setShowOverflow] = useState(false);
   const [showLightPractice, setShowLightPractice] = useState(false);
-  const [showBarClarification, setShowBarClarification] = useState(false);
+  const [barClarification, setBarClarification] = useState<{
+    input: string;
+    revision: number;
+  } | null>(null);
   const overflow = useNowOverflow(showOverflow);
   const feed = nowFeed.data ?? nowFeed.fallbackFeed ?? undefined;
   const firstRealState = hasFirstRealState({
@@ -175,14 +178,14 @@ function LearnerMentorScreen(): React.ReactElement {
       })),
     });
     if (result.kind === 'jump') {
-      setShowBarClarification(false);
+      setBarClarification(null);
       pushNowDeepLink(router, result.deepLink, {
         subjectHubTarget: 'v2-subject-hub',
       });
       return;
     }
     if (result.kind === 'mentor') {
-      setShowBarClarification(false);
+      setBarClarification(null);
       router.push({
         pathname: '/(app)/session',
         params: {
@@ -194,7 +197,10 @@ function LearnerMentorScreen(): React.ReactElement {
       } as Href);
       return;
     }
-    setShowBarClarification(true);
+    setBarClarification((current) => ({
+      input: result.text,
+      revision: (current?.revision ?? 0) + 1,
+    }));
   };
 
   const handleLightPractice = (route: LightPracticeRoute): void => {
@@ -361,14 +367,18 @@ function LearnerMentorScreen(): React.ReactElement {
             onTranscript={handleSubmitText}
           />
 
-          {showBarClarification ? (
+          {barClarification ? (
             <View
+              key={barClarification.revision}
               testID="mentor-bar-clarification"
               accessibilityLiveRegion="polite"
               className="rounded-xl border border-border bg-surface-elevated px-4 py-3"
             >
               <Text className="text-body-sm text-text-secondary">
                 {t('subject.clarifyLabel')}
+              </Text>
+              <Text className="mt-1 text-body-sm text-text-primary">
+                {barClarification.input}
               </Text>
             </View>
           ) : null}

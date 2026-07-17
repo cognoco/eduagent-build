@@ -55,6 +55,12 @@ function hasNavigationCommandShape(text: string): boolean {
   );
 }
 
+function hasBareNavigationTargetShape(text: string): boolean {
+  return /^(?:my\s+)?(?:progress|journal|subjects|library|more)(?:\s+please)?$/.test(
+    text,
+  );
+}
+
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -277,15 +283,11 @@ export function matchBarIntent(
 
   // --- Fallthrough ---
 
-  if (/\b(progress|journal|subjects|library|more)\b/.test(value)) {
-    return { kind: 'uncertain', text: trimmed };
-  }
-
   if (hasQuestionShape(value)) {
     return { kind: 'mentor', text: trimmed };
   }
 
-  if (hasNavigationCommandShape(value)) {
+  if (hasNavigationCommandShape(value) || hasBareNavigationTargetShape(value)) {
     return { kind: 'uncertain', text: trimmed };
   }
 

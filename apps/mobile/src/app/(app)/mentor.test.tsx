@@ -29,7 +29,11 @@ let mockNowFeed: {
   isSlowFallback: boolean;
   refetch: jest.Mock;
 };
-let mockSubjectsCount = 1;
+let mockSubjects: Array<{
+  subjectId: string;
+  subjectName: string;
+  status: 'active';
+}>;
 let mockScopeContext: {
   activeScope: { kind: 'me' } | { kind: 'supporter-hub' } | PersonScope;
   availableScopes: PersonScope[];
@@ -63,10 +67,7 @@ jest.mock(
     return {
       ...actual,
       useSubjectsIndex: () => ({
-        subjects: Array.from({ length: mockSubjectsCount }, (_, index) => ({
-          subjectId: `subject-${index}`,
-          status: 'active',
-        })),
+        subjects: mockSubjects,
         isLoading: false,
         isError: false,
         refetch: jest.fn(),
@@ -172,9 +173,12 @@ function expectFreeformRoute(rawInput: string): void {
   });
 }
 
-function expectVisibleClarification(): void {
+function expectVisibleClarification(input?: string): void {
   const clarification = screen.getByTestId('mentor-bar-clarification');
   within(clarification).getByText('What exactly do you want to learn?');
+  if (input) {
+    within(clarification).getByText(input);
+  }
   expect(clarification.props.accessibilityLiveRegion).toBe('polite');
 }
 
@@ -186,7 +190,13 @@ describe('MentorScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSubjectsCount = 1;
+    mockSubjects = [
+      {
+        subjectId: 'subject-0',
+        subjectName: 'Mathematics',
+        status: 'active',
+      },
+    ];
     mockNowFeed = {
       data: feed([card()]),
       fallbackFeed: null,
@@ -226,7 +236,6 @@ describe('MentorScreen', () => {
   it('shows the ask box and light practice instead of a dead-end on an empty feed', () => {
     // Real first state (a subject exists) but the now-feed is empty: the old
     // build showed a "Nothing needs you / Browse" card whose tap did nothing.
-    mockSubjectsCount = 1;
     mockNowFeed = {
       ...mockNowFeed,
       data: feed([]),
@@ -329,7 +338,7 @@ describe('MentorScreen', () => {
   });
 
   it('renders ColdStartCard in the anchor slot for a profile with no first real state', () => {
-    mockSubjectsCount = 0;
+    mockSubjects = [];
     mockNowFeed = {
       ...mockNowFeed,
       data: feed([]),
@@ -351,6 +360,25 @@ describe('MentorScreen', () => {
     fireEvent(screen.getByTestId('mentor-bar-input'), 'submitEditing');
 
     expect(mockPush).toHaveBeenCalledWith('/(app)/subject-hub/spanish');
+  });
+
+  it('closed-catalog-named-subject-jump — routes a confident named subject to its hub', () => {
+    mockSubjects = [
+      {
+        subjectId: 'subject-maths',
+        subjectName: 'Maths',
+        status: 'active',
+      },
+    ];
+    renderMentorScreen();
+
+    fireEvent.changeText(
+      screen.getByTestId('mentor-bar-input'),
+      'resume my maths learning',
+    );
+    fireEvent.press(screen.getByTestId('mentor-bar-send'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/subject-hub/subject-maths');
   });
 
   describe('all submit mechanisms', () => {
@@ -376,6 +404,30 @@ describe('MentorScreen', () => {
       fireEvent(screen.getByTestId('mentor-bar-input'), 'submitEditing');
 
       expectFreeformRoute('Teach me about neon');
+    });
+
+    it('declarative-learn-more — routes exact raw input to freeform', () => {
+      renderMentorScreen();
+
+      fireEvent.changeText(
+        screen.getByTestId('mentor-bar-input'),
+        'I want to learn more about neon',
+      );
+      fireEvent.press(screen.getByTestId('mentor-bar-send'));
+
+      expectFreeformRoute('I want to learn more about neon');
+    });
+
+    it('question-more — routes exact raw input to freeform', () => {
+      renderMentorScreen();
+
+      fireEvent.changeText(
+        screen.getByTestId('mentor-bar-input'),
+        'what should I learn more about?',
+      );
+      fireEvent(screen.getByTestId('mentor-bar-input'), 'submitEditing');
+
+      expectFreeformRoute('what should I learn more about?');
     });
   });
 
@@ -431,6 +483,25 @@ describe('MentorScreen', () => {
     fireEvent(screen.getByTestId('mentor-bar-input'), 'submitEditing');
 
     expectVisibleClarification();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('consecutive-uncertain-refresh — visibly refreshes clarification for the second command', () => {
+    renderMentorScreen();
+
+    const input = screen.getByTestId('mentor-bar-input');
+    const send = screen.getByTestId('mentor-bar-send');
+    fireEvent.changeText(input, 'show my progress');
+    fireEvent.press(send);
+    expectVisibleClarification('show my progress');
+
+    fireEvent.changeText(input, 'take me to the library');
+    fireEvent.press(send);
+
+    const refreshed = screen.getByTestId('mentor-bar-clarification');
+    within(refreshed).getByText('take me to the library');
+    expect(within(refreshed).queryByText('show my progress')).toBeNull();
+    expect(refreshed.props.accessibilityLiveRegion).toBe('polite');
     expect(mockPush).not.toHaveBeenCalled();
   });
 
