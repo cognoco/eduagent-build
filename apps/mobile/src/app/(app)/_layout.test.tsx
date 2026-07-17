@@ -1020,7 +1020,7 @@ describe('AppLayout', () => {
         const avatarTop = Math.max(safeAreaTop, 24) + 8;
         expect(avatarShell).toHaveStyle({ top: avatarTop });
 
-        const expectedPushedPadding = avatarTop + 44 - safeAreaTop;
+        const expectedPushedPadding = avatarTop + 44;
         expect(activeScene).toHaveStyle({
           paddingTop: expectedPushedPadding,
         });
@@ -1074,6 +1074,41 @@ describe('AppLayout', () => {
     },
   );
 
+  it.each([
+    { surface: '360x760 web', safeAreaTop: 0, expectedPadding: 76 },
+    { surface: 'native safe area', safeAreaTop: 47, expectedPadding: 52 },
+  ])(
+    'preserves top-level More safe-area ownership on $surface',
+    async ({ safeAreaTop, expectedPadding }) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+        mockSafeAreaInsets = {
+          top: safeAreaTop,
+          bottom: 0,
+          left: 0,
+          right: 0,
+        };
+        mockUsePathname.mockReturnValue('/more');
+
+        renderLayout();
+
+        expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
+          paddingTop: expectedPadding,
+        });
+      } finally {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = original;
+      }
+    },
+  );
+
   it('keeps pushed content below chrome that grows for font scaling or long scope labels', async () => {
     const flags = require('../../lib/feature-flags') as {
       FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
@@ -1096,7 +1131,7 @@ describe('AppLayout', () => {
       });
 
       expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
-        paddingTop: 72,
+        paddingTop: 119,
       });
     } finally {
       (

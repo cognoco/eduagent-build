@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../../lib/platform-alert';
 import { useCallback, useMemo, useState } from 'react';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { InterestContext } from '@eduagent/schemas';
 import { useProfile } from '../../lib/profile';
 import { computeAgeBracket } from '@eduagent/schemas';
@@ -37,7 +36,6 @@ import { useUpdateInterestsContext } from '../../hooks/use-onboarding-dimensions
 
 export default function MentorMemoryScreen() {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { returnTo } = useLocalSearchParams<{
     returnTo?: string | string[];
@@ -228,7 +226,7 @@ export default function MentorMemoryScreen() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+      <View className="flex-1 bg-background">
         <TimeoutLoader
           isLoading
           title={t('session.mentorMemory.loadTimeout.title')}
@@ -253,7 +251,7 @@ export default function MentorMemoryScreen() {
 
   if (isError && !profile) {
     return (
-      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+      <View className="flex-1 bg-background">
         <ErrorFallback
           variant="centered"
           message={t('session.mentorMemory.loadError')}
@@ -274,11 +272,7 @@ export default function MentorMemoryScreen() {
   }
 
   return (
-    <View
-      className="flex-1 bg-background"
-      style={{ paddingTop: insets.top }}
-      testID="mentor-memory-screen"
-    >
+    <View className="flex-1 bg-background" testID="mentor-memory-screen">
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={handleBack}

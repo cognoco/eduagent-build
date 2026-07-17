@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { signIn } from '../../helpers/auth';
 import { buildSeedEmail } from '../../helpers/runtime';
 import { seedScenario } from '../../helpers/test-seed';
+import { emulateNativeTopSafeArea } from '../../helpers/native-safe-area';
 
 test.describe.configure({ mode: 'serial' });
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -102,6 +103,7 @@ test('J-03 360px long supporter scopes remain operable and clear pushed content 
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 760 });
+  await emulateNativeTopSafeArea(page, 47);
   await installLongSupporterScopes(page);
   await seedAndSignInParent(page, 'j03-long-supporter-scopes');
   await applyScopeTextScale(page);
@@ -125,6 +127,8 @@ test('J-03 360px long supporter scopes remain operable and clear pushed content 
   ]);
   expect(scopeShellBox).not.toBeNull();
   expect(avatarShellBox).not.toBeNull();
+  expect(scopeShellBox!.y).toBeCloseTo(55, 0);
+  expect(avatarShellBox!.y).toBeCloseTo(55, 0);
   expect(scopeShellBox!.x + scopeShellBox!.width).toBeLessThanOrEqual(
     avatarShellBox!.x - 8,
   );

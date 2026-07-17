@@ -149,7 +149,7 @@ describe('AccommodationScreen', () => {
     active.result.getByTestId('accommodation-mode-predictable');
   });
 
-  it('renders its identity surface after the native top safe area', async () => {
+  it('leaves top safe-area clearance to the pushed root scene', async () => {
     mockSafeAreaTop = 47;
     active = renderScreen(<AccommodationScreen />, {
       profile: owner,
@@ -157,8 +157,9 @@ describe('AccommodationScreen', () => {
     });
 
     expect(
-      await active.result.findByTestId('accommodation-screen'),
-    ).toHaveStyle({ paddingTop: 47 });
+      (await active.result.findByTestId('accommodation-screen')).props.style
+        ?.paddingTop ?? 0,
+    ).toBe(0);
   });
 
   it('PATCHes accommodation mode when a card is pressed', async () => {

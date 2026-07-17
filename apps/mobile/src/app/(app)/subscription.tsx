@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { platformAlert } from '../../lib/platform-alert';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import type {
   PurchasesPackage,
@@ -95,7 +94,6 @@ export default function SubscriptionScreen() {
 }
 
 function SubscriptionContent(): React.ReactElement | null {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
   const { activeProfile, profiles = [] } = useProfile();
@@ -705,11 +703,7 @@ function SubscriptionContent(): React.ReactElement | null {
   const { subscriptionPackages, storePurchaseUnavailable } = offeringsState;
 
   return (
-    <View
-      className="flex-1 bg-background"
-      style={{ paddingTop: insets.top }}
-      testID="subscription-screen"
-    >
+    <View className="flex-1 bg-background" testID="subscription-screen">
       <SubscriptionHeader />
 
       {isLoading ? (

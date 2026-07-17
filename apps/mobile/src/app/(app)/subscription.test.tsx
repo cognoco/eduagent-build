@@ -529,14 +529,15 @@ describe('SubscriptionScreen', () => {
     );
   });
 
-  it('renders its identity surface after the native top safe area', async () => {
+  it('leaves top safe-area clearance to the pushed root scene', async () => {
     mockSafeAreaTop = 47;
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(await screen.findByTestId('subscription-screen')).toHaveStyle({
-      paddingTop: 47,
-    });
+    expect(
+      (await screen.findByTestId('subscription-screen')).props.style
+        ?.paddingTop ?? 0,
+    ).toBe(0);
   });
 
   // -------------------------------------------------------------------------

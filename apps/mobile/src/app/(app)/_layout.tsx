@@ -656,8 +656,7 @@ export default function AppLayout() {
   const pushedSceneTopInset =
     chromeTopInset +
     V2_CHROME_CONTROL_TOP_GAP +
-    Math.max(scopeChipHeight, accountAvatarHeight) -
-    insets.top;
+    Math.max(scopeChipHeight, accountAvatarHeight);
   const tabBarBottomInset = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
     ? Math.max(insets.bottom, V2_TAB_BAR_MIN_BOTTOM_INSET)
     : Math.max(insets.bottom, 24);
@@ -735,10 +734,12 @@ export default function AppLayout() {
                 // The floating V2 chrome (account avatar, scope chip) is absolutely
                 // positioned and reserves no layout space. Top-level tab scenes own
                 // their header row, so they retain the shell's safe-area inset.
-                // Pushed scenes already apply their own safe-area padding; reserve
-                // only the remaining fixed control band here so the safe area and
-                // chrome are each counted exactly once. Full-screen routes and proxy
-                // chrome manage their own top spacing and opt out.
+                // The root owns the complete safe-area + control band for pushed
+                // scenes; their direct children do not add top-safe padding. The
+                // top-level More screen keeps its existing safe-area owner, so the
+                // root reserves only its remaining control band there.
+                // Full-screen routes and proxy chrome manage their own top spacing
+                // and opt out.
                 sceneStyle: {
                   backgroundColor: isProxyChromeActive
                     ? proxyColors.sceneBackground
@@ -749,7 +750,9 @@ export default function AppLayout() {
                     !isFullScreen
                       ? isVisible
                         ? chromeTopInset
-                        : pushedSceneTopInset
+                        : pathname === '/more'
+                          ? pushedSceneTopInset - insets.top
+                          : pushedSceneTopInset
                       : 0,
                 },
                 tabBarStyle: isFullScreen

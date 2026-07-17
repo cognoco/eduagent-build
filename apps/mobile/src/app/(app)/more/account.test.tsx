@@ -138,7 +138,7 @@ describe('AccountScreen', () => {
     active.result.getByTestId('change-password-row');
   });
 
-  it('leaves native top-inset ownership to the enclosing More Stack header', () => {
+  it('leaves native top-inset ownership to the pushed root scene', () => {
     active = renderScreen(<AccountScreen />, {
       profile: ownerProfile,
       routes: defaultRoutes,

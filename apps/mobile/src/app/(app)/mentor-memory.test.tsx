@@ -230,14 +230,15 @@ describe('MentorMemoryScreen — interests null guard', () => {
     jest.clearAllMocks();
   });
 
-  it('renders its identity surface after the native top safe area', async () => {
+  it('leaves top safe-area clearance to the pushed root scene', async () => {
     mockSafeAreaTop = 47;
 
     render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
 
-    expect(await screen.findByTestId('mentor-memory-screen')).toHaveStyle({
-      paddingTop: 47,
-    });
+    expect(
+      (await screen.findByTestId('mentor-memory-screen')).props.style
+        ?.paddingTop ?? 0,
+    ).toBe(0);
   });
 
   it('does not crash when profile.interests is undefined', () => {
