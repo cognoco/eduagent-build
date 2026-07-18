@@ -15,6 +15,8 @@ import {
   recentRoundListItemSchema,
   activeRoundDetailResponseSchema,
   completedRoundDetailResponseSchema,
+  validatedQuestionResultSchema,
+  ConflictError,
   type ClientQuizQuestion,
   type GenerateRoundInput,
   type QuizQuestion,
@@ -56,6 +58,40 @@ type QuizRouteEnv = {
 const roundIdParamSchema = z.object({
   id: z.string().uuid(),
 });
+
+function normalizeCompletedRoundResults(
+  rawResults: unknown,
+  questions: QuizQuestion[],
+) {
+  if (!Array.isArray(rawResults)) {
+    throw new ConflictError('Completed round results are unavailable');
+  }
+
+  return rawResults.map((rawResult) => {
+    if (typeof rawResult !== 'object' || rawResult === null) {
+      throw new ConflictError('Completed round results are unavailable');
+    }
+    const questionIndex = Reflect.get(rawResult, 'questionIndex');
+    const question =
+      typeof questionIndex === 'number' &&
+      Number.isInteger(questionIndex) &&
+      questionIndex >= 0
+        ? questions[questionIndex]
+        : undefined;
+    if (!question) {
+      throw new ConflictError('Completed round results are unavailable');
+    }
+
+    const parsed = validatedQuestionResultSchema.safeParse({
+      ...rawResult,
+      correctAnswer: question.correctAnswer,
+    });
+    if (!parsed.success) {
+      throw new ConflictError('Completed round results are unavailable');
+    }
+    return parsed.data;
+  });
+}
 
 // ─── Answer-stripping projection ─────────────────────────────────────────
 // [CR-1] Prevent answer leaking: correctAnswer, acceptedAliases,
@@ -284,7 +320,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
                       : undefined,
               };
             }),
-            results: round.results,
+            results: normalizeCompletedRoundResults(round.results, questions),
           }),
           200,
         );

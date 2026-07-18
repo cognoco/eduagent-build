@@ -34,6 +34,7 @@ jest.mock(
 
 import {
   assertAnswerInOptions,
+  buildStoredQuestionResult,
   buildMasterySm2Input,
   buildMissedItemText,
   calculateScore,
@@ -56,6 +57,102 @@ import {
   TEST_PROFILE_ID_2,
   TEST_PROFILE_ID_3,
 } from '@eduagent/test-utils';
+
+describe('buildStoredQuestionResult [WI-2190]', () => {
+  const cases: Array<{
+    name: string;
+    question: QuizQuestion;
+    result: QuestionResult & { finalAttempt?: boolean; correctAnswer?: string };
+  }> = [
+    {
+      name: 'Capitals correct answer',
+      question: {
+        type: 'capitals',
+        country: 'France',
+        correctAnswer: 'Paris',
+        acceptedAliases: ['Paris'],
+        distractors: ['Berlin', 'Madrid', 'Rome'],
+        funFact: '',
+        isLibraryItem: false,
+      },
+      result: {
+        questionIndex: 0,
+        correct: true,
+        correctAnswer: 'client-forgery',
+        answerGiven: 'Paris',
+        timeMs: 500,
+      },
+    },
+    {
+      name: 'Guess Who wrong disputed final attempt',
+      question: {
+        type: 'guess_who',
+        canonicalName: 'Ada Lovelace',
+        correctAnswer: 'Ada Lovelace',
+        acceptedAliases: ['Lovelace'],
+        clues: ['1', '2', '3', '4', '5'],
+        mcFallbackOptions: [
+          'Ada Lovelace',
+          'Grace Hopper',
+          'Marie Curie',
+          'Rosalind Franklin',
+        ],
+        funFact: '',
+        isLibraryItem: false,
+      },
+      result: {
+        questionIndex: 0,
+        correct: false,
+        answerGiven: 'Grace Hopper',
+        timeMs: 700,
+        cluesUsed: 5,
+        finalAttempt: true,
+        disputed: true,
+      },
+    },
+    {
+      name: 'Guess Who skipped final attempt',
+      question: {
+        type: 'guess_who',
+        canonicalName: 'Ada Lovelace',
+        correctAnswer: 'Ada Lovelace',
+        acceptedAliases: ['Lovelace'],
+        clues: ['1', '2', '3', '4', '5'],
+        mcFallbackOptions: [
+          'Ada Lovelace',
+          'Grace Hopper',
+          'Marie Curie',
+          'Rosalind Franklin',
+        ],
+        funFact: '',
+        isLibraryItem: false,
+      },
+      result: {
+        questionIndex: 0,
+        correct: false,
+        answerGiven: '[skipped]',
+        timeMs: 0,
+        finalAttempt: true,
+      },
+    },
+  ];
+
+  it.each(cases)(
+    '$name persists the server-owned answer in detail-readable shape',
+    ({ question, result }) => {
+      const stored = buildStoredQuestionResult(result, question);
+
+      expect(stored).toMatchObject({
+        questionIndex: 0,
+        correct: result.correct,
+        correctAnswer: question.correctAnswer,
+        answerGiven: result.answerGiven,
+      });
+      expect(stored.correctAnswer).not.toBe('client-forgery');
+      expect(stored).not.toHaveProperty('finalAttempt');
+    },
+  );
+});
 
 describe('calculateScore', () => {
   it('counts correct answers', () => {
@@ -826,6 +923,9 @@ describe('completeQuizRound mastery upsert Sentry escalation [CR-2026-05-19-M1]'
         upsertMissedItems: jest.fn().mockResolvedValue(undefined),
         softDeleteResolvedItems: jest.fn().mockResolvedValue(undefined),
       },
+      quizMissedItems: {
+        insertMany: jest.fn().mockResolvedValue(undefined),
+      },
       profiles: { findById: jest.fn().mockResolvedValue(null) },
       subjects: { findById: jest.fn().mockResolvedValue(null) },
       xpLedger: { insert: jest.fn().mockResolvedValue(undefined) },
@@ -1330,6 +1430,9 @@ describe('completeQuizRound empty recordedResults guard [BUG-854]', () => {
         upsertMissedItems: jest.fn().mockResolvedValue(undefined),
         softDeleteResolvedItems: jest.fn().mockResolvedValue(undefined),
       },
+      quizMissedItems: {
+        insertMany: jest.fn().mockResolvedValue(undefined),
+      },
       profiles: { findById: jest.fn().mockResolvedValue(null) },
       subjects: { findById: jest.fn().mockResolvedValue(null) },
       xpLedger: { insert: jest.fn().mockResolvedValue(undefined) },
@@ -1360,17 +1463,18 @@ describe('completeQuizRound empty recordedResults guard [BUG-854]', () => {
     expect(repoSpy.quizRounds.completeActive).not.toHaveBeenCalled();
   });
 
-  it('[NEGATIVE/BUG-854] resolves normally when round has recorded /check results', async () => {
+  it('[WI-2190] persists trusted detail shape and dispute metadata from a completed recorded answer', async () => {
     mockQueueCelebration.mockResolvedValue([]);
 
     // Same round but with a recorded /check result — the happy path.
     const mockRoundWithResults = {
       ...mockRoundNoResults,
+      questions: [{ ...capitalsQuestion, isLibraryItem: true }],
       results: [
         {
           questionIndex: 0,
-          correct: true,
-          answerGiven: 'Paris',
+          correct: false,
+          answerGiven: 'Berlin',
           timeMs: 2000,
           finalAttempt: true,
         },
@@ -1416,11 +1520,30 @@ describe('completeQuizRound empty recordedResults guard [BUG-854]', () => {
       );
 
     const result = await completeQuizRound(makeMockDb(), PROFILE_ID, ROUND_ID, [
-      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 2000 },
+      {
+        questionIndex: 0,
+        correct: false,
+        answerGiven: 'Berlin',
+        timeMs: 2000,
+        disputed: true,
+      },
     ]);
 
-    // Round completes normally with the correct score.
-    expect(result.score).toBe(1);
+    expect(result.score).toBe(0);
     expect(repoSpy.quizRounds.completeActive).toHaveBeenCalledTimes(1);
+    expect(repoSpy.quizRounds.completeActive).toHaveBeenCalledWith(
+      ROUND_ID,
+      expect.objectContaining({
+        results: [
+          expect.objectContaining({
+            questionIndex: 0,
+            correct: false,
+            correctAnswer: 'Paris',
+            answerGiven: 'Berlin',
+            disputed: true,
+          }),
+        ],
+      }),
+    );
   });
 });

@@ -71,6 +71,11 @@ const mockRound = {
   total: 10,
 };
 
+const mockRoundDetail = {
+  ...mockRound,
+  activityLabel: 'Vocabulary',
+};
+
 // ---------------------------------------------------------------------------
 // useGenerateRound
 // ---------------------------------------------------------------------------
@@ -412,6 +417,36 @@ describe('useCompleteRound', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['streak'] });
   });
 
+  it('[WI-2190] invalidates the completed round detail for the active profile', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          roundId: 'round-1',
+          score: 1,
+          total: 1,
+          xpEarned: 10,
+          celebrationTier: 'perfect',
+          droppedResults: 0,
+          questionResults: [],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useCompleteRound(), {
+      wrapper: createWrapper(),
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    await act(async () => {
+      await result.current.mutateAsync({ roundId: 'round-1', results: [] });
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['quiz-round-detail', 'round-1', 'test-profile-id'],
+    });
+  });
+
   it('propagates API errors', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response('Bad request', { status: 400 }),
@@ -516,7 +551,7 @@ describe('useRoundDetail', () => {
 
   it('fetches round detail by ID', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(mockRound), { status: 200 }),
+      new Response(JSON.stringify(mockRoundDetail), { status: 200 }),
     );
 
     const { result } = renderHook(() => useRoundDetail('round-1'), {
@@ -528,6 +563,62 @@ describe('useRoundDetail', () => {
     });
 
     expect(result.current.data?.id).toBe(MOCK_ROUND_ID);
+  });
+
+  it('[WI-2190] retains completed grading fields when parsing history detail', async () => {
+    const completedRound = {
+      id: MOCK_ROUND_ID,
+      activityType: 'vocabulary',
+      activityLabel: 'Vocabulary',
+      theme: 'Nature',
+      status: 'completed',
+      score: 0,
+      total: 1,
+      xpEarned: 0,
+      celebrationTier: 'nice',
+      completedAt: '2026-07-18T10:00:00.000Z',
+      questions: [
+        {
+          type: 'vocabulary',
+          term: 'der Hund',
+          options: ['dog', 'cat'],
+          funFact: '',
+          cefrLevel: 'A1',
+          correctAnswer: 'dog',
+          acceptedAliases: ['dog', 'hound'],
+          isLibraryItem: false,
+        },
+      ],
+      results: [
+        {
+          questionIndex: 0,
+          correct: false,
+          correctAnswer: 'dog',
+          answerGiven: '',
+          disputed: true,
+        },
+      ],
+    };
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(completedRound), { status: 200 }),
+    );
+
+    const { result } = renderHook(() => useRoundDetail('round-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toMatchObject({
+      status: 'completed',
+      results: [
+        {
+          questionIndex: 0,
+          correctAnswer: 'dog',
+          answerGiven: '',
+          disputed: true,
+        },
+      ],
+    });
   });
 
   it('is disabled when roundId is undefined — no fetch fires', async () => {
@@ -558,7 +649,7 @@ describe('useRoundDetail', () => {
 
     // Populate cache via first fetch
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(mockRound), { status: 200 }),
+      new Response(JSON.stringify(mockRoundDetail), { status: 200 }),
     );
 
     const { result } = renderHook(() => useRoundDetail('round-1'), { wrapper });
@@ -596,7 +687,7 @@ describe('useRoundDetail', () => {
     const { wrapper, queryClient: sharedQc } = createSharedWrapper();
 
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(mockRound), { status: 200 }),
+      new Response(JSON.stringify(mockRoundDetail), { status: 200 }),
     );
 
     const { result } = renderHook(() => useRoundDetail('round-1'), { wrapper });

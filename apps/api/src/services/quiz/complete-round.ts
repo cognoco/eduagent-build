@@ -90,12 +90,14 @@ function getServerAttemptElapsedMs(
   return Number.isFinite(elapsed) ? Math.max(0, elapsed) : 0;
 }
 
-function toStoredQuestionResult(
+export function buildStoredQuestionResult(
   result: RecordedQuestionResult,
-): QuestionResult {
+  question: QuizQuestion,
+): QuestionResult & { correctAnswer: string } {
   return {
     questionIndex: result.questionIndex,
     correct: result.correct,
+    correctAnswer: question.correctAnswer,
     answerGiven: result.answerGiven,
     timeMs: result.timeMs,
     ...(result.cluesUsed != null ? { cluesUsed: result.cluesUsed } : {}),
@@ -612,14 +614,32 @@ export async function completeQuizRound(
     }
 
     const finalRecordedResults = recordedResults.filter(isFinalRecordedAttempt);
-    const completionSourceResults = finalRecordedResults;
+    const disputedQuestionIndices = new Set(
+      results
+        .filter((result) => result.disputed === true)
+        .map((result) => result.questionIndex),
+    );
+    const completionSourceResults = finalRecordedResults.map((result) =>
+      disputedQuestionIndices.has(result.questionIndex)
+        ? { ...result, disputed: true }
+        : result,
+    );
     const validatedResults = validateResults(
       questions,
       completionSourceResults,
     );
-    const storedResults = validatedResults.map((result) =>
-      toStoredQuestionResult(result as RecordedQuestionResult),
-    );
+    const storedResults = validatedResults.map((result) => {
+      const question = questions[result.questionIndex];
+      if (!question) {
+        throw new ConflictError(
+          'Recorded quiz result has no matching question',
+        );
+      }
+      return buildStoredQuestionResult(
+        result as RecordedQuestionResult,
+        question,
+      );
+    });
     const droppedResults =
       (recordedResults.length > 0
         ? finalRecordedResults.length
