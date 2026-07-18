@@ -128,7 +128,9 @@ export async function removeAllScopedPersisterCaches(): Promise<void> {
  * would destroy that user's own legitimate offline-paint cache before their
  * persister mounts. Gating on "definitively signed out" covers exactly the two
  * moments the failure contract requires — app start with no session, and the
- * window before the next sign-in — and no others. Returns whether it swept.
+ * window before the next sign-in — and no others. Returns whether a sweep was
+ * ATTEMPTED (true even if the removal then failed and escalated — the guard
+ * decision, not the storage outcome); callers today ignore the value.
  */
 export async function reattemptPersisterPurgeIfSignedOut(auth: {
   isLoaded: boolean;
