@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
 import {
   supporterRelationSchema,
   visibilityContractSchema,
@@ -14,6 +15,7 @@ import { assertOk } from '../../../lib/assert-ok';
 import { useApiClient } from '../../../lib/api-client';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { formatApiError } from '../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import {
   useEligibleManagedPersons,
@@ -111,6 +113,16 @@ export default function InitiateLinkScreen(): React.ReactElement {
         contentInsetAdjustmentBehavior="automatic"
         testID="visibility-link-initiate-screen"
       >
+        {/* [WI-2188] `_layout.tsx` hides the native Stack header for this
+            whole route group, so this is the ceremony's only exit affordance
+            here — canGoBack() is true for support-hub entry (mentor.tsx /
+            subjects.tsx push this screen as a single push), false for a
+            historyless direct/deep-link entry, which falls back to the same
+            V2 home used by the sibling `[contractId].tsx` back button. */}
+        <LinkCeremonyBackButton
+          onPress={() => goBackOrReplace(router, '/(app)/home')}
+          testID="visibility-link-initiate-picker-back"
+        />
         <SupporteePicker
           eligibleManagedPersons={eligibleManagedPersons}
           onSelectManagedPerson={(person) =>
@@ -153,6 +165,24 @@ export default function InitiateLinkScreen(): React.ReactElement {
       contentInsetAdjustmentBehavior="automatic"
       testID="visibility-link-initiate-screen"
     >
+      {/* [WI-2188] Discriminated by entry shape, reusing the two exit
+          handlers this screen already has rather than inventing a third:
+          reached via the inline picker (no supporteePersonId param) → back
+          to the picker (same `setTarget(null)` shape the existingTeen
+          branches already use above); reached via a pre-filled param (the
+          `pushLinkInitiateForManagedPerson` direct-entry path, which skips
+          the picker entirely) → there is no picker to return to, so this
+          falls straight back to support-hub/fallback like the picker's own
+          back button — AC-3 requires support-hub entry to return there in
+          one step, not two. */}
+      <LinkCeremonyBackButton
+        onPress={() =>
+          paramSupporteePersonId
+            ? goBackOrReplace(router, '/(app)/home')
+            : setTarget(null)
+        }
+        testID="visibility-link-initiate-confirm-back"
+      />
       <View>
         <Text className="text-display-sm font-semibold text-text-primary">
           {t('visibility.link.createTitle')}
@@ -205,6 +235,38 @@ export default function InitiateLinkScreen(): React.ReactElement {
         />
       ) : null}
     </ScrollView>
+  );
+}
+
+// [WI-2188] Shared in-app exit for the two ceremony steps that previously had
+// none (the initial picker and the managed-person confirmation step). Styled
+// to match the sibling `link/[contractId].tsx` back button (same chevron +
+// "common.goBack" label + tap-target sizing) so the `link/*` route family's
+// back affordance stays visually consistent. Never submits or mutates — the
+// caller supplies pure navigation/state-reset `onPress` handlers.
+function LinkCeremonyBackButton({
+  onPress,
+  testID,
+}: {
+  onPress: () => void;
+  testID: string;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('common.goBack')}
+      className="min-h-[44px] flex-row items-center gap-2 self-start rounded-button border border-border px-4 py-2"
+      onPress={onPress}
+      testID={testID}
+    >
+      <Ionicons name="chevron-back" size={18} color={colors.textSecondary} />
+      <Text className="text-body-sm font-semibold text-text-secondary">
+        {t('common.goBack')}
+      </Text>
+    </Pressable>
   );
 }
 
