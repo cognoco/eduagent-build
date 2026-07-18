@@ -26,6 +26,7 @@ import {
   retentionCards,
   sessionSummaries,
   subjects,
+  supportVisibilityContracts,
   supportership,
   subscription,
   type Database,
@@ -48,6 +49,7 @@ import {
 } from '@eduagent/schemas';
 
 import { markMomentSurfaced } from './activity-ledger';
+import { acceptedVisibilityCondition } from './linking-ceremony';
 import { getAssessmentEligibleTopics } from './retention-data';
 import { resolveEffectiveAccessTier } from './subscription';
 
@@ -360,7 +362,12 @@ function normalizeNowQuery(query: NowScope | NowQuery): NowQuery {
 
 // `person`/`supportership` reads here are S4-scoped and were shipped early
 // inside the S0 service; ruled correct, not a tier leak
-// (docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md).
+// (docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md). That ruling is
+// about S0-vs-S4 layering only — it does not cover accepted-visibility
+// gating, which is a separate axis. [WI-2237] added the
+// `supportVisibilityContracts` join below because a client-supplied
+// `personId` on a merely-created (never accepted) supportership previously
+// still returned real Now-feed data.
 async function resolveNowTarget(
   db: Database,
   profileId: string,
@@ -378,12 +385,15 @@ async function resolveNowTarget(
     .select({ edgeId: supportership.id })
     .from(supportership)
     .innerJoin(person, eq(person.id, supportership.supporteePersonId))
+    .innerJoin(
+      supportVisibilityContracts,
+      eq(supportVisibilityContracts.supportershipId, supportership.id),
+    )
     .where(
       and(
         eq(supportership.supporterPersonId, profileId),
         eq(supportership.supporteePersonId, query.personId),
-        isNull(supportership.revokedAt),
-        isNull(person.archivedAt),
+        acceptedVisibilityCondition(),
       ),
     )
     .limit(1);
@@ -438,7 +448,10 @@ async function collectCandidatesForRequest(
 
 // `person`/`supportership` reads here are S4-scoped and were shipped early
 // inside the S0 service; ruled correct, not a tier leak
-// (docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md).
+// (docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md). That ruling is
+// about S0-vs-S4 layering only — see the `resolveNowTarget` note above for
+// why the `supportVisibilityContracts` join [WI-2237] is a separate,
+// necessary axis.
 async function collectSupporterHubCandidates(
   db: Database,
   supporterPersonId: string,
@@ -451,11 +464,14 @@ async function collectSupporterHubCandidates(
     })
     .from(supportership)
     .innerJoin(person, eq(person.id, supportership.supporteePersonId))
+    .innerJoin(
+      supportVisibilityContracts,
+      eq(supportVisibilityContracts.supportershipId, supportership.id),
+    )
     .where(
       and(
         eq(supportership.supporterPersonId, supporterPersonId),
-        isNull(supportership.revokedAt),
-        isNull(person.archivedAt),
+        acceptedVisibilityCondition(),
       ),
     )
     .orderBy(asc(supportership.id))

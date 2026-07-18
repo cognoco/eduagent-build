@@ -25,6 +25,7 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 import { nowRoutes } from './now';
+import { acceptLink, initiateLink } from '../services/linking-ceremony';
 import {
   deleteV2IdentitiesForTest,
   ensureV2IdentityForLegacyProfileTest,
@@ -255,22 +256,40 @@ async function seedAssessmentEligibleTopic(
   return topic;
 }
 
-async function seedSupportership(
+// [WI-2237] `/now`'s `scope=person`/`scope=supporter-hub` now require an
+// ACCEPTED visibility contract, not just a non-revoked edge — a bare
+// `supportership` insert (with no contract, or a `pending` one) no longer
+// grants Now-feed access (see the negative test below). Seeds through the
+// real `initiateLink`+`acceptLink` write path, mirroring
+// `visibility.integration.test.ts`'s `seedAcceptedContract`.
+async function seedAcceptedContract(
   database: Database,
   supporterPersonId: string,
   supporteePersonId: string,
 ): Promise<string> {
-  const [row] = await database
-    .insert(supportership)
-    .values({
-      supporterPersonId,
-      supporteePersonId,
-    })
-    .returning({ id: supportership.id });
+  const initiated = await initiateLink(database, {
+    supporterPersonId,
+    supporteePersonId,
+    relation: 'parent',
+    managedTier: false,
+  });
+  seededSupportershipIds.push(initiated.supportershipId);
 
-  if (!row) throw new Error('Failed to seed supportership');
-  seededSupportershipIds.push(row.id);
-  return row.id;
+  await acceptLink(database, initiated.id, {
+    actorPersonId: supporterPersonId,
+    audience: 'supporter',
+  });
+  const accepted = await acceptLink(database, initiated.id, {
+    actorPersonId: supporteePersonId,
+    audience: 'supportee',
+  });
+
+  if (accepted.status !== 'accepted') {
+    throw new Error(
+      `Expected seeded contract to reach status "accepted", got "${accepted.status}"`,
+    );
+  }
+  return initiated.supportershipId;
 }
 
 async function seedParkedQuestion(
@@ -507,7 +526,7 @@ describe('Integration: now routes', () => {
   it('surfaces unfinished, needs-deepening, and challenge-ready cards in supporter person and hub scopes', async () => {
     const supporterId = await seedProfile(db, 'supporter-candidate-kinds');
     const childId = await seedProfile(db, 'child-candidate-kinds');
-    const edgeId = await seedSupportership(db, supporterId, childId);
+    const edgeId = await seedAcceptedContract(db, supporterId, childId);
 
     await seedActiveSession(db, childId, 'supporter-unfinished');
     await seedNeedsDeepening(db, childId, 'supporter-deepening');
@@ -543,7 +562,7 @@ describe('Integration: now routes', () => {
   it('excludes transcript-adjacent artifact cards from supporter person and hub feeds', async () => {
     const supporterId = await seedProfile(db, 'supporter-artifact-wall');
     const childId = await seedProfile(db, 'child-artifact-wall');
-    const edgeId = await seedSupportership(db, supporterId, childId);
+    const edgeId = await seedAcceptedContract(db, supporterId, childId);
     const retention = await seedRetentionDue(
       db,
       childId,
@@ -621,5 +640,47 @@ describe('Integration: now routes', () => {
       code: ERROR_CODES.FORBIDDEN,
       message: 'You do not have access to this person.',
     });
+  });
+
+  // [WI-2237] negative-path break test: a non-revoked edge whose visibility
+  // contract never reached 'accepted' must not leak the child's Now-feed
+  // data through either the person-scope or supporter-hub surface.
+  it('returns 403 for scope=person and no data for scope=supporter-hub when the visibility contract is pending, not accepted', async () => {
+    const supporterId = await seedProfile(db, 'supporter-pending-contract');
+    const childId = await seedProfile(db, 'child-pending-contract');
+    const initiated = await initiateLink(db, {
+      supporterPersonId: supporterId,
+      supporteePersonId: childId,
+      relation: 'parent',
+      managedTier: false,
+    });
+    seededSupportershipIds.push(initiated.supportershipId);
+    expect(initiated.status).toBe('pending');
+
+    await seedRetentionDue(
+      db,
+      childId,
+      'pending-contract-must-not-leak',
+      new Date('2020-01-01T00:00:00.000Z'),
+    );
+
+    const personRes = await makeApp(db, supporterId).request(
+      `/v1/now?scope=person&personId=${childId}`,
+    );
+    expect(personRes.status).toBe(403);
+    await expect(personRes.json()).resolves.toMatchObject({
+      code: ERROR_CODES.FORBIDDEN,
+      message: 'You do not have access to this person.',
+    });
+
+    const hubRes = await makeApp(db, supporterId).request(
+      '/v1/now?scope=supporter-hub',
+    );
+    expect(hubRes.status).toBe(200);
+    const hubBody = (await hubRes.json()) as { cards: unknown[] };
+    expect(hubBody.cards).toHaveLength(0);
+    expect(JSON.stringify(hubBody)).not.toContain(
+      'pending-contract-must-not-leak',
+    );
   });
 });
