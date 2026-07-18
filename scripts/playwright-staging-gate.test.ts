@@ -91,6 +91,13 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
           resultText: 'Unknown error while the API transport was unavailable',
         }),
       ).toEqual({ kind: 'infra-signalled' });
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: 'expect(received).toBe(true)',
+        }),
+      ).toEqual({ kind: 'product' });
       writeFileSync(
         join(root, 'run', 'trace.trace'),
         JSON.stringify({ type: 'console', text: '503 in prose' }),
