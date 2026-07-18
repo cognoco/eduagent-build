@@ -686,70 +686,138 @@ describe('Integration: now routes', () => {
     );
   });
 
-  // [WI-2237] RGR: revoke-race guard for the correlated EXISTS embedded in
-  // the candidate reads (now-feed.ts's acceptedSupporterAccessExists).
-  // `resolveNowTarget` already re-checks accepted visibility on every
-  // top-level `/now` call, so a plain "seed accepted -> revoke -> call
-  // buildNowFeed again" test would pass with or without this round's fix
-  // (that outer gate alone denies it) — it would not be a genuine
-  // regression guard. This test instead calls the candidate-read seam
-  // (`collectCandidatesForRequest`, exported test-only) DIRECTLY with a
-  // stale personId/edgeId, bypassing `resolveNowTarget` entirely, to prove
-  // the read itself denies once the edge is revoked — the exact
-  // intra-call TOCTOU window Codex's review flagged (a revoke landing
-  // between the pre-check and these reads). Watched RED with
-  // `acceptedSupporterAccessExists` reverted (revoked edge still returned
-  // the unfinished-session candidate), GREEN with the fix restored.
-  it('RGR: denies the now-feed candidate read for a revoked edge even when called directly, bypassing the outer pre-check [revoke-race]', async () => {
-    const supporterId = await seedProfile(db, 'supporter-revoke-race');
-    const childId = await seedProfile(db, 'child-revoke-race');
+  // [WI-2237] Load-bearing regression guard for finding #1 — the
+  // challenge-ready candidate read must carry the accepted-visibility
+  // predicate IN the read itself (as `getAssessmentEligibleTopics`'s
+  // injected `accessGuard`), not in an earlier separate pre-check. The seed
+  // is challenge_ready-ONLY (no active session / needs-deepening / retention
+  // due), so the sole possible candidate is a challenge_ready card — reverting
+  // the in-query guard in `getAssessmentEligibleTopics` makes a NON-ACCEPTED
+  // edge leak that card (RED), while every sibling read stays empty (nothing
+  // is seeded for them). The read seam (`collectCandidatesForRequest`,
+  // exported test-only) is called DIRECTLY with a stale personId/edgeId/viewer,
+  // bypassing `resolveNowTarget`, which reproduces the exact intra-call TOCTOU
+  // vector Codex flagged: a revoke landing between the outer pre-check and the
+  // reads. Under this round's option-A fix the auth and the read are one query,
+  // so the guard is proven by the read returning nothing rather than by a
+  // thrown pre-check. Executed RED (guard reverted → revoked edge returned the
+  // challenge_ready card) then GREEN (guard restored → nothing).
+  it('challenge-ready candidate read allows an accepted edge and denies a revoked edge in the same read [revoke-race]', async () => {
+    const supporterId = await seedProfile(db, 'supporter-challenge-race');
+    const childId = await seedProfile(db, 'child-challenge-race');
     const edgeId = await seedAcceptedContract(db, supporterId, childId);
-    const sessionId = await seedActiveSession(db, childId, 'revoke-race');
-
-    const now = new Date();
-
-    // Pre-check passes (accepted edge) and the candidate read returns the
-    // real, person-scoped card — proving the correlated EXISTS is not
-    // silently always-false and stripping legitimate content.
-    const allowedCandidates = await collectCandidatesForRequest(
+    // Only a challenge-ready-eligible topic is seeded, so challenge_ready is
+    // the single candidate the read can surface.
+    const challenge = await seedAssessmentEligibleTopic(
       db,
       childId,
-      { scope: 'person', personId: childId },
+      'challenge-race',
+    );
+
+    const now = new Date();
+    const personRequest = {
+      scope: 'person' as const,
+      personId: childId,
+    };
+
+    // Case ACCEPTED (allow): the correlated EXISTS is satisfied, so the read
+    // surfaces the challenge_ready card — proving the guard is not
+    // always-false and does not over-deny a legitimately accepted supporter.
+    const acceptedPerson = await collectCandidatesForRequest(
+      db,
+      childId,
+      personRequest,
       now,
       edgeId,
       supporterId,
     );
     expect(
-      allowedCandidates.some(
+      acceptedPerson.some(
         (candidate) =>
-          candidate.kind === 'unfinished_session' &&
-          candidate.params.sessionId === sessionId,
+          candidate.kind === 'challenge_ready' &&
+          candidate.params.topicId === challenge.topicId,
       ),
     ).toBe(true);
 
-    // The supportee revokes mid-session (simulates the race window: a
-    // revoke landing after the pre-check succeeded but before these reads).
+    const acceptedHub = await collectCandidatesForRequest(
+      db,
+      supporterId,
+      { scope: 'supporter-hub', personId: supporterId },
+      now,
+      undefined,
+      supporterId,
+    );
+    expect(
+      acceptedHub.some((candidate) => candidate.kind === 'challenge_ready'),
+    ).toBe(true);
+
+    // The supportee revokes (breaks acceptedVisibilityCondition's
+    // `revokedAt IS NULL` clause).
     await requestSelfUnlink(db, {
       supportershipId: edgeId,
       callerPersonId: childId,
       now,
     });
 
-    // The SAME stale personId/edgeId/viewer, re-requested directly against
-    // the candidate-read seam (no fresh resolveNowTarget pre-check in
-    // between), must now deny — no person-scoped Now data leaks through.
-    // (`collectChallengeReadyCandidates`'s re-check rejects the whole read
-    // rather than silently filtering the revoked candidate out — a
-    // stronger, fail-closed denial than an empty array.)
-    await expect(
-      collectCandidatesForRequest(
-        db,
-        childId,
-        { scope: 'person', personId: childId },
-        now,
-        edgeId,
-        supporterId,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    // Case REVOKED (deny): the SAME stale personId/edgeId/viewer, re-requested
+    // directly against the read seam with no fresh resolveNowTarget in between,
+    // must surface nothing — the challenge_ready card no longer leaks because
+    // the guard lives in the read.
+    const revokedPerson = await collectCandidatesForRequest(
+      db,
+      childId,
+      personRequest,
+      now,
+      edgeId,
+      supporterId,
+    );
+    expect(revokedPerson).toHaveLength(0);
+    expect(JSON.stringify(revokedPerson)).not.toContain(challenge.topicId);
+
+    // Hub scope also denies (its accepted-edge enumeration drops the revoked
+    // edge, and the per-edge read carries the same in-query guard).
+    const revokedHub = await collectCandidatesForRequest(
+      db,
+      supporterId,
+      { scope: 'supporter-hub', personId: supporterId },
+      now,
+      undefined,
+      supporterId,
+    );
+    expect(revokedHub).toHaveLength(0);
+  });
+
+  // [WI-2237] Second non-accepted axis: a never-accepted (pending) contract
+  // breaks acceptedVisibilityCondition's `status = 'accepted'` clause. Same
+  // challenge_ready-only seed and direct read seam — the in-query guard must
+  // deny the pending edge just as it denies the revoked one.
+  it('challenge-ready candidate read denies a pending (never-accepted) edge', async () => {
+    const supporterId = await seedProfile(db, 'supporter-challenge-pending');
+    const childId = await seedProfile(db, 'child-challenge-pending');
+    const initiated = await initiateLink(db, {
+      supporterPersonId: supporterId,
+      supporteePersonId: childId,
+      relation: 'parent',
+      managedTier: false,
+    });
+    seededSupportershipIds.push(initiated.supportershipId);
+    expect(initiated.status).toBe('pending');
+
+    const challenge = await seedAssessmentEligibleTopic(
+      db,
+      childId,
+      'challenge-pending',
+    );
+
+    const pendingPerson = await collectCandidatesForRequest(
+      db,
+      childId,
+      { scope: 'person', personId: childId },
+      new Date(),
+      initiated.supportershipId,
+      supporterId,
+    );
+    expect(pendingPerson).toHaveLength(0);
+    expect(JSON.stringify(pendingPerson)).not.toContain(challenge.topicId);
   });
 });

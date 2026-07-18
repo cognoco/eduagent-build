@@ -51,10 +51,7 @@ import {
 } from '@eduagent/schemas';
 
 import { markMomentSurfaced } from './activity-ledger';
-import {
-  acceptedVisibilityCondition,
-  findAcceptedContractForSupportee,
-} from './linking-ceremony';
+import { acceptedVisibilityCondition } from './linking-ceremony';
 import { getAssessmentEligibleTopics } from './retention-data';
 import { resolveEffectiveAccessTier } from './subscription';
 
@@ -552,12 +549,7 @@ async function collectNowCandidates(
     collectUnfinishedSessionCandidates(db, profileId, scope, accessGuard),
     collectRetentionDueCandidates(db, profileId, scope, now, accessGuard),
     collectNeedsDeepeningCandidates(db, profileId, scope, now, accessGuard),
-    collectChallengeReadyCandidates(
-      db,
-      profileId,
-      scope,
-      visibility === 'supporter' ? supporterPersonId : undefined,
-    ),
+    collectChallengeReadyCandidates(db, profileId, scope, accessGuard),
     visibility === 'self'
       ? collectParkedItemCandidates(db, profileId, scope)
       : Promise.resolve([]),
@@ -843,22 +835,15 @@ async function collectChallengeReadyCandidates(
   db: Database,
   profileId: string,
   scope: NowScope,
-  supporterPersonId?: string,
+  accessGuard?: SQL,
 ): Promise<NowFeedCandidate[]> {
-  if (supporterPersonId) {
-    // [WI-2237] getAssessmentEligibleTopics (retention-data.ts) is a
-    // cross-service helper shared with self-scope callers, so it can't
-    // embed a correlated EXISTS without widening its own contract. Re-run
-    // the canonical accepted-visibility check (the same helper
-    // assertAcceptedSupportership uses) immediately before delegating to
-    // it, narrowing the same TOCTOU window the other candidate reads in
-    // this file close via acceptedSupporterAccessExists.
-    await findAcceptedContractForSupportee(db, {
-      supporterPersonId,
-      supporteePersonId: profileId,
-    });
-  }
-  const rows = await getAssessmentEligibleTopics(db, profileId);
+  // [WI-2237] The accepted-visibility authorization is now embedded in the
+  // eligibility read itself: `getAssessmentEligibleTopics` injects `accessGuard`
+  // (the same correlated `acceptedSupporterAccessExists` EXISTS threaded to the
+  // other supporter-scoped reads in this file) into its primary query WHERE, so
+  // the read is default-deny within the SAME query — a revoke/restamp/lapse is
+  // honored by the read, not by an earlier separate pre-check.
+  const rows = await getAssessmentEligibleTopics(db, profileId, accessGuard);
 
   return rows.slice(0, 20).map((row) => ({
     id: row.topicId,

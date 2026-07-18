@@ -17,6 +17,7 @@ import {
   inArray,
   or,
   sql,
+  type SQL,
 } from 'drizzle-orm';
 import { z } from 'zod';
 import {
@@ -749,9 +750,25 @@ export async function getTopicRetention(
   return card ? mapRetentionCardRow(card) : null;
 }
 
+/**
+ * [WI-2237] `accessGuard` is an optional correlated-visibility predicate
+ * (a `SQL` EXISTS built by the caller, e.g. now-feed's
+ * `acceptedSupporterAccessExists`) that supporter-scoped callers inject into
+ * the PRIMARY query's WHERE, so the eligibility read itself is default-deny —
+ * it returns nothing when the supporter's visibility contract is not accepted,
+ * with the authorization evaluated as part of the SAME query as the read (no
+ * separate pre-check window). Self-scope callers pass nothing and are
+ * unaffected.
+ *
+ * Guarding only the primary query is complete: the two follow-up reads
+ * (`findOwnedCurriculumTopics`, `assessments.findMany`) are keyed on
+ * `topicIds`/`ownedTopicIds` derived from this guarded result, so an empty
+ * primary yields no topic ids and neither follow-up query runs.
+ */
 export async function getAssessmentEligibleTopics(
   db: Database,
   profileId: string,
+  accessGuard?: SQL,
 ): Promise<AssessmentEligibleTopic[]> {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
@@ -782,6 +799,7 @@ export async function getAssessmentEligibleTopics(
         inArray(learningSessions.status, ['completed', 'auto_closed']),
         gte(learningSessions.exchangeCount, MIN_EXCHANGES_FOR_TOPIC_COMPLETION),
         gte(learningSessions.endedAt, cutoff),
+        accessGuard,
       ),
     )
     .orderBy(desc(learningSessions.lastActivityAt));
