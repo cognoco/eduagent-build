@@ -43,7 +43,7 @@ function SecurityRow({
       accessibilityRole="button"
       testID={testID}
     >
-      <View>
+      <View className="flex-1 min-w-0 pr-3" testID={`${testID}-label-column`}>
         <Text className="text-body text-text-primary">{label}</Text>
         {targetName ? (
           <Text className="text-body-sm text-text-secondary mt-0.5">
@@ -51,7 +51,10 @@ function SecurityRow({
           </Text>
         ) : null}
       </View>
-      <Text className="text-body text-text-secondary">
+      <Text
+        className="text-body text-text-secondary shrink-0"
+        testID={`${testID}-indicator`}
+      >
         {expanded ? 'v' : '>'}
       </Text>
     </Pressable>
