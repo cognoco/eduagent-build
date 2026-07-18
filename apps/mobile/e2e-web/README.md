@@ -36,6 +36,8 @@ Local API mode starts `wrangler dev` unless `PLAYWRIGHT_SKIP_LOCAL_API=1` is set
 
 Before `expo export`, the web server rewrites `apps/mobile/.env.local` and `apps/mobile/.env.development.local` so the built web bundle uses the same API URL as the Playwright seed helpers. Set `PLAYWRIGHT_API_URL` to override it; `EXPO_PUBLIC_API_URL` is accepted as a fallback for compatibility. If neither is set, local mode uses `http://127.0.0.1:8787` and staging mode uses the default shared test API.
 
+The export also sets `EXPO_PUBLIC_E2E=true`, enabling guarded browser-test hosts such as `/quiz/dev-only/results`. Non-E2E builds redirect those routes to the app home screen.
+
 ### Mentor Chrome audit registry smoke
 
 Opt-in project that iterates over every `mentor-audit-*` seed scenario in
@@ -92,6 +94,7 @@ the export process tree before exiting.
 | `smoke-auth` | Anonymous auth navigation and sign-up form smoke tests. |
 | `smoke-learner` | Seeded learner home and UX crawl. |
 | `smoke-parent` | Seeded parent home smoke. |
+| `smoke-accessibility` | Production quiz-results exit semantics, focus, keyboard/pointer activation, routing, and repeat suppression. |
 | `role-transitions` | Parent/child drill-down and back-chain journeys J04-J07. |
 | `later-phases` | J08-J19 journey coverage, auth W03, and navigation W01-W05. |
 
