@@ -13,6 +13,7 @@ import {
   type Href,
 } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Text, View } from 'react-native';
 import type {
   CompleteRoundResponse,
@@ -69,6 +70,7 @@ interface NavigationStorage {
 }
 
 function SeededQuizResults(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const { freeze } = useLocalSearchParams<{ freeze?: string }>();
   const { setActivityType, setCompletionResult, setReturnTo, setRound } =
@@ -115,7 +117,7 @@ function SeededQuizResults(): React.ReactElement {
   if (!ready) {
     return (
       <View testID="quiz-results-e2e-loading">
-        <Text>Preparing quiz results…</Text>
+        <Text>{t('quiz.launch.loadingAlmost')}</Text>
       </View>
     );
   }
