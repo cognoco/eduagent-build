@@ -203,6 +203,15 @@ export default defineConfig({
       },
     },
     {
+      name: 'smoke-accessibility',
+      dependencies: ['setup'],
+      testMatch: /flows[\\/]accessibility[\\/]quiz-results-exits\.spec\.ts/,
+      fullyParallel: false,
+      use: {
+        storageState: path.join(e2eWebDir, '.auth', 'solo-learner.json'),
+      },
+    },
+    {
       name: 'role-transitions',
       dependencies: ['setup'],
       testMatch: /flows[\\/]journeys[\\/]j0[4-7]-.*\.spec\.ts/,

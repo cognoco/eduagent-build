@@ -15,6 +15,7 @@ test('applyExpoPublicEnvOverrides writes API URL and explicit mode-nav flags', (
     ].join('\n'),
     {
       EXPO_PUBLIC_API_URL: 'https://api-stg.mentomate.com',
+      EXPO_PUBLIC_E2E: 'true',
       EXPO_PUBLIC_ENABLE_MODE_NAV: 'true',
       EXPO_PUBLIC_ENABLE_MODE_NAV_V1: 'true',
       EXPO_PUBLIC_ENABLE_MODE_NAV_V2: 'true',
@@ -25,6 +26,7 @@ test('applyExpoPublicEnvOverrides writes API URL and explicit mode-nav flags', (
     result,
     /^EXPO_PUBLIC_API_URL="https:\/\/api-stg\.mentomate\.com"$/m,
   );
+  assert.match(result, /^EXPO_PUBLIC_E2E="true"$/m);
   assert.match(result, /^EXPO_PUBLIC_ENABLE_MODE_NAV="true"$/m);
   assert.match(result, /^EXPO_PUBLIC_ENABLE_MODE_NAV_V1="true"$/m);
   assert.match(result, /^EXPO_PUBLIC_ENABLE_MODE_NAV_V2="true"$/m);
@@ -38,4 +40,5 @@ test('applyExpoPublicEnvOverrides only writes mode-nav flags explicitly provided
 
   assert.match(result, /^EXPO_PUBLIC_API_URL="http:\/\/127\.0\.0\.1:8787"$/m);
   assert.doesNotMatch(result, /EXPO_PUBLIC_ENABLE_MODE_NAV/);
+  assert.doesNotMatch(result, /EXPO_PUBLIC_E2E/);
 });
