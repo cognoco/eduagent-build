@@ -213,7 +213,7 @@ A fresh `git fetch origin main` kept `origin/main` at `acfe90399eb5b38f13db205e6
 - `pnpm prepush` — exit 0; `tsc --build` completed successfully.
 - `pnpm format:check` — exit 0; all three configured format targets passed. A direct Prettier check of every changed source, test, artifact, and Markdown file also passed.
 - `git diff --check` — exit 0 with no output.
-- Non-mutating `complete --validate` — exit 0; all four sections, three prose trip-wires, evidence presence, and AC coverage reported `PASS`; the command confirmed that it performed no Notion writes.
+- Non-mutating `rtk bun /home/vetinari/.codex/plugins/cache/zdx-marketplace/cosmo/0.8.2/skills/execute/execute.ts complete .workitem-artifacts/WI-2094 green --validate` — exit 0; all four sections, three prose trip-wires, evidence presence, and AC coverage reported `PASS`; the command confirmed that it performed no Notion writes.
 - Prospective authoritative audit — `splitAcItems()` returned only `AC-1`; claim indices 0–3 and the Bug red-green pointer each resolved to their exact canonical path against the final-to-be-tracked file set. The same audit is rerun against the committed reviewed revision after commit.
 
 The environment remains Node `v24.18.0` with pnpm `10.19.0` against the repository's Node 22 engine request. The engine warning was present on pnpm commands but no verification command failed.

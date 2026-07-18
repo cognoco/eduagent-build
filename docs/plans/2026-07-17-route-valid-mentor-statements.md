@@ -4,7 +4,7 @@ date: 2026-07-17
 profile: code
 work_items: [WI-2094]
 spec: _wip/mvp-roadmap/refinements/refine-BID-13-mentor.md
-status: done
+status: complete
 ---
 
 # Route Valid Mentor Statements — Implementation Plan
@@ -71,7 +71,7 @@ Out of scope:
   rtk pnpm prepush
   rtk pnpm format:check
   rtk git diff --check
-  rtk bun /home/vetinari/.codex/plugins/cache/zdx-marketplace/cosmo/0.8.2/skills/execute/execute.ts complete .workitem-artifacts/WI-2094 --validate
+  rtk bun /home/vetinari/.codex/plugins/cache/zdx-marketplace/cosmo/0.8.2/skills/execute/execute.ts complete .workitem-artifacts/WI-2094 green --validate
   ```
 
 - [x] T5: Audit evidence and prepare handoff — done when `splitAcItems` output is recorded, every manifest claim uses a valid ordinal and a grammar-compatible resolvable pointer, GC1 reasons state why each real hook/context cannot run in this isolated route test while the GC6 partial-mock shape remains intact, the final commit file set is explicit, and the diff stays inside scope. Commit and explicit branch push then use the repository commit workflow without PR or lifecycle completion.
