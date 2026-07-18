@@ -4,6 +4,13 @@
 > `scheduledDeletion` Inngest function → `executeDeletionV2`. Written against
 > post-WI-1985 behavior (guardianship/supportership edge teardown extended to
 > every hard-delete path, not just whole-org erasure).
+>
+> This runbook governs **server-side** subject erasure only — the DB hard-delete
+> transaction plus the external Clerk-login and subscription-store teardown legs.
+> It does **not** cover on-device client cache lifecycle (the mobile
+> query-persister / sign-out purge) or telemetry payload scrubbing; those govern
+> different surfaces, and none of the irreversible-boundary claims below depend
+> on their behavior.
 
 ## Boundary Summary Table
 
@@ -76,6 +83,27 @@ roll back the statutory auto-erasure pipelines (consent-withdrawal, day-30
 no-consent, archived-cleanup). Post-WI-1985, every hard-delete path — org-wide
 or person-scoped — tears down its incident edges first.
 
+### Consent-DENY is abort-based over any live grant
+
+A consent **denial** (`processConsentResponseV2` deny branch,
+`consent-v2.ts:697-760`) hard-deletes the charge person by cascade — but only
+when the person holds **no** live `consent_grant`. Unlike the erasure paths,
+the deny path does **not** re-home grants first, so it leans on the
+`consent_grant.charge_person_id ON DELETE RESTRICT` FK (`deletion-v2.ts:9-10`):
+if any live grant still exists, that FK aborts the whole deny transaction before
+the person can be deleted (`consent-v2.ts:744-753` documents this fail-safe).
+
+Operator-ruled canon (WI-1193 / WI-1442 AC-4, **Option B**): **a deny never
+deletes a person who holds any live grant — same lawful basis included**, not
+only a different-basis grant (the earlier WI-1442 guardrail aborted only on a
+different basis; Option B removed WI-1193's unconditional same-basis re-home, so
+both now abort). The only flows that delete a live-grant holder are the
+**deliberate withdrawal / erasure** paths, which migrate the grant to
+`consent_receipt` first (`deletion-v2.ts:484-513`); a DENY migrates nothing and
+aborts instead. Rationale: guardian-addressed consent tokens cannot target a
+self-consenting adult, and the irreversibility asymmetry favors fail-closed —
+do not delete on denial while consent evidence is still live.
+
 ## 3. What survives deletion — retained artifacts
 
 These rows are written **inside** the same transaction that deletes the
@@ -95,6 +123,28 @@ an incident response.
 **Not retained** (hard-deleted, no retain tier): guardianship/supportership
 edges, the `subscription` row(s), the `person`/`organization` rows themselves,
 and the matching `byok_waitlist` row.
+
+### Design constraint: the deletion record must survive a DB restore (Q6 deletion supremacy)
+
+All three retained artifacts above are written **inside the same Postgres
+transaction** and therefore live in the **same database**. That makes them
+durable against any in-app reversal (Section 2) but **not** against a database
+point-in-time (PITR) restore: restoring the database to a moment before the
+deletion rolls the whole DB back — including these records — so a deleted
+person/org would be resurrected and the `deletion_audit` proving the erasure
+would vanish with it. The current deletion record is **inside** the restore
+blast radius.
+
+Operator-ruled canon (Canon-pass Q6, deletion supremacy): the deletion record
+must be **durable outside the DB-restore blast radius**, so that any deletion
+recorded since a restore point can be **re-applied** after a restore rather than
+silently undone. `WI-2056` (post-restore deletion replay) and `WI-2057` (future
+deletion primitives) are the intended consumers of such a record; `WI-2390`
+(T3 deletion-recovery hardening) is the adjacent hardening item — reconcile any
+overlap at its triage, not here. Until a blast-radius-external record exists,
+treat a PITR restore as capable of resurrecting erased subjects: after any
+restore, cross-check against an out-of-band deletion log before assuming the
+restored state is GDPR-clean.
 
 ## 4. Export-before-delete UX expectation
 
@@ -143,31 +193,51 @@ attempt, then again on final exhaustion:
   idempotent success (`clerk-user.ts:293-302`) — the identity is already gone.
 - **Clerk erasure, terminal**: once all 5 Inngest retries on `delete-clerk-user`
   are exhausted, the function-level `onFailure` fires
-  (`account-deletion.ts:40-78`): a structured `logger.error` plus a
-  `captureException` tagged `surface: account-deletion.terminal_failure`, with
-  `accountId`, `runId`, and an explicit hint: *"DB cascade may have completed
-  while external erasure work survives (Clerk login identity and/or
-  subscription provider teardown) — GDPR Art 17 erasure half-completed.
-  Inspect the Inngest run to determine which step failed and finish the
-  erasure manually."*
+  (`account-deletion.ts:40-78`). It emits two signals: a structured
+  `logger.error('account_deletion.terminal_failure', …)` carrying `accountId`,
+  `runId`, `reason: 'handler_retries_exhausted'`, and `errorName`
+  (`account-deletion.ts:51-58`); and a `captureException` whose
+  `surface: 'account-deletion.terminal_failure'`, `accountId`, `runId`, and an
+  explicit hint (*"DB cascade may have completed while external erasure work
+  survives … GDPR Art 17 erasure half-completed …"*) are placed in the
+  event's **`extra`** object, **not** in Sentry tags
+  (`account-deletion.ts:59-76`). This distinction matters for search — see the
+  remediation note below.
 - **Subscription store teardown, terminal**: its own `onFailure`
-  (`billing-subscription-store-teardown.ts:24-59`) captures to Sentry tagged
-  `surface: billing-subscription-store-teardown.terminal_failure` with the same
-  `accountId` / `runId` shape.
+  (`billing-subscription-store-teardown.ts:24-59`) emits the same two signals:
+  `logger.error('billing.store_teardown.terminal_failure', …)` with
+  `accountId` / `runId` / `errorName`, and a `captureException` whose
+  `surface: 'billing-subscription-store-teardown.terminal_failure'` /
+  `accountId` / `runId` are likewise in the event's **`extra`** object, not
+  tags (`billing-subscription-store-teardown.ts:35-50`).
 
 ### Where it lands
 
-**Sentry only.** Both terminal-failure handlers return a plain status object
-(`{ status: 'terminal_failure', accountId }`) from `onFailure` — this is
-visible in the Inngest dashboard for that specific run, but nothing durable is
-re-dispatched. There is no queryable event stream of "accounts with a
-half-completed erasure" independent of Sentry issue search.
+**Sentry + structured logs, but no durable dead-letter event.** Each
+terminal-failure handler emits a Sentry exception (surface in `extra`) and a
+structured `logger.error` (queryable by event name in the logging backend), and
+returns a plain status object (`{ status: 'terminal_failure', accountId }`) from
+`onFailure` visible in the Inngest dashboard for that run. What is missing is a
+**durable, re-dispatched dead-letter event** an ops consumer could subscribe to
+or alert on: nothing re-emits "this account has a half-completed erasure" as a
+first-class Inngest event (see Known gap / TODO). So detection depends on
+someone querying the logs / Sentry, not on a signal that pages on its own.
 
 ### Operator remediation steps
 
-1. In Sentry, search for `surface:account-deletion.terminal_failure` (Clerk
-   leg) or `surface:billing-subscription-store-teardown.terminal_failure`
-   (subscription-store leg). Note the `accountId` and `runId`.
+1. Locate the terminal failure. The reliable locator is the **structured log
+   event**, not a Sentry tag: query the logging backend for
+   `account_deletion.terminal_failure` (Clerk leg) or
+   `billing.store_teardown.terminal_failure` (subscription-store leg) and read
+   `accountId` / `runId` off the record. In Sentry the same failures appear as
+   exceptions, but their `surface` value lives in the event's `extra` data, **not
+   in tags** — so a `surface:account-deletion.terminal_failure` /
+   `surface:billing-subscription-store-teardown.terminal_failure` **tag** query
+   returns nothing. To find them in Sentry, search the additional-data /
+   full-text for that surface string rather than using the `surface:` tag
+   filter. (Only the *per-attempt* Clerk captures are genuinely tagged —
+   `surface:clerk_delete` — and those are retry noise, not the terminal signal.)
+   Note the `accountId` and `runId`.
 2. Open the Inngest run (`runId`) and inspect which step failed and why (rate
    limit, expired `CLERK_SECRET_KEY`, Stripe/RevenueCat outage, etc.).
 3. Confirm the DB side is actually gone: `organizationExistsV2` should be
@@ -182,9 +252,22 @@ half-completed erasure" independent of Sentry issue search.
      unavailable). A 404 confirms it was already erased.
    - **Subscription store**: manually cancel the Stripe subscription /
      RevenueCat entitlement using the `stripeSubscriptionId` /
-     `revenuecatOriginalAppUserId` captured in the original
-     `getSubscriptionStoreTeardownTargetsV2` snapshot (visible in the Inngest
-     event payload for `app/billing.subscription_store_teardown_requested`).
+     `revenuecatOriginalAppUserId` from the teardown targets. The durable,
+     always-present source is the **`capture-subscription-store-teardown-targets`
+     step output in the account-deletion run** itself
+     (`account-deletion.ts:148-154` → `getSubscriptionStoreTeardownTargetsV2`) —
+     it is computed before the DB commit and persists in the run regardless of
+     what happened downstream. The `app/billing.subscription_store_teardown_requested`
+     event payload carries the *same* targets, but **only if that event was
+     actually dispatched**: the dispatch is itself a retried step
+     (`step.sendEvent('request-subscription-store-teardown', …)`,
+     `account-deletion.ts:180-191`), so if it exhausts its retries after the DB
+     commit, no teardown event — and therefore no
+     `billing-subscription-store-teardown.terminal_failure` — is ever produced;
+     the failure surfaces as `account-deletion.terminal_failure` instead. In
+     that case do **not** look for the teardown event payload (there is none);
+     read the IDs from the account-deletion run's
+     `capture-subscription-store-teardown-targets` step output.
 5. Once resolved, resolve the Sentry issue manually — nothing in-app clears it.
 
 ### Known gap / TODO
