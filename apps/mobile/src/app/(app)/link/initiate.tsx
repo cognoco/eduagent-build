@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
@@ -74,6 +74,16 @@ export default function InitiateLinkScreen(): React.ReactElement {
     parseRelation(firstParam(params.relation)),
   );
 
+  // [WI-2188 rework] `createMutation.reset()` (in the confirmation Back
+  // handler below) only clears TanStack Query's *observer* state — it does
+  // not cancel an already in-flight request. Without this guard, a create
+  // request that resolves successfully AFTER the user has backed out still
+  // ran its unconditional `onSuccess`, pulling them forward into the
+  // contract screen they had just exited. Set on Back, checked in
+  // `onSuccess`, and cleared before every new submit so a later, deliberate
+  // create still navigates normally.
+  const hasExitedRef = useRef(false);
+
   const createMutation = useMutation({
     mutationFn: async () => {
       const supporterPersonId = activeProfile?.id;
@@ -92,6 +102,7 @@ export default function InitiateLinkScreen(): React.ReactElement {
       return visibilityContractSchema.parse(await okRes.json());
     },
     onSuccess: (contract) => {
+      if (hasExitedRef.current) return;
       router.replace({
         pathname: '/(app)/link/[contractId]',
         params: {
@@ -186,6 +197,11 @@ export default function InitiateLinkScreen(): React.ReactElement {
           // the picker and re-selecting a person re-renders the confirmation
           // step with the stale error already showing, before this attempt
           // has submitted anything.
+          //
+          // reset() does not cancel a request already in flight — mark that
+          // the user has exited so a late-resolving success (see
+          // `hasExitedRef` above) cannot navigate them forward again.
+          hasExitedRef.current = true;
           createMutation.reset();
           setTarget(null);
         }}
@@ -221,7 +237,10 @@ export default function InitiateLinkScreen(): React.ReactElement {
         accessibilityRole="button"
         accessibilityLabel={t('visibility.link.createAction')}
         className="min-h-[48px] items-center justify-center rounded-button bg-primary px-4 py-3"
-        onPress={() => createMutation.mutate()}
+        onPress={() => {
+          hasExitedRef.current = false;
+          createMutation.mutate();
+        }}
         testID="visibility-link-create"
       >
         <Text className="text-body font-semibold text-text-inverse">
@@ -236,7 +255,10 @@ export default function InitiateLinkScreen(): React.ReactElement {
           message={formatApiError(createMutation.error)}
           primaryAction={{
             label: t('common.tryAgain'),
-            onPress: () => createMutation.mutate(),
+            onPress: () => {
+              hasExitedRef.current = false;
+              createMutation.mutate();
+            },
             testID: 'visibility-link-create-retry',
           }}
           testID="visibility-link-create-error"

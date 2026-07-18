@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import {
   ERROR_RESPONSES,
@@ -450,6 +450,62 @@ describe('InitiateLinkScreen', () => {
       expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
         1,
       );
+    });
+
+    // [WI-2188 rework] Bug RGR — the confirmation Back handler resets the
+    // mutation's *observer* state (`createMutation.reset()`), but that does
+    // not cancel an already in-flight create request. Its unconditional
+    // `onSuccess` previously fired `router.replace(...)` regardless, so a
+    // request that resolved successfully AFTER the user had already backed
+    // out pulled them forward into the contract screen. This is the
+    // loading/pending-state exit AC-2/AC-4 require.
+    it('pressing back while the create request is pending prevents a late-resolving success from navigating forward', async () => {
+      let resolveCreate: (value: unknown) => void = () => undefined;
+      const pendingCreate = new Promise((resolve) => {
+        resolveCreate = resolve;
+      });
+      const InitiateLinkScreen = require('./initiate').default;
+      const rendered = renderScreen(<InitiateLinkScreen />, {
+        profile: NAMED_PROFILES.guardian,
+        profiles: [NAMED_PROFILES.guardian, NAMED_PROFILES.linkedChild],
+        routes: {
+          '/visibility/links': () => pendingCreate,
+        },
+      });
+      cleanupRender = rendered.cleanup;
+      const { routedFetch } = rendered;
+
+      fireEvent.press(
+        screen.getByTestId(
+          `visibility-link-initiate-picker-managed-${NAMED_PROFILES.linkedChild.id}`,
+        ),
+      );
+      fireEvent.press(screen.getByTestId('visibility-link-create'));
+
+      // The request is now in flight (pending) — the mutationFn is blocked
+      // on `pendingCreate`, which we control from here.
+      await waitFor(() =>
+        expect(
+          fetchCallsMatching(routedFetch, '/visibility/links'),
+        ).toHaveLength(1),
+      );
+
+      // Exit the confirmation step while still pending.
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-confirm-back'),
+      );
+      screen.getByTestId('visibility-link-initiate-picker');
+      expect(mockReplace).not.toHaveBeenCalled();
+
+      // Now let the request resolve successfully, after the user has left.
+      await act(async () => {
+        resolveCreate(CONTRACT);
+        await pendingCreate;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(mockReplace).not.toHaveBeenCalled();
+      screen.getByTestId('visibility-link-initiate-picker');
     });
 
     it('the existing-teen invite branch (V2 on) back button returns to the picker', () => {
