@@ -4,6 +4,7 @@ import { pressableClick } from '../../helpers/pressable';
 import { authStateDir } from '../../helpers/runtime';
 import { readSeedData } from '../../helpers/seed-data';
 import { emulateNativeTopSafeArea } from '../../helpers/native-safe-area';
+import { tokens, type ColorScheme } from '../../../src/lib/design-tokens';
 
 test.use({ storageState: path.join(authStateDir, 'solo-learner.json') });
 
@@ -113,17 +114,37 @@ async function expectNestedNavigatorOnSemanticBackground(
 async function expectNestedNavigatorTransitionFramesStaySemantic(
   page: Page,
   {
+    expectedColorScheme,
     triggerTestId,
     sourceStateSelector,
     targetStateSelector,
     targetPathname,
   }: {
+    expectedColorScheme: ColorScheme;
     triggerTestId: string;
     sourceStateSelector: string;
     targetStateSelector: string;
     targetPathname: string;
   },
 ): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page
+          .getByTestId('app-root-view')
+          .evaluate((appRoot) =>
+            getComputedStyle(appRoot)
+              .getPropertyValue('--color-background')
+              .trim()
+              .toLowerCase(),
+          ),
+      {
+        message: `active semantic background did not hydrate to ${expectedColorScheme}`,
+        timeout: 60_000,
+      },
+    )
+    .toBe(tokens[expectedColorScheme].colors.background.toLowerCase());
+
   const observation = await page.evaluate(
     async (options) => {
       const appRoot = document.querySelector<HTMLElement>(
@@ -529,6 +550,7 @@ for (const colorScheme of ['dark', 'light'] as const) {
           timeout: 60_000,
         });
         await expectNestedNavigatorTransitionFramesStaySemantic(page, {
+          expectedColorScheme: colorScheme,
           triggerTestId: 'account-avatar-button',
           sourceStateSelector: '[data-testid="mentor-screen"]',
           targetStateSelector: '[data-testid="account-screen"]',
@@ -538,6 +560,7 @@ for (const colorScheme of ['dark', 'light'] as const) {
           timeout: 60_000,
         });
         await expectNestedNavigatorTransitionFramesStaySemantic(page, {
+          expectedColorScheme: colorScheme,
           triggerTestId: 'account-back',
           sourceStateSelector: '[data-testid="account-screen"]',
           targetStateSelector: '[data-testid="mentor-screen"]',

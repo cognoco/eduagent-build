@@ -21,3 +21,11 @@ The corresponding unit production-only revert produced six expected failures: da
 The production change is limited to the three previously bare nested navigators: subject-hub, account, and practice. It does not change the V2 root safe-area registry, padding calculations, fixed-chrome measurements, tab scene layout, route ownership, or component positioning introduced by WI-2185.
 
 The browser fixtures use only seeded synthetic learner and supporter data. No production data is referenced.
+
+## Post-merge verifier rework
+
+Independent verification of PR #2237's pinned landed revision ran the complete forced-fresh W05/J03 set with the local API, one worker, and zero retries. Fourteen of 15 cases passed. The single failure was the named dark/wide W05 transition case: its oracle froze the light semantic value `rgb(250, 245, 238)` immediately after navigation commit, while 14 later samples had already hydrated to the correct dark semantic value `rgb(26, 26, 62)`. All direct/reload subject-hub, practice, account, chrome, and J03 assertions remained green, isolating the defect to expected-value timing in the transition proof.
+
+The rework keeps production code unchanged. Before clicking or freezing the transition oracle, the W05 helper now polls the app root's `--color-background` until it equals the expected scheme from the canonical design tokens. It then preserves the existing exact-path synchronization and 30-consecutive-frame assertions.
+
+In the identical forced-fresh local posture, the exact named dark/wide case passed all 3 cases including its two setup dependencies in 1.2 minutes, with one worker and zero retries. The complete W05/J03 rerun then passed all 15 cases in 3.2 minutes under the same one-worker, zero-retry posture. TypeScript build, focused ESLint, and Prettier checks also passed.
