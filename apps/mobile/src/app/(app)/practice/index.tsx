@@ -242,6 +242,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 18,
   },
+  quizBrowseAction: {
+    minHeight: 44,
+  },
   quizOption: {
     minHeight: 128,
     borderRadius: 18,
@@ -689,37 +692,43 @@ export default function PracticeScreen(): React.ReactElement {
 
           <View className="gap-3">
             <SectionLabel>{t('practiceHub.sections.quiz')}</SectionLabel>
-            <Pressable
-              className="active:opacity-80"
+            <View
               style={[
                 styles.quizCard,
                 {
                   borderColor: colors.quizBorder,
                   backgroundColor: colors.quizBg,
                 },
-                pointerStyle(),
               ]}
-              onPress={openQuiz}
-              accessibilityRole="button"
+              role="group"
               accessibilityLabel={t('practiceHub.quiz.title')}
-              accessibilityHint={t('practiceHub.quiz.hintOpenQuiz')}
-              testID="practice-quiz"
+              testID="practice-quiz-group"
             >
-              <View className="flex-row items-start justify-between">
-                <View className="flex-1 pr-3">
-                  <Text className="text-h2 font-bold text-text-primary">
-                    {t('practiceHub.quiz.title')}
-                  </Text>
-                  <Text className="mt-2 text-body-sm text-text-secondary">
-                    {quizSubtitle}
-                  </Text>
+              <Pressable
+                className="active:opacity-80"
+                style={[styles.quizBrowseAction, pointerStyle()]}
+                onPress={openQuiz}
+                accessibilityRole="button"
+                accessibilityLabel={t('practiceHub.quiz.title')}
+                accessibilityHint={t('practiceHub.quiz.hintOpenQuiz')}
+                testID="practice-quiz"
+              >
+                <View className="flex-row items-start justify-between">
+                  <View className="flex-1 pr-3">
+                    <Text className="text-h2 font-bold text-text-primary">
+                      {t('practiceHub.quiz.title')}
+                    </Text>
+                    <Text className="mt-2 text-body-sm text-text-secondary">
+                      {quizSubtitle}
+                    </Text>
+                  </View>
+                  {!statsError ? (
+                    <CueChip strong testID="practice-quiz-xp" colors={colors}>
+                      {t('practiceHub.xpLabel', { xp: totalXp })}
+                    </CueChip>
+                  ) : null}
                 </View>
-                {!statsError ? (
-                  <CueChip strong testID="practice-quiz-xp" colors={colors}>
-                    {t('practiceHub.xpLabel', { xp: totalXp })}
-                  </CueChip>
-                ) : null}
-              </View>
+              </Pressable>
               <View className="mt-4 flex-row gap-3">
                 <Pressable
                   className="flex-1 active:opacity-80"
@@ -731,10 +740,7 @@ export default function PracticeScreen(): React.ReactElement {
                     },
                     pointerStyle(),
                   ]}
-                  onPress={(event) => {
-                    event?.stopPropagation?.();
-                    openQuizActivity('capitals');
-                  }}
+                  onPress={() => openQuizActivity('capitals')}
                   accessibilityRole="button"
                   accessibilityLabel={t('practiceHub.quiz.capitals')}
                   testID="practice-quiz-capitals"
@@ -773,10 +779,7 @@ export default function PracticeScreen(): React.ReactElement {
                     },
                     pointerStyle(),
                   ]}
-                  onPress={(event) => {
-                    event?.stopPropagation?.();
-                    openQuizActivity('guess_who');
-                  }}
+                  onPress={() => openQuizActivity('guess_who')}
                   accessibilityRole="button"
                   accessibilityLabel={t('practiceHub.quiz.guessWho')}
                   testID="practice-quiz-guess-who"
@@ -806,7 +809,7 @@ export default function PracticeScreen(): React.ReactElement {
                   </View>
                 </Pressable>
               </View>
-            </Pressable>
+            </View>
           </View>
 
           <View className="gap-3">

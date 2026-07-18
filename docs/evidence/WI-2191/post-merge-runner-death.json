@@ -1,0 +1,868 @@
+{
+  "config": {
+    "configFile": "apps/mobile/playwright.config.ts",
+    "rootDir": "apps/mobile/e2e-web",
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": "apps/mobile/e2e-web/helpers/global-setup.ts",
+    "globalTeardown": "apps/mobile/e2e-web/helpers/global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "runId": "playwright-1784338193092-c593",
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338193092-c593",
+          "actualWorkers": 1
+        },
+        "id": "setup",
+        "name": "setup",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/helpers[\\\\/]auth\\.setup\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338193092-c593",
+          "actualWorkers": 1
+        },
+        "id": "smoke-auth",
+        "name": "smoke-auth",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]auth[\\\\/](auth-navigation|sign-up-flow)\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338193092-c593",
+          "actualWorkers": 1
+        },
+        "id": "auth-access",
+        "name": "auth-access",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]auth[\\\\/](a02-signup-verification-ui|a03-forgot-password-ui|a05-mfa-verification-ui|a14-slow-auth-spinner)\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338193092-c593",
+          "actualWorkers": 1
+        },
+        "id": "smoke-learner",
+        "name": "smoke-learner",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]journeys[\\\\/]j01-.*\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338193092-c593",
+          "actualWorkers": 1
+        },
+        "id": "smoke-parent",
+        "name": "smoke-parent",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]journeys[\\\\/]j03-.*\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338193092-c593",
+          "actualWorkers": 1
+        },
+        "id": "smoke-accessibility",
+        "name": "smoke-accessibility",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]accessibility[\\\\/]quiz-results-exits\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338193092-c593",
+          "actualWorkers": 1
+        },
+        "id": "role-transitions",
+        "name": "role-transitions",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]journeys[\\\\/]j0[4-7]-.*\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338193092-c593",
+          "actualWorkers": 1
+        },
+        "id": "later-phases",
+        "name": "later-phases",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/](journeys[\\\\/](j0[89]|j[1-9][0-9])-.*|auth[\\\\/]w03-.*|navigation[\\\\/]w0[1-5]-.*)\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338193092-c593",
+          "actualWorkers": 1
+        },
+        "id": "child-subject-detail",
+        "name": "child-subject-detail",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]navigation[\\\\/]w06-child-subject-detail\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338193092-c593",
+          "actualWorkers": 1
+        },
+        "id": "mentor-audit-registry-smoke",
+        "name": "mentor-audit-registry-smoke",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]mentor-audit[\\\\/].+\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338193092-c593",
+          "actualWorkers": 1
+        },
+        "id": "config-f-smoke",
+        "name": "config-f-smoke",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]config-f[\\\\/].+\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.56.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "helpers/auth.setup.ts",
+      "file": "helpers/auth.setup.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "seed onboarding-complete and capture solo-learner storage state",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12165,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:30:38.694Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "24f9ee9347290e4420b0-d9aaca8550141091b7c4",
+          "file": "helpers/auth.setup.ts",
+          "line": 24,
+          "column": 8
+        },
+        {
+          "title": "seed parent-multi-child and capture owner-with-children storage state",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "setup",
+              "projectName": "setup",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 14226,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:30:50.956Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "24f9ee9347290e4420b0-3b471a06b9232a52dc81",
+          "file": "helpers/auth.setup.ts",
+          "line": 24,
+          "column": 8
+        }
+      ]
+    },
+    {
+      "title": "flows/journeys/j10-practice-quiz-cycle.spec.ts",
+      "file": "flows/journeys/j10-practice-quiz-cycle.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "J-10 learner → Practice → Quiz → launch → play → results → home",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 30207,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:31:06.098Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "616954023f516c737710-13fff5e6287f9b6b4ece",
+          "file": "flows/journeys/j10-practice-quiz-cycle.spec.ts",
+          "line": 25,
+          "column": 5
+        },
+        {
+          "title": "J-10 / QUIZ-18 cold quiz play route shows no-round recovery",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13078,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:31:36.433Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "616954023f516c737710-8e9916fc32522e06a253",
+          "file": "flows/journeys/j10-practice-quiz-cycle.spec.ts",
+          "line": 175,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "flows/journeys/j20-vocabulary-quiz-answer-mapping.spec.ts",
+      "file": "flows/journeys/j20-vocabulary-quiz-answer-mapping.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "J-20 vocabulary quiz: tapped option text matches POSTed answerGiven (BUG-924)",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 40186,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\u001b[22m\n\n    at pressableClick (apps/mobile/e2e-web/helpers/pressable.ts:27:26)\n    at apps/mobile/e2e-web/flows/journeys/j20-vocabulary-quiz-answer-mapping.spec.ts:90:3",
+                    "location": {
+                      "file": "apps/mobile/e2e-web/helpers/pressable.ts",
+                      "column": 26,
+                      "line": 27
+                    },
+                    "snippet": "   at helpers/pressable.ts:27\n\n  25 |\n  26 |   for (let attempt = 0; attempt < 2; attempt += 1) {\n> 27 |     await expect(target).toBeVisible({ timeout: 15_000 });\n     |                          ^\n  28 |\n  29 |     try {\n  30 |       await target.scrollIntoViewIfNeeded();"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "apps/mobile/e2e-web/helpers/pressable.ts",
+                        "column": 26,
+                        "line": 27
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\u001b[22m\n\n\n   at helpers/pressable.ts:27\n\n  25 |\n  26 |   for (let attempt = 0; attempt < 2; attempt += 1) {\n> 27 |     await expect(target).toBeVisible({ timeout: 15_000 });\n     |                          ^\n  28 |\n  29 |     try {\n  30 |       await target.scrollIntoViewIfNeeded();\n    at pressableClick (apps/mobile/e2e-web/helpers/pressable.ts:27:26)\n    at apps/mobile/e2e-web/flows/journeys/j20-vocabulary-quiz-answer-mapping.spec.ts:90:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:31:49.526Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j20-vocabul-cdedf-POSTed-answerGiven-BUG-924--later-phases/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j20-vocabul-cdedf-POSTed-answerGiven-BUG-924--later-phases/video.webm"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j20-vocabul-cdedf-POSTed-answerGiven-BUG-924--later-phases/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j20-vocabul-cdedf-POSTed-answerGiven-BUG-924--later-phases/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "apps/mobile/e2e-web/helpers/pressable.ts",
+                    "column": 26,
+                    "line": 27
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "f7ef66bd5c76b5edb247-64917ab6b9760097186c",
+          "file": "flows/journeys/j20-vocabulary-quiz-answer-mapping.spec.ts",
+          "line": 65,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+      "file": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "[WI-2191] narrow web layout has a labelled group with non-nested 44px actions",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 7332,
+                  "error": {
+                    "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n",
+                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n    at signIn (apps/mobile/e2e-web/helpers/auth.ts:234:14)\n    at seedAndSignIn (apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3",
+                    "location": {
+                      "file": "apps/mobile/e2e-web/helpers/auth.ts",
+                      "column": 14,
+                      "line": 234
+                    },
+                    "snippet": "   at helpers/auth.ts:234\n\n  232 |     }, options.activeProfileId);\n  233 |   }\n> 234 |   await page.goto(options.landingPath ?? '/home', { waitUntil: 'commit' });\n      |              ^\n  235 |\n  236 |   try {\n  237 |     // Tap through the post-approval landing if it appears (fresh SecureStore)"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "apps/mobile/e2e-web/helpers/auth.ts",
+                        "column": 14,
+                        "line": 234
+                      },
+                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n\n   at helpers/auth.ts:234\n\n  232 |     }, options.activeProfileId);\n  233 |   }\n> 234 |   await page.goto(options.landingPath ?? '/home', { waitUntil: 'commit' });\n      |              ^\n  235 |\n  236 |   try {\n  237 |     // Tap through the post-approval landing if it appears (fresh SecureStore)\n    at signIn (apps/mobile/e2e-web/helpers/auth.ts:234:14)\n    at seedAndSignIn (apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:32:30.636Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-29bc5-ith-non-nested-44px-actions-later-phases/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-29bc5-ith-non-nested-44px-actions-later-phases/video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-29bc5-ith-non-nested-44px-actions-later-phases/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "apps/mobile/e2e-web/helpers/auth.ts",
+                    "column": 14,
+                    "line": 234
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "38bcc6117dd28e29d177-4bcf8a5fcdf8d695e565",
+          "file": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+          "line": 43,
+          "column": 7
+        },
+        {
+          "title": "[WI-2191] wide web layout has a labelled group with non-nested 44px actions",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 3,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 2672,
+                  "error": {
+                    "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n",
+                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n\n    at signIn (apps/mobile/e2e-web/helpers/auth.ts:215:14)\n    at seedAndSignIn (apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3",
+                    "location": {
+                      "file": "apps/mobile/e2e-web/helpers/auth.ts",
+                      "column": 14,
+                      "line": 215
+                    },
+                    "snippet": "   at helpers/auth.ts:215\n\n  213 |\n  214 |   await setupClerkTestingToken({ page });\n> 215 |   await page.goto('/sign-in', { waitUntil: 'commit' });\n      |              ^\n  216 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({\n  217 |     timeout: 60_000,\n  218 |   });"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "apps/mobile/e2e-web/helpers/auth.ts",
+                        "column": 14,
+                        "line": 215
+                      },
+                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n\n\n   at helpers/auth.ts:215\n\n  213 |\n  214 |   await setupClerkTestingToken({ page });\n> 215 |   await page.goto('/sign-in', { waitUntil: 'commit' });\n      |              ^\n  216 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({\n  217 |     timeout: 60_000,\n  218 |   });\n    at signIn (apps/mobile/e2e-web/helpers/auth.ts:215:14)\n    at seedAndSignIn (apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:32:38.756Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-f89fb-ith-non-nested-44px-actions-later-phases/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-f89fb-ith-non-nested-44px-actions-later-phases/video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-f89fb-ith-non-nested-44px-actions-later-phases/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "apps/mobile/e2e-web/helpers/auth.ts",
+                    "column": 14,
+                    "line": 215
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "38bcc6117dd28e29d177-9c3102cd4d1a59dd6932",
+          "file": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+          "line": 43,
+          "column": 7
+        },
+        {
+          "title": "[WI-2191] pointer, keyboard, and touch launch only the chosen quick-quiz route",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 4,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 2630,
+                  "error": {
+                    "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n",
+                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n\n    at signIn (apps/mobile/e2e-web/helpers/auth.ts:215:14)\n    at seedAndSignIn (apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3",
+                    "location": {
+                      "file": "apps/mobile/e2e-web/helpers/auth.ts",
+                      "column": 14,
+                      "line": 215
+                    },
+                    "snippet": "   at helpers/auth.ts:215\n\n  213 |\n  214 |   await setupClerkTestingToken({ page });\n> 215 |   await page.goto('/sign-in', { waitUntil: 'commit' });\n      |              ^\n  216 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({\n  217 |     timeout: 60_000,\n  218 |   });"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "apps/mobile/e2e-web/helpers/auth.ts",
+                        "column": 14,
+                        "line": 215
+                      },
+                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n\n\n   at helpers/auth.ts:215\n\n  213 |\n  214 |   await setupClerkTestingToken({ page });\n> 215 |   await page.goto('/sign-in', { waitUntil: 'commit' });\n      |              ^\n  216 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({\n  217 |     timeout: 60_000,\n  218 |   });\n    at signIn (apps/mobile/e2e-web/helpers/auth.ts:215:14)\n    at seedAndSignIn (apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:32:42.094Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-d7119-the-chosen-quick-quiz-route-later-phases/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-d7119-the-chosen-quick-quiz-route-later-phases/video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-d7119-the-chosen-quick-quiz-route-later-phases/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "apps/mobile/e2e-web/helpers/auth.ts",
+                    "column": 14,
+                    "line": 215
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "38bcc6117dd28e29d177-9161eac49601d4bde519",
+          "file": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+          "line": 90,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "flows/navigation/w01-no-bleed-through-fullscreen.spec.ts",
+      "file": "flows/navigation/w01-no-bleed-through-fullscreen.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "W-01 full-screen routes hide the tab bar and prior scene content",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 5,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 241,
+                  "error": {
+                    "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n",
+                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n    at apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:11:14",
+                    "location": {
+                      "file": "apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts",
+                      "column": 14,
+                      "line": 11
+                    },
+                    "snippet": "   9 |   page,\n  10 | }) => {\n> 11 |   await page.goto('/home', { waitUntil: 'commit' });\n     |              ^\n  12 |   await expect(page.getByTestId('learner-screen')).toBeVisible({\n  13 |     timeout: 60_000,\n  14 |   });"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts",
+                        "column": 14,
+                        "line": 11
+                      },
+                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n\n   9 |   page,\n  10 | }) => {\n> 11 |   await page.goto('/home', { waitUntil: 'commit' });\n     |              ^\n  12 |   await expect(page.getByTestId('learner-screen')).toBeVisible({\n  13 |     timeout: 60_000,\n  14 |   });\n    at apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:11:14"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:32:45.401Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases/video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts",
+                    "column": 14,
+                    "line": 11
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "f07f472d3d0782f31411-cd28f18ee9d558d6edd6",
+          "file": "flows/navigation/w01-no-bleed-through-fullscreen.spec.ts",
+          "line": 8,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "flows/navigation/w04-browser-history-stack.spec.ts",
+      "file": "flows/navigation/w04-browser-history-stack.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "W-04 practice to quiz keeps the contextual web stack coherent",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 6,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 253,
+                  "error": {
+                    "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n",
+                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n    at apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:15:14",
+                    "location": {
+                      "file": "apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts",
+                      "column": 14,
+                      "line": 15
+                    },
+                    "snippet": "  13 |   page,\n  14 | }) => {\n> 15 |   await page.goto('/home', { waitUntil: 'commit' });\n     |              ^\n  16 |   await expect(page.getByTestId('learner-screen')).toBeVisible({\n  17 |     timeout: 60_000,\n  18 |   });"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts",
+                        "column": 14,
+                        "line": 15
+                      },
+                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n\n  13 |   page,\n  14 | }) => {\n> 15 |   await page.goto('/home', { waitUntil: 'commit' });\n     |              ^\n  16 |   await expect(page.getByTestId('learner-screen')).toBeVisible({\n  17 |     timeout: 60_000,\n  18 |   });\n    at apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:15:14"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:32:46.312Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases/video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts",
+                    "column": 14,
+                    "line": 15
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "685c111c2abe24406db7-8fd5647c1e50a7f10aef",
+          "file": "flows/navigation/w04-browser-history-stack.spec.ts",
+          "line": 12,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-18T01:29:53.096Z",
+    "duration": 177295.201,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 6,
+    "flaky": 0
+  }
+}

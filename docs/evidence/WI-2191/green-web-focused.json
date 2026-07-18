@@ -1,0 +1,345 @@
+{
+  "config": {
+    "configFile": "apps/mobile/playwright.config.ts",
+    "rootDir": "apps/mobile/e2e-web",
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": "apps/mobile/e2e-web/helpers/global-setup.ts",
+    "globalTeardown": "apps/mobile/e2e-web/helpers/global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "runId": "playwright-1784338517891-3598",
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338517891-3598",
+          "actualWorkers": 1
+        },
+        "id": "setup",
+        "name": "setup",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/helpers[\\\\/]auth\\.setup\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338517891-3598",
+          "actualWorkers": 1
+        },
+        "id": "smoke-auth",
+        "name": "smoke-auth",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]auth[\\\\/](auth-navigation|sign-up-flow)\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338517891-3598",
+          "actualWorkers": 1
+        },
+        "id": "auth-access",
+        "name": "auth-access",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]auth[\\\\/](a02-signup-verification-ui|a03-forgot-password-ui|a05-mfa-verification-ui|a14-slow-auth-spinner)\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338517891-3598",
+          "actualWorkers": 1
+        },
+        "id": "smoke-learner",
+        "name": "smoke-learner",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]journeys[\\\\/]j01-.*\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338517891-3598",
+          "actualWorkers": 1
+        },
+        "id": "smoke-parent",
+        "name": "smoke-parent",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]journeys[\\\\/]j03-.*\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338517891-3598",
+          "actualWorkers": 1
+        },
+        "id": "smoke-accessibility",
+        "name": "smoke-accessibility",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]accessibility[\\\\/]quiz-results-exits\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338517891-3598",
+          "actualWorkers": 1
+        },
+        "id": "role-transitions",
+        "name": "role-transitions",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]journeys[\\\\/]j0[4-7]-.*\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338517891-3598",
+          "actualWorkers": 1
+        },
+        "id": "later-phases",
+        "name": "later-phases",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/](journeys[\\\\/](j0[89]|j[1-9][0-9])-.*|auth[\\\\/]w03-.*|navigation[\\\\/]w0[1-5]-.*)\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338517891-3598",
+          "actualWorkers": 1
+        },
+        "id": "child-subject-detail",
+        "name": "child-subject-detail",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]navigation[\\\\/]w06-child-subject-detail\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338517891-3598",
+          "actualWorkers": 1
+        },
+        "id": "mentor-audit-registry-smoke",
+        "name": "mentor-audit-registry-smoke",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]mentor-audit[\\\\/].+\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338517891-3598",
+          "actualWorkers": 1
+        },
+        "id": "config-f-smoke",
+        "name": "config-f-smoke",
+        "testDir": "apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]config-f[\\\\/].+\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.56.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+      "file": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "[WI-2191] narrow web layout has a labelled group with non-nested 44px actions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 20250,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:36:10.421Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "38bcc6117dd28e29d177-4bcf8a5fcdf8d695e565",
+          "file": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+          "line": 43,
+          "column": 7
+        },
+        {
+          "title": "[WI-2191] wide web layout has a labelled group with non-nested 44px actions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 18110,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:36:30.911Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "38bcc6117dd28e29d177-9c3102cd4d1a59dd6932",
+          "file": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+          "line": 43,
+          "column": 7
+        },
+        {
+          "title": "[WI-2191] pointer, keyboard, and touch launch only the chosen quick-quiz route",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 25590,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:36:49.054Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "38bcc6117dd28e29d177-9161eac49601d4bde519",
+          "file": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+          "line": 90,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-18T01:35:17.895Z",
+    "duration": 128972.33799999999,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

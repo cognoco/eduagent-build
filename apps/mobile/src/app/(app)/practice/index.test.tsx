@@ -340,28 +340,85 @@ describe('PracticeScreen', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('routes the quiz parent to index and nested options to direct launch', async () => {
+  it('[WI-2191] has no quick-quiz button ancestor containing Capitals or Guess Who buttons', async () => {
     mount();
     await waitFor(() => screen.getByTestId('practice-quiz'));
 
-    fireEvent.press(screen.getByTestId('practice-quiz'));
-    fireEvent.press(screen.getByTestId('practice-quiz-capitals'));
-    fireEvent.press(screen.getByTestId('practice-quiz-guess-who'));
+    const quizAction = screen.getByTestId('practice-quiz');
+    const nestedQuizButtons = quizAction
+      .findAll(
+        (node: { props?: Record<string, unknown> }) =>
+          node.props?.accessibilityRole === 'button' &&
+          typeof node.props?.testID === 'string' &&
+          node.props.testID !== 'practice-quiz',
+      )
+      .map(
+        (node: { props?: Record<string, unknown> }) =>
+          node.props?.testID as string,
+      );
 
-    expect(mockPush).toHaveBeenCalledTimes(3);
-    expect(mockPush).toHaveBeenNthCalledWith(1, {
-      pathname: '/(app)/quiz',
-      params: { returnTo: 'practice' },
-    });
-    expect(mockPush).toHaveBeenNthCalledWith(2, {
-      pathname: '/(app)/quiz/launch',
-      params: { activityType: 'capitals', returnTo: 'practice' },
-    });
-    expect(mockPush).toHaveBeenNthCalledWith(3, {
-      pathname: '/(app)/quiz/launch',
-      params: { activityType: 'guess_who', returnTo: 'practice' },
-    });
+    expect([...new Set(nestedQuizButtons)]).toEqual([]);
   });
+
+  it('[WI-2191] exposes a labelled group with three separate actions in logical read order', async () => {
+    mount();
+    await waitFor(() => screen.getByTestId('practice-quiz-group'));
+
+    const quizGroup = screen.getByTestId('practice-quiz-group');
+    const quizActionOrder = quizGroup
+      .findAll(
+        (node: { props?: Record<string, unknown> }) =>
+          node.props?.accessibilityRole === 'button' &&
+          typeof node.props?.testID === 'string',
+      )
+      .map(
+        (node: { props?: Record<string, unknown> }) =>
+          node.props?.testID as string,
+      );
+
+    expect(quizGroup.props.role).toBe('group');
+    expect(quizGroup.props.accessibilityLabel).toBe('Quick quiz');
+    expect([...new Set(quizActionOrder)]).toEqual([
+      'practice-quiz',
+      'practice-quiz-capitals',
+      'practice-quiz-guess-who',
+    ]);
+  });
+
+  it.each([
+    {
+      testID: 'practice-quiz',
+      expectedRoute: {
+        pathname: '/(app)/quiz',
+        params: { returnTo: 'practice' },
+      },
+    },
+    {
+      testID: 'practice-quiz-capitals',
+      expectedRoute: {
+        pathname: '/(app)/quiz/launch',
+        params: { activityType: 'capitals', returnTo: 'practice' },
+      },
+    },
+    {
+      testID: 'practice-quiz-guess-who',
+      expectedRoute: {
+        pathname: '/(app)/quiz/launch',
+        params: { activityType: 'guess_who', returnTo: 'practice' },
+      },
+    },
+  ])(
+    '[WI-2191] native accessibility activation of $testID launches only its chosen route once',
+    async ({ testID, expectedRoute }) => {
+      mount();
+      await waitFor(() => screen.getByTestId(testID));
+
+      fireEvent.press(screen.getByTestId(testID));
+
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      expect(mockPush).toHaveBeenCalledWith(expectedRoute);
+    },
+  );
 
   it('routes vocabulary, recitation, dictation, and quiz history to their flows', async () => {
     mount();
