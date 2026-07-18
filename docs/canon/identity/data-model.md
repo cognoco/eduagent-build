@@ -562,3 +562,68 @@ decisions ledger and the counsel-finding trail live in `_wip/identity-foundation
 | Org-scoped consent (v1) | `consent_grant.organization_id` is `NOT NULL`; `controller_role` is the clean-add future |
 | Moved-country grace | `person.residence_jurisdiction` + the sweep's grace-window consumer |
 | Three-layer authority separation (`inv 22`) | consent on `guardianship`; billing on `subscription.payer_person_id`; visibility on `supportership` |
+
+---
+
+## §8 — `person_id` mistake recovery (forward-repair doctrine)
+
+> **Amended 2026-07-18** per the operator canon-pass ruling on `WI-2055`
+> (one-way-door risk drain, T2). Read against `MMT-ADR-0007`, `0008`, `0011`,
+> `0015`, and `0020` — none of the five states or implies a rollback-based
+> recovery path, so this section amends canon directly rather than opening a
+> new ADR.
+>
+> **Scope.** This section governs recovery from a **`person_id` mistake** —
+> data attached to the wrong `person`, a bad merge, a mis-keyed write.
+> **It does not govern deletion recovery** (undoing a legitimate,
+> consent-driven or lifecycle-driven person/account deletion) — that is
+> `WI-2390`, tracked separately, out of scope here.
+
+### 8.1 Legacy rollback is retired, absolutely
+
+Rolling back to the legacy (pre-`MMT-ADR-0012` baseline-reset) schema is
+**not a recovery path for `person_id` mistakes** — not conditionally, not as
+a break-glass option. The legacy tables no longer exist post-reset (§1); a
+"rollback" would mean resurrecting a dropped schema, which is not a smaller
+or safer action than fixing forward. This retirement is absolute.
+
+### 8.2 Recovery today: Neon PITR — staged, not final
+
+Recovery from a `person_id` mistake is, today, **Neon point-in-time restore
+(PITR) / snapshot recovery** — see
+`docs/runbooks/neon-pitr-identity-recovery.md` (`WI-2056`) for the mechanics,
+the restore procedure, what it does and does not recover, and the mandatory
+deletion-replay step (§8.4).
+
+This is a **staged** position, not a permanent one. Purpose-built
+forward-repair primitives — merge, reparent, and alias operations scoped to
+`person_id` — are tracked as `WI-2057` (Backlog). This canon **names and
+links** `WI-2057`; it does not define merge/reparent/alias behavior, because
+those primitives do not exist yet. Behavior for those primitives belongs in
+`WI-2057`'s own design, not here.
+
+### 8.3 Ad hoc manual `person_id` data-surgery is prohibited
+
+Directly editing `person_id` values, or other identity-graph rows, by hand
+(one-off SQL against production, a console query, a manual patch script) is
+**prohibited** as a way to fix a `person_id` mistake. The sanctioned paths
+are: the Neon PITR runbook (§8.2, today) and, once shipped, the `WI-2057`
+primitives. Any deviation from these sanctioned paths requires an explicit
+**operator escalation** before it happens — it is never a call an agent or
+on-call engineer makes unilaterally.
+
+### 8.4 Deletion-supremacy invariant
+
+**Deletion always wins.** Any operation that recovers `person_id` mistakes —
+a PITR restore today, or a `WI-2057` primitive once it ships — **must
+re-apply every deletion recorded since the recovery's restore point** before
+the recovery is considered complete. A recovery step is never allowed to
+resurrect a person who was validly deleted after that point.
+
+This canon states the invariant only; the mechanics that satisfy it —
+the deletion-record source of truth and the replay procedure — live in the
+Neon PITR runbook (`WI-2056`, §5 of
+`docs/runbooks/neon-pitr-identity-recovery.md`), the `WI-2057` primitives
+(when they ship), and the deletion mechanics documented for `WI-2058`
+(`docs/runbooks/deletion-irreversible-boundary.md`). Canon does not carry a
+second copy of that mechanism.
