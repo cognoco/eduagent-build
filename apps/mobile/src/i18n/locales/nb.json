@@ -2515,7 +2515,6 @@
       "profileRemovedOrNoAccess": "Profilen kan ha blitt fjernet, eller du har ikke lenger tilgang",
       "backToDashboard": "Tilbake til dashbordet",
       "noAccessToProfile": "Du har ikke tilgang til denne profilen",
-      "firstReportSoon": "Den første rapporten kommer på slutten av måneden",
       "progressNudgeFreshTitle": "Spør om {{focus}} mens det er ferskt",
       "progressNudgeFreshSubtitle": "{{name}} øvde på {{focus}} {{time}}. Prøv en kort runde selv, og spør så hva som klikket.",
       "progressNudgeRecentTitle": "Hold {{focus}} varmt",
@@ -2631,8 +2630,7 @@
       "checkConnectionRetry": "Sjekk tilkoblingen din og prøv igjen",
       "weekOf": "Uke",
       "retryReports": "Prøv rapporter på nytt",
-      "firstReportArriveOn": "{{name}}s første rapport kommer den {{date}}",
-      "firstReportTimeContext": "{{name}}s første rapport {{timeContext}}"
+      "firstCombinedReportOn": "{{name}}s første ukentlige eller månedlige rapport kan komme allerede {{date}}, når det er nok læring å oppsummere."
     },
     "report": {
       "sessions": "Økter",

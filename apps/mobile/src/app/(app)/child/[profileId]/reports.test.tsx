@@ -13,6 +13,7 @@ jest.mock('react-i18next', () => ({
       }
       return key;
     },
+    i18n: { language: 'en-US' },
   }),
 }));
 
@@ -63,14 +64,28 @@ jest.mock(
 const { default: ChildReportsScreen, getNextReportInfo } =
   require('./reports') as {
     default: React.ComponentType;
-    getNextReportInfo: (now?: Date) => { date: string; timeContext: string };
+    getNextReportInfo: (
+      now?: Date,
+      locale?: string,
+      timezone?: string | null,
+    ) => {
+      date: string;
+      runAt: Date;
+    };
   };
 
 describe('ChildReportsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseChildDetail.mockReturnValue({
-      data: { displayName: 'Emma', profileId: 'child-001' },
+      data: {
+        displayName: 'Emma',
+        profileId: 'child-001',
+        organizationTimezone: null,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
     });
     mockUseChildWeeklyReports.mockReturnValue({
       data: undefined,
@@ -138,16 +153,85 @@ describe('ChildReportsScreen', () => {
     it('shows time context element', () => {
       render(<ChildReportsScreen />);
 
-      expect(
-        screen.getByTestId('child-reports-empty-time-context'),
-      ).toBeTruthy();
+      expect(screen.getByRole('summary')).toHaveProp(
+        'testID',
+        'child-reports-empty-time-context',
+      );
+      screen.getByText(/parentView\.reports\.firstCombinedReportOn:/);
     });
 
-    it('falls back to "Your child" when child detail is not loaded', () => {
-      mockUseChildDetail.mockReturnValue({ data: null });
+    it('waits for the weekly query before showing the combined empty expectation', () => {
+      mockUseChildWeeklyReports.mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        isError: false,
+        refetch: jest.fn(),
+      });
 
       render(<ChildReportsScreen />);
 
+      screen.getByText('parentView.reports.loadingReports');
+      expect(screen.queryByTestId('child-reports-empty')).toBeNull();
+    });
+
+    it('[WI-2186] waits for timezone provenance before showing a dated empty expectation', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-06-08T10:00:00.000Z'));
+
+      try {
+        mockUseChildWeeklyReports.mockReturnValue({
+          data: [],
+          isLoading: false,
+          isError: false,
+          refetch: jest.fn(),
+        });
+        mockUseChildDetail.mockReturnValue({
+          data: undefined,
+          isLoading: true,
+          isError: false,
+          refetch: jest.fn(),
+        });
+
+        const view = render(<ChildReportsScreen />);
+
+        screen.getByText('parentView.reports.loadingReports');
+        expect(
+          screen.queryByTestId('child-reports-empty-time-context'),
+        ).toBeNull();
+        expect(screen.queryByText(/June 15/)).toBeNull();
+
+        mockUseChildDetail.mockReturnValue({
+          data: {
+            displayName: 'Emma',
+            profileId: 'child-001',
+            organizationTimezone: 'America/Los_Angeles',
+          },
+          isLoading: false,
+          isError: false,
+          refetch: jest.fn(),
+        });
+        view.rerender(<ChildReportsScreen />);
+
+        screen.getByText(
+          'parentView.reports.firstCombinedReportOn:{"name":"Emma","date":"June 8, 2026"}',
+        );
+        expect(screen.queryByText(/June 15/)).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('uses the UTC/name fallback after child detail successfully resolves null', () => {
+      mockUseChildDetail.mockReturnValue({
+        data: null,
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<ChildReportsScreen />);
+
+      screen.getByTestId('child-reports-empty-time-context');
       screen.getByText(
         'parentView.reports.seeProgressNow:{"name":"parentView.index.yourChild"}',
       );
@@ -170,6 +254,31 @@ describe('ChildReportsScreen', () => {
   });
 
   describe('error state', () => {
+    it('[WI-2186] keeps failed timezone provenance distinct from an empty report state', () => {
+      const childRefetch = jest.fn();
+      mockUseChildDetail.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        refetch: childRefetch,
+      });
+      mockUseChildReports.mockReturnValue({
+        data: [],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<ChildReportsScreen />);
+
+      screen.getByTestId('child-reports-error');
+      expect(
+        screen.queryByTestId('child-reports-empty-time-context'),
+      ).toBeNull();
+      fireEvent.press(screen.getByTestId('child-reports-error-retry'));
+      expect(childRefetch).toHaveBeenCalled();
+    });
+
     it('renders error card with retry and back buttons', () => {
       const refetch = jest.fn();
       mockUseChildReports.mockReturnValue({
@@ -532,47 +641,84 @@ describe('ChildReportsScreen', () => {
 });
 
 describe('getNextReportInfo', () => {
-  it('returns "should be ready later today" on the 1st before 10:00 UTC', () => {
+  it('[WI-2186] uses the organization timezone for the next weekly delivery', () => {
+    const mondayMorningUtc = new Date('2026-06-08T10:00:00.000Z');
+    const result = getNextReportInfo(
+      mondayMorningUtc,
+      'en-US',
+      'America/Los_Angeles',
+    );
+
+    expect(result.runAt.toISOString()).toBe('2026-06-08T16:00:00.000Z');
+    expect(result.date).toContain('June 8');
+  });
+
+  it('uses the existing UTC fallback on the weekly delivery boundary', () => {
+    const beforeUtcRun = getNextReportInfo(
+      new Date('2026-06-08T08:59:59.999Z'),
+      'en-US',
+      null,
+    );
+    const atUtcRun = getNextReportInfo(
+      new Date('2026-06-08T09:00:00.000Z'),
+      'en-US',
+      null,
+    );
+
+    expect(beforeUtcRun.runAt.toISOString()).toBe('2026-06-08T09:00:00.000Z');
+    expect(atUtcRun.runAt.toISOString()).toBe('2026-06-15T09:00:00.000Z');
+  });
+
+  it('[WI-2186] chooses Monday weekly delivery instead of the later month-end schedule', () => {
+    const wednesday = new Date(Date.UTC(2026, 5, 3, 12, 0, 0));
+    const result = getNextReportInfo(wednesday);
+
+    expect(result.date).toContain('June 8');
+    expect(result.date).not.toContain('July');
+  });
+
+  it('chooses monthly delivery when the 1st arrives before next Monday', () => {
+    const tuesday = new Date(Date.UTC(2026, 8, 29, 12, 0, 0));
+    const result = getNextReportInfo(tuesday);
+
+    expect(result.date).toContain('October 1');
+    expect(result.runAt.toISOString()).toBe('2026-10-01T10:00:00.000Z');
+  });
+
+  it('returns the 1st before 10:00 UTC as the earliest monthly run', () => {
     const jan1_8am = new Date(Date.UTC(2026, 0, 1, 8, 0, 0));
     const result = getNextReportInfo(jan1_8am);
-    expect(result.date).toBe('');
-    expect(result.timeContext).toBe('should be ready later today');
+    expect(result.date).toContain('January 1');
   });
 
-  it('returns next month date on the 1st after 10:00 UTC', () => {
+  it('returns next Monday on the 1st after the monthly run', () => {
     const jan1_11am = new Date(Date.UTC(2026, 0, 1, 11, 0, 0));
     const result = getNextReportInfo(jan1_11am);
-    expect(result.timeContext).toMatch(/arrives in about \d+ days/);
-    expect(result.date).toContain('February');
+    expect(result.date).toContain('January 5');
   });
 
-  it('returns "arrives in a few days" when 3 or fewer days remain', () => {
-    // Dec 30 — 2 days until Jan 1
+  it('returns the earlier monthly run when 3 or fewer days remain', () => {
     const dec30 = new Date(Date.UTC(2025, 11, 30, 12, 0, 0));
     const result = getNextReportInfo(dec30);
-    expect(result.timeContext).toBe('arrives in a few days');
     expect(result.date).toContain('January');
   });
 
-  it('returns "arrives in about N days" when more than 3 days remain', () => {
-    // Jan 15 — ~17 days until Feb 1
+  it('returns the earlier weekly run when the monthly run is weeks away', () => {
     const jan15 = new Date(Date.UTC(2026, 0, 15, 12, 0, 0));
     const result = getNextReportInfo(jan15);
-    expect(result.timeContext).toMatch(/arrives in about \d+ days/);
-    expect(result.date).toContain('February');
+    expect(result.date).toContain('January 19');
   });
 
-  it('handles month boundary correctly for short months', () => {
-    // Feb 15 — next report is March 1
+  it('handles the weekly boundary correctly in short months', () => {
     const feb15 = new Date(Date.UTC(2026, 1, 15, 12, 0, 0));
     const result = getNextReportInfo(feb15);
-    expect(result.date).toContain('March');
+    expect(result.date).toContain('February 16');
   });
 
   it('handles year boundary (December → January)', () => {
     const dec15 = new Date(Date.UTC(2025, 11, 15, 12, 0, 0));
     const result = getNextReportInfo(dec15);
-    expect(result.date).toContain('January');
-    expect(result.date).toContain('2026');
+    expect(result.date).toContain('December 22');
+    expect(result.date).toContain('2025');
   });
 });

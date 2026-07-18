@@ -130,6 +130,7 @@ async function seedProfile(input: {
   displayName: string;
   birthYear?: number;
   isOwner?: boolean;
+  timezone?: string | null;
   // [WI-586] When set, the person joins this existing org instead of a fresh
   // one. A guardian + their charges MUST share one organization — the v2
   // dashboard read (getChildrenForParent) restricts charges to members of the
@@ -145,7 +146,10 @@ async function seedProfile(input: {
   } else {
     const [org] = await db
       .insert(organization)
-      .values({ name: `Dashboard Test Org ${RUN_ID}_${seedCounter}` })
+      .values({
+        name: `Dashboard Test Org ${RUN_ID}_${seedCounter}`,
+        timezone: input.timezone ?? null,
+      })
       .returning({ id: organization.id });
     orgIds.push(org!.id);
     orgId = org!.id;
@@ -1186,6 +1190,7 @@ describe('dashboard service integration', () => {
       await seedProfile({
         displayName: 'Guardian',
         birthYear: 1980,
+        timezone: 'America/Los_Angeles',
       });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Learner',
@@ -1219,6 +1224,7 @@ describe('dashboard service integration', () => {
       expect.objectContaining({
         profileId: childProfileId,
         displayName: 'Learner',
+        organizationTimezone: 'America/Los_Angeles',
         sessionsThisWeek: 1,
       }),
     );

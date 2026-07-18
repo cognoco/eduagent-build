@@ -2542,7 +2542,6 @@
       "profileRemovedOrNoAccess": "O perfil pode ter sido removido ou você não tem mais acesso",
       "backToDashboard": "Voltar para o painel",
       "noAccessToProfile": "Você não tem acesso a este perfil",
-      "firstReportSoon": "O primeiro relatório chegará no final do mês",
       "progressNudgeFreshTitle": "Pergunta sobre {{focus}} enquanto está fresco",
       "progressNudgeFreshSubtitle": "{{name}} estudou {{focus}} {{time}}. Experimenta uma ronda rápida também e depois pergunta o que fez sentido.",
       "progressNudgeRecentTitle": "Mantém {{focus}} ativo",
@@ -2658,8 +2657,7 @@
       "checkConnectionRetry": "Verifique sua conexão e tente novamente",
       "weekOf": "Semana de",
       "retryReports": "Repetir relatórios",
-      "firstReportArriveOn": "O primeiro relatório de {{name}} chegará em {{date}}",
-      "firstReportTimeContext": "O primeiro relatório de {{name}} {{timeContext}}"
+      "firstCombinedReportOn": "O primeiro relatório semanal ou mensal de {{name}} pode chegar já em {{date}}, quando houver aprendizado suficiente para resumir."
     },
     "report": {
       "sessions": "Sessões",

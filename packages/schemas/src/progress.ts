@@ -389,6 +389,11 @@ export const dashboardChildSchema = z.object({
 });
 export type DashboardChild = z.infer<typeof dashboardChildSchema>;
 
+export const dashboardChildDetailSchema = dashboardChildSchema.extend({
+  organizationTimezone: z.string().nullable(),
+});
+export type DashboardChildDetail = z.infer<typeof dashboardChildDetailSchema>;
+
 export const pendingNoticeTypeSchema = z.enum([
   'consent_archived',
   'consent_deleted',
@@ -803,7 +808,7 @@ export type DashboardResponse = z.infer<typeof dashboardResponseSchema>;
 
 // GET /dashboard/children/:profileId
 export const childDetailResponseSchema = z.object({
-  child: dashboardChildSchema.nullable(),
+  child: dashboardChildDetailSchema.nullable(),
 });
 export type ChildDetailResponse = z.infer<typeof childDetailResponseSchema>;
 

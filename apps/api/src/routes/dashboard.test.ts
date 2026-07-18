@@ -359,6 +359,7 @@ describe('dashboard routes', () => {
         const redactedChild = {
           profileId: PROFILE_ID,
           displayName: 'Timmy',
+          organizationTimezone: null,
           consentStatus: status,
           respondedAt: null,
           summary,
@@ -392,6 +393,7 @@ describe('dashboard routes', () => {
         expect(body.child).toMatchObject({
           profileId: PROFILE_ID,
           displayName: 'Timmy',
+          organizationTimezone: null,
           consentStatus: status,
           sessionsThisWeek: 0,
           totalSessions: 0,

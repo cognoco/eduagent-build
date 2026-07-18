@@ -2,7 +2,11 @@ import { useMemo, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { WeeklyReportSummary } from '@eduagent/schemas';
+import {
+  getNextWeeklyProgressPushRun,
+  resolveReportScheduleTimezone,
+  type WeeklyReportSummary,
+} from '@eduagent/schemas';
 import { useChildDetail } from '../../../../hooks/use-dashboard';
 import {
   useChildReports,
@@ -13,41 +17,36 @@ import { useTranslation } from 'react-i18next';
 import { ReportsList } from '../../../../components/progress/ReportsList';
 import { formatShortDate } from '../../../../lib/format-datetime';
 
-/** Returns the formatted next report date and a human-friendly time context. */
+/** Returns the earliest upcoming weekly or monthly report run. */
 export function getNextReportInfo(
   now = new Date(),
   locale?: string,
+  timezone?: string | null,
 ): {
   date: string;
-  timeContext: string;
+  runAt: Date;
 } {
-  const isFirstOfMonth = now.getUTCDate() === 1;
-  const cronHour = 10; // Monthly report cron runs 10:00 UTC on the 1st
+  const nextWeeklyRun = getNextWeeklyProgressPushRun(now, timezone);
 
-  // If it's the 1st and before the cron, report may arrive today
-  if (isFirstOfMonth && now.getUTCHours() < cronHour) {
-    return { date: '', timeContext: 'should be ready later today' };
+  let nextMonthlyRun = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 10, 0, 0),
+  );
+  if (nextMonthlyRun.getTime() <= now.getTime()) {
+    nextMonthlyRun = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 10, 0, 0),
+    );
   }
 
-  // Next run is the 1st of next month at 10:00 UTC
-  const nextRun = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 10, 0, 0),
-  );
-  const daysUntil = Math.ceil(
-    (nextRun.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-  );
+  const weeklyRunsFirst = nextWeeklyRun.getTime() <= nextMonthlyRun.getTime();
+  const nextRun = weeklyRunsFirst ? nextWeeklyRun : nextMonthlyRun;
   const formattedDate = formatShortDate(nextRun, locale, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
+    timeZone: weeklyRunsFirst ? resolveReportScheduleTimezone(timezone) : 'UTC',
   });
 
-  const timeContext =
-    daysUntil <= 3
-      ? 'arrives in a few days'
-      : `arrives in about ${daysUntil} days`;
-
-  return { date: formattedDate, timeContext };
+  return { date: formattedDate, runAt: nextRun };
 }
 
 function formatReportWeek(
@@ -172,7 +171,12 @@ export default function ChildReportsScreen(): React.ReactElement {
   const profileId = Array.isArray(rawProfileId)
     ? rawProfileId[0]
     : rawProfileId;
-  const { data: child } = useChildDetail(profileId);
+  const {
+    data: child,
+    isLoading: childLoading,
+    isError: childError,
+    refetch: childRefetch,
+  } = useChildDetail(profileId);
   const {
     data: reports,
     isLoading,
@@ -190,14 +194,15 @@ export default function ChildReportsScreen(): React.ReactElement {
     string | null
   >(null);
 
-  const combinedLoading = isLoading || weeklyLoading;
   const hasAnyData =
     (reports?.length ?? 0) > 0 || (weeklyReports?.length ?? 0) > 0;
+  const combinedLoading =
+    isLoading || weeklyLoading || (!hasAnyData && childLoading);
   // [CCR finding, 2026-05-14] Prior version was `!hasAnyData && isError`,
   // which silently swallowed weekly-only failures: weekly down + monthly up
   // showed neither an error banner nor a retry path. The retry handler
-  // already calls both refetches, so widening this condition is sufficient.
-  const combinedError = !hasAnyData && (isError || weeklyError);
+  // calls each backing query's refetch, so widening this condition is sufficient.
+  const combinedError = !hasAnyData && (isError || weeklyError || childError);
   const latestWeeklyReport = weeklyReports?.[0];
   const selectedWeeklyReport = useMemo(() => {
     if (!weeklyReports?.length) return undefined;
@@ -305,6 +310,7 @@ export default function ChildReportsScreen(): React.ReactElement {
           <View className="flex-row gap-3 mt-4">
             <Pressable
               onPress={() => {
+                void childRefetch();
                 void refetch();
                 void weeklyRefetch();
               }}
@@ -374,24 +380,21 @@ export default function ChildReportsScreen(): React.ReactElement {
         testID="child-reports-empty"
       >
         {(() => {
-          const { date, timeContext } = getNextReportInfo(
+          const { date } = getNextReportInfo(
             new Date(),
             i18n?.language,
+            child?.organizationTimezone,
           );
           return (
             <Text
               className="text-body-sm text-text-secondary text-center"
+              accessibilityRole="summary"
               testID="child-reports-empty-time-context"
             >
-              {date
-                ? t('parentView.reports.firstReportArriveOn', {
-                    name: childName,
-                    date,
-                  })
-                : t('parentView.reports.firstReportTimeContext', {
-                    name: childName,
-                    timeContext,
-                  })}
+              {t('parentView.reports.firstCombinedReportOn', {
+                name: childName,
+                date,
+              })}
             </Text>
           );
         })()}

@@ -40,6 +40,7 @@ import {
 } from '@eduagent/schemas';
 import type {
   DashboardChild,
+  DashboardChildDetail,
   DemoDashboardData,
   KnowledgeInventory,
   MonthlyReportRecord,
@@ -84,6 +85,7 @@ import {
   getChildrenGdprConsentStatusesV2,
   resolveOrgIdForPerson,
 } from './identity-v2/family-v2';
+import { getPersonOrgTimezone } from './identity-v2/helpers';
 import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
@@ -298,6 +300,15 @@ function redactDashboardChild(child: DashboardChild): DashboardChild {
     currentStreak: 0,
     longestStreak: 0,
     totalXp: 0,
+  };
+}
+
+function redactDashboardChildDetail(
+  child: DashboardChildDetail,
+): DashboardChildDetail {
+  return {
+    ...redactDashboardChild(child),
+    organizationTimezone: child.organizationTimezone,
   };
 }
 
@@ -1091,13 +1102,13 @@ export async function getChildrenForParent(
  * [F-PV-06] Replaces the previous all-children fan-out (getChildrenForParent →
  * find) which hit 7 + 10N subrequests and breached the Cloudflare Workers 50-
  * subrequest cap at N≥5. This implementation queries only the requested child,
- * targeting ≤16 subrequests.
+ * targeting ≤17 subrequests.
  */
 export async function getChildDetail(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-): Promise<DashboardChild | null> {
+): Promise<DashboardChildDetail | null> {
   // [EP15-I5] Throws ForbiddenError (→ 403) on access denial instead of
   // returning null. A null return here now means "parent has access but
   // the child was not present in the dashboard list" — a genuine not-found.
@@ -1109,12 +1120,16 @@ export async function getChildDetail(
     chargePersonId: childProfileId,
   });
 
-  // Step 1: Get the child's profile — 1 query
-  // [WI-586] v2 path: read from person table; resolve consent via v2 resolver.
-  const personRow = await db.query.person.findFirst({
-    where: and(eq(person.id, childProfileId), isNull(person.archivedAt)),
-    columns: { displayName: true },
-  });
+  // Step 1: Get the child's profile and guardian organization timezone —
+  // 2 concurrent queries. [WI-586] v2 path: read from person/membership/org;
+  // resolve consent via the v2 resolver.
+  const [personRow, organizationTimezone] = await Promise.all([
+    db.query.person.findFirst({
+      where: and(eq(person.id, childProfileId), isNull(person.archivedAt)),
+      columns: { displayName: true },
+    }),
+    getPersonOrgTimezone(db, parentProfileId),
+  ]);
   if (!personRow) return null;
   const profileDisplayName = personRow.displayName;
   // [WI-809][BUG-465] GDPR-pinned, basis-explicit. A basis-blind AnyBasis read
@@ -1275,9 +1290,10 @@ export async function getChildDetail(
     totalSessions,
   );
 
-  return redactDashboardChild({
+  return redactDashboardChildDetail({
     profileId: childProfileId,
     displayName: profileDisplayName,
+    organizationTimezone,
     consentStatus,
     respondedAt: consentRespondedAt,
     summary,

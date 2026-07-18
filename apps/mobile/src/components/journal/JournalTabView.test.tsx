@@ -541,6 +541,58 @@ describe('JournalTabView', () => {
     ).toBeNull();
   });
 
+  it('[WI-2186] shows one combined empty expectation only after both report queries settle', () => {
+    mockMonthlyReports = query([]);
+    mockWeeklyReports = query([]);
+
+    render(<JournalTabView />);
+    fireEvent.press(screen.getByTestId('journal-tab-reports'));
+
+    expect(
+      screen.getAllByText(
+        'Your next weekly or monthly report will appear here once there is enough learning to summarize.',
+      ),
+    ).toHaveLength(1);
+    expect(
+      screen.queryByText(
+        'The first report will arrive at the end of the month',
+      ),
+    ).toBeNull();
+  });
+
+  it('[WI-2186] keeps a settled endpoint error distinct from no report activity', () => {
+    mockMonthlyReports = {
+      ...query([]),
+      isError: true,
+    };
+    mockWeeklyReports = query([]);
+
+    render(<JournalTabView />);
+    fireEvent.press(screen.getByTestId('journal-tab-reports'));
+
+    screen.getByTestId('journal-reports-error');
+    expect(screen.queryByTestId('progress-latest-report-empty')).toBeNull();
+    expect(screen.queryByTestId('reports-list-empty')).toBeNull();
+  });
+
+  it.each([
+    ['weekly-only', [], [weeklyReport], 'weekly-report-card-weekly-1'],
+    ['monthly-only', [monthlyReport], [], 'report-card-monthly-1'],
+  ])(
+    '[WI-2186] preserves the %s report state',
+    (_case, monthly, weekly, rowTestID) => {
+      mockMonthlyReports = query(monthly);
+      mockWeeklyReports = query(weekly);
+
+      render(<JournalTabView />);
+      fireEvent.press(screen.getByTestId('journal-tab-reports'));
+
+      screen.getByTestId(rowTestID);
+      expect(screen.queryByTestId('reports-list-empty')).toBeNull();
+      expect(screen.queryByTestId('journal-reports-error')).toBeNull();
+    },
+  );
+
   it('exposes a transcription-only mic on the archive search line', () => {
     render(<JournalTabView />);
     fireEvent.press(screen.getByTestId('journal-tab-notes'));

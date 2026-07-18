@@ -27,6 +27,7 @@ import {
   person,
   weeklyReports,
 } from '@eduagent/database';
+import { isWeeklyProgressPushLocalHour9 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { INNGEST_PLAN_CONCURRENCY_CAP } from '../plan-limits';
 import { getStepDatabase, getStepResendApiKey } from '../helpers';
@@ -119,19 +120,7 @@ type PreparedWeeklyProgressDigest =
 // cron to `0 9 * * 1` would constrain delivery to UTC parents only and break
 // timezone-aware morning delivery for everyone else. See test:
 // "fires for each parent exactly once across the 24 Monday-UTC hours".
-export function isLocalHour9(timezone: string | null, nowUtc: Date): boolean {
-  if (!timezone) return nowUtc.getUTCHours() === 9;
-  try {
-    const localTimeStr = nowUtc.toLocaleString('en-US', {
-      timeZone: timezone,
-      hour: 'numeric',
-      hour12: false,
-    });
-    return parseInt(localTimeStr, 10) === 9;
-  } catch {
-    return nowUtc.getUTCHours() === 9;
-  }
-}
+export const isLocalHour9 = isWeeklyProgressPushLocalHour9;
 
 function startOfCurrentWeek(date: Date): Date {
   const day = date.getUTCDay();

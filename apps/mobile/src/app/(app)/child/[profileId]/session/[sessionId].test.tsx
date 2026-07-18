@@ -125,6 +125,7 @@ function setRoutes(session: unknown): void {
     child: {
       profileId: '30000000-0000-4000-8000-000000000001',
       displayName: 'Emma',
+      organizationTimezone: null,
       consentStatus: null,
       respondedAt: null,
       summary: '',

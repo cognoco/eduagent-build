@@ -164,7 +164,7 @@ function JournalReportsSection(): React.ReactElement {
     );
   }
 
-  if (isError && !monthlyReports.data && !weeklyReports.data) {
+  if (isError && !hasAnyReports) {
     return (
       <ErrorFallback
         variant="card"
@@ -205,6 +205,7 @@ function JournalReportsSection(): React.ReactElement {
         monthlyReports={monthlyReports.data ?? []}
         weeklyReports={weeklyReports.data ?? []}
         scrollEnabled={false}
+        showEmptyState={false}
         testID="journal-reports-list"
         onPressMonthly={(reportId) =>
           router.push({
