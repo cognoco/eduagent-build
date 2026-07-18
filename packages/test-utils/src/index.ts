@@ -11,6 +11,12 @@ export { loadDatabaseEnv } from './lib/load-database-env.js';
 // Database mock for unit testing
 export { createMockDb } from './lib/neon-mock.js';
 
+// Shared deterministic Mentor boundary cases (test-only)
+export {
+  MENTOR_CAPABILITY_CASES,
+  type MentorCapabilityCase,
+} from './lib/mentor-capability-cases.js';
+
 // Canonical RFC 9562 v4 UUIDs for tests
 export {
   TEST_PROFILE_ID,

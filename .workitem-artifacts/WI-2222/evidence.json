@@ -1,0 +1,26 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "One shared five-row test-only table drives deterministic matcher, retained adversarial/property matcher, closed deep-link, learner/person scope, and persisted-session composition boundaries with exact mapped routes and raw input.",
+      "pointer": "docs/evidence/WI-2222/verification.md"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The shared contract is exported by the test-utils package and contains catalog jump, freeform Mentor session, clarification, unsupported route, and wrong-scope denial without copying the existing generated corpus.",
+      "pointer": "packages/test-utils/src/lib/mentor-capability-cases.ts"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Disposable raw-input and route mutations fail every consuming boundary suite, are restored exactly without a mutation commit, and return the focused verification surface to green.",
+      "pointer": "docs/evidence/WI-2222/verification.md"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "The implementation plan keeps Playwright, Maestro, flow-inventory, broad live-LLM, product behavior, backend wire, schema, migration, and supporter-surface work explicitly out of scope.",
+      "pointer": "docs/plans/2026-07-18-consolidate-mentor-capability-contract-tests.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-18",
+  "redGreenPointer": "docs/evidence/WI-2222/verification.md"
+}

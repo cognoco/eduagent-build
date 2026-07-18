@@ -1,9 +1,26 @@
+import { MENTOR_CAPABILITY_CASES } from '@eduagent/test-utils';
+
 import { matchBarIntent, type BarIntentNameIndex } from './bar-intent-match';
 import { pushNowDeepLink } from './now-deep-link';
 
 const NOOP_ROUTER = { push: (): void => undefined };
 
 describe('matchBarIntent', () => {
+  it.each(MENTOR_CAPABILITY_CASES)(
+    '$id matches the shared deterministic capability outcome',
+    ({ input, expectedMatcher, expectedRawInput }) => {
+      const result = matchBarIntent(input);
+      if (expectedMatcher.kind === 'jump') {
+        expect(result).toEqual(expectedMatcher);
+        return;
+      }
+      expect(result).toEqual({
+        kind: expectedMatcher.kind,
+        text: expectedRawInput,
+      });
+    },
+  );
+
   it('returns a deterministic jump only for currently supported catalog routes', () => {
     const result = matchBarIntent('continue my session session-123');
 
@@ -24,13 +41,6 @@ describe('matchBarIntent', () => {
     });
   });
 
-  it('routes an explicit pedagogical show-me-how request to Mentor with exact input', () => {
-    expect(matchBarIntent('show me how photosynthesis works')).toEqual({
-      kind: 'mentor',
-      text: 'show me how photosynthesis works',
-    });
-  });
-
   it('routes a pedagogical request containing a literal subject ID to Mentor with exact input', () => {
     expect(matchBarIntent('show me how subject subject-123 works')).toEqual({
       kind: 'mentor',
@@ -42,17 +52,6 @@ describe('matchBarIntent', () => {
     expect(matchBarIntent('should I open subject spanish?')).toEqual({
       kind: 'mentor',
       text: 'should I open subject spanish?',
-    });
-  });
-
-  it('preserves an explicit literal subject catalog jump', () => {
-    expect(matchBarIntent('show subject subject-123')).toEqual({
-      kind: 'jump',
-      deepLink: {
-        route: 'subject.hub',
-        params: { subjectId: 'subject-123' },
-        chain: [],
-      },
     });
   });
 
@@ -77,13 +76,6 @@ describe('matchBarIntent', () => {
     expect(matchBarIntent('why does the moon look bigger tonight?')).toEqual({
       kind: 'mentor',
       text: 'why does the moon look bigger tonight?',
-    });
-  });
-
-  it('returns uncertain for short or ambiguous text', () => {
-    expect(matchBarIntent('review')).toEqual({
-      kind: 'uncertain',
-      text: 'review',
     });
   });
 
