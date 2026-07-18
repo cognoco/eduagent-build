@@ -17,6 +17,7 @@ status: complete
 In scope:
 - `apps/mobile/src/lib/bar-intent-match.ts` — distinguish substantive declaratives from uncertain navigation/ambiguity without broadening the closed route catalog.
 - `apps/mobile/src/lib/bar-intent-match.test.ts` — cover pedagogical requests, genuine navigation commands, explicit catalog jumps, and modified unsupported destinations at the matcher boundary.
+- `apps/mobile/src/lib/bar-intent-match.adversarial.test.ts` — retain the closed-catalog invariant for unsupported subject-list input.
 - `apps/mobile/src/app/(app)/mentor.tsx` — route matcher outcomes and render learner-scope clarification state.
 - `apps/mobile/src/app/(app)/mentor.test.tsx` — behavior-first coverage at the input/send/navigation boundary, including the real 360px layout interaction and repeated iOS announcement; retain its three GC6 Pattern A partial mocks with specific GC1 reasons.
 - `docs/evidence/WI-2094/` — preserve the original immutable baseline/candidate/revert/restore proof and add rework-cycle raw RED/GREEN/REVERT/RESTORE outputs.
@@ -31,42 +32,163 @@ Out of scope:
 ## Tasks
 
 - [x] T1: Add rework boundary regressions before production changes — done when focused Jest fails against reviewed production for exactly the missing behavior: `show me how photosynthesis works` does not yet preserve exact freeform `rawInput`; `progress report`, `journal entries`, and `subjects list` do not yet stay on clarification/closed-catalog handling; the 360px case does not yet observe a component-consumed compact layout; repeated clarification revisions do not yet call the repository announcement path on iOS; and Android still receives duplicate explicit announcements in addition to its polite live region. Existing tests continue to characterize genuine navigation commands, literal and named catalog jumps, questions, arrow press, keyboard submit, and edit-then-submit.
-- [x] T2: Implement the minimum learner-only routing, clarification, and layout behavior — done when T1 passes using this concrete flow:
+- [x] T2: Implement the minimum learner-only routing, clarification, and layout behavior — done when T1 passes using the real final symbols and control flow below:
 
-  ```text
-  matchBarIntent(rawInput):
-    trimmed = trim(rawInput); normalized = normalize(trimmed)
-    if empty/short -> uncertain(trimmed)
-    if literal ID route matches -> jump(existing closed-catalog deep link)
-    if a unique name-index route matches AND input is not question/pedagogical -> jump(existing deep link)
-    if question-shaped OR /^show me how\b/ -> mentor(trimmed)
-    if navigation-command-shaped OR bare unsupported target
-       (progress[ report] | journal[ entries] | subjects[ list] | library | more)
-       -> uncertain(trimmed)
-    return mentor(trimmed)
+  ```ts
+  export function matchBarIntent(
+    text: string,
+    nameIndex?: BarIntentNameIndex,
+  ): BarIntentResult {
+    const trimmed = text.trim();
+    const value = normalized(trimmed);
 
-  LearnerMentorScreen submit(result):
-    jump      -> clear clarification; pushNowDeepLink(existing catalog mapper)
-    mentor    -> clear clarification; push freeform session with rawInput=result.text
-    uncertain -> set { input: result.text, revision: previousRevision + 1 }
+    if (!value || value.length < 8) {
+      return { kind: 'uncertain', text: trimmed };
+    }
 
-  LearnerMentorScreen clarification/layout:
-    width = useWindowDimensions().width
-    horizontalPadding = width <= 360 ? 12 : 20
-    when clarificationRevision is defined/changes AND Platform.OS == ios:
-      useAnnounce()(clarificationLabel + submitted input)
-    render the same visible revision-keyed polite live region on every platform
-    keep input/send inside ScrollView
+    if (hasQuestionShape(value) || hasPedagogicalRequestShape(value)) {
+      return { kind: 'mentor', text: trimmed };
+    }
+
+    if (hasUnsupportedNavigationTargetShape(value)) {
+      return { kind: 'uncertain', text: trimmed };
+    }
+
+    const sessionId = wordAfter(value, 'session');
+    if (sessionId && /\b(continue|resume|open)\b/.test(value)) {
+      return {
+        kind: 'jump',
+        deepLink: {
+          route: 'session.resume',
+          params: { sessionId },
+          chain: [],
+        },
+      };
+    }
+
+    const subjectId = wordAfter(value, 'subject');
+    const bookId = wordAfter(value, 'book');
+    const topicId = wordAfter(value, 'topic');
+
+    if (subjectId && topicId && /\b(review|practice)\b/.test(value)) {
+      return {
+        kind: 'jump',
+        deepLink: {
+          route: 'retention.review',
+          params: { subjectId, topicId },
+          chain: ['subject.hub'],
+        },
+      };
+    }
+
+    if (subjectId && topicId && /\b(challenge|test)\b/.test(value)) {
+      return {
+        kind: 'jump',
+        deepLink: {
+          route: 'challenge.start',
+          params: { subjectId, topicId },
+          chain: ['subject.hub'],
+        },
+      };
+    }
+
+    if (subjectId && bookId && topicId && /\b(open|show|go to)\b/.test(value)) {
+      return {
+        kind: 'jump',
+        deepLink: {
+          route: 'subject.topic',
+          params: { subjectId, bookId, topicId },
+          chain: ['subject.hub'],
+        },
+      };
+    }
+
+    if (subjectId && /\b(open|show|go to)\b/.test(value)) {
+      return {
+        kind: 'jump',
+        deepLink: {
+          route: 'subject.hub',
+          params: { subjectId },
+          chain: [],
+        },
+      };
+    }
+
+    if (nameIndex) {
+      const nlResult = resolveByNameIndex(value, nameIndex);
+      if (nlResult === 'ambiguous') {
+        return { kind: 'uncertain', text: trimmed };
+      }
+      if (nlResult !== null) return nlResult;
+    }
+
+    if (hasNavigationCommandShape(value)) {
+      return { kind: 'uncertain', text: trimmed };
+    }
+
+    return { kind: 'mentor', text: trimmed };
+  }
   ```
+
+  ```ts
+  const clarificationRetryLabel =
+    barClarification && barClarification.revision > 1
+      ? t('common.tryAgain')
+      : null;
+  const clarificationAnnouncement = barClarification
+    ? [
+        clarificationRetryLabel,
+        t('subject.clarifyLabel'),
+        barClarification.input,
+      ]
+        .filter(Boolean)
+        .join(' ')
+    : null;
+
+  const handleSubmitText = (text: string): void => {
+    const result = matchBarIntent(text, {
+      subjects: subjectsIndex.subjects.map((s) => ({
+        id: s.subjectId,
+        name: s.subjectName,
+      })),
+    });
+    if (result.kind === 'jump') {
+      setBarClarification(null);
+      pushNowDeepLink(router, result.deepLink, {
+        subjectHubTarget: 'v2-subject-hub',
+      });
+      return;
+    }
+    if (result.kind === 'mentor') {
+      setBarClarification(null);
+      router.push({
+        pathname: '/(app)/session',
+        params: {
+          entrySource: 'mentor',
+          returnTo: 'mentor',
+          mode: 'freeform',
+          rawInput: result.text,
+        },
+      } as Href);
+      return;
+    }
+    setBarClarification((current) => ({
+      input: result.text,
+      revision: (current?.revision ?? 0) + 1,
+    }));
+  };
+  ```
+
+  `useEffect()` retains the existing `Platform.OS !== 'ios'` return, `useWindowDimensions()` retains the `windowWidth <= 360 ? 12 : 20` padding, and the revision-keyed `accessibilityLiveRegion="polite"` renders `clarificationRetryLabel` visibly only from revision 2 onward.
 
 - [x] T3: Preserve and extend Bug regression evidence honestly — done when the original immutable RED/GREEN/REVERT/RESTORE files and SHA matrix are unchanged, rework-cycle raw outputs record pre-fix RED, post-fix GREEN, production-only REVERT, and RESTORE, and the report distinguishes original committed proof from rework working-tree proof without claiming an uncreated commit.
 - [x] T4: Verify the complete rework surface with every command below — done when each exits zero (the focused RED command is expected nonzero only at T1 before production changes), the 360px command names and passes the interactive compact-layout case, and non-mutating Cosmo validation reports every check `PASS`:
 
   ```bash
-  rtk pnpm exec jest --runTestsByPath "$PWD/apps/mobile/src/lib/bar-intent-match.test.ts" --runInBand --no-coverage --testNamePattern 'pedagogical|unsupported destination|navigation|catalog'
-  rtk pnpm exec jest --runTestsByPath "$PWD/apps/mobile/src/app/(app)/mentor.test.tsx" --runInBand --no-coverage --testNamePattern 'photosynthesis|unsupported destination|small-screen-360|clarification'
-  rtk pnpm exec jest --runTestsByPath "$PWD/apps/mobile/src/app/(app)/mentor.test.tsx" "$PWD/apps/mobile/src/components/mentor/MentorInputBar.test.tsx" "$PWD/apps/mobile/src/lib/bar-intent-match.test.ts" "$PWD/apps/mobile/src/lib/bar-intent-match.adversarial.test.ts" --runInBand --no-coverage
-  rtk pnpm exec jest --runTestsByPath "$PWD/apps/mobile/src/app/(app)/mentor.test.tsx" --runInBand --no-coverage --testNamePattern 'small-screen-360'
+  rtk pnpm exec jest --config apps/mobile/jest.config.cjs --runTestsByPath "$PWD/apps/mobile/src/lib/bar-intent-match.test.ts" --runInBand --forceExit --no-coverage --testNamePattern 'pedagogical|literal|unsupported|navigation|catalog'
+  rtk pnpm exec jest --config apps/mobile/jest.config.cjs --runTestsByPath "$PWD/apps/mobile/src/app/(app)/mentor.test.tsx" --runInBand --forceExit --no-coverage --testNamePattern 'pedagogical-literal-id|literal-question-unchanged|explicit-literal-catalog-jump|identical-uncertain-repeat-visible|small-screen-360|explicitly on iOS|Android clarification'
+  rtk pnpm exec jest --config apps/mobile/jest.config.cjs --runTestsByPath "$PWD/apps/mobile/src/app/(app)/mentor.test.tsx" "$PWD/apps/mobile/src/components/mentor/MentorInputBar.test.tsx" "$PWD/apps/mobile/src/lib/bar-intent-match.test.ts" "$PWD/apps/mobile/src/lib/bar-intent-match.adversarial.test.ts" --runInBand --forceExit --no-coverage
+  rtk pnpm exec jest --config apps/mobile/jest.config.cjs --runTestsByPath "$PWD/apps/mobile/src/app/(app)/mentor.test.tsx" --runInBand --forceExit --no-coverage --testNamePattern 'small-screen-360'
   rtk pnpm exec nx run @eduagent/mobile:typecheck
   rtk pnpm exec nx run @eduagent/mobile:lint
   rtk pnpm prepush
@@ -81,5 +203,5 @@ Out of scope:
 
 - T1: The first two focused commands in T4, captured before production edits.
 - T2: Repeat both focused commands after the matcher and learner-screen changes.
-- T3: Run the same focused rework command for GREEN, production-only REVERT, and RESTORE; retain the raw JSON outputs beside the original immutable evidence.
+- T3: Run the same focused rework command for GREEN, production-only REVERT, and RESTORE; retain the raw JSON outputs beside the original immutable evidence. Repair-cycle-3 uses immutable test-only RED `14af6052f9ed5f15e1cf245a62969da85bc3bd8f`, candidate `a83f91f6ace548e8aa22ae68c422085e4aa707dc`, production-only REVERT `4d9fdffdec4fc109ec171adb6a952c0a0a94f191`, and exact RESTORE `a3ee8dee5905ea10d743d08399f6eccf76b2db4a`.
 - T4: Run every command listed inline in T4; no verification step is delegated to an external/live brief.

@@ -264,3 +264,64 @@ The production repair adds only the `Platform.OS !== 'ios'` early-return conditi
 A fresh `git fetch origin` resolved `origin/main` to `6dce228a9892ae6f90e87863bb18983d2ef75d5e`, one commit beyond merge base `ba9775edba0eaafa95f65ee1ccd072e744bc757c`. The history-preserving `git merge --no-commit --no-ff origin/main` completed without conflicts and left `MERGE_HEAD` exactly equal to the fetched main revision for the intentional final commit. The incoming delta is confined to the WI-2192 quiz-result accessibility repair, its web-E2E support, and a root package script; it changes no Mentor component, Mentor test, matcher, dependency lock, or WI-2094 artifact byte. Therefore the already-fresh behavior, type, lint, format, and pre-push gates remained applicable without repetition. Post-integration staged and unstaged diff hygiene, direct changed-file formatting, and non-mutating Cosmo validation were rerun and passed.
 
 After the immutable REVERT and RESTORE commits, a second fresh `git fetch origin` kept `origin/main` at the same `6dce228a9892ae6f90e87863bb18983d2ef75d5e` revision, which is already an ancestor of the candidate history; no additional merge was needed. The focused platform cases, four impacted suites, typecheck, lint, repository format check, pre-push build, JSON parsing, diff hygiene, and non-mutating Cosmo validation listed above were all rerun after restoration. The production source, component test, matcher, and matcher test have no net diff from `2ea88ef95f5901569c55b7a15e12d76c63e40295`.
+
+## External review rework cycle 3 — final pre-merge repair
+
+PR 2230 threads `discussion_r3607260038` and `discussion_r3607260040` exposed two final correctness/documentation gaps. `matchBarIntent()` guaranteed question/pedagogical routing only after literal session/subject/book/topic extraction, so `show me how subject subject-123 works` and `should I open subject spanish?` were hijacked into subject-hub jumps. The same permissive token extraction treated `list` as a literal subject ID for `show subject list`. The implementation plan also described T2 in pseudo-code instead of the real TypeScript symbols and branches.
+
+An independent Claude Opus review of exact published head `1261d97093bb94bee4ec7455cd626f959a1ed079` found no P0, P1, or P2 issue. Its actionable lower-severity finding was valid: an identical uncertain submission incremented `revision`, remounted the live region, and retriggered the iOS effect while rendering and announcing byte-identical content. The repair now renders the existing localized `common.tryAgain` copy visibly from revision 2 and includes that same localized text in the iOS announcement. Android still receives no explicit `announceForAccessibility()` call and retains the single polite live-region path.
+
+The question/pedagogical guarantee now runs immediately after empty/short handling and before every literal or name-index extraction. Unsupported shell-target recognition also runs before extraction and recognizes singular `subject list`; explicit catalog command `show subject subject-123` still reaches the unchanged closed mapper. The speculative topic-paired natural-language routes remain untouched as the acknowledged deferral. Supporter/person dispatch, session persistence, Challenge Round behavior, and `WI-2112` are unchanged.
+
+The cheap discriminating ColdStartCard boundary is included: its real input/send controls call the shared learner handler and prove exact pedagogical-literal raw input reaches the existing freeform route.
+
+### Repair-cycle-3 immutable proof
+
+| Phase | Immutable revision | Production state | Result | Raw result |
+| --- | --- | --- | --- | --- |
+| RED | `14af6052f9ed5f15e1cf245a62969da85bc3bd8f` | Test-only commit over reviewed production; all new matcher, main-bar, ColdStartCard, unsupported-target, visible-repeat, and platform assertions present | 3 suites failed; 10 failed, 69 passed, 79 total | [rework-3-red.json](rework-3-red.json) |
+| Candidate attempt 1 | working candidate over `14af6052f9ed5f15e1cf245a62969da85bc3bd8f` | Production behavior was correct; two assertions used `Try again` instead of the real existing English translation `Try Again` | 1 suite failed, 2 suites passed; 2 failed, 77 passed, 79 total | [rework-3-candidate-1-failed.json](rework-3-candidate-1-failed.json) |
+| GREEN | `a83f91f6ace548e8aa22ae68c422085e4aa707dc` | Candidate production plus assertions corrected to the actual i18n contract | 3 suites passed; 79 passed, 0 failed | [rework-3-green.json](rework-3-green.json) |
+| Production-only REVERT | `4d9fdffdec4fc109ec171adb6a952c0a0a94f191` | Only `mentor.tsx` and `bar-intent-match.ts` candidate changes removed; all tests unchanged | 3 suites failed; 10 failed, 69 passed, 79 total | [rework-3-revert-production.json](rework-3-revert-production.json) |
+| Exact RESTORE | `a3ee8dee5905ea10d743d08399f6eccf76b2db4a` | Exact candidate production restored | 3 suites passed; 79 passed, 0 failed | [rework-3-restore-green.json](rework-3-restore-green.json) |
+
+Candidate and RESTORE are byte-identical across both production files and all three repair test files:
+
+```bash
+rtk git diff --exit-code a83f91f6ace548e8aa22ae68c422085e4aa707dc a3ee8dee5905ea10d743d08399f6eccf76b2db4a -- 'apps/mobile/src/app/(app)/mentor.tsx' apps/mobile/src/lib/bar-intent-match.ts 'apps/mobile/src/app/(app)/mentor.test.tsx' apps/mobile/src/lib/bar-intent-match.test.ts apps/mobile/src/lib/bar-intent-match.adversarial.test.ts
+```
+
+The command exits zero with no output. Candidate and RESTORE `mentor.tsx` both have blob `776b81f2f2bbc10d8e59ce3d7fb3938794bddbc3`; candidate and RESTORE `bar-intent-match.ts` both have blob `45734a709608e3d660196d7c491c13de724f8439`.
+
+All four principal phases used the same mobile-configured command, changing only `--outputFile`:
+
+```bash
+rtk pnpm exec jest --config apps/mobile/jest.config.cjs --runTestsByPath 'apps/mobile/src/lib/bar-intent-match.test.ts' 'apps/mobile/src/lib/bar-intent-match.adversarial.test.ts' 'apps/mobile/src/app/(app)/mentor.test.tsx' --runInBand --forceExit --no-coverage --json --outputFile docs/evidence/WI-2094/rework-3-red.json
+rtk pnpm exec jest --config apps/mobile/jest.config.cjs --runTestsByPath 'apps/mobile/src/lib/bar-intent-match.test.ts' 'apps/mobile/src/lib/bar-intent-match.adversarial.test.ts' 'apps/mobile/src/app/(app)/mentor.test.tsx' --runInBand --forceExit --no-coverage --json --outputFile docs/evidence/WI-2094/rework-3-green.json
+rtk pnpm exec jest --config apps/mobile/jest.config.cjs --runTestsByPath 'apps/mobile/src/lib/bar-intent-match.test.ts' 'apps/mobile/src/lib/bar-intent-match.adversarial.test.ts' 'apps/mobile/src/app/(app)/mentor.test.tsx' --runInBand --forceExit --no-coverage --json --outputFile docs/evidence/WI-2094/rework-3-revert-production.json
+rtk pnpm exec jest --config apps/mobile/jest.config.cjs --runTestsByPath 'apps/mobile/src/lib/bar-intent-match.test.ts' 'apps/mobile/src/lib/bar-intent-match.adversarial.test.ts' 'apps/mobile/src/app/(app)/mentor.test.tsx' --runInBand --forceExit --no-coverage --json --outputFile docs/evidence/WI-2094/rework-3-restore-green.json
+```
+
+### Final main integration and device waiver
+
+A fresh `git fetch origin` resolved `origin/main` to `6dce228a9892ae6f90e87863bb18983d2ef75d5e`. That revision was already an ancestor through the earlier history-preserving integration, so `rtk git merge --no-ff origin/main` exited zero with `Already up to date.` No evidence commit was rebased, amended, or force-pushed.
+
+The Android physical-preview clause remains explicitly waived on Lancre. There is no physical preview device here; automated behavior plus the named `small-screen-360` interactive proof satisfies the Android requirement. The test exercises a 360px native window, input and Send inside the scroll container, 12px compact padding, keyboard tap persistence, and exact freeform navigation. The platform tests separately prove two iOS explicit announcements and zero Android explicit announcements while Android keeps `accessibilityLiveRegion="polite"`.
+
+### Repair-cycle-3 final gates
+
+Fresh post-RESTORE validation completed against the final candidate tree:
+
+- Focused matcher command — exit 0; 1 suite passed, 11 selected cases passed, and 17 cases were skipped by the requested name pattern.
+- Focused learner-screen command — exit 0; 1 suite passed, 7 selected cases passed, and 37 cases were skipped by the requested name pattern. It covers the pedagogical literal ID, unchanged literal question, explicit literal catalog jump, visibly changing identical uncertainty, compact 360px interaction, iOS explicit announcement, and Android no-explicit-announcement boundaries.
+- Four impacted Mentor/matcher suites — exit 0; 4 suites and 86 cases passed with no failures. Machine-readable output: [rework-3-final-green.json](rework-3-final-green.json).
+- Isolated `small-screen-360` command — exit 0; its single selected interactive compact-layout case passed.
+- Isolated platform command — exit 0; both selected platform cases passed, proving the preserved iOS-only `Platform.OS` guard and zero Android explicit announcements.
+- `pnpm exec nx run @eduagent/mobile:typecheck` — exit 0; the mobile target and six dependencies succeeded, with Nx cache hits for all seven tasks.
+- `pnpm exec nx run @eduagent/mobile:lint` — exit 0; 0 errors and the existing 51-warning baseline.
+- `pnpm prepush` — exit 0; `tsc --build` succeeded.
+- `pnpm format:check` — exit 0; all three configured format targets succeeded.
+- All six repair-cycle-3 raw Jest files parsed as JSON with the counts recorded above; `git diff --check` returned no output.
+- Non-mutating `complete --validate` — exit 0 after the completion summary was made count-specific; all section, prose trip-wire, evidence-presence, and AC-coverage checks reported `PASS`. No Notion writes or lifecycle transition were performed.
+
+The repository continued to emit its recorded Node 22 engine warning under Node `v24.18.0`, plus existing Jest/Expo test diagnostics; every named gate exited successfully.

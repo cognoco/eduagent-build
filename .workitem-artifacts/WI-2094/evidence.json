@@ -2,23 +2,23 @@
   "claims": [
     {
       "acRef": "AC-1",
-      "description": "The root causes and learner-only production fixes are identified at the deterministic matcher, clarification announcement, and responsive layout boundaries.",
+      "description": "The full root-cause chain and learner-only fixes are recorded across matcher ordering, unsupported literal-like targets, visible repeated clarification, platform announcement, and compact-layout boundaries.",
       "pointer": "docs/evidence/WI-2094/report.md"
     },
     {
       "acRef": "AC-1",
-      "description": "Behavior-first rework coverage proves exact photosynthesis raw input, all three modified unsupported destinations, repeated native announcements, and the production-consumed interactive 360px layout contract.",
-      "pointer": "docs/evidence/WI-2094/rework-1-restore-green.json"
+      "description": "The final test-only RED proves literal-looking pedagogical and question input, bogus subject-list routing, ColdStartCard dispatch, and identical repeated clarification all fail against reviewed production while the explicit literal catalog jump remains characterized.",
+      "pointer": "docs/evidence/WI-2094/rework-3-red.json"
     },
     {
       "acRef": "AC-1",
-      "description": "The immutable production-only platform-guard REVERT reproduces Android's duplicate explicit announcements while the iOS case remains green and all tests stay unchanged.",
-      "pointer": "docs/evidence/WI-2094/rework-2-revert-production.json"
+      "description": "The immutable final production-only REVERT reproduces the named matcher and screen failures with every repaired test unchanged.",
+      "pointer": "docs/evidence/WI-2094/rework-3-revert-production.json"
     },
     {
       "acRef": "AC-1",
-      "description": "The exact production RESTORE returns both platform-sensitive cases to green: every revised clarification is explicitly announced on iOS while Android retains only the visible polite live region.",
-      "pointer": "docs/evidence/WI-2094/rework-2-restore-green.json"
+      "description": "The exact final RESTORE returns all repaired matcher, main-bar, ColdStartCard, visible-repeat, adversarial, iOS, and Android cases to green.",
+      "pointer": "docs/evidence/WI-2094/rework-3-restore-green.json"
     },
     {
       "acRef": "AC-1",
@@ -27,7 +27,7 @@
     },
     {
       "acRef": "AC-1",
-      "description": "The implementation plan records concrete routing, rawInput, clarification revision, deterministic jump, layout, announcement, verification, and deferred-scope decisions.",
+      "description": "The implementation plan records real final TypeScript symbols and control flow plus executable matcher, screen, compact-layout, platform, type, lint, build, format, and lifecycle-validation commands.",
       "pointer": "docs/plans/2026-07-17-route-valid-mentor-statements.md"
     }
   ],
