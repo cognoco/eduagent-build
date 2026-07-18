@@ -48,7 +48,7 @@ import {
   type EmailOptions,
 } from '../notifications/email';
 import { createLogger } from '../logger';
-import { calculateAge } from '../age-utils';
+import { calculateAgeFromParts } from '../age-utils';
 import { inngest } from '../../inngest/client';
 import { safeSend } from '../safe-non-core';
 import {
@@ -428,8 +428,24 @@ export async function repairOrSignalAdultSelfConsentV2(
     columns: { birthDate: true },
   });
   if (!personRow) return 'not_applicable';
-  const birthYear = Number(String(personRow.birthDate).slice(0, 4));
-  if (!Number.isFinite(birthYear) || calculateAge(birthYear) < 18) {
+  // Adult-owner gate — use the owner's EXACT birth date when present (year-only
+  // math overestimates by up to 11 months, letting an owner born late in the
+  // year, still 17, read as 18: the unsafe direction for a consent gate). Same
+  // full-date rule child-profile-v2.ts uses for its adult-owner gate, per
+  // AGENTS.md §Profile Shapes. `birthDate` is the `YYYY-MM-DD` date column;
+  // fail-closed on a null/non-numeric birthYear.
+  const birthDate = String(personRow.birthDate);
+  const birthYear = Number(birthDate.slice(0, 4));
+  const birthMonth = Number(birthDate.slice(5, 7));
+  const birthDay = Number(birthDate.slice(8, 10));
+  if (
+    !Number.isFinite(birthYear) ||
+    calculateAgeFromParts(
+      birthYear,
+      Number.isFinite(birthMonth) ? birthMonth : undefined,
+      Number.isFinite(birthDay) ? birthDay : undefined,
+    ) < 18
+  ) {
     return 'not_applicable';
   }
 
