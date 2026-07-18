@@ -317,7 +317,12 @@ export default function SignUpScreen() {
       await withClerkTimeout(
         signUp.create({ emailAddress, password }),
         'signUp.create',
-        SIGN_UP_CAPTCHA_TIMEOUT_MS,
+        // [WI-2119] The longer CAPTCHA ceiling only applies on web — native
+        // never renders Clerk's Smart CAPTCHA, so it keeps the standard
+        // CLERK_REQUEST_TIMEOUT_MS rather than silently waiting 45s.
+        Platform.OS === 'web'
+          ? SIGN_UP_CAPTCHA_TIMEOUT_MS
+          : CLERK_REQUEST_TIMEOUT_MS,
       );
       if (__DEV__)
         console.log(
