@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import {
+  ERROR_RESPONSES,
   NAMED_PROFILES,
   renderScreen,
   type RenderScreenOptions,
@@ -18,6 +19,10 @@ jest.mock(
 );
 
 const mockReplace = jest.fn();
+const mockBack = jest.fn();
+// [WI-2188] Defaults true (support-hub entry has history); individual tests
+// flip this to simulate a direct/historyless entry (deep link, cold start).
+const mockCanGoBack = jest.fn(() => true);
 let mockParams: Record<string, string> = {};
 let mockScopeContext: {
   activeScope: { kind: 'me' } | { kind: 'supporter-hub' };
@@ -31,7 +36,11 @@ let mockScopeContext: {
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
-  useRouter: () => ({ replace: mockReplace }),
+  useRouter: () => ({
+    replace: mockReplace,
+    back: mockBack,
+    canGoBack: mockCanGoBack,
+  }),
 }));
 
 jest.mock('../../../lib/scope-context', () => ({
@@ -79,6 +88,10 @@ function renderInitiateScreen(
 describe('InitiateLinkScreen', () => {
   afterEach(() => {
     jest.clearAllMocks();
+    // [WI-2188] clearAllMocks() clears call history but NOT a prior
+    // mockReturnValue() — restore the support-hub-entry default explicitly
+    // so a historyless-entry test doesn't leak `false` into the next test.
+    mockCanGoBack.mockReturnValue(true);
     cleanupRender?.();
     cleanupRender = undefined;
     mockParams = {};
@@ -263,5 +276,212 @@ describe('InitiateLinkScreen', () => {
     renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
 
     screen.getByTestId('visibility-link-initiate-picker-empty');
+  });
+
+  // [WI-2188] Every ceremony step must expose a visible, non-submitting
+  // in-app exit — the initial picker and the managed-person confirmation
+  // step previously had none (only the existing-teen branches did).
+  describe('in-app exits (WI-2188)', () => {
+    it('the picker back button calls router.back() when history exists (support-hub entry), and does not submit', () => {
+      renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+      screen.getByTestId('visibility-link-initiate-picker');
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-picker-back'),
+      );
+
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockReplace).not.toHaveBeenCalled();
+    });
+
+    it('the picker back button falls back to router.replace("/(app)/home") on a historyless entry (deep link / cold start)', () => {
+      mockCanGoBack.mockReturnValue(false);
+      renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-picker-back'),
+      );
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      expect(mockBack).not.toHaveBeenCalled();
+    });
+
+    it('the picker back button is present and functional in the empty-eligible-children state', () => {
+      renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+      screen.getByTestId('visibility-link-initiate-picker-empty');
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-picker-back'),
+      );
+
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    });
+
+    it('the confirmation back button returns to the picker when reached via inline picker selection, and does not submit', () => {
+      const { routedFetch } = renderInitiateScreen({
+        profiles: [NAMED_PROFILES.guardian, NAMED_PROFILES.linkedChild],
+      });
+
+      fireEvent.press(
+        screen.getByTestId(
+          `visibility-link-initiate-picker-managed-${NAMED_PROFILES.linkedChild.id}`,
+        ),
+      );
+      screen.getByTestId('visibility-link-create');
+
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-confirm-back'),
+      );
+
+      screen.getByTestId('visibility-link-initiate-picker');
+      expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
+        0,
+      );
+    });
+
+    it('the confirmation back button calls router.back() (not setTarget) when reached via a pre-filled supporteePersonId — support-hub entry returns there in one step', () => {
+      mockParams = {
+        supporteePersonId: NAMED_PROFILES.linkedChild.id,
+        supporteeName: NAMED_PROFILES.linkedChild.displayName,
+      };
+      renderInitiateScreen();
+
+      // Pre-filled entry skips the picker — confirmation renders directly.
+      screen.getByTestId('visibility-link-create');
+      expect(
+        screen.queryByTestId('visibility-link-initiate-picker'),
+      ).toBeNull();
+
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-confirm-back'),
+      );
+
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockReplace).not.toHaveBeenCalled();
+    });
+
+    it('the confirmation back button falls back to router.replace("/(app)/home") on a historyless pre-filled entry', () => {
+      mockCanGoBack.mockReturnValue(false);
+      mockParams = {
+        supporteePersonId: NAMED_PROFILES.linkedChild.id,
+        supporteeName: NAMED_PROFILES.linkedChild.displayName,
+      };
+      renderInitiateScreen();
+
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-confirm-back'),
+      );
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      expect(mockBack).not.toHaveBeenCalled();
+    });
+
+    it('the confirmation back button stays functional after an API error, and pressing it does not re-submit', async () => {
+      const InitiateLinkScreen = require('./initiate').default;
+      const rendered = renderScreen(<InitiateLinkScreen />, {
+        profile: NAMED_PROFILES.guardian,
+        profiles: [NAMED_PROFILES.guardian, NAMED_PROFILES.linkedChild],
+        routes: {
+          '/visibility/links': () => ERROR_RESPONSES.validation(),
+        },
+      });
+      cleanupRender = rendered.cleanup;
+      const { routedFetch } = rendered;
+
+      fireEvent.press(
+        screen.getByTestId(
+          `visibility-link-initiate-picker-managed-${NAMED_PROFILES.linkedChild.id}`,
+        ),
+      );
+      fireEvent.press(screen.getByTestId('visibility-link-create'));
+
+      await waitFor(() => screen.getByTestId('visibility-link-create-error'));
+      expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
+        1,
+      );
+
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-confirm-back'),
+      );
+
+      screen.getByTestId('visibility-link-initiate-picker');
+      // Back is pure navigation — it must not have triggered a retry/re-submit.
+      expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
+        1,
+      );
+    });
+
+    it('re-entering confirmation after an error + back does not show the stale error before a new submit', async () => {
+      const InitiateLinkScreen = require('./initiate').default;
+      const rendered = renderScreen(<InitiateLinkScreen />, {
+        profile: NAMED_PROFILES.guardian,
+        profiles: [NAMED_PROFILES.guardian, NAMED_PROFILES.linkedChild],
+        routes: {
+          '/visibility/links': () => ERROR_RESPONSES.validation(),
+        },
+      });
+      cleanupRender = rendered.cleanup;
+      const { routedFetch } = rendered;
+
+      fireEvent.press(
+        screen.getByTestId(
+          `visibility-link-initiate-picker-managed-${NAMED_PROFILES.linkedChild.id}`,
+        ),
+      );
+      fireEvent.press(screen.getByTestId('visibility-link-create'));
+      await waitFor(() => screen.getByTestId('visibility-link-create-error'));
+
+      // Leave the errored confirmation step via the new WI-2188 back button.
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-confirm-back'),
+      );
+      screen.getByTestId('visibility-link-initiate-picker');
+
+      // Re-enter confirmation for the same managed person without submitting.
+      fireEvent.press(
+        screen.getByTestId(
+          `visibility-link-initiate-picker-managed-${NAMED_PROFILES.linkedChild.id}`,
+        ),
+      );
+
+      // The prior mutation's error state must not leak into the fresh
+      // confirmation render — nothing has been submitted yet this time.
+      expect(screen.queryByTestId('visibility-link-create-error')).toBeNull();
+      expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
+        1,
+      );
+    });
+
+    it('the existing-teen invite branch (V2 on) back button returns to the picker', () => {
+      const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+      try {
+        renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+        fireEvent.press(
+          screen.getByTestId('visibility-link-initiate-picker-existing-teen'),
+        );
+        screen.getByTestId('visibility-link-initiate-existing-teen-invite');
+
+        fireEvent.press(
+          screen.getByTestId('visibility-link-initiate-existing-teen-back'),
+        );
+
+        screen.getByTestId('visibility-link-initiate-picker');
+      } finally {
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = original;
+      }
+    });
+
+    it('the picker back button is reachable by accessible role+name (keyboard/screen-reader activation path)', () => {
+      renderInitiateScreen({ profiles: [NAMED_PROFILES.guardian] });
+
+      fireEvent.press(screen.getByRole('button', { name: 'Go Back' }));
+
+      expect(mockBack).toHaveBeenCalledTimes(1);
+    });
   });
 });
