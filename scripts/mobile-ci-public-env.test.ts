@@ -74,10 +74,7 @@ function getJob(name: (typeof NATIVE_BUILD_JOBS)[number]): WorkflowJob {
   return job;
 }
 
-// Pulls the literal "Verify EAS environment variables" step's `run:` bash
-// straight out of the parsed workflow — executing the workflow's own text
-// (rather than a hand-copied re-implementation) so this test cannot drift
-// from what CI actually runs.
+// Extracts the actual "Verify EAS environment variables" step's `run:` bash from the parsed workflow, so this test can't drift from what CI runs.
 function getVerifyStepRun(jobName: (typeof NATIVE_BUILD_JOBS)[number]): string {
   const steps = getJob(jobName).steps ?? [];
   const verifyStep = steps.find((step) =>
@@ -89,10 +86,7 @@ function getVerifyStepRun(jobName: (typeof NATIVE_BUILD_JOBS)[number]): string {
   return verifyStep.run;
 }
 
-// Runs a job's verify-EAS-env bash against a fake `eas` binary that prints a
-// fixed `eas env:list` fixture, so the test exercises the real predicate
-// (grep pattern, missing-key accumulation, exit code) instead of a
-// reimplementation of it.
+// Runs a job's verify-EAS-env bash against a fake `eas` binary that prints a fixed `eas env:list` fixture, exercising the real predicate instead of a reimplementation.
 function runVerifyPredicate(
   jobName: (typeof NATIVE_BUILD_JOBS)[number],
   fixture: string,
@@ -141,10 +135,7 @@ const PRESENT_NON_EMPTY_FIXTURE = [
   'EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID=rc_android_abc',
 ].join('\n');
 
-// WI-2301 rework: the AC-1 defect — a configured-but-EMPTY EAS env var
-// renders as "KEY=" (nothing after "="), and the old `grep -q "^${key}="`
-// treated the bare prefix match as "present". This fixture reproduces that
-// exact shape for one required key.
+// "KEY=" (nothing after "=") must be treated as missing, not present.
 const EMPTY_VALUE_FIXTURE = [
   'EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=',
   'EXPO_PUBLIC_SENTRY_DSN=https://sentry.example/1',
