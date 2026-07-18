@@ -2273,6 +2273,41 @@ const COPPA = 'coppa_parental_consent';
           withdrawAdultSelfConsentV2(db, adultId, orgId, 'never_granted'),
         ).rejects.toThrow(ConsentRecordNotFoundError);
       });
+
+      // [#5 concurrency regression] Two callers withdrawing the SAME grant race
+      // on the isNull(withdrawnAt) UPDATE. Exactly one wins; the loser's
+      // conditional UPDATE matches zero rows. The loser must re-read and return
+      // the PERSISTED winner's timestamp — never its own un-persisted local
+      // `now`. Assert the invariant (both callers, and the stored row, agree),
+      // not a specific interleave, so the test is not timing-flaky.
+      it('[#5] concurrent withdrawals of the same purpose return the SAME persisted timestamp', async () => {
+        const orgId = await seedOrg();
+        const adultId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+        });
+        await recordAdultSelfConsentV2(db, adultId, orgId);
+
+        const [a, b] = await Promise.all([
+          withdrawAdultSelfConsentV2(db, adultId, orgId, PURPOSE),
+          withdrawAdultSelfConsentV2(db, adultId, orgId, PURPOSE),
+        ]);
+
+        // Both callers observe the ONE persisted withdrawal timestamp.
+        expect(a.withdrawnAt.getTime()).toBe(b.withdrawnAt.getTime());
+
+        // And it is exactly what the row actually stores — proving neither
+        // caller returned an un-persisted local timestamp.
+        const stored = await db.query.consentGrant.findFirst({
+          where: and(
+            eq(consentGrant.chargePersonId, adultId),
+            eq(consentGrant.purpose, PURPOSE),
+            eq(consentGrant.lawfulBasis, 'adult_self_consent'),
+          ),
+          columns: { withdrawnAt: true },
+        });
+        expect(stored?.withdrawnAt).not.toBeNull();
+        expect(a.withdrawnAt.getTime()).toBe(stored!.withdrawnAt!.getTime());
+      });
     });
   },
 );

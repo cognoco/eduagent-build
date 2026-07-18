@@ -10,6 +10,7 @@ import {
   childConsentStatusSchema,
   consentActionResultSchema,
   selfConsentWithdrawRequestSchema,
+  consentAccountabilityReportSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -31,7 +32,7 @@ import {
   ConsentRecordNotFoundError,
   ConsentGracePeriodExpiredError,
 } from '../services/consent';
-import { notFound, forbidden, apiError } from '../errors';
+import { notFound, forbidden, unauthorized, apiError } from '../errors';
 import {
   assertOwnerProfile,
   assertOwnerAndParentAccess,
@@ -47,6 +48,7 @@ import {
   getOrgMemberDisplayNameV2,
 } from '../services/identity-v2/consent-v2';
 import { getChildConsentForParentV2 } from '../services/identity-v2/family-v2';
+import { getConsentAccountabilityV2 } from '../services/identity-v2/consent-status-v2';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
 import {
@@ -175,6 +177,11 @@ type ConsentRouteEnv = {
     account: Account;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
+    // [WI-774/WI-1302] The authenticated caller's own person id, resolved
+    // server-side by accountMiddleware from the Clerk JWT (never request-
+    // supplied, unlike X-Profile-Id). Used by the adult self-consent withdrawal
+    // + accountability routes to bind to the caller's OWN person.
+    callerPersonId: string | undefined;
   };
 };
 
@@ -558,18 +565,24 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
   })
 
   // [WI-1193 AC2] Authenticated self-service withdrawal of ONE adult
-  // self-consent purpose. The caller withdraws their OWN consent
-  // (chargePersonId = the caller's own profile), so authentication is the only
-  // gate — an adult acts on their own lawful basis, no owner/guardian check.
-  // Purposes are independently revocable: withdrawing one purpose never touches
-  // the other's grant. This is the user-reachable path that makes the
-  // per-purpose grants (AC2) actually revocable.
+  // self-consent purpose. An adult acts on their OWN lawful basis, so the
+  // charge is bound to `callerPersonId` — the login→person binding
+  // accountMiddleware resolves server-side from the Clerk JWT (WI-774/WI-1302),
+  // NOT withProfile(c).profileId, which is the X-Profile-Id-selectable active
+  // profile. Binding to the active profile would let an account member withdraw
+  // ANOTHER in-account profile's adult consent (IDOR); callerPersonId cannot be
+  // retargeted by the caller. Purposes are independently revocable: withdrawing
+  // one purpose never touches the other's grant. This is the user-reachable path
+  // that makes the per-purpose grants (AC2) actually revocable.
   .put(
     '/consent/self/withdraw',
     zValidator('json', selfConsentWithdrawRequestSchema),
     async (c) => {
       const db = c.get('db');
-      const { profileId: chargePersonId } = withProfile(c);
+      const chargePersonId = c.get('callerPersonId');
+      if (!chargePersonId) {
+        return unauthorized(c, 'No identity is provisioned for this login.');
+      }
       const account = requireAccount(c.get('account'));
       const { purpose } = c.req.valid('json');
 
@@ -595,6 +608,39 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       }
     },
   )
+
+  // [WI-1193 AC3] Authenticated accountability report for the caller's OWN
+  // consent record — the production caller for getConsentAccountabilityV2 and
+  // the GDPR Art 5(2)/7(1) "demonstrate consent on request" surface. Bound to
+  // callerPersonId (server-resolved from the JWT), mirroring the withdrawal
+  // route: a caller retrieves only their own lawful basis + versioned
+  // terms-acceptance + accepted purposes (+ any withdrawal), never another
+  // profile's. One query per charge (DISTINCT ON purpose/lawful_basis).
+  .get('/consent/self/accountability', async (c) => {
+    const db = c.get('db');
+    const chargePersonId = c.get('callerPersonId');
+    if (!chargePersonId) {
+      return unauthorized(c, 'No identity is provisioned for this login.');
+    }
+    const account = requireAccount(c.get('account'));
+    const records = await getConsentAccountabilityV2(
+      db,
+      chargePersonId,
+      account.id,
+    );
+    return c.json(
+      consentAccountabilityReportSchema.parse({
+        records: records.map((r) => ({
+          purpose: r.purpose,
+          lawfulBasis: r.lawfulBasis,
+          granted: r.granted,
+          termsAcceptedAt: r.termsAcceptedAt,
+          termsVersion: r.termsVersion,
+          withdrawnAt: r.withdrawnAt,
+        })),
+      }),
+    );
+  })
 
   .put('/consent/:childProfileId/restore', async (c) => {
     const db = c.get('db');

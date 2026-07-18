@@ -85,16 +85,48 @@ export type ConsentActionResult = z.infer<typeof consentActionResultSchema>;
 // [WI-1193 AC3] One purpose's current consent state, as surfaced to the
 // accountability report the api service's getConsentAccountabilityV2 returns
 // (GDPR Art 5(2)/7(1)). Client-facing (returned by an exported service
-// function), so the contract lives here — the service and the follow-up
-// accountability route share ONE definition instead of drifting.
+// function), so the contract lives here — the service and the accountability
+// route share ONE definition instead of drifting.
 export interface ConsentAccountabilityRecord {
   purpose: string;
   lawfulBasis: string;
   granted: boolean;
-  /** The moment consent (or terms acceptance, for `adult_self_consent`) was given. */
+  /**
+   * [WI-1193 AC1] The durable terms-acceptance moment, recorded as its own fact
+   * (consent_grant.audit_fact.termsAcceptedAt) at signup — NOT a rename of
+   * granted_at. Falls back to granted_at for grants written before the fact was
+   * captured, so pre-existing rows still resolve.
+   */
   termsAcceptedAt: Date;
+  /**
+   * [WI-1193 AC1] The consent-policy version accepted at that moment
+   * (consent_grant.audit_fact.termsVersion). The versioned half of the
+   * terms-acceptance fact MMT-ADR-0011 keeps separate from the lawful basis;
+   * null for grants written before the version was captured.
+   */
+  termsVersion: string | null;
   withdrawnAt: Date | null;
 }
+
+// [WI-1193 AC3] Wire shape for the authenticated accountability report route
+// (GET /consent/self/accountability) — the ISO-serialized form of
+// ConsentAccountabilityRecord. Gives getConsentAccountabilityV2 a production
+// caller and lets the DPO/data-subject retrieve the lawful basis + versioned
+// terms-acceptance + accepted purposes + any withdrawal in one query.
+export const consentAccountabilityRecordSchema = z.object({
+  purpose: z.string(),
+  lawfulBasis: z.string(),
+  granted: z.boolean(),
+  termsAcceptedAt: isoDateField,
+  termsVersion: z.string().nullable(),
+  withdrawnAt: isoDateField.nullable(),
+});
+export const consentAccountabilityReportSchema = z.object({
+  records: z.array(consentAccountabilityRecordSchema),
+});
+export type ConsentAccountabilityReport = z.infer<
+  typeof consentAccountabilityReportSchema
+>;
 
 // [WI-1193 AC2] Body for the authenticated adult self-consent purpose-withdrawal
 // route (PUT /consent/self/withdraw). Each granular purpose is independently

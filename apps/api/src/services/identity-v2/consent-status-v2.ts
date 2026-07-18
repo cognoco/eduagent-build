@@ -738,10 +738,18 @@ export function consentGateSatisfiedSql(personColumn: ReturnType<typeof sql>) {
 
 /**
  * [WI-1193 AC3] The CURRENT consent_grant row per (purpose, lawful_basis) for a
- * charge — lawful basis + terms-accepted timestamp (`grantedAt`, renamed here
- * to `termsAcceptedAt` — the CONSENTED grant IS the terms-acceptance event) +
+ * charge — lawful basis + the durable, versioned terms-acceptance fact +
  * accepted purposes, in ONE query, satisfying GDPR Art 5(2)/7(1) accountability
  * (must be able to demonstrate consent on request).
+ *
+ * [WI-1193 AC1] `termsAcceptedAt`/`termsVersion` come from the grant's
+ * `audit_fact` (the durable terms-acceptance fact recorded at signup, kept
+ * SEPARATE from the lawful basis per MMT-ADR-0011), NOT a rename of
+ * `granted_at`. `termsAcceptedAt` falls back to `granted_at` and `termsVersion`
+ * to null for grants written before the fact was captured, so pre-existing rows
+ * still resolve. The withdrawal path MERGES `audit_fact`, so these survive a
+ * withdrawal — the report proves consent WAS validly obtained even after it is
+ * withdrawn.
  *
  * `DISTINCT ON (purpose, lawful_basis) ... ORDER BY purpose, lawful_basis,
  * granted_at DESC, id DESC` reuses the exact (granted_at DESC, id DESC)
@@ -757,38 +765,70 @@ export async function getConsentAccountabilityV2(
 ): Promise<ConsentAccountabilityRecord[]> {
   const rows = (await db.execute(sql`
     SELECT DISTINCT ON (purpose, lawful_basis)
-      purpose, lawful_basis, granted, granted_at, withdrawn_at
+      purpose, lawful_basis, granted, granted_at, withdrawn_at, audit_fact
     FROM consent_grant
     WHERE charge_person_id = ${chargePersonId}
       AND organization_id = ${organizationId}
     ORDER BY purpose, lawful_basis, granted_at DESC, id DESC
   `)) as unknown as
-    | Array<{
-        purpose: string;
-        lawful_basis: string;
-        granted: boolean;
-        granted_at: string | Date;
-        withdrawn_at: string | Date | null;
-      }>
+    | Array<AccountabilityRow>
     | {
-        rows: Array<{
-          purpose: string;
-          lawful_basis: string;
-          granted: boolean;
-          granted_at: string | Date;
-          withdrawn_at: string | Date | null;
-        }>;
+        rows: Array<AccountabilityRow>;
       };
   const list = Array.isArray(rows) ? rows : rows.rows;
   // The Neon driver returns raw `db.execute` timestamp columns as ISO strings,
   // not Date objects (the Drizzle query builder's type parsers don't apply to
   // a bare `sql` execute) — coerce explicitly, same pattern as the
   // `minGrantedAt` aggregate above.
-  return list.map((r) => ({
-    purpose: r.purpose,
-    lawfulBasis: r.lawful_basis,
-    granted: r.granted,
-    termsAcceptedAt: new Date(r.granted_at),
-    withdrawnAt: r.withdrawn_at ? new Date(r.withdrawn_at) : null,
-  }));
+  return list.map((r) => {
+    const audit = parseAuditFact(r.audit_fact);
+    const acceptedAt =
+      typeof audit?.['termsAcceptedAt'] === 'string'
+        ? (audit['termsAcceptedAt'] as string)
+        : null;
+    return {
+      purpose: r.purpose,
+      lawfulBasis: r.lawful_basis,
+      granted: r.granted,
+      // Durable terms-acceptance moment; fall back to granted_at for grants
+      // written before the fact was captured.
+      termsAcceptedAt: acceptedAt
+        ? new Date(acceptedAt)
+        : new Date(r.granted_at),
+      termsVersion:
+        typeof audit?.['termsVersion'] === 'string'
+          ? (audit['termsVersion'] as string)
+          : null,
+      withdrawnAt: r.withdrawn_at ? new Date(r.withdrawn_at) : null,
+    };
+  });
+}
+
+interface AccountabilityRow {
+  purpose: string;
+  lawful_basis: string;
+  granted: boolean;
+  granted_at: string | Date;
+  withdrawn_at: string | Date | null;
+  audit_fact: Record<string, unknown> | string | null;
+}
+
+/**
+ * The Neon driver returns a jsonb column from a bare `sql` execute as a parsed
+ * object, but be defensive against a string (some drivers return raw text) so
+ * the accountability read never throws on a malformed row.
+ */
+function parseAuditFact(
+  value: Record<string, unknown> | string | null,
+): Record<string, unknown> | null {
+  if (!value) return null;
+  if (typeof value === 'object') return value;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === 'object'
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
 }

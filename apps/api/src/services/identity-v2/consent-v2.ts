@@ -243,6 +243,7 @@ export async function recordAdultSelfConsentV2(
   db: Database,
   chargePersonId: string,
   organizationId: string,
+  termsVersion?: string,
 ): Promise<void> {
   const now = new Date();
   await db.insert(consentGrant).values(
@@ -253,7 +254,18 @@ export async function recordAdultSelfConsentV2(
       lawfulBasis: 'adult_self_consent' as const,
       granted: true,
       grantedAt: now,
-      auditFact: { source: 'adult_self_signup' },
+      // [WI-1193 AC1] audit_fact carries the durable terms-acceptance fact as
+      // its OWN keys — the moment the adult accepted plus the consent-policy
+      // VERSION then in force — kept SEPARATE from the lawful basis
+      // (MMT-ADR-0011: terms acceptance is a distinct, versioned fact, never
+      // bundled into the basis). getConsentAccountabilityV2 surfaces these; the
+      // withdrawal path MERGES rather than overwrites audit_fact so they survive
+      // a withdrawal (Art 5(2)/7(1) must still prove consent WAS validly given).
+      auditFact: {
+        source: 'adult_self_signup',
+        termsAcceptedAt: now.toISOString(),
+        termsVersion: termsVersion ?? null,
+      },
     })),
   );
 }
@@ -283,7 +295,7 @@ export async function withdrawAdultSelfConsentV2(
       eq(consentGrant.lawfulBasis, 'adult_self_consent'),
     ),
     orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
-    columns: { id: true, withdrawnAt: true },
+    columns: { id: true, withdrawnAt: true, auditFact: true },
   });
   if (!current) {
     throw new ConsentRecordNotFoundError();
@@ -293,12 +305,26 @@ export async function withdrawAdultSelfConsentV2(
   }
 
   const now = new Date();
-  await db
+  // [WI-1193 AC1] MERGE audit_fact rather than overwrite: the durable
+  // terms-acceptance fact (termsAcceptedAt/termsVersion) written at signup must
+  // SURVIVE the withdrawal so getConsentAccountabilityV2 can still prove consent
+  // WAS validly obtained (GDPR Art 5(2)/7(1) outlives the withdrawal). We only
+  // flip `source` to the withdrawal marker.
+  const priorAuditFact =
+    current.auditFact && typeof current.auditFact === 'object'
+      ? (current.auditFact as Record<string, unknown>)
+      : {};
+  // [WI-1193 #5] UPDATE ... RETURNING to learn whether THIS call won the
+  // isNull(withdrawnAt) race. A concurrent withdrawal of the same grant leaves
+  // exactly one winner; the loser's conditional UPDATE matches zero rows. Never
+  // return the local `now` on a lost race — it was never persisted; re-read and
+  // return the winner's stamped timestamp instead.
+  const updated = await db
     .update(consentGrant)
     .set({
       withdrawnAt: now,
       priorValue: true,
-      auditFact: { source: 'adult_self_withdrawal' },
+      auditFact: { ...priorAuditFact, source: 'adult_self_withdrawal' },
     })
     .where(
       and(
@@ -306,9 +332,21 @@ export async function withdrawAdultSelfConsentV2(
         eq(consentGrant.chargePersonId, chargePersonId),
         isNull(consentGrant.withdrawnAt),
       ),
-    );
+    )
+    .returning({ withdrawnAt: consentGrant.withdrawnAt });
 
-  return { chargePersonId, withdrawnAt: now };
+  const won = updated[0]?.withdrawnAt;
+  if (won) {
+    return { chargePersonId, withdrawnAt: won };
+  }
+
+  // Lost the race: a concurrent caller already stamped the row. Return the
+  // PERSISTED winner's timestamp, not this call's un-persisted `now`.
+  const winner = await db.query.consentGrant.findFirst({
+    where: eq(consentGrant.id, current.id),
+    columns: { withdrawnAt: true },
+  });
+  return { chargePersonId, withdrawnAt: winner?.withdrawnAt ?? now };
 }
 
 // ---------------------------------------------------------------------------
