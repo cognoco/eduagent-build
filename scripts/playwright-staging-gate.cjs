@@ -137,7 +137,9 @@ if (require.main === module) {
   if (mode === '--canary') {
     const result = await runCanary({ apiUrl: process.env.PLAYWRIGHT_API_URL, secret: process.env.TEST_SEED_SECRET });
     printState(result);
-    process.exit(result.state === GATE_STATES.NOT_RUN ? 2 : 0);
+    // State is the sole control channel; callers inspect GATE_STATE and emit
+    // diagnostics without losing them to set -e.
+    process.exit(0);
   }
   if (mode === '--classify') {
     const resultFile = args[2];

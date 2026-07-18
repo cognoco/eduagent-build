@@ -55,6 +55,10 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
         [
           JSON.stringify({ type: 'response', status: 503 }),
           JSON.stringify({
+            type: 'requestfailed',
+            errorText: 'net::ERR_CONNECTION_RESET',
+          }),
+          JSON.stringify({
             type: 'console',
             text: '502 mentioned in arbitrary prose',
           }),
@@ -62,6 +66,13 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
       );
       expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
         kind: 'infra-signalled',
+      });
+      writeFileSync(
+        join(root, 'run', 'trace.trace'),
+        JSON.stringify({ type: 'console', text: '503 in prose' }),
+      );
+      expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
+        kind: 'unknown',
       });
     } finally {
       rmSync(root, { recursive: true, force: true });
