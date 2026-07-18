@@ -96,6 +96,20 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
         classifyFailure({
           artifactRoot: root,
           exitCode: 1,
+          resultText: 'handles cancellation flow',
+        }),
+      ).toEqual({ kind: 'infra-signalled' });
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: 'Test run cancelled',
+        }),
+      ).toEqual({ kind: 'product' });
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
           resultText: 'expect(received).toBe(true)',
         }),
       ).toEqual({ kind: 'product' });
@@ -124,29 +138,32 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
     }
   });
 
-  it('classifies retryable API status from a Playwright zip archive', () => {
-    const root = mkdtempSync(join(tmpdir(), 'wi-2228-trace-zip-'));
-    try {
-      const trace = join(root, 'trace.trace');
-      writeFileSync(
-        trace,
-        JSON.stringify({
-          type: 'resource-snapshot',
-          snapshot: {
-            request: { url: 'https://api-stg.example.test/v1/profiles' },
-            response: { status: 503 },
-          },
-        }),
-      );
-      execFileSync('zip', ['-q', 'trace.zip', 'trace.trace'], { cwd: root });
-      rmSync(trace);
-      expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
-        kind: 'infra-signalled',
-      });
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
+  (process.platform === 'win32' ? it.skip : it)(
+    'classifies retryable API status from a Playwright zip archive',
+    () => {
+      const root = mkdtempSync(join(tmpdir(), 'wi-2228-trace-zip-'));
+      try {
+        const trace = join(root, 'trace.trace');
+        writeFileSync(
+          trace,
+          JSON.stringify({
+            type: 'resource-snapshot',
+            snapshot: {
+              request: { url: 'https://api-stg.example.test/v1/profiles' },
+              response: { status: 503 },
+            },
+          }),
+        );
+        execFileSync('zip', ['-q', 'trace.zip', 'trace.trace'], { cwd: root });
+        rmSync(trace);
+        expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
+          kind: 'infra-signalled',
+        });
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   it('does not neutralize assertion, cancellation, or unknown failures', () => {
     const cases = [

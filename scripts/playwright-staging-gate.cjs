@@ -17,7 +17,7 @@ const GATE_STATES = Object.freeze({
 
 const RETRYABLE = new Set([502, 503, 504]);
 const TRANSPORT = /(?:timed?out|timeout|network|fetch failed|socket|connection reset|connect)/i;
-const HARD_FAILURE = /(?:assert(?:ion)?|expect\(|no tests? found|discovery|config(?:uration)?|cancel(?:led|lation)?|malformed)/i;
+const HARD_FAILURE = /(?:assert(?:ion)?|expect\(|no tests? found|discovery|config(?:uration)?|test run cancel(?:led|ed)|interrupted|malformed)/i;
 const MAX_TRACE_BYTES = 8 * 1024 * 1024;
 
 function validatedApiUrl(value) {
