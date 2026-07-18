@@ -54,6 +54,10 @@ type ProfileEnv = {
     // [WI-301] Kill switch for non-owner -> owner profile elevation.
     // Default-on; set to 'false' for emergency rollback.
     OWNER_ELEVATION_GATE_ENABLED?: string;
+    // [WI-1193 AC1] Consent-policy version recorded as the versioned half of the
+    // adult owner's durable terms-acceptance fact at graph bootstrap. Same
+    // binding the consent routes read (config default '2026-05-31').
+    CONSENT_POLICY_VERSION: string;
   };
   Variables: {
     user: AuthUser;
@@ -306,6 +310,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
           pronouns: input.pronouns ?? null,
           avatarUrl: input.avatarUrl ?? null,
           timezone: null,
+          consentPolicyVersion: c.env.CONSENT_POLICY_VERSION,
         });
         const profile = buildBootstrapProfile(graph, input);
         // WI-1504: launch activation instrumentation — signup_completed

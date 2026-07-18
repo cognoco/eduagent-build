@@ -192,6 +192,15 @@ export interface CreateIdentityGraphInput {
   timezone?: string | null;
   /** Organization display name; derived as today when absent. */
   organizationName?: string;
+  /**
+   * [WI-1193 AC1] The consent-policy version in force when the adult accepts,
+   * stored as the versioned half of the durable terms-acceptance fact on the
+   * owner's self-consent grants (adults age >= 18 only). Sourced from
+   * CONSENT_POLICY_VERSION by the production caller (profiles.ts). Optional so
+   * pre-version test callers still compile; absent → the grant records a null
+   * terms version, which the accountability report surfaces as such.
+   */
+  consentPolicyVersion?: string;
 }
 
 /**
@@ -326,7 +335,12 @@ export async function createIdentityGraph(
       // above) gets NO consent recorded by this call — a pre-existing gap this
       // WI does not resolve; see the PR description for the follow-up.
       if (consentCheck.age >= 18) {
-        await recordAdultSelfConsentV2(txDb, personRow.id, orgRow.id);
+        await recordAdultSelfConsentV2(
+          txDb,
+          personRow.id,
+          orgRow.id,
+          input.consentPolicyVersion,
+        );
       }
 
       // (7) subscription — FR108 14-day plus trial, end-of-day in the org tz.
