@@ -338,8 +338,6 @@ describe('QuizResultsScreen — [F-040] missed-question cards', () => {
     expect(
       screen.getByTestId('quiz-results-history').props.accessibilityState,
     ).toEqual({ disabled: true });
-    expect(mockFocusCallback).not.toBeNull();
-
     act(() => {
       mockFocusCallback?.();
     });

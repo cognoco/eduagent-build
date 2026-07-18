@@ -141,21 +141,54 @@ This is the required production-coupled semantics RED → GREEN → lock-revert 
 restore GREEN sequence. Both isolated production removals fail the same named
 browser case.
 
-### History-return Gate-1 RED → GREEN
+### History-return retained-instance GREEN → source-revert RED → restore-GREEN
 
-Gate 1 identified that the exact-once lock remained set when History was pushed:
-the results route stays mounted behind History, so Back returned to three disabled
-exits. Before the production fix, the new unchanged native regression failed with
-`mockFocusCallback` still `null` (1 failed, 13 passed). The production results
-screen now re-arms the lock through `useFocusEffect` whenever it regains focus.
+The exact native regression is `re-enables exits when results regain focus after
+a History push` in
+`apps/mobile/src/app/(app)/quiz/results.test.tsx:319`. It activates History,
+observes the rendered History control become disabled, drives the retained
+results instance's focus-return boundary, then asserts the rendered control is
+enabled before Play Again navigates exactly once. It does not assert that the
+focus callback was registered; the callback is only a boundary driver at
+`apps/mobile/src/app/(app)/quiz/results.test.tsx:342`.
 
-After the fix, the native suite passed 14/14. The real Chromium case also performs
-View History → `/quiz/history?returnTo=practice` → browser Back → Play Again →
-`/quiz/launch`, verifies the controls are enabled on return, and observes the two
-exact router calls in order. The complete browser project remained green:
+With the production focus reset at
+`apps/mobile/src/app/(app)/quiz/results.tsx:29`, the exact case passed:
 
 ```text
-3 passed (2.1m); target case 58.2s
+PASS apps/mobile/src/app/(app)/quiz/results.test.tsx
+Tests:       13 skipped, 1 passed, 14 total
+```
+
+Removing only that production `useFocusEffect` reset while leaving the test
+unchanged made the same case fail at its user-visible disabled-state assertion
+(`apps/mobile/src/app/(app)/quiz/results.test.tsx:347`):
+
+```text
+Expected: { "disabled": false }
+Received: { "disabled": true }
+Tests:       1 failed, 13 skipped, 14 total
+```
+
+Restoring the production reset returned the unchanged exact case to green:
+
+```text
+PASS apps/mobile/src/app/(app)/quiz/results.test.tsx
+Tests:       13 skipped, 1 passed, 14 total
+```
+
+The real Chromium case `quiz-results exits are real named buttons with
+exact-once web activation` is at
+`apps/mobile/e2e-web/flows/accessibility/quiz-results-exits.spec.ts:104`.
+Its production-source-revert probe remained green, so it does not expose the
+retained-instance failure and is not cited as the RED proof. After production
+source was restored, the full Chromium project passed:
+
+```text
+✓ setup: seed onboarding-complete and capture solo-learner storage state
+✓ setup: seed parent-multi-child and capture owner-with-children storage state
+✓ smoke-accessibility: quiz-results exits are real named buttons with exact-once web activation
+3 passed (2.0m)
 ```
 
 ## Native and repository verification
