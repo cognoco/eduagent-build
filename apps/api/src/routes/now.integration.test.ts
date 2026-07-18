@@ -26,7 +26,11 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 import { nowRoutes } from './now';
 import { acceptLink, initiateLink } from '../services/linking-ceremony';
-import { collectCandidatesForRequest } from '../services/now-feed';
+import {
+  collectCandidatesForRequest,
+  collectChallengeReadyCandidates,
+  __setChallengeReadyRaceHook,
+} from '../services/now-feed';
 import { requestSelfUnlink } from '../services/supportership-revocation';
 import {
   deleteV2IdentitiesForTest,
@@ -751,5 +755,81 @@ describe('Integration: now routes', () => {
         supporterId,
       ),
     ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  // [WI-2237] Complementary coverage for the challenge-ready supporter path's
+  // snapshot-atomicity fix. The security DENIAL proof is the sibling RGR above
+  // (collectCandidatesForRequest, revoke-then-recall -> ForbiddenError, watched
+  // red/green). This block adds two properties: (a) an accepted edge with no
+  // revoke still returns the child's challenge_ready candidate (the guard is not
+  // always-deny); and (b) a revoke committed before the eligibility read (the
+  // __setChallengeReadyRaceHook seam fires before the transaction opens, so the
+  // revoke lands before the snapshot) is denied by the in-transaction
+  // authorization read.
+  //
+  // What the transaction buys is CONSISTENCY, not a deny-difference a black-box
+  // assertion can isolate: the authorization and every eligibility read run
+  // against one `repeatable read` snapshot, so they cannot disagree (the TOCTOU
+  // where auth passes on stale state but the read returns post-revoke data). By
+  // design a revoke committed AFTER the snapshot is invisible and the request
+  // serves the consistent accepted-at-snapshot candidate -- the accepted
+  // contract (WI-2401 tracks the stronger fail-closed variant), not a leak. A
+  // transaction-only revert therefore does NOT flip this to RED: the reinstated
+  // pre-check still denies a pre-snapshot revoke; the transaction's guarantee is
+  // demonstrated by trace + the sibling RGR, not by this deny assertion.
+  describe('challenge-ready between-reads revoke race [WI-2237]', () => {
+    afterEach(() => {
+      __setChallengeReadyRaceHook(null);
+    });
+
+    it('accepted, no mid-call revoke: returns the child challenge-ready candidate (guard is not always-deny)', async () => {
+      const supporterId = await seedProfile(db, 'supporter-window-accepted');
+      const childId = await seedProfile(db, 'child-window-accepted');
+      const edgeId = await seedAcceptedContract(db, supporterId, childId);
+      const eligible = await seedAssessmentEligibleTopic(
+        db,
+        childId,
+        'window-accepted',
+      );
+      // Edge is live and no seam is installed — nothing revokes mid-call.
+      expect(edgeId).toBeTruthy();
+
+      const candidates = await collectChallengeReadyCandidates(
+        db,
+        childId,
+        'person',
+        supporterId,
+      );
+
+      expect(
+        candidates.some(
+          (candidate) =>
+            candidate.kind === 'challenge_ready' &&
+            candidate.params.topicId === eligible.topicId,
+        ),
+      ).toBe(true);
+    });
+
+    it('revoke committed before the eligibility read denies the whole read — no revoked candidate leaks', async () => {
+      const supporterId = await seedProfile(db, 'supporter-window-revoke');
+      const childId = await seedProfile(db, 'child-window-revoke');
+      const edgeId = await seedAcceptedContract(db, supporterId, childId);
+      await seedAssessmentEligibleTopic(db, childId, 'window-revoke');
+
+      // Commit the revoke before the eligibility read: the seam awaits before
+      // the transaction opens, so the revoke lands before the repeatable-read
+      // snapshot and the in-transaction authorization read denies it.
+      __setChallengeReadyRaceHook(async () => {
+        await requestSelfUnlink(db, {
+          supportershipId: edgeId,
+          callerPersonId: childId,
+          now: new Date(),
+        });
+      });
+
+      await expect(
+        collectChallengeReadyCandidates(db, childId, 'person', supporterId),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
   });
 });
