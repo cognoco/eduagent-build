@@ -411,6 +411,47 @@ describe('InitiateLinkScreen', () => {
       );
     });
 
+    it('re-entering confirmation after an error + back does not show the stale error before a new submit', async () => {
+      const InitiateLinkScreen = require('./initiate').default;
+      const rendered = renderScreen(<InitiateLinkScreen />, {
+        profile: NAMED_PROFILES.guardian,
+        profiles: [NAMED_PROFILES.guardian, NAMED_PROFILES.linkedChild],
+        routes: {
+          '/visibility/links': () => ERROR_RESPONSES.validation(),
+        },
+      });
+      cleanupRender = rendered.cleanup;
+      const { routedFetch } = rendered;
+
+      fireEvent.press(
+        screen.getByTestId(
+          `visibility-link-initiate-picker-managed-${NAMED_PROFILES.linkedChild.id}`,
+        ),
+      );
+      fireEvent.press(screen.getByTestId('visibility-link-create'));
+      await waitFor(() => screen.getByTestId('visibility-link-create-error'));
+
+      // Leave the errored confirmation step via the new WI-2188 back button.
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-confirm-back'),
+      );
+      screen.getByTestId('visibility-link-initiate-picker');
+
+      // Re-enter confirmation for the same managed person without submitting.
+      fireEvent.press(
+        screen.getByTestId(
+          `visibility-link-initiate-picker-managed-${NAMED_PROFILES.linkedChild.id}`,
+        ),
+      );
+
+      // The prior mutation's error state must not leak into the fresh
+      // confirmation render — nothing has been submitted yet this time.
+      expect(screen.queryByTestId('visibility-link-create-error')).toBeNull();
+      expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
+        1,
+      );
+    });
+
     it('the existing-teen invite branch (V2 on) back button returns to the picker', () => {
       const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
       (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =

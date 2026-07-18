@@ -176,11 +176,19 @@ export default function InitiateLinkScreen(): React.ReactElement {
           back button — AC-3 requires support-hub entry to return there in
           one step, not two. */}
       <LinkCeremonyBackButton
-        onPress={() =>
-          paramSupporteePersonId
-            ? goBackOrReplace(router, '/(app)/home')
-            : setTarget(null)
-        }
+        onPress={() => {
+          if (paramSupporteePersonId) {
+            goBackOrReplace(router, '/(app)/home');
+            return;
+          }
+          // Reset the mutation alongside the state change: without this, a
+          // prior failed submit's `isError` state survives the trip back to
+          // the picker and re-selecting a person re-renders the confirmation
+          // step with the stale error already showing, before this attempt
+          // has submitted anything.
+          createMutation.reset();
+          setTarget(null);
+        }}
         testID="visibility-link-initiate-confirm-back"
       />
       <View>
