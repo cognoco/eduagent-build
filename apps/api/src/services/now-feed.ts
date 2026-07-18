@@ -839,26 +839,65 @@ async function collectNeedsDeepeningCandidates(
   }));
 }
 
-async function collectChallengeReadyCandidates(
+// [WI-2237] Test-only seam. Fires once, synchronously, at the exact point
+// between the (now-removed) standalone accepted-visibility pre-check and the
+// challenge-ready authorization+eligibility transaction below — so the
+// revoke-race regression test can commit a revoke into the precise
+// between-reads TOCTOU window and prove the TRANSACTION, not an earlier
+// separate pre-check, is what closes it. Null (a no-op) in production; only
+// now.integration.test.ts ever sets it. See __setChallengeReadyRaceHook.
+let challengeReadyRaceHook: (() => Promise<void>) | null = null;
+
+/**
+ * @internal test-only. Install (or clear with `null`) the seam that fires
+ * immediately before {@link collectChallengeReadyCandidates} opens its
+ * accepted-visibility + eligibility transaction. Used exclusively by the
+ * WI-2237 revoke-race regression test; never set in production.
+ */
+export function __setChallengeReadyRaceHook(
+  hook: (() => Promise<void>) | null,
+): void {
+  challengeReadyRaceHook = hook;
+}
+
+/**
+ * @internal exported for testing only. [WI-2237] The supporter-scoped path
+ * asserts accepted visibility AND performs every one of
+ * getAssessmentEligibleTopics's reads (learningSessions, findOwnedCurriculumTopics,
+ * assessments) inside ONE `repeatable read` transaction. A revoke/restamp/lapse
+ * committed mid-flight is therefore either already visible to the
+ * in-transaction authorization read (which then throws ForbiddenError, denying
+ * the whole read) or invisible to the entire atomic snapshot — closing the
+ * multi-read TOCTOU that a separate, earlier pre-check left open. The
+ * self-scope path (no supporterPersonId) is a single owner-scoped read and
+ * needs no transaction.
+ */
+export async function collectChallengeReadyCandidates(
   db: Database,
   profileId: string,
   scope: NowScope,
   supporterPersonId?: string,
 ): Promise<NowFeedCandidate[]> {
+  let rows: Awaited<ReturnType<typeof getAssessmentEligibleTopics>>;
   if (supporterPersonId) {
-    // [WI-2237] getAssessmentEligibleTopics (retention-data.ts) is a
-    // cross-service helper shared with self-scope callers, so it can't
-    // embed a correlated EXISTS without widening its own contract. Re-run
-    // the canonical accepted-visibility check (the same helper
-    // assertAcceptedSupportership uses) immediately before delegating to
-    // it, narrowing the same TOCTOU window the other candidate reads in
-    // this file close via acceptedSupporterAccessExists.
-    await findAcceptedContractForSupportee(db, {
-      supporterPersonId,
-      supporteePersonId: profileId,
-    });
+    if (challengeReadyRaceHook) await challengeReadyRaceHook();
+    rows = await db.transaction(
+      async (tx) => {
+        const txDb = tx as unknown as Database;
+        // Authorization and the eligibility reads share one snapshot: the
+        // accepted-visibility assertion is never checked against one committed
+        // state and then served data from another.
+        await findAcceptedContractForSupportee(txDb, {
+          supporterPersonId,
+          supporteePersonId: profileId,
+        });
+        return getAssessmentEligibleTopics(txDb, profileId);
+      },
+      { isolationLevel: 'repeatable read' },
+    );
+  } else {
+    rows = await getAssessmentEligibleTopics(db, profileId);
   }
-  const rows = await getAssessmentEligibleTopics(db, profileId);
 
   return rows.slice(0, 20).map((row) => ({
     id: row.topicId,

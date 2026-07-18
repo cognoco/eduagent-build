@@ -26,7 +26,11 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 import { nowRoutes } from './now';
 import { acceptLink, initiateLink } from '../services/linking-ceremony';
-import { collectCandidatesForRequest } from '../services/now-feed';
+import {
+  collectCandidatesForRequest,
+  collectChallengeReadyCandidates,
+  __setChallengeReadyRaceHook,
+} from '../services/now-feed';
 import { requestSelfUnlink } from '../services/supportership-revocation';
 import {
   deleteV2IdentitiesForTest,
@@ -751,5 +755,77 @@ describe('Integration: now routes', () => {
         supporterId,
       ),
     ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  // [WI-2237] Load-bearing between-reads TOCTOU regression for the
+  // challenge-ready supporter path. Distinct from the RGR above (which commits
+  // the revoke BEFORE the whole call, so the outer pre-check already denies):
+  // here the revoke commits INSIDE the call, at the precise point between the
+  // accepted-visibility authorization and getAssessmentEligibleTopics's
+  // multi-read eligibility scan (the __setChallengeReadyRaceHook seam fires
+  // synchronously just before the transaction opens). Only wrapping BOTH the
+  // authorization and every eligibility read in one `repeatable read`
+  // transaction closes this window: the snapshot is taken AFTER the committed
+  // revoke, so the in-transaction authorization read observes it and denies.
+  //
+  // Red-green-revert (watched): reverting the transaction to a standalone
+  // pre-check followed by an unguarded getAssessmentEligibleTopics(db, ...)
+  // makes the "revoke-in-window" case RESOLVE with the child's challenge_ready
+  // candidate (the leak) instead of rejecting — the assertion below flips RED.
+  describe('challenge-ready between-reads revoke race [WI-2237]', () => {
+    afterEach(() => {
+      __setChallengeReadyRaceHook(null);
+    });
+
+    it('accepted, no mid-call revoke: returns the child challenge-ready candidate (guard is not always-deny)', async () => {
+      const supporterId = await seedProfile(db, 'supporter-window-accepted');
+      const childId = await seedProfile(db, 'child-window-accepted');
+      const edgeId = await seedAcceptedContract(db, supporterId, childId);
+      const eligible = await seedAssessmentEligibleTopic(
+        db,
+        childId,
+        'window-accepted',
+      );
+      // Edge is live and no seam is installed — nothing revokes mid-call.
+      expect(edgeId).toBeTruthy();
+
+      const candidates = await collectChallengeReadyCandidates(
+        db,
+        childId,
+        'person',
+        supporterId,
+      );
+
+      expect(
+        candidates.some(
+          (candidate) =>
+            candidate.kind === 'challenge_ready' &&
+            candidate.params.topicId === eligible.topicId,
+        ),
+      ).toBe(true);
+    });
+
+    it('revoke committed in the between-reads window denies the whole read — no revoked candidate leaks', async () => {
+      const supporterId = await seedProfile(db, 'supporter-window-revoke');
+      const childId = await seedProfile(db, 'child-window-revoke');
+      const edgeId = await seedAcceptedContract(db, supporterId, childId);
+      await seedAssessmentEligibleTopic(db, childId, 'window-revoke');
+
+      // Commit the revoke at the exact between-reads point: after the
+      // authorization the broken pre-check version already ran, before the
+      // eligibility scan. The seam awaits before the transaction opens, so the
+      // transaction snapshot is taken AFTER the committed revoke.
+      __setChallengeReadyRaceHook(async () => {
+        await requestSelfUnlink(db, {
+          supportershipId: edgeId,
+          callerPersonId: childId,
+          now: new Date(),
+        });
+      });
+
+      await expect(
+        collectChallengeReadyCandidates(db, childId, 'person', supporterId),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
   });
 });
