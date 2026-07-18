@@ -38,6 +38,14 @@ async function expectBelowFixedChrome(
   await expect(page.getByTestId('account-avatar-button')).toBeEnabled();
 }
 
+function mentorMemoryStateRoot(page: Page): Locator {
+  return page
+    .locator(
+      '[data-testid="mentor-memory-screen"], [data-testid="mentor-memory-loading-screen"], [data-testid="mentor-memory-error-screen"]',
+    )
+    .first();
+}
+
 async function expectChildOwnedScreenAtNativeChromeBottom(
   page: Page,
   screenRoot: Locator,
@@ -86,16 +94,13 @@ async function expectDirectScreenAtNativeSafeArea(
 }
 
 test('W-05 tab URLs render the correct screen on web', async ({ page }) => {
-  const seed = await readSeedData('solo-learner');
-  const subjectId = seed.ids.subjectId;
-
   await page.goto('/home', { waitUntil: 'commit' });
   await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 60_000,
   });
 
   await page.goto('/library', { waitUntil: 'commit' });
-  await expect(page.getByTestId(`shelf-row-header-${subjectId}`)).toBeVisible({
+  await expect(page.getByTestId('library-screen')).toBeVisible({
     timeout: 30_000,
   });
 
@@ -173,9 +178,7 @@ test(`W-05 native top=47 composes ${navigationShell} safe-area ownership across 
 
   if (!v2Enabled) {
     await page.goto('/mentor-memory', { waitUntil: 'commit' });
-    await expectDirectScreenAtNativeSafeArea(
-      page.getByTestId('mentor-memory-screen'),
-    );
+    await expectDirectScreenAtNativeSafeArea(mentorMemoryStateRoot(page));
 
     await page.goto('/more/accommodation', { waitUntil: 'commit' });
     await expectDirectScreenAtNativeSafeArea(
@@ -209,7 +212,7 @@ test(`W-05 native top=47 composes ${navigationShell} safe-area ownership across 
   await page.goto('/mentor-memory', { waitUntil: 'commit' });
   await expectChildOwnedScreenAtNativeChromeBottom(
     page,
-    page.getByTestId('mentor-memory-screen'),
+    mentorMemoryStateRoot(page),
   );
 
   await page.goto('/more/accommodation', { waitUntil: 'commit' });

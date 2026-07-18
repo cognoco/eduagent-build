@@ -228,7 +228,11 @@ export default function MentorMemoryScreen() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+      <View
+        className="flex-1 bg-background"
+        style={{ paddingTop: insets.top }}
+        testID="mentor-memory-loading-screen"
+      >
         <TimeoutLoader
           isLoading
           title={t('session.mentorMemory.loadTimeout.title')}
@@ -253,7 +257,11 @@ export default function MentorMemoryScreen() {
 
   if (isError && !profile) {
     return (
-      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+      <View
+        className="flex-1 bg-background"
+        style={{ paddingTop: insets.top }}
+        testID="mentor-memory-error-screen"
+      >
         <ErrorFallback
           variant="centered"
           message={t('session.mentorMemory.loadError')}

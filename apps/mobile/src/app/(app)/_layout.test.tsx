@@ -210,6 +210,7 @@ const {
   HIDDEN_TAB_ROUTES,
   V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP,
   V2_ROOT_SAFE_AREA_EXCEPTIONS,
+  assertV2SafeAreaOwnershipInvariant,
   resolveV2PushedScenePaddingTop,
 } = require('./_layout');
 const {
@@ -1920,6 +1921,38 @@ describe('V2 pushed-route safe-area ownership invariant', () => {
         safeAreaTop: 47,
       }),
     ).toBe(52);
+  });
+
+  it('binds root and path-specific ownership values to audited exceptions', () => {
+    expect(() =>
+      assertV2SafeAreaOwnershipInvariant(
+        {
+          ...V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP,
+          'future-route': 'root',
+        },
+        V2_ROOT_SAFE_AREA_EXCEPTIONS,
+      ),
+    ).toThrow(/future-route.*root ownership.*path-bound exception/);
+
+    expect(() =>
+      assertV2SafeAreaOwnershipInvariant(
+        {
+          ...V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP,
+          'future-route': 'root',
+        },
+        [
+          ...V2_ROOT_SAFE_AREA_EXCEPTIONS,
+          { routeName: 'future-route', pathPrefix: '/future-route/special' },
+        ],
+      ),
+    ).toThrow(/future-route.*root ownership.*complete route prefix/);
+
+    expect(() =>
+      assertV2SafeAreaOwnershipInvariant(V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP, [
+        ...V2_ROOT_SAFE_AREA_EXCEPTIONS,
+        { routeName: 'subject', pathPrefix: '/subject' },
+      ]),
+    ).toThrow(/subject.*child ownership.*root exception/);
   });
 
   it('refuses to silently assign ownership to a future pushed route', () => {

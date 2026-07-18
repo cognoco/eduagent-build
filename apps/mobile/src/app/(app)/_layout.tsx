@@ -145,6 +145,71 @@ export const V2_ROOT_SAFE_AREA_EXCEPTIONS = [
   { routeName: 'progress', pathPrefix: '/progress/saved' },
 ] as const;
 
+interface V2RootSafeAreaException {
+  readonly routeName: string;
+  readonly pathPrefix: string;
+}
+
+export function assertV2SafeAreaOwnershipInvariant(
+  ownership: Readonly<Record<string, V2PushedSafeAreaOwner>>,
+  exceptions: readonly V2RootSafeAreaException[],
+): void {
+  for (const [routeName, owner] of Object.entries(ownership)) {
+    const routeExceptions = exceptions.filter(
+      (exception) => exception.routeName === routeName,
+    );
+
+    if (owner === 'child' && routeExceptions.length > 0) {
+      throw new Error(
+        `V2 pushed route "${routeName}" has child ownership but a root exception`,
+      );
+    }
+
+    if (owner !== 'child' && routeExceptions.length === 0) {
+      throw new Error(
+        `V2 pushed route "${routeName}" has ${owner} ownership without a path-bound exception`,
+      );
+    }
+
+    if (
+      owner === 'root' &&
+      !routeExceptions.some(
+        (exception) => exception.pathPrefix === `/${routeName}`,
+      )
+    ) {
+      throw new Error(
+        `V2 pushed route "${routeName}" has root ownership without the complete route prefix`,
+      );
+    }
+
+    if (
+      owner === 'path-specific' &&
+      routeExceptions.some(
+        (exception) =>
+          !exception.pathPrefix.startsWith(`/${routeName}/`) ||
+          exception.pathPrefix === `/${routeName}`,
+      )
+    ) {
+      throw new Error(
+        `V2 pushed route "${routeName}" has an exception outside its path-specific prefix`,
+      );
+    }
+  }
+
+  for (const exception of exceptions) {
+    if (!(exception.routeName in ownership)) {
+      throw new Error(
+        `V2 root exception "${exception.routeName}" is missing from the ownership audit`,
+      );
+    }
+  }
+}
+
+assertV2SafeAreaOwnershipInvariant(
+  V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP,
+  V2_ROOT_SAFE_AREA_EXCEPTIONS,
+);
+
 function pathnameMatchesPrefix(pathname: string, pathPrefix: string): boolean {
   return pathname === pathPrefix || pathname.startsWith(`${pathPrefix}/`);
 }
@@ -172,6 +237,15 @@ export function resolveV2PushedScenePaddingTop({
     throw new Error(
       `V2 pushed route "${routeName}" is missing from the safe-area ownership audit`,
     );
+  }
+
+  const owner =
+    V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP[
+      rootRouteName as keyof typeof V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP
+    ];
+
+  if (owner === 'child') {
+    return pushedSceneTopInset - safeAreaTop;
   }
 
   const rootOwnsSafeArea = V2_ROOT_SAFE_AREA_EXCEPTIONS.some(

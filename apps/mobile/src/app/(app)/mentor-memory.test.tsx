@@ -237,6 +237,9 @@ describe('MentorMemoryScreen — interests null guard', () => {
     mockModeNavV1Enabled = false;
     mockModeNavV2Enabled = false;
     mockSafeAreaTop = 0;
+    mockFetch.setRoute('learner-profile', () => ({
+      profile: mockProfileData,
+    }));
     jest.clearAllMocks();
   });
 
@@ -261,6 +264,42 @@ describe('MentorMemoryScreen — interests null guard', () => {
       ).toBe(expected);
     },
   );
+
+  it('owns the native top inset while Mentor Memory loads in V2', async () => {
+    mockModeNavV0Enabled = true;
+    mockModeNavV1Enabled = true;
+    mockModeNavV2Enabled = true;
+    mockSafeAreaTop = 47;
+    mockFetch.setRoute(
+      'learner-profile',
+      () => new Promise<never>(() => undefined),
+    );
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    expect(
+      (await screen.findByTestId('mentor-memory-loading-screen')).props.style
+        ?.paddingTop ?? 0,
+    ).toBe(47);
+  });
+
+  it('owns the native top inset when Mentor Memory fails to load in V2', async () => {
+    mockModeNavV0Enabled = true;
+    mockModeNavV1Enabled = true;
+    mockModeNavV2Enabled = true;
+    mockSafeAreaTop = 47;
+    mockFetch.setRoute(
+      'learner-profile',
+      () => new Response('Internal server error', { status: 500 }),
+    );
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    expect(
+      (await screen.findByTestId('mentor-memory-error-screen')).props.style
+        ?.paddingTop ?? 0,
+    ).toBe(47);
+  });
 
   it('does not crash when profile.interests is undefined', () => {
     mockProfileData = { ...mockProfileBase, interests: undefined };
