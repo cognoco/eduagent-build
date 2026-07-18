@@ -42,7 +42,7 @@ Content authoring — not engineering — is the dominant cost for almost every 
 | Option | Engine fit | Notes | Commercial read |
 |---|---|---|---|
 | **Coaching / habits (B2C — fitness, sobriety, productivity)** | High | Guardian/learner → coach/self; voice-first matches Calm/Noom shape | Proven ($150-700M businesses) but crowded, brutal CAC |
-| **Sales-call role-play (B2B SaaS)** | Very high | Manager/rep *is* your guardian/learner shape; rubric-scored exchanges = Challenge Rounds | **Strong** — Second Nature raised $15M, Hyperbound, Quantified all building this; $50-200/seat/mo; hardest part is enterprise sale, not product |
+| **Sales-call role-play (B2B SaaS)** | Very high | Manager/rep *is* your guardian/learner shape; rubric-scored exchanges = Challenge Rounds | ~~**Strong**~~ **Superseded 2026-06-06 → trap (see addendum §2)** — Second Nature raised $15M, Hyperbound, Quantified all building this; Gong-tier incumbents bolting it on |
 | **AI companion / character chat** | High | Persistent state + structured signals + safety caps all fit | Proven ($M ARR — Replika, Character.AI) but crowded, ethically loaded, well-funded incumbents |
 | **Interactive fiction / D&D companion** | High | Sessions → scenes; envelope signals → narrative state; hard caps → pacing; voice DM = wow moment | Smaller market than it feels (NovelAI ~$1-3M ARR); passionate but bounded; AI Dungeon plateaued |
 | **Guided intake (immigration, taxes, wills, divorce, KYC)** | Very high — "LLM proposes, server decides" is *exactly* the pattern these need | TurboTax is $4B; nobody else has solved server-trusted LLM intake well | **High ceiling** but 6-12 month compliance/trust moat before first dollar |
@@ -56,7 +56,7 @@ People pay reliably when there is **urgency + a measurable outcome.** Education 
 Ranking by "easiest path to real revenue with what's already built":
 
 1. **Professional cert prep** — clearest yes. Pick one exam (AWS SAA, PMP, or a nursing board), own it, ship narrow.
-2. **Sales role-play B2B** — highest revenue per customer, longest sales cycle, engine is almost ideal.
+2. ~~**Sales role-play B2B** — highest revenue per customer, longest sales cycle, engine is almost ideal.~~ *(Superseded 2026-06-06 — downgraded to trap, see addendum §2.)*
 3. **AI companion / character app** — proven revenue, but you'd be fighting Character.AI and Replika.
 4. **Guided intake (vertical-specific)** — highest ceiling, longest runway to first dollar.
 5. **Interactive fiction** — fun and engine fits, but smaller market; treat as passion project, not revenue play.
