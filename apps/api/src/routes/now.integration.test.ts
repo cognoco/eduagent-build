@@ -757,21 +757,26 @@ describe('Integration: now routes', () => {
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  // [WI-2237] Load-bearing between-reads TOCTOU regression for the
-  // challenge-ready supporter path. Distinct from the RGR above (which commits
-  // the revoke BEFORE the whole call, so the outer pre-check already denies):
-  // here the revoke commits INSIDE the call, at the precise point between the
-  // accepted-visibility authorization and getAssessmentEligibleTopics's
-  // multi-read eligibility scan (the __setChallengeReadyRaceHook seam fires
-  // synchronously just before the transaction opens). Only wrapping BOTH the
-  // authorization and every eligibility read in one `repeatable read`
-  // transaction closes this window: the snapshot is taken AFTER the committed
-  // revoke, so the in-transaction authorization read observes it and denies.
+  // [WI-2237] Complementary coverage for the challenge-ready supporter path's
+  // snapshot-atomicity fix. The security DENIAL proof is the sibling RGR above
+  // (collectCandidatesForRequest, revoke-then-recall -> ForbiddenError, watched
+  // red/green). This block adds two properties: (a) an accepted edge with no
+  // revoke still returns the child's challenge_ready candidate (the guard is not
+  // always-deny); and (b) a revoke committed before the eligibility read (the
+  // __setChallengeReadyRaceHook seam fires before the transaction opens, so the
+  // revoke lands before the snapshot) is denied by the in-transaction
+  // authorization read.
   //
-  // Red-green-revert (watched): reverting the transaction to a standalone
-  // pre-check followed by an unguarded getAssessmentEligibleTopics(db, ...)
-  // makes the "revoke-in-window" case RESOLVE with the child's challenge_ready
-  // candidate (the leak) instead of rejecting — the assertion below flips RED.
+  // What the transaction buys is CONSISTENCY, not a deny-difference a black-box
+  // assertion can isolate: the authorization and every eligibility read run
+  // against one `repeatable read` snapshot, so they cannot disagree (the TOCTOU
+  // where auth passes on stale state but the read returns post-revoke data). By
+  // design a revoke committed AFTER the snapshot is invisible and the request
+  // serves the consistent accepted-at-snapshot candidate -- the accepted
+  // contract (WI-2401 tracks the stronger fail-closed variant), not a leak. A
+  // transaction-only revert therefore does NOT flip this to RED: the reinstated
+  // pre-check still denies a pre-snapshot revoke; the transaction's guarantee is
+  // demonstrated by trace + the sibling RGR, not by this deny assertion.
   describe('challenge-ready between-reads revoke race [WI-2237]', () => {
     afterEach(() => {
       __setChallengeReadyRaceHook(null);
@@ -805,16 +810,15 @@ describe('Integration: now routes', () => {
       ).toBe(true);
     });
 
-    it('revoke committed in the between-reads window denies the whole read — no revoked candidate leaks', async () => {
+    it('revoke committed before the eligibility read denies the whole read — no revoked candidate leaks', async () => {
       const supporterId = await seedProfile(db, 'supporter-window-revoke');
       const childId = await seedProfile(db, 'child-window-revoke');
       const edgeId = await seedAcceptedContract(db, supporterId, childId);
       await seedAssessmentEligibleTopic(db, childId, 'window-revoke');
 
-      // Commit the revoke at the exact between-reads point: after the
-      // authorization the broken pre-check version already ran, before the
-      // eligibility scan. The seam awaits before the transaction opens, so the
-      // transaction snapshot is taken AFTER the committed revoke.
+      // Commit the revoke before the eligibility read: the seam awaits before
+      // the transaction opens, so the revoke lands before the repeatable-read
+      // snapshot and the in-transaction authorization read denies it.
       __setChallengeReadyRaceHook(async () => {
         await requestSelfUnlink(db, {
           supportershipId: edgeId,
