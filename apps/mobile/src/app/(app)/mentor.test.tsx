@@ -350,6 +350,23 @@ describe('MentorScreen', () => {
     expect(screen.queryByTestId('now-card-stack')).toBeNull();
   });
 
+  it('cold-start pedagogical literal ID routes exact input through the shared freeform boundary', () => {
+    mockSubjects = [];
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([]),
+    };
+    renderMentorScreen();
+
+    fireEvent.changeText(
+      screen.getByTestId('cold-start-input'),
+      'show me how subject subject-123 works',
+    );
+    fireEvent.press(screen.getByTestId('cold-start-send'));
+
+    expectFreeformRoute('show me how subject subject-123 works');
+  });
+
   it('closed-catalog-jump — pushes deterministic route phrases through the closed mapper', () => {
     renderMentorScreen();
 
@@ -360,6 +377,18 @@ describe('MentorScreen', () => {
     fireEvent(screen.getByTestId('mentor-bar-input'), 'submitEditing');
 
     expect(mockPush).toHaveBeenCalledWith('/(app)/subject-hub/spanish');
+  });
+
+  it('explicit-literal-catalog-jump — keeps show subject subject-123 inside the closed mapper', () => {
+    renderMentorScreen();
+
+    fireEvent.changeText(
+      screen.getByTestId('mentor-bar-input'),
+      'show subject subject-123',
+    );
+    fireEvent.press(screen.getByTestId('mentor-bar-send'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/subject-hub/subject-123');
   });
 
   it('closed-catalog-named-subject-jump — routes a confident named subject to its hub', () => {
@@ -441,6 +470,30 @@ describe('MentorScreen', () => {
 
       expectFreeformRoute('show me how photosynthesis works');
     });
+
+    it('pedagogical-literal-id — routes exact raw input to freeform before literal extraction', () => {
+      renderMentorScreen();
+
+      fireEvent.changeText(
+        screen.getByTestId('mentor-bar-input'),
+        'show me how subject subject-123 works',
+      );
+      fireEvent.press(screen.getByTestId('mentor-bar-send'));
+
+      expectFreeformRoute('show me how subject subject-123 works');
+    });
+
+    it('literal-question-unchanged — preserves exact question raw input before literal extraction', () => {
+      renderMentorScreen();
+
+      fireEvent.changeText(
+        screen.getByTestId('mentor-bar-input'),
+        'should I open subject spanish?',
+      );
+      fireEvent(screen.getByTestId('mentor-bar-input'), 'submitEditing');
+
+      expectFreeformRoute('should I open subject spanish?');
+    });
   });
 
   it('editing then submit routes the latest text instead of the initial draft', () => {
@@ -498,7 +551,12 @@ describe('MentorScreen', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it.each(['progress report', 'journal entries', 'subjects list'])(
+  it.each([
+    'progress report',
+    'journal entries',
+    'subjects list',
+    'show subject list',
+  ])(
     'unsupported destination "%s" reveals clarification instead of starting Mentor',
     (input) => {
       renderMentorScreen();
@@ -530,6 +588,27 @@ describe('MentorScreen', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
+  it('identical-uncertain-repeat-visible — visibly changes the clarification after the same command is submitted twice', () => {
+    renderMentorScreen();
+
+    const input = screen.getByTestId('mentor-bar-input');
+    const send = screen.getByTestId('mentor-bar-send');
+    fireEvent.changeText(input, 'show my progress');
+    fireEvent.press(send);
+
+    let clarification = screen.getByTestId('mentor-bar-clarification');
+    expect(within(clarification).queryByText('Try again')).toBeNull();
+
+    fireEvent.changeText(input, 'show my progress');
+    fireEvent.press(send);
+
+    clarification = screen.getByTestId('mentor-bar-clarification');
+    within(clarification).getByText('Try again');
+    within(clarification).getByText('show my progress');
+    expect(clarification.props.accessibilityLiveRegion).toBe('polite');
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
   it('announces every clarification revision explicitly on iOS without announcing the initial empty state', () => {
     const originalPlatformOS = Platform.OS;
     Object.defineProperty(Platform, 'OS', {
@@ -556,7 +635,10 @@ describe('MentorScreen', () => {
       fireEvent.press(send);
       expect(announce).toHaveBeenCalledTimes(2);
       expect(announce).toHaveBeenLastCalledWith(
-        'What exactly do you want to learn? show my progress',
+        'Try again What exactly do you want to learn? show my progress',
+      );
+      within(screen.getByTestId('mentor-bar-clarification')).getByText(
+        'Try again',
       );
     } finally {
       announce.mockRestore();

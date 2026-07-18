@@ -46,6 +46,7 @@ const UNSUPPORTED = [
   'take me to the library',
   'open more',
   'show settings',
+  'show subject list',
 ];
 
 const QUESTIONS = [
