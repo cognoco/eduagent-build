@@ -563,7 +563,6 @@ function SessionScreenInner() {
   const lastExpectedMinutesRef = useRef(10);
   const hasAutoSentRef = useRef(false);
   const mentorOpenerLaunchKeyRef = useRef<string | null>(null);
-  const internallyBackfilledSessionIdRef = useRef<string | null>(null);
   const hasHydratedRecoveryRef = useRef(false);
   const queuedProblemTextRef = useRef<string | null>(null);
   const localMessageIdRef = useRef(0);
@@ -643,7 +642,6 @@ function SessionScreenInner() {
     ) {
       return;
     }
-    internallyBackfilledSessionIdRef.current = activeSessionId;
     router.setParams({ sessionId: activeSessionId });
   }, [activeSessionId, mentorOpenerText, routeSessionId, router]);
 
@@ -720,14 +718,6 @@ function SessionScreenInner() {
   // Reset state when screen regains focus (prevents stale state loop)
   useFocusEffect(
     useCallback(() => {
-      const isInternalSessionIdBackfill =
-        !!routeSessionId &&
-        internallyBackfilledSessionIdRef.current === routeSessionId;
-      internallyBackfilledSessionIdRef.current = null;
-      if (isInternalSessionIdBackfill) {
-        return;
-      }
-
       animationCleanupRef.current?.();
       // When resuming a session (routeSessionId set), leave messages,
       // exchangeCount, and escalationRung alone — the transcript hydration
