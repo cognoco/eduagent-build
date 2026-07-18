@@ -495,6 +495,7 @@ jest.mock(
       composerAccessory,
       belowInput,
       inputMode,
+      isStreaming,
       onInputModeChange,
       onSend,
       onBackPress,
@@ -512,6 +513,7 @@ jest.mock(
       composerAccessory?: React.ReactNode;
       belowInput?: React.ReactNode;
       inputMode?: InputMode;
+      isStreaming?: boolean;
       onInputModeChange?: (mode: InputMode) => void;
       onSend: (text: string) => void;
       onBackPress?: () => void;
@@ -534,6 +536,9 @@ jest.mock(
         <View>
           <Text testID="session-subtitle">{subtitle}</Text>
           <Text testID="mock-input-mode">{inputMode ?? 'text'}</Text>
+          <Text testID="mock-streaming-state">
+            {isStreaming ? 'streaming' : 'idle'}
+          </Text>
           {headerBelow}
           {inputDisabled && showDisabledBanner !== false ? (
             <View testID="input-disabled-banner">
@@ -574,6 +579,12 @@ jest.mock(
             onPress={() => onSend('Solve 2x + 5 = 17')}
           >
             <Text>Send</Text>
+          </Pressable>
+          <Pressable
+            testID="mentor-follow-up-button"
+            onPress={() => onSend('Yes')}
+          >
+            <Text>Yes</Text>
           </Pressable>
           <Pressable testID="mock-back-button" onPress={() => onBackPress?.()}>
             <Text>Back</Text>
@@ -1975,6 +1986,150 @@ describe('SessionScreen homework flow', () => {
       expect(
         testScreen.queryByText('Africa is the second-largest continent.'),
       ).toBeTruthy();
+    });
+  });
+
+  it('preserves Mentor opener context while its allocated session ID is backfilled into the focused route', async () => {
+    const mentorOpener = 'Why do apples fall toward the ground?';
+    const recoveryKey = `session-recovery-marker-${ACTIVE_PROFILE_ID}`;
+    let routeParams = {
+      mode: 'freeform',
+      entrySource: 'mentor',
+      rawInput: mentorOpener,
+      topicId: TOPIC_ID,
+      topicName: 'Gravity',
+    };
+    let releaseOpener!: () => void;
+    const openerMayFinish = new Promise<void>((resolve) => {
+      releaseOpener = resolve;
+    });
+
+    getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+    (useLocalSearchParams as jest.Mock).mockImplementation(() => routeParams);
+    mockFetch.setRoute('/subjects/classify', (_url, init) => {
+      const body = extractJsonBody<{ text: string }>(init);
+      return body?.text === mentorOpener
+        ? {
+            candidates: [
+              {
+                subjectId: SECOND_SUBJECT_ID,
+                subjectName: 'Physics',
+                confidence: 0.98,
+              },
+            ],
+            needsConfirmation: false,
+          }
+        : {
+            candidates: [],
+            needsConfirmation: false,
+            suggestedSubjectName: null,
+          };
+    });
+    mockStream
+      .mockImplementationOnce(async (_message, onChunk, onDone) => {
+        onChunk('Gravity pulls them toward Earth.');
+        await openerMayFinish;
+        await onDone({
+          exchangeCount: 1,
+          escalationRung: 1,
+          aiEventId: 'mentor-opener-reply',
+        });
+      })
+      .mockImplementationOnce(async (_message, onChunk, onDone) => {
+        onChunk('Yes — and that same force keeps the Moon in orbit.');
+        await onDone({
+          exchangeCount: 2,
+          escalationRung: 1,
+          aiEventId: 'mentor-follow-up-reply',
+        });
+      });
+
+    const testScreen = renderSessionScreen();
+
+    await waitFor(() => {
+      expect({
+        streamCalls: mockStream.mock.calls.length,
+        classificationCalls: fetchCallsMatching(mockFetch, '/subjects/classify')
+          .length,
+        setParamsCalls: mockSetParams.mock.calls,
+      }).toEqual({
+        streamCalls: 1,
+        classificationCalls: 1,
+        setParamsCalls: [[{ sessionId: SESSION_ID }]],
+      });
+    });
+
+    routeParams = { ...routeParams, sessionId: SESSION_ID };
+    await act(async () => {
+      testScreen.rerender(<SessionScreen />);
+      await Promise.resolve();
+    });
+    const streamingStateAfterBackfill = testScreen.getByTestId(
+      'mock-streaming-state',
+    ).props.children;
+
+    await act(async () => {
+      releaseOpener();
+      await openerMayFinish;
+    });
+    await waitFor(() => {
+      expect(secureStore[recoveryKey]).toBeDefined();
+      expect(testScreen.getByTestId('mock-streaming-state')).toHaveTextContent(
+        'idle',
+      );
+    });
+
+    fireEvent.press(testScreen.getByTestId('mentor-follow-up-button'));
+    await waitFor(() => {
+      expect(mockStream).toHaveBeenCalledTimes(2);
+      expect(JSON.parse(secureStore[recoveryKey] ?? '{}')).toMatchObject({
+        sessionId: SESSION_ID,
+        topicId: TOPIC_ID,
+      });
+    });
+
+    const classificationTexts = fetchCallsMatching(
+      mockFetch,
+      '/subjects/classify',
+    ).map(({ init }) => extractJsonBody<{ text: string }>(init)?.text);
+    const sessionCreation = fetchCallsMatching(
+      mockFetch,
+      `/subjects/${SECOND_SUBJECT_ID}/sessions`,
+    )[0];
+    const recoveryMarker = JSON.parse(secureStore[recoveryKey] ?? '{}') as {
+      subjectId?: string;
+      topicId?: string;
+    };
+
+    expect(
+      extractJsonBody<{
+        rawInput?: string;
+        subjectId?: string;
+        topicId?: string;
+      }>(sessionCreation?.init),
+    ).toMatchObject({
+      rawInput: mentorOpener,
+      subjectId: SECOND_SUBJECT_ID,
+      topicId: TOPIC_ID,
+    });
+    expect({
+      streamingStateAfterBackfill,
+      classificationTexts,
+      streamedMessages: mockStream.mock.calls.map(([message]) => message),
+      streamedSessionIds: mockStream.mock.calls.map((call) => call[3]),
+      recoveryContext: {
+        subjectId: recoveryMarker.subjectId,
+        topicId: recoveryMarker.topicId,
+      },
+    }).toEqual({
+      streamingStateAfterBackfill: 'streaming',
+      classificationTexts: [mentorOpener],
+      streamedMessages: [mentorOpener, 'Yes'],
+      streamedSessionIds: [SESSION_ID, SESSION_ID],
+      recoveryContext: {
+        subjectId: SECOND_SUBJECT_ID,
+        topicId: TOPIC_ID,
+      },
     });
   });
 
