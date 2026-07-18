@@ -240,7 +240,9 @@ jobs:
           fi
           missing=()
           for key in "${required_env[@]}"; do
-            if ! grep -q "^${key}=" <<<"$output"; then
+            # Require a non-empty value after "=" — a configured-but-empty EAS
+            # var renders as "KEY=" and must not be treated as present.
+            if ! grep -qE "^${key}=.+" <<<"$output"; then
               missing+=("$key")
             fi
           done
@@ -310,7 +312,9 @@ jobs:
           fi
           missing=()
           for key in "${required_env[@]}"; do
-            if ! grep -q "^${key}=" <<<"$output"; then
+            # Require a non-empty value after "=" — a configured-but-empty EAS
+            # var renders as "KEY=" and must not be treated as present.
+            if ! grep -qE "^${key}=.+" <<<"$output"; then
               missing+=("$key")
             fi
           done
