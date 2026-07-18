@@ -73,13 +73,14 @@ jobs:
           fi
 
           # Trusted same-repo PR: run the real smoke iff the change set touches
-          # the web/mobile surface. Docs-only / config-only PRs pass through.
+          # the web/mobile surface. CI gate/controller-only changes pass
+          # through; workflow_dispatch supplies the hard canary/suite proof.
           FILES=$(git diff --name-only "origin/${BASE_REF}...HEAD")
           SURFACE_CHANGED=false
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             case "$f" in
-              apps/*|packages/*|pnpm-lock.yaml|.github/workflows/e2e-web.yml)
+              apps/*|packages/*|pnpm-lock.yaml)
                 SURFACE_CHANGED=true
                 break
                 ;;
