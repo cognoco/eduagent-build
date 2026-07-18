@@ -63,8 +63,13 @@ jest.mock(
 const { default: ChildReportsScreen, getNextReportInfo } =
   require('./reports') as {
     default: React.ComponentType;
-    getNextReportInfo: (now?: Date) => {
+    getNextReportInfo: (
+      now?: Date,
+      locale?: string,
+      timezone?: string | null,
+    ) => {
       date: string;
+      runAt: Date;
     };
   };
 
@@ -550,6 +555,34 @@ describe('ChildReportsScreen', () => {
 });
 
 describe('getNextReportInfo', () => {
+  it('[WI-2186] uses the organization timezone for the next weekly delivery', () => {
+    const mondayMorningUtc = new Date('2026-06-08T10:00:00.000Z');
+    const result = getNextReportInfo(
+      mondayMorningUtc,
+      'en-US',
+      'America/Los_Angeles',
+    );
+
+    expect(result.runAt.toISOString()).toBe('2026-06-08T16:00:00.000Z');
+    expect(result.date).toContain('June 8');
+  });
+
+  it('uses the existing UTC fallback on the weekly delivery boundary', () => {
+    const beforeUtcRun = getNextReportInfo(
+      new Date('2026-06-08T08:59:59.999Z'),
+      'en-US',
+      null,
+    );
+    const atUtcRun = getNextReportInfo(
+      new Date('2026-06-08T09:00:00.000Z'),
+      'en-US',
+      null,
+    );
+
+    expect(beforeUtcRun.runAt.toISOString()).toBe('2026-06-08T09:00:00.000Z');
+    expect(atUtcRun.runAt.toISOString()).toBe('2026-06-15T09:00:00.000Z');
+  });
+
   it('[WI-2186] chooses Monday weekly delivery instead of the later month-end schedule', () => {
     const wednesday = new Date(Date.UTC(2026, 5, 3, 12, 0, 0));
     const result = getNextReportInfo(wednesday);
@@ -563,6 +596,7 @@ describe('getNextReportInfo', () => {
     const result = getNextReportInfo(tuesday);
 
     expect(result.date).toContain('October 1');
+    expect(result.runAt.toISOString()).toBe('2026-10-01T10:00:00.000Z');
   });
 
   it('returns the 1st before 10:00 UTC as the earliest monthly run', () => {

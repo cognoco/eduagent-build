@@ -353,6 +353,7 @@ export type DashboardChildProgress = z.infer<
 export const dashboardChildSchema = z.object({
   profileId: z.string().uuid(),
   displayName: z.string(),
+  organizationTimezone: z.string().nullable().optional(),
   consentStatus: consentStatusSchema.nullable(),
   respondedAt: isoDateField.nullable(),
   summary: z.string(),

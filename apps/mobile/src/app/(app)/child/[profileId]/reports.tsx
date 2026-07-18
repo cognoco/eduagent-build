@@ -2,7 +2,11 @@ import { useMemo, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { WeeklyReportSummary } from '@eduagent/schemas';
+import {
+  getNextWeeklyProgressPushRun,
+  resolveReportScheduleTimezone,
+  type WeeklyReportSummary,
+} from '@eduagent/schemas';
 import { useChildDetail } from '../../../../hooks/use-dashboard';
 import {
   useChildReports,
@@ -17,23 +21,12 @@ import { formatShortDate } from '../../../../lib/format-datetime';
 export function getNextReportInfo(
   now = new Date(),
   locale?: string,
+  timezone?: string | null,
 ): {
   date: string;
+  runAt: Date;
 } {
-  const daysUntilMonday = (8 - now.getUTCDay()) % 7;
-  const nextWeeklyRun = new Date(
-    Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() + daysUntilMonday,
-      9,
-      0,
-      0,
-    ),
-  );
-  if (nextWeeklyRun.getTime() <= now.getTime()) {
-    nextWeeklyRun.setUTCDate(nextWeeklyRun.getUTCDate() + 7);
-  }
+  const nextWeeklyRun = getNextWeeklyProgressPushRun(now, timezone);
 
   let nextMonthlyRun = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 10, 0, 0),
@@ -44,18 +37,16 @@ export function getNextReportInfo(
     );
   }
 
-  const nextRun =
-    nextWeeklyRun.getTime() <= nextMonthlyRun.getTime()
-      ? nextWeeklyRun
-      : nextMonthlyRun;
+  const weeklyRunsFirst = nextWeeklyRun.getTime() <= nextMonthlyRun.getTime();
+  const nextRun = weeklyRunsFirst ? nextWeeklyRun : nextMonthlyRun;
   const formattedDate = formatShortDate(nextRun, locale, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
-    timeZone: 'UTC',
+    timeZone: weeklyRunsFirst ? resolveReportScheduleTimezone(timezone) : 'UTC',
   });
 
-  return { date: formattedDate };
+  return { date: formattedDate, runAt: nextRun };
 }
 
 function formatReportWeek(
@@ -382,7 +373,11 @@ export default function ChildReportsScreen(): React.ReactElement {
         testID="child-reports-empty"
       >
         {(() => {
-          const { date } = getNextReportInfo(new Date(), i18n?.language);
+          const { date } = getNextReportInfo(
+            new Date(),
+            i18n?.language,
+            child?.organizationTimezone,
+          );
           return (
             <Text
               className="text-body-sm text-text-secondary text-center"

@@ -26,6 +26,7 @@ export * from './visibility-contract';
 
 // Progress, Motivation & Dashboard (Epic 4)
 export * from './progress';
+export * from './report-schedule';
 export * from './retention-status';
 export * from './struggle-status';
 export * from './snapshots';
