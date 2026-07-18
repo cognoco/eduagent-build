@@ -95,3 +95,32 @@ One shared **read-only** infrastructure dependency: `apps/mobile/src/lib/scope-c
 1. **Dispatch-relevant — sequencing is advisory-only, not mechanically enforced.** All three items have empty Notion `Blocked by`. "WI-2222 last" exists only as Brief prose plus `Workstream Order=2` on WI-2222 (2094/2099 have `Workstream Order=null`) — per Notion convention this is an advisory soft-sequence, not a hard gate. If the dispatcher/claim mechanism reads `Blocked by` for gating, it will see WI-2222 as immediately claimable alongside 2094/2099. Recommend either: (a) set a hard `Blocked by` WI-2222 → WI-2094 before dispatch, or (b) confirm with the dispatch tooling owner that Brief-prose/Workstream-Order sequencing is actually honored. This is the one item that could cause a real ordering violation if missed.
 2. WI-2094 and WI-2099 share the same `Blocking` target: WI-2231 ("Fix V2 profile and consent exits and cover the first Mentor session", Type=Bug) — consistent with WI-2222's own AC noting WI-2231/2234/2236 own the composed Playwright/Maestro journeys. Forward-looking only, not a blocker for this batch; noted for downstream awareness.
 3. No blocking gaps found in any of the three items. All three are legitimately READY-CONFIRMED; this pass surfaced sequencing precision (edge type/strength) and seam evidence beyond what the Brief already asserted, not new defects.
+
+---
+
+## 6. WI-2099 final integration record — 2026-07-18
+
+This append-only execution record does not change the refinement decisions,
+scope, acceptance criteria, or sequencing above. The final external-builder
+fetch resolved `origin/main` to
+`6dce228a9892ae6f90e87863bb18983d2ef75d5e`. That revision was already the
+second parent of history-preserving merge
+`c981d3767435a53c5ba59e88243bc8eab6ccb6d6`, so the final normal merge command
+reported `Already up to date.` The production/evidence candidate tested before
+this append-only record was
+`0c41950c53a548314251b3a885d5d475d5a5aa18`; no production behavior changed
+during final integration.
+
+Fresh verification retained the required public-boundary coverage: the
+focused internal route-backfill case passed 1/1 with 49 skipped; all six
+persisted opener scenarios passed with 16 skipped; the complete integration
+file passed 22/22; and the session index, streaming, subject-classification,
+and message-outbox suites passed 149/149. Mobile typecheck plus six dependency
+tasks, mobile lint with 0 errors and the existing 51 warnings, `pnpm prepush`,
+all three configured `format:check` targets, `git diff --check`, and sanctioned
+`complete green --validate` exited 0; validation performed no Notion write. The
+independent Opus review returned `NO_ACTIONABLE_FINDINGS`; main changed no
+load-bearing file after that review, and a focused runtime-assumption re-check
+found no reason to change production code or tests. Full commands, raw Jest
+outputs, immutable RED/GREEN/REVERT/RESTORE references, and environment caveats
+remain in `docs/evidence/WI-2099/report.md`.
