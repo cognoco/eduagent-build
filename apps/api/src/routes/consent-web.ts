@@ -700,7 +700,10 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
       db,
       payload.chargePersonId,
       payload.organizationId,
-      payload.tokenId,
+      // [WI-2347] `?? null`: a cw1 token has no tokenId (undefined); the
+      // service layer treats `undefined` as "skip the check" (edge-only
+      // callers), so a bearer-token call must always pass a defined value.
+      payload.tokenId ?? null,
     );
 
     // No current grant (never approved, or already deleted past grace) →
@@ -780,7 +783,8 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         payload.chargePersonId,
         payload.organizationId,
         audit,
-        payload.tokenId,
+        // [WI-2347] see the GET-withdraw call site above for the `?? null` rationale.
+        payload.tokenId ?? null,
       );
 
       // Durable grace→delete via Inngest (engine rule: durable async →
@@ -865,7 +869,8 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         payload.chargePersonId,
         payload.organizationId,
         audit,
-        payload.tokenId,
+        // [WI-2347] see the GET-withdraw call site above for the `?? null` rationale.
+        payload.tokenId ?? null,
       );
       return c.html(
         pageLayout('Consent Restored', consentRestoredBody(childName)),

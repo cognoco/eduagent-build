@@ -18,6 +18,7 @@
  * 4. XSS escaping — child name containing <script> is escaped in every HTML response
  */
 
+import { createHmac } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
 import {
   consentGrant,
@@ -765,6 +766,19 @@ const WITHDRAW_ENV: Record<string, string> = {
   CONSENT_WITHDRAWAL_TOKEN_SECRET: WITHDRAW_SECRET,
 };
 
+// [WI-2347] Replicates the legacy `cw1` wire format — no live production code
+// path mints these anymore (signWithdrawalToken only mints cw2), but real
+// links minted before this change are still in parents' inboxes, so
+// verifyWithdrawalToken must keep accepting them.
+function forgeCw1Token(chargePersonId: string, organizationId: string): string {
+  const payload = `cw1:${chargePersonId}:${organizationId}`;
+  const encodedPayload = Buffer.from(payload, 'utf8').toString('base64url');
+  const sig = createHmac('sha256', WITHDRAW_SECRET)
+    .update(encodedPayload)
+    .digest('base64url');
+  return `${encodedPayload}.${sig}`;
+}
+
 describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
   const v2OrgIds: string[] = [];
   const v2PersonIds: string[] = [];
@@ -1004,6 +1018,44 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     });
     // [WI-2347] cw2 also carries the per-link tokenId.
     expect(typeof decoded?.tokenId).toBe('string');
+  });
+
+  // [WI-2347 review, CONSIDER-2] End-to-end through the actual route (not
+  // just the service layer): a legacy cw1 link — no tokenId embedded at
+  // all — must be rejected once the grant it names has been superseded by a
+  // newer cw2-minted grant. This is the case the route's `payload.tokenId ??
+  // null` conversion exists to close: without it, a bare `undefined` would
+  // skip the id check entirely rather than being treated as "cw1, expect
+  // null".
+  it('POST withdraw: a legacy cw1 link is rejected as "nothing to withdraw" once superseded by a newer cw2-minted grant', async () => {
+    const { orgId, childId } = await seedApprovedGrant({ displayName: 'Cora' });
+    // A newer grant minted after 'Cora's, carrying a withdrawalTokenId —
+    // simulates a fresh re-consent cycle under the post-migration code.
+    const db = createIntegrationDb();
+    await db.insert(consentGrant).values({
+      chargePersonId: childId,
+      organizationId: orgId,
+      purpose: 'platform_use',
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+      grantedAt: new Date(),
+      priorValue: null,
+      auditFact: { source: 'consent_response_approved' },
+      withdrawalTokenId: crypto.randomUUID(),
+    });
+
+    const legacyToken = forgeCw1Token(childId, orgId);
+    const res = await postW('/v1/consent-page/withdraw', {
+      token: legacyToken,
+    });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('Nothing to withdraw');
+
+    const grants = await db.query.consentGrant.findMany({
+      where: eq(consentGrant.chargePersonId, childId),
+    });
+    expect(grants.every((g) => g.withdrawnAt === null)).toBe(true);
   });
 });
 

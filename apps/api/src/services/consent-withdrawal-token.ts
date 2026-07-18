@@ -45,6 +45,10 @@ function sign(encodedPayload: string, secret: string): string {
     .digest('base64url');
 }
 
+// [WI-2347] Deliberately apps/api-only, not @eduagent/schemas: this token
+// shape is an internal implementation detail of the P0 email-consent bearer
+// link (never sent to or parsed by mobile), so it doesn't belong in the
+// shared cross-package contract package.
 export interface SignWithdrawalTokenOptions {
   /** Embedded in the token; compared against `consentGrant.withdrawalTokenId`
    * at verify time so a withdrawn/superseded grant makes the link unusable. */
@@ -67,6 +71,7 @@ export function signWithdrawalToken(
   return `${encodedPayload}.${sign(encodedPayload, secret)}`;
 }
 
+// [WI-2347] Same apps/api-only rationale as SignWithdrawalTokenOptions above.
 export interface VerifiedWithdrawalToken {
   chargePersonId: string;
   organizationId: string;

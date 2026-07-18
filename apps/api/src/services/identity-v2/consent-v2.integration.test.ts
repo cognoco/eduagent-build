@@ -56,7 +56,10 @@ import {
   withdrawAdultSelfConsentV2,
   withdrawConsentByToken,
 } from './consent-v2';
-import { CONSENT_PURPOSE_LLM_DISCLOSURE } from './consent-status-v2';
+import {
+  CONSENT_PURPOSE_LLM_DISCLOSURE,
+  DEFAULT_CONSENT_PURPOSE,
+} from './consent-status-v2';
 import {
   consentPersonLockKey,
   deleteArchivedPersonIfStillEligibleV2,
@@ -795,6 +798,75 @@ const COPPA = 'coppa_parental_consent';
             generateUUIDv7(),
           );
           expect(state).toBeNull();
+        });
+
+        // [WI-2347 review, CONSIDER-2] A legacy cw1 token (no tokenId — the
+        // route passes `null`) must be accepted ONLY while the current grant
+        // has never been touched by cw2 issuance (withdrawalTokenId still
+        // null). Once superseded by a fresh cw2 mint, the old cw1 link must
+        // become unusable exactly like a mismatched cw2 tokenId does.
+        it('withdrawConsentByToken ACCEPTS a legacy cw1 token (null tokenId) against a pre-migration grant with no withdrawalTokenId', async () => {
+          const orgId = await seedOrg();
+          const childId = await seedPerson(orgId);
+          // Simulates a grant approved before this change shipped: no id.
+          await db.insert(consentGrant).values({
+            chargePersonId: childId,
+            organizationId: orgId,
+            purpose: DEFAULT_CONSENT_PURPOSE,
+            lawfulBasis: 'gdpr_parental_consent',
+            granted: true,
+            grantedAt: new Date(),
+            priorValue: null,
+            auditFact: { source: 'consent_response_approved' },
+          });
+
+          const result = await withdrawConsentByToken(
+            db,
+            childId,
+            orgId,
+            undefined,
+            null,
+          );
+          expect(result.withdrawnAt).toBeTruthy();
+        });
+
+        it('withdrawConsentByToken REJECTS a legacy cw1 token (null tokenId) once the grant has been superseded by a newer cw2-minted grant (AC-1)', async () => {
+          const orgId = await seedOrg();
+          const childId = await seedPerson(orgId);
+          // Pre-migration grant, no withdrawalTokenId.
+          await db.insert(consentGrant).values({
+            chargePersonId: childId,
+            organizationId: orgId,
+            purpose: DEFAULT_CONSENT_PURPOSE,
+            lawfulBasis: 'gdpr_parental_consent',
+            granted: true,
+            grantedAt: new Date(Date.now() - 60_000),
+            priorValue: null,
+            auditFact: { source: 'consent_response_approved' },
+          });
+          // A newer grant that DOES carry a withdrawalTokenId — e.g. a fresh
+          // re-consent cycle minted under the post-migration code.
+          await db.insert(consentGrant).values({
+            chargePersonId: childId,
+            organizationId: orgId,
+            purpose: DEFAULT_CONSENT_PURPOSE,
+            lawfulBasis: 'gdpr_parental_consent',
+            granted: true,
+            grantedAt: new Date(),
+            priorValue: null,
+            auditFact: { source: 'consent_response_approved' },
+            withdrawalTokenId: generateUUIDv7(),
+          });
+
+          // The old cw1 link (no tokenId) must NOT act on the newer grant.
+          await expect(
+            withdrawConsentByToken(db, childId, orgId, undefined, null),
+          ).rejects.toBeInstanceOf(ConsentRecordNotFoundError);
+
+          const grants = await db.query.consentGrant.findMany({
+            where: eq(consentGrant.chargePersonId, childId),
+          });
+          expect(grants.every((g) => g.withdrawnAt === null)).toBe(true);
         });
       });
     });
