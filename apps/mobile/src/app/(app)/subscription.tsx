@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { platformAlert } from '../../lib/platform-alert';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import type {
   PurchasesPackage,
@@ -25,6 +24,7 @@ import { useProfile } from '../../lib/profile';
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
 import { queryKeys } from '../../lib/query-keys';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TimeoutLoader } from '../../components/common';
 import {
@@ -95,9 +95,9 @@ export default function SubscriptionScreen() {
 }
 
 function SubscriptionContent(): React.ReactElement | null {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { activeProfile, profiles = [] } = useProfile();
   const navigationContract = useNavigationContract();
   const activeProfileRole = useActiveProfileRole();

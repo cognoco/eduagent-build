@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { ScopeDescriptor } from '@eduagent/schemas';
 
@@ -47,10 +47,13 @@ export function ScopeChip(): React.ReactElement | null {
   }
 
   return (
-    <View
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
       testID="scope-chip"
       accessibilityRole="tablist"
-      className="max-w-[260px] flex-row items-center gap-1 rounded-full border border-border bg-surface p-1 shadow-sm"
+      className="max-w-[260px] rounded-full border border-border bg-surface shadow-sm"
+      contentContainerClassName="items-center gap-1 p-1"
     >
       {availableScopes.map((scope) => {
         const selected = sameScope(scope, activeScope);
@@ -63,7 +66,7 @@ export function ScopeChip(): React.ReactElement | null {
             accessibilityLabel={label}
             accessibilityState={{ selected }}
             onPress={() => setActiveScope(scope)}
-            className={`min-h-9 max-w-[150px] items-center justify-center rounded-full px-3 ${
+            className={`min-h-11 min-w-11 max-w-[150px] items-center justify-center rounded-full px-3 ${
               selected ? 'bg-primary' : 'bg-transparent'
             }`}
           >
@@ -78,6 +81,6 @@ export function ScopeChip(): React.ReactElement | null {
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
