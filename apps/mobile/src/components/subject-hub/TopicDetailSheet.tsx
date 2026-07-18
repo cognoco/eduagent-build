@@ -57,6 +57,7 @@ export function TopicDetailSheet({
       onClose={onClose}
       backdropDismissible
       backdropAccessibilityLabel={t('subjectHub.sheet.close')}
+      accessibilityLabel={topic.topic.title}
     >
       <View
         testID="subject-hub-topic-sheet"
