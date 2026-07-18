@@ -291,32 +291,147 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(shouldPersistQuery(retention)).toBe(true);
   });
 
-  // [independent re-audit finding] A segment-0-only 'profile'/'profiles'
-  // allow-rule lets ANY differently-shaped query rooted at those words slip
-  // through — not just the audited 2-element queryKeys.profiles.active /
-  // queryKeys.profiles.list factory shapes. scope-context.tsx's real query
-  // (['profile', activeProfileId, 'scopes'], supporterScopeListSchema ->
-  // personScopeDescriptorSchema.displayName — a linked person's name, PII)
-  // is exactly that: same first segment, unaudited shape, never checked.
-  it("excludes the scope-context 'profile'/'scopes' query (unaudited shape, linked-person displayName PII) while still persisting the audited 2-element profile/profiles factory shapes", () => {
+  // [round 3 re-audit finding] The 2-element profile/profiles factory shapes
+  // that round 2 kept ('profiles'/'profile' — publicProfileSchema) themselves
+  // carry PII under the AC's broad reading: displayName, avatarUrl,
+  // birthMonth/birthDay, location, pronouns, consentStatus. Round 2's
+  // segment-0-collision fix (excluding the unaudited scope-context shape) is
+  // still correct and still tested, but the audited 2-element shape is now
+  // ALSO excluded — nothing rooted at 'profile'/'profiles' persists.
+  it("excludes every 'profile'/'profiles'-rooted query, including the previously-allowed 2-element profile/profiles factory shapes (publicProfileSchema PII: displayName/avatarUrl/birthMonth/birthDay/location/pronouns/consentStatus)", () => {
     const scopesQuery = makeSuccessfulQuery(['profile', 'profile-1', 'scopes']);
     expect(shouldPersistQuery(scopesQuery)).toBe(false);
 
     const activeProfile = makeSuccessfulQuery(['profile', 'profile-1']);
-    expect(shouldPersistQuery(activeProfile)).toBe(true);
+    expect(shouldPersistQuery(activeProfile)).toBe(false);
 
     const profilesList = makeSuccessfulQuery(['profiles', 'user-1']);
-    expect(shouldPersistQuery(profilesList)).toBe(true);
+    expect(shouldPersistQuery(profilesList)).toBe(false);
   });
 
-  it('persists verified-clean progress sub-queries (metrics/enums/ids only)', () => {
-    const overview = makeSuccessfulQuery([
-      'progress',
-      'study',
-      'overview',
+  it('excludes subscription-family (familySubscriptionSchema.members[].displayName — PII)', () => {
+    const query = makeSuccessfulQuery(['subscription-family', 'profile-1']);
+    expect(shouldPersistQuery(query)).toBe(false);
+  });
+
+  it('excludes vocabulary (vocabularySchema.term/translation — user-created via the vocabulary create API)', () => {
+    const query = makeSuccessfulQuery(['vocabulary', 'profile-1', 'subject-1']);
+    expect(shouldPersistQuery(query)).toBe(false);
+  });
+
+  it('excludes usage (usageSchema.byProfile[].name — family member display name, PII)', () => {
+    const query = makeSuccessfulQuery(['usage', 'profile-1']);
+    expect(shouldPersistQuery(query)).toBe(false);
+  });
+
+  it('excludes subject-sessions (subjectSessionSchema.bookTitle — learner-controlled via the focused-book creation path)', () => {
+    const query = makeSuccessfulQuery([
+      'subject-sessions',
+      'subject-1',
       'profile-1',
     ]);
-    expect(shouldPersistQuery(overview)).toBe(true);
+    expect(shouldPersistQuery(query)).toBe(false);
+  });
+
+  it('excludes retention.teaching-preference (nativeLanguage free text) while still persisting retention.subject/topic/evaluate-eligibility', () => {
+    const teachingPreference = makeSuccessfulQuery([
+      'retention',
+      'teaching-preference',
+      'subject-1',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(teachingPreference)).toBe(false);
+
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery(['retention', 'subject', 'subject-1', 'profile-1']),
+      ),
+    ).toBe(true);
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery(['retention', 'topic', 'topic-1', 'profile-1']),
+      ),
+    ).toBe(true);
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery([
+          'retention',
+          'evaluate-eligibility',
+          'topic-1',
+          'profile-1',
+        ]),
+      ),
+    ).toBe(true);
+  });
+
+  it('excludes settings.native-language (unconstrained user-typed string) while still persisting the other settings sub-queries', () => {
+    const nativeLanguage = makeSuccessfulQuery([
+      'settings',
+      'native-language',
+      'subject-1',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(nativeLanguage)).toBe(false);
+
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery(['settings', 'notifications', 'profile-1']),
+      ),
+    ).toBe(true);
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery(['settings', 'celebration-level', 'profile-1']),
+      ),
+    ).toBe(true);
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery(['settings', 'withdrawal-archive', 'profile-1']),
+      ),
+    ).toBe(true);
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery([
+          'settings',
+          'family-pool-breakdown-sharing',
+          'profile-1',
+        ]),
+      ),
+    ).toBe(true);
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery([
+          'settings',
+          'analogy-domain',
+          'subject-1',
+          'profile-1',
+        ]),
+      ),
+    ).toBe(true);
+  });
+
+  it('excludes progress.subject/overview/continue/resume-target/review-summary/overdue-topics/inventory/milestones and progress.topic.resolve (subjectName — the learner-typed subject title, per subjectCreateSchema.name / create-subject.tsx resolvedName-fallback) while still persisting progress.history and progress.topic.active-session', () => {
+    const subjectNameBearing: readonly (readonly unknown[])[] = [
+      ['progress', 'study', 'subject', 'subject-1', 'profile-1'],
+      ['progress', 'study', 'overview', 'profile-1'],
+      ['progress', 'study', 'continue', 'profile-1'],
+      ['progress', 'study', 'resume-target', 'profile-1'],
+      ['progress', 'study', 'review-summary', 'profile-1'],
+      ['progress', 'study', 'overdue-topics', 'profile-1'],
+      ['progress', 'study', 'inventory', 'profile-1'],
+      ['progress', 'study', 'milestones', 'profile-1'],
+      ['progress', 'study', 'topic', 'subject-1', 'resolve', 'profile-1'],
+    ];
+    for (const key of subjectNameBearing) {
+      expect(shouldPersistQuery(makeSuccessfulQuery(key))).toBe(false);
+    }
+
+    const history = makeSuccessfulQuery([
+      'progress',
+      'study',
+      'history',
+      'profile-1',
+    ]);
+    expect(shouldPersistQuery(history)).toBe(true);
 
     const activeSessionForTopic = makeSuccessfulQuery([
       'progress',
@@ -329,27 +444,34 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(shouldPersistQuery(activeSessionForTopic)).toBe(true);
   });
 
-  it('persists other verified-clean query-key roots (retention, vocabulary, settings, subscription, profiles, ...)', () => {
+  it('persists other verified-clean query-key roots (book-sessions, topic-sessions, language-progress, subscription, subscription-status, revenuecat)', () => {
     expect(
       shouldPersistQuery(
-        makeSuccessfulQuery(['retention', 'subject', 'subject-1', 'profile-1']),
+        makeSuccessfulQuery(['book-sessions', 'book-1', 'profile-1']),
       ),
     ).toBe(true);
     expect(
       shouldPersistQuery(
-        makeSuccessfulQuery(['vocabulary', 'profile-1', 'subject-1']),
+        makeSuccessfulQuery(['topic-sessions', 'topic-1', 'profile-1']),
       ),
     ).toBe(true);
     expect(
       shouldPersistQuery(
-        makeSuccessfulQuery(['settings', 'notifications', 'profile-1']),
+        makeSuccessfulQuery(['language-progress', 'subject-1', 'profile-1']),
       ),
     ).toBe(true);
     expect(
       shouldPersistQuery(makeSuccessfulQuery(['subscription', 'profile-1'])),
     ).toBe(true);
     expect(
-      shouldPersistQuery(makeSuccessfulQuery(['profiles', 'user-1'])),
+      shouldPersistQuery(
+        makeSuccessfulQuery(['subscription-status', 'profile-1']),
+      ),
+    ).toBe(true);
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery(['revenuecat', 'customerInfo', 'user-1']),
+      ),
     ).toBe(true);
   });
 
@@ -367,7 +489,7 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(shouldPersistQuery(query)).toBe(false);
   });
 
-  it('[integration] persistQueryClientSave writes allowlisted data but drops transcript/summary/parking-lot/recap/report/dashboard/subjects data to AsyncStorage', async () => {
+  it('[integration] persistQueryClientSave writes allowlisted data but drops transcript/summary/parking-lot/recap/report/dashboard/subjects/profile/subscription-family/vocabulary/usage/subject-sessions/teaching-preference/native-language/subjectName data to AsyncStorage', async () => {
     const client = new QueryClient();
     client.setQueryData(
       ['retention', 'subject', 'subject-1', USER],
@@ -403,6 +525,43 @@ describe('shouldPersistQuery [WI-1987]', () => {
       ['subjects', USER, false],
       [{ rawInput: 'the raw text the learner typed to create this subject' }],
     );
+    client.setQueryData(
+      ['profiles', USER],
+      [{ displayName: 'Jorn Real Name' }],
+    );
+    client.setQueryData(
+      ['subscription-family', USER],
+      [{ members: [{ displayName: 'Wife Real Name' }] }],
+    );
+    client.setQueryData(
+      ['vocabulary', USER, 'subject-1'],
+      [
+        {
+          term: 'raw learner vocab term',
+          translation: 'raw learner translation',
+        },
+      ],
+    );
+    client.setQueryData(
+      ['usage', USER],
+      [{ byProfile: [{ name: 'Child Real Name' }] }],
+    );
+    client.setQueryData(
+      ['subject-sessions', 'subject-1', USER],
+      [{ bookTitle: 'the raw focus text the learner typed as a book title' }],
+    );
+    client.setQueryData(
+      ['retention', 'teaching-preference', 'subject-1', USER],
+      [{ nativeLanguage: 'a custom native language the learner typed' }],
+    );
+    client.setQueryData(
+      ['settings', 'native-language', 'subject-1', USER],
+      [{ nativeLanguage: 'a custom native language typed in settings' }],
+    );
+    client.setQueryData(
+      ['progress', 'study', 'overview', USER],
+      [{ subjectName: 'the raw subject title the learner typed' }],
+    );
 
     await persistQueryClientSave({
       queryClient: client,
@@ -423,6 +582,15 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(raw).not.toContain('a private highlight about the learner');
     expect(raw).not.toContain('a private narrative about the child session');
     expect(raw).not.toContain('the raw text the learner typed');
+    expect(raw).not.toContain('Jorn Real Name');
+    expect(raw).not.toContain('Wife Real Name');
+    expect(raw).not.toContain('raw learner vocab term');
+    expect(raw).not.toContain('raw learner translation');
+    expect(raw).not.toContain('Child Real Name');
+    expect(raw).not.toContain('the raw focus text the learner typed');
+    expect(raw).not.toContain('a custom native language the learner typed');
+    expect(raw).not.toContain('a custom native language typed in settings');
+    expect(raw).not.toContain('the raw subject title the learner typed');
     expect(raw).toContain('retention');
   });
 });

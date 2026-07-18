@@ -115,83 +115,112 @@ export function createScopedPersister(userId: string | null | undefined) {
 }
 
 // ---------------------------------------------------------------------------
-// [WI-1987, reworked] Dehydration ALLOWLIST (default-deny)
+// [WI-1987, round 3 rework] Dehydration ALLOWLIST (default-deny, PII-broad)
 //
 // Original fix: without a `shouldDehydrateQuery` filter,
 // `PersistQueryClientProvider` persists EVERY successful query to
 // AsyncStorage (unencrypted on-device storage) — including session
 // transcripts (sessionTranscriptSchema.exchanges), so real learner/mentor
-// chat text was written to plaintext disk. A first pass added a denylist for
-// `session-transcript` / `session-summary` / `parking-lot` (matched on
-// queryKey[0]). Review bounced that pass: it missed sibling prose-bearing
-// families (`recaps`/`journal-recaps` — displaySummary/highlight/narrative/
-// conversationPrompt/learner quote; `my-reports`/dashboard reports —
-// highlights/nextSteps), and a re-audit of every family in query-keys.ts
-// (plus the inline-literal keys outside it) found the leak is systemic:
-// `rawInput` (the learner's verbatim raw text) and generated
-// summary/narrative/guidance/quote fields are threaded through most
-// progress/dashboard/session response shapes — including the ordinary
-// `['subjects', profileId]` list query and the parent dashboard ROOT query,
-// not just the screens named in review. A denylist fails open: every new
-// query family is persisted by default until someone remembers to add it
-// here, and this audit alone found four independent waves of misses in one
-// pass. An allowlist fails closed: an unlisted family just doesn't paint
-// on cold start (mild, self-correcting) instead of silently writing prose to
-// disk (the actual bug, undetectable without an audit like this one).
+// chat text was written to plaintext disk. Round 1 added a denylist; review
+// bounced it (denylist fails open). Round 2 switched to this allowlist but
+// STILL positively admitted PII: `profiles`/`profile`
+// (publicProfileSchema — displayName/avatarUrl/birthMonth/birthDay/location/
+// pronouns/consentStatus), `subscription-family`
+// (familySubscriptionSchema.members[].displayName), and `vocabulary`
+// (vocabularySchema.term/translation — user-created via the vocabulary
+// create API). Round 2 also read "PII" narrowly (structured identity fields
+// only), so it missed sibling leaks of the same shape.
 //
-// So: `shouldPersistQuery` now denies by default and only persists query-key
-// roots verified end-to-end (packages/schemas/src/*.ts, read in full) to
-// carry ONLY structural metadata — numeric metrics, uuids, enums, dates, and
-// curriculum-authored titles (topic/subject/book names picked by the
-// curriculum, not typed by the learner). Add a new root here ONLY after
-// reading its response schema and confirming no field is learner-authored
-// free text, mentor/LLM-generated prose, or a
-// rawInput/summary/narrative/highlight/quote/guidance-shaped string.
+// Round 3 re-read every currently-allowlisted family's response schema
+// end-to-end against a BROAD PII definition — names, avatars, birth
+// date parts, location, pronouns, consent status, AND any user-controlled
+// string (vocabulary terms/translations, custom "other" language names,
+// learner-typed subject/book titles) — and found the leak is systemic
+// beyond the three named families:
+//   - `usage` — usageSchema.byProfile[].name (family member display name).
+//   - `settings` was allowlisted at segment-0 (queryKey[0] === 'settings'),
+//     silently admitting EVERY settings.* sub-query. `settings.native-language`
+//     (nativeLanguageResponseSchema / nativeLanguageUpdateSchema) is an
+//     unconstrained `z.string().min(2).max(50)` — the mobile "other" custom
+//     native-language picker (onboarding/language-setup.tsx) writes raw
+//     learner-typed text through this exact shape.
+//   - `retention` was allowlisted at segment-0, silently admitting
+//     `retention.teaching-preference`
+//     (teachingPreferenceResponseDataSchema.nativeLanguage: `z.string()`,
+//     same free-text field family as settings.native-language).
+//   - `subject-sessions` (subjectSessionSchema.bookTitle) — `bookTitle`
+//     mirrors `curriculumBooks.title`, which the "focused book" subject-
+//     creation path (services/subject.ts createSubjectWithStructure) sets
+//     DIRECTLY to the learner's typed `focus`/`rawInput` text with no LLM
+//     normalization — confirmed learner-controlled by the codebase's own
+//     `[PROMPT-INJECT-8]` comment in services/book-generation.ts ("bookTitle
+//     ... is learner- or LLM-generated stored text"). Book titles are NOT
+//     reliably curriculum-authored the way topic titles are.
+//   - Most of `progress`'s previously-allowed segment-2 values
+//     (`subject`/`overview`/`continue`/`resume-target`/`review-summary`/
+//     `overdue-topics`/`inventory`, plus the `topic`/`resolve` fixed
+//     literal) embed `subjectName` / `subjectProgressSchema.name` —
+//     the SUBJECT's name, which `subjectCreateSchema.name` and
+//     `apps/mobile/src/app/create-subject.tsx` (`resolveState.result.
+//     resolvedName ?? name.trim()`) prove is the learner's raw typed text
+//     whenever LLM subject-name resolution is ambiguous/no-match. This is
+//     the same user-controlled-string class as `vocabulary`'s term/
+//     translation, not a "curriculum-authored title" (topic/book titles are
+//     LLM-generated FROM a book/subject title, not typed by the learner
+//     directly — genuinely distinct from subject names).
+//   - `progress`'s `milestones` segment-2 value
+//     (milestoneRecordSchema.metadata: `z.record(z.string(), z.unknown())`)
+//     is an unconstrained open bag — no schema can prove it PII-free, and it
+//     is documented (at its one call site) to carry `subjectName`, which is
+//     now known-tainted per the point above.
+//
+// A denylist fails open: every new query family persists by default until
+// someone remembers to add it here. An allowlist fails closed: an unlisted
+// family just doesn't paint on cold start (mild, self-correcting) instead of
+// silently writing PII/prose to disk. `shouldPersistQuery` denies by default
+// and only persists query-key shapes verified end-to-end
+// (packages/schemas/src/*.ts, read in full, PLUS the service/route code that
+// populates each field — schema shape alone is not sufficient proof, see
+// `bookTitle`/`subjectName` above) to carry ONLY structural metadata —
+// numeric metrics, uuids, enums, dates/timestamps, and titles proven to be
+// exclusively curriculum/LLM-authored (never a direct, un-normalized copy of
+// learner-typed input). Add a new allow rule here ONLY after reading the
+// response schema AND tracing every string field's write path to its
+// source.
 // ---------------------------------------------------------------------------
 
 /**
- * Query-key roots (`queryKey[0]`) verified fully clean of learner/mentor
- * prose and `rawInput`. See file-level comment above for the standard each
- * entry must meet.
+ * Query-key roots (`queryKey[0]`) verified fully clean of PII, learner/mentor
+ * prose, and `rawInput`. See file-level comment above for the standard each
+ * entry must meet. Families that mix clean and PII-bearing sub-queries under
+ * the same root are NOT here — they get a segment-aware predicate below
+ * instead of a root-level allow.
  */
 export const PERSISTABLE_QUERY_KEY_ROOTS: ReadonlySet<string> = new Set([
-  'book-sessions', // bookSessionSchema — id/topicId/topicTitle/chapter/exchangeCount/createdAt
-  'topic-sessions', // topicSessionSchema — id/sessionType/durationSeconds/createdAt
-  'subject-sessions', // subjectSessionSchema — ids/titles/sessionType/durationSeconds/createdAt
-  'retention', // retentionCardSchema(+topicTitle/bookId) + teachingPreferenceResponseDataSchema — scores/dates/enums
-  'language-progress', // languageProgressSchema — levels/milestone ids+titles, no prose
-  'vocabulary', // vocabularySchema — curated term/translation flashcard data, not learner narrative
+  'book-sessions', // bookSessionSchema — id/topicId/topicTitle(LLM-generated)/chapter(fixed labels)/exchangeCount/createdAt — no bookTitle field
+  'topic-sessions', // topicSessionSchema — id/sessionType/durationSeconds/createdAt — no titles at all
+  'language-progress', // languageProgressSchema — levels/milestone ids+titles from the static per-language milestone library (language-curriculum.ts), no learner text
   'subscription', // subscriptionSchema — billing tier/limits/dates
-  'usage', // usageSchema — billing counters
-  'subscription-family', // familySubscriptionSchema — billing counters + member displayName
   'subscription-status', // subscriptionStatusResponseSchema — billing enums/counters
-  'revenuecat', // RevenueCat SDK CustomerInfo/Offerings — third-party billing entitlement data
-  'settings', // notification/celebration/withdrawal/analogy/language prefs — booleans/enums/locale strings
+  'revenuecat', // RevenueCat SDK — NOT zod-validated (raw SDK types), verified by type inspection: customerInfo (entitlements/activeSubscriptions/originalAppUserId/dates) carries no name/free-text; offerings (serverDescription/metadata) is RevenueCat-dashboard-authored business config, not learner/family-typed. No learner PII on either shape.
 ]);
 
 /**
  * `progress` (queryKeys.progress.*) mixes safe aggregate-metric queries with
- * prose-bearing ones under the same `queryKey[0]`. The `'profile'`-scoped
- * sub-queries (profileSessions/profileReports/profileWeeklyReports/
- * profileReportDetail/profileWeeklyReportDetail) are the self-view mirror of
- * the dashboard child queries below and carry the same
- * displaySummary/highlight/narrative/conversationPrompt/highlights/nextSteps
- * fields; `topicProgress` carries `summaryExcerpt`. Only the segment-2
- * values below (and the two fixed-literal `'topic'` sub-queries that do NOT
- * carry summaryExcerpt) are allowed — everything else under `'progress'`,
- * including `'profile'` and the variable-topicId shape of `'topic'`, is
- * excluded by omission.
+ * PII/prose-bearing ones under the same `queryKey[0]`. `history` is the only
+ * segment-2 value proven clean end-to-end (progressHistorySchema — dates +
+ * numeric dataPoints only). Every other previously-allowed segment-2 value
+ * embeds `subjectName`/`subjectProgressSchema.name` (learner-controlled, see
+ * file-level comment) or an unconstrained metadata bag (`milestones`) and is
+ * excluded by omission: `subject`, `overview`, `continue`, `resume-target`,
+ * `review-summary`, `overdue-topics`, `inventory`, `milestones`. The
+ * `'profile'`-scoped sub-queries (profileSessions/profileReports/etc — the
+ * self-view mirror of the dashboard child queries) and the variable-topicId
+ * shape of `'topic'` (topicProgress, `summaryExcerpt`) were already excluded
+ * pre-round-3 and remain so.
  */
 const PERSISTABLE_PROGRESS_SEGMENT2: ReadonlySet<string> = new Set([
-  'subject', // subjectProgressSchema — counts/enums/dates
-  'overview', // progressOverviewResponseSchema — counts/enums, subjects: subjectProgressSchema[]
-  'continue', // continueSuggestionSchema — ids/titles only
-  'resume-target', // learningResumeTargetSchema — ids/titles/enum + short system `reason` string
-  'review-summary', // reviewSummaryResponseSchema — counts + nextReviewTopicSchema (ids/titles)
-  'overdue-topics', // overdueTopicsResponseSchema — counts + overdueTopicSchema (ids/titles/enums)
-  'inventory', // knowledgeInventorySchema — counts + currentlyWorkingOn (topic titles)
-  'history', // progressHistorySchema — dates + numeric dataPoints
-  'milestones', // milestoneRecordSchema — enum/counts + metadata: { subjectName } only (verified at the one call site, milestone-detection.ts)
+  'history', // progressHistorySchema — dates + numeric dataPoints only
 ]);
 
 function isPersistableProgressQuery(key: readonly unknown[]): boolean {
@@ -203,42 +232,85 @@ function isPersistableProgressQuery(key: readonly unknown[]): boolean {
   ) {
     return true;
   }
-  // activeSessionForTopic (['progress', mode, 'topic', topicId, 'active-session', profileId])
-  // and resolveTopicSubject (segment4 'resolve') are clean; topicProgress
-  // (['progress', mode, 'topic', subjectId, topicId, profileId], segment4 = a
-  // variable topicId, never one of these two literals) carries
-  // `summaryExcerpt` and must fall through to excluded.
-  return (
-    segment2 === 'topic' &&
-    (key[4] === 'active-session' || key[4] === 'resolve')
-  );
+  // activeSessionForTopic (['progress', mode, 'topic', topicId,
+  // 'active-session', profileId], activeSessionResponseSchema — sessionId
+  // only) is clean. resolveTopicSubject (segment4 'resolve',
+  // topicResolveResponseSchema) was previously allowed here too but its
+  // response carries `subjectName` — same learner-controlled-string taint as
+  // the excluded progress segment-2 values above — so it is EXCLUDED as of
+  // round 3. topicProgress (['progress', mode, 'topic', subjectId, topicId,
+  // profileId], segment4 = a variable topicId, never one of these literals)
+  // carries `summaryExcerpt` and remains excluded.
+  return segment2 === 'topic' && key[4] === 'active-session';
 }
 
 /**
- * `library.retention` (retentionCardWithMetaSchema — clean) shares
- * `queryKey[0]` with `library.conceptMastery`
- * (`mentorAdditions: z.array(z.string())` — mentor-generated prose about the
- * learner's demonstrated concept mastery). Only `retention` is allowed.
+ * `library.retention` (retentionCardWithMetaSchema — retentionCardSchema +
+ * topicTitle/bookId, no bookTitle/subjectName — clean) shares `queryKey[0]`
+ * with `library.conceptMastery` (`mentorAdditions: z.array(z.string())` —
+ * mentor-generated prose about the learner's demonstrated concept mastery).
+ * Only `retention` is allowed.
  */
 function isPersistableLibraryQuery(key: readonly unknown[]): boolean {
   return key[0] === 'library' && key[1] === 'retention';
 }
 
 /**
- * [WI-1987 re-audit finding] `queryKeys.profiles.list` (`['profiles',
- * userId]`) and `queryKeys.profiles.active` (`['profile', profileId]`) are
- * both exactly 2-element `publicProfileSchema`-backed keys — clean. But
- * `'profile'`/`'profiles'` are common enough words that an UNAUDITED query
- * can collide on segment-0 alone: `scope-context.tsx`'s
- * `['profile', activeProfileId, 'scopes']` is a real, different-shaped query
- * (`supporterScopeListSchema` → `personScopeDescriptorSchema.displayName`, a
- * linked person's name — PII) that a segment-0-only rule would silently
- * allow. Constrain the allow-rule to the EXACT 2-element factory shape so any
- * other 'profile'/'profiles'-rooted query — audited or not — falls through
- * to default-deny.
+ * `retention` (queryKeys.retention.*) mixes clean sub-queries with one
+ * PII-bearing sub-query under the same `queryKey[0]`:
+ *   - `subject` (subjectRetentionResponseSchema — retentionCardWithMetaSchema[]
+ *     + reviewDueCount) — clean.
+ *   - `topic` (topicRetentionResponseSchema — a single nullable
+ *     retentionCardSchema, no title fields at all) — clean.
+ *   - `evaluate-eligibility` (evaluateEligibilitySchema — topicTitle
+ *     (LLM-generated) + scores/enums + a system `reason` string populated
+ *     only with fixed server strings, never learner/LLM content) — clean.
+ *   - `teaching-preference` (teachingPreferenceResponseDataSchema —
+ *     `nativeLanguage: z.string().nullable()`, an unconstrained free-text
+ *     field the settings PUT route accepts verbatim, same taint as
+ *     `settings.native-language` below) — EXCLUDED.
  */
-function isPersistableProfileQuery(key: readonly unknown[]): boolean {
-  return key.length === 2 && (key[0] === 'profiles' || key[0] === 'profile');
+function isPersistableRetentionQuery(key: readonly unknown[]): boolean {
+  return (
+    key[0] === 'retention' &&
+    (key[1] === 'subject' ||
+      key[1] === 'topic' ||
+      key[1] === 'evaluate-eligibility')
+  );
+}
+
+/**
+ * `settings` (queryKeys.settings.*) mixes clean boolean/enum preference
+ * sub-queries with one free-text sub-query under the same `queryKey[0]`.
+ * `native-language` (nativeLanguageResponseSchema /
+ * nativeLanguageUpdateSchema — `z.string().min(2).max(50)`, no enum) is
+ * genuinely learner-typed: the onboarding "other" native-language picker
+ * (apps/mobile/src/app/(app)/onboarding/language-setup.tsx) and the
+ * corresponding PUT route (routes/settings.ts) both accept and persist
+ * arbitrary custom text through this exact shape. Every other settings
+ * sub-key is a verified boolean/enum:
+ *   - `notifications` (notificationPrefsResponseSchema — booleans + one
+ *     bounded int) — clean.
+ *   - `celebration-level` (celebrationLevelSchema — enum) — clean.
+ *   - `withdrawal-archive` (withdrawalArchivePreferenceSchema — enum) — clean.
+ *   - `family-pool-breakdown-sharing` (`{ value: z.boolean() }`) — clean.
+ *   - `analogy-domain` (analogyDomainSchema — enum) — clean.
+ */
+const PERSISTABLE_SETTINGS_SEGMENT1: ReadonlySet<string> = new Set([
+  'notifications',
+  'celebration-level',
+  'withdrawal-archive',
+  'family-pool-breakdown-sharing',
+  'analogy-domain',
+]);
+
+function isPersistableSettingsQuery(key: readonly unknown[]): boolean {
+  const segment1 = key[1];
+  return (
+    key[0] === 'settings' &&
+    typeof segment1 === 'string' &&
+    PERSISTABLE_SETTINGS_SEGMENT1.has(segment1)
+  );
 }
 
 // `dashboard` (queryKeys.dashboard.* — the parent-facing child views) is
@@ -262,9 +334,16 @@ function isPersistableProfileQuery(key: readonly unknown[]): boolean {
 // displaySummary/highlight/narrative/conversationPrompt/verifiedProof.quote),
 // `my-reports` (self-scope mirror of dashboard reports — highlights/nextSteps),
 // `learner-profile` (learningProfileSchema.communicationNotes — free-text
-// notes), `subjects` (subjectSchema.rawInput — the learner's raw
+// notes), `subjects` (subjectSchema.rawInput/name — the learner's raw
 // subject-creation text), `resume-nudge` (topicHint — not independently
-// verified prose-free, excluded conservatively).
+// verified prose-free, excluded conservatively), `profiles`/`profile`
+// (publicProfileSchema — displayName/avatarUrl/birthMonth/birthDay/location/
+// pronouns/consentStatus — PII), `subscription-family`
+// (familySubscriptionSchema.members[].displayName — PII), `usage`
+// (usageSchema.byProfile[].name — PII), `vocabulary` (vocabularySchema.term/
+// translation — user-created via the vocabulary create API), `subject-sessions`
+// (subjectSessionSchema.bookTitle — learner-controlled, see file-level
+// comment).
 
 /**
  * `dehydrateOptions.shouldDehydrateQuery` for the scoped persister.
@@ -280,7 +359,8 @@ export function shouldPersistQuery(query: Query): boolean {
       PERSISTABLE_QUERY_KEY_ROOTS.has(firstSegment)) ||
     isPersistableProgressQuery(key) ||
     isPersistableLibraryQuery(key) ||
-    isPersistableProfileQuery(key);
+    isPersistableRetentionQuery(key) ||
+    isPersistableSettingsQuery(key);
   if (!allowed) return false;
   return defaultShouldDehydrateQuery(query);
 }
