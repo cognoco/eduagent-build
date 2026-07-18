@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import {
   ERROR_RESPONSES,
@@ -450,6 +450,113 @@ describe('InitiateLinkScreen', () => {
       expect(fetchCallsMatching(routedFetch, '/visibility/links')).toHaveLength(
         1,
       );
+    });
+
+    // [WI-2188 rework] Bug RGR — the confirmation Back handler resets the
+    // mutation's *observer* state (`createMutation.reset()`), but that does
+    // not cancel an already in-flight create request. Its unconditional
+    // `onSuccess` previously fired `router.replace(...)` regardless, so a
+    // request that resolved successfully AFTER the user had already backed
+    // out pulled them forward into the contract screen. This is the
+    // loading/pending-state exit AC-2/AC-4 require.
+    it('pressing back while the create request is pending prevents a late-resolving success from navigating forward', async () => {
+      let resolveCreate: (value: unknown) => void = () => undefined;
+      const pendingCreate = new Promise((resolve) => {
+        resolveCreate = resolve;
+      });
+      const InitiateLinkScreen = require('./initiate').default;
+      const rendered = renderScreen(<InitiateLinkScreen />, {
+        profile: NAMED_PROFILES.guardian,
+        profiles: [NAMED_PROFILES.guardian, NAMED_PROFILES.linkedChild],
+        routes: {
+          '/visibility/links': () => pendingCreate,
+        },
+      });
+      cleanupRender = rendered.cleanup;
+      const { routedFetch } = rendered;
+
+      fireEvent.press(
+        screen.getByTestId(
+          `visibility-link-initiate-picker-managed-${NAMED_PROFILES.linkedChild.id}`,
+        ),
+      );
+      fireEvent.press(screen.getByTestId('visibility-link-create'));
+
+      // The request is now in flight (pending) — the mutationFn is blocked
+      // on `pendingCreate`, which we control from here.
+      await waitFor(() =>
+        expect(
+          fetchCallsMatching(routedFetch, '/visibility/links'),
+        ).toHaveLength(1),
+      );
+
+      // Exit the confirmation step while still pending.
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-confirm-back'),
+      );
+      screen.getByTestId('visibility-link-initiate-picker');
+      expect(mockReplace).not.toHaveBeenCalled();
+
+      // Now let the request resolve successfully, after the user has left.
+      await act(async () => {
+        resolveCreate(CONTRACT);
+        await pendingCreate;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(mockReplace).not.toHaveBeenCalled();
+      screen.getByTestId('visibility-link-initiate-picker');
+    });
+
+    // [WI-2188 rework] Sibling surface of the same defect: the pre-filled
+    // (`pushLinkInitiateForManagedPerson` direct-entry) confirmation Back
+    // handler takes the `paramSupporteePersonId` branch and returns early —
+    // it must ALSO guard against a late-resolving create success, not just
+    // the inline-picker branch above.
+    it('pressing back on a pre-filled entry while the create request is pending prevents a late-resolving success from navigating forward', async () => {
+      let resolveCreate: (value: unknown) => void = () => undefined;
+      const pendingCreate = new Promise((resolve) => {
+        resolveCreate = resolve;
+      });
+      mockParams = {
+        supporteePersonId: NAMED_PROFILES.linkedChild.id,
+        supporteeName: NAMED_PROFILES.linkedChild.displayName,
+      };
+      const InitiateLinkScreen = require('./initiate').default;
+      const rendered = renderScreen(<InitiateLinkScreen />, {
+        profile: NAMED_PROFILES.guardian,
+        routes: {
+          '/visibility/links': () => pendingCreate,
+        },
+      });
+      cleanupRender = rendered.cleanup;
+      const { routedFetch } = rendered;
+
+      // Pre-filled entry skips the picker — confirmation renders directly.
+      fireEvent.press(screen.getByTestId('visibility-link-create'));
+
+      await waitFor(() =>
+        expect(
+          fetchCallsMatching(routedFetch, '/visibility/links'),
+        ).toHaveLength(1),
+      );
+
+      // Exit via the pre-filled-entry branch (goBackOrReplace/router.back())
+      // while the request is still pending.
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-confirm-back'),
+      );
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockReplace).not.toHaveBeenCalled();
+
+      // Now let the request resolve successfully, after the user has left.
+      await act(async () => {
+        resolveCreate(CONTRACT);
+        await pendingCreate;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(mockReplace).not.toHaveBeenCalled();
     });
 
     it('the existing-teen invite branch (V2 on) back button returns to the picker', () => {
