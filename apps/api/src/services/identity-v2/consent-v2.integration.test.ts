@@ -2177,7 +2177,7 @@ const COPPA = 'coppa_parental_consent';
     // [WI-1193] Adult self-consent — record + independent-purpose withdrawal
     // -------------------------------------------------------------------------
     describe('[WI-1193] recordAdultSelfConsentV2 + withdrawAdultSelfConsentV2', () => {
-      it('records a CONSENTED grant for EACH purpose, basis=adult_self_consent', async () => {
+      it('records a CONSENTED grant for EACH purpose, basis=art6_1_a', async () => {
         const orgId = await seedOrg();
         const adultId = await seedPerson(orgId, {
           roles: ['admin', 'learner'],
@@ -2194,7 +2194,7 @@ const COPPA = 'coppa_parental_consent';
           PURPOSE,
         ]);
         for (const g of grants) {
-          expect(g.lawfulBasis).toBe('adult_self_consent');
+          expect(g.lawfulBasis).toBe('art6_1_a');
           expect(g.granted).toBe(true);
           expect(g.withdrawnAt).toBeNull();
         }
@@ -2301,7 +2301,7 @@ const COPPA = 'coppa_parental_consent';
           where: and(
             eq(consentGrant.chargePersonId, adultId),
             eq(consentGrant.purpose, PURPOSE),
-            eq(consentGrant.lawfulBasis, 'adult_self_consent'),
+            eq(consentGrant.lawfulBasis, 'art6_1_a'),
           ),
           columns: { withdrawnAt: true },
         });

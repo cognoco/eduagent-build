@@ -57,6 +57,7 @@ import { MentorBornCeremonyOverlay } from '../components/common/MentorBornCeremo
 import {
   createScopedPersister,
   getQueryCacheBuster,
+  reattemptPersisterPurgeIfSignedOut,
   shouldPersistQuery,
 } from '../lib/query-persister';
 import { shouldReportQueryErrorToSentry } from '../lib/query-error-reporting';
@@ -410,7 +411,16 @@ class SplashErrorBoundary extends React.Component<
  * blob is correctly partitioned.
  */
 function ScopedPersistProvider({ children }: { children: React.ReactNode }) {
-  const { userId, isSignedIn } = useAuth();
+  const { userId, isSignedIn, isLoaded } = useAuth();
+  // [WI-1987] Re-attempt any sign-out purge that a storage failure left
+  // behind. Fires only when DEFINITIVELY signed out (isLoaded && !isSignedIn),
+  // so it covers app start with no session AND the window before the next
+  // sign-in, without touching a returning user's cache during Clerk's initial
+  // load. Escalation on failure lives inside the helper. See
+  // reattemptPersisterPurgeIfSignedOut.
+  useEffect(() => {
+    void reattemptPersisterPurgeIfSignedOut({ isLoaded, isSignedIn });
+  }, [isLoaded, isSignedIn]);
   // Render an inert pass-through while signed out — there is no identity to
   // scope to, and we explicitly do not want to rehydrate the previous user's
   // cache during the signed-out window. The next sign-in will mount the

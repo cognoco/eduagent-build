@@ -219,7 +219,7 @@ export async function createDirectConsentGrant(
 // "no email workflow" reasoning above). This writes ONE CONSENTED consent_grant
 // per purpose in ADULT_SELF_CONSENT_PURPOSES (AC2 purpose split — each purpose
 // is its own row, so withdrawing one never touches the other), basis =
-// 'adult_self_consent'. No consent_request row is written (there is no pre-grant
+// 'art6_1_a'. No consent_request row is written (there is no pre-grant
 // workflow for this basis — see the ConsentBasis doc comment).
 //
 // Withdrawal is deliberately NOT `stampWithdrawal`/`revokeConsentV2`: those are
@@ -234,7 +234,7 @@ export async function createDirectConsentGrant(
 
 /**
  * [WI-1193 AC1/AC2] Write the adult self-consent grants — one CONSENTED row per
- * ADULT_SELF_CONSENT_PURPOSES purpose, basis='adult_self_consent'. Called once,
+ * ADULT_SELF_CONSENT_PURPOSES purpose, basis='art6_1_a'. Called once,
  * inside the identity-graph bootstrap transaction, for a self-registered adult
  * owner. `db` may be a transaction handle (passed through unchanged, same
  * pattern as createDirectConsentGrant).
@@ -251,7 +251,7 @@ export async function recordAdultSelfConsentV2(
       chargePersonId,
       organizationId,
       purpose,
-      lawfulBasis: 'adult_self_consent' as const,
+      lawfulBasis: 'art6_1_a' as const,
       granted: true,
       grantedAt: now,
       // [WI-1193 AC1] audit_fact carries the durable terms-acceptance fact as
@@ -275,7 +275,7 @@ export async function recordAdultSelfConsentV2(
  * independent of any other purpose the same adult holds. The single sanctioned
  * in-row transition — stamp `withdrawn_at` (+ prior_value=true, audit_fact) on
  * the current grant for (chargePersonId, purpose, organizationId,
- * 'adult_self_consent') — mirroring `stampWithdrawal`'s shape, but purpose-aware
+ * 'art6_1_a') — mirroring `stampWithdrawal`'s shape, but purpose-aware
  * and with no guardian check (the caller IS the consenting adult). Idempotent: a
  * second withdrawal of an already-withdrawn purpose returns the existing
  * `withdrawnAt`. Throws `ConsentRecordNotFoundError` if the purpose was never
@@ -292,7 +292,7 @@ export async function withdrawAdultSelfConsentV2(
       eq(consentGrant.chargePersonId, chargePersonId),
       eq(consentGrant.purpose, purpose),
       eq(consentGrant.organizationId, organizationId),
-      eq(consentGrant.lawfulBasis, 'adult_self_consent'),
+      eq(consentGrant.lawfulBasis, 'art6_1_a'),
     ),
     orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
     columns: { id: true, withdrawnAt: true, auditFact: true },

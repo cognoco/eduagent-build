@@ -131,7 +131,7 @@ files carrying at least one hit. Full breakdowns are in §4.
 | 7 | `docs/change-classes.md` | `docs/runbooks/change-classes.md` | L3 operational (CI-routing procedure) | Pure "what to run for this diff" procedure; J3 bucketed as L3, target ambiguous between specs/runbooks — runbooks fits the content | 31 / 17 |
 | 8 | `docs/deployment-and-secrets.md` | `docs/runbooks/deployment-and-secrets.md` | L3 operational | Ops procedure guide | 38 / 18 |
 | 9 | `docs/e2e-smoke-pack.md` | `docs/runbooks/e2e-smoke-pack.md` | L3 operational | Release-gate procedure | 3 / 3 |
-| 10 | `docs/future-app-options.md` | **UNHOMED — see §5** | Speculative, no completion date, disclaims commitment | Doesn't cleanly satisfy L3's "has a completion date after which it's history" test | 1 / 1 |
+| 10 | `docs/future-app-options.md` | `docs/future ideas/future-app-options.md` — **RESOLVED by operator 2026-07-18** | Speculative, no completion date, disclaims commitment | Dedicated exploratory future-ideas holding area; not canon, roadmap, or L3 operational material | 1 / 1 |
 | 11 | `docs/llm-issues.md` | `docs/runbooks/llm-issues.md` | L3 operational (living troubleshooting log) | Best available fit despite the "living, never archived" tension (flagged in §5) | 3 / 3 |
 | 12 | `docs/pre-launch-checklist.md` | `docs/runbooks/pre-launch-checklist.md` | L3 operational | Release checklist, clear runbook shape | 7 / 5 |
 | 13 | `docs/ux-todos.md` | **UNHOMED — see §5** | Rolling backlog list, not a procedure or a spec | Doesn't fit any L3 sub-type cleanly | 4 / 3 |
@@ -247,7 +247,7 @@ only, not part of the update burden).
 
 3 lines / 3 files. Real: `docs/change-classes.md:41` (itself moving in lockstep — update both in the same commit) and `apps/mobile/e2e/scripts/run-smoke.sh:21` (script comment).
 
-### 4.10 `docs/future-app-options.md`, `docs/ux-todos.md`, `docs/Strategy_analysis.md`, `docs/llm-issues.md`, `docs/pre-launch-checklist.md`, `docs/ci-troubleshooting.md`, `docs/logo.svg`
+### 4.10 `docs/future-app-options.md` → `docs/future ideas/future-app-options.md`, plus `docs/ux-todos.md`, `docs/Strategy_analysis.md`, `docs/llm-issues.md`, `docs/pre-launch-checklist.md`, `docs/ci-troubleshooting.md`, `docs/logo.svg`
 
 All low-citation (0–7 hits), no CI coupling. Notable real code hits: `docs/llm-issues.md` cited by `apps/mobile/src/components/session/MessageBubble.test.tsx:20` and `apps/mobile/src/components/common/ThemedMarkdown.tsx:35` (both comments); `docs/logo.svg` cited by `apps/mobile/src/components/AnimatedSplash.tsx:63` (comment); `docs/ci-troubleshooting.md` cited by `.claude/memory/feedback_nx_reset_before_commit.md:7` via a `superseded_by:` frontmatter field — **this is a structured field, not prose; it must be updated precisely or the memory's own schema linkage breaks.**
 
@@ -319,7 +319,7 @@ All low-citation (0–7 hits), no CI coupling. Notable real code hits: `docs/llm
    - Candidate targets: stay at `docs/` root (a named, permanent exception to "no loose canon"); or `docs/canon/project_context.md` (if the CI action's `review_rules_path` input is updated in lockstep).
    - **Recommendation: keep at root as a documented exception.** The CI coupling makes this the highest-blast-radius move in the entire table for the least architectural benefit — nothing about its content changes meaning by staying loose.
 
-4. **`docs/future-app-options.md`.** Explicitly "not a commitment," no completion date — fails L3's own discriminating test. Candidates: `docs/specs/` (if treated as a very early-stage speculative spec), `docs/plans/` (if treated as backlog), or genuinely a new "not yet L3" holding pattern this ADR doesn't define. **Recommendation: `docs/specs/future-app-options.md`,** flagged with a note that it is explicitly pre-spec.
+4. **`docs/future-app-options.md`.** Explicitly "not a commitment," no completion date — fails L3's own discriminating test. **Resolved by operator 2026-07-18:** moved to `docs/future ideas/future-app-options.md`, a dedicated exploratory holding area outside canon, roadmap, and L3 operational material. This supersedes the earlier `docs/specs/` recommendation.
 
 5. **`docs/flows/**` — reclassify out of the "assets" bucket.** J3's table lumps `flows/` in with `logo-designs/ mockups/ screenshots_and_store_info/ visual-artefacts/` under "assets / legal artifact," target `assets/`. **This does not match current contents**: every one of the 32 files under `docs/flows/` today is markdown (flow-access inventories, a route-shell map, a master-directory index + per-flow pages, two revision plans) — zero images. Candidates: `docs/specs/flows/` (feature-inventory shape), `docs/registers/flows/` (given its master-directory + per-flow-page structure resembles a governed register more than a spec), or a new `docs/canon/navigation/` home paired with `audience-matrix.md`. **Recommendation:** pair with item 1(b)/1(c) above — whichever way `audience-matrix.md` lands, `flows/` should land beside it, since 14+ flow pages already cite the matrix as a co-equal source. This is a genuine judgment call for the operator, not a mechanical one.
 
@@ -371,7 +371,7 @@ Per §5/§6 above, the following need an explicit operator decision before S2-11
 1. Target for `audience-matrix.md` (canon-spine vs. domain-canon vs. register) — and whether `flows/` moves in lockstep with it.
 2. Whether `flows/` is reclassified out of "assets" (recommended) and where it lands.
 3. Whether `project_context.md` stays at root permanently (recommended) or moves with a coordinated CI-action edit.
-4. `future-app-options.md`, `ux-todos.md`, `Strategy_analysis.md`, `docs/analysis/` — four small, low-citation files/dirs whose only real blocker is "no clean §I.4 slot," not citation risk.
+4. `ux-todos.md`, `Strategy_analysis.md`, `docs/analysis/` — three small, low-citation files/dirs whose only real blocker is "no clean §I.4 slot," not citation risk. (`future-app-options.md` resolved to `docs/future ideas/` by operator ruling 2026-07-18.)
 5. `screenshots_and_store_info/` — split vs. move-whole-to-compliance.
 6. `visual-artefacts/` scripts — bundle-with-outputs vs. relocate-to-repo-root-scripts.
 7. Whether to fold the three pre-existing-rot findings (§6) into this WI's execution or file them as separate small follow-ups.
