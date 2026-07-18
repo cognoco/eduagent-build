@@ -313,6 +313,75 @@ describe('scrubSentryEvent', () => {
       "Cannot read properties of undefined (reading 'foo')",
     );
   });
+
+  // [WI-2353] Red-green regression: @sentry/cloudflare's default
+  // requestDataIntegration copies event.request.headers verbatim, and the
+  // SDK only withholds the cookie header by default (sendDefaultPii: false)
+  // — authorization is not treated specially, so `Authorization: Bearer
+  // <jwt>` reaches Sentry on every authed request that captures an event.
+  // Before this fix, nothing redacted event.request.headers.authorization
+  // and this assertion FAILED (the literal token passed through unchanged);
+  // after adding the redaction it PASSES.
+  it('redacts the authorization header from event.request.headers', () => {
+    const event = {
+      request: {
+        url: 'https://api.example.com/v1/sessions',
+        headers: {
+          authorization: 'Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.sig',
+          'user-agent': 'MentoMate/1.0',
+        },
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.headers?.authorization).toBeUndefined();
+    expect(scrubbed.request?.headers?.['user-agent']).toBe('MentoMate/1.0');
+  });
+
+  // Case-insensitive: the SDK/runtime may not always lowercase header keys.
+  it('redacts a differently-cased Authorization header key', () => {
+    const event = {
+      request: {
+        headers: { Authorization: 'Bearer eyJhbGciOiJSUzI1NiJ9.sig' },
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.headers?.Authorization).toBeUndefined();
+  });
+
+  // [WI-2353] AC#4 regression guard: the SDK already withholds the cookie
+  // header by default (sendDefaultPii: false) — confirm the authorization
+  // redaction above does not disturb that existing behavior.
+  it('leaves an already-absent cookie header absent (no regression)', () => {
+    const event = {
+      request: {
+        headers: {
+          authorization: 'Bearer eyJhbGciOiJSUzI1NiJ9.sig',
+          'user-agent': 'MentoMate/1.0',
+        },
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.headers?.cookie).toBeUndefined();
+    expect(scrubbed.request?.headers?.['user-agent']).toBe('MentoMate/1.0');
+  });
+
+  it('leaves an event with no request.headers unchanged', () => {
+    const event = {
+      request: { url: 'https://api.example.com/v1/sessions' },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request).toEqual({
+      url: 'https://api.example.com/v1/sessions',
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
