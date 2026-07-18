@@ -116,6 +116,9 @@ function classifyFailure({ artifactRoot, exitCode, resultText = '' }) {
 }
 
 function decide({ preflight, postflight, classification, exitCode }) {
+  // The workflow shell is the authoritative runtime path; this exported
+  // decision function is its executable regression contract. Keep both
+  // branches aligned and extend the matrix tests when the gate changes.
   if (preflight === GATE_STATES.UNAVAILABLE && classification === 'not-run') return 0;
   if (exitCode === 0) return 0;
   if (classification === 'cancellation' || classification === 'product' || classification === 'unknown') return exitCode || 1;
