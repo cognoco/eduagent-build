@@ -10,6 +10,7 @@ import { AccountAdminSheet } from './AccountAdminSheet';
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockRedirect = jest.fn();
+const mockCanEnter = jest.fn(() => true);
 const mockClerkSignOut = jest.fn();
 const mockQueryClient = { clear: jest.fn() };
 const mockSignOutWithCleanup = jest.fn();
@@ -21,6 +22,8 @@ let mockGates = {
   showExportDelete: true,
   showAddChild: true,
   showRemoveFamilyMember: true,
+  showAccommodationChildEditor: true,
+  showMentorLanguageChildEditor: true,
 };
 let mockProfiles = [
   { id: 'owner-1', displayName: 'Owner', isOwner: true },
@@ -76,7 +79,10 @@ jest.mock('@tanstack/react-query', () => ({
 
 jest.mock('../../hooks/use-navigation-contract', () => ({
   ...jest.requireActual('../../hooks/use-navigation-contract'),
-  useNavigationContract: () => ({ gates: mockGates }),
+  useNavigationContract: () => ({
+    gates: mockGates,
+    canEnter: mockCanEnter,
+  }),
 }));
 
 jest.mock('../../lib/profile', () => ({
@@ -109,6 +115,7 @@ jest.mock('../../lib/platform-alert', () => ({
 describe('AccountAdminSheet', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCanEnter.mockReturnValue(true);
     mockGates = {
       sessionIsOwner: true,
       showBilling: true,
@@ -116,6 +123,8 @@ describe('AccountAdminSheet', () => {
       showExportDelete: true,
       showAddChild: true,
       showRemoveFamilyMember: true,
+      showAccommodationChildEditor: true,
+      showMentorLanguageChildEditor: true,
     };
     mockProfiles = [
       { id: 'owner-1', displayName: 'Owner', isOwner: true },
@@ -168,6 +177,8 @@ describe('AccountAdminSheet', () => {
       showExportDelete: false,
       showAddChild: false,
       showRemoveFamilyMember: false,
+      showAccommodationChildEditor: false,
+      showMentorLanguageChildEditor: false,
     };
     mockActiveProfile = { id: 'child-1', displayName: 'Child', isOwner: false };
     mockProfiles = [mockActiveProfile];
@@ -197,6 +208,66 @@ describe('AccountAdminSheet', () => {
       screen.getByTestId('account-admin-notifications').props
         .accessibilityLabel,
     ).toContain('Owner');
+  });
+
+  it('hides learner rows for a live external supportership person that is not an editable managed child', () => {
+    mockCanEnter.mockReturnValue(false);
+    mockActiveScope = {
+      kind: 'person',
+      personId: 'external-supportee',
+      edgeId: 'external-edge',
+      displayName: 'External learner',
+    };
+    mockAvailableScopes = [
+      ...mockAvailableScopes,
+      {
+        kind: 'person',
+        personId: 'external-supportee',
+        edgeId: 'external-edge',
+        displayName: 'External learner',
+      },
+    ];
+
+    render(<AccountAdminSheet />);
+
+    expect(
+      screen.queryByTestId('account-admin-learning-preferences'),
+    ).toBeNull();
+    expect(screen.queryByTestId('account-admin-mentor-memory')).toBeNull();
+    expect(screen.queryByTestId('account-admin-mentor-language')).toBeNull();
+    expect(mockCanEnter).toHaveBeenCalledWith('child/[profileId]', {
+      profileId: 'external-supportee',
+    });
+    expect(
+      screen.getByTestId('account-admin-notifications').props
+        .accessibilityLabel,
+    ).toContain('Owner');
+  });
+
+  it('hides learner rows when a managed-child person scope lacks the route editor gate', () => {
+    mockCanEnter.mockReturnValue(false);
+    mockActiveScope = {
+      kind: 'person',
+      personId: 'child-1',
+      edgeId: 'edge-1',
+      displayName: 'Mia',
+    };
+    mockGates = {
+      ...mockGates,
+      showAccommodationChildEditor: false,
+      showMentorLanguageChildEditor: false,
+    };
+
+    render(<AccountAdminSheet />);
+
+    expect(
+      screen.queryByTestId('account-admin-learning-preferences'),
+    ).toBeNull();
+    expect(screen.queryByTestId('account-admin-mentor-memory')).toBeNull();
+    expect(screen.queryByTestId('account-admin-mentor-language')).toBeNull();
+    expect(mockCanEnter).toHaveBeenCalledWith('child/[profileId]', {
+      profileId: 'child-1',
+    });
   });
 
   it('keeps learner mutations unavailable until the persisted scope has loaded', () => {

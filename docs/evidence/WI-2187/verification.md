@@ -8,10 +8,25 @@ Account administration sheet with an owner session and an authorized learner
 person scope, then observes the visible and accessible mutation targets and the
 learner-specific destinations.
 
+The review-correction case is **a live external supportership person, or a
+managed-child person in a Study context without the child-editor route gate,
+must not receive learner rows whose destinations reject the edit**. The
+production scope API includes every live supportee at
+`apps/api/src/services/scope-resolution.ts:36`, while the Account sheet now
+requires the selected person to appear in the navigation contract's linked
+child IDs and to be editable under the same route gates as the destinations at
+`apps/mobile/src/components/account/AccountAdminSheet.tsx:51`. The sheet consumes
+the contract's public `canEnter` boundary; its linked-child route decision is
+implemented at `apps/mobile/src/lib/navigation-contract.ts:457` and
+`apps/mobile/src/lib/navigation-contract.ts:477`. The exact
+external-supportee and route-gate regressions start at
+`apps/mobile/src/components/account/AccountAdminSheet.test.tsx:213` and
+`apps/mobile/src/components/account/AccountAdminSheet.test.tsx:247`.
+
 The production scope resolver is at
 `apps/mobile/src/components/account/AccountAdminSheet.tsx:39`, and the exact
 regression starts at
-`apps/mobile/src/components/account/AccountAdminSheet.test.tsx:218`.
+`apps/mobile/src/components/account/AccountAdminSheet.test.tsx:289`.
 
 ## Executed RED → GREEN → production-only revert RED → restore GREEN
 
@@ -30,6 +45,26 @@ This sequence exercises the reported identity defect itself. It does not use a
 generic smoke result as a substitute for the owner-global-versus-authorized-
 learner assertion.
 
+## Review correction — external supportee and Study-context route gate
+
+The two correction regressions remained present and unchanged in all four
+phases. The production-only revert removed only the managed-child and route-gate
+check from `AccountAdminSheet.tsx`; restoring reapplied that exact production
+diff.
+
+| Phase | Production state | Exact captured output |
+| --- | --- | --- |
+| RED | Pre-correction PR production with both new regressions | Exit 1; 1 suite failed; 2 tests failed, 7 passed, 9 total. The live external supportee and the managed child without editor gates both still rendered `account-admin-learning-preferences`. |
+| GREEN | Minimal managed-child plus destination-gate check applied | Exit 0; 1 suite passed; 9 tests passed, 9 total. Both named cases withheld all three learner rows while owner-global rows remained owner-labelled. |
+| Production-only revert RED | Both correction tests retained; only the production check removed | Exit 1; 1 suite failed; the same 2 tests failed, 7 passed, 9 total, at the same learner-row assertion. |
+| Restore GREEN | Exact production correction restored | Exit 0; 1 suite passed; 9 tests passed, 9 total. |
+
+This sequence exercises the reported external-supportee and Study-context dead
+affordances themselves. No existing Playwright fixture seeds a supportership
+person outside the Clerk account's managed profile list, so no adjacent browser
+spec is presented as proof of this defect; the required PR smoke remains a
+separate CI gate.
+
 ## Acceptance-criteria evidence
 
 ### AC-1 — Owner-global rows and leaves identify the owner
@@ -39,10 +74,10 @@ learner assertion.
   `apps/mobile/src/components/more/settings-rows.test.tsx:54` and
   `apps/mobile/src/components/more/settings-rows.test.tsx:72` execute the row and
   toggle variants.
-- `apps/mobile/src/components/account/AccountAdminSheet.tsx:160` binds owner-only
+- `apps/mobile/src/components/account/AccountAdminSheet.tsx:168` binds owner-only
   Account, security, notification, privacy, support, and sign-out rows to the
   owner display name. The mixed owner/learner assertion is executable at
-  `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:218`.
+  `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:289`.
 - `apps/mobile/src/components/account-security.tsx:42` includes the owner name in
   each security mutation's accessible name;
   `apps/mobile/src/components/account-security.test.tsx:61` executes all three
@@ -54,9 +89,9 @@ learner assertion.
 
 ### AC-2 — Direct Mentor language and exact owner request identity
 
-- `apps/mobile/src/components/account/AccountAdminSheet.tsx:134` routes Mentor
+- `apps/mobile/src/components/account/AccountAdminSheet.tsx:149` routes Mentor
   language directly to the intended picker with the authorized learner ID;
-  `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:246` executes the
+  `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:289` executes the
   first learner route, scope-change route, and owner route without a duplicate
   Account hop.
 - `apps/mobile/src/app/(app)/more/account.tsx:111` labels the owner Mentor-language
@@ -74,12 +109,15 @@ learner assertion.
 
 - `apps/mobile/src/components/account/AccountAdminSheet.tsx:41` authorizes a
   learner only when both person ID and edge ID match the live scope list, and
-  `apps/mobile/src/components/account/AccountAdminSheet.tsx:54` withholds learner
-  mutations while scope state is stale or loading. Direct non-owner/proxy,
-  stale-scope, and loading cases execute at
-  `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:163`,
-  `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:181`, and
-  `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:202`.
+  `apps/mobile/src/components/account/AccountAdminSheet.tsx:51` additionally
+  requires an account-managed child plus both destination editor gates before
+  emitting learner mutations. Direct non-owner/proxy, stale-scope, live
+  external-supportee, Study-context route-gate, and loading cases execute at
+  `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:172`,
+  `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:192`,
+  `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:213`,
+  `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:247`, and
+  `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:273`.
 - `apps/mobile/src/app/(app)/more/accommodation.tsx:45` requires owner role plus a
   live child profile before sending `childProfileId`, and
   `apps/mobile/src/app/(app)/more/accommodation.tsx:68` redirects unauthorized
@@ -99,10 +137,14 @@ learner assertion.
 
 ### AC-4 — Cross-mutation, scope-change, navigation, and request regressions
 
-- `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:218` exercises
+- `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:289` exercises
   owner-global and learner-specific rows in the same rendered scope and changes
   from one authorized learner pair to another without cross-attribution.
-- `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:269` executes all
+- `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:213` and
+  `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:247` exercise
+  live supportership and route-gate variants without exposing dead learner
+  affordances.
+- `apps/mobile/src/components/account/AccountAdminSheet.test.tsx:340` executes all
   existing Account destinations, while
   `apps/mobile/src/app/(app)/more/accommodation.test.tsx:466` and
   `apps/mobile/src/app/(app)/more/mentor-language.test.tsx:252` execute back-stack
@@ -127,8 +169,8 @@ GREEN with 1 passed and 9 skipped tests.
 Final validation against the complete corrective candidate produced:
 
 - focused identity, authorization, route, request, and layout regressions: 8
-  suites passed; 94 tests passed;
-- the complete mobile Jest project: 485 suites passed; 5,858 tests passed;
+  suites passed; 96 tests passed;
+- the complete mobile Jest project: 485 suites passed; 5,860 tests passed;
 - mobile typecheck and all six dependency targets: successful;
 - full mobile lint: successful with 0 errors and the existing 51-warning
   baseline; no warning points at the corrective files;

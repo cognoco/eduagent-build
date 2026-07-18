@@ -48,11 +48,26 @@ export function AccountAdminSheet(): React.ReactElement {
     : undefined;
   const authorizedLearnerScope =
     selectedPersonScope?.kind === 'person' ? selectedPersonScope : undefined;
-  const learnerTargetName = authorizedLearnerScope?.displayName ?? displayName;
+  const canEnterSelectedLearnerRoute = authorizedLearnerScope
+    ? navigationContract.canEnter('child/[profileId]', {
+        profileId: authorizedLearnerScope.personId,
+      })
+    : false;
+  const editableLearnerProfile =
+    authorizedLearnerScope && canEnterSelectedLearnerRoute
+      ? profiles.find(
+          (profile) => profile.id === authorizedLearnerScope.personId,
+        )
+      : undefined;
+  const canEditSelectedLearner =
+    editableLearnerProfile !== undefined &&
+    navigationContract.gates.showAccommodationChildEditor &&
+    navigationContract.gates.showMentorLanguageChildEditor;
+  const learnerTargetName = editableLearnerProfile?.displayName ?? displayName;
   const showLearnerSettings =
     !isScopeLoading &&
-    (activeScope.kind !== 'person' || authorizedLearnerScope !== undefined);
-  const learnerProfileId = authorizedLearnerScope?.personId;
+    (activeScope.kind !== 'person' || canEditSelectedLearner);
+  const learnerProfileId = editableLearnerProfile?.id;
 
   const handleSignOut = useCallback(async () => {
     if (isSigningOut) return;
