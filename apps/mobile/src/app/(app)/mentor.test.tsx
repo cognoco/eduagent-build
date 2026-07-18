@@ -6,6 +6,7 @@ import type {
   ScopeDescriptor,
   SharedRecord,
 } from '@eduagent/schemas';
+import { MENTOR_CAPABILITY_CASES } from '@eduagent/test-utils';
 
 import {
   NAMED_PROFILES,
@@ -19,6 +20,20 @@ const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
 const mockPush = jest.fn();
 const mockNowRefetch = jest.fn();
+const LEARNER_CAPABILITY_CASES = MENTOR_CAPABILITY_CASES.filter(
+  ({ scope }) => scope === 'learner',
+);
+const WRONG_SCOPE_CAPABILITY_CASES = MENTOR_CAPABILITY_CASES.filter(
+  ({ scope }) => scope === 'person',
+);
+const unsupportedRouteCase = MENTOR_CAPABILITY_CASES.find(
+  ({ capability }) => capability === 'unsupported-route',
+);
+
+if (!unsupportedRouteCase || unsupportedRouteCase.expectedRawInput === null) {
+  throw new Error('Shared Mentor unsupported-route case is incomplete');
+}
+
 let cleanupRender: (() => void) | undefined;
 let mockNowFeed: {
   data: NowResponse | undefined;
@@ -288,23 +303,29 @@ describe('MentorScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/journal');
   });
 
-  it('renders the person-scope Mentor variant without loading the Me feed', () => {
-    mockScopeContext = {
-      ...mockScopeContext,
-      activeScope: {
-        kind: 'person',
-        personId: PERSON_ID,
-        edgeId: EDGE_ID,
-        displayName: 'Emma',
-      },
-    };
+  it.each(WRONG_SCOPE_CAPABILITY_CASES)(
+    '$id denies learner Mentor dispatch in person scope',
+    (capabilityCase) => {
+      mockScopeContext = {
+        ...mockScopeContext,
+        activeScope: {
+          kind: 'person',
+          personId: PERSON_ID,
+          edgeId: EDGE_ID,
+          displayName: 'Emma',
+        },
+      };
 
-    renderMentorScreen();
+      renderMentorScreen();
 
-    screen.getByTestId('person-scope-mentor-tab');
-    expect(screen.getAllByText('Emma').length).toBeGreaterThan(0);
-    expect(screen.queryByTestId('mentor-screen')).toBeNull();
-  });
+      expect(capabilityCase.expectedRoute.kind).toBe('none');
+      screen.getByTestId('person-scope-mentor-tab');
+      expect(screen.getAllByText('Emma').length).toBeGreaterThan(0);
+      expect(screen.queryByTestId('mentor-screen')).toBeNull();
+      expect(screen.queryByTestId('mentor-bar-input')).toBeNull();
+      expect(mockPush).not.toHaveBeenCalled();
+    },
+  );
 
   it('surfaces the school-day-evening homework highlight above the feed, tappable to camera [T11]', () => {
     jest.useFakeTimers();
@@ -367,6 +388,39 @@ describe('MentorScreen', () => {
     expectFreeformRoute('show me how subject subject-123 works');
   });
 
+  it.each(LEARNER_CAPABILITY_CASES)(
+    '$id drives the learner-scope capability boundary',
+    (capabilityCase) => {
+      renderMentorScreen();
+
+      fireEvent.changeText(
+        screen.getByTestId('mentor-bar-input'),
+        capabilityCase.input,
+      );
+      fireEvent.press(screen.getByTestId('mentor-bar-send'));
+
+      if (capabilityCase.expectedRoute.kind === 'path') {
+        expect(mockPush).toHaveBeenCalledWith(
+          capabilityCase.expectedRoute.href,
+        );
+        return;
+      }
+      if (capabilityCase.expectedRoute.kind === 'session') {
+        expect(mockPush).toHaveBeenCalledWith({
+          pathname: capabilityCase.expectedRoute.pathname,
+          params: {
+            ...capabilityCase.expectedRoute.params,
+            rawInput: capabilityCase.expectedRawInput,
+          },
+        });
+        return;
+      }
+
+      expectVisibleClarification(capabilityCase.expectedRawInput ?? undefined);
+      expect(mockPush).not.toHaveBeenCalled();
+    },
+  );
+
   it('closed-catalog-jump — pushes deterministic route phrases through the closed mapper', () => {
     renderMentorScreen();
 
@@ -377,18 +431,6 @@ describe('MentorScreen', () => {
     fireEvent(screen.getByTestId('mentor-bar-input'), 'submitEditing');
 
     expect(mockPush).toHaveBeenCalledWith('/(app)/subject-hub/spanish');
-  });
-
-  it('explicit-literal-catalog-jump — keeps show subject subject-123 inside the closed mapper', () => {
-    renderMentorScreen();
-
-    fireEvent.changeText(
-      screen.getByTestId('mentor-bar-input'),
-      'show subject subject-123',
-    );
-    fireEvent.press(screen.getByTestId('mentor-bar-send'));
-
-    expect(mockPush).toHaveBeenCalledWith('/(app)/subject-hub/subject-123');
   });
 
   it('closed-catalog-named-subject-jump — routes a confident named subject to its hub', () => {
@@ -538,19 +580,6 @@ describe('MentorScreen', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('unsupported-library — reveals clarification without expanding the route catalog', () => {
-    renderMentorScreen();
-
-    fireEvent.changeText(
-      screen.getByTestId('mentor-bar-input'),
-      'take me to the library',
-    );
-    fireEvent(screen.getByTestId('mentor-bar-input'), 'submitEditing');
-
-    expectVisibleClarification();
-    expect(mockPush).not.toHaveBeenCalled();
-  });
-
   it.each([
     'progress report',
     'journal entries',
@@ -578,11 +607,11 @@ describe('MentorScreen', () => {
     fireEvent.press(send);
     expectVisibleClarification('show my progress');
 
-    fireEvent.changeText(input, 'take me to the library');
+    fireEvent.changeText(input, unsupportedRouteCase.input);
     fireEvent.press(send);
 
     const refreshed = screen.getByTestId('mentor-bar-clarification');
-    within(refreshed).getByText('take me to the library');
+    within(refreshed).getByText(unsupportedRouteCase.expectedRawInput);
     expect(within(refreshed).queryByText('show my progress')).toBeNull();
     expect(refreshed.props.accessibilityLiveRegion).toBe('polite');
     expect(mockPush).not.toHaveBeenCalled();
@@ -667,9 +696,9 @@ describe('MentorScreen', () => {
       fireEvent.press(send);
       expectVisibleClarification('show my progress');
 
-      fireEvent.changeText(input, 'take me to the library');
+      fireEvent.changeText(input, unsupportedRouteCase.input);
       fireEvent.press(send);
-      expectVisibleClarification('take me to the library');
+      expectVisibleClarification(unsupportedRouteCase.expectedRawInput);
 
       expect(announce).not.toHaveBeenCalled();
     } finally {
@@ -681,7 +710,7 @@ describe('MentorScreen', () => {
     }
   });
 
-  it.each(['review', 'open dashboard'])(
+  it.each(['open dashboard'])(
     '%s takes the explicit clarification path',
     (input) => {
       renderMentorScreen();

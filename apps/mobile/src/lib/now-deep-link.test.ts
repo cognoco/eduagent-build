@@ -1,4 +1,5 @@
 import type { NowDeepLink } from '@eduagent/schemas';
+import { MENTOR_CAPABILITY_CASES } from '@eduagent/test-utils';
 
 import { pushNowDeepLink } from './now-deep-link';
 
@@ -12,7 +13,39 @@ const subjectTopicLink: NowDeepLink = {
   chain: ['subject.hub'],
 };
 
+const catalogJumpCase = MENTOR_CAPABILITY_CASES.find(
+  ({ capability }) => capability === 'catalog-jump',
+);
+
+if (!catalogJumpCase) {
+  throw new Error('Shared Mentor catalog-jump case is missing');
+}
+
+const catalogJumpMatcher = catalogJumpCase.expectedMatcher;
+const catalogJumpRoute = catalogJumpCase.expectedRoute;
+
+if (catalogJumpMatcher.kind !== 'jump' || catalogJumpRoute.kind !== 'path') {
+  throw new Error('Shared Mentor catalog-jump case is incomplete');
+}
+
 describe('pushNowDeepLink', () => {
+  it('expands the shared Mentor catalog jump through the closed route mapper', () => {
+    const router = { push: jest.fn() };
+
+    pushNowDeepLink(
+      router,
+      {
+        route: catalogJumpMatcher.deepLink.route,
+        params: { ...catalogJumpMatcher.deepLink.params },
+        chain: [...catalogJumpMatcher.deepLink.chain],
+      },
+      { subjectHubTarget: 'v2-subject-hub' },
+    );
+
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledWith(catalogJumpRoute.href);
+  });
+
   it('pushes ancestor chain entries before the leaf route', () => {
     const router = { push: jest.fn() };
 

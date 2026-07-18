@@ -28,6 +28,7 @@ import {
   subscription as subscriptionV2,
 } from '@eduagent/database';
 import type { SessionType } from '@eduagent/schemas';
+import { MENTOR_CAPABILITY_CASES } from '@eduagent/test-utils';
 
 import {
   buildIntegrationEnv,
@@ -136,6 +137,17 @@ const AUTH_USER_ID = 'integration-learning-user';
 const AUTH_EMAIL = 'integration-learning@integration.test';
 const FLAG_EVENT_ID = '00000000-0000-4000-8000-000000000091';
 const UNKNOWN_ID = '00000000-0000-4000-8000-000000000099';
+const mentorSessionCase = MENTOR_CAPABILITY_CASES.find(
+  ({ capability }) => capability === 'mentor-session',
+);
+
+if (
+  !mentorSessionCase ||
+  mentorSessionCase.expectedRoute.kind !== 'session' ||
+  mentorSessionCase.expectedRawInput === null
+) {
+  throw new Error('Shared Mentor session case is incomplete');
+}
 
 async function createOwnerProfile(): Promise<string> {
   const res = await app.request(
@@ -616,7 +628,7 @@ describe('Integration: Learning Session Lifecycle', () => {
     it('persists a question opener before a Yes follow-up in exact order and rehydrates the downstream transcript', async () => {
       const profileId = await createOwnerProfile();
       const subject = await seedSubject(profileId, { name: 'Physics' });
-      const opener = 'Why do apples fall toward the ground?';
+      const opener = mentorSessionCase.input;
       const mobile = await renderRealMobileSession({
         profileId,
         subjectId: subject.id,
@@ -630,13 +642,18 @@ describe('Integration: Learning Session Lifecycle', () => {
 
         expect(mobile.sessionId).toEqual(expect.any(String));
         const persistedSession = await loadSession(mobile.sessionId!);
-        expect(persistedSession?.rawInput).toBe(opener);
+        expect(persistedSession?.rawInput).toBe(
+          mentorSessionCase.expectedRawInput,
+        );
 
         const transcript = (await loadTranscript(
           profileId,
           mobile.sessionId!,
         )) as PersistedTranscript;
-        expectCanonicalExchangeOrder(transcript, [opener, 'Yes']);
+        expectCanonicalExchangeOrder(transcript, [
+          mentorSessionCase.expectedRawInput,
+          'Yes',
+        ]);
       } finally {
         await mobile.unmount();
       }
