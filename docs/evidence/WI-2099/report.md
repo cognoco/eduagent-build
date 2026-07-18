@@ -222,3 +222,92 @@ outbox and blocks later turns rather than confirming an incomplete exchange.
 Subsequent replay can hydrate the assistant once it exists. Recovering a
 server-side turn that permanently stopped after only its learner event would
 require a backend idempotency contract change, which this item forbids.
+
+## Reviewer rework cycle 2 — focused-route backfill reset
+
+Independent review of PR #2226 identified a screen-boundary gap that the six
+persisted-session cases could not observe. After the streaming hook allocated a
+new Mentor session, `router.setParams({ sessionId })` changed
+`routeSessionId` while the session screen remained focused. That dependency
+change recreated the `useFocusEffect` callback and ran the full focus reset
+mid-opener, clearing `isStreaming`, `classifiedSubject`,
+`pendingSubjectResolution`, and `showWrongSubjectChip`. A first follow-up such
+as `Yes` was consequently classified again without the opener's subject and
+could overwrite the local recovery marker without that context.
+
+The production change is deliberately narrow. The session screen records the
+internally allocated session ID immediately before `setParams`. When the focus
+callback reruns for that exact ID, it consumes the marker and skips that one
+dependency-triggered reset. Any later focus, external route change, or genuine
+navigation has no marker and retains the complete existing reset behavior.
+No backend wire contract, shared schema, database schema, migration, or
+non-Mentor entry behavior changed.
+
+The new regression in
+`apps/mobile/src/app/(app)/session/index.test.tsx` mounts the actual session
+screen, runs the real subject-classification and session-streaming hooks against
+the routed API boundary, holds the opener stream open, applies the internal
+session-ID route backfill, completes the Mentor reply, and sends `Yes`. It
+asserts all of the following together:
+
+- streaming remains active across the internal route update;
+- the opener is the only text classified, so `Yes` retains the opener's
+  Physics subject instead of being reclassified;
+- session creation keeps the route opener as `rawInput` and includes the
+  Gravity topic;
+- opener then `Yes` stream in that order on the same allocated session;
+- the post-follow-up recovery marker still contains the Physics subject and
+  Gravity topic.
+
+### Immutable rework proof
+
+| Phase | Immutable revision | Production state | Result | Raw result |
+| --- | --- | --- | --- | --- |
+| RED | `bb6248ee285ff2c784e652ab084546763148b001` | Screen regression committed before any rework production edit | 1 selected test failed; 49 skipped; 50 total. Backfill observed `idle`, `Yes` was classified again, and recovery subject became absent. | [rework2-red-screen-route-backfill.json](rework2-red-screen-route-backfill.json) |
+| GREEN | `6d12a1d9745ed1f01d58590e1dd252efe2793f26` | One-shot internal-backfill focus-reset guard | 1 selected test passed; 49 skipped; 50 total | [rework2-green-screen-route-backfill.json](rework2-green-screen-route-backfill.json) |
+| REVERT | `3401d7aedcf1e0ee9176fc908731366d830500ea` | Production session screen only restored to the RED revision; regression unchanged | Same 1 selected test failed with the same three differences; 49 skipped; 50 total | [rework2-revert-production-only.json](rework2-revert-production-only.json) |
+| RESTORE | `6b020eebb678ba6dea7c3a175b7506db5ce9cbde` | Production session screen byte-identical to GREEN; regression unchanged | 1 selected test passed; 49 skipped; 50 total | [rework2-restore-screen-route-backfill.json](rework2-restore-screen-route-backfill.json) |
+
+Both of these repository comparisons exit 0, proving the REVERT production
+file equals RED and RESTORE equals GREEN:
+
+```bash
+git diff --exit-code bb6248ee285ff2c784e652ab084546763148b001 3401d7aedcf1e0ee9176fc908731366d830500ea -- 'apps/mobile/src/app/(app)/session/index.tsx'
+git diff --exit-code 6d12a1d9745ed1f01d58590e1dd252efe2793f26 6b020eebb678ba6dea7c3a175b7506db5ce9cbde -- 'apps/mobile/src/app/(app)/session/index.tsx'
+```
+
+The phase command was the same at every revision, changing only the output
+artifact name:
+
+```bash
+pnpm exec jest --config apps/mobile/jest.config.cjs --runInBand --runTestsByPath 'apps/mobile/src/app/(app)/session/index.test.tsx' --testNamePattern='preserves Mentor opener context while its allocated session ID is backfilled into the focused route' --silent --forceExit --json --outputFile=docs/evidence/WI-2099/<phase>.json
+```
+
+### Rework validation before latest-main reconciliation
+
+- New focused-screen regression — 1 passed, 49 skipped, 50 total.
+- Original six persisted-session scenarios — 6 passed, 16 skipped, 22 total;
+  raw result: [rework2-six-persisted-sessions.json](rework2-six-persisted-sessions.json).
+- Full impacted integration file — 22 passed, 22 total; raw result:
+  [rework2-full-learning-session-integration.json](rework2-full-learning-session-integration.json).
+- Affected mobile unit suites — 3 suites passed, 140 tests passed; raw
+  result: [rework2-mobile-unit-suites.json](rework2-mobile-unit-suites.json).
+- Mobile typecheck — the mobile target and all six dependency targets passed
+  with cache skipped.
+- Mobile lint — 0 errors and the existing 51-warning repository baseline; no
+  new warning points at the regression or reset guard.
+
+One discarded full-integration invocation was accidentally overlapped with a
+detached copy of the same Neon-backed file. Their shared database cleanup
+collided, producing unrelated owner-person, authorization, and missing-event
+failures. After confirming no duplicate Jest process remained, the file was
+rerun alone and passed 22/22 as recorded above. The integration harness and
+screen regression both require `--forceExit` for their existing retained open
+handles. Node `v24.18.0` remains the only available runtime despite the repo's
+Node 22 engine declaration.
+
+The canonical BID-13 refinement plan at
+`_wip/mvp-roadmap/refinements/refine-BID-13-mentor.md` remains unchanged: this
+rework strengthens its required real-boundary regression and does not alter the
+single acceptance-criteria unit, six persisted-session variants, sequencing,
+or scope.

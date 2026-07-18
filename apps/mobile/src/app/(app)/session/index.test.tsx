@@ -1992,7 +1992,14 @@ describe('SessionScreen homework flow', () => {
   it('preserves Mentor opener context while its allocated session ID is backfilled into the focused route', async () => {
     const mentorOpener = 'Why do apples fall toward the ground?';
     const recoveryKey = `session-recovery-marker-${ACTIVE_PROFILE_ID}`;
-    let routeParams = {
+    let routeParams: {
+      mode: string;
+      entrySource: string;
+      rawInput: string;
+      topicId: string;
+      topicName: string;
+      sessionId?: string;
+    } = {
       mode: 'freeform',
       entrySource: 'mentor',
       rawInput: mentorOpener,
@@ -2006,25 +2013,28 @@ describe('SessionScreen homework flow', () => {
 
     getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
     (useLocalSearchParams as jest.Mock).mockImplementation(() => routeParams);
-    mockFetch.setRoute('/subjects/classify', (_url, init) => {
-      const body = extractJsonBody<{ text: string }>(init);
-      return body?.text === mentorOpener
-        ? {
-            candidates: [
-              {
-                subjectId: SECOND_SUBJECT_ID,
-                subjectName: 'Physics',
-                confidence: 0.98,
-              },
-            ],
-            needsConfirmation: false,
-          }
-        : {
-            candidates: [],
-            needsConfirmation: false,
-            suggestedSubjectName: null,
-          };
-    });
+    mockFetch.setRoute(
+      '/subjects/classify',
+      (_url: string, init?: RequestInit) => {
+        const body = extractJsonBody<{ text: string }>(init);
+        return body?.text === mentorOpener
+          ? {
+              candidates: [
+                {
+                  subjectId: SECOND_SUBJECT_ID,
+                  subjectName: 'Physics',
+                  confidence: 0.98,
+                },
+              ],
+              needsConfirmation: false,
+            }
+          : {
+              candidates: [],
+              needsConfirmation: false,
+              suggestedSubjectName: null,
+            };
+      },
+    );
     mockStream
       .mockImplementationOnce(async (_message, onChunk, onDone) => {
         onChunk('Gravity pulls them toward Earth.');
