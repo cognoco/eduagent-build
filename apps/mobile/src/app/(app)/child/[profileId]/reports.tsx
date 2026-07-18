@@ -13,41 +13,49 @@ import { useTranslation } from 'react-i18next';
 import { ReportsList } from '../../../../components/progress/ReportsList';
 import { formatShortDate } from '../../../../lib/format-datetime';
 
-/** Returns the formatted next report date and a human-friendly time context. */
+/** Returns the earliest upcoming weekly or monthly report run. */
 export function getNextReportInfo(
   now = new Date(),
   locale?: string,
 ): {
   date: string;
-  timeContext: string;
 } {
-  const isFirstOfMonth = now.getUTCDate() === 1;
-  const cronHour = 10; // Monthly report cron runs 10:00 UTC on the 1st
-
-  // If it's the 1st and before the cron, report may arrive today
-  if (isFirstOfMonth && now.getUTCHours() < cronHour) {
-    return { date: '', timeContext: 'should be ready later today' };
+  const daysUntilMonday = (8 - now.getUTCDay()) % 7;
+  const nextWeeklyRun = new Date(
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() + daysUntilMonday,
+      9,
+      0,
+      0,
+    ),
+  );
+  if (nextWeeklyRun.getTime() <= now.getTime()) {
+    nextWeeklyRun.setUTCDate(nextWeeklyRun.getUTCDate() + 7);
   }
 
-  // Next run is the 1st of next month at 10:00 UTC
-  const nextRun = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 10, 0, 0),
+  let nextMonthlyRun = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 10, 0, 0),
   );
-  const daysUntil = Math.ceil(
-    (nextRun.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-  );
+  if (nextMonthlyRun.getTime() <= now.getTime()) {
+    nextMonthlyRun = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 10, 0, 0),
+    );
+  }
+
+  const nextRun =
+    nextWeeklyRun.getTime() <= nextMonthlyRun.getTime()
+      ? nextWeeklyRun
+      : nextMonthlyRun;
   const formattedDate = formatShortDate(nextRun, locale, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
+    timeZone: 'UTC',
   });
 
-  const timeContext =
-    daysUntil <= 3
-      ? 'arrives in a few days'
-      : `arrives in about ${daysUntil} days`;
-
-  return { date: formattedDate, timeContext };
+  return { date: formattedDate };
 }
 
 function formatReportWeek(
@@ -374,24 +382,17 @@ export default function ChildReportsScreen(): React.ReactElement {
         testID="child-reports-empty"
       >
         {(() => {
-          const { date, timeContext } = getNextReportInfo(
-            new Date(),
-            i18n?.language,
-          );
+          const { date } = getNextReportInfo(new Date(), i18n?.language);
           return (
             <Text
               className="text-body-sm text-text-secondary text-center"
+              accessibilityRole="summary"
               testID="child-reports-empty-time-context"
             >
-              {date
-                ? t('parentView.reports.firstReportArriveOn', {
-                    name: childName,
-                    date,
-                  })
-                : t('parentView.reports.firstReportTimeContext', {
-                    name: childName,
-                    timeContext,
-                  })}
+              {t('parentView.reports.firstCombinedReportOn', {
+                name: childName,
+                date,
+              })}
             </Text>
           );
         })()}

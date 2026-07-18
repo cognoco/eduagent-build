@@ -2515,7 +2515,6 @@
       "profileRemovedOrNoAccess": "プロフィールが削除されたか、アクセス権がなくなった可能性があります",
       "backToDashboard": "ダッシュボードに戻る",
       "noAccessToProfile": "このプロフィールへのアクセス権がありません",
-      "firstReportSoon": "最初のレポートは月末に届きます",
       "progressNudgeFreshTitle": "{{focus}}が新しいうちに聞いてみる",
       "progressNudgeFreshSubtitle": "{{name}}は{{time}}に{{focus}}を学びました。あなたも少し試してから、何がわかったか聞いてみましょう。",
       "progressNudgeRecentTitle": "{{focus}}を忘れないうちに",
@@ -2631,8 +2630,7 @@
       "checkConnectionRetry": "接続を確認して、もう一度お試しください",
       "weekOf": "の週",
       "retryReports": "レポートを再試行",
-      "firstReportArriveOn": "{{name}}さんの最初のレポートは{{date}}に届きます",
-      "firstReportTimeContext": "{{name}}さんの最初のレポートは{{timeContext}}"
+      "firstCombinedReportOn": "{{name}}さんの最初の週次または月次レポートは、まとめられるだけの学習量があれば、早ければ{{date}}に表示されます。"
     },
     "report": {
       "sessions": "セッション",

@@ -63,7 +63,9 @@ jest.mock(
 const { default: ChildReportsScreen, getNextReportInfo } =
   require('./reports') as {
     default: React.ComponentType;
-    getNextReportInfo: (now?: Date) => { date: string; timeContext: string };
+    getNextReportInfo: (now?: Date) => {
+      date: string;
+    };
   };
 
 describe('ChildReportsScreen', () => {
@@ -138,9 +140,25 @@ describe('ChildReportsScreen', () => {
     it('shows time context element', () => {
       render(<ChildReportsScreen />);
 
-      expect(
-        screen.getByTestId('child-reports-empty-time-context'),
-      ).toBeTruthy();
+      expect(screen.getByRole('summary')).toHaveProp(
+        'testID',
+        'child-reports-empty-time-context',
+      );
+      screen.getByText(/parentView\.reports\.firstCombinedReportOn:/);
+    });
+
+    it('waits for the weekly query before showing the combined empty expectation', () => {
+      mockUseChildWeeklyReports.mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<ChildReportsScreen />);
+
+      screen.getByText('parentView.reports.loadingReports');
+      expect(screen.queryByTestId('child-reports-empty')).toBeNull();
     });
 
     it('falls back to "Your child" when child detail is not loaded', () => {
@@ -532,47 +550,55 @@ describe('ChildReportsScreen', () => {
 });
 
 describe('getNextReportInfo', () => {
-  it('returns "should be ready later today" on the 1st before 10:00 UTC', () => {
+  it('[WI-2186] chooses Monday weekly delivery instead of the later month-end schedule', () => {
+    const wednesday = new Date(Date.UTC(2026, 5, 3, 12, 0, 0));
+    const result = getNextReportInfo(wednesday);
+
+    expect(result.date).toContain('June 8');
+    expect(result.date).not.toContain('July');
+  });
+
+  it('chooses monthly delivery when the 1st arrives before next Monday', () => {
+    const tuesday = new Date(Date.UTC(2026, 8, 29, 12, 0, 0));
+    const result = getNextReportInfo(tuesday);
+
+    expect(result.date).toContain('October 1');
+  });
+
+  it('returns the 1st before 10:00 UTC as the earliest monthly run', () => {
     const jan1_8am = new Date(Date.UTC(2026, 0, 1, 8, 0, 0));
     const result = getNextReportInfo(jan1_8am);
-    expect(result.date).toBe('');
-    expect(result.timeContext).toBe('should be ready later today');
+    expect(result.date).toContain('January 1');
   });
 
-  it('returns next month date on the 1st after 10:00 UTC', () => {
+  it('returns next Monday on the 1st after the monthly run', () => {
     const jan1_11am = new Date(Date.UTC(2026, 0, 1, 11, 0, 0));
     const result = getNextReportInfo(jan1_11am);
-    expect(result.timeContext).toMatch(/arrives in about \d+ days/);
-    expect(result.date).toContain('February');
+    expect(result.date).toContain('January 5');
   });
 
-  it('returns "arrives in a few days" when 3 or fewer days remain', () => {
-    // Dec 30 — 2 days until Jan 1
+  it('returns the earlier monthly run when 3 or fewer days remain', () => {
     const dec30 = new Date(Date.UTC(2025, 11, 30, 12, 0, 0));
     const result = getNextReportInfo(dec30);
-    expect(result.timeContext).toBe('arrives in a few days');
     expect(result.date).toContain('January');
   });
 
-  it('returns "arrives in about N days" when more than 3 days remain', () => {
-    // Jan 15 — ~17 days until Feb 1
+  it('returns the earlier weekly run when the monthly run is weeks away', () => {
     const jan15 = new Date(Date.UTC(2026, 0, 15, 12, 0, 0));
     const result = getNextReportInfo(jan15);
-    expect(result.timeContext).toMatch(/arrives in about \d+ days/);
-    expect(result.date).toContain('February');
+    expect(result.date).toContain('January 19');
   });
 
-  it('handles month boundary correctly for short months', () => {
-    // Feb 15 — next report is March 1
+  it('handles the weekly boundary correctly in short months', () => {
     const feb15 = new Date(Date.UTC(2026, 1, 15, 12, 0, 0));
     const result = getNextReportInfo(feb15);
-    expect(result.date).toContain('March');
+    expect(result.date).toContain('February 16');
   });
 
   it('handles year boundary (December → January)', () => {
     const dec15 = new Date(Date.UTC(2025, 11, 15, 12, 0, 0));
     const result = getNextReportInfo(dec15);
-    expect(result.date).toContain('January');
-    expect(result.date).toContain('2026');
+    expect(result.date).toContain('December 22');
+    expect(result.date).toContain('2025');
   });
 });

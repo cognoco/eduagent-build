@@ -18,12 +18,10 @@ const CANONICAL_FILES = new Set([
 ]);
 
 // `(1000 * 60 * 60 * 24)` whole-day diff math — the relative-date idiom. These
-// four sites compute calendar-day spans for non-display logic, not for
+// three sites compute calendar-day spans for non-display logic, not for
 // rendering a relative date label, so they stay.
 const DAY_DIFF_RE = /1000\s*\*\s*60\s*\*\s*60\s*\*\s*24/;
 const DAY_DIFF_ALLOWED = new Set([
-  // countdown to the next scheduled report run
-  'apps/mobile/src/app/(app)/child/[profileId]/reports.tsx',
   // streak derivation
   'apps/mobile/src/lib/progress.ts',
   // review scheduling

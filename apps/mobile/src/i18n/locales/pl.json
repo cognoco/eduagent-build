@@ -2654,7 +2654,6 @@
       "profileRemovedOrNoAccess": "Profil mógł zostać usunięty lub nie masz już do niego dostępu",
       "backToDashboard": "Wróć do pulpitu",
       "noAccessToProfile": "Nie masz dostępu do tego profilu",
-      "firstReportSoon": "Pierwszy raport pojawi się pod koniec miesiąca",
       "progressNudgeFreshTitle": "Zapytaj o {{focus}}, póki jest świeże",
       "progressNudgeFreshSubtitle": "{{name}} uczył/a się {{focus}} {{time}}. Spróbuj chwilę samodzielnie, a potem zapytaj, co zaskoczyło.",
       "progressNudgeRecentTitle": "Podtrzymaj {{focus}}",
@@ -2786,8 +2785,7 @@
       "checkConnectionRetry": "Sprawdź połączenie i spróbuj ponownie",
       "weekOf": "Tydzień od",
       "retryReports": "Ponów raporty",
-      "firstReportArriveOn": "Pierwszy raport {{name}} pojawi się w dniu {{date}}",
-      "firstReportTimeContext": "Pierwszy raport {{name}} {{timeContext}}"
+      "firstCombinedReportOn": "Pierwszy tygodniowy lub miesięczny raport {{name}} może pojawić się już {{date}}, gdy zbierze się wystarczająco dużo danych do podsumowania."
     },
     "report": {
       "sessions": "Sesje",
