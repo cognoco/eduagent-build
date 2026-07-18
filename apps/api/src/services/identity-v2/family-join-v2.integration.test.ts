@@ -297,7 +297,7 @@ const NOT_CAPABLE_BIRTH_YEAR = NOW_YEAR - 14;
   );
 
   // [WI-1193] CAPABLE_BIRTH_YEAR (18) is a genuine adult by the codebase's
-  // adult threshold, and createIdentityGraph now writes 'adult_self_consent'
+  // adult threshold, and createIdentityGraph now writes 'art6_1_a'
   // consent_grant rows for a self-registered adult owner at signup — so the
   // accepting person here (self-consent-capable at 17+, admitting real 18+
   // adults too) arrives holding their own consent grants. Before WI-1193's

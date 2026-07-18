@@ -219,7 +219,7 @@ describe('Integration: POST /v1/consent-page/confirm', () => {
     // [WI-1193] A realistic parental-consent-deny subject is a managed MINOR
     // child awaiting emailed guardian consent — it holds NO consent_grant (a
     // grant is written only on APPROVAL). The prior fixture created the profile
-    // as an adult owner, who now (WI-1193 AC1) holds adult_self_consent grants
+    // as an adult owner, who now (WI-1193 AC1) holds art6_1_a grants
     // at signup; denying such a person is impossible in production — a
     // self-registered adult has no guardian to deny for them — and the
     // consent_grant RESTRICT FK correctly refused the delete. Per the WI-1442
