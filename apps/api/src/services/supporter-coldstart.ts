@@ -88,7 +88,8 @@ export async function resolveSupporterColdStart(
       // pre-acceptance cold-start cards by design (cold-start-doorway UX;
       // WI-2226). Whether its pre-acceptance learning-activity signal
       // (hasLearningState / staleIdleStep) should be gated is tracked as
-      // WI-2395 (owner: supporter-linking lane).
+      // WI-2395 (owner: supporter-linking lane; target: 2026-Q3, before
+      // supporter-linking GA).
       and(
         eq(supportership.supporterPersonId, supporterPersonId),
         isNull(supportership.revokedAt),

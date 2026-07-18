@@ -70,6 +70,8 @@ async function assertActiveSupportership(
     .from(supportership)
     .innerJoin(person, eq(person.id, supportership.supporterPersonId))
     .where(
+      // [WI-2237 deferred-sweep] latent bare-edge gate — gate before wiring
+      // a caller; tracked WI-2395 (target: 2026-Q3)
       and(
         eq(supportership.supporterPersonId, input.supporterPersonId),
         eq(supportership.supporteePersonId, input.supporteePersonId),

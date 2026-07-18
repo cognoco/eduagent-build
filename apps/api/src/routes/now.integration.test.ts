@@ -26,6 +26,8 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 import { nowRoutes } from './now';
 import { acceptLink, initiateLink } from '../services/linking-ceremony';
+import { collectCandidatesForRequest } from '../services/now-feed';
+import { requestSelfUnlink } from '../services/supportership-revocation';
 import {
   deleteV2IdentitiesForTest,
   ensureV2IdentityForLegacyProfileTest,
@@ -682,5 +684,72 @@ describe('Integration: now routes', () => {
     expect(JSON.stringify(hubBody)).not.toContain(
       'pending-contract-must-not-leak',
     );
+  });
+
+  // [WI-2237] RGR: revoke-race guard for the correlated EXISTS embedded in
+  // the candidate reads (now-feed.ts's acceptedSupporterAccessExists).
+  // `resolveNowTarget` already re-checks accepted visibility on every
+  // top-level `/now` call, so a plain "seed accepted -> revoke -> call
+  // buildNowFeed again" test would pass with or without this round's fix
+  // (that outer gate alone denies it) — it would not be a genuine
+  // regression guard. This test instead calls the candidate-read seam
+  // (`collectCandidatesForRequest`, exported test-only) DIRECTLY with a
+  // stale personId/edgeId, bypassing `resolveNowTarget` entirely, to prove
+  // the read itself denies once the edge is revoked — the exact
+  // intra-call TOCTOU window Codex's review flagged (a revoke landing
+  // between the pre-check and these reads). Watched RED with
+  // `acceptedSupporterAccessExists` reverted (revoked edge still returned
+  // the unfinished-session candidate), GREEN with the fix restored.
+  it('RGR: denies the now-feed candidate read for a revoked edge even when called directly, bypassing the outer pre-check [revoke-race]', async () => {
+    const supporterId = await seedProfile(db, 'supporter-revoke-race');
+    const childId = await seedProfile(db, 'child-revoke-race');
+    const edgeId = await seedAcceptedContract(db, supporterId, childId);
+    const sessionId = await seedActiveSession(db, childId, 'revoke-race');
+
+    const now = new Date();
+
+    // Pre-check passes (accepted edge) and the candidate read returns the
+    // real, person-scoped card — proving the correlated EXISTS is not
+    // silently always-false and stripping legitimate content.
+    const allowedCandidates = await collectCandidatesForRequest(
+      db,
+      childId,
+      { scope: 'person', personId: childId },
+      now,
+      edgeId,
+      supporterId,
+    );
+    expect(
+      allowedCandidates.some(
+        (candidate) =>
+          candidate.kind === 'unfinished_session' &&
+          candidate.params.sessionId === sessionId,
+      ),
+    ).toBe(true);
+
+    // The supportee revokes mid-session (simulates the race window: a
+    // revoke landing after the pre-check succeeded but before these reads).
+    await requestSelfUnlink(db, {
+      supportershipId: edgeId,
+      callerPersonId: childId,
+      now,
+    });
+
+    // The SAME stale personId/edgeId/viewer, re-requested directly against
+    // the candidate-read seam (no fresh resolveNowTarget pre-check in
+    // between), must now deny — no person-scoped Now data leaks through.
+    // (`collectChallengeReadyCandidates`'s re-check rejects the whole read
+    // rather than silently filtering the revoked candidate out — a
+    // stronger, fail-closed denial than an empty array.)
+    await expect(
+      collectCandidatesForRequest(
+        db,
+        childId,
+        { scope: 'person', personId: childId },
+        now,
+        edgeId,
+        supporterId,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
