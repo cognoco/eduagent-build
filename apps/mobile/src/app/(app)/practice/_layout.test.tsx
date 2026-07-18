@@ -1,14 +1,10 @@
 import { render } from '@testing-library/react-native';
 import { ThemeContext } from '../../../lib/theme';
 import { tokens } from '../../../lib/design-tokens';
-import AccountLayout, {
-  unstable_settings,
-  ACCOUNT_PRESENTATION,
-} from './_layout';
+import PracticeLayout, { unstable_settings } from './_layout';
 
 interface StackScreenOptions {
   headerShown?: boolean;
-  presentation?: string;
   contentStyle?: { backgroundColor?: string };
 }
 
@@ -21,18 +17,17 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-describe('account nested layout', () => {
+describe('practice nested layout', () => {
   beforeEach(() => {
     mockStackScreenOptions = undefined;
   });
 
-  it('seeds the index route and presents the account surface modally', () => {
+  it('seeds the index route for cross-stack pushes', () => {
     expect(unstable_settings).toEqual({ initialRouteName: 'index' });
-    expect(ACCOUNT_PRESENTATION).toBe('modal');
   });
 
   it.each(['dark', 'light'] as const)(
-    'uses the active %s semantic background for the pushed account modal',
+    'uses the active %s semantic background for pushed practice scenes',
     (colorScheme) => {
       render(
         <ThemeContext.Provider
@@ -43,13 +38,12 @@ describe('account nested layout', () => {
             setAccentPresetId: jest.fn(),
           }}
         >
-          <AccountLayout />
+          <PracticeLayout />
         </ThemeContext.Provider>,
       );
 
       expect(mockStackScreenOptions).toMatchObject({
         headerShown: false,
-        presentation: ACCOUNT_PRESENTATION,
         contentStyle: {
           backgroundColor: tokens[colorScheme].colors.background,
         },
