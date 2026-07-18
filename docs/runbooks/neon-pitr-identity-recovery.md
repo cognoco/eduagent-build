@@ -36,6 +36,15 @@ history/restore settings) before relying on a specific point in time being
 recoverable. Treat "PITR window" as "however far back the console currently
 lets you pick," and re-verify after any plan change.
 
+Scheduled snapshots follow a **project-configured cadence** which — like the
+retention window above — is a Neon console setting, not a value this runbook
+hardcodes. Confirm the current snapshot schedule and the concrete list of
+available restore points in the Neon console (project → Backups / snapshot
+schedule, alongside the history/restore settings) before assuming any
+particular snapshot exists to restore from. Treat the console as the source of
+truth for **both** the PITR window and the snapshot cadence, and re-verify
+after any plan change.
+
 ## 3. Restore procedure
 
 Follow these steps **in order**. Steps 1 and 2 are both non-negotiable, and
