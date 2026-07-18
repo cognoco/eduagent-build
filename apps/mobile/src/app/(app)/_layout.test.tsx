@@ -205,7 +205,13 @@ jest.mock(
 // Route: GET /subjects → { subjects: [] }
 
 const AppLayout = require('./_layout').default;
-const { FULL_SCREEN_ROUTES, HIDDEN_TAB_ROUTES } = require('./_layout');
+const {
+  FULL_SCREEN_ROUTES,
+  HIDDEN_TAB_ROUTES,
+  V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP,
+  V2_ROOT_SAFE_AREA_EXCEPTIONS,
+  resolveV2PushedScenePaddingTop,
+} = require('./_layout');
 const {
   computeModeVisibleTabs,
   computeVisibleTabs,
@@ -984,10 +990,10 @@ describe('AppLayout', () => {
 
   it.each(
     [
-      '/mentor-memory',
-      '/more/accommodation',
-      '/subscription',
-      '/more/account',
+      '/dashboard',
+      '/billing/manage',
+      '/subject-hub/subject-1',
+      '/progress/saved',
     ].flatMap((pathname) => [
       { pathname, surface: '360x760 web', safeAreaTop: 0 },
       { pathname, surface: 'native safe area', safeAreaTop: 47 },
@@ -1024,6 +1030,50 @@ describe('AppLayout', () => {
         expect(activeScene).toHaveStyle({
           paddingTop: expectedPushedPadding,
         });
+      } finally {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = original;
+      }
+    },
+  );
+
+  it.each([
+    '/mentor-memory',
+    '/more/accommodation',
+    '/subscription',
+    '/more/account',
+    '/subject/subject-1',
+    '/topic/topic-1',
+    '/my-notes',
+  ])(
+    'composes root chrome clearance with child-owned safe area exactly once for %s',
+    async (pathname) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+      };
+      const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      try {
+        (
+          flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+        const safeAreaTop = 47;
+        mockSafeAreaInsets = {
+          top: safeAreaTop,
+          bottom: 0,
+          left: 0,
+          right: 0,
+        };
+        mockUsePathname.mockReturnValue(pathname);
+
+        renderLayout();
+
+        const activeScene = await screen.findByTestId('active-root-scene');
+        const rootPadding = (activeScene.props.style as { paddingTop: number })
+          .paddingTop;
+        const completeChromeClearance = Math.max(safeAreaTop, 24) + 8 + 44;
+
+        expect(rootPadding + safeAreaTop).toBe(completeChromeClearance);
       } finally {
         (
           flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
@@ -1131,7 +1181,8 @@ describe('AppLayout', () => {
       });
 
       expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
-        paddingTop: 119,
+        // 119px complete measured chrome minus the child's 47px safe inset.
+        paddingTop: 72,
       });
     } finally {
       (
@@ -1797,6 +1848,98 @@ describe('FULL_SCREEN_ROUTES — nested ceremony route guard', () => {
     for (const route of ['link', 'link/initiate', 'link/[contractId]']) {
       expect(FULL_SCREEN_ROUTES.has(route)).toBe(true);
     }
+  });
+});
+
+describe('V2 pushed-route safe-area ownership invariant', () => {
+  it('audits every chrome-bearing hidden route by root route name', () => {
+    expect(V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP).toEqual({
+      home: 'child',
+      'own-learning': 'child',
+      library: 'child',
+      recaps: 'child',
+      progress: 'path-specific',
+      more: 'child',
+      dashboard: 'root',
+      subscription: 'child',
+      billing: 'root',
+      'mentor-memory': 'child',
+      subject: 'child',
+      'subject-hub': 'root',
+      'pick-book': 'child',
+      child: 'child',
+      'my-notes': 'child',
+      vocabulary: 'child',
+      topic: 'child',
+    });
+
+    for (const route of HIDDEN_TAB_ROUTES) {
+      if (!FULL_SCREEN_ROUTES.has(route)) {
+        expect(V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP).toHaveProperty(route);
+      }
+    }
+  });
+
+  it('keeps the root-full exception set narrow and path-bound', () => {
+    expect(V2_ROOT_SAFE_AREA_EXCEPTIONS).toEqual([
+      { routeName: 'dashboard', pathPrefix: '/dashboard' },
+      { routeName: 'billing', pathPrefix: '/billing' },
+      { routeName: 'subject-hub', pathPrefix: '/subject-hub' },
+      { routeName: 'progress', pathPrefix: '/progress/saved' },
+    ]);
+
+    expect(
+      resolveV2PushedScenePaddingTop({
+        routeName: 'billing/manage',
+        pathname: '/billing/manage',
+        pushedSceneTopInset: 99,
+        safeAreaTop: 47,
+      }),
+    ).toBe(99);
+    expect(
+      resolveV2PushedScenePaddingTop({
+        routeName: 'subject/[subjectId]',
+        pathname: '/subject/subject-1',
+        pushedSceneTopInset: 99,
+        safeAreaTop: 47,
+      }),
+    ).toBe(52);
+    expect(
+      resolveV2PushedScenePaddingTop({
+        routeName: 'progress/[subjectId]',
+        pathname: '/progress/subject-1',
+        pushedSceneTopInset: 99,
+        safeAreaTop: 47,
+      }),
+    ).toBe(52);
+    expect(
+      resolveV2PushedScenePaddingTop({
+        routeName: 'billing/manage',
+        pathname: '/billingish/manage',
+        pushedSceneTopInset: 99,
+        safeAreaTop: 47,
+      }),
+    ).toBe(52);
+  });
+
+  it('refuses to silently assign ownership to a future pushed route', () => {
+    expect(() =>
+      resolveV2PushedScenePaddingTop({
+        routeName: 'future-route',
+        pathname: '/future-route',
+        pushedSceneTopInset: 99,
+        safeAreaTop: 47,
+      }),
+    ).toThrow(/future-route.*safe-area ownership audit/);
+
+    expect(
+      resolveV2PushedScenePaddingTop({
+        routeName: '_lib/proxy-chrome',
+        pathname: '/mentor',
+        pushedSceneTopInset: 99,
+        safeAreaTop: 47,
+      }),
+    ).toBe(52);
   });
 });
 

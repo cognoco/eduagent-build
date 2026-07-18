@@ -153,9 +153,9 @@ describe('AccommodationScreen', () => {
     { shell: 'flags-off', v0: false, v1: false, v2: false, expected: 47 },
     { shell: 'V0', v0: true, v1: false, v2: false, expected: 47 },
     { shell: 'V1', v0: true, v1: true, v2: false, expected: 47 },
-    { shell: 'V2', v0: true, v1: true, v2: true, expected: 0 },
+    { shell: 'V2', v0: true, v1: true, v2: true, expected: 47 },
   ])(
-    'owns the native top inset on $shell only when the root does not',
+    'owns the native top inset on $shell',
     async ({ v0, v1, v2, expected }) => {
       const flags = require('../../../lib/feature-flags') as {
         FEATURE_FLAGS: {

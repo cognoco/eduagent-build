@@ -112,6 +112,79 @@ export const HIDDEN_TAB_ROUTES = [
   'onboarding',
 ] as const;
 
+type V2PushedSafeAreaOwner = 'child' | 'root' | 'path-specific';
+
+// Central ownership audit for every V2 route that keeps floating chrome while
+// being hidden from the V2 tab bar. `child` includes nested navigators (for
+// example More's header), which consume the native safe-area inset themselves.
+// The root therefore reserves only the remaining fixed-control band by default.
+export const V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP = {
+  home: 'child',
+  'own-learning': 'child',
+  library: 'child',
+  recaps: 'child',
+  progress: 'path-specific',
+  more: 'child',
+  dashboard: 'root',
+  subscription: 'child',
+  billing: 'root',
+  'mentor-memory': 'child',
+  subject: 'child',
+  'subject-hub': 'root',
+  'pick-book': 'child',
+  child: 'child',
+  'my-notes': 'child',
+  vocabulary: 'child',
+  topic: 'child',
+} as const satisfies Record<string, V2PushedSafeAreaOwner>;
+
+export const V2_ROOT_SAFE_AREA_EXCEPTIONS = [
+  { routeName: 'dashboard', pathPrefix: '/dashboard' },
+  { routeName: 'billing', pathPrefix: '/billing' },
+  { routeName: 'subject-hub', pathPrefix: '/subject-hub' },
+  { routeName: 'progress', pathPrefix: '/progress/saved' },
+] as const;
+
+function pathnameMatchesPrefix(pathname: string, pathPrefix: string): boolean {
+  return pathname === pathPrefix || pathname.startsWith(`${pathPrefix}/`);
+}
+
+export function resolveV2PushedScenePaddingTop({
+  routeName,
+  pathname,
+  pushedSceneTopInset,
+  safeAreaTop,
+}: {
+  routeName: string;
+  pathname: string;
+  pushedSceneTopInset: number;
+  safeAreaTop: number;
+}): number {
+  const rootRouteName = routeName.split('/')[0] ?? routeName;
+
+  // Expo Router exposes colocated underscore-prefixed implementation modules
+  // to screenOptions even though they are not user-navigable pushed routes.
+  if (rootRouteName.startsWith('_')) {
+    return pushedSceneTopInset - safeAreaTop;
+  }
+
+  if (!(rootRouteName in V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP)) {
+    throw new Error(
+      `V2 pushed route "${routeName}" is missing from the safe-area ownership audit`,
+    );
+  }
+
+  const rootOwnsSafeArea = V2_ROOT_SAFE_AREA_EXCEPTIONS.some(
+    (exception) =>
+      exception.routeName === rootRouteName &&
+      pathnameMatchesPrefix(pathname, exception.pathPrefix),
+  );
+
+  return rootOwnsSafeArea
+    ? pushedSceneTopInset
+    : pushedSceneTopInset - safeAreaTop;
+}
+
 const ACCOUNT_AVATAR_HIDDEN_PATHS = [
   '/account',
   '/onboarding',
@@ -734,10 +807,10 @@ export default function AppLayout() {
                 // The floating V2 chrome (account avatar, scope chip) is absolutely
                 // positioned and reserves no layout space. Top-level tab scenes own
                 // their header row, so they retain the shell's safe-area inset.
-                // The root owns the complete safe-area + control band for pushed
-                // scenes; their direct children do not add top-safe padding. The
-                // top-level More screen keeps its existing safe-area owner, so the
-                // root reserves only its remaining control band there.
+                // Audited pushed scenes keep a single safe-area owner. The root
+                // normally reserves only the remaining fixed-control band because
+                // the child (or nested navigator) owns the native inset. A narrow,
+                // path-bound exception set covers screens proven not to own it.
                 // Full-screen routes and proxy chrome manage their own top spacing
                 // and opt out.
                 sceneStyle: {
@@ -750,9 +823,12 @@ export default function AppLayout() {
                     !isFullScreen
                       ? isVisible
                         ? chromeTopInset
-                        : pathname === '/more'
-                          ? pushedSceneTopInset - insets.top
-                          : pushedSceneTopInset
+                        : resolveV2PushedScenePaddingTop({
+                            routeName: route.name,
+                            pathname,
+                            pushedSceneTopInset,
+                            safeAreaTop: insets.top,
+                          })
                       : 0,
                 },
                 tabBarStyle: isFullScreen

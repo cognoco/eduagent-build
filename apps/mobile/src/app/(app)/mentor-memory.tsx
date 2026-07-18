@@ -34,13 +34,11 @@ import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { useEntryGate } from '../../hooks/use-entry-gate';
 import { useUpdateInterestsContext } from '../../hooks/use-onboarding-dimensions';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FEATURE_FLAGS } from '../../lib/feature-flags';
 
 export default function MentorMemoryScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const screenTopInset = FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? 0 : insets.top;
   const { returnTo } = useLocalSearchParams<{
     returnTo?: string | string[];
   }>();
@@ -230,10 +228,7 @@ export default function MentorMemoryScreen() {
 
   if (isLoading) {
     return (
-      <View
-        className="flex-1 bg-background"
-        style={{ paddingTop: screenTopInset }}
-      >
+      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
         <TimeoutLoader
           isLoading
           title={t('session.mentorMemory.loadTimeout.title')}
@@ -258,10 +253,7 @@ export default function MentorMemoryScreen() {
 
   if (isError && !profile) {
     return (
-      <View
-        className="flex-1 bg-background"
-        style={{ paddingTop: screenTopInset }}
-      >
+      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
         <ErrorFallback
           variant="centered"
           message={t('session.mentorMemory.loadError')}
@@ -284,7 +276,7 @@ export default function MentorMemoryScreen() {
   return (
     <View
       className="flex-1 bg-background"
-      style={{ paddingTop: screenTopInset }}
+      style={{ paddingTop: insets.top }}
       testID="mentor-memory-screen"
     >
       <View className="px-5 pt-4 pb-2 flex-row items-center">

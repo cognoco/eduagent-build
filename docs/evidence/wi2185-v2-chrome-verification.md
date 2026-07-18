@@ -18,12 +18,119 @@
 
 **Latest integration merge:** `53bad989168bd18c29c467513b094d378ba8157d`
 
-The review delta is pinned as
-`e0026d5a82675bc6e5654d807c9abdb89d5b8bff..7b038d8e989f6b0be8e9a2f79299d6e8fd8d642a`.
-The candidate hash contains the production and test changes below; this evidence-only
-commit and the merge of the fetched integration base follow it.
+**Adversarial remediation base:** `092d4ebefa3aca800fd2301005b668260c2c866a`
 
-## Ownership contract
+**Adversarial fetched integration head:** `ba9775edba0eaafa95f65ee1ccd072e744bc757c`
+
+The fetched integration head changes only WI-2099 evidence and is intentionally
+not merged into this exact remediation candidate.
+
+The historical cycle-3 review delta is pinned as
+`e0026d5a82675bc6e5654d807c9abdb89d5b8bff..7b038d8e989f6b0be8e9a2f79299d6e8fd8d642a`.
+That candidate hash contains the production and test changes from the historical
+cycle; its evidence-only commit and integration merge follow it.
+
+## Adversarial ownership remediation
+
+The latest remediation replaces the blanket V2 root-owned safe-area rule with a
+central, machine-checked ownership audit. Every chrome-bearing route hidden from
+the V2 tab bar is registered by its Expo root route name. New user-navigable
+pushed routes fail closed until they are added to the audit; colocated
+underscore-prefixed implementation modules are treated as child-owned because
+Expo exposes them to `screenOptions` even though they are not navigable routes.
+
+The default is now composed ownership: the child screen or nested navigator owns
+the native safe-area inset, and the root layout contributes only
+`pushedSceneTopInset - insets.top`, the remaining fixed-control band. Root-full
+ownership is limited to four path-bound exceptions proven not to consume the
+safe area themselves:
+
+- `/dashboard`;
+- `/billing` and descendants;
+- `/subject-hub` and descendants; and
+- `/progress/saved` and descendants.
+
+`/mentor-memory`, `/more/accommodation`, and `/subscription` once again own their
+native top inset unconditionally in flags-off, V0, V1, and V2. Subject, topic,
+notes, and More's nested navigator follow the same child-owned default. This
+keeps the V2 avatar/chip chrome at `y=55..99` with the screen root contributing
+47px and the root scene contributing the remaining 52px at a native top inset
+of 47px.
+
+### Latest red → green → production-only revert → red → restore → green
+
+The representative composed-geometry test was first added against the prior
+production implementation. It failed on the child-owned subject, topic, and
+notes routes with the exact doubled-safe-area symptom:
+
+```text
+Expected complete composed clearance: 99
+Received:                           146
+```
+
+After central ownership was implemented, the representative matrix passed. For
+the required behavioral revert, only the production root-scene resolver call was
+temporarily restored to the blanket full-band behavior while the tests remained
+unchanged. All seven representative routes failed with the same exact result:
+
+```text
+/mentor-memory, /more/accommodation, /subscription, /more/account,
+/subject/subject-1, /topic/topic-1, /my-notes
+
+Expected: 99
+Received: 146
+Tests:    7 failed
+```
+
+Restoring the resolver returned the same seven-route matrix to GREEN. The full
+root-layout suite then passed 107 tests, including exact registry coverage,
+path-bound exceptions, nested Expo route-name normalization, the fail-closed
+future-route invariant, and measured chrome growth.
+
+### Latest real native composition coverage
+
+W-05 now exercises the real seeded subject, topic, and notes screens in addition
+to the named Mentor Memory, Accommodation, and Subscription screens in every
+shell mode. V2 also retains the real nested `/more/account` header/content
+geometry check. Topic navigation carries the seeded subject ID explicitly, so
+the route resolves the same domain fixture rather than falling into its missing
+topic state.
+
+At native `top=47`, W-05 measures the fixed V2 chrome bottom at 99px and verifies
+that the root's 52px remaining band plus each child-owned 47px inset composes to
+99px exactly. Flags-off, V0, and V1 verify the same screens retain their 47px
+child-owned inset without V2 chrome. The mode runs use separately compiled
+bundles; changing flags only in the Playwright process is not counted as
+evidence.
+
+During the first real routed V2 run, Expo surfaced the nested name
+`billing/manage` and the non-navigable module `_lib/proxy-chrome` to
+`screenOptions`. The former is normalized to its audited root route and the
+latter follows the explicit implementation-module rule. These were candidate
+hardening discoveries, not waived failures.
+
+### Latest remediation verification
+
+```text
+Focused Jest:                    6 suites passed, 244 tests passed
+Uncached mobile typecheck:       passed (mobile + 6 dependencies)
+Uncached mobile lint:            passed, 0 errors / 51 baseline warnings
+Repository prepush (tsc build):  passed
+Prettier + git diff check:        passed
+
+flags-off W-05 native top=47:    3 passed
+V0 W-05 native top=47:           3 passed
+V1 W-05 native top=47:           3 passed
+V2 W-05 native top=47:           3 passed
+V2 W-05 wide + 360x760:          4 passed
+```
+
+The focused Jest command uses `--forceExit` because the existing mobile Jest
+harness leaves asynchronous handles open after reporting all results. The same
+run without `--forceExit` reported all 244 tests green before remaining alive;
+the forced run exited zero with the identical result set.
+
+## Historical ownership contract (superseded by adversarial remediation)
 
 - Under V2, the root app layout owns the complete pushed-scene band:
   `chromeTopInset + 8px gap + max(measured ScopeChip, measured avatar)`.

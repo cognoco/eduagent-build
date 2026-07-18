@@ -24,7 +24,6 @@ import { useProfile } from '../../lib/profile';
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
 import { queryKeys } from '../../lib/query-keys';
-import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TimeoutLoader } from '../../components/common';
@@ -99,7 +98,6 @@ function SubscriptionContent(): React.ReactElement | null {
   const router = useRouter();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const screenTopInset = FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? 0 : insets.top;
   const { activeProfile, profiles = [] } = useProfile();
   const navigationContract = useNavigationContract();
   const activeProfileRole = useActiveProfileRole();
@@ -709,7 +707,7 @@ function SubscriptionContent(): React.ReactElement | null {
   return (
     <View
       className="flex-1 bg-background"
-      style={{ paddingTop: screenTopInset }}
+      style={{ paddingTop: insets.top }}
       testID="subscription-screen"
     >
       <SubscriptionHeader />

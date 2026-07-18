@@ -38,12 +38,11 @@ async function expectBelowFixedChrome(
   await expect(page.getByTestId('account-avatar-button')).toBeEnabled();
 }
 
-async function expectDirectScreenAtNativeChromeBottom(
+async function expectChildOwnedScreenAtNativeChromeBottom(
   page: Page,
-  testId: string,
+  screenRoot: Locator,
 ): Promise<void> {
   const chrome = page.getByTestId('account-avatar-shell');
-  const screenRoot = page.getByTestId(testId);
   await expect(chrome).toBeVisible({ timeout: 60_000 });
   await expect(screenRoot).toBeVisible({ timeout: 60_000 });
 
@@ -58,15 +57,17 @@ async function expectDirectScreenAtNativeChromeBottom(
   expect(screenBox).not.toBeNull();
   expect(chromeBox!.y).toBeCloseTo(55, 0);
   expect(chromeBox!.y + chromeBox!.height).toBeCloseTo(99, 0);
-  expect(screenBox!.y).toBeGreaterThanOrEqual(98.5);
-  expect(paddingTop).toBe(0);
+  expect(screenBox!.y).toBeCloseTo(52, 0);
+  expect(paddingTop).toBe(47);
+  expect(screenBox!.y + paddingTop).toBeCloseTo(
+    chromeBox!.y + chromeBox!.height,
+    0,
+  );
 }
 
 async function expectDirectScreenAtNativeSafeArea(
-  page: Page,
-  testId: string,
+  screenRoot: Locator,
 ): Promise<void> {
-  const screenRoot = page.getByTestId(testId);
   const screenContent = screenRoot.locator(':scope > *').first();
   await expect(screenRoot).toBeVisible({ timeout: 60_000 });
   await expect(screenContent).toBeVisible({ timeout: 60_000 });
@@ -163,27 +164,85 @@ test(`W-05 native top=47 composes ${navigationShell} safe-area ownership across 
   await page.setViewportSize({ width: 360, height: 760 });
   await emulateNativeTopSafeArea(page, 47);
 
+  const seed = await readSeedData('solo-learner');
+  const subjectId = seed.ids.subjectId;
+  const topicId = seed.ids.topicId;
+  if (!subjectId || !topicId) {
+    throw new Error('solo-learner seed did not return subjectId/topicId');
+  }
+
   if (!v2Enabled) {
     await page.goto('/mentor-memory', { waitUntil: 'commit' });
-    await expectDirectScreenAtNativeSafeArea(page, 'mentor-memory-screen');
+    await expectDirectScreenAtNativeSafeArea(
+      page.getByTestId('mentor-memory-screen'),
+    );
 
     await page.goto('/more/accommodation', { waitUntil: 'commit' });
-    await expectDirectScreenAtNativeSafeArea(page, 'accommodation-screen');
+    await expectDirectScreenAtNativeSafeArea(
+      page.getByTestId('accommodation-screen'),
+    );
 
     await page.goto('/subscription', { waitUntil: 'commit' });
-    await expectDirectScreenAtNativeSafeArea(page, 'subscription-screen');
+    await expectDirectScreenAtNativeSafeArea(
+      page.getByTestId('subscription-screen'),
+    );
+
+    await page.goto(`/subject/${subjectId}`, { waitUntil: 'commit' });
+    await expectDirectScreenAtNativeSafeArea(
+      page.getByTestId('subject-settings-back').locator('xpath=../..'),
+    );
+
+    await page.goto(`/topic/${topicId}?subjectId=${subjectId}`, {
+      waitUntil: 'commit',
+    });
+    await expectDirectScreenAtNativeSafeArea(
+      page.getByTestId('topic-detail-back').locator('xpath=../..'),
+    );
+
+    await page.goto('/my-notes', { waitUntil: 'commit' });
+    await expectDirectScreenAtNativeSafeArea(page.getByTestId('my-notes-hub'));
+
     await expect(page.getByTestId('account-avatar-shell')).toHaveCount(0);
     return;
   }
 
   await page.goto('/mentor-memory', { waitUntil: 'commit' });
-  await expectDirectScreenAtNativeChromeBottom(page, 'mentor-memory-screen');
+  await expectChildOwnedScreenAtNativeChromeBottom(
+    page,
+    page.getByTestId('mentor-memory-screen'),
+  );
 
   await page.goto('/more/accommodation', { waitUntil: 'commit' });
-  await expectDirectScreenAtNativeChromeBottom(page, 'accommodation-screen');
+  await expectChildOwnedScreenAtNativeChromeBottom(
+    page,
+    page.getByTestId('accommodation-screen'),
+  );
 
   await page.goto('/subscription', { waitUntil: 'commit' });
-  await expectDirectScreenAtNativeChromeBottom(page, 'subscription-screen');
+  await expectChildOwnedScreenAtNativeChromeBottom(
+    page,
+    page.getByTestId('subscription-screen'),
+  );
+
+  await page.goto(`/subject/${subjectId}`, { waitUntil: 'commit' });
+  await expectChildOwnedScreenAtNativeChromeBottom(
+    page,
+    page.getByTestId('subject-settings-back').locator('xpath=../..'),
+  );
+
+  await page.goto(`/topic/${topicId}?subjectId=${subjectId}`, {
+    waitUntil: 'commit',
+  });
+  await expectChildOwnedScreenAtNativeChromeBottom(
+    page,
+    page.getByTestId('topic-detail-back').locator('xpath=../..'),
+  );
+
+  await page.goto('/my-notes', { waitUntil: 'commit' });
+  await expectChildOwnedScreenAtNativeChromeBottom(
+    page,
+    page.getByTestId('my-notes-hub'),
+  );
 
   await page.goto('/more/account', { waitUntil: 'commit' });
   const chrome = page.getByTestId('account-avatar-shell');

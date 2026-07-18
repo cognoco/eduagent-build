@@ -19,7 +19,6 @@ import {
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
-import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   LearningModeOption,
   SettingsRow,
@@ -31,7 +30,6 @@ export default function AccommodationScreen(): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const screenTopInset = FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? 0 : insets.top;
   const { activeProfile, profiles } = useProfile();
   const navigationContract = useNavigationContract();
   const [showGuide, setShowGuide] = useState(false);
@@ -127,7 +125,7 @@ export default function AccommodationScreen(): React.ReactElement {
   return (
     <View
       className="flex-1 bg-background"
-      style={{ paddingTop: screenTopInset }}
+      style={{ paddingTop: insets.top }}
       testID="accommodation-screen"
     >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
