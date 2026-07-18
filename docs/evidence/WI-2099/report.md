@@ -311,3 +311,28 @@ The canonical BID-13 refinement plan at
 rework strengthens its required real-boundary regression and does not alter the
 single acceptance-criteria unit, six persisted-session variants, sequencing,
 or scope.
+
+### Latest-main reconciliation and final verification
+
+The final fetch found `origin/main` at
+`6dce228a9892ae6f90e87863bb18983d2ef75d5e`, one commit ahead of the supplied
+`ba9775edba0eaafa95f65ee1ccd072e744bc757c` base. That intervening quiz-results
+accessibility change did not touch the session implementation, session tests,
+or WI-2099 evidence. It was merged history-preservingly without conflict in
+`c981d3767435a53c5ba59e88243bc8eab6ccb6d6`.
+
+Every impacted gate was then rerun on the merged tree:
+
+- focused-screen route-backfill regression — 1 passed, 49 skipped, 50 total;
+- six persisted-session scenarios — 6 passed, 16 skipped, 22 total;
+- complete impacted integration file — 22 passed, 22 total;
+- three affected mobile suites — 3 suites and 140 tests passed;
+- mobile typecheck — the mobile target and all six dependency targets passed
+  with cache skipped;
+- mobile lint — exit 0 with 0 errors and the existing 51-warning baseline;
+- `pnpm prepush` — exit 0; the repository TypeScript build passed.
+- `pnpm format:check` — exit 0; all three configured project targets passed;
+- `git diff --check` — exit 0;
+- sanctioned `complete --validate` — exit 0; all four completion-summary
+  sections, trip wires, evidence presence, and the single-AC coverage check
+  passed, with no Notion write.
