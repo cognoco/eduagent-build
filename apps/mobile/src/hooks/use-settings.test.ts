@@ -174,7 +174,10 @@ describe('useUpdateNotificationSettings', () => {
       });
     });
 
-    expect(mockFetch).toHaveBeenCalled();
+    const headers = new Headers(
+      (mockFetch.mock.calls[0]?.[1] as RequestInit | undefined)?.headers,
+    );
+    expect(headers.get('X-Profile-Id')).toBe('test-profile-id');
   });
 });
 

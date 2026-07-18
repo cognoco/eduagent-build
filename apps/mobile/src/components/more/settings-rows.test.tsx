@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react-native';
-import { SettingsRow } from './settings-rows';
+import { SettingsRow, ToggleRow } from './settings-rows';
 
 describe('SettingsRow', () => {
   it('renders label text', () => {
@@ -49,5 +49,40 @@ describe('SettingsRow', () => {
   it('shows description when provided', () => {
     render(<SettingsRow label="Language" description="Select your language" />);
     screen.getByText('Select your language');
+  });
+
+  it('visibly and accessibly names the exact mutation target', () => {
+    render(
+      <SettingsRow
+        label="Mentor language"
+        targetName="Mia"
+        onPress={jest.fn()}
+        testID="targeted-settings-row"
+      />,
+    );
+
+    screen.getByText('Mia');
+    expect(
+      screen.getByTestId('targeted-settings-row').props.accessibilityLabel,
+    ).toBe('Mentor language. Mia');
+  });
+});
+
+describe('ToggleRow', () => {
+  it('visibly and accessibly names the exact mutation target', () => {
+    render(
+      <ToggleRow
+        label="Push notifications"
+        targetName="Owner"
+        value={false}
+        onToggle={jest.fn()}
+        testID="targeted-toggle"
+      />,
+    );
+
+    screen.getByText('Owner');
+    expect(
+      screen.getByTestId('targeted-toggle-switch').props.accessibilityLabel,
+    ).toBe('Push notifications. Owner');
   });
 });

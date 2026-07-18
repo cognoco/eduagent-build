@@ -114,6 +114,15 @@ export default function AccommodationScreen(): React.ReactElement {
     );
   }, [canEditChildPreferences, childProfileId, router]);
 
+  if (isChildMode && !canEditChildPreferences) {
+    return (
+      <View
+        className="flex-1 bg-background"
+        testID="accommodation-access-pending"
+      />
+    );
+  }
+
   // [ACCOUNT-06] The hub row that opens this screen is labelled "Preferences";
   // title the self view to match ("Your learning preferences") instead of the
   // jargon-y "Your learning accommodation" so the destination reads as the same
