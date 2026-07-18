@@ -197,12 +197,6 @@ jobs:
     env:
       NX_DAEMON: false
       NX_ISOLATE_PLUGINS: false
-      # Denylisted client-side keys are intentionally absent from committed
-      # eas.json; Mobile CI must fail before submitting an unkeyed native build.
-      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
-      EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
-      EXPO_PUBLIC_REVENUECAT_API_KEY_IOS: ${{ secrets.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS }}
-      EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID: ${{ secrets.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
         with:
@@ -227,7 +221,11 @@ jobs:
           packager: npm
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Verify Expo public build env
+      - name: Verify EAS environment variables (preview)
+        # Checks the EAS Environment Variable store the cloud `eas build` job
+        # actually reads at build time — not a GitHub Actions secret, which is
+        # a different value store the EAS builder never sees.
+        working-directory: apps/mobile
         run: |
           required_env=(
             EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY
@@ -235,15 +233,15 @@ jobs:
             EXPO_PUBLIC_REVENUECAT_API_KEY_IOS
             EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID
           )
+          output=$(eas env:list preview)
           missing=()
           for key in "${required_env[@]}"; do
-            value="${!key-}"
-            if [ -z "$value" ]; then
+            if ! grep -q "^${key}=" <<<"$output"; then
               missing+=("$key")
             fi
           done
           if [ "${#missing[@]}" -ne 0 ]; then
-            printf 'ERROR: required Expo public build env is empty: %s\n' "${missing[*]}" >&2
+            printf 'ERROR: required EAS preview environment variables are not configured: %s\n' "${missing[*]}" >&2
             exit 1
           fi
 
@@ -263,12 +261,6 @@ jobs:
     env:
       NX_DAEMON: false
       NX_ISOLATE_PLUGINS: false
-      # Denylisted client-side keys are intentionally absent from committed
-      # eas.json; Mobile CI must fail before submitting an unkeyed native build.
-      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
-      EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
-      EXPO_PUBLIC_REVENUECAT_API_KEY_IOS: ${{ secrets.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS }}
-      EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID: ${{ secrets.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd  # v5
         with:
@@ -293,7 +285,11 @@ jobs:
           packager: npm
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Verify Expo public build env
+      - name: Verify EAS environment variables (${{ inputs.profile }})
+        # Checks the EAS Environment Variable store the cloud `eas build` job
+        # actually reads at build time — not a GitHub Actions secret, which is
+        # a different value store the EAS builder never sees.
+        working-directory: apps/mobile
         run: |
           required_env=(
             EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY
@@ -301,15 +297,15 @@ jobs:
             EXPO_PUBLIC_REVENUECAT_API_KEY_IOS
             EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID
           )
+          output=$(eas env:list "${{ inputs.profile }}")
           missing=()
           for key in "${required_env[@]}"; do
-            value="${!key-}"
-            if [ -z "$value" ]; then
+            if ! grep -q "^${key}=" <<<"$output"; then
               missing+=("$key")
             fi
           done
           if [ "${#missing[@]}" -ne 0 ]; then
-            printf 'ERROR: required Expo public build env is empty: %s\n' "${missing[*]}" >&2
+            printf 'ERROR: required EAS %s environment variables are not configured: %s\n' "${{ inputs.profile }}" "${missing[*]}" >&2
             exit 1
           fi
 
