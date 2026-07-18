@@ -17,7 +17,8 @@ const GATE_STATES = Object.freeze({
 
 const RETRYABLE = new Set([502, 503, 504]);
 const TRANSPORT = /(?:timed?out|timeout|network|fetch failed|socket|connection reset|connect)/i;
-const HARD_FAILURE = /(?:assert(?:ion)?|expect\(|no tests? found|discovery|config(?:uration)?|cancel(?:led|lation)?|malformed|unknown)/i;
+const HARD_FAILURE = /(?:assert(?:ion)?|expect\(|no tests? found|discovery|config(?:uration)?|cancel(?:led|lation)?|malformed)/i;
+const MAX_TRACE_BYTES = 8 * 1024 * 1024;
 
 function validatedApiUrl(value) {
   const url = new URL(value);
@@ -54,11 +55,13 @@ async function runCanary({ apiUrl, secret, fetchImpl = fetch, attempts = 3, time
         signal: controller.signal,
       });
       last = `http-${response.status}`;
+      // A malformed fetch adapter or test double can reach this path even
+      // though a conforming Fetch Response always exposes an integer status.
+      if (!Number.isInteger(response.status)) return { state: GATE_STATES.NOT_RUN, reason: 'malformed-response', terminal: true };
       if (response.status >= 200 && response.status < 300) return { state: GATE_STATES.HEALTHY, status: response.status };
       if (response.status >= 100 && response.status <= 599 && !RETRYABLE.has(response.status)) {
         return { state: GATE_STATES.NOT_RUN, reason: last, terminal: true };
       }
-      if (!Number.isInteger(response.status)) return { state: GATE_STATES.NOT_RUN, reason: 'malformed-response', terminal: true };
     } catch (error) {
       last = error?.name === 'AbortError' ? 'timeout' : 'transport';
     } finally {
@@ -85,6 +88,7 @@ function traceFiles(root) {
 }
 
 function traceLines(file) {
+  if (statSync(file).size > MAX_TRACE_BYTES) return [];
   if (file.endsWith('.trace')) return readFileSync(file, 'utf8').split('\n');
   try {
     return execFileSync('unzip', ['-p', file], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }).split('\n');
@@ -125,6 +129,7 @@ function decide({ preflight, postflight, classification, exitCode }) {
   // The workflow shell is the authoritative runtime path; this exported
   // decision function is its executable regression contract. Keep both
   // branches aligned and extend the matrix tests when the gate changes.
+  // `not-run` models the workflow's pre-suite bail; classifyFailure never emits it.
   if (preflight === GATE_STATES.UNAVAILABLE && classification === 'not-run') return 0;
   if (exitCode === 0) return 0;
   if (classification === 'cancellation' || classification === 'product' || classification === 'unknown') return exitCode || 1;

@@ -180,8 +180,8 @@ jobs:
             echo "::error title=Doppler token missing::DOPPLER_TOKEN_STG is not set as a GitHub Actions secret. Playwright cannot be run with doppler -c stg, so TEST_SEED_SECRET may drift from .dev.vars and every /__test/seed call will 403. See memory project_playwright_e2e_setup.md."
             exit 1
           fi
-          if [ -z "${PLAYWRIGHT_API_URL:-}" ]; then
-            echo "::error title=Playwright API URL missing::PLAYWRIGHT_API_URL is not set; the staging canary cannot validate the smoke target."
+          if ! command -v unzip >/dev/null 2>&1; then
+            echo "::error title=Trace reader missing::unzip is required to classify Playwright trace archives."
             exit 1
           fi
           # Keep the canary, suite, and postflight in one Doppler boundary so
@@ -190,7 +190,7 @@ jobs:
             export PLAYWRIGHT_TEST_SEED_SECRET=\"\$TEST_SEED_SECRET\"; \
             export CLERK_SECRET_KEY=\"\$CLERK_SECRET_KEY\"; \
             export PLAYWRIGHT_API_URL=\"${PLAYWRIGHT_API_URL}\"; \
-            set -euo pipefail; \
+            set -eu; \
             CANARY_STATE_FILE=\"\${RUNNER_TEMP}/playwright-canary-pre.state\"; \
             node scripts/playwright-staging-gate.cjs --canary > \"\${CANARY_STATE_FILE}\"; \
             if grep -qx 'GATE_STATE=confirmed-unavailable' \"\${CANARY_STATE_FILE}\"; then \
@@ -202,8 +202,9 @@ jobs:
               exit 1; \
             fi; \
             set +e; \
-            pnpm run test:e2e:web:smoke 2>&1 | tee \"\${RUNNER_TEMP}/playwright-result.log\"; \
-            SUITE_STATUS=\${PIPESTATUS[0]}; \
+            pnpm run test:e2e:web:smoke > \"\${RUNNER_TEMP}/playwright-result.log\" 2>&1; \
+            SUITE_STATUS=\$?; \
+            cat \"\${RUNNER_TEMP}/playwright-result.log\"; \
             set -e; \
             POST_STATE_FILE=\"\${RUNNER_TEMP}/playwright-canary-post.state\"; \
             node scripts/playwright-staging-gate.cjs --canary > \"\${POST_STATE_FILE}\"; \

@@ -44,6 +44,16 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
     await expect(
       runCanary({ apiUrl: 'http://api-stg.example.test', secret: 'present' }),
     ).resolves.toMatchObject({ state: GATE_STATES.NOT_RUN });
+    await expect(
+      runCanary({
+        apiUrl: 'https://api-stg.example.test',
+        secret: 'present',
+        fetchImpl: async () => ({ status: 'malformed' }),
+      }),
+    ).resolves.toMatchObject({
+      state: GATE_STATES.NOT_RUN,
+      reason: 'malformed-response',
+    });
   });
 
   it('recognizes trace-backed 502/503/504 and transport records only', () => {
@@ -74,6 +84,13 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
       expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
         kind: 'infra-signalled',
       });
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: 'Unknown error while the API transport was unavailable',
+        }),
+      ).toEqual({ kind: 'infra-signalled' });
       writeFileSync(
         join(root, 'run', 'trace.trace'),
         JSON.stringify({ type: 'console', text: '503 in prose' }),
