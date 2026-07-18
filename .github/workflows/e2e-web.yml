@@ -73,14 +73,14 @@ jobs:
           fi
 
           # Trusted same-repo PR: run the real smoke iff the change set touches
-          # the web/mobile surface. CI gate/controller-only changes pass
-          # through; workflow_dispatch supplies the hard canary/suite proof.
+          # the web/mobile surface or the staging-gate controller. Workflow-
+          # only changes pass through; workflow_dispatch supplies their hard proof.
           FILES=$(git diff --name-only "origin/${BASE_REF}...HEAD")
           SURFACE_CHANGED=false
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             case "$f" in
-              apps/*|packages/*|pnpm-lock.yaml)
+              apps/*|packages/*|pnpm-lock.yaml|scripts/playwright-staging-gate*)
                 SURFACE_CHANGED=true
                 break
                 ;;

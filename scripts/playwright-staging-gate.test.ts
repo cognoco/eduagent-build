@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from '@jest/globals';
@@ -117,6 +118,30 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
       );
       expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
         kind: 'unknown',
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('classifies retryable API status from a Playwright zip archive', () => {
+    const root = mkdtempSync(join(tmpdir(), 'wi-2228-trace-zip-'));
+    try {
+      const trace = join(root, 'trace.trace');
+      writeFileSync(
+        trace,
+        JSON.stringify({
+          type: 'resource-snapshot',
+          snapshot: {
+            request: { url: 'https://api-stg.example.test/v1/profiles' },
+            response: { status: 503 },
+          },
+        }),
+      );
+      execFileSync('zip', ['-q', 'trace.zip', 'trace.trace'], { cwd: root });
+      rmSync(trace);
+      expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
+        kind: 'infra-signalled',
       });
     } finally {
       rmSync(root, { recursive: true, force: true });

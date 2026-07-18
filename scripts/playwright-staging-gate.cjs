@@ -111,7 +111,7 @@ function classifyFailure({ artifactRoot, exitCode, resultText = '' }) {
       const status = record?.type === 'response' ? (record?.metadata?.status ?? record?.status) : record?.status;
       const snapshotUrl = record?.type === 'resource-snapshot' ? record?.snapshot?.request?.url : '';
       const snapshotStatuses = record?.type === 'resource-snapshot'
-        ? [...JSON.stringify(record).matchAll(/"status":(-?\d+)/g)].map((match) => Number(match[1]))
+        ? [record?.snapshot?.response?.status, record?.response?.status].filter(Number.isInteger)
         : [];
       const error = record?.error?.error?.message ?? record?.error?.message ?? record?.errorText;
       return RETRYABLE.has(Number(status))
