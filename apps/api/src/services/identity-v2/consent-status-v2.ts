@@ -74,11 +74,9 @@ export const ADULT_SELF_CONSENT_PURPOSES = [
  * basis). `requested_basis` on consent_request and `lawful_basis` on
  * consent_grant draw from the same value set.
  *
- * `adult_self_consent`: an adult (age >= 18) processing their OWN data with no
- * guardian in the picture — the general "data subject consent" lawful basis
- * (maps to the ratified data-model's `art6_1_a` value; kept in this file's
- * existing `<regime>_<who>_consent` naming style rather than the ADR's abstract
- * article-citation naming — a documented, deliberate divergence, not drift).
+ * `art6_1_a`: an adult (age >= 18) processing their OWN data with no guardian
+ * in the picture — the GDPR Art 6(1)(a) data-subject-consent lawful basis, the
+ * ratified MMT-ADR-0011 §3 `lawful_basis` value for adult self-processing.
  * `consent_request` has NO writer for this basis (see createIdentityGraph /
  * recordAdultSelfConsentV2 in consent-v2.ts): the acceptance IS the signup
  * action, so there is no pre-grant workflow to model.
@@ -86,19 +84,19 @@ export const ADULT_SELF_CONSENT_PURPOSES = [
 export type ConsentBasis =
   | 'gdpr_parental_consent'
   | 'coppa_parental_consent'
-  | 'adult_self_consent';
+  | 'art6_1_a';
 
 /**
  * Fixed basis priority for the AnyBasis tiebreak (GDPR first), matching the
  * §2.3a ordering rule. Lower index = higher priority.
  *
- * [WI-1193] Deliberately excludes `adult_self_consent`: this list is the
+ * [WI-1193] Deliberately excludes `art6_1_a`: this list is the
  * bug-compatible legacy PARENTAL-consent reduction (see
  * `resolveLatestConsentStatusAnyBasis` below) that existing dashboard/family
  * call sites depend on verbatim. Adding the adult basis here would change
  * their output for every adult who now holds a self-consent grant — callers
  * that want the adult's status use the basis-explicit `resolveConsentStatus`
- * with `basis: 'adult_self_consent'` instead.
+ * with `basis: 'art6_1_a'` instead.
  */
 const BASIS_PRIORITY: readonly ConsentBasis[] = [
   'gdpr_parental_consent',

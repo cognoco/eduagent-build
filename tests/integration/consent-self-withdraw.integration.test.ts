@@ -3,7 +3,7 @@
  * AND retrievable through user-reachable routes, bound to the authenticated
  * login→person (never the X-Profile-Id-selectable active profile).
  *
- * A self-registered adult owner (18+) holds one `adult_self_consent` grant per
+ * A self-registered adult owner (18+) holds one `art6_1_a` grant per
  * granular purpose after signup. These cases exercise:
  *   - PUT /v1/consent/self/withdraw — one purpose withdrawn, the other stays live
  *     (AC2 revocability), and the withdrawal binds to callerPersonId so an
@@ -47,7 +47,7 @@ async function selfConsentGrant(personId: string, purpose: string) {
     where: and(
       eq(consentGrant.chargePersonId, personId),
       eq(consentGrant.purpose, purpose),
-      eq(consentGrant.lawfulBasis, 'adult_self_consent'),
+      eq(consentGrant.lawfulBasis, 'art6_1_a'),
     ),
   });
 }
@@ -114,7 +114,7 @@ describe('Integration: adult self-consent routes (WI-1193 AC2/AC3)', () => {
   // grant must be UNTOUCHED (the caller can only act on their OWN consent).
   //
   // RED (pre-fix): the handler read withProfile(c).profileId = the selected
-  // child → withdrew the CHILD's seeded adult_self_consent grant.
+  // child → withdrew the CHILD's seeded art6_1_a grant.
   // GREEN: it reads callerPersonId = the owner → the child's grant stays live.
   it('[AC2] withdrawal is bound to the caller, NOT the X-Profile-Id target (cross-profile IDOR blocked)', async () => {
     const owner = await createProfileViaRoute({
@@ -137,7 +137,7 @@ describe('Integration: adult self-consent routes (WI-1193 AC2/AC3)', () => {
       parentProfileId: owner.id,
       childProfileId: child.id,
     });
-    // Seed an adult_self_consent grant on the CHILD — the attack target. (A
+    // Seed an art6_1_a grant on the CHILD — the attack target. (A
     // child would not normally hold one; seeding it makes the IDOR assertion
     // meaningful: prove the route cannot be tricked into withdrawing it.)
     const db = createIntegrationDb();
@@ -210,7 +210,7 @@ describe('Integration: adult self-consent routes (WI-1193 AC2/AC3)', () => {
       'platform_use',
     ]);
     for (const r of beforeBody.records) {
-      expect(r.lawfulBasis).toBe('adult_self_consent');
+      expect(r.lawfulBasis).toBe('art6_1_a');
       expect(r.granted).toBe(true);
       expect(r.withdrawnAt).toBeNull();
       expect(r.termsVersion).toBe(TEST_POLICY_VERSION);
@@ -268,7 +268,7 @@ describe('Integration: adult self-consent routes (WI-1193 AC2/AC3)', () => {
       parentProfileId: owner.id,
       childProfileId: child.id,
     });
-    // A distinctly-versioned adult_self_consent grant on the child.
+    // A distinctly-versioned art6_1_a grant on the child.
     const db = createIntegrationDb();
     await recordAdultSelfConsentV2(
       db,

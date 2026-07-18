@@ -341,7 +341,7 @@ export async function acceptFamilyJoin(
       // person-delete (the teen SURVIVES). Person-scoped edges (any
       // supportership) are NOT torn down — they follow the surviving teen.
       //
-      // [WI-1193] createIdentityGraph now writes 'adult_self_consent'
+      // [WI-1193] createIdentityGraph now writes 'art6_1_a'
       // consent_grant rows for a self-registered adult owner (age >= 18) at
       // signup, and this accept path's self-consent-capable gate (17+, above)
       // admits real 18+ adults, not only 13-17 teens — so the accepting person

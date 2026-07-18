@@ -242,7 +242,7 @@ async function cleanupByClerk(
     // [WI-1193 AC1/AC2] A self-registered adult owner (birthYear 1990 → age
     // ~35-36) gets a persisted lawful-basis + terms-accepted fact per purpose:
     // one CONSENTED consent_grant row for EACH of platform_use/llm_disclosure,
-    // basis='adult_self_consent' — the "adult who never needed consent" gap
+    // basis='art6_1_a' — the "adult who never needed consent" gap
     // this WI closes.
     const grants = await db.query.consentGrant.findMany({
       where: eq(consentGrant.chargePersonId, graph.personId),
@@ -251,7 +251,7 @@ async function cleanupByClerk(
     const purposes = grants.map((g) => g.purpose).sort();
     expect(purposes).toEqual(['llm_disclosure', 'platform_use']);
     for (const g of grants) {
-      expect(g.lawfulBasis).toBe('adult_self_consent');
+      expect(g.lawfulBasis).toBe('art6_1_a');
       expect(g.granted).toBe(true);
       expect(g.withdrawnAt).toBeNull();
       expect(g.organizationId).toBe(graph.organizationId);

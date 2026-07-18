@@ -550,7 +550,7 @@ const COPPA = 'coppa_parental_consent';
             chargePersonId: personId,
             organizationId: orgId,
             purpose: PURPOSE,
-            lawfulBasis: 'adult_self_consent',
+            lawfulBasis: 'art6_1_a',
             granted: true,
             grantedAt,
           },
@@ -558,7 +558,7 @@ const COPPA = 'coppa_parental_consent';
             chargePersonId: personId,
             organizationId: orgId,
             purpose: CONSENT_PURPOSE_LLM_DISCLOSURE,
-            lawfulBasis: 'adult_self_consent',
+            lawfulBasis: 'art6_1_a',
             granted: true,
             grantedAt,
           },
@@ -568,11 +568,11 @@ const COPPA = 'coppa_parental_consent';
 
         expect(report).toHaveLength(2);
         const byPurpose = new Map(report.map((r) => [r.purpose, r]));
-        expect(byPurpose.get(PURPOSE)?.lawfulBasis).toBe('adult_self_consent');
+        expect(byPurpose.get(PURPOSE)?.lawfulBasis).toBe('art6_1_a');
         expect(byPurpose.get(PURPOSE)?.termsAcceptedAt).toEqual(grantedAt);
         expect(byPurpose.get(PURPOSE)?.withdrawnAt).toBeNull();
         expect(byPurpose.get(CONSENT_PURPOSE_LLM_DISCLOSURE)?.lawfulBasis).toBe(
-          'adult_self_consent',
+          'art6_1_a',
         );
       });
 
