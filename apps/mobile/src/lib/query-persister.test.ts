@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Sentry from '@sentry/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import {
   persistQueryClientRestore,
@@ -9,6 +10,9 @@ import {
   buildPersisterKey,
   createScopedPersister,
   getQueryCacheBuster,
+  LEGACY_CACHE_KEY,
+  purgePersisterKeys,
+  reattemptPersisterPurgeIfSignedOut,
   shouldPersistQuery,
 } from './query-persister';
 
@@ -614,5 +618,132 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(raw).not.toContain('learner free text milestone label');
     expect(raw).not.toContain('progress history bare string leak canary');
     expect(raw).toContain('retention');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sign-out purge failure contract [WI-1987]
+//
+// Operator ruling (4th-review escalation): on a scoped-persister purge failure
+// (1) sign-out always completes, (2) the failure escalates to Sentry carrying
+// KEY NAMES ONLY — never cached values, and (3) the survivor is re-attempted at
+// the next definitively-signed-out moment (app start / before next sign-in).
+// The Fix Development Rule bans silent recovery in auth code; these prove the
+// two swallowed .catch(() => {}) blocks are gone.
+// ---------------------------------------------------------------------------
+
+describe('purgePersisterKeys — escalate-on-failure, key names only [WI-1987]', () => {
+  beforeEach(() => {
+    (Sentry.captureMessage as jest.Mock).mockClear();
+    (AsyncStorage.multiRemove as jest.Mock).mockClear();
+  });
+
+  it('removes the given keys on the happy path and does not escalate', async () => {
+    const key = buildPersisterKey('user-x');
+    await AsyncStorage.setItem(key, 'cache-with-transcript');
+
+    await purgePersisterKeys([key]);
+
+    expect(await AsyncStorage.getItem(key)).toBeNull();
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('escalates to Sentry with KEY NAMES ONLY (never cached values) when removal fails, and does not throw', async () => {
+    const key = buildPersisterKey('user-y');
+    const secretValue =
+      'private learner transcript that must never leave the device';
+    await AsyncStorage.setItem(key, secretValue);
+    (AsyncStorage.multiRemove as jest.Mock).mockRejectedValueOnce(
+      new Error('AsyncStorage disk failure'),
+    );
+
+    // Must not throw — sign-out always completes.
+    await expect(purgePersisterKeys([key])).resolves.toBeUndefined();
+
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1);
+    const [message, ctx] = (Sentry.captureMessage as jest.Mock).mock.calls[0];
+    expect(message).toContain('persister purge failed');
+    expect(ctx.tags.feature).toBe('auth');
+    // Key NAME is reported for remediation…
+    expect(ctx.extra.keyNames).toEqual([key]);
+    // …but the cached VALUE never appears anywhere in the escalation payload.
+    expect(JSON.stringify(ctx)).not.toContain(secretValue);
+  });
+
+  it('is a no-op for an empty key list', async () => {
+    await purgePersisterKeys([]);
+    expect(AsyncStorage.multiRemove).not.toHaveBeenCalled();
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('reattemptPersisterPurgeIfSignedOut — next-start / pre-sign-in re-sweep [WI-1987]', () => {
+  beforeEach(() => {
+    (Sentry.captureMessage as jest.Mock).mockClear();
+    (AsyncStorage.multiRemove as jest.Mock).mockClear();
+  });
+
+  it('sweeps a survivor scoped cache when DEFINITIVELY signed out (next app start / before next sign-in)', async () => {
+    const survivor = buildPersisterKey('user-whose-signout-purge-failed');
+    await AsyncStorage.setItem(survivor, 'orphaned-cache-with-transcript');
+    await AsyncStorage.setItem(LEGACY_CACHE_KEY, 'pre-BUG-357-orphan');
+    // A non-persister key must survive the sweep.
+    await AsyncStorage.setItem('unrelated-app-key', 'keep-me');
+
+    const swept = await reattemptPersisterPurgeIfSignedOut({
+      isLoaded: true,
+      isSignedIn: false,
+    });
+
+    expect(swept).toBe(true);
+    expect(await AsyncStorage.getItem(survivor)).toBeNull();
+    expect(await AsyncStorage.getItem(LEGACY_CACHE_KEY)).toBeNull();
+    expect(await AsyncStorage.getItem('unrelated-app-key')).toBe('keep-me');
+  });
+
+  it('does NOT sweep while Clerk is still loading — a returning user’s cold-start cache is preserved', async () => {
+    // The load-bearing guard: during Clerk's initial load useAuth reports
+    // !isSignedIn even for a returning user whose session is about to restore.
+    // Sweeping here would destroy their own offline-paint cache.
+    const returningUserCache = buildPersisterKey('returning-user');
+    await AsyncStorage.setItem(returningUserCache, 'legit-offline-paint-cache');
+
+    const swept = await reattemptPersisterPurgeIfSignedOut({
+      isLoaded: false,
+      isSignedIn: false,
+    });
+
+    expect(swept).toBe(false);
+    expect(await AsyncStorage.getItem(returningUserCache)).toBe(
+      'legit-offline-paint-cache',
+    );
+  });
+
+  it('does NOT sweep when signed in — the current user keeps their cache', async () => {
+    const currentUserCache = buildPersisterKey('signed-in-user');
+    await AsyncStorage.setItem(currentUserCache, 'current-user-cache');
+
+    const swept = await reattemptPersisterPurgeIfSignedOut({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+
+    expect(swept).toBe(false);
+    expect(await AsyncStorage.getItem(currentUserCache)).toBe(
+      'current-user-cache',
+    );
+  });
+
+  it('escalates (not throws) when the survivor sweep itself hits a storage failure', async () => {
+    await AsyncStorage.setItem(buildPersisterKey('user-z'), 'orphan');
+    (AsyncStorage.multiRemove as jest.Mock).mockRejectedValueOnce(
+      new Error('disk failure during re-sweep'),
+    );
+
+    await expect(
+      reattemptPersisterPurgeIfSignedOut({ isLoaded: true, isSignedIn: false }),
+    ).resolves.toBe(true);
+
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1);
   });
 });
