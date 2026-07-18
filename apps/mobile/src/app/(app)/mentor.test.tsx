@@ -597,13 +597,13 @@ describe('MentorScreen', () => {
     fireEvent.press(send);
 
     let clarification = screen.getByTestId('mentor-bar-clarification');
-    expect(within(clarification).queryByText('Try again')).toBeNull();
+    expect(within(clarification).queryByText('Try Again')).toBeNull();
 
     fireEvent.changeText(input, 'show my progress');
     fireEvent.press(send);
 
     clarification = screen.getByTestId('mentor-bar-clarification');
-    within(clarification).getByText('Try again');
+    within(clarification).getByText('Try Again');
     within(clarification).getByText('show my progress');
     expect(clarification.props.accessibilityLiveRegion).toBe('polite');
     expect(mockPush).not.toHaveBeenCalled();
@@ -635,10 +635,10 @@ describe('MentorScreen', () => {
       fireEvent.press(send);
       expect(announce).toHaveBeenCalledTimes(2);
       expect(announce).toHaveBeenLastCalledWith(
-        'Try again What exactly do you want to learn? show my progress',
+        'Try Again What exactly do you want to learn? show my progress',
       );
       within(screen.getByTestId('mentor-bar-clarification')).getByText(
-        'Try again',
+        'Try Again',
       );
     } finally {
       announce.mockRestore();
