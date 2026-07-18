@@ -1409,6 +1409,36 @@ describe('childDetailResponseSchema', () => {
       true,
     );
   });
+
+  it('[WI-2186] requires explicit nullable timezone provenance for successful child detail', () => {
+    const dashboardChild = dashboardChildSchema.parse({
+      profileId: TEST_UUID,
+      displayName: 'Alex',
+      consentStatus: 'CONSENTED',
+      respondedAt: null,
+      summary: 'Active learner',
+      sessionsThisWeek: 3,
+      sessionsLastWeek: 2,
+      totalTimeThisWeek: 60,
+      totalTimeLastWeek: 45,
+      exchangesThisWeek: 20,
+      exchangesLastWeek: 15,
+      trend: 'up',
+      subjects: [],
+      guidedVsImmediateRatio: 0.6,
+      retentionTrend: 'stable',
+      totalSessions: 10,
+    });
+
+    expect(
+      childDetailResponseSchema.safeParse({ child: dashboardChild }).success,
+    ).toBe(false);
+    expect(
+      childDetailResponseSchema.safeParse({
+        child: { ...dashboardChild, organizationTimezone: null },
+      }).success,
+    ).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

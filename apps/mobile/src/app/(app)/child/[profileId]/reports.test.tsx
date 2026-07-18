@@ -78,7 +78,11 @@ describe('ChildReportsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseChildDetail.mockReturnValue({
-      data: { displayName: 'Emma', profileId: 'child-001' },
+      data: {
+        displayName: 'Emma',
+        profileId: 'child-001',
+        organizationTimezone: null,
+      },
       isLoading: false,
       isError: false,
       refetch: jest.fn(),

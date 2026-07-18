@@ -353,7 +353,6 @@ export type DashboardChildProgress = z.infer<
 export const dashboardChildSchema = z.object({
   profileId: z.string().uuid(),
   displayName: z.string(),
-  organizationTimezone: z.string().nullable().optional(),
   consentStatus: consentStatusSchema.nullable(),
   respondedAt: isoDateField.nullable(),
   summary: z.string(),
@@ -389,6 +388,11 @@ export const dashboardChildSchema = z.object({
   totalXp: z.number().int().default(0),
 });
 export type DashboardChild = z.infer<typeof dashboardChildSchema>;
+
+export const dashboardChildDetailSchema = dashboardChildSchema.extend({
+  organizationTimezone: z.string().nullable(),
+});
+export type DashboardChildDetail = z.infer<typeof dashboardChildDetailSchema>;
 
 export const pendingNoticeTypeSchema = z.enum([
   'consent_archived',
@@ -804,7 +808,7 @@ export type DashboardResponse = z.infer<typeof dashboardResponseSchema>;
 
 // GET /dashboard/children/:profileId
 export const childDetailResponseSchema = z.object({
-  child: dashboardChildSchema.nullable(),
+  child: dashboardChildDetailSchema.nullable(),
 });
 export type ChildDetailResponse = z.infer<typeof childDetailResponseSchema>;
 

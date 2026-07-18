@@ -114,6 +114,7 @@ function setRoutes(
         child: {
           profileId: '20000000-0000-4000-8000-000000000012',
           displayName: 'Emma',
+          organizationTimezone: null,
           consentStatus: null,
           respondedAt: null,
           summary: '',
@@ -328,7 +329,13 @@ describe('ChildMentorMemoryScreen — consent-withdrawn empty state (WI-264)', (
         if (url.includes('/memory')) return { memory: { categories: [] } };
         if (url.includes('/sessions')) return { sessions: [] };
         if (init?.method && init.method !== 'GET') return {};
-        return { child: { displayName: 'Emma', profileId: 'child-001' } };
+        return {
+          child: {
+            displayName: 'Emma',
+            profileId: 'child-001',
+            organizationTimezone: null,
+          },
+        };
       },
     );
   }

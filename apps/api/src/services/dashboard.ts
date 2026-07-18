@@ -40,6 +40,7 @@ import {
 } from '@eduagent/schemas';
 import type {
   DashboardChild,
+  DashboardChildDetail,
   DemoDashboardData,
   KnowledgeInventory,
   MonthlyReportRecord,
@@ -279,7 +280,6 @@ function redactDashboardChild(child: DashboardChild): DashboardChild {
   return {
     profileId: child.profileId,
     displayName: child.displayName,
-    organizationTimezone: child.organizationTimezone,
     consentStatus: child.consentStatus,
     respondedAt: child.respondedAt,
     summary: redactedConsentSummary(child.displayName, child.consentStatus),
@@ -300,6 +300,15 @@ function redactDashboardChild(child: DashboardChild): DashboardChild {
     currentStreak: 0,
     longestStreak: 0,
     totalXp: 0,
+  };
+}
+
+function redactDashboardChildDetail(
+  child: DashboardChildDetail,
+): DashboardChildDetail {
+  return {
+    ...redactDashboardChild(child),
+    organizationTimezone: child.organizationTimezone,
   };
 }
 
@@ -1099,7 +1108,7 @@ export async function getChildDetail(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-): Promise<DashboardChild | null> {
+): Promise<DashboardChildDetail | null> {
   // [EP15-I5] Throws ForbiddenError (→ 403) on access denial instead of
   // returning null. A null return here now means "parent has access but
   // the child was not present in the dashboard list" — a genuine not-found.
@@ -1281,7 +1290,7 @@ export async function getChildDetail(
     totalSessions,
   );
 
-  return redactDashboardChild({
+  return redactDashboardChildDetail({
     profileId: childProfileId,
     displayName: profileDisplayName,
     organizationTimezone,

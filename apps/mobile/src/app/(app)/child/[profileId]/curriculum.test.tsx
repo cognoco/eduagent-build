@@ -77,6 +77,7 @@ describe('ChildCurriculumScreen', () => {
       data: {
         profileId: 'child-001',
         displayName: 'Emma',
+        organizationTimezone: null,
         subjects: [
           {
             subjectId: '11111111-1111-7111-8111-111111111111',
@@ -239,6 +240,7 @@ describe('ChildCurriculumScreen', () => {
       data: {
         profileId: 'child-001',
         displayName: 'Emma',
+        organizationTimezone: null,
         subjects: [],
       },
       isLoading: false,
