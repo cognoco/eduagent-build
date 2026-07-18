@@ -307,10 +307,9 @@ handles. Node `v24.18.0` remains the only available runtime despite the repo's
 Node 22 engine declaration.
 
 The canonical BID-13 refinement plan at
-`_wip/mvp-roadmap/refinements/refine-BID-13-mentor.md` remains unchanged: this
-rework strengthens its required real-boundary regression and does not alter the
-single acceptance-criteria unit, six persisted-session variants, sequencing,
-or scope.
+`_wip/mvp-roadmap/refinements/refine-BID-13-mentor.md` now carries an append-only
+final-integration record. The rework does not alter the single
+acceptance-criteria unit, six persisted-session variants, sequencing, or scope.
 
 ### Latest-main reconciliation and final verification
 
@@ -336,3 +335,62 @@ Every impacted gate was then rerun on the merged tree:
 - sanctioned `complete --validate` — exit 0; all four completion-summary
   sections, trip wires, evidence presence, and the single-AC coverage check
   passed, with no Notion write.
+
+### External-builder final latest-main integration
+
+The final external-builder fetch again resolved `origin/main` to
+`6dce228a9892ae6f90e87863bb18983d2ef75d5e`. The normal history-preserving
+merge command `git merge --no-ff --no-edit origin/main` reported `Already up to
+date.` because that exact main revision was already the second parent of merge
+commit `c981d3767435a53c5ba59e88243bc8eab6ccb6d6`. No commit was rebased,
+amended, squashed, or force-pushed. The verified production/evidence candidate
+before this append-only evidence update was
+`0c41950c53a548314251b3a885d5d475d5a5aa18`.
+
+No revision arrived after the independent Opus review. The fetched main delta
+therefore changed none of `session/index.tsx`, `use-session-streaming.ts`,
+`use-subject-classification.ts`, `session-types.ts`, or the persisted-session
+integration test. A focused runtime-assumption re-check confirmed that the
+internal-backfill guard still records the allocated session ID before
+`setParams`, skips exactly the matching dependency-triggered focus reset once,
+and clears the marker before returning. The independent Opus
+`NO_ACTIONABLE_FINDINGS` verdict remains applicable to the tested tree; no
+production or regression-test change was warranted.
+
+Fresh isolated command outcomes on Node `v24.18.0` and pnpm `10.19.0`:
+
+- focused route-backfill screen regression — exit 0; 1 suite passed; 1 passed,
+  49 skipped, 50 total; raw result:
+  [final-integration-route-backfill-main-6dce228a.json](final-integration-route-backfill-main-6dce228a.json);
+- six persisted opener scenarios — exit 0; 1 suite passed; 6 passed, 16
+  skipped, 22 total; raw result:
+  [final-integration-six-persisted-main-6dce228a.json](final-integration-six-persisted-main-6dce228a.json);
+- literal requested full-file form
+  `pnpm test:integration -- --runTestsByPath tests/integration/learning-session.integration.test.ts --runInBand --silent --forceExit`
+  — exit 0; 1 suite passed; 22 passed, 22 total. This repo's wrapper forwarded
+  the extra separator into Jest, so options after it were reported as matching
+  patterns; the isolated file still ran completely. A second invocation using
+  the repo's proven argument form plus JSON output also exited 0 with 22 of 22;
+  raw result:
+  [final-integration-full-learning-session-main-6dce228a.json](final-integration-full-learning-session-main-6dce228a.json);
+- affected mobile suites — session index, session streaming, subject
+  classification, and message outbox — exit 0; 4 suites passed; 149 tests
+  passed; raw result:
+  [final-integration-mobile-suites-main-6dce228a.json](final-integration-mobile-suites-main-6dce228a.json);
+- `pnpm exec nx run @eduagent/mobile:typecheck` — exit 0; the mobile target and
+  all six dependency tasks succeeded. Nx reported the mobile target as flaky
+  after its successful retry;
+- `pnpm exec nx run @eduagent/mobile:lint` — exit 0; 0 errors and the existing
+  51-warning repository baseline;
+- `pnpm prepush` — exit 0; `tsc --build` succeeded;
+- `pnpm format:check` — exit 0; all three configured projects passed from
+  matching cache outputs;
+- `git diff --check` — exit 0;
+- sanctioned `complete .workitem-artifacts/WI-2099 green --validate` — exit 0;
+  all four summary sections, three trip-wires, evidence presence, and the
+  single-AC coverage check passed, with no Notion write.
+
+The focused and integration commands retain the repository's existing open
+handles and use `--forceExit`. The repository still declares Node 22 while the
+only available runtime is Node 24; every required command above completed
+successfully under that explicit mismatch.

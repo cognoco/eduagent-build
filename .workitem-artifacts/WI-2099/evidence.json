@@ -29,6 +29,16 @@
       "acRef": "AC-1",
       "description": "Historical proof plus reviewer-rework RED, GREEN, production-only REVERT, RESTORE, validation counts, and caveats are preserved without deleting prior evidence.",
       "pointer": "docs/evidence/WI-2099/report.md"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Fresh final latest-main integration reran the complete learning-session file and preserved all 22 scenarios after the history-preserving main merge.",
+      "pointer": "docs/evidence/WI-2099/final-integration-full-learning-session-main-6dce228a.json"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Fresh final mobile verification covers the session screen, streaming hook, subject classification, and message outbox with 149 passing tests.",
+      "pointer": "docs/evidence/WI-2099/final-integration-mobile-suites-main-6dce228a.json"
     }
   ],
   "noiseBaselineVersion": "2026-07-18",
