@@ -24,6 +24,23 @@ describe('matchBarIntent', () => {
     });
   });
 
+  it('routes an explicit pedagogical show-me-how request to Mentor with exact input', () => {
+    expect(matchBarIntent('show me how photosynthesis works')).toEqual({
+      kind: 'mentor',
+      text: 'show me how photosynthesis works',
+    });
+  });
+
+  it.each(['progress report', 'journal entries', 'subjects list'])(
+    'keeps the unsupported destination phrase "%s" on the clarification path',
+    (input) => {
+      expect(matchBarIntent(input)).toEqual({
+        kind: 'uncertain',
+        text: input,
+      });
+    },
+  );
+
   it('returns mentor for a clear conversational message', () => {
     expect(matchBarIntent('why does the moon look bigger tonight?')).toEqual({
       kind: 'mentor',

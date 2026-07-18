@@ -145,3 +145,75 @@ Preview-Android preflight on this Linux host found no `adb` executable, no Maest
 - Clarification uses existing localized copy, a polite accessibility live region, a monotonically increasing revision, and visible submitted-input content so consecutive uncertain sends refresh observably.
 - The 360px interaction assertion checks containment and successful submission rather than a snapshot.
 - The changed test converted all three pre-existing internal mocks to `jest.requireActual()` plus targeted overrides and introduced no new internal mock site.
+
+## External review rework cycle 1
+
+The rework branch started at `acfe90399eb5b38f13db205e668de373ca783ce8`, which was also the freshly fetched `origin/main` revision. That history already contained reviewed implementation `321984eb56d54bc13046fd9e6a2275831ebd0df1`; no rebase or additional main merge was needed.
+
+The new tests were added before either production file changed. The focused RED runs isolated four matcher failures and six learner-screen failures:
+
+- `show me how photosynthesis works` was `uncertain` because every leading `show` matched the navigation-command guard.
+- `progress report`, `journal entries`, and `subjects list` were Mentor turns because the bare unsupported-target guard recognized only their unmodified nouns.
+- the 360px test's `Dimensions` spy had zero production calls and the scroll container retained 20px horizontal padding.
+- repeated clarification revisions made zero calls to `AccessibilityInfo.announceForAccessibility` because a live-region prop alone did not use the repository native announcement path.
+
+| Phase | Production state | Result | Raw result |
+| --- | --- | --- | --- |
+| Rework matcher RED | Reviewed production at branch base; new matcher tests present | 1 suite failed; 4 failed, 1 passed, 19 skipped | [rework-1-matcher-red.json](rework-1-matcher-red.json) |
+| Rework learner RED | Reviewed production at branch base; new component tests present | 1 suite failed; 6 failed, 31 skipped | [rework-1-mentor-red.json](rework-1-mentor-red.json) |
+| Rework matcher GREEN | Candidate matcher fix | 1 suite passed; 5 passed, 19 skipped | [rework-1-matcher-green.json](rework-1-matcher-green.json) |
+| Rework learner GREEN | Candidate learner-screen fix | 1 suite passed; 6 passed, 31 skipped | [rework-1-mentor-green.json](rework-1-mentor-green.json) |
+| Rework production-only REVERT | Both production patches removed while all new tests remained | 2 suites failed; 10 failed, 51 skipped | [rework-1-revert-production.json](rework-1-revert-production.json) |
+| Rework RESTORE | Exact candidate production patches restored | 2 suites passed; 10 passed, 51 skipped | [rework-1-restore-green.json](rework-1-restore-green.json) |
+
+The original immutable proof matrix and its referenced commits/files above were not rewritten. This rework extension is deliberately labeled as working-tree TDD/revert evidence: it does not invent a disposable commit SHA. Its raw results become immutable in the final rework commit, while the reviewed production baseline remains the immutable branch-base revision and the production-only revert is reproducible by removing only the final commit's `mentor.tsx` and `bar-intent-match.ts` deltas.
+
+### Rework exact focused commands
+
+Matcher RED/GREEN used the same command, with the output file changed from `rework-1-matcher-red.json` to `rework-1-matcher-green.json` after the production fix:
+
+```bash
+rtk pnpm exec jest --runTestsByPath '/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/apps/mobile/src/lib/bar-intent-match.test.ts' --runInBand --no-coverage --testNamePattern 'pedagogical|unsupported destination|navigation|catalog' --json --outputFile='/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/docs/evidence/WI-2094/rework-1-matcher-red.json'
+```
+
+Learner RED/GREEN used the same command, with the output file changed from `rework-1-mentor-red.json` to `rework-1-mentor-green.json` after the production fix:
+
+```bash
+rtk pnpm exec jest --runTestsByPath '/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/apps/mobile/src/app/(app)/mentor.test.tsx' --runInBand --no-coverage --testNamePattern 'photosynthesis|unsupported destination|small-screen-360|announces clarification' --json --outputFile='/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/docs/evidence/WI-2094/rework-1-mentor-red.json'
+```
+
+Production-only REVERT/RESTORE used the same two-suite command, with the output file changed from `rework-1-revert-production.json` to `rework-1-restore-green.json` after the exact production patch was restored:
+
+```bash
+rtk pnpm exec jest --runTestsByPath '/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/apps/mobile/src/lib/bar-intent-match.test.ts' '/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/apps/mobile/src/app/(app)/mentor.test.tsx' --runInBand --no-coverage --testNamePattern 'pedagogical|photosynthesis|unsupported destination|small-screen-360|announces clarification' --json --outputFile='/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/docs/evidence/WI-2094/rework-1-revert-production.json'
+```
+
+### Acceptance-criteria and pointer audit
+
+The shared `splitAcItems()` implementation splits only newline-prefixed bullets or numbered items. The current acceptance-criteria blob has headings and paragraphs but no list markers, so it returns exactly one unit: `AC-1`. The prior `AC-2` and `AC-3` claims were invalid ordinals and are now `AC-1` claims.
+
+The authoritative resolver accepts `path:line` only when the path portion matches `^[\\w.\\-/]+$`. The former claim pointer `apps/mobile/src/app/(app)/mentor.test.tsx:365` contained parentheses, so the resolver retained `:365` as part of the path and found no tracked file. It is replaced by `docs/evidence/WI-2094/rework-1-restore-green.json`, a bare exact tracked path. Every remaining claim pointer and the Bug red-green pointer is also a bare exact tracked path:
+
+| Pointer | Purpose | Authoritative resolution expected at reviewed revision |
+| --- | --- | --- |
+| `docs/evidence/WI-2094/report.md` | Root cause, original immutable proof, and Bug red-green declaration | exact tracked path |
+| `docs/evidence/WI-2094/rework-1-restore-green.json` | Named rework boundary and interaction proof | exact tracked path |
+| `docs/plans/2026-07-17-route-valid-mentor-statements.md` | Concrete implementation, verification, and deferred-scope contract | exact tracked path |
+
+### Rework final verification
+
+A fresh `git fetch origin main` kept `origin/main` at `acfe90399eb5b38f13db205e668de373ca783ce8`, exactly the rework branch base, so no history-preserving merge was needed.
+
+- Focused matcher GREEN — exit 0; the selected pedagogical, unsupported-destination, navigation, and catalog cases passed.
+- Focused learner GREEN — exit 0; the selected photosynthesis, unsupported-destination, repeated-announcement, and 360px cases passed.
+- Four impacted Jest suites — exit 0; 4 suites and 75 tests passed with no snapshots.
+- Exact 360px interaction proof — exit 0; the single selected case passed, observed a production `Dimensions.get('window')` call through `useWindowDimensions`, asserted 12px compact horizontal padding, retained scroll tap handling and `min-w-0`, and routed Send to exact freeform raw input.
+- Mobile typecheck — exit 0; the mobile target and six dependencies completed successfully.
+- Mobile lint — exit 0; 0 errors and the unchanged 51-warning baseline. No warning points at the three `mentor.test.tsx` GC6 partial mocks or the new production code.
+- `pnpm prepush` — exit 0; `tsc --build` completed successfully.
+- `pnpm format:check` — exit 0; all three configured format targets passed. A direct Prettier check of every changed source, test, artifact, and Markdown file also passed.
+- `git diff --check` — exit 0 with no output.
+- Non-mutating `complete --validate` — exit 0; all four sections, three prose trip-wires, evidence presence, and AC coverage reported `PASS`; the command confirmed that it performed no Notion writes.
+- Prospective authoritative audit — `splitAcItems()` returned only `AC-1`; claim indices 0–3 and the Bug red-green pointer each resolved to their exact canonical path against the final-to-be-tracked file set. The same audit is rerun against the committed reviewed revision after commit.
+
+The environment remains Node `v24.18.0` with pnpm `10.19.0` against the repository's Node 22 engine request. The engine warning was present on pnpm commands but no verification command failed.

@@ -49,6 +49,10 @@ function hasQuestionShape(text: string): boolean {
   return /[?]$/.test(text) || /^(why|how|what|when|where|who)\b/.test(text);
 }
 
+function hasPedagogicalRequestShape(text: string): boolean {
+  return /^show me how\b/.test(text);
+}
+
 function hasNavigationCommandShape(text: string): boolean {
   return /^(open|show|go to|take me to|bring me to|navigate to|resume|continue|view|see|review|practice|challenge|test)\b/.test(
     text,
@@ -56,7 +60,7 @@ function hasNavigationCommandShape(text: string): boolean {
 }
 
 function hasBareNavigationTargetShape(text: string): boolean {
-  return /^(?:my\s+)?(?:progress|journal|subjects|library|more)(?:\s+please)?$/.test(
+  return /^(?:my\s+)?(?:progress(?:\s+report)?|journal(?:\s+entries)?|subjects(?:\s+list)?|library|more)(?:\s+please)?$/.test(
     text,
   );
 }
@@ -111,7 +115,7 @@ function resolveByNameIndex(
 ): BarIntentResult | 'ambiguous' | null {
   // Question-shaped input must not be intercepted as a navigation jump —
   // let it fall through to the mentor path so typed questions reach rawInput.
-  if (hasQuestionShape(value)) return null;
+  if (hasQuestionShape(value) || hasPedagogicalRequestShape(value)) return null;
 
   const subjectResult = resolveNameInText(nameIndex.subjects ?? [], value);
   const topicResult = resolveNameInText(nameIndex.topics ?? [], value);
@@ -283,7 +287,7 @@ export function matchBarIntent(
 
   // --- Fallthrough ---
 
-  if (hasQuestionShape(value)) {
+  if (hasQuestionShape(value) || hasPedagogicalRequestShape(value)) {
     return { kind: 'mentor', text: trimmed };
   }
 

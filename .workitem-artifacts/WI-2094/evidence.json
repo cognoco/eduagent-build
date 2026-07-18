@@ -2,22 +2,22 @@
   "claims": [
     {
       "acRef": "AC-1",
-      "description": "The root causes and production fixes are identified at the deterministic matcher and learner send boundary, including the original light-practice no-op, broad keyword interception, and non-refreshing boolean clarification.",
+      "description": "The root causes and learner-only production fixes are identified at the deterministic matcher, clarification announcement, and responsive layout boundaries.",
       "pointer": "docs/evidence/WI-2094/report.md"
     },
     {
-      "acRef": "AC-2",
-      "description": "Behavior-first boundary coverage proves exact neon and learn-more declaratives, more questions, all submit mechanisms, editing then submit, literal and named closed-catalog jumps, consecutive clarification refresh, exact route params, and interactive 360px behavior.",
-      "pointer": "apps/mobile/src/app/(app)/mentor.test.tsx:365"
+      "acRef": "AC-1",
+      "description": "Behavior-first rework coverage proves exact photosynthesis raw input, all three modified unsupported destinations, repeated native announcements, and the production-consumed interactive 360px layout contract.",
+      "pointer": "docs/evidence/WI-2094/rework-1-restore-green.json"
     },
     {
-      "acRef": "AC-2",
-      "description": "Immutable machine-readable original RED, GREEN, production-only REVERT, RESTORE, and independent-review RED/GREEN outputs plus all required validation results are preserved.",
+      "acRef": "AC-1",
+      "description": "The original immutable RED, GREEN, production-only REVERT, and RESTORE proof remains preserved and is extended with honestly labeled rework-cycle proof.",
       "pointer": "docs/evidence/WI-2094/report.md"
     },
     {
-      "acRef": "AC-3",
-      "description": "The implementation remains deterministic and deliberately excludes richer semantic classification, multilingual corpus expansion, and named topic/session targeting.",
+      "acRef": "AC-1",
+      "description": "The implementation plan records concrete routing, rawInput, clarification revision, deterministic jump, layout, announcement, verification, and deferred-scope decisions.",
       "pointer": "docs/plans/2026-07-17-route-valid-mentor-statements.md"
     }
   ],

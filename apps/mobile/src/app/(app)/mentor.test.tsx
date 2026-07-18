@@ -1,4 +1,4 @@
-import { Dimensions } from 'react-native';
+import { AccessibilityInfo, Dimensions } from 'react-native';
 import { fireEvent, screen, within } from '@testing-library/react-native';
 import type {
   NowCard,
@@ -45,7 +45,7 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock(
-  '../../hooks/use-now-feed' /* gc1-allow: pattern-a conversion */,
+  '../../hooks/use-now-feed' /* gc1-allow: real hooks start profile-scoped API queries and native cache timers; this route test injects feed, error, and overflow states without those effects */,
   () => {
     const actual = jest.requireActual(
       '../../hooks/use-now-feed',
@@ -59,7 +59,7 @@ jest.mock(
 );
 
 jest.mock(
-  '../../hooks/use-subjects-index' /* gc1-allow: pattern-a conversion */,
+  '../../hooks/use-subjects-index' /* gc1-allow: real hook aggregates three asynchronous subject, library, and progress queries; this route test needs a deterministic name index without those API calls */,
   () => {
     const actual = jest.requireActual(
       '../../hooks/use-subjects-index',
@@ -77,7 +77,7 @@ jest.mock(
 );
 
 jest.mock(
-  '../../lib/scope-context' /* gc1-allow: pattern-a conversion */,
+  '../../lib/scope-context' /* gc1-allow: real hook throws without its provider and resolves persisted scope asynchronously; this dispatch test injects me, supporter-hub, and person scope states directly */,
   () => {
     const actual = jest.requireActual(
       '../../lib/scope-context',
@@ -429,6 +429,18 @@ describe('MentorScreen', () => {
 
       expectFreeformRoute('what should I learn more about?');
     });
+
+    it('pedagogical-show-how-photosynthesis — routes exact raw input to freeform', () => {
+      renderMentorScreen();
+
+      fireEvent.changeText(
+        screen.getByTestId('mentor-bar-input'),
+        'show me how photosynthesis works',
+      );
+      fireEvent.press(screen.getByTestId('mentor-bar-send'));
+
+      expectFreeformRoute('show me how photosynthesis works');
+    });
   });
 
   it('editing then submit routes the latest text instead of the initial draft', () => {
@@ -486,6 +498,19 @@ describe('MentorScreen', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
+  it.each(['progress report', 'journal entries', 'subjects list'])(
+    'unsupported destination "%s" reveals clarification instead of starting Mentor',
+    (input) => {
+      renderMentorScreen();
+
+      fireEvent.changeText(screen.getByTestId('mentor-bar-input'), input);
+      fireEvent.press(screen.getByTestId('mentor-bar-send'));
+
+      expectVisibleClarification(input);
+      expect(mockPush).not.toHaveBeenCalled();
+    },
+  );
+
   it('consecutive-uncertain-refresh — visibly refreshes clarification for the second command', () => {
     renderMentorScreen();
 
@@ -503,6 +528,34 @@ describe('MentorScreen', () => {
     expect(within(refreshed).queryByText('show my progress')).toBeNull();
     expect(refreshed.props.accessibilityLiveRegion).toBe('polite');
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('announces clarification on every revision without announcing the initial empty state', () => {
+    const announce = jest
+      .spyOn(AccessibilityInfo, 'announceForAccessibility')
+      .mockImplementation(() => undefined);
+    try {
+      renderMentorScreen();
+      expect(announce).not.toHaveBeenCalled();
+
+      const input = screen.getByTestId('mentor-bar-input');
+      const send = screen.getByTestId('mentor-bar-send');
+      fireEvent.changeText(input, 'show my progress');
+      fireEvent.press(send);
+      expect(announce).toHaveBeenCalledTimes(1);
+      expect(announce).toHaveBeenLastCalledWith(
+        'What exactly do you want to learn? show my progress',
+      );
+
+      fireEvent.changeText(input, 'show my progress');
+      fireEvent.press(send);
+      expect(announce).toHaveBeenCalledTimes(2);
+      expect(announce).toHaveBeenLastCalledWith(
+        'What exactly do you want to learn? show my progress',
+      );
+    } finally {
+      announce.mockRestore();
+    }
   });
 
   it.each(['review', 'open dashboard'])(
@@ -528,10 +581,13 @@ describe('MentorScreen', () => {
     try {
       renderMentorScreen();
 
-      expect(Dimensions.get('window').width).toBe(360);
       const scroll = screen.getByTestId('mentor-scroll');
       const input = within(scroll).getByTestId('mentor-bar-input');
       const send = within(scroll).getByTestId('mentor-bar-send');
+      expect(dimensions).toHaveBeenCalledWith('window');
+      expect(scroll.props.contentContainerStyle).toEqual(
+        expect.objectContaining({ paddingHorizontal: 12 }),
+      );
       expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
       expect(input.props.className).toContain('min-w-0');
       fireEvent.changeText(input, 'Teach me about neon');
