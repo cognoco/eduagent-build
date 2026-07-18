@@ -179,6 +179,10 @@ jobs:
             echo "::error title=Doppler token missing::DOPPLER_TOKEN_STG is not set as a GitHub Actions secret. Playwright cannot be run with doppler -c stg, so TEST_SEED_SECRET may drift from .dev.vars and every /__test/seed call will 403. See memory project_playwright_e2e_setup.md."
             exit 1
           fi
+          if [ -z "${PLAYWRIGHT_API_URL:-}" ]; then
+            echo "::error title=Playwright API URL missing::PLAYWRIGHT_API_URL is not set; the staging canary cannot validate the smoke target."
+            exit 1
+          fi
           # Keep the canary, suite, and postflight in one Doppler boundary so
           # TEST_SEED_SECRET is exactly the value the staging API accepts.
           doppler run -p mentomate -c stg --command "\
