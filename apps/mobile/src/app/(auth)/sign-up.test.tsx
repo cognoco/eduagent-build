@@ -390,6 +390,112 @@ describe('SignUpScreen', () => {
     });
   });
 
+  // [WI-2119] AC-3 regression guard (native): a verified Codex finding on
+  // PR #2206 showed signUp.create() was given the longer web CAPTCHA ceiling
+  // UNCONDITIONALLY, so native silently regressed from CLERK_REQUEST_TIMEOUT_MS
+  // (20s) to SIGN_UP_CAPTCHA_TIMEOUT_MS (45s). This asserts native times out at
+  // exactly CLERK_REQUEST_TIMEOUT_MS, not the longer web ceiling.
+  it('[WI-2119] native sign-up times out at CLERK_REQUEST_TIMEOUT_MS, not the longer web CAPTCHA ceiling', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'ios',
+      configurable: true,
+      writable: true,
+    });
+    jest.useFakeTimers();
+    mockCreate.mockImplementation(neverResolves);
+
+    render(<SignUpScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-up-email'),
+      'new@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('sign-up-password'), 'secure123');
+    fireEvent.press(screen.getByTestId('sign-up-button'));
+
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledWith({
+        emailAddress: 'new@example.com',
+        password: 'secure123',
+      });
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(CLERK_REQUEST_TIMEOUT_MS);
+      await Promise.resolve();
+    });
+
+    // Native times out at the standard 20s ceiling — it never renders a
+    // CAPTCHA, so it must not wait the longer web-only 45s.
+    screen.getByText(
+      'The security service did not respond in time. Check your connection and try again.',
+    );
+    expect(
+      screen.getByTestId('sign-up-button').props.accessibilityState,
+    ).toEqual(expect.objectContaining({ busy: false, disabled: false }));
+  });
+
+  // [WI-2119] AC-3 regression guard (web): the counterpart to the native test
+  // above — web genuinely gets the longer CAPTCHA-aware ceiling. Confirms
+  // signUp.create() is still pending at CLERK_REQUEST_TIMEOUT_MS (20s) and
+  // only times out once SIGN_UP_CAPTCHA_TIMEOUT_MS (45s) elapses.
+  it('[WI-2119] web sign-up stays pending past CLERK_REQUEST_TIMEOUT_MS and only times out at SIGN_UP_CAPTCHA_TIMEOUT_MS', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'web',
+      configurable: true,
+      writable: true,
+    });
+    jest.useFakeTimers();
+    mockCreate.mockImplementation(neverResolves);
+
+    render(<SignUpScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-up-email'),
+      'new@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('sign-up-password'), 'secure123');
+    fireEvent.press(screen.getByTestId('sign-up-button'));
+
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledWith({
+        emailAddress: 'new@example.com',
+        password: 'secure123',
+      });
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(CLERK_REQUEST_TIMEOUT_MS);
+      await Promise.resolve();
+    });
+
+    // Still pending at 20s — web's ceiling is longer, so no error yet and
+    // the button remains busy.
+    expect(
+      screen.queryByText(
+        'The security service did not respond in time. Check your connection and try again.',
+      ),
+    ).toBeNull();
+    expect(
+      screen.getByTestId('sign-up-button').props.accessibilityState,
+    ).toEqual(expect.objectContaining({ busy: true }));
+
+    await act(async () => {
+      jest.advanceTimersByTime(
+        SIGN_UP_CAPTCHA_TIMEOUT_MS - CLERK_REQUEST_TIMEOUT_MS,
+      );
+      await Promise.resolve();
+    });
+
+    // Now past the full 45s web ceiling — times out.
+    screen.getByText(
+      'The security service did not respond in time. Check your connection and try again.',
+    );
+    expect(
+      screen.getByTestId('sign-up-button').props.accessibilityState,
+    ).toEqual(expect.objectContaining({ busy: false, disabled: false }));
+  });
+
   // [WI-2119] Regression guard for the mount-lifecycle timeout bug: a real
   // Chromium sign-up hung ~20s and surfaced "The security service did not
   // respond in time" because Clerk's interactive CAPTCHA challenge can render
