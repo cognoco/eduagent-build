@@ -1,0 +1,418 @@
+{
+  "config": {
+    "configFile": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/playwright.config.ts",
+    "rootDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/global-setup.ts",
+    "globalTeardown": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "runId": "playwright-1784336943724-bbda",
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784336943724-bbda",
+          "actualWorkers": 1
+        },
+        "id": "setup",
+        "name": "setup",
+        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/helpers[\\\\/]auth\\.setup\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784336943724-bbda",
+          "actualWorkers": 1
+        },
+        "id": "smoke-auth",
+        "name": "smoke-auth",
+        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]auth[\\\\/](auth-navigation|sign-up-flow)\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784336943724-bbda",
+          "actualWorkers": 1
+        },
+        "id": "auth-access",
+        "name": "auth-access",
+        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]auth[\\\\/](a02-signup-verification-ui|a03-forgot-password-ui|a05-mfa-verification-ui|a14-slow-auth-spinner)\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784336943724-bbda",
+          "actualWorkers": 1
+        },
+        "id": "smoke-learner",
+        "name": "smoke-learner",
+        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]journeys[\\\\/]j01-.*\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784336943724-bbda",
+          "actualWorkers": 1
+        },
+        "id": "smoke-parent",
+        "name": "smoke-parent",
+        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]journeys[\\\\/]j03-.*\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784336943724-bbda",
+          "actualWorkers": 1
+        },
+        "id": "role-transitions",
+        "name": "role-transitions",
+        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]journeys[\\\\/]j0[4-7]-.*\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784336943724-bbda",
+          "actualWorkers": 1
+        },
+        "id": "later-phases",
+        "name": "later-phases",
+        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/](journeys[\\\\/](j0[89]|j[1-9][0-9])-.*|auth[\\\\/]w03-.*|navigation[\\\\/]w0[1-5]-.*)\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784336943724-bbda",
+          "actualWorkers": 1
+        },
+        "id": "child-subject-detail",
+        "name": "child-subject-detail",
+        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]navigation[\\\\/]w06-child-subject-detail\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784336943724-bbda",
+          "actualWorkers": 1
+        },
+        "id": "mentor-audit-registry-smoke",
+        "name": "mentor-audit-registry-smoke",
+        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]mentor-audit[\\\\/].+\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784336943724-bbda",
+          "actualWorkers": 1
+        },
+        "id": "config-f-smoke",
+        "name": "config-f-smoke",
+        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]config-f[\\\\/].+\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "shard": null,
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.56.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+      "file": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "[WI-2191] narrow web layout has a labelled group with non-nested 44px actions",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 30294,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('group', { name: 'Quick quiz' })\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('group', { name: 'Quick quiz' })\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('group', { name: 'Quick quiz' })\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('group', { name: 'Quick quiz' })\u001b[22m\n\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:54:25",
+                    "location": {
+                      "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+                      "column": 25,
+                      "line": 54
+                    },
+                    "snippet": "  52 |     const guessWho = page.getByTestId('practice-quiz-guess-who');\n  53 |\n> 54 |     await expect(group).toBeVisible();\n     |                         ^\n  55 |     await expect(browse).toHaveRole('button');\n  56 |     await expect(capitals).toHaveRole('button');\n  57 |     await expect(guessWho).toHaveRole('button');"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+                        "column": 25,
+                        "line": 54
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('group', { name: 'Quick quiz' })\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('group', { name: 'Quick quiz' })\u001b[22m\n\n\n  52 |     const guessWho = page.getByTestId('practice-quiz-guess-who');\n  53 |\n> 54 |     await expect(group).toBeVisible();\n     |                         ^\n  55 |     await expect(browse).toHaveRole('button');\n  56 |     await expect(capitals).toHaveRole('button');\n  57 |     await expect(guessWho).toHaveRole('button');\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:54:25"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:09:39.383Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-29bc5-ith-non-nested-44px-actions-later-phases/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-29bc5-ith-non-nested-44px-actions-later-phases/video.webm"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-29bc5-ith-non-nested-44px-actions-later-phases/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-29bc5-ith-non-nested-44px-actions-later-phases/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+                    "column": 25,
+                    "line": 54
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "38bcc6117dd28e29d177-4bcf8a5fcdf8d695e565",
+          "file": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+          "line": 43,
+          "column": 7
+        },
+        {
+          "title": "[WI-2191] wide web layout has a labelled group with non-nested 44px actions",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 30144,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('group', { name: 'Quick quiz' })\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('group', { name: 'Quick quiz' })\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('group', { name: 'Quick quiz' })\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('group', { name: 'Quick quiz' })\u001b[22m\n\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:54:25",
+                    "location": {
+                      "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+                      "column": 25,
+                      "line": 54
+                    },
+                    "snippet": "  52 |     const guessWho = page.getByTestId('practice-quiz-guess-who');\n  53 |\n> 54 |     await expect(group).toBeVisible();\n     |                         ^\n  55 |     await expect(browse).toHaveRole('button');\n  56 |     await expect(capitals).toHaveRole('button');\n  57 |     await expect(guessWho).toHaveRole('button');"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+                        "column": 25,
+                        "line": 54
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('group', { name: 'Quick quiz' })\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('group', { name: 'Quick quiz' })\u001b[22m\n\n\n  52 |     const guessWho = page.getByTestId('practice-quiz-guess-who');\n  53 |\n> 54 |     await expect(group).toBeVisible();\n     |                         ^\n  55 |     await expect(browse).toHaveRole('button');\n  56 |     await expect(capitals).toHaveRole('button');\n  57 |     await expect(guessWho).toHaveRole('button');\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:54:25"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:10:10.612Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-f89fb-ith-non-nested-44px-actions-later-phases/test-failed-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-f89fb-ith-non-nested-44px-actions-later-phases/video.webm"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-f89fb-ith-non-nested-44px-actions-later-phases/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-f89fb-ith-non-nested-44px-actions-later-phases/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+                    "column": 25,
+                    "line": 54
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "38bcc6117dd28e29d177-9c3102cd4d1a59dd6932",
+          "file": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+          "line": 43,
+          "column": 7
+        },
+        {
+          "title": "[WI-2191] pointer, keyboard, and touch launch only the chosen quick-quiz route",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "later-phases",
+              "projectName": "later-phases",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 21494,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-07-18T01:10:41.696Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "38bcc6117dd28e29d177-9161eac49601d4bde519",
+          "file": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
+          "line": 85,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-18T01:09:03.728Z",
+    "duration": 133408.994,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 2,
+    "flaky": 0
+  }
+}
