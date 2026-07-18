@@ -266,6 +266,14 @@ export type ProfileResponse = z.infer<typeof profileResponseSchema>;
 
 export const profileListResponseSchema = z.object({
   profiles: z.array(publicProfileSchema),
+  // [WI-1193 AC1 — first-use repair signal] True when the authenticated caller
+  // is an adult account-owner who holds no adult self-consent (`art6_1_a`)
+  // record AND none could be lawfully repaired from a genuinely captured
+  // versioned terms-acceptance fact — the client must drive a (re-)consent
+  // write. False for everyone else (children, non-owners, adults already
+  // holding or repaired into a record). Default false so pre-WI-1193 cached
+  // responses parse cleanly.
+  needsAdultConsent: z.boolean().default(false),
 });
 export type ProfileListResponse = z.infer<typeof profileListResponseSchema>;
 

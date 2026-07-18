@@ -48,6 +48,7 @@ import {
   type EmailOptions,
 } from '../notifications/email';
 import { createLogger } from '../logger';
+import { calculateAge } from '../age-utils';
 import { inngest } from '../../inngest/client';
 import { safeSend } from '../safe-non-core';
 import {
@@ -347,6 +348,131 @@ export async function withdrawAdultSelfConsentV2(
     columns: { withdrawnAt: true },
   });
   return { chargePersonId, withdrawnAt: winner?.withdrawnAt ?? now };
+}
+
+// ---------------------------------------------------------------------------
+// (2b) [WI-1193 AC1 — first-use repair] repairOrSignalAdultSelfConsentV2
+// ---------------------------------------------------------------------------
+// An adult owner who signed up BEFORE the adult self-consent bootstrap existed
+// holds no `art6_1_a` grant — recordAdultSelfConsentV2 runs only inside the
+// identity-graph bootstrap, which existing adults never re-enter. On an
+// authenticated session bootstrap (GET /v1/profiles) we repair-or-signal:
+//
+//   (a) a genuinely captured VERSIONED terms-acceptance fact exists on a prior
+//       grant → write the accountable `art6_1_a` record DERIVED from it, LEGACY
+//       purpose only (granular purposes attach at the next REAL consent event,
+//       never retroactively), provenance-marked.
+//   (c) no versioned fact → write NOTHING and signal `needs_consent`; the client
+//       drives a normal (re-)consent write. A version-less record fabricated
+//       from the bare signup timestamp is rejected as weak GDPR Art 5(2)/7(1)
+//       evidence (pm-ruling amendment 2026-07-18: the hard constraint governs —
+//       never mint a consent record without a traceable VERSIONED event).
+//
+// Applies ONLY to an adult (age >= 18 — the codebase's established adult
+// threshold, matching the bootstrap gate) account-OWNER (admin membership). The
+// caller's own server-derived person id is passed (never request-supplied), so
+// this is self-scoped and carries no cross-profile hazard.
+
+export type AdultSelfConsentRepairOutcome =
+  | 'not_applicable'
+  | 'already_present'
+  | 'repaired'
+  | 'needs_consent';
+
+interface CapturedVersionedTermsFact {
+  termsAcceptedAt: string;
+  termsVersion: string;
+}
+
+/**
+ * A GENUINELY captured versioned terms fact requires BOTH a real acceptance
+ * moment AND a non-empty version. An unversioned fact (version null/absent) is
+ * NOT a lawful repair source — see repairOrSignalAdultSelfConsentV2.
+ */
+function parseVersionedTermsFact(
+  value: unknown,
+): CapturedVersionedTermsFact | null {
+  if (!value || typeof value !== 'object') return null;
+  const fact = value as Record<string, unknown>;
+  const acceptedAt = fact['termsAcceptedAt'];
+  const version = fact['termsVersion'];
+  if (
+    typeof acceptedAt === 'string' &&
+    acceptedAt.length > 0 &&
+    typeof version === 'string' &&
+    version.length > 0
+  ) {
+    return { termsAcceptedAt: acceptedAt, termsVersion: version };
+  }
+  return null;
+}
+
+export async function repairOrSignalAdultSelfConsentV2(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+): Promise<AdultSelfConsentRepairOutcome> {
+  // Gate: adult (18+) account-OWNER only. A non-owner (managed-child login) or a
+  // minor owner never receives an adult self-consent record.
+  const membershipRow = await db.query.membership.findFirst({
+    where: and(
+      eq(membership.personId, chargePersonId),
+      eq(membership.organizationId, organizationId),
+    ),
+    columns: { roles: true },
+  });
+  if (!membershipRow?.roles.includes('admin')) return 'not_applicable';
+
+  const personRow = await db.query.person.findFirst({
+    where: eq(person.id, chargePersonId),
+    columns: { birthDate: true },
+  });
+  if (!personRow) return 'not_applicable';
+  const birthYear = Number(String(personRow.birthDate).slice(0, 4));
+  if (!Number.isFinite(birthYear) || calculateAge(birthYear) < 18) {
+    return 'not_applicable';
+  }
+
+  // Already bootstrapped (case b) or previously repaired — nothing to do.
+  const existing = await db.query.consentGrant.findFirst({
+    where: and(
+      eq(consentGrant.chargePersonId, chargePersonId),
+      eq(consentGrant.lawfulBasis, 'art6_1_a'),
+    ),
+    columns: { id: true },
+  });
+  if (existing) return 'already_present';
+
+  // The ONLY lawful repair source: a genuinely captured VERSIONED terms fact on
+  // a prior grant for this person.
+  const priorGrants = await db.query.consentGrant.findMany({
+    where: eq(consentGrant.chargePersonId, chargePersonId),
+    columns: { auditFact: true },
+  });
+  let versioned: CapturedVersionedTermsFact | null = null;
+  for (const g of priorGrants) {
+    versioned = parseVersionedTermsFact(g.auditFact);
+    if (versioned) break;
+  }
+  if (!versioned) return 'needs_consent'; // (c) never fabricate
+
+  // (a) Repair from the captured versioned fact. Legacy purpose only.
+  await db.insert(consentGrant).values({
+    chargePersonId,
+    organizationId,
+    purpose: DEFAULT_CONSENT_PURPOSE,
+    lawfulBasis: 'art6_1_a',
+    granted: true,
+    grantedAt: new Date(),
+    auditFact: {
+      source: 'adult_self_consent_repair',
+      termsAcceptedAt: versioned.termsAcceptedAt,
+      termsVersion: versioned.termsVersion,
+      // Provenance: the ORIGINAL terms-acceptance event this record derives from.
+      repairedFromEventAt: versioned.termsAcceptedAt,
+    },
+  });
+  return 'repaired'; // (a)
 }
 
 // ---------------------------------------------------------------------------
