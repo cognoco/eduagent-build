@@ -146,6 +146,8 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
     }
   });
 
+  // `not-run` models the workflow's pre-suite early exit; classifyFailure
+  // never emits it. These rows document the shared gate contract.
   it.each([
     [
       'preflight unavailable neutral',

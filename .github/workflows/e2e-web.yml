@@ -118,6 +118,8 @@ jobs:
       EXPO_PUBLIC_ENABLE_MODE_NAV: 'true'
       EXPO_PUBLIC_ENABLE_MODE_NAV_V1: 'true'
       EXPO_PUBLIC_ENABLE_MODE_NAV_V2: 'true'
+      # Repository variable with a non-empty staging fallback; the canary and
+      # exported app deliberately share this exact API target.
       PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
       PLAYWRIGHT_SKIP_LOCAL_API: '1'
       # [BUG-326] Worker-count discriminator. The Playwright config
@@ -213,6 +215,7 @@ jobs:
             node scripts/playwright-staging-gate.cjs --classify apps/mobile/e2e-web/test-results \"\${SUITE_STATUS}\" \"\${RUNNER_TEMP}/playwright-result.log\"; \
             CLASSIFY_STATUS=\$?; \
             set -e; \
+            # Keep this runtime decision aligned with decide() in playwright-staging-gate.cjs. \
             if [ \"\${SUITE_STATUS}\" -eq 0 ]; then exit 0; fi; \
             if [ \"\${CLASSIFY_STATUS}\" -eq 0 ] && [ \"\${POST_STATE}\" = 'confirmed-unavailable' ]; then \
               echo 'Playwright failure had a trace-backed staging transport signal and confirmed postflight outage; neutral pass-through.'; \
