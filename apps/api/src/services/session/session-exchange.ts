@@ -1974,7 +1974,7 @@ interface ExchangePrep {
  * (canon R5). Runs BEFORE checkExchangeLimit / prepareExchangeContext so a
  * withdrawn-consent profile's request never reaches LLM dispatch.
  */
-export async function assertExchangeConsent(
+async function assertExchangeConsent(
   db: Database,
   profileId: string,
 ): Promise<void> {
