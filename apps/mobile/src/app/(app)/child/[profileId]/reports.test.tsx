@@ -13,6 +13,7 @@ jest.mock('react-i18next', () => ({
       }
       return key;
     },
+    i18n: { language: 'en-US' },
   }),
 }));
 
@@ -78,6 +79,9 @@ describe('ChildReportsScreen', () => {
     jest.clearAllMocks();
     mockUseChildDetail.mockReturnValue({
       data: { displayName: 'Emma', profileId: 'child-001' },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
     });
     mockUseChildWeeklyReports.mockReturnValue({
       data: undefined,
@@ -166,11 +170,64 @@ describe('ChildReportsScreen', () => {
       expect(screen.queryByTestId('child-reports-empty')).toBeNull();
     });
 
-    it('falls back to "Your child" when child detail is not loaded', () => {
-      mockUseChildDetail.mockReturnValue({ data: null });
+    it('[WI-2186] waits for timezone provenance before showing a dated empty expectation', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-06-08T10:00:00.000Z'));
+
+      try {
+        mockUseChildWeeklyReports.mockReturnValue({
+          data: [],
+          isLoading: false,
+          isError: false,
+          refetch: jest.fn(),
+        });
+        mockUseChildDetail.mockReturnValue({
+          data: undefined,
+          isLoading: true,
+          isError: false,
+          refetch: jest.fn(),
+        });
+
+        const view = render(<ChildReportsScreen />);
+
+        screen.getByText('parentView.reports.loadingReports');
+        expect(
+          screen.queryByTestId('child-reports-empty-time-context'),
+        ).toBeNull();
+        expect(screen.queryByText(/June 15/)).toBeNull();
+
+        mockUseChildDetail.mockReturnValue({
+          data: {
+            displayName: 'Emma',
+            profileId: 'child-001',
+            organizationTimezone: 'America/Los_Angeles',
+          },
+          isLoading: false,
+          isError: false,
+          refetch: jest.fn(),
+        });
+        view.rerender(<ChildReportsScreen />);
+
+        screen.getByText(
+          'parentView.reports.firstCombinedReportOn:{"name":"Emma","date":"June 8, 2026"}',
+        );
+        expect(screen.queryByText(/June 15/)).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('uses the UTC/name fallback after child detail successfully resolves null', () => {
+      mockUseChildDetail.mockReturnValue({
+        data: null,
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
 
       render(<ChildReportsScreen />);
 
+      screen.getByTestId('child-reports-empty-time-context');
       screen.getByText(
         'parentView.reports.seeProgressNow:{"name":"parentView.index.yourChild"}',
       );
@@ -193,6 +250,31 @@ describe('ChildReportsScreen', () => {
   });
 
   describe('error state', () => {
+    it('[WI-2186] keeps failed timezone provenance distinct from an empty report state', () => {
+      const childRefetch = jest.fn();
+      mockUseChildDetail.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        refetch: childRefetch,
+      });
+      mockUseChildReports.mockReturnValue({
+        data: [],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<ChildReportsScreen />);
+
+      screen.getByTestId('child-reports-error');
+      expect(
+        screen.queryByTestId('child-reports-empty-time-context'),
+      ).toBeNull();
+      fireEvent.press(screen.getByTestId('child-reports-error-retry'));
+      expect(childRefetch).toHaveBeenCalled();
+    });
+
     it('renders error card with retry and back buttons', () => {
       const refetch = jest.fn();
       mockUseChildReports.mockReturnValue({

@@ -171,7 +171,12 @@ export default function ChildReportsScreen(): React.ReactElement {
   const profileId = Array.isArray(rawProfileId)
     ? rawProfileId[0]
     : rawProfileId;
-  const { data: child } = useChildDetail(profileId);
+  const {
+    data: child,
+    isLoading: childLoading,
+    isError: childError,
+    refetch: childRefetch,
+  } = useChildDetail(profileId);
   const {
     data: reports,
     isLoading,
@@ -189,14 +194,15 @@ export default function ChildReportsScreen(): React.ReactElement {
     string | null
   >(null);
 
-  const combinedLoading = isLoading || weeklyLoading;
   const hasAnyData =
     (reports?.length ?? 0) > 0 || (weeklyReports?.length ?? 0) > 0;
+  const combinedLoading =
+    isLoading || weeklyLoading || (!hasAnyData && childLoading);
   // [CCR finding, 2026-05-14] Prior version was `!hasAnyData && isError`,
   // which silently swallowed weekly-only failures: weekly down + monthly up
   // showed neither an error banner nor a retry path. The retry handler
-  // already calls both refetches, so widening this condition is sufficient.
-  const combinedError = !hasAnyData && (isError || weeklyError);
+  // calls each backing query's refetch, so widening this condition is sufficient.
+  const combinedError = !hasAnyData && (isError || weeklyError || childError);
   const latestWeeklyReport = weeklyReports?.[0];
   const selectedWeeklyReport = useMemo(() => {
     if (!weeklyReports?.length) return undefined;
@@ -304,6 +310,7 @@ export default function ChildReportsScreen(): React.ReactElement {
           <View className="flex-row gap-3 mt-4">
             <Pressable
               onPress={() => {
+                void childRefetch();
                 void refetch();
                 void weeklyRefetch();
               }}
