@@ -234,6 +234,10 @@ jobs:
             EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID
           )
           output=$(eas env:list preview)
+          if ! grep -qE '^[A-Z_]+=' <<<"$output"; then
+            printf 'ERROR: unexpected eas env:list output format — cannot verify required env\n' >&2
+            exit 1
+          fi
           missing=()
           for key in "${required_env[@]}"; do
             if ! grep -q "^${key}=" <<<"$output"; then
@@ -290,6 +294,8 @@ jobs:
         # actually reads at build time — not a GitHub Actions secret, which is
         # a different value store the EAS builder never sees.
         working-directory: apps/mobile
+        env:
+          EAS_PROFILE: ${{ inputs.profile }}
         run: |
           required_env=(
             EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY
@@ -297,7 +303,11 @@ jobs:
             EXPO_PUBLIC_REVENUECAT_API_KEY_IOS
             EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID
           )
-          output=$(eas env:list "${{ inputs.profile }}")
+          output=$(eas env:list "$EAS_PROFILE")
+          if ! grep -qE '^[A-Z_]+=' <<<"$output"; then
+            printf 'ERROR: unexpected eas env:list output format — cannot verify required env\n' >&2
+            exit 1
+          fi
           missing=()
           for key in "${required_env[@]}"; do
             if ! grep -q "^${key}=" <<<"$output"; then
@@ -305,12 +315,15 @@ jobs:
             fi
           done
           if [ "${#missing[@]}" -ne 0 ]; then
-            printf 'ERROR: required EAS %s environment variables are not configured: %s\n' "${{ inputs.profile }}" "${missing[*]}" >&2
+            printf 'ERROR: required EAS %s environment variables are not configured: %s\n' "$EAS_PROFILE" "${missing[*]}" >&2
             exit 1
           fi
 
       - name: Build with EAS
         working-directory: apps/mobile
+        env:
+          EAS_PROFILE: ${{ inputs.profile }}
+          EAS_PLATFORM: ${{ inputs.platform }}
         run: |
-          echo "Building with profile: ${{ inputs.profile }}, platform: ${{ inputs.platform }}"
-          eas build --profile ${{ inputs.profile }} --platform ${{ inputs.platform }} --non-interactive
+          echo "Building with profile: $EAS_PROFILE, platform: $EAS_PLATFORM"
+          eas build --profile "$EAS_PROFILE" --platform "$EAS_PLATFORM" --non-interactive
