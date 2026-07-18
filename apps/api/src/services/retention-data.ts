@@ -760,10 +760,16 @@ export async function getTopicRetention(
  * separate pre-check window). Self-scope callers pass nothing and are
  * unaffected.
  *
- * Guarding only the primary query is complete: the two follow-up reads
- * (`findOwnedCurriculumTopics`, `assessments.findMany`) are keyed on
- * `topicIds`/`ownedTopicIds` derived from this guarded result, so an empty
- * primary yields no topic ids and neither follow-up query runs.
+ * The read runs three statements; the guard is applied to the two that read
+ * revoke-sensitive data, so every emitted field is read under the guard:
+ *  - primary `learningSessions` query — gates topic eligibility (all core card
+ *    fields: topicId, subject, title, lastStudiedAt);
+ *  - `assessments.findMany` — gates `activeAssessmentId`, the only emitted field
+ *    read after the primary query, closing the between-statement window.
+ * `findOwnedCurriculumTopics` is intentionally left unguarded: it re-reads
+ * curriculum metadata keyed on `profileId` + `topicIds`, which a revoke does not
+ * mutate, and it can only drop a card (its result feeds the ownership filter),
+ * never add revoke-sensitive data.
  */
 export async function getAssessmentEligibleTopics(
   db: Database,
@@ -826,6 +832,11 @@ export async function getAssessmentEligibleTopics(
       and(
         inArray(assessments.topicId, ownedTopicIds),
         eq(assessments.status, 'in_progress'),
+        // [WI-2237] activeAssessmentId is the only emitted field read after the
+        // primary query, so it carries the same accepted-visibility guard —
+        // otherwise a revoke landing between the primary read and this one could
+        // still attach an active assessment id to the challenge-ready card.
+        accessGuard,
       ),
     );
     for (const assessment of activeAssessments

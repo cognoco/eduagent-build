@@ -840,9 +840,10 @@ async function collectChallengeReadyCandidates(
   // [WI-2237] The accepted-visibility authorization is now embedded in the
   // eligibility read itself: `getAssessmentEligibleTopics` injects `accessGuard`
   // (the same correlated `acceptedSupporterAccessExists` EXISTS threaded to the
-  // other supporter-scoped reads in this file) into its primary query WHERE, so
-  // the read is default-deny within the SAME query — a revoke/restamp/lapse is
-  // honored by the read, not by an earlier separate pre-check.
+  // other supporter-scoped reads in this file) into the WHERE of every statement
+  // that reads revoke-sensitive data, so the read is default-deny — a
+  // revoke/restamp/lapse is honored by the read, not by an earlier separate
+  // pre-check.
   const rows = await getAssessmentEligibleTopics(db, profileId, accessGuard);
 
   return rows.slice(0, 20).map((row) => ({

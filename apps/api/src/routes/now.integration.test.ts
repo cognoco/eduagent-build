@@ -694,7 +694,12 @@ describe('Integration: now routes', () => {
   // due), so the sole possible candidate is a challenge_ready card — reverting
   // the in-query guard in `getAssessmentEligibleTopics` makes a NON-ACCEPTED
   // edge leak that card (RED), while every sibling read stays empty (nothing
-  // is seeded for them). The read seam (`collectCandidatesForRequest`,
+  // is seeded for them). getAssessmentEligibleTopics guards BOTH revoke-sensitive
+  // statements — the primary eligibility query (exercised here) and the
+  // activeAssessmentId assessments read; that second, between-statement axis is
+  // correct-by-construction (identical accepted-visibility WHERE leg) and is not
+  // deterministically schedulable through this seam, so it is not separately
+  // asserted. The read seam (`collectCandidatesForRequest`,
   // exported test-only) is called DIRECTLY with a stale personId/edgeId/viewer,
   // bypassing `resolveNowTarget`, which reproduces the exact intra-call TOCTOU
   // vector Codex flagged: a revoke landing between the outer pre-check and the
