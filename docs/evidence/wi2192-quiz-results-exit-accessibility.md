@@ -153,7 +153,7 @@ focus callback was registered; the callback is only a boundary driver at
 `apps/mobile/src/app/(app)/quiz/results.test.tsx:342`.
 
 With the production focus reset at
-`apps/mobile/src/app/(app)/quiz/results.tsx:29`, the exact case passed:
+`apps/mobile/src/app/(app)/quiz/results.tsx:33`, the exact case passed:
 
 ```text
 PASS apps/mobile/src/app/(app)/quiz/results.test.tsx
