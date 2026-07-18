@@ -42,15 +42,15 @@ const easJson = JSON.parse(
 // job not listed here would silently skip public-env guard coverage.
 const NATIVE_BUILD_JOBS = ['build-preview', 'build-manual'] as const;
 
-const REQUIRED_PUBLIC_BUILD_ENV = {
-  EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY:
-    '${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}',
-  EXPO_PUBLIC_SENTRY_DSN: '${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}',
-  EXPO_PUBLIC_REVENUECAT_API_KEY_IOS:
-    '${{ secrets.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS }}',
-  EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID:
-    '${{ secrets.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID }}',
-};
+// Client-side keys that must be present in the real EAS Environment Variable
+// store (not a GitHub Actions secret — see WI-2301) before a native build
+// ships, and must never appear in the committed eas.json.
+const REQUIRED_EAS_ENV_KEYS = [
+  'EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY',
+  'EXPO_PUBLIC_SENTRY_DSN',
+  'EXPO_PUBLIC_REVENUECAT_API_KEY_IOS',
+  'EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID',
+] as const;
 
 const EAS_PROFILE_ENVIRONMENTS = {
   development: 'development',
@@ -68,23 +68,28 @@ function getJob(name: (typeof NATIVE_BUILD_JOBS)[number]): WorkflowJob {
 
 describe('Mobile CI native build public Expo env', () => {
   it.each(NATIVE_BUILD_JOBS)(
-    'injects denied public Expo keys into %s',
+    'does not source denied public Expo keys from GH secrets into %s job env',
     (jobName) => {
-      expect(getJob(jobName).env).toEqual(
-        expect.objectContaining(REQUIRED_PUBLIC_BUILD_ENV),
-      );
+      // WI-2301: a GH-secret-sourced job env var is a different value store
+      // than the EAS Environment Variables the cloud `eas build` job reads —
+      // setting it here never reaches the builder. Guards against
+      // reintroducing that dead/misleading pattern.
+      const env = getJob(jobName).env ?? {};
+      for (const key of REQUIRED_EAS_ENV_KEYS) {
+        expect(env).not.toHaveProperty(key);
+      }
     },
   );
 
   it.each(NATIVE_BUILD_JOBS)(
-    'checks denied public Expo keys before EAS build in %s',
+    'verifies required EAS env vars before EAS build in %s',
     (jobName) => {
       const steps = getJob(jobName).steps ?? [];
       const buildStepIndex = steps.findIndex((step) =>
         step.run?.includes('eas build'),
       );
-      const verifyStepIndex = steps.findIndex(
-        (step) => step.name === 'Verify Expo public build env',
+      const verifyStepIndex = steps.findIndex((step) =>
+        step.name?.startsWith('Verify EAS environment variables'),
       );
 
       expect(buildStepIndex).toBeGreaterThanOrEqual(0);
@@ -92,7 +97,8 @@ describe('Mobile CI native build public Expo env', () => {
       expect(verifyStepIndex).toBeLessThan(buildStepIndex);
 
       const verifyRun = steps[verifyStepIndex]?.run ?? '';
-      for (const key of Object.keys(REQUIRED_PUBLIC_BUILD_ENV)) {
+      expect(verifyRun).toContain('eas env:list');
+      for (const key of REQUIRED_EAS_ENV_KEYS) {
         expect(verifyRun).toContain(key);
       }
       expect(verifyRun).toContain('exit 1');
@@ -112,7 +118,7 @@ describe('EAS profile environment mapping', () => {
     'keeps denied public keys out of committed %s eas.json env',
     (profile) => {
       const env = easJson.build[profile]?.env ?? {};
-      for (const key of Object.keys(REQUIRED_PUBLIC_BUILD_ENV)) {
+      for (const key of REQUIRED_EAS_ENV_KEYS) {
         expect(env).not.toHaveProperty(key);
       }
     },
