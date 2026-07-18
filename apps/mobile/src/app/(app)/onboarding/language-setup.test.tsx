@@ -149,6 +149,7 @@ jest.mock(
 jest.mock(
   '../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,
   () => ({
+    ...jest.requireActual('../../../lib/navigation'),
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
   }),
 );
@@ -205,6 +206,17 @@ describe('LanguageSetup', () => {
     );
   });
 
+  it('uses Subjects as the Back fallback for a V2 Subjects entry', () => {
+    mockReturnTo = 'subjects';
+    render(<LanguageSetup />);
+
+    fireEvent.press(screen.getByTestId('language-setup-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/subjects',
+    );
+  });
+
   it('shows validation error for "Other" language without custom input', async () => {
     render(<LanguageSetup />);
 
@@ -234,6 +246,20 @@ describe('LanguageSetup', () => {
           topicId: 'topic-1',
           subjectName: 'Spanish',
         },
+      });
+    });
+  });
+
+  it('forwards a V2 Subjects return target to the first language session', async () => {
+    mockReturnTo = 'subjects';
+    render(<LanguageSetup />);
+
+    fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: expect.objectContaining({ returnTo: 'subjects' }),
       });
     });
   });
@@ -323,6 +349,38 @@ describe('LanguageSetup', () => {
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
       '/(app)/home',
+    );
+  });
+
+  it('routes error Cancel to Subjects for a V2 Subjects entry', async () => {
+    mockReturnTo = 'subjects';
+    mockMutateAsync.mockRejectedValue(new Error('save failed'));
+    render(<LanguageSetup />);
+
+    fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+    await waitFor(() => {
+      screen.getByTestId('language-setup-error-cancel');
+    });
+    fireEvent.press(screen.getByTestId('language-setup-error-cancel'));
+
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/subjects',
+    );
+  });
+
+  it('routes a missing-subject guard back to Subjects for a V2 Subjects entry', () => {
+    mockSubjectId = undefined;
+    mockReturnTo = 'subjects';
+    render(<LanguageSetup />);
+
+    screen.getByText('Go Back');
+    fireEvent.press(screen.getByTestId('language-setup-guard-home'));
+
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/subjects',
     );
   });
 

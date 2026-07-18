@@ -209,6 +209,27 @@ describe('SubjectsScreen', () => {
     });
   });
 
+  it.each([
+    ['empty', []],
+    ['populated', SUBJECTS],
+  ] as const)(
+    'routes the %s Me-scope Add action through the typed create-subject return contract',
+    (_state, subjects) => {
+      mockSubjectsIndex = {
+        ...mockSubjectsIndex,
+        subjects: [...subjects],
+      };
+
+      render(<SubjectsScreen />);
+      fireEvent.press(screen.getByTestId('subjects-browse-create'));
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/create-subject',
+        params: { returnTo: 'subjects' },
+      });
+    },
+  );
+
   it('renders retryable error state instead of a stub card', () => {
     mockSubjectsIndex = {
       subjects: [],

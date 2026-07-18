@@ -15,6 +15,7 @@ let mockParams: {
   topicId?: string;
   topicName?: string;
   rawInput?: string;
+  returnTo?: string;
 } = {
   subject: 'Marine biology',
   subjectId: 'subject-1',
@@ -159,6 +160,7 @@ describe('ReadyScreen', () => {
       topicId: 'topic-1',
       topicName: 'Coral reefs',
       rawInput: 'help me understand reefs',
+      returnTo: 'subjects',
     };
     const activeProfile = createTestProfile({
       id: 'profile-1',
@@ -186,6 +188,7 @@ describe('ReadyScreen', () => {
         topicId: 'topic-1',
         topicName: 'Coral reefs',
         rawInput: 'help me understand reefs',
+        returnTo: 'subjects',
       },
     });
   });

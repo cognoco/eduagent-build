@@ -29,7 +29,12 @@ import { MagicPenAnimation } from '../components/common/MagicPenAnimation';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError, extractApiErrorCode } from '../lib/format-api-error';
 import { errorHasCode } from '../components/session/session-types';
-import { homeHrefForReturnTo, goBackOrReplace } from '../lib/navigation';
+import {
+  homeHrefForReturnTo,
+  goBackOrReplace,
+  SUBJECTS_HREF,
+  SUBJECTS_RETURN_TO,
+} from '../lib/navigation';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import type { LearningSession, SubjectResolveResult } from '@eduagent/schemas';
@@ -186,6 +191,7 @@ function CreateSubjectScreenAuthenticated() {
                 ...(data.session.topicId
                   ? { topicId: data.session.topicId }
                   : {}),
+                ...(returnTo ? { returnTo } : {}),
               },
             } as Href);
             return;
@@ -198,6 +204,7 @@ function CreateSubjectScreenAuthenticated() {
               subjectName: input.subjectName,
               sessionId: data.session.id,
               topicId: data.session.topicId ?? undefined,
+              ...(returnTo ? { returnTo } : {}),
             },
           } as Href);
           return;
@@ -226,6 +233,7 @@ function CreateSubjectScreenAuthenticated() {
               ? { topicName: input.fallbackTopicName }
               : {}),
             ...(input.rawInput ? { rawInput: input.rawInput } : {}),
+            ...(returnTo ? { returnTo } : {}),
           },
         } as Href);
         return;
@@ -240,10 +248,11 @@ function CreateSubjectScreenAuthenticated() {
             ? { topicName: input.fallbackTopicName }
             : {}),
           ...(input.rawInput ? { rawInput: input.rawInput } : {}),
+          ...(returnTo ? { returnTo } : {}),
         },
       } as Href);
     },
-    [apiClient, router],
+    [apiClient, returnTo, router],
   );
 
   // [M4] 30s timeout on resolve phase — show error + retry
@@ -385,6 +394,7 @@ function CreateSubjectScreenAuthenticated() {
                 : {}),
               step: '1',
               totalSteps: '1',
+              ...(returnTo ? { returnTo } : {}),
             },
           } as Href);
           return;
@@ -622,6 +632,8 @@ function CreateSubjectScreenAuthenticated() {
     if (returnTo === 'chat') {
       // [BUG-633 / M-1] Same defensive fallback as handleCancel.
       goBackOrReplace(router, '/(app)/home' as Href);
+    } else if (returnTo === SUBJECTS_RETURN_TO) {
+      router.replace(SUBJECTS_HREF as Href);
     } else {
       router.replace('/(app)/library' as Href);
     }
@@ -827,6 +839,7 @@ function CreateSubjectScreenAuthenticated() {
                             mode: 'learning',
                             subjectId: subject.id,
                             subjectName: subject.name,
+                            ...(returnTo ? { returnTo } : {}),
                           },
                         } as Href)
                       }

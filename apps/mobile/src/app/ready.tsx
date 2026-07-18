@@ -56,6 +56,7 @@ export default function ReadyScreen() {
     topicId?: string;
     topicName?: string;
     rawInput?: string;
+    returnTo?: string;
   }>();
 
   const subject = (params.subject ?? '').trim();
@@ -92,6 +93,7 @@ export default function ReadyScreen() {
     if (params.topicId) sessionParams.topicId = params.topicId;
     if (params.topicName) sessionParams.topicName = params.topicName;
     if (params.rawInput) sessionParams.rawInput = params.rawInput;
+    if (params.returnTo) sessionParams.returnTo = params.returnTo;
 
     router.replace({
       pathname: '/(app)/session',
@@ -105,6 +107,7 @@ export default function ReadyScreen() {
     params.topicId,
     params.topicName,
     params.rawInput,
+    params.returnTo,
   ]);
 
   // /ready always runs as the learner whose profile is now active —

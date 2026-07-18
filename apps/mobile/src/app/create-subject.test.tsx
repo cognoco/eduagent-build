@@ -1084,6 +1084,136 @@ describe('CreateSubjectScreen', () => {
     });
   });
 
+  it('forwards the Subjects return target through the first-subject ready step', async () => {
+    mockSearchParams = { returnTo: 'subjects' };
+    setResolveResponse({
+      status: 'direct_match',
+      resolvedName: 'Math',
+      suggestions: [],
+      displayMessage: 'Math works.',
+    });
+    createSubjectResponse = {
+      subject: makeSubject({ id: SUBJECT_IDS.math, name: 'Math' }),
+      structureType: 'narrow',
+    };
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+    await enterSubjectName('Math');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/ready',
+        params: {
+          subject: 'Math',
+          subjectId: SUBJECT_IDS.math,
+          sessionId: SESSION_IDS.first,
+          topicId: TOPIC_IDS.first,
+          returnTo: 'subjects',
+        },
+      });
+    });
+  });
+
+  it.each([
+    ['narrow', undefined],
+    ['focused_book', BOOK_IDS.easter],
+  ] as const)(
+    'forwards the Subjects return target into a returning learner %s session',
+    async (structureType, bookId) => {
+      mockSearchParams = { returnTo: 'subjects' };
+      subjectsListData = [
+        makeSubject({ id: SUBJECT_IDS.history, name: 'History' }),
+      ];
+      setResolveResponse({
+        status: 'direct_match',
+        resolvedName: 'Math',
+        suggestions: [],
+        displayMessage: 'Math works.',
+      });
+      createSubjectResponse = {
+        subject: makeSubject({ id: SUBJECT_IDS.math, name: 'Math' }),
+        structureType,
+        ...(bookId ? { bookId, bookTitle: 'Fractions' } : {}),
+      };
+
+      render(<CreateSubjectScreen />, { wrapper: Wrapper });
+      await enterSubjectName('Math');
+      fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith({
+          pathname: '/(app)/session',
+          params: expect.objectContaining({
+            mode: 'learning',
+            subjectId: SUBJECT_IDS.math,
+            subjectName: 'Math',
+            returnTo: 'subjects',
+          }),
+        });
+      });
+    },
+  );
+
+  it('forwards the Subjects return target into language setup', async () => {
+    mockSearchParams = { returnTo: 'subjects' };
+    setResolveResponse({
+      status: 'direct_match',
+      resolvedName: 'Italian',
+      suggestions: [],
+      displayMessage: 'Italian works.',
+    });
+    createSubjectResponse = {
+      subject: makeSubject({
+        id: SUBJECT_IDS.italian,
+        name: 'Italian',
+        pedagogyMode: 'four_strands',
+        languageCode: 'it',
+      }),
+      structureType: 'narrow',
+    };
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+    await enterSubjectName('Italian');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/onboarding/language-setup',
+        params: expect.objectContaining({
+          subjectId: SUBJECT_IDS.italian,
+          returnTo: 'subjects',
+        }),
+      });
+    });
+  });
+
+  it('keeps the broad structure flow on its created-subject picker destination', async () => {
+    mockSearchParams = { returnTo: 'subjects' };
+    setResolveResponse({
+      status: 'direct_match',
+      resolvedName: 'History',
+      suggestions: [],
+      displayMessage: 'History works.',
+    });
+    createSubjectResponse = {
+      subject: makeSubject({ id: SUBJECT_IDS.history, name: 'History' }),
+      structureType: 'broad',
+      bookCount: 6,
+    };
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+    await enterSubjectName('History');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/pick-book/[subjectId]',
+        params: { subjectId: SUBJECT_IDS.history },
+      });
+    });
+  });
+
   // ----------------------------------------------------------------
   // BUG-3: Cancel and subject-limit buttons must route back to chat
   // when the screen was opened from a session (returnTo=chat).
@@ -1151,6 +1281,16 @@ describe('CreateSubjectScreen', () => {
     fireEvent.press(screen.getByTestId('create-subject-cancel'));
 
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('Cancel button returns to the V2 Subjects tab when opened from Subjects', () => {
+    mockSearchParams = { returnTo: 'subjects' };
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+    fireEvent.press(screen.getByTestId('create-subject-cancel'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
     expect(mockBack).not.toHaveBeenCalled();
   });
 
@@ -1228,6 +1368,31 @@ describe('CreateSubjectScreen', () => {
     fireEvent.press(screen.getByTestId('manage-subjects-button'));
 
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('subject-limit Manage returns to the V2 Subjects tab for a Subjects entry', async () => {
+    mockSearchParams = { returnTo: 'subjects' };
+    setResolveResponse({
+      status: 'direct_match',
+      resolvedName: 'Math',
+      suggestions: [],
+      displayMessage: 'Math works.',
+    });
+    createSubjectShouldError = true;
+    createSubjectErrorMessage = 'Request could not be completed.';
+    createSubjectErrorCode = 'SUBJECT_LIMIT_EXCEEDED';
+    createSubjectErrorStatus = 409;
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+    await enterSubjectName('Math');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      screen.getByTestId('manage-subjects-button');
+    });
+    fireEvent.press(screen.getByTestId('manage-subjects-button'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
   });
 
   it('[WI-855] typed SUBJECT_LIMIT_EXCEEDED shows delete-first guidance + manage button', async () => {
@@ -1433,6 +1598,31 @@ describe('CreateSubjectScreen', () => {
         mode: 'learning',
         subjectId: SUBJECT_IDS.continueMath,
         subjectName: 'Math',
+      },
+    });
+  });
+
+  it('keeps the Subjects return target when continuing an existing subject', async () => {
+    mockSearchParams = { returnTo: 'subjects' };
+    subjectsListData = [
+      makeSubject({ id: SUBJECT_IDS.continueMath, name: 'Math' }),
+    ];
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+    await waitFor(() => {
+      screen.getByTestId(`subject-continue-${SUBJECT_IDS.continueMath}`);
+    });
+    fireEvent.press(
+      screen.getByTestId(`subject-continue-${SUBJECT_IDS.continueMath}`),
+    );
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: SUBJECT_IDS.continueMath,
+        subjectName: 'Math',
+        returnTo: 'subjects',
       },
     });
   });
