@@ -3,6 +3,8 @@ import { AppState, Linking, Platform, type AppStateStatus } from 'react-native';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
+import { ProfileContext, type ProfileContextValue } from '../../../lib/profile';
+import { createTestProfile } from '../../../test-utils/screen-render';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -88,6 +90,7 @@ jest.mock(
       ToggleRow: ({
         label,
         description,
+        targetName,
         value,
         onToggle,
         disabled,
@@ -95,6 +98,7 @@ jest.mock(
       }: {
         label: string;
         description?: string;
+        targetName?: string;
         value: boolean;
         onToggle: (v: boolean) => void;
         disabled?: boolean;
@@ -102,11 +106,15 @@ jest.mock(
       }) => (
         <View testID={testID ? `row-${testID}` : undefined}>
           <Text>{label}</Text>
+          {targetName ? <Text>{targetName}</Text> : null}
           {description ? <Text>{description}</Text> : null}
           <Switch
             value={value}
             onValueChange={onToggle}
             disabled={disabled}
+            accessibilityLabel={[label, targetName, description]
+              .filter(Boolean)
+              .join('. ')}
             testID={testID}
           />
         </View>
@@ -114,16 +122,19 @@ jest.mock(
       SettingsRow: ({
         label,
         description,
+        targetName,
         onPress,
         testID,
       }: {
         label: string;
         description?: string;
+        targetName?: string;
         onPress?: () => void;
         testID?: string;
       }) => (
         <Pressable onPress={onPress} testID={testID}>
           <Text>{label}</Text>
+          {targetName ? <Text>{targetName}</Text> : null}
           {description ? <Text>{description}</Text> : null}
         </Pressable>
       ),
@@ -135,11 +146,29 @@ function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
+  const owner = createTestProfile({
+    id: 'owner-1',
+    displayName: 'Owner',
+    isOwner: true,
+  });
+  const profileValue: ProfileContextValue = {
+    profiles: [owner],
+    activeProfile: owner,
+    isExplicitProxyMode: false,
+    switchProfile: async () => ({ success: true }),
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
+  };
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return React.createElement(
       QueryClientProvider,
       { client: queryClient },
-      children,
+      React.createElement(ProfileContext.Provider, {
+        value: profileValue,
+        children,
+      }),
     );
   };
 }
@@ -206,6 +235,18 @@ describe('NotificationsScreen', () => {
     getByTestId('weekly-digest-toggle');
     getByTestId('weekly-email-digest-toggle');
     getByTestId('monthly-email-digest-toggle');
+  });
+
+  it('names the owner target on every global notification mutation', async () => {
+    const { getByTestId, getAllByText } = await renderNotificationsScreen();
+
+    expect(getAllByText('Owner')).toHaveLength(4);
+    expect(getByTestId('weekly-digest-toggle').props.accessibilityLabel).toBe(
+      'Weekly progress digest. Owner',
+    );
+    expect(
+      getByTestId('monthly-email-digest-toggle').props.accessibilityLabel,
+    ).toContain('Owner');
   });
 
   it('reflects pushEnabled=false from prefs', async () => {

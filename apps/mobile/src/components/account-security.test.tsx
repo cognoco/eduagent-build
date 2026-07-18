@@ -58,6 +58,23 @@ describe('AccountSecurity', () => {
     screen.getByTestId('manage-devices-row');
   });
 
+  it('visibly and accessibly names the owner on every security mutation', () => {
+    active = renderWithProviders(
+      <AccountSecurity visible targetName="Owner" />,
+    );
+
+    expect(screen.getAllByText('Owner')).toHaveLength(3);
+    expect(
+      screen.getByTestId('change-password-row').props.accessibilityLabel,
+    ).toBe('Change Password. Owner');
+    expect(
+      screen.getByTestId('change-email-row').props.accessibilityLabel,
+    ).toBe('Change email. Owner');
+    expect(
+      screen.getByTestId('manage-devices-row').props.accessibilityLabel,
+    ).toBe('Manage devices. Owner');
+  });
+
   it('[auth-3] shows Add password row for SSO users instead of only a provider note', () => {
     mockUser = {
       passwordEnabled: false,

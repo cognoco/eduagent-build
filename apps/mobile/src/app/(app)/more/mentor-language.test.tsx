@@ -229,6 +229,23 @@ describe('MentorLanguageScreen', () => {
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
     });
+    active.result.getByTestId('mentor-language-access-pending');
+    expect(active.result.queryByTestId('mentor-language-option-de')).toBeNull();
+  });
+
+  it('fails closed for a stale direct child deep link outside the live profile list', async () => {
+    mockSearchParams = { childProfileId: 'stale-child' };
+    active = renderScreen(<MentorLanguageScreen />, {
+      profile: owner,
+      profiles: [owner],
+      routes: onboardingRoutes,
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
+    });
+    active.result.getByTestId('mentor-language-access-pending');
+    expect(active.result.queryByTestId('mentor-language-option-de')).toBeNull();
   });
 
   describe('back navigation', () => {

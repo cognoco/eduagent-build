@@ -438,6 +438,27 @@ describe('AccommodationScreen', () => {
       expect(
         active.result.queryByText(/Mia's learning preferences/),
       ).toBeNull();
+      active.result.getByTestId('accommodation-access-pending');
+      expect(
+        active.result.queryByTestId('accommodation-mode-short-burst'),
+      ).toBeNull();
+    });
+
+    it('fails closed for a stale direct child deep link outside the live profile list', async () => {
+      mockSearchParams = { childProfileId: 'stale-child' };
+      active = renderScreen(<AccommodationScreen />, {
+        profile: owner,
+        profiles: [owner],
+        routes: modeRoute('none'),
+      });
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
+      });
+      active.result.getByTestId('accommodation-access-pending');
+      expect(
+        active.result.queryByTestId('accommodation-mode-short-burst'),
+      ).toBeNull();
     });
   });
 

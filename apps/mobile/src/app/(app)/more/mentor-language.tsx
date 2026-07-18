@@ -95,6 +95,15 @@ export default function MentorLanguageScreen(): React.ReactElement {
     ],
   );
 
+  if (isChildMode && !canEditChildPreferences) {
+    return (
+      <View
+        className="flex-1 bg-background"
+        testID="mentor-language-access-pending"
+      />
+    );
+  }
+
   const title = canEditChildPreferences
     ? t('more.mentorLanguage.childScreenTitle', {
         name: childProfile?.displayName,

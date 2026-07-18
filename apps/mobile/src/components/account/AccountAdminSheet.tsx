@@ -8,12 +8,13 @@ import {
 } from 'react-native';
 import { useAuth } from '@clerk/expo';
 import { useQueryClient } from '@tanstack/react-query';
-import { type Href, useRouter } from 'expo-router';
+import { Redirect, type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { platformAlert } from '../../lib/platform-alert';
 import { useProfile } from '../../lib/profile';
+import { useScopeContext } from '../../lib/scope-context';
 import {
   ClerkSignOutTimeoutError,
   signOutWithCleanup,
@@ -26,10 +27,32 @@ export function AccountAdminSheet(): React.ReactElement {
   const queryClient = useQueryClient();
   const { signOut, userId } = useAuth();
   const { activeProfile, profiles } = useProfile();
+  const {
+    activeScope,
+    availableScopes,
+    isLoading: isScopeLoading,
+  } = useScopeContext();
   const navigationContract = useNavigationContract();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const displayName = activeProfile?.displayName ?? t('more.account.profile');
+  const activePersonScope =
+    activeScope.kind === 'person' ? activeScope : undefined;
+  const selectedPersonScope = activePersonScope
+    ? availableScopes.find(
+        (scope) =>
+          scope.kind === 'person' &&
+          scope.personId === activePersonScope.personId &&
+          scope.edgeId === activePersonScope.edgeId,
+      )
+    : undefined;
+  const authorizedLearnerScope =
+    selectedPersonScope?.kind === 'person' ? selectedPersonScope : undefined;
+  const learnerTargetName = authorizedLearnerScope?.displayName ?? displayName;
+  const showLearnerSettings =
+    !isScopeLoading &&
+    (activeScope.kind !== 'person' || authorizedLearnerScope !== undefined);
+  const learnerProfileId = authorizedLearnerScope?.personId;
 
   const handleSignOut = useCallback(async () => {
     if (isSigningOut) return;
@@ -54,6 +77,10 @@ export function AccountAdminSheet(): React.ReactElement {
     }
   }, [isSigningOut, profiles, queryClient, router, signOut, t, userId]);
 
+  if (!navigationContract.gates.sessionIsOwner) {
+    return <Redirect href="/(app)/home" />;
+  }
+
   return (
     <ScrollView
       className="flex-1 px-5"
@@ -70,26 +97,52 @@ export function AccountAdminSheet(): React.ReactElement {
         </Text>
       </View>
 
-      <SectionHeader>
-        {t('more.learningPreferences.sectionHeader')}
-      </SectionHeader>
-      <SettingsRow
-        label={t('more.learningPreferences.rowLabel')}
-        onPress={() => router.push('/(app)/more/accommodation' as Href)}
-        testID="account-admin-learning-preferences"
-      />
-      <SettingsRow
-        label={t('more.mentorMemory.sectionHeader')}
-        onPress={() =>
-          router.push('/(app)/mentor-memory?returnTo=account' as Href)
-        }
-        testID="account-admin-mentor-memory"
-      />
-      <SettingsRow
-        label={t('more.account.mentorLanguage')}
-        onPress={() => router.push('/(app)/more/account' as Href)}
-        testID="account-admin-mentor-language"
-      />
+      {showLearnerSettings ? (
+        <>
+          <SectionHeader>
+            {t('more.learningPreferences.sectionHeader')}
+          </SectionHeader>
+          <SettingsRow
+            label={t('more.learningPreferences.rowLabel')}
+            targetName={learnerTargetName}
+            onPress={() =>
+              router.push(
+                learnerProfileId
+                  ? (`/(app)/more/accommodation?childProfileId=${learnerProfileId}` as Href)
+                  : ('/(app)/more/accommodation' as Href),
+              )
+            }
+            testID="account-admin-learning-preferences"
+          />
+          <SettingsRow
+            label={t('more.mentorMemory.sectionHeader')}
+            targetName={learnerTargetName}
+            onPress={() =>
+              router.push(
+                learnerProfileId
+                  ? ({
+                      pathname: '/(app)/child/[profileId]/mentor-memory',
+                      params: { profileId: learnerProfileId },
+                    } as Href)
+                  : ('/(app)/mentor-memory?returnTo=account' as Href),
+              )
+            }
+            testID="account-admin-mentor-memory"
+          />
+          <SettingsRow
+            label={t('more.account.mentorLanguage')}
+            targetName={learnerTargetName}
+            onPress={() =>
+              router.push(
+                learnerProfileId
+                  ? (`/(app)/more/mentor-language?childProfileId=${learnerProfileId}` as Href)
+                  : ('/(app)/more/mentor-language' as Href),
+              )
+            }
+            testID="account-admin-mentor-language"
+          />
+        </>
+      ) : null}
 
       <SectionHeader>{t('more.account.sectionHeader')}</SectionHeader>
       <SettingsRow
@@ -104,6 +157,7 @@ export function AccountAdminSheet(): React.ReactElement {
       {navigationContract.gates.showAccountSecurity ? (
         <SettingsRow
           label={t('accountAdmin.security')}
+          targetName={displayName}
           onPress={() => router.push('/(app)/more/account' as Href)}
           testID="account-admin-security"
         />
@@ -111,12 +165,14 @@ export function AccountAdminSheet(): React.ReactElement {
       {navigationContract.gates.showBilling ? (
         <SettingsRow
           label={t('more.account.subscription')}
+          targetName={displayName}
           onPress={() => router.push('/(app)/subscription' as Href)}
           testID="account-admin-subscription"
         />
       ) : null}
       <SettingsRow
         label={t('more.notifications.sectionHeader')}
+        targetName={displayName}
         onPress={() => router.push('/(app)/more/notifications' as Href)}
         testID="account-admin-notifications"
       />
@@ -149,11 +205,13 @@ export function AccountAdminSheet(): React.ReactElement {
       <SectionHeader>{t('more.sections.settings')}</SectionHeader>
       <SettingsRow
         label={t('more.privacy.privacyAndData')}
+        targetName={displayName}
         onPress={() => router.push('/(app)/more/privacy' as Href)}
         testID="account-admin-privacy"
       />
       <SettingsRow
         label={t('more.help.helpAndFeedback')}
+        targetName={displayName}
         onPress={() => router.push('/(app)/more/help' as Href)}
         testID="account-admin-help"
       />
@@ -165,7 +223,7 @@ export function AccountAdminSheet(): React.ReactElement {
           isSigningOut ? 'opacity-60' : ''
         }`}
         accessibilityRole="button"
-        accessibilityLabel={t('more.account.signOut')}
+        accessibilityLabel={`${t('more.account.signOut')}. ${displayName}`}
         accessibilityState={{ disabled: isSigningOut }}
         testID="account-admin-sign-out"
       >

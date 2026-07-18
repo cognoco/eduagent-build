@@ -8,6 +8,7 @@ import {
 } from '../../../hooks/use-settings';
 import { usePushTokenRegistration } from '../../../hooks/use-push-token-registration';
 import { platformAlert } from '../../../lib/platform-alert';
+import { useProfile } from '../../../lib/profile';
 import {
   SectionHeader,
   SettingsRow,
@@ -27,6 +28,8 @@ function hasNotificationPermission(
 
 export default function NotificationsScreen(): React.ReactElement {
   const { t } = useTranslation();
+  const { activeProfile } = useProfile();
+  const targetName = activeProfile?.displayName;
   const {
     data: notifPrefs,
     isLoading: notifLoading,
@@ -280,6 +283,7 @@ export default function NotificationsScreen(): React.ReactElement {
           <>
             <ToggleRow
               label={t('more.notifications.pushTitle')}
+              targetName={targetName}
               description={pushDescription}
               value={serverPushEnabled}
               onToggle={handleTogglePush}
@@ -289,6 +293,7 @@ export default function NotificationsScreen(): React.ReactElement {
             {openSettingsVisible ? (
               <SettingsRow
                 label={t('more.notifications.openSettingsTitle')}
+                targetName={targetName}
                 description={t('more.notifications.openSettingsDescription')}
                 onPress={() => {
                   void Linking.openSettings();
@@ -298,6 +303,7 @@ export default function NotificationsScreen(): React.ReactElement {
             ) : null}
             <ToggleRow
               label={t('more.notifications.weeklyDigestTitle')}
+              targetName={targetName}
               value={notifPrefs?.weeklyProgressPush ?? false}
               onToggle={handleToggleDigest}
               disabled={updateNotifications.isPending}
@@ -305,6 +311,7 @@ export default function NotificationsScreen(): React.ReactElement {
             />
             <ToggleRow
               label={t('more.notifications.weeklyEmailDigestTitle')}
+              targetName={targetName}
               description={t('more.notifications.emailDigestDescription')}
               value={notifPrefs?.weeklyProgressEmail ?? true}
               onToggle={handleToggleWeeklyEmailDigest}
@@ -313,6 +320,7 @@ export default function NotificationsScreen(): React.ReactElement {
             />
             <ToggleRow
               label={t('more.notifications.monthlyEmailDigestTitle')}
+              targetName={targetName}
               description={t('more.notifications.emailDigestDescription')}
               value={notifPrefs?.monthlyProgressEmail ?? true}
               onToggle={handleToggleMonthlyEmailDigest}
