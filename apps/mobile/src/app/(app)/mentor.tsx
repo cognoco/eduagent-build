@@ -122,7 +122,11 @@ function LearnerMentorScreen(): React.ReactElement {
     : null;
   const clarificationRevision = barClarification?.revision;
   useEffect(() => {
-    if (!clarificationAnnouncement || clarificationRevision === undefined) {
+    if (
+      Platform.OS !== 'ios' ||
+      !clarificationAnnouncement ||
+      clarificationRevision === undefined
+    ) {
       return;
     }
     announce(clarificationAnnouncement);

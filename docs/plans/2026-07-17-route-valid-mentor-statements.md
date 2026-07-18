@@ -10,7 +10,7 @@ status: complete
 # Route Valid Mentor Statements — Implementation Plan
 
 **Goal:** Ensure every enabled learner Mentor submission produces an observable result while preserving closed-catalog jumps and existing question-to-freeform routing.
-**Approach:** Drive the change through `LearnerMentorScreen` component behavior. Extend the deterministic matcher so substantive declaratives and explicit pedagogical requests become Mentor turns while short, ambiguous, unsupported-catalog, and unmatched navigation-style inputs remain uncertain; render and explicitly announce a revisioned clarification for the uncertain result. Consume the native window width to give the inline input a compact 360px layout contract without changing supporter/person dispatch or Challenge behavior.
+**Approach:** Drive the change through `LearnerMentorScreen` component behavior. Extend the deterministic matcher so substantive declaratives and explicit pedagogical requests become Mentor turns while short, ambiguous, unsupported-catalog, and unmatched navigation-style inputs remain uncertain; render a revisioned clarification for the uncertain result, explicitly announce each revision on iOS, and retain the polite live-region path without a duplicate explicit announcement on Android. Consume the native window width to give the inline input a compact 360px layout contract without changing supporter/person dispatch or Challenge behavior.
 
 ## Scope
 
@@ -30,7 +30,7 @@ Out of scope:
 
 ## Tasks
 
-- [x] T1: Add rework boundary regressions before production changes — done when focused Jest fails against reviewed production for exactly the missing behavior: `show me how photosynthesis works` does not yet preserve exact freeform `rawInput`; `progress report`, `journal entries`, and `subjects list` do not yet stay on clarification/closed-catalog handling; the 360px case does not yet observe a component-consumed compact layout; and repeated clarification revisions do not yet call the repository announcement path. Existing tests continue to characterize genuine navigation commands, literal and named catalog jumps, questions, arrow press, keyboard submit, and edit-then-submit.
+- [x] T1: Add rework boundary regressions before production changes — done when focused Jest fails against reviewed production for exactly the missing behavior: `show me how photosynthesis works` does not yet preserve exact freeform `rawInput`; `progress report`, `journal entries`, and `subjects list` do not yet stay on clarification/closed-catalog handling; the 360px case does not yet observe a component-consumed compact layout; repeated clarification revisions do not yet call the repository announcement path on iOS; and Android still receives duplicate explicit announcements in addition to its polite live region. Existing tests continue to characterize genuine navigation commands, literal and named catalog jumps, questions, arrow press, keyboard submit, and edit-then-submit.
 - [x] T2: Implement the minimum learner-only routing, clarification, and layout behavior — done when T1 passes using this concrete flow:
 
   ```text
@@ -53,9 +53,10 @@ Out of scope:
   LearnerMentorScreen clarification/layout:
     width = useWindowDimensions().width
     horizontalPadding = width <= 360 ? 12 : 20
-    when clarificationRevision is defined/changes:
+    when clarificationRevision is defined/changes AND Platform.OS == ios:
       useAnnounce()(clarificationLabel + submitted input)
-    render the same visible revision-keyed clarification and keep input/send inside ScrollView
+    render the same visible revision-keyed polite live region on every platform
+    keep input/send inside ScrollView
   ```
 
 - [x] T3: Preserve and extend Bug regression evidence honestly — done when the original immutable RED/GREEN/REVERT/RESTORE files and SHA matrix are unchanged, rework-cycle raw outputs record pre-fix RED, post-fix GREEN, production-only REVERT, and RESTORE, and the report distinguishes original committed proof from rework working-tree proof without claiming an uncreated commit.
@@ -63,7 +64,7 @@ Out of scope:
 
   ```bash
   rtk pnpm exec jest --runTestsByPath "$PWD/apps/mobile/src/lib/bar-intent-match.test.ts" --runInBand --no-coverage --testNamePattern 'pedagogical|unsupported destination|navigation|catalog'
-  rtk pnpm exec jest --runTestsByPath "$PWD/apps/mobile/src/app/(app)/mentor.test.tsx" --runInBand --no-coverage --testNamePattern 'photosynthesis|unsupported destination|small-screen-360|announces clarification'
+  rtk pnpm exec jest --runTestsByPath "$PWD/apps/mobile/src/app/(app)/mentor.test.tsx" --runInBand --no-coverage --testNamePattern 'photosynthesis|unsupported destination|small-screen-360|clarification'
   rtk pnpm exec jest --runTestsByPath "$PWD/apps/mobile/src/app/(app)/mentor.test.tsx" "$PWD/apps/mobile/src/components/mentor/MentorInputBar.test.tsx" "$PWD/apps/mobile/src/lib/bar-intent-match.test.ts" "$PWD/apps/mobile/src/lib/bar-intent-match.adversarial.test.ts" --runInBand --no-coverage
   rtk pnpm exec jest --runTestsByPath "$PWD/apps/mobile/src/app/(app)/mentor.test.tsx" --runInBand --no-coverage --testNamePattern 'small-screen-360'
   rtk pnpm exec nx run @eduagent/mobile:typecheck

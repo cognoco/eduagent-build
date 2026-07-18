@@ -217,3 +217,35 @@ A fresh `git fetch origin main` kept `origin/main` at `acfe90399eb5b38f13db205e6
 - Prospective authoritative audit — `splitAcItems()` returned only `AC-1`; claim indices 0–3 and the Bug red-green pointer each resolved to their exact canonical path against the final-to-be-tracked file set. The same audit is rerun against the committed reviewed revision after commit.
 
 The environment remains Node `v24.18.0` with pnpm `10.19.0` against the repository's Node 22 engine request. The engine warning was present on pnpm commands but no verification command failed.
+
+## External review rework cycle 2
+
+The unresolved PR 2230 review thread at `discussion_r3607204374` identified a platform-specific accessibility duplication in the rework-cycle-1 clarification repair. `LearnerMentorScreen` called `useAnnounce()` after every clarification revision on all native platforms while the rendered clarification already retained `accessibilityLiveRegion="polite"`. Because `useAnnounce()` calls `AccessibilityInfo.announceForAccessibility()` on Android as well as iOS, Android received both its native live-region notification and a second explicit announcement.
+
+The platform-sensitive tests were added before the production guard changed. The iOS expectation already passed against reviewed production, while Android failed for the intended reason: two clarification revisions produced two explicit calls even though both visible revisions retained the polite live-region path.
+
+| Phase | Production state | Result | Raw result |
+| --- | --- | --- | --- |
+| Rework-cycle-2 RED | Reviewed production with new platform-sensitive tests | 1 suite failed; 1 failed, 1 passed, 36 skipped, 38 total | [rework-2-red.json](rework-2-red.json) |
+| Rework-cycle-2 GREEN | Explicit announcement effect gated to iOS | 1 suite passed; 2 passed, 36 skipped, 38 total | [rework-2-green.json](rework-2-green.json) |
+
+RED and GREEN used the same focused command, changing only the output file after the production guard was applied:
+
+```bash
+rtk pnpm exec jest --runTestsByPath '/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/apps/mobile/src/app/(app)/mentor.test.tsx' --runInBand --no-coverage --testNamePattern 'explicitly on iOS|Android clarification' --json --outputFile='/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/docs/evidence/WI-2094/rework-2-red.json'
+```
+
+The production repair adds only the `Platform.OS !== 'ios'` early-return condition to the existing effect. The revisioned clarification state, visible localized label and submitted input, and `accessibilityLiveRegion="polite"` remain unchanged. The iOS test proves two successive revisions each call the explicit announcer; the Android test proves the same two visible revisions retain the polite live region and make zero explicit announcer calls. No matcher, routing, supporter/person dispatch, session, or Challenge behavior changed in this cycle.
+
+### Rework-cycle-2 final verification and main integration
+
+- Platform-sensitive focused GREEN — exit 0; 1 suite passed, with 2 selected cases passed and 36 skipped. Machine-readable output: [rework-2-green.json](rework-2-green.json).
+- Four impacted Mentor/matcher suites — exit 0; 4 suites and 76 tests passed with no snapshots.
+- Mobile typecheck — exit 0; the mobile target and six dependencies completed successfully from the Nx cache.
+- Mobile lint — exit 0; 0 errors and the unchanged 51-warning baseline. No warning points at either changed Mentor file.
+- `pnpm format:check` — exit 0; all three configured repository targets passed. A direct Prettier check of every changed source, test, WI artifact, JSON result, and Markdown file also passed.
+- `pnpm prepush` — exit 0; `tsc --build` completed successfully under the already-recorded Node 24 / repository Node 22 engine warning.
+- Both generated Jest result files and the evidence manifest parsed as JSON; staged and unstaged `git diff --check` returned no output.
+- Non-mutating `complete --validate` — exit 0; all four completion sections, all three prose trip-wires, evidence presence, and AC coverage reported `PASS`; no Notion writes were performed.
+
+A fresh `git fetch origin` resolved `origin/main` to `6dce228a9892ae6f90e87863bb18983d2ef75d5e`, one commit beyond merge base `ba9775edba0eaafa95f65ee1ccd072e744bc757c`. The history-preserving `git merge --no-commit --no-ff origin/main` completed without conflicts and left `MERGE_HEAD` exactly equal to the fetched main revision for the intentional final commit. The incoming delta is confined to the WI-2192 quiz-result accessibility repair, its web-E2E support, and a root package script; it changes no Mentor component, Mentor test, matcher, dependency lock, or WI-2094 artifact byte. Therefore the already-fresh behavior, type, lint, format, and pre-push gates remained applicable without repetition. Post-integration staged and unstaged diff hygiene, direct changed-file formatting, and non-mutating Cosmo validation were rerun and passed.

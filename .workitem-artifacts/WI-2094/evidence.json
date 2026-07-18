@@ -12,6 +12,11 @@
     },
     {
       "acRef": "AC-1",
+      "description": "Platform-sensitive review coverage proves every revised clarification is explicitly announced on iOS while Android makes no explicit announcement and retains the visible polite live region.",
+      "pointer": "docs/evidence/WI-2094/rework-2-green.json"
+    },
+    {
+      "acRef": "AC-1",
       "description": "The original immutable RED, GREEN, production-only REVERT, and RESTORE proof remains preserved and is extended with honestly labeled rework-cycle proof.",
       "pointer": "docs/evidence/WI-2094/report.md"
     },

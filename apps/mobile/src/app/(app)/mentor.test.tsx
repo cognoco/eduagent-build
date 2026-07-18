@@ -1,4 +1,4 @@
-import { AccessibilityInfo, Dimensions } from 'react-native';
+import { AccessibilityInfo, Dimensions, Platform } from 'react-native';
 import { fireEvent, screen, within } from '@testing-library/react-native';
 import type {
   NowCard,
@@ -530,7 +530,12 @@ describe('MentorScreen', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('announces clarification on every revision without announcing the initial empty state', () => {
+  it('announces every clarification revision explicitly on iOS without announcing the initial empty state', () => {
+    const originalPlatformOS = Platform.OS;
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'ios',
+    });
     const announce = jest
       .spyOn(AccessibilityInfo, 'announceForAccessibility')
       .mockImplementation(() => undefined);
@@ -555,6 +560,42 @@ describe('MentorScreen', () => {
       );
     } finally {
       announce.mockRestore();
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: originalPlatformOS,
+      });
+    }
+  });
+
+  it('keeps Android clarification on the polite live-region path without an explicit announcement', () => {
+    const originalPlatformOS = Platform.OS;
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+    const announce = jest
+      .spyOn(AccessibilityInfo, 'announceForAccessibility')
+      .mockImplementation(() => undefined);
+    try {
+      renderMentorScreen();
+
+      const input = screen.getByTestId('mentor-bar-input');
+      const send = screen.getByTestId('mentor-bar-send');
+      fireEvent.changeText(input, 'show my progress');
+      fireEvent.press(send);
+      expectVisibleClarification('show my progress');
+
+      fireEvent.changeText(input, 'take me to the library');
+      fireEvent.press(send);
+      expectVisibleClarification('take me to the library');
+
+      expect(announce).not.toHaveBeenCalled();
+    } finally {
+      announce.mockRestore();
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: originalPlatformOS,
+      });
     }
   });
 
