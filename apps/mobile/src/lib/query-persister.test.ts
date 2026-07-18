@@ -274,7 +274,7 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(shouldPersistQuery(topicProgress)).toBe(false);
   });
 
-  it('excludes library.conceptMastery (mentorAdditions prose) but allows library.retention (clean)', () => {
+  it('excludes library.conceptMastery (mentorAdditions prose) AND library.retention (retentionCardWithMetaSchema.topicTitle — raw learner content per pii-scrub.ts)', () => {
     const conceptMastery = makeSuccessfulQuery([
       'library',
       'concept-mastery',
@@ -288,7 +288,7 @@ describe('shouldPersistQuery [WI-1987]', () => {
       'retention',
       'profile-1',
     ]);
-    expect(shouldPersistQuery(retention)).toBe(true);
+    expect(shouldPersistQuery(retention)).toBe(false);
   });
 
   // [round 3 re-audit finding] The 2-element profile/profiles factory shapes
@@ -333,7 +333,7 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(shouldPersistQuery(query)).toBe(false);
   });
 
-  it('excludes retention.teaching-preference (nativeLanguage free text) while still persisting retention.subject/topic/evaluate-eligibility', () => {
+  it('excludes retention.subject/evaluate-eligibility (topicTitle — raw learner content per pii-scrub.ts) and retention.teaching-preference (nativeLanguage), persisting only retention.topic (card: uuid/number/enum/date)', () => {
     const teachingPreference = makeSuccessfulQuery([
       'retention',
       'teaching-preference',
@@ -346,12 +346,7 @@ describe('shouldPersistQuery [WI-1987]', () => {
       shouldPersistQuery(
         makeSuccessfulQuery(['retention', 'subject', 'subject-1', 'profile-1']),
       ),
-    ).toBe(true);
-    expect(
-      shouldPersistQuery(
-        makeSuccessfulQuery(['retention', 'topic', 'topic-1', 'profile-1']),
-      ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldPersistQuery(
         makeSuccessfulQuery([
@@ -360,6 +355,11 @@ describe('shouldPersistQuery [WI-1987]', () => {
           'topic-1',
           'profile-1',
         ]),
+      ),
+    ).toBe(false);
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery(['retention', 'topic', 'topic-1', 'profile-1']),
       ),
     ).toBe(true);
   });
@@ -409,8 +409,8 @@ describe('shouldPersistQuery [WI-1987]', () => {
     ).toBe(true);
   });
 
-  it('excludes progress.subject/overview/continue/resume-target/review-summary/overdue-topics/inventory/milestones and progress.topic.resolve (subjectName — the learner-typed subject title, per subjectCreateSchema.name / create-subject.tsx resolvedName-fallback) while still persisting progress.history and progress.topic.active-session', () => {
-    const subjectNameBearing: readonly (readonly unknown[])[] = [
+  it('excludes progress.subject/overview/continue/resume-target/review-summary/overdue-topics/inventory/milestones, progress.topic.resolve, AND progress.history (progressDataPointSchema.date is a bare z.string()) — persisting only progress.topic.active-session (sessionId uuid only)', () => {
+    const excludedProgress: readonly (readonly unknown[])[] = [
       ['progress', 'study', 'subject', 'subject-1', 'profile-1'],
       ['progress', 'study', 'overview', 'profile-1'],
       ['progress', 'study', 'continue', 'profile-1'],
@@ -420,18 +420,11 @@ describe('shouldPersistQuery [WI-1987]', () => {
       ['progress', 'study', 'inventory', 'profile-1'],
       ['progress', 'study', 'milestones', 'profile-1'],
       ['progress', 'study', 'topic', 'subject-1', 'resolve', 'profile-1'],
+      ['progress', 'study', 'history', 'profile-1'],
     ];
-    for (const key of subjectNameBearing) {
+    for (const key of excludedProgress) {
       expect(shouldPersistQuery(makeSuccessfulQuery(key))).toBe(false);
     }
-
-    const history = makeSuccessfulQuery([
-      'progress',
-      'study',
-      'history',
-      'profile-1',
-    ]);
-    expect(shouldPersistQuery(history)).toBe(true);
 
     const activeSessionForTopic = makeSuccessfulQuery([
       'progress',
@@ -444,20 +437,10 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(shouldPersistQuery(activeSessionForTopic)).toBe(true);
   });
 
-  it('persists other verified-clean query-key roots (book-sessions, topic-sessions, language-progress, subscription, subscription-status, revenuecat)', () => {
-    expect(
-      shouldPersistQuery(
-        makeSuccessfulQuery(['book-sessions', 'book-1', 'profile-1']),
-      ),
-    ).toBe(true);
+  it('persists only the structurally-clean roots (topic-sessions, subscription, subscription-status) and excludes book-sessions (topicTitle), language-progress (milestoneTitle/sublevel), revenuecat (unverifiable raw SDK)', () => {
     expect(
       shouldPersistQuery(
         makeSuccessfulQuery(['topic-sessions', 'topic-1', 'profile-1']),
-      ),
-    ).toBe(true);
-    expect(
-      shouldPersistQuery(
-        makeSuccessfulQuery(['language-progress', 'subject-1', 'profile-1']),
       ),
     ).toBe(true);
     expect(
@@ -468,33 +451,67 @@ describe('shouldPersistQuery [WI-1987]', () => {
         makeSuccessfulQuery(['subscription-status', 'profile-1']),
       ),
     ).toBe(true);
+
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery(['book-sessions', 'book-1', 'profile-1']),
+      ),
+    ).toBe(false);
+    expect(
+      shouldPersistQuery(
+        makeSuccessfulQuery(['language-progress', 'subject-1', 'profile-1']),
+      ),
+    ).toBe(false);
     expect(
       shouldPersistQuery(
         makeSuccessfulQuery(['revenuecat', 'customerInfo', 'user-1']),
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('does not persist a non-success query, same as the default (e.g. errored)', () => {
     const client = new QueryClient();
-    client.setQueryData(['retention', 'subject', 'subject-1', USER], {
+    client.setQueryData(['retention', 'topic', 'topic-1', USER], {
       some: 'data',
     });
     const query = client
       .getQueryCache()
-      .find({ queryKey: ['retention', 'subject', 'subject-1', USER] })!;
+      .find({ queryKey: ['retention', 'topic', 'topic-1', USER] })!;
     // Force the query into an error state — defaultShouldDehydrateQuery only
-    // persists 'success' status queries.
+    // persists 'success' status queries. Uses an allowlisted family
+    // (retention.topic) so the error gate is proven to override the allow rule.
     query.setState({ status: 'error', error: new Error('boom') });
     expect(shouldPersistQuery(query)).toBe(false);
   });
 
   it('[integration] persistQueryClientSave writes allowlisted data but drops transcript/summary/parking-lot/recap/report/dashboard/subjects/profile/subscription-family/vocabulary/usage/subject-sessions/teaching-preference/native-language/subjectName data to AsyncStorage', async () => {
     const client = new QueryClient();
+    // Persisted (clean): retention.topic — card is all uuid/number/enum/date.
+    client.setQueryData(['retention', 'topic', 'topic-1', USER], {
+      card: { topicId: 'topic-1', easeFactor: 2.5, repetitions: 3 },
+    });
+    // Excluded topicTitle-bearing families (topicTitle is raw learner content
+    // per pii-scrub.ts) — each seeded with a distinctive learner string that
+    // must NOT reach disk. Red-green counterexample for the structural rule:
+    // revert any exclusion above and one of these canaries leaks to AsyncStorage.
+    client.setQueryData(['retention', 'subject', 'subject-1', USER], {
+      topics: [{ topicTitle: 'learner named this retention subject topic' }],
+    });
     client.setQueryData(
-      ['retention', 'subject', 'subject-1', USER],
-      [{ id: 's1' }],
+      ['book-sessions', 'book-1', USER],
+      [{ topicTitle: 'learner named this book session topic' }],
     );
+    client.setQueryData(['library', 'retention', USER], {
+      subjects: [
+        { topics: [{ topicTitle: 'learner named this library topic' }] },
+      ],
+    });
+    client.setQueryData(['language-progress', 'subject-1', USER], {
+      nextMilestone: { milestoneTitle: 'learner free text milestone label' },
+    });
+    client.setQueryData(['progress', 'study', 'history', USER], {
+      dataPoints: [{ date: 'progress history bare string leak canary' }],
+    });
     client.setQueryData(['session-transcript', 'study', 'session-1', USER], {
       session: { sessionId: 'session-1' },
       exchanges: [{ role: 'learner', text: 'my real chat message' }],
@@ -591,6 +608,11 @@ describe('shouldPersistQuery [WI-1987]', () => {
     expect(raw).not.toContain('a custom native language the learner typed');
     expect(raw).not.toContain('a custom native language typed in settings');
     expect(raw).not.toContain('the raw subject title the learner typed');
+    expect(raw).not.toContain('learner named this retention subject topic');
+    expect(raw).not.toContain('learner named this book session topic');
+    expect(raw).not.toContain('learner named this library topic');
+    expect(raw).not.toContain('learner free text milestone label');
+    expect(raw).not.toContain('progress history bare string leak canary');
     expect(raw).toContain('retention');
   });
 });

@@ -181,12 +181,20 @@ export function createScopedPersister(userId: string | null | undefined) {
 // and only persists query-key shapes verified end-to-end
 // (packages/schemas/src/*.ts, read in full, PLUS the service/route code that
 // populates each field — schema shape alone is not sufficient proof, see
-// `bookTitle`/`subjectName` above) to carry ONLY structural metadata —
-// numeric metrics, uuids, enums, dates/timestamps, and titles proven to be
-// exclusively curriculum/LLM-authored (never a direct, un-normalized copy of
-// learner-typed input). Add a new allow rule here ONLY after reading the
-// response schema AND tracing every string field's write path to its
-// source.
+// `bookTitle`/`subjectName` above) to be STRUCTURALLY incapable of carrying
+// learner content: every field in the response schema — and every nested
+// schema — must be a uuid/id, a z.enum, a number, a boolean, or a branded
+// date field (isoDateField / isoDateSchema). ANY bare z.string() that is not
+// a uuid DISQUALIFIES the whole family, even one that "looks" curriculum- or
+// LLM-authored (topicTitle, milestoneTitle, bookTitle, subjectName, a
+// free-text sublevel). This is a mechanical rule ON PURPOSE: per-string
+// provenance judgments ("this title is only ever LLM-generated") repeatedly
+// proved wrong at review, and the repo's canonical PII classifier
+// (packages/schemas/src/pii-scrub.ts) classifies topicTitle et al. as raw
+// learner content. Over-exclusion has ZERO acceptance cost — no family is
+// required to be cached — so when in doubt, exclude. Add a new allow rule
+// here ONLY after confirming the response schema (and its nested schemas)
+// contain no bare non-uuid string field.
 // ---------------------------------------------------------------------------
 
 /**
@@ -197,31 +205,28 @@ export function createScopedPersister(userId: string | null | undefined) {
  * instead of a root-level allow.
  */
 export const PERSISTABLE_QUERY_KEY_ROOTS: ReadonlySet<string> = new Set([
-  'book-sessions', // bookSessionSchema — id/topicId/topicTitle(LLM-generated)/chapter(fixed labels)/exchangeCount/createdAt — no bookTitle field
-  'topic-sessions', // topicSessionSchema — id/sessionType/durationSeconds/createdAt — no titles at all
-  'language-progress', // languageProgressSchema — levels/milestone ids+titles from the static per-language milestone library (language-curriculum.ts), no learner text
-  'subscription', // subscriptionSchema — billing tier/limits/dates
-  'subscription-status', // subscriptionStatusResponseSchema — billing enums/counters
-  'revenuecat', // RevenueCat SDK — NOT zod-validated (raw SDK types), verified by type inspection: customerInfo (entitlements/activeSubscriptions/originalAppUserId/dates) carries no name/free-text; offerings (serverDescription/metadata) is RevenueCat-dashboard-authored business config, not learner/family-typed. No learner PII on either shape.
+  'topic-sessions', // topicSessionSchema — id(uuid)/sessionType(enum)/durationSeconds(number)/createdAt(branded date). No string field.
+  'subscription', // subscriptionSchema — tier/status/billingAccess enums, branded dates, booleans, integer counters. No string field.
+  'subscription-status', // subscriptionStatusResponseSchema — tier/status enums + integer counters. No string field.
+  // EXCLUDED under the structural rule (bare non-uuid string field): book-sessions
+  // (bookSessionSchema.topicTitle, chapter), language-progress
+  // (languageProgressSchema.currentSublevel, nextMilestone.milestoneTitle, sublevel),
+  // revenuecat (raw SDK — no zod schema to mechanically verify, so string-freeness is
+  // unprovable; RevenueCat's own native SDK cache is unaffected by excluding it here).
 ]);
 
 /**
- * `progress` (queryKeys.progress.*) mixes safe aggregate-metric queries with
- * PII/prose-bearing ones under the same `queryKey[0]`. `history` is the only
- * segment-2 value proven clean end-to-end (progressHistorySchema — dates +
- * numeric dataPoints only). Every other previously-allowed segment-2 value
- * embeds `subjectName`/`subjectProgressSchema.name` (learner-controlled, see
- * file-level comment) or an unconstrained metadata bag (`milestones`) and is
- * excluded by omission: `subject`, `overview`, `continue`, `resume-target`,
- * `review-summary`, `overdue-topics`, `inventory`, `milestones`. The
- * `'profile'`-scoped sub-queries (profileSessions/profileReports/etc — the
- * self-view mirror of the dashboard child queries) and the variable-topicId
- * shape of `'topic'` (topicProgress, `summaryExcerpt`) were already excluded
- * pre-round-3 and remain so.
+ * `progress` (queryKeys.progress.*) — NO segment-2 family survives the
+ * structural rule, so this set is empty. `history` (progressHistorySchema)
+ * was previously allowed, but its nested progressDataPointSchema.date is a
+ * bare z.string() (not a branded date field) — a bare string cannot be
+ * mechanically distinguished from free text, so it is disqualified. Every
+ * other segment-2 value embeds `subjectName`/`subjectProgressSchema.name` or
+ * an unconstrained metadata bag and was already excluded. The only
+ * persistable shape under `'progress'` is the active-session key below
+ * (sessionId uuid only).
  */
-const PERSISTABLE_PROGRESS_SEGMENT2: ReadonlySet<string> = new Set([
-  'history', // progressHistorySchema — dates + numeric dataPoints only
-]);
+const PERSISTABLE_PROGRESS_SEGMENT2: ReadonlySet<string> = new Set([]);
 
 function isPersistableProgressQuery(key: readonly unknown[]): boolean {
   if (key[0] !== 'progress') return false;
@@ -245,38 +250,26 @@ function isPersistableProgressQuery(key: readonly unknown[]): boolean {
 }
 
 /**
- * `library.retention` (retentionCardWithMetaSchema — retentionCardSchema +
- * topicTitle/bookId, no bookTitle/subjectName — clean) shares `queryKey[0]`
- * with `library.conceptMastery` (`mentorAdditions: z.array(z.string())` —
- * mentor-generated prose about the learner's demonstrated concept mastery).
- * Only `retention` is allowed.
+ * `library` — NOTHING under this root is persistable. `library.retention`
+ * (retentionCardWithMetaSchema = retentionCardSchema + topicTitle) carries a
+ * bare topicTitle string (raw learner content per pii-scrub.ts) and is now
+ * EXCLUDED; `library.conceptMastery` (mentorAdditions: z.array(z.string()) —
+ * mentor prose) was already excluded. There is no library allow rule.
  */
-function isPersistableLibraryQuery(key: readonly unknown[]): boolean {
-  return key[0] === 'library' && key[1] === 'retention';
-}
 
 /**
- * `retention` (queryKeys.retention.*) mixes clean sub-queries with one
- * PII-bearing sub-query under the same `queryKey[0]`:
- *   - `subject` (subjectRetentionResponseSchema — retentionCardWithMetaSchema[]
- *     + reviewDueCount) — clean.
- *   - `topic` (topicRetentionResponseSchema — a single nullable
- *     retentionCardSchema, no title fields at all) — clean.
- *   - `evaluate-eligibility` (evaluateEligibilitySchema — topicTitle
- *     (LLM-generated) + scores/enums + a system `reason` string populated
- *     only with fixed server strings, never learner/LLM content) — clean.
- *   - `teaching-preference` (teachingPreferenceResponseDataSchema —
- *     `nativeLanguage: z.string().nullable()`, an unconstrained free-text
- *     field the settings PUT route accepts verbatim, same taint as
- *     `settings.native-language` below) — EXCLUDED.
+ * `retention` (queryKeys.retention.*) — only `topic` survives the structural
+ * rule:
+ *   - `topic` (topicRetentionResponseSchema = { card: retentionCardSchema } —
+ *     card is all uuid/number/enum/branded-date, no string) — PERSISTED.
+ *   - `subject` (subjectRetentionResponseSchema — retentionCardWithMetaSchema[])
+ *     and `evaluate-eligibility` (evaluateEligibilitySchema) both carry a bare
+ *     topicTitle string (raw learner content per pii-scrub.ts) — EXCLUDED.
+ *   - `teaching-preference` (teachingPreferenceResponseDataSchema.nativeLanguage,
+ *     a free-text string) — EXCLUDED.
  */
 function isPersistableRetentionQuery(key: readonly unknown[]): boolean {
-  return (
-    key[0] === 'retention' &&
-    (key[1] === 'subject' ||
-      key[1] === 'topic' ||
-      key[1] === 'evaluate-eligibility')
-  );
+  return key[0] === 'retention' && key[1] === 'topic';
 }
 
 /**
@@ -358,7 +351,6 @@ export function shouldPersistQuery(query: Query): boolean {
     (typeof firstSegment === 'string' &&
       PERSISTABLE_QUERY_KEY_ROOTS.has(firstSegment)) ||
     isPersistableProgressQuery(key) ||
-    isPersistableLibraryQuery(key) ||
     isPersistableRetentionQuery(key) ||
     isPersistableSettingsQuery(key);
   if (!allowed) return false;
