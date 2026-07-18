@@ -149,6 +149,18 @@ export class SessionExchangeLimitError extends Error {
   }
 }
 
+/**
+ * [WI-2372] Thrown by `assertExchangeConsent` when the profile's consent has
+ * been withdrawn (parental or adult self-consent) — refuses the exchange
+ * before any LLM dispatch. Mapped to 403 CONSENT_WITHDRAWN in routes/sessions.ts.
+ */
+export class ConsentWithdrawnError extends Error {
+  constructor() {
+    super('Consent has been withdrawn — processing is refused');
+    this.name = 'ConsentWithdrawnError';
+  }
+}
+
 export class CurriculumSessionNotReadyError extends Error {
   constructor() {
     super('Curriculum is still being prepared');

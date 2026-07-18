@@ -651,6 +651,7 @@ import {
   setSessionInputMode,
   startFirstCurriculumSession,
   SessionExchangeLimitError,
+  ConsentWithdrawnError,
   markSessionKeptOutOfLibrary,
   requestSessionLibraryFiling,
   restoreSessionForAutoFiling,
@@ -935,6 +936,28 @@ describe('session routes', () => {
       expect(res.status).toBe(429);
       const body = await res.json();
       expect(body.code).toBe('EXCHANGE_LIMIT_EXCEEDED');
+    });
+
+    // [WI-2372] "request on behalf of a withdrawn-consent subject -> refusal"
+    // (AC2) — the consent gate refuses before any LLM dispatch.
+    it('returns 403 with CONSENT_WITHDRAWN code when consent has been withdrawn [WI-2372]', async () => {
+      (processMessage as jest.Mock).mockRejectedValueOnce(
+        new ConsentWithdrawnError(),
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/messages`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'one more question' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('CONSENT_WITHDRAWN');
     });
 
     // [BUG-92 / CR-2026-05-19-C4] processMessage now surfaces `readyToFinish`
@@ -2924,6 +2947,35 @@ describe('session routes', () => {
       expect(res.status).toBe(503);
       const body = await res.json();
       expect(body).toMatchObject({ code: 'LLM_UNAVAILABLE' });
+    });
+
+    // [WI-2372] Consent gate refuses before any streaming begins — no SSE
+    // frame reaches the client, and the non-streaming fallback (which also
+    // re-checks consent) surfaces the same refusal rather than a chunk.
+    it('returns 403 with CONSENT_WITHDRAWN and no SSE frame when consent has been withdrawn [WI-2372]', async () => {
+      (streamMessage as jest.Mock).mockRejectedValueOnce(
+        new ConsentWithdrawnError(),
+      );
+      (processMessage as jest.Mock).mockRejectedValueOnce(
+        new ConsentWithdrawnError(),
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('CONSENT_WITHDRAWN');
+      expect(res.headers.get('content-type')).not.toContain(
+        'text/event-stream',
+      );
     });
 
     it('[LLM-CIRCUIT] CircuitOpenError surfaces as 503 LLM_UNAVAILABLE, not a generic 500', async () => {
