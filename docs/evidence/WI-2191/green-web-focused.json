@@ -11,7 +11,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "runId": "playwright-1784337125560-cf8a",
+      "runId": "playwright-1784338517891-3598",
       "actualWorkers": 1
     },
     "preserveOutput": "always",
@@ -31,7 +31,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "runId": "playwright-1784337125560-cf8a",
+          "runId": "playwright-1784338517891-3598",
           "actualWorkers": 1
         },
         "id": "setup",
@@ -48,7 +48,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "runId": "playwright-1784337125560-cf8a",
+          "runId": "playwright-1784338517891-3598",
           "actualWorkers": 1
         },
         "id": "smoke-auth",
@@ -65,7 +65,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "runId": "playwright-1784337125560-cf8a",
+          "runId": "playwright-1784338517891-3598",
           "actualWorkers": 1
         },
         "id": "auth-access",
@@ -82,7 +82,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "runId": "playwright-1784337125560-cf8a",
+          "runId": "playwright-1784338517891-3598",
           "actualWorkers": 1
         },
         "id": "smoke-learner",
@@ -99,7 +99,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "runId": "playwright-1784337125560-cf8a",
+          "runId": "playwright-1784338517891-3598",
           "actualWorkers": 1
         },
         "id": "smoke-parent",
@@ -116,7 +116,24 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "runId": "playwright-1784337125560-cf8a",
+          "runId": "playwright-1784338517891-3598",
+          "actualWorkers": 1
+        },
+        "id": "smoke-accessibility",
+        "name": "smoke-accessibility",
+        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testIgnore": [],
+        "testMatch": [
+          "/flows[\\\\/]accessibility[\\\\/]quiz-results-exits\\.spec\\.ts/"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "runId": "playwright-1784338517891-3598",
           "actualWorkers": 1
         },
         "id": "role-transitions",
@@ -133,7 +150,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "runId": "playwright-1784337125560-cf8a",
+          "runId": "playwright-1784338517891-3598",
           "actualWorkers": 1
         },
         "id": "later-phases",
@@ -150,7 +167,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "runId": "playwright-1784337125560-cf8a",
+          "runId": "playwright-1784338517891-3598",
           "actualWorkers": 1
         },
         "id": "child-subject-detail",
@@ -167,7 +184,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "runId": "playwright-1784337125560-cf8a",
+          "runId": "playwright-1784338517891-3598",
           "actualWorkers": 1
         },
         "id": "mentor-audit-registry-smoke",
@@ -184,7 +201,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "runId": "playwright-1784337125560-cf8a",
+          "runId": "playwright-1784338517891-3598",
           "actualWorkers": 1
         },
         "id": "config-f-smoke",
@@ -227,12 +244,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 14163,
+                  "duration": 20250,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-07-18T01:12:39.062Z",
+                  "startTime": "2026-07-18T01:36:10.421Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -261,12 +278,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 13897,
+                  "duration": 18110,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-07-18T01:12:53.301Z",
+                  "startTime": "2026-07-18T01:36:30.911Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -295,12 +312,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 22244,
+                  "duration": 25590,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-07-18T01:13:07.211Z",
+                  "startTime": "2026-07-18T01:36:49.054Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -310,7 +327,7 @@
           ],
           "id": "38bcc6117dd28e29d177-9161eac49601d4bde519",
           "file": "flows/journeys/j28-practice-quick-quiz-semantics.spec.ts",
-          "line": 85,
+          "line": 90,
           "column": 5
         }
       ]
@@ -318,8 +335,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-07-18T01:12:05.564Z",
-    "duration": 85961.93,
+    "startTime": "2026-07-18T01:35:17.895Z",
+    "duration": 128972.33799999999,
     "expected": 3,
     "skipped": 0,
     "unexpected": 0,
