@@ -629,6 +629,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'learning-active',
         shard: 1,
       },
+      {
+        flow: 'flows/v2/v2-subject-create-round-trip.yaml',
+        scenario: 'onboarding-no-subject',
+        shard: 1,
+      },
     ]);
     expect(workflowRaw).toContain('- v2');
     expect(workflowRaw).toContain('EXPO_PUBLIC_ENABLE_MODE_NAV_V2:');
