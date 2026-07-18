@@ -105,8 +105,14 @@ function classifyFailure({ artifactRoot, exitCode, resultText = '' }) {
     try {
       const record = JSON.parse(line);
       const status = record?.type === 'response' ? (record?.metadata?.status ?? record?.status) : record?.status;
+      const snapshotUrl = record?.type === 'resource-snapshot' ? record?.snapshot?.request?.url : '';
+      const snapshotStatuses = record?.type === 'resource-snapshot'
+        ? [...JSON.stringify(record).matchAll(/"status":(-?\d+)/g)].map((match) => Number(match[1]))
+        : [];
       const error = record?.error?.error?.message ?? record?.error?.message ?? record?.errorText;
-      return RETRYABLE.has(Number(status)) || (record?.type === 'requestfailed' && TRANSPORT.test(String(error ?? '')));
+      return RETRYABLE.has(Number(status))
+        || (record?.type === 'requestfailed' && TRANSPORT.test(String(error ?? '')))
+        || (snapshotUrl && /\/v1\//.test(snapshotUrl) && snapshotStatuses.includes(-1));
     } catch {
       return false;
     }

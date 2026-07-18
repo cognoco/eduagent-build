@@ -59,6 +59,13 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
             errorText: 'net::ERR_CONNECTION_RESET',
           }),
           JSON.stringify({
+            type: 'resource-snapshot',
+            snapshot: {
+              request: { url: 'https://api-stg.example.test/v1/profiles' },
+              response: { status: -1 },
+            },
+          }),
+          JSON.stringify({
             type: 'console',
             text: '502 mentioned in arbitrary prose',
           }),
