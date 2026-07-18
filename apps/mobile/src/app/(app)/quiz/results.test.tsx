@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type {
   CompleteRoundResponse,
   QuizRoundResponse,
@@ -25,7 +25,11 @@ const mockRouterPush = jest.fn();
 const mockRouterReplace = jest.fn();
 const mockRouterBack = jest.fn();
 let mockCanGoBack = false;
+let mockFocusCallback: (() => void) | null = null;
 jest.mock('expo-router', () => ({
+  useFocusEffect: (callback: () => void) => {
+    mockFocusCallback = callback;
+  },
   useRouter: () => ({
     push: mockRouterPush,
     replace: mockRouterReplace,
@@ -52,6 +56,7 @@ beforeEach(() => {
   mockRouterReplace.mockClear();
   mockRouterBack.mockClear();
   mockCanGoBack = false;
+  mockFocusCallback = null;
 });
 
 interface SeedInput {
@@ -310,6 +315,42 @@ describe('QuizResultsScreen — [F-040] missed-question cards', () => {
       expect(expectedRouter).toHaveBeenCalledWith(expectedRoute);
     },
   );
+
+  it('re-enables exits when results regain focus after a History push', () => {
+    renderWithFlow({
+      round: buildCapitalsRound(),
+      completionResult: {
+        score: 4,
+        total: 4,
+        xpEarned: 50,
+        celebrationTier: 'perfect',
+        droppedResults: 0,
+        questionResults: [],
+      },
+      returnTo: 'practice',
+    });
+    mockRouterPush.mockClear();
+    mockRouterReplace.mockClear();
+
+    fireEvent.press(screen.getByTestId('quiz-results-history'));
+
+    expect(mockRouterPush).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByTestId('quiz-results-history').props.accessibilityState,
+    ).toEqual({ disabled: true });
+    expect(mockFocusCallback).not.toBeNull();
+
+    act(() => {
+      mockFocusCallback?.();
+    });
+
+    expect(
+      screen.getByTestId('quiz-results-history').props.accessibilityState,
+    ).toEqual({ disabled: false });
+    fireEvent.press(screen.getByTestId('quiz-results-play-again'));
+    expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+    expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/quiz/launch');
+  });
 
   it('opens history with Practice return target when quiz came from Practice', () => {
     renderWithFlow({

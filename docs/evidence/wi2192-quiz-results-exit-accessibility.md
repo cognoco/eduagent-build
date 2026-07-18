@@ -33,10 +33,13 @@ The test uses Chromium and the actual React Native Web DOM. It checks:
 - Enter, Space, and pointer activation for every action;
 - one exact recorded `push`/`replace` call plus the observable destination URL;
 - `aria-disabled=true` after activation and suppression of a forced second
-  keyboard/pointer activation.
+  keyboard/pointer activation; and
+- History push → browser Back → focus return re-enables the results exits and
+  permits a subsequent exact Play Again navigation.
 
 The freeze-mode matrix supplies nine exact-once/disabled steps. The delegating
-matrix supplies nine real-router destination steps. The old synthetic
+matrix supplies nine real-router destination steps, followed by one real
+History-return recovery step. The old synthetic
 `createDOMProps`/`PressResponder` proxy test was deleted because it stayed green
 when production semantics were reverted.
 
@@ -71,12 +74,13 @@ Final restored output:
   Tab-order, and visible-focus assertions are in
   `apps/mobile/e2e-web/flows/accessibility/quiz-results-exits.spec.ts`.
 - **AC-2 — exactly-once activation and repeat suppression:** the synchronous
-  shared navigation lock and disabled state are in
+  shared navigation lock, focus-return reset, and disabled state are in
   `apps/mobile/src/app/(app)/quiz/results.tsx`. Native duplicate-press coverage is
   in `apps/mobile/src/app/(app)/quiz/results.test.tsx`. The browser matrix in
   `apps/mobile/e2e-web/flows/accessibility/quiz-results-exits.spec.ts` proves
   Enter, Space, and pointer behavior for all three actions, exact calls, real
-  destinations, disabled state, and repeat suppression.
+  destinations, disabled state, repeat suppression, and recovery after returning
+  from the pushed History route.
 - **AC-3 — preserve rendering and deep links:** existing missed/perfect score,
   celebration, Play Again, Done, and Practice return-target cases remain in
   `apps/mobile/src/app/(app)/quiz/results.test.tsx`. The browser host delegates
@@ -137,6 +141,23 @@ This is the required production-coupled semantics RED → GREEN → lock-revert 
 restore GREEN sequence. Both isolated production removals fail the same named
 browser case.
 
+### History-return Gate-1 RED → GREEN
+
+Gate 1 identified that the exact-once lock remained set when History was pushed:
+the results route stays mounted behind History, so Back returned to three disabled
+exits. Before the production fix, the new unchanged native regression failed with
+`mockFocusCallback` still `null` (1 failed, 13 passed). The production results
+screen now re-arms the lock through `useFocusEffect` whenever it regains focus.
+
+After the fix, the native suite passed 14/14. The real Chromium case also performs
+View History → `/quiz/history?returnTo=practice` → browser Back → Play Again →
+`/quiz/launch`, verifies the controls are enabled on return, and observes the two
+exact router calls in order. The complete browser project remained green:
+
+```text
+3 passed (2.1m); target case 58.2s
+```
+
 ## Native and repository verification
 
 Initial native TDD, before the browser rework, captured a missing-role RED and
@@ -145,7 +166,7 @@ three missing-disabled-state REDs. The final focused native results suite is gre
 ```text
 PASS apps/mobile/src/app/(app)/quiz/results.test.tsx
 Test Suites: 1 passed, 1 total
-Tests:       13 passed, 13 total
+Tests:       14 passed, 14 total
 ```
 
 The final verification commands and outputs are:
@@ -160,7 +181,7 @@ node --test apps/mobile/e2e-web/helpers/serve-exported-web-env.test.mjs
 pnpm exec jest --config apps/mobile/jest.config.cjs --runInBand \
   --runTestsByPath apps/mobile/src/app/screen-navigation.test.ts \
   'apps/mobile/src/app/(app)/quiz/results.test.tsx'
-  2 suites passed; 100 tests passed
+  2 suites passed; 102 tests passed
 
 pnpm exec jest --config apps/mobile/jest.config.cjs --runInBand \
   --forceExit --silent

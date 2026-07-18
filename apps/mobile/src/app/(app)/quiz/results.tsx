@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RewardBurst } from '../../../components/common/RewardBurst';
 import { useThemeColors } from '../../../lib/theme';
@@ -26,6 +26,16 @@ export function QuizResultsContent({
   const practiceReturnParams = returnTo === 'practice' ? { returnTo } : {};
   const navigationStartedRef = useRef(false);
   const [isNavigating, setIsNavigating] = useState(false);
+
+  // History is pushed onto the quiz stack, so this results instance remains
+  // mounted behind it. Re-arm the exits when the user returns; replacement
+  // routes unmount the screen and retain the one-shot lock for their lifetime.
+  useFocusEffect(
+    useCallback(() => {
+      navigationStartedRef.current = false;
+      setIsNavigating(false);
+    }, []),
+  );
   // [BUG-777 / M-15] Pin the FIRST non-null round we see so a "Play Again"
   // press — which sets a NEW round into context BEFORE this screen unmounts
   // — can't cause a render flash where questionPrompt's 'Question' fallback

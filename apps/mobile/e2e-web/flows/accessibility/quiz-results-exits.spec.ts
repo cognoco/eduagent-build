@@ -178,4 +178,27 @@ test('quiz-results exits are real named buttons with exact-once web activation',
       });
     }
   }
+
+  await test.step('History return re-enables exits on the same results flow', async () => {
+    await openHost(page, false);
+    await page.getByRole('button', { name: 'View History' }).click();
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/quiz/history');
+
+    await page.goBack();
+
+    await expect(page.getByTestId('quiz-results-screen')).toBeVisible();
+    const playAgainAfterReturn = page.getByRole('button', {
+      name: 'Play Again',
+    });
+    await expect(playAgainAfterReturn).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await playAgainAfterReturn.click();
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/quiz/launch');
+    expect(await readNavigationCalls(page)).toEqual([
+      actions[2].expectedCall,
+      actions[0].expectedCall,
+    ]);
+  });
 });
