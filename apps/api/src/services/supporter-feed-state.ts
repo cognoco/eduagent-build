@@ -29,6 +29,8 @@ async function assertActiveSupportership(
     .select({ id: supportership.id })
     .from(supportership)
     .where(
+      // [WI-2237 deferred-sweep] latent bare-edge gate — gate before wiring
+      // a caller; tracked WI-2395 (target: 2026-Q3)
       and(
         eq(supportership.id, key.supportershipId),
         eq(supportership.supporterPersonId, key.viewerPersonId),
