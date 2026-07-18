@@ -449,7 +449,8 @@ export async function repairOrSignalAdultSelfConsentV2(
     return 'not_applicable';
   }
 
-  // Already bootstrapped (case b) or previously repaired — nothing to do.
+  // Fast path: already bootstrapped (case b) or previously repaired — nothing to
+  // do. Re-checked authoritatively inside the locked transaction below.
   const existing = await db.query.consentGrant.findFirst({
     where: and(
       eq(consentGrant.chargePersonId, chargePersonId),
@@ -471,24 +472,51 @@ export async function repairOrSignalAdultSelfConsentV2(
     if (versioned) break;
   }
   if (!versioned) return 'needs_consent'; // (c) never fabricate
+  // const captures the non-null narrowing for the transaction closure below.
+  const fact = versioned;
 
-  // (a) Repair from the captured versioned fact. Legacy purpose only.
-  await db.insert(consentGrant).values({
-    chargePersonId,
-    organizationId,
-    purpose: DEFAULT_CONSENT_PURPOSE,
-    lawfulBasis: 'art6_1_a',
-    granted: true,
-    grantedAt: new Date(),
-    auditFact: {
-      source: 'adult_self_consent_repair',
-      termsAcceptedAt: versioned.termsAcceptedAt,
-      termsVersion: versioned.termsVersion,
-      // Provenance: the ORIGINAL terms-acceptance event this record derives from.
-      repairedFromEventAt: versioned.termsAcceptedAt,
-    },
+  // Serialise the write per-person with a pg_advisory_xact_lock so two
+  // concurrent bootstraps for the same owner cannot both clear the guard and
+  // write duplicate art6_1_a rows into this GDPR compliance table. There is no
+  // unique constraint on (charge_person_id, lawful_basis) — the AC2 purpose
+  // split means a person legitimately holds several art6_1_a grants — so a plain
+  // insert cannot be made idempotent by ON CONFLICT here. Same idiom as
+  // services/nudge.ts. Double-checked: re-read existing INSIDE the lock so the
+  // loser of a race early-outs instead of inserting.
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${
+        'adult-consent-repair:' + chargePersonId
+      }, 0))`,
+    );
+
+    const existingLocked = await tx.query.consentGrant.findFirst({
+      where: and(
+        eq(consentGrant.chargePersonId, chargePersonId),
+        eq(consentGrant.lawfulBasis, 'art6_1_a'),
+      ),
+      columns: { id: true },
+    });
+    if (existingLocked) return 'already_present';
+
+    // (a) Repair from the captured versioned fact. Legacy purpose only.
+    await tx.insert(consentGrant).values({
+      chargePersonId,
+      organizationId,
+      purpose: DEFAULT_CONSENT_PURPOSE,
+      lawfulBasis: 'art6_1_a',
+      granted: true,
+      grantedAt: new Date(),
+      auditFact: {
+        source: 'adult_self_consent_repair',
+        termsAcceptedAt: fact.termsAcceptedAt,
+        termsVersion: fact.termsVersion,
+        // Provenance: the ORIGINAL terms-acceptance event this record derives from.
+        repairedFromEventAt: fact.termsAcceptedAt,
+      },
+    });
+    return 'repaired'; // (a)
   });
-  return 'repaired'; // (a)
 }
 
 // ---------------------------------------------------------------------------
