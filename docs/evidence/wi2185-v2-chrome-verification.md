@@ -4,6 +4,12 @@
 
 **Captured:** 2026-07-18
 
+**Reviewer-rework base:** `dbaf003beb2e4377016372c523346f6dcac550d1`
+
+**Reviewer-rework code candidate:** `7657df8eaaba619d33a25e8789b097cc168a5b28`
+
+**Reviewer-rework fetched integration head:** `6dce228a9892ae6f90e87863bb18983d2ef75d5e`
+
 **Cycle-3 review base:** `e0026d5a82675bc6e5654d807c9abdb89d5b8bff`
 
 **Cycle-3 code candidate:** `7b038d8e989f6b0be8e9a2f79299d6e8fd8d642a`
@@ -29,6 +35,158 @@ The historical cycle-3 review delta is pinned as
 `e0026d5a82675bc6e5654d807c9abdb89d5b8bff..7b038d8e989f6b0be8e9a2f79299d6e8fd8d642a`.
 That candidate hash contains the production and test changes from the historical
 cycle; its evidence-only commit and integration merge follow it.
+
+## Reviewer rework: executable ownership and state proof
+
+The exact rework delta is pinned as
+`dbaf003beb2e4377016372c523346f6dcac550d1..7657df8eaaba619d33a25e8789b097cc168a5b28`.
+The newer fetched integration head was not merged: this evidence describes the
+exact branch candidate above, and the executor is not authorized to land it.
+
+The central ownership registry is now a runtime input, not documentation. Child
+ownership selects the composed remaining-band calculation directly. A module-load
+invariant binds every `root` or `path-specific` value to a route-local exception,
+rejects exceptions on child-owned routes, and rejects exception routes absent from
+the registry. The resolver still fails closed for a future navigable route, so a
+new root cannot silently inherit child ownership.
+
+Mentor Memory now exposes its real loading and error screen roots. Executable tests
+drive the real fetch boundary into pending and HTTP-500 states and assert that each
+root contributes the native 47px inset. W-05 accepts the loaded, loading, or error
+root for geometry because safe-area ownership must hold in every state; its Library
+inventory check uses the real `library-screen` root rather than depending on staged
+subject-list readiness.
+
+### AC1-AC4 executable map
+
+- **AC1 — every non-fullscreen pushed V2 scene clears complete fixed chrome once:**
+  `apps/mobile/src/app/(app)/_layout.tsx:119` owns the registry,
+  `apps/mobile/src/app/(app)/_layout.tsx:153` enforces the registry/exception
+  invariant, and `apps/mobile/src/app/(app)/_layout.tsx:217` resolves the root
+  contribution. The seven-route composition matrix is executable at
+  `apps/mobile/src/app/(app)/_layout.test.tsx:1051`; top-level and fullscreen
+  no-duplication is executable at
+  `apps/mobile/src/app/(app)/_layout.test.tsx:1096`.
+- **AC2 — Mentor Memory, Accommodation, Subscription, and More/Account at wide,
+  360x760, and native top=47:** the routed wide/narrow matrix starts at
+  `apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:124`
+  and the real native composition matrix at
+  `apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:166`.
+  Per-shell native ownership remains executable at
+  `apps/mobile/src/app/(app)/mentor-memory.test.tsx:252`,
+  `apps/mobile/src/app/(app)/more/accommodation.test.tsx:158`,
+  `apps/mobile/src/app/(app)/subscription.test.tsx:538`, and
+  `apps/mobile/src/app/(app)/more/account.test.tsx:141`.
+- **AC3 — deep links, back/returnTo, refresh/loading, long labels, multiple scopes,
+  font scale, and independent targets:** direct navigation, reload, and Back/More
+  restoration run from
+  `apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:124`;
+  explicit `returnTo=more` is tested at
+  `apps/mobile/src/app/(app)/mentor-memory.test.tsx:690`; loading/error inset
+  geometry is tested at `apps/mobile/src/app/(app)/mentor-memory.test.tsx:268` and
+  `apps/mobile/src/app/(app)/mentor-memory.test.tsx:286`; the 360px native
+  long-label, 32px/52px text-scale, five-scope, 44px-target, Account composition
+  scenario starts at
+  `apps/mobile/e2e-web/flows/journeys/j03-parent-gateway.spec.ts:102`.
+- **AC4 — root-layout RED proof plus representative web/native coverage without
+  flags-off/V0/V1 regressions:** the production-only seven-route revert is the
+  matrix at `apps/mobile/src/app/(app)/_layout.test.tsx:1051`; shell-preservation
+  matrices are at `apps/mobile/src/app/(app)/mentor-memory.test.tsx:252`,
+  `apps/mobile/src/app/(app)/more/accommodation.test.tsx:158`, and
+  `apps/mobile/src/app/(app)/subscription.test.tsx:538`; W-05 selects and executes
+  the active flags-off/V0/V1/V2 shell at
+  `apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:10`.
+
+### Corrective red/green and production-only regression proof
+
+The corrective selector was first run before implementation. It produced exactly
+three failures: the ownership invariant export was undefined, and neither
+`mentor-memory-loading-screen` nor `mentor-memory-error-screen` existed. After the
+production changes, the same three tests passed.
+
+For the production-only revert, only the root resolver call was temporarily
+changed back to the full `pushedSceneTopInset`; tests were unchanged. The exact
+result was:
+
+```text
+/mentor-memory, /more/accommodation, /subscription, /more/account,
+/subject/subject-1, /topic/topic-1, /my-notes
+
+Expected: 99
+Received: 146
+Tests:    7 failed, 101 skipped
+```
+
+After restoring production, the focused ownership/state selector returned:
+
+```text
+Test Suites: 2 passed, 2 total
+Tests:       10 passed, 128 skipped
+```
+
+### Full routed browser output on the rework candidate
+
+The complete relevant J-01 and J-03 specs ran on fresh V2 staging exports with
+one worker and no retries:
+
+```text
+setup solo learner                                         12.2s
+setup parent                                               13.6s
+J-01 seeded learner lands on V2 mentor home                 2.6s
+J-01 pushed V2 content clears fixed chrome at 360x760       2.5s
+J-03 seeded parent lands on the V2 mentor shell            15.0s
+J-03 parent V2 shell omits retired mode switcher           12.6s
+J-03 long scopes/native top=47/font scale/targets/Account  15.8s
+
+7 passed (1.9m)
+```
+
+The final complete W-05 file used the same fresh-export discipline:
+
+```text
+setup solo learner                                          11.6s
+setup parent                                                12.2s
+W-05 tab URLs render the correct screen on web               8.7s
+W-05 pushed V2 routes clear fixed chrome at wide            14.5s
+W-05 pushed V2 routes clear fixed chrome at 360x760         15.2s
+W-05 native top=47 composes V2 safe-area ownership          12.8s
+
+6 passed (2.0m)
+```
+
+Three earlier complete W-05 attempts exposed staging/test coupling while the
+geometry assertions themselves stayed green:
+
+```text
+attempt 1: 5 passed, 1 failed (2.4m) — Library seed row unavailable
+attempt 2: 4 passed, 2 failed (3.2m) — same Library row plus Mentor API error state
+attempt 3: 5 passed, 1 failed (2.0m) — strict "Library" text matched title and tab
+```
+
+The candidate resolves those proof-harness defects by checking the real Library
+screen root and all real Mentor Memory state roots; no staging outage is waived in
+the final result.
+
+### Final rework gates and review
+
+```text
+Test Suites: 6 passed, 6 total
+Tests:       247 passed, 247 total
+Snapshots:   0 total
+
+NX Successfully ran target typecheck for project @eduagent/mobile and 6 tasks it depends on
+NX Successfully ran target lint for project @eduagent/mobile
+51 problems (0 errors, 51 baseline warnings)
+pnpm prepush (tsc --build): passed
+Prettier + git diff check:   passed
+```
+
+Sequential Standards and Spec review of the pinned code candidate found no
+actionable issues. The five-file rework is surgical, adds no internal mocks, and
+the corrective commit records the required GC6 deferral for the 14 retained
+legacy internal mocks. The Spec review followed the executable AC1-AC4 map above
+and confirmed each requirement against both implementation and current test
+evidence.
 
 ## Adversarial ownership remediation
 
