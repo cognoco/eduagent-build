@@ -188,6 +188,12 @@ export default function InitiateLinkScreen(): React.ReactElement {
           one step, not two. */}
       <LinkCeremonyBackButton
         onPress={() => {
+          // Mark the exit before either branch below runs: reset() does not
+          // cancel a request already in flight, so a late-resolving success
+          // (see `hasExitedRef` above) must not navigate the user forward —
+          // regardless of which exit path (pre-filled vs. inline-picker
+          // entry) they take out of this step.
+          hasExitedRef.current = true;
           if (paramSupporteePersonId) {
             goBackOrReplace(router, '/(app)/home');
             return;
@@ -197,11 +203,6 @@ export default function InitiateLinkScreen(): React.ReactElement {
           // the picker and re-selecting a person re-renders the confirmation
           // step with the stale error already showing, before this attempt
           // has submitted anything.
-          //
-          // reset() does not cancel a request already in flight — mark that
-          // the user has exited so a late-resolving success (see
-          // `hasExitedRef` above) cannot navigate them forward again.
-          hasExitedRef.current = true;
           createMutation.reset();
           setTarget(null);
         }}

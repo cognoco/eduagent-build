@@ -508,6 +508,57 @@ describe('InitiateLinkScreen', () => {
       screen.getByTestId('visibility-link-initiate-picker');
     });
 
+    // [WI-2188 rework] Sibling surface of the same defect: the pre-filled
+    // (`pushLinkInitiateForManagedPerson` direct-entry) confirmation Back
+    // handler takes the `paramSupporteePersonId` branch and returns early —
+    // it must ALSO guard against a late-resolving create success, not just
+    // the inline-picker branch above.
+    it('pressing back on a pre-filled entry while the create request is pending prevents a late-resolving success from navigating forward', async () => {
+      let resolveCreate: (value: unknown) => void = () => undefined;
+      const pendingCreate = new Promise((resolve) => {
+        resolveCreate = resolve;
+      });
+      mockParams = {
+        supporteePersonId: NAMED_PROFILES.linkedChild.id,
+        supporteeName: NAMED_PROFILES.linkedChild.displayName,
+      };
+      const InitiateLinkScreen = require('./initiate').default;
+      const rendered = renderScreen(<InitiateLinkScreen />, {
+        profile: NAMED_PROFILES.guardian,
+        routes: {
+          '/visibility/links': () => pendingCreate,
+        },
+      });
+      cleanupRender = rendered.cleanup;
+      const { routedFetch } = rendered;
+
+      // Pre-filled entry skips the picker — confirmation renders directly.
+      fireEvent.press(screen.getByTestId('visibility-link-create'));
+
+      await waitFor(() =>
+        expect(
+          fetchCallsMatching(routedFetch, '/visibility/links'),
+        ).toHaveLength(1),
+      );
+
+      // Exit via the pre-filled-entry branch (goBackOrReplace/router.back())
+      // while the request is still pending.
+      fireEvent.press(
+        screen.getByTestId('visibility-link-initiate-confirm-back'),
+      );
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockReplace).not.toHaveBeenCalled();
+
+      // Now let the request resolve successfully, after the user has left.
+      await act(async () => {
+        resolveCreate(CONTRACT);
+        await pendingCreate;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(mockReplace).not.toHaveBeenCalled();
+    });
+
     it('the existing-teen invite branch (V2 on) back button returns to the picker', () => {
       const original = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
       (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
