@@ -538,11 +538,12 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
       if (approved && v2Result) {
         const secret = c.env.CONSENT_WITHDRAWAL_TOKEN_SECRET;
         const apiOrigin = c.env.API_ORIGIN;
-        if (secret && apiOrigin) {
+        if (secret && apiOrigin && v2Result.withdrawalTokenId) {
           const withdrawalToken = signWithdrawalToken(
             v2Result.chargePersonId,
             v2Result.organizationId,
             secret,
+            { tokenId: v2Result.withdrawalTokenId },
           );
           const basePath = c.req.path.replaceAll('/consent-page/confirm', '');
           withdrawalUrl = `${apiOrigin}${basePath}/consent-page/withdraw?token=${encodeURIComponent(
@@ -699,6 +700,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
       db,
       payload.chargePersonId,
       payload.organizationId,
+      payload.tokenId,
     );
 
     // No current grant (never approved, or already deleted past grace) →
@@ -778,6 +780,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         payload.chargePersonId,
         payload.organizationId,
         audit,
+        payload.tokenId,
       );
 
       // Durable grace→delete via Inngest (engine rule: durable async →
@@ -862,6 +865,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         payload.chargePersonId,
         payload.organizationId,
         audit,
+        payload.tokenId,
       );
       return c.html(
         pageLayout('Consent Restored', consentRestoredBody(childName)),

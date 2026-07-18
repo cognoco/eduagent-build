@@ -823,6 +823,10 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
       organizationId: org!.id,
       roles: ['learner'],
     });
+    // [WI-2347] The tokenId a `cw2` link is bound to — set on the seeded
+    // grant row exactly as `processConsentResponseV2` would on approve, so
+    // the mismatch check in the service layer sees a live, matching link.
+    const withdrawalTokenId = crypto.randomUUID();
     if (opts.grant !== false) {
       await db.insert(consentGrant).values({
         chargePersonId: p!.id,
@@ -834,9 +838,12 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
         priorValue: null,
         withdrawnAt: opts.withdrawnAt ?? null,
         auditFact: { source: 'consent_response_approved' },
+        withdrawalTokenId,
       });
     }
-    const token = signWithdrawalToken(p!.id, org!.id, WITHDRAW_SECRET);
+    const token = signWithdrawalToken(p!.id, org!.id, WITHDRAW_SECRET, {
+      tokenId: withdrawalTokenId,
+    });
     return { orgId: org!.id, childId: p!.id, token };
   }
 
@@ -990,10 +997,13 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     const { childId, orgId, token } = await seedApprovedGrant({
       displayName: 'Val',
     });
-    expect(verifyWithdrawalToken(token, WITHDRAW_SECRET)).toEqual({
+    const decoded = verifyWithdrawalToken(token, WITHDRAW_SECRET);
+    expect(decoded).toMatchObject({
       chargePersonId: childId,
       organizationId: orgId,
     });
+    // [WI-2347] cw2 also carries the per-link tokenId.
+    expect(typeof decoded?.tokenId).toBe('string');
   });
 });
 
@@ -1136,10 +1146,13 @@ describe('POST /v1/consent-page/confirm — approval mints withdrawal email (ide
       const withdrawalUrl = extractUrl(payload.body);
       const urlToken = new URL(withdrawalUrl).searchParams.get('token');
       expect(urlToken).toBeTruthy();
-      expect(verifyWithdrawalToken(urlToken!, WITHDRAW_SECRET)).toEqual({
+      const decoded = verifyWithdrawalToken(urlToken!, WITHDRAW_SECRET);
+      expect(decoded).toMatchObject({
         chargePersonId: childId,
         organizationId: orgId,
       });
+      // [WI-2347] cw2 also carries the per-link tokenId.
+      expect(typeof decoded?.tokenId).toBe('string');
     } finally {
       emailSpy.mockRestore();
     }
