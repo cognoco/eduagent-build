@@ -59,8 +59,8 @@ function hasNavigationCommandShape(text: string): boolean {
   );
 }
 
-function hasUnsupportedNavigationTargetShape(text: string): boolean {
-  return /^(?:(?:open|show|go to|take me to|bring me to|navigate to|view|see)\s+)?(?:my\s+)?(?:progress(?:\s+report)?|journal(?:\s+entries)?|subjects?\s+list|library|more)(?:\s+please)?$/.test(
+function hasBareNavigationTargetShape(text: string): boolean {
+  return /^(?:my\s+)?(?:progress(?:\s+report)?|journal(?:\s+entries)?|subjects(?:\s+list)?|library|more)(?:\s+please)?$/.test(
     text,
   );
 }
@@ -213,20 +213,7 @@ export function matchBarIntent(
     return { kind: 'uncertain', text: trimmed };
   }
 
-  // A question or explicit teaching request is conversational even when it
-  // contains words that resemble the literal route grammar. Guarantee Mentor
-  // routing before extracting any session/subject/book/topic token.
-  if (hasQuestionShape(value) || hasPedagogicalRequestShape(value)) {
-    return { kind: 'mentor', text: trimmed };
-  }
-
-  // Unsupported shell destinations must not be mistaken for literal IDs
-  // (for example, "show subject list" must not treat "list" as subjectId).
-  if (hasUnsupportedNavigationTargetShape(value)) {
-    return { kind: 'uncertain', text: trimmed };
-  }
-
-  // --- Literal-ID extraction paths ---
+  // --- Literal-ID extraction paths (unchanged) ---
 
   const sessionId = wordAfter(value, 'session');
   if (sessionId && /\b(continue|resume|open)\b/.test(value)) {
@@ -300,7 +287,11 @@ export function matchBarIntent(
 
   // --- Fallthrough ---
 
-  if (hasNavigationCommandShape(value)) {
+  if (hasQuestionShape(value) || hasPedagogicalRequestShape(value)) {
+    return { kind: 'mentor', text: trimmed };
+  }
+
+  if (hasNavigationCommandShape(value) || hasBareNavigationTargetShape(value)) {
     return { kind: 'uncertain', text: trimmed };
   }
 

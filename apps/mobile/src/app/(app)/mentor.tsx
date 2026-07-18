@@ -117,18 +117,8 @@ function LearnerMentorScreen(): React.ReactElement {
     input: string;
     revision: number;
   } | null>(null);
-  const clarificationRetryLabel =
-    barClarification && barClarification.revision > 1
-      ? t('common.tryAgain')
-      : null;
   const clarificationAnnouncement = barClarification
-    ? [
-        clarificationRetryLabel,
-        t('subject.clarifyLabel'),
-        barClarification.input,
-      ]
-        .filter(Boolean)
-        .join(' ')
+    ? `${t('subject.clarifyLabel')} ${barClarification.input}`
     : null;
   const clarificationRevision = barClarification?.revision;
   useEffect(() => {
@@ -405,11 +395,6 @@ function LearnerMentorScreen(): React.ReactElement {
               accessibilityLiveRegion="polite"
               className="rounded-xl border border-border bg-surface-elevated px-4 py-3"
             >
-              {clarificationRetryLabel ? (
-                <Text className="mb-1 text-xs font-semibold text-primary">
-                  {clarificationRetryLabel}
-                </Text>
-              ) : null}
               <Text className="text-body-sm text-text-secondary">
                 {t('subject.clarifyLabel')}
               </Text>
