@@ -19,15 +19,19 @@ import {
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   LearningModeOption,
   SettingsRow,
 } from '../../../components/more/settings-rows';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function AccommodationScreen(): React.ReactElement {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
+  const screenTopInset = FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? 0 : insets.top;
   const { activeProfile, profiles } = useProfile();
   const navigationContract = useNavigationContract();
   const [showGuide, setShowGuide] = useState(false);
@@ -121,7 +125,11 @@ export default function AccommodationScreen(): React.ReactElement {
     : t('more.learningPreferences.screenTitle');
 
   return (
-    <View className="flex-1 bg-background" testID="accommodation-screen">
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: screenTopInset }}
+      testID="accommodation-screen"
+    >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={handleBack}

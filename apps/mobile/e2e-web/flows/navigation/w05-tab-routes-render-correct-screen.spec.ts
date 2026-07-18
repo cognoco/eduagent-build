@@ -7,6 +7,17 @@ import { emulateNativeTopSafeArea } from '../../helpers/native-safe-area';
 
 test.use({ storageState: path.join(authStateDir, 'solo-learner.json') });
 
+const v0Enabled = process.env.EXPO_PUBLIC_ENABLE_MODE_NAV === 'true';
+const v1Enabled = process.env.EXPO_PUBLIC_ENABLE_MODE_NAV_V1 === 'true';
+const v2Enabled = process.env.EXPO_PUBLIC_ENABLE_MODE_NAV_V2 === 'true';
+const navigationShell = v2Enabled
+  ? 'V2'
+  : v1Enabled
+    ? 'V1'
+    : v0Enabled
+      ? 'V0'
+      : 'flags-off';
+
 async function expectBelowFixedChrome(
   page: Page,
   content: Locator,
@@ -49,6 +60,28 @@ async function expectDirectScreenAtNativeChromeBottom(
   expect(chromeBox!.y + chromeBox!.height).toBeCloseTo(99, 0);
   expect(screenBox!.y).toBeGreaterThanOrEqual(98.5);
   expect(paddingTop).toBe(0);
+}
+
+async function expectDirectScreenAtNativeSafeArea(
+  page: Page,
+  testId: string,
+): Promise<void> {
+  const screenRoot = page.getByTestId(testId);
+  const screenContent = screenRoot.locator(':scope > *').first();
+  await expect(screenRoot).toBeVisible({ timeout: 60_000 });
+  await expect(screenContent).toBeVisible({ timeout: 60_000 });
+
+  const [screenBox, contentBox, paddingTop] = await Promise.all([
+    screenRoot.boundingBox(),
+    screenContent.boundingBox(),
+    screenRoot.evaluate((element) =>
+      Number.parseFloat(window.getComputedStyle(element).paddingTop),
+    ),
+  ]);
+  expect(screenBox).not.toBeNull();
+  expect(contentBox).not.toBeNull();
+  expect(contentBox!.y).toBeGreaterThanOrEqual(screenBox!.y + 46.5);
+  expect(paddingTop).toBe(47);
 }
 
 test('W-05 tab URLs render the correct screen on web', async ({ page }) => {
@@ -124,11 +157,24 @@ for (const viewport of [
   });
 }
 
-test('W-05 native top=47 has one root-owned clearance across pushed routes', async ({
+test(`W-05 native top=47 composes ${navigationShell} safe-area ownership across pushed routes`, async ({
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 760 });
   await emulateNativeTopSafeArea(page, 47);
+
+  if (!v2Enabled) {
+    await page.goto('/mentor-memory', { waitUntil: 'commit' });
+    await expectDirectScreenAtNativeSafeArea(page, 'mentor-memory-screen');
+
+    await page.goto('/more/accommodation', { waitUntil: 'commit' });
+    await expectDirectScreenAtNativeSafeArea(page, 'accommodation-screen');
+
+    await page.goto('/subscription', { waitUntil: 'commit' });
+    await expectDirectScreenAtNativeSafeArea(page, 'subscription-screen');
+    await expect(page.getByTestId('account-avatar-shell')).toHaveCount(0);
+    return;
+  }
 
   await page.goto('/mentor-memory', { waitUntil: 'commit' });
   await expectDirectScreenAtNativeChromeBottom(page, 'mentor-memory-screen');

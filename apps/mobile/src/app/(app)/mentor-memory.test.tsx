@@ -123,13 +123,21 @@ jest.mock(
 // (blocked = isParentProxy) and V1 (blocked = !canEnter). WI-274 tests set
 // this to true so the screen body renders while isParentProxy=true (V1 uses
 // canEnter=true to skip the redirect, then the screen shows disabled controls).
+let mockModeNavV0Enabled = false;
 let mockModeNavV1Enabled = false;
+let mockModeNavV2Enabled = false;
 jest.mock(
   '../../lib/feature-flags' /* gc1-allow: compile-time constant that switches redirect branch; needed to test V1-mode proxy write guards */,
   () => ({
     FEATURE_FLAGS: {
+      get MODE_NAV_V0_ENABLED() {
+        return mockModeNavV0Enabled;
+      },
       get MODE_NAV_V1_ENABLED() {
         return mockModeNavV1Enabled;
+      },
+      get MODE_NAV_V2_ENABLED() {
+        return mockModeNavV2Enabled;
       },
     },
   }),
@@ -225,21 +233,34 @@ describe('MentorMemoryScreen — interests null guard', () => {
     mockProfileData = { ...mockProfileBase, interests: [] };
     mockSearchParams = {};
     mockIsParentProxy = false;
+    mockModeNavV0Enabled = false;
     mockModeNavV1Enabled = false;
+    mockModeNavV2Enabled = false;
     mockSafeAreaTop = 0;
     jest.clearAllMocks();
   });
 
-  it('leaves top safe-area clearance to the pushed root scene', async () => {
-    mockSafeAreaTop = 47;
+  it.each([
+    { shell: 'flags-off', v0: false, v1: false, v2: false, expected: 47 },
+    { shell: 'V0', v0: true, v1: false, v2: false, expected: 47 },
+    { shell: 'V1', v0: true, v1: true, v2: false, expected: 47 },
+    { shell: 'V2', v0: true, v1: true, v2: true, expected: 0 },
+  ])(
+    'owns the native top inset on $shell only when the root does not',
+    async ({ v0, v1, v2, expected }) => {
+      mockModeNavV0Enabled = v0;
+      mockModeNavV1Enabled = v1;
+      mockModeNavV2Enabled = v2;
+      mockSafeAreaTop = 47;
 
-    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+      render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
 
-    expect(
-      (await screen.findByTestId('mentor-memory-screen')).props.style
-        ?.paddingTop ?? 0,
-    ).toBe(0);
-  });
+      expect(
+        (await screen.findByTestId('mentor-memory-screen')).props.style
+          ?.paddingTop ?? 0,
+      ).toBe(expected);
+    },
+  );
 
   it('does not crash when profile.interests is undefined', () => {
     mockProfileData = { ...mockProfileBase, interests: undefined };

@@ -149,18 +149,43 @@ describe('AccommodationScreen', () => {
     active.result.getByTestId('accommodation-mode-predictable');
   });
 
-  it('leaves top safe-area clearance to the pushed root scene', async () => {
-    mockSafeAreaTop = 47;
-    active = renderScreen(<AccommodationScreen />, {
-      profile: owner,
-      routes: modeRoute('none'),
-    });
+  it.each([
+    { shell: 'flags-off', v0: false, v1: false, v2: false, expected: 47 },
+    { shell: 'V0', v0: true, v1: false, v2: false, expected: 47 },
+    { shell: 'V1', v0: true, v1: true, v2: false, expected: 47 },
+    { shell: 'V2', v0: true, v1: true, v2: true, expected: 0 },
+  ])(
+    'owns the native top inset on $shell only when the root does not',
+    async ({ v0, v1, v2, expected }) => {
+      const flags = require('../../../lib/feature-flags') as {
+        FEATURE_FLAGS: {
+          MODE_NAV_V0_ENABLED: boolean;
+          MODE_NAV_V1_ENABLED: boolean;
+          MODE_NAV_V2_ENABLED: boolean;
+        };
+      };
+      const original = { ...flags.FEATURE_FLAGS };
+      try {
+        Object.assign(flags.FEATURE_FLAGS, {
+          MODE_NAV_V0_ENABLED: v0,
+          MODE_NAV_V1_ENABLED: v1,
+          MODE_NAV_V2_ENABLED: v2,
+        });
+        mockSafeAreaTop = 47;
+        active = renderScreen(<AccommodationScreen />, {
+          profile: owner,
+          routes: modeRoute('none'),
+        });
 
-    expect(
-      (await active.result.findByTestId('accommodation-screen')).props.style
-        ?.paddingTop ?? 0,
-    ).toBe(0);
-  });
+        expect(
+          (await active.result.findByTestId('accommodation-screen')).props.style
+            ?.paddingTop ?? 0,
+        ).toBe(expected);
+      } finally {
+        Object.assign(flags.FEATURE_FLAGS, original);
+      }
+    },
+  );
 
   it('PATCHes accommodation mode when a card is pressed', async () => {
     active = renderScreen(<AccommodationScreen />, {
