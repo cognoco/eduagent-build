@@ -222,3 +222,175 @@ outbox and blocks later turns rather than confirming an incomplete exchange.
 Subsequent replay can hydrate the assistant once it exists. Recovering a
 server-side turn that permanently stopped after only its learner event would
 require a backend idempotency contract change, which this item forbids.
+
+## Reviewer rework cycle 2 — focused-route backfill reset
+
+Independent review of PR #2226 identified a screen-boundary gap that the six
+persisted-session cases could not observe. After the streaming hook allocated a
+new Mentor session, `router.setParams({ sessionId })` changed
+`routeSessionId` while the session screen remained focused. That dependency
+change recreated the `useFocusEffect` callback and ran the full focus reset
+mid-opener, clearing `isStreaming`, `classifiedSubject`,
+`pendingSubjectResolution`, and `showWrongSubjectChip`. A first follow-up such
+as `Yes` was consequently classified again without the opener's subject and
+could overwrite the local recovery marker without that context.
+
+The production change is deliberately narrow. The session screen records the
+internally allocated session ID immediately before `setParams`. When the focus
+callback reruns for that exact ID, it consumes the marker and skips that one
+dependency-triggered reset. Any later focus, external route change, or genuine
+navigation has no marker and retains the complete existing reset behavior.
+No backend wire contract, shared schema, database schema, migration, or
+non-Mentor entry behavior changed.
+
+The new regression in
+`apps/mobile/src/app/(app)/session/index.test.tsx` mounts the actual session
+screen, runs the real subject-classification and session-streaming hooks against
+the routed API boundary, holds the opener stream open, applies the internal
+session-ID route backfill, completes the Mentor reply, and sends `Yes`. It
+asserts all of the following together:
+
+- streaming remains active across the internal route update;
+- the opener is the only text classified, so `Yes` retains the opener's
+  Physics subject instead of being reclassified;
+- session creation keeps the route opener as `rawInput` and includes the
+  Gravity topic;
+- opener then `Yes` stream in that order on the same allocated session;
+- the post-follow-up recovery marker still contains the Physics subject and
+  Gravity topic.
+
+### Immutable rework proof
+
+| Phase | Immutable revision | Production state | Result | Raw result |
+| --- | --- | --- | --- | --- |
+| RED | `bb6248ee285ff2c784e652ab084546763148b001` | Screen regression committed before any rework production edit | 1 selected test failed; 49 skipped; 50 total. Backfill observed `idle`, `Yes` was classified again, and recovery subject became absent. | [rework2-red-screen-route-backfill.json](rework2-red-screen-route-backfill.json) |
+| GREEN | `6d12a1d9745ed1f01d58590e1dd252efe2793f26` | One-shot internal-backfill focus-reset guard | 1 selected test passed; 49 skipped; 50 total | [rework2-green-screen-route-backfill.json](rework2-green-screen-route-backfill.json) |
+| REVERT | `3401d7aedcf1e0ee9176fc908731366d830500ea` | Production session screen only restored to the RED revision; regression unchanged | Same 1 selected test failed with the same three differences; 49 skipped; 50 total | [rework2-revert-production-only.json](rework2-revert-production-only.json) |
+| RESTORE | `6b020eebb678ba6dea7c3a175b7506db5ce9cbde` | Production session screen byte-identical to GREEN; regression unchanged | 1 selected test passed; 49 skipped; 50 total | [rework2-restore-screen-route-backfill.json](rework2-restore-screen-route-backfill.json) |
+
+Both of these repository comparisons exit 0, proving the REVERT production
+file equals RED and RESTORE equals GREEN:
+
+```bash
+git diff --exit-code bb6248ee285ff2c784e652ab084546763148b001 3401d7aedcf1e0ee9176fc908731366d830500ea -- 'apps/mobile/src/app/(app)/session/index.tsx'
+git diff --exit-code 6d12a1d9745ed1f01d58590e1dd252efe2793f26 6b020eebb678ba6dea7c3a175b7506db5ce9cbde -- 'apps/mobile/src/app/(app)/session/index.tsx'
+```
+
+The phase command was the same at every revision, changing only the output
+artifact name:
+
+```bash
+pnpm exec jest --config apps/mobile/jest.config.cjs --runInBand --runTestsByPath 'apps/mobile/src/app/(app)/session/index.test.tsx' --testNamePattern='preserves Mentor opener context while its allocated session ID is backfilled into the focused route' --silent --forceExit --json --outputFile=docs/evidence/WI-2099/<phase>.json
+```
+
+### Rework validation before latest-main reconciliation
+
+- New focused-screen regression — 1 passed, 49 skipped, 50 total.
+- Original six persisted-session scenarios — 6 passed, 16 skipped, 22 total;
+  raw result: [rework2-six-persisted-sessions.json](rework2-six-persisted-sessions.json).
+- Full impacted integration file — 22 passed, 22 total; raw result:
+  [rework2-full-learning-session-integration.json](rework2-full-learning-session-integration.json).
+- Affected mobile unit suites — 3 suites passed, 140 tests passed; raw
+  result: [rework2-mobile-unit-suites.json](rework2-mobile-unit-suites.json).
+- Mobile typecheck — the mobile target and all six dependency targets passed
+  with cache skipped.
+- Mobile lint — 0 errors and the existing 51-warning repository baseline; no
+  new warning points at the regression or reset guard.
+
+One discarded full-integration invocation was accidentally overlapped with a
+detached copy of the same Neon-backed file. Their shared database cleanup
+collided, producing unrelated owner-person, authorization, and missing-event
+failures. After confirming no duplicate Jest process remained, the file was
+rerun alone and passed 22/22 as recorded above. The integration harness and
+screen regression both require `--forceExit` for their existing retained open
+handles. Node `v24.18.0` remains the only available runtime despite the repo's
+Node 22 engine declaration.
+
+The canonical BID-13 refinement plan at
+`_wip/mvp-roadmap/refinements/refine-BID-13-mentor.md` now carries an append-only
+final-integration record. The rework does not alter the single
+acceptance-criteria unit, six persisted-session variants, sequencing, or scope.
+
+### Latest-main reconciliation and final verification
+
+The final fetch found `origin/main` at
+`6dce228a9892ae6f90e87863bb18983d2ef75d5e`, one commit ahead of the supplied
+`ba9775edba0eaafa95f65ee1ccd072e744bc757c` base. That intervening quiz-results
+accessibility change did not touch the session implementation, session tests,
+or WI-2099 evidence. It was merged history-preservingly without conflict in
+`c981d3767435a53c5ba59e88243bc8eab6ccb6d6`.
+
+Every impacted gate was then rerun on the merged tree:
+
+- focused-screen route-backfill regression — 1 passed, 49 skipped, 50 total;
+- six persisted-session scenarios — 6 passed, 16 skipped, 22 total;
+- complete impacted integration file — 22 passed, 22 total;
+- three affected mobile suites — 3 suites and 140 tests passed;
+- mobile typecheck — the mobile target and all six dependency targets passed
+  with cache skipped;
+- mobile lint — exit 0 with 0 errors and the existing 51-warning baseline;
+- `pnpm prepush` — exit 0; the repository TypeScript build passed.
+- `pnpm format:check` — exit 0; all three configured project targets passed;
+- `git diff --check` — exit 0;
+- sanctioned `complete --validate` — exit 0; all four completion-summary
+  sections, trip wires, evidence presence, and the single-AC coverage check
+  passed, with no Notion write.
+
+### External-builder final latest-main integration
+
+The final external-builder fetch again resolved `origin/main` to
+`6dce228a9892ae6f90e87863bb18983d2ef75d5e`. The normal history-preserving
+merge command `git merge --no-ff --no-edit origin/main` reported `Already up to
+date.` because that exact main revision was already the second parent of merge
+commit `c981d3767435a53c5ba59e88243bc8eab6ccb6d6`. No commit was rebased,
+amended, squashed, or force-pushed. The verified production/evidence candidate
+before this append-only evidence update was
+`0c41950c53a548314251b3a885d5d475d5a5aa18`.
+
+No revision arrived after the independent Opus review. The fetched main delta
+therefore changed none of `session/index.tsx`, `use-session-streaming.ts`,
+`use-subject-classification.ts`, `session-types.ts`, or the persisted-session
+integration test. A focused runtime-assumption re-check confirmed that the
+internal-backfill guard still records the allocated session ID before
+`setParams`, skips exactly the matching dependency-triggered focus reset once,
+and clears the marker before returning. The independent Opus
+`NO_ACTIONABLE_FINDINGS` verdict remains applicable to the tested tree; no
+production or regression-test change was warranted.
+
+Fresh isolated command outcomes on Node `v24.18.0` and pnpm `10.19.0`:
+
+- focused route-backfill screen regression — exit 0; 1 suite passed; 1 passed,
+  49 skipped, 50 total; raw result:
+  [final-integration-route-backfill-main-6dce228a.json](final-integration-route-backfill-main-6dce228a.json);
+- six persisted opener scenarios — exit 0; 1 suite passed; 6 passed, 16
+  skipped, 22 total; raw result:
+  [final-integration-six-persisted-main-6dce228a.json](final-integration-six-persisted-main-6dce228a.json);
+- literal requested full-file form
+  `pnpm test:integration -- --runTestsByPath tests/integration/learning-session.integration.test.ts --runInBand --silent --forceExit`
+  — exit 0; 1 suite passed; 22 passed, 22 total. This repo's wrapper forwarded
+  the extra separator into Jest, so options after it were reported as matching
+  patterns; the isolated file still ran completely. A second invocation using
+  the repo's proven argument form plus JSON output also exited 0 with 22 of 22;
+  raw result:
+  [final-integration-full-learning-session-main-6dce228a.json](final-integration-full-learning-session-main-6dce228a.json);
+- affected mobile suites — session index, session streaming, subject
+  classification, and message outbox — exit 0; 4 suites passed; 149 tests
+  passed; raw result:
+  [final-integration-mobile-suites-main-6dce228a.json](final-integration-mobile-suites-main-6dce228a.json);
+- `pnpm exec nx run @eduagent/mobile:typecheck` — exit 0; the mobile target and
+  all six dependency tasks succeeded. Nx reported the mobile target as flaky
+  after its successful retry;
+- `pnpm exec nx run @eduagent/mobile:lint` — exit 0; 0 errors and the existing
+  51-warning repository baseline;
+- `pnpm prepush` — exit 0; `tsc --build` succeeded;
+- `pnpm format:check` — exit 0; all three configured projects passed from
+  matching cache outputs;
+- `git diff --check` — exit 0;
+- sanctioned `complete .workitem-artifacts/WI-2099 green --validate` — exit 0;
+  all four summary sections, three trip-wires, evidence presence, and the
+  single-AC coverage check passed, with no Notion write.
+
+The focused and integration commands retain the repository's existing open
+handles and use `--forceExit`. The repository still declares Node 22 while the
+only available runtime is Node 24; every required command above completed
+successfully under that explicit mismatch.

@@ -112,6 +112,153 @@ export const HIDDEN_TAB_ROUTES = [
   'onboarding',
 ] as const;
 
+type V2PushedSafeAreaOwner = 'child' | 'root' | 'path-specific';
+
+// Central ownership audit for every V2 route that keeps floating chrome while
+// being hidden from the V2 tab bar. `child` includes nested navigators (for
+// example More's header), which consume the native safe-area inset themselves.
+// The root therefore reserves only the remaining fixed-control band by default.
+export const V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP = {
+  home: 'child',
+  'own-learning': 'child',
+  library: 'child',
+  recaps: 'child',
+  progress: 'path-specific',
+  more: 'child',
+  dashboard: 'root',
+  subscription: 'child',
+  billing: 'root',
+  'mentor-memory': 'child',
+  subject: 'child',
+  'subject-hub': 'root',
+  'pick-book': 'child',
+  child: 'child',
+  'my-notes': 'child',
+  vocabulary: 'child',
+  topic: 'child',
+} as const satisfies Record<string, V2PushedSafeAreaOwner>;
+
+export const V2_ROOT_SAFE_AREA_EXCEPTIONS = [
+  { routeName: 'dashboard', pathPrefix: '/dashboard' },
+  { routeName: 'billing', pathPrefix: '/billing' },
+  { routeName: 'subject-hub', pathPrefix: '/subject-hub' },
+  { routeName: 'progress', pathPrefix: '/progress/saved' },
+] as const;
+
+interface V2RootSafeAreaException {
+  readonly routeName: string;
+  readonly pathPrefix: string;
+}
+
+export function assertV2SafeAreaOwnershipInvariant(
+  ownership: Readonly<Record<string, V2PushedSafeAreaOwner>>,
+  exceptions: readonly V2RootSafeAreaException[],
+): void {
+  for (const [routeName, owner] of Object.entries(ownership)) {
+    const routeExceptions = exceptions.filter(
+      (exception) => exception.routeName === routeName,
+    );
+
+    if (owner === 'child' && routeExceptions.length > 0) {
+      throw new Error(
+        `V2 pushed route "${routeName}" has child ownership but a root exception`,
+      );
+    }
+
+    if (owner !== 'child' && routeExceptions.length === 0) {
+      throw new Error(
+        `V2 pushed route "${routeName}" has ${owner} ownership without a path-bound exception`,
+      );
+    }
+
+    if (
+      owner === 'root' &&
+      !routeExceptions.some(
+        (exception) => exception.pathPrefix === `/${routeName}`,
+      )
+    ) {
+      throw new Error(
+        `V2 pushed route "${routeName}" has root ownership without the complete route prefix`,
+      );
+    }
+
+    if (
+      owner === 'path-specific' &&
+      routeExceptions.some(
+        (exception) =>
+          !exception.pathPrefix.startsWith(`/${routeName}/`) ||
+          exception.pathPrefix === `/${routeName}`,
+      )
+    ) {
+      throw new Error(
+        `V2 pushed route "${routeName}" has an exception outside its path-specific prefix`,
+      );
+    }
+  }
+
+  for (const exception of exceptions) {
+    if (!(exception.routeName in ownership)) {
+      throw new Error(
+        `V2 root exception "${exception.routeName}" is missing from the ownership audit`,
+      );
+    }
+  }
+}
+
+assertV2SafeAreaOwnershipInvariant(
+  V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP,
+  V2_ROOT_SAFE_AREA_EXCEPTIONS,
+);
+
+function pathnameMatchesPrefix(pathname: string, pathPrefix: string): boolean {
+  return pathname === pathPrefix || pathname.startsWith(`${pathPrefix}/`);
+}
+
+export function resolveV2PushedScenePaddingTop({
+  routeName,
+  pathname,
+  pushedSceneTopInset,
+  safeAreaTop,
+}: {
+  routeName: string;
+  pathname: string;
+  pushedSceneTopInset: number;
+  safeAreaTop: number;
+}): number {
+  const rootRouteName = routeName.split('/')[0] ?? routeName;
+
+  // Expo Router exposes colocated underscore-prefixed implementation modules
+  // to screenOptions even though they are not user-navigable pushed routes.
+  if (rootRouteName.startsWith('_')) {
+    return pushedSceneTopInset - safeAreaTop;
+  }
+
+  if (!(rootRouteName in V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP)) {
+    throw new Error(
+      `V2 pushed route "${routeName}" is missing from the safe-area ownership audit`,
+    );
+  }
+
+  const owner =
+    V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP[
+      rootRouteName as keyof typeof V2_PUSHED_ROUTE_SAFE_AREA_OWNERSHIP
+    ];
+
+  if (owner === 'child') {
+    return pushedSceneTopInset - safeAreaTop;
+  }
+
+  const rootOwnsSafeArea = V2_ROOT_SAFE_AREA_EXCEPTIONS.some(
+    (exception) =>
+      exception.routeName === rootRouteName &&
+      pathnameMatchesPrefix(pathname, exception.pathPrefix),
+  );
+
+  return rootOwnsSafeArea
+    ? pushedSceneTopInset
+    : pushedSceneTopInset - safeAreaTop;
+}
+
 const ACCOUNT_AVATAR_HIDDEN_PATHS = [
   '/account',
   '/onboarding',
@@ -128,6 +275,8 @@ const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
 const DEFAULT_AUTH_REDIRECT_PATH = '/(app)/home';
 const PREVIEW_PROBE_TIMEOUT_MS = 2_500;
 const V2_CHROME_MIN_TOP_INSET = 24;
+const V2_CHROME_CONTROL_TOP_GAP = 8;
+const V2_CHROME_CONTROL_HEIGHT = 44;
 const V2_TAB_BAR_MIN_BOTTOM_INSET = 48;
 
 const iconMap: Record<
@@ -166,6 +315,12 @@ export default function AppLayout() {
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
+  const [scopeChipHeight, setScopeChipHeight] = React.useState(
+    V2_CHROME_CONTROL_HEIGHT,
+  );
+  const [accountAvatarHeight, setAccountAvatarHeight] = React.useState(
+    V2_CHROME_CONTROL_HEIGHT,
+  );
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -645,6 +800,10 @@ export default function AppLayout() {
   const chromeTopInset = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
     ? Math.max(insets.top, V2_CHROME_MIN_TOP_INSET)
     : insets.top;
+  const pushedSceneTopInset =
+    chromeTopInset +
+    V2_CHROME_CONTROL_TOP_GAP +
+    Math.max(scopeChipHeight, accountAvatarHeight);
   const tabBarBottomInset = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
     ? Math.max(insets.bottom, V2_TAB_BAR_MIN_BOTTOM_INSET)
     : Math.max(insets.bottom, 24);
@@ -669,8 +828,16 @@ export default function AppLayout() {
           {showScopeChip ? (
             <View
               className="absolute left-4 z-40"
-              style={{ top: chromeTopInset + 8 }}
+              style={{ top: chromeTopInset + V2_CHROME_CONTROL_TOP_GAP }}
               testID="scope-chip-shell"
+              onLayout={(event) =>
+                setScopeChipHeight(
+                  Math.max(
+                    V2_CHROME_CONTROL_HEIGHT,
+                    Math.ceil(event.nativeEvent.layout.height),
+                  ),
+                )
+              }
             >
               <ScopeChip />
             </View>
@@ -678,8 +845,16 @@ export default function AppLayout() {
           {showAccountAvatar ? (
             <View
               className="absolute right-4 z-40"
-              style={{ top: chromeTopInset + 8 }}
+              style={{ top: chromeTopInset + V2_CHROME_CONTROL_TOP_GAP }}
               testID="account-avatar-shell"
+              onLayout={(event) =>
+                setAccountAvatarHeight(
+                  Math.max(
+                    V2_CHROME_CONTROL_HEIGHT,
+                    Math.ceil(event.nativeEvent.layout.height),
+                  ),
+                )
+              }
             >
               <AccountAvatar />
             </View>
@@ -703,14 +878,15 @@ export default function AppLayout() {
                 // An opaque sceneStyle prevents the previous tab from bleeding
                 // through when switching to a full-screen route (session, quiz, etc.).
                 //
-                // V2 tab scenes (mentor/subjects/journal) own their header row,
-                // but the shell renders no native header (headerShown:false) and
-                // the floating chrome (account avatar, scope chip) is absolutely
-                // positioned — it reserves no layout space. Without a top inset the
-                // screen's own header rides up under the status bar. Pad the scene
-                // down by chromeTopInset so the header aligns with the chrome band.
-                // Full-screen routes (session/quiz/etc.) manage their own layout, and
-                // proxy chrome uses the ProxyBanner for top spacing — both opt out.
+                // The floating V2 chrome (account avatar, scope chip) is absolutely
+                // positioned and reserves no layout space. Top-level tab scenes own
+                // their header row, so they retain the shell's safe-area inset.
+                // Audited pushed scenes keep a single safe-area owner. The root
+                // normally reserves only the remaining fixed-control band because
+                // the child (or nested navigator) owns the native inset. A narrow,
+                // path-bound exception set covers screens proven not to own it.
+                // Full-screen routes and proxy chrome manage their own top spacing
+                // and opt out.
                 sceneStyle: {
                   backgroundColor: isProxyChromeActive
                     ? proxyColors.sceneBackground
@@ -719,7 +895,14 @@ export default function AppLayout() {
                     FEATURE_FLAGS.MODE_NAV_V2_ENABLED &&
                     !isProxyChromeActive &&
                     !isFullScreen
-                      ? chromeTopInset
+                      ? isVisible
+                        ? chromeTopInset
+                        : resolveV2PushedScenePaddingTop({
+                            routeName: route.name,
+                            pathname,
+                            pushedSceneTopInset,
+                            safeAreaTop: insets.top,
+                          })
                       : 0,
                 },
                 tabBarStyle: isFullScreen

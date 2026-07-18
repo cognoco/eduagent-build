@@ -25,6 +25,7 @@ import type { Profile, Subscription } from '@eduagent/schemas';
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+let mockSafeAreaTop = 0;
 
 // Captures the useFocusEffect callback so tests can simulate screen focus.
 // Must be declared before jest.mock factory so the factory closure captures it.
@@ -55,7 +56,12 @@ jest.mock(
 jest.mock(
   'react-native-safe-area-context', // gc1-allow: native-boundary — requires native insets unavailable in Jest
   () => ({
-    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+    useSafeAreaInsets: () => ({
+      top: mockSafeAreaTop,
+      bottom: 0,
+      left: 0,
+      right: 0,
+    }),
   }),
 );
 
@@ -437,6 +443,7 @@ describe('SubscriptionScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     capturedFocusEffect = null;
+    mockSafeAreaTop = 0;
     // Reset RevenueCat hook state
     mockOfferings = null;
     mockOfferingsLoading = false;
@@ -521,6 +528,42 @@ describe('SubscriptionScreen', () => {
         }),
     );
   });
+
+  it.each([
+    { shell: 'flags-off', v0: false, v1: false, v2: false, expected: 47 },
+    { shell: 'V0', v0: true, v1: false, v2: false, expected: 47 },
+    { shell: 'V1', v0: true, v1: true, v2: false, expected: 47 },
+    { shell: 'V2', v0: true, v1: true, v2: true, expected: 47 },
+  ])(
+    'owns the native top inset on $shell',
+    async ({ v0, v1, v2, expected }) => {
+      const flags = require('../../lib/feature-flags') as {
+        FEATURE_FLAGS: {
+          MODE_NAV_V0_ENABLED: boolean;
+          MODE_NAV_V1_ENABLED: boolean;
+          MODE_NAV_V2_ENABLED: boolean;
+        };
+      };
+      const original = { ...flags.FEATURE_FLAGS };
+      try {
+        Object.assign(flags.FEATURE_FLAGS, {
+          MODE_NAV_V0_ENABLED: v0,
+          MODE_NAV_V1_ENABLED: v1,
+          MODE_NAV_V2_ENABLED: v2,
+        });
+        mockSafeAreaTop = 47;
+
+        render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+        expect(
+          (await screen.findByTestId('subscription-screen')).props.style
+            ?.paddingTop ?? 0,
+        ).toBe(expected);
+      } finally {
+        Object.assign(flags.FEATURE_FLAGS, original);
+      }
+    },
+  );
 
   // -------------------------------------------------------------------------
   // Loading states

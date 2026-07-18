@@ -325,3 +325,23 @@ Fresh post-RESTORE validation completed against the final candidate tree:
 - Non-mutating `complete --validate` — exit 0 after the completion summary was made count-specific; all section, prose trip-wire, evidence-presence, and AC-coverage checks reported `PASS`. No Notion writes or lifecycle transition were performed.
 
 The repository continued to emit its recorded Node 22 engine warning under Node `v24.18.0`, plus existing Jest/Expo test diagnostics; every named gate exited successfully.
+
+## External-builder integration of WI-2099 and WI-2185
+
+On 2026-07-18, a fresh fetch verified the reviewed WI-2094 branch and its remote at `dac4dd1d99374e6079238afe7801099a69a25243`, then resolved `origin/main` to `a3250e10f45497e9e82cb6f20b47d5a3a76ed831`. That main revision contains the landed WI-2099 session-state repair and WI-2185 V2 pushed-scene chrome repair. A normal `git merge --no-ff --no-commit origin/main` completed cleanly with `MERGE_HEAD` equal to the fetched main revision; there were no unmerged paths, conflict markers, or manual source resolutions. The reviewed WI-2094 Mentor source and test files remained byte-identical to the pre-merge branch head, while the incoming session-state and chrome changes entered through the main parent unchanged.
+
+Fresh verification on the integrated merge tree completed as follows:
+
+- Four impacted WI-2094 Mentor/matcher suites — exit 0; 4 suites and 86 cases passed.
+- Named matcher selection — exit 0; 11 selected cases passed.
+- Named learner-screen routing/clarification selection — exit 0; 5 selected cases passed.
+- Platform selection — exit 0; both iOS and Android cases passed.
+- Isolated `small-screen-360` selection — exit 0; the single interactive compact-layout case passed.
+- WI-2099 focused route-backfill session-screen regression — exit 0; 1 selected case passed and 49 were skipped by the selector.
+- WI-2099 persisted-session integration — exit 0; all 6 selected opener-persistence scenarios passed and 16 were skipped by the selector.
+- WI-2185 focused root/child safe-area ownership and chrome matrix — exit 0; 21 selected cases passed across the root layout and Mentor Memory suites.
+- Cache-bypassed mobile typecheck — exit 0; the mobile target and all six dependencies passed.
+- Cache-bypassed mobile lint — exit 0; 0 errors with the established 51-warning baseline.
+- `pnpm prepush`, `pnpm format:check`, staged and unstaged `git diff --check`, and non-mutating WI-2094 `complete --validate` — all exited 0; every validation check reported `PASS`, with no Notion writes.
+
+Warnings remained non-blocking and unchanged in character: the repository requests Node 22 while this host provides Node `v24.18.0`; Jest reported stale `baseline-browser-mapping` data and existing Expo native-module/environment diagnostics; the parallel cache-bypassed typecheck emitted a transient `MaxListenersExceededWarning`. No historical RED/GREEN/REVERT/RESTORE artifact was edited or regenerated, and the supervised untracked `.workitem-artifacts/WI-2094/workitem.json` remained untouched.

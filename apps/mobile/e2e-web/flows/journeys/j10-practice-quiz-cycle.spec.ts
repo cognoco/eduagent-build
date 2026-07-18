@@ -28,8 +28,8 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
   await seedAndSignIn(page, {
     scenario: 'onboarding-complete',
     alias: 'j10',
-    landingTestId: 'learner-screen',
-    landingPath: '/home',
+    landingTestId: 'mentor-screen',
+    landingPath: '/mentor',
   });
 
   await page.goto('/home', { waitUntil: 'commit' });
@@ -178,8 +178,8 @@ test('J-10 / QUIZ-18 cold quiz play route shows no-round recovery', async ({
   await seedAndSignIn(page, {
     scenario: 'onboarding-complete',
     alias: 'j10-no-round',
-    landingTestId: 'learner-screen',
-    landingPath: '/home',
+    landingTestId: 'mentor-screen',
+    landingPath: '/mentor',
   });
 
   await page.goto('/quiz/play', { waitUntil: 'commit' });
