@@ -24,6 +24,8 @@ export const scopesRoutes = new Hono<RouteEnv>()
     return c.json(supporterScopeListSchema.parse(scopes));
   })
   .get('/scopes/coldstart', async (c) => {
+    // [WI-2237 deferred-sweep] see resolveSupporterColdStart — intentionally
+    // exempt from the accepted-visibility gate (WI-2395 tracks the deferral).
     const { db, profileId } = withProfile(c);
     const coldStart = await resolveSupporterColdStart(db, profileId);
     return c.json(supporterColdStartSchema.parse(coldStart));
