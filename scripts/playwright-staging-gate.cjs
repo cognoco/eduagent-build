@@ -116,7 +116,9 @@ function classifyFailure({ artifactRoot, exitCode, resultText = '' }) {
       const error = record?.error?.error?.message ?? record?.error?.message ?? record?.errorText;
       return RETRYABLE.has(Number(status))
         || (record?.type === 'requestfailed' && TRANSPORT.test(String(error ?? '')))
-        || (snapshotUrl && /\/v1\//.test(snapshotUrl) && snapshotStatuses.includes(-1));
+        || (snapshotUrl
+          && /\/v1\//.test(snapshotUrl)
+          && snapshotStatuses.some((snapshotStatus) => snapshotStatus === -1 || RETRYABLE.has(snapshotStatus)));
     } catch {
       return false;
     }

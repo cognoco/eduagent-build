@@ -100,6 +100,19 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
       ).toEqual({ kind: 'product' });
       writeFileSync(
         join(root, 'run', 'trace.trace'),
+        JSON.stringify({
+          type: 'resource-snapshot',
+          snapshot: {
+            request: { url: 'https://api-stg.example.test/v1/profiles' },
+            response: { status: 503 },
+          },
+        }),
+      );
+      expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
+        kind: 'infra-signalled',
+      });
+      writeFileSync(
+        join(root, 'run', 'trace.trace'),
         JSON.stringify({ type: 'console', text: '503 in prose' }),
       );
       expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
