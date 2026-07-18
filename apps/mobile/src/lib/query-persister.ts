@@ -24,6 +24,7 @@
 // ---------------------------------------------------------------------------
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Sentry from '@sentry/react-native';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { defaultShouldDehydrateQuery, type Query } from '@tanstack/react-query';
 import * as Updates from 'expo-updates';
@@ -49,29 +50,93 @@ export function buildPersisterKey(userId: string | null | undefined): string {
 }
 
 /**
- * [WI-1987 rework] Deterministic fallback purge for sign-out paths that
- * don't have a `clerkUserId` to build a targeted key from (auth-expired,
- * profile-load-timeout — see sign-out.ts). Since we can't compute WHICH
- * scoped key belongs to the signing-out session, this removes every scoped
- * persister key on disk (plus the pre-BUG-357 unscoped legacy key) rather
- * than falling back to `queryClient.clear()` + the persister's throttled
- * (2s) write — the fallback the previous version of this fix left in place,
- * which is exactly the crash-window race BUG-357 closed for the
- * known-clerkUserId case. A device that has signed in as more than one
- * Clerk user loses every account's offline-paint cache when this runs, not
- * just the signing-out one — an acceptable cost for guaranteeing no scoped
- * cache (which may hold learner prose) survives an auth-expired sign-out on
- * disk.
+ * Pure filter: given every AsyncStorage key, return the persister-owned ones
+ * (the pre-BUG-357 unscoped legacy key plus every `::`-scoped partition).
+ * Extracted so both the purge paths and their tests share one definition of
+ * "a persister cache key" — a sibling app key must never be swept.
  */
-export async function removeAllScopedPersisterCaches(): Promise<void> {
-  const keys = await AsyncStorage.getAllKeys();
-  const targets = keys.filter(
+export function listScopedPersisterKeys(allKeys: readonly string[]): string[] {
+  return allKeys.filter(
     (key) =>
       key === LEGACY_CACHE_KEY || key.startsWith(SCOPED_CACHE_KEY_PREFIX),
   );
-  if (targets.length > 0) {
-    await AsyncStorage.multiRemove(targets);
+}
+
+/**
+ * [WI-1987] Remove the given persister cache key(s) and, on a storage
+ * failure, ESCALATE rather than swallow. The repo Fix Development Rule bans
+ * silent recovery in auth code (a swallowed removal here would leave a
+ * plaintext learner-content cache on disk while sign-out reported success) —
+ * so a failed purge emits a structured Sentry event (queryable metric via the
+ * `purge` tag) carrying only the storage KEY NAMES, never the cached values.
+ * It never throws: sign-out must always complete (session teardown is the
+ * primary boundary); the survivor is re-attempted at the next definitively
+ * signed-out moment via `reattemptPersisterPurgeIfSignedOut`.
+ */
+export async function purgePersisterKeys(
+  keyNames: readonly string[],
+): Promise<void> {
+  if (keyNames.length === 0) return;
+  try {
+    await AsyncStorage.multiRemove([...keyNames]);
+  } catch (err) {
+    Sentry.captureMessage('sign-out: scoped persister purge failed', {
+      level: 'error',
+      tags: { feature: 'auth', purge: 'persister-scoped-cache' },
+      // [WI-1987] KEY NAMES ONLY — never the cached values (which may hold
+      // learner prose). Names identify which cache survived, for remediation.
+      extra: { keyNames: [...keyNames], error: String(err) },
+    });
   }
+}
+
+/**
+ * [WI-1987] Fallback purge for sign-out paths without a `clerkUserId` to build
+ * a targeted key from (auth-expired, profile-load-timeout — see sign-out.ts),
+ * and the re-sweep entry point. Since we can't compute WHICH scoped key belongs
+ * to the signing-out session, it removes every scoped persister key on disk
+ * (plus the pre-BUG-357 unscoped legacy key). A device signed in as more than
+ * one Clerk user loses every account's offline-paint cache when this runs — an
+ * acceptable cost for guaranteeing no scoped cache (which may hold learner
+ * prose) survives on disk. Enumeration and removal failures escalate (never
+ * throw) via the same key-names-only Sentry path as `purgePersisterKeys`.
+ */
+export async function removeAllScopedPersisterCaches(): Promise<void> {
+  let allKeys: readonly string[];
+  try {
+    allKeys = await AsyncStorage.getAllKeys();
+  } catch (err) {
+    Sentry.captureMessage('sign-out: scoped persister key enumeration failed', {
+      level: 'error',
+      tags: { feature: 'auth', purge: 'persister-scoped-cache' },
+      extra: { error: String(err) },
+    });
+    return;
+  }
+  await purgePersisterKeys(listScopedPersisterKeys(allKeys));
+}
+
+/**
+ * [WI-1987] Re-attempt a sign-out purge that a prior storage failure left
+ * behind. Sweeps every scoped persister cache — but ONLY when the app is
+ * DEFINITIVELY signed out (`isLoaded && !isSignedIn`), never during Clerk's
+ * initial load. That guard is load-bearing: on a returning user's cold start
+ * `useAuth()` reports `!isSignedIn` while still loading, and sweeping then
+ * would destroy that user's own legitimate offline-paint cache before their
+ * persister mounts. Gating on "definitively signed out" covers exactly the two
+ * moments the failure contract requires — app start with no session, and the
+ * window before the next sign-in — and no others. Returns whether it swept.
+ */
+export async function reattemptPersisterPurgeIfSignedOut(auth: {
+  isLoaded: boolean;
+  // `boolean | undefined` matches Clerk's useAuth(): isSignedIn is undefined
+  // while loading — treated as not-definitively-signed-out by the isLoaded
+  // guard below, so no sweep runs mid-load.
+  isSignedIn: boolean | undefined;
+}): Promise<boolean> {
+  if (!auth.isLoaded || auth.isSignedIn) return false;
+  await removeAllScopedPersisterCaches();
+  return true;
 }
 
 /**
