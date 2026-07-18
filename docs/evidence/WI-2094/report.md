@@ -224,10 +224,12 @@ The unresolved PR 2230 review thread at `discussion_r3607204374` identified a pl
 
 The platform-sensitive tests were added before the production guard changed. The iOS expectation already passed against reviewed production, while Android failed for the intended reason: two clarification revisions produced two explicit calls even though both visible revisions retained the polite live-region path.
 
-| Phase | Production state | Result | Raw result |
-| --- | --- | --- | --- |
-| Rework-cycle-2 RED | Reviewed production with new platform-sensitive tests | 1 suite failed; 1 failed, 1 passed, 36 skipped, 38 total | [rework-2-red.json](rework-2-red.json) |
-| Rework-cycle-2 GREEN | Explicit announcement effect gated to iOS | 1 suite passed; 2 passed, 36 skipped, 38 total | [rework-2-green.json](rework-2-green.json) |
+| Phase | Immutable reference | Production state | Result | Raw result |
+| --- | --- | --- | --- | --- |
+| Rework-cycle-2 RED | Production baseline `b9e05bdc4bd51c45c59aafe0786e54c96895391f`; raw-result blob `ff057d2452c9571f18fe2af83e12487796f8c69f` sealed by `2ea88ef95f5901569c55b7a15e12d76c63e40295` | Reviewed production with new platform-sensitive tests in the working tree; no standalone RED execution commit was created | 1 suite failed; 1 failed, 1 passed, 36 skipped, 38 total | [rework-2-red.json](rework-2-red.json) |
+| Rework-cycle-2 GREEN | `2ea88ef95f5901569c55b7a15e12d76c63e40295`; raw-result blob `76694cd644690e508d6081120d07ba4ce14e7d23` | Explicit announcement effect gated to iOS | 1 suite passed; 2 passed, 36 skipped, 38 total | [rework-2-green.json](rework-2-green.json) |
+| Rework-cycle-2 production-only REVERT | `fc80a892699991a1ad48e530c168ddb718c1f963` | Only the iOS platform guard was removed; the hook formatter collapsed the remaining two-term condition; tests were unchanged | 1 suite failed; 1 failed, 1 passed, 36 skipped, 38 total; Android alone failed with two explicit calls | [rework-2-revert-production.json](rework-2-revert-production.json) |
+| Rework-cycle-2 exact RESTORE | `cb1bdffaf6cc170452cb4bd23f10882291f25816` | Exact candidate production block restored; `mentor.tsx` blob `84b96b62fde99e8e0c7ff698802f5a967fd87308` matches the candidate | 1 suite passed; 2 passed, 36 skipped, 38 total | [rework-2-restore-green.json](rework-2-restore-green.json) |
 
 RED and GREEN used the same focused command, changing only the output file after the production guard was applied:
 
@@ -235,17 +237,30 @@ RED and GREEN used the same focused command, changing only the output file after
 rtk pnpm exec jest --runTestsByPath '/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/apps/mobile/src/app/(app)/mentor.test.tsx' --runInBand --no-coverage --testNamePattern 'explicitly on iOS|Android clarification' --json --outputFile='/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/docs/evidence/WI-2094/rework-2-red.json'
 ```
 
+The immutable production-only REVERT and RESTORE used that identical selection, changing only the output file:
+
+```bash
+rtk pnpm exec jest --runTestsByPath '/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/apps/mobile/src/app/(app)/mentor.test.tsx' --runInBand --no-coverage --testNamePattern 'explicitly on iOS|Android clarification' --json --outputFile='/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/docs/evidence/WI-2094/rework-2-revert-production.json'
+rtk pnpm exec jest --runTestsByPath '/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/apps/mobile/src/app/(app)/mentor.test.tsx' --runInBand --no-coverage --testNamePattern 'explicitly on iOS|Android clarification' --json --outputFile='/home/vetinari/nexus/_dev/eduagent-build/.worktrees/wi-2094-rework-1/docs/evidence/WI-2094/rework-2-restore-green.json'
+```
+
+`git diff 2ea88ef95f5901569c55b7a15e12d76c63e40295 cb1bdffaf6cc170452cb4bd23f10882291f25816 -- 'apps/mobile/src/app/(app)/mentor.tsx' 'apps/mobile/src/app/(app)/mentor.test.tsx'` returns no output. The candidate and restored `mentor.tsx` both resolve to blob `84b96b62fde99e8e0c7ff698802f5a967fd87308`, and the platform-sensitive test file is unchanged across both disposable production commits.
+
+The supervised claim attempt at the start of this evidence repair was refused because `WI-2094` remained at `Stage=Executing` with a populated claim. The fetched artifact confirmed that the existing claimant was the same `builder:codex:WI-2094` identity, so the operator-authorized same-claim resume continued; no foreign claim or lifecycle change was observed.
+
 The production repair adds only the `Platform.OS !== 'ios'` early-return condition to the existing effect. The revisioned clarification state, visible localized label and submitted input, and `accessibilityLiveRegion="polite"` remain unchanged. The iOS test proves two successive revisions each call the explicit announcer; the Android test proves the same two visible revisions retain the polite live region and make zero explicit announcer calls. No matcher, routing, supporter/person dispatch, session, or Challenge behavior changed in this cycle.
 
-### Rework-cycle-2 final verification and main integration
+### Rework-cycle-2 final verification, main integration, and immutable operator gate
 
-- Platform-sensitive focused GREEN — exit 0; 1 suite passed, with 2 selected cases passed and 36 skipped. Machine-readable output: [rework-2-green.json](rework-2-green.json).
+- Platform-sensitive focused GREEN after the exact RESTORE — exit 0; 1 suite passed, with 2 selected cases passed and 36 skipped. Machine-readable output: [rework-2-restore-green.json](rework-2-restore-green.json).
 - Four impacted Mentor/matcher suites — exit 0; 4 suites and 76 tests passed with no snapshots.
 - Mobile typecheck — exit 0; the mobile target and six dependencies completed successfully from the Nx cache.
 - Mobile lint — exit 0; 0 errors and the unchanged 51-warning baseline. No warning points at either changed Mentor file.
-- `pnpm format:check` — exit 0; all three configured repository targets passed. A direct Prettier check of every changed source, test, WI artifact, JSON result, and Markdown file also passed.
+- `pnpm format:check` — exit 0; all three configured repository targets passed.
 - `pnpm prepush` — exit 0; `tsc --build` completed successfully under the already-recorded Node 24 / repository Node 22 engine warning.
-- Both generated Jest result files and the evidence manifest parsed as JSON; staged and unstaged `git diff --check` returned no output.
+- Both new REVERT/RESTORE Jest result files and the evidence manifest parsed as JSON; staged and unstaged `git diff --check` returned no output.
 - Non-mutating `complete --validate` — exit 0; all four completion sections, all three prose trip-wires, evidence presence, and AC coverage reported `PASS`; no Notion writes were performed.
 
 A fresh `git fetch origin` resolved `origin/main` to `6dce228a9892ae6f90e87863bb18983d2ef75d5e`, one commit beyond merge base `ba9775edba0eaafa95f65ee1ccd072e744bc757c`. The history-preserving `git merge --no-commit --no-ff origin/main` completed without conflicts and left `MERGE_HEAD` exactly equal to the fetched main revision for the intentional final commit. The incoming delta is confined to the WI-2192 quiz-result accessibility repair, its web-E2E support, and a root package script; it changes no Mentor component, Mentor test, matcher, dependency lock, or WI-2094 artifact byte. Therefore the already-fresh behavior, type, lint, format, and pre-push gates remained applicable without repetition. Post-integration staged and unstaged diff hygiene, direct changed-file formatting, and non-mutating Cosmo validation were rerun and passed.
+
+After the immutable REVERT and RESTORE commits, a second fresh `git fetch origin` kept `origin/main` at the same `6dce228a9892ae6f90e87863bb18983d2ef75d5e` revision, which is already an ancestor of the candidate history; no additional merge was needed. The focused platform cases, four impacted suites, typecheck, lint, repository format check, pre-push build, JSON parsing, diff hygiene, and non-mutating Cosmo validation listed above were all rerun after restoration. The production source, component test, matcher, and matcher test have no net diff from `2ea88ef95f5901569c55b7a15e12d76c63e40295`.

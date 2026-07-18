@@ -22,3 +22,5 @@ Raw Jest result files:
 - [rework-1-restore-green.json](rework-1-restore-green.json)
 - [rework-2-red.json](rework-2-red.json)
 - [rework-2-green.json](rework-2-green.json)
+- [rework-2-revert-production.json](rework-2-revert-production.json)
+- [rework-2-restore-green.json](rework-2-restore-green.json)

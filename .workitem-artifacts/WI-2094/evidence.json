@@ -12,8 +12,13 @@
     },
     {
       "acRef": "AC-1",
-      "description": "Platform-sensitive review coverage proves every revised clarification is explicitly announced on iOS while Android makes no explicit announcement and retains the visible polite live region.",
-      "pointer": "docs/evidence/WI-2094/rework-2-green.json"
+      "description": "The immutable production-only platform-guard REVERT reproduces Android's duplicate explicit announcements while the iOS case remains green and all tests stay unchanged.",
+      "pointer": "docs/evidence/WI-2094/rework-2-revert-production.json"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "The exact production RESTORE returns both platform-sensitive cases to green: every revised clarification is explicitly announced on iOS while Android retains only the visible polite live region.",
+      "pointer": "docs/evidence/WI-2094/rework-2-restore-green.json"
     },
     {
       "acRef": "AC-1",
