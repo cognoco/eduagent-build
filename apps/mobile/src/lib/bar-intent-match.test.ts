@@ -24,6 +24,55 @@ describe('matchBarIntent', () => {
     });
   });
 
+  it('routes an explicit pedagogical show-me-how request to Mentor with exact input', () => {
+    expect(matchBarIntent('show me how photosynthesis works')).toEqual({
+      kind: 'mentor',
+      text: 'show me how photosynthesis works',
+    });
+  });
+
+  it('routes a pedagogical request containing a literal subject ID to Mentor with exact input', () => {
+    expect(matchBarIntent('show me how subject subject-123 works')).toEqual({
+      kind: 'mentor',
+      text: 'show me how subject subject-123 works',
+    });
+  });
+
+  it('routes a question containing a subject-like literal to Mentor with exact input', () => {
+    expect(matchBarIntent('should I open subject spanish?')).toEqual({
+      kind: 'mentor',
+      text: 'should I open subject spanish?',
+    });
+  });
+
+  it('preserves an explicit literal subject catalog jump', () => {
+    expect(matchBarIntent('show subject subject-123')).toEqual({
+      kind: 'jump',
+      deepLink: {
+        route: 'subject.hub',
+        params: { subjectId: 'subject-123' },
+        chain: [],
+      },
+    });
+  });
+
+  it('keeps a bogus subject-list target on the clarification path', () => {
+    expect(matchBarIntent('show subject list')).toEqual({
+      kind: 'uncertain',
+      text: 'show subject list',
+    });
+  });
+
+  it.each(['progress report', 'journal entries', 'subjects list'])(
+    'keeps the unsupported destination phrase "%s" on the clarification path',
+    (input) => {
+      expect(matchBarIntent(input)).toEqual({
+        kind: 'uncertain',
+        text: input,
+      });
+    },
+  );
+
   it('returns mentor for a clear conversational message', () => {
     expect(matchBarIntent('why does the moon look bigger tonight?')).toEqual({
       kind: 'mentor',

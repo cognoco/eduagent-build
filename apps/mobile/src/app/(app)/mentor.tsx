@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +32,7 @@ import {
   useEligibleManagedPersons,
   type EligibleManagedPerson,
 } from '../../hooks/use-eligible-supportees';
+import { useAnnounce } from '../../hooks/use-announce';
 import { useNowFeed, useNowOverflow } from '../../hooks/use-now-feed';
 import { useSubjectsIndex } from '../../hooks/use-subjects-index';
 import { matchBarIntent } from '../../lib/bar-intent-match';
@@ -94,6 +96,8 @@ function pushMentorHomeworkCamera(router: ReturnType<typeof useRouter>): void {
 function LearnerMentorScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
+  const announce = useAnnounce();
+  const { width: windowWidth } = useWindowDimensions();
   const nowFeed = useNowFeed();
   const subjectsIndex = useSubjectsIndex();
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
@@ -113,6 +117,30 @@ function LearnerMentorScreen(): React.ReactElement {
     input: string;
     revision: number;
   } | null>(null);
+  const clarificationRetryLabel =
+    barClarification && barClarification.revision > 1
+      ? t('common.tryAgain')
+      : null;
+  const clarificationAnnouncement = barClarification
+    ? [
+        clarificationRetryLabel,
+        t('subject.clarifyLabel'),
+        barClarification.input,
+      ]
+        .filter(Boolean)
+        .join(' ')
+    : null;
+  const clarificationRevision = barClarification?.revision;
+  useEffect(() => {
+    if (
+      Platform.OS !== 'ios' ||
+      !clarificationAnnouncement ||
+      clarificationRevision === undefined
+    ) {
+      return;
+    }
+    announce(clarificationAnnouncement);
+  }, [announce, clarificationAnnouncement, clarificationRevision]);
   const overflow = useNowOverflow(showOverflow);
   const feed = nowFeed.data ?? nowFeed.fallbackFeed ?? undefined;
   const firstRealState = hasFirstRealState({
@@ -317,7 +345,10 @@ function LearnerMentorScreen(): React.ReactElement {
       <ScrollView
         testID="mentor-scroll"
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 16 }}
+        contentContainerStyle={{
+          paddingHorizontal: windowWidth <= 360 ? 12 : 20,
+          paddingVertical: 16,
+        }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -374,6 +405,11 @@ function LearnerMentorScreen(): React.ReactElement {
               accessibilityLiveRegion="polite"
               className="rounded-xl border border-border bg-surface-elevated px-4 py-3"
             >
+              {clarificationRetryLabel ? (
+                <Text className="mb-1 text-xs font-semibold text-primary">
+                  {clarificationRetryLabel}
+                </Text>
+              ) : null}
               <Text className="text-body-sm text-text-secondary">
                 {t('subject.clarifyLabel')}
               </Text>
