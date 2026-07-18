@@ -1,11 +1,11 @@
 {
   "config": {
-    "configFile": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/playwright.config.ts",
-    "rootDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+    "configFile": "apps/mobile/playwright.config.ts",
+    "rootDir": "apps/mobile/e2e-web",
     "forbidOnly": true,
     "fullyParallel": true,
-    "globalSetup": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/global-setup.ts",
-    "globalTeardown": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/global-teardown.ts",
+    "globalSetup": "apps/mobile/e2e-web/helpers/global-setup.ts",
+    "globalTeardown": "apps/mobile/e2e-web/helpers/global-teardown.ts",
     "globalTimeout": 0,
     "grep": {},
     "grepInvert": null,
@@ -27,7 +27,7 @@
     "quiet": false,
     "projects": [
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -36,7 +36,7 @@
         },
         "id": "setup",
         "name": "setup",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/helpers[\\\\/]auth\\.setup\\.ts/"
@@ -44,7 +44,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -53,7 +53,7 @@
         },
         "id": "smoke-auth",
         "name": "smoke-auth",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]auth[\\\\/](auth-navigation|sign-up-flow)\\.spec\\.ts/"
@@ -61,7 +61,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -70,7 +70,7 @@
         },
         "id": "auth-access",
         "name": "auth-access",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]auth[\\\\/](a02-signup-verification-ui|a03-forgot-password-ui|a05-mfa-verification-ui|a14-slow-auth-spinner)\\.spec\\.ts/"
@@ -78,7 +78,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -87,7 +87,7 @@
         },
         "id": "smoke-learner",
         "name": "smoke-learner",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]journeys[\\\\/]j01-.*\\.spec\\.ts/"
@@ -95,7 +95,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -104,7 +104,7 @@
         },
         "id": "smoke-parent",
         "name": "smoke-parent",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]journeys[\\\\/]j03-.*\\.spec\\.ts/"
@@ -112,7 +112,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -121,7 +121,7 @@
         },
         "id": "role-transitions",
         "name": "role-transitions",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]journeys[\\\\/]j0[4-7]-.*\\.spec\\.ts/"
@@ -129,7 +129,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -138,7 +138,7 @@
         },
         "id": "later-phases",
         "name": "later-phases",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/](journeys[\\\\/](j0[89]|j[1-9][0-9])-.*|auth[\\\\/]w03-.*|navigation[\\\\/]w0[1-5]-.*)\\.spec\\.ts/"
@@ -146,7 +146,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -155,7 +155,7 @@
         },
         "id": "child-subject-detail",
         "name": "child-subject-detail",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]navigation[\\\\/]w06-child-subject-detail\\.spec\\.ts/"
@@ -163,7 +163,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -172,7 +172,7 @@
         },
         "id": "mentor-audit-registry-smoke",
         "name": "mentor-audit-registry-smoke",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]mentor-audit[\\\\/].+\\.spec\\.ts/"
@@ -180,7 +180,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -189,7 +189,7 @@
         },
         "id": "config-f-smoke",
         "name": "config-f-smoke",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]config-f[\\\\/].+\\.spec\\.ts/"

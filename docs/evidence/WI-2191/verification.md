@@ -34,10 +34,10 @@ now-unnecessary `stopPropagation()` handlers are removed.
 
 | Acceptance Criterion | Executable evidence |
 | --- | --- |
-| No interactive ancestor contains an interactive descendant; Quick quiz is a labelled group or single non-nested action | `apps/mobile/src/app/(app)/practice/index.tsx`; `apps/mobile/src/app/(app)/practice/index.test.tsx`; `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts`; `docs/evidence/WI-2191/green-native-full.json`; `docs/evidence/WI-2191/green-web-focused.json` |
-| Capitals and Guess Who remain separate localized 44px controls in logical focus/read order | `apps/mobile/src/app/(app)/practice/index.tsx`; `apps/mobile/src/app/(app)/practice/index.test.tsx`; `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts`; `docs/evidence/WI-2191/green-web-focused.json` |
-| Pointer, touch, Enter, Space, VoiceOver, and TalkBack activation launch only the selected route once | `apps/mobile/src/app/(app)/practice/index.test.tsx`; `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts`; `docs/evidence/WI-2191/green-native-full.json`; `docs/evidence/WI-2191/green-web-focused.json` |
-| Semantic-tree and bubbling regression coverage includes narrow/wide variants and preserves sibling Practice cards | `apps/mobile/src/app/(app)/practice/index.test.tsx`; `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts`; `docs/evidence/WI-2191/green-native-full.json`; `docs/evidence/WI-2191/green-web-relevant-full.json` |
+| AC-1 — No interactive ancestor contains an interactive descendant; Quick quiz is a labelled group or single non-nested action | Production group and sibling actions: `apps/mobile/src/app/(app)/practice/index.tsx:703`, `apps/mobile/src/app/(app)/practice/index.tsx:714`, `apps/mobile/src/app/(app)/practice/index.tsx:746`, `apps/mobile/src/app/(app)/practice/index.tsx:785`. Native defect assertion: `apps/mobile/src/app/(app)/practice/index.test.tsx:343`, `apps/mobile/src/app/(app)/practice/index.test.tsx:360`. Chromium structural assertion and passing result: `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:43`, `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:66`, `docs/evidence/WI-2191/green-web-focused.json:232`, `docs/evidence/WI-2191/green-web-focused.json:340`. |
+| AC-2 — Capitals and Guess Who remain separate localized 44px controls in logical focus/read order | Production localized sibling controls: `apps/mobile/src/app/(app)/practice/index.tsx:745`, `apps/mobile/src/app/(app)/practice/index.tsx:746`, `apps/mobile/src/app/(app)/practice/index.tsx:784`, `apps/mobile/src/app/(app)/practice/index.tsx:785`. Native read-order assertion: `apps/mobile/src/app/(app)/practice/index.test.tsx:363`, `apps/mobile/src/app/(app)/practice/index.test.tsx:381`. Chromium size, narrow/wide matrix, order assertion, and passing results: `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:23`, `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:39`, `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:61`, `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:82`, `docs/evidence/WI-2191/green-web-focused.json:232`, `docs/evidence/WI-2191/green-web-focused.json:266`. |
+| AC-3 — Pointer, touch, Enter, Space, VoiceOver, and TalkBack activation launch only the selected route once | Production handlers: `apps/mobile/src/app/(app)/practice/index.tsx:710`, `apps/mobile/src/app/(app)/practice/index.tsx:743`, `apps/mobile/src/app/(app)/practice/index.tsx:782`. Native semantic activation and exact-once assertion: `apps/mobile/src/app/(app)/practice/index.test.tsx:388`, `apps/mobile/src/app/(app)/practice/index.test.tsx:413`, `apps/mobile/src/app/(app)/practice/index.test.tsx:418`, `docs/evidence/WI-2191/green-native-full.json:1`. Chromium pointer/Enter/Space/touch assertions and result: `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:90`, `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:95`, `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:99`, `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:103`, `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:110`, `docs/evidence/WI-2191/green-web-focused.json:300`, `docs/evidence/WI-2191/green-web-focused.json:340`. |
+| AC-4 — Semantic-tree and bubbling regression coverage includes narrow/wide variants and preserves sibling Practice cards | Native defect/read-order/exact-once cases and sibling-card order: `apps/mobile/src/app/(app)/practice/index.test.tsx:343`, `apps/mobile/src/app/(app)/practice/index.test.tsx:363`, `apps/mobile/src/app/(app)/practice/index.test.tsx:388`, `apps/mobile/src/app/(app)/practice/index.test.tsx:581`, `apps/mobile/src/app/(app)/practice/index.test.tsx:612`, `docs/evidence/WI-2191/green-native-full.json:1`. Chromium narrow/wide and input-mode cases: `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:39`, `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:90`, `docs/evidence/WI-2191/green-web-focused.json:232`, `docs/evidence/WI-2191/green-web-focused.json:266`, `docs/evidence/WI-2191/green-web-focused.json:300`. Relevant sibling-flow result: `docs/evidence/WI-2191/green-web-relevant-full.json:292`, `docs/evidence/WI-2191/green-web-relevant-full.json:520`, `docs/evidence/WI-2191/green-web-relevant-full.json:562`, `docs/evidence/WI-2191/green-web-relevant-full.json:601`. |
 
 The native test named `[WI-2191] has no quick-quiz button ancestor containing
 Capitals or Guess Who buttons` exercises the reported hierarchy defect itself.
@@ -57,11 +57,11 @@ asserts the exact selected URL or quiz-index screen.
 
 | Phase | Production state | Result | Machine-readable output |
 | --- | --- | --- | --- |
-| RED | Baseline source; new native defect test only | The named defect case failed because `practice-quiz` contained `practice-quiz-capitals` and `practice-quiz-guess-who` | `docs/evidence/WI-2191/red-native-baseline.json` |
-| Browser RED | Baseline source; new Chromium spec | Narrow and wide cases could not find the labelled group; the interaction characterization passed | `docs/evidence/WI-2191/red-web-baseline.json` |
-| GREEN | Candidate repair | Five focused native cases passed; three focused browser cases passed | `docs/evidence/WI-2191/green-native-focused.json`; `docs/evidence/WI-2191/green-web-focused.json` |
-| REVERT | Only `apps/mobile/src/app/(app)/practice/index.tsx` restored byte-for-byte to baseline while tests remained | The same named defect case failed on the same two nested descendants | `docs/evidence/WI-2191/revert-native-defect.json` |
-| RESTORE | Candidate production source restored | Full Practice unit suite passed, 23/23 | `docs/evidence/WI-2191/green-native-full.json` |
+| RED | Baseline source; new native defect test only | The named defect case failed because `practice-quiz` contained `practice-quiz-capitals` and `practice-quiz-guess-who` | `docs/evidence/WI-2191/red-native-baseline.json:1` |
+| Browser RED | Baseline source; new Chromium spec | Narrow and wide cases could not find the labelled group; the interaction characterization passed | `docs/evidence/WI-2191/red-web-baseline.json:215`, `docs/evidence/WI-2191/red-web-baseline.json:294`, `docs/evidence/WI-2191/red-web-baseline.json:410` |
+| GREEN | Candidate repair | Five focused native cases passed; three focused browser cases passed | `docs/evidence/WI-2191/green-native-focused.json:1`, `docs/evidence/WI-2191/green-web-focused.json:232`, `docs/evidence/WI-2191/green-web-focused.json:266`, `docs/evidence/WI-2191/green-web-focused.json:300`, `docs/evidence/WI-2191/green-web-focused.json:340` |
+| REVERT | Only `apps/mobile/src/app/(app)/practice/index.tsx` restored byte-for-byte to baseline while tests remained | The same named defect case failed on the same two nested descendants | `docs/evidence/WI-2191/revert-native-defect.json:1` |
+| RESTORE | Candidate production source restored | Full Practice unit suite passed, 23/23 | `docs/evidence/WI-2191/green-native-full.json:1` |
 
 Before the REVERT invocation, the production-file diff against baseline was
 empty. The regression tests and evidence files were left in place. Restoring
@@ -71,18 +71,20 @@ validation.
 ## Final verification
 
 - Full Practice screen unit file: one suite passed; 23/23 tests passed. Output:
-  `docs/evidence/WI-2191/green-native-full.json`.
+  `docs/evidence/WI-2191/green-native-full.json:1`.
 - Focused production Chromium regression on the exact integrated code tree:
   3/3 tests passed in 2.1 minutes on the isolated
   `http://127.0.0.1:19018` runner. Output:
-  `docs/evidence/WI-2191/green-web-focused.json`.
+  `docs/evidence/WI-2191/green-web-focused.json:232` and
+  `docs/evidence/WI-2191/green-web-focused.json:340`.
 - Full relevant Playwright selection before the unrelated latest-main merge:
   10/10 tests passed in 3.6 minutes,
   comprising two required auth setup tests and all eight tests in
   `j10-practice-quiz-cycle`, `j20-vocabulary-quiz-answer-mapping`, the new
   `j28-practice-quick-quiz-semantics`, `w01-no-bleed-through-fullscreen`, and
   `w04-browser-history-stack`. Output:
-  `docs/evidence/WI-2191/green-web-relevant-full.json`.
+  `docs/evidence/WI-2191/green-web-relevant-full.json:292` and
+  `docs/evidence/WI-2191/green-web-relevant-full.json:601`.
 - Mobile typecheck and all six dependency targets passed with cache disabled.
 - Mobile lint passed with zero errors and the repository's existing 51
   warnings; no warning points at a changed file.
@@ -99,13 +101,51 @@ produced the clean 10/10 result linked above.
 
 The first attempt to repeat that full selection after integrating latest main
 encountered a runner cascade, preserved at
-`docs/evidence/WI-2191/post-merge-runner-death.json`: J20's staging seed did
+`docs/evidence/WI-2191/post-merge-runner-death.json:384` and
+`docs/evidence/WI-2191/post-merge-runner-death.json:471`: J20's staging seed did
 not expose its vocabulary card, and the exported-web server then exited. Every
 subsequent J28/W01/W04 failure was
 `net::ERR_CONNECTION_REFUSED` for `http://127.0.0.1:19006`, not a product
 assertion. The complete runner was not churned. Instead, J28's three exact
 WI-2191 defect cases were restarted in isolation on port 19018 against the
 same integrated code tree and passed 3/3 as recorded above.
+
+### Reproducible focused Chromium environment
+
+The fresh 3/3 J28 result used the exact legacy-shell environment and runner
+arguments below. The JSON reporter result is
+`docs/evidence/WI-2191/green-web-focused.json:232`; its summary is
+`docs/evidence/WI-2191/green-web-focused.json:340`.
+
+```sh
+CI=1 EXPO_PUBLIC_E2E=true PLAYWRIGHT_SKIP_LOCAL_API=1 E2E_ENV=staging \
+  PLAYWRIGHT_WEB_PORT=19018 \
+  PLAYWRIGHT_BASE_URL=http://127.0.0.1:19018 \
+  PLAYWRIGHT_API_URL=https://api-stg.mentomate.com \
+  EXPO_PUBLIC_API_URL=https://api-stg.mentomate.com \
+  EXPO_PUBLIC_MODE_NAV_V1_ENABLED=true \
+  EXPO_PUBLIC_FAMILY_V1_ENABLED=true \
+  EXPO_PUBLIC_SUBJECT16_V1_ENABLED=true \
+  EXPO_PUBLIC_SUBJECT17_V1_ENABLED=true \
+  PLAYWRIGHT_JSON_OUTPUT_FILE=docs/evidence/WI-2191/green-web-focused.json \
+  node scripts/doppler-run.mjs run -c stg -- \
+  pnpm exec playwright test -c apps/mobile/playwright.config.ts \
+  apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts \
+  --project=later-phases --workers=1 --retries=0 --no-deps --reporter=json
+```
+
+A separate release-V2 compatibility attempt used
+`EXPO_PUBLIC_ENABLE_MODE_NAV=true`,
+`EXPO_PUBLIC_ENABLE_MODE_NAV_V1=true`, and
+`EXPO_PUBLIC_ENABLE_MODE_NAV_V2=true` with the same staging API, isolated port,
+J28 file, `later-phases` project, one worker, zero retries, and `--no-deps`.
+That attempt stopped in `seedAndSignIn` before any J28 product assertion: the
+spec hard-codes `landingPath: '/home'` and `landingTestId: 'learner-screen'`
+at `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:34`
+and `apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:35`,
+while the release-V2 shell correctly redirected the seeded learner to
+`/mentor`. This is a harness-mode assumption, not a product result and not
+evidence against the candidate.
 
 ## Executor self-review
 

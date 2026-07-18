@@ -1,11 +1,11 @@
 {
   "config": {
-    "configFile": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/playwright.config.ts",
-    "rootDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+    "configFile": "apps/mobile/playwright.config.ts",
+    "rootDir": "apps/mobile/e2e-web",
     "forbidOnly": true,
     "fullyParallel": true,
-    "globalSetup": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/global-setup.ts",
-    "globalTeardown": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/global-teardown.ts",
+    "globalSetup": "apps/mobile/e2e-web/helpers/global-setup.ts",
+    "globalTeardown": "apps/mobile/e2e-web/helpers/global-teardown.ts",
     "globalTimeout": 0,
     "grep": {},
     "grepInvert": null,
@@ -27,7 +27,7 @@
     "quiet": false,
     "projects": [
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -36,7 +36,7 @@
         },
         "id": "setup",
         "name": "setup",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/helpers[\\\\/]auth\\.setup\\.ts/"
@@ -44,7 +44,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -53,7 +53,7 @@
         },
         "id": "smoke-auth",
         "name": "smoke-auth",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]auth[\\\\/](auth-navigation|sign-up-flow)\\.spec\\.ts/"
@@ -61,7 +61,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -70,7 +70,7 @@
         },
         "id": "auth-access",
         "name": "auth-access",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]auth[\\\\/](a02-signup-verification-ui|a03-forgot-password-ui|a05-mfa-verification-ui|a14-slow-auth-spinner)\\.spec\\.ts/"
@@ -78,7 +78,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -87,7 +87,7 @@
         },
         "id": "smoke-learner",
         "name": "smoke-learner",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]journeys[\\\\/]j01-.*\\.spec\\.ts/"
@@ -95,7 +95,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -104,7 +104,7 @@
         },
         "id": "smoke-parent",
         "name": "smoke-parent",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]journeys[\\\\/]j03-.*\\.spec\\.ts/"
@@ -112,7 +112,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -121,7 +121,7 @@
         },
         "id": "smoke-accessibility",
         "name": "smoke-accessibility",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]accessibility[\\\\/]quiz-results-exits\\.spec\\.ts/"
@@ -129,7 +129,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -138,7 +138,7 @@
         },
         "id": "role-transitions",
         "name": "role-transitions",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]journeys[\\\\/]j0[4-7]-.*\\.spec\\.ts/"
@@ -146,7 +146,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -155,7 +155,7 @@
         },
         "id": "later-phases",
         "name": "later-phases",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/](journeys[\\\\/](j0[89]|j[1-9][0-9])-.*|auth[\\\\/]w03-.*|navigation[\\\\/]w0[1-5]-.*)\\.spec\\.ts/"
@@ -163,7 +163,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -172,7 +172,7 @@
         },
         "id": "child-subject-detail",
         "name": "child-subject-detail",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]navigation[\\\\/]w06-child-subject-detail\\.spec\\.ts/"
@@ -180,7 +180,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -189,7 +189,7 @@
         },
         "id": "mentor-audit-registry-smoke",
         "name": "mentor-audit-registry-smoke",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]mentor-audit[\\\\/].+\\.spec\\.ts/"
@@ -197,7 +197,7 @@
         "timeout": 90000
       },
       {
-        "outputDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results",
+        "outputDir": "apps/mobile/e2e-web/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -206,7 +206,7 @@
         },
         "id": "config-f-smoke",
         "name": "config-f-smoke",
-        "testDir": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web",
+        "testDir": "apps/mobile/e2e-web",
         "testIgnore": [],
         "testMatch": [
           "/flows[\\\\/]config-f[\\\\/].+\\.spec\\.ts/"
@@ -399,9 +399,9 @@
                   "duration": 40186,
                   "error": {
                     "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\u001b[22m\n",
-                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\u001b[22m\n\n    at pressableClick (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/pressable.ts:27:26)\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j20-vocabulary-quiz-answer-mapping.spec.ts:90:3",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\u001b[22m\n\n    at pressableClick (apps/mobile/e2e-web/helpers/pressable.ts:27:26)\n    at apps/mobile/e2e-web/flows/journeys/j20-vocabulary-quiz-answer-mapping.spec.ts:90:3",
                     "location": {
-                      "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/pressable.ts",
+                      "file": "apps/mobile/e2e-web/helpers/pressable.ts",
                       "column": 26,
                       "line": 27
                     },
@@ -410,11 +410,11 @@
                   "errors": [
                     {
                       "location": {
-                        "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/pressable.ts",
+                        "file": "apps/mobile/e2e-web/helpers/pressable.ts",
                         "column": 26,
                         "line": 27
                       },
-                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\u001b[22m\n\n\n   at helpers/pressable.ts:27\n\n  25 |\n  26 |   for (let attempt = 0; attempt < 2; attempt += 1) {\n> 27 |     await expect(target).toBeVisible({ timeout: 15_000 });\n     |                          ^\n  28 |\n  29 |     try {\n  30 |       await target.scrollIntoViewIfNeeded();\n    at pressableClick (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/pressable.ts:27:26)\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j20-vocabulary-quiz-answer-mapping.spec.ts:90:3"
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\nExpected: visible\nTimeout: 15000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 15000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('quiz-vocabulary-019f72da-0f89-783b-8b6d-ac5b54e09092')\u001b[22m\n\n\n   at helpers/pressable.ts:27\n\n  25 |\n  26 |   for (let attempt = 0; attempt < 2; attempt += 1) {\n> 27 |     await expect(target).toBeVisible({ timeout: 15_000 });\n     |                          ^\n  28 |\n  29 |     try {\n  30 |       await target.scrollIntoViewIfNeeded();\n    at pressableClick (apps/mobile/e2e-web/helpers/pressable.ts:27:26)\n    at apps/mobile/e2e-web/flows/journeys/j20-vocabulary-quiz-answer-mapping.spec.ts:90:3"
                     }
                   ],
                   "stdout": [],
@@ -426,26 +426,26 @@
                     {
                       "name": "screenshot",
                       "contentType": "image/png",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j20-vocabul-cdedf-POSTed-answerGiven-BUG-924--later-phases/test-failed-1.png"
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j20-vocabul-cdedf-POSTed-answerGiven-BUG-924--later-phases/test-failed-1.png"
                     },
                     {
                       "name": "video",
                       "contentType": "video/webm",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j20-vocabul-cdedf-POSTed-answerGiven-BUG-924--later-phases/video.webm"
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j20-vocabul-cdedf-POSTed-answerGiven-BUG-924--later-phases/video.webm"
                     },
                     {
                       "name": "error-context",
                       "contentType": "text/markdown",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j20-vocabul-cdedf-POSTed-answerGiven-BUG-924--later-phases/error-context.md"
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j20-vocabul-cdedf-POSTed-answerGiven-BUG-924--later-phases/error-context.md"
                     },
                     {
                       "name": "trace",
                       "contentType": "application/zip",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j20-vocabul-cdedf-POSTed-answerGiven-BUG-924--later-phases/trace.zip"
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j20-vocabul-cdedf-POSTed-answerGiven-BUG-924--later-phases/trace.zip"
                     }
                   ],
                   "errorLocation": {
-                    "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/pressable.ts",
+                    "file": "apps/mobile/e2e-web/helpers/pressable.ts",
                     "column": 26,
                     "line": 27
                   }
@@ -486,9 +486,9 @@
                   "duration": 7332,
                   "error": {
                     "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n",
-                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n    at signIn (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts:234:14)\n    at seedAndSignIn (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3",
+                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n    at signIn (apps/mobile/e2e-web/helpers/auth.ts:234:14)\n    at seedAndSignIn (apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3",
                     "location": {
-                      "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts",
+                      "file": "apps/mobile/e2e-web/helpers/auth.ts",
                       "column": 14,
                       "line": 234
                     },
@@ -497,11 +497,11 @@
                   "errors": [
                     {
                       "location": {
-                        "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts",
+                        "file": "apps/mobile/e2e-web/helpers/auth.ts",
                         "column": 14,
                         "line": 234
                       },
-                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n\n   at helpers/auth.ts:234\n\n  232 |     }, options.activeProfileId);\n  233 |   }\n> 234 |   await page.goto(options.landingPath ?? '/home', { waitUntil: 'commit' });\n      |              ^\n  235 |\n  236 |   try {\n  237 |     // Tap through the post-approval landing if it appears (fresh SecureStore)\n    at signIn (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts:234:14)\n    at seedAndSignIn (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3"
+                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n\n   at helpers/auth.ts:234\n\n  232 |     }, options.activeProfileId);\n  233 |   }\n> 234 |   await page.goto(options.landingPath ?? '/home', { waitUntil: 'commit' });\n      |              ^\n  235 |\n  236 |   try {\n  237 |     // Tap through the post-approval landing if it appears (fresh SecureStore)\n    at signIn (apps/mobile/e2e-web/helpers/auth.ts:234:14)\n    at seedAndSignIn (apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3"
                     }
                   ],
                   "stdout": [],
@@ -513,21 +513,21 @@
                     {
                       "name": "screenshot",
                       "contentType": "image/png",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-29bc5-ith-non-nested-44px-actions-later-phases/test-failed-1.png"
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-29bc5-ith-non-nested-44px-actions-later-phases/test-failed-1.png"
                     },
                     {
                       "name": "video",
                       "contentType": "video/webm",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-29bc5-ith-non-nested-44px-actions-later-phases/video.webm"
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-29bc5-ith-non-nested-44px-actions-later-phases/video.webm"
                     },
                     {
                       "name": "trace",
                       "contentType": "application/zip",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-29bc5-ith-non-nested-44px-actions-later-phases/trace.zip"
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-29bc5-ith-non-nested-44px-actions-later-phases/trace.zip"
                     }
                   ],
                   "errorLocation": {
-                    "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts",
+                    "file": "apps/mobile/e2e-web/helpers/auth.ts",
                     "column": 14,
                     "line": 234
                   }
@@ -560,9 +560,9 @@
                   "duration": 2672,
                   "error": {
                     "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n",
-                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n\n    at signIn (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts:215:14)\n    at seedAndSignIn (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3",
+                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n\n    at signIn (apps/mobile/e2e-web/helpers/auth.ts:215:14)\n    at seedAndSignIn (apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3",
                     "location": {
-                      "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts",
+                      "file": "apps/mobile/e2e-web/helpers/auth.ts",
                       "column": 14,
                       "line": 215
                     },
@@ -571,11 +571,11 @@
                   "errors": [
                     {
                       "location": {
-                        "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts",
+                        "file": "apps/mobile/e2e-web/helpers/auth.ts",
                         "column": 14,
                         "line": 215
                       },
-                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n\n\n   at helpers/auth.ts:215\n\n  213 |\n  214 |   await setupClerkTestingToken({ page });\n> 215 |   await page.goto('/sign-in', { waitUntil: 'commit' });\n      |              ^\n  216 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({\n  217 |     timeout: 60_000,\n  218 |   });\n    at signIn (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts:215:14)\n    at seedAndSignIn (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3"
+                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n\n\n   at helpers/auth.ts:215\n\n  213 |\n  214 |   await setupClerkTestingToken({ page });\n> 215 |   await page.goto('/sign-in', { waitUntil: 'commit' });\n      |              ^\n  216 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({\n  217 |     timeout: 60_000,\n  218 |   });\n    at signIn (apps/mobile/e2e-web/helpers/auth.ts:215:14)\n    at seedAndSignIn (apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3"
                     }
                   ],
                   "stdout": [],
@@ -587,21 +587,21 @@
                     {
                       "name": "screenshot",
                       "contentType": "image/png",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-f89fb-ith-non-nested-44px-actions-later-phases/test-failed-1.png"
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-f89fb-ith-non-nested-44px-actions-later-phases/test-failed-1.png"
                     },
                     {
                       "name": "video",
                       "contentType": "video/webm",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-f89fb-ith-non-nested-44px-actions-later-phases/video.webm"
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-f89fb-ith-non-nested-44px-actions-later-phases/video.webm"
                     },
                     {
                       "name": "trace",
                       "contentType": "application/zip",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-f89fb-ith-non-nested-44px-actions-later-phases/trace.zip"
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-f89fb-ith-non-nested-44px-actions-later-phases/trace.zip"
                     }
                   ],
                   "errorLocation": {
-                    "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts",
+                    "file": "apps/mobile/e2e-web/helpers/auth.ts",
                     "column": 14,
                     "line": 215
                   }
@@ -634,9 +634,9 @@
                   "duration": 2630,
                   "error": {
                     "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n",
-                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n\n    at signIn (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts:215:14)\n    at seedAndSignIn (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3",
+                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n\n    at signIn (apps/mobile/e2e-web/helpers/auth.ts:215:14)\n    at seedAndSignIn (apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3",
                     "location": {
-                      "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts",
+                      "file": "apps/mobile/e2e-web/helpers/auth.ts",
                       "column": 14,
                       "line": 215
                     },
@@ -645,11 +645,11 @@
                   "errors": [
                     {
                       "location": {
-                        "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts",
+                        "file": "apps/mobile/e2e-web/helpers/auth.ts",
                         "column": 14,
                         "line": 215
                       },
-                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n\n\n   at helpers/auth.ts:215\n\n  213 |\n  214 |   await setupClerkTestingToken({ page });\n> 215 |   await page.goto('/sign-in', { waitUntil: 'commit' });\n      |              ^\n  216 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({\n  217 |     timeout: 60_000,\n  218 |   });\n    at signIn (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts:215:14)\n    at seedAndSignIn (/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3"
+                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/sign-in\", waiting until \"commit\"\u001b[22m\n\n\n   at helpers/auth.ts:215\n\n  213 |\n  214 |   await setupClerkTestingToken({ page });\n> 215 |   await page.goto('/sign-in', { waitUntil: 'commit' });\n      |              ^\n  216 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({\n  217 |     timeout: 60_000,\n  218 |   });\n    at signIn (apps/mobile/e2e-web/helpers/auth.ts:215:14)\n    at seedAndSignIn (apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:25:3)\n    at apps/mobile/e2e-web/flows/journeys/j28-practice-quick-quiz-semantics.spec.ts:31:3"
                     }
                   ],
                   "stdout": [],
@@ -661,21 +661,21 @@
                     {
                       "name": "screenshot",
                       "contentType": "image/png",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-d7119-the-chosen-quick-quiz-route-later-phases/test-failed-1.png"
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-d7119-the-chosen-quick-quiz-route-later-phases/test-failed-1.png"
                     },
                     {
                       "name": "video",
                       "contentType": "video/webm",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-d7119-the-chosen-quick-quiz-route-later-phases/video.webm"
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-d7119-the-chosen-quick-quiz-route-later-phases/video.webm"
                     },
                     {
                       "name": "trace",
                       "contentType": "application/zip",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-d7119-the-chosen-quick-quiz-route-later-phases/trace.zip"
+                      "path": "apps/mobile/e2e-web/test-results/flows-journeys-j28-practic-d7119-the-chosen-quick-quiz-route-later-phases/trace.zip"
                     }
                   ],
                   "errorLocation": {
-                    "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/helpers/auth.ts",
+                    "file": "apps/mobile/e2e-web/helpers/auth.ts",
                     "column": 14,
                     "line": 215
                   }
@@ -716,9 +716,9 @@
                   "duration": 241,
                   "error": {
                     "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n",
-                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:11:14",
+                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n    at apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:11:14",
                     "location": {
-                      "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts",
+                      "file": "apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts",
                       "column": 14,
                       "line": 11
                     },
@@ -727,11 +727,11 @@
                   "errors": [
                     {
                       "location": {
-                        "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts",
+                        "file": "apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts",
                         "column": 14,
                         "line": 11
                       },
-                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n\n   9 |   page,\n  10 | }) => {\n> 11 |   await page.goto('/home', { waitUntil: 'commit' });\n     |              ^\n  12 |   await expect(page.getByTestId('learner-screen')).toBeVisible({\n  13 |     timeout: 60_000,\n  14 |   });\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:11:14"
+                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n\n   9 |   page,\n  10 | }) => {\n> 11 |   await page.goto('/home', { waitUntil: 'commit' });\n     |              ^\n  12 |   await expect(page.getByTestId('learner-screen')).toBeVisible({\n  13 |     timeout: 60_000,\n  14 |   });\n    at apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:11:14"
                     }
                   ],
                   "stdout": [],
@@ -743,21 +743,21 @@
                     {
                       "name": "screenshot",
                       "contentType": "image/png",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases/test-failed-1.png"
+                      "path": "apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases/test-failed-1.png"
                     },
                     {
                       "name": "video",
                       "contentType": "video/webm",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases/video.webm"
+                      "path": "apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases/video.webm"
                     },
                     {
                       "name": "trace",
                       "contentType": "application/zip",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases/trace.zip"
+                      "path": "apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases/trace.zip"
                     }
                   ],
                   "errorLocation": {
-                    "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts",
+                    "file": "apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts",
                     "column": 14,
                     "line": 11
                   }
@@ -798,9 +798,9 @@
                   "duration": 253,
                   "error": {
                     "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n",
-                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:15:14",
+                    "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n    at apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:15:14",
                     "location": {
-                      "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts",
+                      "file": "apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts",
                       "column": 14,
                       "line": 15
                     },
@@ -809,11 +809,11 @@
                   "errors": [
                     {
                       "location": {
-                        "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts",
+                        "file": "apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts",
                         "column": 14,
                         "line": 15
                       },
-                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n\n  13 |   page,\n  14 | }) => {\n> 15 |   await page.goto('/home', { waitUntil: 'commit' });\n     |              ^\n  16 |   await expect(page.getByTestId('learner-screen')).toBeVisible({\n  17 |     timeout: 60_000,\n  18 |   });\n    at /home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:15:14"
+                      "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:19006/home\", waiting until \"commit\"\u001b[22m\n\n\n  13 |   page,\n  14 | }) => {\n> 15 |   await page.goto('/home', { waitUntil: 'commit' });\n     |              ^\n  16 |   await expect(page.getByTestId('learner-screen')).toBeVisible({\n  17 |     timeout: 60_000,\n  18 |   });\n    at apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:15:14"
                     }
                   ],
                   "stdout": [],
@@ -825,21 +825,21 @@
                     {
                       "name": "screenshot",
                       "contentType": "image/png",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases/test-failed-1.png"
+                      "path": "apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases/test-failed-1.png"
                     },
                     {
                       "name": "video",
                       "contentType": "video/webm",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases/video.webm"
+                      "path": "apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases/video.webm"
                     },
                     {
                       "name": "trace",
                       "contentType": "application/zip",
-                      "path": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases/trace.zip"
+                      "path": "apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases/trace.zip"
                     }
                   ],
                   "errorLocation": {
-                    "file": "/home/vetinari/nexus/_dev/eduagent-build/.worktrees/WI-2191/apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts",
+                    "file": "apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts",
                     "column": 14,
                     "line": 15
                   }
