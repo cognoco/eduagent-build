@@ -24,10 +24,13 @@
 // ---------------------------------------------------------------------------
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Sentry from '@sentry/react-native';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { defaultShouldDehydrateQuery, type Query } from '@tanstack/react-query';
 import * as Updates from 'expo-updates';
+
+// Age/consent-gated Sentry wrapper (not the raw SDK star-import — see
+// bundle-safety.test.ts). Gates capture on the under-13 consent state.
+import { Sentry } from './sentry';
 
 /**
  * Legacy un-scoped persister key used pre-BUG-357. Retained as a constant
