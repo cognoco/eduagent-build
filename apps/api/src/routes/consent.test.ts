@@ -314,6 +314,24 @@ jest.mock(
   }),
 );
 
+// [WI-1989] assertCallerIsAccountOwner calls verifyPersonIsOrgAdminV2, which
+// runs a raw membership query the fully-mocked DB module cannot satisfy.
+// Every scenario in this file that currently reaches assertCallerIsAccountOwner
+// is a caller-owner scenario (the non-owner break tests are rejected earlier by
+// assertOwnerProfile's / assertOwnerAndParentAccess's X-Profile-Id-resolved
+// isOwner check, before this guard runs) — the caller-vs-X-Profile-Id-spoof
+// distinction this guard exists to enforce is covered by the real-DB break
+// test in tests/integration/wi1989-owner-idor.integration.test.ts.
+jest.mock('../services/identity-v2/ownership-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/ownership-v2',
+  ) as typeof import('../services/identity-v2/ownership-v2');
+  return {
+    ...actual,
+    verifyPersonIsOrgAdminV2: jest.fn().mockResolvedValue(true),
+  };
+});
+
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { ERROR_CODES } from '@eduagent/schemas';

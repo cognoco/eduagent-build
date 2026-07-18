@@ -11,11 +11,15 @@ import {
 const recapParamsSchema = z.object({ recapId: z.string().uuid() });
 
 import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import { requireProfileId } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { withProfile } from '../route-utils/route-context';
 import { notFound } from '../errors';
-import { assertOwnerProfile } from '../services/family-access';
+import {
+  assertOwnerProfile,
+  assertCallerIsAccountOwner,
+} from '../services/family-access';
 import {
   getRecapForParent,
   listRecapsForParent,
@@ -30,6 +34,10 @@ type RecapsRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
+    account: Account;
+    // [WI-1989] The authenticated caller's own person id, resolved server-side
+    // by accountMiddleware — required by assertCallerIsAccountOwner.
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -38,6 +46,8 @@ type RecapsRouteEnv = {
 export const recapsRoutes = new Hono<RecapsRouteEnv>()
   .get('/recaps', zValidator('query', recapsQuerySchema), async (c) => {
     assertOwnerProfile(c);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(c);
 
     const db = c.get('db');
     const parentProfileId = requireProfileId(c.get('profileId'));
@@ -67,6 +77,8 @@ export const recapsRoutes = new Hono<RecapsRouteEnv>()
     zValidator('param', recapParamsSchema),
     async (c) => {
       assertOwnerProfile(c);
+      // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      await assertCallerIsAccountOwner(c);
 
       const db = c.get('db');
       const parentProfileId = requireProfileId(c.get('profileId'));
