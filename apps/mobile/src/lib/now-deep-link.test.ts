@@ -1,7 +1,7 @@
 import type { NowDeepLink } from '@eduagent/schemas';
 import { MENTOR_CAPABILITY_CASES } from '@eduagent/test-utils';
 
-import { pushNowDeepLink } from './now-deep-link';
+import { buildNowPath, pushNowDeepLink } from './now-deep-link';
 
 const subjectTopicLink: NowDeepLink = {
   route: 'subject.topic',
@@ -84,6 +84,15 @@ describe('pushNowDeepLink', () => {
     expect(router.push).toHaveBeenCalledWith(
       '/(app)/session?sessionId=session-1',
     );
+  });
+
+  it('rejects notice.recheck because it must run its mutation before navigation', () => {
+    expect(() =>
+      buildNowPath('notice.recheck', {
+        noticeId: 'notice-1',
+        subjectId: 'subject-1',
+      }),
+    ).toThrow(/action route/i);
   });
 
   it('[WI-1121] pushes a session summary route once when the chain is empty', () => {

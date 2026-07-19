@@ -5,7 +5,11 @@ import type { NowOverflowResponse, NowResponse } from '@eduagent/schemas';
 import { createHookWrapper } from '../test-utils/app-hook-test-utils';
 import { setActiveProfileId } from '../lib/api-client';
 import { buildNowFeedCacheKey, readCachedNowFeed } from '../lib/now-feed-cache';
-import { useNowFeed, useNowOverflow } from './use-now-feed';
+import {
+  useMentorNoticeActions,
+  useNowFeed,
+  useNowOverflow,
+} from './use-now-feed';
 
 const FRESH_CACHE_TIMESTAMP = '2999-06-14T08:00:00.000Z';
 
@@ -136,6 +140,77 @@ describe('useNowOverflow', () => {
     const enabled = renderHook(() => useNowOverflow(true), { wrapper });
     await waitFor(() => expect(enabled.result.current.isSuccess).toBe(true));
     expect(enabled.result.current.data).toEqual(value);
+
+    queryClient.clear();
+  });
+});
+
+describe('useMentorNoticeActions', () => {
+  let originalFetch: typeof globalThis.fetch;
+  let mockFetch: jest.Mock;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    mockFetch = jest.fn();
+    globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
+    setActiveProfileId('test-profile-id');
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    setActiveProfileId(undefined);
+  });
+
+  it('starts a notice re-check through the typed action endpoint', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          sessionId: '550e8400-e29b-41d4-a716-446655440001',
+        }),
+        { status: 200 },
+      ),
+    );
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.recheck.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).resolves.toEqual({
+      sessionId: '550e8400-e29b-41d4-a716-446655440001',
+    });
+    expect(String(mockFetch.mock.calls[0]?.[0])).toContain(
+      '/mentor-notices/550e8400-e29b-41d4-a716-446655440002/recheck',
+    );
+
+    queryClient.clear();
+  });
+
+  it('defers a notice through the typed action endpoint', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          noticeId: '550e8400-e29b-41d4-a716-446655440002',
+          deferredAt: '2026-07-19T12:00:00.000Z',
+        }),
+        { status: 200 },
+      ),
+    );
+    const { queryClient, wrapper } = createHookWrapper();
+    const rendered = renderHook(() => useMentorNoticeActions(), { wrapper });
+
+    await expect(
+      rendered.result.current.defer.mutateAsync(
+        '550e8400-e29b-41d4-a716-446655440002',
+      ),
+    ).resolves.toEqual({
+      noticeId: '550e8400-e29b-41d4-a716-446655440002',
+      deferredAt: '2026-07-19T12:00:00.000Z',
+    });
+    expect(String(mockFetch.mock.calls[0]?.[0])).toContain(
+      '/mentor-notices/550e8400-e29b-41d4-a716-446655440002/defer',
+    );
 
     queryClient.clear();
   });

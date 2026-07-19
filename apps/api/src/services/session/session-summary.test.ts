@@ -183,6 +183,9 @@ describe('getSessionSummary', () => {
         xpLedger: {
           findFirst: jest.fn().mockResolvedValue(undefined),
         },
+        mentorNotices: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
       },
     } as unknown as import('@eduagent/database').Database;
 
@@ -190,6 +193,66 @@ describe('getSessionSummary', () => {
     expect(result).not.toBeNull();
     expect(result!.baseXp).toBeNull();
     expect(result!.reflectionBonusXp).toBeNull();
+  });
+
+  it('returns the durable mentor-notice receipt after a summary reload', async () => {
+    const db = {
+      query: {
+        learningSessions: {
+          findFirst: jest.fn().mockResolvedValue(buildSessionRow()),
+        },
+        sessionSummaries: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue(
+              buildSummaryRow({ status: 'accepted', nextTopicId: null }),
+            ),
+        },
+        xpLedger: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        mentorNotices: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: '550e8400-e29b-41d4-a716-446655440000',
+            concept: 'balancing both sides of an equation',
+            correctionHint: 'Use the same operation on each side.',
+          }),
+        },
+      },
+    } as unknown as import('@eduagent/database').Database;
+
+    const result = await getSessionSummary(db, 'prof-1', 'sess-1', {
+      mentorNoticeEnabled: true,
+    });
+
+    expect(result?.mentorNotice).toEqual({
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      concept: 'balancing both sides of an equation',
+      correctionHint: 'Use the same operation on each side.',
+    });
+  });
+
+  it('hides a durable mentor-notice receipt when the rollout flag is off', async () => {
+    const mentorNoticeFindFirst = jest.fn();
+    const db = {
+      query: {
+        learningSessions: {
+          findFirst: jest.fn().mockResolvedValue(buildSessionRow()),
+        },
+        sessionSummaries: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue(
+              buildSummaryRow({ status: 'accepted', nextTopicId: null }),
+            ),
+        },
+        xpLedger: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        mentorNotices: { findFirst: mentorNoticeFindFirst },
+      },
+    } as unknown as import('@eduagent/database').Database;
+
+    const result = await getSessionSummary(db, 'prof-1', 'sess-1');
+
+    expect(result?.mentorNotice).toBeUndefined();
+    expect(mentorNoticeFindFirst).not.toHaveBeenCalled();
   });
 
   it('uses sessionSummaries.findFirst to look up summary by profileId (scoped read)', async () => {
@@ -248,6 +311,9 @@ describe('getSessionSummary', () => {
           findFirst: jest.fn().mockResolvedValue(summaryRow),
         },
         xpLedger: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
+        mentorNotices: {
           findFirst: jest.fn().mockResolvedValue(undefined),
         },
       },

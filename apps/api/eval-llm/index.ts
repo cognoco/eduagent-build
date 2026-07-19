@@ -45,6 +45,7 @@ import { sessionRecapFlow } from './flows/session-recap';
 import { sessionSummaryFlow } from './flows/session-summary';
 import { filingPreSessionFlow } from './flows/filing-pre-session';
 import { exchangesFlow } from './flows/exchanges';
+import { homeworkNoticeFlow } from './flows/homework-notice';
 import { topicProbeSignalsFlow } from './flows/topic-probe-signals';
 import { topicIntentMatcherFlow } from './flows/topic-intent-matcher';
 import { subjectClassifyFlow } from './flows/subject-classify';
@@ -192,6 +193,7 @@ const FLOWS: FlowDefinition[] = [
   sessionSummaryFlow as FlowDefinition,
   filingPreSessionFlow as FlowDefinition,
   exchangesFlow as FlowDefinition,
+  homeworkNoticeFlow as FlowDefinition,
   topicProbeSignalsFlow as FlowDefinition,
   topicIntentMatcherFlow as FlowDefinition,
   subjectClassifyFlow as FlowDefinition,

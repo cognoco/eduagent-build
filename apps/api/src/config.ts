@@ -169,6 +169,10 @@ const envSchema = z.object({
   // See docs/plans/2026-05-18-challenge-round-targets.md "Rollout Gate".
   CHALLENGE_ROUND_RUNTIME_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // Homework notice felt moments — single default-off kill switch covering
+  // prompt proposals, durable acceptance, read surfaces, routes, and jobs.
+  MENTOR_NOTICE_ENABLED: z.enum(['true', 'false']).default('false'),
+
   // Launch-cohort allowlist for Challenge Round (WI-1754 AC2). Comma-
   // separated profile ids. Narrows CHALLENGE_ROUND_RUNTIME_ENABLED to an
   // explicit cohort instead of the whole environment — see
@@ -340,6 +344,10 @@ export function isTopicIntentMatcherEnabled(
 export function isChallengeRoundRuntimeEnabled(
   value: string | undefined,
 ): boolean {
+  return value === 'true';
+}
+
+export function isMentorNoticeEnabled(value: string | undefined): boolean {
   return value === 'true';
 }
 

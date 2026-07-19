@@ -206,13 +206,25 @@ function scrubAuthorizationHeader(headers: Record<string, unknown>): void {
 }
 
 /**
- * `beforeSend` scrubber for the API's Sentry init — recursively strips
- * denylisted PII-bearing keys from `event.extra`, every `event.contexts`
- * entry, and every breadcrumb's `data`; redacts any `JSON.parse`
- * SyntaxError-shaped `exception.value` (see rationale below); and strips the
- * `authorization` header from `event.request.headers` [WI-2353] before the
- * event leaves the process. Defense-in-depth, not a substitute for
- * call-site discipline. [WI-1990]
+ * `beforeSend`/`beforeSendTransaction` scrubber for the API's Sentry init —
+ * recursively strips denylisted PII-bearing keys from `event.extra`, every
+ * `event.contexts` entry, and every breadcrumb's `data`; redacts any
+ * `JSON.parse` SyntaxError-shaped `exception.value` (see rationale below);
+ * and strips the `authorization` header from `event.request.headers`
+ * [WI-2353] before the event leaves the process. Defense-in-depth, not a
+ * substitute for call-site discipline. [WI-1990]
+ *
+ * [WI-2353 rework] Wired to BOTH `beforeSend` (error events) AND
+ * `beforeSendTransaction` (sampled transaction events) in
+ * apps/api/src/index.ts — `requestDataIntegration` attaches the same
+ * `request.headers` to transaction events whenever `tracesSampleRate` is
+ * non-zero, so `beforeSend` alone leaves the Authorization header
+ * unredacted on every sampled transaction. Accepts `Sentry.Event` (the base
+ * type both `ErrorEvent` and `TransactionEvent` extend) rather than
+ * `Sentry.ErrorEvent` specifically, since every field this function reads
+ * or writes (`request`, `extra`, `contexts`, `breadcrumbs`, `exception`) is
+ * declared on the shared base, not on the error-only `type: undefined`
+ * discriminant.
  *
  * [WI-1990 rework] `exception.type`/`exception.value` is the one Sentry
  * event surface neither the key-based `extra`/`contexts`/breadcrumb
@@ -238,7 +250,7 @@ function scrubAuthorizationHeader(headers: Record<string, unknown>): void {
  * high-cardinality (every malformed response groups as a new issue); the
  * redacted structural message groups correctly.
  */
-export function scrubSentryEvent<T extends Sentry.ErrorEvent>(event: T): T {
+export function scrubSentryEvent<T extends Sentry.Event>(event: T): T {
   if (event.request?.headers) {
     scrubAuthorizationHeader(event.request.headers);
   }

@@ -14,9 +14,66 @@ import {
   topicProbeRequestedEventSchema,
   blockedSafetyDigestEventSchema,
   minorPiiEchoRedactedEventSchema,
+  mentorNoticeCreatedEventSchema,
+  mentorNoticeNudgeEventSchema,
+  mentorNoticeNudgeSentEventSchema,
+  mentorNoticeRecheckOutcomeEventSchema,
+  mentorNoticeRecheckStartedEventSchema,
 } from './inngest-events.js';
 
 const validUuid = '00000000-0000-4000-8000-000000000001';
+
+describe('mentor notice lifecycle event schemas', () => {
+  const base = {
+    eventId: validUuid,
+    profileId: '00000000-0000-4000-8000-000000000002',
+    noticeId: '00000000-0000-4000-8000-000000000003',
+    timestamp: '2026-07-19T10:00:00.000Z',
+  };
+
+  it('accepts the ID-only nudge work payload', () => {
+    expect(mentorNoticeNudgeEventSchema.safeParse(base).success).toBe(true);
+  });
+
+  it('accepts opaque lifecycle telemetry including deferred outcomes', () => {
+    expect(
+      mentorNoticeCreatedEventSchema.safeParse({
+        ...base,
+        sourceSessionId: '00000000-0000-4000-8000-000000000004',
+      }).success,
+    ).toBe(true);
+    expect(
+      mentorNoticeNudgeSentEventSchema.safeParse({
+        ...base,
+        status: 'skipped',
+      }).success,
+    ).toBe(true);
+    expect(
+      mentorNoticeRecheckStartedEventSchema.safeParse({
+        ...base,
+        sessionId: '00000000-0000-4000-8000-000000000005',
+      }).success,
+    ).toBe(true);
+    expect(
+      mentorNoticeRecheckOutcomeEventSchema.safeParse({
+        ...base,
+        sessionId: '00000000-0000-4000-8000-000000000005',
+        outcome: 'deferred',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('does not retain learner-facing concept or quote text', () => {
+    const parsed = mentorNoticeCreatedEventSchema.parse({
+      ...base,
+      sourceSessionId: '00000000-0000-4000-8000-000000000004',
+      concept: 'private learner concept',
+      learnerQuote: 'verbatim learner answer',
+    });
+    expect(parsed).not.toHaveProperty('concept');
+    expect(parsed).not.toHaveProperty('learnerQuote');
+  });
+});
 
 describe('billing alert delivery failure event schema', () => {
   it('accepts controlled delivery failure reasons', () => {
