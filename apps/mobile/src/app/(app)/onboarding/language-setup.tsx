@@ -21,6 +21,7 @@ import {
   goBackOrReplace,
   homeHrefForReturnTo,
   isSessionForwardableReturnTo,
+  SETTINGS_RETURN_TO,
   SUBJECTS_RETURN_TO,
 } from '../../../lib/navigation';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
@@ -138,7 +139,7 @@ export default function LanguageSetup() {
     // BUG-692-FOLLOWUP: Mark the mutation as cancelled so the post-await
     // router.replace in handleContinue does not fire after back-navigation.
     cancelledRef.current = true;
-    if (returnTo === 'settings') {
+    if (returnTo === SETTINGS_RETURN_TO) {
       goBackOrReplace(router, '/(app)/more' as Href);
       return;
     }
@@ -166,7 +167,7 @@ export default function LanguageSetup() {
       // don't navigate to session from a screen the user has already left.
       if (cancelledRef.current) return;
       // ACCOUNT-29: Settings re-entry saves and routes back to More.
-      if (returnTo === 'settings') {
+      if (returnTo === SETTINGS_RETURN_TO) {
         goBackOrReplace(router, '/(app)/more' as Href);
         return;
       }
@@ -194,7 +195,7 @@ export default function LanguageSetup() {
   };
 
   const guardActionLabel =
-    returnTo === 'settings' || returnTo === SUBJECTS_RETURN_TO
+    returnTo === SETTINGS_RETURN_TO || returnTo === SUBJECTS_RETURN_TO
       ? t('common.goBack')
       : t('common.goHome');
 

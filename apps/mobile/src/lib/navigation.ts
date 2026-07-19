@@ -14,6 +14,7 @@ export const JOURNAL_RETURN_TO = 'journal';
 export const JOURNAL_HREF = '/(app)/journal';
 export const SUBJECTS_RETURN_TO = 'subjects';
 export const SUBJECTS_HREF = '/(app)/subjects';
+export const SETTINGS_RETURN_TO = 'settings';
 export const FAMILY_RECAPS_RETURN_TO = 'family-recaps';
 export const FAMILY_RECAPS_HREF = '/(app)/recaps';
 export const FAMILY_PROGRESS_RETURN_TO = 'family-progress';
