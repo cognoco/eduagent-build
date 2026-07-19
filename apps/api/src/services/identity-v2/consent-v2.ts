@@ -48,7 +48,7 @@ import {
   type EmailOptions,
 } from '../notifications/email';
 import { createLogger } from '../logger';
-import { calculateAgeFromParts } from '../age-utils';
+import { computeAgeBracketFromDate } from '@eduagent/schemas';
 import { inngest } from '../../inngest/client';
 import { safeSend } from '../safe-non-core';
 import {
@@ -428,23 +428,23 @@ export async function repairOrSignalAdultSelfConsentV2(
     columns: { birthDate: true },
   });
   if (!personRow) return 'not_applicable';
-  // Adult-owner gate — use the owner's EXACT birth date when present (year-only
-  // math overestimates by up to 11 months, letting an owner born late in the
-  // year, still 17, read as 18: the unsafe direction for a consent gate). Same
-  // full-date rule child-profile-v2.ts uses for its adult-owner gate, per
-  // AGENTS.md §Profile Shapes. `birthDate` is the `YYYY-MM-DD` date column;
-  // fail-closed on a null/non-numeric birthYear.
+  // Adult-owner gate — computeAgeBracketFromDate is the canonical feature-gating
+  // / safety-adjacent age function AGENTS.md §Profile Shapes names for the
+  // adult-owner gate (exact-date UTC math, year-only fallback when month/day are
+  // absent — never the year-only computeAgeBracket, which overestimates by up to
+  // 11 months and could read a late-in-the-year 17-year-old as 18). `birthDate`
+  // is the `YYYY-MM-DD` date column; fail-closed on a null/non-numeric birthYear.
   const birthDate = String(personRow.birthDate);
   const birthYear = Number(birthDate.slice(0, 4));
   const birthMonth = Number(birthDate.slice(5, 7));
   const birthDay = Number(birthDate.slice(8, 10));
   if (
     !Number.isFinite(birthYear) ||
-    calculateAgeFromParts(
+    computeAgeBracketFromDate(
       birthYear,
       Number.isFinite(birthMonth) ? birthMonth : undefined,
       Number.isFinite(birthDay) ? birthDay : undefined,
-    ) < 18
+    ) !== 'adult'
   ) {
     return 'not_applicable';
   }
