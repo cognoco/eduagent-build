@@ -89,7 +89,6 @@ function scanV2Semantics(flow: FlowFile): {
     command: string;
     assertion: boolean;
     line?: number;
-    definitionLine?: number;
   }>;
   parseError?: string;
 } {
@@ -113,7 +112,6 @@ function scanV2Semantics(flow: FlowFile): {
       command: string;
       assertion: boolean;
       line?: number;
-      definitionLine?: number;
     }> = [];
     const keyText = (key: unknown): string | undefined =>
       isScalar(key) ? String(key.value).trim() : undefined;
@@ -136,12 +134,11 @@ function scanV2Semantics(flow: FlowFile): {
         (pair) => keyText(pair.key) === 'optional' && isMaestroTrue(pair.value),
       );
       if (!optionalPair) return;
-      const definitionLine = optionalLine(optionalPair.key, optionalPair.value);
+      const line = optionalLine(optionalPair.key, optionalPair.value);
       optionals.push({
         command,
         assertion: /^assert[A-Za-z0-9_]*$/.test(command),
-        line: definitionLine,
-        definitionLine,
+        line,
       });
     };
     const walk = (
@@ -234,10 +231,7 @@ export function runC6(inputs: ValidatorInputs): CheckResult {
             JUSTIFIED_PRECEDING_RE.test(precedingLine)
           );
         };
-        if (
-          isJustifiedAt(optional.line) ||
-          isJustifiedAt(optional.definitionLine)
-        ) {
+        if (isJustifiedAt(optional.line)) {
           continue;
         }
         violations.push({

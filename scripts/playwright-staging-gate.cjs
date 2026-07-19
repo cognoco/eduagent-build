@@ -511,9 +511,7 @@ function runDecisionCli([preflight, postflight, classification, exitCodeText]) {
   const decision = decide({ preflight, postflight, classification, exitCode });
   const reason =
     classification === 'not-run'
-      ? decision === 0
-        ? 'preflight-confirmed-unavailable'
-        : 'preflight-not-run'
+      ? 'preflight-not-run'
       : decision === 0 && exitCode !== 0
         ? 'confirmed-staging-outage'
         : decision === 0
