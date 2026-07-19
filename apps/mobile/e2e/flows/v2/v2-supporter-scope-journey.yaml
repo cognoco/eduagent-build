@@ -45,6 +45,11 @@ tags:
     id: 'scope-chip-option-person-${REVOKED_SUPPORTEE_PERSON_ID}'
 
 # Mentor: open the rich person scope.
+- scrollUntilVisible:
+    element:
+      id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}'
+    direction: DOWN
+    timeout: 5000
 - tapOn:
     id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}'
 - extendedWaitUntil:

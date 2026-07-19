@@ -339,6 +339,8 @@ jobs:
       # Start API server in background (NODE_ENV=test enables __test/* routes)
       - name: Start API server (background)
         env:
+          # V2 is selectable only by workflow_dispatch; schedule selects nightly
+          # and every other trusted trigger selects pr in MAESTRO_CI_SUITE below.
           USE_MAESTRO_V2_FIXTURE: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_suite == 'v2' }}
         run: |
           if [ "$USE_MAESTRO_V2_FIXTURE" = "true" ]; then
