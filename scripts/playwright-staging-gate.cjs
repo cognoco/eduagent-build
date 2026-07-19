@@ -21,11 +21,11 @@ const TRANSPORT =
 const RESULT_TRANSPORT =
   /^\s*(?:Error:\s*)?(?:apiRequestContext|request)\.[A-Za-z]+:\s*(?:fetch failed|socket hang up|econnrefused|econnreset|err_connection_reset|connection refused|connection reset|net::err_[a-z_]+)\s+at\s+(https:\/\/\S+\/v1\/\S*)\s*$/i;
 const RESULT_TRANSPORT_HEADER =
-  /^\s*(?:Error:\s*)?(?:apiRequestContext|request)\.[A-Za-z]+:\s*(?:(?:(?:connect|read)\s+)?econn(?:refused|reset)(?:\s+[0-9a-f.:[\]-]+)?|fetch failed|socket hang up|err_connection_reset|connection refused|connection reset|net::err_[a-z_]+)\s*$/i;
+  /^\s*(?:Error:\s*)?(?:apiRequestContext|request)\.([A-Za-z]+):\s*(?:(?:(?:connect|read)\s+)?(?:econn(?:refused|reset)|etimedout)(?:\s+[0-9a-f.:[\]-]+)?|getaddrinfo\s+(?:eai_again|enotfound)\s+([a-z0-9._-]+)|fetch failed|socket hang up|err_connection_reset|connection refused|connection reset|net::err_[a-z_]+)\s*$/i;
 const RESULT_REQUEST_HEADER =
   /^\s*(?:Error:\s*)?(?:apiRequestContext|request)\.[A-Za-z]+:/i;
 const CALL_LOG_LABEL = /^\s*Call log:\s*$/;
-const CALL_LOG_REQUEST = /^\s*-\s*→\s+[A-Z]+\s+(https:\/\/\S+)\s*$/;
+const CALL_LOG_REQUEST = /^\s*-\s*→\s+([A-Z]+)\s+(https:\/\/\S+)\s*$/;
 const CALL_LOG_ARROW = /^\s*-\s*→\s+\S+/;
 // Match standard JavaScript error-class lines (Error:, TypeError:,
 // ConfigError:) while excluding identifier labels such as handleError:.
@@ -349,7 +349,8 @@ function resultSignals(resultText, apiOrigin) {
       continue;
     }
 
-    if (!RESULT_TRANSPORT_HEADER.test(lines[index])) {
+    const transportHeader = RESULT_TRANSPORT_HEADER.exec(lines[index]);
+    if (!transportHeader) {
       if (RESULT_REQUEST_HEADER.test(lines[index])) {
         transportLines.add(index);
         invalidTransport = true;
@@ -372,7 +373,24 @@ function resultSignals(resultText, apiOrigin) {
       invalidTransport = true;
       continue;
     }
-    const route = targetApiRoute(firstRequest[1], apiOrigin);
+    let requestUrl;
+    try {
+      requestUrl = new URL(firstRequest[2]);
+    } catch {
+      invalidTransport = true;
+      continue;
+    }
+    const dnsHostname = transportHeader[2];
+    if (
+      transportHeader[1].toUpperCase() !== firstRequest[1] ||
+      (dnsHostname &&
+        dnsHostname.toLowerCase().replace(/\.$/, '') !==
+          requestUrl.hostname.toLowerCase().replace(/\.$/, ''))
+    ) {
+      invalidTransport = true;
+      continue;
+    }
+    const route = targetApiRoute(requestUrl.href, apiOrigin);
     if (route) routes.push(route);
     else invalidTransport = true;
   }

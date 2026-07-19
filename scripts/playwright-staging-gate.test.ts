@@ -465,6 +465,137 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
     }
   });
 
+  it('correlates Playwright DNS and timeout headers with trace and canary evidence', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'wi-2228-dns-transport-'));
+    const emptyRoot = mkdtempSync(join(tmpdir(), 'wi-2228-no-trace-'));
+    const callLogResult = (
+      header: string,
+      url = 'https://api-stg.example.test/v1/profiles',
+      extraLines: string[] = [],
+      method = 'GET',
+    ) =>
+      [header, 'Call log:', `  - → ${method} ${url}`, ...extraLines].join('\n');
+    try {
+      writeFileSync(
+        join(root, 'trace.trace'),
+        JSON.stringify({
+          type: 'resource-snapshot',
+          snapshot: {
+            request: { url: 'https://api-stg.example.test/v1/profiles' },
+            response: { status: -1 },
+          },
+        }),
+      );
+      const unavailablePostflight = await runCanary({
+        apiUrl: TEST_API_URL,
+        secret: 'test-secret',
+        fetchImpl: async () => ({ status: 503 }),
+        attempts: 1,
+        random: () => 0,
+      });
+      const healthyPostflight = await runCanary({
+        apiUrl: TEST_API_URL,
+        secret: 'test-secret',
+        fetchImpl: async () => ({ status: 200 }),
+        attempts: 1,
+        random: () => 0,
+      });
+      const dnsPostflight = await runCanary({
+        apiUrl: TEST_API_URL,
+        secret: 'test-secret',
+        fetchImpl: async () => {
+          throw new TypeError('getaddrinfo EAI_AGAIN api-stg.example.test');
+        },
+        attempts: 1,
+        random: () => 0,
+      });
+      expect(unavailablePostflight.state).toBe(GATE_STATES.UNAVAILABLE);
+      expect(healthyPostflight.state).toBe(GATE_STATES.HEALTHY);
+      expect(dnsPostflight.state).toBe(GATE_STATES.NOT_RUN);
+
+      for (const header of [
+        'Error: apiRequestContext.get: getaddrinfo EAI_AGAIN api-stg.example.test',
+        'Error: apiRequestContext.get: getaddrinfo ENOTFOUND api-stg.example.test',
+        'Error: request.get: getaddrinfo EAI_AGAIN API-STG.EXAMPLE.TEST.',
+        'Error: apiRequestContext.get: connect ETIMEDOUT 192.0.2.1:443',
+      ]) {
+        const classification = classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: callLogResult(header),
+        });
+        expect(classification).toEqual({ kind: 'infra-signalled' });
+        expect(
+          decide({
+            preflight: GATE_STATES.HEALTHY,
+            postflight: unavailablePostflight.state,
+            classification: classification.kind,
+            exitCode: 1,
+          }),
+        ).toBe(0);
+        expect(
+          decide({
+            preflight: GATE_STATES.HEALTHY,
+            postflight: healthyPostflight.state,
+            classification: classification.kind,
+            exitCode: 1,
+          }),
+        ).toBe(1);
+        expect(
+          decide({
+            preflight: GATE_STATES.HEALTHY,
+            postflight: dnsPostflight.state,
+            classification: classification.kind,
+            exitCode: 1,
+          }),
+        ).toBe(1);
+      }
+
+      const dnsHeader =
+        'Error: apiRequestContext.get: getaddrinfo EAI_AGAIN api-stg.example.test';
+      for (const resultText of [
+        callLogResult(
+          'Error: apiRequestContext.get: getaddrinfo EAI_AGAIN third-party.example',
+        ),
+        callLogResult(
+          'Error: apiRequestContext.post: getaddrinfo EAI_AGAIN api-stg.example.test',
+        ),
+        callLogResult(dnsHeader, undefined, [], 'POST'),
+        callLogResult(dnsHeader, 'https://third-party.example/v1/profiles'),
+        dnsHeader,
+        [
+          'worker note: getaddrinfo EAI_AGAIN api-stg.example.test',
+          'Call log:',
+          '  - → GET https://api-stg.example.test/v1/profiles',
+        ].join('\n'),
+        callLogResult(dnsHeader, undefined, [
+          '  - → GET https://api-stg.example.test/v1/other',
+        ]),
+      ]) {
+        expect(
+          classifyFailure({ artifactRoot: root, exitCode: 1, resultText }),
+        ).toEqual({ kind: 'unknown' });
+      }
+      expect(
+        classifyFailure({
+          artifactRoot: emptyRoot,
+          exitCode: 1,
+          resultText: callLogResult(dnsHeader),
+        }),
+      ).toEqual({ kind: 'unknown' });
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: `${callLogResult(dnsHeader)}\nTypeError: invalid response shape`,
+        }),
+      ).toEqual({ kind: 'product' });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     [
       'response',
