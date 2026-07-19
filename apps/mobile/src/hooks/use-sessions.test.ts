@@ -134,6 +134,34 @@ describe('useStartSession', () => {
     expect(body.inputMode).toBe('voice');
   });
 
+  it('[WI-2184] does not invalidate completed-session history when starting a session', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ session: makeLearningSession() }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const wrapper = createWrapper();
+    const topicHistoryKey = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      'test-profile-id',
+    );
+    queryClient.setQueryDefaults(topicHistoryKey, { gcTime: Infinity });
+    queryClient.setQueryData(topicHistoryKey, []);
+    const { result } = renderHook(() => useStartSession('subject-1'), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ subjectId: 'subject-1' });
+    });
+
+    expect(queryClient.getQueryState(topicHistoryKey)?.isInvalidated).toBe(
+      false,
+    );
+  });
+
   it('starts the first curriculum session through the scoped fast-path endpoint', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -967,9 +995,23 @@ describe('useRetrySummaryFeedback', () => {
       sessionId,
       profileB.id,
     );
+    const profileAHistory = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      profileA.id,
+    );
+    const profileBHistory = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      profileB.id,
+    );
     for (const key of [profileASummary, profileBSummary]) {
       queryClient.setQueryDefaults(key, { gcTime: Infinity });
       queryClient.setQueryData(key, null);
+    }
+    for (const key of [profileAHistory, profileBHistory]) {
+      queryClient.setQueryDefaults(key, { gcTime: Infinity });
+      queryClient.setQueryData(key, []);
     }
 
     const { result, rerender } = renderHook(
@@ -1012,6 +1054,12 @@ describe('useRetrySummaryFeedback', () => {
       true,
     );
     expect(queryClient.getQueryState(profileBSummary)?.isInvalidated).toBe(
+      false,
+    );
+    expect(queryClient.getQueryState(profileAHistory)?.isInvalidated).toBe(
+      false,
+    );
+    expect(queryClient.getQueryState(profileBHistory)?.isInvalidated).toBe(
       false,
     );
   });

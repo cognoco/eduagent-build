@@ -60,7 +60,6 @@ const SUBMIT_SUMMARY_TIMEOUT_MS = 35_000;
 
 function invalidateSessionDerivedQueries(
   queryClient: ReturnType<typeof useQueryClient>,
-  profileId: string | undefined,
 ): void {
   // PR-10 deferred: broad ['progress'], ['dashboard'], ['retention'],
   // ['language-progress'], ['resume-nudge'] — session-close touches many surfaces
@@ -74,16 +73,15 @@ function invalidateSessionDerivedQueries(
   void queryClient.invalidateQueries({ queryKey: ['retention'] });
   void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
   void queryClient.invalidateQueries({ queryKey: ['resume-nudge'] });
-  // All three history families store the profile scope in their final segment.
-  // Match their exact canonical shapes so another profile's cache stays warm.
+}
+
+function invalidateSessionHistoryQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  profileId: string | undefined,
+): void {
   void queryClient.invalidateQueries({
     predicate: ({ queryKey }) =>
-      ((queryKey[0] === 'topic-sessions' || queryKey[0] === 'book-sessions') &&
-        queryKey.length === 4 &&
-        queryKey[3] === profileId) ||
-      (queryKey[0] === 'subject-sessions' &&
-        queryKey.length === 3 &&
-        queryKey[2] === profileId),
+      queryKeys.historySessionsMatch(profileId)(queryKey),
   });
 }
 
@@ -140,7 +138,6 @@ export function useStartSession(subjectId: string): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { profileId } = useSessionNavigationScope();
 
   return useMutation({
     mutationFn: async (input: {
@@ -163,9 +160,8 @@ export function useStartSession(subjectId: string): UseMutationResult<
         'POST /subjects/:subjectId/sessions',
       );
     },
-    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
-    onSuccess: (_data, _variables, mutationContext) => {
-      invalidateSessionDerivedQueries(queryClient, mutationContext?.profileId);
+    onSuccess: () => {
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -185,7 +181,6 @@ export function useStartFirstCurriculumSession(
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { profileId } = useSessionNavigationScope();
 
   return useMutation({
     mutationFn: async (input: {
@@ -208,9 +203,8 @@ export function useStartFirstCurriculumSession(
         'POST /subjects/:subjectId/sessions/first-curriculum',
       );
     },
-    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
-    onSuccess: (_data, _variables, mutationContext) => {
-      invalidateSessionDerivedQueries(queryClient, mutationContext?.profileId);
+    onSuccess: () => {
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -284,7 +278,7 @@ export function useClearContinuationDepth(
             mutationProfileId,
           )(query.queryKey),
       });
-      invalidateSessionDerivedQueries(queryClient, mutationProfileId);
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -298,7 +292,6 @@ export function useSyncHomeworkState(
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
-  const { profileId } = useSessionNavigationScope();
 
   return useMutation({
     mutationFn: async (input: { metadata: HomeworkSessionMetadata }) => {
@@ -313,9 +306,8 @@ export function useSyncHomeworkState(
         'POST /sessions/:sessionId/homework-state',
       );
     },
-    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
-    onSuccess: (_data, _variables, mutationContext) => {
-      invalidateSessionDerivedQueries(queryClient, mutationContext?.profileId);
+    onSuccess: () => {
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -374,7 +366,8 @@ export function useCloseSession(sessionId: string): UseMutationResult<
     },
     onMutate: (): SessionDerivedMutationContext => ({ profileId }),
     onSuccess: (_data, _variables, mutationContext) => {
-      invalidateSessionDerivedQueries(queryClient, mutationContext?.profileId);
+      invalidateSessionDerivedQueries(queryClient);
+      invalidateSessionHistoryQueries(queryClient, mutationContext?.profileId);
     },
   });
 }
@@ -667,7 +660,8 @@ export function useSubmitSummary(
             mutationProfileId,
           )(query.queryKey),
       });
-      invalidateSessionDerivedQueries(queryClient, mutationProfileId);
+      invalidateSessionDerivedQueries(queryClient);
+      invalidateSessionHistoryQueries(queryClient, mutationProfileId);
     },
   });
 }
@@ -738,7 +732,8 @@ export function useSkipSummary(
             mutationProfileId,
           )(query.queryKey),
       });
-      invalidateSessionDerivedQueries(queryClient, mutationProfileId);
+      invalidateSessionDerivedQueries(queryClient);
+      invalidateSessionHistoryQueries(queryClient, mutationProfileId);
     },
   });
 }
