@@ -205,13 +205,90 @@ function scrubAuthorizationHeader(headers: Record<string, unknown>): void {
   }
 }
 
+/** Marker substituted for a stripped query string / URL query segment. */
+const STRIPPED_QUERY_MARKER = '[stripped]';
+
+/**
+ * [WI-2339] `@sentry/cloudflare`'s default `requestDataIntegration` copies
+ * `event.request.query_string` and the full `event.request.url` (query
+ * string included) verbatim — `include.query_string` defaults to `true` and
+ * is independent of `sendDefaultPii` (unlike cookies), so it is not covered
+ * by the WI-2353 auth-header fix or by `sendDefaultPii: false`. Verified
+ * empirically against this repo's real `Sentry.withSentry` pipeline
+ * (`@sentry/cloudflare@10.39.0`): a request to `/throws?token=SECRET-abc123`
+ * ships `request.query_string: "token=SECRET-abc123&foo=bar"` and the same
+ * literal in `request.url` unless scrubbed here.
+ *
+ * No GET route in this API currently carries free-text or secret query
+ * params (see the WI's Risk/Impact note) — this is a forward guard, not a
+ * live-leak fix. Wholesale-stripping the query string (rather than
+ * pattern-matching known-bad param names, as `.agents/skills/tech/
+ * sentry-scrubbing/SKILL.md`'s `stripUrlSecrets` example does) is the
+ * allowlist-shaped choice AC5 asks for: a denylist of param names misses the
+ * next one added; dropping the whole query string is safe by default and
+ * loses nothing since no query param carries diagnostic value today.
+ */
+function stripQueryString(url: string): string {
+  const queryIndex = url.indexOf('?');
+  return queryIndex === -1
+    ? url
+    : `${url.slice(0, queryIndex)}?${STRIPPED_QUERY_MARKER}`;
+}
+
+/**
+ * Strips `event.request.query_string`, the query segment of
+ * `event.request.url`, and (defensively — not populated by this SDK/runtime
+ * today, see [WI-2339] Risk/Impact) recursively denylist-scrubs
+ * `event.request.data` if a future capture site or SDK upgrade starts
+ * populating it.
+ */
+function scrubRequestUrlFields(
+  request: NonNullable<Sentry.ErrorEvent['request']>,
+): void {
+  if (
+    typeof request.query_string === 'string' &&
+    request.query_string.length > 0
+  ) {
+    request.query_string = STRIPPED_QUERY_MARKER;
+  }
+  if (typeof request.url === 'string') {
+    request.url = stripQueryString(request.url);
+  }
+  if (isPlainObject(request.data)) {
+    request.data = scrubKeys(request.data);
+  }
+}
+
+/**
+ * [WI-2339] The `Fetch` integration (active by default on
+ * `@sentry/cloudflare`) records outbound `fetch()` calls as breadcrumbs
+ * whose `data.url` carries the full request URL, query string included —
+ * the same leak vector as `event.request.url` above, but keyed under `url`
+ * rather than caught by `PII_DENYLIST_KEYS` (the key itself, `url`, is
+ * legitimate breadcrumb data; only the query segment is the risk). Applied
+ * after the key-based `scrubKeys` pass in `scrubSentryEvent`'s breadcrumb
+ * map so a denylisted key nested under `data.url`'s sibling fields is still
+ * caught by the existing mechanism.
+ */
+function scrubBreadcrumbUrl(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  if (typeof data.url === 'string') {
+    return { ...data, url: stripQueryString(data.url) };
+  }
+  return data;
+}
+
 /**
  * `beforeSend`/`beforeSendTransaction` scrubber for the API's Sentry init —
  * recursively strips denylisted PII-bearing keys from `event.extra`, every
  * `event.contexts` entry, and every breadcrumb's `data`; redacts any
  * `JSON.parse` SyntaxError-shaped `exception.value` (see rationale below);
- * and strips the `authorization` header from `event.request.headers`
- * [WI-2353] before the event leaves the process. Defense-in-depth, not a
+ * strips the `authorization` header from `event.request.headers` [WI-2353];
+ * and [WI-2339] strips `event.request.query_string`, the query segment of
+ * `event.request.url`, denylist-scrubs `event.request.data` (defensively —
+ * not populated today), and strips the query segment of any breadcrumb's
+ * `data.url` before the event leaves the process. Defense-in-depth, not a
  * substitute for call-site discipline. [WI-1990]
  *
  * [WI-2353 rework] Wired to BOTH `beforeSend` (error events) AND
@@ -254,6 +331,9 @@ export function scrubSentryEvent<T extends Sentry.Event>(event: T): T {
   if (event.request?.headers) {
     scrubAuthorizationHeader(event.request.headers);
   }
+  if (event.request) {
+    scrubRequestUrlFields(event.request);
+  }
   if (event.extra) {
     event.extra = scrubKeys(event.extra);
   }
@@ -266,7 +346,9 @@ export function scrubSentryEvent<T extends Sentry.Event>(event: T): T {
   }
   if (event.breadcrumbs) {
     event.breadcrumbs = event.breadcrumbs.map((crumb) =>
-      crumb.data ? { ...crumb, data: scrubKeys(crumb.data) } : crumb,
+      crumb.data
+        ? { ...crumb, data: scrubBreadcrumbUrl(scrubKeys(crumb.data)) }
+        : crumb,
     );
   }
   if (event.exception?.values) {
