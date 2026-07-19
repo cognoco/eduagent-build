@@ -11,6 +11,20 @@ describe('decideNotificationTapNavigation', () => {
     ).toEqual({ context: 'study', kind: 'push', href: '/(app)/home' });
   });
 
+  it('routes notice re-check nudges to Mentor home', () => {
+    expect(
+      decideNotificationTapNavigation({
+        currentPathname: '/progress',
+        effectiveAppContext: 'study',
+        notificationData: {
+          type: 'notice_recheck',
+          noticeId: 'notice-1',
+          subjectId: 'subject-1',
+        },
+      }),
+    ).toEqual({ context: 'study', kind: 'push', href: '/(app)/home' });
+  });
+
   it('pushes same-context notifications during a session', () => {
     expect(
       decideNotificationTapNavigation({

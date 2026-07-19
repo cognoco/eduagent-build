@@ -20,7 +20,7 @@ const DEFAULT_OPTIONS: Required<PushNowDeepLinkOptions> = {
   subjectHubTarget: 'legacy-shelf',
 };
 
-const PATH_BUILDERS: Record<NowDeepLinkRoute, PathBuilder> = {
+const PATH_BUILDERS: Partial<Record<NowDeepLinkRoute, PathBuilder>> = {
   'settings.more': () => '/(app)/more',
   'settings.account': () => '/(app)/more/account',
   'billing.manage': () => '/(app)/subscription',
@@ -86,7 +86,12 @@ export function buildNowPath(
   params: Record<string, string>,
   options: PushNowDeepLinkOptions = {},
 ): string {
-  return PATH_BUILDERS[route](params, { ...DEFAULT_OPTIONS, ...options });
+  if (route === 'notice.recheck') {
+    throw new Error('notice.recheck is an action route, not a navigation path');
+  }
+  const builder = PATH_BUILDERS[route];
+  if (!builder) throw new Error(`Unsupported now path route: ${route}`);
+  return builder(params, { ...DEFAULT_OPTIONS, ...options });
 }
 
 export function pushNowDeepLink(

@@ -15,6 +15,7 @@ import {
 } from '../../services/identity-v2/family-v2';
 import {
   formatRecallNudge,
+  REVIEW_FAMILY_DEDUP_TYPES,
   sendPushNotification,
 } from '../../services/notifications';
 import { checkAndLogRateLimitInternal } from '../../services/settings';
@@ -79,7 +80,7 @@ export const recallNudgeSend = inngest.createFunction(
           {
             hours: 24,
             maxCount: 1,
-            dedupTypes: ['recall_nudge', 'review_reminder'],
+            dedupTypes: [...REVIEW_FAMILY_DEDUP_TYPES],
           },
         );
       } catch (err) {

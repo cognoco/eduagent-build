@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
   useQuery,
+  useMutation,
+  useQueryClient,
   type UseQueryResult,
   keepPreviousData,
 } from '@tanstack/react-query';
@@ -9,6 +11,8 @@ import {
   nowResponseSchema,
   type NowOverflowResponse,
   type NowResponse,
+  mentorNoticeDeferResponseSchema,
+  mentorNoticeRecheckResponseSchema,
 } from '@eduagent/schemas';
 
 import { assertOk } from '../lib/assert-ok';
@@ -88,6 +92,55 @@ export function useNowFeed(): NowFeedQueryResult {
     fallbackFeed,
     isSlowFallback,
   };
+}
+
+export function useMentorNoticeActions() {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
+  const issuedForProfileId = activeProfile?.id;
+
+  const invalidate = async (): Promise<void> => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: ['now-feed', issuedForProfileId],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['now-overflow', issuedForProfileId],
+      }),
+    ]);
+  };
+
+  const recheck = useMutation({
+    mutationFn: async (noticeId: string) => {
+      const response = await client['mentor-notices'][
+        ':noticeId'
+      ].recheck.$post({ param: { noticeId } });
+      const ok = await assertOk(response);
+      return parseJson(
+        ok,
+        mentorNoticeRecheckResponseSchema,
+        'POST /mentor-notices/:noticeId/recheck',
+      );
+    },
+    onSuccess: invalidate,
+  });
+  const defer = useMutation({
+    mutationFn: async (noticeId: string) => {
+      const response = await client['mentor-notices'][':noticeId'].defer.$post({
+        param: { noticeId },
+      });
+      const ok = await assertOk(response);
+      return parseJson(
+        ok,
+        mentorNoticeDeferResponseSchema,
+        'POST /mentor-notices/:noticeId/defer',
+      );
+    },
+    onSuccess: invalidate,
+  });
+
+  return { recheck, defer, invalidate };
 }
 
 export function useNowOverflow(

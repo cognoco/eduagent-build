@@ -79,6 +79,7 @@ import {
   NoInterleavedTopicsError,
 } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
+import { getMentorNoticeReceipt } from '../services/mentor-notices';
 import {
   markPersisted,
   MAX_IDEMPOTENCY_KEY_LENGTH,
@@ -94,6 +95,7 @@ import {
   isMemoryFactsRelevanceEnabled,
   isJudgeFrameworkEnabled,
   isJudgeEnforcementEnabled,
+  isMentorNoticeEnabled,
 } from '../config';
 import { FILING_CONFIG } from '../config/filing';
 
@@ -147,6 +149,7 @@ type SessionRouteEnv = {
     VOYAGE_API_KEY?: string;
     MATCHER_ENABLED?: string;
     CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
+    MENTOR_NOTICE_ENABLED?: string;
     CHALLENGE_ROUND_COHORT_PROFILE_IDS?: string;
     REVIEW_CALLBACK_OPENER_ENABLED?: string;
     CHALLENGE_ROUND_GRADER_ENABLED?: string;
@@ -493,6 +496,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         profileId,
         c.env.CHALLENGE_ROUND_COHORT_PROFILE_IDS,
       );
+      const mentorNoticeEnabled = isMentorNoticeEnabled(
+        c.env.MENTOR_NOTICE_ENABLED,
+      );
       const reviewCallbackOpenerEnabled = isReviewCallbackOpenerEnabled(
         c.env.REVIEW_CALLBACK_OPENER_ENABLED,
       );
@@ -519,6 +525,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             memoryFactsReadEnabled,
             memoryFactsRelevanceEnabled,
             challengeRoundRuntimeEnabled,
+            mentorNoticeEnabled,
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
             judgeEnforcementEnabled,
@@ -631,6 +638,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         profileId,
         c.env.CHALLENGE_ROUND_COHORT_PROFILE_IDS,
       );
+      const mentorNoticeEnabled = isMentorNoticeEnabled(
+        c.env.MENTOR_NOTICE_ENABLED,
+      );
       const reviewCallbackOpenerEnabled = isReviewCallbackOpenerEnabled(
         c.env.REVIEW_CALLBACK_OPENER_ENABLED,
       );
@@ -665,6 +675,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             memoryFactsReadEnabled,
             memoryFactsRelevanceEnabled,
             challengeRoundRuntimeEnabled,
+            mentorNoticeEnabled,
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
             judgeEnforcementEnabled,
@@ -898,7 +909,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
-      const summary = await getSessionSummary(db, profileId, sessionId);
+      const summary = await getSessionSummary(db, profileId, sessionId, {
+        mentorNoticeEnabled: isMentorNoticeEnabled(c.env.MENTOR_NOTICE_ENABLED),
+      });
       return c.json({ summary });
     },
   )
@@ -1025,6 +1038,18 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           400,
           ERROR_CODES.VALIDATION_ERROR,
           'Recall bridge is only available for homework sessions',
+        );
+      }
+
+      if (
+        isMentorNoticeEnabled(c.env.MENTOR_NOTICE_ENABLED) &&
+        (await getMentorNoticeReceipt(db, profileId, sessionId))
+      ) {
+        return apiError(
+          c,
+          409,
+          ERROR_CODES.RECALL_BRIDGE_SUPPRESSED,
+          'Recall Bridge is suppressed because a mentor notice was captured',
         );
       }
 

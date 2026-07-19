@@ -171,11 +171,6 @@ export default function SessionSummaryScreen() {
   // completed at least one session (the post-value moment). Skipped in
   // parent-proxy mode and dedup'd via SecureStore inside the hook.
   // Must be called before any early returns to satisfy Rules of Hooks.
-  usePostSessionNotificationAsk(
-    activeProfile?.id,
-    totalSessionCount >= 1,
-    isProxyMode,
-  );
   const [recallQuestions, setRecallQuestions] = useState<string[] | null>(null);
 
   // BUG-449: when the user re-enters this screen from Library → Shelf → Book →
@@ -198,6 +193,12 @@ export default function SessionSummaryScreen() {
   });
   const sessionBookmarks = useSessionBookmarks(sessionId ?? undefined);
   const persisted = persistedSummary.data ?? null;
+  usePostSessionNotificationAsk(
+    activeProfile?.id,
+    totalSessionCount >= 1,
+    isProxyMode,
+    Boolean(persisted?.mentorNotice),
+  );
   // Destructure `refetch` once: TanStack Query produces a new top-level
   // result object reference on every state slice change (isFetching, isStale,
   // dataUpdatedAt, background polling tick). If we depended on the whole
@@ -933,6 +934,25 @@ export default function SessionSummaryScreen() {
           >
             {persisted.closingLine}
           </Text>
+        ) : null}
+
+        {persisted?.mentorNotice ? (
+          <View
+            className="bg-surface rounded-card p-4 mb-4"
+            testID="session-summary-mentor-notice"
+          >
+            <Text className="text-body font-semibold text-text-primary mb-1">
+              {t('sessionSummary.mentorNotice.title')}
+            </Text>
+            <Text className="text-body text-text-primary">
+              {persisted.mentorNotice.concept}
+            </Text>
+            {persisted.mentorNotice.correctionHint ? (
+              <Text className="text-caption text-text-secondary mt-2">
+                {persisted.mentorNotice.correctionHint}
+              </Text>
+            ) : null}
+          </View>
         ) : null}
 
         {/* Session takeaways (learner-friendly, no internal metrics) */}
