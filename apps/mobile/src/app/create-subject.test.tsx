@@ -367,6 +367,24 @@ describe('CreateSubjectScreen', () => {
     );
   });
 
+  it('keeps a whitespace-only subject name disabled without calling the subject APIs', () => {
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), '   ');
+    const submit = screen.getByTestId('create-subject-submit');
+
+    expect(submit).toBeDisabled();
+    screen.getByTestId('create-subject-validation-hint');
+    fireEvent.press(submit);
+
+    expect(fetchCallsMatching(mockFetch, '/subjects/resolve')).toHaveLength(0);
+    expect(
+      fetchCallsMatching(mockFetch, '/subjects').filter(
+        ({ url, init }) => init?.method === 'POST' && !url.includes('/resolve'),
+      ),
+    ).toHaveLength(0);
+  });
+
   it('tapping a chip immediately triggers resolveInput', async () => {
     setResolveResponse({
       status: 'direct_match',

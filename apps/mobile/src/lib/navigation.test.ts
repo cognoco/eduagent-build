@@ -143,6 +143,20 @@ describe('goBackOrReplace', () => {
     expect(router.replace).toHaveBeenCalledWith('/(app)/home');
   });
 
+  it('replaces with Subjects when a Subjects-origin screen has no browser history', () => {
+    const router = {
+      back: jest.fn(),
+      canGoBack: jest.fn().mockReturnValue(false),
+      replace: jest.fn(),
+    } satisfies Pick<Router, 'back' | 'canGoBack' | 'replace'>;
+
+    goBackOrReplace(router, SUBJECTS_HREF);
+
+    expect(router.canGoBack).toHaveBeenCalledTimes(1);
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith('/(app)/subjects');
+  });
+
   // ---------------------------------------------------------------------------
   // [BUG-552] goBackOrReplace fallback contract lock-down
   //

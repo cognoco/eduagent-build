@@ -692,13 +692,13 @@ function makeSubjectRecord(overrides?: Partial<{ name: string }>) {
 //  PATCH /subjects/:id; POST /subjects already had a guard pre-PR)
 // ---------------------------------------------------------------------------
 describe('[WI-177 / DS-088] subjects proxy-mode guard', () => {
-  function makeProxyApp() {
+  function makeProxyApp(resolvedVia: 'auto' | 'explicit-header' = 'auto') {
     const proxyApp = new Hono();
     proxyApp.use('*', async (c, next) => {
       c.set('db' as never, {});
       c.set('profileId' as never, PROFILE_ID);
       c.set('user' as never, { id: 'test-user' });
-      c.set('profileMeta' as never, { isOwner: false, resolvedVia: 'auto' });
+      c.set('profileMeta' as never, { isOwner: false, resolvedVia });
       await next();
     });
     proxyApp.route('/', subjectRoutes);
@@ -708,6 +708,18 @@ describe('[WI-177 / DS-088] subjects proxy-mode guard', () => {
   const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 
   beforeEach(() => jest.clearAllMocks());
+
+  it('POST /subjects rejects proxy-mode creation before calling the subject service', async () => {
+    const res = await makeProxyApp('explicit-header').request('/subjects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Chemistry' }),
+    });
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ code: 'PROXY_MODE' });
+    expect(createSubjectWithStructureMock).not.toHaveBeenCalled();
+  });
 
   it('PUT /subjects/:id/language-setup returns 403 in proxy mode', async () => {
     const res = await makeProxyApp().request(
