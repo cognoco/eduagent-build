@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { clearMentorLanguageCoordination } from './mentor-language-coordination';
+import { clearMentorLanguageStateOnSignOut } from './mentor-language-coordination';
 
 import * as SecureStore from './secure-storage';
 import { sanitizeSecureStoreKey } from './secure-storage';
@@ -262,7 +262,7 @@ const ASYNCSTORAGE_PREFIX_WIPE: ReadonlyArray<string> = [
 export async function clearProfileSecureStorageOnSignOut(
   profileIds: ReadonlyArray<string>,
 ): Promise<void> {
-  clearMentorLanguageCoordination(profileIds);
+  const mentorLanguageCleanup = clearMentorLanguageStateOnSignOut(profileIds);
   const keys = new Set<string>();
 
   for (const profileId of profileIds) {
@@ -328,6 +328,7 @@ export async function clearProfileSecureStorageOnSignOut(
         })
       : Promise.resolve(),
     prefixScanRemoval,
+    mentorLanguageCleanup,
   ]);
 
   // [CR-SIGNOUT-TIMEOUT-10] Hard cap so a stuck Keychain/Keystore can't

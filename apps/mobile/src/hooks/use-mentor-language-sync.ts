@@ -3,7 +3,10 @@ import i18next from 'i18next';
 import { conversationLanguageSchema } from '@eduagent/schemas';
 
 import { useProfile } from '../lib/profile';
-import { shouldSuppressMentorLanguageAutoSync } from '../lib/mentor-language-coordination';
+import {
+  beginAutomaticMentorLanguageUpdate,
+  shouldSuppressMentorLanguageAutoSync,
+} from '../lib/mentor-language-coordination';
 import { useUpdateConversationLanguage } from './use-onboarding-dimensions';
 
 type SyncKey = { profileId: string; language: string };
@@ -40,8 +43,12 @@ export function useMentorLanguageSync(): void {
         profileId: activeProfile.id,
         language: parsed.data,
       };
+      const languageOperation = beginAutomaticMentorLanguageUpdate(
+        activeProfile.id,
+      );
+      if (!languageOperation) return;
       mutate(
-        { conversationLanguage: parsed.data },
+        { conversationLanguage: parsed.data, languageOperation },
         {
           onSuccess: () => {
             lastSyncedRef.current = syncKey;

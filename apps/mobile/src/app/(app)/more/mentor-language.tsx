@@ -76,7 +76,7 @@ export default function MentorLanguageScreen(): React.ReactElement {
       updateConversationLanguage.mutate(
         {
           conversationLanguage: lang,
-          explicitOperation,
+          languageOperation: explicitOperation,
           childProfileId:
             canEditChildPreferences && childProfileId
               ? childProfileId

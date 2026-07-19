@@ -105,6 +105,17 @@ const child = createTestProfile({
 
 const onboardingRoutes = { '/onboarding/': { success: true } };
 
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
+}
+
 describe('MentorLanguageScreen', () => {
   let active: ReturnType<typeof renderScreen> | null = null;
 
@@ -263,6 +274,154 @@ describe('MentorLanguageScreen', () => {
     );
     expect(patchLanguages).toEqual(['en']);
     expect(raceProfile.conversationLanguage).toBe('en');
+  });
+
+  it('[WI-2098 R4 write ordering] applies a newer explicit choice after an older automatic save even when the explicit response is faster', async () => {
+    const raceProfile = createTestProfile({
+      ...owner,
+      id: 'profile-race',
+      conversationLanguage: 'en',
+    });
+    const automaticResponse = deferred<void>();
+    const patchLanguages: string[] = [];
+    await i18nextInstance.changeLanguage('de');
+
+    active = renderScreen(<MentorLanguageWithSync />, {
+      profile: raceProfile,
+      routes: {
+        '/onboarding/': async (_url: string, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body)) as {
+            conversationLanguage: string;
+          };
+          patchLanguages.push(body.conversationLanguage);
+          if (body.conversationLanguage === 'de') {
+            await automaticResponse.promise;
+          }
+          raceProfile.conversationLanguage = body.conversationLanguage;
+          return { success: true };
+        },
+      },
+    });
+
+    await waitFor(() => expect(patchLanguages).toEqual(['de']));
+    fireEvent.press(active.result.getByTestId('mentor-language-option-es'));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(patchLanguages).toEqual(['de']);
+
+    automaticResponse.resolve();
+    await waitFor(() => expect(patchLanguages).toEqual(['de', 'es']));
+    await waitFor(() => expect(raceProfile.conversationLanguage).toBe('es'));
+  });
+
+  it('[WI-2098 R4 write ordering] applies a newer explicit choice when the older automatic response finishes first', async () => {
+    const raceProfile = createTestProfile({
+      ...owner,
+      id: 'profile-race',
+      conversationLanguage: 'en',
+    });
+    const explicitResponse = deferred<void>();
+    const patchLanguages: string[] = [];
+    await i18nextInstance.changeLanguage('de');
+
+    active = renderScreen(<MentorLanguageWithSync />, {
+      profile: raceProfile,
+      routes: {
+        '/onboarding/': async (_url: string, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body)) as {
+            conversationLanguage: string;
+          };
+          patchLanguages.push(body.conversationLanguage);
+          if (body.conversationLanguage === 'es') {
+            await explicitResponse.promise;
+          }
+          raceProfile.conversationLanguage = body.conversationLanguage;
+          return { success: true };
+        },
+      },
+    });
+
+    await waitFor(() => expect(raceProfile.conversationLanguage).toBe('de'));
+    fireEvent.press(active.result.getByTestId('mentor-language-option-es'));
+    await waitFor(() => expect(patchLanguages).toEqual(['de', 'es']));
+    expect(raceProfile.conversationLanguage).toBe('de');
+
+    explicitResponse.resolve();
+    await waitFor(() => expect(raceProfile.conversationLanguage).toBe('es'));
+  });
+
+  it('[WI-2098 R4 explicit ordering] preserves the latest rapid explicit choice when its response would otherwise finish first', async () => {
+    const raceProfile = createTestProfile({
+      ...owner,
+      id: 'profile-race',
+      conversationLanguage: 'en',
+    });
+    const firstResponse = deferred<void>();
+    const patchLanguages: string[] = [];
+    active = renderScreen(<MentorLanguageScreen />, {
+      profile: raceProfile,
+      routes: {
+        '/onboarding/': async (_url: string, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body)) as {
+            conversationLanguage: string;
+          };
+          patchLanguages.push(body.conversationLanguage);
+          if (body.conversationLanguage === 'es') {
+            await firstResponse.promise;
+          }
+          raceProfile.conversationLanguage = body.conversationLanguage;
+          return { success: true };
+        },
+      },
+    });
+
+    act(() => {
+      fireEvent.press(active!.result.getByTestId('mentor-language-option-es'));
+      fireEvent.press(active!.result.getByTestId('mentor-language-option-fr'));
+    });
+
+    await waitFor(() => expect(patchLanguages).toEqual(['es']));
+    firstResponse.resolve();
+    await waitFor(() => expect(patchLanguages).toEqual(['es', 'fr']));
+    await waitFor(() => expect(raceProfile.conversationLanguage).toBe('fr'));
+  });
+
+  it('[WI-2098 R4 explicit ordering] preserves the latest rapid explicit choice when responses finish in intent order', async () => {
+    const raceProfile = createTestProfile({
+      ...owner,
+      id: 'profile-race',
+      conversationLanguage: 'en',
+    });
+    const secondResponse = deferred<void>();
+    const patchLanguages: string[] = [];
+    active = renderScreen(<MentorLanguageScreen />, {
+      profile: raceProfile,
+      routes: {
+        '/onboarding/': async (_url: string, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body)) as {
+            conversationLanguage: string;
+          };
+          patchLanguages.push(body.conversationLanguage);
+          if (body.conversationLanguage === 'fr') {
+            await secondResponse.promise;
+          }
+          raceProfile.conversationLanguage = body.conversationLanguage;
+          return { success: true };
+        },
+      },
+    });
+
+    act(() => {
+      fireEvent.press(active!.result.getByTestId('mentor-language-option-es'));
+      fireEvent.press(active!.result.getByTestId('mentor-language-option-fr'));
+    });
+
+    await waitFor(() => expect(patchLanguages).toEqual(['es', 'fr']));
+    expect(raceProfile.conversationLanguage).toBe('es');
+    secondResponse.resolve();
+    await waitFor(() => expect(raceProfile.conversationLanguage).toBe('fr'));
   });
 
   it('[WI-2098 AC-4] preserves API order and marker across explicit choice, app change, and explicit choice back', async () => {

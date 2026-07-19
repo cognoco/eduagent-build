@@ -25,13 +25,15 @@ import { queryKeys } from '../lib/query-keys';
 import {
   completeExplicitMentorLanguageUpdate,
   failExplicitMentorLanguageUpdate,
-  type ExplicitMentorLanguageOperation,
+  finishMentorLanguageUpdate,
+  type MentorLanguageUpdateOperation,
+  waitForMentorLanguageUpdateTurn,
 } from '../lib/mentor-language-coordination';
 
 interface UpdateLanguageInput {
   childProfileId?: string;
   conversationLanguage: ConversationLanguage;
-  explicitOperation?: ExplicitMentorLanguageOperation;
+  languageOperation?: MentorLanguageUpdateOperation;
 }
 
 interface UpdatePronounsInput {
@@ -64,6 +66,19 @@ export function useUpdateConversationLanguage(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (input) => {
+      if (input.languageOperation) {
+        const canRun = await waitForMentorLanguageUpdateTurn(
+          input.languageOperation,
+        );
+        if (!canRun) {
+          if (input.languageOperation.kind === 'explicit') {
+            failExplicitMentorLanguageUpdate(input.languageOperation);
+          } else {
+            finishMentorLanguageUpdate(input.languageOperation);
+          }
+          throw new Error('Mentor-language update cancelled during sign-out');
+        }
+      }
       try {
         const res = input.childProfileId
           ? await client.onboarding[':profileId'].language.$patch({
@@ -75,15 +90,19 @@ export function useUpdateConversationLanguage(): UseMutationResult<
             });
         await assertOk(res);
         const result = await parseJson(res, onboardingSuccessResponseSchema);
-        if (input.explicitOperation) {
-          await completeExplicitMentorLanguageUpdate(input.explicitOperation);
+        if (input.languageOperation?.kind === 'explicit') {
+          await completeExplicitMentorLanguageUpdate(input.languageOperation);
         }
         return result;
       } catch (error) {
-        if (input.explicitOperation) {
-          failExplicitMentorLanguageUpdate(input.explicitOperation);
+        if (input.languageOperation?.kind === 'explicit') {
+          failExplicitMentorLanguageUpdate(input.languageOperation);
         }
         throw error;
+      } finally {
+        if (input.languageOperation) {
+          finishMentorLanguageUpdate(input.languageOperation);
+        }
       }
     },
     onSuccess: async () => {

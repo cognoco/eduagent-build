@@ -2,14 +2,28 @@ import { renderHook, waitFor } from '@testing-library/react-native';
 import i18next from 'i18next';
 import * as ExpoSecureStore from 'expo-secure-store';
 
+import {
+  finishMentorLanguageUpdate,
+  type MentorLanguageUpdateOperation,
+} from '../lib/mentor-language-coordination';
 import { clearProfileSecureStorageOnSignOut } from '../lib/sign-out-cleanup';
 import { useMentorLanguageSync } from './use-mentor-language-sync';
+
+type MockLanguageInput = {
+  languageOperation?: MentorLanguageUpdateOperation;
+};
+
+function finishMockMutation(vars: unknown): void {
+  const operation = (vars as MockLanguageInput).languageOperation;
+  if (operation) finishMentorLanguageUpdate(operation);
+}
 
 // Default implementation: simulates a successful mutation by calling onSuccess.
 // Tests that need to simulate failure should use mockMutate.mockImplementationOnce
 // and intentionally NOT call onSuccess.
 const mockMutate = jest.fn(
-  (_vars: unknown, opts?: { onSuccess?: () => void }) => {
+  (vars: unknown, opts?: { onSuccess?: () => void }) => {
+    finishMockMutation(vars);
     opts?.onSuccess?.();
   },
 );
@@ -45,7 +59,8 @@ describe('useMentorLanguageSync', () => {
     // mockReset clears call history AND restores the default success implementation.
     mockMutate.mockReset();
     mockMutate.mockImplementation(
-      (_vars: unknown, opts?: { onSuccess?: () => void }) => {
+      (vars: unknown, opts?: { onSuccess?: () => void }) => {
+        finishMockMutation(vars);
         opts?.onSuccess?.();
       },
     );
@@ -61,7 +76,7 @@ describe('useMentorLanguageSync', () => {
 
     await waitFor(() =>
       expect(mockMutate).toHaveBeenCalledWith(
-        { conversationLanguage: 'nb' },
+        expect.objectContaining({ conversationLanguage: 'nb' }),
         expect.any(Object),
       ),
     );
@@ -74,7 +89,7 @@ describe('useMentorLanguageSync', () => {
 
     await waitFor(() =>
       expect(mockMutate).toHaveBeenCalledWith(
-        { conversationLanguage: 'ja' },
+        expect.objectContaining({ conversationLanguage: 'ja' }),
         expect.any(Object),
       ),
     );
@@ -92,7 +107,7 @@ describe('useMentorLanguageSync', () => {
 
     await waitFor(() =>
       expect(mockMutate).toHaveBeenCalledWith(
-        { conversationLanguage: 'de' },
+        expect.objectContaining({ conversationLanguage: 'de' }),
         expect.any(Object),
       ),
     );
@@ -138,7 +153,7 @@ describe('useMentorLanguageSync', () => {
 
     await waitFor(() =>
       expect(mockMutate).toHaveBeenCalledWith(
-        { conversationLanguage: 'de' },
+        expect.objectContaining({ conversationLanguage: 'de' }),
         expect.any(Object),
       ),
     );
@@ -154,7 +169,7 @@ describe('useMentorLanguageSync', () => {
 
     await waitFor(() =>
       expect(mockMutate).toHaveBeenCalledWith(
-        { conversationLanguage: 'de' },
+        expect.objectContaining({ conversationLanguage: 'de' }),
         expect.any(Object),
       ),
     );
@@ -239,8 +254,9 @@ describe('useMentorLanguageSync', () => {
     // callback but never calls it (the real useMutation omits onSuccess on
     // error). This means lastSyncedRef must NOT be set after the first call.
     let firstCallDone = false;
-    mockMutate.mockImplementationOnce((_vars: unknown, _opts: unknown) => {
+    mockMutate.mockImplementationOnce((vars: unknown, _opts: unknown) => {
       // Intentionally do NOT call opts.onSuccess — simulates a failed patch.
+      finishMockMutation(vars);
       firstCallDone = true;
     });
 
@@ -262,7 +278,7 @@ describe('useMentorLanguageSync', () => {
     await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(2));
     expect(mockMutate).toHaveBeenNthCalledWith(
       2,
-      { conversationLanguage: 'nb' },
+      expect.objectContaining({ conversationLanguage: 'nb' }),
       expect.any(Object),
     );
   });
