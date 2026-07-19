@@ -229,6 +229,8 @@ jobs:
 
       - name: Upload V2 Playwright artifacts
         if: always()
+        continue-on-error: true
+        timeout-minutes: 2
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: playwright-web-v2-${{ github.run_id }}-${{ github.run_attempt }}

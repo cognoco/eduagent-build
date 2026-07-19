@@ -259,6 +259,8 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     expect(classifyCommand).toContain('${PLAYWRIGHT_API_URL}');
 
     expect(uploadV2?.if).toBe('always()');
+    expect(uploadV2?.['continue-on-error']).toBe(true);
+    expect(Number(uploadV2?.['timeout-minutes'])).toBeGreaterThan(0);
     expect(String((uploadV2?.with as Record<string, unknown>)?.name)).toContain(
       'playwright-web-v2-${{ github.run_id }}-${{ github.run_attempt }}',
     );
