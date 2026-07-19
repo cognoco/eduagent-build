@@ -371,6 +371,9 @@ function CreateSubjectScreenAuthenticated() {
         }
 
         if (result.structureType === 'broad') {
+          // The established broad-subject flow owns its picker exits (created
+          // subject hub/shelf), which WI-2215 explicitly preserves. Do not pass
+          // the Subjects entry token into a route that has no return contract.
           router.replace({
             pathname: '/(app)/pick-book/[subjectId]',
             params: {
