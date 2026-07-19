@@ -308,10 +308,15 @@ checked against.
     a guardian's **consent-authority**. *(Ruled — `MMT-ADR-0008`, Option A: the **whole edge is global**
     and stores consent-authority + the consent record only; `operate`/`manage`/`view` are **derived** —
     `guardian-link ∧ shared-org ∧ charge-has-no-Login` — never stored per-org.)* **Edge-less
-    exception:** an **email-consenting parent** (consent given by link; no `person` row, no edge)
-    cannot be served by this resolver, so their consent **withdrawal/restore** is authorized by a
-    signed, non-expiring **bearer token** — granting *only* withdraw/restore of that one charge's
-    consent, never `operate`/`manage`/`view` or any data access. *(Ruled — `MMT-ADR-0027`.)*
+    exception (withdrawal only):** an **email-consenting parent** (consent given by link; no `person`
+    row, no edge) cannot be served by this resolver, so their consent **withdrawal** is authorized by a
+    signed, non-expiring **bearer token** — granting *only* withdrawal of that one charge's consent,
+    never `operate`/`manage`/`view`, any data access, or restoration. *(Ruled — `MMT-ADR-0029`.)*
+    **Restoring** a withdrawn grant is **not** part of this exception — it always requires an
+    authenticated session through this same edge-derived resolver, exactly like every other guardianship
+    operation; the email-parent (having no edge) currently has no restore path at all. *(Amended
+    2026-07-19 per OPQ-114 — the exception previously also covered restore; `MMT-ADR-0029`'s "Alternatives
+    considered" #6 records why that was narrowed.)*
 24. **Time-triggered transitions must be scheduler-driven.** Age / consent-threshold / 18 crossings and
     `residence_jurisdiction` re-evaluation fire with **no user action** — a dormant account still
     transitions on its birthday — so they **cannot live only in request handlers**; a durable scheduler

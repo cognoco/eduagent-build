@@ -1199,39 +1199,6 @@ export async function restoreConsentV2(
 }
 
 /**
- * Bearer-token restore (undo) for the email-consenting parent (P0,
- * MMT-ADR-0027). The mirror of `withdrawConsentByToken`: the same
- * append-a-new-grant core as `restoreConsentV2`, authorized by the verified
- * withdrawal token rather than a guardianship edge. Outside the 7-day grace it
- * throws `ConsentGracePeriodExpiredError` (the data is already gone), identical
- * to the edge-gated path. See spec §5.3.
- */
-export async function restoreConsentByToken(
-  db: Database,
-  chargePersonId: string,
-  organizationId: string,
-  audit?: { requestIp?: string; userAgent?: string },
-  /** [WI-2347] Same non-enumerating supersession check as
-   * `withdrawConsentByToken` — see its param doc. Pass `string` for `cw2`,
-   * `null` for legacy `cw1`; never `undefined` (this is always a
-   * bearer-token call). */
-  expectedTokenId?: string | null,
-): Promise<RestoreConsentV2Result> {
-  return appendRestoreGrant(
-    db,
-    chargePersonId,
-    organizationId,
-    'gdpr_parental_consent',
-    {
-      source: 'email_parent_restore',
-      ...(audit?.requestIp !== undefined ? { requestIp: audit.requestIp } : {}),
-      ...(audit?.userAgent !== undefined ? { userAgent: audit.userAgent } : {}),
-    },
-    expectedTokenId,
-  );
-}
-
-/**
  * The post-authorization core of restore: take the per-person advisory lock,
  * re-read the current grant, enforce the grace window, APPEND a new
  * un-withdrawn grant, and clear `archived_at` — all in one serialized
@@ -1254,7 +1221,6 @@ async function appendRestoreGrant(
   organizationId: string,
   basis: ConsentBasis,
   auditFact: Record<string, unknown>,
-  expectedTokenId?: string | null,
 ): Promise<RestoreConsentV2Result> {
   const now = new Date();
   // WI-583 race guard: the grace-end delete/archive predicates
@@ -1282,13 +1248,6 @@ async function appendRestoreGrant(
       columns: { id: true, withdrawnAt: true, withdrawalTokenId: true },
     });
     if (!current) {
-      throw new ConsentRecordNotFoundError();
-    }
-    if (
-      expectedTokenId !== undefined &&
-      current.withdrawalTokenId !== null &&
-      current.withdrawalTokenId !== expectedTokenId
-    ) {
       throw new ConsentRecordNotFoundError();
     }
     // Not withdrawn → nothing to restore (idempotent no-op).
