@@ -12,14 +12,21 @@ interface ProfileLifecycle {
   closed: boolean;
 }
 
-export interface MentorLanguageUpdateOperation {
+interface MentorLanguageUpdateOperationBase {
   profileId: string;
-  kind: 'automatic' | 'explicit';
 }
 
-export interface ExplicitMentorLanguageOperation extends MentorLanguageUpdateOperation {
+export interface AutomaticMentorLanguageOperation extends MentorLanguageUpdateOperationBase {
+  kind: 'automatic';
+}
+
+export interface ExplicitMentorLanguageOperation extends MentorLanguageUpdateOperationBase {
   kind: 'explicit';
 }
+
+export type MentorLanguageUpdateOperation =
+  | AutomaticMentorLanguageOperation
+  | ExplicitMentorLanguageOperation;
 
 interface OperationMetadata {
   lifecycle: ProfileLifecycle;

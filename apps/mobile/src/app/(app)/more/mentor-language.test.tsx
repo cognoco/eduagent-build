@@ -2,6 +2,7 @@ import i18nextInstance from 'i18next';
 import * as ExpoSecureStore from 'expo-secure-store';
 import { fireEvent, act, waitFor } from '@testing-library/react-native';
 import { useQuery } from '@tanstack/react-query';
+import type { ConversationLanguage } from '@eduagent/schemas';
 import {
   renderScreen,
   cleanupScreen,
@@ -251,7 +252,7 @@ describe('MentorLanguageScreen', () => {
         routes: {
           '/onboarding/': (_url: string, init?: RequestInit) => {
             const body = JSON.parse(String(init?.body)) as {
-              conversationLanguage: string;
+              conversationLanguage: ConversationLanguage;
             };
             patchLanguages.push(body.conversationLanguage);
             raceProfile.conversationLanguage = body.conversationLanguage;
@@ -291,7 +292,7 @@ describe('MentorLanguageScreen', () => {
       routes: {
         '/onboarding/': async (_url: string, init?: RequestInit) => {
           const body = JSON.parse(String(init?.body)) as {
-            conversationLanguage: string;
+            conversationLanguage: ConversationLanguage;
           };
           patchLanguages.push(body.conversationLanguage);
           if (body.conversationLanguage === 'de') {
@@ -331,7 +332,7 @@ describe('MentorLanguageScreen', () => {
       routes: {
         '/onboarding/': async (_url: string, init?: RequestInit) => {
           const body = JSON.parse(String(init?.body)) as {
-            conversationLanguage: string;
+            conversationLanguage: ConversationLanguage;
           };
           patchLanguages.push(body.conversationLanguage);
           if (body.conversationLanguage === 'es') {
@@ -365,7 +366,7 @@ describe('MentorLanguageScreen', () => {
       routes: {
         '/onboarding/': async (_url: string, init?: RequestInit) => {
           const body = JSON.parse(String(init?.body)) as {
-            conversationLanguage: string;
+            conversationLanguage: ConversationLanguage;
           };
           patchLanguages.push(body.conversationLanguage);
           if (body.conversationLanguage === 'es') {
@@ -401,7 +402,7 @@ describe('MentorLanguageScreen', () => {
       routes: {
         '/onboarding/': async (_url: string, init?: RequestInit) => {
           const body = JSON.parse(String(init?.body)) as {
-            conversationLanguage: string;
+            conversationLanguage: ConversationLanguage;
           };
           patchLanguages.push(body.conversationLanguage);
           if (body.conversationLanguage === 'fr') {
@@ -438,7 +439,7 @@ describe('MentorLanguageScreen', () => {
       routes: {
         '/onboarding/': (_url: string, init?: RequestInit) => {
           const body = JSON.parse(String(init?.body)) as {
-            conversationLanguage: string;
+            conversationLanguage: ConversationLanguage;
           };
           patchLanguages.push(body.conversationLanguage);
           orderedProfile.conversationLanguage = body.conversationLanguage;
@@ -502,8 +503,9 @@ describe('MentorLanguageScreen', () => {
       conversationLanguage: 'de',
     });
     const patchLanguages: string[] = [];
-    const realSetItem = ExpoSecureStore.setItemAsync.getMockImplementation();
-    ExpoSecureStore.setItemAsync
+    const setItemMock = jest.mocked(ExpoSecureStore.setItemAsync);
+    const realSetItem = setItemMock.getMockImplementation();
+    setItemMock
       .mockRejectedValueOnce(new Error('storage unavailable'))
       .mockImplementation(realSetItem!);
     await i18nextInstance.changeLanguage('de');
@@ -512,7 +514,7 @@ describe('MentorLanguageScreen', () => {
       routes: {
         '/onboarding/': (_url: string, init?: RequestInit) => {
           const body = JSON.parse(String(init?.body)) as {
-            conversationLanguage: string;
+            conversationLanguage: ConversationLanguage;
           };
           patchLanguages.push(body.conversationLanguage);
           retryProfile.conversationLanguage = body.conversationLanguage;
@@ -551,7 +553,7 @@ describe('MentorLanguageScreen', () => {
       routes: {
         '/onboarding/': (_url: string, init?: RequestInit) => {
           const body = JSON.parse(String(init?.body)) as {
-            conversationLanguage: string;
+            conversationLanguage: ConversationLanguage;
           };
           patchLanguages.push(body.conversationLanguage);
           if (failExplicit) {

@@ -163,7 +163,9 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     const profileId = 'profile-late-write';
     const markerKey = `mentorLanguageExplicitOverride_${profileId}`;
     const markerWrite = deferred<void>();
-    const realSetItem = ExpoSecureStore.setItemAsync.getMockImplementation();
+    const realSetItem = jest
+      .mocked(ExpoSecureStore.setItemAsync)
+      .getMockImplementation();
     jest
       .spyOn(ExpoSecureStore, 'setItemAsync')
       .mockImplementationOnce(async (key, value) => {
@@ -187,7 +189,9 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     const profileId = 'profile-early-write';
     const markerKey = `mentorLanguageExplicitOverride_${profileId}`;
     const markerWrite = deferred<void>();
-    const realSetItem = ExpoSecureStore.setItemAsync.getMockImplementation();
+    const realSetItem = jest
+      .mocked(ExpoSecureStore.setItemAsync)
+      .getMockImplementation();
     jest
       .spyOn(ExpoSecureStore, 'setItemAsync')
       .mockImplementationOnce(async (key, value) => {
