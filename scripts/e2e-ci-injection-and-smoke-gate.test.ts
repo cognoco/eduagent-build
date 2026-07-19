@@ -997,7 +997,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
   });
 
-  it('[WI-2241] hard-proves the exact rich supportee persists after relaunch before restoring Journal', () => {
+  it('[WI-2241] hard-selects the exact rich supportee through the Support hub before and after relaunch', () => {
     const supporterFlow = readFileSync(
       join(
         repoRoot,
@@ -1011,18 +1011,92 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     if (!Array.isArray(commands)) {
       throw new Error('supporter scope Maestro commands must be a YAML list');
     }
+    const firstHubReady = commands.findIndex(
+      (command) =>
+        JSON.stringify(command) ===
+        JSON.stringify({
+          extendedWaitUntil: {
+            visible: { id: 'support-hub-mentor-tab' },
+            timeout: 30000,
+          },
+        }),
+    );
     const relaunchStart = commands.findIndex(
       (command) => command === 'stopApp',
     );
 
+    expect(firstHubReady).toBeGreaterThanOrEqual(0);
+    expect(commands.slice(firstHubReady, firstHubReady + 5)).toEqual([
+      {
+        extendedWaitUntil: {
+          visible: { id: 'support-hub-mentor-tab' },
+          timeout: 30000,
+        },
+      },
+      {
+        scrollUntilVisible: {
+          element: {
+            id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}',
+          },
+          direction: 'DOWN',
+          timeout: 5000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'support-hub-mentor-person-${SUPPORTEE_PERSON_ID}',
+        },
+      },
+      {
+        assertNotVisible: {
+          id: 'scope-chip-option-person-${REVOKED_SUPPORTEE_PERSON_ID}',
+        },
+      },
+      {
+        tapOn: {
+          id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}',
+        },
+      },
+    ]);
     expect(relaunchStart).toBeGreaterThanOrEqual(0);
-    expect(commands.slice(relaunchStart, relaunchStart + 7)).toEqual([
+    expect(commands.slice(relaunchStart, relaunchStart + 12)).toEqual([
       'stopApp',
       { launchApp: { clearState: false } },
       {
         extendedWaitUntil: {
-          visible: { id: 'person-scope-mentor-tab' },
+          visible: { id: 'scope-chip' },
           timeout: 30000,
+        },
+      },
+      {
+        tapOn: {
+          id: 'scope-chip-option-supporter-hub',
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'support-hub-mentor-tab' },
+          timeout: 15000,
+        },
+      },
+      {
+        scrollUntilVisible: {
+          element: {
+            id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}',
+          },
+          direction: 'DOWN',
+          timeout: 5000,
+        },
+      },
+      {
+        tapOn: {
+          id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}',
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'person-scope-mentor-tab' },
+          timeout: 15000,
         },
       },
       {
