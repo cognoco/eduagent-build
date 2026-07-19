@@ -484,6 +484,53 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
       ),
     ).toBe(false);
   });
+
+  it('reuses the same auto-file event id for the same session and retry attempt', async () => {
+    let now = 1_000;
+    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now++);
+    const freeformSession = {
+      filedAt: null,
+      filingStatus: 'filing_pending',
+      filingRetryCount: 1,
+      topicId: null,
+      exchangeCount: 3,
+      metadata: { effectiveMode: 'freeform' },
+      updatedAt: new Date(),
+    };
+
+    try {
+      const first = await executeHandler(
+        {
+          'mark-pending-and-claim-retry-slot': async () => 2,
+        },
+        null,
+        freeformSession,
+      );
+      const second = await executeHandler(
+        {
+          'mark-pending-and-claim-retry-slot': async () => 2,
+        },
+        null,
+        freeformSession,
+      );
+
+      const firstDispatch = first.runner.sendEventCalls.find(
+        (call) => call.name === 'dispatch-filing-retry',
+      );
+      const secondDispatch = second.runner.sendEventCalls.find(
+        (call) => call.name === 'dispatch-filing-retry',
+      );
+
+      expect(firstDispatch?.payload).toMatchObject({
+        id: `auto-file-${SESSION_ID}-observer-retry-${SESSION_ID}-2`,
+      });
+      expect((secondDispatch?.payload as { id?: string } | undefined)?.id).toBe(
+        (firstDispatch?.payload as { id?: string } | undefined)?.id,
+      );
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
