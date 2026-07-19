@@ -100,6 +100,7 @@ function pushMentorHomeworkCamera(router: ReturnType<typeof useRouter>): void {
 function LearnerMentorScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
+  const { setActiveScope } = useScopeContext();
   const announce = useAnnounce();
   const { width: windowWidth } = useWindowDimensions();
   const nowFeed = useNowFeed();
@@ -194,6 +195,7 @@ function LearnerMentorScreen(): React.ReactElement {
     }
     pushNowDeepLink(router, card.deepLink, {
       subjectHubTarget: 'v2-subject-hub',
+      setActiveScope,
     });
   };
 
@@ -248,6 +250,7 @@ function LearnerMentorScreen(): React.ReactElement {
       setBarClarification(null);
       pushNowDeepLink(router, result.deepLink, {
         subjectHubTarget: 'v2-subject-hub',
+        setActiveScope,
       });
       return;
     }
@@ -328,6 +331,7 @@ function LearnerMentorScreen(): React.ReactElement {
       if (resumeLink) {
         pushNowDeepLink(router, resumeLink, {
           subjectHubTarget: 'v2-subject-hub',
+          setActiveScope,
         });
         return;
       }
