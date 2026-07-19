@@ -6,7 +6,7 @@ import {
   ChatShell,
   animateResponse,
   type ChatMessage,
-} from '../../../components/session/ChatShell';
+} from '../../../components/session';
 import {
   RemediationCard,
   type RetentionStatus,

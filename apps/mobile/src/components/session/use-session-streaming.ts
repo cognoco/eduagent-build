@@ -12,7 +12,7 @@ import type {
   FluencyDrillEvent,
   LanguageLearningActivityEvent,
 } from '../../lib/sse';
-import type { ChatMessage } from './ChatShell';
+import type { ChatMessage } from './session-types';
 import type {
   useStreamMessage,
   useStartSession,

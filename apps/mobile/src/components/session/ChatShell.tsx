@@ -36,8 +36,6 @@ import { DeskLampAnimation, MagicPenAnimation } from '../common';
 import Animated, { FadeOut } from 'react-native-reanimated';
 import type { ChatMessage } from './session-types';
 
-export type { ChatMessage } from './session-types';
-
 interface ChatShellProps {
   title: string;
   subtitle?: string;
