@@ -32,6 +32,7 @@ import {
   useSessionSummary,
   useSkipSummary,
   useSubmitSummary,
+  useRetrySummaryFeedback,
   useRecallBridge,
 } from '../../hooks/use-sessions';
 import { useSessionBookmarks } from '../../hooks/use-bookmarks';
@@ -138,8 +139,11 @@ export default function SessionSummaryScreen() {
   // allowing double-submission if user taps rapidly.
   const submitInFlight = useRef(false);
   const skipInFlight = useRef(false);
+  const feedbackRetryInFlight = useRef(false);
+  const [feedbackRetryAttempted, setFeedbackRetryAttempted] = useState(false);
 
   const submitSummary = useSubmitSummary(sessionId ?? '');
+  const retrySummaryFeedback = useRetrySummaryFeedback(sessionId ?? '');
   const skipSummary = useSkipSummary(sessionId ?? '');
   const session = useSession(sessionId ?? '');
   const transcript = useSessionTranscript(sessionId ?? '');
@@ -214,6 +218,8 @@ export default function SessionSummaryScreen() {
 
   useEffect(() => {
     setRecapTimedOut(false);
+    setAiFeedback(null);
+    setFeedbackRetryAttempted(false);
     // A new session id resets the loading-escape anchor — otherwise an
     // in-flight 10s timer from a previous session would continue ticking
     // against the new session's load.
@@ -350,9 +356,12 @@ export default function SessionSummaryScreen() {
 
   const showSubmittedView = submitted || isPersistedSubmitted;
   const displayContent = submitted ? summaryText : (persisted?.content ?? '');
-  const displayAiFeedback = submitted
-    ? aiFeedback
-    : (persisted?.aiFeedback ?? null);
+  const displayAiFeedback = aiFeedback ?? persisted?.aiFeedback ?? null;
+  const displayFeedbackStatus = displayAiFeedback
+    ? 'available'
+    : submitted
+      ? 'unavailable'
+      : persisted?.feedbackStatus;
   const transcriptSessionType = liveTranscript?.session.sessionType;
   const sessionType = deriveSessionSummaryMode({
     sessionTypeParam,
@@ -679,6 +688,33 @@ export default function SessionSummaryScreen() {
       return false;
     } finally {
       submitInFlight.current = false;
+    }
+  };
+
+  const handleRetryFeedback = async (): Promise<void> => {
+    if (
+      retrySummaryFeedback.isPending ||
+      feedbackRetryInFlight.current ||
+      !sessionId
+    ) {
+      return;
+    }
+    feedbackRetryInFlight.current = true;
+    setFeedbackRetryAttempted(true);
+    try {
+      const result = await retrySummaryFeedback.mutateAsync();
+      setAiFeedback(result.summary.aiFeedback);
+      if (!isPersistedSubmitted) {
+        setSubmitted(true);
+      }
+      await refetchPersistedSummary();
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { surface: 'session-summary.feedback-retry' },
+        extra: { sessionId },
+      });
+    } finally {
+      feedbackRetryInFlight.current = false;
     }
   };
 
@@ -1466,6 +1502,34 @@ export default function SessionSummaryScreen() {
                     {displayAiFeedback}
                   </Text>
                 </>
+              ) : displayFeedbackStatus === 'unavailable' ? (
+                <View
+                  className="mt-3 border-t border-surface-elevated pt-3"
+                  testID="feedback-unavailable"
+                  accessibilityLiveRegion="polite"
+                >
+                  <Text className="text-body-sm font-semibold text-text-primary mb-1">
+                    {t('sessionSummary.feedbackUnavailableTitle')}
+                  </Text>
+                  <Text className="text-body-sm text-text-secondary mb-3">
+                    {feedbackRetryAttempted || retrySummaryFeedback.isError
+                      ? t('sessionSummary.feedbackStillUnavailable')
+                      : t('sessionSummary.feedbackUnavailableMessage')}
+                  </Text>
+                  <Button
+                    variant="secondary"
+                    label={
+                      retrySummaryFeedback.isPending
+                        ? t('sessionSummary.retryingFeedback')
+                        : t('sessionSummary.retryFeedback')
+                    }
+                    onPress={() => {
+                      void handleRetryFeedback();
+                    }}
+                    loading={retrySummaryFeedback.isPending}
+                    testID="retry-feedback-button"
+                  />
+                </View>
               ) : null}
             </View>
           </View>

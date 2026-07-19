@@ -217,6 +217,9 @@ export const LLM_ROUTE_PATTERNS_POST_ONLY = [
   // idempotency short-circuit for re-submitted accepted summaries lands in a
   // separate WP; allowlist coverage is the prerequisite.
   /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/summary\/?$/,
+  // Saved-summary feedback recovery invokes the evaluator but refunds the
+  // decrement in the route so a recovery attempt does not consume quota.
+  /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/summary\/retry-feedback\/?$/,
   // [WI-136 / DS-038] POST /assessments/:assessmentId/answer invokes
   // evaluateAssessmentAnswer (LLM). The terminal-replay guard at the service
   // layer lands in a separate WP; allowlist coverage is the prerequisite.

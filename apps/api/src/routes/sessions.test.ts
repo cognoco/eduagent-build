@@ -539,6 +539,18 @@ jest.mock('../services/session', () => {
           status: 'accepted',
         },
       })),
+    retrySummaryFeedback: jest
+      .fn()
+      .mockImplementation((_db, _profileId, sessionId) => ({
+        summary: {
+          id: '880e8400-e29b-41d4-a716-446655440001',
+          sessionId,
+          content: 'Saved learner summary',
+          aiFeedback: 'Clear explanation.',
+          feedbackStatus: 'available',
+          status: 'accepted',
+        },
+      })),
     streamMessage: jest.fn().mockImplementation(() =>
       Promise.resolve({
         stream: (async function* () {
@@ -656,8 +668,10 @@ import {
   requestSessionLibraryFiling,
   restoreSessionForAutoFiling,
   resetFilingForRetry,
+  retrySummaryFeedback,
 } from '../services/session';
 import { app } from '../index';
+import { markQuotaRefundedAfterSummaryFeedbackRetry } from './sessions';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, MAX_HOMEWORK_PROBLEMS } from '@eduagent/schemas';
 import { FILING_CONFIG } from '../config/filing';
@@ -2045,6 +2059,99 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('POST /v1/sessions/:sessionId/summary/retry-feedback [WI-2183]', () => {
+    beforeEach(() => {
+      mockRefundQuotaOrEscalate.mockClear();
+      mockInngestSend.mockClear();
+    });
+
+    it('returns recovered feedback, refunds the metered turn, and emits no completion event', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.summary).toEqual(
+        expect.objectContaining({
+          sessionId: SESSION_ID,
+          feedbackStatus: 'available',
+          aiFeedback: 'Clear explanation.',
+        }),
+      );
+      expect(mockRefundQuotaOrEscalate).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        expect.objectContaining({
+          route: 'sessions.summary.retry_feedback',
+          profileId: 'test-profile-id',
+          sessionId: SESSION_ID,
+          source: 'monthly',
+        }),
+      );
+      expect(mockInngestSend).not.toHaveBeenCalled();
+    });
+
+    it('refunds an unavailable retry response without claiming feedback exists', async () => {
+      jest.mocked(retrySummaryFeedback).mockResolvedValueOnce({
+        summary: {
+          id: '880e8400-e29b-41d4-a716-446655440001',
+          sessionId: SESSION_ID,
+          content: 'Saved learner summary',
+          aiFeedback: null,
+          feedbackStatus: 'unavailable',
+          status: 'submitted',
+        },
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(
+        expect.objectContaining({
+          summary: expect.objectContaining({
+            aiFeedback: null,
+            feedbackStatus: 'unavailable',
+          }),
+        }),
+      );
+      expect(mockRefundQuotaOrEscalate).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not set quotaRefunded when the explicit refund fails', () => {
+      const markRefunded = jest.fn();
+
+      markQuotaRefundedAfterSummaryFeedbackRetry(false, markRefunded);
+
+      expect(markRefunded).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 without authentication', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
+        { method: 'POST' },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 400 for a non-UUID session id before evaluation', async () => {
+      const res = await app.request(
+        '/v1/sessions/not-a-uuid/summary/retry-feedback',
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+      expect(mockRefundQuotaOrEscalate).not.toHaveBeenCalled();
     });
   });
 

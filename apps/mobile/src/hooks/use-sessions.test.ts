@@ -21,6 +21,7 @@ import {
   useSessionSummary,
   useSkipSummary,
   useSubmitSummary,
+  useRetrySummaryFeedback,
   useTopicParkingLot,
   useAddParkingLotItem,
   computeFilingRefetchInterval,
@@ -529,6 +530,7 @@ describe('useSubmitSummary', () => {
             sessionId: '660e8400-e29b-41d4-a716-446655440000',
             content: 'Gravity pulls objects toward Earth',
             aiFeedback: 'Clear and accurate summary.',
+            feedbackStatus: 'available',
             status: 'accepted',
           },
         }),
@@ -564,6 +566,7 @@ describe('useSubmitSummary', () => {
             sessionId: '660e8400-e29b-41d4-a716-446655440000',
             content: 'Gravity pulls objects toward Earth',
             aiFeedback: 'Clear and accurate summary.',
+            feedbackStatus: 'available',
             status: 'accepted',
           },
         }),
@@ -609,6 +612,41 @@ describe('useSubmitSummary', () => {
     });
 
     expect(result.current.error).toBeInstanceOf(Error);
+  });
+});
+
+describe('useRetrySummaryFeedback', () => {
+  it('[WI-2183] retries only feedback and returns the available evaluation', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          summary: {
+            id: '880e8400-e29b-41d4-a716-446655440001',
+            sessionId: '660e8400-e29b-41d4-a716-446655440000',
+            content: 'Gravity pulls objects toward Earth',
+            aiFeedback: 'Clear and accurate summary.',
+            feedbackStatus: 'available',
+            status: 'accepted',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const { result } = renderHook(
+      () => useRetrySummaryFeedback('660e8400-e29b-41d4-a716-446655440000'),
+      { wrapper: createWrapper() },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    expect(result.current.data?.summary.feedbackStatus).toBe('available');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/summary/retry-feedback'),
+      expect.objectContaining({ method: 'POST' }),
+    );
   });
 });
 

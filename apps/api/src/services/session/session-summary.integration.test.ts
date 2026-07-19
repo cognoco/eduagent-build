@@ -26,6 +26,7 @@ import {
   learningSessions,
   sessionSummaries,
   subjects,
+  topicNotes,
   xpLedger,
   type Database,
 } from '@eduagent/database';
@@ -41,7 +42,12 @@ import {
   registerLlmProviderFixture,
 } from '../../test-utils/llm-provider-fixtures';
 import { _resetCircuits } from '../llm';
-import { getSessionSummary, submitSummary } from './session-summary';
+import { NotFoundError } from '@eduagent/schemas';
+import {
+  getSessionSummary,
+  retrySummaryFeedback,
+  submitSummary,
+} from './session-summary';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -261,6 +267,135 @@ describeIfDb(
       // XP should be multiplied only once (100 * 1.5 = 150, not 100 * 1.5 * 1.5).
       // REFLECTION_XP_MULTIPLIER = 1.5 per xp.ts
       expect(xpRow!.amount).toBeLessThanOrEqual(200); // not double-multiplied
+    });
+
+    it('[WI-2183] saves learner content exactly once when the feedback provider fails', async () => {
+      const { db, profileId, sessionId } = await seedFullSessionWithXpEntry();
+      llmFixture?.setChatError(new Error('provider unavailable'));
+
+      const result = await submitSummary(db, profileId, sessionId, {
+        content: 'I learned how a variable can stand for an unknown value.',
+      });
+      const rows = await db.query.sessionSummaries.findMany({
+        where: eq(sessionSummaries.sessionId, sessionId),
+      });
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.content).toBe(
+        'I learned how a variable can stand for an unknown value.',
+      );
+      expect(rows[0]!.aiFeedback).toBeNull();
+      expect(result.summary.feedbackStatus).toBe('unavailable');
+    });
+
+    it('[WI-2183] successful feedback retry preserves the summary row and XP award', async () => {
+      const { db, profileId, topicId, sessionId } =
+        await seedFullSessionWithXpEntry();
+      llmFixture?.setChatResponse('provider returned no JSON');
+      const submitted = await submitSummary(db, profileId, sessionId, {
+        content: 'I learned how a variable can stand for an unknown value.',
+      });
+      const xpBefore = await db.query.xpLedger.findFirst({
+        where: eq(xpLedger.topicId, topicId),
+      });
+      const notesBefore = await db.query.topicNotes.findMany({
+        where: eq(topicNotes.sessionId, sessionId),
+      });
+
+      llmFixture?.setChatResponse(
+        llmStructuredJson({
+          feedback: 'You clearly explained the role of the unknown value.',
+          hasUnderstandingGaps: false,
+          gapAreas: [],
+          isAccepted: true,
+        }),
+      );
+      const retried = await retrySummaryFeedback(db, profileId, sessionId);
+      const rows = await db.query.sessionSummaries.findMany({
+        where: eq(sessionSummaries.sessionId, sessionId),
+      });
+      const xpAfter = await db.query.xpLedger.findFirst({
+        where: eq(xpLedger.topicId, topicId),
+      });
+      const notesAfter = await db.query.topicNotes.findMany({
+        where: eq(topicNotes.sessionId, sessionId),
+      });
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.id).toBe(submitted.summary.id);
+      expect(retried.summary.feedbackStatus).toBe('available');
+      expect(retried.summary.aiFeedback).toBe(
+        'You clearly explained the role of the unknown value.',
+      );
+      expect(xpAfter!.amount).toBe(xpBefore!.amount);
+      expect(xpAfter!.reflectionMultiplierApplied).toBe(
+        xpBefore!.reflectionMultiplierApplied,
+      );
+      expect(notesBefore).toHaveLength(1);
+      expect(notesAfter).toHaveLength(1);
+      expect(notesAfter[0]!.id).toBe(notesBefore[0]!.id);
+    });
+
+    it('[WI-2183] concurrent feedback retries evaluate at most once and keep one summary row', async () => {
+      const { db, profileId, sessionId } = await seedFullSessionWithXpEntry();
+      llmFixture?.setChatResponse('provider returned no JSON');
+      await submitSummary(db, profileId, sessionId, {
+        content: 'I learned how a variable can stand for an unknown value.',
+      });
+      llmFixture?.clearCalls();
+      llmFixture?.setChatResponse(
+        llmStructuredJson({
+          feedback: 'Clear explanation.',
+          hasUnderstandingGaps: false,
+          gapAreas: [],
+          isAccepted: true,
+        }),
+      );
+
+      const results = await Promise.all([
+        retrySummaryFeedback(createIntegrationDb(), profileId, sessionId),
+        retrySummaryFeedback(createIntegrationDb(), profileId, sessionId),
+      ]);
+      const rows = await db.query.sessionSummaries.findMany({
+        where: eq(sessionSummaries.sessionId, sessionId),
+      });
+
+      expect(llmFixture?.chatCalls).toHaveLength(1);
+      expect(results.map((result) => result.summary.feedbackStatus)).toEqual([
+        'available',
+        'available',
+      ]);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.aiFeedback).toBe('Clear explanation.');
+    });
+
+    it('[WI-2183] concurrent unavailable retries share the winner state without a second evaluation', async () => {
+      const { db, profileId, sessionId } = await seedFullSessionWithXpEntry();
+      llmFixture?.setChatResponse('provider returned no JSON');
+      await submitSummary(db, profileId, sessionId, {
+        content: 'I learned how a variable can stand for an unknown value.',
+      });
+      llmFixture?.clearCalls();
+
+      const results = await Promise.all([
+        retrySummaryFeedback(createIntegrationDb(), profileId, sessionId),
+        retrySummaryFeedback(createIntegrationDb(), profileId, sessionId),
+      ]);
+
+      expect(llmFixture?.chatCalls).toHaveLength(1);
+      expect(results.map((result) => result.summary.feedbackStatus)).toEqual([
+        'unavailable',
+        'unavailable',
+      ]);
+    });
+
+    it('[WI-2183] denies feedback retry for a session owned by another profile', async () => {
+      const { db, sessionId } = await seedFullSessionWithXpEntry();
+
+      await expect(
+        retrySummaryFeedback(db, generateUUIDv7(), sessionId),
+      ).rejects.toBeInstanceOf(NotFoundError);
+      expect(llmFixture?.chatCalls).toHaveLength(0);
     });
   },
 );

@@ -3176,7 +3176,12 @@
         "language_focus": "Nächstes Mal: Wir arbeiten an Grammatikmustern",
         "fluency": "Nächstes Mal: ein kurzer Flüssigkeitssprint"
       }
-    }
+    },
+    "feedbackUnavailableTitle": "Feedback ist noch nicht verfügbar",
+    "feedbackUnavailableMessage": "Deine Zusammenfassung ist gespeichert. Du kannst das Feedback erneut anfordern, ohne sie nochmals einzureichen.",
+    "feedbackStillUnavailable": "Feedback ist immer noch nicht verfügbar, aber deine Zusammenfassung ist sicher. Du kannst es erneut versuchen oder fortfahren, wann immer du bereit bist.",
+    "retryFeedback": "Feedback wiederholen",
+    "retryingFeedback": "Feedback wird wiederholt..."
   },
   "sessionTranscript": {
     "archived": {
