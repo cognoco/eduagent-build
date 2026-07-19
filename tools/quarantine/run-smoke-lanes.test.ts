@@ -5,10 +5,14 @@
 // mutes), and the registry validator catches malformed entries before they
 // can gate CI silently.
 
-import { describe, expect, it } from '@jest/globals';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import {
   DECLARED_CORE_PROJECTS,
   isActive,
+  loadRegistry,
   playwrightProjectFlags,
   resolveLanes,
   validate,
@@ -67,6 +71,44 @@ describe('[WI-2452] isActive', () => {
   });
 });
 
+describe('[WI-2452] loadRegistry — malformed top-level structure', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'run-smoke-lanes-'));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('returns an empty array for a genuinely absent file (not malformed)', () => {
+    expect(loadRegistry(join(dir, 'absent.json'))).toEqual([]);
+  });
+
+  it('accepts a genuinely valid empty ledger', () => {
+    const file = join(dir, 'valid-empty.json');
+    writeFileSync(file, JSON.stringify({ version: 1, entries: [] }));
+    expect(loadRegistry(file)).toEqual([]);
+  });
+
+  it('throws when "entries" is absent from an otherwise-valid document', () => {
+    const file = join(dir, 'missing-entries.json');
+    writeFileSync(file, JSON.stringify({ version: 1 }));
+    expect(() => loadRegistry(file)).toThrow(
+      /malformed.*"entries" must be an array/,
+    );
+  });
+
+  it('throws when "entries" is present but not an array', () => {
+    const file = join(dir, 'wrong-type-entries.json');
+    writeFileSync(file, JSON.stringify({ version: 1, entries: 'oops' }));
+    expect(() => loadRegistry(file)).toThrow(
+      /malformed.*"entries" must be an array/,
+    );
+  });
+});
+
 describe('[WI-2452] playwrightProjectFlags', () => {
   it('formats an empty list as an empty string', () => {
     expect(playwrightProjectFlags([])).toBe('');
@@ -95,6 +137,12 @@ describe('[WI-2452] validate', () => {
 
   it('accepts an empty registry', () => {
     expect(validate([])).toEqual([]);
+  });
+
+  it('flags a missing id', () => {
+    const { id: _id, ...rest } = validEntry;
+    const problems = validate([rest]);
+    expect(problems.some((p) => p.includes('missing "id"'))).toBe(true);
   });
 
   it('flags an unknown project name', () => {
