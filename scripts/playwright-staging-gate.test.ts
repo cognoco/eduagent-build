@@ -475,4 +475,40 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
     expect(result.status).toBe(2);
     expect(result.stderr).toContain('Invalid staging-gate decision input');
   });
+
+  it('uses stdout as the classifier CLI semantic channel', () => {
+    const root = mkdtempSync(join(tmpdir(), 'wi-2228-classify-cli-'));
+    try {
+      const resultFile = join(root, 'result.log');
+      writeFileSync(
+        join(root, 'trace.trace'),
+        JSON.stringify({
+          type: 'response',
+          url: 'https://api-stg.example.test/v1/profiles',
+          status: 503,
+        }),
+      );
+      for (const [resultText, expected] of [
+        ['TypeError: fetch failed', 'infra-signalled'],
+        ['Error: navigation contract mismatch', 'product'],
+      ]) {
+        writeFileSync(resultFile, resultText);
+        const result = spawnSync(
+          process.execPath,
+          [
+            join(process.cwd(), 'scripts/playwright-staging-gate.cjs'),
+            '--classify',
+            root,
+            '1',
+            resultFile,
+          ],
+          { encoding: 'utf8' },
+        );
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain(`FAILURE_CLASS=${expected}`);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

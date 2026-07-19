@@ -182,6 +182,8 @@ jobs:
             echo "::error title=Doppler token missing::DOPPLER_TOKEN_STG is not set as a GitHub Actions secret. Playwright cannot be run with doppler -c stg, so TEST_SEED_SECRET may drift from .dev.vars and every /__test/seed call will 403. See memory project_playwright_e2e_setup.md."
             exit 1
           fi
+          # ubuntu-latest includes unzip; keep this explicit guard so a runner
+          # image change fails with the exact missing dependency.
           if ! command -v unzip >/dev/null 2>&1; then
             echo "::error title=Trace reader missing::unzip is required to classify Playwright trace archives."
             exit 1
@@ -209,9 +211,7 @@ jobs:
             node scripts/playwright-staging-gate.cjs --canary > \"\${POST_STATE_FILE}\"; \
             POST_STATE=\$(cut -d= -f2 \"\${POST_STATE_FILE}\"); \
             CLASSIFY_STATE_FILE=\"\${RUNNER_TEMP}/playwright-classification.state\"; \
-            set +e; \
             node scripts/playwright-staging-gate.cjs --classify apps/mobile/e2e-web/test-results \"\${SUITE_STATUS}\" \"\${RUNNER_TEMP}/playwright-result.log\" > \"\${CLASSIFY_STATE_FILE}\"; \
-            set -e; \
             cat \"\${CLASSIFY_STATE_FILE}\"; \
             FAILURE_CLASS=\$(cut -d= -f2 \"\${CLASSIFY_STATE_FILE}\"); \
             node scripts/playwright-staging-gate.cjs --decide \"\${PRE_STATE}\" \"\${POST_STATE}\" \"\${FAILURE_CLASS}\" \"\${SUITE_STATUS}\""

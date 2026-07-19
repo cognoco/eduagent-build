@@ -130,6 +130,8 @@ function* traceContents(file) {
   }
   let members;
   try {
+    // Platforms without unzip (including native Windows) yield incomplete
+    // inspection below, which keeps the classifier unknown/red.
     members = execFileSync('unzip', ['-Z1', file], {
       encoding: 'utf8',
       maxBuffer: MAX_TRACE_INDEX_BYTES,
@@ -334,9 +336,9 @@ module.exports = { GATE_STATES, runCanary, classifyFailure, decide };
         resultText,
       });
       process.stdout.write(`FAILURE_CLASS=${result.kind}\n`);
-      // Exit zero means an infra signal was found; callers read authoritative
-      // FAILURE_CLASS stdout, while this status is informational only.
-      process.exit(result.kind === 'infra-signalled' ? 0 : 1);
+      // FAILURE_CLASS stdout is the sole semantic channel. Reaching this point
+      // means classification executed normally; unexpected errors stay nonzero.
+      process.exit(0);
     }
     if (mode === '--decide') {
       process.exit(runDecisionCli(args));
