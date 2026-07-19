@@ -78,6 +78,14 @@ function parseBounds(value: unknown, label: string): ParsedBounds {
   }
 
   const [left, top, right, bottom] = coordinates;
+  if (
+    left === undefined ||
+    top === undefined ||
+    right === undefined ||
+    bottom === undefined
+  ) {
+    throw new Error(`${label} has malformed UIAutomator bounds: ${raw}`);
+  }
   if (right < left || bottom < top) {
     throw new Error(`${label} has inverted UIAutomator bounds: ${raw}`);
   }
@@ -125,7 +133,11 @@ function exactlyOne(
   if (matches.length !== 1) {
     throw new Error(`expected exactly one ${label}; found ${matches.length}`);
   }
-  return matches[0];
+  const match = matches[0];
+  if (!match) {
+    throw new Error(`expected exactly one ${label}; found 0`);
+  }
+  return match;
 }
 
 function parseHierarchy(xml: string): HierarchyNode[] {
@@ -159,7 +171,11 @@ function parseHierarchy(xml: string): HierarchyNode[] {
       `expected exactly one hierarchy root; found ${roots.length}`,
     );
   }
-  const rootBounds = parseBounds(roots[0].bounds, 'hierarchy root');
+  const root = roots[0];
+  if (!root) {
+    throw new Error('expected exactly one hierarchy root; found 0');
+  }
+  const rootBounds = parseBounds(root.bounds, 'hierarchy root');
   if (
     rootBounds.left !== 0 ||
     rootBounds.top !== 0 ||
