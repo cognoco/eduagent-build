@@ -241,14 +241,25 @@ function stripQueryString(url: string): string {
  * today, see [WI-2339] Risk/Impact) recursively denylist-scrubs
  * `event.request.data` if a future capture site or SDK upgrade starts
  * populating it.
+ *
+ * [Gate-2 fix] `query_string` is typed by the SDK as `string |
+ * Record<string, unknown> | Array<[string, string]>` — a `typeof ===
+ * 'string'` guard would silently no-op (PII passes through unscrubbed) for
+ * the object/array forms, exactly the future-shape this is meant to
+ * pre-empt. Strip wholesale on any truthy value regardless of type, rather
+ * than trying to parse/preserve the object/array forms — this matches the
+ * function's own stated allowlist-shaped intent (nothing kept, so nothing
+ * missed next quarter).
+ *
+ * Mutates `request` in place (mirrors `scrubAuthorizationHeader` above and
+ * the `event.extra`/`event.contexts` handling in `scrubSentryEvent` below);
+ * `scrubBreadcrumbUrl` returns a new object instead because it runs inside
+ * the breadcrumb `.map()`, which is already building a new array.
  */
 function scrubRequestUrlFields(
   request: NonNullable<Sentry.ErrorEvent['request']>,
 ): void {
-  if (
-    typeof request.query_string === 'string' &&
-    request.query_string.length > 0
-  ) {
+  if (request.query_string) {
     request.query_string = STRIPPED_QUERY_MARKER;
   }
   if (typeof request.url === 'string') {

@@ -438,6 +438,40 @@ describe('scrubSentryEvent', () => {
     expect(scrubbed.request?.query_string).toBe('');
   });
 
+  // [Gate-2 SHOULD-FIX] Red-green regression: the SDK types
+  // event.request.query_string as `string | Record<string, unknown> |
+  // Array<[string, string]>`, not string-only. A `typeof === 'string'` guard
+  // silently no-ops (passes the object/array forms through unscrubbed) for
+  // exactly the future-shape this forward guard exists to pre-empt. Before
+  // this fix, the object-shaped query_string below passed through with the
+  // literal secret intact and this assertion FAILED; after switching to a
+  // truthy check (strip wholesale regardless of type) it PASSES.
+  it('strips a non-string (object-shaped) event.request.query_string', () => {
+    const event = {
+      request: {
+        url: 'https://api.example.com/v1/sessions',
+        query_string: { token: 'SECRET-abc123' },
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.query_string).toBe('[stripped]');
+  });
+
+  it('strips a non-string (array-shaped) event.request.query_string', () => {
+    const event = {
+      request: {
+        url: 'https://api.example.com/v1/sessions',
+        query_string: [['token', 'SECRET-abc123']],
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.query_string).toBe('[stripped]');
+  });
+
   // [WI-2339] Defensive coverage for event.request.data — NOT populated by
   // this app's SDK/runtime today (see the WI's Risk/Impact: no free-text POST
   // body reaches Sentry at @sentry/cloudflare@10.39.0), so this is a unit
