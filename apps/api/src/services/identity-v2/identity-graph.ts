@@ -45,6 +45,7 @@ import { safeSend } from '../safe-non-core';
 import { inngest } from '../../inngest/client';
 import { computeTrialEndDate } from '../trial';
 import { getTierConfig } from '../subscription';
+import { addMonthsClamped } from '../billing/billing-shared';
 import { resolveIdentityV2, type ResolvedIdentityV2 } from './identity-resolve';
 import { checkConsentRequiredFromDate } from '../consent';
 import { ProfileValidationError } from '../profile';
@@ -365,8 +366,7 @@ export async function createIdentityGraph(
       });
 
       const plusTier = getTierConfig('plus');
-      const cycleResetAt = new Date();
-      cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
+      const cycleResetAt = addMonthsClamped(new Date(), 1);
 
       // (9) owner profile_quota_usage — written unconditionally against the v2
       // graph (profile_quota_usage.profile_id references person.id after the

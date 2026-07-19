@@ -32,13 +32,29 @@ export interface ProfileQuotaUsageSnapshot {
 }
 
 /**
+ * Add calendar months in UTC, clamping the original day to the last valid day
+ * of the target month. The input Date is never mutated.
+ */
+export function addMonthsClamped(date: Date, months: number): Date {
+  const result = new Date(date);
+  const originalDay = result.getUTCDate();
+
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + months);
+
+  const lastDayOfTargetMonth = new Date(
+    Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  result.setUTCDate(Math.min(originalDay, lastDayOfTargetMonth));
+  return result;
+}
+
+/**
  * Compute the next monthly reset date from a given reference date.
  * Shared by quota-provision.ts and quota-provision-v2.ts.
  */
 export function nextMonthlyReset(now: Date): Date {
-  const cycleResetAt = new Date(now);
-  cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
-  return cycleResetAt;
+  return addMonthsClamped(now, 1);
 }
 
 /**

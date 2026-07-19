@@ -232,6 +232,64 @@ describe('topupExpiryReminder', () => {
     expect(names).toContain('find-credits-expiring-today');
   });
 
+  it('widens a leap-month-end 6-month reminder through the target month end', async () => {
+    jest.setSystemTime(new Date('2028-02-29T09:00:00.000Z'));
+    mockFindExpiringTopUpCredits.mockResolvedValue([]);
+
+    await executeSteps();
+
+    expect(mockFindExpiringTopUpCredits).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      new Date('2028-08-29T00:00:00.000Z'),
+      new Date('2028-08-31T23:59:59.999Z'),
+    );
+  });
+
+  it('assigns the leap-day 6-month query to August 29', async () => {
+    jest.setSystemTime(new Date('2027-08-29T09:00:00.000Z'));
+    mockFindExpiringTopUpCredits.mockResolvedValue([]);
+
+    await executeSteps();
+
+    expect(mockFindExpiringTopUpCredits).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      new Date('2028-02-29T00:00:00.000Z'),
+      new Date('2028-02-29T23:59:59.999Z'),
+    );
+  });
+
+  it.each(['2027-08-30', '2027-08-31'])(
+    'does not query leap day again from %s',
+    async (sourceDate) => {
+      jest.setSystemTime(new Date(`${sourceDate}T09:00:00.000Z`));
+      mockFindExpiringTopUpCredits.mockResolvedValue([]);
+
+      await executeSteps();
+
+      expect(mockFindExpiringTopUpCredits).not.toHaveBeenCalledWith(
+        expect.anything(),
+        new Date('2028-02-29T00:00:00.000Z'),
+        new Date('2028-02-29T23:59:59.999Z'),
+      );
+    },
+  );
+
+  it('widens an April month-end 4-month reminder through the target month end', async () => {
+    jest.setSystemTime(new Date('2025-04-30T09:00:00.000Z'));
+    mockFindExpiringTopUpCredits.mockResolvedValue([]);
+
+    await executeSteps();
+
+    expect(mockFindExpiringTopUpCredits).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      new Date('2025-08-30T00:00:00.000Z'),
+      new Date('2025-08-31T23:59:59.999Z'),
+    );
+  });
+
   it('[BUG-838] does not throw when system clock returns an invalid date', async () => {
     // Break test for BUG-838: previously getExpiryWindowForMilestone called
     // target.toISOString() unconditionally and the cron's final

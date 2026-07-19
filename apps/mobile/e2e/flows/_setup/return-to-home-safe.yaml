@@ -11,6 +11,11 @@
 appId: com.mentomate.app
 ---
 # If mentor-screen is visible, we're on the V2 Mentor landing — do nothing.
+# [WI-2241] Same guard for a supporter persona's Support hub Mentor tab
+# (testID support-hub-mentor-tab) — mentor.tsx renders that instead of
+# mentor-screen when activeScope.kind is 'supporter-hub'/'person'. Without
+# this nested guard a supporter scenario's valid Support hub landing looks
+# "stuck" to the legacy fallback chain below and gets navigated away from.
 # Otherwise continue through the legacy home/dashboard guards and only press
 # Back when we're truly stuck on a session/other screen.
 - runFlow:
@@ -21,5 +26,10 @@ appId: com.mentomate.app
       - runFlow:
           when:
             notVisible:
-              id: 'dashboard-scroll'
-          file: return-to-home-check-parent-home.yaml
+              id: 'support-hub-mentor-tab'
+          commands:
+            - runFlow:
+                when:
+                  notVisible:
+                    id: 'dashboard-scroll'
+                file: return-to-home-check-parent-home.yaml

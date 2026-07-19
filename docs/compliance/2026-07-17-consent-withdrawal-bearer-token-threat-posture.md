@@ -1,5 +1,17 @@
 # Consent-Withdrawal Bearer-Token — Threat Posture
 
+> **Historical document (superseded 2026-07-19, `WI-2348` / `OPQ-114`).** This
+> document describes the pre-2026-07-19 mechanism, under which the bearer
+> token authorized both withdraw AND restore. **Bearer-token restore was
+> removed** — `restoreConsentByToken` no longer exists, and
+> `POST /consent-page/restore` never mutates (see finding T-11 below, and the
+> amended [`MMT-ADR-0029`](../adr/MMT-ADR-0029-bearer-token-consent-withdrawal-authority.md)).
+> The bearer token is now **withdraw-only**; restore requires an authenticated
+> guardian session (`restoreConsentV2` / `PUT /consent/:childProfileId/restore`).
+> Any statement below that assumes bearer-token restore is current behavior no
+> longer reflects the live system — read this alongside the ADR amendment
+> before relying on it for anything but historical context.
+
 **Checklist item:** A9 (consent as a real choice) extended by Art. 7(3) (withdrawal as easy as giving) · **Law:** GDPR Article 7(3) / Article 6 · **Status:** RULED 2026-07-17 (OPQ-114) — DPO-acting + eng/security sign-off below. **Version 1.**
 **Scope:** the P0 email-consenting-parent bearer-token withdrawal/restore mechanism only (`cw1` tokens). Does not re-assess the edge-gated in-app guardian withdrawal path (`revokeConsentV2`/`restoreConsentV2`), which is unaffected.
 **Feeds:** WI-1577 (final pre-store-submission launch-compliance gate) — see `dpia.md` §6 row 6.11 and §9 item 9 for the cross-reference this posture satisfies.
@@ -195,6 +207,7 @@ Disposition classes used below: **Resolved by design** (mitigated, no residual r
 | Re-evaluation trigger | Before or at the **P1 link-account/invited-parent successor design** (`MMT-ADR-0029`'s named successor path) — that design must implement authenticated-only restore per this ruling, or explicitly re-affirm bearer-restore with its own stated reasoning; either way it should be recorded as its own ADR-lockstep decision, not left implicit. |
 | Accountable owner | Jørn, acting DPO (the policy ruling); Zuzana Kopečná (flags the as-built gap; not tasked with resolving it here). Scheduling the ADR-level reconciliation is an **open, unassigned** item for product/architecture — not silently defaulted to engineering. |
 | Verification evidence | `restoreConsentByToken`'s signature carries no actor-identity parameter — only `db, chargePersonId, organizationId, audit?` (`consent-v2.ts:857-861`) — confirming the "as built" claim above at the type level, not just by inspection. The restore tests exercise successful restore on token validity alone, with no additional identity or "same caller as the withdrawal" assertion: `consent-v2.integration.test.ts:620-636` ("restoreConsentByToken APPENDS a new un-withdrawn grant... (undo)") and `consent-web.integration.test.ts:957-976` ("POST restore: within grace re-grants..."). No test in either suite asserts that restore is rejected for a caller other than the one who withdrew — consistent with, and further evidence for, the as-built gap this row records. |
+| **Resolved (2026-07-19, WI-2348)** | The ADR-level reconciliation this row called for was scheduled and executed: `MMT-ADR-0029` amended (bearer token is withdraw-only), `docs/canon/identity/ontology.md` inv 23 updated in the same change-set, `restoreConsentByToken` and the `POST /consent-page/restore` bearer path **removed** (not merely gated) — restore now only reachable via the already-live authenticated `restoreConsentV2` / `PUT /consent/:childProfileId/restore`. This row's "as built" description is historical (accurate as of 2026-07-17); it is superseded, not retracted. The "no restore path at all for the edge-less email-parent" consequence this leaves is recorded in `MMT-ADR-0029`'s amended Consequences section as an explicit, product/architecture-owned forward item. |
 
 ---
 

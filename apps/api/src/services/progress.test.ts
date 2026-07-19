@@ -34,19 +34,30 @@ const mockGetPracticeActivitySummaryBatch = jest
 
 jest.mock(
   './practice-activity-summary' /* gc1-allow: unit test boundary */,
-  () => ({
-    getPracticeActivitySummary: (...args: unknown[]) =>
-      mockGetPracticeActivitySummary(...args),
-    getPracticeActivitySummaryBatch: (...args: unknown[]) =>
-      mockGetPracticeActivitySummaryBatch(
-        ...(args as [unknown, string[], unknown]),
-      ),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      './practice-activity-summary',
+    ) as typeof import('./practice-activity-summary');
+    return {
+      ...actual,
+      getPracticeActivitySummary: (...args: unknown[]) =>
+        mockGetPracticeActivitySummary(...args),
+      getPracticeActivitySummaryBatch: (...args: unknown[]) =>
+        mockGetPracticeActivitySummaryBatch(
+          ...(args as [unknown, string[], unknown]),
+        ),
+    };
+  },
 );
 
-import type { Database } from '@eduagent/database';
+import { desc } from 'drizzle-orm';
+
+import {
+  createScopedRepository,
+  curricula,
+  type Database,
+} from '@eduagent/database';
 import type { SubjectProgress } from '@eduagent/schemas';
-import { createScopedRepository } from '@eduagent/database';
 import {
   getSubjectProgress,
   getTopicProgress,
@@ -202,6 +213,7 @@ function createMockDb({
   curriculumFindFirst = undefined as
     | { id: string; subjectId: string }
     | undefined,
+  curriculumFindFirstRows,
   curriculaFindMany = [] as Array<{
     id: string;
     subjectId: string;
@@ -218,6 +230,11 @@ function createMockDb({
   ownedTopicRows,
 }: {
   curriculumFindFirst?: { id: string; subjectId: string } | undefined;
+  curriculumFindFirstRows?: Array<{
+    id: string;
+    subjectId: string;
+    version: number;
+  }>;
   curriculaFindMany?: Array<{
     id: string;
     subjectId: string;
@@ -233,6 +250,27 @@ function createMockDb({
   topicSubjectJoinRows?: Array<{ topicId: string }>;
   ownedTopicRows?: ReturnType<typeof mockOwnedTopicRow>[];
 } = {}): Database {
+  let selectedCurriculumId: string | undefined;
+  const curriculumFindFirstMock = jest
+    .fn()
+    .mockImplementation(async (config?: { orderBy?: unknown }) => {
+      if (!curriculumFindFirstRows) return curriculumFindFirst;
+
+      const selected = config?.orderBy
+        ? [...curriculumFindFirstRows].sort((a, b) => b.version - a.version)[0]
+        : curriculumFindFirstRows[0];
+      selectedCurriculumId = selected?.id;
+      return selected;
+    });
+  const curriculumTopicsFindManyMock = curriculumFindFirstRows
+    ? jest
+        .fn()
+        .mockImplementation(async () =>
+          topicsFindMany.filter(
+            (topic) => topic.curriculumId === selectedCurriculumId,
+          ),
+        )
+    : jest.fn().mockResolvedValue(topicsFindMany);
   const effectiveOwnedTopicRows =
     ownedTopicRows ??
     (topicSubjectJoinRows.length === 0
@@ -273,11 +311,11 @@ function createMockDb({
     }),
     query: {
       curricula: {
-        findFirst: jest.fn().mockResolvedValue(curriculumFindFirst),
+        findFirst: curriculumFindFirstMock,
         findMany: jest.fn().mockResolvedValue(curriculaFindMany),
       },
       curriculumTopics: {
-        findMany: jest.fn().mockResolvedValue(topicsFindMany),
+        findMany: curriculumTopicsFindManyMock,
         findFirst: jest.fn().mockResolvedValue(topicFindFirst),
       },
     },
@@ -365,6 +403,71 @@ describe('getSubjectProgress', () => {
     expect(result!.topicsCompleted).toBe(0);
     expect(result!.topicsVerified).toBe(0);
     expect(result!.retentionStatus).toBe('strong');
+  });
+
+  it('[WI-1994] uses the latest curriculum when the subject has multiple versions', async () => {
+    const olderCurriculumId = 'curr-v1';
+    const latestCurriculumId = 'curr-v2';
+    const olderTopics = [
+      mockTopicRow({
+        id: 'topic-v1-a',
+        curriculumId: olderCurriculumId,
+        sortOrder: 1,
+      }),
+      mockTopicRow({
+        id: 'topic-v1-b',
+        curriculumId: olderCurriculumId,
+        sortOrder: 2,
+      }),
+    ];
+    const latestTopics = [
+      mockTopicRow({
+        id: 'topic-v2-a',
+        curriculumId: latestCurriculumId,
+        sortOrder: 1,
+      }),
+      mockTopicRow({
+        id: 'topic-v2-b',
+        curriculumId: latestCurriculumId,
+        sortOrder: 2,
+      }),
+      mockTopicRow({
+        id: 'topic-v2-c',
+        curriculumId: latestCurriculumId,
+        sortOrder: 3,
+      }),
+      mockTopicRow({
+        id: 'topic-v2-d',
+        curriculumId: latestCurriculumId,
+        sortOrder: 4,
+      }),
+      mockTopicRow({
+        id: 'topic-v2-e',
+        curriculumId: latestCurriculumId,
+        sortOrder: 5,
+      }),
+    ];
+
+    setupScopedRepo({ subjectFindFirst: mockSubjectRow() });
+    const db = createMockDb({
+      curriculumFindFirstRows: [
+        { id: olderCurriculumId, subjectId, version: 1 },
+        { id: latestCurriculumId, subjectId, version: 2 },
+      ],
+      topicsFindMany: [...olderTopics, ...latestTopics],
+    });
+
+    const result = await getSubjectProgress(db, profileId, subjectId);
+
+    expect(result).toMatchObject({
+      subjectId,
+      topicsTotal: 5,
+      topicsCompleted: 0,
+      topicsVerified: 0,
+    });
+    expect(db.query.curricula.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: desc(curricula.version) }),
+    );
   });
 
   it('counts topics, completed, and verified correctly', async () => {

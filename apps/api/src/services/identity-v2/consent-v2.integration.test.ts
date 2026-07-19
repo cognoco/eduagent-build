@@ -50,7 +50,6 @@ import {
   recordAdultSelfConsentV2,
   requestConsentV2,
   resendConsentV2,
-  restoreConsentByToken,
   restoreConsentV2,
   revokeConsentV2,
   withdrawAdultSelfConsentV2,
@@ -553,7 +552,7 @@ const COPPA = 'coppa_parental_consent';
     // withdrawConsentByToken to an isGuardianOf check and the
     // "STAMPS … with no edge" case below fails.
     // -------------------------------------------------------------------------
-    describe('bearer-token withdrawal/restore (email-parent, no edge)', () => {
+    describe('bearer-token withdrawal (email-parent, no edge) [WI-2348: restore no longer bearer-authorized]', () => {
       // The exact email-parent state: an APPROVED gdpr grant produced by the
       // consent-response flow, which creates NO guardianship edge (inv 14,
       // proven by the approval test above).
@@ -627,24 +626,6 @@ const COPPA = 'coppa_parental_consent';
           where: eq(consentGrant.chargePersonId, childId),
         });
         expect(grants).toHaveLength(1);
-      });
-
-      it('restoreConsentByToken APPENDS a new un-withdrawn grant within grace (undo)', async () => {
-        const { orgId, childId } = await seedApprovedNoEdge();
-        await withdrawConsentByToken(db, childId, orgId);
-
-        await restoreConsentByToken(db, childId, orgId, { userAgent: 'jest' });
-
-        const grants = await db.query.consentGrant.findMany({
-          where: eq(consentGrant.chargePersonId, childId),
-        });
-        expect(grants).toHaveLength(2);
-        const restored = grants.find((g) => g.priorValue === false);
-        expect(restored?.granted).toBe(true);
-        expect(restored?.withdrawnAt).toBeNull();
-        expect(
-          (restored?.auditFact as { source?: string } | null)?.source,
-        ).toBe('email_parent_restore');
       });
 
       it('withdrawConsentByToken on a person with no grant throws and never mutates (safe no-op)', async () => {
@@ -727,23 +708,35 @@ const COPPA = 'coppa_parental_consent';
           expect(grant?.withdrawnAt).toBeNull();
         });
 
-        it('restoreConsentByToken carries the SAME withdrawalTokenId forward — the original email link keeps matching after restore', async () => {
-          const { orgId, childId, withdrawalTokenId } =
-            await seedApprovedNoEdge();
-          await withdrawConsentByToken(
+        // [WI-2348] restoreConsentByToken is gone (bearer possession no
+        // longer authorizes restore — see the top-level describe rename).
+        // The withdrawalTokenId-carry-forward invariant this used to cover
+        // still holds — appendRestoreGrant's unconditional carry-forward is
+        // unchanged — but now only reachable via the edge-authorized
+        // restoreConsentV2, so the case moves there.
+        it('restoreConsentV2 carries the SAME withdrawalTokenId forward through an edge-authorized restore — the original email link keeps matching', async () => {
+          const orgId = await seedOrg();
+          const guardianId = await seedPerson(orgId, {
+            roles: ['admin', 'learner'],
+            displayName: 'Parent',
+          });
+          const childId = await seedPerson(orgId);
+          await seedGuardianEdge(guardianId, childId);
+          await createDirectConsentGrant(
             db,
             childId,
             orgId,
-            undefined,
-            withdrawalTokenId,
+            'GDPR',
+            guardianId,
           );
-          await restoreConsentByToken(
-            db,
-            childId,
-            orgId,
-            undefined,
-            withdrawalTokenId,
-          );
+          const withdrawalTokenId = generateUUIDv7();
+          await db
+            .update(consentGrant)
+            .set({ withdrawalTokenId })
+            .where(eq(consentGrant.chargePersonId, childId));
+
+          await revokeConsentV2(db, childId, guardianId, orgId, 'GDPR');
+          await restoreConsentV2(db, childId, guardianId, orgId, 'GDPR');
 
           const grants = await db.query.consentGrant.findMany({
             where: eq(consentGrant.chargePersonId, childId),
@@ -752,7 +745,8 @@ const COPPA = 'coppa_parental_consent';
           expect(grants).toHaveLength(2);
           expect(grants[1]!.withdrawalTokenId).toBe(withdrawalTokenId);
 
-          // The SAME token id still resolves the (now-restored) current grant.
+          // The SAME token id still resolves the (now-restored) current grant
+          // — a bearer link minted before this restore keeps matching after it.
           const state = await getGdprGrantWithdrawalStateV2(
             db,
             childId,
@@ -760,33 +754,6 @@ const COPPA = 'coppa_parental_consent';
             withdrawalTokenId,
           );
           expect(state?.withdrawnAt).toBeNull();
-        });
-
-        it('restoreConsentByToken with a stale tokenId throws and does not append a row', async () => {
-          const { orgId, childId, withdrawalTokenId } =
-            await seedApprovedNoEdge();
-          await withdrawConsentByToken(
-            db,
-            childId,
-            orgId,
-            undefined,
-            withdrawalTokenId,
-          );
-
-          await expect(
-            restoreConsentByToken(
-              db,
-              childId,
-              orgId,
-              undefined,
-              generateUUIDv7(),
-            ),
-          ).rejects.toBeInstanceOf(ConsentRecordNotFoundError);
-
-          const grants = await db.query.consentGrant.findMany({
-            where: eq(consentGrant.chargePersonId, childId),
-          });
-          expect(grants).toHaveLength(1);
         });
 
         it('getGdprGrantWithdrawalStateV2 treats a mismatched tokenId as "nothing to withdraw" (no enumeration)', async () => {

@@ -42,6 +42,10 @@
     {
       "flow": "flows/v2/v2-shell-navigation.yaml",
       "scenario": "learning-active"
+    },
+    {
+      "flow": "flows/v2/v2-supporter-scope-journey.yaml",
+      "scenario": "v2-supporter-accepted"
     }
   ],
   "scenarioOverrides": {

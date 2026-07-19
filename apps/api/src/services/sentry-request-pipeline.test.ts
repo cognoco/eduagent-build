@@ -78,11 +78,53 @@ function findCapturedErrorEvent(envelopeBody: string): {
   );
 }
 
+/** Same envelope-parsing approach as findCapturedErrorEvent, but selects the
+ *  TRANSACTION item's EVENT PAYLOAD line (Sentry.TransactionEvent's
+ *  `type: 'transaction'` discriminant, which error events never carry) --
+ *  NOT the item header line, which is also `{"type":"transaction"}` but
+ *  carries no `request`/`contexts`/`spans` fields. Matching on `type` alone
+ *  would silently return the header (a false pass: `request` reads as
+ *  `undefined` whether or not the fix redacts anything), so this also
+ *  requires the `contexts` field the header never has. */
+function findCapturedTransactionEvent(envelopeBodies: string[]): {
+  request?: { headers?: Record<string, unknown> };
+} {
+  for (const body of envelopeBodies) {
+    const lines = body.split('\n').filter(Boolean);
+    for (const line of lines) {
+      try {
+        const parsed = JSON.parse(line) as {
+          type?: string;
+          contexts?: unknown;
+        };
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          parsed.type === 'transaction' &&
+          parsed.contexts
+        ) {
+          return parsed as { request?: { headers?: Record<string, unknown> } };
+        }
+      } catch {
+        // envelope header / item header lines aren't event JSON -- skip.
+      }
+    }
+  }
+  throw new Error(
+    `no captured transaction event found across ${envelopeBodies.length} envelope body/bodies`,
+  );
+}
+
 /** Builds a Sentry-wrapped Hono app with a single throwing route, wired
  *  exactly like apps/api/src/index.ts's production default export
- *  (Sentry.withSentry + beforeSend: scrubSentryEvent + an app.onError that
- *  explicitly calls captureException). */
-function buildThrowingSentryApp() {
+ *  (Sentry.withSentry + beforeSend: scrubSentryEvent + beforeSendTransaction:
+ *  scrubSentryEvent [WI-2353 rework] + an app.onError that explicitly calls
+ *  captureException). `tracesSampleRate` defaults to 0 (no transaction
+ *  envelope shipped) for the AC-1/AC-4 error-event cases; the transaction
+ *  case below passes 1 to force a sampled transaction event, since
+ *  wrapRequestHandler wraps every request in a span regardless of whether
+ *  the handler throws. */
+function buildThrowingSentryApp(tracesSampleRate = 0) {
   const app = new Hono();
   app.onError((err, c) => {
     captureException(err, { requestPath: c.req.path });
@@ -95,8 +137,9 @@ function buildThrowingSentryApp() {
   return Sentry.withSentry(
     () => ({
       dsn: 'https://public@o0.ingest.sentry.io/1',
-      tracesSampleRate: 0,
+      tracesSampleRate,
       beforeSend: scrubSentryEvent,
+      beforeSendTransaction: scrubSentryEvent,
     }),
     { fetch: app.fetch } as unknown as {
       fetch: (
@@ -186,5 +229,39 @@ describe('Sentry.withSentry request pipeline (WI-2353 rework — AC-1, AC-4)', (
       envelopeBodies[envelopeBodies.length - 1]!,
     );
     expect(event.request?.headers?.cookie).toBeUndefined();
+  });
+
+  // Bounce#2 finding: beforeSend fires on ERROR events only. With
+  // tracesSampleRate non-zero (0.1 prod, 1.0 dev/preview/staging in
+  // production), requestDataIntegration attaches the SAME event.request.headers
+  // to sampled TRANSACTION events too, and those events bypass beforeSend
+  // entirely -- they only go through beforeSendTransaction. This is a
+  // DIFFERENT named case from AC-1 (transaction event, not error event):
+  // an authenticated request that gets sampled into a transaction must have
+  // its Authorization header redacted (and its Cookie header still SDK-
+  // stripped) in that transaction event, not just in the error event the
+  // same request also produces. Reverting the beforeSendTransaction wiring
+  // in index.ts (equivalently: removing scrubSentryEvent from this test's
+  // beforeSendTransaction option) makes this exact assertion fail -- the
+  // bearer token surfaces in the captured transaction event.
+  it('transaction event: a sampled transaction produced by the same authenticated thrown request also has its Authorization header redacted and Cookie header stripped', async () => {
+    const wrapped = buildThrowingSentryApp(1);
+    const { ctx, drain } = createTestExecutionContext();
+
+    const request = new Request('https://api.example.com/throws', {
+      headers: {
+        authorization:
+          'Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.integration-test-transaction.sig',
+        cookie: '__session=integration-test-cookie-value',
+      },
+    });
+
+    const response = await wrapped.fetch(request, {} as never, ctx as never);
+    expect(response.status).toBe(500);
+    await drain();
+
+    const transactionEvent = findCapturedTransactionEvent(envelopeBodies);
+    expect(transactionEvent.request?.headers?.authorization).toBeUndefined();
+    expect(transactionEvent.request?.headers?.cookie).toBeUndefined();
   });
 });
