@@ -178,6 +178,36 @@ test('guard exits 0 when DB_PUSH_LOCAL_DEV=1 and DATABASE_URL resolves to 127.0.
   assert.match(stdout, /DB_PUSH_LOCAL_DEV=1 override accepted/);
 });
 
+test('guard exits 1 when DB_PUSH_LOCAL_DEV=1 but DATABASE_URL resolves to a non-local, non-neon host', () => {
+  // WI-1874 review CONSIDER: the "or is not localhost/127.0.0.1" branch was
+  // only exercised by the neon.tech-shaped case above. Assert it also blocks
+  // an arbitrary non-local host with no neon.tech substring.
+  const { status, stderr } = runGuard({
+    DOPPLER_CONFIG: undefined,
+    DB_PUSH_LOCAL_DEV: '1',
+    DATABASE_URL: 'postgres://user:pass@mydb.internal.example.com/db',
+  });
+  assert.equal(status, 1, 'expected exit 1 — non-local, non-neon host must still be blocked');
+  assert.match(stderr, /drizzle-kit push is blocked/);
+  assert.match(stderr, /localhost/);
+  assert.ok(!stderr.includes('user'), 'username must not appear in output');
+  assert.ok(!stderr.includes('pass'), 'password must not appear in output');
+});
+
+test('guard exits 1 when DB_PUSH_LOCAL_DEV=1 and DATABASE_URL is malformed/unparseable', () => {
+  // WI-1874 review CONSIDER: extractHost() returns null for an unparseable
+  // DATABASE_URL; the guard must still fail-closed rather than treat a null
+  // host as accepted.
+  const { status, stderr } = runGuard({
+    DOPPLER_CONFIG: undefined,
+    DB_PUSH_LOCAL_DEV: '1',
+    DATABASE_URL: 'not-a-valid-url',
+  });
+  assert.equal(status, 1, 'expected exit 1 — an unparseable DATABASE_URL must be blocked');
+  assert.match(stderr, /drizzle-kit push is blocked/);
+  assert.match(stderr, /\(unparseable\)/);
+});
+
 // ── Credential redaction ──────────────────────────────────────────────────────
 
 test('guard redacts credentials in DATABASE_URL before logging (stg config)', () => {
