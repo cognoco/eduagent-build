@@ -879,8 +879,9 @@ export default function AppLayout() {
                 // through when switching to a full-screen route (session, quiz, etc.).
                 //
                 // The floating V2 chrome (account avatar, scope chip) is absolutely
-                // positioned and reserves no layout space. Top-level tab scenes own
-                // their header row, so they retain the shell's safe-area inset.
+                // positioned and reserves no layout space. Top-level tab scenes
+                // therefore start below the complete measured control band so their
+                // first interactive row cannot sit underneath the scope chip/avatar.
                 // Audited pushed scenes keep a single safe-area owner. The root
                 // normally reserves only the remaining fixed-control band because
                 // the child (or nested navigator) owns the native inset. A narrow,
@@ -896,7 +897,7 @@ export default function AppLayout() {
                     !isProxyChromeActive &&
                     !isFullScreen
                       ? isVisible
-                        ? chromeTopInset
+                        ? pushedSceneTopInset
                         : resolveV2PushedScenePaddingTop({
                             routeName: route.name,
                             pathname,

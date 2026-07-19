@@ -90,6 +90,8 @@ tags:
     visible:
       id: 'person-scope-structural-subjects'
     timeout: 15000
+- assertVisible:
+    id: 'person-scope-subject-${SUBJECT_ID}'
 
 # Journal (same person/edge, still the rich supportee).
 - tapOn:
