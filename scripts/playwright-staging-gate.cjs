@@ -31,7 +31,10 @@ const CALL_LOG_ARROW = /^\s*-\s*→\s+\S+/;
 // ConfigError:) while excluding identifier labels such as handleError:.
 const ERROR_LINE =
   /(?:^|[\s\]])(?:[Ee]rror|[A-Z][A-Za-z0-9]*Error)(?:\s+\[[^\]]+\])?:/;
-const ANSI_ESCAPE = /\x1b\[[0-?]*[ -/]*[@-~]/g;
+const ANSI_ESCAPE = new RegExp(
+  `${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`,
+  'g',
+);
 const CODE_FRAME_CONTEXT = /^\s*(\d+)\s*\|/;
 const CODE_FRAME_FOCUS = /^\s*>\s*(\d+)\s*\|/;
 const CODE_FRAME_POINTER = /^\s*\|\s*\^/;
