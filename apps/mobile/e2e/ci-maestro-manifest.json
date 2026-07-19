@@ -40,6 +40,10 @@
   ],
   "v2": [
     {
+      "flow": "flows/v2/v2-homework-manual-entry.yaml",
+      "scenario": "onboarding-complete"
+    },
+    {
       "flow": "flows/v2/v2-shell-navigation.yaml",
       "scenario": "learning-active"
     },

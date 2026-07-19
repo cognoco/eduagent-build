@@ -1158,6 +1158,21 @@ export default function CameraScreen(): React.ReactNode {
           </Text>
         </Pressable>
 
+        {homeworkEntrySource === 'mentor' &&
+          draftProblems.every((problem) => problem.source === 'manual') && (
+            <Pressable
+              testID="manual-entry-cancel"
+              onPress={handleClose}
+              className="self-start min-h-[48px] px-2 justify-center"
+              accessibilityLabel={t('homework.cancelAndGoBackLabel')}
+              accessibilityRole="button"
+            >
+              <Text className="text-body font-semibold text-primary">
+                {t('common.cancel')}
+              </Text>
+            </Pressable>
+          )}
+
         {showCelebration && (
           <View className="items-center mt-2">
             <CelebrationAnimation

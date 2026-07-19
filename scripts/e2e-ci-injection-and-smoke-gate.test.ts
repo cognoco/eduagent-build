@@ -830,6 +830,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
     expect(plan).toEqual([
       {
+        flow: 'flows/v2/v2-homework-manual-entry.yaml',
+        scenario: 'onboarding-complete',
+        shard: 1,
+      },
+      {
         flow: 'flows/v2/v2-shell-navigation.yaml',
         scenario: 'learning-active',
         shard: 1,
@@ -883,6 +888,128 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/assertNotVisible:/g)).toHaveLength(6);
     expect(flow.match(/id: ['"]tab-subjects['"]/g)).toHaveLength(3);
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
+  });
+
+  it('[WI-2236] registers the manual homework case in the V2 Maestro manifest', () => {
+    const manifest = JSON.parse(
+      readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/ci-maestro-manifest.json'),
+        'utf8',
+      ),
+    ) as { v2: Array<{ flow: string; scenario: string | null }> };
+
+    expect(manifest.v2).toContainEqual({
+      flow: 'flows/v2/v2-homework-manual-entry.yaml',
+      scenario: 'onboarding-complete',
+    });
+  });
+
+  it('[WI-2236] hard-gates the exact guaranteed properties of the manual homework case', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-homework-manual-entry.yaml'),
+      'utf8',
+    );
+    type ElementSelector = {
+      id?: string;
+      text?: string;
+      enabled?: boolean;
+    };
+    type MaestroCommand = {
+      assertVisible?: ElementSelector;
+      extendedWaitUntil?: {
+        visible?: ElementSelector;
+        timeout?: number;
+      };
+      tapOn?: ElementSelector;
+      optional?: boolean;
+    };
+    const commands = parseYaml(
+      source.split(/^---$/m)[1] ?? '',
+    ) as MaestroCommand[];
+
+    const exactSelector = (
+      actual: ElementSelector | undefined,
+      expected: ElementSelector,
+    ): boolean => {
+      if (!actual) return false;
+      return (
+        actual.id === expected.id &&
+        actual.text === expected.text &&
+        actual.enabled === expected.enabled &&
+        Object.keys(actual).length === Object.keys(expected).length
+      );
+    };
+
+    const mandatoryAssertVisible = (selector: ElementSelector): number =>
+      commands.findIndex(
+        (command) =>
+          command.optional !== true &&
+          exactSelector(command.assertVisible, selector),
+      );
+    const mandatoryExtendedWait = (
+      selector: ElementSelector,
+      timeout: number,
+      startAt = 0,
+    ): number =>
+      commands.findIndex(
+        (command, index) =>
+          index >= startAt &&
+          command.optional !== true &&
+          command.extendedWaitUntil?.timeout === timeout &&
+          exactSelector(command.extendedWaitUntil.visible, selector),
+      );
+    const tapIndex = (id: string): number =>
+      commands.findIndex(
+        (command) => command.optional !== true && command.tapOn?.id === id,
+      );
+    const containsOptionalTrue = (value: unknown): boolean => {
+      if (Array.isArray(value)) return value.some(containsOptionalTrue);
+      if (!value || typeof value !== 'object') return false;
+      return Object.entries(value).some(
+        ([key, nested]) =>
+          (key === 'optional' && nested === true) ||
+          containsOptionalTrue(nested),
+      );
+    };
+
+    for (const selector of [
+      { id: 'homework-problem-text-bubble', text: 'Solve 3x + 7 = 22' },
+      { id: 'homework-problem-text', text: 'Solve 3x + 7 = 22' },
+      { id: 'message-bubble-user-1', text: 'Solve 3x + 7 = 22' },
+    ]) {
+      expect(mandatoryAssertVisible(selector)).toBeGreaterThan(-1);
+    }
+
+    expect(
+      mandatoryExtendedWait(
+        { id: 'homework-problem-progress', text: 'Problem 1 of 1' },
+        30_000,
+      ),
+    ).toBeGreaterThan(-1);
+    expect(
+      mandatoryExtendedWait({ id: 'message-bubble-assistant-2' }, 60_000),
+    ).toBeGreaterThan(-1);
+
+    const back = tapIndex('chat-shell-back');
+    expect(back).toBeGreaterThan(-1);
+    const mentorReturn = mandatoryExtendedWait(
+      { id: 'mentor-screen' },
+      30_000,
+      back + 1,
+    );
+    expect(mentorReturn).toBeGreaterThan(back);
+    expect(
+      commands.findIndex(
+        (command, index) =>
+          index > mentorReturn &&
+          command.optional !== true &&
+          exactSelector(command.assertVisible, {
+            id: 'mentor-bar-input',
+            enabled: true,
+          }),
+      ),
+    ).toBeGreaterThan(mentorReturn);
+    expect(containsOptionalTrue(commands)).toBe(false);
   });
 
   it('keeps the generated Android APK free of the duplicate OSGI manifest', () => {

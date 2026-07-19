@@ -529,14 +529,16 @@ export function HomeworkModeChips({
 // ─── MentorHomeworkFirstResponse ─────────────────────────────────────────────
 // T23: V2 "mentor-is-the-app" homework round-trip. When the learner captures a
 // homework photo from the Mentor bar (entrySource=mentor + returnTo=mentor),
-// they land back in the same conversation thread with the captured image as
-// their own image bubble, followed by two deterministic first-response actions
-// — "help me solve this" / "check my answer" — and NO subject-picking preamble.
+// they land back in the same conversation thread with their captured image or
+// manually entered problem as their own bubble, followed by two deterministic
+// first-response actions — "help me solve this" / "check my answer" — and NO
+// subject-picking preamble.
 // The buttons are the FIRST actionable response; tapping one starts the
 // tutoring turn with the chosen homework mode.
 
 export interface MentorHomeworkFirstResponseProps {
   imageUri: string | undefined;
+  problemText: string | undefined;
   disabled: boolean;
   onHelpMeSolve: () => void;
   onCheckMyAnswer: () => void;
@@ -544,6 +546,7 @@ export interface MentorHomeworkFirstResponseProps {
 
 export function MentorHomeworkFirstResponse({
   imageUri,
+  problemText,
   disabled,
   onHelpMeSolve,
   onCheckMyAnswer,
@@ -565,10 +568,16 @@ export function MentorHomeworkFirstResponse({
         />
       ) : (
         <View
-          className="w-full aspect-[4/3] rounded-card bg-surface-elevated mb-3 items-center justify-center"
-          accessibilityLabel={t('mentorHome.homework.imageAlt')}
-          testID="homework-image-bubble"
-        />
+          className="w-full rounded-card bg-surface-elevated mb-3 px-4 py-3"
+          testID="homework-problem-text-bubble-container"
+        >
+          <Text
+            className="text-body text-text-primary"
+            testID="homework-problem-text-bubble"
+          >
+            {problemText ?? ''}
+          </Text>
+        </View>
       )}
       <View className="flex-row gap-2">
         <Pressable

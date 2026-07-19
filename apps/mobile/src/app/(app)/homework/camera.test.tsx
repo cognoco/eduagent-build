@@ -523,6 +523,28 @@ describe('CameraScreen', () => {
     expect(queryByTestId('camera-view')).toBeNull();
   });
 
+  it('routes a cancelled Mentor manual entry directly back to Mentor', () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      entrySource: 'mentor',
+      returnTo: 'mentor',
+    });
+    useCameraPermissions.mockReturnValue([
+      { granted: true, canAskAgain: true },
+      jest.fn(),
+      jest.fn().mockResolvedValue({ granted: true, canAskAgain: true }),
+    ]);
+
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    fireEvent.press(getByTestId('manual-entry-button'));
+    fireEvent.press(getByTestId('manual-entry-cancel'));
+
+    expect(mockRouter.replace).toHaveBeenCalledTimes(1);
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/mentor');
+  });
+
   it('shows Settings link when permission denied and cannot ask again', () => {
     useCameraPermissions.mockReturnValue([
       { granted: false, canAskAgain: false },

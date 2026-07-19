@@ -489,10 +489,11 @@ function SessionScreenInner() {
   const [homeworkMode, setHomeworkMode] = useState<
     'help_me' | 'check_answer' | undefined
   >(undefined);
-  // T23: V2 mentor-homework round-trip. The captured photo lands back in the
-  // session thread as the learner's image bubble with two deterministic
-  // first-response actions (help me solve / check my answer). Once the learner
-  // picks one, the deterministic block is consumed and the tutoring turn begins.
+  // T23: V2 mentor-homework round-trip. The captured photo or manually entered
+  // problem lands back in the session thread as the learner's own bubble with
+  // two deterministic first-response actions (help me solve / check my answer).
+  // Once the learner picks one, the deterministic block is consumed and the
+  // tutoring turn begins.
   const isMentorHomeworkFrame = mentorHomeworkWrapUpFrame === 'mentor-homework';
   const [mentorHomeworkChoice, setMentorHomeworkChoice] = useState<
     'help_me' | 'check_answer' | null
@@ -1156,7 +1157,7 @@ function SessionScreenInner() {
     // T23: For the V2 mentor-homework frame the deterministic help/check
     // buttons are the first actionable response — defer the OCR auto-send
     // until the learner picks one (mentorHomeworkChoice set). This keeps the
-    // image bubble + buttons as the genuine first turn with no LLM/subject
+    // learner problem bubble + buttons as the genuine first turn with no LLM/subject
     // preamble. For every other entry the auto-send fires as before.
     if (isMentorHomeworkFrame && !mentorHomeworkChoice) {
       return undefined;
@@ -1644,12 +1645,13 @@ function SessionScreenInner() {
 
   // T23: Render the deterministic homework first-response only for the V2
   // mentor-homework frame and only until the learner picks help/check. It is
-  // the FIRST actionable response in-thread — image bubble + two buttons, with
-  // no subject-picking preamble.
+  // the FIRST actionable response in-thread — learner problem bubble + two
+  // buttons, with no subject-picking preamble.
   const mentorHomeworkFirstResponse =
     isMentorHomeworkFrame && !mentorHomeworkChoice ? (
       <MentorHomeworkFirstResponse
         imageUri={imageUri}
+        problemText={initialProblemText}
         disabled={isStreaming || isClosing || !!quotaError}
         onHelpMeSolve={handleMentorHomeworkHelpMeSolve}
         onCheckMyAnswer={handleMentorHomeworkCheckMyAnswer}

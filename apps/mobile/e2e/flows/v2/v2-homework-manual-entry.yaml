@@ -1,0 +1,138 @@
+# WI-2236: V2 Mentor manual-entry homework round trip
+#
+# Case: onboarding-complete learner opens homework from Mentor, cancels one
+# manual draft, then enters exactly one visible equation, chooses Help me
+# solve, receives the first homework response, ends the session, and returns
+# to usable Mentor. Every assertion below is mandatory. Camera, gallery, OCR,
+# permissions, shutter, and image persistence remain in WI-2341 device QA.
+appId: com.mentomate.app
+tags:
+  - v2
+  - homework
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'onboarding-complete'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+- assertVisible:
+    id: 'mentor-bar-input'
+    enabled: true
+
+# The manual-entry cancel escape returns to a usable Mentor surface.
+- tapOn:
+    id: 'mentor-bar-homework-chip'
+- extendedWaitUntil:
+    visible:
+      id: 'manual-entry-button'
+    timeout: 15000
+- tapOn:
+    id: 'manual-entry-button'
+- extendedWaitUntil:
+    visible:
+      id: 'manual-entry-cancel'
+    timeout: 15000
+- tapOn:
+    id: 'manual-entry-cancel'
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'mentor-bar-input'
+    enabled: true
+
+# Enter one manual problem from the same Mentor surface.
+- tapOn:
+    id: 'mentor-bar-homework-chip'
+- extendedWaitUntil:
+    visible:
+      id: 'manual-entry-button'
+    timeout: 15000
+- tapOn:
+    id: 'manual-entry-button'
+- extendedWaitUntil:
+    visible:
+      id: 'result-text-input'
+    timeout: 15000
+- tapOn:
+    id: 'result-text-input'
+- inputText: 'Solve 3x + 7 = 22'
+- hideKeyboard
+- assertVisible:
+    id: 'result-text-input'
+    text: 'Solve 3x + 7 = 22'
+
+# Classification either resolves General Studies directly or asks the learner
+# to select it. The final session-screen assertion remains the hard outcome.
+- extendedWaitUntil:
+    visible:
+      id: 'confirm-button|subject-picker'
+    timeout: 60000
+- runFlow:
+    when:
+      visible:
+        id: 'subject-picker'
+    commands:
+      - tapOn:
+          id: 'subject-pick-${SUBJECT_ID}'
+- runFlow:
+    when:
+      visible:
+        id: 'confirm-button'
+    commands:
+      - tapOn:
+          id: 'confirm-button'
+
+- extendedWaitUntil:
+    visible:
+      id: 'session-screen'
+    timeout: 30000
+- assertVisible:
+    id: 'homework-problem-text-bubble'
+    text: 'Solve 3x + 7 = 22'
+- assertVisible:
+    id: 'homework-help-me-solve'
+    enabled: true
+- tapOn:
+    id: 'homework-help-me-solve'
+
+# The associated problem remains exact and singular after the session starts.
+- extendedWaitUntil:
+    visible:
+      id: 'homework-problem-progress'
+      text: 'Problem 1 of 1'
+    timeout: 30000
+- assertVisible:
+    id: 'homework-problem-text'
+    text: 'Solve 3x + 7 = 22'
+- assertVisible:
+    id: 'message-bubble-user-1'
+    text: 'Solve 3x + 7 = 22'
+- extendedWaitUntil:
+    visible:
+      id: 'message-bubble-assistant-2'
+    timeout: 60000
+
+- tapOn:
+    id: 'finish-homework-chip'
+- tapOn:
+    text: 'End Session'
+- extendedWaitUntil:
+    visible:
+      id: 'first-session-wrap-up'
+    timeout: 30000
+- tapOn:
+    id: 'chat-shell-back'
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+- assertVisible:
+    id: 'mentor-bar-input'
+    enabled: true

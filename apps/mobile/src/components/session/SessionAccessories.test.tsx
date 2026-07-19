@@ -2,6 +2,7 @@ import { render, fireEvent } from '@testing-library/react-native';
 import {
   SessionToolAccessory,
   HomeworkModeChips,
+  MentorHomeworkFirstResponse,
   SubjectResolutionAccessory,
 } from './SessionAccessories';
 
@@ -339,5 +340,26 @@ describe('HomeworkModeChips problem text', () => {
     expect(getByTestId('homework-problem-text').props.children).toBe(
       longProblem,
     );
+  });
+});
+
+describe('MentorHomeworkFirstResponse manual-entry problem association', () => {
+  it('renders the entered manual problem as the learner bubble instead of an empty image placeholder', () => {
+    const problemText = 'Solve 3x + 7 = 22';
+
+    const { getByTestId, queryByTestId } = render(
+      <MentorHomeworkFirstResponse
+        imageUri={undefined}
+        problemText={problemText}
+        disabled={false}
+        onHelpMeSolve={jest.fn()}
+        onCheckMyAnswer={jest.fn()}
+      />,
+    );
+
+    expect(getByTestId('homework-problem-text-bubble').props.children).toBe(
+      problemText,
+    );
+    expect(queryByTestId('homework-image-bubble')).toBeNull();
   });
 });
