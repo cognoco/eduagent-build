@@ -111,8 +111,8 @@ tags:
     text: 'PRIVATE'
 
 # Relaunch: kill and restart the app. A cold launch deliberately returns to
-# the Mentor tab and does not guarantee a persisted person selection, so
-# explicitly re-select the SAME rich supportee before re-opening Journal.
+# the Mentor tab. Prove the persisted scope from the exact rich supportee's
+# person-specific content before deliberately restoring Journal.
 - stopApp
 - launchApp:
     clearState: false
@@ -120,16 +120,8 @@ tags:
     visible:
       id: 'person-scope-mentor-tab'
     timeout: 30000
-- scrollUntilVisible:
-    element:
-      id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
-    direction: RIGHT
-    timeout: 10000
-- tapOn:
-    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
 - assertVisible:
-    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
-    selected: true
+    id: 'support-hub-mentor-person-${SUPPORTEE_PERSON_ID}'
 - tapOn:
     id: 'tab-journal'
     retryTapIfNoChange: true
@@ -137,6 +129,8 @@ tags:
     visible:
       id: 'person-scope-journal-placeholder'
     timeout: 15000
+- assertVisible:
+    id: 'visibility-shared-record'
 
 # EMPTY SHARED RECORD: switching to the empty-record supportee renders an
 # honest empty state, not an error and no leaked private content.

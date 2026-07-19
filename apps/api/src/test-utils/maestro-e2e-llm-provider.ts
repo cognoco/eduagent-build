@@ -1,4 +1,7 @@
-import { registerLlmProviderFixture } from './llm-provider-fixtures';
+import {
+  llmEnvelopeReply,
+  registerLlmProviderFixture,
+} from './llm-provider-fixtures';
 
 /** Register the deterministic external-boundary LLM used by hosted Maestro. */
 export function registerMaestroE2eLlmProvider(): void {
@@ -7,6 +10,9 @@ export function registerMaestroE2eLlmProvider(): void {
     // the fixture under that existing provider id exercises the real router
     // and subject-response parser without making an external request.
     id: 'openai',
+    streamResponse: llmEnvelopeReply(
+      "Let's work through this together. What have you noticed so far?",
+    ),
     chatResponses: [
       {
         status: 'direct_match',

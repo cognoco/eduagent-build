@@ -1,5 +1,6 @@
 import { resetLlmMiddleware } from '../middleware/llm';
 import { detectSubjectType } from '../services/book-generation';
+import { streamExchange } from '../services/exchanges';
 import { _resetCircuits } from '../services/llm';
 import { resolveSubjectName } from '../services/subject-resolve';
 import { app } from './maestro-e2e-worker';
@@ -11,7 +12,7 @@ afterEach(() => {
 });
 
 describe('hosted Maestro LLM provider', () => {
-  it('preserves the Photosynthesis direct match and narrow structure after a no-key hosted-worker health probe', async () => {
+  it('preserves the Photosynthesis subject calls and a semantic session stream after a no-key hosted-worker health probe', async () => {
     jest.spyOn(console, 'warn').mockImplementation();
 
     // Mirror the hosted boot sequence: the health probe runs the no-key test
@@ -48,5 +49,28 @@ describe('hosted Maestro LLM provider', () => {
         }),
       ]),
     });
+
+    const exchange = await streamExchange(
+      {
+        sessionId: 'maestro-session',
+        profileId: 'maestro-profile',
+        subjectName: resolution.resolvedName,
+        topicTitle: 'How Plants Capture Light',
+        topicDescription: 'How leaves collect light energy for making food',
+        sessionType: 'learning',
+        escalationRung: 1,
+        exchangeHistory: [],
+        birthYear: 2000,
+      },
+      'How should we start?',
+    );
+    let visibleReply = '';
+    for await (const chunk of exchange.stream) {
+      visibleReply += chunk;
+    }
+
+    expect(visibleReply).toBe(
+      "Let's work through this together. What have you noticed so far?",
+    );
   });
 });
