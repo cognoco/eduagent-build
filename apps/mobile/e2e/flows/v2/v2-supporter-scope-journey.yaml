@@ -165,10 +165,10 @@ tags:
 - assertVisible:
     id: 'person-scope-journal-empty-lamp'
 
-# Back to Support hub via the scope chip.
+# Back to Support hub via the scope chip, preserving the active Journal tab.
 - tapOn:
     id: 'scope-chip-option-supporter-hub'
 - extendedWaitUntil:
     visible:
-      id: 'support-hub-mentor-tab'
+      id: 'support-hub-journal-tab'
     timeout: 15000

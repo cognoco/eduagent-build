@@ -132,7 +132,7 @@ test('J-29 supporter: Support hub -> person scope -> Mentor -> Subjects -> Journ
     page.getByTestId('person-scope-journal-empty-lamp'),
   ).toBeVisible();
 
-  // --- Back to Support hub.
+  // --- Back to Support hub, preserving the active Journal tab.
   await pressableClick(page.getByTestId('scope-chip-option-supporter-hub'));
-  await expect(page.getByTestId('support-hub-mentor-tab')).toBeVisible();
+  await expect(page.getByTestId('support-hub-journal-tab')).toBeVisible();
 });
