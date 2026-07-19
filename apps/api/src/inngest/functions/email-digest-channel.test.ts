@@ -408,8 +408,15 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('Email digest channel — weekly', () => {
+  const failNextPush = () =>
+    mockSendPushNotification.mockResolvedValueOnce({
+      sent: false,
+      reason: 'network_error',
+    });
+
   // Break test 1: Email sent when both preference + parent email present
   it('(T1) sends email when weekly_progress_email=true and parent email present', async () => {
+    failNextPush();
     const db = buildMockDb();
     db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
       status: 'CONSENTED',
@@ -513,6 +520,7 @@ describe('Email digest channel — weekly', () => {
 
   // Break test 4: Struggle watch-line rendered with topic name when struggles non-empty
   it('(T4) renders struggle watch-line with topic names when learning_profiles.struggles non-empty', async () => {
+    failNextPush();
     dbState.struggles = [{ topic: 'fractions' }, { topic: 'decimals' }];
     const db = buildMockDb();
     db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
@@ -539,6 +547,7 @@ describe('Email digest channel — weekly', () => {
 
   // Break test 5: Watch-line omitted when struggles empty
   it('(T5) omits watch-line topics when struggles is empty', async () => {
+    failNextPush();
     dbState.struggles = [];
     const db = buildMockDb();
     db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
@@ -561,6 +570,7 @@ describe('Email digest channel — weekly', () => {
 
   // Break test 6: Resend Idempotency-Key set per parentId + reportWeek
   it('(T6) sets Resend Idempotency-Key from weekly + parentId + reportWeek', async () => {
+    failNextPush();
     const db = buildMockDb();
     db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
       status: 'CONSENTED',
@@ -580,6 +590,8 @@ describe('Email digest channel — weekly', () => {
 
   // Break test 7: Retry after transient Resend failure does not double-send
   it('(T7) Resend Idempotency-Key is deterministic — same key on retry prevents double-send', async () => {
+    failNextPush();
+    failNextPush();
     // The idempotency key is derived from parentId + reportWeek (not a random uuid),
     // so two calls with the same parentId on the same week produce identical keys.
     // Resend deduplicates on this key within 24h.
@@ -670,6 +682,7 @@ describe('Email digest channel — weekly', () => {
 
   // Break test 10: Mixed consent — CONSENTED child included, WITHDRAWN child excluded
   it('(T10) weekly — includes only CONSENTED child row; WITHDRAWN child redacted', async () => {
+    failNextPush();
     const db = buildMockDb([
       { childProfileId: CHILD_ID_A },
       { childProfileId: CHILD_ID_B },
@@ -762,11 +775,12 @@ function buildMonthlyMockDb(
   const mockSelect = jest
     .fn()
     .mockImplementation((fields: Record<string, unknown>) => ({
-      from: 'personId' in fields
-        ? jest.fn().mockReturnValue({
-            where: jest.fn().mockResolvedValue([]),
-          })
-        : mockSelectFrom,
+      from:
+        'personId' in fields
+          ? jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([]),
+            })
+          : mockSelectFrom,
     }));
 
   return Object.assign(createMockDb() as Record<string, unknown>, {

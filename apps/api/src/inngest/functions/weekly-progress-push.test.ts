@@ -1461,6 +1461,10 @@ describe('memoized step-state PII break test [F-085]', () => {
       weeklyProgressPush: true,
       weeklyProgressEmail: true,
     });
+    mockSendPushNotification.mockResolvedValueOnce({
+      sent: false,
+      reason: 'network_error',
+    });
     mockDb.query.learningProfiles.findFirst.mockResolvedValue({
       struggles: [{ topic: 'Fractions' }],
     });

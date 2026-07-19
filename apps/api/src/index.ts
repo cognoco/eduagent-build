@@ -640,6 +640,12 @@ export default Sentry.withSentry(
     dsn: (env as unknown as Bindings).SENTRY_DSN,
     tracesSampleRate:
       (env as unknown as Bindings).ENVIRONMENT === 'production' ? 0.1 : 1.0,
+    // [WI-2339] @sentry/cloudflare's sdk.js already defaults
+    // sendDefaultPii to false (verified: sdk.js:14, `options.sendDefaultPii
+    // ?? false`) — this line changes no runtime behavior. Set explicitly so
+    // the PII-attachment posture is asserted in code, not inherited from an
+    // SDK default that could change on a future upgrade.
+    sendDefaultPii: false,
     // [WI-1990] Defense-in-depth PII backstop — strips denylisted keys
     // (learner free-text, names, etc.) from extra/contexts before an event
     // leaves the API. Not a substitute for call-site discipline.

@@ -60,14 +60,24 @@ function createTestExecutionContext() {
  *  and returns the error-event payload (the item carrying `.exception`) --
  *  not the envelope/item header lines, and not a transaction/span item. */
 function findCapturedErrorEvent(envelopeBody: string): {
-  request?: { headers?: Record<string, unknown> };
+  request?: {
+    headers?: Record<string, unknown>;
+    url?: string;
+    query_string?: string;
+  };
 } {
   const lines = envelopeBody.split('\n').filter(Boolean);
   for (const line of lines) {
     try {
       const parsed = JSON.parse(line) as { exception?: unknown };
       if (parsed && typeof parsed === 'object' && parsed.exception) {
-        return parsed as { request?: { headers?: Record<string, unknown> } };
+        return parsed as {
+          request?: {
+            headers?: Record<string, unknown>;
+            url?: string;
+            query_string?: string;
+          };
+        };
       }
     } catch {
       // envelope header / item header lines aren't event JSON -- skip.
@@ -263,5 +273,37 @@ describe('Sentry.withSentry request pipeline (WI-2353 rework — AC-1, AC-4)', (
     const transactionEvent = findCapturedTransactionEvent(envelopeBodies);
     expect(transactionEvent.request?.headers?.authorization).toBeUndefined();
     expect(transactionEvent.request?.headers?.cookie).toBeUndefined();
+  });
+
+  // [WI-2339] Named case: a request carrying a secret-bearing query string
+  // (`?token=SECRET-abc123`) throws and is captured through the SAME real
+  // Sentry.withSentry/requestDataIntegration/beforeSend pipeline as AC-1/AC-4
+  // above -- not scrubSentryEvent called directly. Verified empirically
+  // (see sentry.ts's stripQueryString doc comment) that
+  // requestDataIntegration attaches event.request.query_string and the
+  // query segment of event.request.url regardless of sendDefaultPii, unlike
+  // cookies/authorization. Guaranteed property asserted: the literal secret
+  // is absent from both fields on the event Sentry.withSentry actually
+  // ships. Reverting the scrubRequestUrlFields wiring in sentry.ts makes
+  // this exact assertion fail (verified manually: red before the fix, green
+  // after).
+  it('WI-2339: a request with a secret query param throws, the secret is absent from request.query_string and request.url in the event Sentry.withSentry actually ships', async () => {
+    const wrapped = buildThrowingSentryApp();
+    const { ctx, drain } = createTestExecutionContext();
+
+    const request = new Request(
+      'https://api.example.com/throws?token=SECRET-abc123&foo=bar',
+    );
+
+    const response = await wrapped.fetch(request, {} as never, ctx as never);
+    expect(response.status).toBe(500);
+    await drain();
+
+    expect(envelopeBodies.length).toBeGreaterThan(0);
+    const event = findCapturedErrorEvent(
+      envelopeBodies[envelopeBodies.length - 1]!,
+    );
+    expect(event.request?.query_string).not.toContain('SECRET-abc123');
+    expect(event.request?.url).not.toContain('SECRET-abc123');
   });
 });
