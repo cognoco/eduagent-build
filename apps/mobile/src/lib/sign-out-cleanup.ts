@@ -135,7 +135,8 @@ export const GLOBAL_KEYS: ReadonlyArray<string> = [
   // Unlike the intro-seen flag this is transient onboarding intent, not a
   // durable "seen" latch, so it IS wiped on sign-out: the next signed-out user
   // on a shared device must start from a clean chooser, not inherit the prior
-  // user's parent/learner choice. Spec: docs/plans/2026-05-28-parent-audience-add-child-onboarding.md
+  // user's parent/learner/supporter choice (WI-2225 added the third,
+  // non-authorizing 'supporter' value to this same carrier). Spec: docs/plans/2026-05-28-parent-audience-add-child-onboarding.md
   'preAuthAudience.v1',
 ];
 
