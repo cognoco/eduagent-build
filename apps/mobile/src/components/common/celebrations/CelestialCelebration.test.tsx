@@ -1,10 +1,12 @@
-import { render, screen } from '@testing-library/react-native';
+import { act, render, screen } from '@testing-library/react-native';
 
 import { CelestialCelebration } from './CelestialCelebration';
 import { PolarStar } from './PolarStar';
 import { TwinStars } from './TwinStars';
 import { Comet } from './Comet';
 import { OrionsBelt } from './OrionsBelt';
+import { useCelebration } from '../../../hooks/use-celebration';
+import type { PendingCelebration } from '@eduagent/schemas';
 
 /**
  * Controllable mock for useReducedMotion. Default: false (animations run).
@@ -98,7 +100,8 @@ describe('CelestialCelebration', () => {
     expect(toJSON()).toBeTruthy();
   });
 
-  it('calls onComplete immediately when reduced motion is enabled', () => {
+  it('keeps reduced-motion confirmation visible briefly before completing', () => {
+    jest.useFakeTimers();
     mockReduceMotion.mockReturnValue(true);
 
     const onComplete = jest.fn();
@@ -111,8 +114,14 @@ describe('CelestialCelebration', () => {
       />,
     );
 
-    // With reduced motion, onComplete fires immediately in the useEffect
+    expect(onComplete).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(1500);
+    });
+
     expect(onComplete).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
   });
 
   it('calls onComplete via the animated path when withTiming callback fires', () => {
@@ -158,6 +167,77 @@ describe('CelestialCelebration', () => {
   });
 });
 
+function ReducedMotionMilestoneQueue({
+  queue,
+}: {
+  queue: PendingCelebration[];
+}) {
+  const { CelebrationOverlay } = useCelebration({
+    queue,
+    celebrationLevel: 'all',
+  });
+  return CelebrationOverlay;
+}
+
+describe('reduced-motion milestone queue', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockReduceMotion.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+    mockReduceMotion.mockReturnValue(false);
+  });
+
+  it('shows three distinct static confirmations instead of skipping visibility', () => {
+    const queuedAt = '2026-01-01T10:00:00.000Z';
+    render(
+      <ReducedMotionMilestoneQueue
+        queue={[
+          {
+            celebration: 'polar_star',
+            reason: 'polar_star',
+            detail: null,
+            queuedAt,
+          },
+          {
+            celebration: 'twin_stars',
+            reason: 'twin_stars',
+            detail: null,
+            queuedAt,
+          },
+          {
+            celebration: 'orions_belt',
+            reason: 'orions_belt',
+            detail: null,
+            queuedAt,
+          },
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByText('Polar Star - first independent answer'),
+    ).toBeTruthy();
+
+    act(() => {
+      jest.advanceTimersByTime(1500);
+    });
+    expect(
+      screen.getByText('Twin Stars - three strong answers in a row'),
+    ).toBeTruthy();
+
+    act(() => {
+      jest.advanceTimersByTime(1500);
+    });
+    expect(
+      screen.getByText("Orion's Belt - 5 in a row without help!"),
+    ).toBeTruthy();
+  });
+});
+
 describe('PolarStar', () => {
   afterEach(() => {
     mockReduceMotion.mockReturnValue(false);
@@ -176,11 +256,18 @@ describe('PolarStar', () => {
   });
 
   it('passes onComplete to CelestialCelebration', () => {
+    jest.useFakeTimers();
     mockReduceMotion.mockReturnValue(true);
 
     const onComplete = jest.fn();
     render(<PolarStar onComplete={onComplete} />);
+
+    act(() => {
+      jest.advanceTimersByTime(1500);
+    });
+
     expect(onComplete).toHaveBeenCalled();
+    jest.useRealTimers();
   });
 });
 

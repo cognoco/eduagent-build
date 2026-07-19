@@ -10,12 +10,9 @@ import type {
 } from '@eduagent/schemas';
 import { Comet, OrionsBelt, PolarStar, TwinStars } from '../components/common';
 import { resolveCelebrationLevelForAccommodation } from '../lib/celebration-level';
+import { getMilestoneLabel } from './use-milestone-tracker';
 
 type QueueEntry = PendingCelebration;
-type ProfileBatchState = {
-  batchId: string | null;
-  shown: number;
-};
 
 const CELEBRATION_REGISTRY: Record<
   CelebrationName,
@@ -36,31 +33,8 @@ const CELEBRATION_REGISTRY: Record<
   orions_belt: { tier: 4, Component: OrionsBelt },
 };
 
-function getCelebrationMessage(
-  reason: CelebrationReason,
-  audience: 'child' | 'adult',
-): string {
-  if (reason === 'comet' || reason === 'topic_mastered') {
-    return audience === 'child'
-      ? 'You had a breakthrough!'
-      : 'Breakthrough - concept clicked.';
-  }
-
-  if (reason === 'orions_belt' || reason === 'streak_30') {
-    return audience === 'child'
-      ? 'That was a huge milestone!'
-      : 'Major milestone reached.';
-  }
-
-  if (reason === 'deep_diver') {
-    return 'Great thoughtful responses';
-  }
-
-  if (reason === 'persistent') {
-    return 'You kept going';
-  }
-
-  return audience === 'child' ? 'Nice work!' : 'Nice work.';
+function getCelebrationMessage(reason: CelebrationReason): string {
+  return getMilestoneLabel(reason);
 }
 
 function filterByLevel(
@@ -92,13 +66,9 @@ export function useCelebration(options?: {
     options?.accommodationMode,
     options?.celebrationLevel ?? 'all',
   );
-  const audience = options?.audience ?? 'child';
   const [activeEntry, setActiveEntry] = useState<QueueEntry | null>(null);
   const [pendingQueue, setPendingQueue] = useState<QueueEntry[]>([]);
   const seenQueueKeysByProfileRef = useRef<Map<string, Set<string>>>(new Map());
-  const batchStateByProfileRef = useRef<Map<string, ProfileBatchState>>(
-    new Map(),
-  );
   const profileKey = options?.profileId ?? '__default__';
 
   // Keep a ref to the latest options so callbacks (e.g. onAllComplete) are
@@ -126,26 +96,6 @@ export function useCelebration(options?: {
       seenQueueKeys = new Set();
       seenQueueKeysByProfileRef.current.set(profileKey, seenQueueKeys);
     }
-    let batchState = batchStateByProfileRef.current.get(profileKey);
-    if (!batchState) {
-      batchState = { batchId: null, shown: 0 };
-      batchStateByProfileRef.current.set(profileKey, batchState);
-    }
-
-    // Batch identity: the max queuedAt across all entries. A fresh session
-    // completion produces newer timestamps than the previous batch.
-    const batchId =
-      options.queue
-        .map((e) => e.queuedAt)
-        .sort()
-        .slice(-1)[0] ?? null;
-
-    // New batch — reset the per-batch cap counter
-    if (batchId !== batchState.batchId) {
-      batchState.shown = 0;
-      batchState.batchId = batchId;
-    }
-
     const unseen = options.queue
       .map((entry) => ({ entry, key: getQueueEntryKey(entry) }))
       .filter(
@@ -155,21 +105,13 @@ export function useCelebration(options?: {
 
     if (unseen.length === 0) return;
 
-    // Throttle: at most 2 celebrations per batch
-    const MAX_TOASTS_PER_BATCH = 2;
-    const remaining = MAX_TOASTS_PER_BATCH - batchState.shown;
-    const toShow = unseen.slice(0, Math.max(0, remaining));
-
-    if (toShow.length === 0) return;
-
-    batchState.shown += toShow.length;
-    for (const { key } of toShow) {
+    for (const { key } of unseen) {
       seenQueueKeys.add(key);
     }
 
     setPendingQueue((current) => [
       ...current,
-      ...toShow.map(({ entry }) => entry),
+      ...unseen.map(({ entry }) => entry),
     ]);
   }, [celebrationLevel, options?.queue, profileKey]);
 
@@ -209,7 +151,7 @@ export function useCelebration(options?: {
         />
         <View className="mt-2 bg-surface/95 rounded-full px-4 py-2">
           <Text className="text-body-sm font-semibold text-text-primary">
-            {getCelebrationMessage(activeEntry.reason, audience)}
+            {getCelebrationMessage(activeEntry.reason)}
           </Text>
           {activeEntry.detail ? (
             <Text className="text-caption text-text-secondary text-center mt-1">
@@ -219,7 +161,7 @@ export function useCelebration(options?: {
         </View>
       </View>
     );
-  }, [activeEntry, audience]);
+  }, [activeEntry]);
 
   return {
     CelebrationOverlay,
