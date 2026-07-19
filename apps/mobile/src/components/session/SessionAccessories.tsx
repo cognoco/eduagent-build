@@ -12,8 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import type { HomeworkProblem } from '@eduagent/schemas';
 import type { Router, Href } from 'expo-router';
 import type { useCreateSubject } from '../../hooks/use-subjects';
-import type { ChatMessage } from './ChatShell';
 import {
+  type ChatMessage,
   type QuickChipId,
   type PendingSubjectResolution,
   type ConversationStage,

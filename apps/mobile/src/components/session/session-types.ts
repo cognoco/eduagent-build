@@ -1,7 +1,31 @@
 import i18next from 'i18next';
-import type { PendingCelebration } from '@eduagent/schemas';
-import type { ChatMessage } from './ChatShell';
+import type {
+  MentorNoticeAccepted,
+  PendingCelebration,
+} from '@eduagent/schemas';
 import { sanitizeSecureStoreKey } from '../../lib/secure-storage';
+import type { VerificationBadge } from './MessageBubble';
+
+export interface ChatMessage {
+  id: string;
+  role: 'assistant' | 'user';
+  content: string;
+  streaming?: boolean;
+  outboxStatus?: 'pending' | 'permanently-failed';
+  kind?: 'reconnect_prompt' | 'session_expired' | 'quota_exceeded';
+  escalationRung?: number;
+  verificationBadge?: VerificationBadge;
+  eventId?: string;
+  isSystemPrompt?: boolean;
+  /** BUG-373: True for programmatically auto-sent messages (homework OCR, queued
+   *  multi-problem). Used to exclude from userMessageCount so the voice/text
+   *  toggle stays visible until the user deliberately sends a message. */
+  isAutoSent?: boolean;
+  /** Local file URI of a homework image attached to this message */
+  imageUri?: string;
+  /** Durable homework observation accepted on this completed assistant turn. */
+  mentorNotice?: MentorNoticeAccepted;
+}
 
 export function computePaceMultiplier(
   history: Array<{ actualSeconds: number; expectedMinutes: number }>,

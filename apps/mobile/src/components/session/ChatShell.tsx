@@ -20,7 +20,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MessageBubble, type VerificationBadge } from './MessageBubble';
+import { MessageBubble } from './MessageBubble';
 import { VoiceRecordButton, VoiceTranscriptPreview } from './VoiceRecordButton';
 import { VoiceToggle } from './VoiceToggle';
 import { VoicePlaybackBar } from './VoicePlaybackBar';
@@ -34,28 +34,9 @@ import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { DeskLampAnimation, MagicPenAnimation } from '../common';
 import Animated, { FadeOut } from 'react-native-reanimated';
-import type { MentorNoticeAccepted } from '@eduagent/schemas';
+import type { ChatMessage } from './session-types';
 
-export interface ChatMessage {
-  id: string;
-  role: 'assistant' | 'user';
-  content: string;
-  streaming?: boolean;
-  outboxStatus?: 'pending' | 'permanently-failed';
-  kind?: 'reconnect_prompt' | 'session_expired' | 'quota_exceeded';
-  escalationRung?: number;
-  verificationBadge?: VerificationBadge;
-  eventId?: string;
-  isSystemPrompt?: boolean;
-  /** BUG-373: True for programmatically auto-sent messages (homework OCR, queued
-   *  multi-problem). Used to exclude from userMessageCount so the voice/text
-   *  toggle stays visible until the user deliberately sends a message. */
-  isAutoSent?: boolean;
-  /** Local file URI of a homework image attached to this message */
-  imageUri?: string;
-  /** Durable homework observation accepted on this completed assistant turn. */
-  mentorNotice?: MentorNoticeAccepted;
-}
+export type { ChatMessage } from './session-types';
 
 interface ChatShellProps {
   title: string;
