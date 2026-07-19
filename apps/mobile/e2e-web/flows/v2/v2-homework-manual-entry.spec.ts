@@ -3,11 +3,13 @@ import { expect, test, type Page, type Request } from '@playwright/test';
 import type { LearningSessionResponse } from '@eduagent/schemas';
 
 import { apiBaseUrl } from '../../helpers/runtime';
-import { readSeedData } from '../../helpers/seed-data';
 import { pressableClick } from '../../helpers/pressable';
+import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { fillTextInput } from '../../helpers/text-input';
 
 const MANUAL_HOMEWORK_PROBLEM = 'Solve 3x + 7 = 22';
+
+test.use({ storageState: { cookies: [], origins: [] } });
 
 function isSessionCreate(request: Request): boolean {
   const pathname = new URL(request.url()).pathname;
@@ -28,16 +30,20 @@ async function openManualEntryFromMentor(page: Page): Promise<void> {
   });
 }
 
-test('V2 Mentor manual homework creates one associated session, receives help, and returns to Mentor', async ({
+test('V2 Mentor trial-active manual homework creates one associated session, receives help, and returns to Mentor', async ({
   page,
 }) => {
-  const seed = await readSeedData('solo-learner');
+  const seed = await seedAndSignIn(page, {
+    scenario: 'trial-active',
+    alias: 'wi-2236-manual-homework',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
+  });
   const sessionCreateRequests: Request[] = [];
   page.on('request', (request) => {
     if (isSessionCreate(request)) sessionCreateRequests.push(request);
   });
 
-  await page.goto('/mentor', { waitUntil: 'commit' });
   await expect(page.getByTestId('mentor-screen')).toBeVisible({
     timeout: 60_000,
   });
@@ -95,6 +101,7 @@ test('V2 Mentor manual homework creates one associated session, receives help, a
   expect(createdSession.id).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   );
+  expect(createdSession.subjectId).toBe(seed.ids.subjectId);
 
   await expect(page.getByTestId('homework-problem-progress')).toHaveText(
     'Problem 1 of 1',
@@ -155,6 +162,7 @@ test('V2 Mentor manual homework creates one associated session, receives help, a
     (await persistedResponse.json()) as LearningSessionResponse
   ).session;
   expect(persistedSession.id).toBe(createdSession.id);
+  expect(persistedSession.subjectId).toBe(seed.ids.subjectId);
   expect(persistedSession.sessionType).toBe('homework');
   expect(persistedSession.metadata?.homework?.problemCount).toBe(1);
   expect(persistedSession.metadata?.homework?.currentProblemIndex).toBe(0);

@@ -84,6 +84,8 @@ tags:
       visible:
         id: 'subject-picker'
     commands:
+      # The native runner maps the seed response's ids.subjectId to the global
+      # SUBJECT_ID Maestro variable before this flow (and its setup subflow) runs.
       - tapOn:
           id: 'subject-pick-${SUBJECT_ID}'
 - runFlow:
