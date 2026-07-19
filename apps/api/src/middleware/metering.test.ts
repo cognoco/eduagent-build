@@ -388,6 +388,7 @@ jest.mock(
 );
 
 import { app } from '../index';
+import { inngest } from '../inngest/client';
 import { MeteringError } from '../services/billing';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import {
@@ -761,12 +762,10 @@ describe('metering middleware', () => {
       expect(mockDecrementQuota).not.toHaveBeenCalled();
     });
 
-    // [CR-2026-05-21-047] Break test — KV failure in idempotency replay lookup
-    // must emit a safeSend dispatch for observability AND still return null
-    // (fall through to normal metering). Without the fix, safeSend is never
-    // called — the failure is silent and every client retry double-decrements
-    // the quota pool on KV outage.
-    it('[CR-2026-05-21-047] emits safeSend on idempotency KV read failure and still processes the request (no behavior change)', async () => {
+    // Idempotent session requests must fail closed when the metering replay
+    // lookup cannot distinguish a first request from a retry. The structured
+    // metric remains best-effort, but no quota or route work may begin.
+    it('fails closed before quota decrement when an idempotency KV read throws', async () => {
       mockSafeSendFn.mockClear();
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
@@ -801,15 +800,23 @@ describe('metering middleware', () => {
         { ...TEST_ENV, IDEMPOTENCY_KV: throwingIdempotencyKV },
       );
 
-      // User-facing behavior unchanged: request falls through to normal metering
-      expect(res.status).toBe(200);
-      expect(mockDecrementQuota).toHaveBeenCalled();
+      expect(res.status).toBe(503);
+      expect(res.headers.get('Retry-After')).toBe('5');
+      await expect(res.json()).resolves.toEqual({
+        code: 'INTERNAL_ERROR',
+        message:
+          'Idempotency check temporarily unavailable. Please retry with the same Idempotency-Key.',
+      });
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
 
       // [BREAK] safeSend must have been called — proves the failure is observable.
       // Before the fix this assertion fails because safeSend is never invoked.
       expect(mockSafeSendFn).toHaveBeenCalledTimes(1);
 
-      // Verify the send thunk contains the expected event shape
+      // Execute the safeSend thunk against the real Inngest client seam so the
+      // structured event contract is asserted without network I/O.
       const [sendThunk, surface, context] = mockSafeSendFn.mock.calls[0] as [
         () => Promise<unknown>,
         string,
@@ -817,9 +824,24 @@ describe('metering middleware', () => {
       ];
       expect(surface).toBe('metering.idempotency_replay_lookup_failed');
       expect(context).toMatchObject({ route: expect.any(String) });
-
-      // The thunk itself is a function (we do not call it — safeSend is mocked)
-      expect(typeof sendThunk).toBe('function');
+      const sendSpy = jest
+        .spyOn(inngest, 'send')
+        .mockResolvedValue({ ids: [] } as never);
+      try {
+        await sendThunk();
+        expect(sendSpy).toHaveBeenCalledWith({
+          name: 'app/idempotency.preflight_lookup_failed',
+          data: {
+            accountId: 'test-account-id',
+            profileId: 'test-profile-id',
+            route: '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+            error: 'KV outage',
+            timestamp: expect.any(String),
+          },
+        });
+      } finally {
+        sendSpy.mockRestore();
+      }
     });
 
     it('refunds quota when a metered route rejects before producing an answer', async () => {

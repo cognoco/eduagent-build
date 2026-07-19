@@ -50,6 +50,11 @@ export interface NotificationResult {
 
 /** Maximum push notifications per day per profile */
 export const MAX_DAILY_PUSH = 3;
+export const REVIEW_FAMILY_DEDUP_TYPES = [
+  'review_reminder',
+  'recall_nudge',
+  'notice_recheck',
+] as const;
 
 const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send';
 

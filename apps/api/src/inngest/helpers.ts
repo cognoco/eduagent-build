@@ -53,6 +53,7 @@ export interface EnvBindings {
   memoryFactsDedupThreshold?: string;
   maxDedupLlmCallsPerSession?: string;
   memoryFactsDedupRolloutPct?: string;
+  mentorNoticeEnabled?: string;
 }
 
 function readStringBinding(
@@ -103,6 +104,7 @@ export function readInngestEnvBindings(env: unknown): EnvBindings {
       bindings,
       'MEMORY_FACTS_DEDUP_ROLLOUT_PCT',
     ),
+    mentorNoticeEnabled: readStringBinding(bindings, 'MENTOR_NOTICE_ENABLED'),
   };
 }
 
@@ -315,6 +317,12 @@ export function getStepRetentionPurgeEnabled(): boolean {
     warnMissingBinding('retentionPurgeEnabled');
   }
   return (bound ?? process.env['RETENTION_PURGE_ENABLED']) === 'true';
+}
+
+export function getStepMentorNoticeEnabled(): boolean {
+  const bound = getEnvBinding('mentorNoticeEnabled');
+  if (bound === undefined) warnMissingBinding('mentorNoticeEnabled');
+  return (bound ?? process.env['MENTOR_NOTICE_ENABLED']) === 'true';
 }
 
 // [R1] CLERK_SECRET_KEY is used by the scheduled-deletion job to erase the

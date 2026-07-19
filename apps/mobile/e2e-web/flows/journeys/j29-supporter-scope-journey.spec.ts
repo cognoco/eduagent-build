@@ -86,9 +86,12 @@ test('J-29 supporter: Support hub -> person scope -> Mentor -> Subjects -> Journ
   await expect(page.getByTestId('subject-hub')).toBeVisible();
   await expect(page.getByTestId('subject-hub-notes-section')).toHaveCount(0);
   await expect(page.getByTestId('subject-hub-notes-input')).toHaveCount(0);
-  await pressableClick(page.getByTestId('person-scope-subject-hub-back'));
+  await page.getByTestId('person-scope-subject-hub-back').click();
   await expect(
     page.getByTestId('person-scope-structural-subjects'),
+  ).toBeVisible();
+  await expect(
+    page.getByTestId(`person-scope-subject-${subjectId}`),
   ).toBeVisible();
 
   // --- Journal (same person/edge, still the rich supportee).
@@ -129,7 +132,7 @@ test('J-29 supporter: Support hub -> person scope -> Mentor -> Subjects -> Journ
     page.getByTestId('person-scope-journal-empty-lamp'),
   ).toBeVisible();
 
-  // --- Back to Support hub.
+  // --- Back to Support hub, preserving the active Journal tab.
   await pressableClick(page.getByTestId('scope-chip-option-supporter-hub'));
-  await expect(page.getByTestId('support-hub-mentor-tab')).toBeVisible();
+  await expect(page.getByTestId('support-hub-journal-tab')).toBeVisible();
 });

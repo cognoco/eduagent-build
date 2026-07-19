@@ -8,6 +8,7 @@ import {
   createScreenWrapper,
   createTestProfile,
 } from '../../../test-utils/screen-render';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -318,11 +319,38 @@ describe('AssessmentPickerScreen', () => {
       getByTestId('assessment-picker-empty');
     });
 
-    it('navigates to library when browse button pressed', () => {
-      mockTopics = [];
-      const { getByTestId } = renderAssessmentPickerScreen();
-      fireEvent.press(getByTestId('assessment-picker-browse'));
-      expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+    describe('browse CTA destination [WI-2219]', () => {
+      let originalV2: boolean;
+
+      beforeEach(() => {
+        originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      });
+
+      afterEach(() => {
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = originalV2;
+      });
+
+      it('navigates to library when V2 nav is off', () => {
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = false;
+        mockTopics = [];
+        const { getByTestId } = renderAssessmentPickerScreen();
+        fireEvent.press(getByTestId('assessment-picker-browse'));
+        expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+      });
+
+      it('navigates to V2 Subjects when V2 nav is on', () => {
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+        mockTopics = [];
+        const { getByTestId } = renderAssessmentPickerScreen();
+        fireEvent.press(getByTestId('assessment-picker-browse'));
+        expect(mockPush).toHaveBeenCalledWith('/(app)/subjects');
+      });
     });
   });
 

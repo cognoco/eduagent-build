@@ -18,6 +18,7 @@ import {
   pushAddChildForSupport,
   pushLinkInitiateForManagedPerson,
   pushLinkInitiatePicker,
+  SUBJECTS_RETURN_TO,
 } from '../../lib/navigation';
 import { useScopeContext } from '../../lib/scope-context';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
@@ -127,7 +128,12 @@ export default function SubjectsScreen(): React.ReactElement {
             params: { subjectId },
           } as Href)
         }
-        onCreateSubject={() => router.push('/(app)/onboarding' as Href)}
+        onCreateSubject={() =>
+          router.push({
+            pathname: '/create-subject',
+            params: { returnTo: SUBJECTS_RETURN_TO },
+          } as Href)
+        }
         onBookPress={handleBookPress}
         onTopicPress={handleTopicPress}
         onNotePress={handleNotePress}

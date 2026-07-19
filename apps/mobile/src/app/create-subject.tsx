@@ -29,7 +29,13 @@ import { MagicPenAnimation } from '../components/common/MagicPenAnimation';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError, extractApiErrorCode } from '../lib/format-api-error';
 import { errorHasCode } from '../components/session/session-types';
-import { homeHrefForReturnTo, goBackOrReplace } from '../lib/navigation';
+import {
+  homeHrefForReturnTo,
+  goBackOrReplace,
+  isSessionForwardableReturnTo,
+  SUBJECTS_HREF,
+  SUBJECTS_RETURN_TO,
+} from '../lib/navigation';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import type { LearningSession, SubjectResolveResult } from '@eduagent/schemas';
@@ -114,6 +120,9 @@ function CreateSubjectScreenAuthenticated() {
     returnTo?: string;
     chatTopic?: string;
   }>();
+  const sessionReturnTo = isSessionForwardableReturnTo(returnTo)
+    ? returnTo
+    : undefined;
   const colors = useThemeColors();
   const createSubject = useCreateSubject();
   const resolveSubject = useResolveSubject();
@@ -186,6 +195,7 @@ function CreateSubjectScreenAuthenticated() {
                 ...(data.session.topicId
                   ? { topicId: data.session.topicId }
                   : {}),
+                ...(sessionReturnTo ? { returnTo: sessionReturnTo } : {}),
               },
             } as Href);
             return;
@@ -198,6 +208,7 @@ function CreateSubjectScreenAuthenticated() {
               subjectName: input.subjectName,
               sessionId: data.session.id,
               topicId: data.session.topicId ?? undefined,
+              ...(sessionReturnTo ? { returnTo: sessionReturnTo } : {}),
             },
           } as Href);
           return;
@@ -226,6 +237,7 @@ function CreateSubjectScreenAuthenticated() {
               ? { topicName: input.fallbackTopicName }
               : {}),
             ...(input.rawInput ? { rawInput: input.rawInput } : {}),
+            ...(sessionReturnTo ? { returnTo: sessionReturnTo } : {}),
           },
         } as Href);
         return;
@@ -240,10 +252,11 @@ function CreateSubjectScreenAuthenticated() {
             ? { topicName: input.fallbackTopicName }
             : {}),
           ...(input.rawInput ? { rawInput: input.rawInput } : {}),
+          ...(sessionReturnTo ? { returnTo: sessionReturnTo } : {}),
         },
       } as Href);
     },
-    [apiClient, router],
+    [apiClient, router, sessionReturnTo],
   );
 
   // [M4] 30s timeout on resolve phase — show error + retry
@@ -362,6 +375,9 @@ function CreateSubjectScreenAuthenticated() {
         }
 
         if (result.structureType === 'broad') {
+          // The established broad-subject flow owns its picker exits (created
+          // subject hub/shelf). Do not pass the Subjects entry token into a
+          // route that has no return contract.
           router.replace({
             pathname: '/(app)/pick-book/[subjectId]',
             params: {
@@ -385,6 +401,7 @@ function CreateSubjectScreenAuthenticated() {
                 : {}),
               step: '1',
               totalSteps: '1',
+              ...(sessionReturnTo ? { returnTo: sessionReturnTo } : {}),
             },
           } as Href);
           return;
@@ -415,6 +432,7 @@ function CreateSubjectScreenAuthenticated() {
       router,
       originalInput,
       returnTo,
+      sessionReturnTo,
       chatTopic,
       transitionToFirstSession,
       existingSubjects,
@@ -622,6 +640,8 @@ function CreateSubjectScreenAuthenticated() {
     if (returnTo === 'chat') {
       // [BUG-633 / M-1] Same defensive fallback as handleCancel.
       goBackOrReplace(router, '/(app)/home' as Href);
+    } else if (returnTo === SUBJECTS_RETURN_TO) {
+      router.replace(SUBJECTS_HREF as Href);
     } else {
       router.replace('/(app)/library' as Href);
     }
@@ -827,6 +847,9 @@ function CreateSubjectScreenAuthenticated() {
                             mode: 'learning',
                             subjectId: subject.id,
                             subjectName: subject.name,
+                            ...(sessionReturnTo
+                              ? { returnTo: sessionReturnTo }
+                              : {}),
                           },
                         } as Href)
                       }

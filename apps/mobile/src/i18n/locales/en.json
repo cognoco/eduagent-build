@@ -858,6 +858,7 @@
       "guidedResponse": "Guided response",
       "pendingSync": "Message pending sync",
       "sending": "Sending…",
+      "mentorNotice": "Noticed along the way: {{concept}}",
       "escalation": {
         "stepByStep": "Step-by-step",
         "letMeShowYou": "Let me show you",
@@ -3051,6 +3052,14 @@
         "arcAdvancing": "You are moving this forward",
         "arcMastered": "Session wrapped"
       },
+      "mentor_notice": {
+        "title": "A small idea worth checking",
+        "cta": "Check it now",
+        "notNow": "Not now",
+        "arcDue": "Ready when you are",
+        "arcAdvancing": "Opening a quick check",
+        "arcMastered": "Locked in"
+      },
       "retention_due": {
         "title": "Review what is due",
         "cta": "Review",
@@ -3093,6 +3102,9 @@
       },
       "session_filed": {
         "title": "Saved {{topicTitle}} to your learning record."
+      },
+      "notice_locked_in": {
+        "title": "You locked in {{concept}}."
       },
       "quota": {
         "title": "A learning moment was saved."
@@ -3290,6 +3302,7 @@
       "topic_mastered": "Marked {{topicTitle}} as mastered.",
       "recap_ready": "A recap is ready.",
       "snapshot_ready": "A learning snapshot is ready.",
+      "notice_locked_in": "Locked in {{concept}} in {{subjectName}}.",
       "reflection_bonus": "Reflection bonus saved.",
       "quiz_personal_best": "Personal best saved."
     },
@@ -3522,8 +3535,13 @@
     "notificationPrimer": {
       "title": "Want a daily nudge?",
       "message": "We can send a gentle reminder so you don't lose your streak. You can turn it off anytime in Settings.",
+      "noticeTitle": "Want a gentle follow-up?",
+      "noticeMessage": "We can remind you to revisit what your mentor noticed today. You can turn this off anytime in Settings.",
       "allow": "Allow",
       "notNow": "Not now"
+    },
+    "mentorNotice": {
+      "title": "Noticed along the way"
     },
     "masteredRow": {
       "title": "You mastered:"

@@ -1,5 +1,17 @@
 # Consent-Withdrawal Bearer-Token — Threat Posture
 
+> **Historical document (superseded 2026-07-19, `WI-2348` / `OPQ-114`).** This
+> document describes the pre-2026-07-19 mechanism, under which the bearer
+> token authorized both withdraw AND restore. **Bearer-token restore was
+> removed** — `restoreConsentByToken` no longer exists, and
+> `POST /consent-page/restore` never mutates (see finding T-11 below, and the
+> amended [`MMT-ADR-0029`](../adr/MMT-ADR-0029-bearer-token-consent-withdrawal-authority.md)).
+> The bearer token is now **withdraw-only**; restore requires an authenticated
+> guardian session (`restoreConsentV2` / `PUT /consent/:childProfileId/restore`).
+> Any statement below that assumes bearer-token restore is current behavior no
+> longer reflects the live system — read this alongside the ADR amendment
+> before relying on it for anything but historical context.
+
 **Checklist item:** A9 (consent as a real choice) extended by Art. 7(3) (withdrawal as easy as giving) · **Law:** GDPR Article 7(3) / Article 6 · **Status:** RULED 2026-07-17 (OPQ-114) — DPO-acting + eng/security sign-off below. **Version 1.**
 **Scope:** the P0 email-consenting-parent bearer-token withdrawal/restore mechanism only (`cw1` tokens). Does not re-assess the edge-gated in-app guardian withdrawal path (`revokeConsentV2`/`restoreConsentV2`), which is unaffected.
 **Feeds:** WI-1577 (final pre-store-submission launch-compliance gate) — see `dpia.md` §6 row 6.11 and §9 item 9 for the cross-reference this posture satisfies.

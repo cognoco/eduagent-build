@@ -1085,16 +1085,38 @@ describe('AppLayout', () => {
 
   it.each(
     [
-      { pathname: '/mentor', routeKind: 'top-level tab' },
-      { pathname: '/account', routeKind: 'full-screen account' },
-      { pathname: '/session', routeKind: 'full-screen session' },
-    ].flatMap(({ pathname, routeKind }) => [
-      { pathname, routeKind, surface: '360x760 web', safeAreaTop: 0 },
-      { pathname, routeKind, surface: 'native safe area', safeAreaTop: 47 },
+      { pathname: '/mentor', routeKind: 'Mentor tab', ownsChrome: true },
+      { pathname: '/subjects', routeKind: 'Subjects tab', ownsChrome: true },
+      { pathname: '/journal', routeKind: 'Journal tab', ownsChrome: true },
+      {
+        pathname: '/account',
+        routeKind: 'full-screen account',
+        ownsChrome: false,
+      },
+      {
+        pathname: '/session',
+        routeKind: 'full-screen session',
+        ownsChrome: false,
+      },
+    ].flatMap(({ pathname, routeKind, ownsChrome }) => [
+      {
+        pathname,
+        routeKind,
+        ownsChrome,
+        surface: '360x760 web',
+        safeAreaTop: 0,
+      },
+      {
+        pathname,
+        routeKind,
+        ownsChrome,
+        surface: 'native safe area',
+        safeAreaTop: 47,
+      },
     ]),
   )(
-    'does not duplicate v2 chrome clearance for $routeKind on $surface',
-    async ({ pathname, routeKind, safeAreaTop }) => {
+    'keeps $routeKind content below floating v2 controls on $surface',
+    async ({ pathname, ownsChrome, safeAreaTop }) => {
       const flags = require('../../lib/feature-flags') as {
         FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
       };
@@ -1114,8 +1136,7 @@ describe('AppLayout', () => {
         renderLayout();
 
         expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
-          paddingTop:
-            routeKind === 'top-level tab' ? Math.max(safeAreaTop, 24) : 0,
+          paddingTop: ownsChrome ? Math.max(safeAreaTop, 24) + 8 + 44 : 0,
         });
       } finally {
         (
@@ -1124,6 +1145,37 @@ describe('AppLayout', () => {
       }
     },
   );
+
+  it('moves visible Subjects content below a scope chip that grows for font scaling', async () => {
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    try {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = true;
+      mockSafeAreaInsets = { top: 47, bottom: 0, left: 0, right: 0 };
+      mockUsePathname.mockReturnValue('/subjects');
+
+      renderLayout();
+
+      const scopeShell = await screen.findByTestId('scope-chip-shell', {
+        includeHiddenElements: true,
+      });
+      fireEvent(scopeShell, 'layout', {
+        nativeEvent: { layout: { height: 64 } },
+      });
+
+      expect(await screen.findByTestId('active-root-scene')).toHaveStyle({
+        paddingTop: 119,
+      });
+    } finally {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = original;
+    }
+  });
 
   it.each([
     { surface: '360x760 web', safeAreaTop: 0, expectedPadding: 76 },

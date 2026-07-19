@@ -286,42 +286,61 @@ export async function startSession(
   // [L10-001] Session row + session_start audit event must be atomic — if the
   // audit insert fails after the session is created, the session would exist
   // with no session_start event in its audit trail.
-  const row = await db.transaction(async (tx) => {
-    const [inserted] = await tx
-      .insert(learningSessions)
-      .values({
-        profileId,
-        subjectId,
-        topicId: input.topicId ?? null,
-        sessionType: input.sessionType ?? 'learning',
-        verificationType: input.verificationType ?? null,
-        inputMode: input.inputMode ?? 'text',
-        status: 'active',
-        escalationRung: 1,
-        exchangeCount: 0,
-        metadata: {
-          ...(input.metadata ?? {}),
-          inputMode: input.inputMode ?? input.metadata?.inputMode ?? 'text',
-        },
-        rawInput: input.rawInput ?? null,
-      })
-      .returning();
-
-    if (!inserted)
-      throw new Error('Insert learning session did not return a row');
-
-    await tx.insert(sessionEvents).values({
-      sessionId: inserted.id,
+  const row = await db.transaction((tx) =>
+    createSessionWithStartEvent(
+      tx as unknown as Database,
       profileId,
       subjectId,
-      eventType: 'session_start' as const,
-      content: '',
-    });
-
-    return inserted;
-  });
+      input,
+    ),
+  );
 
   return mapSessionRow(row);
+}
+
+/**
+ * Transaction-aware insert primitive. Callers must prove subject/topic
+ * ownership before entering; this function owns only the atomic row + audit
+ * event write.
+ */
+export async function createSessionWithStartEvent(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  input: SessionStartInput,
+) {
+  const [inserted] = await db
+    .insert(learningSessions)
+    .values({
+      profileId,
+      subjectId,
+      topicId: input.topicId ?? null,
+      sessionType: input.sessionType ?? 'learning',
+      verificationType: input.verificationType ?? null,
+      inputMode: input.inputMode ?? 'text',
+      status: 'active',
+      escalationRung: 1,
+      exchangeCount: 0,
+      metadata: {
+        ...(input.metadata ?? {}),
+        inputMode: input.inputMode ?? input.metadata?.inputMode ?? 'text',
+      },
+      rawInput: input.rawInput ?? null,
+    })
+    .returning();
+
+  if (!inserted)
+    throw new Error('Insert learning session did not return a row');
+
+  await db.insert(sessionEvents).values({
+    sessionId: inserted.id,
+    profileId,
+    subjectId,
+    eventType: 'session_start' as const,
+    content: '',
+  });
+
+  return inserted;
 }
 
 const FIRST_CURRICULUM_SESSION_WAIT_MS = 25_000;
@@ -1022,7 +1041,8 @@ export async function closeStaleSessions(
     // Advance cursor to last row. If the page was smaller than the limit,
     // we have exhausted all stale sessions.
     if (page.length < pageSize) break;
-    const last: typeof learningSessions.$inferSelect = page[page.length - 1]!;
+    const last: typeof learningSessions.$inferSelect | undefined = page.at(-1);
+    if (!last) break;
     cursor = { lastActivityAt: last.lastActivityAt, lastId: last.id };
   }
 

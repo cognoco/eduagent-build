@@ -10,6 +10,7 @@ import { useSubjects } from '../../../hooks/use-subjects';
 import { useVocabulary } from '../../../hooks/use-vocabulary';
 import { homeHrefForReturnTo } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useQuizFlow } from './_layout';
 
 // [BUG-891] Below this threshold the quiz draws from a generic seed list,
@@ -343,7 +344,13 @@ export default function QuizIndexScreen(): React.ReactElement {
               <IntentCard
                 title={t('quiz.index.vocabLockedTitle')}
                 subtitle={t('quiz.index.vocabLockedSubtitle')}
-                onPress={() => router.push('/(app)/library' as Href)}
+                onPress={() =>
+                  router.push(
+                    (FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+                      ? '/(app)/subjects'
+                      : '/(app)/library') as Href,
+                  )
+                }
                 testID="quiz-vocab-locked"
               />
             </View>

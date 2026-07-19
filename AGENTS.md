@@ -380,7 +380,7 @@ Local hooks are fast feedback; **CI is the authoritative gate that protects `mai
 
 ## Repo-Specific Guardrails
 
-- Default exports are only for Expo Router page components.
+- Default exports are only for runtime-mandated entrypoints: Expo Router page components and Cloudflare Worker module entrypoints.
 - Tests are co-located with source files. Do not create `__tests__/` folders.
 - Package imports go through the package barrel, enforced by `@nx/enforce-module-boundaries`.
 - SecureStore keys must use Expo-safe characters only: letters, numbers, `.`, `-`, `_`.
