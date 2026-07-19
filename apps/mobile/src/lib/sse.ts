@@ -347,7 +347,7 @@ export function streamSSEViaXHR(
   // sending data for IDLE_TIMEOUT_MS. The server may take 20s+ for LLM
   // streaming then another 10s for post-stream DB writes — the total easily
   // exceeds a fixed 30s timeout, but the stream is never truly idle.
-  const IDLE_TIMEOUT_MS = 45_000;
+  const IDLE_TIMEOUT_MS = 90_000;
   let idleTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
     if (done) return;
     const timeoutError = new Error(

@@ -41,7 +41,8 @@ jest.mock(
   }),
 );
 
-const WATCHDOG_RECONNECT_TEXT = 'Connection dropped — Try again';
+const RECONNECT_ERROR_TEXT =
+  'Lost connection — check your network and tap Reconnect to try again.';
 
 function applyMessageUpdates(
   calls: Array<[unknown]>,
@@ -1263,50 +1264,63 @@ describe('useSessionStreaming', () => {
       expect(stillStreaming).toHaveLength(0);
     });
 
-    it('does not overwrite watchdog reconnect prompts during finalization', async () => {
+    it('[WI-2102] keeps the mentor-writing indicator mounted for the sparse t=0/25/79s stream', async () => {
       jest.useFakeTimers();
-
-      let finishStream:
-        | ((result?: Record<string, unknown>) => Promise<void>)
-        | undefined;
 
       const opts = makeOpts({
         streamMessage: jest.fn(
-          (
+          async (
             _text: string,
-            _onChunk: (accumulated: string) => void,
+            onChunk: (accumulated: string) => void,
             onComplete: (result: Record<string, unknown>) => Promise<void>,
             _sessionId: string,
-          ) =>
-            new Promise<void>((resolve) => {
-              finishStream = async (
-                result = {
-                  aiEventId: 'ai-event-late',
-                  exchangeCount: 1,
-                  escalationRung: 0,
-                },
-              ) => {
-                await onComplete(result);
-                resolve();
-              };
-            }),
+          ) => {
+            onChunk('t=0');
+            await new Promise((resolve) => setTimeout(resolve, 25_000));
+            onChunk('t=25');
+            await new Promise((resolve) => setTimeout(resolve, 54_000));
+            onChunk('t=79');
+            await onComplete({
+              aiEventId: 'ai-event-sparse',
+              exchangeCount: 1,
+              escalationRung: 0,
+            });
+          },
         ),
       });
       const { result } = renderHook(() => useSessionStreaming(opts as any));
 
       try {
-        let pending: Promise<void> | undefined;
+        let pending!: Promise<void>;
         await act(async () => {
           pending = result.current.continueWithMessage('retry later');
-        });
-
-        await act(async () => {
-          jest.advanceTimersByTime(45_000);
           await Promise.resolve();
         });
 
         await act(async () => {
-          await finishStream?.();
+          await jest.advanceTimersByTimeAsync(25_000);
+        });
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(45_000);
+        });
+
+        const messagesAt70Seconds = applyMessageUpdates(
+          (opts.setMessages as jest.Mock).mock.calls,
+          [],
+        );
+        expect(messagesAt70Seconds).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: 'assistant',
+              content: 't=25',
+              streaming: true,
+            }),
+          ]),
+        );
+        expect(opts.setIsStreaming).not.toHaveBeenCalledWith(false);
+
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(9_000);
           await pending;
         });
 
@@ -1319,12 +1333,97 @@ describe('useSessionStreaming', () => {
           expect.arrayContaining([
             expect.objectContaining({
               role: 'assistant',
-              kind: 'reconnect_prompt',
-              content: WATCHDOG_RECONNECT_TEXT,
+              content: 't=79',
+              streaming: false,
+              eventId: 'ai-event-sparse',
             }),
           ]),
         );
-        expect(finalMessages[0]).not.toHaveProperty('isSystemPrompt');
+        expect(finalMessages[0]).not.toHaveProperty('kind');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('[WI-2102] finalizes a completed reply exactly once', async () => {
+      const onCompleteCalls = jest.fn();
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (
+            _text: string,
+            onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+          ) => {
+            onChunk('Complete answer');
+            onCompleteCalls();
+            await onComplete({
+              aiEventId: 'ai-event-complete',
+              exchangeCount: 1,
+              escalationRung: 0,
+            });
+          },
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('finish once');
+      });
+
+      const indicatorUnmounts = (opts.setIsStreaming as jest.Mock).mock.calls
+        .map(([next]) => next)
+        .filter((next) => next === false);
+      expect(onCompleteCalls).toHaveBeenCalledTimes(1);
+      expect(indicatorUnmounts).toHaveLength(1);
+      expect(opts.trackExchange).toHaveBeenCalledTimes(1);
+    });
+
+    it('[WI-2102] clears the indicator and surfaces the existing error when aborted at t=40s', async () => {
+      jest.useFakeTimers();
+      const abortError = Object.assign(new Error('The operation was aborted'), {
+        name: 'AbortError',
+      });
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (_text: string, onChunk: (accumulated: string) => void) => {
+            onChunk('Partial answer');
+            await new Promise((resolve) => setTimeout(resolve, 40_000));
+            throw abortError;
+          },
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      try {
+        let pending!: Promise<void>;
+        await act(async () => {
+          pending = result.current.continueWithMessage('abort at forty');
+          await Promise.resolve();
+        });
+
+        expect(opts.setIsStreaming).toHaveBeenCalledWith(true);
+        expect(opts.setIsStreaming).not.toHaveBeenCalledWith(false);
+
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(40_000);
+          await pending;
+        });
+
+        const finalMessages = applyMessageUpdates(
+          (opts.setMessages as jest.Mock).mock.calls,
+          [],
+        );
+        expect(opts.setIsStreaming).toHaveBeenCalledWith(false);
+        expect(finalMessages).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: 'assistant',
+              content: RECONNECT_ERROR_TEXT,
+              streaming: false,
+              kind: 'reconnect_prompt',
+            }),
+          ]),
+        );
       } finally {
         jest.useRealTimers();
       }
