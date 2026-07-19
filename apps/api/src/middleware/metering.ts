@@ -357,21 +357,20 @@ async function maybeReplayIdempotentSessionRequest(
       profileId,
       error: errorMessage,
     });
-    // [CR-2026-05-21-047] Silent recovery in billing without a structured metric
-    // is banned (AGENTS.md "Fix Development Rules"). On KV outage every idempotent
-    // session request is processed twice if the client retries — including
-    // double-decrementing the quota pool. Emit via safeSend so dispatch failure
-    // is captured in Sentry but never throws and never breaks the user action.
+    // Silent recovery in billing without a structured metric is banned
+    // (AGENTS.md "Fix Development Rules"). On KV outage an idempotent session
+    // request cannot distinguish a first write from a retry, so both metering
+    // and route-level preflight use the same fail-closed 503 policy. Emit via
+    // safeSend before rejecting so dispatch failure is captured in Sentry but
+    // never replaces the user-facing response.
     const account = c.get('account') as { id: string } | undefined;
     await safeSend(
       () =>
         inngest.send({
           // orphan-allow: structured telemetry signal required by AGENTS.md
           // ("silent recovery in billing must emit a structured metric"). The
-          // KV-outage recovery is in-line (returns null → request processed
-          // without replay protection); escalation is via logger.warn. The
-          // event is a dashboard-queryable signal for KV-outage frequency — no
-          // remediation handler is needed.
+          // The event is a dashboard-queryable signal for KV-outage frequency;
+          // no remediation handler is needed.
           name: 'app/idempotency.preflight_lookup_failed',
           data: {
             accountId: account?.id ?? null,
@@ -384,7 +383,15 @@ async function maybeReplayIdempotentSessionRequest(
       'metering.idempotency_replay_lookup_failed',
       { profileId, route: c.req.path },
     );
-    return null;
+    c.header('Retry-After', '5');
+    return c.json(
+      {
+        code: ERROR_CODES.INTERNAL_ERROR,
+        message:
+          'Idempotency check temporarily unavailable. Please retry with the same Idempotency-Key.',
+      },
+      503,
+    );
   }
 
   if (!existing) return null;
