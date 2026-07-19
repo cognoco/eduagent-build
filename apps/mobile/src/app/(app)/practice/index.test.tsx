@@ -3,6 +3,7 @@ import {
   renderScreen,
   type RenderScreenResult,
 } from '../../../test-utils/screen-render';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // ─── Boundary mocks (external / native runtime only) ────────────────────────
 //
@@ -280,18 +281,49 @@ describe('PracticeScreen', () => {
     screen.getByText('Your next review is in 3 hours');
   });
 
-  it('lets the learner browse topics from the empty state', async () => {
-    mount({
-      reviewSummary: {
-        totalOverdue: 0,
-        nextReviewTopic: null,
-        nextUpcomingReviewAt: null,
-      },
+  describe('review-empty browse CTA destination [WI-2219]', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
     });
 
-    await waitFor(() => screen.getByTestId('review-empty-browse'));
-    fireEvent.press(screen.getByTestId('review-empty-browse'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
+
+    it('lets the learner browse topics from the empty state, going to library when V2 nav is off', async () => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        false;
+      mount({
+        reviewSummary: {
+          totalOverdue: 0,
+          nextReviewTopic: null,
+          nextUpcomingReviewAt: null,
+        },
+      });
+
+      await waitFor(() => screen.getByTestId('review-empty-browse'));
+      fireEvent.press(screen.getByTestId('review-empty-browse'));
+      expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+    });
+
+    it('lets the learner browse topics from the empty state, going to V2 Subjects when V2 nav is on', async () => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+      mount({
+        reviewSummary: {
+          totalOverdue: 0,
+          nextReviewTopic: null,
+          nextUpcomingReviewAt: null,
+        },
+      });
+
+      await waitFor(() => screen.getByTestId('review-empty-browse'));
+      fireEvent.press(screen.getByTestId('review-empty-browse'));
+      expect(mockPush).toHaveBeenCalledWith('/(app)/subjects');
+    });
   });
 
   it('shows quiz XP in the header and quick quiz cue before any XP is earned', async () => {
