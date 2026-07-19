@@ -18,9 +18,11 @@ jest.mock(
 );
 
 const mockPush = jest.fn();
+let mockPathname = '/mentor';
 
 jest.mock('expo-router' /* gc1-allow: native-boundary */, () => ({
   useRouter: () => ({ push: mockPush }),
+  usePathname: () => mockPathname,
 }));
 
 describe('AccountAvatar', () => {
@@ -31,6 +33,7 @@ describe('AccountAvatar', () => {
     active = null;
     cleanupScreen();
     jest.clearAllMocks();
+    mockPathname = '/mentor';
   });
 
   it('renders the avatar image when the active profile has an avatarUrl', () => {
@@ -73,6 +76,20 @@ describe('AccountAvatar', () => {
     expect(images).toHaveLength(0);
   });
 
+  it('names the exact active profile in the Account entry label', () => {
+    active = renderScreen(<AccountAvatar />, {
+      profile: createTestProfile({
+        displayName: 'Test Parent',
+        avatarUrl: null,
+      }),
+    });
+
+    expect(
+      active.result.getByTestId('account-avatar-button').props
+        .accessibilityLabel,
+    ).toBe('Open account settings for Test Parent');
+  });
+
   it('renders a "?" placeholder when the display name is empty', () => {
     active = renderScreen(<AccountAvatar />, {
       profile: createTestProfile({
@@ -95,14 +112,25 @@ describe('AccountAvatar', () => {
     active.result.getByText('MJ');
   });
 
-  it('routes to the account screen when pressed', () => {
-    active = renderScreen(<AccountAvatar />, {
-      profile: createTestProfile({ displayName: 'Sam', avatarUrl: null }),
-    });
+  it.each([
+    ['/mentor', 'mentor'],
+    ['/subjects', 'subjects'],
+    ['/journal', 'journal'],
+  ] as const)(
+    'routes from %s to Account with the initiating-tab return token',
+    (pathname, returnTo) => {
+      mockPathname = pathname;
+      active = renderScreen(<AccountAvatar />, {
+        profile: createTestProfile({ displayName: 'Sam', avatarUrl: null }),
+      });
 
-    fireEvent.press(active.result.getByTestId('account-avatar-button'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/account');
-  });
+      fireEvent.press(active.result.getByTestId('account-avatar-button'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/account',
+        params: { returnTo },
+      });
+    },
+  );
 
   it('renders nothing when there is no active profile', () => {
     const { wrapper } = createScreenWrapper({

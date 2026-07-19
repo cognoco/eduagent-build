@@ -4423,7 +4423,8 @@
   },
   "accountAdmin": {
     "title": "Konto",
-    "openAccount": "Otwórz ustawienia konta",
+    "openAccount": "Otwórz ustawienia konta dla {{name}}",
+    "backTo": "Wróć do {{destination}}",
     "security": "Bezpieczeństwo konta",
     "familySettings": "Ustawienia rodzinne"
   },

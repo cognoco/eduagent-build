@@ -21,8 +21,49 @@ export const STUDY_PROGRESS_HREF = '/(app)/progress';
 export const FAMILY_CHILDREN_RETURN_TO = 'family-children';
 export const FAMILY_CHILDREN_HREF = '/(app)/home';
 
+export type V2AccountReturnToken = 'mentor' | 'subjects' | 'journal';
+
+const V2_ACCOUNT_RETURN_HREFS = {
+  mentor: '/(app)/mentor',
+  subjects: '/(app)/subjects',
+  journal: '/(app)/journal',
+} as const satisfies Record<V2AccountReturnToken, Href>;
+
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+/**
+ * Pin Account entry to one of the three V2 tab roots. Unknown pushed routes
+ * intentionally return to Mentor instead of the retired Home shell.
+ */
+export function accountReturnTokenForPathname(
+  pathname: string,
+): V2AccountReturnToken {
+  if (pathname === '/subjects' || pathname.startsWith('/subjects/')) {
+    return 'subjects';
+  }
+  if (pathname === '/journal' || pathname.startsWith('/journal/')) {
+    return 'journal';
+  }
+  return 'mentor';
+}
+
+export function accountReturnToken(
+  returnTo: string | string[] | undefined,
+): V2AccountReturnToken {
+  const token = firstParam(returnTo);
+  return token === 'subjects' || token === 'journal' ? token : 'mentor';
+}
+
+/** Resolve Account's empty-history fallback without trusting arbitrary URLs. */
+export function accountReturnHref(
+  returnTo: string | string[] | undefined,
+  v2Enabled: boolean,
+): Href {
+  if (!v2Enabled) return FAMILY_HOME_PATH as Href;
+
+  return V2_ACCOUNT_RETURN_HREFS[accountReturnToken(returnTo)] as Href;
 }
 
 export function childProfileHref(

@@ -1,0 +1,250 @@
+# [WI-2240] V2 owner Account entry, return, row-gating, and sign-out boundary.
+# WHICH cases: family owner enters from Mentor/Subjects/Journal; Account Back
+# and Android Back return to the exact initiating tab; owner contract rows are
+# present; sign-out + cold relaunch expose no prior identity or learning shell.
+appId: com.mentomate.app
+tags:
+  - v2
+  - account
+  - navigation
+  - auth
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'parent-multi-child'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+- tapOn:
+    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-mentor-tab'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-mentor'
+    selected: true
+- assertVisible:
+    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+- assertVisible:
+    id: 'support-hub-mentor-person-${CHILD1_PROFILE_ID}'
+    containsDescendants:
+      - text: '^Emma$'
+
+# Mentor in Emma's exact person scope -> Account -> named back to the same
+# selected tab, person chip, and Emma content.
+- tapOn:
+    id: 'account-avatar-button'
+- extendedWaitUntil:
+    visible:
+      id: 'account-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-profile'
+- assertVisible:
+    id: 'account-admin-notifications'
+- assertVisible:
+    id: 'account-admin-security'
+- assertVisible:
+    id: 'account-admin-subscription'
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-add-child'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-add-child'
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-family-settings'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'account-admin-family-settings'
+- tapOn:
+    id: 'account-back'
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-mentor-tab'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-mentor'
+    selected: true
+- assertVisible:
+    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+- assertVisible:
+    id: 'support-hub-mentor-person-${CHILD1_PROFILE_ID}'
+    containsDescendants:
+      - text: '^Emma$'
+
+# Subjects in Emma's exact person scope -> Account -> Android Back returns to
+# the selected Subjects tab, exact person chip, and seeded Mathematics row.
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-structural-subjects'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-subjects'
+    selected: true
+- assertVisible:
+    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
+    selected: true
+- assertVisible:
+    id: 'person-scope-subject-${SUBJECT1_ID}'
+    text: '^Mathematics$'
+- tapOn:
+    id: 'account-avatar-button'
+- extendedWaitUntil:
+    visible:
+      id: 'account-screen'
+    timeout: 15000
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-structural-subjects'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-subjects'
+    selected: true
+- assertVisible:
+    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
+    selected: true
+- assertVisible:
+    id: 'person-scope-subject-${SUBJECT1_ID}'
+    text: '^Mathematics$'
+- assertNotVisible:
+    id: 'learner-screen'
+
+# Journal in Emma's exact person scope -> Account -> representative Privacy
+# leaf -> Account -> the same selected tab, person chip, and Emma content.
+- tapOn:
+    id: 'tab-journal'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-journal-placeholder'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-journal'
+    selected: true
+- assertVisible:
+    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+- assertVisible:
+    id: 'person-scope-journal-placeholder'
+    containsDescendants:
+      - text: '^Emma$'
+- tapOn:
+    id: 'account-avatar-button'
+- extendedWaitUntil:
+    visible:
+      id: 'account-screen'
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-privacy'
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: 'account-admin-privacy'
+- extendedWaitUntil:
+    visible:
+      id: 'more-privacy-scroll'
+    timeout: 15000
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'account-screen'
+    timeout: 15000
+- tapOn:
+    id: 'account-back'
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-journal-placeholder'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-journal'
+    selected: true
+- assertVisible:
+    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+- assertVisible:
+    id: 'person-scope-journal-placeholder'
+    containsDescendants:
+      - text: '^Emma$'
+
+# Sign out from Account and hard-prove the unauthenticated/no-data boundary.
+- tapOn:
+    id: 'account-avatar-button'
+- scrollUntilVisible:
+    element:
+      id: 'account-admin-sign-out'
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: 'account-admin-sign-out'
+- extendedWaitUntil:
+    visible:
+      id: 'sign-in-button'
+    timeout: 30000
+- assertNotVisible:
+    id: 'account-screen'
+- assertNotVisible:
+    id: 'account-avatar-button'
+- assertNotVisible:
+    id: 'mentor-screen'
+- assertNotVisible:
+    id: 'subjects-screen'
+- assertNotVisible:
+    id: 'journal-screen'
+- assertNotVisible:
+    text: '^Test Parent$'
+- assertNotVisible:
+    text: '^General Knowledge$'
+- assertNotVisible:
+    text: '^Emma$'
+- assertNotVisible:
+    text: '^Mathematics$'
+
+# Browser Back analogue on Android can leave the auth activity; a cold
+# no-clear relaunch must still render only the unauthenticated boundary.
+- pressKey: back
+- stopApp
+- openLink: 'mentomate:///mentor'
+- extendedWaitUntil:
+    visible:
+      id: 'sign-in-button'
+    timeout: 30000
+- assertNotVisible:
+    id: 'account-screen'
+- assertNotVisible:
+    id: 'account-avatar-button'
+- assertNotVisible:
+    text: '^Test Parent$'
+- assertNotVisible:
+    text: '^General Knowledge$'
+- assertNotVisible:
+    text: '^Emma$'
+- assertNotVisible:
+    text: '^Mathematics$'

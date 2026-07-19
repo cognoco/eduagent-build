@@ -46,6 +46,14 @@
     {
       "flow": "flows/v2/v2-supporter-scope-journey.yaml",
       "scenario": "v2-supporter-accepted"
+    },
+    {
+      "flow": "flows/v2/v2-account-owner.yaml",
+      "scenario": "parent-multi-child"
+    },
+    {
+      "flow": "flows/v2/v2-account-non-owner-child.yaml",
+      "scenario": "v2-account-non-owner-child"
     }
   ],
   "scenarioOverrides": {

@@ -5,6 +5,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 
+import { ClerkSignOutTimeoutError } from '../../lib/sign-out';
 import { AccountAdminSheet } from './AccountAdminSheet';
 
 const mockPush = jest.fn();
@@ -14,6 +15,7 @@ const mockCanEnter = jest.fn(() => true);
 const mockClerkSignOut = jest.fn();
 const mockQueryClient = { clear: jest.fn() };
 const mockSignOutWithCleanup = jest.fn();
+const mockPlatformAlert = jest.fn();
 
 let mockGates = {
   sessionIsOwner: true,
@@ -25,6 +27,7 @@ let mockGates = {
   showAccommodationChildEditor: true,
   showMentorLanguageChildEditor: true,
 };
+let mockIsParentProxy = false;
 let mockProfiles = [
   { id: 'owner-1', displayName: 'Owner', isOwner: true },
   { id: 'child-1', displayName: 'Mia', isOwner: false },
@@ -82,6 +85,7 @@ jest.mock('../../hooks/use-navigation-contract', () => ({
   useNavigationContract: () => ({
     gates: mockGates,
     canEnter: mockCanEnter,
+    isParentProxy: mockIsParentProxy,
   }),
 }));
 
@@ -109,13 +113,16 @@ jest.mock('../../lib/sign-out', () => ({
 
 jest.mock('../../lib/platform-alert', () => ({
   ...jest.requireActual('../../lib/platform-alert'),
-  platformAlert: jest.fn(),
+  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
 }));
 
 describe('AccountAdminSheet', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSignOutWithCleanup.mockReset();
+    mockPlatformAlert.mockReset();
     mockCanEnter.mockReturnValue(true);
+    mockIsParentProxy = false;
     mockGates = {
       sessionIsOwner: true,
       showBilling: true,
@@ -169,7 +176,7 @@ describe('AccountAdminSheet', () => {
     screen.getByTestId('account-admin-sign-out');
   });
 
-  it('fails closed for non-owner and proxy sessions reached by direct link', () => {
+  it('shows only permitted rows for a non-owner child and keeps owner-only rows absent', () => {
     mockGates = {
       sessionIsOwner: false,
       showBilling: false,
@@ -182,6 +189,27 @@ describe('AccountAdminSheet', () => {
     };
     mockActiveProfile = { id: 'child-1', displayName: 'Child', isOwner: false };
     mockProfiles = [mockActiveProfile];
+
+    render(<AccountAdminSheet />);
+
+    screen.getByTestId('account-admin-sheet');
+    screen.getByTestId('account-admin-learning-preferences');
+    screen.getByTestId('account-admin-mentor-memory');
+    screen.getByTestId('account-admin-mentor-language');
+    screen.getByTestId('account-admin-profile');
+    screen.getByTestId('account-admin-notifications');
+    screen.getByTestId('account-admin-privacy');
+    screen.getByTestId('account-admin-help');
+    screen.getByTestId('account-admin-sign-out');
+    expect(screen.queryByTestId('account-admin-security')).toBeNull();
+    expect(screen.queryByTestId('account-admin-subscription')).toBeNull();
+    expect(screen.queryByTestId('account-admin-add-child')).toBeNull();
+    expect(screen.queryByTestId('account-admin-family-settings')).toBeNull();
+    expect(mockRedirect).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when a parent-proxy session reaches Account by direct route', () => {
+    mockIsParentProxy = true;
 
     render(<AccountAdminSheet />);
 
@@ -395,5 +423,44 @@ describe('AccountAdminSheet', () => {
       clerkUserId: 'user-1',
     });
     expect(mockClerkSignOut).not.toHaveBeenCalled();
+  });
+
+  it('forces the sign-in boundary when the cleanup call reports a Clerk timeout', async () => {
+    mockSignOutWithCleanup.mockRejectedValue(
+      new ClerkSignOutTimeoutError(8_000),
+    );
+
+    render(<AccountAdminSheet />);
+    fireEvent.press(screen.getByTestId('account-admin-sign-out'));
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/sign-in'));
+    expect(mockPlatformAlert).not.toHaveBeenCalled();
+  });
+
+  it('re-enables sign out after a generic error so the user can retry', async () => {
+    mockSignOutWithCleanup
+      .mockRejectedValueOnce(new Error('temporary Clerk failure'))
+      .mockResolvedValueOnce(undefined);
+
+    render(<AccountAdminSheet />);
+    fireEvent.press(screen.getByTestId('account-admin-sign-out'));
+
+    await waitFor(() =>
+      expect(mockPlatformAlert).toHaveBeenCalledWith(
+        'Could not sign out',
+        'Please try again in a moment.',
+      ),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('account-admin-sign-out').props.accessibilityState
+          .disabled,
+      ).toBe(false),
+    );
+
+    fireEvent.press(screen.getByTestId('account-admin-sign-out'));
+    await waitFor(() =>
+      expect(mockSignOutWithCleanup).toHaveBeenCalledTimes(2),
+    );
   });
 });

@@ -4255,7 +4255,8 @@
   },
   "accountAdmin": {
     "title": "Konto",
-    "openAccount": "Kontoeinstellungen öffnen",
+    "openAccount": "Kontoeinstellungen für {{name}} öffnen",
+    "backTo": "Zurück zu {{destination}}",
     "security": "Kontosicherheit",
     "familySettings": "Familieneinstellungen"
   },

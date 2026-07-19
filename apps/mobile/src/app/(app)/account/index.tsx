@@ -1,16 +1,33 @@
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AccountAdminSheet } from '../../../components/account/AccountAdminSheet';
-import { goBackOrReplace } from '../../../lib/navigation';
+import {
+  accountReturnHref,
+  accountReturnToken,
+  goBackOrReplace,
+} from '../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 export default function AccountScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useTranslation();
+  const { returnTo } = useLocalSearchParams<{
+    returnTo?: string | string[];
+  }>();
+  const returnHref = accountReturnHref(
+    returnTo,
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
+  );
+  const returnToken = accountReturnToken(returnTo);
+  const returnTabTitle = t(`tabs.${returnToken}`);
+  const returnLabel = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+    ? t('accountAdmin.backTo', { destination: returnTabTitle })
+    : t('common.goBack');
 
   return (
     <View
@@ -20,9 +37,9 @@ export default function AccountScreen(): React.ReactElement {
     >
       <View className="px-4 pt-2 pb-1 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+          onPress={() => goBackOrReplace(router, returnHref)}
           accessibilityRole="button"
-          accessibilityLabel={t('common.goBack')}
+          accessibilityLabel={returnLabel}
           hitSlop={8}
           testID="account-back"
         >

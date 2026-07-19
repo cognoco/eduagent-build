@@ -113,7 +113,8 @@
   },
   "accountAdmin": {
     "title": "Account",
-    "openAccount": "Open account settings",
+    "openAccount": "Open account settings for {{name}}",
+    "backTo": "Back to {{destination}}",
     "security": "Account security",
     "familySettings": "Family settings"
   },

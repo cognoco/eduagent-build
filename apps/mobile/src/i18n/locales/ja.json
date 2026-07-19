@@ -4255,7 +4255,8 @@
   },
   "accountAdmin": {
     "title": "アカウント",
-    "openAccount": "アカウント設定を開く",
+    "openAccount": "{{name}}のアカウント設定を開く",
+    "backTo": "{{destination}}に戻る",
     "security": "アカウントのセキュリティ",
     "familySettings": "ファミリー設定"
   },

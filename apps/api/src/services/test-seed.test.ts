@@ -181,6 +181,8 @@ describe('VALID_SCENARIOS', () => {
       'mentor-audit-bridge-backstack',
       // [WI-2241] Supportership-aware v2 seed.
       'v2-supporter-accepted',
+      // [WI-2240] Credentialed learner-only identity for Account row gating.
+      'v2-account-non-owner-child',
     ]);
   });
 
@@ -335,6 +337,38 @@ describe('seedScenario', () => {
     // (clerkUserId is set internally, but we can verify via the returned accountId)
     expect(typeof result.accountId).toBe('string');
     expect(result.accountId.length).toBeGreaterThan(0);
+  });
+
+  it('[WI-2240] seeds a credentialed learner-only person without an admin role', async () => {
+    const db = createMockDb();
+    const result = await seedScenario(
+      db,
+      'v2-account-non-owner-child',
+      'child@example.com',
+    );
+    const insertResult = (db.insert as jest.Mock).mock.results[0]?.value as
+      | { values?: jest.Mock }
+      | undefined;
+    const insertedRows =
+      insertResult?.values?.mock.calls.map(([row]) => row) ?? [];
+
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        personId: result.profileId,
+        clerkUserId: expect.stringMatching(/^clerk_seed_/),
+        email: 'child@example.com',
+      }),
+    );
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        personId: result.profileId,
+        organizationId: result.accountId,
+        roles: ['learner'],
+      }),
+    );
+    expect(insertedRows).not.toContainEqual(
+      expect.objectContaining({ roles: expect.arrayContaining(['admin']) }),
+    );
   });
 
   it.each([

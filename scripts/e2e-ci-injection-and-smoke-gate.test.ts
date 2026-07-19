@@ -454,6 +454,364 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
   });
 });
 
+describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts', () => {
+  const webFlowRoot = join(repoRoot, 'apps/mobile/e2e-web/flows/v2');
+  const nativeFlowRoot = join(repoRoot, 'apps/mobile/e2e/flows/v2');
+  const ownerBrowser = readFileSync(
+    join(webFlowRoot, 'v2-account-owner.spec.ts'),
+    'utf8',
+  );
+  const nonOwnerBrowser = readFileSync(
+    join(webFlowRoot, 'v2-account-non-owner-child.spec.ts'),
+    'utf8',
+  );
+  const accountAdminComponentTest = readFileSync(
+    join(
+      repoRoot,
+      'apps/mobile/src/components/account/AccountAdminSheet.test.tsx',
+    ),
+    'utf8',
+  );
+  const ownerNative = readFileSync(
+    join(nativeFlowRoot, 'v2-account-owner.yaml'),
+    'utf8',
+  );
+  const nonOwnerNative = readFileSync(
+    join(nativeFlowRoot, 'v2-account-non-owner-child.yaml'),
+    'utf8',
+  );
+
+  type MaestroCommand = Record<string, unknown> | string;
+  type MaestroExpectation = {
+    command: string;
+    id?: string;
+    text?: string;
+    selected?: boolean;
+    value?: string;
+  };
+
+  function sourceAfter(source: string, marker: string): string {
+    const index = source.indexOf(marker);
+    expect(index).toBeGreaterThanOrEqual(0);
+    return source.slice(index);
+  }
+
+  function expectSourceOrder(source: string, markers: string[]): void {
+    let cursor = 0;
+    for (const marker of markers) {
+      const index = source.indexOf(marker, cursor);
+      if (index < 0) {
+        throw new Error(`Missing ordered source marker: ${marker}`);
+      }
+      cursor = index + marker.length;
+    }
+  }
+
+  function parseMaestroCommands(source: string): MaestroCommand[] {
+    const document = source.split(/^---$/m)[1];
+    expect(document).toBeDefined();
+    return parseYaml(document!) as MaestroCommand[];
+  }
+
+  function matchesMaestroCommand(
+    actual: MaestroCommand,
+    expected: MaestroExpectation,
+  ): boolean {
+    if (typeof actual === 'string') {
+      return actual === expected.command && expected.value === undefined;
+    }
+    if (!(expected.command in actual)) return false;
+    const value = actual[expected.command];
+    if (expected.value !== undefined) return value === expected.value;
+    if (typeof value !== 'object' || value === null) return false;
+
+    const record = value as Record<string, unknown>;
+    if (expected.id !== undefined) {
+      const serialized = JSON.stringify(value);
+      if (
+        record.id !== expected.id &&
+        !serialized.includes(`"id":"${expected.id}"`)
+      ) {
+        return false;
+      }
+    }
+    if (expected.text !== undefined) {
+      const serialized = JSON.stringify(value);
+      if (
+        record.text !== expected.text &&
+        !serialized.includes(`"text":"${expected.text}"`)
+      ) {
+        return false;
+      }
+    }
+    if (
+      expected.selected !== undefined &&
+      record.selected !== expected.selected
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  function expectMaestroOrder(
+    commands: MaestroCommand[],
+    expected: MaestroExpectation[],
+  ): void {
+    let cursor = 0;
+    for (const step of expected) {
+      const index = commands.findIndex(
+        (command, commandIndex) =>
+          commandIndex >= cursor && matchesMaestroCommand(command, step),
+      );
+      if (index < 0) {
+        throw new Error(
+          `Missing ordered Maestro command: ${JSON.stringify(step)}`,
+        );
+      }
+      cursor = index + 1;
+    }
+  }
+
+  const visible = (
+    id?: string,
+    text?: string,
+    selected?: boolean,
+  ): MaestroExpectation => ({
+    command: 'assertVisible',
+    id,
+    text,
+    selected,
+  });
+  const absent = (id?: string, text?: string): MaestroExpectation => ({
+    command: 'assertNotVisible',
+    id,
+    text,
+  });
+  const waitVisible = (id: string): MaestroExpectation => ({
+    command: 'extendedWaitUntil',
+    id,
+  });
+  const tap = (id: string): MaestroExpectation => ({
+    command: 'tapOn',
+    id,
+  });
+
+  const permittedRows = [
+    'account-admin-learning-preferences',
+    'account-admin-mentor-memory',
+    'account-admin-mentor-language',
+    'account-admin-profile',
+    'account-admin-notifications',
+    'account-admin-privacy',
+    'account-admin-help',
+    'account-admin-sign-out',
+  ];
+  const ownerOnlyRows = [
+    'account-admin-security',
+    'account-admin-subscription',
+    'account-admin-add-child',
+    'account-admin-family-settings',
+  ];
+
+  it('hard-proves the browser non-owner subject and row contract before and after Account', () => {
+    const componentContract = accountAdminComponentTest.slice(
+      accountAdminComponentTest.indexOf(
+        "it('shows only permitted rows for a non-owner child",
+      ),
+      accountAdminComponentTest.indexOf(
+        "it('fails closed when a parent-proxy session",
+      ),
+    );
+    const journey = sourceAfter(
+      nonOwnerBrowser,
+      "test('V2 credentialed non-owner child",
+    );
+
+    expectSourceOrder(nonOwnerBrowser, [
+      'async function expectTestChildSubjectsScope',
+      "getByTestId('account-avatar-button')",
+      "'aria-label'",
+      "'Open account settings for Test Child'",
+      '`subjects-browse-row-${subjectId}`',
+      "getByText('Child Learning Data', { exact: true })",
+    ]);
+    expectSourceOrder(journey, [
+      "readSeedData('v2-account-non-owner-child')",
+      "page.goto('/subjects'",
+      'expectTestChildSubjectsScope(page, subjectId)',
+      "getByTestId('account-avatar-button').click()",
+      "getByText('Test Child', { exact: true })",
+      'for (const permittedRow of',
+      'for (const ownerOnlyRow of',
+      "getByTestId('account-back').click()",
+      'toHaveURL(/\\/subjects',
+      'expectTestChildSubjectsScope(page, subjectId)',
+    ]);
+    for (const row of permittedRows) {
+      expect(nonOwnerBrowser).toContain(row);
+      expect(componentContract).toContain(`screen.getByTestId('${row}')`);
+    }
+    for (const row of ownerOnlyRows) {
+      expect(nonOwnerBrowser).toContain(row);
+      expect(componentContract).toContain(
+        `expect(screen.queryByTestId('${row}')).toBeNull()`,
+      );
+      expect(nonOwnerNative).not.toContain(row);
+    }
+    expect(nonOwnerBrowser).toContain(
+      'expect(page.getByTestId(permittedRow)).toBeVisible()',
+    );
+    expect(nonOwnerBrowser).toContain(
+      'expect(page.getByTestId(ownerOnlyRow)).toHaveCount(0)',
+    );
+  });
+
+  it('uses real browser clicks, hard-visible owner rows, and exact scoped data before sign-out', () => {
+    const noLeakHelper = ownerBrowser.slice(
+      ownerBrowser.indexOf('async function expectSignedOutWithoutOwnerData'),
+      ownerBrowser.indexOf("test('V2 owner sign-out"),
+    );
+    const signOutJourney = sourceAfter(ownerBrowser, "test('V2 owner sign-out");
+
+    expect(`${ownerBrowser}\n${nonOwnerBrowser}`).not.toContain(
+      'pressableClick',
+    );
+    expect(ownerBrowser).not.toContain('toBeAttached');
+    expect(ownerBrowser).toContain(
+      'expect(page.getByTestId(row)).toBeVisible()',
+    );
+    for (const row of [...permittedRows.slice(3, 6), ...ownerOnlyRows]) {
+      expect(ownerBrowser).toContain(row);
+    }
+    expectSourceOrder(noLeakHelper, [
+      "getByTestId('sign-in-button')",
+      "getByTestId('account-screen')",
+      'toHaveCount(0)',
+      "getByText('Test Parent', { exact: true })",
+      'toHaveCount(0)',
+      "getByText('Emma', { exact: true })",
+      'toHaveCount(0)',
+      "getByText('Mathematics', { exact: true })",
+      'toHaveCount(0)',
+    ]);
+    expectSourceOrder(signOutJourney, [
+      "readSeedData('owner-with-children')",
+      'seed.ids.child1ProfileId',
+      'seed.ids.subject1Id',
+      "page.goto('/subjects'",
+      'await emmaChip.click()',
+      "getByTestId('person-scope-structural-subjects')",
+      "emmaChip.getByText('Emma', { exact: true })",
+      "mathematicsSubject.getByText('Mathematics', { exact: true })",
+      "getByTestId('account-avatar-button').click()",
+      "getByTestId('account-admin-sign-out').click()",
+      'expectSignedOutWithoutOwnerData(page)',
+      "page.goBack({ waitUntil: 'commit' })",
+      'expectSignedOutWithoutOwnerData(page)',
+      'await page.close()',
+      'await context.newPage()',
+      "freshPage.goto('/subjects'",
+      'expectSignedOutWithoutOwnerData(freshPage)',
+    ]);
+    for (const data of ['Test Parent', 'Emma', 'Mathematics']) {
+      expect(signOutJourney).toContain(data);
+    }
+  });
+
+  it('hard-proves native owner round trips and the post-relaunch no-data boundary in order', () => {
+    const commands = parseMaestroCommands(ownerNative);
+    const childChip = 'scope-chip-option-person-${CHILD1_PROFILE_ID}';
+
+    expectMaestroOrder(commands, [
+      tap(childChip),
+      visible('tab-mentor', undefined, true),
+      visible(childChip, undefined, true),
+      visible('support-hub-mentor-person-${CHILD1_PROFILE_ID}', '^Emma$'),
+      tap('account-avatar-button'),
+      waitVisible('account-screen'),
+      visible('account-admin-profile'),
+      visible('account-admin-notifications'),
+      ...ownerOnlyRows.map((row) => visible(row)),
+      tap('account-back'),
+      visible('tab-mentor', undefined, true),
+      visible(childChip, undefined, true),
+      visible('support-hub-mentor-person-${CHILD1_PROFILE_ID}', '^Emma$'),
+      tap('tab-subjects'),
+      visible('tab-subjects', undefined, true),
+      visible(childChip, undefined, true),
+      visible('person-scope-subject-${SUBJECT1_ID}', '^Mathematics$'),
+      tap('account-avatar-button'),
+      { command: 'pressKey', value: 'back' },
+      visible('tab-subjects', undefined, true),
+      visible(childChip, undefined, true),
+      visible('person-scope-subject-${SUBJECT1_ID}', '^Mathematics$'),
+      tap('tab-journal'),
+      visible('tab-journal', undefined, true),
+      visible(childChip, undefined, true),
+      visible('person-scope-journal-placeholder', '^Emma$'),
+      tap('account-avatar-button'),
+      tap('account-admin-privacy'),
+      { command: 'pressKey', value: 'back' },
+      tap('account-back'),
+      visible('tab-journal', undefined, true),
+      visible(childChip, undefined, true),
+      visible('person-scope-journal-placeholder', '^Emma$'),
+      tap('account-avatar-button'),
+      tap('account-admin-sign-out'),
+      waitVisible('sign-in-button'),
+      absent('account-screen'),
+      absent('account-avatar-button'),
+      absent('mentor-screen'),
+      absent('subjects-screen'),
+      absent('journal-screen'),
+      absent(undefined, '^Test Parent$'),
+      absent(undefined, '^General Knowledge$'),
+      absent(undefined, '^Emma$'),
+      absent(undefined, '^Mathematics$'),
+      { command: 'pressKey', value: 'back' },
+      { command: 'stopApp' },
+      { command: 'openLink', value: 'mentomate:///mentor' },
+      waitVisible('sign-in-button'),
+      absent('account-screen'),
+      absent('account-avatar-button'),
+      absent(undefined, '^Test Parent$'),
+      absent(undefined, '^General Knowledge$'),
+      absent(undefined, '^Emma$'),
+      absent(undefined, '^Mathematics$'),
+    ]);
+  });
+
+  it('hard-proves native Test Child data and every permitted row before and after Account', () => {
+    const commands = parseMaestroCommands(nonOwnerNative);
+
+    expectMaestroOrder(commands, [
+      visible('tab-subjects', undefined, true),
+      visible(
+        'account-avatar-button',
+        '^Open account settings for Test Child$',
+      ),
+      visible('subjects-browse-row-${SUBJECT_ID}', '^Child Learning Data$'),
+      tap('account-avatar-button'),
+      waitVisible('account-screen'),
+      visible(undefined, '^Test Child$'),
+      ...permittedRows.map((row) => visible(row)),
+      tap('account-back'),
+      visible('tab-subjects', undefined, true),
+      visible(
+        'account-avatar-button',
+        '^Open account settings for Test Child$',
+      ),
+      visible('subjects-browse-row-${SUBJECT_ID}', '^Child Learning Data$'),
+    ]);
+  });
+
+  it('keeps every WI-2240 Maestro assertion hard', () => {
+    expect(`${ownerNative}\n${nonOwnerNative}`).not.toMatch(
+      /optional\s*:\s*true/,
+    );
+  });
+});
+
 describe('[WI-1651] e2e-ci.yml propagates Maestro failures', () => {
   const workflow = loadWorkflow('e2e-ci.yml');
   const jobs = workflow.jobs as Record<string, Job>;
@@ -829,6 +1187,18 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
 
     expect(plan).toEqual([
+      // [WI-2240] Account row contract for a credentialed learner-only login.
+      {
+        flow: 'flows/v2/v2-account-non-owner-child.yaml',
+        scenario: 'v2-account-non-owner-child',
+        shard: 1,
+      },
+      // [WI-2240] Owner Account entry/return and sign-out boundary journey.
+      {
+        flow: 'flows/v2/v2-account-owner.yaml',
+        scenario: 'parent-multi-child',
+        shard: 1,
+      },
       {
         flow: 'flows/v2/v2-shell-navigation.yaml',
         scenario: 'learning-active',

@@ -160,7 +160,9 @@ export type SeedScenario =
   | 'mentor-audit-bridge-backstack'
   // [WI-2241] Supportership-aware v2 identity + accepted-visibility fixture —
   // apps/api/src/services/test-seed-v2-supporter.ts.
-  | 'v2-supporter-accepted';
+  | 'v2-supporter-accepted'
+  // [WI-2240] Credentialed learner-only identity for Account row gating.
+  | 'v2-account-non-owner-child';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -1183,6 +1185,59 @@ async function seedOnboardingComplete(
     email,
     password,
     ids: { subjectId, topicId: firstTopicId },
+  };
+}
+
+/**
+ * A credentialed learner who is not an organization admin. Unlike the
+ * managed-child fixtures, this person owns a Clerk login and can enter the
+ * V2 shell directly; unlike owner fixtures, membership carries only the
+ * learner role. That distinction is the property Account E2E must exercise.
+ */
+async function seedV2AccountNonOwnerChild(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Test Child',
+    birthYear: LEARNER_BIRTH_YEAR,
+    isOwner: false,
+  });
+
+  const loginId = generateUUIDv7();
+  await db.insert(login).values({
+    id: loginId,
+    personId: profileId,
+    clerkUserId,
+    email,
+  });
+  await db.update(person).set({ loginId }).where(eq(person.id, profileId));
+
+  await db.insert(consentGrant).values({
+    id: generateUUIDv7(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Child Learning Data',
+  );
+
+  return {
+    scenario: 'v2-account-non-owner-child',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId },
   };
 }
 
@@ -5957,6 +6012,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   // identities with the accepted-visibility fixture logic (linking-ceremony)
   // and the rich learning/report insert helpers above.
   'v2-supporter-accepted': seedV2SupporterAccepted,
+  'v2-account-non-owner-child': seedV2AccountNonOwnerChild,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];

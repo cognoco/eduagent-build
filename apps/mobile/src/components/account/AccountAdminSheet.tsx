@@ -92,7 +92,7 @@ export function AccountAdminSheet(): React.ReactElement {
     }
   }, [isSigningOut, profiles, queryClient, router, signOut, t, userId]);
 
-  if (!navigationContract.gates.sessionIsOwner) {
+  if (navigationContract.isParentProxy) {
     return <Redirect href="/(app)/home" />;
   }
 
