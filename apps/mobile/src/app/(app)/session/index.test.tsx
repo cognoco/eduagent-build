@@ -2676,6 +2676,33 @@ describe('SessionScreen homework flow', () => {
       return testScreen;
     }
 
+    async function renderFirstSessionWrapUp() {
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+      const testScreen = await renderAndCloseFreeformSession({
+        mode: 'freeform',
+        entrySource: 'mentor',
+        returnTo: 'mentor',
+      });
+
+      await waitFor(() => {
+        testScreen.getByTestId('first-session-wrap-up');
+      });
+
+      return testScreen;
+    }
+
+    const firstSessionReflection =
+      'I learned that balancing equations keeps both sides equal.';
+
+    function enterFirstSessionReflection(
+      testScreen: ReturnType<typeof renderSessionScreen>,
+    ) {
+      fireEvent.changeText(
+        testScreen.getByTestId('first-session-reflection-input'),
+        firstSessionReflection,
+      );
+    }
+
     it('navigates to summary without filing prompt when a freeform session is closed', async () => {
       const testScreen = await renderAndCloseFreeformSession();
 
@@ -2692,17 +2719,8 @@ describe('SessionScreen homework flow', () => {
       testScreen.unmount();
     }, 15000);
 
-    it('renders the V2 first-session Mentor wrap-up and saves Your Words through the summary boundary', async () => {
-      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
-      const testScreen = await renderAndCloseFreeformSession({
-        mode: 'freeform',
-        entrySource: 'mentor',
-        returnTo: 'mentor',
-      });
-
-      await waitFor(() => {
-        testScreen.getByTestId('first-session-wrap-up');
-      });
+    it('[WI-2095] renders the reflection receipt and settles saving after a successful submit', async () => {
+      const testScreen = await renderFirstSessionWrapUp();
 
       expect(mockReplace).not.toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2713,17 +2731,12 @@ describe('SessionScreen homework flow', () => {
         testScreen.getByText(/I'll remember what you write here/),
       ).toBeTruthy();
 
-      const reflection =
-        'I learned that balancing equations keeps both sides equal.';
-      fireEvent.changeText(
-        testScreen.getByTestId('first-session-reflection-input'),
-        reflection,
-      );
+      enterFirstSessionReflection(testScreen);
       fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
 
       await waitFor(() => {
         expect(mockSubmitSummary).toHaveBeenCalledWith({
-          content: reflection,
+          content: firstSessionReflection,
         });
       });
 
@@ -2739,6 +2752,116 @@ describe('SessionScreen homework flow', () => {
       expect(
         testScreen.getAllByText(/You chose the next step/).length,
       ).toBeGreaterThan(0);
+      expect(testScreen.queryByText('Saving...')).toBeNull();
+      testScreen.unmount();
+    }, 15000);
+
+    it('[WI-2095] shows localized retry feedback and settles saving after a 5xx failure', async () => {
+      mockSubmitSummary.mockRejectedValueOnce(new Error('HTTP 500'));
+      const testScreen = await renderFirstSessionWrapUp();
+
+      enterFirstSessionReflection(testScreen);
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+
+      await waitFor(() => {
+        expect(
+          testScreen.getByText(
+            "Couldn't save your summary. Check your connection and try again — your work won't be lost.",
+          ),
+        ).toBeTruthy();
+      });
+      expect(testScreen.queryByText('Saving...')).toBeNull();
+      expect(
+        testScreen.getByTestId('first-session-reflection-input').props.value,
+      ).toBe(firstSessionReflection);
+      expect(
+        testScreen.getByTestId('first-session-wrap-submit'),
+      ).not.toBeDisabled();
+      testScreen.unmount();
+    }, 15000);
+
+    it('[WI-2095] times out a stalled reflection request and shows localized retry feedback', async () => {
+      mockSubmitSummary.mockImplementationOnce(
+        () => new Promise(() => undefined),
+      );
+      const testScreen = await renderFirstSessionWrapUp();
+
+      enterFirstSessionReflection(testScreen);
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(35_000);
+      });
+
+      expect(
+        testScreen.getByText(
+          "Couldn't save your summary. Check your connection and try again — your work won't be lost.",
+        ),
+      ).toBeTruthy();
+      expect(testScreen.queryByText('Saving...')).toBeNull();
+      expect(
+        testScreen.getByTestId('first-session-reflection-input').props.value,
+      ).toBe(firstSessionReflection);
+      expect(
+        testScreen.getByTestId('first-session-wrap-submit'),
+      ).not.toBeDisabled();
+      testScreen.unmount();
+    }, 15000);
+
+    it('[WI-2095] shows localized retry feedback for a malformed summary response', async () => {
+      mockSubmitSummary.mockResolvedValueOnce({ malformed: true });
+      const testScreen = await renderFirstSessionWrapUp();
+
+      enterFirstSessionReflection(testScreen);
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+
+      await waitFor(() => {
+        expect(
+          testScreen.getByText(
+            "Couldn't save your summary. Check your connection and try again — your work won't be lost.",
+          ),
+        ).toBeTruthy();
+      });
+      expect(testScreen.queryByText('Saving...')).toBeNull();
+      expect(
+        testScreen.getByTestId('first-session-reflection-input').props.value,
+      ).toBe(firstSessionReflection);
+      expect(
+        testScreen.getByTestId('first-session-wrap-submit'),
+      ).not.toBeDisabled();
+      testScreen.unmount();
+    }, 15000);
+
+    it('[WI-2095] retains reflection text and re-enables submit after a failed save', async () => {
+      mockSubmitSummary.mockRejectedValueOnce(new Error('HTTP 500'));
+      const testScreen = await renderFirstSessionWrapUp();
+
+      enterFirstSessionReflection(testScreen);
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+
+      await waitFor(() => {
+        expect(
+          testScreen.getByTestId('first-session-wrap-submit'),
+        ).not.toBeDisabled();
+      });
+      expect(
+        testScreen.getByTestId('first-session-reflection-input').props.value,
+      ).toBe(firstSessionReflection);
+      testScreen.unmount();
+    }, 15000);
+
+    it('[WI-2095] sends one reflection request for two submit presses in the same frame', async () => {
+      mockSubmitSummary.mockImplementationOnce(
+        () => new Promise(() => undefined),
+      );
+      const testScreen = await renderFirstSessionWrapUp();
+
+      enterFirstSessionReflection(testScreen);
+      const submitButton = testScreen.getByTestId('first-session-wrap-submit');
+      fireEvent.press(submitButton);
+      fireEvent.press(submitButton);
+
+      expect(mockSubmitSummary).toHaveBeenCalledTimes(1);
       testScreen.unmount();
     }, 15000);
 

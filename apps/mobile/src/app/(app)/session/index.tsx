@@ -151,6 +151,7 @@ function isChallengeRoundInFlight(
 }
 
 const MENTOR_BIRTH_SESSION_TIME_SCALE = 0.35;
+const FIRST_SESSION_SUMMARY_TIMEOUT_MS = 35_000;
 
 interface FirstSessionWrapUpCardProps {
   value: string;
@@ -547,6 +548,10 @@ function SessionScreenInner() {
     useState('');
   const [firstSessionReflectionError, setFirstSessionReflectionError] =
     useState(false);
+  const [
+    isSubmittingFirstSessionReflection,
+    setIsSubmittingFirstSessionReflection,
+  ] = useState(false);
   const [firstSessionReflectionTotalXp, setFirstSessionReflectionTotalXp] =
     useState<number | null>(null);
   const [seenFirstSessionCelebrationIds, setSeenFirstSessionCelebrationIds] =
@@ -563,6 +568,7 @@ function SessionScreenInner() {
   const lastExpectedMinutesRef = useRef(10);
   const hasAutoSentRef = useRef(false);
   const mentorOpenerLaunchKeyRef = useRef<string | null>(null);
+  const firstSessionReflectionInFlightRef = useRef(false);
   const internallyBackfilledSessionIdRef = useRef<string | null>(null);
   const hasHydratedRecoveryRef = useRef(false);
   const queuedProblemTextRef = useRef<string | null>(null);
@@ -1298,10 +1304,22 @@ function SessionScreenInner() {
     if (!firstSessionWrapUp || firstSessionReflectionTotalXp != null) return;
     const content = firstSessionReflectionText.trim();
     if (content.length < 10) return;
+    if (firstSessionReflectionInFlightRef.current) return;
+
+    firstSessionReflectionInFlightRef.current = true;
+    setIsSubmittingFirstSessionReflection(true);
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     try {
       setFirstSessionReflectionError(false);
-      const result = await submitFirstSessionSummary.mutateAsync({ content });
+      const result = await Promise.race([
+        submitFirstSessionSummary.mutateAsync({ content }),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error('First-session summary request timed out'));
+          }, FIRST_SESSION_SUMMARY_TIMEOUT_MS);
+        }),
+      ]);
       setMessages((prev) => [
         ...prev,
         {
@@ -1318,6 +1336,10 @@ function SessionScreenInner() {
       Sentry.captureException(err, {
         tags: { screen: 'session', action: 'first_session_reflection' },
       });
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      firstSessionReflectionInFlightRef.current = false;
+      setIsSubmittingFirstSessionReflection(false);
     }
   }, [
     firstSessionReflectionText,
@@ -1627,7 +1649,7 @@ function SessionScreenInner() {
   const firstSessionWrapUpCard = firstSessionWrapUp ? (
     <FirstSessionWrapUpCard
       value={firstSessionReflectionText}
-      isSubmitting={submitFirstSessionSummary.isPending}
+      isSubmitting={isSubmittingFirstSessionReflection}
       hasError={
         firstSessionReflectionError || submitFirstSessionSummary.isError
       }
