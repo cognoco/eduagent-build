@@ -976,6 +976,614 @@ describe('CameraScreen', () => {
     expect(callArgs.params.imageUri).toBeUndefined();
   });
 
+  it('[WI-2196] creates the correct subject from OCR fallback when one unrelated subject exists and preserves the captured draft', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      entrySource: 'mentor',
+      returnTo: 'mentor',
+    });
+    mockFetch.setRoute('subjects', (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return mockCreateSubjectResult;
+      return { subjects: [makeSubject(MATH_SUBJECT_ID, 'Mathematics')] };
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+    mockLaunchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [
+        {
+          uri: 'file:///gallery/synthetic-homework.png',
+          mimeType: 'image/png',
+        },
+      ],
+    });
+
+    const screen = render(<CameraScreen />, { wrapper: createWrapper() });
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('gallery-button'));
+    });
+    await waitFor(() => screen.getByTestId('photo-preview'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('camera-use-this-button'));
+    });
+
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: 'LOW_QUALITY',
+      source: null,
+      failCount: 1,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+    screen.rerender(<CameraScreen />);
+
+    await waitFor(() => screen.getByTestId('manual-input'));
+    fireEvent.changeText(
+      screen.getByTestId('manual-input'),
+      'Label the parts of a plant cell',
+    );
+    fireEvent.press(screen.getByTestId('manual-continue-button'));
+
+    await waitFor(() => {
+      screen.getByTestId(`manual-subject-pick-${MATH_SUBJECT_ID}`);
+      screen.getByTestId('camera-subject-input');
+    });
+
+    fireEvent.changeText(screen.getByTestId('camera-subject-input'), 'Biology');
+    fireEvent.press(screen.getByTestId('camera-continue-button'));
+
+    await waitFor(() => {
+      const createCalls = fetchCallsMatching(mockFetch, 'subjects').filter(
+        (call: { url: string; init?: { method?: string } }) =>
+          call.init?.method === 'POST' && !call.url.includes('classify'),
+      );
+      expect(createCalls).toHaveLength(1);
+      expect(
+        extractJsonBody<{ name: string; rawInput: string }>(
+          createCalls[0]?.init,
+        ),
+      ).toEqual({ name: 'Biology', rawInput: 'Biology' });
+    });
+
+    expect(mockRouter.replace).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: expect.objectContaining({
+        mode: 'homework',
+        subjectId: CREATED_SUBJECT_ID,
+        subjectName: 'Biology',
+        problemText: 'Label the parts of a plant cell',
+        imageUri: 'file:///gallery/synthetic-homework.png',
+        imageMimeType: 'image/png',
+        captureSource: 'gallery',
+        entrySource: 'mentor',
+        returnTo: 'mentor',
+      }),
+    });
+  });
+
+  it('[WI-2196] reuses an exact subject name from OCR fallback without creating a duplicate', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    mockFetch.setRoute('subjects', (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return mockCreateSubjectResult;
+      return { subjects: [makeSubject(SCIENCE_SUBJECT_ID, 'Biology')] };
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: 'LOW_QUALITY',
+      source: null,
+      failCount: 1,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+
+    const screen = render(<CameraScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('manual-input'));
+    fireEvent.changeText(
+      screen.getByTestId('manual-input'),
+      'Describe how chlorophyll absorbs light',
+    );
+    fireEvent.press(screen.getByTestId('manual-continue-button'));
+    await waitFor(() => screen.getByTestId('camera-subject-input'));
+
+    fireEvent.changeText(
+      screen.getByTestId('camera-subject-input'),
+      ' biology ',
+    );
+    fireEvent.press(screen.getByTestId('camera-continue-button'));
+
+    const createCalls = fetchCallsMatching(mockFetch, 'subjects').filter(
+      (call: { url: string; init?: { method?: string } }) =>
+        call.init?.method === 'POST' && !call.url.includes('classify'),
+    );
+    expect(createCalls).toHaveLength(0);
+    expect(mockRouter.replace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/session',
+        params: expect.objectContaining({
+          subjectId: SCIENCE_SUBJECT_ID,
+          subjectName: 'Biology',
+          problemText: 'Describe how chlorophyll absorbs light',
+        }),
+      }),
+    );
+  });
+
+  it('[WI-2196] preserves the fallback draft and typed subject after a network failure so retry succeeds', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    let createAttempts = 0;
+    mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) => {
+      if (init?.method !== 'POST') {
+        return { subjects: [makeSubject(MATH_SUBJECT_ID, 'Mathematics')] };
+      }
+      createAttempts += 1;
+      if (createAttempts === 1) {
+        throw new Error('Synthetic network outage');
+      }
+      return mockCreateSubjectResult;
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: 'LOW_QUALITY',
+      source: null,
+      failCount: 1,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+
+    const screen = render(<CameraScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('manual-input'));
+    fireEvent.changeText(
+      screen.getByTestId('manual-input'),
+      'Compare plant and animal cells',
+    );
+    fireEvent.press(screen.getByTestId('manual-continue-button'));
+    await waitFor(() => screen.getByTestId('camera-subject-input'));
+    fireEvent.changeText(screen.getByTestId('camera-subject-input'), 'Biology');
+    fireEvent.press(screen.getByTestId('camera-continue-button'));
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(1));
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+    expect(screen.getByTestId('manual-input').props.value).toBe(
+      'Compare plant and animal cells',
+    );
+    expect(screen.getByTestId('camera-subject-input').props.value).toBe(
+      'Biology',
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('camera-continue-button').props.disabled,
+      ).not.toBe(true);
+    });
+
+    fireEvent.press(screen.getByTestId('camera-continue-button'));
+
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledTimes(1));
+    expect(createAttempts).toBe(2);
+    expect(mockRouter.replace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/session',
+        params: expect.objectContaining({
+          subjectId: CREATED_SUBJECT_ID,
+          subjectName: 'Biology',
+          problemText: 'Compare plant and animal cells',
+        }),
+      }),
+    );
+
+    alertSpy.mockRestore();
+  });
+
+  it('[WI-2196] submits one subject creation when fallback Continue is double-pressed', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    let resolveCreate!: (value: Record<string, unknown>) => void;
+    const pendingCreate = new Promise<Record<string, unknown>>((resolve) => {
+      resolveCreate = resolve;
+    });
+    mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return pendingCreate;
+      return { subjects: [makeSubject(MATH_SUBJECT_ID, 'Mathematics')] };
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: 'LOW_QUALITY',
+      source: null,
+      failCount: 1,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+
+    const screen = render(<CameraScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('manual-input'));
+    fireEvent.changeText(
+      screen.getByTestId('manual-input'),
+      'Name the cell organelles',
+    );
+    fireEvent.press(screen.getByTestId('manual-continue-button'));
+    await waitFor(() => screen.getByTestId('camera-subject-input'));
+    fireEvent.changeText(screen.getByTestId('camera-subject-input'), 'Biology');
+
+    fireEvent.press(screen.getByTestId('camera-continue-button'));
+    fireEvent.press(screen.getByTestId('camera-continue-button'));
+
+    await waitFor(() => {
+      const createCalls = fetchCallsMatching(mockFetch, 'subjects').filter(
+        (call: { url: string; init?: { method?: string } }) =>
+          call.init?.method === 'POST' && !call.url.includes('classify'),
+      );
+      expect(createCalls).toHaveLength(1);
+    });
+    await act(async () => {
+      resolveCreate({
+        subject: makeSubject(CREATED_SUBJECT_ID, 'Biology'),
+        structureType: 'broad',
+      });
+    });
+
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledTimes(1));
+  });
+
+  it.each([
+    {
+      escapeName: 'Retake',
+      escapeTestId: 'try-camera-again-button',
+      settlement: 'success' as const,
+    },
+    {
+      escapeName: 'Retake',
+      escapeTestId: 'try-camera-again-button',
+      settlement: 'error' as const,
+    },
+    {
+      escapeName: 'Close',
+      escapeTestId: 'close-button',
+      settlement: 'success' as const,
+    },
+    {
+      escapeName: 'Close',
+      escapeTestId: 'close-button',
+      settlement: 'error' as const,
+    },
+  ])(
+    '[WI-2196] $escapeName invalidates a pending subject create when it settles with $settlement',
+    async ({ escapeTestId, settlement }) => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+      (useLocalSearchParams as jest.Mock).mockReturnValue({});
+      let resolveCreate!: (value: Record<string, unknown>) => void;
+      let rejectCreate!: (reason: Error) => void;
+      const pendingCreate = new Promise<Record<string, unknown>>(
+        (resolve, reject) => {
+          resolveCreate = resolve;
+          rejectCreate = reject;
+        },
+      );
+      mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) => {
+        if (init?.method === 'POST') return pendingCreate;
+        return { subjects: [makeSubject(MATH_SUBJECT_ID, 'Mathematics')] };
+      });
+      mockClassifyResult = { needsConfirmation: true, candidates: [] };
+      (useHomeworkOcr as jest.Mock).mockReturnValue({
+        text: null,
+        status: 'error',
+        error: "We couldn't read that.",
+        errorCode: 'LOW_QUALITY',
+        source: null,
+        failCount: 1,
+        process: mockProcess,
+        retry: mockRetry,
+        cancel: mockCancel,
+      });
+
+      const screen = render(<CameraScreen />, { wrapper: createWrapper() });
+
+      await waitFor(() => screen.getByTestId('manual-input'));
+      fireEvent.changeText(
+        screen.getByTestId('manual-input'),
+        'Name the cell organelles',
+      );
+      fireEvent.press(screen.getByTestId('manual-continue-button'));
+      await waitFor(() => screen.getByTestId('camera-subject-input'));
+      fireEvent.changeText(
+        screen.getByTestId('camera-subject-input'),
+        'Biology',
+      );
+      fireEvent.press(screen.getByTestId('camera-continue-button'));
+
+      await waitFor(() => {
+        const createCalls = fetchCallsMatching(mockFetch, 'subjects').filter(
+          (call: { url: string; init?: { method?: string } }) =>
+            call.init?.method === 'POST' && !call.url.includes('classify'),
+        );
+        expect(createCalls).toHaveLength(1);
+      });
+
+      fireEvent.press(screen.getByTestId(escapeTestId));
+      alertSpy.mockClear();
+
+      await act(async () => {
+        if (settlement === 'success') {
+          resolveCreate({
+            subject: makeSubject(CREATED_SUBJECT_ID, 'Biology'),
+            structureType: 'broad',
+          });
+        } else {
+          rejectCreate(new Error('Synthetic late create failure'));
+        }
+        await pendingCreate.catch(() => undefined);
+      });
+
+      const sessionNavigations = mockRouter.replace.mock.calls.filter(
+        ([destination]) =>
+          typeof destination === 'object' &&
+          destination !== null &&
+          destination.pathname === '/(app)/session',
+      );
+      expect(sessionNavigations).toHaveLength(0);
+      expect(alertSpy).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
+    },
+  );
+
+  it('[WI-2196] waits for the subject list before deciding whether an exact typed name needs creation', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    let resolveSubjects!: (value: Record<string, unknown>) => void;
+    const pendingSubjects = new Promise<Record<string, unknown>>((resolve) => {
+      resolveSubjects = resolve;
+    });
+    mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return mockCreateSubjectResult;
+      return pendingSubjects;
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: 'LOW_QUALITY',
+      source: null,
+      failCount: 1,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+
+    const screen = render(<CameraScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('manual-input'));
+    fireEvent.changeText(
+      screen.getByTestId('manual-input'),
+      'Describe how chlorophyll absorbs light',
+    );
+    fireEvent.press(screen.getByTestId('manual-continue-button'));
+    await waitFor(() => screen.getByTestId('camera-subject-input'));
+    fireEvent.changeText(
+      screen.getByTestId('camera-subject-input'),
+      ' biology ',
+    );
+
+    const continueButton = screen.getByTestId('camera-continue-button');
+    expect(continueButton.props.accessibilityState).toEqual({
+      disabled: true,
+    });
+    fireEvent.press(continueButton);
+    expect(
+      fetchCallsMatching(mockFetch, 'subjects').filter(
+        (call: { url: string; init?: { method?: string } }) =>
+          call.init?.method === 'POST' && !call.url.includes('classify'),
+      ),
+    ).toHaveLength(0);
+
+    await act(async () => {
+      resolveSubjects({
+        subjects: [makeSubject(SCIENCE_SUBJECT_ID, 'Biology')],
+      });
+      await pendingSubjects;
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('camera-continue-button').props.accessibilityState,
+      ).toEqual({ disabled: false });
+    });
+    fireEvent.press(screen.getByTestId('camera-continue-button'));
+
+    await waitFor(() => {
+      expect(mockRouter.replace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/session',
+          params: expect.objectContaining({
+            subjectId: SCIENCE_SUBJECT_ID,
+            subjectName: 'Biology',
+            problemText: 'Describe how chlorophyll absorbs light',
+          }),
+        }),
+      );
+    });
+    expect(
+      fetchCallsMatching(mockFetch, 'subjects').filter(
+        (call: { url: string; init?: { method?: string } }) =>
+          call.init?.method === 'POST' && !call.url.includes('classify'),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('[WI-2196] blocks subject creation after a failed list request, then reuses the exact subject returned by retry', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    let subjectGetCount = 0;
+    mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return mockCreateSubjectResult;
+      subjectGetCount += 1;
+      if (subjectGetCount === 1) {
+        return new Response(
+          JSON.stringify({
+            code: 'BAD_REQUEST',
+            message: 'Synthetic subject-list failure',
+          }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        );
+      }
+      return { subjects: [makeSubject(SCIENCE_SUBJECT_ID, 'Biology')] };
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: 'LOW_QUALITY',
+      source: null,
+      failCount: 1,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+
+    const screen = render(<CameraScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('manual-input'));
+    fireEvent.changeText(
+      screen.getByTestId('manual-input'),
+      'Describe how chlorophyll absorbs light',
+    );
+    fireEvent.press(screen.getByTestId('manual-continue-button'));
+    await waitFor(() =>
+      screen.getByTestId('manual-subject-picker-error-retry'),
+    );
+
+    fireEvent.changeText(
+      screen.getByTestId('camera-subject-input'),
+      ' biology ',
+    );
+    const blockedContinue = screen.getByTestId('camera-continue-button');
+    expect(blockedContinue.props.accessibilityState).toEqual({
+      disabled: true,
+    });
+    fireEvent.press(blockedContinue);
+    expect(
+      fetchCallsMatching(mockFetch, 'subjects').filter(
+        (call: { url: string; init?: { method?: string } }) =>
+          call.init?.method === 'POST' && !call.url.includes('classify'),
+      ),
+    ).toHaveLength(0);
+
+    fireEvent.press(screen.getByTestId('manual-subject-picker-error-retry'));
+    await waitFor(() =>
+      screen.getByTestId(`manual-subject-pick-${SCIENCE_SUBJECT_ID}`),
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('camera-continue-button').props.accessibilityState,
+      ).toEqual({ disabled: false });
+    });
+    fireEvent.press(screen.getByTestId('camera-continue-button'));
+
+    await waitFor(() => {
+      expect(mockRouter.replace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/session',
+          params: expect.objectContaining({
+            subjectId: SCIENCE_SUBJECT_ID,
+            subjectName: 'Biology',
+            problemText: 'Describe how chlorophyll absorbs light',
+          }),
+        }),
+      );
+    });
+    expect(
+      fetchCallsMatching(mockFetch, 'subjects').filter(
+        (call: { url: string; init?: { method?: string } }) =>
+          call.init?.method === 'POST' && !call.url.includes('classify'),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('[WI-2196] keeps the inline draft recoverable when subject creation reaches the plan limit', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    mockFetch.setRoute('subjects', (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            code: 'SUBJECT_LIMIT_EXCEEDED',
+            message: 'You have reached the subject limit for your plan',
+          }),
+          {
+            status: 409,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        );
+      }
+      return { subjects: [makeSubject(MATH_SUBJECT_ID, 'Mathematics')] };
+    });
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: 'LOW_QUALITY',
+      source: null,
+      failCount: 1,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+
+    const screen = render(<CameraScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('manual-input'));
+    fireEvent.changeText(
+      screen.getByTestId('manual-input'),
+      'Compare plant and animal cells',
+    );
+    fireEvent.press(screen.getByTestId('manual-continue-button'));
+    await waitFor(() => screen.getByTestId('camera-subject-input'));
+    fireEvent.changeText(screen.getByTestId('camera-subject-input'), 'Biology');
+    fireEvent.press(screen.getByTestId('camera-continue-button'));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        'You have reached the subject limit for your plan',
+        undefined,
+        undefined,
+      );
+    });
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+    expect(screen.getByTestId('manual-input').props.value).toBe(
+      'Compare plant and animal cells',
+    );
+    expect(screen.getByTestId('camera-subject-input').props.value).toBe(
+      'Biology',
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('camera-continue-button').props.accessibilityState,
+      ).toEqual({ disabled: false });
+    });
+
+    alertSpy.mockRestore();
+  });
+
   // ---- Result phase ----
 
   it('keeps server-sourced OCR text in the result editor even when the shape filter would drop it', async () => {
@@ -1193,6 +1801,10 @@ describe('CameraScreen', () => {
       getByTestId('subject-picker');
     });
 
+    fireEvent.changeText(
+      getByTestId('result-text-input'),
+      'Edited photosynthesis worksheet question',
+    );
     fireEvent.press(getByTestId('confirm-task-button'));
     fireEvent.changeText(getByTestId('camera-subject-input'), 'Biology');
     fireEvent.press(getByTestId('camera-continue-button'));
@@ -1220,6 +1832,11 @@ describe('CameraScreen', () => {
         params: expect.objectContaining({
           subjectId: CREATED_SUBJECT_ID,
           subjectName: 'Biology',
+          problemText: 'Edited photosynthesis worksheet question',
+          homeworkProblems: expect.stringContaining(
+            'Edited photosynthesis worksheet question',
+          ),
+          ocrText: 'Photosynthesis worksheet question',
         }),
       }),
     );
@@ -1459,7 +2076,7 @@ describe('CameraScreen', () => {
     alertSpy.mockRestore();
   });
 
-  it('[BUG-690] error-phase manual picker shows empty state with Create action when no subjects', async () => {
+  it('[BUG-690 / WI-2196] error-phase empty state creates the typed subject inline', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
     // Subjects list is empty
@@ -1506,12 +2123,28 @@ describe('CameraScreen', () => {
 
     await waitFor(() => {
       getByTestId('manual-subject-picker-empty');
+      getByTestId('camera-subject-input');
     });
-    // Empty state must include an actionable Create button (not a dead end).
-    getByTestId('manual-subject-picker-create');
+    fireEvent.changeText(getByTestId('camera-subject-input'), 'Biology');
+    fireEvent.press(getByTestId('camera-continue-button'));
 
-    fireEvent.press(getByTestId('manual-subject-picker-create'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/create-subject');
+    await waitFor(() => {
+      const createCalls = fetchCallsMatching(mockFetch, 'subjects').filter(
+        (call: { url: string; init?: { method?: string } }) =>
+          call.init?.method === 'POST' && !call.url.includes('classify'),
+      );
+      expect(createCalls).toHaveLength(1);
+    });
+    expect(mockRouter.replace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/session',
+        params: expect.objectContaining({
+          subjectId: CREATED_SUBJECT_ID,
+          subjectName: 'Biology',
+          problemText: 'some homework text',
+        }),
+      }),
+    );
 
     alertSpy.mockRestore();
   });

@@ -51,6 +51,14 @@ import {
 
 type FlashMode = 'off' | 'on' | 'auto';
 
+type HomeworkSessionDraft = {
+  problemText: string;
+  problems?: HomeworkProblem[];
+  imageUri?: string;
+  sourceOcrText?: string;
+  captureSource?: HomeworkCaptureSource;
+};
+
 export default function CameraScreen(): React.ReactNode {
   const router = useRouter();
   const { t } = useTranslation();
@@ -70,7 +78,13 @@ export default function CameraScreen(): React.ReactNode {
   const [state, dispatch] = useReducer(cameraReducer, initialCameraState);
   const ocr = useHomeworkOcr();
   const cameraRef = useRef<CameraView>(null);
-  const { data: subjects, isLoading: subjectsLoading } = useSubjects();
+  const {
+    data: subjects,
+    isLoading: subjectsLoading,
+    isSuccess: subjectsResolved,
+    isError: subjectsError,
+    refetch: refetchSubjects,
+  } = useSubjects();
   const createSubject = useCreateSubject();
   const speech = useSpeechRecognition();
 
@@ -94,8 +108,20 @@ export default function CameraScreen(): React.ReactNode {
   } | null>(null);
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
   const classifyTriggeredRef = useRef(false);
+  const subjectContinueInFlightRef = useRef(false);
+  const subjectContinueAttemptRef = useRef(0);
   const [manualSubjectName, setManualSubjectName] = useState('');
+  const manualSubjectMatchesExisting = subjects?.some(
+    (subject) =>
+      subject.name.trim().toLowerCase() ===
+      manualSubjectName.trim().toLowerCase(),
+  );
   const lastAppliedTranscriptRef = useRef('');
+
+  const invalidateSubjectContinue = useCallback(() => {
+    subjectContinueAttemptRef.current += 1;
+    subjectContinueInFlightRef.current = false;
+  }, []);
 
   // BUG-366: Track phase via ref so useFocusEffect can check it without
   // adding it as a dependency (which would cause spurious re-runs).
@@ -108,6 +134,7 @@ export default function CameraScreen(): React.ReactNode {
   useFocusEffect(
     useCallback(() => {
       if (phaseRef.current === 'result') return;
+      invalidateSubjectContinue();
       dispatch({ type: 'RESET', hasPermission: permission?.granted ?? false });
       setOcrText('');
       setDraftProblems([]);
@@ -122,7 +149,7 @@ export default function CameraScreen(): React.ReactNode {
       setAutoDetectedSubject(null);
       setShowSubjectPicker(false);
       classifyTriggeredRef.current = false;
-    }, [permission?.granted]),
+    }, [invalidateSubjectContinue, permission?.granted]),
   );
 
   // Sync permission state into reducer
@@ -440,6 +467,7 @@ export default function CameraScreen(): React.ReactNode {
   }, [state.imageUri, ocr]);
 
   const handleRetake = useCallback(() => {
+    invalidateSubjectContinue();
     if (speech.isListening) {
       void speech.stopListening();
     }
@@ -456,9 +484,10 @@ export default function CameraScreen(): React.ReactNode {
     setShowCelebration(true);
     classifyTriggeredRef.current = false;
     dispatch({ type: 'RESET', hasPermission: permission?.granted ?? false });
-  }, [permission?.granted, speech]);
+  }, [invalidateSubjectContinue, permission?.granted, speech]);
 
   const handleStartManualEntry = useCallback(() => {
+    invalidateSubjectContinue();
     if (speech.isListening) {
       void speech.stopListening();
     }
@@ -478,7 +507,7 @@ export default function CameraScreen(): React.ReactNode {
       createHomeworkProblem('', { source: 'manual', originalText: null }),
     ]);
     dispatch({ type: 'START_MANUAL_ENTRY' });
-  }, [speech]);
+  }, [invalidateSubjectContinue, speech]);
 
   const handleRetryOcr = useCallback(async () => {
     dispatch({ type: 'RETRY_OCR' });
@@ -613,64 +642,73 @@ export default function CameraScreen(): React.ReactNode {
     ],
   );
 
-  const handleManualSubjectContinue = useCallback(async () => {
-    const typedName = manualSubjectName.trim();
-    if (!typedName) return;
-    if (!canStartSession) {
-      platformAlert(
-        t('homework.confirmTaskRequiredTitle'),
-        t('homework.confirmTaskRequiredBody'),
-      );
-      return;
-    }
+  const handleManualSubjectContinue = useCallback(
+    async (draft: HomeworkSessionDraft) => {
+      const typedName = manualSubjectName.trim();
+      if (!typedName || !subjectsResolved || subjectContinueInFlightRef.current)
+        return;
+      if (!canStartSession) {
+        platformAlert(
+          t('homework.confirmTaskRequiredTitle'),
+          t('homework.confirmTaskRequiredBody'),
+        );
+        return;
+      }
 
-    const existingSubject = subjects?.find(
-      (subject) =>
-        subject.name.trim().toLowerCase() === typedName.toLowerCase(),
-    );
-    if (existingSubject) {
-      navigateToSession(
-        existingSubject.id,
-        existingSubject.name,
-        combinedProblemText,
-        draftProblems,
-        state.imageUri ?? undefined,
-        ocrText,
-        homeworkCaptureSource,
+      subjectContinueInFlightRef.current = true;
+      const attempt = subjectContinueAttemptRef.current + 1;
+      subjectContinueAttemptRef.current = attempt;
+      const existingSubject = subjects?.find(
+        (subject) =>
+          subject.name.trim().toLowerCase() === typedName.toLowerCase(),
       );
-      return;
-    }
+      if (existingSubject) {
+        navigateToSession(
+          existingSubject.id,
+          existingSubject.name,
+          draft.problemText,
+          draft.problems,
+          draft.imageUri,
+          draft.sourceOcrText,
+          draft.captureSource,
+        );
+        return;
+      }
 
-    try {
-      const result = await createSubject.mutateAsync({
-        name: typedName,
-        rawInput: typedName,
-      });
-      navigateToSession(
-        result.subject.id,
-        result.subject.name,
-        combinedProblemText,
-        draftProblems,
-        state.imageUri ?? undefined,
-        ocrText,
-        homeworkCaptureSource,
-      );
-    } catch (err: unknown) {
-      platformAlert(t('homework.createSubjectErrorTitle'), formatApiError(err));
-    }
-  }, [
-    combinedProblemText,
-    createSubject,
-    draftProblems,
-    manualSubjectName,
-    navigateToSession,
-    ocrText,
-    homeworkCaptureSource,
-    canStartSession,
-    state.imageUri,
-    subjects,
-    t,
-  ]);
+      try {
+        const result = await createSubject.mutateAsync({
+          name: typedName,
+          rawInput: typedName,
+        });
+        if (attempt !== subjectContinueAttemptRef.current) return;
+        navigateToSession(
+          result.subject.id,
+          result.subject.name,
+          draft.problemText,
+          draft.problems,
+          draft.imageUri,
+          draft.sourceOcrText,
+          draft.captureSource,
+        );
+      } catch (err: unknown) {
+        if (attempt !== subjectContinueAttemptRef.current) return;
+        platformAlert(
+          t('homework.createSubjectErrorTitle'),
+          formatApiError(err),
+        );
+        subjectContinueInFlightRef.current = false;
+      }
+    },
+    [
+      canStartSession,
+      createSubject,
+      manualSubjectName,
+      navigateToSession,
+      subjects,
+      subjectsResolved,
+      t,
+    ],
+  );
 
   const handleManualContinue = useCallback(async () => {
     if (subjectId) {
@@ -749,8 +787,9 @@ export default function CameraScreen(): React.ReactNode {
   // the explicit returnTo target makes close/back behavior deterministic
   // regardless of the underlying back-stack state.
   const handleClose = useCallback(() => {
+    invalidateSubjectContinue();
     router.replace(homeworkReturnHrefForReturnTo(returnTo));
-  }, [returnTo, router]);
+  }, [invalidateSubjectContinue, returnTo, router]);
 
   // Intercept Android hardware back so it routes through handleClose too;
   // without this, the OS goBack() returns to whichever tab was active when
@@ -1435,69 +1474,91 @@ export default function CameraScreen(): React.ReactNode {
                 </Text>
               </View>
             ) : null}
-            {/* Show classification candidates first (sorted by confidence) */}
-            {classifyMutation.data?.candidates
-              ?.slice()
-              .filter((c): c is NonNullable<typeof c> => c != null)
-              .sort((a, b) => b.confidence - a.confidence)
-              .map((candidate, index) => (
-                <Pressable
-                  key={candidate.subjectId}
-                  onPress={() =>
-                    handlePickSubject(
-                      candidate.subjectId,
-                      candidate.subjectName,
-                    )
-                  }
-                  className={`rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center ${
-                    index === 0
-                      ? 'bg-primary/10 border border-primary/30'
-                      : 'bg-surface-elevated'
-                  }`}
-                  accessibilityLabel={t('homework.selectSubjectLabel', {
-                    name: candidate.subjectName,
-                  })}
-                  accessibilityRole="button"
-                  testID={`subject-pick-${candidate.subjectId}`}
-                >
-                  <Text className="text-body text-text-primary">
-                    {candidate.subjectName}
+            {subjectsError ? (
+              <Pressable
+                onPress={() => void refetchSubjects()}
+                className="py-3"
+                accessibilityRole="button"
+                accessibilityLabel={t('subject.retryLoadSubjectsLabel')}
+                testID="subject-picker-error-retry"
+              >
+                <Text className="text-body-sm text-danger">
+                  {t('subject.subjectsLoadError')}{' '}
+                  <Text className="font-semibold text-primary">
+                    {t('subject.tapToRetry')}
                   </Text>
-                </Pressable>
-              ))}
+                </Text>
+              </Pressable>
+            ) : null}
+            {/* Show classification candidates first (sorted by confidence) */}
+            {subjectsResolved &&
+              classifyMutation.data?.candidates
+                ?.slice()
+                .filter((c): c is NonNullable<typeof c> => c != null)
+                .sort((a, b) => b.confidence - a.confidence)
+                .map((candidate, index) => (
+                  <Pressable
+                    key={candidate.subjectId}
+                    onPress={() =>
+                      handlePickSubject(
+                        candidate.subjectId,
+                        candidate.subjectName,
+                      )
+                    }
+                    className={`rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center ${
+                      index === 0
+                        ? 'bg-primary/10 border border-primary/30'
+                        : 'bg-surface-elevated'
+                    }`}
+                    accessibilityLabel={t('homework.selectSubjectLabel', {
+                      name: candidate.subjectName,
+                    })}
+                    accessibilityRole="button"
+                    testID={`subject-pick-${candidate.subjectId}`}
+                  >
+                    <Text className="text-body text-text-primary">
+                      {candidate.subjectName}
+                    </Text>
+                  </Pressable>
+                ))}
             {/* Remaining enrolled subjects not in candidates */}
-            {subjects
-              ?.filter(
-                (s) =>
-                  !classifyMutation.data?.candidates?.some(
-                    (c) => c != null && c.subjectId === s.id,
-                  ),
-              )
-              .map((s) => (
-                <Pressable
-                  key={s.id}
-                  onPress={() => handlePickSubject(s.id, s.name)}
-                  className="bg-surface-elevated rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
-                  accessibilityLabel={t('homework.selectSubjectLabel', {
-                    name: s.name,
-                  })}
-                  accessibilityRole="button"
-                  testID={`subject-pick-${s.id}`}
-                >
-                  <Text className="text-body text-text-primary">{s.name}</Text>
-                </Pressable>
-              ))}
-            <Pressable
-              onPress={() => router.push('/create-subject' as Href)}
-              className="bg-surface rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
-              accessibilityLabel={t('homework.createNewSubjectLabel')}
-              accessibilityRole="button"
-              testID="camera-create-subject"
-            >
-              <Text className="text-body font-semibold text-primary">
-                {t('homework.createNewSubject')}
-              </Text>
-            </Pressable>
+            {subjectsResolved &&
+              subjects
+                ?.filter(
+                  (s) =>
+                    !classifyMutation.data?.candidates?.some(
+                      (c) => c != null && c.subjectId === s.id,
+                    ),
+                )
+                .map((s) => (
+                  <Pressable
+                    key={s.id}
+                    onPress={() => handlePickSubject(s.id, s.name)}
+                    className="bg-surface-elevated rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
+                    accessibilityLabel={t('homework.selectSubjectLabel', {
+                      name: s.name,
+                    })}
+                    accessibilityRole="button"
+                    testID={`subject-pick-${s.id}`}
+                  >
+                    <Text className="text-body text-text-primary">
+                      {s.name}
+                    </Text>
+                  </Pressable>
+                ))}
+            {subjectsResolved ? (
+              <Pressable
+                onPress={() => router.push('/create-subject' as Href)}
+                className="bg-surface rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
+                accessibilityLabel={t('homework.createNewSubjectLabel')}
+                accessibilityRole="button"
+                testID="camera-create-subject"
+              >
+                <Text className="text-body font-semibold text-primary">
+                  {t('homework.createNewSubject')}
+                </Text>
+              </Pressable>
+            ) : null}
 
             {/* Manual subject entry — lets user type a subject name */}
             <Text className="text-body-sm text-text-secondary mt-4 mb-2">
@@ -1515,10 +1576,30 @@ export default function CameraScreen(): React.ReactNode {
             />
             <Pressable
               testID="camera-continue-button"
-              onPress={() => void handleManualSubjectContinue()}
-              disabled={!manualSubjectName.trim() || createSubject.isPending}
+              onPress={() =>
+                void handleManualSubjectContinue({
+                  problemText: combinedProblemText,
+                  problems: draftProblems,
+                  imageUri: state.imageUri ?? undefined,
+                  sourceOcrText: ocrText,
+                  captureSource: homeworkCaptureSource,
+                })
+              }
+              disabled={
+                !manualSubjectName.trim() ||
+                createSubject.isPending ||
+                !subjectsResolved
+              }
+              accessibilityState={{
+                disabled:
+                  !manualSubjectName.trim() ||
+                  createSubject.isPending ||
+                  !subjectsResolved,
+              }}
               className={`rounded-button py-4 min-h-[48px] items-center justify-center mb-2 ${
-                manualSubjectName.trim() && !createSubject.isPending
+                manualSubjectName.trim() &&
+                !createSubject.isPending &&
+                subjectsResolved
                   ? 'bg-accent'
                   : 'bg-surface-elevated'
               }`}
@@ -1534,7 +1615,11 @@ export default function CameraScreen(): React.ReactNode {
               >
                 {createSubject.isPending
                   ? t('homework.creatingSubject')
-                  : t('common.continue')}
+                  : t(
+                      manualSubjectMatchesExisting
+                        ? 'common.continue'
+                        : 'homework.createSubject',
+                    )}
               </Text>
             </Pressable>
 
@@ -1693,27 +1778,29 @@ export default function CameraScreen(): React.ReactNode {
                           {t('homework.loadingSubjects')}
                         </Text>
                       </View>
+                    ) : subjectsError ? (
+                      <Pressable
+                        onPress={() => void refetchSubjects()}
+                        className="py-3"
+                        accessibilityRole="button"
+                        accessibilityLabel={t('subject.retryLoadSubjectsLabel')}
+                        testID="manual-subject-picker-error-retry"
+                      >
+                        <Text className="text-body-sm text-danger">
+                          {t('subject.subjectsLoadError')}{' '}
+                          <Text className="font-semibold text-primary">
+                            {t('subject.tapToRetry')}
+                          </Text>
+                        </Text>
+                      </Pressable>
                     ) : !subjects || subjects.length === 0 ? (
                       <View
                         className="py-3"
                         testID="manual-subject-picker-empty"
                       >
-                        <Text className="text-body-sm text-text-secondary mb-3">
+                        <Text className="text-body-sm text-text-secondary">
                           {t('homework.noSubjectsYet')}
                         </Text>
-                        <Pressable
-                          testID="manual-subject-picker-create"
-                          onPress={() => router.push('/create-subject' as Href)}
-                          className="bg-primary rounded-button py-3 px-4 min-h-[48px] items-center justify-center"
-                          accessibilityLabel={t(
-                            'homework.createNewSubjectLabel',
-                          )}
-                          accessibilityRole="button"
-                        >
-                          <Text className="text-body font-semibold text-text-inverse">
-                            {t('homework.createSubject')}
-                          </Text>
-                        </Pressable>
                       </View>
                     ) : (
                       subjects.map((s) => (
@@ -1733,6 +1820,68 @@ export default function CameraScreen(): React.ReactNode {
                         </Pressable>
                       ))
                     )}
+                    <Text className="text-body-sm text-text-secondary mt-2 mb-2">
+                      {t('homework.orTypeSubject')}
+                    </Text>
+                    <TextInput
+                      testID="camera-subject-input"
+                      value={manualSubjectName}
+                      onChangeText={setManualSubjectName}
+                      placeholder={t('homework.subjectInputPlaceholder')}
+                      placeholderTextColor={colors.muted}
+                      className="bg-surface rounded-button px-4 py-3 text-body text-text-primary min-h-[48px] border border-border"
+                      accessibilityLabel={t('homework.typeSubjectLabel')}
+                      autoCapitalize="words"
+                    />
+                    <Pressable
+                      testID="camera-continue-button"
+                      onPress={() =>
+                        void handleManualSubjectContinue({
+                          problemText: manualText,
+                          imageUri: state.imageUri ?? undefined,
+                          sourceOcrText: ocrText || undefined,
+                          captureSource: homeworkCaptureSource,
+                        })
+                      }
+                      disabled={
+                        !manualSubjectName.trim() ||
+                        createSubject.isPending ||
+                        !subjectsResolved
+                      }
+                      accessibilityState={{
+                        disabled:
+                          !manualSubjectName.trim() ||
+                          createSubject.isPending ||
+                          !subjectsResolved,
+                      }}
+                      className={`rounded-button py-4 min-h-[48px] items-center justify-center ${
+                        manualSubjectName.trim() &&
+                        !createSubject.isPending &&
+                        subjectsResolved
+                          ? 'bg-accent'
+                          : 'bg-surface-elevated'
+                      }`}
+                      accessibilityLabel={t(
+                        'homework.continueWithSubjectLabel',
+                      )}
+                      accessibilityRole="button"
+                    >
+                      <Text
+                        className={`text-body font-semibold ${
+                          manualSubjectName.trim()
+                            ? 'text-white'
+                            : 'text-text-secondary'
+                        }`}
+                      >
+                        {createSubject.isPending
+                          ? t('homework.creatingSubject')
+                          : t(
+                              manualSubjectMatchesExisting
+                                ? 'common.continue'
+                                : 'homework.createSubject',
+                            )}
+                      </Text>
+                    </Pressable>
                   </>
                 ) : (
                   <Pressable
