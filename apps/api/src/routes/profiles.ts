@@ -27,6 +27,7 @@ import {
   updateProfileV2,
 } from '../services/identity-v2/profile-v2';
 import { verifyPersonIsOrgAdminV2 } from '../services/identity-v2/ownership-v2';
+import { repairOrSignalAdultSelfConsentV2 } from '../services/identity-v2/consent-v2';
 import { assertChargeNotCredentialed } from '../services/family-access';
 
 import {
@@ -43,6 +44,9 @@ import {
 } from '../services/profile';
 import { recordActivationEvent } from '../services/activation-events';
 import { safeWrite } from '../services/safe-non-core';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 type ProfileEnv = {
   Bindings: {
@@ -165,8 +169,37 @@ export const profileRoutes = new Hono<ProfileEnv>()
     }
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
+    // [WI-1193 AC1] First-use adult self-consent repair-or-signal. Runs once per
+    // session bootstrap for the authenticated OWNER (callerPersonId is
+    // server-derived, never request-supplied). Case (a) writes an art6_1_a
+    // repair record derived from a captured versioned terms fact; case (c)
+    // writes nothing and surfaces `needsAdultConsent` so the client drives a
+    // (re-)consent write. Non-owners / minors / already-recorded adults → false.
+    const callerPersonId = c.get('callerPersonId');
+    let needsAdultConsent = false;
+    if (callerPersonId) {
+      // Best-effort: the repair-or-signal enhances the bootstrap but must never
+      // block it. A failure is logged (observable, not silent) and defaults the
+      // signal off — the caller re-evaluates on the next session (the check is
+      // idempotent; case (a) writes only on success, so no partial state).
+      try {
+        const outcome = await repairOrSignalAdultSelfConsentV2(
+          db,
+          callerPersonId,
+          account.id,
+        );
+        needsAdultConsent = outcome === 'needs_consent';
+      } catch (err) {
+        logger.error('adult self-consent repair-or-signal failed', {
+          error: err instanceof Error ? err.message : String(err),
+          callerPersonId,
+        });
+      }
+    }
     const profiles = await listProfilesV2(db, account.id);
-    return c.json(profileListResponseSchema.parse({ profiles }));
+    return c.json(
+      profileListResponseSchema.parse({ profiles, needsAdultConsent }),
+    );
   })
   .post('/profiles', zValidator('json', profileCreateSchema), async (c) => {
     const db = c.get('db');

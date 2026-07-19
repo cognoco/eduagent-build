@@ -264,7 +264,10 @@ describe('GET /v1/profiles', () => {
     const res = await makeApp().request('/v1/profiles');
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ profiles: [] });
+    await expect(res.json()).resolves.toEqual({
+      profiles: [],
+      needsAdultConsent: false,
+    });
   });
 
   // [CUT-B1] v2 pre-graph: a freshly signed-up user under IDENTITY_V2_ENABLED
@@ -314,7 +317,10 @@ describe('GET /v1/profiles', () => {
     );
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ profiles: [] });
+    await expect(res.json()).resolves.toEqual({
+      profiles: [],
+      needsAdultConsent: false,
+    });
   });
 
   it('propagates service errors to 500', async () => {
