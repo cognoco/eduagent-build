@@ -39,6 +39,11 @@ tags:
       id: 'create-subject-name'
     timeout: 15000
 - hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: 'create-subject-cancel'
+    direction: UP
+    timeout: 10000
 - assertVisible:
     id: 'create-subject-cancel'
 - tapOn:
