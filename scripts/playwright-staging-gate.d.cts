@@ -36,6 +36,7 @@ export function runCanary(options: {
 
 export function classifyFailure(options: {
   artifactRoot: string;
+  apiUrl: string;
   exitCode: number;
   resultText?: string;
 }): { kind: Exclude<FailureKind, 'not-run'> };

@@ -11,11 +11,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from '@jest/globals';
 import {
-  classifyFailure,
+  classifyFailure as classifyFailureForTarget,
   decide,
   GATE_STATES,
   runCanary,
 } from './playwright-staging-gate.cjs';
+
+const TEST_API_URL = 'https://api-stg.example.test';
+const TARGET_TRANSPORT_RESULT =
+  'Error: apiRequestContext.get: ECONNRESET at https://api-stg.example.test/v1/profiles';
+const OFF_TARGET_TRANSPORT_RESULT =
+  'Error: apiRequestContext.get: ECONNRESET at https://third-party.example/v1/profiles';
+const classifyFailure = (
+  options: Omit<Parameters<typeof classifyFailureForTarget>[0], 'apiUrl'>,
+) => classifyFailureForTarget({ ...options, apiUrl: TEST_API_URL });
 
 describe('[WI-2228] staging canary and fail-closed classification', () => {
   it.each([[502], [503], [504]])(
@@ -129,9 +138,37 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
         classifyFailure({
           artifactRoot: root,
           exitCode: 1,
-          resultText: 'TypeError: fetch failed',
+          resultText: TARGET_TRANSPORT_RESULT,
         }),
       ).toEqual({ kind: 'infra-signalled' });
+      const urlLessClassification = classifyFailure({
+        artifactRoot: root,
+        exitCode: 1,
+        resultText: 'TypeError: fetch failed',
+      });
+      expect(urlLessClassification).toEqual({ kind: 'product' });
+      expect(
+        decide({
+          preflight: GATE_STATES.HEALTHY,
+          postflight: GATE_STATES.UNAVAILABLE,
+          classification: urlLessClassification.kind,
+          exitCode: 1,
+        }),
+      ).toBe(1);
+      const mixedOriginClassification = classifyFailure({
+        artifactRoot: root,
+        exitCode: 1,
+        resultText: `${TARGET_TRANSPORT_RESULT}\n${OFF_TARGET_TRANSPORT_RESULT}`,
+      });
+      expect(mixedOriginClassification).toEqual({ kind: 'unknown' });
+      expect(
+        decide({
+          preflight: GATE_STATES.HEALTHY,
+          postflight: GATE_STATES.UNAVAILABLE,
+          classification: mixedOriginClassification.kind,
+          exitCode: 1,
+        }),
+      ).toBe(1);
       expect(
         classifyFailure({
           artifactRoot: root,
@@ -178,7 +215,7 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
         classifyFailure({
           artifactRoot: root,
           exitCode: 1,
-          resultText: 'TypeError: fetch failed',
+          resultText: TARGET_TRANSPORT_RESULT,
         }),
       ).toEqual({ kind: 'infra-signalled' });
       expect(
@@ -192,9 +229,37 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
         classifyFailure({
           artifactRoot: root,
           exitCode: 1,
-          resultText: 'Error: apiRequestContext.get: ECONNRESET',
+          resultText: TARGET_TRANSPORT_RESULT,
         }),
       ).toEqual({ kind: 'infra-signalled' });
+      for (const reporterLabel of ['handleError', 'renderError']) {
+        expect(
+          classifyFailure({
+            artifactRoot: root,
+            exitCode: 1,
+            resultText: `${TARGET_TRANSPORT_RESULT}\n${reporterLabel}: retrying request`,
+          }),
+        ).toEqual({ kind: 'infra-signalled' });
+      }
+      for (const productLine of [
+        '[chromium] SyntaxError: Unexpected token',
+        '\u001b[31mTypeError [ERR_INVALID_ARG_TYPE]: invalid value\u001b[0m',
+      ]) {
+        const classification = classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: `${TARGET_TRANSPORT_RESULT}\n${productLine}`,
+        });
+        expect(classification).toEqual({ kind: 'product' });
+        expect(
+          decide({
+            preflight: GATE_STATES.HEALTHY,
+            postflight: GATE_STATES.UNAVAILABLE,
+            classification: classification.kind,
+            exitCode: 1,
+          }),
+        ).toBe(1);
+      }
       expect(
         classifyFailure({
           artifactRoot: root,
@@ -223,7 +288,7 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
         classifyFailure({
           artifactRoot: root,
           exitCode: 1,
-          resultText: 'TypeError: fetch failed',
+          resultText: TARGET_TRANSPORT_RESULT,
         }),
       ).toEqual({ kind: 'infra-signalled' });
       writeFileSync(
@@ -237,6 +302,21 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
       expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
         kind: 'unknown',
       });
+      writeFileSync(
+        join(root, 'run', 'trace.trace'),
+        JSON.stringify({
+          type: 'response',
+          url: 'https://third-party.example/v1/profiles',
+          status: 503,
+        }),
+      );
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: TARGET_TRANSPORT_RESULT,
+        }),
+      ).toEqual({ kind: 'unknown' });
       writeFileSync(
         join(root, 'run', 'trace.trace'),
         JSON.stringify({
@@ -255,6 +335,120 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
       expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
         kind: 'unknown',
       });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    [
+      'response',
+      {
+        type: 'response',
+        url: 'https://third-party.example/v1/profiles',
+        status: 503,
+      },
+    ],
+    [
+      'request failure',
+      {
+        type: 'requestfailed',
+        url: 'https://third-party.example/v1/profiles',
+        errorText: 'net::ERR_CONNECTION_RESET',
+      },
+    ],
+    [
+      'resource snapshot',
+      {
+        type: 'resource-snapshot',
+        snapshot: {
+          request: { url: 'https://third-party.example/v1/profiles' },
+          response: { status: -1 },
+        },
+      },
+    ],
+    [
+      'same-origin response on another API route',
+      {
+        type: 'response',
+        url: 'https://api-stg.example.test/v1/other',
+        status: 503,
+      },
+    ],
+  ])('keeps unrelated %s evidence unknown and red', (_name, record) => {
+    const root = mkdtempSync(join(tmpdir(), 'wi-2228-off-target-trace-'));
+    try {
+      writeFileSync(join(root, 'trace.trace'), JSON.stringify(record));
+      const classification = classifyFailure({
+        artifactRoot: root,
+        exitCode: 1,
+        resultText: TARGET_TRANSPORT_RESULT,
+      });
+      expect(classification).toEqual({ kind: 'unknown' });
+      expect(
+        decide({
+          preflight: GATE_STATES.HEALTHY,
+          postflight: GATE_STATES.UNAVAILABLE,
+          classification: classification.kind,
+          exitCode: 1,
+        }),
+      ).toBe(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    [
+      'response',
+      {
+        type: 'response',
+        metadata: { url: 'https://api-stg.example.test/v1/profiles' },
+        url: 'https://third-party.example/v1/profiles',
+        status: 503,
+      },
+    ],
+    [
+      'request failure',
+      {
+        type: 'requestfailed',
+        metadata: { url: 'https://api-stg.example.test/v1/profiles' },
+        url: 'https://third-party.example/v1/profiles',
+        errorText: 'net::ERR_CONNECTION_RESET',
+      },
+    ],
+    [
+      'resource snapshot',
+      {
+        type: 'resource-snapshot',
+        snapshot: {
+          request: { url: 'https://api-stg.example.test/v1/profiles' },
+          response: { status: 200 },
+        },
+        response: {
+          url: 'https://third-party.example/v1/profiles',
+          status: -1,
+        },
+      },
+    ],
+  ])('rejects ambiguous mixed-field %s evidence', (_name, record) => {
+    const root = mkdtempSync(join(tmpdir(), 'wi-2228-mixed-trace-'));
+    try {
+      writeFileSync(join(root, 'trace.trace'), JSON.stringify(record));
+      const classification = classifyFailure({
+        artifactRoot: root,
+        exitCode: 1,
+        resultText: TARGET_TRANSPORT_RESULT,
+      });
+      expect(classification).toEqual({ kind: 'unknown' });
+      expect(
+        decide({
+          preflight: GATE_STATES.HEALTHY,
+          postflight: GATE_STATES.UNAVAILABLE,
+          classification: classification.kind,
+          exitCode: 1,
+        }),
+      ).toBe(1);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -282,7 +476,7 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
           classifyFailure({
             artifactRoot: root,
             exitCode: 1,
-            resultText: 'TypeError: fetch failed',
+            resultText: TARGET_TRANSPORT_RESULT,
           }),
         ).toEqual({ kind: 'infra-signalled' });
       } finally {
@@ -321,7 +515,7 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
           classifyFailure({
             artifactRoot: root,
             exitCode: 1,
-            resultText: 'TypeError: fetch failed',
+            resultText: TARGET_TRANSPORT_RESULT,
           }),
         ).toEqual({ kind: 'infra-signalled' });
       } finally {
@@ -528,7 +722,7 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
         }),
       );
       for (const [resultText, expected] of [
-        ['TypeError: fetch failed', 'infra-signalled'],
+        [TARGET_TRANSPORT_RESULT, 'infra-signalled'],
         ['Error: navigation contract mismatch', 'product'],
       ]) {
         writeFileSync(resultFile, resultText);
@@ -540,6 +734,7 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
             root,
             '1',
             resultFile,
+            TEST_API_URL,
           ],
           { encoding: 'utf8' },
         );

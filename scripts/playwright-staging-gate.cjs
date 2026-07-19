@@ -19,9 +19,12 @@ const RETRYABLE = new Set([502, 503, 504]);
 const TRANSPORT =
   /(?:timed?out|timeout|network|fetch failed|socket hang up|econnrefused|econnreset|err_connection_reset|connection refused|connection reset)/i;
 const RESULT_TRANSPORT =
-  /^\s*(?:TypeError:\s*fetch failed|Error:\s*(?:apiRequestContext|request)\.[A-Za-z]+:\s*(?:fetch failed|socket hang up|econnrefused|econnreset|err_connection_reset|connection refused|connection reset|net::err_[a-z_]+)(?:\s+at\s+https:\/\/\S+\/v1\/\S*)?)\s*$/i;
+  /^\s*Error:\s*(?:apiRequestContext|request)\.[A-Za-z]+:\s*(?:fetch failed|socket hang up|econnrefused|econnreset|err_connection_reset|connection refused|connection reset|net::err_[a-z_]+)\s+at\s+(https:\/\/\S+\/v1\/\S*)\s*$/i;
+// Match standard JavaScript error-class lines (Error:, TypeError:,
+// ConfigError:) while excluding identifier labels such as handleError:.
 const ERROR_LINE =
-  /(?:^|\s)(?:Error(?:\s+\[[^\]]+\])?|[A-Za-z][A-Za-z0-9]*Error):/i;
+  /(?:^|[\s\]])(?:[Ee]rror|[A-Z][A-Za-z0-9]*Error)(?:\s+\[[^\]]+\])?:/;
+const ANSI_ESCAPE = /\x1b\[[0-?]*[ -/]*[@-~]/g;
 const HARD_FAILURE =
   /(?:assert(?:ion)?|expect\(|unknown error|no tests? found|test discovery (?:error|failed)|(?:config(?:uration)?) (?:validation )?(?:error|failed|failure|invalid)|invalid (?:test )?config(?:uration)?|config(?:uration)?error|(?:failed|unable) to (?:load|resolve) (?:the )?config|test run cancel(?:led|ed)|interrupted|malformed)/i;
 const MAX_TRACE_MEMBER_BYTES = 32 * 1024 * 1024;
@@ -161,53 +164,136 @@ function* traceContents(file) {
   }
 }
 
-function isApiNetworkSignal(line) {
+function targetApiRoute(value, apiOrigin) {
+  try {
+    const url = new URL(value);
+    return url.origin === apiOrigin && url.pathname.startsWith('/v1/')
+      ? `${url.origin}${url.pathname}`
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function hasAmbiguousSignalFields(record) {
+  const urls = [
+    record?.metadata?.url,
+    record?.request?.url,
+    record?.url,
+    record?.response?.url,
+    record?.snapshot?.request?.url,
+  ].filter((value) => value !== undefined && value !== null && value !== '');
+  const normalizedUrls = [];
+  for (const value of urls) {
+    try {
+      normalizedUrls.push(new URL(value).href);
+    } catch {
+      return true;
+    }
+  }
+  if (new Set(normalizedUrls).size > 1) return true;
+
+  const statuses = [
+    record?.metadata?.status,
+    record?.status,
+    record?.response?.status,
+    record?.snapshot?.response?.status,
+  ].filter((value) => value !== undefined && value !== null);
+  if (
+    statuses.some((status) => !Number.isInteger(status)) ||
+    new Set(statuses).size > 1
+  )
+    return true;
+
+  const errors = [
+    record?.metadata?.error?.error?.message,
+    record?.metadata?.error?.message,
+    record?.metadata?.errorText,
+    record?.request?.error?.error?.message,
+    record?.request?.error?.message,
+    record?.request?.errorText,
+    record?.error?.error?.message,
+    record?.error?.message,
+    record?.errorText,
+    record?.response?.error?.error?.message,
+    record?.response?.error?.message,
+    record?.response?.errorText,
+  ].filter((value) => value !== undefined && value !== null && value !== '');
+  return new Set(errors.map(String)).size > 1;
+}
+
+function isRetryableResponse(url, status, apiOrigin, expectedRoute) {
+  return (
+    targetApiRoute(url, apiOrigin) === expectedRoute &&
+    Number.isInteger(status) &&
+    RETRYABLE.has(status)
+  );
+}
+
+function isTransportFailure(url, error, apiOrigin, expectedRoute) {
+  return (
+    targetApiRoute(url, apiOrigin) === expectedRoute &&
+    TRANSPORT.test(String(error ?? ''))
+  );
+}
+
+function isApiNetworkSignal(line, apiOrigin, expectedRoute) {
   try {
     const record = JSON.parse(line);
-    const url =
-      record?.metadata?.url ??
-      record?.request?.url ??
-      record?.url ??
-      record?.response?.url;
-    const isApiRequest = /\/v1\//.test(String(url ?? ''));
-    const status =
-      record?.type === 'response'
-        ? (record?.metadata?.status ?? record?.status)
-        : record?.status;
-    const snapshotUrl =
-      record?.type === 'resource-snapshot'
-        ? record?.snapshot?.request?.url
-        : '';
-    const snapshotStatuses =
-      record?.type === 'resource-snapshot'
-        ? [record?.snapshot?.response?.status, record?.response?.status].filter(
-            Number.isInteger,
-          )
-        : [];
-    const error =
-      record?.error?.error?.message ??
-      record?.error?.message ??
-      record?.errorText;
-    return (
-      (record?.type === 'response' &&
-        isApiRequest &&
-        RETRYABLE.has(Number(status))) ||
-      (record?.type === 'requestfailed' &&
-        isApiRequest &&
-        TRANSPORT.test(String(error ?? ''))) ||
-      (snapshotUrl &&
-        /\/v1\//.test(snapshotUrl) &&
-        snapshotStatuses.some(
-          (snapshotStatus) =>
-            snapshotStatus === -1 || RETRYABLE.has(snapshotStatus),
-        ))
-    );
+    if (hasAmbiguousSignalFields(record)) return false;
+    if (record?.type === 'response')
+      return [
+        [record?.metadata?.url, record?.metadata?.status],
+        [record?.url, record?.status],
+        [record?.response?.url, record?.response?.status],
+      ].some(([url, status]) =>
+        isRetryableResponse(url, status, apiOrigin, expectedRoute),
+      );
+    if (record?.type === 'requestfailed')
+      return [
+        [
+          record?.metadata?.url,
+          record?.metadata?.error?.error?.message ??
+            record?.metadata?.error?.message ??
+            record?.metadata?.errorText,
+        ],
+        [
+          record?.request?.url,
+          record?.request?.error?.error?.message ??
+            record?.request?.error?.message ??
+            record?.request?.errorText,
+        ],
+        [
+          record?.url,
+          record?.error?.error?.message ??
+            record?.error?.message ??
+            record?.errorText,
+        ],
+        [
+          record?.response?.url,
+          record?.response?.error?.error?.message ??
+            record?.response?.error?.message ??
+            record?.response?.errorText,
+        ],
+      ].some(([url, error]) =>
+        isTransportFailure(url, error, apiOrigin, expectedRoute),
+      );
+    if (record?.type === 'resource-snapshot') {
+      const status = record?.snapshot?.response?.status;
+      return (
+        targetApiRoute(record?.snapshot?.request?.url, apiOrigin) ===
+          expectedRoute &&
+        Number.isInteger(status) &&
+        (status === -1 || RETRYABLE.has(status))
+      );
+    }
+    return false;
   } catch {
     return false;
   }
 }
 
-function hasApiNetworkSignal(root) {
+function hasApiNetworkSignal(root, apiOrigin, expectedRoute) {
   let inspectedBytes = 0;
   let inspectedMembers = 0;
   let networkSignal = false;
@@ -222,33 +308,58 @@ function hasApiNetworkSignal(root) {
         inspectedBytes > MAX_TRACE_TOTAL_BYTES
       )
         return false;
-      if (content.split('\n').some(isApiNetworkSignal)) networkSignal = true;
+      if (
+        content
+          .split('\n')
+          .some((line) => isApiNetworkSignal(line, apiOrigin, expectedRoute))
+      )
+        networkSignal = true;
     }
   }
   return networkSignal;
 }
 
 function hasNonTransportError(resultText) {
-  return resultText
-    .split('\n')
-    .some((line) => ERROR_LINE.test(line) && !RESULT_TRANSPORT.test(line));
+  return resultText.split('\n').some((line) => {
+    const normalized = line.replace(ANSI_ESCAPE, '');
+    return ERROR_LINE.test(normalized) && !RESULT_TRANSPORT.test(normalized);
+  });
 }
 
-function hasResultTransportError(resultText) {
-  return resultText.split('\n').some((line) => RESULT_TRANSPORT.test(line));
+function resultTransportRoute(resultText, apiOrigin) {
+  const routes = [];
+  for (const line of resultText.split('\n')) {
+    const match = RESULT_TRANSPORT.exec(line.replace(ANSI_ESCAPE, ''));
+    if (!match) continue;
+    const route = targetApiRoute(match[1], apiOrigin);
+    if (!route) return null;
+    routes.push(route);
+  }
+  return new Set(routes).size === 1 ? routes[0] : null;
 }
 
 /**
  * Inspect Playwright-owned trace network records. Console prose is excluded.
  * A hard result/configuration failure wins over a later canary outage.
  */
-function classifyFailure({ artifactRoot, exitCode, resultText = '' }) {
+function classifyFailure({ artifactRoot, apiUrl, exitCode, resultText = '' }) {
   if (exitCode === 0) return { kind: 'success' };
   if (exitCode === 130 || exitCode === 143) return { kind: 'cancellation' };
   if (HARD_FAILURE.test(resultText) || hasNonTransportError(resultText))
     return { kind: 'product' };
-  if (!hasResultTransportError(resultText)) return { kind: 'unknown' };
-  const networkSignal = hasApiNetworkSignal(artifactRoot);
+  let apiOrigin;
+  try {
+    apiOrigin = validatedApiUrl(apiUrl).origin;
+  } catch {
+    return { kind: 'unknown' };
+  }
+  const expectedRoute = resultTransportRoute(resultText, apiOrigin);
+  if (!expectedRoute) return { kind: 'unknown' };
+  const networkSignal = hasApiNetworkSignal(
+    artifactRoot,
+    apiOrigin,
+    expectedRoute,
+  );
   return networkSignal ? { kind: 'infra-signalled' } : { kind: 'unknown' };
 }
 
@@ -336,6 +447,7 @@ module.exports = { GATE_STATES, runCanary, classifyFailure, decide };
           : '';
       const result = classifyFailure({
         artifactRoot: args[0] ?? 'apps/mobile/e2e-web/test-results',
+        apiUrl: args[3],
         exitCode: Number(args[1] ?? 1),
         resultText,
       });

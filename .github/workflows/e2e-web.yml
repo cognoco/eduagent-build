@@ -215,7 +215,7 @@ jobs:
             node scripts/playwright-staging-gate.cjs --canary > \"\${POST_STATE_FILE}\"; \
             POST_STATE=\$(cut -d= -f2 \"\${POST_STATE_FILE}\"); \
             CLASSIFY_STATE_FILE=\"\${RUNNER_TEMP}/playwright-classification.state\"; \
-            node scripts/playwright-staging-gate.cjs --classify apps/mobile/e2e-web/test-results \"\${SUITE_STATUS}\" \"\${RUNNER_TEMP}/playwright-result.log\" > \"\${CLASSIFY_STATE_FILE}\"; \
+            node scripts/playwright-staging-gate.cjs --classify apps/mobile/e2e-web/test-results \"\${SUITE_STATUS}\" \"\${RUNNER_TEMP}/playwright-result.log\" \"\${PLAYWRIGHT_API_URL}\" > \"\${CLASSIFY_STATE_FILE}\"; \
             cat \"\${CLASSIFY_STATE_FILE}\"; \
             FAILURE_CLASS=\$(cut -d= -f2 \"\${CLASSIFY_STATE_FILE}\"); \
             node scripts/playwright-staging-gate.cjs --decide \"\${PRE_STATE}\" \"\${POST_STATE}\" \"\${FAILURE_CLASS}\" \"\${SUITE_STATUS}\""
