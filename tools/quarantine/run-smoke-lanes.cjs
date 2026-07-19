@@ -36,14 +36,16 @@ const DECLARED_CORE_PROJECTS = Object.freeze([
 
 const WI_RE = /^WI-\d+$/;
 
-function loadRegistry() {
+// registryPath defaults to REGISTRY_PATH but is injectable so tests can point
+// this at a temp fixture instead of mutating the real committed registry.
+function loadRegistry(registryPath = REGISTRY_PATH) {
   let raw;
   try {
-    raw = fs.readFileSync(REGISTRY_PATH, 'utf8');
+    raw = fs.readFileSync(registryPath, 'utf8');
   } catch (err) {
     if (err.code === 'ENOENT') return [];
     throw new Error(
-      `run-smoke-lanes: cannot read ${REGISTRY_PATH}: ${err.message}`,
+      `run-smoke-lanes: cannot read ${registryPath}: ${err.message}`,
     );
   }
   let data;
@@ -51,10 +53,20 @@ function loadRegistry() {
     data = JSON.parse(raw);
   } catch (err) {
     throw new Error(
-      `run-smoke-lanes: ${REGISTRY_PATH} is not valid JSON: ${err.message}`,
+      `run-smoke-lanes: ${registryPath} is not valid JSON: ${err.message}`,
     );
   }
-  return Array.isArray(data.entries) ? data.entries : [];
+  // A missing file is fine (no registry yet — entries is empty). A file that
+  // parses as JSON but whose "entries" is absent or not an array is a
+  // DIFFERENT, malformed condition — distinct from a genuinely valid empty
+  // ledger ({ "entries": [] }) — and must fail loud rather than silently
+  // resolve to the same empty-array result.
+  if (!Array.isArray(data.entries)) {
+    throw new Error(
+      `run-smoke-lanes: ${registryPath} is malformed — "entries" must be an array (got ${JSON.stringify(data.entries)}). A valid empty ledger is { "entries": [] }.`,
+    );
+  }
+  return data.entries;
 }
 
 // An entry is active (still quarantining, i.e. demoting its project to
@@ -90,7 +102,7 @@ function playwrightProjectFlags(projects) {
 
 // Deterministic registry-shape validator (WI-2452), mirrors
 // tools/quarantine/validate.cjs's checks (WI-536): fails on a missing
-// owner/wi/reason/expires, an unknown project name, an unparsable expires,
+// id/owner/wi/reason/expires, an unknown project name, an unparsable expires,
 // or a duplicate project entry. Does NOT require expires to be in the
 // future — an already-expired entry is inert, not invalid, and removing it
 // is a cleanup courtesy, not a correctness requirement.
@@ -103,6 +115,9 @@ function validate(entries) {
     if (!e || typeof e !== 'object') {
       problems.push(`${where}: not an object`);
       return;
+    }
+    if (!e.id) {
+      problems.push(`${where}: missing "id"`);
     }
     if (!e.project || !DECLARED_CORE_PROJECTS.includes(e.project)) {
       problems.push(
@@ -154,9 +169,16 @@ module.exports = {
 if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'core' || mode === 'advisory') {
-    const { core, advisory } = resolveLanes();
+    let lanes;
+    try {
+      lanes = resolveLanes();
+    } catch (err) {
+      console.error(`✖ ${err.message}`);
+      process.exit(1);
+    }
     process.stdout.write(
-      playwrightProjectFlags(mode === 'core' ? core : advisory) + '\n',
+      playwrightProjectFlags(mode === 'core' ? lanes.core : lanes.advisory) +
+        '\n',
     );
   } else if (mode === 'validate') {
     let entries;
