@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" bounds="[0,0][360,760]">
+    <node resource-id="com.mentomate.app:id/scope-chip" class="android.widget.HorizontalScrollView" bounds="[16,32][276,84]">
+      <node resource-id="com.mentomate.app:id/scope-chip-option-supporter-hub" class="android.view.View" content-desc="Support hub" selected="true" visible-to-user="true" bounds="[20,36][120,80]">
+        <node class="android.widget.TextView" text="Support hub" bounds="[28,46][108,70]" />
+      </node>
+      <node resource-id="com.mentomate.app:id/scope-chip-option-person-rich" class="android.view.View" content-desc="Test Supportee" selected="false" visible-to-user="true" bounds="[124,36][240,80]" />
+      <node resource-id="com.mentomate.app:id/scope-chip-option-person-empty" class="android.view.View" content-desc="Empty-Record Supportee" selected="false" visible-to-user="true" bounds="[244,36][275,80]" />
+    </node>
+    <node resource-id="com.mentomate.app:id/account-avatar-button" class="android.view.View" content-desc="Account" bounds="[300,32][344,76]" />
+    <node class="android.widget.ScrollView" resource-id="support-hub-mentor-tab" bounds="[0,84][360,700]">
+      <node class="android.widget.TextView" text="Support hub" bounds="[20,100][190,132]" />
+      <node class="android.widget.TextView" text="Shared signals and next steps for the learners you support." bounds="[20,136][340,176]" />
+    </node>
+  </node>
+</hierarchy>

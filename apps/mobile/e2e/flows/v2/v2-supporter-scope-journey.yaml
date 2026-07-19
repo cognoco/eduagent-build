@@ -11,6 +11,20 @@
 # Subjects surface), the revoked supportee's absence of any UI affordance,
 # and the empty-record supportee's honest empty state.
 #
+# [WI-2176] Orion native geometry contract:
+# - Force the Android window to 360x760 physical pixels at 160 dpi and reset
+#   font_scale to 1.0 before this flow, use an en-US V2 build, and leave the app
+#   at the final named screenshot. Maestro proves the journey and endpoint only.
+# - Then run apps/mobile/e2e/scripts/capture-wi2176-orion-header.sh. Its two
+#   structured UIAutomator snapshots, not the relative Maestro selectors,
+#   prove the numeric edge, clearance, safe-area, and 44x44 target conditions.
+# - OUTSTANDING AC4: longest-localized-label and loading-to-loaded-transition
+#   coverage still requires later claimed source work; this English seed does
+#   not simulate either condition.
+# - OUTSTANDING AC6: persisted Me still requires later claimed seed/source work.
+#   This seed gives learning state only to supportees, so the server truthfully
+#   omits the supporter's Me option. Person persistence below is not a substitute.
+#
 # [Phase-4 review, WI-2241] The actual NEGATIVE WALL FAIL-CLOSED property (a
 # revoked/unrelated caller is denied outright, not served foreign data) is
 # proven at its source in test-seed-v2-supporter.integration.test.ts (real
@@ -30,6 +44,77 @@ tags:
     env:
       SEED_SCENARIO: 'v2-supporter-accepted'
       API_URL: ${API_URL}
+
+# Native small-phone header: wait for the populated English Support hub and
+# exercise each available scope target. Numeric geometry is checked externally
+# from the final UIAutomator hierarchy, after the complete journey.
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 15000
+- assertVisible:
+    id: 'scope-chip-shell'
+- assertVisible:
+    id: 'account-avatar-shell'
+- assertVisible:
+    id: 'account-avatar-button'
+    enabled: true
+- assertVisible:
+    id: 'scope-chip-option-supporter-hub'
+    enabled: true
+    selected: true
+- swipe:
+    from:
+      id: 'scope-chip'
+    direction: LEFT
+    duration: 400
+- extendedWaitUntil:
+    visible:
+      id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+    timeout: 5000
+- assertVisible:
+    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+    enabled: true
+- swipe:
+    from:
+      id: 'scope-chip'
+    direction: LEFT
+    duration: 400
+- extendedWaitUntil:
+    visible:
+      id: 'scope-chip-option-person-${EMPTY_SUPPORTEE_PERSON_ID}'
+    timeout: 5000
+- assertVisible:
+    id: 'scope-chip-option-person-${EMPTY_SUPPORTEE_PERSON_ID}'
+    enabled: true
+- swipe:
+    from:
+      id: 'scope-chip'
+    direction: RIGHT
+    duration: 400
+- extendedWaitUntil:
+    visible:
+      id: 'scope-chip-option-supporter-hub'
+    timeout: 5000
+
+# The Account target must remain actionable without disturbing the selected
+# Support-hub scope. Round-trip through the real native route and Back control.
+- tapOn:
+    id: 'account-avatar-button'
+    point: '50%,50%'
+- extendedWaitUntil:
+    visible:
+      id: 'account-screen'
+    timeout: 15000
+- tapOn:
+    id: 'account-back'
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 15000
+- assertVisible:
+    id: 'scope-chip-option-supporter-hub'
+    selected: true
 
 - extendedWaitUntil:
     visible:
@@ -172,3 +257,76 @@ tags:
     visible:
       id: 'support-hub-journal-tab'
     timeout: 15000
+
+# PERSISTED PERSON: exercise the real person scope option, cold-relaunch without
+# clearing app state, and require its accessibility selected state after
+# scope-list hydration. This is a hard assertion, not a screenshot.
+- tapOn:
+    id: 'tab-mentor'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 15000
+- swipe:
+    from:
+      id: 'scope-chip'
+    direction: LEFT
+    duration: 400
+- extendedWaitUntil:
+    visible:
+      id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+    timeout: 5000
+- tapOn:
+    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-mentor-tab'
+    timeout: 15000
+- assertVisible:
+    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+    selected: true
+- stopApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-mentor-tab'
+    timeout: 30000
+- swipe:
+    from:
+      id: 'scope-chip'
+    direction: LEFT
+    duration: 400
+- extendedWaitUntil:
+    visible:
+      id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+    timeout: 5000
+- assertVisible:
+    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+    selected: true
+
+# Finish at the English Support-hub geometry state consumed by the external
+# UIAutomator capture/checker. A targeted reverse swipe exposes the hub option
+# without sending a gesture through the page body.
+- swipe:
+    from:
+      id: 'scope-chip'
+    direction: RIGHT
+    duration: 400
+- extendedWaitUntil:
+    visible:
+      id: 'scope-chip-option-supporter-hub'
+    timeout: 5000
+- tapOn:
+    id: 'scope-chip-option-supporter-hub'
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 15000
+- assertVisible:
+    id: 'scope-chip-option-supporter-hub'
+    selected: true
+- assertVisible:
+    text: 'Shared signals and next steps for the learners you support.'
+- takeScreenshot: wi2176-orion-360x760-english-support-hub-header

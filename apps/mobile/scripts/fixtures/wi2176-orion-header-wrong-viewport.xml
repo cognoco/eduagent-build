@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" bounds="[0,0][412,915]">
+    <node resource-id="scope-chip" class="android.widget.HorizontalScrollView" bounds="[16,32][300,84]">
+      <node resource-id="scope-chip-option-supporter-hub" class="android.view.View" content-desc="Support hub" selected="true" visible-to-user="true" bounds="[20,36][108,80]" />
+      <node resource-id="scope-chip-option-person-rich" class="android.view.View" content-desc="Test Supportee" selected="false" visible-to-user="true" bounds="[112,36][200,80]" />
+      <node resource-id="scope-chip-option-person-empty" class="android.view.View" content-desc="Empty-Record Supportee" selected="false" visible-to-user="true" bounds="[204,36][296,80]" />
+    </node>
+    <node resource-id="account-avatar-button" class="android.view.View" content-desc="Account" bounds="[340,32][384,76]" />
+    <node class="android.widget.ScrollView" resource-id="support-hub-mentor-tab" bounds="[0,84][412,860]">
+      <node class="android.widget.TextView" text="Support hub" bounds="[20,100][190,132]" />
+      <node class="android.widget.TextView" text="Shared signals and next steps for the learners you support." bounds="[20,136][340,176]" />
+    </node>
+  </node>
+</hierarchy>
