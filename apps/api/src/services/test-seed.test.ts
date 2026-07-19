@@ -179,6 +179,8 @@ describe('VALID_SCENARIOS', () => {
       'mentor-audit-family-pool-members',
       'mentor-audit-family-owner-daily-quota-with-child',
       'mentor-audit-bridge-backstack',
+      // [WI-2241] Supportership-aware v2 seed.
+      'v2-supporter-accepted',
     ]);
   });
 
@@ -262,7 +264,23 @@ describe('seedScenario', () => {
     global.fetch = originalFetch;
   });
 
-  it.each(VALID_SCENARIOS as SeedScenario[])(
+  // [WI-2241] Scenarios that call db.transaction() with read-after-write
+  // inside it (initiateLink/acceptLink/requestSelfUnlink via
+  // test-seed-v2-supporter.ts) cannot be honestly exercised against this
+  // file's stateless mock — createMockDb() has no `.transaction()` and its
+  // `.select()...where()` always resolves `[]`, so the second write in the
+  // chain would read back nothing it just wrote. Faking that with a
+  // last-row-wins mock would pass the dispatch smoke test while verifying
+  // nothing about the transactional contract logic — worse than not testing
+  // it at all. Real coverage lives in
+  // test-seed-v2-supporter.integration.test.ts (real Neon DB, same pattern as
+  // supporter-visibility-authorization.integration.test.ts).
+  const DB_TRANSACTION_SCENARIOS: SeedScenario[] = ['v2-supporter-accepted'];
+  const MOCK_DISPATCHABLE_SCENARIOS = (
+    VALID_SCENARIOS as SeedScenario[]
+  ).filter((scenario) => !DB_TRANSACTION_SCENARIOS.includes(scenario));
+
+  it.each(MOCK_DISPATCHABLE_SCENARIOS)(
     'dispatches "%s" and returns SeedResult',
     async (scenario: SeedScenario) => {
       const db = createMockDb();
@@ -571,11 +589,12 @@ describe('resetDatabase', () => {
     const result = await resetDatabase(db);
 
     expect(result).toEqual({ deletedCount: 2, clerkUsersDeleted: 0 });
-    // deleteOrganizationGraph issues 6 deletes: consentRequest, consentGrant,
-    // subscription, guardianship, person, organization (only organization uses
-    // .returning()). consentRequest is deleted before consentGrant (WI-880) to
-    // clear the consent_request.consent_grant_id NO ACTION back-link FK.
-    expect(db.delete).toHaveBeenCalledTimes(6);
+    // deleteOrganizationGraph issues 7 deletes: consentRequest, consentGrant,
+    // subscription, guardianship, supportership [WI-2241], person, organization
+    // (only organization uses .returning()). consentRequest is deleted before
+    // consentGrant (WI-880) to clear the consent_request.consent_grant_id NO
+    // ACTION back-link FK.
+    expect(db.delete).toHaveBeenCalledTimes(7);
     expect(deleteReturning).toHaveBeenCalledTimes(1);
   });
 

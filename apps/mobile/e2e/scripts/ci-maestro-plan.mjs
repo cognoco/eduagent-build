@@ -132,6 +132,13 @@ function validateManifest(allFlows, validScenarios) {
     if (!manifestPr.has(flow))
       fail(`pr-blocking flow missing from PR manifest: ${flow}`);
   }
+  const taggedV2 = new Set(
+    allFlows.filter(({ tags }) => tags.includes('v2')).map(({ flow }) => flow),
+  );
+  for (const flow of taggedV2) {
+    if (!manifestV2.has(flow))
+      fail(`V2-tagged flow missing from V2 manifest: ${flow}`);
+  }
   for (const { flow, scenario } of manifest.pr) {
     const metadata = byPath.get(flow);
     if (!metadata) fail(`PR manifest flow does not exist: ${flow}`);

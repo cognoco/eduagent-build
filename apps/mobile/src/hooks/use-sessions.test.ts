@@ -591,11 +591,11 @@ describe('useSubmitSummary', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
   });
 
-  it('handles submission error', async () => {
+  it('[WI-2095] settles isPending after a 5xx response', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('API error 422', {
-        status: 422,
-        statusText: 'Unprocessable Entity',
+      new Response('API error 500', {
+        status: 500,
+        statusText: 'Internal Server Error',
       }),
     );
 
@@ -611,7 +611,162 @@ describe('useSubmitSummary', () => {
       expect(result.current.isError).toBe(true);
     });
 
+    expect(result.current.isPending).toBe(false);
     expect(result.current.error).toBeInstanceOf(Error);
+  });
+
+  it('[WI-2095] aborts a stalled request after 35 seconds and settles isPending', async () => {
+    jest.useFakeTimers();
+    let requestSignal: AbortSignal | undefined;
+    mockFetch.mockImplementationOnce(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          requestSignal = init?.signal ?? undefined;
+          requestSignal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted', 'AbortError'));
+          });
+        }),
+    );
+
+    const { result } = renderHook(() => useSubmitSummary('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => {
+      result.current.mutate({ content: 'A reflection long enough to save' });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.isPending).toBe(true);
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(35_000);
+    });
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(requestSignal?.aborted).toBe(true);
+    expect(result.current.isPending).toBe(false);
+    jest.useRealTimers();
+  });
+
+  it('[WI-2095] settles isPending after an unparseable raw response', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response('{not valid json', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const { result } = renderHook(() => useSubmitSummary('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => {
+      result.current.mutate({ content: 'A reflection long enough to save' });
+    });
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(result.current.isPending).toBe(false);
+  });
+
+  it('[WI-2095] propagates a caller abort to the summary request', async () => {
+    const caller = new AbortController();
+    let requestSignal: AbortSignal | undefined;
+    mockFetch.mockImplementationOnce(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          requestSignal = init?.signal ?? undefined;
+          requestSignal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted', 'AbortError'));
+          });
+        }),
+    );
+
+    const { result } = renderHook(() => useSubmitSummary('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => {
+      result.current.mutate({
+        content: 'A reflection long enough to save',
+        signal: caller.signal,
+      });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    caller.abort();
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(false);
+    });
+
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it('[WI-2095] settles a timeout before retrying without overlap or a late result win', async () => {
+    jest.useFakeTimers();
+    let activeRequests = 0;
+    let maxActiveRequests = 0;
+    let requestCount = 0;
+    mockFetch.mockImplementation(
+      (_input: RequestInfo | URL, init?: RequestInit) => {
+        requestCount += 1;
+        activeRequests += 1;
+        maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
+        if (requestCount === 2) {
+          activeRequests -= 1;
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                summary: {
+                  id: '880e8400-e29b-41d4-a716-446655440002',
+                  sessionId: '660e8400-e29b-41d4-a716-446655440000',
+                  content: 'The retry wins',
+                  aiFeedback: null,
+                  status: 'accepted',
+                },
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            activeRequests -= 1;
+            reject(new DOMException('The operation was aborted', 'AbortError'));
+          });
+        });
+      },
+    );
+
+    const { result } = renderHook(() => useSubmitSummary('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => {
+      result.current.mutate({ content: 'The first reflection stalls' });
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(35_000);
+    });
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ content: 'The retry wins' });
+    });
+
+    expect(requestCount).toBe(2);
+    expect(maxActiveRequests).toBe(1);
+    expect(result.current.data?.summary.content).toBe('The retry wins');
+    jest.useRealTimers();
   });
 });
 

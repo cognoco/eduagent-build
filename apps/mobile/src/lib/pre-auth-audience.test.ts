@@ -150,4 +150,68 @@ describe('pre-auth audience carrier', () => {
       expect(deleteItemSpy).toHaveBeenCalledWith('preAuthAudience.v1');
     });
   });
+
+  // [WI-2225] 'supporter' — a third, non-authorizing pre-auth intent value
+  // carried by the same device-scoped mechanism as 'learner'/'parent'.
+  describe('supporter audience (WI-2225)', () => {
+    // Warm signup: the chooser sets the value and profile setup reads it
+    // back synchronously in the same session, same as 'parent'/'learner'.
+    it('warm signup: makes a supporter choice readable synchronously', () => {
+      markPreAuthAudienceSync('supporter');
+      expect(readPreAuthAudienceSync()).toBe('supporter');
+    });
+
+    it('warm signup: persists the supporter audience to SecureStore with a JSON record', async () => {
+      markPreAuthAudienceSync('supporter');
+      await Promise.resolve();
+      expect(setItemSpy).toHaveBeenCalledWith(
+        'preAuthAudience.v1',
+        expect.stringContaining('"audience":"supporter"'),
+      );
+    });
+
+    // Cold verification: an email-verification round-trip (or any app
+    // restart) drops the in-memory cache; the async read must hydrate a
+    // fresh supporter record from SecureStore rather than treating it as
+    // unrecognized.
+    it('cold verification: hydrates a supporter choice from SecureStore after an in-memory reset', async () => {
+      getItemSpy.mockResolvedValue(
+        JSON.stringify({ audience: 'supporter', savedAt: Date.now() }),
+      );
+      __resetPreAuthAudienceForTests();
+      await expect(readPreAuthAudience()).resolves.toBe('supporter');
+    });
+
+    // Abandoned/expired signup: a supporter record older than the TTL must
+    // fall back safely (null, not a stale/invalid value) — same guarantee
+    // the carrier already gives 'parent'/'learner'.
+    it('abandoned signup: returns null and deletes the key for an expired supporter record', async () => {
+      getItemSpy.mockResolvedValue(
+        JSON.stringify({
+          audience: 'supporter',
+          savedAt: Date.now() - (PRE_AUTH_AUDIENCE_TTL_MS + 1000),
+        }),
+      );
+      __resetPreAuthAudienceForTests();
+      await expect(readPreAuthAudience()).resolves.toBeNull();
+      expect(deleteItemSpy).toHaveBeenCalledWith('preAuthAudience.v1');
+    });
+
+    it('overwrites a prior learner choice with supporter', () => {
+      markPreAuthAudienceSync('learner');
+      markPreAuthAudienceSync('supporter');
+      expect(readPreAuthAudienceSync()).toBe('supporter');
+    });
+
+    // Sign-out cleanup (carrier half): clearPreAuthAudience wipes a
+    // supporter record exactly as it does parent/learner. The full
+    // sign-out-wipe-by-key-name guarantee is covered in
+    // sign-out-cleanup.test.ts.
+    it('sign-out: clearPreAuthAudience clears both the in-memory supporter value and the SecureStore key', async () => {
+      markPreAuthAudienceSync('supporter');
+      await clearPreAuthAudience();
+      expect(readPreAuthAudienceSync()).toBeNull();
+      expect(deleteItemSpy).toHaveBeenCalledWith('preAuthAudience.v1');
+    });
+  });
 });

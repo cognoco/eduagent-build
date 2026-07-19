@@ -7,6 +7,26 @@
 > here is a **finding**, to be fixed by a separate follow-up Work Item, not by
 > this doc's author.
 
+> **Audited at:** `origin/main` @ **`2ce257f001833572eb8a239150922c522b9f7ad2`**
+> (the commit that landed this doc, PR #2280).
+>
+> **Citation unit (drift-immune).** Every **gap** in the enumeration (§1, §1b)
+> is cited by its **handler identity** — `` `file.ts · METHOD /route` `` — the
+> registered route, stable across line churn. This is the authoritative unit
+> the reviewer verifies; §7 is the scripted proof that all of them resolve at
+> the audited SHA. Physical line numbers are **optional convenience annotations
+> valid only at the audited SHA above**; they are *generated*, not
+> hand-maintained, by the re-verify pass (`verify-010-citations.mjs`, output in
+> §7), and **head-drift after the audited SHA is not a defect** for this
+> point-in-time artifact. The §2 (not-a-gap) and §1c (out-of-scope write)
+> references keep their `file.ts:line` locations for the WI-2416 sweep's
+> convenience; those line numbers are likewise annotations valid only at the
+> audited SHA. Rationale: this doc cites hot files (`sessions.ts`,
+> `progress.ts`) that `main` advanced past repeatedly during authoring; pinning
+> the audit to one SHA and citing the drift-immune unit ends the moving-target
+> race (per the pinned-revision principle, WI-2366 family / PM loop-breaker
+> ruling 2026-07-19).
+
 **Verdict: reachable, not refuted.** The plan's premise holds. Same root cause
 as WI-1989/WI-1301/WI-1302 (org-membership standing in for caller identity),
 now confirmed on the **read** surface: several routes let an authenticated,
@@ -43,18 +63,48 @@ there is only one authenticated actor in the sub-tree, so no rival identity can
 exploit the header — the gap only bites once a family has 2+ independently
 logged-in members.
 
-## 1. Confirmed gaps (file:line, audited)
+## 1. Confirmed gaps
 
-| # | File:line | Route | Current check | Data/action exposed | Severity |
-|---|---|---|---|---|---|
-| G1 | `routes/recaps.ts:62-74` | `GET /recaps/self` | none — bare `withProfile(c).profileId` | mentor-generated recap summaries of another profile's learning sessions | **HIGH** |
-| G2 | `routes/learner-profile.ts:64-75` | `GET /learner-profile` | none — bare `withProfile(c)` | full memory-projection self-view (facts/preferences the mentor has learned about the learner) | **HIGH** |
-| G3 | `routes/learner-profile.ts:77-86` | `GET /learner-profile/export-text` | none — bare `withProfile(c)` | human-readable full memory export of another profile | **HIGH** |
-| G4 | `routes/notes.ts:105-186,300-310` (all GETs in file) | `GET /notes`, `/notes/topic-ids`, book/topic note routes | none — bare `requireProfileId(c.get('profileId'))`, no guardian variant exists in this file at all | conversation-linked notes | **HIGH** |
-| G5 | `routes/consent.ts:464-488` | `GET /consent/my-status` | none — bare `c.get('profileId')` | consent status, masked parent email, consent type of another profile | **MEDIUM** |
-| G6 | `routes/consent.ts:144-169` (self-service branch, line 152-154), called from `POST /consent/request:224` and `POST /consent/resend:345` | `assertCanRequestConsentForChild` self-service branch | `if (childProfileId === activeProfileId) return;` — no `callerPersonId` check, no credential check | attacker can trigger/resend a parental-consent email and set `consentType` for **any** child profile on the account by setting `X-Profile-Id` to that child's id | **MEDIUM** (state-changing, not data disclosure — flagged here because exec-1989 named it as the concrete target, even though the enclosing routes are POST, not GET; see scope note below) |
-| G7 | `routes/progress.ts:108-227` (all self GET/POST routes: `/progress/sessions`, `/overdue-topics`, `/practice-activity-history`, `/reports*`, `/weekly-reports*`, `/topic/:topicId/active-session`) | none — bare `withProfile(c)`, no guardian variant in this file | practice history, monthly/weekly performance reports | **MEDIUM–HIGH** |
-| G8 | `routes/sessions.ts:184` (`GET /sessions/resume-nudge`), `:190` (`GET /subjects/:subjectId/sessions`), `:272` (`GET /sessions/:sessionId`), `:571` (`GET /sessions/:sessionId/transcript`), `:884` (`GET /sessions/:sessionId/summary`); `routes/quiz.ts:216` (`GET /quiz/rounds/recent`), `:239` (`GET /quiz/rounds/:id`), `:399` (`GET /quiz/stats`) | none — bare `withProfile(c)` / `requireProfileId(c.get('profileId'))`; neither file imports any owner/guardian guard | session state, quiz history/answers; `/sessions/:sessionId/transcript` is the **full raw mentor-conversation transcript** (same sensitivity class as G1's recaps, arguably more so — it's the source material recaps are generated from) | **HIGH** (`/transcript`); **MEDIUM–HIGH** (the other 7 handlers) |
+Citation unit is the handler identity `` `file.ts · METHOD /route` `` (see header).
+Line numbers live in §7 (scripted, valid at the audited SHA), not in these rows.
+
+| # | Handler | Current check | Data/action exposed | Severity |
+|---|---|---|---|---|
+| G1 | `recaps.ts · GET /recaps/self` | none — bare `withProfile(c).profileId` | mentor-generated recap summaries of another profile's learning sessions | **HIGH** |
+| G2 | `learner-profile.ts · GET /learner-profile` | none — bare `withProfile(c)` | full memory-projection self-view (facts/preferences the mentor has learned about the learner) | **HIGH** |
+| G3 | `learner-profile.ts · GET /learner-profile/export-text` | none — bare `withProfile(c)` | human-readable full memory export of another profile | **HIGH** |
+| G4a | `notes.ts · GET /subjects/:subjectId/books/:bookId/notes` | none — bare `requireProfileId(c.get('profileId'))`, no guardian variant exists in this file at all | all notes for every topic in a book | **HIGH** |
+| G4b | `notes.ts · GET /subjects/:subjectId/topics/:topicId/note` | none — bare `requireProfileId(c.get('profileId'))` | single legacy-shape note for a topic | **HIGH** |
+| G4c | `notes.ts · GET /notes` | none — bare `requireProfileId(c.get('profileId'))` | all notes for the profile, cursor-paginated | **HIGH** |
+| G4d | `notes.ts · GET /notes/topic-ids` | none — bare `requireProfileId(c.get('profileId'))` | topic IDs that have at least one note | **HIGH** |
+| G4e | `notes.ts · GET /notes/concept-mastery` | none — bare `withProfile(c)` | derived concept-grain note-mastery signals | **HIGH** |
+| G4f | `notes.ts · GET /subjects/:subjectId/topics/:topicId/notes` | none — bare `requireProfileId(c.get('profileId'))` | all notes for a topic | **HIGH** |
+| G4g | `notes.ts · GET /subjects/:subjectId/topics/:topicId/sessions` | none — bare `requireProfileId(c.get('profileId'))` | sessions linked to a topic (backs the notes screen's session list) | **HIGH** |
+| G5 | `consent.ts · GET /consent/my-status` | none — bare `c.get('profileId')` | consent status, masked parent email, consent type of another profile | **MEDIUM** |
+| G6 | `consent.ts · POST /consent/request`, `consent.ts · POST /consent/resend` (both reach the `assertCanRequestConsentForChild` self-service branch, `if (childProfileId === activeProfileId) return;`) | no `callerPersonId` check, no credential check on the self-service branch | attacker can trigger/resend a parental-consent email and set `consentType` for **any** child profile on the account by setting `X-Profile-Id` to that child's id | **MEDIUM** (state-changing, not data disclosure — flagged here because exec-1989 named it as the concrete target, even though the enclosing routes are POST, not GET; see scope note below) |
+| G7a | `progress.ts · GET /subjects/:subjectId/progress` | none — bare `withProfile(c)`, no guardian variant in this file | subject progress with topic breakdown | **MEDIUM–HIGH** |
+| G7b | `progress.ts · GET /subjects/:subjectId/topics/:topicId/progress` | none — bare `withProfile(c)` | detailed topic progress | **MEDIUM–HIGH** |
+| G7c | `progress.ts · GET /progress/overview` | none — bare `withProfile(c)` | overall progress across all subjects | **MEDIUM–HIGH** |
+| G7d | `progress.ts · GET /progress/review-summary` | none — bare `withProfile(c)` | total overdue review count + next review topic | **MEDIUM–HIGH** |
+| G7e | `progress.ts · GET /progress/overdue-topics` | none — bare `withProfile(c)` | overdue topics grouped by subject | **MEDIUM–HIGH** |
+| G7f | `progress.ts · GET /progress/sessions` | none — bare `withProfile(c)` | practice history | **MEDIUM–HIGH** |
+| G7g | `progress.ts · GET /progress/practice-activity-history` | none — bare `withProfile(c)` | practice history across all activity types (quiz/review/assessment/dictation/recitation/fluency_drill) | **MEDIUM–HIGH** |
+| G7h | `progress.ts · GET /progress/reports` | none — bare `withProfile(c)` | monthly performance reports list | **MEDIUM–HIGH** |
+| G7i | `progress.ts · GET /progress/reports/:reportId` | none — bare `withProfile(c)` | monthly performance report detail | **MEDIUM–HIGH** |
+| G7j | `progress.ts · GET /progress/weekly-reports` | none — bare `withProfile(c)` | weekly performance reports list | **MEDIUM–HIGH** |
+| G7k | `progress.ts · GET /progress/weekly-reports/:weeklyReportId` | none — bare `withProfile(c)` | weekly performance report detail | **MEDIUM–HIGH** |
+| G7l | `progress.ts · GET /progress/topic/:topicId/active-session` | none — bare `withProfile(c)` | active/paused session for a specific topic | **MEDIUM–HIGH** |
+| G7m | `progress.ts · GET /topics/:topicId/resolve` | none — bare `withProfile(c)` | topic's parent subject (deep-link resolution) | **MEDIUM–HIGH** |
+| G7n | `progress.ts · GET /progress/resume-target` | none — bare `withProfile(c)` | unified "continue learning" target for Home/Library/Progress | **MEDIUM–HIGH** |
+| G7o | `progress.ts · GET /progress/continue` | none — bare `withProfile(c)` | "continue where I left off" suggestion | **MEDIUM–HIGH** |
+| G8a | `sessions.ts · GET /sessions/resume-nudge` | none — bare `withProfile(c)` / `requireProfileId(c.get('profileId'))`; the file imports no owner/guardian guard | resume-nudge state for another profile's paused session | **MEDIUM–HIGH** |
+| G8b | `sessions.ts · GET /subjects/:subjectId/sessions` | none — bare `withProfile(c)` / `requireProfileId(c.get('profileId'))` | session list for a subject | **MEDIUM–HIGH** |
+| G8c | `sessions.ts · GET /sessions/:sessionId` | none — bare `withProfile(c)` / `requireProfileId(c.get('profileId'))` | session state/metadata | **MEDIUM–HIGH** |
+| G8d | `sessions.ts · GET /sessions/:sessionId/transcript` | none — bare `withProfile(c)` / `requireProfileId(c.get('profileId'))` | the **full raw mentor-conversation transcript** — same sensitivity class as G1's recaps, arguably more so (it is the source material recaps are generated from) | **HIGH** |
+| G8e | `sessions.ts · GET /sessions/:sessionId/summary` | none — bare `withProfile(c)` / `requireProfileId(c.get('profileId'))` | session summary | **MEDIUM–HIGH** |
+| G8f | `quiz.ts · GET /quiz/rounds/recent` | none — bare `withProfile(c)` / `requireProfileId(c.get('profileId'))`; the file imports no owner/guardian guard | recent quiz rounds | **MEDIUM–HIGH** |
+| G8g | `quiz.ts · GET /quiz/rounds/:id` | none — bare `withProfile(c)` / `requireProfileId(c.get('profileId'))` | quiz-round detail: history and answers | **MEDIUM–HIGH** |
+| G8h | `quiz.ts · GET /quiz/stats` | none — bare `withProfile(c)` / `requireProfileId(c.get('profileId'))` | quiz performance stats | **MEDIUM–HIGH** |
 
 **Proposed ruling — same remedy for G1–G8** (and for the further gaps in §1b
 below): a shared authority check, reusing existing primitives (§3), applied
@@ -82,28 +132,35 @@ branches sharing the same root cause are **not** re-tabled at this rigor
 (WI-2006's AC is read-side) — they are named, grouped, and folded into the
 WI-2416 follow-up sweep at the end of this section instead.
 
-| # | File:line | Route | Current check | Data/action exposed | Severity |
-|---|---|---|---|---|---|
-| G9 | `routes/assessments.ts:83-96` | `GET /subjects/:subjectId/topics/:topicId/assessments/active` | none — bare `withProfile(c)` | active assessment status/depth/mastery for the topic | **MEDIUM** |
-| G10 | `routes/assessments.ts:205-241` | `GET /assessments/:assessmentId` | none — bare `withProfile(c)` | full assessment record incl. `exchangeHistory` (the mentor/learner chat exchanges for the assessment) | **HIGH** (transcript-class content) |
-| G11 | `routes/book-suggestions.ts:45-59,90-103` (both GETs) | `GET /subjects/:subjectId/book-suggestions`, `/book-suggestions/all` | none — bare `requireProfileId(c.get('profileId'))` | unpicked/all book suggestions for a subject | **MEDIUM** |
-| G12 | `routes/bookmarks.ts:57-69,70-83` (both GETs) | `GET /bookmarks/session`, `GET /bookmarks` | none — bare `requireProfileId(c.get('profileId'))` | bookmarked conversation events, tagged by subject/topic | **MEDIUM** |
-| G13 | `routes/books.ts:71-80,82-100,101-122,332-343` (all 4 GETs) | `GET /library/books`, `/subjects/:subjectId/books`, `/subjects/:subjectId/books/:bookId`, `.../:bookId/sessions` | none — bare `requireProfileId(c.get('profileId'))` | library/curriculum structure, per-book session list | **MEDIUM** |
-| G14 | `routes/celebrations.ts:30-59` | `GET /celebrations/pending` | none — bare `requireProfileId(c.get('profileId'))`; the `viewer=parent` query param is also purely client-asserted (not derived from caller identity) | pending achievement/celebration milestones | **LOW** |
-| G15 | `routes/coaching-card.ts:22-28` | `GET /coaching-card` | none — bare `requireProfileId(c.get('profileId'))` | mentor's private coaching-card guidance about the learner (same class as G2's memory projection) | **HIGH** |
-| G16 | `routes/curriculum.ts:132-138,276-301` (both GETs; the file's writes — `clone-from-child`/`undo` — are already owner-gated, see §2) | `GET /subjects/:subjectId/curriculum`, `.../curriculum/topics/:topicId/explain` | none — bare `requireProfileId(c.get('profileId'))` | curriculum structure, topic-ordering rationale | **MEDIUM** |
-| G17 | `routes/dictation.ts:340-346,354-360` (both GETs) | `GET /dictation/streak`, `GET /dictation/history` | none — bare `requireProfileId(c.get('profileId'))` | dictation streak; history includes the **persisted source sentences** of past exercises | **MEDIUM** (streak) / **MEDIUM–HIGH** (history) |
-| G18 | `routes/language-progress.ts:26-41` | `GET /subjects/:subjectId/cefr-progress` | none — bare `requireProfileId(c.get('profileId'))` | CEFR language-proficiency progress | **MEDIUM** |
-| G19 | `routes/library-search.ts:17-28` | `GET /library/search` | none — bare `requireProfileId(c.get('profileId'))` | search results over the profile's library | **MEDIUM** |
-| G20 | `routes/nudges.ts:47-51` | `GET /nudges` | none — bare `requireProfileId(c.get('profileId'))` | unread nudges (encouragement messages from other family members) | **MEDIUM** |
-| G21 | `routes/parking-lot.ts:44-55,58-69` (both GETs) | `GET /sessions/:sessionId/parking-lot`, `.../topics/:topicId/parking-lot` | none — bare `requireProfileId(c.get('profileId'))` | parked learner questions | **MEDIUM** |
-| G22 | `routes/retention.ts:62-251` (all 8 GETs: `/library/retention`, `/retention/assessment-eligible`, `/subjects/:subjectId/retention`, `/topics/:topicId/retention`, `/subjects/:subjectId/needs-deepening`, `/subjects/:subjectId/teaching-preference`, `/retention/stability`, `/topics/:topicId/evaluate-eligibility`) | none — bare `requireProfileId(c.get('profileId'))` | retention/stability metrics, teaching preferences, EVALUATE eligibility | **MEDIUM** |
-| G23 | `routes/settings.ts:82-86` (`GET /settings/notifications`); `:112-134` self-branch only (`GET /settings/celebration-level` with no `childProfileId` query — the `childProfileId` branch on the same handler already calls `assertOwnerProfile`+`assertCallerIsAccountOwner`, not a gap); `:329-338` (`GET /settings/subjects/:subjectId/analogy-domain`); `:368-377` (`GET /settings/subjects/:subjectId/native-language`) | notification prefs, own celebration level, analogy-domain/native-language subject preferences | none — bare `withProfile(c)`, and the service functions (`getNotificationPrefs`, `getCelebrationLevel`, `getAnalogyDomain`, `getNativeLanguage`) carry no ownership check either (contrast with the file's own `getOwnedFamilyPoolBreakdownSharing`/`verifyProfileOwnership`, see §2) | **LOW** |
-| G24 | `routes/snapshot-progress.ts:47-52,53-63,64-89` (all 3 GETs) | `GET /progress/inventory`, `/progress/history`, `/progress/milestones` | none — bare `withProfile(c)` | knowledge inventory, progress history, recent milestones — same class as G7's `progress.ts` (a **separate** file of the same name-shape; don't conflate the two) | **MEDIUM–HIGH** |
-| G25 | `routes/streaks.ts:22-28,31-37` (both GETs) | `GET /streaks`, `GET /xp` | none — bare `requireProfileId(c.get('profileId'))` | streak/XP gamification stats | **LOW** |
-| G26 | `routes/subjects.ts:100-107,215-227` (both GETs) | `GET /subjects`, `GET /subjects/:id` | none — bare `requireProfileId(c.get('profileId'))` | subject list/detail | **MEDIUM** |
-| G27 | `routes/topic-suggestions.ts:25-41` | `GET /subjects/:subjectId/books/:bookId/topic-suggestions` | none — bare `requireProfileId(c.get('profileId'))` | unused topic suggestions for a book | **LOW–MEDIUM** |
-| G28 | `routes/vocabulary.ts:37-54` | `GET /subjects/:subjectId/vocabulary` | none — bare `requireProfileId(c.get('profileId'))` | vocabulary list for a subject | **MEDIUM** |
+| # | Handler | Current check | Data/action exposed | Severity |
+|---|---|---|---|---|
+| G9 | `assessments.ts · GET /subjects/:subjectId/topics/:topicId/assessments/active` | none — bare `withProfile(c)` | active assessment status/depth/mastery for the topic | **MEDIUM** |
+| G10 | `assessments.ts · GET /assessments/:assessmentId` | none — bare `withProfile(c)` | full assessment record incl. `exchangeHistory` (the mentor/learner chat exchanges for the assessment) | **HIGH** (transcript-class content) |
+| G11 | `book-suggestions.ts · GET /subjects/:subjectId/book-suggestions`, `book-suggestions.ts · GET /subjects/:subjectId/book-suggestions/all` | none — bare `requireProfileId(c.get('profileId'))` | unpicked/all book suggestions for a subject | **MEDIUM** |
+| G12 | `bookmarks.ts · GET /bookmarks/session`, `bookmarks.ts · GET /bookmarks` | none — bare `requireProfileId(c.get('profileId'))` | bookmarked conversation events, tagged by subject/topic | **MEDIUM** |
+| G13 | `books.ts · GET /library/books`, `books.ts · GET /subjects/:subjectId/books`, `books.ts · GET /subjects/:subjectId/books/:bookId`, `books.ts · GET /subjects/:subjectId/books/:bookId/sessions` | none — bare `requireProfileId(c.get('profileId'))` | library/curriculum structure, per-book session list | **MEDIUM** |
+| G14 | `celebrations.ts · GET /celebrations/pending` | none — bare `requireProfileId(c.get('profileId'))`; the `viewer=parent` query param is also purely client-asserted (not derived from caller identity) | pending achievement/celebration milestones | **LOW** |
+| G15 | `coaching-card.ts · GET /coaching-card` | none — bare `requireProfileId(c.get('profileId'))` | mentor's private coaching-card guidance about the learner (same class as G2's memory projection) | **HIGH** |
+| G16 | `curriculum.ts · GET /subjects/:subjectId/curriculum`, `curriculum.ts · GET /subjects/:subjectId/curriculum/topics/:topicId/explain` (the file's writes — `clone-from-child`/`undo` — are already owner-gated, see §2) | none — bare `requireProfileId(c.get('profileId'))` | curriculum structure, topic-ordering rationale | **MEDIUM** |
+| G17 | `dictation.ts · GET /dictation/streak`, `dictation.ts · GET /dictation/history` | none — bare `requireProfileId(c.get('profileId'))` | dictation streak; history includes the **persisted source sentences** of past exercises | **MEDIUM** (streak) / **MEDIUM–HIGH** (history) |
+| G18 | `language-progress.ts · GET /subjects/:subjectId/cefr-progress` | none — bare `requireProfileId(c.get('profileId'))` | CEFR language-proficiency progress | **MEDIUM** |
+| G19 | `library-search.ts · GET /library/search` | none — bare `requireProfileId(c.get('profileId'))` | search results over the profile's library | **MEDIUM** |
+| G20 | `nudges.ts · GET /nudges` | none — bare `requireProfileId(c.get('profileId'))` | unread nudges (encouragement messages from other family members) | **MEDIUM** |
+| G21 | `parking-lot.ts · GET /sessions/:sessionId/parking-lot`, `parking-lot.ts · GET /subjects/:subjectId/topics/:topicId/parking-lot` | none — bare `requireProfileId(c.get('profileId'))` | parked learner questions | **MEDIUM** |
+| G22a | `retention.ts · GET /library/retention` | none — bare `requireProfileId(c.get('profileId'))` | retention metrics aggregated across all subjects | **MEDIUM** |
+| G22b | `retention.ts · GET /retention/assessment-eligible` | none — bare `requireProfileId(c.get('profileId'))` (`assertNotProxyMode` present, orthogonal — see note above the gap tables) | topics eligible for assessment | **MEDIUM** |
+| G22c | `retention.ts · GET /subjects/:subjectId/retention` | none — bare `requireProfileId(c.get('profileId'))` | retention status for all topics in a subject | **MEDIUM** |
+| G22d | `retention.ts · GET /topics/:topicId/retention` | none — bare `requireProfileId(c.get('profileId'))` | retention card for a single topic | **MEDIUM** |
+| G22e | `retention.ts · GET /subjects/:subjectId/needs-deepening` | none — bare `requireProfileId(c.get('profileId'))` | topics needing extra review | **MEDIUM** |
+| G22f | `retention.ts · GET /subjects/:subjectId/teaching-preference` | none — bare `requireProfileId(c.get('profileId'))` | teaching-method preference | **MEDIUM** |
+| G22g | `retention.ts · GET /retention/stability` | none — bare `requireProfileId(c.get('profileId'))` | topic stability status | **MEDIUM** |
+| G22h | `retention.ts · GET /topics/:topicId/evaluate-eligibility` | none — bare `requireProfileId(c.get('profileId'))` | EVALUATE-eligibility check for a topic | **MEDIUM** |
+| G23 | `settings.ts · GET /settings/notifications`, `settings.ts · GET /settings/celebration-level` (self-branch only — with no `childProfileId` query; the `childProfileId` branch on the same handler already calls `assertOwnerProfile`+`assertCallerIsAccountOwner`, not a gap), `settings.ts · GET /settings/subjects/:subjectId/analogy-domain`, `settings.ts · GET /settings/subjects/:subjectId/native-language` | none — bare `withProfile(c)`, and the service functions (`getNotificationPrefs`, `getCelebrationLevel`, `getAnalogyDomain`, `getNativeLanguage`) carry no ownership check either (contrast with the file's own `getOwnedFamilyPoolBreakdownSharing`/`verifyProfileOwnership`, see §2) | **LOW** |
+| G24 | `snapshot-progress.ts · GET /progress/inventory`, `snapshot-progress.ts · GET /progress/history`, `snapshot-progress.ts · GET /progress/milestones` | none — bare `withProfile(c)` | knowledge inventory, progress history, recent milestones — same class as G7a–G7o's `progress.ts` (a **separate** file of the same name-shape; don't conflate the two) | **MEDIUM–HIGH** |
+| G25 | `streaks.ts · GET /streaks`, `streaks.ts · GET /xp` | none — bare `requireProfileId(c.get('profileId'))` | streak/XP gamification stats | **LOW** |
+| G26 | `subjects.ts · GET /subjects`, `subjects.ts · GET /subjects/:id` | none — bare `requireProfileId(c.get('profileId'))` | subject list/detail | **MEDIUM** |
+| G27 | `topic-suggestions.ts · GET /subjects/:subjectId/books/:bookId/topic-suggestions` | none — bare `requireProfileId(c.get('profileId'))` | unused topic suggestions for a book | **LOW–MEDIUM** |
+| G28 | `vocabulary.ts · GET /subjects/:subjectId/vocabulary` | none — bare `requireProfileId(c.get('profileId'))` | vocabulary list for a subject | **MEDIUM** |
 
 ### New-beyond-G1–G8: the supporter-scope surface (`now.ts`, `scopes.ts`)
 
@@ -116,12 +173,12 @@ self-or-guardian-of-uncredentialed; it has no supportership clause). Flagging
 prominently because the fix in §3 as written would miss this surface entirely
 if implemented as-is.
 
-| # | File:line | Route | Current check | Data/action exposed | Severity |
-|---|---|---|---|---|---|
-| G29 | `routes/now.ts:16-20,22-27` (both GETs) | `GET /now`, `GET /now/overflow` (`scope=self`) | none — bare `withProfile(c)` for the `self` scope | personalized "Now" digest cards (deep-links into sessions/topics) — same disclosure class as G1's recaps | **HIGH** |
-| G30 | `routes/now.ts:16-20,22-27` (`scope=supporter-hub` / `scope=person`) — resolved in `services/now-feed.ts` `resolveTarget` (`:376-413`) and `collectSupporterHubCandidates` (`:425-447`) | `GET /now?scope=supporter-hub\|person` | checks a `supportership` edge **from the header-resolved `profileId`** to the target `personId` (`now-feed.ts:401-402`) — authority is derived from the spoofable header, not `callerPersonId` | supporter-hub summary / a specific supportee's Now feed, for whichever profile the header resolves to | **HIGH** |
-| G31 | `routes/scopes.ts:21-25,26-32` (`GET /scopes`, `GET /scopes/coldstart`) | none — bare `withProfile(c)` | which supportee scopes / cold-start state the resolved profile has | **MEDIUM** |
-| G32 | `routes/scopes.ts:33-46` — `readSupporteeStructuralSubjects` (`services/supporter-structural-mask.ts:137-162`) | `GET /scopes/:personId/subjects` | checks a `supportership` edge **from the header-resolved `profileId`** to `:personId` (`supporter-structural-mask.ts:150-153`) — same shape as G30 | a supportee's structural subject list | **HIGH** |
+| # | Handler | Current check | Data/action exposed | Severity |
+|---|---|---|---|---|
+| G29 | `now.ts · GET /now`, `now.ts · GET /now/overflow` (both under `scope=self`) | none — bare `withProfile(c)` for the `self` scope | personalized "Now" digest cards (deep-links into sessions/topics) — same disclosure class as G1's recaps | **HIGH** |
+| G30 | `now.ts · GET /now`, `now.ts · GET /now/overflow` (the `scope=supporter-hub` / `scope=person` branches — target resolved in `services/now-feed.ts` `resolveTarget` / `collectSupporterHubCandidates`) | checks a `supportership` edge **from the header-resolved `profileId`** to the target `personId` (`services/now-feed.ts`) — authority is derived from the spoofable header, not `callerPersonId` | supporter-hub summary / a specific supportee's Now feed, for whichever profile the header resolves to | **HIGH** |
+| G31 | `scopes.ts · GET /scopes`, `scopes.ts · GET /scopes/coldstart` | none — bare `withProfile(c)` | which supportee scopes / cold-start state the resolved profile has | **MEDIUM** |
+| G32 | `scopes.ts · GET /scopes/:personId/subjects` — served via `readSupporteeStructuralSubjects` (`services/supporter-structural-mask.ts`) | checks a `supportership` edge **from the header-resolved `profileId`** to `:personId` (`services/supporter-structural-mask.ts`) — same shape as G30 | a supportee's structural subject list | **HIGH** |
 
 **Proposed ruling (G29–G32):** the self-scope rows (G29's `self` case, G31)
 take the same self-or-guardian remedy as G1–G28. The supportership-edge rows
@@ -180,8 +237,11 @@ but on inspection already close the caller-identity hole:
   { await assertChargeNotCredentialed(db, id); }` (lines 420, 484), which
   independently blocks the spoof: a credentialed target can't be
   "self-updated" by a caller who isn't really them. Verified safe.
-- **`routes/dashboard.ts` — all 13 `/dashboard/children/:profileId/*` routes** —
-  already gate with `assertOwnerAndParentAccess` + `assertCallerIsAccountOwner`
+- **`routes/dashboard.ts` — all 14 `/dashboard/children/:profileId/*` routes**
+  (`:105,131,152,173,201,224,283,305,332,353,396,413,458,480` — the rework-3
+  handler-parity pass found `GET /dashboard/children/:profileId/progress-history`
+  at `:173`, uncited in the prior pass alongside its 13 siblings) — already
+  gate with `assertOwnerAndParentAccess` + `assertCallerIsAccountOwner`
   (WI-1989), `+ assertChargeNotCredentialed` / `assertChildDashboardDataVisible`
   where relevant. This is the reference "guardian legitimately reads a child"
   template — it answers plan question 4 (§5) and needs no read-side change.
@@ -189,6 +249,11 @@ but on inspection already close the caller-identity hole:
   `withProfile(c)`, no guard) shares this doc's exact gap shape but is **not**
   re-listed as a new gap here — it's already the subject of the previously
   captured **WI-2397** ("root /dashboard ungated"). Reconciled, not missed.
+- **`routes/consent.ts:490-531` (`GET /consent/:childProfileId/status`)** —
+  found by the rework-3 handler-parity pass (absent from both prior versions
+  of this doc despite consent.ts being a scanned file). Gates with
+  `assertOwnerProfile` + `assertCallerIsAccountOwner` (WI-1989 pattern,
+  `:496-501`) before reading the named child's consent state. Not a gap.
 - **`routes/family-join.ts` (`POST /family-join/invite`, `POST
   /family-join/accept`)** — both route through `withCaller()`, which binds
   every authorized action to `callerPersonId` (server-resolved), never to the
@@ -304,57 +369,175 @@ family as WI-2397/WI-2398. **§1c (added in the rework) generalizes this
 observation** to the full set of self-mutating write branches the 224-site
 scan surfaced across all 40 files, including 5 more routes in this same file.
 
-## Full classification (WI-2006 rework — completes the deferred sweep)
+## Full classification (WI-2006 rework 3 — exhaustive per-handler enumeration)
 
-The first pass deferred a full sweep of the 224 call sites / 40 files the
-scan found (§0/§3 root cause and rule were already validated; only the
-enumeration was incomplete — the Gate-2 bounce). This rework reads all 40
-files in full and classifies every read (`GET`) handler and every
-self-mutating write branch found. Arithmetic, so the count is checkable
-against the raw scan (`rg -n
-"requireProfileId\(c.get\('profileId'\)\)|withProfile\(c\)"
-apps/api/src/routes` → 224 lines / 40 files):
+The first pass deferred a full sweep of the 224 call sites / 40 files the scan
+found (§0/§3 root cause and rule were already validated; only the enumeration
+was incomplete — the Gate-2 bounce #1). Rework 2 read all 40 files and
+classified every `GET` handler, but cited several groups (notably G7's 15
+`progress.ts` handlers, tabled under one `108-227` range) as line-range
+lumps instead of individual rows, and undercounted two handlers
+entirely — Gate-2 bounce #2. Rework 3 re-derived the handler set from scratch,
+per file, and reconciled it 1:1 against every row, but cited it by drift-prone
+`file:line` — Gate-2 bounce #3 (`sessions.ts` lines had moved under it).
+**This pass (the re-scope) re-expresses every gap citation as its drift-immune
+handler identity `` `file.ts · METHOD /route` ``, declares the audited SHA
+(header), and re-verifies all of them against that SHA in one scripted pass
+(§7).** The reconciliation below holds **at the audited SHA**; the method and
+the proof are below.
 
-- **34 `GET` handlers previously classified** (G1–G8, counting each handler
-  G4/G7/G8 group under one row): 1 (G1) + 1 (G2) + 1 (G3) + 7 (G4, all
-  `notes.ts` GETs) + 1 (G5) + 15 (G7, all `progress.ts` GETs) + 8 (G8,
-  `sessions.ts` + `quiz.ts`) = 34. (G6 is a `POST` self-service branch, not a
-  `GET`.)
-- **20 `GET` handlers previously reviewed and cleared**: 2 (`recaps.ts`
-  non-self) + 2 (`consent.ts` self/withdraw + self/accountability) + 14
-  (`dashboard.ts`'s 13 `/children/:profileId/*` routes + `/dashboard/demo`,
-  not re-audited here — a demo/seed route, no real profile data) + 2
-  (`learner-profile.ts`'s `:profileId` variants).
-- **42 new `GET` handlers classified as gaps this rework, tabled under 20
-  IDs** (G9–G28; several IDs group multiple same-shape handlers per file,
-  the same convention G4/G7/G8 already use): 2 handlers (G9+G10,
-  assessments) + 2 (G11, book-suggestions) + 2 (G12, bookmarks) + 4 (G13,
-  books) + 1 (G14, celebrations) + 1 (G15, coaching-card) + 2 (G16,
-  curriculum) + 2 (G17, dictation) + 1 (G18, language-progress) + 1 (G19,
-  library-search) + 1 (G20, nudges) + 2 (G21, parking-lot) + 8 (G22,
-  retention) + 4 (G23, settings) + 3 (G24, snapshot-progress) + 2 (G25,
-  streaks) + 2 (G26, subjects) + 1 (G27, topic-suggestions) + 1 (G28,
-  vocabulary) = **42**. The G9–G28 table above is the source of truth; this
-  bullet is a cross-check against it, not a re-derivation.
-- **4 new `GET` handlers classified as gaps under the supporter-scope
-  finding** (G29–G32, `now.ts` ×2, `scopes.ts` ×2 — one of the `scopes.ts`
-  rows, `/scopes/:personId/subjects`, is HIGH and structurally new, see
-  above).
-- **5 new `GET` handlers reviewed and cleared this rework**:
-  `notifications.ts` child-cap (1), `settings.ts` withdrawal-archive (1) +
-  family-pool-breakdown-sharing (1), `visibility.ts` (2). (`family-join.ts`
-  and `analytics.ts`/`support.ts` are also cleared in §2, but contribute 0
-  `GET` handlers — they're `POST`-only files; `onboarding.ts`'s cleared
-  `/onboarding/language` self-route is a `PATCH`, counted with the write
-  branches in §1c, not here.)
-- **Remaining call sites** (roughly the balance of 224 minus the above) are
-  self-mutating write branches — every one of them is named in §1c, none
-  individually severity-scored (out of this spike's read-side AC), all
-  folded into the WI-2416 follow-up.
+### Method
+
+For each of the 40 scanned files, every `GET` route registration was located
+independently of the doc (`rg -nP "(?<!c)\.get\(" apps/api/src/routes/*.ts`,
+filtered to the 40-file list, with multi-line `.get(\n  '/path',` call sites
+followed by hand-reading the surrounding lines — a single-line-only regex
+undercounts, since roughly a third of this codebase's route registrations put
+the path on the line after `.get(`). Every resulting handler was then matched
+against a row in this doc (a gap ID or a §2 "not a gap" bullet) by its own
+precise file:line span — not by falling inside a broader cited range.
+
+### Coverage proof (all 108 `GET` handlers in the 40 scanned files)
+
+| Disposition | Count | Composition |
+|---|---|---|
+| Gaps, G1–G8 (originally tabled, now itemized where they were grouped) | 34 | 1 (G1) + 1 (G2) + 1 (G3) + 7 (G4a–G4g, `notes.ts`) + 1 (G5) + 15 (G7a–G7o, `progress.ts`) + 8 (G8a–G8h, `sessions.ts` ×5 + `quiz.ts` ×3) = 34. (G6 is a `POST` self-service branch, not a `GET` — excluded here, tabled in §1.) |
+| Gaps, G9–G28 | 42 | 2 (G9+G10, assessments) + 2 (G11, book-suggestions) + 2 (G12, bookmarks) + 4 (G13, books) + 1 (G14, celebrations) + 1 (G15, coaching-card) + 2 (G16, curriculum) + 2 (G17, dictation) + 1 (G18, language-progress) + 1 (G19, library-search) + 1 (G20, nudges) + 2 (G21, parking-lot) + 8 (G22a–G22h, retention) + 4 (G23, settings) + 3 (G24, snapshot-progress) + 2 (G25, streaks) + 2 (G26, subjects) + 1 (G27, topic-suggestions) + 1 (G28, vocabulary) = 42. |
+| Gaps, G29–G32 (supporter-scope) | 5 | `now.ts` ×2 (G29+G30, same 2 physical handlers under both scope branches) + `scopes.ts` ×3 (G31 ×2 + G32 ×1). **Correction from rework 2:** the prior arithmetic bullet said "`scopes.ts` ×2", undercounting by 1 — `scopes.ts` has 3 `GET` handlers (`:21`, `:26`, `:32`→`:33`), all three already individually cited across G31/G32; only the summary total (4→5) was wrong, not the row coverage. |
+| Cleared, §2 | 26 | 2 (`recaps.ts` — `:47`, `:75`, both owner-gated) + 2 (`consent.ts` — `:638` self/accountability, `:490` `:childProfileId/status`, both `callerPersonId`- or owner-gated) + 15 (`dashboard.ts` — 14 `/children/:profileId/*` routes incl. `:173` `progress-history`, found missing this rework, + `/dashboard/demo`) + 2 (`learner-profile.ts` `:profileId` variants) + 1 (`notifications.ts` child-cap) + 2 (`settings.ts` withdrawal-archive + family-pool-breakdown-sharing) + 2 (`visibility.ts`) = 26. |
+| Excluded — tracked under a different, already-open WI | 1 | `dashboard.ts:88-102` root `GET /dashboard` — same gap shape as this doc's other findings, but already captured as **WI-2397**; not re-tabled here to avoid a duplicate WI, per §2. |
+| **Total `GET` handlers, 40 files** | **108** | 34 + 42 + 5 + 26 + 1 = **108**, matching the current handler count in `apps/api/src/routes/*.ts` for the 40 scanned files (re-derived independently of this doc — see Method). |
+
+**Two corrections found by this rework's independent re-derivation** (neither
+changes a severity verdict or the root-cause finding; both are additions to
+§2, not gaps):
+
+1. `routes/consent.ts:490-531` (`GET /consent/:childProfileId/status`) was
+   absent from both prior versions of this doc despite `consent.ts` being a
+   scanned file. It is owner-gated (`assertOwnerProfile` +
+   `assertCallerIsAccountOwner`) — not a gap, now added to §2.
+2. `routes/dashboard.ts:173-198` (`GET
+   /dashboard/children/:profileId/progress-history`) was the file's 14th
+   `/children/:profileId/*` route; the prior doc's §2 bullet said "13" and
+   didn't cite it. It carries the same `assertOwnerAndParentAccess` +
+   `assertCallerIsAccountOwner` gate as its 13 siblings — not a gap, §2
+   bullet corrected.
+
+Self-mutating write branches (`POST`/`PATCH`/`DELETE` matches of the same two
+scan patterns) are the balance of the 224 call sites beyond these 108 `GET`
+handlers — every one is named in §1c, none individually severity-scored (out
+of this spike's read-side AC), all folded into the WI-2416 follow-up.
 
 No "deferred" / "sampled" / "not individually audited" placeholder remains
-anywhere in this doc — every read surface the scan found has a file:line, a
-current-check description, a gap-or-not verdict, and (for gaps) a proposed
-ruling. New HIGH-severity findings beyond the original G1–G8 (G10, G15, G29,
-G30, G32) are listed above rather than fixed — this remains a
-spike/documentation deliverable; no handler was changed to produce this doc.
+anywhere in this doc — every read surface the scan found has its own row keyed
+by handler identity (a gap ID or a §2 bullet, never a range that spans more
+than one handler), a current-check description, a gap-or-not verdict, and (for
+gaps) a proposed ruling. New HIGH-severity findings beyond the original
+G1–G8 (G10, G15, G29, G30, G32) are listed above rather than fixed — this
+remains a spike/documentation deliverable; no handler was changed to produce
+this doc.
+
+## 7. Citation re-verify (scripted, at the audited SHA)
+
+Every gap handler-identity in §1/§1b was re-verified in one mechanical pass
+against the audited SHA
+(`2ce257f001833572eb8a239150922c522b9f7ad2`) with the co-located script:
+
+```
+node verify-010-citations.mjs 2ce257f001833572eb8a239150922c522b9f7ad2 --md
+```
+
+The script parses every `` `file.ts · METHOD /route` `` citation in this doc,
+resolves each against `apps/api/src/routes/<file>` at that SHA (matching the
+registered `.<method>('/route', …)` site, single- or multi-line), and exits
+non-zero if any citation does not resolve. The line numbers below are its
+output — a convenience annotation valid at the audited SHA, not a hand-kept
+figure; head-drift after this SHA is not a defect. The table below is that
+run's output, pasted verbatim.
+
+| Citation | Resolves | Reg. line @ `2ce257f001` |
+|---|---|---|
+| `recaps.ts · GET /recaps/self` | ✅ | 62 |
+| `learner-profile.ts · GET /learner-profile` | ✅ | 64 |
+| `learner-profile.ts · GET /learner-profile/export-text` | ✅ | 77 |
+| `notes.ts · GET /subjects/:subjectId/books/:bookId/notes` | ✅ | 105 |
+| `notes.ts · GET /subjects/:subjectId/topics/:topicId/note` | ✅ | 125 |
+| `notes.ts · GET /notes` | ✅ | 145 |
+| `notes.ts · GET /notes/topic-ids` | ✅ | 158 |
+| `notes.ts · GET /notes/concept-mastery` | ✅ | 166 |
+| `notes.ts · GET /subjects/:subjectId/topics/:topicId/notes` | ✅ | 186 |
+| `notes.ts · GET /subjects/:subjectId/topics/:topicId/sessions` | ✅ | 300 |
+| `consent.ts · GET /consent/my-status` | ✅ | 464 |
+| `consent.ts · POST /consent/request` | ✅ | 198 |
+| `consent.ts · POST /consent/resend` | ✅ | 320 |
+| `progress.ts · GET /subjects/:subjectId/progress` | ✅ | 65 |
+| `progress.ts · GET /subjects/:subjectId/topics/:topicId/progress` | ✅ | 75 |
+| `progress.ts · GET /progress/overview` | ✅ | 86 |
+| `progress.ts · GET /progress/review-summary` | ✅ | 94 |
+| `progress.ts · GET /progress/overdue-topics` | ✅ | 108 |
+| `progress.ts · GET /progress/sessions` | ✅ | 116 |
+| `progress.ts · GET /progress/practice-activity-history` | ✅ | 134 |
+| `progress.ts · GET /progress/reports` | ✅ | 152 |
+| `progress.ts · GET /progress/reports/:reportId` | ✅ | 162 |
+| `progress.ts · GET /progress/weekly-reports` | ✅ | 188 |
+| `progress.ts · GET /progress/weekly-reports/:weeklyReportId` | ✅ | 196 |
+| `progress.ts · GET /progress/topic/:topicId/active-session` | ✅ | 221 |
+| `progress.ts · GET /topics/:topicId/resolve` | ✅ | 230 |
+| `progress.ts · GET /progress/resume-target` | ✅ | 240 |
+| `progress.ts · GET /progress/continue` | ✅ | 257 |
+| `sessions.ts · GET /sessions/resume-nudge` | ✅ | 185 |
+| `sessions.ts · GET /subjects/:subjectId/sessions` | ✅ | 191 |
+| `sessions.ts · GET /sessions/:sessionId` | ✅ | 273 |
+| `sessions.ts · GET /sessions/:sessionId/transcript` | ✅ | 577 |
+| `sessions.ts · GET /sessions/:sessionId/summary` | ✅ | 895 |
+| `quiz.ts · GET /quiz/rounds/recent` | ✅ | 216 |
+| `quiz.ts · GET /quiz/rounds/:id` | ✅ | 239 |
+| `quiz.ts · GET /quiz/stats` | ✅ | 399 |
+| `assessments.ts · GET /subjects/:subjectId/topics/:topicId/assessments/active` | ✅ | 83 |
+| `assessments.ts · GET /assessments/:assessmentId` | ✅ | 205 |
+| `book-suggestions.ts · GET /subjects/:subjectId/book-suggestions` | ✅ | 45 |
+| `book-suggestions.ts · GET /subjects/:subjectId/book-suggestions/all` | ✅ | 90 |
+| `bookmarks.ts · GET /bookmarks/session` | ✅ | 57 |
+| `bookmarks.ts · GET /bookmarks` | ✅ | 70 |
+| `books.ts · GET /library/books` | ✅ | 71 |
+| `books.ts · GET /subjects/:subjectId/books` | ✅ | 82 |
+| `books.ts · GET /subjects/:subjectId/books/:bookId` | ✅ | 101 |
+| `books.ts · GET /subjects/:subjectId/books/:bookId/sessions` | ✅ | 332 |
+| `celebrations.ts · GET /celebrations/pending` | ✅ | 30 |
+| `coaching-card.ts · GET /coaching-card` | ✅ | 22 |
+| `curriculum.ts · GET /subjects/:subjectId/curriculum` | ✅ | 132 |
+| `curriculum.ts · GET /subjects/:subjectId/curriculum/topics/:topicId/explain` | ✅ | 276 |
+| `dictation.ts · GET /dictation/streak` | ✅ | 340 |
+| `dictation.ts · GET /dictation/history` | ✅ | 354 |
+| `language-progress.ts · GET /subjects/:subjectId/cefr-progress` | ✅ | 26 |
+| `library-search.ts · GET /library/search` | ✅ | 17 |
+| `nudges.ts · GET /nudges` | ✅ | 47 |
+| `parking-lot.ts · GET /sessions/:sessionId/parking-lot` | ✅ | 44 |
+| `parking-lot.ts · GET /subjects/:subjectId/topics/:topicId/parking-lot` | ✅ | 58 |
+| `retention.ts · GET /library/retention` | ✅ | 62 |
+| `retention.ts · GET /retention/assessment-eligible` | ✅ | 69 |
+| `retention.ts · GET /subjects/:subjectId/retention` | ✅ | 78 |
+| `retention.ts · GET /topics/:topicId/retention` | ✅ | 92 |
+| `retention.ts · GET /subjects/:subjectId/needs-deepening` | ✅ | 136 |
+| `retention.ts · GET /subjects/:subjectId/teaching-preference` | ✅ | 150 |
+| `retention.ts · GET /retention/stability` | ✅ | 222 |
+| `retention.ts · GET /topics/:topicId/evaluate-eligibility` | ✅ | 236 |
+| `settings.ts · GET /settings/notifications` | ✅ | 82 |
+| `settings.ts · GET /settings/celebration-level` | ✅ | 112 |
+| `settings.ts · GET /settings/subjects/:subjectId/analogy-domain` | ✅ | 329 |
+| `settings.ts · GET /settings/subjects/:subjectId/native-language` | ✅ | 368 |
+| `snapshot-progress.ts · GET /progress/inventory` | ✅ | 47 |
+| `snapshot-progress.ts · GET /progress/history` | ✅ | 53 |
+| `snapshot-progress.ts · GET /progress/milestones` | ✅ | 64 |
+| `streaks.ts · GET /streaks` | ✅ | 22 |
+| `streaks.ts · GET /xp` | ✅ | 31 |
+| `subjects.ts · GET /subjects` | ✅ | 100 |
+| `subjects.ts · GET /subjects/:id` | ✅ | 215 |
+| `topic-suggestions.ts · GET /subjects/:subjectId/books/:bookId/topic-suggestions` | ✅ | 25 |
+| `vocabulary.ts · GET /subjects/:subjectId/vocabulary` | ✅ | 37 |
+| `now.ts · GET /now` | ✅ | 16 |
+| `now.ts · GET /now/overflow` | ✅ | 22 |
+| `scopes.ts · GET /scopes` | ✅ | 21 |
+| `scopes.ts · GET /scopes/coldstart` | ✅ | 26 |
+| `scopes.ts · GET /scopes/:personId/subjects` | ✅ | 33 |
+
