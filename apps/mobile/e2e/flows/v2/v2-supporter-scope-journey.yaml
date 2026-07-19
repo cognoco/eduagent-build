@@ -1,0 +1,111 @@
+# [WI-2241] V2 native supporter scope journey.
+#
+# Runs only in the explicit `v2` workflow-dispatch suite (same posture as
+# v2-shell-navigation.yaml — the V2 shell flag is baked into the release
+# bundle, so this is not part of the ordinary PR/nightly APK posture).
+#
+# Support hub -> person scope -> Mentor -> Subjects -> Journal -> Support hub,
+# preserving the SAME person/edge across bottom tabs (asserted by IDs baked
+# into the seeded testIDs, e.g. person-scope-subject-${SUBJECT_ID}, not just
+# copy), plus the STRUCTURAL WALL (no study/note input on the read-only
+# Subjects surface) and the NEGATIVE WALL (none of the seeded private-artifact
+# content — every private fixture row in test-seed-v2-supporter.ts is
+# content-prefixed 'PRIVATE' — is ever visible on screen).
+#
+# SEED_SCENARIO: 'v2-supporter-accepted'
+appId: com.mentomate.app
+tags:
+  - v2
+  - navigation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'v2-supporter-accepted'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 30000
+
+# Support hub: the seeded person chip for the rich supportee is present.
+- assertVisible:
+    id: 'support-hub-mentor-person-${SUPPORTEE_PERSON_ID}'
+
+# Mentor: open the rich person scope.
+- tapOn:
+    id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-mentor-tab'
+    timeout: 15000
+
+# Subjects (same person/edge via the bottom tab).
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-structural-subjects'
+    timeout: 15000
+- assertVisible:
+    id: 'person-scope-subject-${SUBJECT_ID}'
+
+# STRUCTURAL WALL: drilling into the subject renders the read-only hub — no
+# study/note-input affordance (SubjectHubSurface mode=supporter-readonly
+# forces canStudy=false and notes=[], so SubjectHubNotesSection never mounts —
+# apps/mobile/src/components/subject-hub/SubjectHub.tsx `showNotes`).
+- tapOn:
+    id: 'person-scope-subject-${SUBJECT_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-subject-hub'
+    timeout: 15000
+- assertVisible:
+    id: 'subject-hub'
+- assertNotVisible:
+    id: 'subject-hub-notes-section'
+- assertNotVisible:
+    id: 'subject-hub-notes-input'
+- tapOn:
+    id: 'person-scope-subject-hub-back'
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-structural-subjects'
+    timeout: 15000
+
+# Journal (same person/edge, still the rich supportee).
+- tapOn:
+    id: 'tab-journal'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-journal-placeholder'
+    timeout: 15000
+- assertVisible:
+    id: 'visibility-shared-record'
+
+# NEGATIVE WALL: none of the seeded private-artifact content (topic note,
+# bookmark, raw transcript, Mentor-memory) ever reaches the screen.
+- assertNotVisible:
+    text: 'PRIVATE'
+
+# Relaunch: kill and restart the app, then confirm the SAME person/edge is
+# still active (scope-context.tsx persists activeScope via SecureStore keyed
+# on profileId, re-hydrated on next mount) — not reverted to the hub.
+- stopApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-journal-placeholder'
+    timeout: 30000
+
+# Back to Support hub via the scope chip.
+- tapOn:
+    id: 'scope-chip-option-supporter-hub'
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 15000
