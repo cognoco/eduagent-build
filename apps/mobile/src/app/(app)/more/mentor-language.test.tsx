@@ -99,6 +99,21 @@ describe('MentorLanguageScreen', () => {
     jest.clearAllMocks();
   });
 
+  it('renders one localized heading and one Back action without exposing the route slug', () => {
+    active = renderScreen(<MentorLanguageScreen />, {
+      profile: owner,
+      routes: onboardingRoutes,
+    });
+
+    const headings = active.result.getAllByRole('header');
+    const backActions = active.result.getAllByLabelText('Go Back');
+
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent('Mentor language');
+    expect(backActions).toHaveLength(1);
+    expect(active.result.queryByText('mentor-language')).toBeNull();
+  });
+
   it('renders all 10 conversationLanguageSchema locales, not just the 7 UI-shell locales', () => {
     active = renderScreen(<MentorLanguageScreen />, {
       profile: owner,

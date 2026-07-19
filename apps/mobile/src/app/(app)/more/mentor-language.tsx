@@ -125,6 +125,7 @@ export default function MentorLanguageScreen(): React.ReactElement {
         <Text
           className="text-h2 font-bold text-text-primary flex-1"
           numberOfLines={1}
+          accessibilityRole="header"
         >
           {title}
         </Text>
