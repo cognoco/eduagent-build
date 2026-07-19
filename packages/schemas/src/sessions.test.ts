@@ -54,6 +54,30 @@ import {
   outboxSpilloverResultSchema,
 } from './sessions.js';
 
+describe('mentor notice session summary contract', () => {
+  it('parses the persisted noticed-along-the-way receipt', () => {
+    const parsed = sessionSummarySchema.parse({
+      id: '00000000-0000-4000-8000-000000000001',
+      sessionId: '00000000-0000-4000-8000-000000000002',
+      content: 'Summary content',
+      aiFeedback: null,
+      status: 'accepted',
+      closingLine: null,
+      learnerRecap: null,
+      nextTopicId: null,
+      nextTopicTitle: null,
+      nextTopicReason: null,
+      mentorNotice: {
+        id: '00000000-0000-4000-8000-000000000003',
+        concept: 'Sign changes when moving terms',
+        correctionHint: null,
+      },
+    });
+
+    expect(parsed.mentorNotice?.concept).toBe('Sign changes when moving terms');
+  });
+});
+
 const UUID = '550e8400-e29b-41d4-a716-446655440000';
 
 // ---------------------------------------------------------------------------
@@ -1109,6 +1133,29 @@ describe('sessionMessageSchema', () => {
       message: 'Hello',
       imageBase64: 'iVBORw0KGgoAAAANS==',
       imageMimeType: 'application/pdf',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // [WI-2220] Active app shell — see appShellSchema.
+  it('accepts a v0 or v2 shell', () => {
+    expect(
+      sessionMessageSchema.safeParse({ message: 'Hello', shell: 'v0' }).success,
+    ).toBe(true);
+    expect(
+      sessionMessageSchema.safeParse({ message: 'Hello', shell: 'v2' }).success,
+    ).toBe(true);
+  });
+
+  it('accepts a message without a shell', () => {
+    const result = sessionMessageSchema.safeParse({ message: 'Hello' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an invalid shell value', () => {
+    const result = sessionMessageSchema.safeParse({
+      message: 'Hello',
+      shell: 'v1',
     });
     expect(result.success).toBe(false);
   });

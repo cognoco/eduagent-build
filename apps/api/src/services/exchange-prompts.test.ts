@@ -158,6 +158,68 @@ describe('buildSystemPrompt — app-help block', () => {
   });
 });
 
+describe('buildSystemPromptSegments — app shell threading [WI-2220]', () => {
+  const appHelpOptions = { includeAppHelpMap: true };
+
+  it('emits the V2 map when ctx.shell is v2', () => {
+    const { stablePrefix } = buildSystemPromptSegments(
+      makeContext({ shell: 'v2' }),
+      appHelpOptions,
+    );
+    expect(stablePrefix).toContain(
+      'APP HELP (map version 2026-06-27, V2 shell)',
+    );
+    expect(stablePrefix).not.toContain('APP HELP (map version 2026-05-30)');
+  });
+
+  it('emits the V0 map when ctx.shell is v0', () => {
+    const { stablePrefix } = buildSystemPromptSegments(
+      makeContext({ shell: 'v0' }),
+      appHelpOptions,
+    );
+    expect(stablePrefix).toContain('APP HELP (map version 2026-05-30)');
+    expect(stablePrefix).not.toContain(
+      'APP HELP (map version 2026-06-27, V2 shell)',
+    );
+  });
+
+  it('[AC-3] defaults to the V0 map when shell is absent', () => {
+    const { stablePrefix } = buildSystemPromptSegments(
+      makeContext(),
+      appHelpOptions,
+    );
+    expect(stablePrefix).toContain('APP HELP (map version 2026-05-30)');
+    expect(stablePrefix).not.toContain('V2 shell');
+  });
+
+  it('[AC-3] defaults to the V0 map when shell is an invalid value', () => {
+    const { stablePrefix } = buildSystemPromptSegments(
+      makeContext({
+        shell: 'v3' as unknown as ExchangeContext['shell'],
+      }),
+      appHelpOptions,
+    );
+    expect(stablePrefix).toContain('APP HELP (map version 2026-05-30)');
+    expect(stablePrefix).not.toContain('V2 shell');
+  });
+
+  it('[AC-3] honors a shell value that changes between turns of the same session', () => {
+    const session = makeContext({ sessionId: 'sess-mid-shell-change' });
+    const v0Turn = buildSystemPromptSegments(
+      { ...session, shell: 'v0' },
+      appHelpOptions,
+    );
+    const v2Turn = buildSystemPromptSegments(
+      { ...session, shell: 'v2' },
+      appHelpOptions,
+    );
+    expect(v0Turn.stablePrefix).toContain('APP HELP (map version 2026-05-30)');
+    expect(v2Turn.stablePrefix).toContain(
+      'APP HELP (map version 2026-06-27, V2 shell)',
+    );
+  });
+});
+
 describe('buildSystemPrompt — scope-boundary app-help exception', () => {
   it('includes app-help exception in standard learning scope boundaries for app-help turns', () => {
     const prompt = buildSystemPrompt(makeContext({ sessionType: 'learning' }), {
@@ -368,6 +430,60 @@ describe('buildSystemPrompt — homework brevity', () => {
     expect(prompt).toContain('keep it tiny');
     expect(prompt).toContain('one setup line and the key correction step only');
   });
+});
+
+describe('buildSystemPrompt — homework mentor notices', () => {
+  const eventId = '550e8400-e29b-41d4-a716-446655440010';
+
+  it('injects the evidence-bound detection instruction only for enabled homework turns', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'homework',
+        mentorNoticeEnabled: true,
+        currentUserMessageEventId: eventId,
+      }),
+    );
+
+    expect(prompt).toContain('MENTOR NOTICE OBSERVATION');
+    expect(prompt).toContain('signals.noticed_gap');
+    expect(prompt).toContain(eventId);
+    expect(prompt).toContain("Finish the learner's homework help first");
+    expect(prompt).toContain('Do not quiz or re-check the learner now');
+    expect(prompt).toContain('Do not promise a future check-in');
+    expect(prompt).toContain(
+      'Set `observed` to false when the answer is correct',
+    );
+    expect(prompt).toContain(
+      'A possible follow-up check or extra practice is not evidence of a gap',
+    );
+    expect(prompt).toContain('Always emit `signals.noticed_gap` as a decision');
+    expect(prompt).toContain(
+      "If your visible reply corrects the learner's answer or reasoning, `observed` must be true",
+    );
+    const responseFormat = prompt.slice(
+      prompt.indexOf('RESPONSE FORMAT — CRITICAL:'),
+      prompt.indexOf('Signal guidance:'),
+    );
+    expect(responseFormat).toContain('"noticed_gap": { "observed": <bool>');
+    expect(prompt).toContain(
+      'When `observed` is true, copy a short verbatim `learnerQuote`',
+    );
+  });
+
+  it.each([
+    { mentorNoticeEnabled: false, sessionType: 'homework' as const },
+    { mentorNoticeEnabled: true, sessionType: 'learning' as const },
+  ])(
+    'omits notice instructions for $sessionType when enabled=$mentorNoticeEnabled',
+    (overrides) => {
+      const prompt = buildSystemPrompt(
+        makeContext({ ...overrides, currentUserMessageEventId: eventId }),
+      );
+
+      expect(prompt).not.toContain('MENTOR NOTICE OBSERVATION');
+      expect(prompt).not.toContain('signals.noticed_gap');
+    },
+  );
 });
 
 describe('buildSystemPrompt — no-recall recovery', () => {

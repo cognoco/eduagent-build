@@ -49,6 +49,26 @@ describe('LedgerMomentCard', () => {
     expect(queryByText('mentorHome.ledger.future_kind.title')).toBeNull();
   });
 
+  it('renders explicit locked-in mentor notice copy', () => {
+    const { getByText } = render(
+      <LedgerMomentCard
+        card={{
+          ...ledgerCard,
+          templateKey: 'now.ledger_moment.notice_locked_in',
+          params: {
+            ledgerKind: 'notice_locked_in',
+            concept: 'changing signs',
+            subjectName: 'Algebra',
+          },
+        }}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+      />,
+    );
+
+    expect(getByText('You locked in changing signs.')).toBeTruthy();
+  });
+
   it('fires continue on card press', () => {
     const onContinue = jest.fn();
     const { getByTestId } = render(

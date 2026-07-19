@@ -943,6 +943,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                   streaming: false,
                   eventId: result.aiEventId,
                   escalationRung: result.escalationRung,
+                  mentorNotice: result.mentorNotice,
                 };
               }),
             );

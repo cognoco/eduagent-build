@@ -10,6 +10,7 @@ import {
   isManagedTierActive,
   isMaintenanceProductionEnabled,
   isTopicIntentMatcherEnabled,
+  isMentorNoticeEnabled,
   validateEnv,
   validateProductionBindings,
   validateProductionKeys,
@@ -674,6 +675,17 @@ describe('validateEnv', () => {
     expect(isChallengeRoundRuntimeEnabled('yes')).toBe(false);
   });
 
+  it('MENTOR_NOTICE_ENABLED defaults off and enables only for "true"', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.MENTOR_NOTICE_ENABLED).toBe('false');
+    expect(isMentorNoticeEnabled(env.MENTOR_NOTICE_ENABLED)).toBe(false);
+    expect(isMentorNoticeEnabled('true')).toBe(true);
+    expect(isMentorNoticeEnabled('yes')).toBe(false);
+  });
+
   it('CHALLENGE_ROUND_COHORT_PROFILE_IDS defaults to "" when unset', () => {
     const env = validateEnv({
       ENVIRONMENT: 'development',
@@ -788,6 +800,7 @@ describe('validateProductionBindings', () => {
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: 0,
     MATCHER_ENABLED: 'false',
     CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
+    MENTOR_NOTICE_ENABLED: 'false',
     CHALLENGE_ROUND_COHORT_PROFILE_IDS: '',
     REVIEW_CALLBACK_OPENER_ENABLED: 'false',
     JUDGE_FRAMEWORK_ENABLED: 'false',

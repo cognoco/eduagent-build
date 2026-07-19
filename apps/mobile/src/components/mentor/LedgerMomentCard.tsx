@@ -13,6 +13,7 @@ export interface LedgerMomentCardProps {
 
 const SUPPORTED_LEDGER_COPY_KEYS: Partial<Record<string, TranslateKey>> = {
   session_filed: 'mentorHome.ledger.session_filed.title',
+  notice_locked_in: 'mentorHome.ledger.notice_locked_in.title',
 };
 
 function ledgerCopyKey(card: NowCardData): TranslateKey {

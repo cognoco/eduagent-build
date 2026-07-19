@@ -10,6 +10,7 @@ import {
   onboardingDrafts,
   parkingLotItems,
   sessionEmbeddings,
+  mentorNotices,
 } from './schema/index';
 import type { ScopedWhere } from './repository._shared';
 
@@ -168,6 +169,21 @@ export function createSessionRepository(
       async findFirst(extraWhere?: SQL) {
         return db.query.sessionEmbeddings.findFirst({
           where: scopedWhere(sessionEmbeddings, extraWhere),
+        });
+      },
+    },
+
+    mentorNotices: {
+      async findMany(extraWhere?: SQL, orderBy?: SQL | SQL[]) {
+        return db.query.mentorNotices.findMany({
+          where: scopedWhere(mentorNotices, extraWhere),
+          ...(orderBy ? { orderBy } : {}),
+        });
+      },
+      async findFirst(extraWhere?: SQL, orderBy?: SQL | SQL[]) {
+        return db.query.mentorNotices.findFirst({
+          where: scopedWhere(mentorNotices, extraWhere),
+          ...(orderBy ? { orderBy } : {}),
         });
       },
     },

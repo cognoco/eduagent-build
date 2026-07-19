@@ -3,7 +3,7 @@ import React, { type ReactNode } from 'react';
 import type { NowDeepLink, SupporterScopeList } from '@eduagent/schemas';
 import { MENTOR_CAPABILITY_CASES } from '@eduagent/test-utils';
 
-import { pushNowDeepLink } from './now-deep-link';
+import { buildNowPath, pushNowDeepLink } from './now-deep-link';
 import { ScopeContextProvider, useScopeContext } from './scope-context';
 
 // WI-2223: a support.hub pointer must select the Support-hub scope before the
@@ -116,6 +116,15 @@ describe('pushNowDeepLink', () => {
     expect(router.push).toHaveBeenCalledWith(
       '/(app)/session?sessionId=session-1',
     );
+  });
+
+  it('rejects notice.recheck because it must run its mutation before navigation', () => {
+    expect(() =>
+      buildNowPath('notice.recheck', {
+        noticeId: 'notice-1',
+        subjectId: 'subject-1',
+      }),
+    ).toThrow(/action route/i);
   });
 
   it('[WI-1121] pushes a session summary route once when the chain is empty', () => {

@@ -180,7 +180,7 @@ export const filingTimedOutObserve = inngest.createFunction(
 
     if (attemptNumber != null) {
       if (getSessionEffectiveMode(recheck ?? {}) === 'freeform') {
-        const dispatchId = `observer-retry-${attemptNumber}-${Date.now()}`;
+        const dispatchId = `observer-retry-${sessionId}-${attemptNumber}`;
         const retryPayload = sessionAutoFileRequestedEventSchema.parse({
           profileId,
           sessionId,

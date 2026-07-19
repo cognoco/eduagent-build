@@ -13,6 +13,7 @@ import Animated, {
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import type { TranslateKey } from '../../i18n/types';
+import type { MentorNoticeAccepted } from '@eduagent/schemas';
 import { formatMathContent } from '../../lib/math-format';
 import { stripEnvelopeJson } from '../../lib/strip-envelope';
 import { useThemeColors } from '../../lib/theme';
@@ -29,6 +30,7 @@ interface MessageBubbleProps {
   verificationBadge?: VerificationBadge;
   actions?: React.ReactNode;
   testID?: string;
+  mentorNotice?: MentorNoticeAccepted;
 }
 
 function ThinkingDot({ delay }: { delay: number }): React.ReactElement {
@@ -190,6 +192,7 @@ function areEqualMessageBubble(
     prev.escalationRung === next.escalationRung &&
     prev.verificationBadge === next.verificationBadge &&
     prev.actions === next.actions &&
+    prev.mentorNotice === next.mentorNotice &&
     prev.testID === next.testID
   );
 }
@@ -203,6 +206,7 @@ export const MessageBubble = memo(function MessageBubble({
   verificationBadge,
   actions,
   testID,
+  mentorNotice,
 }: MessageBubbleProps): React.ReactElement {
   const { t } = useTranslation();
   const isAI = sender === 'assistant';
@@ -268,6 +272,18 @@ export const MessageBubble = memo(function MessageBubble({
         )}
         {actions ? <View className="mt-3">{actions}</View> : null}
       </View>
+      {isAI && !streaming && mentorNotice && (
+        <View
+          testID="mentor-notice-chip"
+          className="mt-1 ml-1 self-start rounded-full bg-surface px-3 py-1"
+        >
+          <Text className="text-caption text-text-secondary">
+            {t('session.messageBubble.mentorNotice', {
+              concept: mentorNotice.concept,
+            })}
+          </Text>
+        </View>
+      )}
       {isAI &&
         verificationBadge &&
         VERIFICATION_BADGE_KEY[verificationBadge] && (

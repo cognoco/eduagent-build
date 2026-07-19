@@ -27,6 +27,7 @@ export function usePostSessionNotificationAsk(
   profileId: string | undefined,
   hasCompletedSession: boolean,
   isParentProxy: boolean,
+  hasMentorNotice = false,
 ): void {
   const { t } = useTranslation();
   // Tracks the profileId for which the primer has already fired this mount.
@@ -190,8 +191,16 @@ export function usePostSessionNotificationAsk(
       const handle = setTimeout(() => {
         if (cancelled) return;
         platformAlert(
-          t('sessionSummary.notificationPrimer.title'),
-          t('sessionSummary.notificationPrimer.message'),
+          t(
+            hasMentorNotice
+              ? 'sessionSummary.notificationPrimer.noticeTitle'
+              : 'sessionSummary.notificationPrimer.title',
+          ),
+          t(
+            hasMentorNotice
+              ? 'sessionSummary.notificationPrimer.noticeMessage'
+              : 'sessionSummary.notificationPrimer.message',
+          ),
           [
             {
               text: t('sessionSummary.notificationPrimer.notNow'),
@@ -245,5 +254,5 @@ export function usePostSessionNotificationAsk(
       cancelled = true;
       timeouts.forEach((h) => clearTimeout(h));
     };
-  }, [profileId, hasCompletedSession, isParentProxy, t]);
+  }, [profileId, hasCompletedSession, isParentProxy, hasMentorNotice, t]);
 }
