@@ -1,29 +1,13 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
 
+import type { LearningSessionResponse } from '@eduagent/schemas';
+
 import { apiBaseUrl } from '../../helpers/runtime';
 import { readSeedData } from '../../helpers/seed-data';
 import { pressableClick } from '../../helpers/pressable';
 import { fillTextInput } from '../../helpers/text-input';
 
 const MANUAL_HOMEWORK_PROBLEM = 'Solve 3x + 7 = 22';
-
-type HomeworkSessionResponse = {
-  session: {
-    id: string;
-    sessionType: string;
-    metadata?: {
-      homework?: {
-        problemCount: number;
-        currentProblemIndex: number;
-        problems: Array<{
-          text: string;
-          source: string;
-          status?: string;
-        }>;
-      };
-    };
-  };
-};
 
 function isSessionCreate(request: Request): boolean {
   const pathname = new URL(request.url()).pathname;
@@ -106,7 +90,7 @@ test('V2 Mentor manual homework creates one associated session, receives help, a
   await pressableClick(page.getByTestId('homework-help-me-solve'));
   const createdResponse = await created;
   const createdSession = (
-    (await createdResponse.json()) as HomeworkSessionResponse
+    (await createdResponse.json()) as LearningSessionResponse
   ).session;
   expect(createdSession.id).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
@@ -168,7 +152,7 @@ test('V2 Mentor manual homework creates one associated session, receives help, a
   );
   expect(persistedResponse.status()).toBe(200);
   const persistedSession = (
-    (await persistedResponse.json()) as HomeworkSessionResponse
+    (await persistedResponse.json()) as LearningSessionResponse
   ).session;
   expect(persistedSession.id).toBe(createdSession.id);
   expect(persistedSession.sessionType).toBe('homework');
