@@ -144,6 +144,8 @@ jobs:
         with:
           standalone: true
 
+      # Hard runtime contract for playwright-staging-gate.cjs native fetch;
+      # keep this on Node 22 with the repository package-engine constraint.
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
