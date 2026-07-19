@@ -255,6 +255,10 @@ describe('SubjectsScreen', () => {
     screen.getByTestId('support-hub-subjects-tab');
     screen.getByText('Emma');
     expect(screen.queryByText('Spanish')).toBeNull();
+    expect(screen.queryByTestId('subjects-browse-create')).toBeNull();
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/create-subject' }),
+    );
   });
 
   it('renders a person-scope structural placeholder without supportee artifacts', () => {
@@ -273,6 +277,10 @@ describe('SubjectsScreen', () => {
     screen.getByTestId('person-scope-structural-subjects');
     screen.getByText('Emma');
     expect(screen.queryByText('Notes')).toBeNull();
+    expect(screen.queryByTestId('subjects-browse-create')).toBeNull();
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/create-subject' }),
+    );
   });
 
   // WI-1393 A3: the Subjects empty-state anchor reaches /(app)/link/initiate with

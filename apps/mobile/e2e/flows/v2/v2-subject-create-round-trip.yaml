@@ -129,5 +129,7 @@ tags:
     timeout: 15000
 - extendedWaitUntil:
     visible:
-      id: 'subjects-browse-row-.*'
+      text: 'Photosynthesis'
     timeout: 15000
+- assertVisible:
+    text: 'Photosynthesis'
