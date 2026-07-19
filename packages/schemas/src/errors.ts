@@ -481,6 +481,7 @@ export const ERROR_CODES = {
   NETWORK_ERROR: 'NETWORK_ERROR',
   // [WI-1059] Client boundary: API response body did not match expected schema.
   API_RESPONSE_SHAPE_ERROR: 'API_RESPONSE_SHAPE_ERROR',
+  RECALL_BRIDGE_SUPPRESSED: 'RECALL_BRIDGE_SUPPRESSED',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

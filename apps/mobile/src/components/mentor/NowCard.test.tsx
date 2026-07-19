@@ -43,6 +43,28 @@ describe('NowCard', () => {
     expect(getByText('Open your next learning step')).toBeTruthy();
   });
 
+  it('renders the mentor notice actions with translated quiet copy', () => {
+    const notice = card({
+      kind: 'mentor_notice',
+      templateKey: 'now.mentor_notice.default',
+      params: { concept: 'changing signs', subjectName: 'Algebra' },
+      deepLink: {
+        route: 'notice.recheck',
+        params: { noticeId: 'notice-1', subjectId: 'subject-1' },
+        chain: [],
+      },
+    });
+    const onDecline = jest.fn();
+    const rendered = render(
+      <NowCard card={notice} onContinue={jest.fn()} onDecline={onDecline} />,
+    );
+
+    expect(rendered.getByText('A small idea worth checking')).toBeTruthy();
+    expect(rendered.getByText('Check it now')).toBeTruthy();
+    fireEvent.press(rendered.getByText('Not now'));
+    expect(onDecline).toHaveBeenCalledWith(notice);
+  });
+
   it('fires continue, decline, and completion callbacks with the card', () => {
     const value = card({ kind: 'retention_due' });
     const onContinue = jest.fn();

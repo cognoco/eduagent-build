@@ -1,4 +1,9 @@
 import { MIN_LEXICAL_OVERLAP_NOTE_DRAFT } from './caps';
+import {
+  validateEvidenceOverlap,
+  type EvidenceOverlapReason,
+  type EvidenceOverlapResult,
+} from '../evidence-overlap';
 
 /**
  * Lexical-overlap guard for Challenge Round note drafts.
@@ -28,101 +33,8 @@ import { MIN_LEXICAL_OVERLAP_NOTE_DRAFT } from './caps';
  * an overlap-ratio histogram across the drafting scenarios.
  */
 
-const STOPWORDS = new Set([
-  'the',
-  'a',
-  'an',
-  'is',
-  'are',
-  'and',
-  'or',
-  'of',
-  'to',
-  'in',
-  'on',
-  'for',
-  'with',
-  'as',
-  'by',
-  'at',
-  'it',
-  'its',
-  'this',
-  'that',
-  'be',
-  'was',
-  'were',
-  'has',
-  'have',
-  'had',
-  'do',
-  'does',
-  'did',
-  'i',
-  'you',
-  'they',
-  'we',
-  'he',
-  'she',
-]);
-
-function normalize(text: string): string {
-  return text.normalize('NFKC').toLocaleLowerCase();
-}
-
-function characterNgrams(text: string, n = 2): Set<string> {
-  const chars = Array.from(normalize(text).replace(/[^\p{L}\p{N}]/gu, ''));
-  const grams = new Set<string>();
-  for (let i = 0; i <= chars.length - n; i += 1) {
-    grams.add(chars.slice(i, i + n).join(''));
-  }
-  return grams;
-}
-
-function wordTokens(text: string): Set<string> {
-  return new Set(
-    normalize(text)
-      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-      .split(/\s+/)
-      .filter((t) => t.length > 2 && !STOPWORDS.has(t)),
-  );
-}
-
-/**
- * Tokenize the draft and the learner source into the SAME alphabet.
- *
- * The mode (word-tokens vs character-bigrams) is decided ONCE from both sides
- * combined: word mode is used only when BOTH sides yield >1 word-token,
- * otherwise both fall back to bigrams. Deciding per-side independently could put
- * the two sets in different alphabets — e.g. a long English draft (word mode)
- * vs a short/CJK learner answer (bigram fallback) — making overlap structurally
- * 0 and fail-closing a legitimately learner-grounded draft.
- */
-function tokenizePair(
-  draft: string,
-  source: string,
-): { draftTokens: Set<string>; sourceTokens: Set<string> } {
-  const draftWords = wordTokens(draft);
-  const sourceWords = wordTokens(source);
-  if (draftWords.size > 1 && sourceWords.size > 1) {
-    return { draftTokens: draftWords, sourceTokens: sourceWords };
-  }
-  return {
-    draftTokens: characterNgrams(draft),
-    sourceTokens: characterNgrams(source),
-  };
-}
-
-export type DraftValidationReason =
-  | 'empty'
-  | 'no_content_tokens'
-  | 'low_lexical_overlap';
-
-export interface DraftValidationResult {
-  ok: boolean;
-  overlapRatio: number;
-  reason?: DraftValidationReason;
-}
+export type DraftValidationReason = EvidenceOverlapReason;
+export type DraftValidationResult = EvidenceOverlapResult;
 
 /**
  * [BUG-483 / WI-1056] `validateNoteDraft` requires a `verifiedEventContents`
@@ -145,9 +57,6 @@ export function validateNoteDraft(
   solidLearnerQuotes: string[],
   verifiedEventContents: string[],
 ): DraftValidationResult {
-  if (!draft.trim()) {
-    return { ok: false, overlapRatio: 0, reason: 'empty' };
-  }
   // [BUG-483] Use verified event content for tokenization when available.
   // If verifiedEventContents is supplied, the guard measures overlap against
   // actual learner words from the DB — not the LLM's own paraphrase.
@@ -155,23 +64,9 @@ export function validateNoteDraft(
     verifiedEventContents != null && verifiedEventContents.length > 0
       ? verifiedEventContents
       : solidLearnerQuotes;
-  // Tokenize both sides with a single shared mode so word-vs-bigram never
-  // compares across alphabets (see tokenizePair).
-  const { draftTokens, sourceTokens: learnerTokens } = tokenizePair(
+  return validateEvidenceOverlap(
     draft,
     sourceForTokenization.join(' '),
+    MIN_LEXICAL_OVERLAP_NOTE_DRAFT,
   );
-  if (draftTokens.size === 0) {
-    return { ok: false, overlapRatio: 0, reason: 'no_content_tokens' };
-  }
-
-  let overlap = 0;
-  for (const tok of draftTokens) {
-    if (learnerTokens.has(tok)) overlap += 1;
-  }
-  const ratio = overlap / draftTokens.size;
-  if (ratio < MIN_LEXICAL_OVERLAP_NOTE_DRAFT) {
-    return { ok: false, overlapRatio: ratio, reason: 'low_lexical_overlap' };
-  }
-  return { ok: true, overlapRatio: ratio };
 }
