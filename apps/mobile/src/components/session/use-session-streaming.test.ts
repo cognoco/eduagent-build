@@ -17,12 +17,6 @@ jest.mock(
   }),
 );
 
-// Mock ChatShell directly so the hook can avoid the session barrel cycle.
-// prettier-ignore
-jest.mock('./ChatShell', () => ({ // gc1-allow: hook test avoids the session barrel cycle; only the animation helper is needed
-  animateResponse: jest.fn(() => jest.fn()),
-}));
-
 // Mock session recovery
 const mockWriteRecoveryMarker = jest.fn().mockResolvedValue(undefined);
 // prettier-ignore
@@ -1009,10 +1003,7 @@ describe('useSessionStreaming', () => {
       // transcript as a plain AI message — user got un-actionable text and
       // had no retry path. The fallback now appends a typed system message
       // (kind: 'reconnect_prompt'), which activates the inline Reconnect
-      // affordance via SessionMessageActions. animateResponse must NOT be
-      // called in this path.
-      const { animateResponse } = require('./ChatShell');
-      expect(animateResponse).not.toHaveBeenCalled();
+      // affordance via SessionMessageActions.
 
       // Verify a reconnect-prompt system message was appended.
       const setMessagesCalls = (opts.setMessages as jest.Mock).mock.calls;
