@@ -38,6 +38,7 @@ tags:
     visible:
       id: 'create-subject-name'
     timeout: 15000
+- hideKeyboard
 - assertVisible:
     id: 'create-subject-cancel'
 - tapOn:
