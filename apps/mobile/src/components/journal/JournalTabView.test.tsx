@@ -391,7 +391,11 @@ describe('JournalTabView', () => {
     fireEvent.press(screen.getByTestId('journal-tab-reports'));
     // The most-recent report is opened inline (not just listed) — the V1
     // Progress "latest report" card, reused here.
-    screen.getByTestId('progress-latest-report-card');
+    fireEvent.press(screen.getByTestId('progress-latest-report-card'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
+      params: { weeklyReportId: 'weekly-1', returnTo: 'journal' },
+    });
   });
 
   it('filters the notes archive by authorship with one-click chips', () => {
@@ -430,6 +434,7 @@ describe('JournalTabView', () => {
         sessionId: recap.sessionId,
         subjectId: recap.subjectId,
         topicId: recap.topicId,
+        returnTo: 'journal',
       },
     });
   });
@@ -443,7 +448,13 @@ describe('JournalTabView', () => {
     fireEvent.press(screen.getByTestId('weekly-report-card-weekly-1'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
-      params: { weeklyReportId: 'weekly-1' },
+      params: { weeklyReportId: 'weekly-1', returnTo: 'journal' },
+    });
+
+    fireEvent.press(screen.getByTestId('report-card-monthly-1'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/progress/reports/[reportId]',
+      params: { reportId: 'monthly-1', returnTo: 'journal' },
     });
   });
 

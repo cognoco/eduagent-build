@@ -18,6 +18,8 @@ jest.mock(
   '../../../../lib/navigation' /* gc1-allow: navigation stub captures goBackOrReplace calls; real impl requires expo-router Router which is also mocked at this boundary */,
   () => ({
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+    JOURNAL_HREF: '/(app)/journal',
+    JOURNAL_RETURN_TO: 'journal',
   }),
 );
 
@@ -312,6 +314,25 @@ describe('ProgressMonthlyReportDetail', () => {
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
       '/(app)/progress/reports',
+    );
+  });
+
+  it('returns the exact Journal caller when the report was opened from Journal', () => {
+    mockSearchParams = { reportId: 'report-uuid-1', returnTo: 'journal' };
+    mockUseProfileReportDetail.mockReturnValue({
+      data: MONTHLY_REPORT,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    render(<ProgressMonthlyReportDetail />);
+
+    fireEvent.press(screen.getByTestId('progress-report-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/journal',
     );
   });
 

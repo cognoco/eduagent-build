@@ -17,6 +17,7 @@ import { JournalSegmentedControl } from './JournalSegmentedControl';
 import { JournalNotesArchive } from './JournalNotesArchive';
 import { JournalPracticeSection } from './JournalPracticeSection';
 import { RecapRow } from './RecapRow';
+import { JOURNAL_RETURN_TO } from '../../lib/navigation';
 import {
   PracticeReportsEmptyMotif,
   useSectionErrorActions,
@@ -128,12 +129,18 @@ function JournalReportsSection(): React.ReactElement {
     if (latestReport.kind === 'weekly') {
       router.push({
         pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
-        params: { weeklyReportId: latestReport.report.id },
+        params: {
+          weeklyReportId: latestReport.report.id,
+          returnTo: JOURNAL_RETURN_TO,
+        },
       } as Href);
     } else {
       router.push({
         pathname: '/(app)/progress/reports/[reportId]',
-        params: { reportId: latestReport.report.id },
+        params: {
+          reportId: latestReport.report.id,
+          returnTo: JOURNAL_RETURN_TO,
+        },
       } as Href);
     }
   };
@@ -210,13 +217,13 @@ function JournalReportsSection(): React.ReactElement {
         onPressMonthly={(reportId) =>
           router.push({
             pathname: '/(app)/progress/reports/[reportId]',
-            params: { reportId },
+            params: { reportId, returnTo: JOURNAL_RETURN_TO },
           } as Href)
         }
         onPressWeekly={(weeklyReportId) =>
           router.push({
             pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
-            params: { weeklyReportId },
+            params: { weeklyReportId, returnTo: JOURNAL_RETURN_TO },
           } as Href)
         }
       />

@@ -42,7 +42,11 @@ import { useTotalSessionCount } from '../../hooks/use-session-context';
 import { useLearnerProfile } from '../../hooks/use-learner-profile';
 import { useTopicSuggestions } from '../../hooks/use-topic-suggestions';
 import { usePostSessionNotificationAsk } from '../../hooks/use-post-session-notification-ask';
-import { goBackOrReplace, homeHrefForReturnTo } from '../../lib/navigation';
+import {
+  goBackOrReplace,
+  homeHrefForReturnTo,
+  JOURNAL_RETURN_TO,
+} from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { formatApiError, classifyApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
@@ -438,6 +442,11 @@ export default function SessionSummaryScreen() {
   };
 
   const finishSummaryNavigation = (): void => {
+    if (returnTo === JOURNAL_RETURN_TO) {
+      goBackOrReplace(router, summaryHomeHref);
+      return;
+    }
+
     if (filedSubjectId && filedBookId) {
       router.replace('/(app)/library' as Href);
       InteractionManager.runAfterInteractions(() => {

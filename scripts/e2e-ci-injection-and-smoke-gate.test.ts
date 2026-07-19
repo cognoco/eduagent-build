@@ -936,6 +936,18 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
 
     expect(plan).toEqual([
+      // [WI-2239] No-recap Journal recovery reaches the V2 Mentor.
+      {
+        flow: 'flows/v2/v2-journal-empty-recovery.yaml',
+        scenario: 'onboarding-complete',
+        shard: 1,
+      },
+      // [WI-2239] Populated Journal exact-artifact round trips.
+      {
+        flow: 'flows/v2/v2-journal-paper-trail.yaml',
+        scenario: 'v2-journal-paper-trail',
+        shard: 1,
+      },
       {
         flow: 'flows/v2/v2-shell-navigation.yaml',
         scenario: 'learning-active',

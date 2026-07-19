@@ -40,6 +40,14 @@
   ],
   "v2": [
     {
+      "flow": "flows/v2/v2-journal-empty-recovery.yaml",
+      "scenario": "onboarding-complete"
+    },
+    {
+      "flow": "flows/v2/v2-journal-paper-trail.yaml",
+      "scenario": "v2-journal-paper-trail"
+    },
+    {
       "flow": "flows/v2/v2-shell-navigation.yaml",
       "scenario": "learning-active"
     },

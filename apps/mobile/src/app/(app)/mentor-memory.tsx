@@ -17,7 +17,11 @@ import {
   getFocusAreaProgress,
 } from '../../components/mentor-memory-sections';
 import { TellMentorInput } from '../../components/tell-mentor-input';
-import { goBackOrReplace } from '../../lib/navigation';
+import {
+  goBackOrReplace,
+  JOURNAL_HREF,
+  JOURNAL_RETURN_TO,
+} from '../../lib/navigation';
 import { ErrorFallback, TimeoutLoader } from '../../components/common';
 import { formatRelativeDate } from '../../lib/format-relative-date';
 import {
@@ -212,6 +216,11 @@ export default function MentorMemoryScreen() {
   const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
 
   const handleBack = useCallback(() => {
+    if (resolvedReturnTo === JOURNAL_RETURN_TO) {
+      router.replace(JOURNAL_HREF);
+      return;
+    }
+
     if (resolvedReturnTo === 'more') {
       router.replace('/(app)/more');
       return;
@@ -290,6 +299,7 @@ export default function MentorMemoryScreen() {
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={handleBack}
+          testID="mentor-memory-back"
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}

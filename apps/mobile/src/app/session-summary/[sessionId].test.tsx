@@ -532,6 +532,7 @@ describe('SessionSummaryScreen', () => {
     mockParams.topicId = undefined;
     mockParams.filedSubjectId = undefined;
     mockParams.filedBookId = undefined;
+    mockParams.returnTo = undefined;
     mockTranscriptData = null;
     mockSessionSummaryData = null;
     mockTotalSessions = 0;
@@ -2015,6 +2016,35 @@ describe('SessionSummaryScreen', () => {
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
       });
+    });
+
+    it('returns a persisted Journal recap to Journal without swapping to its topic', async () => {
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440005',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Existing Biology recap.',
+        aiFeedback: 'Helpful reflection.',
+        status: 'submitted',
+      };
+      mockParams.subjectId = mockSubjectId;
+      mockParams.topicId = mockSuggestedTopicAId;
+      mockParams.returnTo = 'journal';
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('summary-close-button');
+      });
+      fireEvent.press(screen.getByTestId('summary-close-button'));
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+      });
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/topic/[topicId]',
+        }),
+      );
     });
 
     it('prefers router.back() over replace when canGoBack() is true on revisit continue', async () => {
