@@ -997,7 +997,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
   });
 
-  it('[WI-2241] hard-proves the rich supportee remains selected across relaunch before restoring Journal', () => {
+  it('[WI-2241] hard-proves the exact rich supportee is reselected after relaunch before restoring Journal', () => {
     const supporterFlow = readFileSync(
       join(
         repoRoot,
@@ -1016,7 +1016,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
 
     expect(relaunchStart).toBeGreaterThanOrEqual(0);
-    expect(commands.slice(relaunchStart, relaunchStart + 7)).toEqual([
+    expect(commands.slice(relaunchStart, relaunchStart + 8)).toEqual([
       'stopApp',
       { launchApp: { clearState: false } },
       {
@@ -1029,10 +1029,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scrollUntilVisible: {
           element: {
             id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}',
-            selected: true,
           },
           direction: 'RIGHT',
           timeout: 10000,
+        },
+      },
+      {
+        tapOn: {
+          id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}',
         },
       },
       {
