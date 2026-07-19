@@ -1394,12 +1394,15 @@ describe('useSessionStreaming', () => {
         expect(currentMessages[0]).not.toHaveProperty('kind');
       } finally {
         releaseCompletion();
-        await act(async () => {
-          jest.runOnlyPendingTimers();
-          await pending;
-        });
-        jest.clearAllTimers();
-        jest.useRealTimers();
+        try {
+          await act(async () => {
+            await jest.advanceTimersByTimeAsync(79_000);
+            await pending;
+          });
+        } finally {
+          jest.clearAllTimers();
+          jest.useRealTimers();
+        }
       }
     });
 
