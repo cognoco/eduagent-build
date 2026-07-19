@@ -1,4 +1,8 @@
-# Finding — run-smoke failure taxonomy + staging-side root cause (2026-07-19)
+# Finding — run-smoke failure taxonomy + root cause (2026-07-19)
+
+*(Filename retained from the original submission — this repo path is
+already the citation target for `Fixed In` and cross-references. The
+finding itself is not staging-side; see the retitled §3 below.)*
 
 **WI:** WI-2450 (Diagnose spike — no fix in scope). Feeds WI-2451 (Cure,
 Blocked-by this item) and WI-2452 (advisory/required gate-hygiene split).
@@ -12,13 +16,27 @@ later).
 
 **Method:** `gh run list`/`gh run view`/`gh api .../jobs/<id>/logs` over the
 `E2E Web` workflow (`.github/workflows/e2e-web.yml`); Playwright artifact
-download + `0-trace.network` parsing for one representative failure;
+download + `0-trace.network` parsing for two representative failures;
 `scripts/playwright-staging-gate.cjs`'s `classifyFailure()` executed directly
 against a synthetic input to verify (not infer) its behavior;
 `gh api repos/.../branches/main/protection` to verify (not infer) which
-check name is actually required. Read/instrument-only throughout — no
-staging config change, no local reproduction loops (CI log/artifact reads
-and one `classifyFailure()` unit invocation only).
+check name is actually required; Sentry (`de.sentry.io`, org `zwizzly`) and
+Cloudflare (Workers Adaptive-Invocations GraphQL Analytics) read-only
+telemetry cross-reference (§3 rework revision). Read/instrument-only
+throughout — no staging config change, no deploy, no local reproduction
+loops, no token value reproduced anywhere in this document.
+
+**Rework note (2026-07-19, bounce #1):** `reviewer:codex:global` bounced the
+first submission — AC-1 and bucket (c) were accepted, but bucket (b)'s §3
+named only the transport *symptom* (`net::ERR_FAILED` to `/v1/profiles`),
+not the staging-side *cause* AC-2/AC-3 require. Per the PM's ruling on that
+bounce (BID-29 batch page comment, 2026-07-19T19:40Z): pursue the Sentry/
+Cloudflare telemetry cross-reference first, with a documented-gap scope
+concession authorized only as a fallback if the discriminating telemetry
+turns out not to exist. §3 below is the rework revision — the telemetry
+cross-reference resolved the root cause to a layer (see §3), with one
+narrower residual question minted as **WI-2475** per the same ruling's
+fallback clause.
 
 ## Architecture changed mid-sample — read this before the counts
 
@@ -158,7 +176,12 @@ strengthens, not weakens, the bucket-(b) finding**: it is not a today-only
 artifact of the sample window, it is the same failure that has been driving
 the "ambient red" complaint since at least the day before this WI was filed.
 
-## 3. Staging-side root cause — bucket (b) (AC-2)
+## 3. Root cause — bucket (b) (AC-2)
+
+*(Titled "staging-side root-cause evidence" in the WI's AC-2 — the
+investigation's finding is that it is not staging-side at all; see the
+rework subsection below. Kept the AC's original wording as the section
+identity for traceability; the finding itself supersedes it.)*
 
 Every bucket-(b) failure's `error-context.md` (Playwright's page snapshot at
 the moment of the `toBeVisible` timeout) is byte-identical across all
@@ -198,21 +221,153 @@ terminal burst below, which has no interleaved success. The terminal burst
 is `net::ERR_FAILED`, a distinct Chromium code from `ERR_ABORTED`, and is
 the basis for this finding; the `ERR_ABORTED` noise is excluded.)
 
-**Root cause: short (~3s), sustained bursts of connection-layer failure
-(`net::ERR_FAILED`) to `api-stg.mentomate.com`'s `/v1/profiles` endpoint** —
-not a clean HTTP 5xx, not isolated to the seed endpoint. The app's own
-offline-fallback fires on this, and whichever of the three flows is mid-test
-at that moment fails.
+**The terminal burst is not `/v1/profiles`-specific.** Widening the same
+trace to every `api-stg.mentomate.com` request (not just `/v1/profiles`)
+in the window immediately around the burst shows a batch of ten-plus
+distinct routes (`subjects`, `progress/inventory`, `consent/my-status`,
+`scopes`, …) all returning a clean `200` within the same millisecond at
+13:21:18.6xx, then **every** subsequent request to the host — regardless
+of route — failing `net::ERR_FAILED` from 13:21:22.416 through at least
+13:21:28.866 (`subjects/…` at 13:21:22.416 and 13:21:24.440,
+`progress/inventory` at 13:21:24.369, `activation-events` at 13:21:25.818,
+then the three `/v1/profiles` calls quoted above). `/v1/profiles` fails
+only because it happens to be the profile-bootstrap call the app's error
+boundary is named after and is mid-flight when the outage window opens —
+not because the endpoint itself is special.
 
-**Discriminator not established here (named, not resolved):** the trace
-evidence pins the *symptom* (a connection-layer blip to the Cloudflare
-Worker) but not the *ultimate* cause — worker cold-start vs. Neon contention
-vs. genuine shared-staging load from the many concurrent PR runs this same
-15-hour window shows (12+ distinct branches hit `api-stg.mentomate.com`'s
-E2E suite in the sampled window). Discriminating these needs a Sentry/
-Cloudflare Worker error-rate cross-reference at the precise failure
-timestamps above — out of scope for this read-only diagnosis pass, named as
-the concrete next step for whoever picks up WI-2451.
+### Root cause (rework — telemetry cross-reference, 2026-07-19, per PM ruling on the reviewer bounce)
+
+The original submission left the *ultimate* staging-side cause unresolved
+(worker cold-start vs. Neon contention vs. shared-staging load) and was
+bounced for stopping at the transport symptom. Per the PM's ruling on that
+bounce (BID-29 comment, 2026-07-19T19:40Z — cited here and in the
+completion summary), the read-only telemetry cross-reference was performed:
+Sentry (`de.sentry.io`, org `zwizzly`, project `mentomate-api`, EU region —
+not `sentry.io`) and Cloudflare (Workers Adaptive-Invocations GraphQL
+Analytics for the `mentomate-api-stg` script, account-scoped). Both were
+queried read-only; no staging mutation, deploy, or config change was made;
+no token value is reproduced here — only status codes, counts, and
+timestamps.
+
+**Finding: the outage window is invisible to both the application and the
+platform's own invocation accounting — the failure happens before a
+request is ever counted as reaching the Worker.** For the representative
+run above (`29688502157`, 13:21:22.4–13:21:28.9 UTC):
+
+- **Sentry** shows a clean `GET /v1/profiles` transaction stream through
+  13:21:18Z, then a **20-second gap with zero `/v1/profiles` transactions**
+  (13:21:18Z → 13:21:38Z), and **zero `level:error` events of any kind**
+  anywhere in a 20-minute window bracketing the failure (`13:15`–`13:35`
+  UTC) — ruling out an application exception as the cause.
+- **Cloudflare** (`workersInvocationsAdaptive`, filtered
+  `scriptName: "mentomate-api-stg"`, second-granularity `datetime`
+  dimension) shows a burst of 22 `success` invocations at `13:21:18Z`
+  (matching the trace's clean batch above), then **zero invocations of any
+  status — `success`, `clientDisconnected`, or otherwise — from `13:21:19Z`
+  through `13:21:32Z`**, a 14-second total gap in the Worker's own
+  invocation log, squarely bracketing the client-observed failure window.
+  Handled by colo `SEA`. This closes the one gap the Sentry evidence alone
+  leaves open: Sentry's SDK runs *inside* Worker code, so a Worker crashing
+  before its SDK initializes could in principle produce a Sentry-invisible
+  application failure — but that scenario would still be a Worker
+  invocation (the Worker started running), and Cloudflare's independent,
+  SDK-external invocation log shows none occurred. The two sources cover
+  each other's blind spot.
+
+A Worker cold start, a Neon connection-pool exhaustion, a Neon cold-resume
+(the PM ruling's named candidate — Neon's serverless compute can take
+seconds to resume from suspension), or a Worker-side exception would all
+still register as an invocation: Cloudflare's own documentation defines the
+"Total requests" this dataset counts as "All incoming requests registered
+by a Worker" — i.e. counted at request-receipt, before any application code
+(including a Neon round-trip) runs — so a slow or failed database round-trip
+inside an already-invoked Worker would show up as a delayed `success`, an
+`errors`-counted entry, or at minimum a logged attempt — never as a total
+absence of any invocation record
+(<https://developers.cloudflare.com/workers/observability/metrics-and-analytics/>).
+Cloudflare's own accounting shows none. Independently, Cloudflare
+Workers cold starts are architecturally V8-isolate startups, documented and
+widely benchmarked in the single-digit-millisecond range (unlike
+container-based cold starts elsewhere) — a 14-second total gap is two to
+three orders of magnitude too long to be a cold start even before
+considering whether it would register as an invocation at all. **This rules
+out worker cold-start and Neon-side contention as the cause** and places the
+fault before the request reaches the Workers runtime's invocation layer:
+an edge/network-path connectivity gap between the CI runner and Cloudflare,
+not a backend resource-contention issue.
+
+**Reproduced independently** in a second, unrelated run
+(`29671898435`, `WI-2228-mitigation` branch, 2026-07-19 03:37–03:38 UTC —
+over 9 hours earlier and a different PR entirely): the identical signature,
+widened the same way as the first run above. The full trace in this window
+shows a *distinct, recurring, and benign* pattern of `net::ERR_ABORTED`
+batches at 03:37:28, 03:37:35, and 03:37:43 — each hits several routes
+simultaneously (the signature of a page/render-cycle cancelling its own
+prior in-flight requests, not a network problem) and each is followed by a
+clean `200`/`201` on the same routes within 3–4 seconds (e.g. the
+`03:37:43` batch recovers at `03:37:47.821`–`.828`) — excluded from this
+finding on the same reasoning as the isolated `ERR_ABORTED` noise in the
+first run. Separately, and not part of that recurring pattern, the actual
+outage: starting at `03:38:34.600` (`subjects/…`, `net::ERR_FAILED`) through
+`03:38:37.140` (`activation-events`) and the three `/v1/profiles` calls at
+`03:38:37.161`–`03:38:40.182`, all `net::ERR_FAILED`, all-route, with **no**
+interleaved success anywhere in this ~5.6-second window — unlike every
+preceding `ERR_ABORTED` batch, this one never recovers before the test gives
+up. Cross-checked against Cloudflare, which again shows the Worker's own
+invocation log going silent immediately before and through the outage (last
+invocation at `03:38:32Z`, none through the end of the query window), this
+time on colo **`SJC`** — a *different* Cloudflare data center from the
+first incident's `SEA`. Reproducing across two colos rules out a single
+overloaded/faulty edge location as the cause; reproducing across a >9-hour,
+different-PR gap rules out a one-off coincidence tied to one moment of
+shared-staging load.
+
+**Residual discriminator (not resolved — genuinely out of reach here, not
+guessed at):** the two-colo reproduction is most consistent with a DNS
+resolution hiccup for the `api-stg.mentomate.com` hostname (colo-agnostic
+by construction — DNS resolves before a colo is even selected) over a
+runner-side or Cloudflare-edge-hardware cause, but this document does not
+claim that as proven. A fourth candidate the Workers-invocation data alone
+cannot rule out: Cloudflare's own documentation states a WAF or other
+security-feature block is *also* excluded from "Total requests" counting
+(same source as above) — so a transient WAF or bot-management
+false-positive against this CI traffic (GitHub Actions runner IP ranges and
+a headless-Chromium user agent are both plausible WAF/bot-management
+trigger vectors for exactly this kind of automated traffic) would produce
+an identical zero-invocation signature to a pre-edge DNS/network gap, and
+this document's evidence cannot distinguish the two. Zone-level Cloudflare
+HTTP-edge analytics (one layer
+earlier than Workers-invocation data, which would show whether the request
+reached Cloudflare's edge at all, and would separately surface a WAF-block
+event) were attempted and refused: `com.cloudflare.api.account.zone.analytics.read` is
+not granted to the available `CLOUDFLARE_API_TOKEN` for the `mentomate.com`
+zone. GitHub Actions runner-side DNS/network diagnostics for these specific
+job runs are not retained anywhere queryable from this repo. This residual
+question — is the pre-invocation gap DNS-side, Cloudflare-edge-side
+(including a WAF false-positive), or GitHub-Actions-runner-side? — is
+minted as a follow-up Work Item (**WI-2475**) carrying these two incidents'
+timestamps, colos, and queries as its starting evidence, rather than
+guessed at here.
+
+**This is the PM ruling's branch-2 outcome, explicitly pre-authorized —
+not an evasion of the original bounce.** The ruling (BID-29 batch page
+comment, 2026-07-19T19:40Z) states verbatim: *"if after a genuine attempt
+the discriminating telemetry does not exist (retention window passed,
+sampling missed it, logs not enabled at the relevant layer), document the
+negative result precisely — what was queried, over what window, what was
+absent — and on that record I grant in advance the scope ruling the
+reviewer offered: transport-level failure-mode identification + documented
+telemetry gap satisfies AC-2/AC-3 for bucket (b), with the residual
+discriminator question minted as a follow-up WI carrying your queries as
+its starting evidence."* The three candidate causes the original bounce and
+the ruling named by name — worker cold-start, Neon connection-pool
+exhaustion, and Neon cold-resume — **are** resolved above with real
+telemetry (branch 1: genuinely ruled out, not merely undiscriminated). Only
+the *further* question of which specific pre-invocation layer is the cause
+falls to branch 2's documented-gap provision, because the access needed to
+resolve it (zone-level Cloudflare edge analytics, GitHub Actions runner-side
+network diagnostics) is unavailable, not because the telemetry
+cross-reference wasn't attempted.
 
 ## 4. A named risk for WI-2452 — the V2 gate's own classifier can misfile this exact failure as "product"
 
@@ -253,7 +408,7 @@ dominant Playwright failure shape.
 
 Today's sample did **not** catch this misclassification live inside the
 required gate, because `v2-release`'s `testMatch`
-(`apps/mobile/playwright.config.ts:210-213`) deliberately excludes the three
+(`apps/mobile/playwright.config.ts:208-213`) deliberately excludes the three
 WI-2389 files — the code comment there says exactly why ("keep the stable
 J-01 learner-home baseline ... isolated from legacy smoke projects").
 But `v2-release` **does** include `j01-learner-home.spec.ts` and other
@@ -294,13 +449,26 @@ field, which `continue-on-error` always reports as green.
 
 ## 6. Recommended cure per bucket (input to WI-2451)
 
-- **(b) — WI-2389 three flows.** The 2026-07-18 precedent finding's four
-  candidate mitigations (fail-fast + legible `staging-api-unavailable`
-  status; bounded retry/backoff on profile-load; a staging-health preflight
-  that skips/soft-fails on down; alarm on Worker 5xx/timeout) still apply.
-  This diagnosis adds the specific, reproducible evidence to act on them:
-  endpoint `/v1/profiles`, error `net::ERR_FAILED`, burst shape "3 fails in
-  ~3s after a run of clean 200s."
+- **(b) — WI-2389 three flows.** The root cause (§3, rework revision) is a
+  brief, all-route, pre-Worker-invocation connectivity gap to
+  `api-stg.mentomate.com` — not a Worker-side condition, so a Worker-side
+  mitigation (health preflight, alarm on Worker 5xx) would not observe it.
+  The mitigation that matches the actual failure layer: a bounded
+  connection-level retry (specifically on `net::ERR_FAILED` transport
+  failures, distinct from HTTP-level error status) around the app's API
+  client. Caveat against overselling this as reliably-quick: both traced
+  runs also show a separate, recurring, self-healing `net::ERR_ABORTED`
+  pattern every ~7 seconds throughout the run (§3) — the connection to
+  `api-stg.mentomate.com` is not uniformly quiet even outside the terminal
+  `net::ERR_FAILED` outage this document measured at ~5–6.5 seconds twice.
+  A short retry/backoff would very plausibly clear an outage of the
+  *measured* duration, but this document has only two samples of that
+  duration — it is not established as a reliable upper bound. Fail-fast +
+  legible `staging-api-unavailable` status (2026-07-18 precedent finding)
+  still applies for the case a retry doesn't clear it. Do not action the
+  DNS/edge/WAF hypotheses (§3) until WI-2475 discriminates them — a fix
+  aimed at the wrong layer wastes the retry-mitigation's effectiveness
+  budget.
 - **(c) scenario-catalog drift.** Add a fast, actionable check — either the
   seed API's scenario enum is generated from (or validated against) the same
   source the E2E fixtures reference, or a CI step fails a PR that adds a new
