@@ -19,6 +19,7 @@ import {
 } from '@eduagent/database';
 import type {
   AgeBracket,
+  AppShell,
   ChallengeRoundEvaluationItem,
   ChallengeRoundNoteDraftHint,
   ConversationLanguage,
@@ -2155,6 +2156,8 @@ export async function prepareExchangeContext(
   options?: {
     voyageApiKey?: string;
     homeworkMode?: 'help_me' | 'check_answer';
+    /** [WI-2220] Client-supplied active app shell, passed through per exchange. */
+    shell?: AppShell;
     llmTier?: LLMTier;
     subscriptionTier?: SubscriptionTier;
     quotaRemainingTurns?: number;
@@ -3219,6 +3222,8 @@ export async function prepareExchangeContext(
     // Client-side effective mode — drives mode-specific prompt sections (e.g. recitation)
     effectiveMode: (session.metadata as Record<string, unknown> | null)
       ?.effectiveMode as string | undefined,
+    // [WI-2220] Active app shell, passed from client per exchange
+    shell: options?.shell,
     gapAreas: Array.isArray(sessionMetadata?.gaps)
       ? sessionMetadata.gaps
           .map((gap) => String(gap).trim())
@@ -3703,6 +3708,7 @@ export async function processMessage(
     await prepareExchangeContext(db, profileId, sessionId, input.message, {
       ...options,
       homeworkMode: input.homeworkMode,
+      shell: input.shell,
       currentUserMessageEventId,
     });
 
@@ -4034,6 +4040,7 @@ export async function streamMessage(
     await prepareExchangeContext(db, profileId, sessionId, input.message, {
       ...options,
       homeworkMode: input.homeworkMode,
+      shell: input.shell,
       currentUserMessageEventId,
     });
 

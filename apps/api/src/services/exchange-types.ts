@@ -11,6 +11,7 @@
  */
 
 import type {
+  AppShell,
   HomeworkMode,
   InputMode,
   SessionType,
@@ -200,6 +201,13 @@ export interface ExchangeContext {
   correctStreak?: number;
   /** Client-side effective mode — drives mode-specific prompt sections (e.g. recitation) */
   effectiveMode?: string;
+  /**
+   * [WI-2220] Active app nav shell, threaded from the client per exchange
+   * (mirrors effectiveMode above). Selects which app-help destination map
+   * buildAppHelpPromptBlock answers app-navigation questions from. Absent or
+   * anything other than 'v2' resolves to the 'v0' map — see app-help-map.ts.
+   */
+  shell?: AppShell;
   /** Gap labels carried from a borderline assessment into a focused refresh session. */
   gapAreas?: string[];
   /** Continuation opener phase for same-topic resume sessions. */

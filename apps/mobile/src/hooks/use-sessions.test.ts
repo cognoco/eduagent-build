@@ -934,6 +934,7 @@ describe('useStreamMessage', () => {
     ];
     expect(JSON.parse(init.body)).toEqual({
       message: 'Hello',
+      shell: 'v0',
       imageBase64: 'base64-homework-image',
       imageMimeType: 'image/jpeg',
     });
