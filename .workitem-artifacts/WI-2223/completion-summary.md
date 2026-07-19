@@ -67,24 +67,45 @@ that cited red-green-revert log files never committed to the repo.
 
 ## Caveats / Follow-ups
 
-The AC's text sanctions a full `nav-shell.spec.ts` e2e case as the fallback
-for AC-3's visible-layout claim if a co-located jest genuinely cannot drive
-back/pop navigation. Investigation found this fallback path does not
-mechanically fit: `apps/mobile/e2e-web/flows/config-f/nav-shell.spec.ts` is
-the only file with that name in the repo, and it is Config-F-scoped
-(V1-on/V2-off) — opt-in only, excluded from the default Playwright run by
-`playwright.config.ts`'s `testIgnore`, and it asserts the Mentor tab is NOT
-visible under that flag configuration, so a Support-hub-Mentor-surface case
-cannot exist there. The other candidate, `j29-supporter-scope-journey.spec.ts`
-(in the default-running project, already covering supporter scope), seeds
-the supporter landing directly on the Support-hub surface and never starts
-from Me or exercises a return-to-Me assertion; covering this specific
-transition there would need new seed fixtures, which is out of scope for
-this rework. The new co-located jest test asserts real testIDs on real
-rendered components (`support-hub-mentor-tab` / `mentor-screen` presence and
-absence, not a mocked surface) for both the scope-behavior and the
-visible-layout portions of the return path, so it is treated here as
-satisfying both, with no e2e case added. This finding was raised to the
-requesting session during rework; a follow-up to add proper seed fixtures
-for a Me-and-supporter-scope e2e journey is left as backlog if a full
-pixel-rendered proof is later wanted.
+**Architectural fact, not a deferral:** `scope-context.tsx` has no
+navigation-event listener anywhere (no `useFocusEffect`, no blur handler),
+and `ScopeContextProvider` mounts exactly once at
+`apps/mobile/src/app/(app)/_layout.tsx` root, above the Tabs navigator that
+owns the Mentor route. `activeScope` is therefore structurally decoupled
+from back/pop navigation — it cannot be affected by which screen React
+Navigation currently shows, because navigation lifecycle only mounts/unmounts
+what sits below where scope state lives. "Return to Me" is consequently an
+explicit scope switch (the `setActiveScope({kind:'me'})` call the ScopeChip
+makes), not a `router.back()` consequence. AC-3's return-path evidence is
+provided by the new co-located jest test driving exactly that real switch,
+per the definition above — not by a literal back-navigation call this screen
+has no code path to react to.
+
+**The AC's cited e2e fallback location is structurally infeasible, with
+citations:** `apps/mobile/e2e-web/flows/config-f/nav-shell.spec.ts` is the
+only file with that name in the repo. It asserts
+`await expect(page.getByTestId('tab-mentor')).not.toBeVisible()` at both
+`nav-shell.spec.ts:40` (family shape) and `nav-shell.spec.ts:59` (study
+shape) — the Mentor tab is asserted ABSENT under the Config-F flag
+configuration (V1-on/V2-off) that file tests. That whole file is also
+excluded from the default Playwright run by
+`playwright.config.ts:216`'s `testIgnore: [...quarantineIgnore(),
+/flows[\/]config-f[\/]/]`, running only under the opt-in
+`config-f-smoke` project. A Support-hub-Mentor-surface return case cannot
+exist there: the tab it needs is asserted invisible in the very
+configuration the file exercises, and the file wouldn't run in CI even if it
+could. The other candidate, `j29-supporter-scope-journey.spec.ts` (in the
+default-running `later-phases` project, already covering supporter scope),
+seeds the supporter landing directly on the Support-hub surface
+(`landingTestId: 'support-hub-mentor-tab'`) and never starts from Me or
+exercises a return-to-Me assertion; covering this specific transition there
+would need new seed fixtures (a supporter account with a Me scope), which is
+real scope creep beyond this rework's three named gaps. The new co-located
+jest test asserts real testIDs on real rendered components
+(`support-hub-mentor-tab` / `mentor-screen` presence and absence, not a
+mocked surface) for both the scope-behavior and the visible-layout portions
+of the return path, so it is treated here as satisfying both, with no e2e
+case added. This finding was independently verified by the requesting
+session against the same line numbers during rework. A follow-up to add
+proper seed fixtures for a Me-and-supporter-scope e2e journey is left as
+backlog if a full pixel-rendered proof is later wanted.

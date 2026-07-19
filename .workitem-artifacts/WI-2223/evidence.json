@@ -51,6 +51,11 @@
       "pointer": "apps/mobile/src/app/(app)/mentor.support-hub-return.test.tsx"
     },
     {
+      "acRef": "AC-3",
+      "description": "[rework, evidenced infeasibility, not a deferral] The AC's cited nav-shell.spec.ts e2e fallback for the visible-layout claim is structurally unusable: nav-shell.spec.ts:40 and nav-shell.spec.ts:59 assert tab-mentor is NOT visible under the Config-F flag configuration that file tests, and the whole file is excluded from the default Playwright run by playwright.config.ts:216's testIgnore (config-f is opt-in only via the config-f-smoke project). A Support-hub-Mentor-surface case cannot exist there. The real-mechanism jest test above (real testID presence/absence on real rendered components) is treated as satisfying the visible-layout portion instead.",
+      "pointer": "apps/mobile/e2e-web/flows/config-f/nav-shell.spec.ts:40"
+    },
+    {
       "acRef": "AC-4",
       "description": "Test against the real ScopeContextProvider proves a learner-shape (me-only) account is unaffected: setActiveScope early-returns (activeScope stays 'me') while navigation still proceeds unchanged.",
       "pointer": "apps/mobile/src/lib/now-deep-link.test.ts"
