@@ -453,7 +453,7 @@ One mobile client, one error handling path. RFC 7807 overengineered for this. Bo
                             # Verify Inngest signing key, skip JWT middleware.
 ```
 
-**Family usage response contract:** For an owner-visible Family/Pro breakdown,
+**Family usage response contract (`MMT-ADR-0035`):** For an owner-visible Family/Pro breakdown,
 `GET /v1/usage` returns `familyAggregate: { used, limit, formerMemberUsed? }`.
 `used` is the full current-cycle total. `byProfile` contains active members
 only; `formerMemberUsed` is the non-negative bucket retained from profiles
@@ -463,6 +463,15 @@ The bucket is omitted by older servers and treated as zero for rolling-client
 compatibility. It never changes an active member's attributed usage. It does
 participate in the family aggregate and in the repaired plan-funded monthly
 enforcement counter.
+
+All Family/Pro quota-bearing routes assemble one effective-access and locked
+quota snapshot. The subscription period start anchors the current cycle, the
+quota-pool reset is its public token, and the event ledger supplies consumption.
+`GET /v1/subscription/family` returns that exact reset token as `cycleResetAt`;
+routes and clients never calculate a second Family reset date. RevenueCat
+activation and renewal align both persisted anchors to the provider period.
+Incoherent or unanchored snapshots fail closed, and any bounded retry or
+enforcement repair emits structured observability.
 
 ### Frontend Architecture
 
