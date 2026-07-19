@@ -18,6 +18,7 @@ import {
   login,
   membership,
   guardianship,
+  supportership,
   consentGrant,
   consentRequest,
   subscription,
@@ -50,6 +51,7 @@ import {
 import { listSubjects } from './subject';
 import { getTierConfig } from './subscription';
 import { sleep } from './sleep';
+import { seedV2SupporterAccepted } from './test-seed-v2-supporter';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -155,7 +157,10 @@ export type SeedScenario =
   // Third wave (BILLING-07/08 + BRIDGE-03/04).
   | 'mentor-audit-family-pool-members'
   | 'mentor-audit-family-owner-daily-quota-with-child'
-  | 'mentor-audit-bridge-backstack';
+  | 'mentor-audit-bridge-backstack'
+  // [WI-2241] Supportership-aware v2 identity + accepted-visibility fixture —
+  // apps/api/src/services/test-seed-v2-supporter.ts.
+  | 'v2-supporter-accepted';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -249,7 +254,7 @@ async function fetchClerkWithRetry(
  *
  * If CLERK_SECRET_KEY is not set, generates a fake `clerk_seed_*` ID instead.
  */
-async function createClerkTestUser(
+export async function createClerkTestUser(
   email: string,
   env: SeedEnv,
 ): Promise<{ clerkUserId: string; password: string }> {
@@ -732,7 +737,7 @@ async function createBaseProfile(
   return profileId;
 }
 
-async function createSubjectWithCurriculum(
+export async function createSubjectWithCurriculum(
   db: Database,
   profileId: string,
   name: string,
@@ -807,7 +812,7 @@ async function createSubjectWithCurriculum(
 // (see VALID_SCENARIOS it.each + the Stage-0 ids whitelist in test-seed.test.ts).
 // ---------------------------------------------------------------------------
 
-async function insertWeeklyReport(
+export async function insertWeeklyReport(
   db: Database,
   opts: {
     profileId: string; // parent
@@ -913,7 +918,7 @@ async function insertMonthlyReport(
   return { reportId, reportMonth };
 }
 
-async function insertRetentionCards(
+export async function insertRetentionCards(
   db: Database,
   opts: {
     profileId: string;
@@ -938,7 +943,7 @@ async function insertRetentionCards(
   return { retentionCardIds: rows.map((row) => row.id) };
 }
 
-async function insertSessionWithRecap(
+export async function insertSessionWithRecap(
   db: Database,
   opts: {
     profileId: string;
@@ -5948,6 +5953,10 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'mentor-audit-family-owner-daily-quota-with-child':
     seedMentorAuditFamilyOwnerDailyQuotaWithChild,
   'mentor-audit-bridge-backstack': seedMentorAuditBridgeBackstack,
+  // [WI-2241] test-seed-v2-supporter.ts — composes test-seed-v2 owner
+  // identities with the accepted-visibility fixture logic (linking-ceremony)
+  // and the rich learning/report insert helpers above.
+  'v2-supporter-accepted': seedV2SupporterAccepted,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];
@@ -6024,7 +6033,7 @@ export async function seedScenario(
 //   6. Delete person rows (cascades login, membership, any remaining consent_request, subjects, sessions…)
 //   7. Delete organization rows (membership already gone; safe)
 // ---------------------------------------------------------------------------
-async function deleteOrganizationGraph(
+export async function deleteOrganizationGraph(
   db: Database,
   orgIds: string[],
 ): Promise<number> {
@@ -6109,6 +6118,25 @@ async function deleteOrganizationGraph(
         or(
           inArray(guardianship.guardianPersonId, deletablePersonIds),
           inArray(guardianship.chargePersonId, deletablePersonIds),
+        ),
+      );
+  }
+
+  // 5b. [WI-2241] Delete supportership rows (RESTRICT on both person FK
+  // columns, mirroring guardianship above). support_visibility_contracts /
+  // support_visibility_audit_events / support_visibility_notices all CASCADE
+  // from supportership.id, so deleting the edge here reclaims the whole
+  // visibility-contract subtree — no separate delete needed for those tables.
+  // Required for any reseed of a v2-supporter-accepted-style identity: without
+  // this, the person delete below hits the RESTRICT FK and the whole
+  // idempotent-reseed cleanup throws.
+  if (deletablePersonIds.length > 0) {
+    await db
+      .delete(supportership)
+      .where(
+        or(
+          inArray(supportership.supporterPersonId, deletablePersonIds),
+          inArray(supportership.supporteePersonId, deletablePersonIds),
         ),
       );
   }

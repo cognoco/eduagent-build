@@ -639,6 +639,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'learning-active',
         shard: 1,
       },
+      // [WI-2241] Supporter scope journey — Support hub -> person scope ->
+      // Mentor -> Subjects -> Journal -> Support hub, structural/negative
+      // walls, empty-record honest-empty-state, revoked-edge affordance
+      // absence, and a mid-flow relaunch.
+      {
+        flow: 'flows/v2/v2-supporter-scope-journey.yaml',
+        scenario: 'v2-supporter-accepted',
+        shard: 1,
+      },
     ]);
     expect(workflowRaw).toContain('- v2');
     expect(workflowRaw).toContain('EXPO_PUBLIC_ENABLE_MODE_NAV_V2:');
