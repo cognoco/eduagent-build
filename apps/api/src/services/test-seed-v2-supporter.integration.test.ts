@@ -11,6 +11,15 @@
  * actual seed builder against a real database and asserts, per AC, each
  * guaranteed property by name — never an adjacent/positive-only case while a
  * ruled absence sits unproven.
+ *
+ * NOTE on the PRIVATE-marker `.not.toContain('PRIVATE')` checks below: those
+ * are forward-regression CANARIES, not authorization proofs — the structural
+ * and shared-record read models never select the private-artifact tables in
+ * the first place, so the checks cannot fail for an authorization bug (see
+ * the per-test comments). The actual NEGATIVE WALL property — a
+ * revoked/unauthorized caller is denied outright, not served foreign data —
+ * is proven by the ForbiddenError assertions on the revoked-edge and
+ * unauthorized-deep-link cases.
  */
 import { resolve } from 'path';
 
@@ -96,7 +105,7 @@ function createIntegrationDb(): Database {
       expect(personScope).toBeDefined();
     });
 
-    it('[AC: STRUCTURAL WALL] person Subjects surface returns the seeded structural subject/topic/progress and never leaks the private note/bookmark/transcript content anywhere in the payload', async () => {
+    it('[AC: STRUCTURAL WALL] person Subjects surface returns the seeded structural subject/topic/progress, and its response shape has no field for note/session content at all', async () => {
       const structural = await readSupporteeStructuralSubjects(
         db,
         seeded.ids.supporterPersonId,
@@ -111,15 +120,26 @@ function createIntegrationDb(): Database {
         .find((candidate) => candidate.id === seeded.ids.topicId);
       expect(topic).toBeDefined();
       expect(topic?.progressState).toBeTruthy();
+      // The response is parsed through supporteeStructuralSubjectsResponseSchema
+      // (supporter-structural-mask.ts), whose subject/book/topic shape has no
+      // note/session-content field at all — the structural wall is a type-level
+      // guarantee of THIS response, not something this test proves at runtime.
 
-      // Negative-wall containment check: the raw structural payload must
-      // never carry the seeded private-artifact marker string anywhere,
-      // not just in the fields this test happens to assert positively.
+      // [Phase-4 review, WI-2241] This is a forward-regression CANARY, not an
+      // authorization proof: readSupporteeStructuralSubjects never SELECTs
+      // topicNotes/bookmarks/sessionEvents/learningProfiles in the first
+      // place (supporter-structural-mask.ts's query joins only
+      // subjects/curriculumBooks/curriculumTopics/retentionCards), so this
+      // assertion cannot fail for an authorization bug — it exists to trip
+      // immediately if a future change widens that query or the response
+      // schema to reach into a private table. The actual NEGATIVE WALL
+      // property (an unauthorized/revoked caller is denied, not served
+      // foreign data) is proven by the ForbiddenError cases below, not here.
       const serialized = JSON.stringify(structural);
       expect(serialized).not.toContain('PRIVATE');
     });
 
-    it('[AC: NEGATIVE WALL — shared record] the shared-record read model surfaces only shareable facts (weekly report / recap / milestone) and never the private note/bookmark/transcript content', async () => {
+    it('[AC-5 canary] the shared-record read model surfaces only shareable facts (weekly report / recap / milestone), and a forward-regression canary confirms its payload never carries the private-artifact marker', async () => {
       const record = await readSharedRecordForSupportee(db, {
         supportershipId: seeded.ids.edgeId,
         supporterPersonId: seeded.ids.supporterPersonId,
@@ -127,6 +147,14 @@ function createIntegrationDb(): Database {
       });
       expect(record.supporterView.facts.length).toBeGreaterThan(0);
 
+      // [Phase-4 review, WI-2241] Same canary caveat as the structural-wall
+      // case above: readSharedRecordForSupportee (shared-record-read-model.ts)
+      // only ever queries weeklyReports/sessionSummaries/milestones — it never
+      // selects topicNotes/bookmarks/sessionEvents/learningProfiles, so this
+      // check cannot fail for an authorization bug. It is a regression guard
+      // against a future change widening that read model, not the NEGATIVE
+      // WALL proof itself — that proof is the revoked-edge and
+      // unauthorized-deep-link ForbiddenError cases below.
       const serialized = JSON.stringify(record);
       expect(serialized).not.toContain('PRIVATE');
     });

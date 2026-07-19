@@ -8,9 +8,16 @@
 # preserving the SAME person/edge across bottom tabs (asserted by IDs baked
 # into the seeded testIDs, e.g. person-scope-subject-${SUBJECT_ID}, not just
 # copy), plus the STRUCTURAL WALL (no study/note input on the read-only
-# Subjects surface) and the NEGATIVE WALL (none of the seeded private-artifact
-# content — every private fixture row in test-seed-v2-supporter.ts is
-# content-prefixed 'PRIVATE' — is ever visible on screen).
+# Subjects surface), the revoked supportee's absence of any UI affordance,
+# and the empty-record supportee's honest empty state.
+#
+# [Phase-4 review, WI-2241] The actual NEGATIVE WALL FAIL-CLOSED property (a
+# revoked/unrelated caller is denied outright, not served foreign data) is
+# proven at its source in test-seed-v2-supporter.integration.test.ts (real
+# ForbiddenError assertions against the API). The 'PRIVATE' text-absence
+# check below is a forward-regression CANARY, not that proof — it cannot
+# fail for an authorization bug, since the underlying read models never
+# select the private-artifact tables in the first place.
 #
 # SEED_SCENARIO: 'v2-supporter-accepted'
 appId: com.mentomate.app
@@ -29,9 +36,13 @@ tags:
       id: 'support-hub-mentor-tab'
     timeout: 30000
 
-# Support hub: the seeded person chip for the rich supportee is present.
+# Support hub: the seeded person chip for the rich supportee is present; the
+# revoked supportee has NO scope-chip affordance at all (fails closed with no
+# dangling UI pointing at it — mirrors j29-supporter-scope-journey.spec.ts).
 - assertVisible:
     id: 'support-hub-mentor-person-${SUPPORTEE_PERSON_ID}'
+- assertNotVisible:
+    id: 'scope-chip-option-person-${REVOKED_SUPPORTEE_PERSON_ID}'
 
 # Mentor: open the rich person scope.
 - tapOn:
@@ -86,8 +97,9 @@ tags:
 - assertVisible:
     id: 'visibility-shared-record'
 
-# NEGATIVE WALL: none of the seeded private-artifact content (topic note,
-# bookmark, raw transcript, Mentor-memory) ever reaches the screen.
+# Forward-regression canary (NOT the negative-wall proof — see file header):
+# none of the seeded private-artifact content (topic note, bookmark, raw
+# transcript, Mentor-memory) ever reaches the screen today.
 - assertNotVisible:
     text: 'PRIVATE'
 
@@ -101,6 +113,19 @@ tags:
     visible:
       id: 'person-scope-journal-placeholder'
     timeout: 30000
+
+# EMPTY SHARED RECORD: switching to the empty-record supportee renders an
+# honest empty state, not an error and no leaked private content.
+- tapOn:
+    id: 'scope-chip-option-person-${EMPTY_SUPPORTEE_PERSON_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-journal-placeholder'
+    timeout: 15000
+- assertNotVisible:
+    id: 'visibility-shared-record'
+- assertVisible:
+    id: 'person-scope-journal-empty-lamp'
 
 # Back to Support hub via the scope chip.
 - tapOn:

@@ -6,18 +6,25 @@ import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
  * J-29 [WI-2241] supporter scope journey: Support hub -> person scope ->
  * Mentor -> Subjects -> Journal -> Support hub, preserving the same
  * person/edge across bottom tabs and a relaunch (page reload), plus the
- * structural wall (no study/note input), the negative wall (no private
- * artifact content anywhere on the page), the honest empty shared-record
- * state, and the revoked/unauthorized edge fail-closed absence-of-affordance.
+ * structural wall (no study/note input), a page-content containment canary,
+ * the honest empty shared-record state, and the revoked/unauthorized edge's
+ * absence of any UI affordance.
  *
  * Two synthetic identities: the seeded `v2-supporter-accepted` scenario
  * returns real supporter + supportee credentials (redacted from evidence —
- * see wi2241-art/evidence.json). Only the supporter signs in here; the
- * negative-wall/revoked-edge FAIL-CLOSED property at the API layer (403, no
- * cached data) is asserted directly against the real DB in
- * test-seed-v2-supporter.integration.test.ts — this spec covers the UI-level
- * corollary (no dangling affordance to the revoked/unauthorized person at
- * all).
+ * see wi2241-art/evidence.json). Only the supporter signs in here.
+ *
+ * [Phase-4 review, WI-2241] The actual NEGATIVE WALL FAIL-CLOSED property
+ * (a revoked/unrelated caller is denied outright, not served foreign data)
+ * is proven at its source in test-seed-v2-supporter.integration.test.ts
+ * (real ForbiddenError assertions against the API). This spec's page-body
+ * `not.toContain('PRIVATE')` check below is a forward-regression CANARY, not
+ * that proof — it cannot fail for an authorization bug, since the underlying
+ * read models never select the private-artifact tables in the first place
+ * (see the integration test's per-case comments). What this spec DOES prove
+ * at the UI level is the absence of any affordance pointing at the
+ * revoked/unauthorized identity (no scope-chip-option-person testID for it
+ * at all) and the empty-record honest-empty-state.
  */
 test('J-29 supporter: Support hub -> person scope -> Mentor -> Subjects -> Journal -> Support hub, walls hold, relaunch preserves scope', async ({
   page,
@@ -94,10 +101,12 @@ test('J-29 supporter: Support hub -> person scope -> Mentor -> Subjects -> Journ
   await expect(journalPlaceholder.getByText(richDisplayName)).toBeVisible();
   await expect(page.getByTestId('visibility-shared-record')).toBeVisible();
 
-  // NEGATIVE WALL: none of the seeded private-artifact content (topic note,
-  // bookmark, raw transcript, Mentor-memory) ever reaches the page — every
-  // private fixture row in test-seed-v2-supporter.ts is seeded with content
-  // prefixed 'PRIVATE'.
+  // Forward-regression canary (NOT the negative-wall proof — see file
+  // header): none of the seeded private-artifact content (topic note,
+  // bookmark, raw transcript, Mentor-memory — every private fixture row in
+  // test-seed-v2-supporter.ts is seeded with content prefixed 'PRIVATE')
+  // reaches the page today. Guards against a future data source accidentally
+  // widening to include it.
   const bodyText = (await page.textContent('body')) ?? '';
   expect(bodyText).not.toContain('PRIVATE');
 
