@@ -8,7 +8,7 @@ pnpm monorepo with Nx. Packages: `@eduagent/schemas`, `@eduagent/database`, `@ed
 
 ### Always
 
-- Use named exports only (no default exports, except Expo Router pages)
+- Use named exports only (no default exports, except Expo Router pages and Cloudflare Worker module entrypoints)
 - Use `async`/`await` (never `.then()` chains)
 - Explicit return types on exported functions
 - Import from package barrels (`@eduagent/schemas`), never internal paths

@@ -762,6 +762,51 @@ describe('resolveNavigationContract route predicates', () => {
     ]);
   });
 
+  it.each([
+    {
+      shell: 'V0',
+      flags: {
+        MODE_NAV_V0_ENABLED: true,
+        MODE_NAV_V1_ENABLED: false,
+        MODE_NAV_V2_ENABLED: false,
+      },
+      subjectsAvailable: false,
+      legacyLibraryAvailable: true,
+    },
+    {
+      shell: 'V1',
+      flags: {
+        MODE_NAV_V0_ENABLED: false,
+        MODE_NAV_V1_ENABLED: true,
+        MODE_NAV_V2_ENABLED: false,
+      },
+      subjectsAvailable: false,
+      legacyLibraryAvailable: true,
+    },
+    {
+      shell: 'V2',
+      flags: {
+        MODE_NAV_V0_ENABLED: false,
+        MODE_NAV_V1_ENABLED: true,
+        MODE_NAV_V2_ENABLED: true,
+      },
+      subjectsAvailable: true,
+      legacyLibraryAvailable: null,
+    },
+  ])(
+    '$shell exposes the intended learner subject-creation entry',
+    ({ flags, subjectsAvailable, legacyLibraryAvailable }) => {
+      const contract = resolveNavigationContract(makeContext({ flags }));
+
+      expect(contract.canEnter('subjects')).toBe(subjectsAvailable);
+      expect(contract.isSurfaced('subjects')).toBe(subjectsAvailable);
+      if (legacyLibraryAvailable !== null) {
+        expect(contract.canEnter('library')).toBe(legacyLibraryAvailable);
+        expect(contract.isSurfaced('library')).toBe(legacyLibraryAvailable);
+      }
+    },
+  );
+
   it('keeps V2 root routes behind active-profile and proxy guards', () => {
     const noProfileContract = resolveNavigationContract(
       makeContext({
