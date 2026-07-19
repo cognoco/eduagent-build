@@ -79,15 +79,14 @@ async function seedSourceSession(
   return session.id;
 }
 
-afterAll(async () => {
-  await deleteV2IdentitiesForTest(db, {
-    accountIds,
-    profileIds,
-    deleteSubscriptions: false,
-  });
-});
-
 describe('mentor notice lifecycle — real database', () => {
+  afterAll(async () => {
+    await deleteV2IdentitiesForTest(db, {
+      accountIds,
+      profileIds,
+    });
+  });
+
   it('is idempotent under concurrent create, defer, and re-check start calls', async () => {
     const fixture = await seedFixture('concurrency');
     const sourceSessionId = await seedSourceSession(fixture);

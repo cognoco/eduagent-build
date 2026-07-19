@@ -113,29 +113,21 @@ export async function ensureV2IdentityForLegacyProfileTest(
 
 export async function deleteV2IdentitiesForTest(
   db: Database,
-  input: {
-    accountIds?: string[];
-    profileIds?: string[];
-    /** Skip subscription-table cleanup when the fixture deliberately seeded none. */
-    deleteSubscriptions?: boolean;
-  },
+  input: { accountIds?: string[]; profileIds?: string[] },
 ): Promise<void> {
   const profileIds = input.profileIds ?? [];
   const accountIds = input.accountIds ?? [];
-  const deleteSubscriptions = input.deleteSubscriptions ?? true;
 
-  if (deleteSubscriptions && accountIds.length > 0) {
+  if (accountIds.length > 0) {
     await db
       .delete(subscriptionTable)
       .where(inArray(subscriptionTable.organizationId, accountIds));
   }
 
   if (profileIds.length > 0) {
-    if (deleteSubscriptions) {
-      await db
-        .delete(subscriptionTable)
-        .where(inArray(subscriptionTable.payerPersonId, profileIds));
-    }
+    await db
+      .delete(subscriptionTable)
+      .where(inArray(subscriptionTable.payerPersonId, profileIds));
     await db
       .delete(subscriptionPayers)
       .where(inArray(subscriptionPayers.personId, profileIds));
