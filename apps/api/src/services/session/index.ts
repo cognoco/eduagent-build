@@ -105,6 +105,7 @@ export {
   getSessionSummary,
   skipSummary,
   submitSummary,
+  retrySummaryFeedback,
 } from './session-summary';
 
 export { generateLearnerRecap } from '../session-recap';

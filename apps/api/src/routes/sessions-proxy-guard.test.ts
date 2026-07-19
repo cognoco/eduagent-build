@@ -475,6 +475,10 @@ describe('[WI-371 / DS-194] sessions proxy-mode guard — remaining write routes
     },
     { name: 'summary/skip', path: `/sessions/${SID}/summary/skip` },
     {
+      name: 'summary/retry-feedback',
+      path: `/sessions/${SID}/summary/retry-feedback`,
+    },
+    {
       name: 'summary',
       path: `/sessions/${SID}/summary`,
       body: {

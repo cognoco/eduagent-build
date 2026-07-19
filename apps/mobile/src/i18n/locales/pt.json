@@ -3073,6 +3073,7 @@
       "yourShare": "A tua parte",
       "yourUsage": "A tua utilização",
       "questionsUsed": "{{count}} perguntas",
+      "formerMembers": "Membros anteriores",
       "familyAggregate": "Total da família",
       "quotaResets": "A quota é reposta a {{date}}",
       "renews": "A subscrição renova a {{date}}",
@@ -3207,6 +3208,11 @@
         "fluency": "Próxima vez: um sprint rápido de fluência"
       }
     },
+    "feedbackUnavailableTitle": "O feedback ainda não está disponível",
+    "feedbackUnavailableMessage": "O seu resumo está guardado. Pode tentar obter o feedback novamente sem o submeter outra vez.",
+    "feedbackStillUnavailable": "O feedback ainda não está disponível, mas o seu resumo está seguro. Pode tentar novamente ou continuar quando quiser.",
+    "retryFeedback": "Tentar novamente",
+    "retryingFeedback": "A tentar novamente...",
     "mentorNotice": {
       "title": "Observações do mentor"
     }

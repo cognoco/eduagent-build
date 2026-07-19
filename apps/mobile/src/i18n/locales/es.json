@@ -3046,6 +3046,7 @@
       "yourShare": "Tu parte",
       "yourUsage": "Tu uso",
       "questionsUsed": "{{count}} preguntas",
+      "formerMembers": "Miembros anteriores",
       "familyAggregate": "Total familiar",
       "quotaResets": "La cuota se restablece el {{date}}",
       "renews": "La suscripción se renueva el {{date}}",
@@ -3180,6 +3181,11 @@
         "fluency": "La próxima vez: un sprint rápido de fluidez"
       }
     },
+    "feedbackUnavailableTitle": "Los comentarios aún no están disponibles",
+    "feedbackUnavailableMessage": "Tu resumen está guardado. Puedes volver a solicitar los comentarios sin enviarlo de nuevo.",
+    "feedbackStillUnavailable": "Los comentarios siguen sin estar disponibles, pero tu resumen está a salvo. Puedes volver a intentarlo o continuar cuando quieras.",
+    "retryFeedback": "Volver a intentar",
+    "retryingFeedback": "Volviendo a intentar...",
     "mentorNotice": {
       "title": "Observaciones del mentor"
     }

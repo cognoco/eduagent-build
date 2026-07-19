@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { authStateDir } from '../../helpers/runtime';
 import { readSeedData } from '../../helpers/seed-data';
@@ -49,7 +49,7 @@ const ENTRY_CASES = [
 ] as const;
 
 async function expectEmmaPersonScopedEntry(
-  page: import('@playwright/test').Page,
+  page: Page,
   entry: (typeof ENTRY_CASES)[number],
   childProfileId: string,
   subjectId: string,
@@ -149,9 +149,7 @@ test('V2 Account empty history falls back to Journal and never legacy Home', asy
   await expect(page).not.toHaveURL(/\/home(?:\?.*)?$/);
 });
 
-async function expectSignedOutWithoutOwnerData(
-  page: import('@playwright/test').Page,
-): Promise<void> {
+async function expectSignedOutWithoutOwnerData(page: Page): Promise<void> {
   await expect(page.getByTestId('sign-in-button')).toBeVisible({
     timeout: 60_000,
   });

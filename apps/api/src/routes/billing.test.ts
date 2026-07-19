@@ -121,6 +121,7 @@ jest.mock('../services/account', () => {
 const mockGetSubscriptionByAccountId = jest.fn();
 const mockEnsureFreeSubscription = jest.fn();
 const mockGetEffectiveAccessForSubscription = jest.fn();
+const mockResolveCoherentBillingAccess = jest.fn();
 const mockGetOrProvisionProfileQuotaUsage = jest.fn();
 const mockGetQuotaPool = jest.fn();
 const mockLinkStripeCustomer = jest.fn();
@@ -219,6 +220,8 @@ jest.mock(
         mockMarkSubscriptionCancelled(...args),
       getEffectiveAccessForSubscriptionV2: (...args: unknown[]) =>
         mockGetEffectiveAccessForSubscription(...args),
+      resolveCoherentBillingAccessV2: (...args: unknown[]) =>
+        mockResolveCoherentBillingAccess(...args),
       getOrProvisionProfileQuotaUsageV2: (...args: unknown[]) =>
         mockGetOrProvisionProfileQuotaUsage(...args),
       listFamilyMembersV2: (...args: unknown[]) =>
@@ -391,6 +394,42 @@ beforeEach(() => {
   mockGetEffectiveAccessForSubscription.mockResolvedValue(
     mockEffectiveAccess(),
   );
+  mockResolveCoherentBillingAccess.mockImplementation(
+    async (_db: unknown, subscriptionId: string) => {
+      let access = await mockGetEffectiveAccessForSubscription();
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        if (!access) {
+          return { kind: 'available', access: null, sharedPoolStatus: null };
+        }
+        if (
+          access.effectiveAccessTier !== 'family' &&
+          access.effectiveAccessTier !== 'pro'
+        ) {
+          return { kind: 'available', access, sharedPoolStatus: null };
+        }
+        try {
+          const sharedPoolStatus = await mockGetFamilyPoolStatus(
+            _db,
+            subscriptionId,
+            access,
+          );
+          return sharedPoolStatus
+            ? { kind: 'available', access, sharedPoolStatus }
+            : { kind: 'shared-pool-unavailable', access };
+        } catch (error) {
+          if (
+            !(error instanceof Error) ||
+            error.name !== 'StaleFamilyAccessSnapshotErrorV2' ||
+            attempt === 1
+          ) {
+            throw error;
+          }
+          access = await mockGetEffectiveAccessForSubscription();
+        }
+      }
+      return { kind: 'shared-pool-unavailable', access };
+    },
+  );
   mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(mockProfileQuota());
   mockGetQuotaPool.mockResolvedValue(null);
   mockLinkStripeCustomer.mockResolvedValue(null);
@@ -464,12 +503,149 @@ describe('billing routes', () => {
       expect(body.subscription.remainingQuestions).toBe(458);
     });
 
-    it('returns cancelAtPeriodEnd true when subscription is cancelled but active', async () => {
+    it('honestly retries a stale Family snapshot and returns the transitioned Plus state', async () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(
-        mockSubscription({
-          cancelledAt: '2025-01-20T00:00:00.000Z',
-          status: 'active',
+        mockSubscription({ id: 'sub-transition', tier: 'family' }),
+      );
+      const staleFamilyAccess = mockEffectiveAccess({
+        subscription: mockSubscription({
+          id: 'sub-transition',
+          tier: 'family',
         }),
+        effectiveAccessTier: 'family',
+      });
+      const freshPlusAccess = mockEffectiveAccess({
+        subscription: mockSubscription({
+          id: 'sub-transition',
+          tier: 'plus',
+        }),
+        effectiveAccessTier: 'plus',
+      });
+      mockGetEffectiveAccessForSubscription
+        .mockResolvedValueOnce(staleFamilyAccess)
+        .mockResolvedValueOnce(freshPlusAccess);
+      const { StaleFamilyAccessSnapshotErrorV2 } = jest.requireActual(
+        '../services/billing/billing-v2/family-v2',
+      ) as typeof import('../services/billing/billing-v2/family-v2');
+      mockGetFamilyPoolStatus.mockRejectedValueOnce(
+        new StaleFamilyAccessSnapshotErrorV2(),
+      );
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(
+        mockProfileQuota({
+          subscriptionId: 'sub-transition',
+          monthlyLimit: 700,
+          usedThisMonth: 14,
+        }),
+      );
+
+      const res = await app.request(
+        '/v1/subscription',
+        { headers: OWNER_AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        subscription: {
+          tier: 'plus',
+          effectiveAccessTier: 'plus',
+          monthlyLimit: 700,
+          usedThisMonth: 14,
+        },
+      });
+      expect(mockGetFamilyPoolStatus).toHaveBeenCalledTimes(1);
+      expect(mockGetFamilyPoolStatus).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-transition',
+        staleFamilyAccess,
+      );
+    });
+
+    it('passes the effective Family snapshot into pool assembly during a controlled Plus-to-Family transition', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ id: 'sub-transition', tier: 'plus' }),
+      );
+      const authoritativeAccess = mockEffectiveAccess({
+        subscription: mockSubscription({
+          id: 'sub-transition',
+          tier: 'family',
+        }),
+        effectiveAccessTier: 'family',
+      });
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        authoritativeAccess,
+      );
+      mockGetFamilyPoolStatus.mockResolvedValue({
+        tier: 'family',
+        monthlyLimit: 1500,
+        usedThisMonth: 14,
+        remainingQuestions: 1486,
+        profileCount: 2,
+        maxProfiles: 4,
+        dailyLimit: null,
+        usedToday: 0,
+      });
+
+      const res = await app.request(
+        '/v1/subscription',
+        { headers: OWNER_AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        subscription: {
+          tier: 'family',
+          effectiveAccessTier: 'family',
+          monthlyLimit: 1500,
+          usedThisMonth: 14,
+        },
+      });
+      expect(mockGetFamilyPoolStatus).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-transition',
+        authoritativeAccess,
+      );
+    });
+
+    it.each(['/v1/subscription', '/v1/usage', '/v1/subscription/status'])(
+      'fails closed on %s when effective Family access has no shared quota pool',
+      async (path) => {
+        const familySubscription = mockSubscription({ tier: 'family' });
+        mockGetSubscriptionByAccountId.mockResolvedValue(familySubscription);
+        mockGetEffectiveAccessForSubscription.mockResolvedValue(
+          mockEffectiveAccess({
+            subscription: familySubscription,
+            effectiveAccessTier: 'family',
+          }),
+        );
+        mockGetFamilyPoolStatus.mockResolvedValue(null);
+        mockGetQuotaPool.mockResolvedValue(
+          mockQuotaPool({ monthlyLimit: 100, usedThisMonth: 0 }),
+        );
+
+        const res = await app.request(
+          path,
+          { headers: OWNER_AUTH_HEADERS },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(503);
+        await expect(res.json()).resolves.toMatchObject({
+          code: 'SERVICE_UNAVAILABLE',
+        });
+        expect(mockGetQuotaPool).not.toHaveBeenCalled();
+      },
+    );
+
+    it('returns cancelAtPeriodEnd true when subscription is cancelled but active', async () => {
+      const cancelledSubscription = mockSubscription({
+        cancelledAt: '2025-01-20T00:00:00.000Z',
+        status: 'active',
+      });
+      mockGetSubscriptionByAccountId.mockResolvedValue(cancelledSubscription);
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({ subscription: cancelledSubscription }),
       );
       mockGetQuotaPool.mockResolvedValue(mockQuotaPool());
 
@@ -1045,6 +1221,20 @@ describe('billing routes', () => {
             effectiveAccessTier: tier,
           }),
         );
+        const monthlyLimit = tier === 'family' ? 1500 : 3000;
+        mockGetFamilyPoolStatus.mockResolvedValue({
+          tier,
+          monthlyLimit,
+          usedThisMonth: 0,
+          remainingQuestions: monthlyLimit,
+          profileCount: 1,
+          maxProfiles: tier === 'family' ? 4 : 6,
+          cycleStartAt: '2026-06-01T00:00:00.000Z',
+          cycleResetAt: '2026-07-01T00:00:00.000Z',
+          dailyLimit: null,
+          usedToday: 0,
+          memberUsage: [],
+        });
         mockGetQuotaPool.mockResolvedValue(
           mockQuotaPool({ usedThisMonth: 999 }),
         );
@@ -1062,6 +1252,214 @@ describe('billing routes', () => {
         expect(mockGetOrProvisionProfileQuotaUsage).not.toHaveBeenCalled();
       },
     );
+
+    it('returns former-member usage as a separate owner-visible bucket without inflating owner usage', async () => {
+      const ownerProfileId = '550e8400-e29b-41d4-a716-446655440001';
+      const familySubscription = mockSubscription({ tier: 'family' });
+      mockGetSubscriptionByAccountId.mockResolvedValue(familySubscription);
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({
+          subscription: familySubscription,
+          effectiveAccessTier: 'family',
+        }),
+      );
+      mockGetFamilyPoolStatus.mockResolvedValue({
+        tier: 'family',
+        monthlyLimit: 1500,
+        usedThisMonth: 6,
+        remainingQuestions: 1494,
+        profileCount: 1,
+        maxProfiles: 4,
+        cycleStartAt: '2026-06-01T00:00:00.000Z',
+        cycleResetAt: '2026-07-01T00:00:00.000Z',
+        dailyLimit: null,
+        usedToday: 1,
+        inactiveMemberUsedThisMonth: 5,
+        memberUsage: [
+          {
+            profileId: ownerProfileId,
+            name: 'Owner',
+            roles: ['admin', 'learner'],
+            used: 1,
+          },
+        ],
+      });
+      mockGetUsageBreakdownForProfile.mockResolvedValue({
+        byProfile: [
+          {
+            profile_id: ownerProfileId,
+            name: 'Owner',
+            used: 1,
+            usedToday: 1,
+            is_self: true,
+          },
+        ],
+        familyAggregate: {
+          used: 6,
+          limit: 1500,
+          formerMemberUsed: 5,
+        },
+        isOwnerBreakdownViewer: true,
+        selfUsedToday: null,
+        selfUsedThisMonth: null,
+      });
+
+      const res = await app.request(
+        '/v1/usage',
+        { headers: OWNER_AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        usage: {
+          usedThisMonth: 6,
+          byProfile: [
+            expect.objectContaining({ profile_id: ownerProfileId, used: 1 }),
+          ],
+          familyAggregate: {
+            used: 6,
+            limit: 1500,
+            formerMemberUsed: 5,
+          },
+        },
+      });
+      expect(mockGetUsageBreakdownForProfile).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          inactiveMemberUsedThisMonth: 5,
+          memberUsage: [
+            expect.objectContaining({ profileId: ownerProfileId, used: 1 }),
+          ],
+        }),
+      );
+    });
+
+    it('keeps shared-pool plan remaining independent from top-up availability when over limit', async () => {
+      const ownerProfileId = '550e8400-e29b-41d4-a716-446655440001';
+      const familySubscription = mockSubscription({ tier: 'family' });
+      mockGetSubscriptionByAccountId.mockResolvedValue(familySubscription);
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({
+          subscription: familySubscription,
+          effectiveAccessTier: 'family',
+        }),
+      );
+      mockGetFamilyPoolStatus.mockResolvedValue({
+        tier: 'family',
+        monthlyLimit: 1500,
+        usedThisMonth: 1501,
+        remainingQuestions: 0,
+        profileCount: 1,
+        maxProfiles: 4,
+        cycleStartAt: '2026-06-01T00:00:00.000Z',
+        cycleResetAt: '2026-07-01T00:00:00.000Z',
+        dailyLimit: null,
+        usedToday: 0,
+        memberUsage: [
+          {
+            profileId: ownerProfileId,
+            name: 'Owner',
+            roles: ['admin', 'learner'],
+            used: 1501,
+          },
+        ],
+      });
+      mockGetTopUpCreditsRemaining.mockResolvedValue(10);
+      mockGetUsageBreakdownForProfile.mockResolvedValue({
+        byProfile: [
+          {
+            profile_id: ownerProfileId,
+            name: 'Owner',
+            used: 1501,
+            usedToday: 0,
+            is_self: true,
+          },
+        ],
+        familyAggregate: { used: 1501, limit: 1500 },
+        isOwnerBreakdownViewer: true,
+        selfUsedToday: null,
+        selfUsedThisMonth: null,
+      });
+
+      const res = await app.request(
+        '/v1/usage',
+        { headers: OWNER_AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        usage: {
+          monthlyLimit: 1500,
+          usedThisMonth: 1501,
+          remainingQuestions: 0,
+          topUpCreditsRemaining: 10,
+          warningLevel: 'top-up-available',
+        },
+      });
+    });
+
+    it('returns an owner-visible aggregate for a valid owner-only Family pool', async () => {
+      const ownerProfileId = '550e8400-e29b-41d4-a716-446655440001';
+      const familySubscription = mockSubscription({ tier: 'family' });
+      mockGetSubscriptionByAccountId.mockResolvedValue(familySubscription);
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({
+          subscription: familySubscription,
+          effectiveAccessTier: 'family',
+        }),
+      );
+      mockGetFamilyPoolStatus.mockResolvedValue({
+        tier: 'family',
+        monthlyLimit: 1500,
+        usedThisMonth: 0,
+        remainingQuestions: 1500,
+        profileCount: 1,
+        maxProfiles: 4,
+        cycleStartAt: '2026-06-01T00:00:00.000Z',
+        cycleResetAt: '2026-07-01T00:00:00.000Z',
+        dailyLimit: null,
+        usedToday: 0,
+        memberUsage: [
+          {
+            profileId: ownerProfileId,
+            name: 'Owner',
+            roles: ['admin', 'learner'],
+            used: 0,
+          },
+        ],
+      });
+      mockGetUsageBreakdownForProfile.mockResolvedValue({
+        byProfile: [
+          {
+            profile_id: ownerProfileId,
+            name: 'Owner',
+            used: 0,
+            usedToday: 0,
+            is_self: true,
+          },
+        ],
+        familyAggregate: { used: 0, limit: 1500 },
+        isOwnerBreakdownViewer: true,
+        selfUsedToday: null,
+        selfUsedThisMonth: null,
+      });
+
+      const res = await app.request(
+        '/v1/usage',
+        { headers: OWNER_AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        usage: {
+          byProfile: [expect.objectContaining({ profile_id: ownerProfileId })],
+          familyAggregate: { used: 0, limit: 1500 },
+        },
+      });
+    });
 
     it('returns child-visible usage from their profile breakdown', async () => {
       const childProfileId = '550e8400-e29b-41d4-a716-446655440000';
@@ -1088,7 +1486,32 @@ describe('billing routes', () => {
           effectiveAccessTier: 'family',
         }),
       );
-      mockGetQuotaPool.mockResolvedValue(mockQuotaPool({ usedThisMonth: 450 }));
+      mockGetFamilyPoolStatus.mockResolvedValue({
+        tier: 'family',
+        monthlyLimit: 1500,
+        usedThisMonth: 450,
+        remainingQuestions: 1050,
+        profileCount: 2,
+        maxProfiles: 4,
+        cycleStartAt: '2026-06-01T00:00:00.000Z',
+        cycleResetAt: '2026-07-01T00:00:00.000Z',
+        dailyLimit: null,
+        usedToday: 9,
+        memberUsage: [
+          {
+            profileId: '550e8400-e29b-41d4-a716-446655440001',
+            name: 'Owner',
+            roles: ['admin', 'learner'],
+            used: 438,
+          },
+          {
+            profileId: childProfileId,
+            name: 'Child',
+            roles: ['learner'],
+            used: 12,
+          },
+        ],
+      });
       mockGetUsageBreakdownForProfile.mockResolvedValue({
         byProfile: [],
         familyAggregate: null,
@@ -1112,10 +1535,10 @@ describe('billing routes', () => {
 
       const body = await res.json();
       expect(body.usage.usedThisMonth).toBe(12);
-      // Non-owner viewers see the family pool's actual remaining (50 = 500-450),
-      // NOT a per-child extrapolation (would be 488 = 500-12). Their personal
+      // Non-owner viewers see the family pool's actual remaining
+      // (1050 = 1500-450), NOT a per-child extrapolation. Their personal
       // contribution shows in usedThisMonth, without a per-profile breakdown.
-      expect(body.usage.remainingQuestions).toBe(50);
+      expect(body.usage.remainingQuestions).toBe(1050);
       expect(body.usage.byProfile).toEqual([]);
       expect(body.usage.familyAggregate).toBeNull();
       // usedToday must be the viewer's own daily count, not the family
@@ -1266,7 +1689,7 @@ describe('billing routes', () => {
       expect(mockGetQuotaPool).not.toHaveBeenCalled();
     });
 
-    it('returns shared-pool cached status without hitting the DB', async () => {
+    it('rejects a stale shared-pool cache and reads the coherent Family cycle', async () => {
       const fakeKv = {} as unknown;
       mockReadSubscriptionStatus.mockResolvedValueOnce({
         subscriptionId: 'sub-family',
@@ -1276,6 +1699,28 @@ describe('billing routes', () => {
         status: 'active',
         monthlyLimit: 1500,
         usedThisMonth: 123,
+        dailyLimit: null,
+        usedToday: 0,
+      });
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ id: 'sub-family', tier: 'family' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({
+          subscription: mockSubscription({
+            id: 'sub-family',
+            tier: 'family',
+          }),
+          effectiveAccessTier: 'family',
+        }),
+      );
+      mockGetFamilyPoolStatus.mockResolvedValue({
+        tier: 'family',
+        monthlyLimit: 1500,
+        usedThisMonth: 14,
+        remainingQuestions: 1486,
+        profileCount: 2,
+        maxProfiles: 4,
         dailyLimit: null,
         usedToday: 0,
       });
@@ -1293,9 +1738,17 @@ describe('billing routes', () => {
         effectiveAccessTier: 'family',
         billingAccess: 'current',
         monthlyLimit: 1500,
-        usedThisMonth: 123,
+        usedThisMonth: 14,
       });
-      expect(mockGetSubscriptionByAccountId).not.toHaveBeenCalled();
+      expect(mockGetSubscriptionByAccountId).toHaveBeenCalled();
+      expect(mockGetFamilyPoolStatus).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-family',
+        expect.objectContaining({
+          effectiveAccessTier: 'family',
+          subscription: expect.objectContaining({ id: 'sub-family' }),
+        }),
+      );
       expect(mockGetQuotaPool).not.toHaveBeenCalled();
       expect(mockGetOrProvisionProfileQuotaUsage).not.toHaveBeenCalled();
     });
@@ -1532,35 +1985,171 @@ describe('billing routes', () => {
   // -------------------------------------------------------------------------
 
   describe('GET /v1/subscription/family', () => {
-    it('returns family pool status and members', async () => {
+    it('assembles subscription, status, usage, and family from one effective Family 1500 cycle', async () => {
+      const memberUsage = [
+        {
+          profileId: '550e8400-e29b-41d4-a716-446655440001',
+          name: 'Owner',
+          roles: ['admin', 'learner'],
+          used: 9,
+        },
+        {
+          profileId: '550e8400-e29b-41d4-a716-446655440002',
+          name: 'Child',
+          roles: ['learner'],
+          used: 5,
+        },
+      ];
       mockGetSubscriptionByAccountId.mockResolvedValue(
         mockSubscription({ tier: 'family' }),
+      );
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({
+          subscription: mockSubscription({ tier: 'family' }),
+          effectiveAccessTier: 'family',
+        }),
+      );
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuotaPool({ monthlyLimit: 700, usedThisMonth: 7 }),
+      );
+      mockGetFamilyPoolStatus.mockResolvedValue({
+        tier: 'family',
+        monthlyLimit: 1500,
+        usedThisMonth: 14,
+        remainingQuestions: 1486,
+        profileCount: 2,
+        maxProfiles: 4,
+        cycleStartAt: '2026-06-01T00:00:00.000Z',
+        cycleResetAt: '2026-07-01T00:00:00.000Z',
+        dailyLimit: null,
+        usedToday: 0,
+        memberUsage,
+      });
+      mockListFamilyMembers.mockResolvedValue([
+        {
+          profileId: memberUsage[0]!.profileId,
+          displayName: 'Owner',
+          isOwner: true,
+        },
+        {
+          profileId: memberUsage[1]!.profileId,
+          displayName: 'Child',
+          isOwner: false,
+        },
+      ]);
+      mockGetUsageBreakdownForProfile.mockResolvedValue({
+        byProfile: [
+          {
+            profile_id: memberUsage[0]!.profileId,
+            name: 'Owner',
+            used: 9,
+            usedToday: 0,
+            is_self: true,
+          },
+          {
+            profile_id: memberUsage[1]!.profileId,
+            name: 'Child',
+            used: 5,
+            usedToday: 0,
+            is_self: false,
+          },
+        ],
+        familyAggregate: { used: 14, limit: 1500 },
+        isOwnerBreakdownViewer: true,
+        selfUsedToday: null,
+        selfUsedThisMonth: null,
+      });
+
+      const [subscriptionRes, statusRes, usageRes, familyRes] =
+        await Promise.all([
+          app.request(
+            '/v1/subscription',
+            { headers: OWNER_AUTH_HEADERS },
+            TEST_ENV,
+          ),
+          app.request(
+            '/v1/subscription/status',
+            { headers: OWNER_AUTH_HEADERS },
+            TEST_ENV,
+          ),
+          app.request('/v1/usage', { headers: OWNER_AUTH_HEADERS }, TEST_ENV),
+          app.request(
+            '/v1/subscription/family',
+            { headers: OWNER_AUTH_HEADERS },
+            TEST_ENV,
+          ),
+        ]);
+      const subscriptionBody = await subscriptionRes.json();
+      const statusBody = await statusRes.json();
+      const usageBody = await usageRes.json();
+      const familyBody = await familyRes.json();
+
+      for (const surface of [
+        subscriptionBody.subscription,
+        statusBody.status,
+        usageBody.usage,
+        familyBody.family,
+      ]) {
+        expect(surface.monthlyLimit).toBe(1500);
+        expect(surface.usedThisMonth).toBe(14);
+      }
+      expect(usageBody.usage.familyAggregate).toEqual({
+        used: 14,
+        limit: 1500,
+      });
+      expect(
+        usageBody.usage.byProfile.reduce(
+          (sum: number, row: { used: number }) => sum + row.used,
+          0,
+        ),
+      ).toBe(14);
+      expect(familyBody.family.remainingQuestions).toBe(1486);
+      expect(familyBody.family.cycleResetAt).toBe(usageBody.usage.cycleResetAt);
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
+      expect(mockGetUsageBreakdownForProfile).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ memberUsage }),
+      );
+    });
+
+    it('returns family pool status and members', async () => {
+      const familySubscription = mockSubscription({ tier: 'family' });
+      mockGetSubscriptionByAccountId.mockResolvedValue(familySubscription);
+      mockGetEffectiveAccessForSubscription.mockResolvedValue(
+        mockEffectiveAccess({
+          subscription: familySubscription,
+          effectiveAccessTier: 'family',
+        }),
       );
       mockGetFamilyPoolStatus.mockResolvedValue({
         tier: 'family',
         monthlyLimit: 1500,
         usedThisMonth: 300,
         remainingQuestions: 1200,
+        cycleResetAt: '2026-07-01T00:00:00.000Z',
         profileCount: 3,
         maxProfiles: 4,
+        memberUsage: [
+          {
+            profileId: 'a0000000-0000-4000-a000-000000000001',
+            name: 'Parent',
+            roles: ['admin', 'learner'],
+            used: 200,
+          },
+          {
+            profileId: 'a0000000-0000-4000-a000-000000000002',
+            name: 'Child 1',
+            roles: ['learner'],
+            used: 50,
+          },
+          {
+            profileId: 'a0000000-0000-4000-a000-000000000003',
+            name: 'Child 2',
+            roles: ['learner'],
+            used: 50,
+          },
+        ],
       });
-      mockListFamilyMembers.mockResolvedValue([
-        {
-          profileId: 'a0000000-0000-4000-a000-000000000001',
-          displayName: 'Parent',
-          isOwner: true,
-        },
-        {
-          profileId: 'a0000000-0000-4000-a000-000000000002',
-          displayName: 'Child 1',
-          isOwner: false,
-        },
-        {
-          profileId: 'a0000000-0000-4000-a000-000000000003',
-          displayName: 'Child 2',
-          isOwner: false,
-        },
-      ]);
 
       const res = await app.request(
         '/v1/subscription/family',

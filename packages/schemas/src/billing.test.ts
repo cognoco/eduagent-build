@@ -276,6 +276,33 @@ describe('usageSchema', () => {
     expect(parsed.byProfile).toHaveLength(1);
   });
 
+  it('preserves an explicit non-negative former-member usage bucket', () => {
+    const parsed = usageSchema.parse({
+      ...validUsage,
+      familyAggregate: {
+        used: 6,
+        limit: 100,
+        formerMemberUsed: 5,
+      },
+    });
+
+    expect(parsed.familyAggregate).toEqual({
+      used: 6,
+      limit: 100,
+      formerMemberUsed: 5,
+    });
+    expect(
+      usageSchema.safeParse({
+        ...validUsage,
+        familyAggregate: {
+          used: 6,
+          limit: 100,
+          formerMemberUsed: -1,
+        },
+      }).success,
+    ).toBe(false);
+  });
+
   it('strips unknown fields — does NOT leak undeclared server fields to client [BUG-578]', () => {
     // usageSchema uses .strip() (zod default), not .passthrough().
     // Unknown fields must be dropped so server internals never leak to mobile.
@@ -389,6 +416,7 @@ const validFamilySubscription = {
   monthlyLimit: 700,
   usedThisMonth: 50,
   remainingQuestions: 650,
+  cycleResetAt: ISO,
   profileCount: 2,
   maxProfiles: 5,
   members: [validFamilyMember],
@@ -422,6 +450,14 @@ describe('familySubscriptionSchema', () => {
       tier: 'pro',
     });
     expect(parsed.tier).toBe('pro');
+  });
+
+  it('requires the shared-pool cycle identity', () => {
+    const { cycleResetAt: _cycleResetAt, ...withoutCycle } =
+      validFamilySubscription;
+    expect(familySubscriptionSchema.safeParse(withoutCycle).success).toBe(
+      false,
+    );
   });
 
   it('rejects free tier in family subscription', () => {

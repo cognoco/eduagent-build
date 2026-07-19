@@ -3046,6 +3046,7 @@
       "yourShare": "Din andel",
       "yourUsage": "Ditt forbruk",
       "questionsUsed": "{{count}} spørsmål",
+      "formerMembers": "Tidligere medlemmer",
       "familyAggregate": "Familiesum",
       "quotaResets": "Kvoten nullstilles {{date}}",
       "renews": "Abonnementet fornyes {{date}}",
@@ -3180,6 +3181,11 @@
         "fluency": "Neste gang: en rask flytsprint"
       }
     },
+    "feedbackUnavailableTitle": "Tilbakemelding er ikke tilgjengelig ennå",
+    "feedbackUnavailableMessage": "Sammendraget ditt er lagret. Du kan prøve å hente tilbakemeldingen på nytt uten å sende inn igjen.",
+    "feedbackStillUnavailable": "Tilbakemelding er fortsatt ikke tilgjengelig, men sammendraget ditt er trygt. Du kan prøve på nytt eller fortsette når du er klar.",
+    "retryFeedback": "Gjenta tilbakemelding",
+    "retryingFeedback": "Gjentar tilbakemelding ...",
     "mentorNotice": {
       "title": "Lagt merke til underveis"
     }

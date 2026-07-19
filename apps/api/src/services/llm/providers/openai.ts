@@ -143,6 +143,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
     async chat(
       messages: ChatMessage[],
       config: ModelConfig,
+      signal?: AbortSignal,
     ): Promise<ChatResult> {
       const body: OpenAIRequest = {
         model: mapModel(config),
@@ -163,7 +164,9 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(OPENAI_TIMEOUT_MS)])
+          : AbortSignal.timeout(OPENAI_TIMEOUT_MS),
       });
 
       if (!res.ok) {

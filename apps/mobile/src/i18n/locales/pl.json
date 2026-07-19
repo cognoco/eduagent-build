@@ -3203,6 +3203,7 @@
       "yourShare": "Twój udział",
       "yourUsage": "Twoje wykorzystanie",
       "questionsUsed": "{{count}} pytań",
+      "formerMembers": "Byli członkowie",
       "familyAggregate": "Suma rodzinna",
       "quotaResets": "Limit odnawia się {{date}}",
       "renews": "Subskrypcja odnawia się {{date}}",
@@ -3343,6 +3344,11 @@
         "fluency": "Następnym razem: szybki sprint z płynności"
       }
     },
+    "feedbackUnavailableTitle": "Opinia nie jest jeszcze dostępna",
+    "feedbackUnavailableMessage": "Twoje podsumowanie zostało zapisane. Możesz spróbować ponownie uzyskać opinię bez ponownego przesyłania.",
+    "feedbackStillUnavailable": "Opinia wciąż nie jest dostępna, ale Twoje podsumowanie jest bezpieczne. Możesz spróbować ponownie lub kontynuować, kiedy zechcesz.",
+    "retryFeedback": "Ponów próbę",
+    "retryingFeedback": "Ponawianie próby...",
     "mentorNotice": {
       "title": "Zauważone po drodze"
     }

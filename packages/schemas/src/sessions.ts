@@ -570,11 +570,17 @@ export type SummarySubmitInput = z.infer<typeof summarySubmitSchema>;
 
 // Summary response
 
+export const summaryFeedbackStatusSchema = z.enum(['available', 'unavailable']);
+export type SummaryFeedbackStatus = z.infer<typeof summaryFeedbackStatusSchema>;
+
 export const sessionSummarySchema = z.object({
   id: z.string().uuid(),
   sessionId: z.string().uuid(),
   content: z.string(),
   aiFeedback: z.string().nullable(),
+  // Optional for backwards-compatible parsing of cached pre-WI-2183 payloads;
+  // current API mappers always emit the field.
+  feedbackStatus: summaryFeedbackStatusSchema.optional(),
   status: summaryStatusSchema,
   closingLine: z.string().nullable(),
   learnerRecap: z.string().nullable(),
@@ -805,14 +811,32 @@ export type SessionSummaryGetResponse = z.infer<
 // SubmitSummaryResult — POST /sessions/:sessionId/summary → 200
 // Picks only the fields returned by the submit endpoint (not the full summary).
 export const submitSummaryResultSchema = z.object({
-  summary: sessionSummarySchema.pick({
-    id: true,
-    sessionId: true,
-    content: true,
-    aiFeedback: true,
-    status: true,
-    baseXp: true,
-    reflectionBonusXp: true,
-  }),
+  summary: sessionSummarySchema
+    .pick({
+      id: true,
+      sessionId: true,
+      content: true,
+      aiFeedback: true,
+      status: true,
+      baseXp: true,
+      reflectionBonusXp: true,
+    })
+    .extend({ feedbackStatus: summaryFeedbackStatusSchema }),
 });
 export type SubmitSummaryResult = z.infer<typeof submitSummaryResultSchema>;
+
+// RetrySummaryFeedbackResult — POST /sessions/:sessionId/summary/retry-feedback → 200
+export const retrySummaryFeedbackResultSchema = z.object({
+  summary: sessionSummarySchema
+    .pick({
+      id: true,
+      sessionId: true,
+      content: true,
+      aiFeedback: true,
+      status: true,
+    })
+    .extend({ feedbackStatus: summaryFeedbackStatusSchema }),
+});
+export type RetrySummaryFeedbackResult = z.infer<
+  typeof retrySummaryFeedbackResultSchema
+>;
