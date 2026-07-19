@@ -454,23 +454,6 @@ function mapRetrievalScoreToDepth(score: number): 'low' | 'mid' | 'high' {
   return 'low';
 }
 
-async function updateSessionMetadata(
-  db: Database,
-  profileId: string,
-  sessionId: string,
-  nextMetadata: Record<string, unknown>,
-): Promise<void> {
-  await db
-    .update(learningSessions)
-    .set({ metadata: nextMetadata, updatedAt: new Date() })
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId),
-      ),
-    );
-}
-
 async function applyContinuationScore(
   db: Database,
   profileId: string,
@@ -481,7 +464,7 @@ async function applyContinuationScore(
   // [CR-2026-05-19-M3]: Wrap SELECT + UPDATE in a transaction with FOR UPDATE
   // so concurrent exchanges cannot clobber each other's continuationDepth write.
   // The previously-passed `session.metadata` snapshot was captured at request
-  // start, before `updateSessionMetadata` set `continuationOpenerActive: true`,
+  // start, before `persistSessionMetadata` set `continuationOpenerActive: true`,
   // so spreading that snapshot here clobbered the freshly-written flag.
   await db.transaction(async (tx) => {
     const [fresh] = await tx
@@ -2928,11 +2911,11 @@ export async function prepareExchangeContext(
 
   if (continuationOpenerActive && session.exchangeCount >= 3) {
     continuationDepth = 'mid';
-    const nextMetadata = { ...(sessionMetadata ?? {}) };
-    delete nextMetadata['continuationOpenerActive'];
-    delete nextMetadata['continuationOpenerStartedExchange'];
-    nextMetadata['continuationDepth'] = continuationDepth;
-    await updateSessionMetadata(db, profileId, sessionId, nextMetadata);
+    await persistSessionMetadata(db, profileId, sessionId, {
+      continuationOpenerActive: undefined,
+      continuationOpenerStartedExchange: undefined,
+      continuationDepth,
+    });
   } else if (continuationOpenerActive) {
     continuationOpenerPhase = session.exchangeCount >= 1 ? 'score' : 'probe';
   } else if (
@@ -2944,8 +2927,7 @@ export async function prepareExchangeContext(
     priorSessionMeta.endedAt >= continuationCutoff
   ) {
     continuationOpenerPhase = 'probe';
-    await updateSessionMetadata(db, profileId, sessionId, {
-      ...(sessionMetadata ?? {}),
+    await persistSessionMetadata(db, profileId, sessionId, {
       continuationOpenerActive: true,
       continuationOpenerStartedExchange: 0,
     });
