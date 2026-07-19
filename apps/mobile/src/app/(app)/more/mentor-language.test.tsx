@@ -1,4 +1,5 @@
 import i18nextInstance from 'i18next';
+import * as ExpoSecureStore from 'expo-secure-store';
 import { fireEvent, act, waitFor } from '@testing-library/react-native';
 import {
   renderScreen,
@@ -142,6 +143,48 @@ describe('MentorLanguageScreen', () => {
         conversationLanguage: 'es',
       });
     });
+  });
+
+  it('[WI-2098 AC-1] records a profile-scoped override only after a successful explicit save', async () => {
+    active = renderScreen(<MentorLanguageScreen />, {
+      profile: owner,
+      routes: onboardingRoutes,
+    });
+
+    await act(async () => {
+      fireEvent.press(active!.result.getByTestId('mentor-language-option-es'));
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(ExpoSecureStore.setItemAsync).toHaveBeenCalledWith(
+        'mentorLanguageExplicitOverride_profile-1',
+        'true',
+      ),
+    );
+  });
+
+  it('[WI-2098 AC-5] does not latch the override when the explicit save fails', async () => {
+    active = renderScreen(<MentorLanguageScreen />, {
+      profile: owner,
+      routes: {
+        '/onboarding/': new Response(JSON.stringify({ error: 'save failed' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      },
+    });
+
+    await act(async () => {
+      fireEvent.press(active!.result.getByTestId('mentor-language-option-es'));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(mockPlatformAlert).toHaveBeenCalled());
+    expect(ExpoSecureStore.setItemAsync).not.toHaveBeenCalledWith(
+      'mentorLanguageExplicitOverride_profile-1',
+      'true',
+    );
   });
 
   it('writes a linked child conversation language via the guardian route, keyed by childProfileId', async () => {

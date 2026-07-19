@@ -53,7 +53,7 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     );
   });
 
-  it('clears every per-profile key for each profileId provided', async () => {
+  it('[WI-2098 AC-3] clears every per-profile key, including the explicit Mentor-language override, on sign-out', async () => {
     const ID_A = 'profile-a';
     const ID_B = 'profile-b';
     await clearProfileSecureStorageOnSignOut([ID_A, ID_B]);
@@ -77,6 +77,7 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
           `voice-input-mode-${id}`,
           `accentPreset_${id}`,
           `mentomate_parent_home_seen_${id}`,
+          `mentorLanguageExplicitOverride_${id}`,
         ]),
       );
     }

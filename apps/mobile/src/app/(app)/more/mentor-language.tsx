@@ -16,6 +16,8 @@ import {
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useProfile } from '../../../lib/profile';
+import * as SecureStore from '../../../lib/secure-storage';
+import { mentorLanguageExplicitOverrideKey } from '../../../lib/secure-store-keys';
 import { useThemeColors } from '../../../lib/theme';
 
 // WI-1496 — reads/writes profiles.conversationLanguage (the LLM tutor-prose
@@ -68,6 +70,7 @@ export default function MentorLanguageScreen(): React.ReactElement {
   const handleSelectLanguage = useCallback(
     (lang: ConversationLanguage) => {
       if (lang === currentLanguage) return;
+      const targetProfileId = targetProfile?.id;
       updateConversationLanguage.mutate(
         {
           conversationLanguage: lang,
@@ -77,6 +80,12 @@ export default function MentorLanguageScreen(): React.ReactElement {
               : undefined,
         },
         {
+          onSuccess: async () => {
+            if (!targetProfileId) return;
+            const markerKey =
+              mentorLanguageExplicitOverrideKey(targetProfileId);
+            await SecureStore.setItemAsync(markerKey, 'true');
+          },
           onError: () => {
             platformAlert(
               t('more.errors.couldNotSaveSetting'),
@@ -91,6 +100,7 @@ export default function MentorLanguageScreen(): React.ReactElement {
       childProfileId,
       currentLanguage,
       t,
+      targetProfile?.id,
       updateConversationLanguage,
     ],
   );

@@ -116,6 +116,10 @@ export const guardianNotificationAskKey = (profileId: string): string =>
 export const mentorBirthSeenKey = (profileId: string): string =>
   sanitizeSecureStoreKey(`mentorBirthSeen_${profileId}`);
 
+/** Explicit Mentor-language selection marker (per-profile, device-local). */
+export const mentorLanguageExplicitOverrideKey = (profileId: string): string =>
+  sanitizeSecureStoreKey(`mentorLanguageExplicitOverride_${profileId}`);
+
 /**
  * Summary draft key prefix.
  * Full key: `summary-draft-<profileId>-<sessionId>`.

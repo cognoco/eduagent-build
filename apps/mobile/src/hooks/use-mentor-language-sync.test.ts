@@ -1,6 +1,8 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import i18next from 'i18next';
+import * as ExpoSecureStore from 'expo-secure-store';
 
+import { clearProfileSecureStorageOnSignOut } from '../lib/sign-out-cleanup';
 import { useMentorLanguageSync } from './use-mentor-language-sync';
 
 // Default implementation: simulates a successful mutation by calling onSuccess.
@@ -65,7 +67,7 @@ describe('useMentorLanguageSync', () => {
     );
   });
 
-  it('patches profile after a languageChanged event', async () => {
+  it('[WI-2098 AC-2] auto-syncs app-language changes when no explicit override exists', async () => {
     renderHook(() => useMentorLanguageSync());
 
     await i18next.changeLanguage('ja');
@@ -75,6 +77,91 @@ describe('useMentorLanguageSync', () => {
         { conversationLanguage: 'ja' },
         expect.any(Object),
       ),
+    );
+  });
+
+  it('[WI-2098 AC-1] preserves an explicitly selected mentor language when app language changes', async () => {
+    await ExpoSecureStore.setItemAsync(
+      'mentorLanguageExplicitOverride_profile-1',
+      'true',
+    );
+    mockActiveProfile = {
+      id: 'profile-1',
+      conversationLanguage: 'en',
+    };
+
+    renderHook(() => useMentorLanguageSync());
+
+    await i18next.changeLanguage('de');
+
+    await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
+  });
+
+  it('[WI-2098 AC-3] restores a profile-scoped override after remount without suppressing another profile', async () => {
+    await ExpoSecureStore.setItemAsync(
+      'mentorLanguageExplicitOverride_profile-1',
+      'true',
+    );
+    mockActiveProfile = {
+      id: 'profile-1',
+      conversationLanguage: 'en',
+    };
+
+    const firstMount = renderHook(() => useMentorLanguageSync());
+    await i18next.changeLanguage('de');
+    await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
+    firstMount.unmount();
+
+    mockActiveProfile = {
+      id: 'profile-2',
+      conversationLanguage: 'en',
+    };
+    const secondMount = renderHook(() => useMentorLanguageSync());
+
+    await waitFor(() =>
+      expect(mockMutate).toHaveBeenCalledWith(
+        { conversationLanguage: 'de' },
+        expect.any(Object),
+      ),
+    );
+    secondMount.unmount();
+
+    await clearProfileSecureStorageOnSignOut(['profile-1']);
+    mockMutate.mockClear();
+    mockActiveProfile = {
+      id: 'profile-1',
+      conversationLanguage: 'en',
+    };
+    renderHook(() => useMentorLanguageSync());
+
+    await waitFor(() =>
+      expect(mockMutate).toHaveBeenCalledWith(
+        { conversationLanguage: 'de' },
+        expect.any(Object),
+      ),
+    );
+  });
+
+  it('[WI-2098 AC-4] keeps the explicit override latched across app-language changes and an explicit change back', async () => {
+    const overrideKey = 'mentorLanguageExplicitOverride_profile-1';
+    await ExpoSecureStore.setItemAsync(overrideKey, 'true');
+    mockActiveProfile = {
+      id: 'profile-1',
+      conversationLanguage: 'en',
+    };
+
+    renderHook(() => useMentorLanguageSync());
+    await i18next.changeLanguage('de');
+    await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
+
+    // A later explicit selection writes the same durable marker; it must not
+    // be consumed by, or toggle with, automatic app-language synchronization.
+    await ExpoSecureStore.setItemAsync(overrideKey, 'true');
+    await i18next.changeLanguage('ja');
+
+    await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
+    await expect(ExpoSecureStore.getItemAsync(overrideKey)).resolves.toBe(
+      'true',
     );
   });
 

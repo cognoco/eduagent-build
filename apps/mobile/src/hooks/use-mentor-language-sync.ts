@@ -3,6 +3,8 @@ import i18next from 'i18next';
 import { conversationLanguageSchema } from '@eduagent/schemas';
 
 import { useProfile } from '../lib/profile';
+import * as SecureStore from '../lib/secure-storage';
+import { mentorLanguageExplicitOverrideKey } from '../lib/secure-store-keys';
 import { useUpdateConversationLanguage } from './use-onboarding-dimensions';
 
 type SyncKey = { profileId: string; language: string };
@@ -16,8 +18,21 @@ export function useMentorLanguageSync(): void {
 
   useEffect(() => {
     if (!activeProfile || isPending) return;
+    let cancelled = false;
 
-    const sync = () => {
+    const sync = async () => {
+      try {
+        const explicitOverride = await SecureStore.getItemAsync(
+          mentorLanguageExplicitOverrideKey(activeProfile.id),
+        );
+        if (explicitOverride === 'true') return;
+      } catch {
+        // Fail closed: a transient local-storage read failure must not erase
+        // a Mentor-language choice that may still be present on the device.
+        return;
+      }
+      if (cancelled) return;
+
       const parsed = conversationLanguageSchema.safeParse(i18next.language);
       if (!parsed.success) return;
       if (parsed.data === activeProfile.conversationLanguage) return;
@@ -45,8 +60,15 @@ export function useMentorLanguageSync(): void {
       );
     };
 
-    sync();
-    i18next.on('languageChanged', sync);
-    return () => i18next.off('languageChanged', sync);
+    const handleLanguageChanged = () => {
+      void sync();
+    };
+
+    void sync();
+    i18next.on('languageChanged', handleLanguageChanged);
+    return () => {
+      cancelled = true;
+      i18next.off('languageChanged', handleLanguageChanged);
+    };
   }, [activeProfile, isPending, mutate]);
 }
