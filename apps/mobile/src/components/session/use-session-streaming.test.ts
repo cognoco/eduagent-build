@@ -1267,7 +1267,30 @@ describe('useSessionStreaming', () => {
     it('[WI-2102] keeps the mentor-writing indicator mounted for the sparse t=0/25/79s stream', async () => {
       jest.useFakeTimers();
 
+      let currentMessages: Array<Record<string, unknown>> = [];
+      let isStreaming = false;
+      const streamingTransitions: boolean[] = [];
+      let releaseCompletion!: () => void;
+      const completionGate = new Promise<void>((resolve) => {
+        releaseCompletion = resolve;
+      });
       const opts = makeOpts({
+        setMessages: jest.fn(
+          (
+            update:
+              | Array<Record<string, unknown>>
+              | ((
+                  previous: Array<Record<string, unknown>>,
+                ) => Array<Record<string, unknown>>),
+          ) => {
+            currentMessages =
+              typeof update === 'function' ? update(currentMessages) : update;
+          },
+        ),
+        setIsStreaming: jest.fn((next: boolean) => {
+          if (next !== isStreaming) streamingTransitions.push(next);
+          isStreaming = next;
+        }),
         streamMessage: jest.fn(
           async (
             _text: string,
@@ -1280,6 +1303,7 @@ describe('useSessionStreaming', () => {
             onChunk('t=25');
             await new Promise((resolve) => setTimeout(resolve, 54_000));
             onChunk('t=79');
+            await completionGate;
             await onComplete({
               aiEventId: 'ai-event-sparse',
               exchangeCount: 1,
@@ -1290,25 +1314,29 @@ describe('useSessionStreaming', () => {
       });
       const { result } = renderHook(() => useSessionStreaming(opts as any));
 
+      let pending: Promise<void> | undefined;
       try {
-        let pending!: Promise<void>;
         await act(async () => {
           pending = result.current.continueWithMessage('retry later');
           await Promise.resolve();
         });
 
+        expect(isStreaming).toBe(true);
+        expect(currentMessages).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: 'assistant',
+              content: 't=0',
+              streaming: true,
+            }),
+          ]),
+        );
+
         await act(async () => {
           await jest.advanceTimersByTimeAsync(25_000);
         });
-        await act(async () => {
-          await jest.advanceTimersByTimeAsync(45_000);
-        });
-
-        const messagesAt70Seconds = applyMessageUpdates(
-          (opts.setMessages as jest.Mock).mock.calls,
-          [],
-        );
-        expect(messagesAt70Seconds).toEqual(
+        expect(isStreaming).toBe(true);
+        expect(currentMessages).toEqual(
           expect.arrayContaining([
             expect.objectContaining({
               role: 'assistant',
@@ -1317,19 +1345,43 @@ describe('useSessionStreaming', () => {
             }),
           ]),
         );
-        expect(opts.setIsStreaming).not.toHaveBeenCalledWith(false);
+
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(45_000);
+        });
+        expect(isStreaming).toBe(true);
+        expect(currentMessages).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: 'assistant',
+              content: 't=25',
+              streaming: true,
+            }),
+          ]),
+        );
 
         await act(async () => {
           await jest.advanceTimersByTimeAsync(9_000);
+        });
+        expect(isStreaming).toBe(true);
+        expect(currentMessages).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: 'assistant',
+              content: 't=79',
+              streaming: true,
+            }),
+          ]),
+        );
+
+        releaseCompletion();
+        await act(async () => {
           await pending;
         });
 
-        const finalMessages = applyMessageUpdates(
-          (opts.setMessages as jest.Mock).mock.calls,
-          [],
-        );
-
-        expect(finalMessages).toEqual(
+        expect(isStreaming).toBe(false);
+        expect(streamingTransitions).toEqual([true, false]);
+        expect(currentMessages).toEqual(
           expect.arrayContaining([
             expect.objectContaining({
               role: 'assistant',
@@ -1339,8 +1391,14 @@ describe('useSessionStreaming', () => {
             }),
           ]),
         );
-        expect(finalMessages[0]).not.toHaveProperty('kind');
+        expect(currentMessages[0]).not.toHaveProperty('kind');
       } finally {
+        releaseCompletion();
+        await act(async () => {
+          jest.runOnlyPendingTimers();
+          await pending;
+        });
+        jest.clearAllTimers();
         jest.useRealTimers();
       }
     });
