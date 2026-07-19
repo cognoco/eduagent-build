@@ -158,6 +158,68 @@ describe('buildSystemPrompt — app-help block', () => {
   });
 });
 
+describe('buildSystemPromptSegments — app shell threading [WI-2220]', () => {
+  const appHelpOptions = { includeAppHelpMap: true };
+
+  it('emits the V2 map when ctx.shell is v2', () => {
+    const { stablePrefix } = buildSystemPromptSegments(
+      makeContext({ shell: 'v2' }),
+      appHelpOptions,
+    );
+    expect(stablePrefix).toContain(
+      'APP HELP (map version 2026-06-27, V2 shell)',
+    );
+    expect(stablePrefix).not.toContain('APP HELP (map version 2026-05-30)');
+  });
+
+  it('emits the V0 map when ctx.shell is v0', () => {
+    const { stablePrefix } = buildSystemPromptSegments(
+      makeContext({ shell: 'v0' }),
+      appHelpOptions,
+    );
+    expect(stablePrefix).toContain('APP HELP (map version 2026-05-30)');
+    expect(stablePrefix).not.toContain(
+      'APP HELP (map version 2026-06-27, V2 shell)',
+    );
+  });
+
+  it('[AC-3] defaults to the V0 map when shell is absent', () => {
+    const { stablePrefix } = buildSystemPromptSegments(
+      makeContext(),
+      appHelpOptions,
+    );
+    expect(stablePrefix).toContain('APP HELP (map version 2026-05-30)');
+    expect(stablePrefix).not.toContain('V2 shell');
+  });
+
+  it('[AC-3] defaults to the V0 map when shell is an invalid value', () => {
+    const { stablePrefix } = buildSystemPromptSegments(
+      makeContext({
+        shell: 'v3' as unknown as ExchangeContext['shell'],
+      }),
+      appHelpOptions,
+    );
+    expect(stablePrefix).toContain('APP HELP (map version 2026-05-30)');
+    expect(stablePrefix).not.toContain('V2 shell');
+  });
+
+  it('[AC-3] honors a shell value that changes between turns of the same session', () => {
+    const session = makeContext({ sessionId: 'sess-mid-shell-change' });
+    const v0Turn = buildSystemPromptSegments(
+      { ...session, shell: 'v0' },
+      appHelpOptions,
+    );
+    const v2Turn = buildSystemPromptSegments(
+      { ...session, shell: 'v2' },
+      appHelpOptions,
+    );
+    expect(v0Turn.stablePrefix).toContain('APP HELP (map version 2026-05-30)');
+    expect(v2Turn.stablePrefix).toContain(
+      'APP HELP (map version 2026-06-27, V2 shell)',
+    );
+  });
+});
+
 describe('buildSystemPrompt — scope-boundary app-help exception', () => {
   it('includes app-help exception in standard learning scope boundaries for app-help turns', () => {
     const prompt = buildSystemPrompt(makeContext({ sessionType: 'learning' }), {

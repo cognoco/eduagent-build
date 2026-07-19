@@ -1644,6 +1644,55 @@ describe('processExchange', () => {
     expect(systemPrompts[1]).toContain('Mentor memory');
   });
 
+  it('[WI-2220] answers from the V2 map — never the retired V0 labels — when ctx.shell is v2', async () => {
+    // Production composition boundary: exercises buildExchangeSystemMessage
+    // via processExchange, not the isolated app-help eval. Before the fix,
+    // production always defaulted to V0 regardless of the client's shell.
+    const systemPrompts: string[] = [];
+    const capturingProvider: LLMProvider = {
+      id: 'cerebras',
+      async chat(messages: ChatMessage[], _config: ModelConfig) {
+        systemPrompts.push(String(messages[0]?.content ?? ''));
+        return {
+          content: JSON.stringify({
+            reply: 'Got it.',
+            signals: {
+              understanding_check: false,
+              partial_progress: false,
+              needs_deepening: false,
+            },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(capturingProvider);
+
+    try {
+      await processExchange(
+        { ...baseContext, shell: 'v2' },
+        'Where do I find my notes?',
+      );
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+
+    expect(systemPrompts).toHaveLength(1);
+    expect(systemPrompts[0]).toContain(
+      'APP HELP (map version 2026-06-27, V2 shell)',
+    );
+    expect(systemPrompts[0]).not.toContain('Home >');
+    expect(systemPrompts[0]).not.toContain('Library >');
+    expect(systemPrompts[0]).not.toContain('More >');
+    expect(systemPrompts[0]).not.toContain('Progress >');
+  });
+
   it('answers ordinary freeform facts from 0.88+ general knowledge', async () => {
     const provider: LLMProvider = {
       id: 'cerebras',
