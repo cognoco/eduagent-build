@@ -193,35 +193,74 @@ describe('ReadyScreen', () => {
     });
   });
 
-  it('does not forward an unsupported Library return token into the session', () => {
-    mockParams = {
-      subject: 'Marine biology',
-      subjectId: 'subject-1',
-      sessionId: 'session-1',
-      returnTo: 'library',
-    };
-    const activeProfile = createTestProfile({
-      id: 'profile-1',
-      displayName: 'Ari',
-      isOwner: true,
-      birthYear: 2014,
-    });
-    const { wrapper } = createScreenWrapper({
-      activeProfile,
-      profiles: [activeProfile],
-    });
-    const { getByTestId } = render(<ReadyScreen />, { wrapper });
-
-    fireEvent.press(getByTestId('ready-start'));
-
-    expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/session',
-      params: {
-        mode: 'learning',
+  it.each(['library', 'malformed-return-target'])(
+    'does not forward the unsupported %s return token into the session',
+    (returnTo) => {
+      mockParams = {
+        subject: 'Marine biology',
         subjectId: 'subject-1',
-        subjectName: 'Marine biology',
         sessionId: 'session-1',
-      },
-    });
-  });
+        returnTo,
+      };
+      const activeProfile = createTestProfile({
+        id: 'profile-1',
+        displayName: 'Ari',
+        isOwner: true,
+        birthYear: 2014,
+      });
+      const { wrapper } = createScreenWrapper({
+        activeProfile,
+        profiles: [activeProfile],
+      });
+      const { getByTestId } = render(<ReadyScreen />, { wrapper });
+
+      fireEvent.press(getByTestId('ready-start'));
+
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          subjectId: 'subject-1',
+          subjectName: 'Marine biology',
+          sessionId: 'session-1',
+        },
+      });
+    },
+  );
+
+  it.each(['learner-home', 'own-learning'])(
+    'preserves the supported %s return token into the session',
+    (returnTo) => {
+      mockParams = {
+        subject: 'Marine biology',
+        subjectId: 'subject-1',
+        sessionId: 'session-1',
+        returnTo,
+      };
+      const activeProfile = createTestProfile({
+        id: 'profile-1',
+        displayName: 'Ari',
+        isOwner: true,
+        birthYear: 2014,
+      });
+      const { wrapper } = createScreenWrapper({
+        activeProfile,
+        profiles: [activeProfile],
+      });
+      const { getByTestId } = render(<ReadyScreen />, { wrapper });
+
+      fireEvent.press(getByTestId('ready-start'));
+
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          subjectId: 'subject-1',
+          subjectName: 'Marine biology',
+          sessionId: 'session-1',
+          returnTo,
+        },
+      });
+    },
+  );
 });

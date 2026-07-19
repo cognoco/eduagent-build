@@ -9,7 +9,11 @@ import { MentorBirthErrorBoundary } from '../components/common/MentorBirthErrorB
 import { MentorBirthAnimation } from '../components/common/MentorBirthAnimation';
 import { CheckmarkPopAnimation } from '../components/common/CheckmarkPopAnimation';
 import { Button } from '../components/common/Button';
-import { SUBJECTS_RETURN_TO } from '../lib/navigation';
+import {
+  LEARNER_HOME_RETURN_TO,
+  OWN_LEARNING_RETURN_TO,
+  SUBJECTS_RETURN_TO,
+} from '../lib/navigation';
 
 const SCREEN_HEIGHT =
   Platform.OS === 'web'
@@ -94,8 +98,12 @@ export default function ReadyScreen() {
     if (params.topicId) sessionParams.topicId = params.topicId;
     if (params.topicName) sessionParams.topicName = params.topicName;
     if (params.rawInput) sessionParams.rawInput = params.rawInput;
-    if (params.returnTo === SUBJECTS_RETURN_TO)
-      sessionParams.returnTo = SUBJECTS_RETURN_TO;
+    if (
+      params.returnTo === SUBJECTS_RETURN_TO ||
+      params.returnTo === LEARNER_HOME_RETURN_TO ||
+      params.returnTo === OWN_LEARNING_RETURN_TO
+    )
+      sessionParams.returnTo = params.returnTo;
 
     router.replace({
       pathname: '/(app)/session',

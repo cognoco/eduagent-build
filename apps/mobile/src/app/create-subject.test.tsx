@@ -1084,66 +1084,72 @@ describe('CreateSubjectScreen', () => {
     });
   });
 
-  it('forwards the Subjects return target through the first-subject ready step', async () => {
-    mockSearchParams = { returnTo: 'subjects' };
-    setResolveResponse({
-      status: 'direct_match',
-      resolvedName: 'Math',
-      suggestions: [],
-      displayMessage: 'Math works.',
-    });
-    createSubjectResponse = {
-      subject: makeSubject({ id: SUBJECT_IDS.math, name: 'Math' }),
-      structureType: 'narrow',
-    };
-
-    render(<CreateSubjectScreen />, { wrapper: Wrapper });
-    await enterSubjectName('Math');
-    fireEvent.press(screen.getByTestId('create-subject-submit'));
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/ready',
-        params: {
-          subject: 'Math',
-          subjectId: SUBJECT_IDS.math,
-          sessionId: SESSION_IDS.first,
-          topicId: TOPIC_IDS.first,
-          returnTo: 'subjects',
-        },
+  it.each(['subjects', 'learner-home', 'own-learning'])(
+    'forwards the supported %s return target through the first-subject ready step',
+    async (returnTo) => {
+      mockSearchParams = { returnTo };
+      setResolveResponse({
+        status: 'direct_match',
+        resolvedName: 'Math',
+        suggestions: [],
+        displayMessage: 'Math works.',
       });
-    });
-  });
+      createSubjectResponse = {
+        subject: makeSubject({ id: SUBJECT_IDS.math, name: 'Math' }),
+        structureType: 'narrow',
+      };
 
-  it('does not forward the legacy Library token through the first-subject ready step', async () => {
-    mockSearchParams = { returnTo: 'library' };
-    setResolveResponse({
-      status: 'direct_match',
-      resolvedName: 'Math',
-      suggestions: [],
-      displayMessage: 'Math works.',
-    });
-    createSubjectResponse = {
-      subject: makeSubject({ id: SUBJECT_IDS.math, name: 'Math' }),
-      structureType: 'narrow',
-    };
+      render(<CreateSubjectScreen />, { wrapper: Wrapper });
+      await enterSubjectName('Math');
+      fireEvent.press(screen.getByTestId('create-subject-submit'));
 
-    render(<CreateSubjectScreen />, { wrapper: Wrapper });
-    await enterSubjectName('Math');
-    fireEvent.press(screen.getByTestId('create-subject-submit'));
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/ready',
-        params: {
-          subject: 'Math',
-          subjectId: SUBJECT_IDS.math,
-          sessionId: SESSION_IDS.first,
-          topicId: TOPIC_IDS.first,
-        },
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith({
+          pathname: '/ready',
+          params: {
+            subject: 'Math',
+            subjectId: SUBJECT_IDS.math,
+            sessionId: SESSION_IDS.first,
+            topicId: TOPIC_IDS.first,
+            returnTo,
+          },
+        });
       });
-    });
-  });
+    },
+  );
+
+  it.each(['library', 'malformed-return-target'])(
+    'does not forward the unsupported %s token through the first-subject ready step',
+    async (returnTo) => {
+      mockSearchParams = { returnTo };
+      setResolveResponse({
+        status: 'direct_match',
+        resolvedName: 'Math',
+        suggestions: [],
+        displayMessage: 'Math works.',
+      });
+      createSubjectResponse = {
+        subject: makeSubject({ id: SUBJECT_IDS.math, name: 'Math' }),
+        structureType: 'narrow',
+      };
+
+      render(<CreateSubjectScreen />, { wrapper: Wrapper });
+      await enterSubjectName('Math');
+      fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith({
+          pathname: '/ready',
+          params: {
+            subject: 'Math',
+            subjectId: SUBJECT_IDS.math,
+            sessionId: SESSION_IDS.first,
+            topicId: TOPIC_IDS.first,
+          },
+        });
+      });
+    },
+  );
 
   it.each([
     ['narrow', undefined],

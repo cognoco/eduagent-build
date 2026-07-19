@@ -20,6 +20,8 @@ import { useThemeColors } from '../../../lib/theme';
 import {
   goBackOrReplace,
   homeHrefForReturnTo,
+  LEARNER_HOME_RETURN_TO,
+  OWN_LEARNING_RETURN_TO,
   SUBJECTS_RETURN_TO,
 } from '../../../lib/navigation';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
@@ -182,8 +184,10 @@ export default function LanguageSetup() {
           sessionId: result.session.id,
           topicId: result.session.topicId ?? undefined,
           subjectName: subjectName ?? languageName ?? '',
-          ...(returnTo === SUBJECTS_RETURN_TO
-            ? { returnTo: SUBJECTS_RETURN_TO }
+          ...(returnTo === SUBJECTS_RETURN_TO ||
+          returnTo === LEARNER_HOME_RETURN_TO ||
+          returnTo === OWN_LEARNING_RETURN_TO
+            ? { returnTo }
             : {}),
         },
       } as Href);

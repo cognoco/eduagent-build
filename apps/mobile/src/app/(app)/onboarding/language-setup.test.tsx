@@ -250,39 +250,45 @@ describe('LanguageSetup', () => {
     });
   });
 
-  it('forwards a V2 Subjects return target to the first language session', async () => {
-    mockReturnTo = 'subjects';
-    render(<LanguageSetup />);
+  it.each(['subjects', 'learner-home', 'own-learning'])(
+    'forwards the supported %s return target to the first language session',
+    async (returnTo) => {
+      mockReturnTo = returnTo;
+      render(<LanguageSetup />);
 
-    fireEvent.press(screen.getByTestId('language-setup-continue'));
+      fireEvent.press(screen.getByTestId('language-setup-continue'));
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/(app)/session',
-        params: expect.objectContaining({ returnTo: 'subjects' }),
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith({
+          pathname: '/(app)/session',
+          params: expect.objectContaining({ returnTo }),
+        });
       });
-    });
-  });
+    },
+  );
 
-  it('does not forward the legacy Library token to the first language session', async () => {
-    mockReturnTo = 'library';
-    render(<LanguageSetup />);
+  it.each(['library', 'malformed-return-target'])(
+    'does not forward the unsupported %s token to the first language session',
+    async (returnTo) => {
+      mockReturnTo = returnTo;
+      render(<LanguageSetup />);
 
-    fireEvent.press(screen.getByTestId('language-setup-continue'));
+      fireEvent.press(screen.getByTestId('language-setup-continue'));
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/(app)/session',
-        params: {
-          mode: 'learning',
-          subjectId: 'test-id',
-          sessionId: 'session-1',
-          topicId: 'topic-1',
-          subjectName: 'Spanish',
-        },
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith({
+          pathname: '/(app)/session',
+          params: {
+            mode: 'learning',
+            subjectId: 'test-id',
+            sessionId: 'session-1',
+            topicId: 'topic-1',
+            subjectName: 'Spanish',
+          },
+        });
       });
-    });
-  });
+    },
+  );
 
   it('disables Continue button and hides the label when pending', () => {
     mockIsPending = true;

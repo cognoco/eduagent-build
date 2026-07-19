@@ -32,6 +32,8 @@ import { errorHasCode } from '../components/session/session-types';
 import {
   homeHrefForReturnTo,
   goBackOrReplace,
+  LEARNER_HOME_RETURN_TO,
+  OWN_LEARNING_RETURN_TO,
   SUBJECTS_HREF,
   SUBJECTS_RETURN_TO,
 } from '../lib/navigation';
@@ -119,8 +121,12 @@ function CreateSubjectScreenAuthenticated() {
     returnTo?: string;
     chatTopic?: string;
   }>();
-  const subjectsReturnTo =
-    returnTo === SUBJECTS_RETURN_TO ? SUBJECTS_RETURN_TO : undefined;
+  const sessionReturnTo =
+    returnTo === SUBJECTS_RETURN_TO ||
+    returnTo === LEARNER_HOME_RETURN_TO ||
+    returnTo === OWN_LEARNING_RETURN_TO
+      ? returnTo
+      : undefined;
   const colors = useThemeColors();
   const createSubject = useCreateSubject();
   const resolveSubject = useResolveSubject();
@@ -193,7 +199,7 @@ function CreateSubjectScreenAuthenticated() {
                 ...(data.session.topicId
                   ? { topicId: data.session.topicId }
                   : {}),
-                ...(subjectsReturnTo ? { returnTo: subjectsReturnTo } : {}),
+                ...(sessionReturnTo ? { returnTo: sessionReturnTo } : {}),
               },
             } as Href);
             return;
@@ -206,7 +212,7 @@ function CreateSubjectScreenAuthenticated() {
               subjectName: input.subjectName,
               sessionId: data.session.id,
               topicId: data.session.topicId ?? undefined,
-              ...(subjectsReturnTo ? { returnTo: subjectsReturnTo } : {}),
+              ...(sessionReturnTo ? { returnTo: sessionReturnTo } : {}),
             },
           } as Href);
           return;
@@ -235,7 +241,7 @@ function CreateSubjectScreenAuthenticated() {
               ? { topicName: input.fallbackTopicName }
               : {}),
             ...(input.rawInput ? { rawInput: input.rawInput } : {}),
-            ...(subjectsReturnTo ? { returnTo: subjectsReturnTo } : {}),
+            ...(sessionReturnTo ? { returnTo: sessionReturnTo } : {}),
           },
         } as Href);
         return;
@@ -250,11 +256,11 @@ function CreateSubjectScreenAuthenticated() {
             ? { topicName: input.fallbackTopicName }
             : {}),
           ...(input.rawInput ? { rawInput: input.rawInput } : {}),
-          ...(subjectsReturnTo ? { returnTo: subjectsReturnTo } : {}),
+          ...(sessionReturnTo ? { returnTo: sessionReturnTo } : {}),
         },
       } as Href);
     },
-    [apiClient, router, subjectsReturnTo],
+    [apiClient, router, sessionReturnTo],
   );
 
   // [M4] 30s timeout on resolve phase — show error + retry
@@ -399,7 +405,7 @@ function CreateSubjectScreenAuthenticated() {
                 : {}),
               step: '1',
               totalSteps: '1',
-              ...(subjectsReturnTo ? { returnTo: subjectsReturnTo } : {}),
+              ...(sessionReturnTo ? { returnTo: sessionReturnTo } : {}),
             },
           } as Href);
           return;
@@ -430,7 +436,7 @@ function CreateSubjectScreenAuthenticated() {
       router,
       originalInput,
       returnTo,
-      subjectsReturnTo,
+      sessionReturnTo,
       chatTopic,
       transitionToFirstSession,
       existingSubjects,
@@ -845,8 +851,8 @@ function CreateSubjectScreenAuthenticated() {
                             mode: 'learning',
                             subjectId: subject.id,
                             subjectName: subject.name,
-                            ...(subjectsReturnTo
-                              ? { returnTo: subjectsReturnTo }
+                            ...(sessionReturnTo
+                              ? { returnTo: sessionReturnTo }
                               : {}),
                           },
                         } as Href)
