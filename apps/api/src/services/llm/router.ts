@@ -1510,16 +1510,42 @@ export class CircuitOpenError extends Error {
 const MAX_RETRIES = 3; // Up to 4 total attempts
 const INITIAL_RETRY_DELAY_MS = 500;
 
+async function waitForRetryDelay(
+  delayMs: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (!signal) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    return;
+  }
+  signal.throwIfAborted();
+  await new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timeout);
+      signal.removeEventListener('abort', onAbort);
+      reject(signal.reason);
+    };
+    const timeout = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, delayMs);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 async function withRetry<T>(
   fn: () => Promise<T>,
   label: string,
   maxRetries: number = MAX_RETRIES,
+  signal?: AbortSignal,
 ): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    signal?.throwIfAborted();
     try {
       return await fn();
     } catch (err) {
+      signal?.throwIfAborted();
       lastError = err;
       if (!isTransientError(err)) {
         throw err;
@@ -1532,7 +1558,7 @@ async function withRetry<T>(
           delayMs: Math.round(delay),
           error: err instanceof Error ? err.message : String(err),
         });
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await waitForRetryDelay(delay, signal);
       }
     }
   }
@@ -1564,6 +1590,8 @@ export async function routeAndCall(
     flow?: string;
     sessionId?: string;
     responseFormat?: 'json';
+    /** Cancels provider work and suppresses retry/fallback after caller timeout. */
+    signal?: AbortSignal;
     // Explicit capability override for judge routing (ADR-0016 §2 T3).
     // Only 'judge' is valid as an explicit override; 'text' and 'vision' are
     // always derived from message content (inline_data detection) and must not
@@ -1622,8 +1650,10 @@ export async function routeAndCall(
     const start = Date.now();
     try {
       const raw = await withRetry(
-        () => provider.chat(safeMessages, config),
+        () => provider.chat(safeMessages, config, _options?.signal),
         config.provider,
+        MAX_RETRIES,
+        _options?.signal,
       );
       const result = normalizeChatResult(raw);
       recordSuccess(circuitKey);
@@ -1648,6 +1678,12 @@ export async function routeAndCall(
         stopReason: result.stopReason,
       };
     } catch (err) {
+      if (_options?.signal?.aborted) {
+        // Caller cancellation is not a provider failure. In HALF_OPEN it must
+        // also release the single probe slot so the provider can recover.
+        getCircuit(circuitKey).probeInFlight = false;
+        _options.signal.throwIfAborted();
+      }
       // R-02: only count transient errors toward circuit trips
       const transient = isTransientError(err);
       if (transient) {
@@ -1704,6 +1740,7 @@ export async function routeAndCall(
         conversationLanguage: _options?.conversationLanguage,
         flow: _options?.flow,
         sessionId: _options?.sessionId,
+        signal: _options?.signal,
       });
     }
   }
@@ -1740,6 +1777,7 @@ export async function routeAndCall(
       conversationLanguage: _options?.conversationLanguage,
       flow: _options?.flow,
       sessionId: _options?.sessionId,
+      signal: _options?.signal,
     });
   }
 
@@ -1756,6 +1794,7 @@ async function attemptProvider(
     conversationLanguage?: ConversationLanguage;
     flow?: string;
     sessionId?: string;
+    signal?: AbortSignal;
   },
 ): Promise<RouteResult> {
   const provider = providers.get(config.provider);
@@ -1770,8 +1809,10 @@ async function attemptProvider(
   const start = Date.now();
   try {
     const raw = await withRetry(
-      () => provider.chat(messages, config),
+      () => provider.chat(messages, config, metricContext.signal),
       `${config.provider} (fallback)`,
+      MAX_RETRIES,
+      metricContext.signal,
     );
     const result = normalizeChatResult(raw);
     recordSuccess(circuitKey);
@@ -1796,6 +1837,12 @@ async function attemptProvider(
       stopReason: result.stopReason,
     };
   } catch (err) {
+    if (metricContext.signal?.aborted) {
+      // A cancelled caller must not count against the fallback provider or
+      // strand its HALF_OPEN probe slot.
+      getCircuit(circuitKey).probeInFlight = false;
+      metricContext.signal.throwIfAborted();
+    }
     const transient = isTransientError(err);
     if (transient) {
       recordFailure(circuitKey);

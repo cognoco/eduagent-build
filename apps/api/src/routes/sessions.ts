@@ -101,13 +101,6 @@ import { FILING_CONFIG } from '../config/filing';
 
 const logger = createLogger();
 
-export function markQuotaRefundedAfterSummaryFeedbackRetry(
-  refunded: boolean,
-  markRefunded: () => void,
-): void {
-  if (refunded) markRefunded();
-}
-
 // WI-1504: launch activation instrumentation. occurrenceKey is deliberately
 // omitted — first_session_started should record only the FIRST session a
 // profile starts, not every session, so the default profile-scoped
@@ -965,33 +958,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         ),
       });
 
-      const source = c.get('quotaDecrementSource');
-      const { refunded } = await refundQuotaOrEscalate(
-        db,
-        c.get('subscriptionId'),
-        {
-          route: 'sessions.summary.retry_feedback',
-          profileId,
-          sessionId,
-          source,
-          quotaModel: c.get('quotaDecrementQuotaModel'),
-          topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
-        },
-      );
-      markQuotaRefundedAfterSummaryFeedbackRetry(refunded, () =>
-        c.set('quotaRefunded', true),
-      );
-      if (!refunded && source !== undefined) {
-        logger.warn(
-          '[sessions] summary feedback retry quota refund did not complete',
-          {
-            event: 'sessions.summary.retry_feedback.refund_incomplete',
-            profileId,
-            sessionId,
-          },
-        );
-      }
-
       return c.json(retrySummaryFeedbackResultSchema.parse(result));
     },
   )
@@ -1033,9 +999,13 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           sessionId,
           {
             summaryStatus: result.summary.status,
-            qualityRating: qualityRatingFromSummaryStatus(
-              result.summary.status,
-            ),
+            ...(result.summary.feedbackStatus === 'available'
+              ? {
+                  qualityRating: qualityRatingFromSummaryStatus(
+                    result.summary.status,
+                  ),
+                }
+              : {}),
           },
         );
         pipelineQueued = dispatch.pipelineQueued;

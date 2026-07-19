@@ -171,6 +171,24 @@ const mockSubscription = {
 };
 
 const mockIncrementQuota = jest.fn().mockResolvedValue(undefined);
+const mockDecrementQuota = jest.fn().mockResolvedValue({
+  success: true,
+  source: 'monthly',
+  remainingMonthly: 489,
+  remainingTopUp: 0,
+  remainingDaily: null,
+});
+const mockGetOrProvisionProfileQuotaUsage = jest.fn().mockResolvedValue({
+  id: 'pqu-1',
+  subscriptionId: 'sub-1',
+  profileId: 'test-profile-id',
+  role: 'owner',
+  monthlyLimit: 700,
+  usedThisMonth: 10,
+  dailyLimit: null,
+  usedToday: 0,
+  cycleResetAt: new Date().toISOString(),
+});
 // [BUG-661] safeRefundQuota replaces direct incrementQuota in routes; the
 // mock proxies through mockIncrementQuota so existing assertions about
 // "refund happened with subscriptionId" still apply.
@@ -223,24 +241,9 @@ jest.mock('../services/billing', () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }),
-    getOrProvisionProfileQuotaUsage: jest.fn().mockResolvedValue({
-      id: 'pqu-1',
-      subscriptionId: 'sub-1',
-      profileId: 'test-profile-id',
-      role: 'owner',
-      monthlyLimit: 700,
-      usedThisMonth: 10,
-      dailyLimit: null,
-      usedToday: 0,
-      cycleResetAt: new Date().toISOString(),
-    }),
-    decrementQuota: jest.fn().mockResolvedValue({
-      success: true,
-      source: 'monthly',
-      remainingMonthly: 489,
-      remainingTopUp: 0,
-      remainingDaily: null,
-    }),
+    getOrProvisionProfileQuotaUsage: (...args: unknown[]) =>
+      mockGetOrProvisionProfileQuotaUsage(...args),
+    decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
     getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
     incrementQuota: (...args: unknown[]) => mockIncrementQuota(...args),
     safeRefundQuota: (...args: unknown[]) =>
@@ -290,17 +293,8 @@ jest.mock(
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }),
-      getOrProvisionProfileQuotaUsageV2: jest.fn().mockResolvedValue({
-        id: 'pqu-1',
-        subscriptionId: 'sub-1',
-        profileId: 'test-profile-id',
-        role: 'owner',
-        monthlyLimit: 700,
-        usedThisMonth: 10,
-        dailyLimit: null,
-        usedToday: 0,
-        cycleResetAt: new Date().toISOString(),
-      }),
+      getOrProvisionProfileQuotaUsageV2: (...args: unknown[]) =>
+        mockGetOrProvisionProfileQuotaUsage(...args),
     };
   },
 );
@@ -536,7 +530,10 @@ jest.mock('../services/session', () => {
           sessionId,
           content: input.content,
           aiFeedback: 'Great summary! You captured the key concepts.',
+          feedbackStatus: 'available',
           status: 'accepted',
+          baseXp: null,
+          reflectionBonusXp: null,
         },
       })),
     retrySummaryFeedback: jest
@@ -668,10 +665,10 @@ import {
   requestSessionLibraryFiling,
   restoreSessionForAutoFiling,
   resetFilingForRetry,
+  submitSummary,
   retrySummaryFeedback,
 } from '../services/session';
 import { app } from '../index';
-import { markQuotaRefundedAfterSummaryFeedbackRetry } from './sessions';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, MAX_HOMEWORK_PROBLEMS } from '@eduagent/schemas';
 import { FILING_CONFIG } from '../config/filing';
@@ -2045,6 +2042,42 @@ describe('session routes', () => {
       expect(res.status).toBe(400);
     });
 
+    it('[WI-2183] omits qualityRating when feedback evaluation is unavailable', async () => {
+      jest.mocked(submitSummary).mockResolvedValueOnce({
+        summary: {
+          id: '880e8400-e29b-41d4-a716-446655440001',
+          sessionId: SESSION_ID,
+          content:
+            'Photosynthesis converts light energy into chemical energy in plants.',
+          aiFeedback: null,
+          feedbackStatus: 'unavailable',
+          status: 'submitted',
+          baseXp: null,
+          reflectionBonusXp: null,
+        },
+      });
+      mockInngestSend.mockClear();
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            content:
+              'Photosynthesis converts light energy into chemical energy in plants.',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockInngestSend).toHaveBeenCalledTimes(1);
+      expect(mockInngestSend.mock.calls[0]?.[0].data).not.toHaveProperty(
+        'qualityRating',
+      );
+    });
+
     it('returns 401 without auth header', async () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary`,
@@ -2064,11 +2097,23 @@ describe('session routes', () => {
 
   describe('POST /v1/sessions/:sessionId/summary/retry-feedback [WI-2183]', () => {
     beforeEach(() => {
+      mockDecrementQuota.mockClear();
+      mockGetOrProvisionProfileQuotaUsage.mockReset().mockResolvedValue({
+        id: 'pqu-1',
+        subscriptionId: 'sub-1',
+        profileId: 'test-profile-id',
+        role: 'owner',
+        monthlyLimit: 700,
+        usedThisMonth: 10,
+        dailyLimit: null,
+        usedToday: 0,
+        cycleResetAt: new Date().toISOString(),
+      });
       mockRefundQuotaOrEscalate.mockClear();
       mockInngestSend.mockClear();
     });
 
-    it('returns recovered feedback, refunds the metered turn, and emits no completion event', async () => {
+    it('returns recovered feedback without decrement/refund and emits truthful quota headers', async () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
         { method: 'POST', headers: AUTH_HEADERS },
@@ -2084,20 +2129,13 @@ describe('session routes', () => {
           aiFeedback: 'Clear explanation.',
         }),
       );
-      expect(mockRefundQuotaOrEscalate).toHaveBeenCalledWith(
-        expect.anything(),
-        'sub-1',
-        expect.objectContaining({
-          route: 'sessions.summary.retry_feedback',
-          profileId: 'test-profile-id',
-          sessionId: SESSION_ID,
-          source: 'monthly',
-        }),
-      );
+      expect(res.headers.get('X-Quota-Remaining')).toBe('690');
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockRefundQuotaOrEscalate).not.toHaveBeenCalled();
       expect(mockInngestSend).not.toHaveBeenCalled();
     });
 
-    it('refunds an unavailable retry response without claiming feedback exists', async () => {
+    it('returns unavailable recovery without decrement/refund or false feedback', async () => {
       jest.mocked(retrySummaryFeedback).mockResolvedValueOnce({
         summary: {
           id: '880e8400-e29b-41d4-a716-446655440001',
@@ -2124,15 +2162,33 @@ describe('session routes', () => {
           }),
         }),
       );
-      expect(mockRefundQuotaOrEscalate).toHaveBeenCalledTimes(1);
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockRefundQuotaOrEscalate).not.toHaveBeenCalled();
     });
 
-    it('does not set quotaRefunded when the explicit refund fails', () => {
-      const markRefunded = jest.fn();
+    it('remains available at zero quota and reports zero remaining', async () => {
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValueOnce({
+        id: 'pqu-1',
+        subscriptionId: 'sub-1',
+        profileId: 'test-profile-id',
+        role: 'owner',
+        monthlyLimit: 700,
+        usedThisMonth: 700,
+        dailyLimit: null,
+        usedToday: 0,
+        cycleResetAt: new Date().toISOString(),
+      });
 
-      markQuotaRefundedAfterSummaryFeedbackRetry(false, markRefunded);
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
 
-      expect(markRefunded).not.toHaveBeenCalled();
+      expect(res.status).toBe(200);
+      expect(res.headers.get('X-Quota-Remaining')).toBe('0');
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockRefundQuotaOrEscalate).not.toHaveBeenCalled();
     });
 
     it('returns 401 without authentication', async () => {

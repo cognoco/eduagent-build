@@ -796,16 +796,17 @@ export type SessionSummaryGetResponse = z.infer<
 // SubmitSummaryResult — POST /sessions/:sessionId/summary → 200
 // Picks only the fields returned by the submit endpoint (not the full summary).
 export const submitSummaryResultSchema = z.object({
-  summary: sessionSummarySchema.pick({
-    id: true,
-    sessionId: true,
-    content: true,
-    aiFeedback: true,
-    feedbackStatus: true,
-    status: true,
-    baseXp: true,
-    reflectionBonusXp: true,
-  }),
+  summary: sessionSummarySchema
+    .pick({
+      id: true,
+      sessionId: true,
+      content: true,
+      aiFeedback: true,
+      status: true,
+      baseXp: true,
+      reflectionBonusXp: true,
+    })
+    .extend({ feedbackStatus: summaryFeedbackStatusSchema }),
 });
 export type SubmitSummaryResult = z.infer<typeof submitSummaryResultSchema>;
 

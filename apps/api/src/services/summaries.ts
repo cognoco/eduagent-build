@@ -150,20 +150,18 @@ export async function evaluateSummary(
 
   const timeoutMs =
     options?.evaluationTimeoutMs ?? SUMMARY_EVALUATION_TIMEOUT_MS;
+  const controller = new AbortController();
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    const result = await Promise.race([
-      routeAndCall(messages, 2, {
-        flow: 'summaries.generate',
-        conversationLanguage: options?.conversationLanguage,
-      }),
-      new Promise<never>((_resolve, reject) => {
-        timeout = setTimeout(
-          () => reject(new Error('Summary evaluation timed out')),
-          timeoutMs,
-        );
-      }),
-    ]);
+    timeout = setTimeout(
+      () => controller.abort(new Error('Summary evaluation timed out')),
+      timeoutMs,
+    );
+    const result = await routeAndCall(messages, 2, {
+      flow: 'summaries.generate',
+      conversationLanguage: options?.conversationLanguage,
+      signal: controller.signal,
+    });
 
     return parseSummaryEvaluation(result.response);
   } catch (error) {

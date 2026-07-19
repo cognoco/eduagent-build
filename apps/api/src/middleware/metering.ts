@@ -217,8 +217,10 @@ export const LLM_ROUTE_PATTERNS_POST_ONLY = [
   // idempotency short-circuit for re-submitted accepted summaries lands in a
   // separate WP; allowlist coverage is the prerequisite.
   /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/summary\/?$/,
-  // Saved-summary feedback recovery invokes the evaluator but refunds the
-  // decrement in the route so a recovery attempt does not consume quota.
+  // Saved-summary feedback recovery invokes the evaluator through a
+  // quota-neutral, service-level reservation/cooldown path. It stays in the
+  // LLM allowlist so authentication, quota-state reads, and truthful response
+  // headers still run, but the middleware never decrements for this route.
   /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/summary\/retry-feedback\/?$/,
   // [WI-136 / DS-038] POST /assessments/:assessmentId/answer invokes
   // evaluateAssessmentAnswer (LLM). The terminal-replay guard at the service
@@ -236,6 +238,19 @@ export const LLM_ROUTE_PATTERNS_POST_ONLY = [
   // capacity. Path uses a UUID session ID to avoid matching non-LLM session routes.
   /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/quick-check\/?$/,
 ];
+
+const QUOTA_NEUTRAL_LLM_ROUTE_PATTERNS_POST_ONLY = [
+  /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/summary\/retry-feedback\/?$/,
+];
+
+export function isQuotaNeutralLlmRoute(path: string, method: string): boolean {
+  return (
+    method === 'POST' &&
+    QUOTA_NEUTRAL_LLM_ROUTE_PATTERNS_POST_ONLY.some((pattern) =>
+      pattern.test(path),
+    )
+  );
+}
 
 const PROFILE_REQUIRED_BEFORE_METERING_PATTERNS = [
   /\/dictation\/prepare-homework\/?$/,
@@ -715,6 +730,52 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
             new Date(),
             quotaModel === 'per-profile' ? profileId : undefined,
           );
+
+    // Feedback recovery repairs an already-saved learner artifact. It must
+    // remain usable when visible-turn quota is exhausted and must not rely on
+    // decrement-then-refund accounting. The service-level same-session CAS
+    // reservation and cooldown bound provider abuse; this branch only reads
+    // quota state and reports that unchanged state to the client.
+    if (isQuotaNeutralLlmRoute(c.req.path, c.req.method)) {
+      const remainingMonthly = Math.max(
+        monthlyLimit - usedThisMonth + topUpCreditsRemaining,
+        0,
+      );
+      const remainingDaily =
+        dailyLimit === null ? null : Math.max(dailyLimit - usedToday, 0);
+      const quotaRemainingTurns =
+        remainingDaily === null
+          ? remainingMonthly
+          : Math.min(remainingMonthly, remainingDaily);
+      const quotaDenominator =
+        dailyLimit === null
+          ? monthlyLimit + topUpCreditsRemaining
+          : Math.min(monthlyLimit + topUpCreditsRemaining, dailyLimit);
+      const quotaState = checkQuota({
+        monthlyLimit,
+        usedThisMonth,
+        topUpCreditsRemaining,
+        dailyLimit,
+        usedToday,
+      });
+
+      c.set('subscriptionId', subscriptionId);
+      c.set('subscriptionTier', effectiveAccessTier);
+      c.set('quotaRemainingTurns', quotaRemainingTurns);
+      c.set(
+        'quotaFractionRemaining',
+        quotaDenominator > 0 ? quotaRemainingTurns / quotaDenominator : 0,
+      );
+      c.set('llmTier', getTierConfig(effectiveAccessTier).llmTier);
+
+      await next();
+      c.res = withQuotaHeaders(c.res, {
+        remaining: remainingMonthly,
+        warningLevel: quotaState.warningLevel,
+        remainingDaily,
+      });
+      return;
+    }
 
     // 3. Check quota using pure business logic (checks both daily + monthly)
     const result = checkQuota({

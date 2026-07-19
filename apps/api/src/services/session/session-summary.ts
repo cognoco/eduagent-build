@@ -24,6 +24,13 @@ import { createNoteForSession } from '../notes';
 import { getSession } from './session-crud';
 import { findSessionSummaryRow, mapSummaryRow } from './session-events';
 import { findOwnedCurriculumTopic } from '../curriculum-topic-ownership';
+import {
+  claimExpiringCoordinationKey,
+  deferCoordinationClaim,
+  lockActiveCoordinationClaim,
+  releaseCoordinationClaim,
+  type ExpiringCoordinationClaim,
+} from '../webhook-idempotency';
 
 const logger = createLogger();
 
@@ -352,6 +359,103 @@ type RetrySummaryFeedbackResult = {
   };
 };
 
+const SUMMARY_FEEDBACK_RETRY_COOLDOWN_MS = 60_000;
+const SUMMARY_FEEDBACK_RETRY_LEASE_MS = 30_000;
+const SUMMARY_FEEDBACK_RETRY_COORDINATION_SOURCE = 'summary-feedback-retry';
+
+async function summaryFeedbackRetryCoordinationId(
+  profileId: string,
+  sessionId: string,
+): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(`${profileId}\0${sessionId}`),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
+}
+
+async function claimSummaryFeedbackRetry(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<ExpiringCoordinationClaim | null> {
+  return claimExpiringCoordinationKey(
+    db,
+    SUMMARY_FEEDBACK_RETRY_COORDINATION_SOURCE,
+    await summaryFeedbackRetryCoordinationId(profileId, sessionId),
+    SUMMARY_FEEDBACK_RETRY_LEASE_MS,
+  );
+}
+
+async function completeSummaryFeedbackRetry(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  claim: ExpiringCoordinationClaim,
+  recoveredFeedback: string | null,
+): Promise<typeof sessionSummaries.$inferSelect | null> {
+  return db.transaction(async (tx) => {
+    if (
+      !(await lockActiveCoordinationClaim(
+        tx as unknown as Database,
+        claim,
+        SUMMARY_FEEDBACK_RETRY_LEASE_MS,
+      ))
+    ) {
+      return null;
+    }
+
+    const [current] = await tx
+      .select()
+      .from(sessionSummaries)
+      .where(
+        and(
+          eq(sessionSummaries.profileId, profileId),
+          eq(sessionSummaries.sessionId, sessionId),
+        ),
+      )
+      .for('update')
+      .limit(1);
+
+    if (
+      !current ||
+      (current.status !== 'accepted' && current.status !== 'submitted') ||
+      hasAvailableSummaryFeedback(current.aiFeedback)
+    ) {
+      await releaseCoordinationClaim(tx as unknown as Database, claim);
+      return current ?? null;
+    }
+
+    if (recoveredFeedback !== null) {
+      const [completed] = await tx
+        .update(sessionSummaries)
+        .set({ aiFeedback: recoveredFeedback })
+        .where(
+          and(
+            eq(sessionSummaries.id, current.id),
+            eq(sessionSummaries.profileId, profileId),
+            eq(sessionSummaries.sessionId, sessionId),
+          ),
+        )
+        .returning();
+      await releaseCoordinationClaim(tx as unknown as Database, claim);
+      return completed ?? null;
+    }
+
+    // One column serves both phases without learner-visible state: an active
+    // claim expires after LEASE_MS; shifting its DB timestamp forward by the
+    // difference makes an unavailable result eligible after COOLDOWN_MS.
+    await deferCoordinationClaim(
+      tx as unknown as Database,
+      claim,
+      SUMMARY_FEEDBACK_RETRY_COOLDOWN_MS - SUMMARY_FEEDBACK_RETRY_LEASE_MS,
+    );
+    return current;
+  });
+}
+
 function toRetrySummaryResult(
   row: typeof sessionSummaries.$inferSelect,
 ): RetrySummaryFeedbackResult {
@@ -370,8 +474,12 @@ function toRetrySummaryResult(
 
 /**
  * Re-evaluates only the feedback attached to a saved Session Summary.
- * A blocking advisory lock plus the pre-lock revision lets concurrent callers
- * observe the winner's committed result without duplicating evaluation/write.
+ *
+ * The existing webhook-idempotency table supplies an isolated atomic claim;
+ * its namespaced row is untouched by summary writers and read models. Only
+ * short claim/finalization transactions are held. The provider call happens
+ * between them, and completion matches the exact claim timestamp so a stale
+ * worker cannot overwrite a later lease holder.
  */
 export async function retrySummaryFeedback(
   db: Database,
@@ -389,64 +497,67 @@ export async function retrySummaryFeedback(
   ) {
     throw new ConflictError('Submit the summary before retrying feedback');
   }
+  if (hasAvailableSummaryFeedback(observed.aiFeedback)) {
+    return toRetrySummaryResult(observed);
+  }
 
-  const subject = await getSubject(db, profileId, session.subjectId);
-  return db.transaction(async (tx) => {
-    const txDb = tx as unknown as Database;
-    const lockKey = `session-summary:${profileId}:${sessionId}`;
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
-    );
-
-    const existing = await findSessionSummaryRow(txDb, profileId, sessionId);
+  const claim = await claimSummaryFeedbackRetry(db, profileId, sessionId);
+  if (!claim) {
+    const current = await findSessionSummaryRow(db, profileId, sessionId);
     if (
-      !existing ||
-      (existing.status !== 'accepted' && existing.status !== 'submitted')
+      !current ||
+      (current.status !== 'accepted' && current.status !== 'submitted')
     ) {
       throw new ConflictError('Submit the summary before retrying feedback');
     }
-    if (
-      existing.updatedAt.getTime() !== observed.updatedAt.getTime() ||
-      hasAvailableSummaryFeedback(existing.aiFeedback)
-    ) {
-      return toRetrySummaryResult(existing);
-    }
+    return toRetrySummaryResult(current);
+  }
 
-    const evaluation = await evaluateSummary(
-      subject?.name ?? 'Unknown topic',
-      'Session learning content',
-      existing.content ?? '',
-      { conversationLanguage: options?.conversationLanguage },
+  const reserved = await findSessionSummaryRow(db, profileId, sessionId);
+  if (
+    !reserved ||
+    (reserved.status !== 'accepted' && reserved.status !== 'submitted')
+  ) {
+    await completeSummaryFeedbackRetry(db, profileId, sessionId, claim, null);
+    throw new ConflictError('Submit the summary before retrying feedback');
+  }
+  if (hasAvailableSummaryFeedback(reserved.aiFeedback)) {
+    const current = await completeSummaryFeedbackRetry(
+      db,
+      profileId,
+      sessionId,
+      claim,
+      null,
     );
-    const feedbackAvailable = evaluation.feedbackStatus === 'available';
-    const status = feedbackAvailable
-      ? evaluation.isAccepted
-        ? 'accepted'
-        : 'submitted'
-      : existing.status;
-    const now = new Date(
-      Math.max(Date.now(), existing.updatedAt.getTime() + 1),
-    );
-    await tx
-      .update(sessionSummaries)
-      .set({
-        aiFeedback: feedbackAvailable ? evaluation.feedback : null,
-        status,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(sessionSummaries.id, existing.id),
-          eq(sessionSummaries.profileId, profileId),
-          eq(sessionSummaries.sessionId, sessionId),
-        ),
-      );
+    return toRetrySummaryResult(current ?? reserved);
+  }
 
-    return toRetrySummaryResult({
-      ...existing,
-      aiFeedback: feedbackAvailable ? evaluation.feedback : null,
-      status,
-      updatedAt: now,
-    });
-  });
+  const subject = await getSubject(db, profileId, session.subjectId);
+  const evaluation = await evaluateSummary(
+    subject?.name ?? 'Unknown topic',
+    'Session learning content',
+    reserved.content ?? '',
+    { conversationLanguage: options?.conversationLanguage },
+  );
+  const recoveredFeedback = hasAvailableSummaryFeedback(evaluation.feedback)
+    ? evaluation.feedback
+    : null;
+  const completed = await completeSummaryFeedbackRetry(
+    db,
+    profileId,
+    sessionId,
+    claim,
+    evaluation.feedbackStatus === 'available' ? recoveredFeedback : null,
+  );
+
+  if (completed) return toRetrySummaryResult(completed);
+
+  const current = await findSessionSummaryRow(db, profileId, sessionId);
+  if (
+    !current ||
+    (current.status !== 'accepted' && current.status !== 'submitted')
+  ) {
+    throw new ConflictError('Submit the summary before retrying feedback');
+  }
+  return toRetrySummaryResult(current);
 }

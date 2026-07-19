@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   InteractionManager,
+  Platform,
 } from 'react-native';
 import {
   useRouter,
@@ -26,6 +27,7 @@ import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { useRatingPrompt } from '../../hooks/use-rating-prompt';
+import { useAnnounce } from '../../hooks/use-announce';
 import {
   useSession,
   useSessionTranscript,
@@ -106,6 +108,7 @@ export default function SessionSummaryScreen() {
   const summaryHomeHref = homeHrefForReturnTo(returnTo);
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const announce = useAnnounce();
   // [BUG-134] Auth gate — this route is at the root, not under (app)/, so
   // the (app)/_layout.tsx auth guard does NOT fire on deep-link entry.
   // Without this check, an unauthenticated user opening a /session-summary
@@ -700,15 +703,22 @@ export default function SessionSummaryScreen() {
       return;
     }
     feedbackRetryInFlight.current = true;
-    setFeedbackRetryAttempted(true);
     try {
       const result = await retrySummaryFeedback.mutateAsync();
       setAiFeedback(result.summary.aiFeedback);
+      setFeedbackRetryAttempted(true);
+      announce(
+        result.summary.aiFeedback
+          ? `${t('sessionSummary.mateFeedback')}: ${result.summary.aiFeedback}`
+          : t('sessionSummary.feedbackStillUnavailable'),
+      );
       if (!isPersistedSubmitted) {
         setSubmitted(true);
       }
       await refetchPersistedSummary();
     } catch (error) {
+      setFeedbackRetryAttempted(true);
+      announce(t('sessionSummary.feedbackStillUnavailable'));
       Sentry.captureException(error, {
         tags: { surface: 'session-summary.feedback-retry' },
         extra: { sessionId },
@@ -1489,6 +1499,24 @@ export default function SessionSummaryScreen() {
               <Text className="text-body text-text-primary mb-2">
                 {displayContent}
               </Text>
+              {Platform.OS === 'web' ? (
+                <View
+                  className="sr-only"
+                  testID="feedback-retry-status"
+                  role="status"
+                  accessibilityLiveRegion="polite"
+                >
+                  <Text testID="feedback-retry-status-message">
+                    {feedbackRetryAttempted
+                      ? displayAiFeedback
+                        ? `${t('sessionSummary.mateFeedback')}: ${displayAiFeedback}`
+                        : displayFeedbackStatus === 'unavailable'
+                          ? t('sessionSummary.feedbackStillUnavailable')
+                          : ''
+                      : ''}
+                  </Text>
+                </View>
+              ) : null}
               {displayAiFeedback ? (
                 <>
                   <View className="h-px bg-surface-elevated my-3" />
@@ -1506,7 +1534,6 @@ export default function SessionSummaryScreen() {
                 <View
                   className="mt-3 border-t border-surface-elevated pt-3"
                   testID="feedback-unavailable"
-                  accessibilityLiveRegion="polite"
                 >
                   <Text className="text-body-sm font-semibold text-text-primary mb-1">
                     {t('sessionSummary.feedbackUnavailableTitle')}

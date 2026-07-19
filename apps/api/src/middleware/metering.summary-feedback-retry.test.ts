@@ -1,4 +1,7 @@
-import { LLM_ROUTE_PATTERNS_POST_ONLY } from './metering';
+import {
+  isQuotaNeutralLlmRoute,
+  LLM_ROUTE_PATTERNS_POST_ONLY,
+} from './metering';
 
 const SESSION_ID = '00000000-0000-4000-8000-000000000101';
 
@@ -7,12 +10,12 @@ function matchesPostOnlyLlmRoute(path: string): boolean {
 }
 
 describe('summary feedback retry metering [WI-2183]', () => {
-  it('meters the UUID-scoped retry endpoint before the route refunds recovery quota', () => {
-    expect(
-      matchesPostOnlyLlmRoute(
-        `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
-      ),
-    ).toBe(true);
+  it('classifies the UUID-scoped POST as quota-neutral LLM recovery', () => {
+    const path = `/v1/sessions/${SESSION_ID}/summary/retry-feedback`;
+
+    expect(matchesPostOnlyLlmRoute(path)).toBe(true);
+    expect(isQuotaNeutralLlmRoute(path, 'POST')).toBe(true);
+    expect(isQuotaNeutralLlmRoute(path, 'GET')).toBe(false);
   });
 
   it('does not classify a malformed session id as an LLM-consuming retry', () => {

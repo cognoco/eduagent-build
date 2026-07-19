@@ -38,6 +38,7 @@ import {
   contentFlagSchema,
   summarySubmitSchema,
   sessionSummarySchema,
+  submitSummaryResultSchema,
   skipSummaryResponseSchema,
   parkingLotAddSchema,
   parkingLotItemSchema,
@@ -957,6 +958,23 @@ describe('summarySubmitSchema', () => {
 // sessionSummarySchema
 // ---------------------------------------------------------------------------
 describe('sessionSummarySchema', () => {
+  it('keeps feedbackStatus optional for backwards-compatible GET parsing', () => {
+    const result = sessionSummarySchema.safeParse({
+      id: UUID,
+      sessionId: UUID,
+      content: 'Summary content here',
+      aiFeedback: null,
+      status: 'submitted',
+      closingLine: null,
+      learnerRecap: null,
+      nextTopicId: null,
+      nextTopicTitle: null,
+      nextTopicReason: null,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it('accepts a complete session summary', () => {
     const result = sessionSummarySchema.safeParse({
       id: UUID,
@@ -1033,6 +1051,36 @@ describe('sessionSummarySchema', () => {
       },
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('submitSummaryResultSchema', () => {
+  const currentSubmitResult = {
+    summary: {
+      id: UUID,
+      sessionId: UUID,
+      content: 'Summary content here',
+      aiFeedback: null,
+      feedbackStatus: 'unavailable' as const,
+      status: 'submitted' as const,
+      baseXp: null,
+      reflectionBonusXp: null,
+    },
+  };
+
+  it('requires feedbackStatus on current POST responses', () => {
+    const { feedbackStatus: _feedbackStatus, ...legacyShape } =
+      currentSubmitResult.summary;
+
+    expect(
+      submitSummaryResultSchema.safeParse({ summary: legacyShape }).success,
+    ).toBe(false);
+  });
+
+  it('accepts an explicit feedbackStatus on current POST responses', () => {
+    expect(
+      submitSummaryResultSchema.safeParse(currentSubmitResult).success,
+    ).toBe(true);
   });
 });
 

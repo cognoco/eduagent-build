@@ -100,9 +100,23 @@ describe('evaluateSummary', () => {
 
   it('[WI-2183] bounds a timed-out provider and marks feedback unavailable', async () => {
     const provider = createMockProvider('gemini');
+    let providerAborted = false;
+    let providerCalls = 0;
     registerProvider({
       ...provider,
-      chat: () => new Promise(() => undefined),
+      chat: (_messages, _config, signal) => {
+        providerCalls += 1;
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener(
+            'abort',
+            () => {
+              providerAborted = true;
+              reject(signal.reason);
+            },
+            { once: true },
+          );
+        });
+      },
     });
 
     const result = await evaluateSummary(
@@ -117,6 +131,8 @@ describe('evaluateSummary', () => {
       feedbackStatus: 'unavailable',
       isAccepted: false,
     });
+    expect(providerAborted).toBe(true);
+    expect(providerCalls).toBe(1);
   });
 
   it('handles JSON embedded in surrounding text', async () => {

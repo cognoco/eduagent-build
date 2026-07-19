@@ -17,7 +17,7 @@
  * once (reflectionMultiplierApplied is true on exactly 1 xp_ledger row).
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   createDatabase,
   curricula,
@@ -27,6 +27,7 @@ import {
   sessionSummaries,
   subjects,
   topicNotes,
+  webhookIdempotencyKeys,
   xpLedger,
   type Database,
 } from '@eduagent/database';
@@ -43,6 +44,7 @@ import {
 } from '../../test-utils/llm-provider-fixtures';
 import { _resetCircuits } from '../llm';
 import { NotFoundError } from '@eduagent/schemas';
+import { buildNowFeed, buildNowOverflow } from '../now-feed';
 import {
   getSessionSummary,
   retrySummaryFeedback,
@@ -68,6 +70,53 @@ function createIntegrationDb(): Database {
   return createDatabase(requireDatabaseUrl());
 }
 
+function deferred(): {
+  promise: Promise<void>;
+  resolve: () => void;
+} {
+  let resolve!: () => void;
+  const promise = new Promise<void>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+async function feedbackRetryCoordinationKey(
+  profileId: string,
+  sessionId: string,
+): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(`${profileId}\0${sessionId}`),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
+}
+
+async function waitForFeedbackRetryReservation(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<boolean> {
+  const webhookId = await feedbackRetryCoordinationKey(profileId, sessionId);
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline) {
+    const [row] = await db
+      .select({ receivedAt: webhookIdempotencyKeys.receivedAt })
+      .from(webhookIdempotencyKeys)
+      .where(
+        and(
+          eq(webhookIdempotencyKeys.source, 'summary-feedback-retry'),
+          eq(webhookIdempotencyKeys.webhookId, webhookId),
+        ),
+      );
+    if (row) return true;
+    await new Promise((resolveWait) => setTimeout(resolveWait, 25));
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Seed helpers
 // ---------------------------------------------------------------------------
@@ -78,6 +127,7 @@ const PREFIX = `integration-session-summary-${RUN_ID}`;
 // [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded ids for v2 cleanup.
 const seededAccountIds: string[] = [];
 const seededProfileIds: string[] = [];
+const seededFeedbackRetryKeys: string[] = [];
 
 async function seedFullSessionWithXpEntry(): Promise<{
   db: Database;
@@ -144,6 +194,12 @@ async function seedFullSessionWithXpEntry(): Promise<{
       exchangeCount: 3,
     })
     .returning();
+  seededFeedbackRetryKeys.push(
+    await feedbackRetryCoordinationKey(profileId, session!.id),
+    // Transitional cleanup keeps a RED privacy-regression run from leaking
+    // the cleartext key produced by the pre-fix implementation.
+    `${profileId}:${session!.id}`,
+  );
 
   // Seed an XP ledger entry so applyReflectionMultiplier has something to act on
   await db.insert(xpLedger).values({
@@ -165,6 +221,17 @@ async function seedFullSessionWithXpEntry(): Promise<{
 
 async function cleanupByPrefix() {
   const db = createIntegrationDb();
+  for (const webhookId of seededFeedbackRetryKeys) {
+    await db
+      .delete(webhookIdempotencyKeys)
+      .where(
+        and(
+          eq(webhookIdempotencyKeys.source, 'summary-feedback-retry'),
+          eq(webhookIdempotencyKeys.webhookId, webhookId),
+        ),
+      );
+  }
+  seededFeedbackRetryKeys.length = 0;
   await deleteV2IdentitiesForTest(db, {
     accountIds: seededAccountIds,
     profileIds: seededProfileIds,
@@ -320,6 +387,18 @@ describeIfDb(
       const notesAfter = await db.query.topicNotes.findMany({
         where: eq(topicNotes.sessionId, sessionId),
       });
+      const coordinationRows = await db
+        .select({ webhookId: webhookIdempotencyKeys.webhookId })
+        .from(webhookIdempotencyKeys)
+        .where(
+          and(
+            eq(webhookIdempotencyKeys.source, 'summary-feedback-retry'),
+            eq(
+              webhookIdempotencyKeys.webhookId,
+              await feedbackRetryCoordinationKey(profileId, sessionId),
+            ),
+          ),
+        );
 
       expect(rows).toHaveLength(1);
       expect(rows[0]!.id).toBe(submitted.summary.id);
@@ -334,6 +413,52 @@ describeIfDb(
       expect(notesBefore).toHaveLength(1);
       expect(notesAfter).toHaveLength(1);
       expect(notesAfter[0]!.id).toBe(notesBefore[0]!.id);
+      expect(coordinationRows).toHaveLength(0);
+
+      const providerCallsBeforeRepeatedRetry = llmFixture?.chatCalls.length;
+      const repeated = await retrySummaryFeedback(db, profileId, sessionId);
+      const rowsAfterRepeatedRetry = await db.query.sessionSummaries.findMany({
+        where: eq(sessionSummaries.sessionId, sessionId),
+      });
+      const xpAfterRepeatedRetry = await db.query.xpLedger.findFirst({
+        where: eq(xpLedger.topicId, topicId),
+      });
+      const notesAfterRepeatedRetry = await db.query.topicNotes.findMany({
+        where: eq(topicNotes.sessionId, sessionId),
+      });
+      const coordinationRowsAfterRepeatedRetry = await db
+        .select({ webhookId: webhookIdempotencyKeys.webhookId })
+        .from(webhookIdempotencyKeys)
+        .where(
+          and(
+            eq(webhookIdempotencyKeys.source, 'summary-feedback-retry'),
+            eq(
+              webhookIdempotencyKeys.webhookId,
+              await feedbackRetryCoordinationKey(profileId, sessionId),
+            ),
+          ),
+        );
+
+      expect(llmFixture?.chatCalls).toHaveLength(
+        providerCallsBeforeRepeatedRetry ?? 0,
+      );
+      expect(repeated.summary).toMatchObject({
+        id: retried.summary.id,
+        status: retried.summary.status,
+        aiFeedback: retried.summary.aiFeedback,
+        feedbackStatus: 'available',
+      });
+      expect(rowsAfterRepeatedRetry).toHaveLength(1);
+      expect(rowsAfterRepeatedRetry[0]!.id).toBe(rows[0]!.id);
+      expect(rowsAfterRepeatedRetry[0]!.status).toBe(rows[0]!.status);
+      expect(rowsAfterRepeatedRetry[0]!.aiFeedback).toBe(rows[0]!.aiFeedback);
+      expect(xpAfterRepeatedRetry!.amount).toBe(xpAfter!.amount);
+      expect(xpAfterRepeatedRetry!.reflectionMultiplierApplied).toBe(
+        xpAfter!.reflectionMultiplierApplied,
+      );
+      expect(notesAfterRepeatedRetry).toHaveLength(1);
+      expect(notesAfterRepeatedRetry[0]!.id).toBe(notesAfter[0]!.id);
+      expect(coordinationRowsAfterRepeatedRetry).toHaveLength(0);
     });
 
     it('[WI-2183] concurrent feedback retries evaluate at most once and keep one summary row', async () => {
@@ -361,10 +486,15 @@ describeIfDb(
       });
 
       expect(llmFixture?.chatCalls).toHaveLength(1);
-      expect(results.map((result) => result.summary.feedbackStatus)).toEqual([
-        'available',
-        'available',
-      ]);
+      const feedbackStatuses = results.map(
+        (result) => result.summary.feedbackStatus,
+      );
+      expect(feedbackStatuses).toContain('available');
+      expect(
+        feedbackStatuses.every(
+          (status) => status === 'available' || status === 'unavailable',
+        ),
+      ).toBe(true);
       expect(rows).toHaveLength(1);
       expect(rows[0]!.aiFeedback).toBe('Clear explanation.');
     });
@@ -387,6 +517,383 @@ describeIfDb(
         'unavailable',
         'unavailable',
       ]);
+    });
+
+    it('[WI-2183] unavailable retry establishes a cooldown without exposing internal state', async () => {
+      const { db, profileId, sessionId } = await seedFullSessionWithXpEntry();
+      llmFixture?.setChatResponse('provider returned no JSON');
+      await submitSummary(db, profileId, sessionId, {
+        content: 'I learned how a variable can stand for an unknown value.',
+      });
+      const beforeRetry = await db.query.sessionSummaries.findFirst({
+        where: eq(sessionSummaries.sessionId, sessionId),
+      });
+      llmFixture?.clearCalls();
+
+      const first = await retrySummaryFeedback(db, profileId, sessionId);
+      expect(first.summary.feedbackStatus).toBe('unavailable');
+      expect(llmFixture?.chatCalls).toHaveLength(1);
+
+      llmFixture?.clearCalls();
+      const second = await retrySummaryFeedback(db, profileId, sessionId);
+      const publicSummary = await getSessionSummary(db, profileId, sessionId);
+      const storedSummary = await db.query.sessionSummaries.findFirst({
+        where: eq(sessionSummaries.sessionId, sessionId),
+      });
+      const coordinationKey = await feedbackRetryCoordinationKey(
+        profileId,
+        sessionId,
+      );
+      const coordinationRows = await db
+        .select({ webhookId: webhookIdempotencyKeys.webhookId })
+        .from(webhookIdempotencyKeys)
+        .where(
+          and(
+            eq(webhookIdempotencyKeys.source, 'summary-feedback-retry'),
+            eq(webhookIdempotencyKeys.webhookId, coordinationKey),
+          ),
+        );
+
+      expect(second.summary.feedbackStatus).toBe('unavailable');
+      expect(llmFixture?.chatCalls).toHaveLength(0);
+      expect(publicSummary?.feedbackStatus).toBe('unavailable');
+      expect(publicSummary?.aiFeedback).toBeNull();
+      expect(storedSummary?.aiFeedback).toBeNull();
+      expect(storedSummary?.updatedAt.getTime()).toBe(
+        beforeRetry?.updatedAt.getTime(),
+      );
+      expect(coordinationRows).toEqual([{ webhookId: coordinationKey }]);
+      expect(coordinationKey).toMatch(/^[a-f0-9]{64}$/);
+      expect(coordinationKey).not.toContain(profileId);
+      expect(coordinationKey).not.toContain(sessionId);
+    });
+
+    it('[WI-2183] a committed coordination claim is visible without changing summary ordering while the LLM call is in flight', async () => {
+      const { db, profileId, sessionId } = await seedFullSessionWithXpEntry();
+      llmFixture?.setChatResponse('provider returned no JSON');
+      await submitSummary(db, profileId, sessionId, {
+        content: 'I learned how a variable can stand for an unknown value.',
+      });
+      const beforeRetry = await db.query.sessionSummaries.findFirst({
+        where: eq(sessionSummaries.sessionId, sessionId),
+      });
+      llmFixture?.clearCalls();
+      llmFixture?.setChatResponse(
+        llmStructuredJson({
+          feedback: 'Clear explanation.',
+          hasUnderstandingGaps: false,
+          gapAreas: [],
+          isAccepted: true,
+        }),
+      );
+
+      const baseProvider = (
+        llmFixture as unknown as {
+          provider: { chat: (...args: unknown[]) => Promise<unknown> };
+        }
+      ).provider;
+      const originalChat = baseProvider.chat.bind(baseProvider);
+      const enteredLlm = deferred();
+      const releaseLlm = deferred();
+      baseProvider.chat = async (...args: unknown[]) => {
+        enteredLlm.resolve();
+        await releaseLlm.promise;
+        return originalChat(...args);
+      };
+
+      let firstRetry: ReturnType<typeof retrySummaryFeedback> | undefined;
+      try {
+        firstRetry = retrySummaryFeedback(
+          createIntegrationDb(),
+          profileId,
+          sessionId,
+        );
+        await enteredLlm.promise;
+
+        expect(
+          await waitForFeedbackRetryReservation(db, profileId, sessionId),
+        ).toBe(true);
+        const heldSummary = await db.query.sessionSummaries.findFirst({
+          where: eq(sessionSummaries.sessionId, sessionId),
+        });
+        expect(heldSummary?.updatedAt.getTime()).toBe(
+          beforeRetry?.updatedAt.getTime(),
+        );
+
+        const second = await Promise.race([
+          retrySummaryFeedback(createIntegrationDb(), profileId, sessionId),
+          new Promise<never>((_resolve, reject) => {
+            setTimeout(
+              () => reject(new Error('concurrent retry blocked on the LLM')),
+              500,
+            );
+          }),
+        ]);
+        expect(second.summary.feedbackStatus).toBe('unavailable');
+      } finally {
+        baseProvider.chat = originalChat;
+        releaseLlm.resolve();
+        await firstRetry?.catch(() => undefined);
+      }
+
+      expect(llmFixture?.chatCalls).toHaveLength(1);
+    }, 30_000);
+
+    it('[WI-2183] a stale lease holder cannot overwrite a later recovery', async () => {
+      const { db, profileId, sessionId } = await seedFullSessionWithXpEntry();
+      llmFixture?.setChatResponse('provider returned no JSON');
+      await submitSummary(db, profileId, sessionId, {
+        content: 'I learned how a variable can stand for an unknown value.',
+      });
+      llmFixture?.clearCalls();
+
+      const baseProvider = (
+        llmFixture as unknown as {
+          provider: { chat: (...args: unknown[]) => Promise<unknown> };
+        }
+      ).provider;
+      const originalChat = baseProvider.chat.bind(baseProvider);
+      const enteredFirstLlm = deferred();
+      const releaseFirstLlm = deferred();
+      let providerCall = 0;
+      baseProvider.chat = async (...args: unknown[]) => {
+        providerCall += 1;
+        if (providerCall === 1) {
+          enteredFirstLlm.resolve();
+          await releaseFirstLlm.promise;
+          llmFixture?.setChatResponse(
+            llmStructuredJson({
+              feedback: 'Stale feedback must not win.',
+              hasUnderstandingGaps: false,
+              gapAreas: [],
+              isAccepted: true,
+            }),
+          );
+        } else {
+          llmFixture?.setChatResponse(
+            llmStructuredJson({
+              feedback: 'Fresh recovery wins.',
+              hasUnderstandingGaps: false,
+              gapAreas: [],
+              isAccepted: true,
+            }),
+          );
+        }
+        return originalChat(...args);
+      };
+
+      let staleRetry: ReturnType<typeof retrySummaryFeedback> | undefined;
+      try {
+        staleRetry = retrySummaryFeedback(
+          createIntegrationDb(),
+          profileId,
+          sessionId,
+        );
+        await enteredFirstLlm.promise;
+        expect(
+          await waitForFeedbackRetryReservation(db, profileId, sessionId),
+        ).toBe(true);
+
+        await db
+          .update(webhookIdempotencyKeys)
+          .set({ receivedAt: new Date(Date.now() - 60_000) })
+          .where(
+            and(
+              eq(webhookIdempotencyKeys.source, 'summary-feedback-retry'),
+              eq(
+                webhookIdempotencyKeys.webhookId,
+                await feedbackRetryCoordinationKey(profileId, sessionId),
+              ),
+            ),
+          );
+        const fresh = await retrySummaryFeedback(
+          createIntegrationDb(),
+          profileId,
+          sessionId,
+        );
+
+        expect(fresh.summary.aiFeedback).toBe('Fresh recovery wins.');
+        releaseFirstLlm.resolve();
+        const stale = await staleRetry;
+        expect(stale.summary.aiFeedback).toBe('Fresh recovery wins.');
+      } finally {
+        baseProvider.chat = originalChat;
+        releaseFirstLlm.resolve();
+        await staleRetry?.catch(() => undefined);
+      }
+
+      const stored = await db.query.sessionSummaries.findFirst({
+        where: eq(sessionSummaries.sessionId, sessionId),
+      });
+      expect(llmFixture?.chatCalls).toHaveLength(2);
+      expect(stored?.aiFeedback).toBe('Fresh recovery wins.');
+    }, 30_000);
+
+    it('[WI-2183] retries again after the unavailable cooldown expires', async () => {
+      const { db, profileId, sessionId } = await seedFullSessionWithXpEntry();
+      llmFixture?.setChatResponse('provider returned no JSON');
+      await submitSummary(db, profileId, sessionId, {
+        content: 'I learned how a variable can stand for an unknown value.',
+      });
+      await retrySummaryFeedback(db, profileId, sessionId);
+
+      await db
+        .update(webhookIdempotencyKeys)
+        .set({ receivedAt: new Date(Date.now() - 10 * 60 * 1000) })
+        .where(
+          and(
+            eq(webhookIdempotencyKeys.source, 'summary-feedback-retry'),
+            eq(
+              webhookIdempotencyKeys.webhookId,
+              await feedbackRetryCoordinationKey(profileId, sessionId),
+            ),
+          ),
+        );
+      llmFixture?.clearCalls();
+      llmFixture?.setChatResponse(
+        llmStructuredJson({
+          feedback: 'Clear explanation after the cooldown.',
+          hasUnderstandingGaps: false,
+          gapAreas: [],
+          isAccepted: true,
+        }),
+      );
+
+      const recovered = await retrySummaryFeedback(db, profileId, sessionId);
+
+      expect(llmFixture?.chatCalls).toHaveLength(1);
+      expect(recovered.summary.feedbackStatus).toBe('available');
+      expect(recovered.summary.aiFeedback).toBe(
+        'Clear explanation after the cooldown.',
+      );
+    });
+
+    it('[WI-2183] preserves an unrelated summary update and status while feedback evaluation is held', async () => {
+      const { db, profileId, sessionId } = await seedFullSessionWithXpEntry();
+      llmFixture?.setChatResponse('provider returned no JSON');
+      const submitted = await submitSummary(db, profileId, sessionId, {
+        content: 'I learned how a variable can stand for an unknown value.',
+      });
+      expect(submitted.summary.status).toBe('submitted');
+      llmFixture?.clearCalls();
+      llmFixture?.setChatResponse(
+        llmStructuredJson({
+          feedback: 'Clear explanation.',
+          hasUnderstandingGaps: false,
+          gapAreas: [],
+          isAccepted: true,
+        }),
+      );
+
+      const baseProvider = (
+        llmFixture as unknown as {
+          provider: { chat: (...args: unknown[]) => Promise<unknown> };
+        }
+      ).provider;
+      const originalChat = baseProvider.chat.bind(baseProvider);
+      const enteredLlm = deferred();
+      const releaseLlm = deferred();
+      baseProvider.chat = async (...args: unknown[]) => {
+        enteredLlm.resolve();
+        await releaseLlm.promise;
+        return originalChat(...args);
+      };
+
+      let retry: ReturnType<typeof retrySummaryFeedback> | undefined;
+      try {
+        retry = retrySummaryFeedback(
+          createIntegrationDb(),
+          profileId,
+          sessionId,
+        );
+        await enteredLlm.promise;
+        expect(
+          await waitForFeedbackRetryReservation(db, profileId, sessionId),
+        ).toBe(true);
+
+        await db
+          .update(sessionSummaries)
+          .set({
+            learnerRecap: 'A recap written by the normal summary pipeline.',
+            narrative: 'A parent-facing narrative written concurrently.',
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(sessionSummaries.sessionId, sessionId),
+              eq(sessionSummaries.profileId, profileId),
+            ),
+          );
+        releaseLlm.resolve();
+
+        const result = await retry;
+        expect(result.summary.feedbackStatus).toBe('available');
+        expect(result.summary.status).toBe('submitted');
+      } finally {
+        baseProvider.chat = originalChat;
+        releaseLlm.resolve();
+        await retry?.catch(() => undefined);
+      }
+
+      const stored = await db.query.sessionSummaries.findFirst({
+        where: eq(sessionSummaries.sessionId, sessionId),
+      });
+      expect(stored?.aiFeedback).toBe('Clear explanation.');
+      expect(stored?.status).toBe('submitted');
+      expect(stored?.learnerRecap).toBe(
+        'A recap written by the normal summary pipeline.',
+      );
+      expect(stored?.narrative).toBe(
+        'A parent-facing narrative written concurrently.',
+      );
+    }, 30_000);
+
+    it('[WI-2183] feedback retry does not project an old recap back into the Now feed', async () => {
+      const { db, profileId, sessionId } = await seedFullSessionWithXpEntry();
+      llmFixture?.setChatResponse('provider returned no JSON');
+      await submitSummary(db, profileId, sessionId, {
+        content: 'I learned how a variable can stand for an unknown value.',
+      });
+      const oldTimestamp = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+      await db
+        .update(sessionSummaries)
+        .set({
+          learnerRecap: 'This recap became visible ten days ago.',
+          updatedAt: oldTimestamp,
+        })
+        .where(
+          and(
+            eq(sessionSummaries.sessionId, sessionId),
+            eq(sessionSummaries.profileId, profileId),
+          ),
+        );
+      llmFixture?.setChatResponse(
+        llmStructuredJson({
+          feedback: 'Clear explanation.',
+          hasUnderstandingGaps: false,
+          gapAreas: [],
+          isAccepted: true,
+        }),
+      );
+
+      await retrySummaryFeedback(db, profileId, sessionId);
+      const stored = await db.query.sessionSummaries.findFirst({
+        where: eq(sessionSummaries.sessionId, sessionId),
+      });
+      const feed = await buildNowFeed(db, profileId, 'self');
+      const overflow = await buildNowOverflow(db, profileId, 'self');
+
+      expect(stored?.updatedAt.getTime()).toBe(oldTimestamp.getTime());
+      expect([...feed.cards, ...overflow.items]).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            params: expect.objectContaining({
+              ledgerKind: 'recap_ready',
+              sessionId,
+            }),
+          }),
+        ]),
+      );
     });
 
     it('[WI-2183] denies feedback retry for a session owned by another profile', async () => {
