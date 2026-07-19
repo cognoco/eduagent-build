@@ -378,6 +378,14 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
       0,
     ],
     [
+      'preflight not-run fail closed',
+      GATE_STATES.NOT_RUN,
+      GATE_STATES.NOT_RUN,
+      'not-run',
+      1,
+      1,
+    ],
+    [
       'healthy success',
       GATE_STATES.HEALTHY,
       GATE_STATES.HEALTHY,

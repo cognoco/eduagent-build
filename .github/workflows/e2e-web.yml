@@ -174,18 +174,21 @@ jobs:
           sudo tar -xzf "${DOPPLER_ARCHIVE}" -C /usr/local/bin doppler
           doppler --version
 
+      - name: Verify Playwright trace reader
+        run: |
+          # ubuntu-latest includes unzip; keep this explicit guard so a runner
+          # image change fails with the exact missing dependency before Doppler.
+          if ! command -v unzip >/dev/null 2>&1; then
+            echo "::error title=Trace reader missing::unzip is required to classify Playwright trace archives."
+            exit 1
+          fi
+
       - name: Run Playwright smoke suite (via doppler run -c stg)
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
         run: |
           if [ -z "${DOPPLER_TOKEN:-}" ]; then
             echo "::error title=Doppler token missing::DOPPLER_TOKEN_STG is not set as a GitHub Actions secret. Playwright cannot be run with doppler -c stg, so TEST_SEED_SECRET may drift from .dev.vars and every /__test/seed call will 403. See memory project_playwright_e2e_setup.md."
-            exit 1
-          fi
-          # ubuntu-latest includes unzip; keep this explicit guard so a runner
-          # image change fails with the exact missing dependency.
-          if ! command -v unzip >/dev/null 2>&1; then
-            echo "::error title=Trace reader missing::unzip is required to classify Playwright trace archives."
             exit 1
           fi
           # Keep the canary, suite, and postflight in one Doppler boundary so
