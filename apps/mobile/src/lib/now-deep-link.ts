@@ -4,20 +4,24 @@ import {
   type NowDeepLink,
   type NowDeepLinkRoute,
 } from '@eduagent/schemas';
-import { MENTOR_RETURN_TO } from './navigation';
-
 export type SubjectHubTarget = 'legacy-shelf' | 'v2-subject-hub';
 
 export interface PushNowDeepLinkOptions {
   subjectHubTarget?: SubjectHubTarget;
+  returnTo?: string;
 }
+
+type ResolvedPushNowDeepLinkOptions = {
+  subjectHubTarget: SubjectHubTarget;
+  returnTo?: string;
+};
 
 type PathBuilder = (
   params: Record<string, string>,
-  options: Required<PushNowDeepLinkOptions>,
+  options: ResolvedPushNowDeepLinkOptions,
 ) => string;
 
-const DEFAULT_OPTIONS: Required<PushNowDeepLinkOptions> = {
+const DEFAULT_OPTIONS: ResolvedPushNowDeepLinkOptions = {
   subjectHubTarget: 'legacy-shelf',
 };
 
@@ -25,10 +29,14 @@ const PATH_BUILDERS: Record<NowDeepLinkRoute, PathBuilder> = {
   'settings.more': () => '/(app)/more',
   'settings.account': () => '/(app)/more/account',
   'billing.manage': () => '/(app)/subscription',
-  'session.resume': (params) =>
+  'session.resume': (params, options) =>
     `/(app)/session?sessionId=${encodeURIComponent(
       requiredParam(params, 'sessionId', 'session.resume'),
-    )}&returnTo=${MENTOR_RETURN_TO}`,
+    )}${
+      options.returnTo
+        ? `&returnTo=${encodeURIComponent(options.returnTo)}`
+        : ''
+    }`,
   // [WI-1121 review fix] Matches the path buildSessionDetailHref() builds for
   // a completed session (session-detail-navigation.ts) — the recap/summary
   // screen, distinct from 'session.resume' (the live session chat).

@@ -38,6 +38,7 @@ import { useSubjectsIndex } from '../../hooks/use-subjects-index';
 import { matchBarIntent } from '../../lib/bar-intent-match';
 import { hasFirstRealState } from '../../lib/first-real-state';
 import {
+  MENTOR_RETURN_TO,
   pushAddChildForSupport,
   pushLinkInitiateForManagedPerson,
   pushLinkInitiatePicker,
@@ -169,6 +170,7 @@ function LearnerMentorScreen(): React.ReactElement {
     setArcState(card, 'advancing');
     pushNowDeepLink(router, card.deepLink, {
       subjectHubTarget: 'v2-subject-hub',
+      returnTo: MENTOR_RETURN_TO,
     });
   };
 
@@ -209,6 +211,7 @@ function LearnerMentorScreen(): React.ReactElement {
       setBarClarification(null);
       pushNowDeepLink(router, result.deepLink, {
         subjectHubTarget: 'v2-subject-hub',
+        returnTo: MENTOR_RETURN_TO,
       });
       return;
     }
@@ -289,6 +292,7 @@ function LearnerMentorScreen(): React.ReactElement {
       if (resumeLink) {
         pushNowDeepLink(router, resumeLink, {
           subjectHubTarget: 'v2-subject-hub',
+          returnTo: MENTOR_RETURN_TO,
         });
         return;
       }

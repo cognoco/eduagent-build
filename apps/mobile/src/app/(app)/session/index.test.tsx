@@ -928,6 +928,47 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
+  it('[WI-2234] invalidates the active-profile Now feed before the expired-session Go home path returns to Mentor', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      sessionId: 'expired-session',
+      returnTo: 'mentor',
+    });
+    const { NotFoundError } = require('../../../lib/api-client');
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new NotFoundError('Session not found'),
+    } as never);
+
+    const testScreen = renderSessionScreen();
+    const invalidateSpy = jest.spyOn(
+      activeRender!.queryClient,
+      'invalidateQueries',
+    );
+
+    const expiredMessage = await waitFor(() =>
+      testScreen.getByTestId('mock-message-session-expired'),
+    );
+    fireEvent.press(
+      within(expiredMessage).getByTestId('session-expired-go-home'),
+    );
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: nowFeedQueryKey(ACTIVE_PROFILE_ID),
+      exact: true,
+    });
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
+    expect(invalidateSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      mockReplace.mock.invocationCallOrder[0]!,
+    );
+
+    testScreen.unmount();
+  });
+
   it('[F-110] engages the session-expired UI for any error the boundary classifies as not-found, not only typed NotFoundError instances', () => {
     // sessionExpired is computed from
     // classifyApiError(transcript.error).category === 'not-found' rather
