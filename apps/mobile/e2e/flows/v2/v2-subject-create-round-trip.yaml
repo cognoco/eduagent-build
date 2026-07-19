@@ -64,8 +64,9 @@ tags:
       id: 'subjects-screen'
     timeout: 15000
 
-# Create a deterministic focused topic and carry the Subjects return token
-# through the first-subject ready handoff into the learning session.
+# Create a specific topic and carry the Subjects return token through the
+# first-subject ready handoff. A direct resolver match creates immediately;
+# a resolved/corrected match first requires explicit confirmation.
 - tapOn:
     id: 'subjects-browse-create'
 - extendedWaitUntil:
@@ -82,6 +83,21 @@ tags:
     timeout: 5000
 - tapOn:
     id: 'create-subject-submit'
+- extendedWaitUntil:
+    visible:
+      id: 'subject-resolve-loading'
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: 'subject-resolve-loading'
+    timeout: 60000
+- runFlow:
+    when:
+      visible:
+        id: 'subject-suggestion-accept'
+    commands:
+      - tapOn:
+          id: 'subject-suggestion-accept'
 - extendedWaitUntil:
     visible:
       id: 'ready-screen'
@@ -103,5 +119,6 @@ tags:
       id: 'subjects-screen'
     timeout: 15000
 - extendedWaitUntil:
-    visible: 'Photosynthesis'
+    visible:
+      id: 'subjects-browse-row-.*'
     timeout: 15000
