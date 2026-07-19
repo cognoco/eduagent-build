@@ -503,7 +503,7 @@ describe('HomeworkFirstResponseCompleteMarker', () => {
     expect(queryByTestId('homework-first-response-complete')).toBeNull();
   });
 
-  it('rejects the fatal 4xx assistant-error shape unless successful response provenance exists', () => {
+  it('requires an assistant eventId before marking the first response complete', () => {
     const fatalErrorReply = {
       id: 'fatal-error',
       role: 'assistant' as const,

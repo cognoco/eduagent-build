@@ -83,6 +83,13 @@ test('V2 Mentor trial-active manual homework creates one associated session, rec
   await expect(page.getByTestId('session-screen')).toBeVisible({
     timeout: 30_000,
   });
+  // Staging may resolve the enrolled seed through the picker or auto-create
+  // the classifier's suggested subject. Bind the session to the subject that
+  // this exact browser journey actually resolved.
+  const resolvedSubjectId = new URL(page.url()).searchParams.get('subjectId');
+  expect(resolvedSubjectId).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  );
   await expect(page.getByTestId('homework-problem-text-bubble')).toHaveText(
     MANUAL_HOMEWORK_PROBLEM,
   );
@@ -98,10 +105,33 @@ test('V2 Mentor trial-active manual homework creates one associated session, rec
   const createdSession = (
     (await createdResponse.json()) as LearningSessionResponse
   ).session;
+  const createdRequest = createdResponse.request();
+  const requestSubjectId = new URL(createdRequest.url()).pathname.match(
+    /^\/v1\/subjects\/([^/]+)\/sessions$/,
+  )?.[1];
   expect(createdSession.id).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   );
-  expect(createdSession.subjectId).toBe(seed.ids.subjectId);
+  expect(requestSubjectId).toBe(resolvedSubjectId);
+  expect(createdRequest.postDataJSON()).toMatchObject({
+    subjectId: resolvedSubjectId,
+    sessionType: 'homework',
+    metadata: {
+      effectiveMode: 'homework',
+      homework: {
+        problemCount: 1,
+        currentProblemIndex: 0,
+        problems: [
+          {
+            text: MANUAL_HOMEWORK_PROBLEM,
+            source: 'manual',
+            status: 'active',
+          },
+        ],
+      },
+    },
+  });
+  expect(createdSession.subjectId).toBe(resolvedSubjectId);
 
   await expect(page.getByTestId('homework-problem-progress')).toHaveText(
     'Problem 1 of 1',
@@ -120,24 +150,6 @@ test('V2 Mentor trial-active manual homework creates one associated session, rec
   await expect(page.getByTestId(/^session-reconnect-/)).toHaveCount(0);
 
   expect(sessionCreateRequests).toHaveLength(1);
-  expect(sessionCreateRequests[0]?.postDataJSON()).toMatchObject({
-    subjectId: seed.ids.subjectId,
-    sessionType: 'homework',
-    metadata: {
-      effectiveMode: 'homework',
-      homework: {
-        problemCount: 1,
-        currentProblemIndex: 0,
-        problems: [
-          {
-            text: MANUAL_HOMEWORK_PROBLEM,
-            source: 'manual',
-            status: 'active',
-          },
-        ],
-      },
-    },
-  });
 
   // Re-read the persisted record through the real session endpoint after the
   // assistant reply. Reuse the app request's auth/profile scope in memory only;
@@ -162,7 +174,7 @@ test('V2 Mentor trial-active manual homework creates one associated session, rec
     (await persistedResponse.json()) as LearningSessionResponse
   ).session;
   expect(persistedSession.id).toBe(createdSession.id);
-  expect(persistedSession.subjectId).toBe(seed.ids.subjectId);
+  expect(persistedSession.subjectId).toBe(resolvedSubjectId);
   expect(persistedSession.sessionType).toBe('homework');
   expect(persistedSession.metadata?.homework?.problemCount).toBe(1);
   expect(persistedSession.metadata?.homework?.currentProblemIndex).toBe(0);
