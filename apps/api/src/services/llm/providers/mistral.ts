@@ -99,6 +99,7 @@ export function createMistralProvider(apiKey: string): LLMProvider {
     async chat(
       messages: ChatMessage[],
       config: ModelConfig,
+      signal?: AbortSignal,
     ): Promise<ChatResult> {
       const res = await fetch(MISTRAL_BASE_URL, {
         method: 'POST',
@@ -107,7 +108,9 @@ export function createMistralProvider(apiKey: string): LLMProvider {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(buildBody(messages, config, false)),
-        signal: AbortSignal.timeout(MISTRAL_TIMEOUT_MS),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(MISTRAL_TIMEOUT_MS)])
+          : AbortSignal.timeout(MISTRAL_TIMEOUT_MS),
       });
 
       if (!res.ok) {

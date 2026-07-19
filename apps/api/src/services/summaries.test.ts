@@ -81,7 +81,7 @@ describe('evaluateSummary', () => {
     expect(result.hasUnderstandingGaps).toBe(false);
   });
 
-  it('falls back gracefully when LLM returns non-JSON', async () => {
+  it('[WI-2183] marks feedback unavailable when the provider returns non-JSON', async () => {
     registerLlmProviderFixture({
       chatResponse: llmPlainText('Your summary looks good overall!'),
     });
@@ -92,12 +92,47 @@ describe('evaluateSummary', () => {
       'Arrays are ordered collections.',
     );
 
-    // Fallback: LLM returned non-JSON — show safe error message, do not accept.
-    // The raw LLM text is never passed through as feedback (it could be an error
-    // message, safety refusal, or rate-limit JSON).
-    expect(result.feedback).toContain("couldn't provide AI feedback");
+    expect(result.feedback).toBeNull();
+    expect(result.feedbackStatus).toBe('unavailable');
     expect(result.isAccepted).toBe(false);
     expect(result.hasUnderstandingGaps).toBe(false);
+  });
+
+  it('[WI-2183] bounds a timed-out provider and marks feedback unavailable', async () => {
+    const provider = createMockProvider('gemini');
+    let providerAborted = false;
+    let providerCalls = 0;
+    registerProvider({
+      ...provider,
+      chat: (_messages, _config, signal) => {
+        providerCalls += 1;
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener(
+            'abort',
+            () => {
+              providerAborted = true;
+              reject(signal.reason);
+            },
+            { once: true },
+          );
+        });
+      },
+    });
+
+    const result = await evaluateSummary(
+      'Arrays',
+      'Working with arrays',
+      'Arrays are ordered collections.',
+      { evaluationTimeoutMs: 5 },
+    );
+
+    expect(result).toMatchObject({
+      feedback: null,
+      feedbackStatus: 'unavailable',
+      isAccepted: false,
+    });
+    expect(providerAborted).toBe(true);
+    expect(providerCalls).toBe(1);
   });
 
   it('handles JSON embedded in surrounding text', async () => {
@@ -175,7 +210,7 @@ describe('evaluateSummary', () => {
   });
 
   // [BUG-670 / S-16] Break test — never leak raw LLM string as feedback.
-  it('uses canned fallback when parsed JSON is missing the feedback field', async () => {
+  it('[WI-2183] marks feedback unavailable when parsed JSON misses feedback', async () => {
     registerLlmProviderFixture({
       chatResponse: {
         hasUnderstandingGaps: true,
@@ -190,7 +225,8 @@ describe('evaluateSummary', () => {
       'Some summary text.',
     );
 
-    expect(result.feedback).toContain("couldn't provide AI feedback");
+    expect(result.feedback).toBeNull();
+    expect(result.feedbackStatus).toBe('unavailable');
     expect(result.isAccepted).toBe(false);
   });
 
@@ -210,7 +246,8 @@ describe('evaluateSummary', () => {
       'Arrays are a list of values.',
     );
 
-    expect(result.feedback).toContain("couldn't provide AI feedback");
+    expect(result.feedback).toBeNull();
+    expect(result.feedbackStatus).toBe('unavailable');
     expect(result.hasUnderstandingGaps).toBe(false);
     expect(result.isAccepted).toBe(false);
   });
@@ -231,7 +268,8 @@ describe('evaluateSummary', () => {
       'Arrays are a list of values.',
     );
 
-    expect(result.feedback).toContain("couldn't provide AI feedback");
+    expect(result.feedback).toBeNull();
+    expect(result.feedbackStatus).toBe('unavailable');
     expect(result.hasUnderstandingGaps).toBe(false);
     expect(result.isAccepted).toBe(false);
   });
@@ -252,7 +290,8 @@ describe('evaluateSummary', () => {
       'Arrays are values.',
     );
 
-    expect(result.feedback).toContain("couldn't provide AI feedback");
+    expect(result.feedback).toBeNull();
+    expect(result.feedbackStatus).toBe('unavailable');
     expect(result.hasUnderstandingGaps).toBe(false);
     expect(result.isAccepted).toBe(false);
   });

@@ -19,6 +19,7 @@ import {
   learningSessionSchema,
   RateLimitedError,
   recallBridgeResultSchema,
+  retrySummaryFeedbackResultSchema,
   sessionAutoFileRequestedEventSchema,
   getSubjectSessionsResponseSchema,
   type SubscriptionTier,
@@ -53,6 +54,7 @@ import {
   recordSessionEvent,
   skipSummary,
   submitSummary,
+  retrySummaryFeedback,
   syncHomeworkState,
   setSessionInputMode,
   getResumeNudgeCandidate,
@@ -173,6 +175,8 @@ type SessionRouteEnv = {
     quotaDecrementTopUpCreditId: string | undefined;
     /** Set by metering middleware; keeps refund routing stable if tier state changes mid-request. */
     quotaDecrementQuotaModel: QuotaModel | undefined;
+    /** Set when the handler refunds its metered turn so middleware does not charge it again. */
+    quotaRefunded: boolean | undefined;
     quotaRemainingTurns: number | undefined;
     quotaFractionRemaining: number | undefined;
     profileMeta: ProfileMeta | undefined;
@@ -951,6 +955,26 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     },
   )
 
+  // Retry AI feedback for an already-saved learner summary. This route never
+  // re-submits content or dispatches session completion side effects.
+  .post(
+    '/sessions/:sessionId/summary/retry-feedback',
+    zValidator('param', sessionIdParamsSchema),
+    async (c) => {
+      assertNotProxyMode(c);
+      const { db, profileId } = withProfile(c);
+      const { sessionId } = c.req.valid('param');
+      const profileMeta = c.get('profileMeta');
+      const result = await retrySummaryFeedback(db, profileId, sessionId, {
+        conversationLanguage: parseConversationLanguage(
+          profileMeta?.conversationLanguage,
+        ),
+      });
+
+      return c.json(retrySummaryFeedbackResultSchema.parse(result));
+    },
+  )
+
   // Submit learner summary ("Your Words")
   .post(
     '/sessions/:sessionId/summary',
@@ -988,9 +1012,13 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           sessionId,
           {
             summaryStatus: result.summary.status,
-            qualityRating: qualityRatingFromSummaryStatus(
-              result.summary.status,
-            ),
+            ...(result.summary.feedbackStatus === 'available'
+              ? {
+                  qualityRating: qualityRatingFromSummaryStatus(
+                    result.summary.status,
+                  ),
+                }
+              : {}),
           },
         );
         pipelineQueued = dispatch.pipelineQueued;

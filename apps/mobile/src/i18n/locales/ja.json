@@ -3180,6 +3180,11 @@
         "fluency": "次回: 流暢さの短期集中トレーニング"
       }
     },
+    "feedbackUnavailableTitle": "フィードバックはまだ利用できません",
+    "feedbackUnavailableMessage": "概要は保存されました。再送信せずにフィードバックを再試行できます。",
+    "feedbackStillUnavailable": "フィードバックはまだ利用できませんが、概要は安全に保存されています。準備ができたら、再試行または続行できます。",
+    "retryFeedback": "フィードバックを再試行",
+    "retryingFeedback": "フィードバックを再試行中...",
     "mentorNotice": {
       "title": "学習中に気づいたこと"
     }
