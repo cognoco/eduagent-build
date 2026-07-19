@@ -60,6 +60,10 @@ tags:
     visible:
       id: 'result-text-input'
     timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: 'homework-manual-entry-empty'
+    timeout: 15000
 - tapOn:
     id: 'result-text-input'
 - inputText: 'Solve 3x + 7 = 22'
@@ -72,7 +76,7 @@ tags:
 # to select it. The final session-screen assertion remains the hard outcome.
 - extendedWaitUntil:
     visible:
-      id: 'confirm-button|subject-picker'
+      id: 'homework-subject-resolution-ready'
     timeout: 60000
 - runFlow:
     when:
@@ -116,8 +120,14 @@ tags:
     text: 'Solve 3x + 7 = 22'
 - extendedWaitUntil:
     visible:
-      id: 'message-bubble-assistant-2'
+      id: 'homework-first-response-complete'
     timeout: 60000
+- assertVisible:
+    id: 'message-bubble-assistant-2'
+- assertNotVisible:
+    id: 'thinking-bulb-animation'
+- assertNotVisible:
+    id: 'session-reconnect-.*'
 
 - tapOn:
     id: 'finish-homework-chip'

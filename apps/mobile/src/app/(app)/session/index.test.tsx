@@ -2525,6 +2525,9 @@ describe('SessionScreen homework flow', () => {
           expect.objectContaining({ homeworkMode: 'help_me' }),
         );
       });
+      await waitFor(() => {
+        testScreen.getByTestId('homework-first-response-complete');
+      });
 
       // Once consumed, the deterministic first-response block is gone.
       expect(testScreen.queryByTestId('homework-help-me-solve')).toBeNull();

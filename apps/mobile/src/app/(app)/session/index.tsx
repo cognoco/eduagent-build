@@ -96,6 +96,7 @@ import { BookmarkNudgeTooltip } from '../../../components/session/BookmarkNudgeT
 import {
   SessionToolAccessory,
   SessionAccessory,
+  HomeworkFirstResponseCompleteMarker,
   MentorHomeworkFirstResponse,
 } from '../../../components/session/SessionAccessories';
 import {
@@ -1769,6 +1770,13 @@ function SessionScreenInner() {
         rightAction={headerRight}
         inputAccessory={
           <>
+            <HomeworkFirstResponseCompleteMarker
+              active={isMentorHomeworkFrame && !!mentorHomeworkChoice}
+              problemText={initialProblemText}
+              messages={messages}
+              isStreaming={isStreaming}
+              hasFailure={sessionExpired || !!quotaError}
+            />
             {challengeBanner}
             {drillStrip}
             {mentorHomeworkFirstResponse}

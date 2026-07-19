@@ -752,6 +752,11 @@ export default function CameraScreen(): React.ReactNode {
     router.replace(homeworkReturnHrefForReturnTo(returnTo));
   }, [returnTo, router]);
 
+  const handleCancelManualEntry = useCallback(() => {
+    handleRetake();
+    handleClose();
+  }, [handleClose, handleRetake]);
+
   // Intercept Android hardware back so it routes through handleClose too;
   // without this, the OS goBack() returns to whichever tab was active when
   // camera was pushed, which for cross-tab pushes is the tabs first-route.
@@ -1133,6 +1138,11 @@ export default function CameraScreen(): React.ReactNode {
   // ---- Result phase ----
   if (state.phase === 'result') {
     const needsSubjectPick = !subjectId;
+    const subjectResolutionReady =
+      !needsSubjectPick ||
+      (!classifyMutation.isPending &&
+        ((!showSubjectPicker && autoDetectedSubject !== null) ||
+          (showSubjectPicker && !subjectsLoading)));
     const resultPrompt =
       state.imageUri || ocrText.trim().length > 0
         ? t('homework.problemsFound')
@@ -1145,6 +1155,21 @@ export default function CameraScreen(): React.ReactNode {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         testID="result-scroll"
       >
+        {subjectResolutionReady ? (
+          <View
+            testID="homework-subject-resolution-ready"
+            style={{ width: 1, height: 1 }}
+          />
+        ) : null}
+        {draftProblems.length === 1 &&
+        draftProblems[0]?.source === 'manual' &&
+        draftProblems[0].text.length === 0 ? (
+          <View
+            testID="homework-manual-entry-empty"
+            style={{ width: 1, height: 1 }}
+          />
+        ) : null}
+
         <Pressable
           testID="camera-back-button"
           onPress={handleRetake}
@@ -1162,7 +1187,7 @@ export default function CameraScreen(): React.ReactNode {
           draftProblems.every((problem) => problem.source === 'manual') && (
             <Pressable
               testID="manual-entry-cancel"
-              onPress={handleClose}
+              onPress={handleCancelManualEntry}
               className="self-start min-h-[48px] px-2 justify-center"
               accessibilityLabel={t('homework.cancelAndGoBackLabel')}
               accessibilityRole="button"

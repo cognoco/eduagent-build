@@ -916,11 +916,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     };
     type MaestroCommand = {
       assertVisible?: ElementSelector;
+      assertNotVisible?: ElementSelector;
       extendedWaitUntil?: {
         visible?: ElementSelector;
         timeout?: number;
       };
       tapOn?: ElementSelector;
+      inputText?: string;
       optional?: boolean;
     };
     const commands = parseYaml(
@@ -958,9 +960,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           command.extendedWaitUntil?.timeout === timeout &&
           exactSelector(command.extendedWaitUntil.visible, selector),
       );
-    const tapIndex = (id: string): number =>
+    const tapIndex = (id: string, startAt = 0): number =>
       commands.findIndex(
-        (command) => command.optional !== true && command.tapOn?.id === id,
+        (command, index) =>
+          index >= startAt &&
+          command.optional !== true &&
+          command.tapOn?.id === id,
       );
     const containsOptionalTrue = (value: unknown): boolean => {
       if (Array.isArray(value)) return value.some(containsOptionalTrue);
@@ -987,8 +992,156 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ),
     ).toBeGreaterThan(-1);
     expect(
-      mandatoryExtendedWait({ id: 'message-bubble-assistant-2' }, 60_000),
+      mandatoryExtendedWait({ id: 'homework-first-response-complete' }, 60_000),
     ).toBeGreaterThan(-1);
+    expect(
+      mandatoryExtendedWait(
+        { id: 'homework-subject-resolution-ready' },
+        60_000,
+      ),
+    ).toBeGreaterThan(-1);
+    expect(source).not.toContain("id: 'confirm-button|subject-picker'");
+
+    const firstHomeworkLaunch = tapIndex('mentor-bar-homework-chip');
+    const firstManualLaunch = tapIndex(
+      'manual-entry-button',
+      firstHomeworkLaunch + 1,
+    );
+    const cancel = tapIndex('manual-entry-cancel', firstManualLaunch + 1);
+    const mentorAfterCancel = mandatoryExtendedWait(
+      { id: 'mentor-screen' },
+      15_000,
+      cancel + 1,
+    );
+    const usableMentorInput = commands.findIndex(
+      (command, index) =>
+        index > mentorAfterCancel &&
+        command.optional !== true &&
+        exactSelector(command.assertVisible, {
+          id: 'mentor-bar-input',
+          enabled: true,
+        }),
+    );
+    const secondHomeworkLaunch = tapIndex(
+      'mentor-bar-homework-chip',
+      usableMentorInput + 1,
+    );
+    const secondManualLaunch = tapIndex(
+      'manual-entry-button',
+      secondHomeworkLaunch + 1,
+    );
+    const emptyManualEntry = mandatoryExtendedWait(
+      { id: 'homework-manual-entry-empty' },
+      15_000,
+      secondManualLaunch + 1,
+    );
+    const exactProblemInput = commands.findIndex(
+      (command, index) =>
+        index > emptyManualEntry &&
+        command.optional !== true &&
+        command.inputText === 'Solve 3x + 7 = 22',
+    );
+    const exactTypedProblem = commands.findIndex(
+      (command, index) =>
+        index > exactProblemInput &&
+        command.optional !== true &&
+        exactSelector(command.assertVisible, {
+          id: 'result-text-input',
+          text: 'Solve 3x + 7 = 22',
+        }),
+    );
+    expect(firstHomeworkLaunch).toBeGreaterThan(-1);
+    expect(firstManualLaunch).toBeGreaterThan(firstHomeworkLaunch);
+    expect(cancel).toBeGreaterThan(firstManualLaunch);
+    expect(mentorAfterCancel).toBeGreaterThan(cancel);
+    expect(usableMentorInput).toBeGreaterThan(mentorAfterCancel);
+    expect(secondHomeworkLaunch).toBeGreaterThan(usableMentorInput);
+    expect(secondManualLaunch).toBeGreaterThan(secondHomeworkLaunch);
+    expect(emptyManualEntry).toBeGreaterThan(secondManualLaunch);
+    expect(exactProblemInput).toBeGreaterThan(emptyManualEntry);
+    expect(exactTypedProblem).toBeGreaterThan(exactProblemInput);
+
+    expect(
+      commands.findIndex(
+        (command) =>
+          command.optional !== true &&
+          exactSelector(command.assertNotVisible, {
+            id: 'session-reconnect-.*',
+          }),
+      ),
+    ).toBeGreaterThan(-1);
+
+    const playwrightSource = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e-web/flows/v2/v2-homework-manual-entry.spec.ts',
+      ),
+      'utf8',
+    );
+    const firstBrowserLaunch = playwrightSource.indexOf(
+      'await openManualEntryFromMentor(page);',
+    );
+    const helperHomeworkLaunch = playwrightSource.indexOf(
+      "getByTestId('mentor-bar-homework-chip')",
+    );
+    const helperManualLaunch = playwrightSource.indexOf(
+      "getByTestId('manual-entry-button')",
+      helperHomeworkLaunch,
+    );
+    const helperManualInput = playwrightSource.indexOf(
+      "getByTestId('result-text-input')",
+      helperManualLaunch,
+    );
+    const browserCancel = playwrightSource.indexOf(
+      "getByTestId('manual-entry-cancel')",
+      firstBrowserLaunch,
+    );
+    const browserUsableMentor = playwrightSource.indexOf(
+      "getByTestId('mentor-bar-input')",
+      browserCancel,
+    );
+    const browserMentorEnabled = playwrightSource.indexOf(
+      '.toBeEnabled()',
+      browserUsableMentor,
+    );
+    const secondBrowserLaunch = playwrightSource.indexOf(
+      'await openManualEntryFromMentor(page);',
+      browserMentorEnabled,
+    );
+    const browserEmptyAssertion = playwrightSource.indexOf(
+      ".toHaveValue('')",
+      secondBrowserLaunch,
+    );
+    const browserProblemInput = playwrightSource.indexOf(
+      'MANUAL_HOMEWORK_PROBLEM,',
+      browserEmptyAssertion,
+    );
+    const browserCompletedReply = playwrightSource.indexOf(
+      "getByTestId('homework-first-response-complete')",
+      browserProblemInput,
+    );
+    const browserNonEmptyReply = playwrightSource.indexOf(
+      '.not.toHaveText(/^\\s*$/)',
+      browserCompletedReply,
+    );
+    const browserNoReconnect = playwrightSource.indexOf(
+      'getByTestId(/^session-reconnect-/)',
+      browserCompletedReply,
+    );
+    expect(helperHomeworkLaunch).toBeGreaterThan(-1);
+    expect(helperManualLaunch).toBeGreaterThan(helperHomeworkLaunch);
+    expect(helperManualInput).toBeGreaterThan(helperManualLaunch);
+    expect(helperManualInput).toBeLessThan(firstBrowserLaunch);
+    expect(firstBrowserLaunch).toBeGreaterThan(-1);
+    expect(browserCancel).toBeGreaterThan(firstBrowserLaunch);
+    expect(browserUsableMentor).toBeGreaterThan(browserCancel);
+    expect(browserMentorEnabled).toBeGreaterThan(browserUsableMentor);
+    expect(secondBrowserLaunch).toBeGreaterThan(browserMentorEnabled);
+    expect(browserEmptyAssertion).toBeGreaterThan(secondBrowserLaunch);
+    expect(browserProblemInput).toBeGreaterThan(browserEmptyAssertion);
+    expect(browserCompletedReply).toBeGreaterThan(browserProblemInput);
+    expect(browserNonEmptyReply).toBeGreaterThan(browserCompletedReply);
+    expect(browserNoReconnect).toBeGreaterThan(browserCompletedReply);
 
     const back = tapIndex('chat-shell-back');
     expect(back).toBeGreaterThan(-1);

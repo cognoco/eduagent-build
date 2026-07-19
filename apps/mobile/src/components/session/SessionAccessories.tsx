@@ -12,11 +12,68 @@ import { Ionicons } from '@expo/vector-icons';
 import type { HomeworkProblem } from '@eduagent/schemas';
 import type { Router, Href } from 'expo-router';
 import type { useCreateSubject } from '../../hooks/use-subjects';
+import type { ChatMessage } from './ChatShell';
 import {
   type QuickChipId,
   type PendingSubjectResolution,
   type ConversationStage,
 } from './session-types';
+
+export interface HomeworkFirstResponseCompleteMarkerProps {
+  active: boolean;
+  problemText: string | undefined;
+  messages: ChatMessage[];
+  isStreaming: boolean;
+  hasFailure: boolean;
+}
+
+/**
+ * Semantic E2E readiness marker for the first V2 Mentor homework reply.
+ * A visible assistant bubble alone is insufficient because it can contain a
+ * partial stream or a reconnect/fallback prompt.
+ */
+export function HomeworkFirstResponseCompleteMarker({
+  active,
+  problemText,
+  messages,
+  isStreaming,
+  hasFailure,
+}: HomeworkFirstResponseCompleteMarkerProps) {
+  const normalizedProblem = problemText?.trim();
+  const problemIndex = normalizedProblem
+    ? messages.findIndex(
+        (message) =>
+          message.role === 'user' &&
+          message.isAutoSent === true &&
+          message.content.trim() === normalizedProblem,
+      )
+    : -1;
+  const messagesAfterProblem =
+    problemIndex >= 0 ? messages.slice(problemIndex + 1) : [];
+  const firstAssistantReply = messagesAfterProblem.find(
+    (message) => message.role === 'assistant',
+  );
+  const hasRecoveryOrFallback = messagesAfterProblem.some(
+    (message) => message.kind !== undefined || message.isSystemPrompt === true,
+  );
+  const complete =
+    active &&
+    !isStreaming &&
+    !hasFailure &&
+    !hasRecoveryOrFallback &&
+    firstAssistantReply !== undefined &&
+    firstAssistantReply.streaming !== true &&
+    typeof firstAssistantReply.eventId === 'string' &&
+    firstAssistantReply.eventId.trim().length > 0 &&
+    firstAssistantReply.content.trim().length > 0;
+
+  return complete ? (
+    <View
+      testID="homework-first-response-complete"
+      style={{ width: 1, height: 1 }}
+    />
+  ) : null;
+}
 
 // ─── SessionToolAccessory ────────────────────────────────────────────────────
 
@@ -566,7 +623,7 @@ export function MentorHomeworkFirstResponse({
           accessibilityLabel={t('mentorHome.homework.imageAlt')}
           testID="homework-image-bubble"
         />
-      ) : (
+      ) : problemText ? (
         <View
           className="w-full rounded-card bg-surface-elevated mb-3 px-4 py-3"
           testID="homework-problem-text-bubble-container"
@@ -575,10 +632,10 @@ export function MentorHomeworkFirstResponse({
             className="text-body text-text-primary"
             testID="homework-problem-text-bubble"
           >
-            {problemText ?? ''}
+            {problemText}
           </Text>
         </View>
-      )}
+      ) : null}
       <View className="flex-row gap-2">
         <Pressable
           onPress={onHelpMeSolve}

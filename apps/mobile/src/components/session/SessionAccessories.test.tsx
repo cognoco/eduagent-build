@@ -2,6 +2,7 @@ import { render, fireEvent } from '@testing-library/react-native';
 import {
   SessionToolAccessory,
   HomeworkModeChips,
+  HomeworkFirstResponseCompleteMarker,
   MentorHomeworkFirstResponse,
   SubjectResolutionAccessory,
 } from './SessionAccessories';
@@ -361,5 +362,187 @@ describe('MentorHomeworkFirstResponse manual-entry problem association', () => {
       problemText,
     );
     expect(queryByTestId('homework-image-bubble')).toBeNull();
+  });
+
+  it('renders no media bubble when neither an image nor a problem is associated', () => {
+    const { queryByTestId } = render(
+      <MentorHomeworkFirstResponse
+        imageUri={undefined}
+        problemText={undefined}
+        disabled={false}
+        onHelpMeSolve={jest.fn()}
+        onCheckMyAnswer={jest.fn()}
+      />,
+    );
+
+    expect(queryByTestId('homework-image-bubble')).toBeNull();
+    expect(queryByTestId('homework-problem-text-bubble')).toBeNull();
+    expect(queryByTestId('homework-problem-text-bubble-container')).toBeNull();
+  });
+});
+
+describe('HomeworkFirstResponseCompleteMarker', () => {
+  const problemText = 'Solve 3x + 7 = 22';
+  const openingMessage = {
+    id: 'opening',
+    role: 'assistant' as const,
+    content: 'What are you working on?',
+  };
+  const homeworkMessage = {
+    id: 'homework-problem',
+    role: 'user' as const,
+    content: problemText,
+    isAutoSent: true,
+  };
+
+  it('does not mark empty content, a thinking placeholder, or a partial stream as completed', () => {
+    const { queryByTestId, rerender } = render(
+      <HomeworkFirstResponseCompleteMarker
+        active
+        problemText={problemText}
+        isStreaming={false}
+        hasFailure={false}
+        messages={[
+          openingMessage,
+          homeworkMessage,
+          {
+            id: 'empty-reply',
+            role: 'assistant',
+            content: '',
+            streaming: false,
+          },
+        ]}
+      />,
+    );
+
+    expect(queryByTestId('homework-first-response-complete')).toBeNull();
+
+    rerender(
+      <HomeworkFirstResponseCompleteMarker
+        active
+        problemText={problemText}
+        isStreaming
+        hasFailure={false}
+        messages={[
+          openingMessage,
+          homeworkMessage,
+          {
+            id: 'partial-reply',
+            role: 'assistant',
+            content: 'Let us',
+            streaming: true,
+          },
+        ]}
+      />,
+    );
+
+    expect(queryByTestId('homework-first-response-complete')).toBeNull();
+  });
+
+  it('marks only a non-empty completed genuine reply with no reconnect or fallback message', () => {
+    const completedReply = {
+      id: 'completed-reply',
+      role: 'assistant' as const,
+      content: 'First, subtract 7 from both sides.',
+      streaming: false,
+      eventId: 'ai-event-homework-first-reply',
+    };
+    const { getByTestId, queryByTestId, rerender } = render(
+      <HomeworkFirstResponseCompleteMarker
+        active
+        problemText={problemText}
+        isStreaming={false}
+        hasFailure={false}
+        messages={[
+          openingMessage,
+          homeworkMessage,
+          {
+            id: 'fallback',
+            role: 'assistant',
+            content: 'Try again later.',
+            isSystemPrompt: true,
+          },
+        ]}
+      />,
+    );
+
+    expect(queryByTestId('homework-first-response-complete')).toBeNull();
+
+    rerender(
+      <HomeworkFirstResponseCompleteMarker
+        active
+        problemText={problemText}
+        isStreaming={false}
+        hasFailure={false}
+        messages={[openingMessage, homeworkMessage, completedReply]}
+      />,
+    );
+
+    getByTestId('homework-first-response-complete');
+
+    rerender(
+      <HomeworkFirstResponseCompleteMarker
+        active
+        problemText={problemText}
+        isStreaming={false}
+        hasFailure={false}
+        messages={[
+          openingMessage,
+          homeworkMessage,
+          completedReply,
+          {
+            id: 'reconnect',
+            role: 'assistant',
+            content: 'Reconnect to continue.',
+            kind: 'reconnect_prompt',
+          },
+        ]}
+      />,
+    );
+
+    expect(queryByTestId('homework-first-response-complete')).toBeNull();
+  });
+
+  it('rejects the fatal 4xx assistant-error shape unless successful response provenance exists', () => {
+    const fatalErrorReply = {
+      id: 'fatal-error',
+      role: 'assistant' as const,
+      content: 'That request could not be processed.',
+      streaming: false,
+      kind: undefined,
+      isSystemPrompt: false,
+    };
+    const { getByTestId, queryByTestId, rerender } = render(
+      <HomeworkFirstResponseCompleteMarker
+        active
+        problemText={problemText}
+        isStreaming={false}
+        hasFailure={false}
+        messages={[openingMessage, homeworkMessage, fatalErrorReply]}
+      />,
+    );
+
+    expect(queryByTestId('homework-first-response-complete')).toBeNull();
+
+    rerender(
+      <HomeworkFirstResponseCompleteMarker
+        active
+        problemText={problemText}
+        isStreaming={false}
+        hasFailure={false}
+        messages={[
+          openingMessage,
+          homeworkMessage,
+          {
+            ...fatalErrorReply,
+            id: 'successful-reply',
+            content: 'First, subtract 7 from both sides.',
+            eventId: 'ai-event-homework-first-reply',
+          },
+        ]}
+      />,
+    );
+
+    getByTestId('homework-first-response-complete');
   });
 });

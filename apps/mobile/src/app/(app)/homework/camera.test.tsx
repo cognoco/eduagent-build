@@ -523,7 +523,7 @@ describe('CameraScreen', () => {
     expect(queryByTestId('camera-view')).toBeNull();
   });
 
-  it('routes a cancelled Mentor manual entry directly back to Mentor', () => {
+  it('disposes a cancelled Mentor manual draft before returning to Mentor', () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       entrySource: 'mentor',
       returnTo: 'mentor',
@@ -534,15 +534,19 @@ describe('CameraScreen', () => {
       jest.fn().mockResolvedValue({ granted: true, canAskAgain: true }),
     ]);
 
-    const { getByTestId } = render(<CameraScreen />, {
+    const { getByTestId, queryByTestId } = render(<CameraScreen />, {
       wrapper: createWrapper(),
     });
 
     fireEvent.press(getByTestId('manual-entry-button'));
+    expect(getByTestId('result-text-input')).toBeTruthy();
+    expect(getByTestId('homework-manual-entry-empty')).toBeTruthy();
     fireEvent.press(getByTestId('manual-entry-cancel'));
 
     expect(mockRouter.replace).toHaveBeenCalledTimes(1);
     expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/mentor');
+    expect(queryByTestId('result-text-input')).toBeNull();
+    expect(getByTestId('manual-entry-button')).toBeTruthy();
   });
 
   it('shows Settings link when permission denied and cannot ask again', () => {
@@ -1817,6 +1821,7 @@ describe('CameraScreen', () => {
       await waitFor(() => {
         const row = getByTestId('auto-detected-subject');
         expect(within(row).getByText(/Mathematics/)).toBeTruthy();
+        expect(getByTestId('homework-subject-resolution-ready')).toBeTruthy();
       });
       expect(queryByTestId('subject-picker')).toBeNull();
 
@@ -1824,6 +1829,7 @@ describe('CameraScreen', () => {
       fireEvent.press(getByTestId('change-subject-link'));
       await waitFor(() => {
         getByTestId('subject-picker');
+        getByTestId('homework-subject-resolution-ready');
       });
     });
 
@@ -1931,7 +1937,7 @@ describe('CameraScreen', () => {
       );
       withOcrDone('Some homework problem');
 
-      const { getByTestId } = render(<CameraScreen />, {
+      const { getByTestId, queryByTestId } = render(<CameraScreen />, {
         wrapper: createWrapper(),
       });
 
@@ -1939,6 +1945,7 @@ describe('CameraScreen', () => {
         getByTestId('classify-loading');
         getByTestId('classify-pending-retake');
       });
+      expect(queryByTestId('homework-subject-resolution-ready')).toBeNull();
       // Retake is actually pressable during the pending state.
       fireEvent.press(getByTestId('classify-pending-retake'));
       await waitFor(() => {

@@ -72,6 +72,7 @@ test('V2 Mentor manual homework creates one associated session, receives help, a
   // Case 2 — enter one visible manual problem and resolve its subject through
   // whichever real classification result staging returns.
   await openManualEntryFromMentor(page);
+  await expect(page.getByTestId('result-text-input')).toHaveValue('');
   await fillTextInput(
     page.getByTestId('result-text-input'),
     MANUAL_HOMEWORK_PROBLEM,
@@ -120,8 +121,11 @@ test('V2 Mentor manual homework creates one associated session, receives help, a
   await expect(page.getByTestId('message-bubble-user-1')).toHaveText(
     MANUAL_HOMEWORK_PROBLEM,
   );
+  await expect(
+    page.getByTestId('homework-first-response-complete'),
+  ).toBeVisible({ timeout: 60_000 });
   const firstHomeworkReply = page.getByTestId('message-bubble-assistant-2');
-  await expect(firstHomeworkReply).toBeVisible({ timeout: 60_000 });
+  await expect(firstHomeworkReply).not.toHaveText(/^\s*$/);
   await expect(page.getByTestId(/^session-reconnect-/)).toHaveCount(0);
 
   expect(sessionCreateRequests).toHaveLength(1);
