@@ -182,7 +182,9 @@ export default function LanguageSetup() {
           sessionId: result.session.id,
           topicId: result.session.topicId ?? undefined,
           subjectName: subjectName ?? languageName ?? '',
-          ...(returnTo ? { returnTo } : {}),
+          ...(returnTo === SUBJECTS_RETURN_TO
+            ? { returnTo: SUBJECTS_RETURN_TO }
+            : {}),
         },
       } as Href);
     } catch (err: unknown) {

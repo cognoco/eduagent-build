@@ -264,6 +264,26 @@ describe('LanguageSetup', () => {
     });
   });
 
+  it('does not forward the legacy Library token to the first language session', async () => {
+    mockReturnTo = 'library';
+    render(<LanguageSetup />);
+
+    fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          subjectId: 'test-id',
+          sessionId: 'session-1',
+          topicId: 'topic-1',
+          subjectName: 'Spanish',
+        },
+      });
+    });
+  });
+
   it('disables Continue button and hides the label when pending', () => {
     mockIsPending = true;
 

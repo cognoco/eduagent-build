@@ -1115,6 +1115,36 @@ describe('CreateSubjectScreen', () => {
     });
   });
 
+  it('does not forward the legacy Library token through the first-subject ready step', async () => {
+    mockSearchParams = { returnTo: 'library' };
+    setResolveResponse({
+      status: 'direct_match',
+      resolvedName: 'Math',
+      suggestions: [],
+      displayMessage: 'Math works.',
+    });
+    createSubjectResponse = {
+      subject: makeSubject({ id: SUBJECT_IDS.math, name: 'Math' }),
+      structureType: 'narrow',
+    };
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+    await enterSubjectName('Math');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/ready',
+        params: {
+          subject: 'Math',
+          subjectId: SUBJECT_IDS.math,
+          sessionId: SESSION_IDS.first,
+          topicId: TOPIC_IDS.first,
+        },
+      });
+    });
+  });
+
   it.each([
     ['narrow', undefined],
     ['focused_book', BOOK_IDS.easter],

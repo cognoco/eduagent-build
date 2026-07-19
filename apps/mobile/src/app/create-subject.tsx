@@ -119,6 +119,8 @@ function CreateSubjectScreenAuthenticated() {
     returnTo?: string;
     chatTopic?: string;
   }>();
+  const subjectsReturnTo =
+    returnTo === SUBJECTS_RETURN_TO ? SUBJECTS_RETURN_TO : undefined;
   const colors = useThemeColors();
   const createSubject = useCreateSubject();
   const resolveSubject = useResolveSubject();
@@ -191,7 +193,7 @@ function CreateSubjectScreenAuthenticated() {
                 ...(data.session.topicId
                   ? { topicId: data.session.topicId }
                   : {}),
-                ...(returnTo ? { returnTo } : {}),
+                ...(subjectsReturnTo ? { returnTo: subjectsReturnTo } : {}),
               },
             } as Href);
             return;
@@ -204,7 +206,7 @@ function CreateSubjectScreenAuthenticated() {
               subjectName: input.subjectName,
               sessionId: data.session.id,
               topicId: data.session.topicId ?? undefined,
-              ...(returnTo ? { returnTo } : {}),
+              ...(subjectsReturnTo ? { returnTo: subjectsReturnTo } : {}),
             },
           } as Href);
           return;
@@ -233,7 +235,7 @@ function CreateSubjectScreenAuthenticated() {
               ? { topicName: input.fallbackTopicName }
               : {}),
             ...(input.rawInput ? { rawInput: input.rawInput } : {}),
-            ...(returnTo ? { returnTo } : {}),
+            ...(subjectsReturnTo ? { returnTo: subjectsReturnTo } : {}),
           },
         } as Href);
         return;
@@ -248,11 +250,11 @@ function CreateSubjectScreenAuthenticated() {
             ? { topicName: input.fallbackTopicName }
             : {}),
           ...(input.rawInput ? { rawInput: input.rawInput } : {}),
-          ...(returnTo ? { returnTo } : {}),
+          ...(subjectsReturnTo ? { returnTo: subjectsReturnTo } : {}),
         },
       } as Href);
     },
-    [apiClient, returnTo, router],
+    [apiClient, router, subjectsReturnTo],
   );
 
   // [M4] 30s timeout on resolve phase — show error + retry
@@ -397,7 +399,7 @@ function CreateSubjectScreenAuthenticated() {
                 : {}),
               step: '1',
               totalSteps: '1',
-              ...(returnTo ? { returnTo } : {}),
+              ...(subjectsReturnTo ? { returnTo: subjectsReturnTo } : {}),
             },
           } as Href);
           return;
@@ -428,6 +430,7 @@ function CreateSubjectScreenAuthenticated() {
       router,
       originalInput,
       returnTo,
+      subjectsReturnTo,
       chatTopic,
       transitionToFirstSession,
       existingSubjects,
@@ -842,7 +845,9 @@ function CreateSubjectScreenAuthenticated() {
                             mode: 'learning',
                             subjectId: subject.id,
                             subjectName: subject.name,
-                            ...(returnTo ? { returnTo } : {}),
+                            ...(subjectsReturnTo
+                              ? { returnTo: subjectsReturnTo }
+                              : {}),
                           },
                         } as Href)
                       }
