@@ -36,6 +36,7 @@ import type {
   LanguageActivityTelemetry,
   LanguageComprehensionEvaluation,
   LanguageNextPracticePointer,
+  MentorNoticeAccepted,
 } from '@eduagent/schemas';
 import {
   computeAgeBracket,
@@ -87,6 +88,14 @@ import {
 } from '../prior-learning';
 import { buildMemoryBlock, buildAccommodationBlock } from '../learner-profile';
 import { applyAppHelpSignalGuard, isAppHelpQuery } from '../app-help-map';
+import {
+  acceptMentorNotice,
+  applyMentorNoticeOutcome,
+  getLearningDayStart,
+  getProfileTimeZone,
+  resolveMentorNoticeRecheckContext,
+  validateNoticeEvidence,
+} from '../mentor-notices';
 import { generateEmbedding } from '../embeddings';
 import { retrieveRelevantMemory } from '../memory';
 import { makeEmbedderFromEnv } from '../memory/embed-fact';
@@ -2164,6 +2173,7 @@ export async function prepareExchangeContext(
     semanticMemoryRetrievalEnabled?: boolean;
     challengeRoundRuntimeEnabled?: boolean;
     challengeRoundGraderEnabled?: boolean;
+    mentorNoticeEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
     currentUserMessageEventId?: string;
   },
@@ -3150,6 +3160,10 @@ export async function prepareExchangeContext(
 
   // 6. Build ExchangeContext
   // For interleaved sessions: use the topic list, clear single-topic fields
+  const mentorNoticeRecheck = options?.mentorNoticeEnabled
+    ? await resolveMentorNoticeRecheckContext(db, profileId, session)
+    : null;
+
   const context: ExchangeContext = {
     sessionId,
     profileId,
@@ -3241,6 +3255,8 @@ export async function prepareExchangeContext(
     correctStreak,
     challengeEligible: challengeReadiness.eligible,
     challengeRuntimeEnabled: challengeRoundRuntimeEnabled,
+    mentorNoticeEnabled: options?.mentorNoticeEnabled === true,
+    mentorNoticeRecheck: mentorNoticeRecheck ?? undefined,
     graderEnabled: options?.challengeRoundGraderEnabled === true,
     challengeRound,
     currentUserMessageEventId: options?.currentUserMessageEventId,
@@ -3651,6 +3667,7 @@ export async function processMessage(
     // Call sites read `c.env.CHALLENGE_ROUND_GRADER_ENABLED` and pass the
     // result of `isChallengeRoundGraderEnabled(value)` here.
     challengeRoundGraderEnabled?: boolean;
+    mentorNoticeEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
     judgeFrameworkEnabled?: boolean;
     judgeEnforcementEnabled?: boolean;
@@ -3687,6 +3704,7 @@ export async function processMessage(
   challengeRound?: ChallengeRoundSessionState;
   challengeOffer?: { pitch: string };
   draftedNote?: DraftedChallengeNote;
+  mentorNotice?: MentorNoticeAccepted;
 }> {
   // [WI-2372] Consent-withdrawal gate — first op, before any dispatch.
   await assertExchangeConsent(db, profileId);
@@ -3696,7 +3714,8 @@ export async function processMessage(
   await checkExchangeLimit(db, profileId, sessionId);
 
   const currentUserMessageEventId =
-    options?.challengeRoundRuntimeEnabled === true
+    options?.challengeRoundRuntimeEnabled === true ||
+    options?.mentorNoticeEnabled === true
       ? generateUUIDv7()
       : undefined;
   const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
@@ -3879,6 +3898,61 @@ export async function processMessage(
     );
   }
 
+  let mentorNotice: MentorNoticeAccepted | undefined;
+  if (
+    options?.mentorNoticeEnabled === true &&
+    context.sessionType === 'homework' &&
+    persisted.persistedUserMessage &&
+    result.noticedGap
+  ) {
+    const evidence = await validateNoticeEvidence(
+      db,
+      profileId,
+      sessionId,
+      result.noticedGap,
+    );
+    if (evidence) {
+      mentorNotice =
+        (await acceptMentorNotice(db, {
+          profileId,
+          subjectId: session.subjectId,
+          topicId: session.topicId,
+          sourceSessionId: session.id,
+          concept: evidence.concept,
+          correctionHint: evidence.correctionHint,
+        })) ?? undefined;
+    }
+  }
+
+  if (
+    options?.mentorNoticeEnabled === true &&
+    context.mentorNoticeRecheck &&
+    persisted.persistedUserMessage
+  ) {
+    const proposed = result.noticeRecheck;
+    const valid =
+      proposed?.noticeId === context.mentorNoticeRecheck.id
+        ? await validateNoticeEvidence(db, profileId, sessionId, proposed)
+        : null;
+    if (valid) {
+      const now = new Date();
+      const timezone = await getProfileTimeZone(db, profileId);
+      await applyMentorNoticeOutcome(db, {
+        profileId,
+        noticeId: context.mentorNoticeRecheck.id,
+        outcome: valid.verdict,
+        occurredAt: now,
+        learningDayStart: getLearningDayStart(now, timezone),
+      });
+    } else if (context.mentorNoticeRecheck.exchangeNumber >= 3) {
+      await applyMentorNoticeOutcome(db, {
+        profileId,
+        noticeId: context.mentorNoticeRecheck.id,
+        outcome: 'not_yet',
+      });
+    }
+  }
+
   if (persisted.persistedUserMessage) {
     await maybeDispatchTopicProbeExtraction(
       db,
@@ -3954,6 +4028,7 @@ export async function processMessage(
     challengeRound: challengeRoundRuntime.challengeRound,
     challengeOffer: challengeRoundRuntime.challengeOffer,
     draftedNote: challengeRoundRuntime.draftedNote,
+    mentorNotice,
   };
 }
 
@@ -3979,6 +4054,7 @@ export async function streamMessage(
     challengeRoundRuntimeEnabled?: boolean;
     // T8: true when CHALLENGE_ROUND_GRADER_ENABLED env binding is 'true'.
     challengeRoundGraderEnabled?: boolean;
+    mentorNoticeEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
     judgeFrameworkEnabled?: boolean;
     judgeEnforcementEnabled?: boolean;
@@ -4017,6 +4093,7 @@ export async function streamMessage(
     challengeRound?: ChallengeRoundSessionState;
     challengeOffer?: { pitch: string };
     draftedNote?: DraftedChallengeNote;
+    mentorNotice?: MentorNoticeAccepted;
   }>;
 }> {
   // [WI-2372] Consent-withdrawal gate — first op, before any dispatch.
@@ -4027,7 +4104,8 @@ export async function streamMessage(
   await checkExchangeLimit(db, profileId, sessionId);
 
   const currentUserMessageEventId =
-    options?.challengeRoundRuntimeEnabled === true
+    options?.challengeRoundRuntimeEnabled === true ||
+    options?.mentorNoticeEnabled === true
       ? generateUUIDv7()
       : undefined;
   const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
@@ -4417,6 +4495,61 @@ export async function streamMessage(
         });
       }
 
+      let mentorNotice: MentorNoticeAccepted | undefined;
+      if (
+        options?.mentorNoticeEnabled === true &&
+        context.sessionType === 'homework' &&
+        persisted.persistedUserMessage &&
+        parsed.noticedGap
+      ) {
+        const evidence = await validateNoticeEvidence(
+          db,
+          profileId,
+          sessionId,
+          parsed.noticedGap,
+        );
+        if (evidence) {
+          mentorNotice =
+            (await acceptMentorNotice(db, {
+              profileId,
+              subjectId: session.subjectId,
+              topicId: session.topicId,
+              sourceSessionId: session.id,
+              concept: evidence.concept,
+              correctionHint: evidence.correctionHint,
+            })) ?? undefined;
+        }
+      }
+
+      if (
+        options?.mentorNoticeEnabled === true &&
+        context.mentorNoticeRecheck &&
+        persisted.persistedUserMessage
+      ) {
+        const proposed = parsed.noticeRecheck;
+        const valid =
+          proposed?.noticeId === context.mentorNoticeRecheck.id
+            ? await validateNoticeEvidence(db, profileId, sessionId, proposed)
+            : null;
+        if (valid) {
+          const now = new Date();
+          const timezone = await getProfileTimeZone(db, profileId);
+          await applyMentorNoticeOutcome(db, {
+            profileId,
+            noticeId: context.mentorNoticeRecheck.id,
+            outcome: valid.verdict,
+            occurredAt: now,
+            learningDayStart: getLearningDayStart(now, timezone),
+          });
+        } else if (context.mentorNoticeRecheck.exchangeNumber >= 3) {
+          await applyMentorNoticeOutcome(db, {
+            profileId,
+            noticeId: context.mentorNoticeRecheck.id,
+            outcome: 'not_yet',
+          });
+        }
+      }
+
       // [#419] Apply the server-side hard cap for interview / onboarding flows,
       // mirroring the non-streaming processMessage path. Without this, a
       // streaming interview session could run all the way to
@@ -4442,6 +4575,7 @@ export async function streamMessage(
         challengeRound: challengeRoundRuntime.challengeRound,
         challengeOffer: challengeRoundRuntime.challengeOffer,
         draftedNote: challengeRoundRuntime.draftedNote,
+        mentorNotice,
       };
     },
   };

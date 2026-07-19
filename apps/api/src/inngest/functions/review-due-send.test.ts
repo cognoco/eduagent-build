@@ -18,12 +18,18 @@ jest.mock('../helpers', () => {
 
 jest.mock(
   '../../services/notifications' /* gc1-allow: isolates push notification external boundary */,
-  () => ({
-    sendPushNotification: (...args: unknown[]) =>
-      mockSendPushNotification(...args),
-    formatReviewReminderBody: (...args: unknown[]) =>
-      mockFormatReviewReminderBody(...args),
-  }),
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendPushNotification: (...args: unknown[]) =>
+        mockSendPushNotification(...args),
+      formatReviewReminderBody: (...args: unknown[]) =>
+        mockFormatReviewReminderBody(...args),
+    };
+  },
 );
 
 // [BUG-839] review-due-send was migrated from getRecentNotificationCount →
@@ -288,7 +294,7 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
       {
         hours: 24,
         maxCount: 1,
-        dedupTypes: ['recall_nudge', 'review_reminder'],
+        dedupTypes: ['review_reminder', 'recall_nudge', 'notice_recheck'],
       },
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();

@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useAuth } from '@clerk/expo';
 import type {
   ChallengeRoundSessionState,
+  MentorNoticeAccepted,
   SessionMessageInput,
 } from '@eduagent/schemas';
 import {
@@ -33,6 +34,7 @@ type StreamMessageDoneResult = {
   challengeRound?: ChallengeRoundSessionState;
   challengeOffer?: ChallengeRoundOfferEvent;
   draftedNote?: DraftedChallengeNoteEvent;
+  mentorNotice?: MentorNoticeAccepted;
   confidence?: 'low' | 'medium' | 'high';
   fallback?: {
     reason: StreamFallbackReason;
@@ -215,6 +217,7 @@ export function useStreamMessage(sessionId: string): {
                     challengeRound: event.challengeRound,
                     challengeOffer: event.challengeOffer,
                     draftedNote: event.draftedNote,
+                    mentorNotice: event.mentorNotice,
                     confidence: event.confidence,
                     fallback,
                   });

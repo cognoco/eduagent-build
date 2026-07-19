@@ -61,6 +61,7 @@ import { curriculumRoutes } from './routes/curriculum';
 import { bookRoutes } from './routes/books';
 import { noteRoutes } from './routes/notes';
 import { sessionRoutes } from './routes/sessions';
+import { mentorNoticeRoutes } from './routes/mentor-notices';
 import { bookmarkRoutes } from './routes/bookmarks';
 import { parkingLotRoutes } from './routes/parking-lot';
 import { homeworkRoutes } from './routes/homework';
@@ -188,6 +189,7 @@ type Bindings = {
   ALLOW_MISSING_IDEMPOTENCY_KV?: string;
   ADULT_OWNER_GATE_ENABLED?: string;
   CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
+  MENTOR_NOTICE_ENABLED?: string;
   CHALLENGE_ROUND_COHORT_PROFILE_IDS?: string;
   CHALLENGE_ROUND_GRADER_ENABLED?: string;
   JUDGE_FRAMEWORK_ENABLED?: string;
@@ -375,6 +377,7 @@ const routes = api
   .route('/', bookRoutes)
   .route('/', noteRoutes)
   .route('/', sessionRoutes)
+  .route('/', mentorNoticeRoutes)
   .route('/', bookmarkRoutes)
   .route('/', parkingLotRoutes)
   .route('/', homeworkRoutes)

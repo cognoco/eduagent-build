@@ -330,6 +330,22 @@ export type ChallengeRoundGraderDegradedEvent = z.infer<
   typeof challengeRoundGraderDegradedEventSchema
 >;
 
+export const noticedGapSignalSchema = z.object({
+  concept: z.string().min(1).max(200),
+  correctionHint: z.string().min(1).max(500).optional(),
+  answerEventId: z.string().uuid(),
+  learnerQuote: z.string().min(1).max(500),
+});
+export type NoticedGapSignal = z.infer<typeof noticedGapSignalSchema>;
+
+export const noticeRecheckSignalSchema = z.object({
+  noticeId: z.string().uuid(),
+  verdict: z.enum(['locked_in', 'not_yet', 'dismissed', 'deferred']),
+  answerEventId: z.string().uuid(),
+  learnerQuote: z.string().min(1).max(500),
+});
+export type NoticeRecheckSignal = z.infer<typeof noticeRecheckSignalSchema>;
+
 const signalsSchema = z.preprocess(
   optionalObjectInput,
   z
@@ -375,6 +391,10 @@ const signalsSchema = z.preprocess(
         .array(challengeRoundEvaluationItemSchema)
         .max(10)
         .optional(),
+      /** Homework felt moment: proposed learner-safe notice, accepted only after DB-backed evidence checks. */
+      noticed_gap: noticedGapSignalSchema.optional(),
+      /** Mentor notice re-check verdict, accepted only after DB-backed evidence checks. */
+      notice_recheck: noticeRecheckSignalSchema.optional(),
     })
     .optional(),
 );
@@ -533,6 +553,10 @@ export interface NormalisedEnvelopeSignals {
   challenge_round_offer: boolean;
   /** Challenge Round: per-concept evaluations. Empty array when not in a round. */
   challenge_round_evaluation: ChallengeRoundEvaluationItem[];
+  /** Homework felt moment proposal. Null when absent. */
+  noticed_gap: NoticedGapSignal | null;
+  /** Mentor notice re-check verdict. Null when absent. */
+  notice_recheck: NoticeRecheckSignal | null;
 }
 
 export function normaliseSignals(
@@ -550,6 +574,8 @@ export function normaliseSignals(
     crisis_redirect: signals?.crisis_redirect ?? false,
     challenge_round_offer: signals?.challenge_round_offer ?? false,
     challenge_round_evaluation: signals?.challenge_round_evaluation ?? [],
+    noticed_gap: signals?.noticed_gap ?? null,
+    notice_recheck: signals?.notice_recheck ?? null,
   };
 }
 

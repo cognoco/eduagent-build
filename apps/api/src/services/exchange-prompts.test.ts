@@ -370,6 +370,42 @@ describe('buildSystemPrompt — homework brevity', () => {
   });
 });
 
+describe('buildSystemPrompt — homework mentor notices', () => {
+  const eventId = '550e8400-e29b-41d4-a716-446655440010';
+
+  it('injects the evidence-bound detection instruction only for enabled homework turns', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'homework',
+        mentorNoticeEnabled: true,
+        currentUserMessageEventId: eventId,
+      }),
+    );
+
+    expect(prompt).toContain('MENTOR NOTICE OBSERVATION');
+    expect(prompt).toContain('signals.noticed_gap');
+    expect(prompt).toContain(eventId);
+    expect(prompt).toContain("Finish the learner's homework help first");
+    expect(prompt).toContain('Do not quiz or re-check the learner now');
+    expect(prompt).toContain('Do not promise a future check-in');
+  });
+
+  it.each([
+    { mentorNoticeEnabled: false, sessionType: 'homework' as const },
+    { mentorNoticeEnabled: true, sessionType: 'learning' as const },
+  ])(
+    'omits notice instructions for $sessionType when enabled=$mentorNoticeEnabled',
+    (overrides) => {
+      const prompt = buildSystemPrompt(
+        makeContext({ ...overrides, currentUserMessageEventId: eventId }),
+      );
+
+      expect(prompt).not.toContain('MENTOR NOTICE OBSERVATION');
+      expect(prompt).not.toContain('signals.noticed_gap');
+    },
+  );
+});
+
 describe('buildSystemPrompt — no-recall recovery', () => {
   it('sets a higher bar for concrete next practice and specific feedback', () => {
     const prompt = buildSystemPrompt(makeContext());

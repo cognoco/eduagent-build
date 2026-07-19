@@ -233,6 +233,15 @@ export interface ExchangeContext {
   challengeRound?: ChallengeRoundSessionState;
   /** Server-generated id to use when evaluating the current learner answer. */
   currentUserMessageEventId?: string;
+  /** Runtime gate for evidence-bound homework mentor-notice detection. */
+  mentorNoticeEnabled?: boolean;
+  /** Active bounded mentor-notice re-check offered in this session. */
+  mentorNoticeRecheck?: {
+    id: string;
+    concept: string;
+    correctionHint: string | null;
+    exchangeNumber: number;
+  };
   /**
    * Runtime kill switch for Challenge Round prompt injection and offer
    * consumption. Sourced from the typed `CHALLENGE_ROUND_RUNTIME_ENABLED`

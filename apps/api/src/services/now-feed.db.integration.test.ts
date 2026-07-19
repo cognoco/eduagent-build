@@ -11,6 +11,8 @@ import {
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
+  mentorActivityLedger,
+  mentorNotices,
   progressSnapshots,
   retentionCards,
   sessionSummaries,
@@ -174,6 +176,143 @@ afterAll(async () => {
 });
 
 describe('now-feed derive-on-read projections — real DB (WI-1121)', () => {
+  it('surfaces an eligible open mentor notice only when the feature is enabled', async () => {
+    const fixture = await seedFixture(db, 'mentor-notice-open');
+    const sessionId = await seedSession(db, fixture);
+    const [notice] = await db
+      .insert(mentorNotices)
+      .values({
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: fixture.topicId,
+        sourceSessionId: sessionId,
+        concept: 'Changing signs across the equals sign',
+      })
+      .returning({ id: mentorNotices.id });
+    if (!notice) throw new Error('mentor notice insert failed');
+
+    const hidden = await buildNowFeed(db, fixture.profileId, 'self');
+    expect(hidden.cards.some((card) => card.kind === 'mentor_notice')).toBe(
+      false,
+    );
+
+    const visible = await buildNowFeed(db, fixture.profileId, 'self', {
+      mentorNoticeEnabled: true,
+    });
+    expect(visible.cards).toContainEqual(
+      expect.objectContaining({
+        kind: 'mentor_notice',
+        templateKey: 'now.mentor_notice.default',
+        params: expect.objectContaining({
+          noticeId: notice.id,
+          subjectId: fixture.subjectId,
+        }),
+        deepLink: {
+          route: 'notice.recheck',
+          params: { noticeId: notice.id, subjectId: fixture.subjectId },
+          chain: [],
+        },
+      }),
+    );
+  });
+
+  it('hides a mentor notice deferred during the current shifted learning day', async () => {
+    const fixture = await seedFixture(db, 'mentor-notice-deferred');
+    const sessionId = await seedSession(db, fixture);
+    await db.insert(mentorNotices).values({
+      profileId: fixture.profileId,
+      subjectId: fixture.subjectId,
+      topicId: fixture.topicId,
+      sourceSessionId: sessionId,
+      concept: 'Changing signs across the equals sign',
+      lastDeferredAt: new Date(),
+      lastRecheckOutcome: 'deferred',
+    });
+
+    const feed = await buildNowFeed(db, fixture.profileId, 'self', {
+      mentorNoticeEnabled: true,
+    });
+    expect(feed.cards.some((card) => card.kind === 'mentor_notice')).toBe(
+      false,
+    );
+  });
+
+  it('projects a recent locked-in notice without writing a learning-ledger row', async () => {
+    const fixture = await seedFixture(db, 'mentor-notice-locked');
+    const sessionId = await seedSession(db, fixture);
+    const [notice] = await db
+      .insert(mentorNotices)
+      .values({
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: fixture.topicId,
+        sourceSessionId: sessionId,
+        concept: 'Changing signs across the equals sign',
+        status: 'locked_in',
+        lastRecheckOutcome: 'locked_in',
+        resolvedAt: RECENT,
+      })
+      .returning({ id: mentorNotices.id });
+    if (!notice) throw new Error('mentor notice insert failed');
+    const ledgerBefore = await db
+      .select({ id: mentorActivityLedger.id })
+      .from(mentorActivityLedger)
+      .where(eq(mentorActivityLedger.profileId, fixture.profileId));
+
+    const feed = await buildNowFeed(db, fixture.profileId, 'self', {
+      mentorNoticeEnabled: true,
+    });
+    const card = feed.cards.find(
+      (candidate) => candidate.params.noticeId === notice.id,
+    );
+
+    expect(card).toMatchObject({
+      kind: 'ledger_moment',
+      templateKey: 'now.ledger_moment.notice_locked_in',
+      params: {
+        ledgerKind: 'notice_locked_in',
+        noticeId: notice.id,
+        subjectId: fixture.subjectId,
+      },
+      deepLink: {
+        route: 'subject.hub',
+        params: { subjectId: fixture.subjectId },
+        chain: [],
+      },
+    });
+    const ledgerAfter = await db
+      .select({ id: mentorActivityLedger.id })
+      .from(mentorActivityLedger)
+      .where(eq(mentorActivityLedger.profileId, fixture.profileId));
+    expect(ledgerAfter).toEqual(ledgerBefore);
+  });
+
+  it('does not project a locked-in notice outside the three-day window', async () => {
+    const fixture = await seedFixture(db, 'mentor-notice-locked-stale');
+    const sessionId = await seedSession(db, fixture);
+    const [notice] = await db
+      .insert(mentorNotices)
+      .values({
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: fixture.topicId,
+        sourceSessionId: sessionId,
+        concept: 'Changing signs across the equals sign',
+        status: 'locked_in',
+        lastRecheckOutcome: 'locked_in',
+        resolvedAt: STALE,
+      })
+      .returning({ id: mentorNotices.id });
+    if (!notice) throw new Error('mentor notice insert failed');
+
+    const feed = await buildNowFeed(db, fixture.profileId, 'self', {
+      mentorNoticeEnabled: true,
+    });
+    expect(
+      feed.cards.some((candidate) => candidate.params.noticeId === notice.id),
+    ).toBe(false);
+  });
+
   it('surfaces a recently mastered retention card as a topic_mastered ledger_moment', async () => {
     const fixture = await seedFixture(db, 'topic-mastered');
     await db.insert(retentionCards).values({

@@ -7,6 +7,7 @@ import {
   pendingCelebrationSchema,
 } from './progress.ts';
 import { languageSessionSummarySchema } from './language.ts';
+import { mentorNoticeAcceptedSchema } from './mentor-notices.ts';
 
 export const orphanReasonSchema = z.enum([
   'llm_stream_error',
@@ -237,6 +238,10 @@ export const sessionMetadataSchema = z
      * reflects via session-streaming. Absent = no round has been offered.
      */
     challengeRound: challengeRoundSessionStateSchema.optional(),
+    /** Open mentor-notice re-check attached to this session. */
+    recheckNoticeId: z.string().uuid().optional(),
+    /** Exchange count when a natural re-check offer was attached. */
+    recheckOfferExchangeCount: z.number().int().min(0).optional(),
   })
   .strip();
 export type SessionMetadata = z.infer<typeof sessionMetadataSchema>;
@@ -573,6 +578,7 @@ export const sessionSummarySchema = z.object({
   // WI-1553: four_strands session-end learning summary. Additive — absent on
   // legacy rows and non-language sessions, where it parses to null.
   languageLearningSummary: languageSessionSummarySchema.nullable().optional(),
+  mentorNotice: mentorNoticeAcceptedSchema.optional(),
 });
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 
