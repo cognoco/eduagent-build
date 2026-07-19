@@ -269,6 +269,16 @@ describe('[F-157] e2e-web.yml required smoke check is an honest pass-through', (
       .map((s) => (typeof s.run === 'string' ? s.run : ''))
       .join('\n');
     expect(runSmokeScript).toMatch(/test:e2e:web:smoke/);
+    expect(runSmokeScript).toMatch(/playwright-staging-gate\.cjs --decide/);
+    const classifyCommand = runSmokeScript
+      .split('\n')
+      .find((line) => line.includes('--classify'));
+    expect(classifyCommand).toBeDefined();
+    expect(classifyCommand).toContain('${PLAYWRIGHT_API_URL}');
+    const dopplerIndex = runSmokeScript.indexOf('doppler run');
+    expect(dopplerIndex).toBeGreaterThan(-1);
+    const dopplerCommand = runSmokeScript.slice(dopplerIndex);
+    expect(dopplerCommand).not.toMatch(/^\s*#.*\\\s*$/m);
 
     // ... it must be reachable — a permanently-disabled `if: false` would make
     // the advisory check a silent no-op, hollowing out the real signal.
