@@ -226,6 +226,11 @@ let mockSessionSummaryData: {
   baseXp?: number | null;
   reflectionBonusXp?: number | null;
   purgedAt?: string | null;
+  mentorNotice?: {
+    id: string;
+    concept: string;
+    correctionHint: string | null;
+  };
   // [WI-1553] four_strands session-end learning summary — additive.
   languageLearningSummary?: {
     practicedScenario: string | null;
@@ -614,6 +619,25 @@ describe('SessionSummaryScreen', () => {
     // 5 exchanges, rung 2 → "strong independent thinking"
     screen.getByText(/worked through 5 exchanges/);
     screen.getByText(/strong independent thinking/);
+  });
+
+  it('renders a persisted mentor notice receipt after reload', async () => {
+    mockSessionSummaryData = {
+      ...BASE_MOCK_SUMMARY,
+      mentorNotice: {
+        id: '550e8400-e29b-41d4-a716-446655440099',
+        concept: 'changing signs',
+        correctionHint: 'Apply the inverse operation to both sides.',
+      },
+    };
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByText('Noticed along the way');
+      screen.getByText('changing signs');
+      screen.getByText('Apply the inverse operation to both sides.');
+    });
   });
 
   // [BUG-801] When the URL passes exchangeCount='0' (legitimate value for

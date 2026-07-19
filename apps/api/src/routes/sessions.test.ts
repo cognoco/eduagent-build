@@ -618,6 +618,21 @@ jest.mock('../services/recall-bridge', () => {
   };
 });
 
+const mockGetMentorNoticeReceipt = jest.fn().mockResolvedValue(null);
+jest.mock(
+  '../services/mentor-notices' /* gc1-allow: session route unit test injects receipt lookup outcomes; mentor-notice services have direct unit and integration coverage */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/mentor-notices',
+    ) as typeof import('../services/mentor-notices');
+    return {
+      ...actual,
+      getMentorNoticeReceipt: (...args: unknown[]) =>
+        mockGetMentorNoticeReceipt(...args),
+    };
+  },
+);
+
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
@@ -656,11 +671,13 @@ import {
   requestSessionLibraryFiling,
   restoreSessionForAutoFiling,
   resetFilingForRetry,
+  getSessionSummary,
 } from '../services/session';
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, MAX_HOMEWORK_PROBLEMS } from '@eduagent/schemas';
 import { FILING_CONFIG } from '../config/filing';
+import { generateRecallBridge } from '../services/recall-bridge';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -679,8 +696,34 @@ describe('session routes', () => {
   });
 
   beforeEach(() => {
+    mockGetMentorNoticeReceipt.mockResolvedValue(null);
     clearJWKSCache();
   });
+  describe('POST /v1/sessions/:sessionId/recall-bridge mentor notice suppression', () => {
+    it('returns typed 409 before invoking the Recall Bridge generator', async () => {
+      jest.mocked(getSession).mockResolvedValueOnce({
+        sessionType: 'homework',
+      } as never);
+      mockGetMentorNoticeReceipt.mockResolvedValue({
+        id: '550e8400-e29b-41d4-a716-446655440099',
+        concept: 'Changing signs',
+        correctionHint: null,
+      });
+
+      const response = await app.request(
+        `/v1/sessions/${SESSION_ID}/recall-bridge`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        { ...TEST_ENV, MENTOR_NOTICE_ENABLED: 'true' },
+      );
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'RECALL_BRIDGE_SUPPRESSED',
+      });
+      expect(generateRecallBridge).not.toHaveBeenCalled();
+    });
+  });
+
   // -------------------------------------------------------------------------
   // GET /v1/subjects/:subjectId/sessions
   // -------------------------------------------------------------------------
@@ -1966,6 +2009,28 @@ describe('session routes', () => {
 
       const body = await res.json();
       expect(body).toHaveProperty('summary');
+      expect(getSessionSummary).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        SESSION_ID,
+        { mentorNoticeEnabled: false },
+      );
+    });
+
+    it('enables the mentor-notice receipt only when the rollout flag is on', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary`,
+        { headers: AUTH_HEADERS },
+        { ...TEST_ENV, MENTOR_NOTICE_ENABLED: 'true' },
+      );
+
+      expect(res.status).toBe(200);
+      expect(getSessionSummary).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        SESSION_ID,
+        { mentorNoticeEnabled: true },
+      );
     });
 
     it('returns 401 without auth header', async () => {

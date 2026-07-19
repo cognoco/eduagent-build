@@ -14,9 +14,12 @@ jest.mock('../services/now-feed', () => ({
 const PROFILE_ID = TEST_PROFILE_ID;
 const CHILD_ID = '00000000-0000-4000-8000-000000000101';
 
-function makeApp() {
+function makeApp(mentorNoticeEnabled = false) {
   const app = new Hono();
   app.use('*', async (c, next) => {
+    c.env = {
+      MENTOR_NOTICE_ENABLED: mentorNoticeEnabled ? 'true' : 'false',
+    } as never;
     c.set('db' as never, { marker: 'db' } as unknown as Database);
     c.set('profileId' as never, PROFILE_ID);
     await next();
@@ -60,10 +63,15 @@ describe('now routes', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(buildNowFeed).toHaveBeenCalledWith(expect.anything(), PROFILE_ID, {
-      scope: 'person',
-      personId: CHILD_ID,
-    });
+    expect(buildNowFeed).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      {
+        scope: 'person',
+        personId: CHILD_ID,
+      },
+      { mentorNoticeEnabled: false },
+    );
   });
 
   it('passes supporter-hub scope through without personId', async () => {
@@ -77,9 +85,14 @@ describe('now routes', () => {
     const res = await makeApp().request('/v1/now?scope=supporter-hub');
 
     expect(res.status).toBe(200);
-    expect(buildNowFeed).toHaveBeenCalledWith(expect.anything(), PROFILE_ID, {
-      scope: 'supporter-hub',
-    });
+    expect(buildNowFeed).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      {
+        scope: 'supporter-hub',
+      },
+      { mentorNoticeEnabled: false },
+    );
   });
 
   it('returns 400 from overflow when person scope omits personId', async () => {
@@ -126,6 +139,7 @@ describe('now routes', () => {
         scope: 'person',
         personId: CHILD_ID,
       },
+      { mentorNoticeEnabled: false },
     );
     await expect(res.json()).resolves.toMatchObject({
       scope: 'person',
@@ -137,6 +151,20 @@ describe('now routes', () => {
         },
       ],
     });
+  });
+
+  it('passes the rollout flag to the self feed collector', async () => {
+    const app = makeApp(true);
+
+    const response = await app.request('/v1/now?scope=self');
+
+    expect(response.status).toBe(200);
+    expect(buildNowFeed).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      { scope: 'self' },
+      { mentorNoticeEnabled: true },
+    );
   });
 
   it('passes supporter-hub scope through to buildNowOverflow without personId', async () => {
@@ -154,6 +182,7 @@ describe('now routes', () => {
       {
         scope: 'supporter-hub',
       },
+      { mentorNoticeEnabled: false },
     );
   });
 });

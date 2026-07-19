@@ -23,6 +23,7 @@ import {
   milestones,
   pendingNotices,
   speakingPracticeAttempts,
+  mentorNotices,
 } from './schema/index.js';
 import { createScopedRepository } from './repository.js';
 import type { Database } from './client.js';
@@ -81,6 +82,7 @@ describe('createScopedRepository', () => {
     ['notificationPreferences', notificationPreferences],
     ['learningModes', learningModes],
     ['sessionEmbeddings', sessionEmbeddings],
+    ['mentorNotices', mentorNotices],
     ['quizRounds', quizRounds],
     ['quizMissedItems', quizMissedItems],
   ] as const)('%s.findMany', (namespace, table) => {
@@ -119,6 +121,7 @@ describe('createScopedRepository', () => {
     ['notificationPreferences', notificationPreferences],
     ['learningModes', learningModes],
     ['sessionEmbeddings', sessionEmbeddings],
+    ['mentorNotices', mentorNotices],
     ['quizRounds', quizRounds],
     ['quizMissedItems', quizMissedItems],
   ] as const)('%s.findMany with extraWhere', (namespace, table) => {
@@ -159,6 +162,7 @@ describe('createScopedRepository', () => {
     ['notificationPreferences', notificationPreferences],
     ['learningModes', learningModes],
     ['sessionEmbeddings', sessionEmbeddings],
+    ['mentorNotices', mentorNotices],
     ['quizRounds', quizRounds],
     ['quizMissedItems', quizMissedItems],
   ] as const)('%s.findFirst', (namespace, table) => {

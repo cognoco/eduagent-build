@@ -921,7 +921,8 @@
       "verificationBadge": {
         "evaluate": "GŁĘBSZE MYŚLENIE ZALICZONE",
         "teachBack": "ODPYTYWANIE ZALICZONE"
-      }
+      },
+      "mentorNotice": "Zauważone po drodze: {{concept}}"
     },
     "noteInput": {
       "cancel": "Anuluj",
@@ -3221,7 +3222,9 @@
       "title": "Chcesz codzienne przypomnienie?",
       "message": "Możemy wysłać Ci delikatne przypomnienie, żebyś nie stracił/a swojej serii. Możesz je wyłączyć w Ustawieniach w dowolnym momencie.",
       "allow": "Zezwól",
-      "notNow": "Nie teraz"
+      "notNow": "Nie teraz",
+      "noticeTitle": "Delikatne przypomnienie?",
+      "noticeMessage": "Możemy Ci przypomnieć o powtórzeniu tego, co zauważył dziś Twój mentor. Możesz to wyłączyć w dowolnym momencie w Ustawieniach."
     },
     "masteredRow": {
       "title": "Opanowałeś(-łaś):"
@@ -3340,6 +3343,9 @@
         "language_focus": "Następnym razem: popracujemy nad wzorcami gramatycznymi",
         "fluency": "Następnym razem: szybki sprint z płynności"
       }
+    },
+    "mentorNotice": {
+      "title": "Zauważone po drodze"
     }
   },
   "sessionTranscript": {
@@ -4161,6 +4167,14 @@
         "currentAccess": "Twój płatny dostęp pozostaje aktywny do {{deadline}}.",
         "freeFallback": "Twoje konto korzysta teraz z darmowego dostępu. Zaktualizuj płatność, aby przywrócić swój plan.",
         "currentAccessNoDeadline": "Twój płatny dostęp jest nadal aktywny."
+      },
+      "mentor_notice": {
+        "title": "Mały pomysł wart sprawdzenia",
+        "cta": "Sprawdź teraz",
+        "notNow": "Nie teraz",
+        "arcDue": "Gotowe, kiedy zechcesz",
+        "arcAdvancing": "Otwieram szybkie sprawdzenie",
+        "arcMastered": "Utrwalone"
       }
     },
     "ledger": {
@@ -4173,6 +4187,9 @@
       },
       "quota": {
         "title": "Zapisano chwilę nauki."
+      },
+      "notice_locked_in": {
+        "title": "Utrwalono {{concept}}."
       }
     },
     "overflow": {
@@ -4381,7 +4398,8 @@
       "recap_ready": "Podsumowanie jest gotowe.",
       "snapshot_ready": "Migawka postępów jest gotowa.",
       "reflection_bonus": "Zapisano premię za refleksję.",
-      "quiz_personal_best": "Zapisano rekord osobisty."
+      "quiz_personal_best": "Zapisano rekord osobisty.",
+      "notice_locked_in": "Utrwalono {{concept}} w {{subjectName}}."
     },
     "recaps": {
       "error": "Nie udało się wczytać podsumowań.",

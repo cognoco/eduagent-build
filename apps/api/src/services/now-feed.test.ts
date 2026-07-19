@@ -72,6 +72,23 @@ describe('now feed ranking', () => {
     ]);
   });
 
+  it('ranks mentor notices after unfinished sessions and before retention work', () => {
+    const ranked = rankCandidates(
+      [
+        candidate({ id: 'retention', kind: 'retention_due' }),
+        candidate({ id: 'notice', kind: 'mentor_notice' }),
+        candidate({ id: 'session', kind: 'unfinished_session' }),
+      ],
+      now,
+    );
+
+    expect(ranked.map((item) => item.id)).toEqual([
+      'session',
+      'notice',
+      'retention',
+    ]);
+  });
+
   it('promotes aged parked items and near-expiry needs-deepening items into the P1.5 band', () => {
     const agedParked = candidate({
       id: 'parked-old',
@@ -289,6 +306,19 @@ describe('now feed route catalog', () => {
     expect(resolveDeepLink('journal', {})).toEqual({
       route: 'journal',
       params: {},
+      chain: [],
+    });
+  });
+
+  it('builds the notice re-check action route with its required identifiers', () => {
+    expect(
+      resolveDeepLink('notice.recheck', {
+        noticeId: 'notice-1',
+        subjectId: 'subject-1',
+      }),
+    ).toEqual({
+      route: 'notice.recheck',
+      params: { noticeId: 'notice-1', subjectId: 'subject-1' },
       chain: [],
     });
   });

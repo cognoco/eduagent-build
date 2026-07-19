@@ -744,6 +744,8 @@ describe('normaliseSignals', () => {
     const result = normaliseSignals(undefined);
     expect(result.challenge_round_offer).toBe(false);
     expect(result.challenge_round_evaluation).toEqual([]);
+    expect(result.noticed_gap).toBeNull();
+    expect(result.notice_recheck).toBeNull();
   });
 
   // [H2 — 2026-06-05 safety audit] crisis_redirect signal
@@ -756,6 +758,67 @@ describe('normaliseSignals', () => {
     expect(normaliseSignals({ crisis_redirect: true }).crisis_redirect).toBe(
       true,
     );
+  });
+});
+
+describe('mentor notice envelope fields', () => {
+  const answerEventId = '00000000-0000-4000-8000-000000000001';
+  const noticeId = '00000000-0000-4000-8000-000000000002';
+
+  it('accepts a grounded noticed_gap proposal', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'Those minus signs are sneaky.',
+      signals: {
+        noticed_gap: {
+          concept: 'Sign changes when moving terms',
+          correctionHint: 'Reverse the operation across the equals sign.',
+          answerEventId,
+          learnerQuote: 'I moved -3 over and kept it negative',
+        },
+      },
+    });
+
+    expect(parsed.signals?.noticed_gap?.answerEventId).toBe(answerEventId);
+  });
+
+  it('accepts an explicit null noticed_gap when no gap was observed', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'That answer is correct.',
+      signals: { noticed_gap: null },
+    });
+
+    expect(parsed.signals?.noticed_gap).toBeNull();
+    expect(normaliseSignals(parsed.signals).noticed_gap).toBeNull();
+  });
+
+  it('rejects a noticed_gap proposal without learner evidence', () => {
+    expect(
+      llmResponseEnvelopeSchema.safeParse({
+        reply: 'Keep going.',
+        signals: {
+          noticed_gap: {
+            concept: 'Sign changes',
+            answerEventId,
+          },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts deferred as a non-terminal re-check verdict', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'No problem — we can leave it there.',
+      signals: {
+        notice_recheck: {
+          noticeId,
+          verdict: 'deferred',
+          answerEventId,
+          learnerQuote: 'not now please',
+        },
+      },
+    });
+
+    expect(parsed.signals?.notice_recheck?.verdict).toBe('deferred');
   });
 });
 

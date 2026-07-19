@@ -888,7 +888,8 @@
       "verificationBadge": {
         "evaluate": "TENK-DYPERE GODKJENT",
         "teachBack": "GJENFORTALT GODKJENT"
-      }
+      },
+      "mentorNotice": "Lagt merke til underveis: {{concept}}"
     },
     "noteInput": {
       "cancel": "Avbryt",
@@ -3064,7 +3065,9 @@
       "title": "Vil du ha en daglig påminnelse?",
       "message": "Vi kan sende deg en forsiktig påminnelse så du ikke mister streaken din. Du kan slå den av når som helst i Innstillinger.",
       "allow": "Tillat",
-      "notNow": "Ikke nå"
+      "notNow": "Ikke nå",
+      "noticeTitle": "Vil du ha en liten oppfølging?",
+      "noticeMessage": "Vi kan minne deg på å se over det mentoren din la merke til i dag. Du kan slå av dette når som helst i Innstillinger."
     },
     "masteredRow": {
       "title": "Du mestret:"
@@ -3177,6 +3180,9 @@
         "language_focus": "Neste gang: vi jobber med grammatikkmønstre",
         "fluency": "Neste gang: en rask flytsprint"
       }
+    },
+    "mentorNotice": {
+      "title": "Lagt merke til underveis"
     }
   },
   "sessionTranscript": {
@@ -3995,6 +4001,14 @@
         "currentAccess": "Din betalte tilgang er aktiv frem til {{deadline}}.",
         "freeFallback": "Kontoen din bruker nå gratis tilgang. Oppdater betalingen for å gjenopprette abonnementet ditt.",
         "currentAccessNoDeadline": "Din betalte tilgang er fortsatt aktiv."
+      },
+      "mentor_notice": {
+        "title": "En liten idé verdt å sjekke ut",
+        "cta": "Sjekk det nå",
+        "notNow": "Ikke nå",
+        "arcDue": "Klar når du er det",
+        "arcAdvancing": "Åpner en rask sjekk",
+        "arcMastered": "Sikret"
       }
     },
     "ledger": {
@@ -4007,6 +4021,9 @@
       },
       "quota": {
         "title": "Et læringsøyeblikk ble lagret."
+      },
+      "notice_locked_in": {
+        "title": "Du sikret {{concept}}."
       }
     },
     "overflow": {
@@ -4213,7 +4230,8 @@
       "recap_ready": "En oppsummering er klar.",
       "snapshot_ready": "Et læringsøyeblikksbilde er klart.",
       "reflection_bonus": "Refleksjonsbonus lagret.",
-      "quiz_personal_best": "Personlig rekord lagret."
+      "quiz_personal_best": "Personlig rekord lagret.",
+      "notice_locked_in": "Sikret {{concept}} i {{subjectName}}."
     },
     "recaps": {
       "error": "Kunne ikke laste inn sammendragene dine.",

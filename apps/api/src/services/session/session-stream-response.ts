@@ -42,6 +42,7 @@ interface DoneFrameSource {
   challengeRound?: unknown;
   challengeOffer?: { pitch: string };
   draftedNote?: unknown;
+  mentorNotice?: unknown;
 }
 
 type SessionMessageInput = Parameters<typeof processMessage>[3];
@@ -110,6 +111,7 @@ export function buildDoneFramePayload(source: DoneFrameSource) {
     challengeRound: source.challengeRound,
     challengeOffer: source.challengeOffer,
     draftedNote: source.draftedNote,
+    mentorNotice: source.mentorNotice,
   });
 }
 
@@ -166,6 +168,7 @@ function buildProcessOptions(
     memoryFactsReadEnabled: options.memoryFactsReadEnabled,
     memoryFactsRelevanceEnabled: options.memoryFactsRelevanceEnabled,
     challengeRoundRuntimeEnabled: options.challengeRoundRuntimeEnabled,
+    mentorNoticeEnabled: options.mentorNoticeEnabled,
     reviewCallbackOpenerEnabled: options.reviewCallbackOpenerEnabled,
     judgeFrameworkEnabled: options.judgeFrameworkEnabled,
     judgeEnforcementEnabled: options.judgeEnforcementEnabled,

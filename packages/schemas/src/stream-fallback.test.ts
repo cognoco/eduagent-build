@@ -175,6 +175,11 @@ describe('streamDoneFrameSchema', () => {
         sourceAnswerEventIds: ['e1', 'e2'],
         fallbackPrompt: 'Write what you learned.',
       },
+      mentorNotice: {
+        id: '00000000-0000-4000-8000-000000000009',
+        concept: 'Sign changes when moving terms',
+        correctionHint: 'Reverse the operation across the equals sign.',
+      },
     });
     expect(result.fluencyDrill?.score).toEqual({ correct: 4, total: 5 });
     expect(result.languageLearning?.gradedInput?.text).toBe(
@@ -183,6 +188,7 @@ describe('streamDoneFrameSchema', () => {
     expect(result.challengeRound?.state).toBe('active');
     expect(result.challengeOffer?.pitch).toBe('Want a quick challenge?');
     expect(result.draftedNote?.body).toBe('A drafted note');
+    expect(result.mentorNotice?.concept).toBe('Sign changes when moving terms');
     // expectedResponseMinutes 0 ("no estimate") must be accepted — the builder
     // always emits a number, defaulting to 0.
     expect(result.expectedResponseMinutes).toBe(0);

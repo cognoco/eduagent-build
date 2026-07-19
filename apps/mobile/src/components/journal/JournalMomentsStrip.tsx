@@ -72,6 +72,8 @@ function renderLedgerMomentText(card: NowCard, t: TFunction): string {
       return t('journal.moments.recap_ready', card.params);
     case 'journal.moments.snapshot_ready':
       return t('journal.moments.snapshot_ready', card.params);
+    case 'journal.moments.notice_locked_in':
+      return t('journal.moments.notice_locked_in', card.params);
     case 'journal.moments.milestone_reached':
       return renderMilestoneMomentText(card, t);
     case 'journal.moments.reflection_bonus':
