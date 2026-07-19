@@ -831,7 +831,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(plan).toEqual([
       {
         flow: 'flows/v2/v2-homework-manual-entry.yaml',
-        scenario: 'onboarding-complete',
+        scenario: 'trial-active',
         shard: 1,
       },
       {
@@ -900,7 +900,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
     expect(manifest.v2).toContainEqual({
       flow: 'flows/v2/v2-homework-manual-entry.yaml',
-      scenario: 'onboarding-complete',
+      scenario: 'trial-active',
     });
   });
 

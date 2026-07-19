@@ -41,7 +41,7 @@
   "v2": [
     {
       "flow": "flows/v2/v2-homework-manual-entry.yaml",
-      "scenario": "onboarding-complete"
+      "scenario": "trial-active"
     },
     {
       "flow": "flows/v2/v2-shell-navigation.yaml",

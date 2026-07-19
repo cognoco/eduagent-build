@@ -1,10 +1,11 @@
 # WI-2236: V2 Mentor manual-entry homework round trip
 #
-# Case: onboarding-complete learner opens homework from Mentor, cancels one
-# manual draft, then enters exactly one visible equation, chooses Help me
-# solve, receives the first homework response, ends the session, and returns
-# to usable Mentor. Every assertion below is mandatory. Camera, gallery, OCR,
-# permissions, shutter, and image persistence remain in WI-2341 device QA.
+# Case: trial-active learner with guaranteed metering allowance opens homework
+# from Mentor, cancels one manual draft, then enters exactly one visible
+# equation, chooses Help me solve, receives the first homework response, ends
+# the session, and returns to usable Mentor. Every assertion below is
+# mandatory. Camera, gallery, OCR, permissions, shutter, and image persistence
+# remain in WI-2341 device QA.
 appId: com.mentomate.app
 tags:
   - v2
@@ -13,7 +14,7 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: 'onboarding-complete'
+      SEED_SCENARIO: 'trial-active'
       API_URL: ${API_URL}
 
 - extendedWaitUntil:
