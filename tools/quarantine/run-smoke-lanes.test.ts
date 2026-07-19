@@ -85,7 +85,7 @@ describe('[WI-2452] validate', () => {
   });
 
   it('flags a missing owner', () => {
-    const { owner, ...rest } = validEntry;
+    const { owner: _owner, ...rest } = validEntry;
     const problems = validate([rest]);
     expect(problems.some((p) => p.includes('missing "owner"'))).toBe(true);
   });
@@ -96,7 +96,7 @@ describe('[WI-2452] validate', () => {
   });
 
   it('flags a missing reason', () => {
-    const { reason, ...rest } = validEntry;
+    const { reason: _reason, ...rest } = validEntry;
     const problems = validate([rest]);
     expect(problems.some((p) => p.includes('missing "reason"'))).toBe(true);
   });
