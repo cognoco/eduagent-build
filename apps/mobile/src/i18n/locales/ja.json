@@ -3046,6 +3046,7 @@
       "yourShare": "あなたの割り当て",
       "yourUsage": "あなたの使用状況",
       "questionsUsed": "{{count}}件の質問",
+      "formerMembers": "以前のメンバー",
       "familyAggregate": "家族の合計",
       "quotaResets": "割り当ては{{date}}にリセットされます",
       "renews": "サブスクリプションは{{date}}に更新されます",
