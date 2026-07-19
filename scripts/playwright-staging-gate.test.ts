@@ -22,6 +22,17 @@ const TARGET_TRANSPORT_RESULT =
   'Error: apiRequestContext.get: ECONNRESET at https://api-stg.example.test/v1/profiles';
 const OFF_TARGET_TRANSPORT_RESULT =
   'Error: apiRequestContext.get: ECONNRESET at https://third-party.example/v1/profiles';
+const TARGET_CALL_LOG_RESULT = [
+  'Error: apiRequestContext.get: connect ECONNREFUSED 192.0.2.1:443',
+  'Call log:',
+  '\u001b[2m  - → GET https://api-stg.example.test/v1/profiles\u001b[22m',
+  '\u001b[2m    - accept: */*\u001b[22m',
+].join('\n');
+const OFF_TARGET_CALL_LOG_RESULT = [
+  'Error: apiRequestContext.get: connect ECONNREFUSED 192.0.2.1:443',
+  'Call log:',
+  '  - → GET https://third-party.example/v1/profiles',
+].join('\n');
 const classifyFailure = (
   options: Omit<Parameters<typeof classifyFailureForTarget>[0], 'apiUrl'>,
 ) => classifyFailureForTarget({ ...options, apiUrl: TEST_API_URL });
@@ -218,6 +229,80 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
           resultText: TARGET_TRANSPORT_RESULT,
         }),
       ).toEqual({ kind: 'infra-signalled' });
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: TARGET_CALL_LOG_RESULT,
+        }),
+      ).toEqual({ kind: 'infra-signalled' });
+      for (const resultText of [
+        'Error: apiRequestContext.get: connect ECONNREFUSED 192.0.2.1:443',
+        [
+          'Error: apiRequestContext.get: connect ECONNREFUSED 192.0.2.1:443',
+          'reporter output from another test',
+          'Call log:',
+          '  - → GET https://api-stg.example.test/v1/profiles',
+        ].join('\n'),
+        OFF_TARGET_CALL_LOG_RESULT,
+        `${TARGET_CALL_LOG_RESULT}\n${OFF_TARGET_CALL_LOG_RESULT}`,
+        `${TARGET_CALL_LOG_RESULT}\n${TARGET_CALL_LOG_RESULT.replace('/v1/profiles', '/v1/other')}`,
+        [
+          'Call log:',
+          '  - → GET https://api-stg.example.test/v1/profiles',
+        ].join('\n'),
+        [
+          'Error: apiRequestContext.get: connect ECONNREFUSED 192.0.2.1:443',
+          'Call log:',
+          '  - → GET https://api-stg.example.test/v1/profiles',
+          '  - → GET https://api-stg.example.test/v1/profiles',
+        ].join('\n'),
+        [
+          'Error: apiRequestContext.get: connect ECONNREFUSED 192.0.2.1:443',
+          'Call log:',
+          '  - → GET https://api-stg.example.test/v1/profiles',
+          '  - → GET http://third-party.example/v1/profiles',
+        ].join('\n'),
+        [
+          TARGET_CALL_LOG_RESULT,
+          '',
+          'apiRequestContext.get: connect ETIMEDOUT 192.0.2.2:443',
+          'Call log:',
+          '  - → GET https://third-party.example/v1/profiles',
+        ].join('\n'),
+      ]) {
+        expect(
+          classifyFailure({ artifactRoot: root, exitCode: 1, resultText }),
+        ).toEqual({ kind: 'unknown' });
+      }
+      const productAlongsideCallLog = classifyFailure({
+        artifactRoot: root,
+        exitCode: 1,
+        resultText: `${TARGET_CALL_LOG_RESULT}\nTypeError: invalid response shape`,
+      });
+      expect(productAlongsideCallLog).toEqual({ kind: 'product' });
+      expect(
+        decide({
+          preflight: GATE_STATES.HEALTHY,
+          postflight: GATE_STATES.UNAVAILABLE,
+          classification: productAlongsideCallLog.kind,
+          exitCode: 1,
+        }),
+      ).toBe(1);
+      const timeoutAlongsideCallLog = classifyFailure({
+        artifactRoot: root,
+        exitCode: 1,
+        resultText: `${TARGET_CALL_LOG_RESULT}\nTest timeout of 25000ms exceeded.`,
+      });
+      expect(timeoutAlongsideCallLog).toEqual({ kind: 'product' });
+      expect(
+        decide({
+          preflight: GATE_STATES.HEALTHY,
+          postflight: GATE_STATES.UNAVAILABLE,
+          classification: timeoutAlongsideCallLog.kind,
+          exitCode: 1,
+        }),
+      ).toBe(1);
       expect(
         classifyFailure({
           artifactRoot: root,

@@ -19,14 +19,21 @@ const RETRYABLE = new Set([502, 503, 504]);
 const TRANSPORT =
   /(?:timed?out|timeout|network|fetch failed|socket hang up|econnrefused|econnreset|err_connection_reset|connection refused|connection reset)/i;
 const RESULT_TRANSPORT =
-  /^\s*Error:\s*(?:apiRequestContext|request)\.[A-Za-z]+:\s*(?:fetch failed|socket hang up|econnrefused|econnreset|err_connection_reset|connection refused|connection reset|net::err_[a-z_]+)\s+at\s+(https:\/\/\S+\/v1\/\S*)\s*$/i;
+  /^\s*(?:Error:\s*)?(?:apiRequestContext|request)\.[A-Za-z]+:\s*(?:fetch failed|socket hang up|econnrefused|econnreset|err_connection_reset|connection refused|connection reset|net::err_[a-z_]+)\s+at\s+(https:\/\/\S+\/v1\/\S*)\s*$/i;
+const RESULT_TRANSPORT_HEADER =
+  /^\s*(?:Error:\s*)?(?:apiRequestContext|request)\.[A-Za-z]+:\s*(?:(?:(?:connect|read)\s+)?econn(?:refused|reset)(?:\s+[0-9a-f.:[\]-]+)?|fetch failed|socket hang up|err_connection_reset|connection refused|connection reset|net::err_[a-z_]+)\s*$/i;
+const RESULT_REQUEST_HEADER =
+  /^\s*(?:Error:\s*)?(?:apiRequestContext|request)\.[A-Za-z]+:/i;
+const CALL_LOG_LABEL = /^\s*Call log:\s*$/;
+const CALL_LOG_REQUEST = /^\s*-\s*→\s+[A-Z]+\s+(https:\/\/\S+)\s*$/;
+const CALL_LOG_ARROW = /^\s*-\s*→\s+\S+/;
 // Match standard JavaScript error-class lines (Error:, TypeError:,
 // ConfigError:) while excluding identifier labels such as handleError:.
 const ERROR_LINE =
   /(?:^|[\s\]])(?:[Ee]rror|[A-Z][A-Za-z0-9]*Error)(?:\s+\[[^\]]+\])?:/;
 const ANSI_ESCAPE = /\x1b\[[0-?]*[ -/]*[@-~]/g;
 const HARD_FAILURE =
-  /(?:assert(?:ion)?|expect\(|unknown error|no tests? found|test discovery (?:error|failed)|(?:config(?:uration)?) (?:validation )?(?:error|failed|failure|invalid)|invalid (?:test )?config(?:uration)?|config(?:uration)?error|(?:failed|unable) to (?:load|resolve) (?:the )?config|test run cancel(?:led|ed)|interrupted|malformed)/i;
+  /(?:assert(?:ion)?|expect\(|unknown error|no tests? found|test discovery (?:error|failed)|test timeout of \d+(?:ms|s) exceeded|(?:config(?:uration)?) (?:validation )?(?:error|failed|failure|invalid)|invalid (?:test )?config(?:uration)?|config(?:uration)?error|(?:failed|unable) to (?:load|resolve) (?:the )?config|test run cancel(?:led|ed)|interrupted|malformed)/i;
 const MAX_TRACE_MEMBER_BYTES = 32 * 1024 * 1024;
 const MAX_TRACE_TOTAL_BYTES = 64 * 1024 * 1024;
 const MAX_TRACE_MEMBERS = 64;
@@ -319,23 +326,61 @@ function hasApiNetworkSignal(root, apiOrigin, expectedRoute) {
   return networkSignal;
 }
 
-function hasNonTransportError(resultText) {
-  return resultText.split('\n').some((line) => {
-    const normalized = line.replace(ANSI_ESCAPE, '');
-    return ERROR_LINE.test(normalized) && !RESULT_TRANSPORT.test(normalized);
-  });
-}
-
-function resultTransportRoute(resultText, apiOrigin) {
+function resultSignals(resultText, apiOrigin) {
+  const lines = resultText
+    .split('\n')
+    .map((line) => line.replace(ANSI_ESCAPE, ''));
   const routes = [];
-  for (const line of resultText.split('\n')) {
-    const match = RESULT_TRANSPORT.exec(line.replace(ANSI_ESCAPE, ''));
-    if (!match) continue;
-    const route = targetApiRoute(match[1], apiOrigin);
-    if (!route) return null;
-    routes.push(route);
+  const transportLines = new Set();
+  let invalidTransport = false;
+  for (let index = 0; index < lines.length; index += 1) {
+    const inline = RESULT_TRANSPORT.exec(lines[index]);
+    if (inline) {
+      transportLines.add(index);
+      const route = targetApiRoute(inline[1], apiOrigin);
+      if (route) routes.push(route);
+      else invalidTransport = true;
+      continue;
+    }
+
+    if (!RESULT_TRANSPORT_HEADER.test(lines[index])) {
+      if (RESULT_REQUEST_HEADER.test(lines[index])) {
+        transportLines.add(index);
+        invalidTransport = true;
+      }
+      continue;
+    }
+    transportLines.add(index);
+    if (!CALL_LOG_LABEL.test(lines[index + 1] ?? '')) {
+      invalidTransport = true;
+      continue;
+    }
+
+    const firstRequest = CALL_LOG_REQUEST.exec(lines[index + 2] ?? '');
+    let requestCount = 0;
+    for (let logIndex = index + 2; logIndex < lines.length; logIndex += 1) {
+      if (!lines[logIndex].trim()) break;
+      if (CALL_LOG_ARROW.test(lines[logIndex])) requestCount += 1;
+    }
+    if (!firstRequest || requestCount !== 1) {
+      invalidTransport = true;
+      continue;
+    }
+    const route = targetApiRoute(firstRequest[1], apiOrigin);
+    if (route) routes.push(route);
+    else invalidTransport = true;
   }
-  return new Set(routes).size === 1 ? routes[0] : null;
+  const hasNonTransportError = lines.some(
+    (line, index) => ERROR_LINE.test(line) && !transportLines.has(index),
+  );
+  const uniqueRoutes = new Set(routes);
+  return {
+    hasNonTransportError,
+    route:
+      !invalidTransport && uniqueRoutes.size === 1
+        ? uniqueRoutes.values().next().value
+        : null,
+  };
 }
 
 /**
@@ -345,15 +390,16 @@ function resultTransportRoute(resultText, apiOrigin) {
 function classifyFailure({ artifactRoot, apiUrl, exitCode, resultText = '' }) {
   if (exitCode === 0) return { kind: 'success' };
   if (exitCode === 130 || exitCode === 143) return { kind: 'cancellation' };
-  if (HARD_FAILURE.test(resultText) || hasNonTransportError(resultText))
-    return { kind: 'product' };
+  if (HARD_FAILURE.test(resultText)) return { kind: 'product' };
   let apiOrigin;
   try {
     apiOrigin = validatedApiUrl(apiUrl).origin;
   } catch {
     return { kind: 'unknown' };
   }
-  const expectedRoute = resultTransportRoute(resultText, apiOrigin);
+  const signals = resultSignals(resultText, apiOrigin);
+  if (signals.hasNonTransportError) return { kind: 'product' };
+  const expectedRoute = signals.route;
   if (!expectedRoute) return { kind: 'unknown' };
   const networkSignal = hasApiNetworkSignal(
     artifactRoot,
