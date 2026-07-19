@@ -10,7 +10,7 @@ const mockRouter = {
   canGoBack: jest.fn(() => false),
 };
 let mockReturnTo: string | undefined;
-const originalModeNavV2Enabled = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+let modeNavV2Flag: jest.ReplaceProperty<boolean>;
 
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
@@ -42,13 +42,15 @@ describe('AccountScreen', () => {
     jest.clearAllMocks();
     mockRouter.canGoBack.mockReturnValue(false);
     mockReturnTo = undefined;
-    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-      true;
+    modeNavV2Flag = jest.replaceProperty(
+      FEATURE_FLAGS,
+      'MODE_NAV_V2_ENABLED',
+      true,
+    );
   });
 
-  afterAll(() => {
-    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-      originalModeNavV2Enabled;
+  afterEach(() => {
+    modeNavV2Flag.restore();
   });
 
   it('mounts the account admin sheet', () => {
@@ -77,8 +79,7 @@ describe('AccountScreen', () => {
   );
 
   it('preserves the legacy Home fallback when V2 is disabled', () => {
-    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-      false;
+    modeNavV2Flag.replaceValue(false);
     mockReturnTo = 'journal';
     render(<AccountScreen />);
 
@@ -87,14 +88,21 @@ describe('AccountScreen', () => {
     expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/home');
   });
 
-  it('names the exact V2 tab destination in the Account return control', () => {
-    mockReturnTo = 'journal';
-    render(<AccountScreen />);
+  it.each([
+    ['mentor', 'Back to Mentor'],
+    ['subjects', 'Back to Subjects'],
+    ['journal', 'Back to Journal'],
+  ] as const)(
+    'names the exact %s destination in the Account return control',
+    (returnTo, label) => {
+      mockReturnTo = returnTo;
+      render(<AccountScreen />);
 
-    expect(screen.getByTestId('account-back').props.accessibilityLabel).toBe(
-      'Back to Journal',
-    );
-  });
+      expect(screen.getByTestId('account-back').props.accessibilityLabel).toBe(
+        label,
+      );
+    },
+  );
 
   it('uses native back when the router can go back', () => {
     mockRouter.canGoBack.mockReturnValue(true);

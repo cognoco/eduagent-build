@@ -9,8 +9,15 @@ import {
   accountReturnHref,
   accountReturnToken,
   goBackOrReplace,
+  type V2AccountReturnToken,
 } from '../../../lib/navigation';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
+
+const V2_ACCOUNT_RETURN_TAB_KEYS = {
+  mentor: 'tabs.mentor',
+  subjects: 'tabs.subjects',
+  journal: 'tabs.journal',
+} as const satisfies Record<V2AccountReturnToken, string>;
 
 export default function AccountScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
@@ -24,7 +31,7 @@ export default function AccountScreen(): React.ReactElement {
     FEATURE_FLAGS.MODE_NAV_V2_ENABLED,
   );
   const returnToken = accountReturnToken(returnTo);
-  const returnTabTitle = t(`tabs.${returnToken}`);
+  const returnTabTitle = t(V2_ACCOUNT_RETURN_TAB_KEYS[returnToken]);
   const returnLabel = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
     ? t('accountAdmin.backTo', { destination: returnTabTitle })
     : t('common.goBack');
