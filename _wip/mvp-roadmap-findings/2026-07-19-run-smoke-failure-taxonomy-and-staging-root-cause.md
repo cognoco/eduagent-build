@@ -272,7 +272,14 @@ run above (`29688502157`, 13:21:22.4–13:21:28.9 UTC):
   application failure — but that scenario would still be a Worker
   invocation (the Worker started running), and Cloudflare's independent,
   SDK-external invocation log shows none occurred. The two sources cover
-  each other's blind spot.
+  each other's blind spot. `workersInvocationsAdaptive` is a sampled
+  dataset by name, which could otherwise raise a "real zero or
+  sampled-out zero?" objection — but the same query returns all 22
+  individual invocations at `13:21:18Z`, one second before the gap opens,
+  at full per-invocation granularity; a dataset sampling below 1.0 at this
+  request volume would not resolve distinct invocations that precisely, so
+  the effective sampling rate here is ~1.0 and the zero-count gap is a real
+  absence, not a sampling artifact.
 
 A Worker cold start, a Neon connection-pool exhaustion, a Neon cold-resume
 (the PM ruling's named candidate — Neon's serverless compute can take
