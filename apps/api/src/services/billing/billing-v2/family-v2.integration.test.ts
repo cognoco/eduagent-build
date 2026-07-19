@@ -596,66 +596,127 @@ describe('family-v2 billing service (integration)', () => {
     ).resolves.toMatchObject({ tier: 'family', monthlyLimit: 1500 });
   });
 
-  it.each([
-    {
-      caseName: 'non-leap February end',
-      resetAt: new Date('2026-03-31T12:34:56.000Z'),
-      expectedStart: '2026-02-28T12:34:56.000Z',
-      includedAt: new Date('2026-02-28T12:34:56.000Z'),
-      excludedAt: new Date('2026-02-28T12:34:55.999Z'),
-    },
-    {
-      caseName: 'leap-year February end',
-      resetAt: new Date('2024-03-31T12:34:56.000Z'),
-      expectedStart: '2024-02-29T12:34:56.000Z',
-      includedAt: new Date('2024-02-29T12:34:56.000Z'),
-      excludedAt: new Date('2024-02-29T12:34:55.999Z'),
-    },
-  ])(
-    'clamps a March 31 fallback cycle to $caseName',
-    async ({ resetAt, expectedStart, includedAt, excludedAt }) => {
-      const db = createIntegrationDb();
-      const org = await seedOrganization(4);
-      const owner = await seedPerson({
-        organizationId: org.id,
-        displayName: 'Month-end owner',
-        isOwner: true,
-      });
-      const sub = await seedSubscription({
-        organizationId: org.id,
-        payerPersonId: owner.id,
-        tier: 'family',
-        periodStartAt: null,
-        cycleResetAt: resetAt,
-        seedCounterEvents: false,
-      });
-      await db.insert(usageEvents).values([
-        {
-          subscriptionId: sub.id,
-          profileId: owner.id,
-          occurredAt: includedAt,
-          delta: 1,
-        },
-        {
-          subscriptionId: sub.id,
-          profileId: owner.id,
-          occurredAt: excludedAt,
-          delta: 1,
-        },
-      ]);
+  it('does not reverse-clamp a January 31 cycle after its February reset', async () => {
+    const db = createIntegrationDb();
+    const org = await seedOrganization(4);
+    const owner = await seedPerson({
+      organizationId: org.id,
+      displayName: 'Month-end owner',
+      isOwner: true,
+    });
+    const sub = await seedSubscription({
+      organizationId: org.id,
+      payerPersonId: owner.id,
+      tier: 'family',
+      periodStartAt: new Date('2026-01-31T12:34:56.000Z'),
+      periodEndAt: new Date('2027-01-31T12:34:56.000Z'),
+      cycleResetAt: new Date('2026-02-28T12:34:56.000Z'),
+      seedCounterEvents: false,
+    });
+    await db.insert(usageEvents).values([
+      {
+        subscriptionId: sub.id,
+        profileId: owner.id,
+        occurredAt: new Date('2026-01-30T12:34:56.000Z'),
+        delta: 1,
+      },
+      {
+        subscriptionId: sub.id,
+        profileId: owner.id,
+        occurredAt: new Date('2026-01-31T12:34:56.000Z'),
+        delta: 1,
+      },
+    ]);
 
-      await expect(
-        getFamilyPoolStatusV2(
-          db,
-          sub.id,
-          await requireEffectiveAccess(db, sub.id),
-        ),
-      ).resolves.toMatchObject({
-        cycleStartAt: expectedStart,
-        usedThisMonth: 1,
-      });
-    },
-  );
+    await expect(
+      getFamilyPoolStatusV2(
+        db,
+        sub.id,
+        await requireEffectiveAccess(db, sub.id),
+      ),
+    ).resolves.toMatchObject({
+      cycleStartAt: '2026-01-31T12:34:56.000Z',
+      cycleResetAt: '2026-02-28T12:34:56.000Z',
+      usedThisMonth: 1,
+    });
+  });
+
+  it('replays clamped monthly boundaries inside an annual subscription period', async () => {
+    const db = createIntegrationDb();
+    const org = await seedOrganization(4);
+    const owner = await seedPerson({
+      organizationId: org.id,
+      displayName: 'Annual month-end owner',
+      isOwner: true,
+    });
+    const sub = await seedSubscription({
+      organizationId: org.id,
+      payerPersonId: owner.id,
+      tier: 'family',
+      periodStartAt: new Date('2026-01-31T12:34:56.000Z'),
+      periodEndAt: new Date('2027-01-31T12:34:56.000Z'),
+      cycleResetAt: new Date('2026-03-28T12:34:56.000Z'),
+      seedCounterEvents: false,
+    });
+    await db.insert(usageEvents).values([
+      {
+        subscriptionId: sub.id,
+        profileId: owner.id,
+        occurredAt: new Date('2026-02-27T12:34:56.000Z'),
+        delta: 1,
+      },
+      {
+        subscriptionId: sub.id,
+        profileId: owner.id,
+        occurredAt: new Date('2026-02-28T12:34:56.000Z'),
+        delta: 1,
+      },
+    ]);
+
+    await expect(
+      getFamilyPoolStatusV2(
+        db,
+        sub.id,
+        await requireEffectiveAccess(db, sub.id),
+      ),
+    ).resolves.toMatchObject({
+      cycleStartAt: '2026-02-28T12:34:56.000Z',
+      cycleResetAt: '2026-03-28T12:34:56.000Z',
+      usedThisMonth: 1,
+    });
+  });
+
+  it('fails closed when the locked reset token has no authoritative anchor', async () => {
+    const db = createIntegrationDb();
+    const org = await seedOrganization(4);
+    const owner = await seedPerson({
+      organizationId: org.id,
+      displayName: 'Unanchored owner',
+      isOwner: true,
+    });
+    const sub = await seedSubscription({
+      organizationId: org.id,
+      payerPersonId: owner.id,
+      tier: 'family',
+      usedThisMonth: 9,
+      periodStartAt: null,
+      cycleResetAt: new Date('2026-03-31T12:34:56.000Z'),
+      seedCounterEvents: false,
+    });
+
+    await expect(
+      getFamilyPoolStatusV2(
+        db,
+        sub.id,
+        await requireEffectiveAccess(db, sub.id),
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      db.query.quotaPools.findFirst({
+        where: eq(quotaPools.subscriptionId, sub.id),
+      }),
+    ).resolves.toMatchObject({ usedThisMonth: 9 });
+  });
 
   it('rejects over-cap and cross-org add-profile validation', async () => {
     const db = createIntegrationDb();

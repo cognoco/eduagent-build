@@ -288,6 +288,39 @@ export async function removeProfileFromSubscriptionV2(
   return { removedProfileId: updated.id };
 }
 
+const MAX_MONTHLY_BOUNDARIES_PER_PERIOD = 24;
+
+function resolveMonthlyCycleStart(
+  periodStartAt: string | null,
+  cycleResetAt: Date,
+): Date | null {
+  if (!periodStartAt) return null;
+
+  let cycleStartAt = new Date(periodStartAt);
+  const resetTime = cycleResetAt.getTime();
+  if (
+    !Number.isFinite(cycleStartAt.getTime()) ||
+    cycleStartAt.getTime() >= resetTime
+  ) {
+    return null;
+  }
+
+  // Pool resets advance from the previous boundary with the canonical forward
+  // clamp. Replaying that sequence is required because reversing a clamped
+  // February boundary cannot recover whether the prior month ended on 28–31.
+  for (let step = 0; step < MAX_MONTHLY_BOUNDARIES_PER_PERIOD; step += 1) {
+    const nextResetAt = addMonthsClamped(cycleStartAt, 1);
+    const nextResetTime = nextResetAt.getTime();
+    if (nextResetTime === resetTime) return cycleStartAt;
+    if (nextResetTime <= cycleStartAt.getTime() || nextResetTime > resetTime) {
+      return null;
+    }
+    cycleStartAt = nextResetAt;
+  }
+
+  return null;
+}
+
 /**
  * v2 of getFamilyPoolStatus.
  */
@@ -378,9 +411,29 @@ export async function getFamilyPoolStatusV2(
     if (!pool) return null;
 
     // Family/Pro quotas reset monthly even when the paid subscription period
-    // is annual. The locked quota row owns that monthly boundary; using the
-    // subscription period start would leak earlier months into this cycle.
-    const cycleStartAt = addMonthsClamped(pool.cycleResetAt, -1).toISOString();
+    // is annual. The locked quota row owns the public reset token, while the
+    // locked subscription owns the anchor needed to identify its prior token.
+    const resolvedCycleStartAt = resolveMonthlyCycleStart(
+      lockedSubscription.currentPeriodStart,
+      pool.cycleResetAt,
+    );
+    if (!resolvedCycleStartAt) {
+      const error = new Error('Family quota cycle reset is not anchored');
+      logger.warn('[billing] family quota cycle reset is not anchored', {
+        event: 'billing.family.quota_cycle_unanchored',
+        subscriptionId,
+        cycleResetAt: pool.cycleResetAt.toISOString(),
+      });
+      captureException(error, {
+        extra: {
+          context: 'billing.family.quota_cycle_unanchored',
+          subscriptionId,
+          cycleResetAt: pool.cycleResetAt.toISOString(),
+        },
+      });
+      return null;
+    }
+    const cycleStartAt = resolvedCycleStartAt.toISOString();
 
     const members = await tx
       .select({
