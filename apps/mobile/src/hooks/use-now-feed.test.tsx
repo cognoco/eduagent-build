@@ -5,7 +5,7 @@ import type { NowOverflowResponse, NowResponse } from '@eduagent/schemas';
 import { createHookWrapper } from '../test-utils/app-hook-test-utils';
 import { setActiveProfileId } from '../lib/api-client';
 import { buildNowFeedCacheKey, readCachedNowFeed } from '../lib/now-feed-cache';
-import { useNowFeed, useNowOverflow } from './use-now-feed';
+import { nowFeedQueryKey, useNowFeed, useNowOverflow } from './use-now-feed';
 
 const FRESH_CACHE_TIMESTAMP = '2999-06-14T08:00:00.000Z';
 
@@ -28,6 +28,14 @@ function overflow(
     ...overrides,
   };
 }
+
+describe('nowFeedQueryKey', () => {
+  it('constructs one exact profile-scoped key for feed reads and invalidation', () => {
+    expect(nowFeedQueryKey('profile-a')).toEqual(['now-feed', 'profile-a']);
+    expect(nowFeedQueryKey('profile-b')).toEqual(['now-feed', 'profile-b']);
+    expect(nowFeedQueryKey(undefined)).toEqual(['now-feed', undefined]);
+  });
+});
 
 describe('useNowFeed', () => {
   let originalFetch: typeof globalThis.fetch;

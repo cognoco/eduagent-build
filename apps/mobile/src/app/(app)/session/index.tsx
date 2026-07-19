@@ -59,6 +59,7 @@ import {
   useIsFirstSession,
 } from '../../../hooks/use-session-context';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
+import { nowFeedQueryKey } from '../../../hooks/use-now-feed';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
 import { useCelebrationLevel } from '../../../hooks/use-settings';
 import { useLearnerProfile } from '../../../hooks/use-learner-profile';
@@ -361,7 +362,7 @@ function SessionScreenInner() {
   const refreshMentorFeedBeforeReturn = useCallback(() => {
     if (returnTo !== MENTOR_RETURN_TO || !activeProfile?.id) return;
     void queryClient.invalidateQueries({
-      queryKey: ['now-feed', activeProfile.id],
+      queryKey: nowFeedQueryKey(activeProfile.id),
       exact: true,
     });
   }, [activeProfile?.id, queryClient, returnTo]);

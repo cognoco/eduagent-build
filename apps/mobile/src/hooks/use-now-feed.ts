@@ -22,6 +22,12 @@ import { useApiQuery } from './use-api-query';
 const NOW_FEED_STALE_TIME_MS = 30_000;
 const NOW_FEED_SLOW_FALLBACK_MS = 2_000;
 
+export function nowFeedQueryKey(
+  profileId: string | undefined,
+): readonly ['now-feed', string | undefined] {
+  return ['now-feed', profileId];
+}
+
 export type NowFeedQueryResult = UseQueryResult<NowResponse> & {
   fallbackFeed: NowResponse | null;
   isSlowFallback: boolean;
@@ -35,7 +41,7 @@ export function useNowFeed(): NowFeedQueryResult {
   const [isSlowFallback, setIsSlowFallback] = useState(false);
 
   const query = useQuery({
-    queryKey: ['now-feed', profileId],
+    queryKey: nowFeedQueryKey(profileId),
     queryFn: async ({ signal: querySignal }): Promise<NowResponse> => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {

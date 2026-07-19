@@ -15,6 +15,7 @@ import {
   type RenderScreenResult,
 } from '../../../test-utils/screen-render';
 import SessionScreen from './index';
+import { nowFeedQueryKey } from '../../../hooks/use-now-feed';
 
 // Real session-recovery module; tests spy on readSessionRecoveryMarker as
 // needed via jest.spyOn().
@@ -2555,7 +2556,7 @@ describe('SessionScreen homework flow', () => {
 
       expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
       expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: ['now-feed', ACTIVE_PROFILE_ID],
+        queryKey: nowFeedQueryKey(ACTIVE_PROFILE_ID),
         exact: true,
       });
       expect(invalidateSpy.mock.invocationCallOrder[0]).toBeLessThan(
