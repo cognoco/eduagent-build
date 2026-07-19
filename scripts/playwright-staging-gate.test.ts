@@ -32,6 +32,20 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
     },
   );
 
+  it.each([502, 503, 504])(
+    'reports unavailable after exhausting retryable HTTP %s',
+    async (status) => {
+      const result = await runCanary({
+        apiUrl: 'https://api-stg.example.test',
+        secret: 'test-secret',
+        fetchImpl: async () => ({ status }),
+        attempts: 3,
+        random: () => 0,
+      });
+      expect(result.state).toBe(GATE_STATES.UNAVAILABLE);
+    },
+  );
+
   it.each([401, 403, 404, 500])(
     'fails closed on terminal HTTP %s',
     async (status) => {

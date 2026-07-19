@@ -201,8 +201,9 @@ jobs:
             CANARY_STATE_FILE=\"\${RUNNER_TEMP}/playwright-canary-pre.state\"; \
             node scripts/playwright-staging-gate.cjs --canary > \"\${CANARY_STATE_FILE}\"; \
             PRE_STATE=\$(cut -d= -f2 \"\${CANARY_STATE_FILE}\"); \
+            SUITE_NOT_RUN='not-run'; \
             if [ \"\${PRE_STATE}\" != 'healthy' ]; then \
-              node scripts/playwright-staging-gate.cjs --decide \"\${PRE_STATE}\" 'not-run' 'not-run' 1; \
+              node scripts/playwright-staging-gate.cjs --decide \"\${PRE_STATE}\" \"\${SUITE_NOT_RUN}\" \"\${SUITE_NOT_RUN}\" 1; \
               exit \$?; \
             fi; \
             set +e; \
