@@ -31,6 +31,8 @@
     "prepare": "husky",
     "prepush": "tsc --build",
     "db:push:dev": "node scripts/doppler-run.mjs run -c dev -- pnpm --filter @eduagent/database run db:push",
+    "db:check-identity-fks": "tsx scripts/check-identity-fk-drift.ts",
+    "db:check-identity-fks:dev": "node scripts/doppler-run.mjs run -c dev -- pnpm db:check-identity-fks",
     "db:generate:dev": "node scripts/doppler-run.mjs run -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate:dev": "node -e \"console.error('db:migrate:dev is disabled: dev Neon is push/direct-only (WI-649). Use db:push:dev instead.'); process.exit(1)\"",
     "db:studio:dev": "node scripts/doppler-run.mjs run -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs studio",
