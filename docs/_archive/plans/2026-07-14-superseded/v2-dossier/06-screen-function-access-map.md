@@ -62,7 +62,7 @@
 
 Each row below is an existing or newly-added test proving the **V2-specific**
 trigger path for that surface (not the legacy-route default). Re-run the full
-set from the repo root (verified: 12 suites, 121 tests):
+set from the repo root:
 
 ```bash
 pnpm test:v2-parity
