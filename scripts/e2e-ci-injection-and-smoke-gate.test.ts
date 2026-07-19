@@ -432,6 +432,27 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
   });
 
+  it('executes every planned shard entry even when adb consumes stdin', () => {
+    const harness = createMaestroHarness(0);
+    const expectedFlows = loadPlan('pr').filter(
+      (entry) => entry.shard === 1,
+    ).length;
+
+    try {
+      const result = runCiMaestro(harness, {
+        FAKE_ADB_DRAIN_STDIN: '1',
+      });
+      const invocations = readFileSync(harness.maestroMarker, 'utf8')
+        .trim()
+        .split('\n');
+
+      expect(result.status).toBe(0);
+      expect(invocations).toHaveLength(expectedFlows);
+    } finally {
+      rmSync(harness.root, { recursive: true, force: true });
+    }
+  });
+
   it('boots an embedded test release APK instead of the dev-client launcher', () => {
     const cacheStep = mobileMaestro.steps?.find(
       (step) => step.name === 'Cache E2E release APK',
@@ -742,6 +763,7 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
     adb,
     [
       '#!/usr/bin/env bash',
+      'if [ "${FAKE_ADB_DRAIN_STDIN:-0}" = "1" ]; then cat >/dev/null; fi',
       'case "$*" in',
       '  "exec-out screencap -p") printf fake-png ;;',
       '  "exec-out cat /sdcard/ci-maestro-entry.xml") printf \'<node resource-id="welcome-chooser"/>\' ;;',
