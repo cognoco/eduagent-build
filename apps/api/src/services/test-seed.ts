@@ -52,6 +52,7 @@ import {
 import { listSubjects } from './subject';
 import { getTierConfig } from './subscription';
 import { sleep } from './sleep';
+import { recordPracticeActivityEvent } from './practice-activity-events';
 import { seedV2SupporterAccepted } from './test-seed-v2-supporter';
 
 // ---------------------------------------------------------------------------
@@ -161,6 +162,7 @@ export type SeedScenario =
   | 'mentor-audit-bridge-backstack'
   // WI-2194 — stale Plus denominator repaired into one Family cycle.
   | 'wi-2194-stale-family-cycle'
+  | 'v2-journal-paper-trail'
   // [WI-2241] Supportership-aware v2 identity + accepted-visibility fixture —
   // apps/api/src/services/test-seed-v2-supporter.ts.
   | 'v2-supporter-accepted';
@@ -1068,6 +1070,66 @@ async function insertBookmarks(
   }));
   await db.insert(bookmarks).values(rows);
   return { bookmarkIds: rows.map((row) => row.id) };
+}
+
+async function insertLearnerNote(
+  db: Database,
+  opts: {
+    profileId: string;
+    sessionId: string;
+    topicId: string;
+    content: string;
+  },
+): Promise<{ noteId: string }> {
+  const noteId = generateUUIDv7();
+  await db.insert(topicNotes).values({
+    id: noteId,
+    profileId: opts.profileId,
+    sessionId: opts.sessionId,
+    topicId: opts.topicId,
+    content: opts.content,
+  });
+  return { noteId };
+}
+
+async function insertMentorMemory(
+  db: Database,
+  opts: { profileId: string },
+): Promise<{ mentorMemoryId: string }> {
+  const mentorMemoryId = generateUUIDv7();
+  await db.insert(learningProfiles).values({
+    id: mentorMemoryId,
+    profileId: opts.profileId,
+    learningStyle: {
+      preferredExplanations: ['diagrams', 'examples'],
+      pacePreference: 'thorough',
+      responseToChallenge: 'motivated',
+      confidence: 'medium',
+      corroboratingSessions: 4,
+      source: 'inferred',
+    },
+    interests: ['Plant biology', 'Nature photography'],
+    strengths: [
+      {
+        subject: 'Biology',
+        topics: ['Explaining cause and effect'],
+        confidence: 'high',
+        source: 'inferred',
+      },
+    ],
+    struggles: [],
+    communicationNotes: ['Connects new ideas to real-world examples'],
+    suppressedInferences: [],
+    interestTimestamps: {
+      'Plant biology': pastDate(3).toISOString(),
+      'Nature photography': pastDate(5).toISOString(),
+    },
+    memoryEnabled: true,
+    memoryConsentStatus: 'granted',
+    memoryCollectionEnabled: true,
+    memoryInjectionEnabled: true,
+  });
+  return { mentorMemoryId };
 }
 
 // ---------------------------------------------------------------------------
@@ -4986,6 +5048,136 @@ async function seedMentorAuditResumableSession(
   };
 }
 
+/** One self-owned learner graph spanning every persisted V2 Journal section.
+ *  This is deliberately separate from mentor-audit-rich-child-history: that
+ *  fixture is a Family owner reviewing a linked child, while Journal's Me
+ *  surface reads artifacts belonging to the active credentialed learner. */
+async function seedV2JournalPaperTrail(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Journal Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+    isOwner: true,
+    email,
+    clerkUserId,
+  });
+
+  await db.insert(consentGrant).values({
+    id: generateUUIDv7(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
+  });
+
+  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Biology',
+  );
+  const topicId = topicIds[0];
+  if (!topicId) {
+    throw new Error('v2-journal-paper-trail: subject created no topics');
+  }
+
+  const { sessionId, summaryId: sessionSummaryId } =
+    await insertSessionWithRecap(db, {
+      profileId,
+      subjectId,
+      topicId,
+      recapContent:
+        'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
+      recapHighlight:
+        'Connected chlorophyll, carbon dioxide, and glucose without prompting.',
+      engagementSignal: 'focused',
+      endedDaysAgo: 1,
+      exchangeCount: 8,
+      wallClockSeconds: 960,
+    });
+
+  const { noteId: learnerNoteId } = await insertLearnerNote(db, {
+    profileId,
+    sessionId,
+    topicId,
+    content:
+      'Photosynthesis stores sunlight as chemical energy in glucose for the plant.',
+  });
+  const { bookmarkIds } = await insertBookmarks(db, {
+    profileId,
+    sessionId,
+    subjectId,
+    topicId,
+    contents: ['Chlorophyll captures light energy that powers photosynthesis.'],
+  });
+  const bookmarkId = bookmarkIds[0];
+  if (!bookmarkId) {
+    throw new Error('v2-journal-paper-trail: bookmark helper returned no id');
+  }
+
+  const practiceActivity = await recordPracticeActivityEvent(db, {
+    profileId,
+    subjectId,
+    activityType: 'review',
+    activitySubtype: 'spaced_repetition',
+    completedAt: pastDate(1),
+    pointsEarned: 8,
+    score: 3,
+    total: 3,
+    sourceType: 'topic',
+    sourceId: topicId,
+    metadata: { topicId },
+  });
+  if (!practiceActivity) {
+    throw new Error('v2-journal-paper-trail: practice event was not inserted');
+  }
+
+  // Journal self-view reads reports by childProfileId. Setting both columns
+  // to this credentialed learner makes the subject and owner the same Me scope.
+  const { reportId: weeklyReportId } = await insertWeeklyReport(db, {
+    profileId,
+    childProfileId: profileId,
+    childName: 'Journal Learner',
+    reportWeek: '2026-07-13',
+  });
+  const { reportId: monthlyReportId } = await insertMonthlyReport(db, {
+    profileId,
+    childProfileId: profileId,
+    childName: 'Journal Learner',
+    reportMonth: '2026-07-01',
+    monthLabel: 'July 2026',
+  });
+  const { mentorMemoryId } = await insertMentorMemory(db, { profileId });
+
+  return {
+    scenario: 'v2-journal-paper-trail',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: {
+      learnerProfileId: profileId,
+      subjectId,
+      topicId,
+      sessionId,
+      // The recaps API identifies a recap by its learning-session id.
+      recapId: sessionId,
+      sessionSummaryId,
+      learnerNoteId,
+      bookmarkId,
+      practiceActivityEventId: practiceActivity.id,
+      weeklyReportId,
+      monthlyReportId,
+      mentorMemoryId,
+    },
+  };
+}
+
 /** Rich-history child — composes the Task 0 helpers so the audit can exercise
  *  the parent-native review surfaces (weekly report, recap, retention,
  *  vocabulary, bookmarks) against a single linked child. Deterministic — no
@@ -6019,6 +6211,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
     seedMentorAuditFamilyOwnerDailyQuotaWithChild,
   'mentor-audit-bridge-backstack': seedMentorAuditBridgeBackstack,
   'wi-2194-stale-family-cycle': seedWi2194StaleFamilyCycle,
+  'v2-journal-paper-trail': seedV2JournalPaperTrail,
   // [WI-2241] test-seed-v2-supporter.ts — composes test-seed-v2 owner
   // identities with the accepted-visibility fixture logic (linking-ceremony)
   // and the rich learning/report insert helpers above.

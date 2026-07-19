@@ -8,6 +8,7 @@ import {
   login,
   membership,
   usageEvents,
+  practiceActivityEvents,
   type Database,
 } from '@eduagent/database';
 import { inArray } from 'drizzle-orm';
@@ -57,9 +58,32 @@ function createMockDb(): Database {
     }),
   };
 
+  // Keep one shared values mock because scenario-shape tests inspect all
+  // inserted values through the first db.insert() result. Track the current
+  // table only to emulate recordPracticeActivityEvent's returning chain.
+  let currentInsertTable: unknown;
+  const insertResult = {
+    values: jest.fn((values: Record<string, unknown>) => {
+      if (currentInsertTable === practiceActivityEvents) {
+        return {
+          onConflictDoNothing: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([
+              {
+                ...values,
+                id: '019d14f4-735f-7e11-8800-000000000001',
+              },
+            ]),
+          }),
+        };
+      }
+      return Promise.resolve(undefined);
+    }),
+  };
+
   return {
-    insert: jest.fn().mockReturnValue({
-      values: jest.fn().mockResolvedValue(undefined),
+    insert: jest.fn((table: unknown) => {
+      currentInsertTable = table;
+      return insertResult;
     }),
     update: jest.fn().mockReturnValue(updateChain),
     select: jest.fn().mockReturnValue(selectChain),
@@ -181,6 +205,8 @@ describe('VALID_SCENARIOS', () => {
       'mentor-audit-family-owner-daily-quota-with-child',
       'mentor-audit-bridge-backstack',
       'wi-2194-stale-family-cycle',
+      // [WI-2239] Self-owned V2 Journal paper trail.
+      'v2-journal-paper-trail',
       // [WI-2241] Supportership-aware v2 seed.
       'v2-supporter-accepted',
     ]);
