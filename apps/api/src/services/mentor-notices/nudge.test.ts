@@ -9,9 +9,19 @@ jest.mock('../notifications', () => ({
 }));
 
 import {
+  findEligibleMentorNoticeNudges,
   reserveMentorNoticeNudge,
   sendReservedMentorNoticeNudge,
 } from './nudge';
+
+function makeEligibilityDb(rows: unknown[]) {
+  const limit = jest.fn().mockResolvedValue(rows);
+  const where = jest.fn().mockReturnValue({ limit });
+  const innerJoin = jest.fn().mockReturnThis();
+  const from = jest.fn().mockReturnValue({ innerJoin, where });
+  innerJoin.mockReturnValue({ innerJoin, where });
+  return { select: jest.fn().mockReturnValue({ from }) } as unknown as Database;
+}
 
 function makeReservationDb(counts: { family: number; daily: number }) {
   const noticeForUpdate = jest.fn().mockResolvedValue([{ id: 'notice-1' }]);
@@ -98,6 +108,18 @@ describe('mentor notice nudge reservation', () => {
     ).resolves.toBe(false);
     expect(insertValues).not.toHaveBeenCalled();
     expect(update).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('mentor notice nudge eligibility', () => {
+  it('returns only opaque notice and profile identifiers', async () => {
+    const db = makeEligibilityDb([
+      { noticeId: 'notice-1', profileId: 'profile-1' },
+    ]);
+
+    await expect(findEligibleMentorNoticeNudges(db)).resolves.toEqual([
+      { noticeId: 'notice-1', profileId: 'profile-1' },
+    ]);
   });
 });
 

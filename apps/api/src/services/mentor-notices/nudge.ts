@@ -1,7 +1,11 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import {
+  membership,
   mentorNotices,
   notificationLog,
+  notificationPreferences,
+  organization,
+  person,
   subjects,
   type Database,
 } from '@eduagent/database';
@@ -13,6 +17,39 @@ import {
 } from '../notifications';
 import { safeSend } from '../safe-non-core';
 import { inngest } from '../../inngest/client';
+import { consentGateSatisfiedSql } from '../identity-v2/consent-status-v2';
+
+export async function findEligibleMentorNoticeNudges(db: Database) {
+  return db
+    .select({
+      noticeId: mentorNotices.id,
+      profileId: mentorNotices.profileId,
+    })
+    .from(mentorNotices)
+    .innerJoin(person, eq(person.id, mentorNotices.profileId))
+    .innerJoin(membership, eq(membership.personId, person.id))
+    .innerJoin(organization, eq(organization.id, membership.organizationId))
+    .innerJoin(
+      notificationPreferences,
+      and(
+        eq(notificationPreferences.profileId, person.id),
+        eq(notificationPreferences.pushEnabled, true),
+        eq(notificationPreferences.reviewReminders, true),
+      ),
+    )
+    .where(
+      and(
+        isNull(person.archivedAt),
+        eq(mentorNotices.status, 'open'),
+        eq(mentorNotices.nudgeStatus, 'pending'),
+        consentGateSatisfiedSql(sql`${person.id}`),
+        sql`(now() at time zone coalesce(${organization.timezone}, 'UTC'))::time >= time '16:00'`,
+        sql`(now() at time zone coalesce(${organization.timezone}, 'UTC'))::time < time '17:00'`,
+        sql`((now() at time zone coalesce(${organization.timezone}, 'UTC')) - interval '4 hours')::date = (((${mentorNotices.createdAt} at time zone coalesce(${organization.timezone}, 'UTC')) - interval '4 hours')::date + 1)`,
+      ),
+    )
+    .limit(500);
+}
 
 export async function reserveMentorNoticeNudge(
   db: Database,

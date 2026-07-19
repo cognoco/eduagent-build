@@ -2,16 +2,22 @@ const mockGetStepDatabase = jest.fn();
 const mockGetStepMentorNoticeEnabled = jest.fn();
 const mockFade = jest.fn();
 
-jest.mock('../helpers', () => ({
-  ...jest.requireActual('../helpers'),
-  getStepDatabase: () => mockGetStepDatabase(),
-  getStepMentorNoticeEnabled: () => mockGetStepMentorNoticeEnabled(),
-}));
+jest.mock(
+  '../helpers' /* gc1-allow: Inngest step DB and feature-flag boundary */,
+  () => ({
+    ...jest.requireActual('../helpers'),
+    getStepDatabase: () => mockGetStepDatabase(),
+    getStepMentorNoticeEnabled: () => mockGetStepMentorNoticeEnabled(),
+  }),
+);
 
-jest.mock('../../services/mentor-notices', () => ({
-  ...jest.requireActual('../../services/mentor-notices'),
-  fadeStaleMentorNotices: (...args: unknown[]) => mockFade(...args),
-}));
+jest.mock(
+  '../../services/mentor-notices' /* gc1-allow: service orchestration boundary; service behavior has direct tests */,
+  () => ({
+    ...jest.requireActual('../../services/mentor-notices'),
+    fadeStaleMentorNotices: (...args: unknown[]) => mockFade(...args),
+  }),
+);
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { mentorNoticeFade } from './mentor-notice-fade';

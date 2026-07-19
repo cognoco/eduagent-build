@@ -3,18 +3,24 @@ const mockGetStepMentorNoticeEnabled = jest.fn();
 const mockReserve = jest.fn();
 const mockSend = jest.fn();
 
-jest.mock('../helpers', () => ({
-  ...jest.requireActual('../helpers'),
-  getStepDatabase: () => mockGetStepDatabase(),
-  getStepMentorNoticeEnabled: () => mockGetStepMentorNoticeEnabled(),
-}));
+jest.mock(
+  '../helpers' /* gc1-allow: Inngest step DB and feature-flag boundary */,
+  () => ({
+    ...jest.requireActual('../helpers'),
+    getStepDatabase: () => mockGetStepDatabase(),
+    getStepMentorNoticeEnabled: () => mockGetStepMentorNoticeEnabled(),
+  }),
+);
 
-jest.mock('../../services/mentor-notices', () => ({
-  ...jest.requireActual('../../services/mentor-notices'),
-  getProfileTimeZone: jest.fn().mockResolvedValue('UTC'),
-  reserveMentorNoticeNudge: (...args: unknown[]) => mockReserve(...args),
-  sendReservedMentorNoticeNudge: (...args: unknown[]) => mockSend(...args),
-}));
+jest.mock(
+  '../../services/mentor-notices' /* gc1-allow: service orchestration boundary; service behavior has direct tests */,
+  () => ({
+    ...jest.requireActual('../../services/mentor-notices'),
+    getProfileTimeZone: jest.fn().mockResolvedValue('UTC'),
+    reserveMentorNoticeNudge: (...args: unknown[]) => mockReserve(...args),
+    sendReservedMentorNoticeNudge: (...args: unknown[]) => mockSend(...args),
+  }),
+);
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { mentorNoticeNudgeSend } from './mentor-notice-nudge-send';
