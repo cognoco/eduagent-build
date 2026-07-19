@@ -60,6 +60,7 @@ const SUBMIT_SUMMARY_TIMEOUT_MS = 35_000;
 
 function invalidateSessionDerivedQueries(
   queryClient: ReturnType<typeof useQueryClient>,
+  profileId: string | undefined,
 ): void {
   // PR-10 deferred: broad ['progress'], ['dashboard'], ['retention'],
   // ['language-progress'], ['resume-nudge'] — session-close touches many surfaces
@@ -73,6 +74,17 @@ function invalidateSessionDerivedQueries(
   void queryClient.invalidateQueries({ queryKey: ['retention'] });
   void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
   void queryClient.invalidateQueries({ queryKey: ['resume-nudge'] });
+  // All three history families store the profile scope in their final segment.
+  // Match their exact canonical shapes so another profile's cache stays warm.
+  void queryClient.invalidateQueries({
+    predicate: ({ queryKey }) =>
+      ((queryKey[0] === 'topic-sessions' || queryKey[0] === 'book-sessions') &&
+        queryKey.length === 4 &&
+        queryKey[3] === profileId) ||
+      (queryKey[0] === 'subject-sessions' &&
+        queryKey.length === 3 &&
+        queryKey[2] === profileId),
+  });
 }
 
 function useSessionNavigationScope(): {
@@ -103,6 +115,10 @@ type FilingStatus =
   | null
   | undefined;
 
+interface SessionDerivedMutationContext {
+  profileId: string | undefined;
+}
+
 export function computeFilingRefetchInterval(
   filingStatus: FilingStatus,
 ): number | false {
@@ -124,6 +140,7 @@ export function useStartSession(subjectId: string): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { profileId } = useSessionNavigationScope();
 
   return useMutation({
     mutationFn: async (input: {
@@ -146,8 +163,9 @@ export function useStartSession(subjectId: string): UseMutationResult<
         'POST /subjects/:subjectId/sessions',
       );
     },
-    onSuccess: () => {
-      invalidateSessionDerivedQueries(queryClient);
+    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
+    onSuccess: (_data, _variables, mutationContext) => {
+      invalidateSessionDerivedQueries(queryClient, mutationContext?.profileId);
     },
   });
 }
@@ -167,6 +185,7 @@ export function useStartFirstCurriculumSession(
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { profileId } = useSessionNavigationScope();
 
   return useMutation({
     mutationFn: async (input: {
@@ -189,8 +208,9 @@ export function useStartFirstCurriculumSession(
         'POST /subjects/:subjectId/sessions/first-curriculum',
       );
     },
-    onSuccess: () => {
-      invalidateSessionDerivedQueries(queryClient);
+    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
+    onSuccess: (_data, _variables, mutationContext) => {
+      invalidateSessionDerivedQueries(queryClient, mutationContext?.profileId);
     },
   });
 }
@@ -254,12 +274,17 @@ export function useClearContinuationDepth(
         'PATCH /sessions/:sessionId/clear-continuation-depth',
       );
     },
-    onSuccess: () => {
+    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
+    onSuccess: (_data, _variables, mutationContext) => {
+      const mutationProfileId = mutationContext?.profileId;
       void queryClient.invalidateQueries({
         predicate: (query) =>
-          queryKeys.sessions.matchAnyMode(sessionId, profileId)(query.queryKey),
+          queryKeys.sessions.matchAnyMode(
+            sessionId,
+            mutationProfileId,
+          )(query.queryKey),
       });
-      invalidateSessionDerivedQueries(queryClient);
+      invalidateSessionDerivedQueries(queryClient, mutationProfileId);
     },
   });
 }
@@ -273,6 +298,7 @@ export function useSyncHomeworkState(
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { profileId } = useSessionNavigationScope();
 
   return useMutation({
     mutationFn: async (input: { metadata: HomeworkSessionMetadata }) => {
@@ -287,8 +313,9 @@ export function useSyncHomeworkState(
         'POST /sessions/:sessionId/homework-state',
       );
     },
-    onSuccess: () => {
-      invalidateSessionDerivedQueries(queryClient);
+    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
+    onSuccess: (_data, _variables, mutationContext) => {
+      invalidateSessionDerivedQueries(queryClient, mutationContext?.profileId);
     },
   });
 }
@@ -330,6 +357,7 @@ export function useCloseSession(sessionId: string): UseMutationResult<
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const { profileId } = useSessionNavigationScope();
 
   return useMutation({
     mutationFn: async (input = {}) => {
@@ -344,8 +372,9 @@ export function useCloseSession(sessionId: string): UseMutationResult<
         'POST /sessions/:sessionId/close',
       );
     },
-    onSuccess: () => {
-      invalidateSessionDerivedQueries(queryClient);
+    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
+    onSuccess: (_data, _variables, mutationContext) => {
+      invalidateSessionDerivedQueries(queryClient, mutationContext?.profileId);
     },
   });
 }
@@ -628,15 +657,17 @@ export function useSubmitSummary(
         cleanup();
       }
     },
-    onSuccess: () => {
+    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
+    onSuccess: (_data, _variables, mutationContext) => {
+      const mutationProfileId = mutationContext?.profileId;
       void queryClient.invalidateQueries({
         predicate: (query) =>
           queryKeys.sessions.matchSummaryAnyMode(
             sessionId,
-            profileId,
+            mutationProfileId,
           )(query.queryKey),
       });
-      invalidateSessionDerivedQueries(queryClient);
+      invalidateSessionDerivedQueries(queryClient, mutationProfileId);
     },
   });
 }
@@ -665,12 +696,13 @@ export function useRetrySummaryFeedback(
         cleanup();
       }
     },
-    onSuccess: () => {
+    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
+    onSuccess: (_data, _variables, mutationContext) => {
       void queryClient.invalidateQueries({
         predicate: (query) =>
           queryKeys.sessions.matchSummaryAnyMode(
             sessionId,
-            profileId,
+            mutationContext?.profileId,
           )(query.queryKey),
       });
     },
@@ -696,15 +728,17 @@ export function useSkipSummary(
         'POST /sessions/:sessionId/summary/skip',
       );
     },
-    onSuccess: () => {
+    onMutate: (): SessionDerivedMutationContext => ({ profileId }),
+    onSuccess: (_data, _variables, mutationContext) => {
+      const mutationProfileId = mutationContext?.profileId;
       void queryClient.invalidateQueries({
         predicate: (query) =>
           queryKeys.sessions.matchSummaryAnyMode(
             sessionId,
-            profileId,
+            mutationProfileId,
           )(query.queryKey),
       });
-      invalidateSessionDerivedQueries(queryClient);
+      invalidateSessionDerivedQueries(queryClient, mutationProfileId);
     },
   });
 }
