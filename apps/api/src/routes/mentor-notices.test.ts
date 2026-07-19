@@ -8,12 +8,15 @@ import {
 } from '../services/mentor-notices';
 import { mentorNoticeRoutes } from './mentor-notices';
 
-jest.mock('../services/mentor-notices', () => ({
-  ...jest.requireActual('../services/mentor-notices'),
-  deferMentorNotice: jest.fn(),
-  getProfileTimeZone: jest.fn().mockResolvedValue('UTC'),
-  startMentorNoticeRecheck: jest.fn(),
-}));
+jest.mock(
+  '../services/mentor-notices' /* gc1-allow: route unit test injects service outcomes into a fake request database; services have direct unit and integration coverage */,
+  () => ({
+    ...jest.requireActual('../services/mentor-notices'),
+    deferMentorNotice: jest.fn(),
+    getProfileTimeZone: jest.fn().mockResolvedValue('UTC'),
+    startMentorNoticeRecheck: jest.fn(),
+  }),
+);
 
 const PROFILE_ID = '550e8400-e29b-41d4-a716-446655440001';
 const NOTICE_ID = '550e8400-e29b-41d4-a716-446655440002';
