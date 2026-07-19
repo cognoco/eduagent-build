@@ -110,16 +110,34 @@ tags:
 - assertNotVisible:
     text: 'PRIVATE'
 
-# Relaunch: kill and restart the app, then confirm the SAME person/edge is
-# still active (scope-context.tsx persists activeScope via SecureStore keyed
-# on profileId, re-hydrated on next mount) — not reverted to the hub.
+# Relaunch: kill and restart the app, then confirm the SAME rich supportee is
+# still selected (scope-context.tsx persists activeScope via SecureStore keyed
+# on profileId, re-hydrated on next mount) — not reverted to the hub or another
+# supportee. A cold launch deliberately returns to the Mentor tab, so re-open
+# Journal only after proving the exact persisted scope.
 - stopApp
 - launchApp:
     clearState: false
 - extendedWaitUntil:
     visible:
-      id: 'person-scope-journal-placeholder'
+      id: 'person-scope-mentor-tab'
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+      selected: true
+    direction: RIGHT
+    timeout: 10000
+- assertVisible:
+    id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}'
+    selected: true
+- tapOn:
+    id: 'tab-journal'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-journal-placeholder'
+    timeout: 15000
 
 # EMPTY SHARED RECORD: switching to the empty-record supportee renders an
 # honest empty state, not an error and no leaked private content.

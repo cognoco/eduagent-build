@@ -35,7 +35,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, parseAllDocuments } from 'yaml';
 
 const repoRoot = join(__dirname, '..');
 
@@ -995,6 +995,60 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/assertNotVisible:/g)).toHaveLength(6);
     expect(flow.match(/id: ['"]tab-subjects['"]/g)).toHaveLength(3);
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
+  });
+
+  it('[WI-2241] hard-proves the rich supportee remains selected across relaunch before restoring Journal', () => {
+    const supporterFlow = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/v2/v2-supporter-scope-journey.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(supporterFlow)[1]?.toJS() as unknown;
+
+    expect(Array.isArray(commands)).toBe(true);
+    if (!Array.isArray(commands)) {
+      throw new Error('supporter scope Maestro commands must be a YAML list');
+    }
+    const relaunchStart = commands.findIndex(
+      (command) => command === 'stopApp',
+    );
+
+    expect(relaunchStart).toBeGreaterThanOrEqual(0);
+    expect(commands.slice(relaunchStart, relaunchStart + 7)).toEqual([
+      'stopApp',
+      { launchApp: { clearState: false } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'person-scope-mentor-tab' },
+          timeout: 30000,
+        },
+      },
+      {
+        scrollUntilVisible: {
+          element: {
+            id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}',
+            selected: true,
+          },
+          direction: 'RIGHT',
+          timeout: 10000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'scope-chip-option-person-${SUPPORTEE_PERSON_ID}',
+          selected: true,
+        },
+      },
+      { tapOn: { id: 'tab-journal', retryTapIfNoChange: true } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'person-scope-journal-placeholder' },
+          timeout: 15000,
+        },
+      },
+    ]);
   });
 
   it('keeps the generated Android APK free of the duplicate OSGI manifest', () => {
