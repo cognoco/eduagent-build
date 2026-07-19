@@ -1052,6 +1052,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       id?: string;
       text?: string;
       enabled?: boolean;
+      containsDescendants?: ElementSelector[];
     };
     type MaestroCommand = {
       assertVisible?: ElementSelector;
@@ -1073,10 +1074,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       expected: ElementSelector,
     ): boolean => {
       if (!actual) return false;
+      const actualDescendants = actual.containsDescendants ?? [];
+      const expectedDescendants = expected.containsDescendants ?? [];
       return (
         actual.id === expected.id &&
         actual.text === expected.text &&
         actual.enabled === expected.enabled &&
+        actualDescendants.length === expectedDescendants.length &&
+        expectedDescendants.every((selector, index) =>
+          exactSelector(actualDescendants[index], selector),
+        ) &&
         Object.keys(actual).length === Object.keys(expected).length
       );
     };
@@ -1119,7 +1126,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     for (const selector of [
       { id: 'homework-problem-text-bubble', text: 'Solve 3x + 7 = 22' },
       { id: 'homework-problem-text', text: 'Solve 3x + 7 = 22' },
-      { id: 'message-bubble-user-1', text: 'Solve 3x + 7 = 22' },
+      {
+        id: 'message-bubble-user-1',
+        containsDescendants: [{ text: 'Solve 3x + 7 = 22' }],
+      },
     ]) {
       expect(mandatoryAssertVisible(selector)).toBeGreaterThan(-1);
     }

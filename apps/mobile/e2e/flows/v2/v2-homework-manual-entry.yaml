@@ -120,7 +120,8 @@ tags:
     text: 'Solve 3x + 7 = 22'
 - assertVisible:
     id: 'message-bubble-user-1'
-    text: 'Solve 3x + 7 = 22'
+    containsDescendants:
+      - text: 'Solve 3x + 7 = 22'
 - extendedWaitUntil:
     visible:
       id: 'homework-first-response-complete'
