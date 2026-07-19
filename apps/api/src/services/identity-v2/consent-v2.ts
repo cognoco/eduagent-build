@@ -766,6 +766,12 @@ export interface ProcessConsentResponseV2Result {
    * request never recorded one. See spec §5.1.
    */
   guardianEmail: string | null;
+  /**
+   * [WI-2347] The `withdrawal_token_id` stamped on the newly-inserted grant,
+   * for the approval route to embed in the `cw2` withdrawal token it signs.
+   * Null on a deny (no grant is created).
+   */
+  withdrawalTokenId: string | null;
 }
 
 /**
@@ -811,6 +817,10 @@ export async function processConsentResponseV2(
   const chargePersonId = request.chargePersonId;
   const basis = request.requestedBasis;
 
+  // [WI-2347] Minted up front (not inside the tx) so it's available to build
+  // the return value regardless of which branch below runs.
+  const withdrawalTokenId = approved ? crypto.randomUUID() : null;
+
   if (approved) {
     await db.transaction(async (tx) => {
       // Atomic guard against a concurrent second submit.
@@ -828,6 +838,7 @@ export async function processConsentResponseV2(
             source: 'consent_response_approved',
             policyVersion: audit?.policyVersion ?? request.policyVersion,
           },
+          withdrawalTokenId,
         })
         .returning({ id: consentGrant.id });
       if (!grant) {
@@ -1007,6 +1018,7 @@ export async function processConsentResponseV2(
     approved,
     organizationId: request.organizationId,
     guardianEmail: request.guardianEmail ?? null,
+    withdrawalTokenId,
   };
 }
 
@@ -1064,6 +1076,15 @@ export async function withdrawConsentByToken(
   chargePersonId: string,
   organizationId: string,
   audit?: { requestIp?: string; userAgent?: string },
+  /** [WI-2347] The verified token's embedded id: a `cw2` tokenId, or `null`
+   * for a legacy `cw1` token (which carries none). Always pass one of these
+   * two — never `undefined` — this is always a bearer-token call, unlike
+   * `revokeConsentV2`'s edge path, which omits the param entirely to skip
+   * the check below. A `cw1` token (`null`) only matches a grant that has
+   * never been touched by `cw2` issuance (`withdrawalTokenId` still null);
+   * once superseded by a fresh `cw2` mint, the old `cw1` link is unusable —
+   * same "no grant found" outcome, non-enumerating. */
+  expectedTokenId?: string | null,
 ): Promise<RevokeConsentV2Result> {
   return stampWithdrawal(
     db,
@@ -1075,6 +1096,7 @@ export async function withdrawConsentByToken(
       ...(audit?.requestIp !== undefined ? { requestIp: audit.requestIp } : {}),
       ...(audit?.userAgent !== undefined ? { userAgent: audit.userAgent } : {}),
     },
+    expectedTokenId,
   );
 }
 
@@ -1085,6 +1107,17 @@ export async function withdrawConsentByToken(
  * (`revokeConsentV2` via the edge check, `withdrawConsentByToken` via the
  * verified bearer token) authorizes BEFORE calling. Idempotent: a second call
  * on an already-withdrawn grant returns the existing `withdrawnAt`.
+ *
+ * [WI-2347] `expectedTokenId`, when passed (bearer-token callers always pass
+ * one — `string` for `cw2`, `null` for legacy `cw1`; omitted entirely by the
+ * edge-authorized `revokeConsentV2` path, which skips this check), must
+ * satisfy `current.withdrawalTokenId === null || current.withdrawalTokenId
+ * === expectedTokenId` or this throws `ConsentRecordNotFoundError` — the
+ * same outcome as "no grant", so a superseded link is indistinguishable from
+ * a never-approved one (no enumeration). This also closes the `cw1`-vs-
+ * newer-`cw2`-grant gap: a `cw1` token (`expectedTokenId: null`) only passes
+ * while the current grant's `withdrawalTokenId` is still null; once a fresh
+ * `cw2` mint sets it, the old `cw1` link stops working.
  */
 async function stampWithdrawal(
   db: Database,
@@ -1092,9 +1125,17 @@ async function stampWithdrawal(
   organizationId: string,
   basis: ConsentBasis,
   auditFact: Record<string, unknown>,
+  expectedTokenId?: string | null,
 ): Promise<RevokeConsentV2Result> {
   const current = await currentGrant(db, chargePersonId, organizationId, basis);
   if (!current) {
+    throw new ConsentRecordNotFoundError();
+  }
+  if (
+    expectedTokenId !== undefined &&
+    current.withdrawalTokenId !== null &&
+    current.withdrawalTokenId !== expectedTokenId
+  ) {
     throw new ConsentRecordNotFoundError();
   }
   if (current.withdrawnAt) {
@@ -1170,6 +1211,11 @@ export async function restoreConsentByToken(
   chargePersonId: string,
   organizationId: string,
   audit?: { requestIp?: string; userAgent?: string },
+  /** [WI-2347] Same non-enumerating supersession check as
+   * `withdrawConsentByToken` — see its param doc. Pass `string` for `cw2`,
+   * `null` for legacy `cw1`; never `undefined` (this is always a
+   * bearer-token call). */
+  expectedTokenId?: string | null,
 ): Promise<RestoreConsentV2Result> {
   return appendRestoreGrant(
     db,
@@ -1181,6 +1227,7 @@ export async function restoreConsentByToken(
       ...(audit?.requestIp !== undefined ? { requestIp: audit.requestIp } : {}),
       ...(audit?.userAgent !== undefined ? { userAgent: audit.userAgent } : {}),
     },
+    expectedTokenId,
   );
 }
 
@@ -1191,6 +1238,15 @@ export async function restoreConsentByToken(
  * transaction. Carries NO authority check; callers authorize first (edge or
  * verified bearer token). Idempotent on an already-restored grant (returns
  * without appending).
+ *
+ * [WI-2347] `expectedTokenId`, when passed, must satisfy
+ * `current.withdrawalTokenId === null || current.withdrawalTokenId ===
+ * expectedTokenId` (same non-enumerating check as `stampWithdrawal`,
+ * including the `cw1`-vs-superseded-`cw2`-grant tightening). The appended
+ * row always carries the current grant's `withdrawalTokenId` forward —
+ * restore is a continuation of the same consent relationship, not a new
+ * one, so the one email link stays valid across withdraw/restore cycles
+ * regardless of which path (edge or token) performed the restore.
  */
 async function appendRestoreGrant(
   db: Database,
@@ -1198,6 +1254,7 @@ async function appendRestoreGrant(
   organizationId: string,
   basis: ConsentBasis,
   auditFact: Record<string, unknown>,
+  expectedTokenId?: string | null,
 ): Promise<RestoreConsentV2Result> {
   const now = new Date();
   // WI-583 race guard: the grace-end delete/archive predicates
@@ -1222,9 +1279,16 @@ async function appendRestoreGrant(
         eq(consentGrant.lawfulBasis, basis),
       ),
       orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
-      columns: { id: true, withdrawnAt: true },
+      columns: { id: true, withdrawnAt: true, withdrawalTokenId: true },
     });
     if (!current) {
+      throw new ConsentRecordNotFoundError();
+    }
+    if (
+      expectedTokenId !== undefined &&
+      current.withdrawalTokenId !== null &&
+      current.withdrawalTokenId !== expectedTokenId
+    ) {
       throw new ConsentRecordNotFoundError();
     }
     // Not withdrawn → nothing to restore (idempotent no-op).
@@ -1247,6 +1311,9 @@ async function appendRestoreGrant(
       grantedAt: now,
       priorValue: false,
       auditFact,
+      // [WI-2347] Carry the live link's id forward so the same emailed
+      // withdrawal link keeps matching `currentGrant` after this restore.
+      withdrawalTokenId: current.withdrawalTokenId,
     });
     await tx
       .update(person)
@@ -1592,6 +1659,11 @@ export async function getGdprGrantWithdrawalStateV2(
   db: Database,
   chargePersonId: string,
   organizationId: string,
+  /** [WI-2347] Same non-enumerating supersession check as `stampWithdrawal`
+   * (`string` for `cw2`, `null` for legacy `cw1`, `undefined` only to skip
+   * the check entirely) — a mismatch returns `null`, identical to
+   * "no grant". */
+  expectedTokenId?: string | null,
 ): Promise<{ withdrawnAt: Date | null } | null> {
   const current = await currentGrant(
     db,
@@ -1599,7 +1671,15 @@ export async function getGdprGrantWithdrawalStateV2(
     organizationId,
     'gdpr_parental_consent',
   );
-  return current ? { withdrawnAt: current.withdrawnAt } : null;
+  if (!current) return null;
+  if (
+    expectedTokenId !== undefined &&
+    current.withdrawalTokenId !== null &&
+    current.withdrawalTokenId !== expectedTokenId
+  ) {
+    return null;
+  }
+  return { withdrawnAt: current.withdrawnAt };
 }
 
 /**
@@ -1714,7 +1794,11 @@ async function currentGrant(
   chargePersonId: string,
   organizationId: string,
   basis: ConsentBasis,
-): Promise<{ id: string; withdrawnAt: Date | null } | null> {
+): Promise<{
+  id: string;
+  withdrawnAt: Date | null;
+  withdrawalTokenId: string | null;
+} | null> {
   const row = await db.query.consentGrant.findFirst({
     where: and(
       eq(consentGrant.chargePersonId, chargePersonId),
@@ -1723,7 +1807,7 @@ async function currentGrant(
       eq(consentGrant.lawfulBasis, basis),
     ),
     orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
-    columns: { id: true, withdrawnAt: true },
+    columns: { id: true, withdrawnAt: true, withdrawalTokenId: true },
   });
   return row ?? null;
 }

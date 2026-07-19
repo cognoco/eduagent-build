@@ -44,6 +44,7 @@ import {
   ConsentResendLimitError,
   createDirectConsentGrant,
   createPendingConsentRequest,
+  getGdprGrantWithdrawalStateV2,
   getOrgMemberDisplayNameV2,
   processConsentResponseV2,
   recordAdultSelfConsentV2,
@@ -55,7 +56,10 @@ import {
   withdrawAdultSelfConsentV2,
   withdrawConsentByToken,
 } from './consent-v2';
-import { CONSENT_PURPOSE_LLM_DISCLOSURE } from './consent-status-v2';
+import {
+  CONSENT_PURPOSE_LLM_DISCLOSURE,
+  DEFAULT_CONSENT_PURPOSE,
+} from './consent-status-v2';
 import {
   consentPersonLockKey,
   deleteArchivedPersonIfStillEligibleV2,
@@ -556,6 +560,7 @@ const COPPA = 'coppa_parental_consent';
       async function seedApprovedNoEdge(): Promise<{
         orgId: string;
         childId: string;
+        withdrawalTokenId: string;
       }> {
         const orgId = await seedOrg();
         const childId = await seedPerson(orgId);
@@ -571,8 +576,8 @@ const COPPA = 'coppa_parental_consent';
         const req = await db.query.consentRequest.findFirst({
           where: eq(consentRequest.chargePersonId, childId),
         });
-        await processConsentResponseV2(db, req!.token!, true);
-        return { orgId, childId };
+        const result = await processConsentResponseV2(db, req!.token!, true);
+        return { orgId, childId, withdrawalTokenId: result.withdrawalTokenId! };
       }
 
       it('the edge-gated revokeConsentV2 REJECTS this case (no guardianship edge) and does not mutate', async () => {
@@ -652,6 +657,217 @@ const COPPA = 'coppa_parental_consent';
           where: eq(consentGrant.chargePersonId, childId),
         });
         expect(grants).toHaveLength(0);
+      });
+
+      // -----------------------------------------------------------------------
+      // [WI-2347] T-10 mitigation — server-side per-link revocation. A grant
+      // approved BEFORE this change has no `withdrawalTokenId` (undefined
+      // caller param → check skipped, covered by every un-migrated test
+      // above); these cover the id-bound path a `cw2` token now takes.
+      // -----------------------------------------------------------------------
+      describe('[WI-2347] per-link revocation (withdrawalTokenId)', () => {
+        it('processConsentResponseV2 stamps a fresh withdrawalTokenId on approve, and null on deny', async () => {
+          const { childId, withdrawalTokenId } = await seedApprovedNoEdge();
+          expect(withdrawalTokenId).toEqual(expect.any(String));
+          const grant = await db.query.consentGrant.findFirst({
+            where: eq(consentGrant.chargePersonId, childId),
+          });
+          expect(grant?.withdrawalTokenId).toBe(withdrawalTokenId);
+
+          const orgId = await seedOrg();
+          const denyChildId = await seedPerson(orgId);
+          await createPendingConsentRequest(db, denyChildId, orgId, 'GDPR');
+          await requestConsentV2(db, {
+            chargePersonId: denyChildId,
+            organizationId: orgId,
+            consentType: 'GDPR',
+            guardianEmail: 'parent@example.com',
+            childName: 'Kid',
+            appUrl: 'https://api.test',
+          });
+          const denyReq = await db.query.consentRequest.findFirst({
+            where: eq(consentRequest.chargePersonId, denyChildId),
+          });
+          const denyResult = await processConsentResponseV2(
+            db,
+            denyReq!.token!,
+            false,
+          );
+          expect(denyResult.withdrawalTokenId).toBeNull();
+        });
+
+        it('withdrawConsentByToken succeeds when the caller passes the current withdrawalTokenId', async () => {
+          const { orgId, childId, withdrawalTokenId } =
+            await seedApprovedNoEdge();
+          const result = await withdrawConsentByToken(
+            db,
+            childId,
+            orgId,
+            undefined,
+            withdrawalTokenId,
+          );
+          expect(result.withdrawnAt).toBeTruthy();
+        });
+
+        it('withdrawConsentByToken with a stale/superseded tokenId throws ConsentRecordNotFoundError and does not mutate (AC-1)', async () => {
+          const { orgId, childId } = await seedApprovedNoEdge();
+          await expect(
+            withdrawConsentByToken(
+              db,
+              childId,
+              orgId,
+              undefined,
+              generateUUIDv7(), // a tokenId that names no grant
+            ),
+          ).rejects.toBeInstanceOf(ConsentRecordNotFoundError);
+
+          const grant = await db.query.consentGrant.findFirst({
+            where: eq(consentGrant.chargePersonId, childId),
+          });
+          expect(grant?.withdrawnAt).toBeNull();
+        });
+
+        it('restoreConsentByToken carries the SAME withdrawalTokenId forward — the original email link keeps matching after restore', async () => {
+          const { orgId, childId, withdrawalTokenId } =
+            await seedApprovedNoEdge();
+          await withdrawConsentByToken(
+            db,
+            childId,
+            orgId,
+            undefined,
+            withdrawalTokenId,
+          );
+          await restoreConsentByToken(
+            db,
+            childId,
+            orgId,
+            undefined,
+            withdrawalTokenId,
+          );
+
+          const grants = await db.query.consentGrant.findMany({
+            where: eq(consentGrant.chargePersonId, childId),
+            orderBy: (g, { asc }) => [asc(g.grantedAt)],
+          });
+          expect(grants).toHaveLength(2);
+          expect(grants[1]!.withdrawalTokenId).toBe(withdrawalTokenId);
+
+          // The SAME token id still resolves the (now-restored) current grant.
+          const state = await getGdprGrantWithdrawalStateV2(
+            db,
+            childId,
+            orgId,
+            withdrawalTokenId,
+          );
+          expect(state?.withdrawnAt).toBeNull();
+        });
+
+        it('restoreConsentByToken with a stale tokenId throws and does not append a row', async () => {
+          const { orgId, childId, withdrawalTokenId } =
+            await seedApprovedNoEdge();
+          await withdrawConsentByToken(
+            db,
+            childId,
+            orgId,
+            undefined,
+            withdrawalTokenId,
+          );
+
+          await expect(
+            restoreConsentByToken(
+              db,
+              childId,
+              orgId,
+              undefined,
+              generateUUIDv7(),
+            ),
+          ).rejects.toBeInstanceOf(ConsentRecordNotFoundError);
+
+          const grants = await db.query.consentGrant.findMany({
+            where: eq(consentGrant.chargePersonId, childId),
+          });
+          expect(grants).toHaveLength(1);
+        });
+
+        it('getGdprGrantWithdrawalStateV2 treats a mismatched tokenId as "nothing to withdraw" (no enumeration)', async () => {
+          const { orgId, childId } = await seedApprovedNoEdge();
+          const state = await getGdprGrantWithdrawalStateV2(
+            db,
+            childId,
+            orgId,
+            generateUUIDv7(),
+          );
+          expect(state).toBeNull();
+        });
+
+        // [WI-2347 review, CONSIDER-2] A legacy cw1 token (no tokenId — the
+        // route passes `null`) must be accepted ONLY while the current grant
+        // has never been touched by cw2 issuance (withdrawalTokenId still
+        // null). Once superseded by a fresh cw2 mint, the old cw1 link must
+        // become unusable exactly like a mismatched cw2 tokenId does.
+        it('withdrawConsentByToken ACCEPTS a legacy cw1 token (null tokenId) against a pre-migration grant with no withdrawalTokenId', async () => {
+          const orgId = await seedOrg();
+          const childId = await seedPerson(orgId);
+          // Simulates a grant approved before this change shipped: no id.
+          await db.insert(consentGrant).values({
+            chargePersonId: childId,
+            organizationId: orgId,
+            purpose: DEFAULT_CONSENT_PURPOSE,
+            lawfulBasis: 'gdpr_parental_consent',
+            granted: true,
+            grantedAt: new Date(),
+            priorValue: null,
+            auditFact: { source: 'consent_response_approved' },
+          });
+
+          const result = await withdrawConsentByToken(
+            db,
+            childId,
+            orgId,
+            undefined,
+            null,
+          );
+          expect(result.withdrawnAt).toBeTruthy();
+        });
+
+        it('withdrawConsentByToken REJECTS a legacy cw1 token (null tokenId) once the grant has been superseded by a newer cw2-minted grant (AC-1)', async () => {
+          const orgId = await seedOrg();
+          const childId = await seedPerson(orgId);
+          // Pre-migration grant, no withdrawalTokenId.
+          await db.insert(consentGrant).values({
+            chargePersonId: childId,
+            organizationId: orgId,
+            purpose: DEFAULT_CONSENT_PURPOSE,
+            lawfulBasis: 'gdpr_parental_consent',
+            granted: true,
+            grantedAt: new Date(Date.now() - 60_000),
+            priorValue: null,
+            auditFact: { source: 'consent_response_approved' },
+          });
+          // A newer grant that DOES carry a withdrawalTokenId — e.g. a fresh
+          // re-consent cycle minted under the post-migration code.
+          await db.insert(consentGrant).values({
+            chargePersonId: childId,
+            organizationId: orgId,
+            purpose: DEFAULT_CONSENT_PURPOSE,
+            lawfulBasis: 'gdpr_parental_consent',
+            granted: true,
+            grantedAt: new Date(),
+            priorValue: null,
+            auditFact: { source: 'consent_response_approved' },
+            withdrawalTokenId: generateUUIDv7(),
+          });
+
+          // The old cw1 link (no tokenId) must NOT act on the newer grant.
+          await expect(
+            withdrawConsentByToken(db, childId, orgId, undefined, null),
+          ).rejects.toBeInstanceOf(ConsentRecordNotFoundError);
+
+          const grants = await db.query.consentGrant.findMany({
+            where: eq(consentGrant.chargePersonId, childId),
+          });
+          expect(grants.every((g) => g.withdrawnAt === null)).toBe(true);
+        });
       });
     });
 
