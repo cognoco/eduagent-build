@@ -3,20 +3,29 @@ import {
   nowDeepLinkRouteSchema,
   type NowDeepLink,
   type NowDeepLinkRoute,
+  type ScopeDescriptor,
 } from '@eduagent/schemas';
 
 export type SubjectHubTarget = 'legacy-shelf' | 'v2-subject-hub';
 
-export interface PushNowDeepLinkOptions {
+interface NowPathOptions {
   subjectHubTarget?: SubjectHubTarget;
+}
+
+export interface PushNowDeepLinkOptions extends NowPathOptions {
+  // WI-2223: a support.hub pointer must select the Support-hub scope before
+  // the Mentor tab opens, or the learner Mentor surface renders instead
+  // (activeScope is otherwise unchanged by the push). Callers that hold
+  // useScopeContext pass their setActiveScope through here.
+  setActiveScope?: (scope: ScopeDescriptor) => void;
 }
 
 type PathBuilder = (
   params: Record<string, string>,
-  options: Required<PushNowDeepLinkOptions>,
+  options: Required<NowPathOptions>,
 ) => string;
 
-const DEFAULT_OPTIONS: Required<PushNowDeepLinkOptions> = {
+const DEFAULT_OPTIONS: Required<NowPathOptions> = {
   subjectHubTarget: 'legacy-shelf',
 };
 
@@ -84,7 +93,7 @@ function requiredParam(
 export function buildNowPath(
   route: NowDeepLinkRoute,
   params: Record<string, string>,
-  options: PushNowDeepLinkOptions = {},
+  options: NowPathOptions = {},
 ): string {
   return PATH_BUILDERS[route](params, { ...DEFAULT_OPTIONS, ...options });
 }
@@ -96,6 +105,9 @@ export function pushNowDeepLink(
 ): void {
   for (const route of [...deepLink.chain, deepLink.route]) {
     assertSupportedRoute(route);
+    if (route === 'support.hub') {
+      options.setActiveScope?.({ kind: 'supporter-hub' });
+    }
     router.push(buildNowPath(route, deepLink.params, options) as Href);
   }
 }

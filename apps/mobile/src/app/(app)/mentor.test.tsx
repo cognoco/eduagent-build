@@ -276,6 +276,53 @@ describe('MentorScreen', () => {
     expect(screen.queryByTestId('mentor-screen')).toBeNull();
   });
 
+  // [WI-2223 AC-1] activating a support.hub pointer must select the
+  // Support-hub scope BEFORE the Mentor tab opens, or the learner Mentor
+  // surface renders instead (activeScope is otherwise unchanged by the push).
+  it('[WI-2223] AC-1: selects the Support-hub scope before pushing a support.hub-linked card', () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([
+        card({ deepLink: { route: 'support.hub', params: {}, chain: [] } }),
+      ]),
+    };
+
+    renderMentorScreen();
+
+    fireEvent.press(screen.getByTestId('now-card-continue'));
+
+    expect(mockScopeContext.setActiveScope).toHaveBeenCalledWith({
+      kind: 'supporter-hub',
+    });
+    expect(mockPush).toHaveBeenCalledWith('/(app)/mentor');
+    expect(
+      mockScopeContext.setActiveScope.mock.invocationCallOrder[0],
+    ).toBeLessThan(mockPush.mock.invocationCallOrder[0]);
+  });
+
+  // [WI-2223 AC-3] the Support-hub Mentor surface and the Me Mentor surface
+  // are mutually exclusive — returning to Me scope never carries Support-hub
+  // content along (no duplication of support content into the Me scope).
+  it('[WI-2223] AC-3: the Me scope render carries no Support-hub content after a Support-hub render', () => {
+    mockScopeContext = {
+      ...mockScopeContext,
+      activeScope: { kind: 'supporter-hub' },
+    };
+    renderMentorScreen();
+    screen.getByTestId('support-hub-mentor-tab');
+    expect(screen.queryByTestId('mentor-screen')).toBeNull();
+    cleanupRender?.();
+
+    mockScopeContext = {
+      ...mockScopeContext,
+      activeScope: { kind: 'me' },
+    };
+    renderMentorScreen();
+
+    screen.getByTestId('mentor-screen');
+    expect(screen.queryByTestId('support-hub-mentor-tab')).toBeNull();
+  });
+
   it('routes Support hub cockpit actions through the selected person scope', () => {
     mockScopeContext = {
       ...mockScopeContext,
