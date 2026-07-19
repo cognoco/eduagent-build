@@ -667,6 +667,46 @@ export async function isGdprProcessingAllowedV2(
   return status == null || status === 'CONSENTED';
 }
 
+/**
+ * [WI-2372] Consent gate for the live LLM/exchange pipeline (canon R5).
+ *
+ * `isGdprProcessingAllowedV2` is basis-pinned to `gdpr_parental_consent` — it
+ * covers the child/parental-consent leg but says nothing about an adult's
+ * independently-withdrawable self-consent (`art6_1_a`, purposes
+ * `platform_use` + `llm_disclosure`, reachable via `PUT
+ * /consent/self/withdraw`). This predicate checks BOTH legs: parental
+ * withdrawal (via `isGdprProcessingAllowedV2`) OR either adult self-consent
+ * purpose withdrawn denies processing.
+ *
+ * "No rows → allowed" per leg (matching `isGdprProcessingAllowedV2`'s legacy
+ * semantics) — only an explicit WITHDRAWN status denies, so an adult with no
+ * self-consent grant row (or no org membership) is never false-positived.
+ */
+export async function isLlmExchangeConsentAllowed(
+  db: Database,
+  profileId: string,
+): Promise<boolean> {
+  if (!(await isGdprProcessingAllowedV2(db, profileId))) return false;
+
+  const membershipRow = await db.query.membership.findFirst({
+    where: eq(membership.personId, profileId),
+    columns: { organizationId: true },
+  });
+  if (!membershipRow) return true;
+
+  for (const purpose of ADULT_SELF_CONSENT_PURPOSES) {
+    const status = await resolveConsentStatus(
+      db,
+      profileId,
+      membershipRow.organizationId,
+      purpose,
+      'art6_1_a',
+    );
+    if (status === 'WITHDRAWN') return false;
+  }
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Scan-side EXISTS forms (§2.3a step 4)
 // ---------------------------------------------------------------------------

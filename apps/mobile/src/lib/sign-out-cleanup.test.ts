@@ -28,6 +28,18 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     expect(calledWith).toContain('mentomate_preview_intent');
   });
 
+  // [WI-2225] The pre-auth audience carrier (preAuthAudience.v1) is wiped by
+  // key name, regardless of which value — 'learner', 'parent', or the new
+  // non-authorizing 'supporter' — was stored under it. This test does not
+  // stage a value (the wipe call takes no value, only the key), which is
+  // the point: the next signed-out user on a shared device must never
+  // inherit a prior supporter choice.
+  it('clears preAuthAudience.v1 on sign-out regardless of the stored audience value (incl. supporter)', async () => {
+    await clearProfileSecureStorageOnSignOut([]);
+    const calledWith = mockDelete.mock.calls.map((c) => c[0] as string);
+    expect(calledWith).toContain('preAuthAudience.v1');
+  });
+
   it('clears global keys even when no profileIds are passed', async () => {
     await clearProfileSecureStorageOnSignOut([]);
     const calledWith = mockDelete.mock.calls.map((c) => c[0] as string);

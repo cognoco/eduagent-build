@@ -48,6 +48,7 @@ import {
   type EmailOptions,
 } from '../notifications/email';
 import { createLogger } from '../logger';
+import { computeAgeBracketFromDate } from '@eduagent/schemas';
 import { inngest } from '../../inngest/client';
 import { safeSend } from '../safe-non-core';
 import {
@@ -350,6 +351,175 @@ export async function withdrawAdultSelfConsentV2(
 }
 
 // ---------------------------------------------------------------------------
+// (2b) [WI-1193 AC1 — first-use repair] repairOrSignalAdultSelfConsentV2
+// ---------------------------------------------------------------------------
+// An adult owner who signed up BEFORE the adult self-consent bootstrap existed
+// holds no `art6_1_a` grant — recordAdultSelfConsentV2 runs only inside the
+// identity-graph bootstrap, which existing adults never re-enter. On an
+// authenticated session bootstrap (GET /v1/profiles) we repair-or-signal:
+//
+//   (a) a genuinely captured VERSIONED terms-acceptance fact exists on a prior
+//       grant → write the accountable `art6_1_a` record DERIVED from it, LEGACY
+//       purpose only (granular purposes attach at the next REAL consent event,
+//       never retroactively), provenance-marked.
+//   (c) no versioned fact → write NOTHING and signal `needs_consent`; the client
+//       drives a normal (re-)consent write. A version-less record fabricated
+//       from the bare signup timestamp is rejected as weak GDPR Art 5(2)/7(1)
+//       evidence (pm-ruling amendment 2026-07-18: the hard constraint governs —
+//       never mint a consent record without a traceable VERSIONED event).
+//
+// Applies ONLY to an adult (age >= 18 — the codebase's established adult
+// threshold, matching the bootstrap gate) account-OWNER (admin membership). The
+// caller's own server-derived person id is passed (never request-supplied), so
+// this is self-scoped and carries no cross-profile hazard.
+
+export type AdultSelfConsentRepairOutcome =
+  | 'not_applicable'
+  | 'already_present'
+  | 'repaired'
+  | 'needs_consent';
+
+interface CapturedVersionedTermsFact {
+  termsAcceptedAt: string;
+  termsVersion: string;
+}
+
+/**
+ * A GENUINELY captured versioned terms fact requires BOTH a real acceptance
+ * moment AND a non-empty version. An unversioned fact (version null/absent) is
+ * NOT a lawful repair source — see repairOrSignalAdultSelfConsentV2.
+ */
+function parseVersionedTermsFact(
+  value: unknown,
+): CapturedVersionedTermsFact | null {
+  if (!value || typeof value !== 'object') return null;
+  const fact = value as Record<string, unknown>;
+  const acceptedAt = fact['termsAcceptedAt'];
+  const version = fact['termsVersion'];
+  if (
+    typeof acceptedAt === 'string' &&
+    acceptedAt.length > 0 &&
+    typeof version === 'string' &&
+    version.length > 0
+  ) {
+    return { termsAcceptedAt: acceptedAt, termsVersion: version };
+  }
+  return null;
+}
+
+export async function repairOrSignalAdultSelfConsentV2(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+): Promise<AdultSelfConsentRepairOutcome> {
+  // Gate: adult (18+) account-OWNER only. A non-owner (managed-child login) or a
+  // minor owner never receives an adult self-consent record.
+  const membershipRow = await db.query.membership.findFirst({
+    where: and(
+      eq(membership.personId, chargePersonId),
+      eq(membership.organizationId, organizationId),
+    ),
+    columns: { roles: true },
+  });
+  if (!membershipRow?.roles.includes('admin')) return 'not_applicable';
+
+  const personRow = await db.query.person.findFirst({
+    where: eq(person.id, chargePersonId),
+    columns: { birthDate: true },
+  });
+  if (!personRow) return 'not_applicable';
+  // Adult-owner gate — computeAgeBracketFromDate is the canonical feature-gating
+  // / safety-adjacent age function AGENTS.md §Profile Shapes names for the
+  // adult-owner gate (exact-date UTC math, year-only fallback when month/day are
+  // absent — never the year-only computeAgeBracket, which overestimates by up to
+  // 11 months and could read a late-in-the-year 17-year-old as 18). `birthDate`
+  // is the `YYYY-MM-DD` date column; fail-closed on a null/non-numeric birthYear.
+  const birthDate = String(personRow.birthDate);
+  const birthYear = Number(birthDate.slice(0, 4));
+  const birthMonth = Number(birthDate.slice(5, 7));
+  const birthDay = Number(birthDate.slice(8, 10));
+  if (
+    !Number.isFinite(birthYear) ||
+    computeAgeBracketFromDate(
+      birthYear,
+      Number.isFinite(birthMonth) ? birthMonth : undefined,
+      Number.isFinite(birthDay) ? birthDay : undefined,
+    ) !== 'adult'
+  ) {
+    return 'not_applicable';
+  }
+
+  // Fast path: already bootstrapped (case b) or previously repaired — nothing to
+  // do. Re-checked authoritatively inside the locked transaction below.
+  const existing = await db.query.consentGrant.findFirst({
+    where: and(
+      eq(consentGrant.chargePersonId, chargePersonId),
+      eq(consentGrant.lawfulBasis, 'art6_1_a'),
+    ),
+    columns: { id: true },
+  });
+  if (existing) return 'already_present';
+
+  // The ONLY lawful repair source: a genuinely captured VERSIONED terms fact on
+  // a prior grant for this person.
+  const priorGrants = await db.query.consentGrant.findMany({
+    where: eq(consentGrant.chargePersonId, chargePersonId),
+    columns: { auditFact: true },
+  });
+  let versioned: CapturedVersionedTermsFact | null = null;
+  for (const g of priorGrants) {
+    versioned = parseVersionedTermsFact(g.auditFact);
+    if (versioned) break;
+  }
+  if (!versioned) return 'needs_consent'; // (c) never fabricate
+  // const captures the non-null narrowing for the transaction closure below.
+  const fact = versioned;
+
+  // Serialise the write per-person with a pg_advisory_xact_lock so two
+  // concurrent bootstraps for the same owner cannot both clear the guard and
+  // write duplicate art6_1_a rows into this GDPR compliance table. There is no
+  // unique constraint on (charge_person_id, lawful_basis) — the AC2 purpose
+  // split means a person legitimately holds several art6_1_a grants — so a plain
+  // insert cannot be made idempotent by ON CONFLICT here. Same idiom as
+  // services/nudge.ts. Double-checked: re-read existing INSIDE the lock so the
+  // loser of a race early-outs instead of inserting.
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${
+        'adult-consent-repair:' + chargePersonId
+      }, 0))`,
+    );
+
+    const existingLocked = await tx.query.consentGrant.findFirst({
+      where: and(
+        eq(consentGrant.chargePersonId, chargePersonId),
+        eq(consentGrant.lawfulBasis, 'art6_1_a'),
+      ),
+      columns: { id: true },
+    });
+    if (existingLocked) return 'already_present';
+
+    // (a) Repair from the captured versioned fact. Legacy purpose only.
+    await tx.insert(consentGrant).values({
+      chargePersonId,
+      organizationId,
+      purpose: DEFAULT_CONSENT_PURPOSE,
+      lawfulBasis: 'art6_1_a',
+      granted: true,
+      grantedAt: new Date(),
+      auditFact: {
+        source: 'adult_self_consent_repair',
+        termsAcceptedAt: fact.termsAcceptedAt,
+        termsVersion: fact.termsVersion,
+        // Provenance: the ORIGINAL terms-acceptance event this record derives from.
+        repairedFromEventAt: fact.termsAcceptedAt,
+      },
+    });
+    return 'repaired'; // (a)
+  });
+}
+
+// ---------------------------------------------------------------------------
 // (3) requestConsentV2 — legacy requestConsent
 // ---------------------------------------------------------------------------
 
@@ -596,6 +766,12 @@ export interface ProcessConsentResponseV2Result {
    * request never recorded one. See spec §5.1.
    */
   guardianEmail: string | null;
+  /**
+   * [WI-2347] The `withdrawal_token_id` stamped on the newly-inserted grant,
+   * for the approval route to embed in the `cw2` withdrawal token it signs.
+   * Null on a deny (no grant is created).
+   */
+  withdrawalTokenId: string | null;
 }
 
 /**
@@ -641,6 +817,10 @@ export async function processConsentResponseV2(
   const chargePersonId = request.chargePersonId;
   const basis = request.requestedBasis;
 
+  // [WI-2347] Minted up front (not inside the tx) so it's available to build
+  // the return value regardless of which branch below runs.
+  const withdrawalTokenId = approved ? crypto.randomUUID() : null;
+
   if (approved) {
     await db.transaction(async (tx) => {
       // Atomic guard against a concurrent second submit.
@@ -658,6 +838,7 @@ export async function processConsentResponseV2(
             source: 'consent_response_approved',
             policyVersion: audit?.policyVersion ?? request.policyVersion,
           },
+          withdrawalTokenId,
         })
         .returning({ id: consentGrant.id });
       if (!grant) {
@@ -837,6 +1018,7 @@ export async function processConsentResponseV2(
     approved,
     organizationId: request.organizationId,
     guardianEmail: request.guardianEmail ?? null,
+    withdrawalTokenId,
   };
 }
 
@@ -894,6 +1076,15 @@ export async function withdrawConsentByToken(
   chargePersonId: string,
   organizationId: string,
   audit?: { requestIp?: string; userAgent?: string },
+  /** [WI-2347] The verified token's embedded id: a `cw2` tokenId, or `null`
+   * for a legacy `cw1` token (which carries none). Always pass one of these
+   * two — never `undefined` — this is always a bearer-token call, unlike
+   * `revokeConsentV2`'s edge path, which omits the param entirely to skip
+   * the check below. A `cw1` token (`null`) only matches a grant that has
+   * never been touched by `cw2` issuance (`withdrawalTokenId` still null);
+   * once superseded by a fresh `cw2` mint, the old `cw1` link is unusable —
+   * same "no grant found" outcome, non-enumerating. */
+  expectedTokenId?: string | null,
 ): Promise<RevokeConsentV2Result> {
   return stampWithdrawal(
     db,
@@ -905,6 +1096,7 @@ export async function withdrawConsentByToken(
       ...(audit?.requestIp !== undefined ? { requestIp: audit.requestIp } : {}),
       ...(audit?.userAgent !== undefined ? { userAgent: audit.userAgent } : {}),
     },
+    expectedTokenId,
   );
 }
 
@@ -915,6 +1107,17 @@ export async function withdrawConsentByToken(
  * (`revokeConsentV2` via the edge check, `withdrawConsentByToken` via the
  * verified bearer token) authorizes BEFORE calling. Idempotent: a second call
  * on an already-withdrawn grant returns the existing `withdrawnAt`.
+ *
+ * [WI-2347] `expectedTokenId`, when passed (bearer-token callers always pass
+ * one — `string` for `cw2`, `null` for legacy `cw1`; omitted entirely by the
+ * edge-authorized `revokeConsentV2` path, which skips this check), must
+ * satisfy `current.withdrawalTokenId === null || current.withdrawalTokenId
+ * === expectedTokenId` or this throws `ConsentRecordNotFoundError` — the
+ * same outcome as "no grant", so a superseded link is indistinguishable from
+ * a never-approved one (no enumeration). This also closes the `cw1`-vs-
+ * newer-`cw2`-grant gap: a `cw1` token (`expectedTokenId: null`) only passes
+ * while the current grant's `withdrawalTokenId` is still null; once a fresh
+ * `cw2` mint sets it, the old `cw1` link stops working.
  */
 async function stampWithdrawal(
   db: Database,
@@ -922,9 +1125,17 @@ async function stampWithdrawal(
   organizationId: string,
   basis: ConsentBasis,
   auditFact: Record<string, unknown>,
+  expectedTokenId?: string | null,
 ): Promise<RevokeConsentV2Result> {
   const current = await currentGrant(db, chargePersonId, organizationId, basis);
   if (!current) {
+    throw new ConsentRecordNotFoundError();
+  }
+  if (
+    expectedTokenId !== undefined &&
+    current.withdrawalTokenId !== null &&
+    current.withdrawalTokenId !== expectedTokenId
+  ) {
     throw new ConsentRecordNotFoundError();
   }
   if (current.withdrawnAt) {
@@ -988,39 +1199,21 @@ export async function restoreConsentV2(
 }
 
 /**
- * Bearer-token restore (undo) for the email-consenting parent (P0,
- * MMT-ADR-0027). The mirror of `withdrawConsentByToken`: the same
- * append-a-new-grant core as `restoreConsentV2`, authorized by the verified
- * withdrawal token rather than a guardianship edge. Outside the 7-day grace it
- * throws `ConsentGracePeriodExpiredError` (the data is already gone), identical
- * to the edge-gated path. See spec §5.3.
- */
-export async function restoreConsentByToken(
-  db: Database,
-  chargePersonId: string,
-  organizationId: string,
-  audit?: { requestIp?: string; userAgent?: string },
-): Promise<RestoreConsentV2Result> {
-  return appendRestoreGrant(
-    db,
-    chargePersonId,
-    organizationId,
-    'gdpr_parental_consent',
-    {
-      source: 'email_parent_restore',
-      ...(audit?.requestIp !== undefined ? { requestIp: audit.requestIp } : {}),
-      ...(audit?.userAgent !== undefined ? { userAgent: audit.userAgent } : {}),
-    },
-  );
-}
-
-/**
  * The post-authorization core of restore: take the per-person advisory lock,
  * re-read the current grant, enforce the grace window, APPEND a new
  * un-withdrawn grant, and clear `archived_at` — all in one serialized
  * transaction. Carries NO authority check; callers authorize first (edge or
  * verified bearer token). Idempotent on an already-restored grant (returns
  * without appending).
+ *
+ * [WI-2347] `expectedTokenId`, when passed, must satisfy
+ * `current.withdrawalTokenId === null || current.withdrawalTokenId ===
+ * expectedTokenId` (same non-enumerating check as `stampWithdrawal`,
+ * including the `cw1`-vs-superseded-`cw2`-grant tightening). The appended
+ * row always carries the current grant's `withdrawalTokenId` forward —
+ * restore is a continuation of the same consent relationship, not a new
+ * one, so the one email link stays valid across withdraw/restore cycles
+ * regardless of which path (edge or token) performed the restore.
  */
 async function appendRestoreGrant(
   db: Database,
@@ -1052,7 +1245,7 @@ async function appendRestoreGrant(
         eq(consentGrant.lawfulBasis, basis),
       ),
       orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
-      columns: { id: true, withdrawnAt: true },
+      columns: { id: true, withdrawnAt: true, withdrawalTokenId: true },
     });
     if (!current) {
       throw new ConsentRecordNotFoundError();
@@ -1077,6 +1270,9 @@ async function appendRestoreGrant(
       grantedAt: now,
       priorValue: false,
       auditFact,
+      // [WI-2347] Carry the live link's id forward so the same emailed
+      // withdrawal link keeps matching `currentGrant` after this restore.
+      withdrawalTokenId: current.withdrawalTokenId,
     });
     await tx
       .update(person)
@@ -1422,6 +1618,11 @@ export async function getGdprGrantWithdrawalStateV2(
   db: Database,
   chargePersonId: string,
   organizationId: string,
+  /** [WI-2347] Same non-enumerating supersession check as `stampWithdrawal`
+   * (`string` for `cw2`, `null` for legacy `cw1`, `undefined` only to skip
+   * the check entirely) — a mismatch returns `null`, identical to
+   * "no grant". */
+  expectedTokenId?: string | null,
 ): Promise<{ withdrawnAt: Date | null } | null> {
   const current = await currentGrant(
     db,
@@ -1429,7 +1630,15 @@ export async function getGdprGrantWithdrawalStateV2(
     organizationId,
     'gdpr_parental_consent',
   );
-  return current ? { withdrawnAt: current.withdrawnAt } : null;
+  if (!current) return null;
+  if (
+    expectedTokenId !== undefined &&
+    current.withdrawalTokenId !== null &&
+    current.withdrawalTokenId !== expectedTokenId
+  ) {
+    return null;
+  }
+  return { withdrawnAt: current.withdrawnAt };
 }
 
 /**
@@ -1544,7 +1753,11 @@ async function currentGrant(
   chargePersonId: string,
   organizationId: string,
   basis: ConsentBasis,
-): Promise<{ id: string; withdrawnAt: Date | null } | null> {
+): Promise<{
+  id: string;
+  withdrawnAt: Date | null;
+  withdrawalTokenId: string | null;
+} | null> {
   const row = await db.query.consentGrant.findFirst({
     where: and(
       eq(consentGrant.chargePersonId, chargePersonId),
@@ -1553,7 +1766,7 @@ async function currentGrant(
       eq(consentGrant.lawfulBasis, basis),
     ),
     orderBy: (g, { desc }) => [desc(g.grantedAt), desc(g.id)],
-    columns: { id: true, withdrawnAt: true },
+    columns: { id: true, withdrawnAt: true, withdrawalTokenId: true },
   });
   return row ?? null;
 }

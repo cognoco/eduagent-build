@@ -182,10 +182,35 @@ function redactJsonParseSyntaxErrorValue(value: string): string {
 }
 
 /**
+ * [WI-2353] `@sentry/cloudflare`'s default `requestDataIntegration` copies
+ * `event.request.headers` verbatim (see `@sentry/core`'s
+ * `httpRequestToRequestData` → `headersToDict`, which lowercases every key
+ * via `Headers.forEach`). The SDK only special-cases the `cookie` header
+ * (withheld by `include: { cookies: false }` in `sdk.js`'s
+ * `getDefaultIntegrations`, gated on `sendDefaultPii`) — `authorization` gets
+ * no such treatment, so `Authorization: Bearer <jwt>` reaches Sentry
+ * unredacted on every captured event during an authenticated request.
+ *
+ * Deletes the key rather than replacing it, and matches case-insensitively —
+ * `headersToDict` always lowercases in practice, but this does not assume
+ * that's the only shape a caller could construct. Scoped to
+ * `event.request.headers` only; other `request` fields (url, cookies, data)
+ * and every other header are left untouched.
+ */
+function scrubAuthorizationHeader(headers: Record<string, unknown>): void {
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase() === 'authorization') {
+      delete headers[key];
+    }
+  }
+}
+
+/**
  * `beforeSend` scrubber for the API's Sentry init — recursively strips
  * denylisted PII-bearing keys from `event.extra`, every `event.contexts`
- * entry, and every breadcrumb's `data`; also redacts any `JSON.parse`
- * SyntaxError-shaped `exception.value` (see rationale below) before the
+ * entry, and every breadcrumb's `data`; redacts any `JSON.parse`
+ * SyntaxError-shaped `exception.value` (see rationale below); and strips the
+ * `authorization` header from `event.request.headers` [WI-2353] before the
  * event leaves the process. Defense-in-depth, not a substitute for
  * call-site discipline. [WI-1990]
  *
@@ -214,6 +239,9 @@ function redactJsonParseSyntaxErrorValue(value: string): string {
  * redacted structural message groups correctly.
  */
 export function scrubSentryEvent<T extends Sentry.ErrorEvent>(event: T): T {
+  if (event.request?.headers) {
+    scrubAuthorizationHeader(event.request.headers);
+  }
   if (event.extra) {
     event.extra = scrubKeys(event.extra);
   }

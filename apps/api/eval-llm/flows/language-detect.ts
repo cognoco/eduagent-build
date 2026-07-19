@@ -39,6 +39,17 @@ const FIXTURES: Array<{ scenarioId: string; input: LanguageDetectInput }> = [
       expectedIsLanguageLearning: true,
     },
   },
+  {
+    // Hardened-detector blind spot (OPQ-49): genuine practice request wrapped
+    // in a politics topic — the "discuss X in the target language" class must
+    // still classify as language learning despite the topical framing.
+    scenarioId: 'german-practice-via-politics-topic',
+    input: {
+      rawInput:
+        'I want to practice German by discussing current German politics',
+      expectedIsLanguageLearning: true,
+    },
+  },
   // --- Ambiguous topics that mention a language name but aren't learning --
   {
     // AC regression example: French history must not enter four_strands.

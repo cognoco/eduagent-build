@@ -1,9 +1,10 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 
 import {
   learningSessions,
   person,
   subjects,
+  supportVisibilityContracts,
   supportership,
   type Database,
 } from '@eduagent/database';
@@ -12,6 +13,8 @@ import {
   type ScopeDescriptor,
   type SupporterScopeList,
 } from '@eduagent/schemas';
+
+import { acceptedVisibilityCondition } from './linking-ceremony';
 
 async function hasFirstRealLearningState(
   db: Database,
@@ -46,11 +49,14 @@ export async function resolveScopesForPerson(
     })
     .from(supportership)
     .innerJoin(person, eq(person.id, supportership.supporteePersonId))
+    .innerJoin(
+      supportVisibilityContracts,
+      eq(supportVisibilityContracts.supportershipId, supportership.id),
+    )
     .where(
       and(
         eq(supportership.supporterPersonId, personId),
-        isNull(supportership.revokedAt),
-        isNull(person.archivedAt),
+        acceptedVisibilityCondition(),
       ),
     )
     .orderBy(asc(person.displayName), asc(supportership.id))

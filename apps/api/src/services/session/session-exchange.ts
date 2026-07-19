@@ -76,6 +76,7 @@ import { applyMinorPiiEchoGate } from '../minor-pii-echo-gate';
 import { runSuitabilityEnforcement } from '../suitability-gate';
 import type { ExchangeContext, ReviewCallback } from '../exchange-types';
 import { getReviewCallbackContext } from '../review-callback';
+import { isLlmExchangeConsentAllowed } from '../identity-v2/consent-status-v2';
 import {
   evaluateEscalation,
   getRetentionAwareStartingRung,
@@ -122,6 +123,7 @@ import {
 import {
   getSession,
   MAX_EXCHANGES_PER_SESSION,
+  ConsentWithdrawnError,
   persistSessionMetadata,
   SessionExchangeLimitError,
 } from './session-crud';
@@ -1968,6 +1970,20 @@ interface ExchangePrep {
 }
 
 /**
+ * [WI-2372] Consent-withdrawal guard for the live LLM/exchange pipeline
+ * (canon R5). Runs BEFORE checkExchangeLimit / prepareExchangeContext so a
+ * withdrawn-consent profile's request never reaches LLM dispatch.
+ */
+async function assertExchangeConsent(
+  db: Database,
+  profileId: string,
+): Promise<void> {
+  if (!(await isLlmExchangeConsentAllowed(db, profileId))) {
+    throw new ConsentWithdrawnError();
+  }
+}
+
+/**
  * Lightweight exchange-limit guard. Uses the scoped repository to load
  * the session and check if the exchange cap has been reached, before
  * the expensive prepareExchangeContext query set runs.
@@ -3672,6 +3688,9 @@ export async function processMessage(
   challengeOffer?: { pitch: string };
   draftedNote?: DraftedChallengeNote;
 }> {
+  // [WI-2372] Consent-withdrawal gate — first op, before any dispatch.
+  await assertExchangeConsent(db, profileId);
+
   // Early exchange limit check — runs before expensive prepareExchangeContext
   // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
   await checkExchangeLimit(db, profileId, sessionId);
@@ -4000,6 +4019,9 @@ export async function streamMessage(
     draftedNote?: DraftedChallengeNote;
   }>;
 }> {
+  // [WI-2372] Consent-withdrawal gate — first op, before any dispatch.
+  await assertExchangeConsent(db, profileId);
+
   // Early exchange limit check — runs before expensive prepareExchangeContext
   // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
   await checkExchangeLimit(db, profileId, sessionId);

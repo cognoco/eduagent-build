@@ -21,6 +21,7 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import { requireProfileId } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { parseConversationLanguage } from '../services/llm';
@@ -34,7 +35,10 @@ import {
   addCurriculumTopic,
   adaptCurriculumFromPerformance,
 } from '../services/curriculum';
-import { assertOwnerProfile } from '../services/family-access';
+import {
+  assertOwnerProfile,
+  assertCallerIsAccountOwner,
+} from '../services/family-access';
 import {
   cloneTopicFromChild,
   undoCloneFromChild,
@@ -59,6 +63,10 @@ type CurriculumRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
+    account: Account;
+    // [WI-1989] The authenticated caller's own person id, resolved server-side
+    // by accountMiddleware — required by assertCallerIsAccountOwner.
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -70,6 +78,8 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     zValidator('json', cloneFromChildRequestSchema),
     async (c) => {
       assertOwnerProfile(c);
+      // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      await assertCallerIsAccountOwner(c);
 
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
@@ -107,6 +117,8 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     zValidator('json', undoCloneFromChildRequestSchema),
     async (c) => {
       assertOwnerProfile(c);
+      // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      await assertCallerIsAccountOwner(c);
 
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));

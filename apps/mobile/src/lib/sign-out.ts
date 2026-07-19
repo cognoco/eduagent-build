@@ -28,7 +28,6 @@
 // than re-implementing the steps.
 // ---------------------------------------------------------------------------
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native';
 import type { QueryClient } from '@tanstack/react-query';
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
@@ -36,6 +35,7 @@ import { clearTransitionState } from './auth-transition';
 import { clearPendingAuthRedirect } from './pending-auth-redirect';
 import {
   buildPersisterKey,
+  purgePersisterKeys,
   removeAllScopedPersisterCaches,
 } from './query-persister';
 import {
@@ -130,10 +130,15 @@ export async function signOutWithCleanup(
   // compute the one targeted key without a clerkUserId, so we remove them
   // all instead of leaving any of them to the throttle.
   if (clerkUserId) {
-    await AsyncStorage.removeItem(buildPersisterKey(clerkUserId)).catch(() => {
-      // Non-fatal — same policy as clearProfileSecureStorageOnSignOut below:
-      // better to continue sign-out than abort over one storage failure.
-    });
+    // [WI-1987] Escalate-on-failure purge (see purgePersisterKeys in
+    // query-persister.ts). A swallowed removal here would leave a plaintext
+    // learner-content cache on disk while sign-out reported success — the
+    // silent recovery the Fix Development Rule bans in auth code. purge never
+    // throws (sign-out always completes — session teardown is the primary
+    // boundary) and Sentry-reports the KEY NAME on failure; the survivor is
+    // re-swept at the next definitively-signed-out moment (app start / before
+    // next sign-in) by reattemptPersisterPurgeIfSignedOut in the app shell.
+    await purgePersisterKeys([buildPersisterKey(clerkUserId)]);
   } else {
     // [WI-1987] clerkUserId is unavailable (identity not yet loaded — e.g.
     // auth-expired 401 handler, profile-load-timeout). Breadcrumb so this
@@ -144,10 +149,9 @@ export async function signOutWithCleanup(
       message:
         'sign-out: scoped persister removal used full-sweep fallback (no clerkUserId)',
     });
-    await removeAllScopedPersisterCaches().catch(() => {
-      // Non-fatal — same policy as clearProfileSecureStorageOnSignOut below:
-      // better to continue sign-out than abort over one storage failure.
-    });
+    // Escalate-on-failure full sweep — also never throws; Sentry-reports the
+    // surviving key names rather than swallowing the failure.
+    await removeAllScopedPersisterCaches();
   }
 
   // [SEC-SENTRY-SCOPE] Wipe the Sentry scope so that any crash between

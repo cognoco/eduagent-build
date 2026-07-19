@@ -43,6 +43,7 @@ export type { RecordableSessionEventType } from './session-events';
 export {
   SubjectInactiveError,
   SessionExchangeLimitError,
+  ConsentWithdrawnError,
   CurriculumSessionNotReadyError,
   MAX_EXCHANGES_PER_SESSION,
   startSession,
