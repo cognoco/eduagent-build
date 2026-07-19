@@ -11,6 +11,7 @@ import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { TimeoutLoader } from '../../../components/common/TimeoutLoader';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace, PRACTICE_HREF } from '../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useRelativeDate } from '../../../hooks/use-time-format';
 
 type AssessmentTopic = ReturnType<
@@ -201,7 +202,13 @@ export default function AssessmentPickerScreen(): React.ReactElement {
                 variant="primary"
                 label={t('assessment.pickerBrowseTopics')}
                 testID="assessment-picker-browse"
-                onPress={() => router.push('/(app)/library' as Href)}
+                onPress={() =>
+                  router.push(
+                    (FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+                      ? '/(app)/subjects'
+                      : '/(app)/library') as Href,
+                  )
+                }
               />
             </View>
           </View>
