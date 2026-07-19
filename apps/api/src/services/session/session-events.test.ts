@@ -169,6 +169,17 @@ describe('mapSummaryRow', () => {
     const row = buildSummaryRow({ aiFeedback: null });
     const summary = mapSummaryRow(row as never);
     expect(summary.aiFeedback).toBeNull();
+    expect(summary.feedbackStatus).toBe('unavailable');
+  });
+
+  it('[WI-2183] converts the legacy submit-again fallback into recoverable unavailable state', () => {
+    const row = buildSummaryRow({
+      aiFeedback:
+        "Your summary was saved. We couldn't provide AI feedback right now — you can try submitting again.",
+    });
+    const summary = mapSummaryRow(row as never);
+    expect(summary.aiFeedback).toBeNull();
+    expect(summary.feedbackStatus).toBe('unavailable');
   });
 
   it('always returns nextTopicTitle as null (caller enriches)', () => {

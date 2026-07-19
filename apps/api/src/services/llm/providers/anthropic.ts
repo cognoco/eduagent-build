@@ -214,6 +214,7 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
     async chat(
       messages: ChatMessage[],
       config: ModelConfig,
+      signal?: AbortSignal,
     ): Promise<ChatResult> {
       const { system, messages: anthropicMessages } = toAnthropicFormat(
         messages,
@@ -235,7 +236,9 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
           'anthropic-version': ANTHROPIC_VERSION,
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS)])
+          : AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
       });
 
       if (!res.ok) {

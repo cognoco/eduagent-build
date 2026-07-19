@@ -205,6 +205,7 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
     async chat(
       messages: ChatMessage[],
       config: ModelConfig,
+      signal?: AbortSignal,
     ): Promise<ChatResult> {
       const res = await fetch(CEREBRAS_BASE_URL, {
         method: 'POST',
@@ -213,7 +214,9 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(buildBody(messages, config, false)),
-        signal: AbortSignal.timeout(CEREBRAS_TIMEOUT_MS),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(CEREBRAS_TIMEOUT_MS)])
+          : AbortSignal.timeout(CEREBRAS_TIMEOUT_MS),
       });
 
       if (!res.ok) {

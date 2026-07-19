@@ -25,6 +25,7 @@ import type {
   TranscriptResponse,
   SessionType,
   RecallBridgeResult,
+  RetrySummaryFeedbackResult,
   VerificationType,
   SystemPromptIntent,
 } from '@eduagent/schemas';
@@ -35,6 +36,7 @@ import {
   parkingLotAddResponseSchema,
   parkingLotItemsResponseSchema,
   recallBridgeResultSchema,
+  retrySummaryFeedbackResultSchema,
   sessionStartResultSchema,
   sessionSummaryGetResponseSchema,
   skipSummaryResponseSchema,
@@ -47,7 +49,7 @@ import { parseJson } from '../lib/parse-json';
 import { useProfile } from '../lib/profile';
 import { useAppContext } from '../lib/app-context';
 import { FEATURE_FLAGS } from '../lib/feature-flags';
-import { combinedSignal } from '../lib/query-timeout';
+import { combinedSignal, createTimeoutSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
@@ -635,6 +637,42 @@ export function useSubmitSummary(
           )(query.queryKey),
       });
       invalidateSessionDerivedQueries(queryClient);
+    },
+  });
+}
+
+export function useRetrySummaryFeedback(
+  sessionId: string,
+): UseMutationResult<RetrySummaryFeedbackResult, Error, void> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { profileId } = useSessionNavigationScope();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { signal, cleanup } = createTimeoutSignal(15_000);
+      try {
+        const res = await client.sessions[':sessionId'].summary[
+          'retry-feedback'
+        ].$post({ param: { sessionId } }, { init: { signal } });
+        await assertOk(res);
+        return parseJson(
+          res,
+          retrySummaryFeedbackResultSchema,
+          'POST /sessions/:sessionId/summary/retry-feedback',
+        );
+      } finally {
+        cleanup();
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        predicate: (query) =>
+          queryKeys.sessions.matchSummaryAnyMode(
+            sessionId,
+            profileId,
+          )(query.queryKey),
+      });
     },
   });
 }
