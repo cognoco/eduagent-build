@@ -1004,6 +1004,7 @@ describe('new Stage-0 scenarios return required IDs', () => {
             correct: false,
             correctAnswer: 'Paris',
             answerGiven: 'Berlin',
+            timeMs: 1250,
           },
         ],
       }),

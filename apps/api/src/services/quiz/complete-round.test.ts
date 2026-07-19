@@ -47,6 +47,7 @@ import {
   getVocabSm2Quality,
   inferVocabularyTypeFromTerm,
   isAnswerCorrect,
+  normalizeCompletedRoundResults,
   validateResults,
 } from './complete-round';
 import { QUIZ_CONFIG } from './config';
@@ -152,6 +153,56 @@ describe('buildStoredQuestionResult [WI-2190]', () => {
       expect(stored).not.toHaveProperty('finalAttempt');
     },
   );
+});
+
+describe('normalizeCompletedRoundResults [WI-2190]', () => {
+  const capitalsQuestion: QuizQuestion = {
+    type: 'capitals',
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    distractors: ['Berlin', 'Madrid', 'Rome'],
+    funFact: '',
+    isLibraryItem: false,
+  };
+
+  it('reconstructs the server-owned correct answer for a stored completed result', () => {
+    expect(
+      normalizeCompletedRoundResults(
+        [
+          {
+            questionIndex: 0,
+            correct: false,
+            correctAnswer: 'client-forgery',
+            answerGiven: 'Berlin',
+          },
+        ],
+        [capitalsQuestion],
+      ),
+    ).toEqual([
+      {
+        questionIndex: 0,
+        correct: false,
+        correctAnswer: 'Paris',
+        answerGiven: 'Berlin',
+      },
+    ]);
+  });
+
+  it('rejects a non-array completed-results value as unavailable', () => {
+    expect(() =>
+      normalizeCompletedRoundResults(null, [capitalsQuestion]),
+    ).toThrow('Completed round results are unavailable');
+  });
+
+  it('rejects a completed result whose question index has no match', () => {
+    expect(() =>
+      normalizeCompletedRoundResults(
+        [{ questionIndex: 1, correct: false, answerGiven: 'Berlin' }],
+        [capitalsQuestion],
+      ),
+    ).toThrow('Completed round results are unavailable');
+  });
 });
 
 describe('calculateScore', () => {

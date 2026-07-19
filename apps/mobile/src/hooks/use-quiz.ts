@@ -144,7 +144,9 @@ export function useCompleteRound(): UseMutationResult<
       void queryClient.invalidateQueries({ queryKey: ['quiz-recent'] });
       void queryClient.invalidateQueries({ queryKey: ['quiz-stats'] });
       void queryClient.invalidateQueries({
-        queryKey: ['quiz-round-detail', roundId, activeProfile?.id],
+        queryKey: activeProfile?.id
+          ? ['quiz-round-detail', roundId, activeProfile.id]
+          : ['quiz-round-detail', roundId],
       });
       // PR-10 deferred: broad ['progress'] — quiz completion affects topic progress
       // and subject progress for the round's topic, but the round may span multiple

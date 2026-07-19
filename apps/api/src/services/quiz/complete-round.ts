@@ -16,7 +16,11 @@ import type {
   QuizQuestion,
   ValidatedQuestionResult,
 } from '@eduagent/schemas';
-import { cefrLevelSchema, isGuessWhoFuzzyMatch } from '@eduagent/schemas';
+import {
+  cefrLevelSchema,
+  isGuessWhoFuzzyMatch,
+  validatedQuestionResultSchema,
+} from '@eduagent/schemas';
 import { BadRequestError, ConflictError, NotFoundError } from '../../errors';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
@@ -104,6 +108,40 @@ export function buildStoredQuestionResult(
     ...(result.answerMode ? { answerMode: result.answerMode } : {}),
     ...(result.disputed ? { disputed: true } : {}),
   };
+}
+
+export function normalizeCompletedRoundResults(
+  rawResults: unknown,
+  questions: QuizQuestion[],
+): ValidatedQuestionResult[] {
+  if (!Array.isArray(rawResults)) {
+    throw new ConflictError('Completed round results are unavailable');
+  }
+
+  return rawResults.map((rawResult) => {
+    if (typeof rawResult !== 'object' || rawResult === null) {
+      throw new ConflictError('Completed round results are unavailable');
+    }
+    const questionIndex = Reflect.get(rawResult, 'questionIndex');
+    const question =
+      typeof questionIndex === 'number' &&
+      Number.isInteger(questionIndex) &&
+      questionIndex >= 0
+        ? questions[questionIndex]
+        : undefined;
+    if (!question) {
+      throw new ConflictError('Completed round results are unavailable');
+    }
+
+    const parsed = validatedQuestionResultSchema.safeParse({
+      ...rawResult,
+      correctAnswer: question.correctAnswer,
+    });
+    if (!parsed.success) {
+      throw new ConflictError('Completed round results are unavailable');
+    }
+    return parsed.data;
+  });
 }
 
 async function appendRecordedAttempt(

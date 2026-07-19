@@ -447,6 +447,45 @@ describe('useCompleteRound', () => {
     });
   });
 
+  it('[WI-2190] invalidates every profile variant for the completed round when no active profile is resolved', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          roundId: 'round-1',
+          score: 1,
+          total: 1,
+          xpEarned: 10,
+          celebrationTier: 'perfect',
+          droppedResults: 0,
+          questionResults: [],
+        }),
+        { status: 200 },
+      ),
+    );
+    const wrapperWithoutProfile = createScreenWrapper({
+      activeProfile: null,
+      profiles: [],
+    });
+    queryClient = wrapperWithoutProfile.queryClient;
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+    const { result } = renderHook(() => useCompleteRound(), {
+      wrapper: wrapperWithoutProfile.wrapper,
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ roundId: 'round-1', results: [] });
+    });
+
+    const roundDetailInvalidation = invalidateSpy.mock.calls.find(
+      ([filters]) => filters?.queryKey?.[0] === 'quiz-round-detail',
+    )?.[0];
+    expect(roundDetailInvalidation?.queryKey).toEqual([
+      'quiz-round-detail',
+      'round-1',
+    ]);
+    expect(roundDetailInvalidation?.queryKey).toHaveLength(2);
+  });
+
   it('propagates API errors', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response('Bad request', { status: 400 }),

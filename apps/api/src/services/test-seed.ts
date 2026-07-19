@@ -4178,7 +4178,7 @@ async function seedQuizAnswerCheckFails(
 
 // ---------------------------------------------------------------------------
 // Scenario: quiz-completed-history-detail
-// A completed round in the exact graded shape returned by round-detail reads.
+// A completed round in the production-persisted shape consumed by detail reads.
 // The full Playwright history-open specification uses this seed so it never
 // depends on a prior quiz run or mutates state during the browser assertion.
 // ---------------------------------------------------------------------------
@@ -4214,6 +4214,7 @@ async function seedQuizCompletedHistoryDetail(
         correct: false,
         correctAnswer: 'Paris',
         answerGiven: 'Berlin',
+        timeMs: 1250,
       },
     ],
     score: 0,
