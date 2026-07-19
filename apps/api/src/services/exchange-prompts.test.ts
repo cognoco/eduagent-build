@@ -109,6 +109,42 @@ describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
   });
 });
 
+describe('buildSystemPrompt — source identity clarification [WI-2100]', () => {
+  // WI-2100: a learner saying they are reading "her book" with no title
+  // given must not cause the mentor to guess a specific work (staging
+  // observed it assume The Bell Jar) and teach from that unsupported guess.
+  it('includes a rule to ask which source before teaching an unnamed one', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'learning',
+        effectiveMode: 'freeform',
+        topicTitle: undefined,
+        topicDescription: undefined,
+      }),
+    );
+
+    expect(prompt).toMatch(/SOURCE IDENTITY/i);
+    expect(prompt).toMatch(
+      /do not guess which work they mean|never guess a title/i,
+    );
+    expect(prompt).toMatch(/ask\b[^.]*\b(title|author)\b/i);
+  });
+
+  it('applies the rule regardless of session type (not freeform-only)', () => {
+    // The bug is about source identity, not conversational mode — a
+    // homework or review session can equally reference an unnamed book.
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'homework',
+        topicTitle: 'Ancient trade',
+        topicDescription: 'Ancient civilizations traded goods.',
+      }),
+    );
+
+    expect(prompt).toMatch(/SOURCE IDENTITY/i);
+  });
+});
+
 describe('buildSystemPrompt — app-help block', () => {
   it('does not include the APP HELP map on ordinary learning prompts', () => {
     const prompt = buildSystemPrompt(makeContext());

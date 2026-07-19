@@ -1121,6 +1121,19 @@ function isStuckReactionTurn(value: string): boolean {
   return clauses.every((clause) => STUCK_REACTION_CLAUSE.test(clause));
 }
 
+// [WI-2100] The learner references a specific book/poem/story/article they are
+// reading or working from by pronoun or bare demonstrative ("her book", "his
+// poems", "that article", "the story we're reading") without naming its title
+// or author. This function only runs once the server has already decided no
+// reliable source is available, so the generic "share your textbook/worksheet/
+// photo" fallback below would otherwise stand in for a targeted "which one do
+// you mean" question — the exact staging failure (assuming The Bell Jar) this
+// WI fixes. Mirrors the SOURCE_IDENTITY_CLARIFICATION_RULE prompt block
+// (exchange-prompts.ts) for the case where the model's own reply gets
+// hard-fallbacked before it can ask.
+const AMBIGUOUS_SOURCE_REFERENCE =
+  /\b(?:her|his|their|that|this)\s+(?:book|poems?|storys?|stories|article|novel|essay|text)\b|\bthe\s+(?:book|poem|poems|story|stories|article)\s+(?:we're|we are|i'm|i am|you're|you are|they're|they are)\b/i;
+
 function buildUnsupportedFactualReply(
   sourceAudit: ExchangeSourceAudit,
 ): string {
@@ -1150,6 +1163,18 @@ function buildUnsupportedFactualReply(
     return (
       'No problem — not being sure is a normal part of learning, not a wrong answer. ' +
       'Want a small hint to get started, or should I walk you through it step by step?'
+    );
+  }
+
+  // [WI-2100] Ask which source instead of falling through to the generic
+  // "share your textbook/worksheet/photo" template — must run before the
+  // keyword branches below so an ambiguous reference never gets swallowed by
+  // an unrelated keyword match (e.g. "start analyzing" matching the
+  // explain/start branch).
+  if (AMBIGUOUS_SOURCE_REFERENCE.test(lower)) {
+    return (
+      "I don't want to guess which one you mean, so before we go further: what's the title (or author) of what you're reading? " +
+      "A photo or short excerpt works too if that's easier."
     );
   }
 

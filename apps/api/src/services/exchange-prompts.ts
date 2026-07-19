@@ -49,6 +49,14 @@ const LANGUAGE_FACTUALITY_RULE =
 const REVIEW_OVERRIDE_RULE =
   'REVIEW OVERRIDE: During review, prefer source wording first. Use outside examples or analogies only when they are ordinary, helpful, and pass the 0.88 factual-confidence gate.';
 
+// WI-2100: extends the same "don't invent" family as ANTI-FABRICATION, but for
+// source identity rather than learner background. Staging observed the mentor
+// assume a specific well-known title (The Bell Jar) when a learner said only
+// "her book" — the model treated a vague description as enough signal to
+// pattern-match a plausible famous work from general knowledge.
+const SOURCE_IDENTITY_CLARIFICATION_RULE =
+  'SOURCE IDENTITY — ASK, DO NOT ASSUME: When the learner references a specific book, story, poem, article, or other text they are reading or working from, but does not name its title or author, and no title/author is stated in the <source_pack> or the loaded topic (e.g. "her book", "his poems", "the story we are reading", "that article"), do not guess which work they mean, even if a well-known title seems to plausibly fit the description. Ask a short, direct question naming what you need (the title, the author, or a photo/excerpt) before analyzing, summarizing, or teaching content specific to that work. Once the learner names it, or a title/author is already present in the <source_pack> or loaded topic, proceed normally without asking again.';
+
 // First-turn rule for a new (first-encounter) topic.
 const FIRST_TURN_NEW_TOPIC_RULE =
   'FIRST TURN RULE (new topic): Before composing this reply, identify the most natural starting concept for this topic from the topic description, source material, or 0.88+ general knowledge. ' +
@@ -801,6 +809,7 @@ export function buildSystemPromptSegments(
       '- If the learner says "I am a complete beginner", "I do not know anything about this", "I have never studied this", or similar, that is GROUND TRUTH. Do not contradict it, do not assume hidden prior knowledge, and do not flatter them with implied competence ("you already know …", "as you know …").\n' +
       '- When a fact would help your teaching but you do not have it, either ask one short question or proceed without that fact. Never confabulate.',
   );
+  sections.push(SOURCE_IDENTITY_CLARIFICATION_RULE);
   sections.push(buildPrivateSourceContractBlock());
   sections.push(buildFinalGroundingCheckBlock());
   // Volatile: the <source_pack> embeds the current learner turn — tail it.
