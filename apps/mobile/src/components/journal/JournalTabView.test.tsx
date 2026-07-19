@@ -9,6 +9,7 @@ import type { NowResponse } from '@eduagent/schemas';
 import { JournalTabView } from './JournalTabView';
 
 const mockPush = jest.fn();
+const mockSetActiveScope = jest.fn();
 let mockNowFeed: {
   data: NowResponse | undefined;
   isLoading: boolean;
@@ -27,6 +28,13 @@ let lastPracticeOpts: { limit?: number; type?: string } | undefined;
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
+
+jest.mock(
+  '../../lib/scope-context' /* gc1-allow: real hook throws without its provider and resolves persisted scope asynchronously; this composition test only needs a stable setActiveScope spy */,
+  () => ({
+    useScopeContext: () => ({ setActiveScope: mockSetActiveScope }),
+  }),
+);
 
 jest.mock(
   '../../hooks/use-now-feed' /* gc1-allow: Journal moments consume the already-tested feed hook; component test pins feed states */,
@@ -86,6 +94,14 @@ jest.mock(
     }),
   }),
 );
+
+function firstCallOrder(mockFn: jest.Mock): number {
+  const order = mockFn.mock.invocationCallOrder[0];
+  if (order === undefined) {
+    throw new Error('expected mock to have been called');
+  }
+  return order;
+}
 
 function query<T>(data: T) {
   return {
@@ -278,6 +294,40 @@ describe('JournalTabView', () => {
     // The Sessions tab renders the recap list (recap = the session's row).
     screen.getByTestId('journal-recaps-section');
     screen.getByTestId(`journal-recap-row-${recap.recapId}`);
+  });
+
+  // [WI-2223 AC-1] activating a support.hub-linked ledger moment must select
+  // the Support-hub scope BEFORE the Mentor tab opens — the second
+  // pushNowDeepLink caller (the first is mentor.tsx, covered in
+  // mentor.test.tsx), or the learner Mentor surface renders instead.
+  it('[WI-2223] AC-1: selects the Support-hub scope before pushing a support.hub-linked moment', () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: {
+        scope: 'self',
+        generatedAt: '2026-06-14T00:00:00.000Z',
+        overflowCount: 0,
+        cards: [
+          {
+            kind: 'ledger_moment',
+            templateKey: 'now.ledger_moment.session_filed',
+            params: { ledgerKind: 'session_filed', topicTitle: 'Emma' },
+            deepLink: { route: 'support.hub', params: {}, chain: [] },
+            scope: 'self',
+          },
+        ],
+      },
+    };
+
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-moment-session_filed'));
+
+    expect(mockSetActiveScope).toHaveBeenCalledWith({ kind: 'supporter-hub' });
+    expect(mockPush).toHaveBeenCalledWith('/(app)/mentor');
+    expect(firstCallOrder(mockSetActiveScope)).toBeLessThan(
+      firstCallOrder(mockPush),
+    );
   });
 
   it('renders all five section buttons in the two-row control', () => {

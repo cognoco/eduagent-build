@@ -9,6 +9,7 @@ import { ErrorFallback, TimeoutLoader } from '../common';
 import { BookPageFlipAnimation } from '../common/BookPageFlipAnimation';
 import { useNowFeed } from '../../hooks/use-now-feed';
 import { pushNowDeepLink } from '../../lib/now-deep-link';
+import { useScopeContext } from '../../lib/scope-context';
 import { useSectionErrorActions } from './journal-shared';
 
 function ledgerKind(card: NowCard): string {
@@ -88,6 +89,7 @@ function renderLedgerMomentText(card: NowCard, t: TFunction): string {
 export function JournalMomentsStrip(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
+  const { setActiveScope } = useScopeContext();
   const nowFeed = useNowFeed();
   const moments =
     nowFeed.data?.cards.filter((card) => card.kind === 'ledger_moment') ?? [];
@@ -163,6 +165,7 @@ export function JournalMomentsStrip(): React.ReactElement {
             onPress={() =>
               pushNowDeepLink(router, moment.deepLink, {
                 subjectHubTarget: 'v2-subject-hub',
+                setActiveScope,
               })
             }
           >
