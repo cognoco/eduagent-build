@@ -1009,6 +1009,28 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
   });
 
+  it('[WI-2239] binds the seeded recap row to its Biology subject', () => {
+    const journalFlow = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-journal-paper-trail.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(journalFlow)[1]?.toJS() as unknown;
+
+    expect(Array.isArray(commands)).toBe(true);
+    if (!Array.isArray(commands)) {
+      throw new Error(
+        'Journal paper-trail Maestro commands must be a YAML list',
+      );
+    }
+
+    expect(commands).toContainEqual({
+      assertVisible: {
+        id: 'journal-recap-row-${RECAP_ID}',
+        containsDescendants: [{ text: 'Biology / Biology Topic 1' }],
+      },
+    });
+  });
+
   it('[WI-2241] hard-selects the exact rich supportee through the Support hub before and after relaunch', () => {
     const supporterFlow = readFileSync(
       join(

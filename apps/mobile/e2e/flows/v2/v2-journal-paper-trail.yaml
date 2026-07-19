@@ -39,8 +39,8 @@ tags:
     timeout: 15000
 - assertVisible:
     id: 'journal-recap-row-${RECAP_ID}'
-- assertVisible:
-    text: 'Biology'
+    containsDescendants:
+      - text: 'Biology / Biology Topic 1'
 - tapOn:
     id: 'journal-recap-row-${RECAP_ID}'
 - extendedWaitUntil:
