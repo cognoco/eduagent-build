@@ -40,6 +40,13 @@ function quarantineIgnore(): RegExp[] {
 const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const mobileDir = path.join(process.cwd(), 'apps', 'mobile');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
+const artifactLane = process.env.PLAYWRIGHT_ARTIFACT_LANE;
+if (artifactLane && artifactLane !== 'legacy') {
+  throw new Error(
+    `PLAYWRIGHT_ARTIFACT_LANE must be "legacy" when set; received ${JSON.stringify(artifactLane)}`,
+  );
+}
+const artifactSuffix = artifactLane === 'legacy' ? '-legacy' : '';
 
 // [BUG-325] Worker-count discriminator. We previously inferred "is this the
 // shared *.workers.dev staging API?" by substring-matching the API URL —
@@ -87,7 +94,7 @@ export default defineConfig({
   testDir: e2eWebDir,
   // WI-536 flaky-test quarantine: exclude registered flaky specs from the gate.
   testIgnore: quarantineIgnore(),
-  outputDir: path.join(e2eWebDir, 'test-results'),
+  outputDir: path.join(e2eWebDir, `test-results${artifactSuffix}`),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -102,7 +109,10 @@ export default defineConfig({
       'html',
       {
         open: 'never',
-        outputFolder: path.join(e2eWebDir, 'playwright-report'),
+        outputFolder: path.join(
+          e2eWebDir,
+          `playwright-report${artifactSuffix}`,
+        ),
       },
     ],
   ],
@@ -190,6 +200,18 @@ export default defineConfig({
       name: 'smoke-learner',
       dependencies: ['setup'],
       testMatch: /flows[\\/]journeys[\\/]j01-.*\.spec\.ts/,
+      use: {
+        storageState: path.join(e2eWebDir, '.auth', 'solo-learner.json'),
+      },
+    },
+    {
+      // WI-2228 V2 release gate: keep the stable J-01 learner-home baseline
+      // and future batch flows isolated from legacy smoke projects.
+      name: 'v2-release',
+      dependencies: ['setup'],
+      testMatch:
+        /flows[\\/](?:v2[\\/].+|journeys[\\/]j01-learner-home)\.spec\.ts/,
+      testIgnore: [...quarantineIgnore(), /flows[\\/]config-f[\\/]/],
       use: {
         storageState: path.join(e2eWebDir, '.auth', 'solo-learner.json'),
       },

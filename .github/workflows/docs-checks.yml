@@ -27,6 +27,8 @@ on:
       - 'apps/mobile/e2e/flows/**/*.yml'
       - 'apps/mobile/e2e/*.txt'
       - 'apps/mobile/e2e/CONVENTIONS.md'
+      - 'apps/mobile/e2e/ci-maestro-manifest.json'
+      - 'apps/mobile/e2e/scripts/ci-maestro-plan.mjs'
       - 'scripts/validate-maestro-flows.sh'
       - 'scripts/validate-maestro-flows/**'
   pull_request:
@@ -48,8 +50,11 @@ on:
       - 'apps/mobile/e2e/flows/**/*.yml'
       - 'apps/mobile/e2e/*.txt'
       - 'apps/mobile/e2e/CONVENTIONS.md'
+      - 'apps/mobile/e2e/ci-maestro-manifest.json'
+      - 'apps/mobile/e2e/scripts/ci-maestro-plan.mjs'
       - 'scripts/validate-maestro-flows.sh'
       - 'scripts/validate-maestro-flows/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -60,6 +65,7 @@ concurrency:
 
 jobs:
   rollback-section:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -77,6 +83,7 @@ jobs:
         run: bash scripts/check-migration-rollback.sh
 
   decision-adr-link:
+    if: github.event_name != 'workflow_dispatch'
     # MMT-ADR-0000 §II.5 — forward-only ratchet. A new ADR-class decision block in
     # docs/specs|plans without a linked MMT-ADR fails the check. Today's blocks
     # are grandfathered in scripts/decision-adr-link-baseline.json (the backfill
@@ -102,6 +109,7 @@ jobs:
         run: pnpm run check:decision-adr-link
 
   adr-provenance:
+    if: github.event_name != 'workflow_dispatch'
     # MMT-ADR-0000 section II.6 - forward-only provenance ratchet. Newly added
     # ADRs must not be born in feat(...) commits, and Accepted ADRs must carry
     # human Architecture sign-off.
@@ -137,10 +145,7 @@ jobs:
   maestro-validator:
     # Static integrity checker for Maestro flow YAML. See
     # docs/audit/e2e/validator-spec.md and docs/audit/e2e/m1b-execution-brief.md.
-    # Advisory while the suite settles — promote to required after M1-B
-    # stabilises and the inventory close-out is complete.
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -166,7 +171,11 @@ jobs:
       - name: Validate Maestro flow integrity
         run: bash scripts/validate-maestro-flows.sh
 
+      - name: Build hard V2 Maestro plan
+        run: node apps/mobile/e2e/scripts/ci-maestro-plan.mjs --suite v2 --all --format json
+
   reference-only-gate:
+    if: github.event_name != 'workflow_dispatch'
     # WI-675: verify the deploy-gate unit tests pass against the real migration
     # journal. Runs on any change to migrations or to the gate script/tests, so
     # a PR that adds a new migration or changes the gate is always checked.
