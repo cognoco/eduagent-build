@@ -236,6 +236,45 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
           resultText: TARGET_CALL_LOG_RESULT,
         }),
       ).toEqual({ kind: 'infra-signalled' });
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: [
+            TARGET_CALL_LOG_RESULT,
+            '',
+            '\u001b[2m  38 | await expect(page).toHaveURL(/mentor/);\u001b[22m',
+            '\u001b[2m> 39 | await api.get(/v1/profiles);\u001b[22m',
+            '\u001b[2m     |           ^\u001b[22m',
+            '\u001b[2m  40 | await expect(page).toBeVisible();\u001b[22m',
+          ].join('\n'),
+        }),
+      ).toEqual({ kind: 'infra-signalled' });
+      for (const resultText of [
+        `${TARGET_CALL_LOG_RESULT}\n1 | expect(received).toBe(expected)`,
+        `${TARGET_CALL_LOG_RESULT}\n> 39 | Test timeout of 25000ms exceeded.`,
+        [
+          TARGET_CALL_LOG_RESULT,
+          '> 39 | expect(received).toBe(expected)',
+          '     | reporter detail without a caret',
+        ].join('\n'),
+        [
+          TARGET_CALL_LOG_RESULT,
+          '> 39 | await api.get(/v1/profiles);',
+          '     |           ^',
+          'expect(received).toBe(expected)',
+        ].join('\n'),
+        [
+          TARGET_CALL_LOG_RESULT,
+          '1 | expect(received).toBe(expected)',
+          '> 39 | await api.get(/v1/profiles);',
+          '     |           ^',
+        ].join('\n'),
+      ]) {
+        expect(
+          classifyFailure({ artifactRoot: root, exitCode: 1, resultText }),
+        ).toEqual({ kind: 'product' });
+      }
       for (const resultText of [
         'Error: apiRequestContext.get: connect ECONNREFUSED 192.0.2.1:443',
         [
@@ -329,6 +368,7 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
       for (const productLine of [
         '[chromium] SyntaxError: Unexpected token',
         '\u001b[31mTypeError [ERR_INVALID_ARG_TYPE]: invalid value\u001b[0m',
+        'expect(received).toBe(expected)',
       ]) {
         const classification = classifyFailure({
           artifactRoot: root,

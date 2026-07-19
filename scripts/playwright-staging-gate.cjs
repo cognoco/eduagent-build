@@ -32,6 +32,9 @@ const CALL_LOG_ARROW = /^\s*-\s*→\s+\S+/;
 const ERROR_LINE =
   /(?:^|[\s\]])(?:[Ee]rror|[A-Z][A-Za-z0-9]*Error)(?:\s+\[[^\]]+\])?:/;
 const ANSI_ESCAPE = /\x1b\[[0-?]*[ -/]*[@-~]/g;
+const CODE_FRAME_CONTEXT = /^\s*(\d+)\s*\|/;
+const CODE_FRAME_FOCUS = /^\s*>\s*(\d+)\s*\|/;
+const CODE_FRAME_POINTER = /^\s*\|\s*\^/;
 const HARD_FAILURE =
   /(?:assert(?:ion)?|expect\(|unknown error|no tests? found|test discovery (?:error|failed)|test timeout of \d+(?:ms|s) exceeded|(?:config(?:uration)?) (?:validation )?(?:error|failed|failure|invalid)|invalid (?:test )?config(?:uration)?|config(?:uration)?error|(?:failed|unable) to (?:load|resolve) (?:the )?config|test run cancel(?:led|ed)|interrupted|malformed)/i;
 const MAX_TRACE_MEMBER_BYTES = 32 * 1024 * 1024;
@@ -383,6 +386,37 @@ function resultSignals(resultText, apiOrigin) {
   };
 }
 
+function hardFailureText(resultText) {
+  // Playwright code frames quote neighboring source lines, so an `expect(`
+  // there is context rather than a second failure diagnostic.
+  const lines = resultText
+    .split('\n')
+    .map((line) => line.replace(ANSI_ESCAPE, ''));
+  const frameLines = new Set();
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    const focus = CODE_FRAME_FOCUS.exec(lines[index]);
+    if (!focus || !CODE_FRAME_POINTER.test(lines[index + 1])) continue;
+    const focusLine = Number(focus[1]);
+    frameLines.add(index);
+    frameLines.add(index + 1);
+    let expectedLine = focusLine - 1;
+    for (let context = index - 1; context >= 0; context -= 1) {
+      const match = CODE_FRAME_CONTEXT.exec(lines[context]);
+      if (!match || Number(match[1]) !== expectedLine) break;
+      frameLines.add(context);
+      expectedLine -= 1;
+    }
+    expectedLine = focusLine + 1;
+    for (let context = index + 2; context < lines.length; context += 1) {
+      const match = CODE_FRAME_CONTEXT.exec(lines[context]);
+      if (!match || Number(match[1]) !== expectedLine) break;
+      frameLines.add(context);
+      expectedLine += 1;
+    }
+  }
+  return lines.filter((_line, index) => !frameLines.has(index)).join('\n');
+}
+
 /**
  * Inspect Playwright-owned trace network records. Console prose is excluded.
  * A hard result/configuration failure wins over a later canary outage.
@@ -390,7 +424,8 @@ function resultSignals(resultText, apiOrigin) {
 function classifyFailure({ artifactRoot, apiUrl, exitCode, resultText = '' }) {
   if (exitCode === 0) return { kind: 'success' };
   if (exitCode === 130 || exitCode === 143) return { kind: 'cancellation' };
-  if (HARD_FAILURE.test(resultText)) return { kind: 'product' };
+  if (HARD_FAILURE.test(hardFailureText(resultText)))
+    return { kind: 'product' };
   let apiOrigin;
   try {
     apiOrigin = validatedApiUrl(apiUrl).origin;
