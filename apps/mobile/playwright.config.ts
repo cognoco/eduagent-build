@@ -211,6 +211,8 @@ export default defineConfig({
       dependencies: ['setup'],
       testMatch:
         /flows[\\/](?:v2[\\/].+|journeys[\\/]j01-learner-home)\.spec\.ts/,
+      // Config F requires its own flag-built export; WI-2385 owns the final
+      // expanded-lane/full-suite verification, so this isolated V2 project excludes it.
       testIgnore: [...quarantineIgnore(), /flows[\\/]config-f[\\/]/],
       use: {
         storageState: path.join(e2eWebDir, '.auth', 'solo-learner.json'),

@@ -21,6 +21,45 @@ const INLINE_MAP_COMMAND_RE =
 const INLINE_MAP_OPTIONAL_TRUE_RE = /(?:^|,)\s*optional\s*:\s*true\b/;
 const JUSTIFIED_INLINE_RE = /#\s*justified:/i;
 const JUSTIFIED_PRECEDING_RE = /^\s*#\s*justified:/i;
+const YAML_BOOL_TAG = 'tag:yaml.org,2002:bool';
+const YAML_SEXAGESIMAL_RE =
+  /^[+-]?[0-9][0-9_]*(?::[0-5]?[0-9])+(?:\.[0-9_]*)?$/;
+// Maestro 2.5.1 resolves YAML with SnakeYAML 2.5 before Jackson 2.17.1
+// coerces scalar values to Boolean.
+const MAESTRO_EXPLICIT_TRUE = new Set(['y', 'yes', 'on', 'true']);
+const JACKSON_COERCED_TRUE = new Set(['true', 'True', 'TRUE']);
+
+function javaStringTrim(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value.charCodeAt(start) <= 0x20) start++;
+  while (end > start && value.charCodeAt(end - 1) <= 0x20) end--;
+  return value.slice(start, end);
+}
+
+function isMaestroTrue(value: unknown): boolean {
+  if (!isScalar(value)) return false;
+  if (value.value === true) {
+    // yaml@2 accepts implicit y/Y; SnakeYAML 2.5 leaves them as strings.
+    return (
+      value.tag === YAML_BOOL_TAG ||
+      (value.source !== 'y' && value.source !== 'Y')
+    );
+  }
+  if (
+    typeof value.source === 'string' &&
+    YAML_SEXAGESIMAL_RE.test(value.source)
+  ) {
+    return false;
+  }
+  if (typeof value.value === 'bigint') return value.value !== 0n;
+  if (typeof value.value !== 'string') return false;
+  if (value.tag === YAML_BOOL_TAG) {
+    if (MAESTRO_EXPLICIT_TRUE.has(value.value.toLowerCase())) return true;
+  }
+  if (JACKSON_COERCED_TRUE.has(javaStringTrim(value.value))) return true;
+  return false;
+}
 
 function scanOptional(flow: FlowFile): {
   total: number;
@@ -57,6 +96,8 @@ function scanV2Semantics(flow: FlowFile): {
   try {
     const lineCounter = new LineCounter();
     const documents = parseAllDocuments(flow.contents, {
+      schema: 'yaml-1.1',
+      intAsBigInt: true,
       lineCounter,
       prettyErrors: false,
     });
@@ -84,42 +125,22 @@ function scanV2Semantics(flow: FlowFile): {
         ? undefined
         : lineCounter.linePos(offset).line;
     };
-    const inspectOptions = (
-      node: unknown,
-      command: string,
-      document: Document,
-      aliases: Set<string>,
-      aliasLine?: number,
-    ): void => {
+    const inspectOptions = (node: unknown, command: string): void => {
       if (isAlias(node)) {
-        if (aliases.has(node.source)) return;
-        const resolved = node.resolve(document);
-        if (!resolved) return;
-        aliases.add(node.source);
-        const offset = node.range?.[0];
-        inspectOptions(
-          resolved,
-          command,
-          document,
-          aliases,
-          offset === undefined ? aliasLine : lineCounter.linePos(offset).line,
-        );
-        aliases.delete(node.source);
+        // Maestro 2.5.1 treats a command-value mapping alias as selector text,
+        // so it does not inherit the anchor's optional command option.
         return;
       }
       if (!isMap(node)) return;
       const optionalPair = node.items.find(
-        (pair) =>
-          keyText(pair.key) === 'optional' &&
-          isScalar(pair.value) &&
-          pair.value.value === true,
+        (pair) => keyText(pair.key) === 'optional' && isMaestroTrue(pair.value),
       );
       if (!optionalPair) return;
       const definitionLine = optionalLine(optionalPair.key, optionalPair.value);
       optionals.push({
         command,
         assertion: /^assert[A-Za-z0-9_]*$/.test(command),
-        line: aliasLine ?? definitionLine,
+        line: definitionLine,
         definitionLine,
       });
     };
@@ -148,7 +169,7 @@ function scanV2Semantics(flow: FlowFile): {
       if (sequenceItem) {
         for (const pair of node.items) {
           const command = keyText(pair.key);
-          if (command) inspectOptions(pair.value, command, document, aliases);
+          if (command) inspectOptions(pair.value, command);
         }
       }
       for (const pair of node.items) {
