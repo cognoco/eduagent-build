@@ -54,6 +54,8 @@ import { useNavigationDataScopeContract } from './use-navigation-contract';
 
 export { useStreamMessage } from './use-stream-message';
 
+const SUBMIT_SUMMARY_TIMEOUT_MS = 35_000;
+
 function invalidateSessionDerivedQueries(
   queryClient: ReturnType<typeof useQueryClient>,
 ): void {
@@ -591,23 +593,38 @@ export function useSessionSummary(
 
 export function useSubmitSummary(
   sessionId: string,
-): UseMutationResult<SubmitSummaryResult, Error, { content: string }> {
+): UseMutationResult<
+  SubmitSummaryResult,
+  Error,
+  { content: string; signal?: AbortSignal }
+> {
   const client = useApiClient();
   const queryClient = useQueryClient();
   const { profileId } = useSessionNavigationScope();
 
   return useMutation({
-    mutationFn: async (input: { content: string }) => {
-      const res = await client.sessions[':sessionId'].summary.$post({
-        param: { sessionId },
-        json: input,
-      });
-      await assertOk(res);
-      return parseJson(
-        res,
-        submitSummaryResultSchema,
-        'POST /sessions/:sessionId/summary',
+    mutationFn: async (input: { content: string; signal?: AbortSignal }) => {
+      const { signal, cleanup } = combinedSignal(
+        input.signal,
+        SUBMIT_SUMMARY_TIMEOUT_MS,
       );
+      try {
+        const res = await client.sessions[':sessionId'].summary.$post(
+          {
+            param: { sessionId },
+            json: { content: input.content },
+          },
+          { init: { signal } },
+        );
+        await assertOk(res);
+        return parseJson(
+          res,
+          submitSummaryResultSchema,
+          'POST /sessions/:sessionId/summary',
+        );
+      } finally {
+        cleanup();
+      }
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({

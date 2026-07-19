@@ -4,6 +4,7 @@ import { Alert } from 'react-native';
 import { fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { QuotaExceededError } from '../../../lib/api-client';
+import * as Sentry from '@sentry/react-native';
 import {
   fetchCallsMatching,
   extractJsonBody,
@@ -194,6 +195,17 @@ jest.mock(
           ],
         },
       },
+      [`/sessions/${SESSION_ID}/summary`]: {
+        summary: {
+          id: '80000000-0000-4000-8000-000000000001',
+          sessionId: SESSION_ID,
+          content: 'I learned that equations stay balanced on both sides.',
+          aiFeedback: null,
+          status: 'accepted',
+          baseXp: 12,
+          reflectionBonusXp: 6,
+        },
+      },
       '/sessions': { session: { id: SESSION_ID } },
       '/homework-state': {
         metadata: { problemCount: 2, currentProblemIndex: 0, problems: [] },
@@ -326,12 +338,13 @@ function renderSessionScreen(profile = ACTIVE_PROFILE) {
 }
 
 // ---------------------------------------------------------------------------
-// Session hook mocks (use-sessions stays mocked because useStreamMessage's
+// Session hook mocks (most of use-sessions stays mocked because useStreamMessage's
 // `stream` runs over XHR via streamSSEViaXHR — it bypasses useApiClient and
 // cannot be intercepted through the routed mock fetch. The synthetic
 // onChunk/onDone payloads driven through mockStream (challengeRound /
 // draftedNote / fallback / quota) are this suite's primary control surface, so
-// the whole use-sessions mutation/query set is kept together for consistency.)
+// the stream-dependent mutation/query set stays synthetic. useSubmitSummary
+// remains real so its TanStack state and fetch/parser boundary are exercised.)
 // ---------------------------------------------------------------------------
 
 const mockStartSession = jest.fn();
@@ -342,7 +355,6 @@ const mockRecordSystemPrompt = jest.fn();
 const mockRecordSessionEvent = jest.fn();
 const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
-const mockSubmitSummary = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
 
@@ -372,6 +384,7 @@ const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
 jest.mock(
   '../../../hooks/use-sessions' /* gc1-allow: useStreamMessage streams over XHR (bypasses useApiClient); synthetic onDone payloads are the test control surface */,
   () => ({
+    ...jest.requireActual('../../../hooks/use-sessions'),
     useSession: () => ({ data: null }),
     useStartSession: () => ({
       mutateAsync: mockStartSession,
@@ -392,11 +405,6 @@ jest.mock(
     useRecordSessionEvent: () => ({ mutateAsync: mockRecordSessionEvent }),
     useSetSessionInputMode: () => ({ mutateAsync: mockSetSessionInputMode }),
     useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
-    useSubmitSummary: () => ({
-      mutateAsync: mockSubmitSummary,
-      isPending: false,
-      isError: false,
-    }),
     useParkingLot: () => ({ data: [], isLoading: false }),
     useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
   }),
@@ -765,9 +773,9 @@ describe('SessionScreen homework flow', () => {
     mockFlagSessionContent.mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
     });
-    mockSubmitSummary.mockResolvedValue({
+    mockFetch.setRoute(`/sessions/${SESSION_ID}/summary`, {
       summary: {
-        id: 'summary-1',
+        id: '80000000-0000-4000-8000-000000000001',
         sessionId: SESSION_ID,
         content: 'I learned that equations stay balanced on both sides.',
         aiFeedback: null,
@@ -2735,9 +2743,16 @@ describe('SessionScreen homework flow', () => {
       fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
 
       await waitFor(() => {
-        expect(mockSubmitSummary).toHaveBeenCalledWith({
-          content: firstSessionReflection,
-        });
+        expect(
+          fetchCallsMatching(mockFetch, `/sessions/${SESSION_ID}/summary`),
+        ).toHaveLength(1);
+      });
+      const [summaryCall] = fetchCallsMatching(
+        mockFetch,
+        `/sessions/${SESSION_ID}/summary`,
+      );
+      expect(extractJsonBody(summaryCall?.init)).toEqual({
+        content: firstSessionReflection,
       });
 
       // The reward receipt renders on a state update that settles a tick after
@@ -2757,7 +2772,12 @@ describe('SessionScreen homework flow', () => {
     }, 15000);
 
     it('[WI-2095] shows localized retry feedback and settles saving after a 5xx failure', async () => {
-      mockSubmitSummary.mockRejectedValueOnce(new Error('HTTP 500'));
+      mockFetch.setRoute(
+        `/sessions/${SESSION_ID}/summary`,
+        new Response(JSON.stringify({ error: 'Server error' }), {
+          status: 500,
+        }),
+      );
       const testScreen = await renderFirstSessionWrapUp();
 
       enterFirstSessionReflection(testScreen);
@@ -2781,8 +2801,16 @@ describe('SessionScreen homework flow', () => {
     }, 15000);
 
     it('[WI-2095] times out a stalled reflection request and shows localized retry feedback', async () => {
-      mockSubmitSummary.mockImplementationOnce(
-        () => new Promise(() => undefined),
+      mockFetch.setRoute(
+        `/sessions/${SESSION_ID}/summary`,
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(
+                new DOMException('The operation was aborted', 'AbortError'),
+              );
+            });
+          }),
       );
       const testScreen = await renderFirstSessionWrapUp();
 
@@ -2809,7 +2837,13 @@ describe('SessionScreen homework flow', () => {
     }, 15000);
 
     it('[WI-2095] shows localized retry feedback for a malformed summary response', async () => {
-      mockSubmitSummary.mockResolvedValueOnce({ malformed: true });
+      mockFetch.setRoute(
+        `/sessions/${SESSION_ID}/summary`,
+        new Response('{not valid json', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
       const testScreen = await renderFirstSessionWrapUp();
 
       enterFirstSessionReflection(testScreen);
@@ -2833,7 +2867,12 @@ describe('SessionScreen homework flow', () => {
     }, 15000);
 
     it('[WI-2095] retains reflection text and re-enables submit after a failed save', async () => {
-      mockSubmitSummary.mockRejectedValueOnce(new Error('HTTP 500'));
+      mockFetch.setRoute(
+        `/sessions/${SESSION_ID}/summary`,
+        new Response(JSON.stringify({ error: 'Server error' }), {
+          status: 500,
+        }),
+      );
       const testScreen = await renderFirstSessionWrapUp();
 
       enterFirstSessionReflection(testScreen);
@@ -2851,9 +2890,6 @@ describe('SessionScreen homework flow', () => {
     }, 15000);
 
     it('[WI-2095] sends one reflection request for two submit presses in the same frame', async () => {
-      mockSubmitSummary.mockImplementationOnce(
-        () => new Promise(() => undefined),
-      );
       const testScreen = await renderFirstSessionWrapUp();
 
       enterFirstSessionReflection(testScreen);
@@ -2861,8 +2897,44 @@ describe('SessionScreen homework flow', () => {
       fireEvent.press(submitButton);
       fireEvent.press(submitButton);
 
-      expect(mockSubmitSummary).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(
+          fetchCallsMatching(mockFetch, `/sessions/${SESSION_ID}/summary`),
+        ).toHaveLength(1);
+      });
       testScreen.unmount();
+    }, 15000);
+
+    it('[WI-2095] aborts the reflection request on unmount without reporting it', async () => {
+      let requestSignal: AbortSignal | undefined;
+      mockFetch.setRoute(
+        `/sessions/${SESSION_ID}/summary`,
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            requestSignal = init?.signal ?? undefined;
+            requestSignal?.addEventListener('abort', () => {
+              reject(
+                new DOMException('The operation was aborted', 'AbortError'),
+              );
+            });
+          }),
+      );
+      const captureExceptionSpy = jest.spyOn(Sentry, 'captureException');
+      const testScreen = await renderFirstSessionWrapUp();
+
+      enterFirstSessionReflection(testScreen);
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+      await waitFor(() => {
+        expect(requestSignal).toBeInstanceOf(AbortSignal);
+      });
+      testScreen.unmount();
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(requestSignal?.aborted).toBe(true);
+      expect(captureExceptionSpy).not.toHaveBeenCalled();
+      captureExceptionSpy.mockRestore();
     }, 15000);
 
     it('keeps later V2 Mentor sessions on the existing summary path', async () => {

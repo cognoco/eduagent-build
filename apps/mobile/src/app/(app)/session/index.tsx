@@ -151,7 +151,6 @@ function isChallengeRoundInFlight(
 }
 
 const MENTOR_BIRTH_SESSION_TIME_SCALE = 0.35;
-const FIRST_SESSION_SUMMARY_TIMEOUT_MS = 35_000;
 
 interface FirstSessionWrapUpCardProps {
   value: string;
@@ -548,10 +547,6 @@ function SessionScreenInner() {
     useState('');
   const [firstSessionReflectionError, setFirstSessionReflectionError] =
     useState(false);
-  const [
-    isSubmittingFirstSessionReflection,
-    setIsSubmittingFirstSessionReflection,
-  ] = useState(false);
   const [firstSessionReflectionTotalXp, setFirstSessionReflectionTotalXp] =
     useState<number | null>(null);
   const [seenFirstSessionCelebrationIds, setSeenFirstSessionCelebrationIds] =
@@ -569,6 +564,8 @@ function SessionScreenInner() {
   const hasAutoSentRef = useRef(false);
   const mentorOpenerLaunchKeyRef = useRef<string | null>(null);
   const firstSessionReflectionInFlightRef = useRef(false);
+  const firstSessionReflectionAbortRef = useRef<AbortController | null>(null);
+  const firstSessionReflectionMountedRef = useRef(true);
   const internallyBackfilledSessionIdRef = useRef<string | null>(null);
   const hasHydratedRecoveryRef = useRef(false);
   const queuedProblemTextRef = useRef<string | null>(null);
@@ -879,6 +876,15 @@ function SessionScreenInner() {
   const sessionExpired =
     !!routeSessionId &&
     classifyApiError(transcript.error).category === 'not-found';
+
+  useEffect(() => {
+    firstSessionReflectionMountedRef.current = true;
+    return () => {
+      firstSessionReflectionMountedRef.current = false;
+      firstSessionReflectionAbortRef.current?.abort();
+      firstSessionReflectionAbortRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     const round = activeSession.data?.metadata?.challengeRound;
@@ -1307,19 +1313,21 @@ function SessionScreenInner() {
     if (firstSessionReflectionInFlightRef.current) return;
 
     firstSessionReflectionInFlightRef.current = true;
-    setIsSubmittingFirstSessionReflection(true);
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const controller = new AbortController();
+    firstSessionReflectionAbortRef.current = controller;
 
     try {
       setFirstSessionReflectionError(false);
-      const result = await Promise.race([
-        submitFirstSessionSummary.mutateAsync({ content }),
-        new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => {
-            reject(new Error('First-session summary request timed out'));
-          }, FIRST_SESSION_SUMMARY_TIMEOUT_MS);
-        }),
-      ]);
+      const result = await submitFirstSessionSummary.mutateAsync({
+        content,
+        signal: controller.signal,
+      });
+      if (
+        !firstSessionReflectionMountedRef.current ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -1332,14 +1340,21 @@ function SessionScreenInner() {
         (result.summary.baseXp ?? 0) + (result.summary.reflectionBonusXp ?? 0);
       setFirstSessionReflectionTotalXp(totalXp > 0 ? totalXp : null);
     } catch (err) {
+      if (
+        !firstSessionReflectionMountedRef.current ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
       setFirstSessionReflectionError(true);
       Sentry.captureException(err, {
         tags: { screen: 'session', action: 'first_session_reflection' },
       });
     } finally {
-      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      if (firstSessionReflectionAbortRef.current === controller) {
+        firstSessionReflectionAbortRef.current = null;
+      }
       firstSessionReflectionInFlightRef.current = false;
-      setIsSubmittingFirstSessionReflection(false);
     }
   }, [
     firstSessionReflectionText,
@@ -1649,7 +1664,7 @@ function SessionScreenInner() {
   const firstSessionWrapUpCard = firstSessionWrapUp ? (
     <FirstSessionWrapUpCard
       value={firstSessionReflectionText}
-      isSubmitting={isSubmittingFirstSessionReflection}
+      isSubmitting={submitFirstSessionSummary.isPending}
       hasError={
         firstSessionReflectionError || submitFirstSessionSummary.isError
       }
