@@ -72,7 +72,7 @@ the CI change-class router will not run tests added by 006/008 until 002 widens 
 | 007 | Unit-test the sliding-window rate limiter + IP resolver | P2 | S | — | TODO |
 | 008 | Test webhook dispatcher + v2 top-up money writes for real | P2 | M | 002 | TODO |
 | 009 | Unify the two session idempotency gates to one fail-closed policy | P2 | S | — | TODO |
-| 010 | Define + apply a read-side profile-authority check (spike + fix) | P2 | L | 003 | TODO |
+| 010 | Define + apply a read-side profile-authority check (spike + fix) | P2 | L | 003 | IN PROGRESS — spike done (`010-findings.md`, 8 confirmed gaps + rule + enforcement point); Steps 2-4 (fix) scoped as separate follow-up WI(s) per Cosmo WI-2006's findings-only AC |
 | 001 | Curriculum-adapt signal switch exhaustiveness guard (prior run) | P2 | S | — | TODO |
 | 011 | Adopt the replay harness to test Inngest step idempotency (or delete it) | P3 | M | — | TODO |
 | 012 | Stop normalizeReplyText corrupting escape-sequence coding prose | P3 | S | — | TODO |
