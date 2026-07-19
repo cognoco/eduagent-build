@@ -1,10 +1,14 @@
 # BID-11 Closure-Coherence Audit — WI-1507 (narrow pass)
 
 **Scope note:** this is the PM-ruled NARROW pass over Delivery Batch BID-11 (WI-2064,
-WI-1196, WI-1193, WI-1561). It verifies each item landed against its own Acceptance
-Criteria, checks cross-item semantic coherence, checks the BID-3 (deletion/PII) seam,
-and produces the delta feeding WI-1577 (the final pre-store-submission launch gate).
-**It is not a launch go/no-go** — that verdict belongs to WI-1577.
+WI-1196, WI-1193, WI-1561). It verifies the **closed** members (WI-2064, WI-1196,
+WI-1193) landed against their own Acceptance Criteria, checks cross-item semantic
+coherence among them, checks the BID-3 (deletion/PII) seam, and produces the delta
+feeding WI-1577 (the final pre-store-submission launch gate). **WI-1561 is excluded from
+verification in this pass** — it is mid-rework (Awaiting Info, its worksheet a moving
+target), and the 2026-07-19 PM scoping rider directs the pass not to grade its artifact;
+its verification is deferred in full to WI-1577. **This is not a launch go/no-go** — that
+verdict belongs to WI-1577.
 
 Repo: `cognoco/eduagent-build`. Verified against `origin/main` (local checkout was 17
 commits stranded behind; the four Fixed-In commits below were independently confirmed
@@ -89,25 +93,26 @@ guardrail). **Final landed state:** `rehomeGrantsTx` is private (not exported) i
 consent-deny path in `consent-v2.ts` does not call it. What **did** land and persist is
 a separate, smaller change to `family-join-v2.ts` (see §4).
 
-### WI-1561 — Store data-safety worksheet (DEFERRED — Awaiting Info / OPQ-119)
+### WI-1561 — Store data-safety worksheet (EXCLUDED from this pass — mid-rework)
 
-**Fixed In (partial):** `982ea67fd486bdf3355ae1a9d877eba9d835b979` — confirmed ancestor
-of `origin/main`. Cosmo: **Stage=Executing, State=Awaiting Info** (NOT Closed) — per
-the task's instruction, treated as deferred, not verified-as-landed.
+**Status:** Cosmo **Stage=Executing, State=Awaiting Info** (NOT Closed). Its worksheet
+(`docs/screenshots_and_store_info/app-privacy-data-safety-worksheet.md`) is a moving
+target until the item closes and its OPQ-119 human sign-off lands.
 
-Doc: `docs/screenshots_and_store_info/app-privacy-data-safety-worksheet.md`.
+**Excluded from this pass, per the PM scoping rider (2026-07-19).** The rider directs the
+narrow pass not to verify WI-1561's artifact while it is mid-rework — grading it would
+assert facts about a document WI-1561 may still change — and to choose one of: (a) exclude
+the artifact and record the exclusion + reason, or (b) hold completion until WI-1561
+closes. This pass takes option (a). Accordingly, this audit does **not** grade the
+worksheet's Acceptance Criteria and does **not** characterize its current contents. The
+one durable, non-content fact relied on is that the worksheet's Review-and-Sign-off gate
+is still open (both checkboxes unchecked), consistent with the item's Awaiting-Info state
+and its OPQ-119 human sign-off.
 
-| AC unit | Verdict | Pointer |
-|---|---|---|
-| AC-1 (Minimum-age rows say 13, matching `PROFILE_MINIMUM_AGE`) | **Landed** (code-verified, not human-signed) | Worksheet line 27 ("Minimum age \| 13+ ... `PROFILE_MINIMUM_AGE = 13` in `packages/schemas/src/age.ts:10`"); line 107 (Copy-Ready notes) also says 13+ |
-| AC-2 (legacy-table citations replaced with identity-v2 schema) | **Landed** | Worksheet Data Categories table (lines 41-45) cites `login.email`, `person.display_name`, `guardianship`, `consent_grant` from `packages/database/src/schema/identity.ts`, replacing `accounts.email` / `profiles.display_name` / `family_links` / `consent_states` |
-| AC-3 (homework-image + raw-audio open questions resolved) | **Landed** | Line 48 (homework images: "Not persisted in the application database... sent to a third-party LLM provider" — a more precise, hedged resolution than a bare "transient"); line 49 (audio: transcript-only, no raw audio uploaded by app code, but the on-device-only guarantee is explicitly flagged as NOT independently verified) — **note:** this is a materially more cautious resolution than the AC's suggested exact wording ("transient — not retained" / "transcript-only, no raw audio leaves the device"); it is arguably MORE correct (it does not overclaim provider-side non-retention or on-device-only speech recognition), but is a deviation from the AC's literal text worth flagging to the shepherd |
-| AC-4 (Submission Blockers checklist re-reviewed) | **Landed** | Worksheet lines 9-16; the age/legacy-table/retention item is checked off, five other pre-existing blockers remain open (privacy URL, store access, processor list, tracking answers, retention wording — all unrelated to WI-1561's scope) |
-| AC-5 (worksheet reviewed/signed off before store submission) | **NOT MET — deferred** | Worksheet §"Review & Sign-off" (lines 114-119): both checkboxes (Reviewed by / Legal-Compliance sign-off) are unchecked. This is **OPQ-119**, a human-gated sign-off (Zuzana), tracked in Cosmo as Awaiting Info. **This is the one AC-5 gate this narrow pass cannot close** |
-
-**Verdict:** WI-1561 is **partially landed** (AC-1 through AC-4 are on `main` and code-
-verified) but **AC-5 is open and human-gated**. Per the task's framing, this item is
-DEFERRED, not verified-as-landed, and its AC-5 gap is carried into the delta list below.
+**Verdict:** WI-1561's full landed-versus-Acceptance-Criteria verification — including its
+human sign-off gate (OPQ-119) — is **deferred in its entirety** to the delta list below
+and to the final launch gate (WI-1577), to be performed against WI-1561's landed text once
+it closes.
 
 ---
 
@@ -118,11 +123,12 @@ DEFERRED, not verified-as-landed, and its AC-5 gap is carried into the delta lis
 | Lawful-basis fact (WI-1193) ↔ RLS risk-acceptance posture (WI-1196) | **Coherent** | Independent concerns (consent-recording vs. tenant-isolation defense-in-depth); no shared code path, no contradictory claim. Both memos are honest about deferred/incomplete follow-through (WI-1193 → WI-2386 global purpose split; WI-1196 → WI-2349 rename, hard backstop dated) |
 | Lawful-basis fact (WI-1193) ↔ Bearer-token posture (WI-2064) | **Coherent, adjacent but distinct scope** | WI-2064's posture explicitly scopes itself to the P0 **email-consenting parent** bearer-token path only (doc line 4: "does not re-assess the edge-gated in-app guardian withdrawal path") — it never touches the `art6_1_a` adult-self-consent basis WI-1193 introduces. No overlap, no conflict. Both use the same `consent_grant` table and the same audit-fact idiom (`auditFact.source`), which is a consistent shared pattern, not a collision |
 | RLS posture (WI-1196) ↔ Bearer-token posture (WI-2064) | **Coherent** | Independent risk domains (DB-layer tenant isolation vs. a specific unauthenticated withdrawal mechanism's threat model). Both correctly cross-reference into the same `dpia.md` risk register (6.7 and 6.11 respectively) without contradicting each other |
-| Worksheet (WI-1561, deferred) ↔ the other three | **Consistent where it overlaps, but stale in one place** | The worksheet's Data Categories table (line 45) already cites `consent_grant` "with purpose, lawful basis, granted/withdrawn status" — generically consistent with WI-1193's `art6_1_a`/purpose-split additions and WI-2064's bearer-token withdrawal mechanism, though the worksheet does not name either mechanism specifically (not required by its AC). No contradiction found |
+| Worksheet (WI-1561) ↔ the other three | **Excluded from this pass** | WI-1561 is mid-rework; per the 2026-07-19 PM rider its artifact is not read or graded here, so no coherence judgment is drawn on its contents. Its coherence against the other three is deferred to WI-1577, to be checked against WI-1561's landed text once it closes |
 
-**Overall:** no semantic contradictions found among the four items' claims. Each item's
-scope is disjoint or additive; where they touch the same table (`consent_grant`) or the
-same DPIA register, the cross-references agree.
+**Overall:** among the three verified items (WI-2064, WI-1196, WI-1193), no semantic
+contradictions were found — each item's scope is disjoint or additive, and where they
+touch the same table (`consent_grant`) or the same DPIA register, the cross-references
+agree. WI-1561 is excluded from this coherence pass per the PM rider.
 
 ---
 
@@ -180,13 +186,14 @@ explicitly reverted within the same PR, precisely to avoid superseding the WI-14
 deny-abort guardrail. This is evidence the seam was recognized and resolved during
 WI-1193's own rework cycle, not left implicit.
 
-**One residual, minor finding (not a contradiction, a documentation staleness item):**
-`dpia.md` line 116 (the "Substrate condition" note) still reads: *"Still owed before
-store submission:... the refreshed store data-safety worksheet (closure-check C5 — the
-2026-05-15 worksheet still says age 11 and cites dropped legacy tables)"* — this is now
-**stale**: WI-1561 refreshed the worksheet on 2026-07-17 (age 13, identity-v2 schema
-citations both landed). `dpia.md` was not updated to reflect this. Recommend WI-1577
-correct this line (and note AC-5/OPQ-119 sign-off is the only remaining worksheet gap).
+**One residual, minor finding (documentation staleness item, deferred):**
+`dpia.md` line 116 (the "Substrate condition" note) still describes the store data-safety
+worksheet in its pre-refresh state ("the 2026-05-15 worksheet still says age 11 and cites
+dropped legacy tables") and lists the refreshed worksheet as still owed before store
+submission. WI-1561 is the item that refreshes that worksheet, and it is mid-rework — so
+whether `dpia.md:116` is stale depends on WI-1561's landed text, which this pass does not
+read per the PM rider. Recommend WI-1577 re-check `dpia.md:116` against WI-1561's final
+landed worksheet once WI-1561 closes, and correct the line if it is then stale.
 
 ---
 
@@ -216,12 +223,13 @@ Bucket B item #1 gates. **All five remain UNVERIFIED by this narrow pass:**
 
 **Additional deltas surfaced by this pass (beyond the original 5):**
 
-6. **WI-1561 AC-5 / OPQ-119 — worksheet human sign-off.** The worksheet itself
-   (AC-1..AC-4) is code-verified and landed on `main` (`982ea67f`), but is **not**
-   reviewed/signed off (both checkboxes in its "Review & Sign-off" section are
-   unchecked) and the item sits at Cosmo Stage=Executing/State=Awaiting Info pending
-   Zuzka's human sign-off (OPQ-119). **This must appear in WI-1577's gate — it cannot
-   be treated as closed.**
+6. **WI-1561 — EXCLUDED from this pass (mid-rework), full verification deferred.** Per
+   the 2026-07-19 PM rider, this pass does not verify WI-1561's worksheet while it is a
+   moving target. WI-1561 sits at Cosmo Stage=Executing/State=Awaiting Info pending
+   Zuzka's human sign-off (OPQ-119) — its Review-and-Sign-off gate is still open. Its
+   entire landed-versus-Acceptance-Criteria verification, including the human sign-off,
+   is deferred to WI-1577, to be performed against WI-1561's landed text once it closes.
+   **This must appear in WI-1577's gate — WI-1561 cannot be treated as closed.**
 7. **`lawful_basis` naming drift (coherence delta, not a bug).** WI-1193's adult
    self-consent path uses the canonical `art6_1_a` value per `MMT-ADR-0011`
    §3/data-model.md (confirmed: `docs/adr/MMT-ADR-0011-phase-e-data-model-realization.md:112`
@@ -271,8 +279,9 @@ Bucket B item #1 gates. **All five remain UNVERIFIED by this narrow pass:**
   the one place a real collision was attempted (exporting `rehomeGrantsTx` for reuse
   in the deny path) was deliberately reverted within WI-1193's own rework cycle in
   favor of the pre-existing WI-1442 guardrail.
-- WI-1561 is correctly treated as deferred (AC-1..AC-4 landed and code-verified; AC-5
-  human sign-off is open, OPQ-119).
+- WI-1561 is excluded from this pass per the 2026-07-19 PM rider (its worksheet is mid-
+  rework, a moving target); its full landed-versus-Acceptance-Criteria verification,
+  including the open human sign-off gate (OPQ-119), is deferred to WI-1577.
 
 **This is not a launch decision.** The original 5-point launch-compliance checklist
 (DPO/DPIA sign-off, provider DPAs, privacy-policy TODOs, retention-period values,
