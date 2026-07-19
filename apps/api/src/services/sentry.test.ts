@@ -382,6 +382,179 @@ describe('scrubSentryEvent', () => {
       url: 'https://api.example.com/v1/sessions',
     });
   });
+
+  // [WI-2339] Red-green regression: @sentry/cloudflare's requestDataIntegration
+  // copies event.request.query_string verbatim regardless of sendDefaultPii
+  // (unlike cookies/authorization) — verified empirically against the real
+  // pipeline (sentry-request-pipeline.test.ts). Before this fix, nothing
+  // stripped it and this assertion FAILED (the literal secret passed through
+  // unchanged); after adding scrubRequestUrlFields it PASSES.
+  it('strips event.request.query_string', () => {
+    const event = {
+      request: {
+        url: 'https://api.example.com/v1/sessions?token=SECRET-abc123&foo=bar',
+        query_string: 'token=SECRET-abc123&foo=bar',
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.query_string).not.toContain('SECRET-abc123');
+    expect(scrubbed.request?.query_string).toBe('[stripped]');
+  });
+
+  it('strips the query segment of event.request.url, leaving the path intact', () => {
+    const event = {
+      request: {
+        url: 'https://api.example.com/v1/sessions?token=SECRET-abc123',
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.url).not.toContain('SECRET-abc123');
+    expect(scrubbed.request?.url).toBe(
+      'https://api.example.com/v1/sessions?[stripped]',
+    );
+  });
+
+  it('leaves event.request.url with no query string unchanged', () => {
+    const event = {
+      request: { url: 'https://api.example.com/v1/sessions' },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.url).toBe('https://api.example.com/v1/sessions');
+  });
+
+  it('leaves an empty event.request.query_string unchanged', () => {
+    const event = {
+      request: { url: 'https://api.example.com/v1/sessions', query_string: '' },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.query_string).toBe('');
+  });
+
+  // [Gate-2 SHOULD-FIX] Red-green regression: the SDK types
+  // event.request.query_string as `string | Record<string, unknown> |
+  // Array<[string, string]>`, not string-only. A `typeof === 'string'` guard
+  // silently no-ops (passes the object/array forms through unscrubbed) for
+  // exactly the future-shape this forward guard exists to pre-empt. Before
+  // this fix, the object-shaped query_string below passed through with the
+  // literal secret intact and this assertion FAILED; after switching to a
+  // truthy check (strip wholesale regardless of type) it PASSES.
+  it('strips a non-string (object-shaped) event.request.query_string', () => {
+    const event = {
+      request: {
+        url: 'https://api.example.com/v1/sessions',
+        query_string: { token: 'SECRET-abc123' },
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.query_string).toBe('[stripped]');
+  });
+
+  it('strips a non-string (array-shaped) event.request.query_string', () => {
+    const event = {
+      request: {
+        url: 'https://api.example.com/v1/sessions',
+        query_string: [['token', 'SECRET-abc123']],
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.query_string).toBe('[stripped]');
+  });
+
+  // [WI-2339] Defensive coverage for event.request.data — NOT populated by
+  // this app's SDK/runtime today (see the WI's Risk/Impact: no free-text POST
+  // body reaches Sentry at @sentry/cloudflare@10.39.0), so this is a unit
+  // test against scrubSentryEvent directly rather than a real-pipeline test —
+  // the pipeline cannot be made to populate this field to exercise it. Forward
+  // guard for a future capture site or SDK upgrade that starts attaching it.
+  it('strips denylisted keys from event.request.data (forward guard, not currently populated by the SDK)', () => {
+    const event = {
+      request: {
+        url: 'https://api.example.com/v1/sessions',
+        data: { rawInput: "child's homework text", requestId: 'req-1' },
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.data).not.toHaveProperty('rawInput');
+    expect((scrubbed.request?.data as Record<string, unknown>).requestId).toBe(
+      'req-1',
+    );
+  });
+
+  it('leaves a non-plain-object event.request.data unchanged', () => {
+    const event = {
+      request: {
+        url: 'https://api.example.com/v1/sessions',
+        data: 'raw text body',
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.data).toBe('raw text body');
+  });
+
+  // [WI-2339] Red-green regression: the Fetch integration (active by default
+  // on @sentry/cloudflare) records outbound fetch() calls as breadcrumbs
+  // whose data.url carries the full URL, query string included. The `url`
+  // key itself isn't PII-bearing, so PII_DENYLIST_KEYS never caught this —
+  // only the query segment is the leak. Before this fix, nothing stripped
+  // breadcrumb data.url and this assertion FAILED; after adding
+  // scrubBreadcrumbUrl it PASSES.
+  it('strips the query segment of a breadcrumb data.url, alongside existing key-based scrubbing', () => {
+    const event = {
+      breadcrumbs: [
+        {
+          category: 'fetch',
+          data: {
+            url: 'https://api.example.com/v1/billing?token=SECRET-abc123',
+            jsonStrSample: 'raw llm text',
+            method: 'GET',
+          },
+        },
+      ],
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    const crumb = scrubbed.breadcrumbs?.[0];
+    expect(crumb?.data?.url).not.toContain('SECRET-abc123');
+    expect(crumb?.data?.url).toBe(
+      'https://api.example.com/v1/billing?[stripped]',
+    );
+    expect(crumb?.data).not.toHaveProperty('jsonStrSample');
+    expect(crumb?.data?.method).toBe('GET');
+  });
+
+  it('leaves a breadcrumb data.url with no query string unchanged', () => {
+    const event = {
+      breadcrumbs: [
+        {
+          category: 'fetch',
+          data: { url: 'https://api.example.com/v1/billing', method: 'GET' },
+        },
+      ],
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.breadcrumbs?.[0]?.data?.url).toBe(
+      'https://api.example.com/v1/billing',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
