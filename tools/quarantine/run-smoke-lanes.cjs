@@ -69,8 +69,7 @@ function isActive(entry, now) {
   return expiresAt > now.getTime();
 }
 
-function resolveLanes(now = new Date()) {
-  const entries = loadRegistry();
+function resolveLanes(now = new Date(), entries = loadRegistry()) {
   const activeAdvisory = new Set(
     entries
       .filter(

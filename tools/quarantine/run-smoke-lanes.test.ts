@@ -24,6 +24,25 @@ describe('[WI-2452] resolveLanes', () => {
     expect(core).toEqual([...DECLARED_CORE_PROJECTS]);
     expect(advisory).toEqual([]);
   });
+
+  it('demotes a project to advisory while its quarantine entry is unexpired', () => {
+    const { core, advisory } = resolveLanes(NOW, [
+      { project: 'smoke-parent', expires: FUTURE },
+    ]);
+    expect(advisory).toEqual(['smoke-parent']);
+    expect(core).not.toContain('smoke-parent');
+    expect(core).toEqual(
+      DECLARED_CORE_PROJECTS.filter((p) => p !== 'smoke-parent'),
+    );
+  });
+
+  it('auto-reverts a project to core once its quarantine entry expires', () => {
+    const { core, advisory } = resolveLanes(NOW, [
+      { project: 'smoke-parent', expires: PAST },
+    ]);
+    expect(core).toEqual([...DECLARED_CORE_PROJECTS]);
+    expect(advisory).toEqual([]);
+  });
 });
 
 describe('[WI-2452] isActive', () => {
