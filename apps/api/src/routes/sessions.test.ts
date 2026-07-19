@@ -619,16 +619,19 @@ jest.mock('../services/recall-bridge', () => {
 });
 
 const mockGetMentorNoticeReceipt = jest.fn().mockResolvedValue(null);
-jest.mock('../services/mentor-notices', () => {
-  const actual = jest.requireActual(
-    '../services/mentor-notices',
-  ) as typeof import('../services/mentor-notices');
-  return {
-    ...actual,
-    getMentorNoticeReceipt: (...args: unknown[]) =>
-      mockGetMentorNoticeReceipt(...args),
-  };
-});
+jest.mock(
+  '../services/mentor-notices' /* gc1-allow: session route unit test injects receipt lookup outcomes; mentor-notice services have direct unit and integration coverage */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/mentor-notices',
+    ) as typeof import('../services/mentor-notices');
+    return {
+      ...actual,
+      getMentorNoticeReceipt: (...args: unknown[]) =>
+        mockGetMentorNoticeReceipt(...args),
+    };
+  },
+);
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),

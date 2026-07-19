@@ -2,11 +2,14 @@ import type { Database } from '@eduagent/database';
 
 const mockSendPushNotification = jest.fn();
 
-jest.mock('../notifications', () => ({
-  ...jest.requireActual('../notifications'),
-  sendPushNotification: (...args: unknown[]) =>
-    mockSendPushNotification(...args),
-}));
+jest.mock(
+  '../notifications' /* gc1-allow: isolates the external push-notification boundary; delivery behavior has integration coverage */,
+  () => ({
+    ...jest.requireActual('../notifications'),
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+  }),
+);
 
 import {
   findEligibleMentorNoticeNudges,
