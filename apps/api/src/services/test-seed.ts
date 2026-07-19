@@ -36,6 +36,7 @@ import {
   assessments,
   quotaPools,
   profileQuotaUsage,
+  usageEvents,
   streaks,
   needsDeepeningTopics,
   vocabulary,
@@ -155,7 +156,9 @@ export type SeedScenario =
   // Third wave (BILLING-07/08 + BRIDGE-03/04).
   | 'mentor-audit-family-pool-members'
   | 'mentor-audit-family-owner-daily-quota-with-child'
-  | 'mentor-audit-bridge-backstack';
+  | 'mentor-audit-bridge-backstack'
+  // WI-2194 — stale Plus denominator repaired into one Family cycle.
+  | 'wi-2194-stale-family-cycle';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -5418,6 +5421,16 @@ async function seedMentorAuditFamilyPoolMembers(
     });
   }
 
+  // Family status is reconstructed from current-cycle events, so the
+  // maintained mid-month seed records its 50% usage in the event ledger too.
+  await db.insert(usageEvents).values(
+    Array.from({ length: usedThisMonth }, () => ({
+      subscriptionId,
+      profileId: parentProfileId,
+      delta: 1,
+    })),
+  );
+
   return {
     scenario: 'mentor-audit-family-pool-members',
     accountId,
@@ -5433,6 +5446,58 @@ async function seedMentorAuditFamilyPoolMembers(
       // audit row reads it as a numeric percentage of the monthly cap.
       quotaUsedThisMonth: String(usedThisMonth),
       quotaMonthlyLimit: String(familyTier.monthlyQuota),
+    },
+  };
+}
+
+/** WI-2194 — stale Plus-era pool repaired into one current Family cycle.
+ *  Kept separate from the maintained normal-mid-month audit seed so the
+ *  generic BILLING-08 contract remains at 40–60% usage. */
+async function seedWi2194StaleFamilyCycle(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const base = await seedMentorAuditFamilyPoolMembers(db, email, env);
+  const {
+    subscriptionId,
+    parentProfileId,
+    childProfileId1: childProfileId,
+  } = base.ids;
+  if (!subscriptionId || !parentProfileId || !childProfileId) {
+    throw new Error('WI-2194 Family seed did not return its required IDs');
+  }
+
+  await db
+    .update(quotaPools)
+    .set({
+      monthlyLimit: getTierConfig('plus').monthlyQuota,
+      usedThisMonth: 7,
+    })
+    .where(eq(quotaPools.subscriptionId, subscriptionId));
+  await db
+    .delete(usageEvents)
+    .where(eq(usageEvents.subscriptionId, subscriptionId));
+  await db.insert(usageEvents).values([
+    ...Array.from({ length: 9 }, () => ({
+      subscriptionId,
+      profileId: parentProfileId,
+      delta: 1,
+    })),
+    ...Array.from({ length: 5 }, () => ({
+      subscriptionId,
+      profileId: childProfileId,
+      delta: 1,
+    })),
+  ]);
+
+  return {
+    ...base,
+    scenario: 'wi-2194-stale-family-cycle',
+    ids: {
+      ...base.ids,
+      quotaUsedThisMonth: '14',
+      quotaMonthlyLimit: String(getTierConfig('family').monthlyQuota),
     },
   };
 }
@@ -5948,6 +6013,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'mentor-audit-family-owner-daily-quota-with-child':
     seedMentorAuditFamilyOwnerDailyQuotaWithChild,
   'mentor-audit-bridge-backstack': seedMentorAuditBridgeBackstack,
+  'wi-2194-stale-family-cycle': seedWi2194StaleFamilyCycle,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];

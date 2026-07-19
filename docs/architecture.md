@@ -453,6 +453,16 @@ One mobile client, one error handling path. RFC 7807 overengineered for this. Bo
                             # Verify Inngest signing key, skip JWT middleware.
 ```
 
+**Family usage response contract:** For an owner-visible Family/Pro breakdown,
+`GET /v1/usage` returns `familyAggregate: { used, limit, formerMemberUsed? }`.
+`used` is the full current-cycle total. `byProfile` contains active members
+only; `formerMemberUsed` is the non-negative bucket retained from profiles
+removed during that cycle. Therefore
+`sum(byProfile.used) + (formerMemberUsed ?? 0) === familyAggregate.used`.
+The bucket is omitted by older servers and treated as zero for rolling-client
+compatibility. It never changes a profile's attributed usage or the monthly
+enforcement counter.
+
 ### Frontend Architecture
 
 **State management:**

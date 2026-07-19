@@ -84,6 +84,8 @@ export type UsageProfileBreakdownRow = z.infer<
 export const usageFamilyAggregateSchema = z.object({
   used: z.number().int(),
   limit: z.number().int(),
+  /** Current-cycle usage retained from profiles removed from the family. */
+  formerMemberUsed: z.number().int().nonnegative().optional(),
 });
 export type UsageFamilyAggregate = z.infer<typeof usageFamilyAggregateSchema>;
 

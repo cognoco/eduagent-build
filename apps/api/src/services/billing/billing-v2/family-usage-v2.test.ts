@@ -163,6 +163,33 @@ describe('getUsageBreakdownForProfileV2 (WI-722)', () => {
     expect(result.familyAggregate).toEqual({ used: 17, limit: 100 });
   });
 
+  it('keeps the former-member bucket owner-visible after the last active child is removed', async () => {
+    const db = createV2Db({
+      organizationId: 'org-1',
+      viewer: { id: 'owner-1', displayName: 'Owner', roles: ['admin'] },
+      orgMembers: [{ id: 'owner-1', displayName: 'Owner', roles: ['admin'] }],
+      usageRows: [{ profileId: 'owner-1', used: 1, usedToday: 1 }],
+    });
+    const result = await getUsageBreakdownForProfileV2(db, {
+      subscriptionId: 'sub-1',
+      activeProfileId: 'owner-1',
+      monthlyLimit: 100,
+      cycleStartAt: '2026-05-01T00:00:00.000Z',
+      dayStartAt: '2026-05-06T00:00:00.000Z',
+      inactiveMemberUsedThisMonth: 5,
+    });
+
+    expect(result.isOwnerBreakdownViewer).toBe(true);
+    expect(
+      result.byProfile.find((row) => row.profile_id === 'owner-1'),
+    ).toEqual(expect.objectContaining({ used: 1 }));
+    expect(result.familyAggregate).toEqual({
+      used: 6,
+      limit: 100,
+      formerMemberUsed: 5,
+    });
+  });
+
   it('shows the full breakdown to a non-owner adult when the owner shares it', async () => {
     sharingSpy.mockResolvedValue(true);
     chargeSpy.mockResolvedValue(['child-1']); // co-parent is a guardian

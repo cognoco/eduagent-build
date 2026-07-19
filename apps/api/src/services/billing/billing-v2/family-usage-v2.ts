@@ -76,6 +76,22 @@ export async function getUsageBreakdownForProfileV2(
     monthlyLimit: number;
     cycleStartAt: string;
     dayStartAt: string;
+    /**
+     * Current-cycle usage retained from removed profiles. Kept separate from
+     * memberUsage so no active profile inherits a former member's questions.
+     */
+    inactiveMemberUsedThisMonth?: number;
+    /**
+     * Optional member/cycle snapshot assembled by getFamilyPoolStatusV2.
+     * Routes pass this for Family reads so the visible rows and aggregate use
+     * the exact same member set and monthly event totals as the headline.
+     */
+    memberUsage?: Array<{
+      profileId: string;
+      name: string;
+      roles: string[];
+      used: number;
+    }>;
   },
 ): Promise<UsageBreakdown> {
   // (1) subscription → organization. The v2 image of the legacy
@@ -93,22 +109,38 @@ export async function getUsageBreakdownForProfileV2(
   // `profiles WHERE account_id = sub.accountId AND id = activeProfileId AND
   // archived_at IS NULL` spoofing guard. Scoped to the subscription's org so a
   // profileId from another org cannot read this family's breakdown.
-  const [viewer] = await db
-    .select({
-      id: person.id,
-      displayName: person.displayName,
-      roles: membership.roles,
-    })
-    .from(person)
-    .innerJoin(
-      membership,
-      and(
-        eq(membership.personId, person.id),
-        eq(membership.organizationId, sub.organizationId),
-      ),
-    )
-    .where(and(eq(person.id, input.activeProfileId), isNull(person.archivedAt)))
-    .limit(1);
+  const viewer = input.memberUsage
+    ? (() => {
+        const row = input.memberUsage.find(
+          (member) => member.profileId === input.activeProfileId,
+        );
+        return row
+          ? { id: row.profileId, displayName: row.name, roles: row.roles }
+          : undefined;
+      })()
+    : (
+        await db
+          .select({
+            id: person.id,
+            displayName: person.displayName,
+            roles: membership.roles,
+          })
+          .from(person)
+          .innerJoin(
+            membership,
+            and(
+              eq(membership.personId, person.id),
+              eq(membership.organizationId, sub.organizationId),
+            ),
+          )
+          .where(
+            and(
+              eq(person.id, input.activeProfileId),
+              isNull(person.archivedAt),
+            ),
+          )
+          .limit(1)
+      )[0];
 
   if (!viewer) {
     return EMPTY_BREAKDOWN;
@@ -118,21 +150,30 @@ export async function getUsageBreakdownForProfileV2(
   // (3) org members — the v2 image of `profiles WHERE account_id = …`. Carries
   // the family-owner lookup (admin-role member) AND the per-profile rows the
   // breakdown enumerates, in one org scan.
-  const orgMembers = await db
-    .select({
-      id: person.id,
-      name: person.displayName,
-      roles: membership.roles,
-    })
-    .from(person)
-    .innerJoin(
-      membership,
-      and(
-        eq(membership.personId, person.id),
-        eq(membership.organizationId, sub.organizationId),
-      ),
-    )
-    .where(isNull(person.archivedAt));
+  const orgMembers = input.memberUsage
+    ? input.memberUsage.map((row) => ({
+        id: row.profileId,
+        name: row.name,
+        roles: row.roles,
+        used: row.used,
+      }))
+    : (
+        await db
+          .select({
+            id: person.id,
+            name: person.displayName,
+            roles: membership.roles,
+          })
+          .from(person)
+          .innerJoin(
+            membership,
+            and(
+              eq(membership.personId, person.id),
+              eq(membership.organizationId, sub.organizationId),
+            ),
+          )
+          .where(isNull(person.archivedAt))
+      ).map((row) => ({ ...row, used: undefined }));
 
   const familyOwnerPersonId =
     orgMembers.find((m) => m.roles.includes('admin'))?.id ?? null;
@@ -156,6 +197,7 @@ export async function getUsageBreakdownForProfileV2(
   const guardianIds = await getGuardianPersonIds(db, viewer.id);
   const hasChildLink = chargeIds.some((id) => orgMemberIds.has(id));
   const isChild = guardianIds.some((id) => orgMemberIds.has(id));
+  const formerMemberUsed = Math.max(0, input.inactiveMemberUsedThisMonth ?? 0);
 
   // (5) usage aggregation. profileId = person.id, so the same usage_events rows
   // aggregate as in legacy. The legacy LEFT JOIN (profiles ⟕ usage_events)
@@ -189,7 +231,7 @@ export async function getUsageBreakdownForProfileV2(
   const profileRows = orgMembers.map((m) => ({
     profileId: m.id,
     name: m.name,
-    used: usageByPerson.get(m.id)?.used ?? 0,
+    used: m.used ?? usageByPerson.get(m.id)?.used ?? 0,
     usedToday: usageByPerson.get(m.id)?.usedToday ?? 0,
   }));
 
@@ -202,8 +244,10 @@ export async function getUsageBreakdownForProfileV2(
 
   // The gating logic below is byte-identical to the legacy function — only the
   // INPUTS (org members + guardianship edges) are sourced from the v2 store.
+  // The former-member exception keeps the new presentation bucket visible to
+  // an owner after removing their last active child, when no live edge remains.
   const isOwnerBreakdownViewer =
-    (viewerIsOwner && hasChildLink) ||
+    (viewerIsOwner && (hasChildLink || formerMemberUsed > 0)) ||
     (sharingEnabled && familyOwnerPersonId != null && hasChildLink && !isChild);
   const visibleRows = isOwnerBreakdownViewer
     ? profileRows
@@ -224,7 +268,11 @@ export async function getUsageBreakdownForProfileV2(
       is_self: row.profileId === input.activeProfileId,
     })),
     familyAggregate: isOwnerBreakdownViewer
-      ? { used: familyUsed, limit: input.monthlyLimit }
+      ? {
+          used: familyUsed + formerMemberUsed,
+          limit: input.monthlyLimit,
+          ...(formerMemberUsed > 0 ? { formerMemberUsed } : {}),
+        }
       : null,
     isOwnerBreakdownViewer,
     selfUsedToday: isOwnerBreakdownViewer ? null : (selfRow?.usedToday ?? 0),

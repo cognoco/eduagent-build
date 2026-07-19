@@ -81,6 +81,7 @@ export {
   removeProfileFromSubscriptionV2,
   getFamilyPoolStatusV2,
   ProfileRemovalNotImplementedErrorV2,
+  StaleFamilyAccessSnapshotErrorV2,
 } from './family-v2';
 
 // [WI-722] v2 twin of getUsageBreakdownForProfile — reads guardianship via the

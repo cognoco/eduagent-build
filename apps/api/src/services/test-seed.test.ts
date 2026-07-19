@@ -7,6 +7,7 @@ import {
   person,
   login,
   membership,
+  usageEvents,
   type Database,
 } from '@eduagent/database';
 import { inArray } from 'drizzle-orm';
@@ -179,6 +180,7 @@ describe('VALID_SCENARIOS', () => {
       'mentor-audit-family-pool-members',
       'mentor-audit-family-owner-daily-quota-with-child',
       'mentor-audit-bridge-backstack',
+      'wi-2194-stale-family-cycle',
     ]);
   });
 
@@ -1314,11 +1316,22 @@ describe('mentor-audit seed pack returns required IDs', () => {
   // Third-wave structural assertions — BILLING-07/08 + BRIDGE-03/04.
   // -------------------------------------------------------------------------
 
-  it('family-pool-members seeds exactly 1 owner + 2 children and partial monthly usage', async () => {
+  it('WI-2194 stale-family-cycle seeds 1 owner + 2 children, stale 7/700 pool, and 14 current-cycle events', async () => {
     const captured: Array<Record<string, unknown>> = [];
+    const updates: Array<Record<string, unknown>> = [];
+    const usageOperations: string[] = [];
+    const deleteMock = jest.fn().mockReturnValue({
+      where: jest.fn().mockImplementation(() => {
+        usageOperations.push('delete');
+        return { returning: jest.fn().mockResolvedValue([]) };
+      }),
+    });
     const insertMock = jest.fn().mockImplementation(() => ({
       values: jest.fn().mockImplementation((row: Record<string, unknown>) => {
         captured.push(row);
+        if (Array.isArray(row) && row.some((event) => 'delta' in event)) {
+          usageOperations.push(`insert:${row.length}`);
+        }
         return Promise.resolve();
       }),
     }));
@@ -1330,22 +1343,19 @@ describe('mentor-audit seed pack returns required IDs', () => {
     const db = {
       insert: insertMock,
       update: jest.fn().mockReturnValue({
-        set: jest
-          .fn()
-          .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+        set: jest.fn().mockImplementation((row: Record<string, unknown>) => {
+          updates.push(row);
+          return { where: jest.fn().mockResolvedValue(undefined) };
+        }),
       }),
       select: jest.fn().mockReturnValue(selectChain),
-      delete: jest.fn().mockReturnValue({
-        where: jest
-          .fn()
-          .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
-      }),
+      delete: deleteMock,
       execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
     } as unknown as Database;
 
     const result = await seedScenario(
       db,
-      'mentor-audit-family-pool-members',
+      'wi-2194-stale-family-cycle',
       'test@example.com',
     );
 
@@ -1374,24 +1384,98 @@ describe('mentor-audit seed pack returns required IDs', () => {
     expect(ownerRow).toBeDefined();
     expect(ownerRow?.defaultAppContext).toBe('family');
 
-    // Quota pool row must reflect partial use (~50% of monthly cap) — the
-    // audit reads this to verify the steady-state pool readout.
+    // The persisted pool deliberately carries the stale Plus-era values that
+    // the Family cycle read must repair/reject before assembly.
+    expect(updates).toContainEqual(
+      expect.objectContaining({ monthlyLimit: 700, usedThisMonth: 7 }),
+    );
+    expect(deleteMock).toHaveBeenCalledWith(usageEvents);
+    expect(usageOperations).toEqual(['insert:750', 'delete', 'insert:14']);
+
+    const usageEventRows = captured.find(
+      (row) =>
+        Array.isArray(row) &&
+        row.length === 14 &&
+        row.every((event) => event.delta === 1),
+    ) as Array<Record<string, unknown>> | undefined;
+    expect(usageEventRows).toHaveLength(14);
+    expect(
+      usageEventRows?.filter(
+        (row) => row.profileId === result.ids.parentProfileId,
+      ),
+    ).toHaveLength(9);
+    expect(
+      usageEventRows?.filter(
+        (row) => row.profileId === result.ids.childProfileId1,
+      ),
+    ).toHaveLength(5);
+    expect(
+      usageEventRows?.every(
+        (row) => row.subscriptionId === result.ids.subscriptionId,
+      ),
+    ).toBe(true);
+
+    expect(result.ids.quotaMonthlyLimit).toBe('1500');
+    expect(result.ids.quotaUsedThisMonth).toBe('14');
+  });
+
+  it('family-pool-members preserves normal mid-month usage at half of the Family allowance', async () => {
+    const captured: Array<Record<string, unknown>> = [];
+    const db = {
+      insert: jest.fn().mockImplementation(() => ({
+        values: jest.fn().mockImplementation((row: Record<string, unknown>) => {
+          captured.push(row);
+          return Promise.resolve();
+        }),
+      })),
+      update: jest.fn().mockReturnValue({
+        set: jest
+          .fn()
+          .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+      }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+      delete: jest.fn().mockReturnValue({
+        where: jest
+          .fn()
+          .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
+      }),
+      execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
+    } as unknown as Database;
+
+    const result = await seedScenario(
+      db,
+      'mentor-audit-family-pool-members',
+      'test@example.com',
+    );
     const quotaRow = captured.find(
       (row) =>
         'monthlyLimit' in row &&
         'usedThisMonth' in row &&
         'subscriptionId' in row,
     );
-    expect(quotaRow).toBeDefined();
-    const monthlyLimit = Number(quotaRow?.monthlyLimit);
-    const usedThisMonth = Number(quotaRow?.usedThisMonth);
-    expect(monthlyLimit).toBeGreaterThan(0);
-    expect(usedThisMonth).toBeGreaterThan(0);
-    expect(usedThisMonth).toBeLessThan(monthlyLimit);
-    expect(usedThisMonth).toBe(Math.floor(monthlyLimit / 2));
 
-    expect(result.ids.quotaMonthlyLimit).toBe(String(monthlyLimit));
-    expect(result.ids.quotaUsedThisMonth).toBe(String(usedThisMonth));
+    expect(quotaRow).toMatchObject({
+      monthlyLimit: 1500,
+      usedThisMonth: 750,
+    });
+    expect(result.ids.quotaMonthlyLimit).toBe('1500');
+    expect(result.ids.quotaUsedThisMonth).toBe('750');
+    const usageEventRows = captured.find(
+      (row) => Array.isArray(row) && row.some((event) => 'delta' in event),
+    ) as Array<Record<string, unknown>> | undefined;
+    expect(usageEventRows).toHaveLength(750);
+    expect(usageEventRows?.every((event) => event.delta === 1)).toBe(true);
+    expect(
+      usageEventRows?.every(
+        (event) =>
+          event.subscriptionId === result.ids.subscriptionId &&
+          event.profileId === result.ids.parentProfileId,
+      ),
+    ).toBe(true);
   });
 
   it('family-owner-daily-quota-with-child sets defaultAppContext=family on the owner and stocks the child with learning state', async () => {

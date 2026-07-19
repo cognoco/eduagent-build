@@ -16,7 +16,12 @@ import {
 import { ProfileContext, type ProfileContextValue } from '../../lib/profile';
 import { createTestProfile } from '../../test-utils/app-hook-test-utils';
 import { queryKeys } from '../../lib/query-keys';
-import type { Profile, Subscription } from '@eduagent/schemas';
+import type {
+  FamilySubscription,
+  Profile,
+  Subscription,
+  Usage,
+} from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -246,7 +251,7 @@ function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
   };
 }
 
-const DEFAULT_USAGE = {
+const DEFAULT_USAGE: Usage = {
   monthlyLimit: 100,
   usedThisMonth: 0,
   remainingQuestions: 100,
@@ -257,6 +262,146 @@ const DEFAULT_USAGE = {
   usedToday: 0,
   dailyRemainingQuestions: 10,
 };
+
+const FAMILY_OWNER_ID = '00000000-0000-7000-a000-000000000201';
+const FAMILY_MEMBER_ID = '00000000-0000-7000-a000-000000000202';
+
+function makeFamilySnapshot(input: {
+  used: number;
+  tier?: FamilySubscription['tier'];
+  limit?: number;
+}): FamilySubscription {
+  const tier = input.tier ?? 'family';
+  const limit = input.limit ?? (tier === 'pro' ? 3000 : 1500);
+  const maxProfiles = tier === 'pro' ? 6 : 4;
+  return {
+    tier,
+    monthlyLimit: limit,
+    usedThisMonth: input.used,
+    remainingQuestions: Math.max(limit - input.used, 0),
+    profileCount: 2,
+    maxProfiles,
+    members: [
+      {
+        profileId: FAMILY_OWNER_ID,
+        displayName: 'Owner',
+        isOwner: true,
+      },
+      {
+        profileId: FAMILY_MEMBER_ID,
+        displayName: 'Member',
+        isOwner: false,
+      },
+    ],
+  };
+}
+
+function setCoherentFamilyQuotaRoutes(input: {
+  used: number;
+  formerMemberUsed?: number;
+  topUpCreditsRemaining?: number;
+  cycleResetAt?: string;
+  tier?: FamilySubscription['tier'];
+  limit?: number;
+}) {
+  const topUpCreditsRemaining = input.topUpCreditsRemaining ?? 0;
+  const tier = input.tier ?? 'family';
+  const limit = input.limit ?? (tier === 'pro' ? 3000 : 1500);
+  const maxProfiles = tier === 'pro' ? 6 : 4;
+  const formerMemberUsed = input.formerMemberUsed ?? 0;
+  const activeMemberUsed = input.used - formerMemberUsed;
+  const ownerUsed = Math.min(activeMemberUsed, limit);
+  const memberUsed = activeMemberUsed - ownerUsed;
+  mockFetch.setRoute(
+    '/subscription',
+    () =>
+      new Response(
+        JSON.stringify({
+          subscription: makeSubscription({
+            tier,
+            monthlyLimit: limit,
+            usedThisMonth: input.used,
+            remainingQuestions: Math.max(limit - input.used, 0),
+            dailyLimit: null,
+            dailyRemainingQuestions: null,
+          }),
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+  );
+  mockFetch.setRoute(
+    '/usage',
+    () =>
+      new Response(
+        JSON.stringify({
+          usage: {
+            ...DEFAULT_USAGE,
+            monthlyLimit: limit,
+            usedThisMonth: input.used,
+            remainingQuestions:
+              Math.max(limit - input.used, 0) + topUpCreditsRemaining,
+            topUpCreditsRemaining,
+            warningLevel:
+              input.used >= limit
+                ? topUpCreditsRemaining > 0
+                  ? 'top-up-available'
+                  : 'exceeded'
+                : 'none',
+            cycleResetAt: input.cycleResetAt ?? '2026-07-01T00:00:00.000Z',
+            dailyLimit: null,
+            dailyRemainingQuestions: null,
+            byProfile: [
+              {
+                profile_id: FAMILY_OWNER_ID,
+                name: 'Owner',
+                used: ownerUsed,
+                usedToday: 0,
+                is_self: true,
+              },
+              {
+                profile_id: FAMILY_MEMBER_ID,
+                name: 'Member',
+                used: memberUsed,
+                usedToday: 0,
+                is_self: false,
+              },
+            ],
+            familyAggregate: { used: input.used, limit, formerMemberUsed },
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+  );
+  mockFetch.setRoute(
+    '/subscription/family',
+    () =>
+      new Response(
+        JSON.stringify({
+          family: {
+            tier,
+            monthlyLimit: limit,
+            usedThisMonth: input.used,
+            remainingQuestions: Math.max(limit - input.used, 0),
+            profileCount: 2,
+            maxProfiles,
+            members: [
+              {
+                profileId: FAMILY_OWNER_ID,
+                displayName: 'Owner',
+                isOwner: true,
+              },
+              {
+                profileId: FAMILY_MEMBER_ID,
+                displayName: 'Member',
+                isOwner: false,
+              },
+            ],
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Active profile state (mutable for tests that need different profiles)
@@ -278,10 +423,14 @@ function createWrapper(opts?: {
   seedCache?: boolean;
   subscription?: Subscription;
   usage?: typeof DEFAULT_USAGE;
+  family?: FamilySubscription;
+  queryClient?: QueryClient;
 }) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
+  const queryClient =
+    opts?.queryClient ??
+    new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
   if (opts?.seedCache) {
     queryClient.setQueryData(
       queryKeys.subscription(mockActiveProfile.id),
@@ -291,23 +440,28 @@ function createWrapper(opts?: {
       queryKeys.usage(mockActiveProfile.id),
       opts.usage ?? DEFAULT_USAGE,
     );
+    if (opts.family) {
+      queryClient.setQueryData(
+        queryKeys.subscriptionFamily(mockActiveProfile.id),
+        opts.family,
+      );
+    }
   }
 
   // Provide the real ProfileContext so useProfile() and the real
   // useActiveProfileRole() / useParentProxy() hooks resolve correctly without
   // internal mocks.
-  const profileContextValue: ProfileContextValue = {
-    profiles: [mockActiveProfile],
-    activeProfile: mockActiveProfile,
-    isExplicitProxyMode: false,
-    switchProfile: async () => ({ success: true }),
-    isLoading: false,
-    profileLoadError: null,
-    profileWasRemoved: false,
-    acknowledgeProfileRemoval: () => undefined,
-  };
-
   return function Wrapper({ children }: { children: React.ReactNode }) {
+    const profileContextValue: ProfileContextValue = {
+      profiles: [mockActiveProfile],
+      activeProfile: mockActiveProfile,
+      isExplicitProxyMode: false,
+      switchProfile: async () => ({ success: true }),
+      isLoading: false,
+      profileLoadError: null,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: () => undefined,
+    };
     return React.createElement(
       QueryClientProvider,
       { client: queryClient },
@@ -564,6 +718,22 @@ describe('SubscriptionScreen', () => {
       }
     },
   );
+
+  it('labels former-member usage separately without inflating the owner usage row', async () => {
+    setCoherentFamilyQuotaRoutes({ used: 6, formerMemberUsed: 5 });
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('family-pool-section'));
+    const ownerRow = screen.getByTestId(`usage-profile-${FAMILY_OWNER_ID}`);
+    within(ownerRow).getByText('1 questions');
+    expect(within(ownerRow).queryByText('6 questions')).toBeNull();
+    const formerMemberRow = screen.getByTestId('usage-former-members');
+    within(formerMemberRow).getByText('Former members');
+    within(formerMemberRow).getByText('5 questions');
+    screen.getByText('6 / 1500');
+    expect(screen.queryByTestId('family-quota-error')).toBeNull();
+  });
 
   // -------------------------------------------------------------------------
   // Loading states
@@ -1620,6 +1790,47 @@ describe('SubscriptionScreen', () => {
         ),
     );
     mockFetch.setRoute(
+      '/usage',
+      () =>
+        new Response(
+          JSON.stringify({
+            usage: {
+              ...DEFAULT_USAGE,
+              monthlyLimit: 1500,
+              usedThisMonth: 14,
+              remainingQuestions: 1486,
+              dailyLimit: null,
+              dailyRemainingQuestions: null,
+              byProfile: [
+                {
+                  profile_id: '00000000-0000-7000-a000-000000000101',
+                  name: 'Parent',
+                  used: 9,
+                  usedToday: 0,
+                  is_self: true,
+                },
+                {
+                  profile_id: '00000000-0000-7000-a000-000000000102',
+                  name: 'Alex',
+                  used: 5,
+                  usedToday: 0,
+                  is_self: false,
+                },
+                {
+                  profile_id: '00000000-0000-7000-a000-000000000103',
+                  name: 'Mia',
+                  used: 0,
+                  usedToday: 0,
+                  is_self: false,
+                },
+              ],
+              familyAggregate: { used: 14, limit: 1500 },
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
       '/subscription/family',
       () =>
         new Response(
@@ -1627,8 +1838,8 @@ describe('SubscriptionScreen', () => {
             family: {
               tier: 'family',
               monthlyLimit: 1500,
-              usedThisMonth: 300,
-              remainingQuestions: 1200,
+              usedThisMonth: 14,
+              remainingQuestions: 1486,
               profileCount: 3,
               maxProfiles: 4,
               members: [
@@ -1660,10 +1871,20 @@ describe('SubscriptionScreen', () => {
       screen.getByTestId('family-pool-section');
     });
     screen.getByText('3 of 4 profiles connected');
-    screen.getByText(/1200 shared questions left/i);
+    screen.getByText(/1486 shared questions left/i);
+    screen.getByText('14 / 1500 questions used');
+    screen.getByText('1%');
+    screen.getByText('9 questions');
+    screen.getByText('5 questions');
+    screen.getByText('14 / 1500');
+    expect(screen.getByRole('progressbar').props.accessibilityValue).toEqual({
+      min: 0,
+      max: 1500,
+      now: 14,
+    });
     screen.getByText('Parent (owner)');
-    screen.getByText('Alex');
-    screen.getByText('Mia');
+    expect(screen.getAllByText('Alex')).toHaveLength(2);
+    expect(screen.getAllByText('Mia')).toHaveLength(2);
     screen.getByTestId(
       'remove-family-member-00000000-0000-7000-a000-000000000102',
     );
@@ -1672,16 +1893,32 @@ describe('SubscriptionScreen', () => {
     );
   });
 
-  it('shows live family pool details for pro subscriptions', async () => {
+  it('hides a stale Plus 700 usage snapshot during a Plus-to-Family transition and refreshes all quota reads', async () => {
     mockFetch.setRoute(
       '/subscription',
       () =>
         new Response(
           JSON.stringify({
-            subscription: makeSubscription({
-              tier: 'pro',
-              status: 'active',
-            }),
+            subscription: makeSubscription({ tier: 'family' }),
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/usage',
+      () =>
+        new Response(
+          JSON.stringify({
+            usage: {
+              ...DEFAULT_USAGE,
+              monthlyLimit: 700,
+              usedThisMonth: 14,
+              remainingQuestions: 686,
+              dailyLimit: null,
+              dailyRemainingQuestions: null,
+              byProfile: [],
+              familyAggregate: { used: 14, limit: 700 },
+            },
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -1692,26 +1929,56 @@ describe('SubscriptionScreen', () => {
         new Response(
           JSON.stringify({
             family: {
-              tier: 'pro',
+              tier: 'family',
               monthlyLimit: 1500,
-              usedThisMonth: 300,
-              remainingQuestions: 1200,
-              profileCount: 3,
+              usedThisMonth: 14,
+              remainingQuestions: 1486,
+              profileCount: 1,
+              maxProfiles: 4,
+              members: [],
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('family-quota-error'));
+    expect(screen.queryByText('14 / 700 questions used')).toBeNull();
+    expect(screen.queryByText(/1486 shared questions left/i)).toBeNull();
+    fireEvent.press(screen.getByTestId('family-quota-retry'));
+    await waitFor(() => {
+      expect(fetchCallsMatching(mockFetch, '/usage').length).toBeGreaterThan(1);
+      expect(
+        fetchCallsMatching(mockFetch, '/subscription/family').length,
+      ).toBeGreaterThan(1);
+    });
+  });
+
+  it('rejects equal-looking Family snapshots when they describe different profile sets', async () => {
+    setCoherentFamilyQuotaRoutes({ used: 14 });
+    mockFetch.setRoute(
+      '/subscription/family',
+      () =>
+        new Response(
+          JSON.stringify({
+            family: {
+              tier: 'family',
+              monthlyLimit: 1500,
+              usedThisMonth: 14,
+              remainingQuestions: 1486,
+              profileCount: 2,
               maxProfiles: 4,
               members: [
                 {
-                  profileId: '00000000-0000-7000-a000-000000000101',
-                  displayName: 'Parent',
+                  profileId: FAMILY_OWNER_ID,
+                  displayName: 'Owner',
                   isOwner: true,
                 },
                 {
-                  profileId: '00000000-0000-7000-a000-000000000102',
-                  displayName: 'Alex',
-                  isOwner: false,
-                },
-                {
-                  profileId: '00000000-0000-7000-a000-000000000103',
-                  displayName: 'Mia',
+                  profileId: '00000000-0000-7000-a000-000000000299',
+                  displayName: 'Different member',
                   isOwner: false,
                 },
               ],
@@ -1723,14 +1990,279 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    await waitFor(() => {
-      screen.getByTestId('family-pool-section');
+    await waitFor(() => screen.getByTestId('family-quota-error'));
+    expect(screen.queryByText('14 / 1500 questions used')).toBeNull();
+    expect(screen.queryByTestId('family-pool-section')).toBeNull();
+  });
+
+  it.each([
+    {
+      caseName: 'zero usage in the current Family cycle',
+      used: 0,
+      topUpCreditsRemaining: 0,
+      expectedRemaining: 1500,
+      expectedPercent: '0%',
+    },
+    {
+      caseName: 'exact Family limit',
+      used: 1500,
+      topUpCreditsRemaining: 0,
+      expectedRemaining: 0,
+      expectedPercent: '100%',
+    },
+    {
+      caseName: 'over-limit Family usage funded by top-up credits',
+      used: 1501,
+      topUpCreditsRemaining: 10,
+      expectedRemaining: 0,
+      expectedPercent: '100%',
+    },
+  ])(
+    'keeps headline, aggregate, remaining, percentage, and accessibility coherent for $caseName',
+    async ({
+      used,
+      topUpCreditsRemaining,
+      expectedRemaining,
+      expectedPercent,
+    }) => {
+      setCoherentFamilyQuotaRoutes({ used, topUpCreditsRemaining });
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      await waitFor(() => screen.getByTestId('family-pool-section'));
+      screen.getByText(`${used} / 1500 questions used`);
+      screen.getByText(`${used} / 1500`);
+      screen.getByText(expectedPercent);
+      screen.getByText(
+        new RegExp(`${expectedRemaining} shared questions left`, 'i'),
+      );
+      expect(screen.getByRole('progressbar').props.accessibilityValue).toEqual({
+        min: 0,
+        max: 1500,
+        now: Math.min(used, 1500),
+      });
+      if (topUpCreditsRemaining > 0) {
+        screen.getByText(
+          new RegExp(`${topUpCreditsRemaining} top-up credits remaining`, 'i'),
+        );
+      }
+    },
+  );
+
+  it('drops prior-cycle Family arithmetic across an unmount and same-client cold relaunch', async () => {
+    setCoherentFamilyQuotaRoutes({
+      used: 14,
+      cycleResetAt: '2026-07-01T00:00:00.000Z',
     });
-    screen.getByText('3 of 4 profiles connected');
-    screen.getByText(/1200 shared questions left/i);
-    screen.getByText('Parent (owner)');
-    screen.getByText('Alex');
-    screen.getByText('Mia');
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
+    const wrapper = createWrapper({ queryClient });
+    const firstMount = render(<SubscriptionScreen />, { wrapper });
+
+    await waitFor(() => screen.getByText('14 / 1500 questions used'));
+    firstMount.unmount();
+
+    setCoherentFamilyQuotaRoutes({
+      used: 0,
+      cycleResetAt: '2026-08-01T00:00:00.000Z',
+    });
+    render(<SubscriptionScreen />, { wrapper });
+
+    expect(screen.queryByText('14 / 1500 questions used')).toBeNull();
+    await waitFor(() => screen.getByText('0 / 1500 questions used'));
+    screen.getByText(/1500 shared questions left/i);
+  });
+
+  it.each([
+    { effectiveTier: 'free' as const, limit: 100 },
+    { effectiveTier: 'plus' as const, limit: 700 },
+  ])(
+    'does not request or render cached Family data after an effective $effectiveTier downgrade',
+    async ({ effectiveTier, limit }) => {
+      const subscription = makeSubscription({
+        tier: 'family',
+        effectiveAccessTier: effectiveTier,
+        monthlyLimit: limit,
+        usedThisMonth: 14,
+        remainingQuestions: limit - 14,
+        dailyLimit: null,
+        dailyRemainingQuestions: null,
+      });
+      const usage = {
+        ...DEFAULT_USAGE,
+        monthlyLimit: limit,
+        usedThisMonth: 14,
+        remainingQuestions: limit - 14,
+        dailyLimit: null,
+        dailyRemainingQuestions: null,
+      };
+      mockFetch.setRoute(
+        '/subscription',
+        () =>
+          new Response(JSON.stringify({ subscription }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      );
+      mockFetch.setRoute(
+        '/usage',
+        () =>
+          new Response(JSON.stringify({ usage }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      );
+
+      render(<SubscriptionScreen />, {
+        wrapper: createWrapper({
+          seedCache: true,
+          subscription,
+          usage,
+          family: makeFamilySnapshot({ used: 14 }),
+        }),
+      });
+
+      await waitFor(() => screen.getByText(`14 / ${limit} questions used`));
+      expect(screen.queryByText('14 / 1500 questions used')).toBeNull();
+      expect(screen.queryByTestId('family-pool-section')).toBeNull();
+      expect(
+        fetchCallsMatching(mockFetch, '/subscription/family'),
+      ).toHaveLength(0);
+    },
+  );
+
+  it('keeps Plus per-profile 700 semantics unchanged without requiring a Family snapshot', async () => {
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: makeSubscription({
+              tier: 'plus',
+              monthlyLimit: 700,
+              usedThisMonth: 14,
+              remainingQuestions: 686,
+              dailyLimit: null,
+              dailyRemainingQuestions: null,
+            }),
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/usage',
+      () =>
+        new Response(
+          JSON.stringify({
+            usage: {
+              ...DEFAULT_USAGE,
+              monthlyLimit: 700,
+              usedThisMonth: 14,
+              remainingQuestions: 686,
+              dailyLimit: null,
+              dailyRemainingQuestions: null,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByText('14 / 700 questions used'));
+    expect(screen.queryByTestId('family-quota-error')).toBeNull();
+    expect(screen.getByRole('progressbar').props.accessibilityValue).toEqual({
+      min: 0,
+      max: 700,
+      now: 14,
+    });
+  });
+
+  it('shows one honest retry state when the Family endpoint partially fails', async () => {
+    setCoherentFamilyQuotaRoutes({ used: 14 });
+    mockFetch.setRoute(
+      '/subscription/family',
+      () =>
+        new Response(JSON.stringify({ error: 'Unavailable' }), { status: 503 }),
+    );
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('family-quota-error'));
+    expect(screen.queryByText('14 / 1500 questions used')).toBeNull();
+    expect(screen.queryByTestId('family-pool-section')).toBeNull();
+  });
+
+  it('does not retain owner Family arithmetic after an owner-to-member profile switch', async () => {
+    setCoherentFamilyQuotaRoutes({ used: 14 });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
+    const wrapper = createWrapper({ queryClient });
+    const view = render(<SubscriptionScreen />, { wrapper });
+
+    await waitFor(() => screen.getByText('14 / 1500 questions used'));
+
+    mockActiveProfile = createTestProfile({
+      id: FAMILY_MEMBER_ID,
+      displayName: 'Member',
+      isOwner: false,
+    });
+    view.rerender(<SubscriptionScreen />);
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/'));
+    expect(screen.queryByText('14 / 1500 questions used')).toBeNull();
+    expect(screen.queryByTestId('family-pool-section')).toBeNull();
+  });
+
+  it('shows canonical Pro 3000 shared-pool arithmetic and hides stale Family cache during refetch', async () => {
+    setCoherentFamilyQuotaRoutes({ tier: 'pro', used: 300 });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
+    const staleUsage = {
+      ...DEFAULT_USAGE,
+      monthlyLimit: 1500,
+      usedThisMonth: 14,
+      remainingQuestions: 1486,
+      dailyLimit: null,
+      dailyRemainingQuestions: null,
+      byProfile: [
+        {
+          profile_id: FAMILY_OWNER_ID,
+          name: 'Owner',
+          used: 14,
+          usedToday: 0,
+          is_self: true,
+        },
+        {
+          profile_id: FAMILY_MEMBER_ID,
+          name: 'Member',
+          used: 0,
+          usedToday: 0,
+          is_self: false,
+        },
+      ],
+      familyAggregate: { used: 14, limit: 1500 },
+    };
+
+    render(<SubscriptionScreen />, {
+      wrapper: createWrapper({
+        queryClient,
+        seedCache: true,
+        subscription: makeSubscription({ tier: 'family' }),
+        usage: staleUsage,
+        family: makeFamilySnapshot({ used: 14 }),
+      }),
+    });
+
+    expect(screen.queryByText('14 / 1500 questions used')).toBeNull();
+    await waitFor(() => screen.getByText('300 / 3000 questions used'));
+    screen.getByText('300 / 3000');
+    screen.getByText('2 of 6 profiles connected');
+    screen.getByText(/2700 shared questions left/i);
+    expect(screen.queryByTestId('family-quota-error')).toBeNull();
   });
 
   it('removes a non-owner profile from the family pool after confirmation', async () => {
@@ -1743,6 +2275,40 @@ describe('SubscriptionScreen', () => {
               tier: 'family',
               status: 'active',
             }),
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/usage',
+      () =>
+        new Response(
+          JSON.stringify({
+            usage: {
+              ...DEFAULT_USAGE,
+              monthlyLimit: 1500,
+              usedThisMonth: 300,
+              remainingQuestions: 1200,
+              dailyLimit: null,
+              dailyRemainingQuestions: null,
+              byProfile: [
+                {
+                  profile_id: '00000000-0000-7000-a000-000000000101',
+                  name: 'Parent',
+                  used: 200,
+                  usedToday: 0,
+                  is_self: true,
+                },
+                {
+                  profile_id: '00000000-0000-7000-a000-000000000102',
+                  name: 'Alex',
+                  used: 100,
+                  usedToday: 0,
+                  is_self: false,
+                },
+              ],
+              familyAggregate: { used: 300, limit: 1500 },
+            },
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -2548,6 +3114,30 @@ describe('SubscriptionScreen', () => {
         isOwner: boolean;
       }>;
     }) {
+      const members = opts?.members ?? [
+        {
+          profileId: v1OwnerProfileId,
+          displayName: 'Alex',
+          isOwner: true,
+        },
+        {
+          profileId: v1ChildProfileId,
+          displayName: 'Kid',
+          isOwner: false,
+        },
+      ];
+      const suppliedRows = opts?.byProfile ?? [];
+      const byProfile = members.map(
+        (member) =>
+          suppliedRows.find((row) => row.profile_id === member.profileId) ?? {
+            profile_id: member.profileId,
+            name: member.displayName,
+            used: 0,
+            usedToday: 0,
+            is_self: member.isOwner,
+          },
+      );
+      const usedThisMonth = byProfile.reduce((sum, row) => sum + row.used, 0);
       mockFetch.setRoute(
         '/subscription',
         () =>
@@ -2568,7 +3158,13 @@ describe('SubscriptionScreen', () => {
             JSON.stringify({
               usage: {
                 ...DEFAULT_USAGE,
-                byProfile: opts?.byProfile,
+                monthlyLimit: 1500,
+                usedThisMonth,
+                remainingQuestions: 1500 - usedThisMonth,
+                dailyLimit: null,
+                dailyRemainingQuestions: null,
+                byProfile,
+                familyAggregate: { used: usedThisMonth, limit: 1500 },
               },
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -2582,22 +3178,11 @@ describe('SubscriptionScreen', () => {
               family: {
                 tier: 'family',
                 monthlyLimit: 1500,
-                usedThisMonth: 0,
-                remainingQuestions: 1500,
-                profileCount: opts?.members?.length ?? 2,
+                usedThisMonth,
+                remainingQuestions: 1500 - usedThisMonth,
+                profileCount: members.length,
                 maxProfiles: 4,
-                members: opts?.members ?? [
-                  {
-                    profileId: v1OwnerProfileId,
-                    displayName: 'Alex',
-                    isOwner: true,
-                  },
-                  {
-                    profileId: v1ChildProfileId,
-                    displayName: 'Kid',
-                    isOwner: false,
-                  },
-                ],
+                members,
               },
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } },

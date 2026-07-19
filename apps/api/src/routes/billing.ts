@@ -45,12 +45,12 @@ import {
   markSubscriptionCancelledV2,
   getEffectiveAccessForSubscriptionV2,
   getOrProvisionProfileQuotaUsageV2,
-  listFamilyMembersV2,
   addProfileToSubscriptionV2,
   removeProfileFromSubscriptionV2,
   getFamilyPoolStatusV2,
   getUsageBreakdownForProfileV2,
   ProfileRemovalNotImplementedErrorV2,
+  StaleFamilyAccessSnapshotErrorV2,
 } from '../services/billing/billing-v2';
 import {
   resolveWarningLevel,
@@ -79,6 +79,41 @@ import { requireAccount } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 
 const logger = createLogger();
+
+async function resolveCoherentBillingAccess(
+  db: Database,
+  subscriptionId: string,
+) {
+  let access = await getEffectiveAccessForSubscriptionV2(db, subscriptionId);
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (!access) return { access: null, sharedPoolStatus: null };
+    if (
+      getTierConfig(access.effectiveAccessTier).quotaModel !== 'shared-pool'
+    ) {
+      return { access, sharedPoolStatus: null };
+    }
+
+    try {
+      const sharedPoolStatus = await getFamilyPoolStatusV2(
+        db,
+        subscriptionId,
+        access,
+      );
+      return { access, sharedPoolStatus };
+    } catch (error) {
+      if (
+        !(error instanceof StaleFamilyAccessSnapshotErrorV2) ||
+        attempt === 1
+      ) {
+        throw error;
+      }
+      access = await getEffectiveAccessForSubscriptionV2(db, subscriptionId);
+    }
+  }
+
+  return { access, sharedPoolStatus: null };
+}
 
 // [WI-994] Local schema for the Stripe cancel response. The Stripe SDK v20
 // does not expose `current_period_end` at subscription level in its TypeScript
@@ -168,12 +203,13 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
     }
 
-    const access = await getEffectiveAccessForSubscriptionV2(
+    const { access, sharedPoolStatus } = await resolveCoherentBillingAccess(
       db,
       subscription.id,
     );
+    const subscriptionSnapshot = access?.subscription ?? subscription;
     const effectiveAccessTier =
-      access?.effectiveAccessTier ?? subscription.tier;
+      access?.effectiveAccessTier ?? subscriptionSnapshot.tier;
     const quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
     const activeProfileId = c.get('profileId');
     const profileQuota =
@@ -187,32 +223,47 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         : null;
     const quota = profileQuota
       ? null
-      : await getQuotaPoolV2(db, subscription.id);
+      : sharedPoolStatus
+        ? null
+        : await getQuotaPoolV2(db, subscription.id);
     const monthlyLimit =
       profileQuota?.monthlyLimit ??
+      sharedPoolStatus?.monthlyLimit ??
       quota?.monthlyLimit ??
       freeTier.monthlyQuota;
     const usedThisMonth =
-      profileQuota?.usedThisMonth ?? quota?.usedThisMonth ?? 0;
+      profileQuota?.usedThisMonth ??
+      sharedPoolStatus?.usedThisMonth ??
+      quota?.usedThisMonth ??
+      0;
     const remaining = Math.max(0, monthlyLimit - usedThisMonth);
-    const dailyLimit = profileQuota?.dailyLimit ?? quota?.dailyLimit ?? null;
-    const usedToday = profileQuota?.usedToday ?? quota?.usedToday ?? 0;
+    const dailyLimit =
+      profileQuota?.dailyLimit ??
+      sharedPoolStatus?.dailyLimit ??
+      quota?.dailyLimit ??
+      null;
+    const usedToday =
+      profileQuota?.usedToday ??
+      sharedPoolStatus?.usedToday ??
+      quota?.usedToday ??
+      0;
     const dailyRemainingQuestions =
       dailyLimit !== null ? Math.max(0, dailyLimit - usedToday) : null;
 
     // cancelAtPeriodEnd: subscription has a cancellation date but status is still active
     const cancelAtPeriodEnd =
-      subscription.cancelledAt !== null && subscription.status === 'active';
+      subscriptionSnapshot.cancelledAt !== null &&
+      subscriptionSnapshot.status === 'active';
 
     return c.json(
       subscriptionResponseSchema.parse({
         subscription: {
-          tier: subscription.tier,
+          tier: subscriptionSnapshot.tier,
           effectiveAccessTier,
           billingAccess: access?.billingAccess ?? 'current',
-          status: subscription.status,
-          trialEndsAt: subscription.trialEndsAt,
-          currentPeriodEnd: subscription.currentPeriodEnd,
+          status: subscriptionSnapshot.status,
+          trialEndsAt: subscriptionSnapshot.trialEndsAt,
+          currentPeriodEnd: subscriptionSnapshot.currentPeriodEnd,
           cancelAtPeriodEnd,
           monthlyLimit,
           usedThisMonth,
@@ -542,12 +593,13 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
     const activeProfileId = c.get('profileId');
     const activeProfileMeta = c.get('profileMeta');
-    const access = await getEffectiveAccessForSubscriptionV2(
+    const { access, sharedPoolStatus } = await resolveCoherentBillingAccess(
       db,
       subscription.id,
     );
+    const subscriptionSnapshot = access?.subscription ?? subscription;
     const effectiveAccessTier =
-      access?.effectiveAccessTier ?? subscription.tier;
+      access?.effectiveAccessTier ?? subscriptionSnapshot.tier;
     // Profile-scoped quota views require active profile context before
     // aggregate quota reads; otherwise shared-pool usage can expose
     // family-wide activity to non-owner viewers.
@@ -584,17 +636,31 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
               : 0,
           ]
         : await Promise.all([
-            getQuotaPoolV2(db, subscription.id),
+            sharedPoolStatus
+              ? Promise.resolve(null)
+              : getQuotaPoolV2(db, subscription.id),
             getTopUpCreditsRemaining(db, subscription.id),
           ]);
     const monthlyLimit =
       profileQuota?.monthlyLimit ??
+      sharedPoolStatus?.monthlyLimit ??
       quota?.monthlyLimit ??
       freeTier.monthlyQuota;
     const usedThisMonth =
-      profileQuota?.usedThisMonth ?? quota?.usedThisMonth ?? 0;
-    const dailyLimit = profileQuota?.dailyLimit ?? quota?.dailyLimit ?? null;
-    const usedToday = profileQuota?.usedToday ?? quota?.usedToday ?? 0;
+      profileQuota?.usedThisMonth ??
+      sharedPoolStatus?.usedThisMonth ??
+      quota?.usedThisMonth ??
+      0;
+    const dailyLimit =
+      profileQuota?.dailyLimit ??
+      sharedPoolStatus?.dailyLimit ??
+      quota?.dailyLimit ??
+      null;
+    const usedToday =
+      profileQuota?.usedToday ??
+      sharedPoolStatus?.usedToday ??
+      quota?.usedToday ??
+      0;
     const remaining = calculateRemainingQuestions({
       monthlyLimit,
       usedThisMonth,
@@ -610,11 +676,13 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     );
     const cycleResetAt =
       profileQuota?.cycleResetAt ??
+      sharedPoolStatus?.cycleResetAt ??
       quota?.cycleResetAt ??
       new Date().toISOString();
     const resetDate = new Date(cycleResetAt);
     const cycleStartAt =
-      subscription.currentPeriodStart ??
+      sharedPoolStatus?.cycleStartAt ??
+      subscriptionSnapshot.currentPeriodStart ??
       new Date(
         Date.UTC(resetDate.getUTCFullYear(), resetDate.getUTCMonth() - 1, 1),
       ).toISOString();
@@ -661,6 +729,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
             monthlyLimit,
             cycleStartAt,
             dayStartAt,
+            inactiveMemberUsedThisMonth:
+              sharedPoolStatus?.inactiveMemberUsedThisMonth,
+            memberUsage: sharedPoolStatus?.memberUsage,
           })
         : null;
     const visibleUsedThisMonth =
@@ -687,7 +758,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       dailyLimit !== null ? Math.max(0, dailyLimit - visibleUsedToday) : null;
     const labels = buildUsageDateLabels({
       resetsAt: cycleResetAt,
-      renewsAt: subscription.currentPeriodEnd,
+      renewsAt: subscriptionSnapshot.currentPeriodEnd,
       timezone: account.timezone,
       locale: activeProfileMeta?.conversationLanguage,
     });
@@ -823,20 +894,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           cachedEffectiveAccessTier &&
           getTierConfig(cachedEffectiveAccessTier).quotaModel === 'shared-pool'
         ) {
-          return c.json(
-            subscriptionStatusResponseSchema.parse({
-              status: {
-                tier: cached.tier,
-                effectiveAccessTier: cachedEffectiveAccessTier,
-                billingAccess: cached.billingAccess ?? 'current',
-                status: cached.status,
-                monthlyLimit: cached.monthlyLimit,
-                usedThisMonth: cached.usedThisMonth,
-                dailyLimit: cached.dailyLimit,
-                usedToday: cached.usedToday,
-              },
-            }),
-          );
+          // Family/Pro status must be assembled from the same current cycle as
+          // /usage and /subscription/family. A KV entry cannot prove its
+          // denominator, event aggregate, and member set are from one cycle,
+          // so reject it and use the coherent DB snapshot below.
         }
       } catch (err) {
         logger.error(
@@ -875,12 +936,13 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
     }
 
-    const access = await getEffectiveAccessForSubscriptionV2(
+    const { access, sharedPoolStatus } = await resolveCoherentBillingAccess(
       db,
       subscription.id,
     );
+    const subscriptionSnapshot = access?.subscription ?? subscription;
     const effectiveAccessTier =
-      access?.effectiveAccessTier ?? subscription.tier;
+      access?.effectiveAccessTier ?? subscriptionSnapshot.tier;
     const quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
     const activeProfileId = c.get('profileId');
     if (quotaModel === 'per-profile' && !activeProfileId) {
@@ -902,23 +964,37 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         : null;
     const quota = profileQuota
       ? null
-      : await getQuotaPoolV2(db, subscription.id);
+      : sharedPoolStatus
+        ? null
+        : await getQuotaPoolV2(db, subscription.id);
 
     return c.json(
       subscriptionStatusResponseSchema.parse({
         status: {
-          tier: subscription.tier,
+          tier: subscriptionSnapshot.tier,
           effectiveAccessTier,
           billingAccess: access?.billingAccess ?? 'current',
-          status: subscription.status,
+          status: subscriptionSnapshot.status,
           monthlyLimit:
             profileQuota?.monthlyLimit ??
+            sharedPoolStatus?.monthlyLimit ??
             quota?.monthlyLimit ??
             freeTier.monthlyQuota,
           usedThisMonth:
-            profileQuota?.usedThisMonth ?? quota?.usedThisMonth ?? 0,
-          dailyLimit: profileQuota?.dailyLimit ?? quota?.dailyLimit ?? null,
-          usedToday: profileQuota?.usedToday ?? quota?.usedToday ?? 0,
+            profileQuota?.usedThisMonth ??
+            sharedPoolStatus?.usedThisMonth ??
+            quota?.usedThisMonth ??
+            0,
+          dailyLimit:
+            profileQuota?.dailyLimit ??
+            sharedPoolStatus?.dailyLimit ??
+            quota?.dailyLimit ??
+            null,
+          usedToday:
+            profileQuota?.usedToday ??
+            sharedPoolStatus?.usedToday ??
+            quota?.usedToday ??
+            0,
         },
       }),
     );
@@ -950,12 +1026,21 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       return notFound(c, 'No subscription found');
     }
 
-    const poolStatus = await getFamilyPoolStatusV2(db, subscription.id);
+    const { access, sharedPoolStatus: poolStatus } =
+      await resolveCoherentBillingAccess(db, subscription.id);
+    if (!access) {
+      return notFound(c, 'No subscription found');
+    }
+
     if (!poolStatus) {
       return notFound(c, 'No quota pool found');
     }
 
-    const members = await listFamilyMembersV2(db, subscription.id);
+    const members = poolStatus.memberUsage.map((member) => ({
+      profileId: member.profileId,
+      displayName: member.name,
+      isOwner: member.roles.includes('admin'),
+    }));
 
     return c.json(
       familyResponseSchema.parse({
