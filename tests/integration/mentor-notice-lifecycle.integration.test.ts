@@ -80,7 +80,11 @@ async function seedSourceSession(
 }
 
 afterAll(async () => {
-  await deleteV2IdentitiesForTest(db, { accountIds, profileIds });
+  await deleteV2IdentitiesForTest(db, {
+    accountIds,
+    profileIds,
+    deleteSubscriptions: false,
+  });
 });
 
 describe('mentor notice lifecycle — real database', () => {
