@@ -2,16 +2,20 @@ import {
   childProfileHref,
   FAMILY_HOME_PATH,
   homeHrefForReturnTo,
+  isSessionForwardableReturnTo,
   goBackOrReplace,
   pushLearningResumeTarget,
   pushChildReport,
   pushChildWeeklyReport,
   LEARNER_HOME_HREF,
   LEARNER_HOME_RETURN_TO,
+  OWN_LEARNING_RETURN_TO,
   PRACTICE_HREF,
   PRACTICE_RETURN_TO,
   JOURNAL_HREF,
   JOURNAL_RETURN_TO,
+  SUBJECTS_HREF,
+  SUBJECTS_RETURN_TO,
   FAMILY_RECAPS_HREF,
   FAMILY_RECAPS_RETURN_TO,
   FAMILY_PROGRESS_HREF,
@@ -28,6 +32,20 @@ import type { Router } from 'expo-router';
 describe('navigation constants', () => {
   it('exports FAMILY_HOME_PATH for family-facing navigation', () => {
     expect(FAMILY_HOME_PATH).toBe('/(app)/home');
+  });
+});
+
+describe('isSessionForwardableReturnTo', () => {
+  it('accepts each return token that session entry points may forward', () => {
+    expect(isSessionForwardableReturnTo(SUBJECTS_RETURN_TO)).toBe(true);
+    expect(isSessionForwardableReturnTo(LEARNER_HOME_RETURN_TO)).toBe(true);
+    expect(isSessionForwardableReturnTo(OWN_LEARNING_RETURN_TO)).toBe(true);
+  });
+
+  it('rejects unrelated and absent return tokens', () => {
+    expect(isSessionForwardableReturnTo(PRACTICE_RETURN_TO)).toBe(false);
+    expect(isSessionForwardableReturnTo('settings')).toBe(false);
+    expect(isSessionForwardableReturnTo(undefined)).toBe(false);
   });
 });
 
@@ -60,6 +78,10 @@ describe('homeHrefForReturnTo', () => {
 
   it('returns the journal href when returnTo is journal', () => {
     expect(homeHrefForReturnTo(JOURNAL_RETURN_TO)).toBe(JOURNAL_HREF);
+  });
+
+  it('returns the V2 Subjects tab for the subjects return token', () => {
+    expect(homeHrefForReturnTo(SUBJECTS_RETURN_TO)).toBe(SUBJECTS_HREF);
   });
 
   it('resolves Family and Study context return tokens', () => {
@@ -119,6 +141,20 @@ describe('goBackOrReplace', () => {
     goBackOrReplace(router, '/(app)/home');
     expect(router.back).not.toHaveBeenCalled();
     expect(router.replace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('replaces with Subjects when a Subjects-origin screen has no browser history', () => {
+    const router = {
+      back: jest.fn(),
+      canGoBack: jest.fn().mockReturnValue(false),
+      replace: jest.fn(),
+    } satisfies Pick<Router, 'back' | 'canGoBack' | 'replace'>;
+
+    goBackOrReplace(router, SUBJECTS_HREF);
+
+    expect(router.canGoBack).toHaveBeenCalledTimes(1);
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith('/(app)/subjects');
   });
 
   // ---------------------------------------------------------------------------

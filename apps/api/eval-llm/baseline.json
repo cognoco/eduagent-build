@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-11T11:30:13.562Z",
+  "updatedAt": "2026-07-19T17:46:48.000Z",
   "flows": {
     "exchanges": {
       "n": 122,
@@ -15,6 +15,21 @@
         "notePromptShow": 0,
         "fluencyDrillActive": 0.01639344262295082,
         "confidenceLow": 0.09836065573770492
+      }
+    },
+    "homework-notice": {
+      "n": 10,
+      "rates": {
+        "envelopeOk": 1,
+        "hasReply": 1,
+        "replyHasLiteralEscape": 0,
+        "partialProgress": 0.5,
+        "needsDeepening": 0,
+        "understandingCheck": 0.3,
+        "readyToFinish": 0,
+        "notePromptShow": 0,
+        "fluencyDrillActive": 0,
+        "confidenceLow": 0
       }
     },
     "probes": {

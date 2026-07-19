@@ -116,6 +116,9 @@ export const PROFILE_SCOPED_TABLES: readonly string[] = [
   // Added migration 0144 (WI-1777): speaking_practice_attempts_profile_isolation
   // policy, in the same migration that creates the table.
   'speaking_practice_attempts',
+  // Added migration 0147: mentor_notices_profile_isolation policy, in the
+  // same migration that creates the profile-scoped lifecycle table.
+  'mentor_notices',
 ] as const;
 
 /**

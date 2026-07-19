@@ -888,7 +888,8 @@
       "verificationBadge": {
         "evaluate": "PIENSA-A-FONDO SUPERADO",
         "teachBack": "ENSEÑA-DE-VUELTA SUPERADO"
-      }
+      },
+      "mentorNotice": "Observación del mentor: {{concept}}"
     },
     "noteInput": {
       "cancel": "Cancelar",
@@ -3045,6 +3046,7 @@
       "yourShare": "Tu parte",
       "yourUsage": "Tu uso",
       "questionsUsed": "{{count}} preguntas",
+      "formerMembers": "Miembros anteriores",
       "familyAggregate": "Total familiar",
       "quotaResets": "La cuota se restablece el {{date}}",
       "renews": "La suscripción se renueva el {{date}}",
@@ -3063,7 +3065,9 @@
       "title": "¿Quieres un recordatorio diario?",
       "message": "Podemos enviarte un recordatorio suave para que no pierdas tu racha. Puedes desactivarlo en Ajustes en cualquier momento.",
       "allow": "Permitir",
-      "notNow": "Ahora no"
+      "notNow": "Ahora no",
+      "noticeTitle": "¿Quieres un recordatorio?",
+      "noticeMessage": "Podemos recordarte que repases lo que tu mentor notó hoy. Puedes desactivar esta opción cuando quieras en Configuración."
     },
     "masteredRow": {
       "title": "Has dominado:"
@@ -3176,6 +3180,14 @@
         "language_focus": "La próxima vez: trabajaremos en patrones gramaticales",
         "fluency": "La próxima vez: un sprint rápido de fluidez"
       }
+    },
+    "feedbackUnavailableTitle": "Los comentarios aún no están disponibles",
+    "feedbackUnavailableMessage": "Tu resumen está guardado. Puedes volver a solicitar los comentarios sin enviarlo de nuevo.",
+    "feedbackStillUnavailable": "Los comentarios siguen sin estar disponibles, pero tu resumen está a salvo. Puedes volver a intentarlo o continuar cuando quieras.",
+    "retryFeedback": "Volver a intentar",
+    "retryingFeedback": "Volviendo a intentar...",
+    "mentorNotice": {
+      "title": "Observaciones del mentor"
     }
   },
   "sessionTranscript": {
@@ -3994,6 +4006,14 @@
         "currentAccess": "Tu acceso de pago sigue activo hasta el {{deadline}}.",
         "freeFallback": "Tu cuenta está usando el acceso gratuito ahora. Actualiza el pago para restaurar tu plan.",
         "currentAccessNoDeadline": "Tu acceso de pago sigue activo."
+      },
+      "mentor_notice": {
+        "title": "Una pequeña idea para revisar",
+        "cta": "Revisar ahora",
+        "notNow": "Ahora no",
+        "arcDue": "Listo cuando quieras",
+        "arcAdvancing": "Abriendo una revisión rápida",
+        "arcMastered": "Dominado"
       }
     },
     "ledger": {
@@ -4006,6 +4026,9 @@
       },
       "quota": {
         "title": "Se guardó un momento de aprendizaje."
+      },
+      "notice_locked_in": {
+        "title": "Dominaste {{concept}}."
       }
     },
     "overflow": {
@@ -4212,7 +4235,8 @@
       "recap_ready": "Hay un resumen listo.",
       "snapshot_ready": "Hay una instantánea de aprendizaje lista.",
       "reflection_bonus": "Bono de reflexión guardado.",
-      "quiz_personal_best": "Récord personal guardado."
+      "quiz_personal_best": "Récord personal guardado.",
+      "notice_locked_in": "Dominaste {{concept}} en {{subjectName}}."
     },
     "recaps": {
       "error": "No se pudieron cargar tus resúmenes.",

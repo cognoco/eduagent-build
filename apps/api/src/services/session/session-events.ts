@@ -19,6 +19,7 @@ import type {
   VerificationType,
   SessionMetadata,
 } from '@eduagent/schemas';
+import { hasAvailableSummaryFeedback } from '../summaries';
 
 // ---------------------------------------------------------------------------
 // Mappers — Drizzle Date → API ISO string
@@ -67,11 +68,13 @@ export function mapSessionRow(
 export function mapSummaryRow(
   row: typeof sessionSummaries.$inferSelect,
 ): SessionSummary {
+  const feedbackAvailable = hasAvailableSummaryFeedback(row.aiFeedback);
   return {
     id: row.id,
     sessionId: row.sessionId,
     content: row.content ?? '',
-    aiFeedback: row.aiFeedback ?? null,
+    aiFeedback: feedbackAvailable ? row.aiFeedback : null,
+    feedbackStatus: feedbackAvailable ? 'available' : 'unavailable',
     status: row.status,
     closingLine: row.closingLine ?? null,
     learnerRecap: row.learnerRecap ?? null,

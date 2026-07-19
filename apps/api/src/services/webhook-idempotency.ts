@@ -8,10 +8,115 @@
 
 import { webhookIdempotencyKeys } from '@eduagent/database';
 import type { Database } from '@eduagent/database';
+import { and, eq, sql } from 'drizzle-orm';
 import { captureException } from './sentry';
 import { createLogger } from './logger';
 
 const logger = createLogger();
+
+export interface ExpiringCoordinationClaim {
+  source: string;
+  key: string;
+  claimedAt: Date;
+}
+
+/**
+ * Atomically claims a namespaced internal coordination key after its prior
+ * lease expires. This reuses the table's composite unique-key primitive while
+ * keeping every access to webhook_idempotency_keys inside this service.
+ */
+export async function claimExpiringCoordinationKey(
+  db: Database,
+  source: string,
+  key: string,
+  leaseMs: number,
+): Promise<ExpiringCoordinationClaim | null> {
+  return db.transaction(async (tx) => {
+    await tx
+      .delete(webhookIdempotencyKeys)
+      .where(
+        and(
+          eq(webhookIdempotencyKeys.source, source),
+          eq(webhookIdempotencyKeys.webhookId, key),
+          sql`${webhookIdempotencyKeys.receivedAt} <= NOW() - ${leaseMs} * INTERVAL '1 millisecond'`,
+        ),
+      );
+
+    const [claimed] = await tx
+      .insert(webhookIdempotencyKeys)
+      .values({
+        source,
+        webhookId: key,
+        receivedAt: sql`date_trunc('milliseconds', NOW())`,
+      })
+      .onConflictDoNothing({
+        target: [
+          webhookIdempotencyKeys.source,
+          webhookIdempotencyKeys.webhookId,
+        ],
+      })
+      .returning({ claimedAt: webhookIdempotencyKeys.receivedAt });
+
+    return claimed ? { source, key, claimedAt: claimed.claimedAt } : null;
+  });
+}
+
+/** Locks and verifies that the exact claim is still the active lease. */
+export async function lockActiveCoordinationClaim(
+  db: Database,
+  claim: ExpiringCoordinationClaim,
+  leaseMs: number,
+): Promise<boolean> {
+  const [held] = await db
+    .select({ claimedAt: webhookIdempotencyKeys.receivedAt })
+    .from(webhookIdempotencyKeys)
+    .where(
+      and(
+        eq(webhookIdempotencyKeys.source, claim.source),
+        eq(webhookIdempotencyKeys.webhookId, claim.key),
+        eq(webhookIdempotencyKeys.receivedAt, claim.claimedAt),
+        sql`${webhookIdempotencyKeys.receivedAt} > NOW() - ${leaseMs} * INTERVAL '1 millisecond'`,
+      ),
+    )
+    .for('update');
+  return held !== undefined;
+}
+
+/** Releases the exact claim without disturbing a later lease holder. */
+export async function releaseCoordinationClaim(
+  db: Database,
+  claim: ExpiringCoordinationClaim,
+): Promise<void> {
+  await db
+    .delete(webhookIdempotencyKeys)
+    .where(
+      and(
+        eq(webhookIdempotencyKeys.source, claim.source),
+        eq(webhookIdempotencyKeys.webhookId, claim.key),
+        eq(webhookIdempotencyKeys.receivedAt, claim.claimedAt),
+      ),
+    );
+}
+
+/** Defers eligibility for the exact claim using the database clock. */
+export async function deferCoordinationClaim(
+  db: Database,
+  claim: ExpiringCoordinationClaim,
+  deferMs: number,
+): Promise<void> {
+  await db
+    .update(webhookIdempotencyKeys)
+    .set({
+      receivedAt: sql`date_trunc('milliseconds', NOW() + ${deferMs} * INTERVAL '1 millisecond')`,
+    })
+    .where(
+      and(
+        eq(webhookIdempotencyKeys.source, claim.source),
+        eq(webhookIdempotencyKeys.webhookId, claim.key),
+        eq(webhookIdempotencyKeys.receivedAt, claim.claimedAt),
+      ),
+    );
+}
 
 /**
  * Attempt to atomically claim a webhook id. Returns:

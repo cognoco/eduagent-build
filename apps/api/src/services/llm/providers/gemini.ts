@@ -224,6 +224,7 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
     async chat(
       messages: ChatMessage[],
       config: ModelConfig,
+      signal?: AbortSignal,
     ): Promise<ChatResult> {
       const body = toGeminiRequest(messages, config);
       const url = `${GEMINI_BASE_URL}/${config.model}:generateContent`;
@@ -235,7 +236,9 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
           'x-goog-api-key': apiKey,
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(20_000),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(20_000)])
+          : AbortSignal.timeout(20_000),
       });
 
       if (!res.ok) {

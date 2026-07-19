@@ -37,6 +37,9 @@ import { filingCompletedObserve } from './functions/filing-completed-observe';
 import { filingTimedOutObserve } from './functions/filing-timed-out-observe';
 import { filingStrandedBackfill } from './functions/filing-stranded-backfill';
 import { reviewDueScan } from './functions/review-due-scan';
+import { mentorNoticeNudgeScan } from './functions/mentor-notice-nudge-scan';
+import { mentorNoticeNudgeSend } from './functions/mentor-notice-nudge-send';
+import { mentorNoticeFade } from './functions/mentor-notice-fade';
 import { reviewDueSend } from './functions/review-due-send';
 import { dailyReminderScan } from './functions/daily-reminder-scan';
 import { dailyReminderSend } from './functions/daily-reminder-send';
@@ -176,6 +179,9 @@ export {
   filingTimedOutObserve,
   filingStrandedBackfill,
   reviewDueScan,
+  mentorNoticeNudgeScan,
+  mentorNoticeNudgeSend,
+  mentorNoticeFade,
   reviewDueSend,
   dailyReminderScan,
   dailyReminderSend,
@@ -275,6 +281,9 @@ export const functions = [
   filingTimedOutObserve,
   filingStrandedBackfill,
   reviewDueScan,
+  mentorNoticeNudgeScan,
+  mentorNoticeNudgeSend,
+  mentorNoticeFade,
   reviewDueSend,
   dailyReminderScan,
   dailyReminderSend,

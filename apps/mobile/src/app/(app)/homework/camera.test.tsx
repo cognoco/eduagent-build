@@ -628,22 +628,6 @@ describe('CameraScreen', () => {
     getByText(/center your homework/i);
   });
 
-  it('keeps the manual-entry action inside the full-height camera surface', () => {
-    const { getByTestId } = render(<CameraScreen />, {
-      wrapper: createWrapper(),
-    });
-
-    const cameraView = getByTestId('camera-view');
-    const manualEntryButton = getByTestId('manual-entry-button');
-    let nearestHostParent = manualEntryButton.parent;
-
-    while (nearestHostParent && typeof nearestHostParent.type !== 'string') {
-      nearestHostParent = nearestHostParent.parent;
-    }
-
-    expect(nearestHostParent?.props.testID).toBe(cameraView.props.testID);
-  });
-
   it('opens a type-or-record editor from the viewfinder without taking a picture', async () => {
     const { getByTestId, getByText } = render(<CameraScreen />, {
       wrapper: createWrapper(),

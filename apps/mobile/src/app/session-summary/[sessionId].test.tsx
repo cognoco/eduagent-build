@@ -4,9 +4,11 @@ import {
   render,
   screen,
   fireEvent,
+  within,
   waitFor,
 } from '@testing-library/react-native';
 import React from 'react';
+import { AccessibilityInfo, Platform } from 'react-native';
 import { useAuth } from '@clerk/expo';
 import { platformAlert } from '../../lib/platform-alert';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -222,10 +224,16 @@ let mockSessionSummaryData: {
   sessionId: string;
   content: string;
   aiFeedback: string | null;
+  feedbackStatus?: 'available' | 'unavailable';
   status: 'pending' | 'submitted' | 'accepted' | 'skipped' | 'auto_closed';
   baseXp?: number | null;
   reflectionBonusXp?: number | null;
   purgedAt?: string | null;
+  mentorNotice?: {
+    id: string;
+    concept: string;
+    correctionHint: string | null;
+  };
   // [WI-1553] four_strands session-end learning summary — additive.
   languageLearningSummary?: {
     practicedScenario: string | null;
@@ -253,6 +261,7 @@ const BASE_MOCK_SUMMARY = {
   sessionId: '660e8400-e29b-41d4-a716-446655440000',
   content: '',
   aiFeedback: null as string | null,
+  feedbackStatus: 'unavailable' as const,
   status: 'pending' as const,
   closingLine: null as string | null,
   learnerRecap: 'mock-recap',
@@ -274,6 +283,16 @@ let mockSessionData: Record<string, unknown> | null = null;
 // Per-test mutation result containers — default to success shapes; override
 // with setRoute() for tests that need rejections or custom shapes.
 let mockSubmitResult: Record<string, unknown> | Response | null = null;
+let mockRetryFeedbackResult: Record<string, unknown> | Response = {
+  summary: {
+    id: '880e8400-e29b-41d4-a716-446655440000',
+    sessionId: '660e8400-e29b-41d4-a716-446655440000',
+    content: 'Saved learner summary',
+    aiFeedback: 'Clear explanation.',
+    feedbackStatus: 'available',
+    status: 'accepted',
+  },
+};
 let mockSkipResult: Record<string, unknown> | Response = {
   summary: {
     id: 'summary-1',
@@ -326,6 +345,9 @@ const mockFetch = createRoutedMockFetch({
   // GET /sessions/:id (session entity) + POST /summary (submit)
   // Differentiated below by checking URL suffix and method.
   sessions: (url: string, init?: RequestInit) => {
+    if (url.includes('/summary/retry-feedback') && init?.method === 'POST') {
+      return mockRetryFeedbackResult;
+    }
     // POST /sessions/:id/summary → submit summary mutation
     if (url.includes('/summary') && init?.method === 'POST') {
       if (mockSubmitResult instanceof Response) return mockSubmitResult;
@@ -450,6 +472,17 @@ async function flushAsyncEffects(): Promise<void> {
   });
 }
 
+function setPlatformOS(os: typeof Platform.OS): () => void {
+  const originalPlatformOS = Platform.OS;
+  Object.defineProperty(Platform, 'OS', { configurable: true, value: os });
+  return () => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: originalPlatformOS,
+    });
+  };
+}
+
 describe('SessionSummaryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -469,6 +502,16 @@ describe('SessionSummaryScreen', () => {
       parentProfile: null,
     });
     mockSubmitResult = null;
+    mockRetryFeedbackResult = {
+      summary: {
+        id: '880e8400-e29b-41d4-a716-446655440000',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Saved learner summary',
+        aiFeedback: 'Clear explanation.',
+        feedbackStatus: 'available',
+        status: 'accepted',
+      },
+    };
     mockSkipResult = {
       summary: {
         id: '880e8400-e29b-41d4-a716-446655440001',
@@ -518,6 +561,9 @@ describe('SessionSummaryScreen', () => {
     // to inject error responses. Without resetting, the override bleeds into subsequent
     // tests and the submit/summary routes return wrong shapes, causing waitFor timeouts.
     mockFetch.setRoute('sessions', (url: string, init?: RequestInit) => {
+      if (url.includes('/summary/retry-feedback') && init?.method === 'POST') {
+        return mockRetryFeedbackResult;
+      }
       if (url.includes('/summary') && init?.method === 'POST') {
         if (mockSubmitResult instanceof Response) return mockSubmitResult;
         if (mockSubmitResult !== null) return mockSubmitResult;
@@ -614,6 +660,25 @@ describe('SessionSummaryScreen', () => {
     // 5 exchanges, rung 2 → "strong independent thinking"
     screen.getByText(/worked through 5 exchanges/);
     screen.getByText(/strong independent thinking/);
+  });
+
+  it('renders a persisted mentor notice receipt after reload', async () => {
+    mockSessionSummaryData = {
+      ...BASE_MOCK_SUMMARY,
+      mentorNotice: {
+        id: '550e8400-e29b-41d4-a716-446655440099',
+        concept: 'changing signs',
+        correctionHint: 'Apply the inverse operation to both sides.',
+      },
+    };
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByText('Noticed along the way');
+      screen.getByText('changing signs');
+      screen.getByText('Apply the inverse operation to both sides.');
+    });
   });
 
   // [BUG-801] When the URL passes exchangeCount='0' (legitimate value for
@@ -773,6 +838,7 @@ describe('SessionSummaryScreen', () => {
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'I learned about quadratic equations and how to solve them',
         aiFeedback: 'Good summary. You captured the key concepts well.',
+        feedbackStatus: 'available',
         status: 'accepted',
       },
     };
@@ -792,6 +858,31 @@ describe('SessionSummaryScreen', () => {
     });
   });
 
+  it('[WI-2183] keeps a just-submitted summary visible when feedback is unavailable', async () => {
+    mockSubmitResult = {
+      summary: {
+        id: '880e8400-e29b-41d4-a716-446655440025',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'I learned that variables can represent unknown values.',
+        aiFeedback: null,
+        feedbackStatus: 'unavailable',
+        status: 'submitted',
+      },
+    };
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    fireEvent.changeText(
+      screen.getByTestId('summary-input'),
+      'I learned that variables can represent unknown values.',
+    );
+
+    await pressAsync(screen.getByTestId('submit-summary-button'));
+
+    await waitFor(() => screen.getByTestId('feedback-unavailable'));
+    screen.getByText('I learned that variables can represent unknown values.');
+    screen.getByTestId('retry-feedback-button');
+    expect(screen.queryByTestId('summary-input')).toBeNull();
+  });
+
   it('shows submitted reflection bonus XP when the summary mutation returns it', async () => {
     mockSubmitResult = {
       summary: {
@@ -799,6 +890,7 @@ describe('SessionSummaryScreen', () => {
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'I learned about quadratic equations and how to solve them',
         aiFeedback: 'Good summary.',
+        feedbackStatus: 'available',
         status: 'accepted',
         baseXp: 12,
         reflectionBonusXp: 6,
@@ -827,6 +919,7 @@ describe('SessionSummaryScreen', () => {
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'I learned about quadratic equations and factoring methods',
         aiFeedback: 'Well done.',
+        feedbackStatus: 'available',
         status: 'accepted',
       },
     };
@@ -857,6 +950,7 @@ describe('SessionSummaryScreen', () => {
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'I learned about quadratic equations and factoring methods',
         aiFeedback: 'Well done.',
+        feedbackStatus: 'available',
         status: 'accepted',
       },
     };
@@ -888,6 +982,7 @@ describe('SessionSummaryScreen', () => {
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'I explained how factoring helps solve quadratic equations',
         aiFeedback: 'Well done.',
+        feedbackStatus: 'available',
         status: 'accepted',
       },
     };
@@ -996,6 +1091,7 @@ describe('SessionSummaryScreen', () => {
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'I used long division to check the remainder',
         aiFeedback: 'Nice work.',
+        feedbackStatus: 'available',
         status: 'submitted',
       },
     };
@@ -1166,6 +1262,7 @@ describe('SessionSummaryScreen', () => {
           sessionId: '660e8400-e29b-41d4-a716-446655440000',
           content: 'I learned about equations and how to solve them today',
           aiFeedback: 'Great job!',
+          feedbackStatus: 'available',
           status: 'accepted',
         },
       };
@@ -1378,6 +1475,416 @@ describe('SessionSummaryScreen', () => {
   // BUG-449: revisiting a past session (Library → Shelf → Book → tap session)
   // must render the already-saved summary, not the empty "Your Words" prompt.
   describe('revisiting a session with an already-persisted summary [BUG-449]', () => {
+    it('[WI-2183 a11y] exposes Retry as a keyboard-operable button and routes activation to recovery', async () => {
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440020',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'I learned that variables can represent unknown values.',
+        aiFeedback: null,
+        feedbackStatus: 'unavailable',
+        status: 'submitted',
+      };
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      const retryButton = await screen.findByTestId('retry-feedback-button');
+
+      expect(retryButton.props.accessibilityRole).toBe('button');
+      expect(retryButton.props.accessibilityLabel).toBe('Retry feedback');
+      expect(retryButton.props.accessibilityState).toEqual({
+        disabled: false,
+        busy: false,
+      });
+
+      await pressAsync(retryButton);
+
+      expect(
+        fetchCallsMatching(mockFetch, '/summary/retry-feedback').filter(
+          ({ init }) => init?.method === 'POST',
+        ),
+      ).toHaveLength(1);
+    });
+
+    it('[WI-2183] reload shows saved content, truthful unavailable feedback, Retry, Continue, and Library', async () => {
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440021',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'I learned that variables can represent unknown values.',
+        aiFeedback: null,
+        feedbackStatus: 'unavailable',
+        status: 'submitted',
+      };
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => screen.getByTestId('feedback-unavailable'));
+      screen.getByText(
+        'I learned that variables can represent unknown values.',
+      );
+      screen.getByText("Feedback isn't available yet");
+      screen.getByTestId('retry-feedback-button');
+      screen.getByTestId('continue-button');
+      screen.getByTestId('go-to-library');
+      expect(screen.queryByText(/submitting again/i)).toBeNull();
+    });
+
+    it('[WI-2183] successful Retry replaces the unavailable state with feedback in place', async () => {
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440022',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'I learned that variables can represent unknown values.',
+        aiFeedback: null,
+        feedbackStatus: 'unavailable',
+        status: 'submitted',
+      };
+      mockRetryFeedbackResult = {
+        summary: {
+          ...mockSessionSummaryData,
+          aiFeedback: 'You clearly explained what the unknown represents.',
+          feedbackStatus: 'available',
+          status: 'accepted',
+        },
+      };
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      await waitFor(() => screen.getByTestId('retry-feedback-button'));
+
+      await pressAsync(screen.getByTestId('retry-feedback-button'));
+
+      await waitFor(() =>
+        screen.getByText('You clearly explained what the unknown represents.'),
+      );
+      screen.getByText(
+        'I learned that variables can represent unknown values.',
+      );
+      expect(screen.queryByTestId('feedback-unavailable')).toBeNull();
+    });
+
+    it.each(['ios', 'android'] as const)(
+      '[WI-2183 a11y] announces recovered feedback through the %s screen-reader path',
+      async (platformOS) => {
+        const restorePlatformOS = setPlatformOS(platformOS);
+        const announce = jest
+          .spyOn(AccessibilityInfo, 'announceForAccessibility')
+          .mockImplementation(() => undefined);
+        try {
+          mockSessionSummaryData = {
+            id: '880e8400-e29b-41d4-a716-446655440027',
+            sessionId: '660e8400-e29b-41d4-a716-446655440000',
+            content: 'I learned that variables can represent unknown values.',
+            aiFeedback: null,
+            feedbackStatus: 'unavailable',
+            status: 'submitted',
+          };
+          mockRetryFeedbackResult = {
+            summary: {
+              ...mockSessionSummaryData,
+              aiFeedback: 'You clearly explained what the unknown represents.',
+              feedbackStatus: 'available',
+              status: 'accepted',
+            },
+          };
+          render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+          await pressAsync(await screen.findByTestId('retry-feedback-button'));
+
+          await waitFor(() =>
+            expect(announce).toHaveBeenCalledWith(
+              'Mate feedback: You clearly explained what the unknown represents.',
+            ),
+          );
+        } finally {
+          announce.mockRestore();
+          restorePlatformOS();
+        }
+      },
+    );
+
+    it('[WI-2183 a11y] gives web screen readers live updates without invoking the native announcer', async () => {
+      const restorePlatformOS = setPlatformOS('web');
+      const announce = jest
+        .spyOn(AccessibilityInfo, 'announceForAccessibility')
+        .mockImplementation(() => undefined);
+      try {
+        mockSessionSummaryData = {
+          id: '880e8400-e29b-41d4-a716-446655440028',
+          sessionId: '660e8400-e29b-41d4-a716-446655440000',
+          content: 'I learned that variables can represent unknown values.',
+          aiFeedback: null,
+          feedbackStatus: 'unavailable',
+          status: 'submitted',
+        };
+        mockRetryFeedbackResult = {
+          summary: {
+            ...mockSessionSummaryData,
+            aiFeedback: 'Your explanation now has a clear example.',
+            feedbackStatus: 'available',
+            status: 'accepted',
+          },
+        };
+        render(<SessionSummaryScreen />, { wrapper: Wrapper });
+        const unavailable = await screen.findByTestId('feedback-unavailable');
+        const statusBeforeRetry = screen.getByTestId('feedback-retry-status');
+        const statusMessageBeforeRetry = within(statusBeforeRetry).getByTestId(
+          'feedback-retry-status-message',
+        );
+        expect(unavailable.props.accessibilityRole).toBeUndefined();
+        expect(unavailable.props.accessibilityLiveRegion).toBeUndefined();
+        expect(statusMessageBeforeRetry.props.children).toBe('');
+        expect(statusBeforeRetry.props.role).toBe('status');
+        expect(statusBeforeRetry.props.accessibilityRole).toBeUndefined();
+        expect(statusBeforeRetry.props.accessibilityLiveRegion).toBe('polite');
+        expect(statusBeforeRetry.props.role).not.toBe('alert');
+        expect(
+          screen
+            .UNSAFE_getAllByProps({ role: 'status' })
+            .filter(({ type }) => typeof type === 'string'),
+        ).toHaveLength(1);
+        expect(
+          screen
+            .UNSAFE_getAllByProps({ accessibilityLiveRegion: 'polite' })
+            .filter(({ type }) => typeof type === 'string'),
+        ).toHaveLength(1);
+        expect(
+          within(statusBeforeRetry).queryByTestId('retry-feedback-button'),
+        ).toBeNull();
+
+        await pressAsync(screen.getByTestId('retry-feedback-button'));
+
+        const feedback = await screen.findByTestId('ai-feedback');
+        const statusAfterRetry = screen.getByTestId('feedback-retry-status');
+        const statusMessageAfterRetry = within(statusAfterRetry).getByTestId(
+          'feedback-retry-status-message',
+        );
+        expect(statusAfterRetry).toBe(statusBeforeRetry);
+        expect(statusMessageAfterRetry.props.children).toBe(
+          'Mate feedback: Your explanation now has a clear example.',
+        );
+        expect(statusAfterRetry.props.role).toBe('status');
+        expect(statusAfterRetry.props.accessibilityLiveRegion).toBe('polite');
+        expect(
+          screen
+            .UNSAFE_getAllByProps({ role: 'status' })
+            .filter(({ type }) => typeof type === 'string'),
+        ).toHaveLength(1);
+        expect(
+          screen
+            .UNSAFE_getAllByProps({ accessibilityLiveRegion: 'polite' })
+            .filter(({ type }) => typeof type === 'string'),
+        ).toHaveLength(1);
+        expect(feedback.props.role).toBeUndefined();
+        expect(feedback.props.accessibilityRole).toBeUndefined();
+        expect(feedback.props.accessibilityLiveRegion).toBeUndefined();
+        expect(announce).not.toHaveBeenCalled();
+      } finally {
+        announce.mockRestore();
+        restorePlatformOS();
+      }
+    });
+
+    it('[WI-2183 a11y] updates the same web status node for an unavailable retry result', async () => {
+      const restorePlatformOS = setPlatformOS('web');
+      const announce = jest
+        .spyOn(AccessibilityInfo, 'announceForAccessibility')
+        .mockImplementation(() => undefined);
+      try {
+        mockSessionSummaryData = {
+          id: '880e8400-e29b-41d4-a716-446655440029',
+          sessionId: '660e8400-e29b-41d4-a716-446655440000',
+          content: 'I learned that variables can represent unknown values.',
+          aiFeedback: null,
+          feedbackStatus: 'unavailable',
+          status: 'submitted',
+        };
+        mockRetryFeedbackResult = { summary: mockSessionSummaryData };
+        render(<SessionSummaryScreen />, { wrapper: Wrapper });
+        const statusBeforeRetry = await screen.findByTestId(
+          'feedback-retry-status',
+        );
+        expect(
+          within(statusBeforeRetry).getByTestId('feedback-retry-status-message')
+            .props.children,
+        ).toBe('');
+
+        await pressAsync(screen.getByTestId('retry-feedback-button'));
+
+        const statusAfterRetry = screen.getByTestId('feedback-retry-status');
+        expect(statusAfterRetry).toBe(statusBeforeRetry);
+        expect(
+          within(statusAfterRetry).getByTestId('feedback-retry-status-message')
+            .props.children,
+        ).toBe(
+          "Feedback still isn't available, but your summary is safe. You can retry or continue whenever you're ready.",
+        );
+        expect(
+          screen
+            .UNSAFE_getAllByProps({ role: 'status' })
+            .filter(({ type }) => typeof type === 'string'),
+        ).toHaveLength(1);
+        expect(
+          screen
+            .UNSAFE_getAllByProps({ accessibilityLiveRegion: 'polite' })
+            .filter(({ type }) => typeof type === 'string'),
+        ).toHaveLength(1);
+        expect(
+          within(statusAfterRetry).queryByTestId('retry-feedback-button'),
+        ).toBeNull();
+        expect(announce).not.toHaveBeenCalled();
+      } finally {
+        announce.mockRestore();
+        restorePlatformOS();
+      }
+    });
+
+    it('[WI-2183 a11y] rapid repeated Retry taps issue and announce one recovery request', async () => {
+      const restorePlatformOS = setPlatformOS('ios');
+      const announce = jest
+        .spyOn(AccessibilityInfo, 'announceForAccessibility')
+        .mockImplementation(() => undefined);
+      try {
+        mockSessionSummaryData = {
+          id: '880e8400-e29b-41d4-a716-446655440023',
+          sessionId: '660e8400-e29b-41d4-a716-446655440000',
+          content: 'I learned that variables can represent unknown values.',
+          aiFeedback: null,
+          feedbackStatus: 'unavailable',
+          status: 'submitted',
+        };
+        render(<SessionSummaryScreen />, { wrapper: Wrapper });
+        const retryButton = await screen.findByTestId('retry-feedback-button');
+
+        await act(async () => {
+          fireEvent.press(retryButton);
+          fireEvent.press(retryButton);
+          await settleAsyncWork();
+        });
+
+        const retryCalls = mockFetch.mock.calls.filter(
+          ([url, init]) =>
+            String(url).includes('/summary/retry-feedback') &&
+            (init as RequestInit | undefined)?.method === 'POST',
+        );
+        expect(retryCalls).toHaveLength(1);
+        expect(announce).toHaveBeenCalledTimes(1);
+      } finally {
+        announce.mockRestore();
+        restorePlatformOS();
+      }
+    });
+
+    it.each(['ios', 'android'] as const)(
+      '[WI-2183 a11y] repeated unavailable feedback remains truthful, retryable, and announced on %s',
+      async (platformOS) => {
+        const restorePlatformOS = setPlatformOS(platformOS);
+        const announce = jest
+          .spyOn(AccessibilityInfo, 'announceForAccessibility')
+          .mockImplementation(() => undefined);
+        try {
+          mockSessionSummaryData = {
+            id: '880e8400-e29b-41d4-a716-446655440024',
+            sessionId: '660e8400-e29b-41d4-a716-446655440000',
+            content: 'I learned that variables can represent unknown values.',
+            aiFeedback: null,
+            feedbackStatus: 'unavailable',
+            status: 'submitted',
+          };
+          mockRetryFeedbackResult = { summary: mockSessionSummaryData };
+          render(<SessionSummaryScreen />, { wrapper: Wrapper });
+          await waitFor(() => screen.getByTestId('retry-feedback-button'));
+
+          await pressAsync(screen.getByTestId('retry-feedback-button'));
+
+          await waitFor(() =>
+            screen.getByText(/Feedback still isn't available/),
+          );
+          screen.getByTestId('retry-feedback-button');
+          screen.getByTestId('continue-button');
+          screen.getByTestId('go-to-library');
+          expect(announce).toHaveBeenCalledWith(
+            "Feedback still isn't available, but your summary is safe. You can retry or continue whenever you're ready.",
+          );
+        } finally {
+          announce.mockRestore();
+          restorePlatformOS();
+        }
+      },
+    );
+
+    it('[WI-2183 a11y] 15-second retry timeout announces failure and keeps every escape visible', async () => {
+      jest.useFakeTimers();
+      const restorePlatformOS = setPlatformOS('ios');
+      const announce = jest
+        .spyOn(AccessibilityInfo, 'announceForAccessibility')
+        .mockImplementation(() => undefined);
+      try {
+        mockSessionSummaryData = {
+          id: '880e8400-e29b-41d4-a716-446655440026',
+          sessionId: '660e8400-e29b-41d4-a716-446655440000',
+          content: 'I learned that variables can represent unknown values.',
+          aiFeedback: null,
+          feedbackStatus: 'unavailable',
+          status: 'submitted',
+        };
+        let retrySignal: AbortSignal | undefined;
+        let resolveRetryFailureHandled = (): void => undefined;
+        const retryFailureHandled = new Promise<void>((resolve) => {
+          resolveRetryFailureHandled = resolve;
+        });
+        mockSentryCaptureException.mockImplementationOnce(() => {
+          resolveRetryFailureHandled();
+        });
+        mockFetch.setRoute('sessions', (url: string, init?: RequestInit) => {
+          if (
+            url.includes('/summary/retry-feedback') &&
+            init?.method === 'POST'
+          ) {
+            retrySignal = init.signal as AbortSignal;
+            return new Promise((_resolve, reject) => {
+              retrySignal?.addEventListener('abort', () =>
+                reject(new DOMException('Aborted', 'AbortError')),
+              );
+            });
+          }
+          if (url.includes('/summary')) {
+            return {
+              summary: { ...BASE_MOCK_SUMMARY, ...mockSessionSummaryData },
+            };
+          }
+          return { session: mockSessionData };
+        });
+
+        render(<SessionSummaryScreen />, { wrapper: Wrapper });
+        const retryButton = await screen.findByTestId('retry-feedback-button');
+        fireEvent.press(retryButton);
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        expect(retrySignal?.aborted).toBe(false);
+        await act(async () => {
+          jest.advanceTimersByTime(14_999);
+          await Promise.resolve();
+        });
+        expect(retrySignal?.aborted).toBe(false);
+        await act(async () => {
+          jest.advanceTimersByTime(1);
+          await retryFailureHandled;
+        });
+
+        expect(retrySignal?.aborted).toBe(true);
+        screen.getByTestId('retry-feedback-button');
+        screen.getByTestId('continue-button');
+        screen.getByTestId('go-to-library');
+        screen.getByText(/Feedback still isn't available/);
+        await waitFor(() =>
+          expect(announce).toHaveBeenCalledWith(
+            "Feedback still isn't available, but your summary is safe. You can retry or continue whenever you're ready.",
+          ),
+        );
+      } finally {
+        announce.mockRestore();
+        restorePlatformOS();
+        jest.useRealTimers();
+      }
+    });
+
     it('renders saved content + AI feedback (not the empty input) when status is submitted', async () => {
       mockSessionSummaryData = {
         id: '880e8400-e29b-41d4-a716-446655440001',
@@ -1657,6 +2164,7 @@ describe('SessionSummaryScreen', () => {
           sessionId: '660e8400-e29b-41d4-a716-446655440000',
           content: 'Some partial reflection text that is long enough',
           aiFeedback: 'Great reflection.',
+          feedbackStatus: 'available',
           status: 'accepted',
         },
       };

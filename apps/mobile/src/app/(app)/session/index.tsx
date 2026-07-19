@@ -565,6 +565,9 @@ function SessionScreenInner() {
   const lastExpectedMinutesRef = useRef(10);
   const hasAutoSentRef = useRef(false);
   const mentorOpenerLaunchKeyRef = useRef<string | null>(null);
+  const firstSessionReflectionInFlightRef = useRef(false);
+  const firstSessionReflectionAbortRef = useRef<AbortController | null>(null);
+  const firstSessionReflectionMountedRef = useRef(true);
   const internallyBackfilledSessionIdRef = useRef<string | null>(null);
   const hasHydratedRecoveryRef = useRef(false);
   const queuedProblemTextRef = useRef<string | null>(null);
@@ -875,6 +878,15 @@ function SessionScreenInner() {
   const sessionExpired =
     !!routeSessionId &&
     classifyApiError(transcript.error).category === 'not-found';
+
+  useEffect(() => {
+    firstSessionReflectionMountedRef.current = true;
+    return () => {
+      firstSessionReflectionMountedRef.current = false;
+      firstSessionReflectionAbortRef.current?.abort();
+      firstSessionReflectionAbortRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     const round = activeSession.data?.metadata?.challengeRound;
@@ -1300,10 +1312,24 @@ function SessionScreenInner() {
     if (!firstSessionWrapUp || firstSessionReflectionTotalXp != null) return;
     const content = firstSessionReflectionText.trim();
     if (content.length < 10) return;
+    if (firstSessionReflectionInFlightRef.current) return;
+
+    firstSessionReflectionInFlightRef.current = true;
+    const controller = new AbortController();
+    firstSessionReflectionAbortRef.current = controller;
 
     try {
       setFirstSessionReflectionError(false);
-      const result = await submitFirstSessionSummary.mutateAsync({ content });
+      const result = await submitFirstSessionSummary.mutateAsync({
+        content,
+        signal: controller.signal,
+      });
+      if (
+        !firstSessionReflectionMountedRef.current ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -1316,10 +1342,21 @@ function SessionScreenInner() {
         (result.summary.baseXp ?? 0) + (result.summary.reflectionBonusXp ?? 0);
       setFirstSessionReflectionTotalXp(totalXp > 0 ? totalXp : null);
     } catch (err) {
+      if (
+        !firstSessionReflectionMountedRef.current ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
       setFirstSessionReflectionError(true);
       Sentry.captureException(err, {
         tags: { screen: 'session', action: 'first_session_reflection' },
       });
+    } finally {
+      if (firstSessionReflectionAbortRef.current === controller) {
+        firstSessionReflectionAbortRef.current = null;
+      }
+      firstSessionReflectionInFlightRef.current = false;
     }
   }, [
     firstSessionReflectionText,
