@@ -120,9 +120,12 @@ jest.mock(
 
 // Audience carried from the pre-auth chooser. Default 'learner' = clean solo
 // setup (matches the bulk of these first-profile tests). Set to 'parent' to
-// exercise the family + add-child redirect path. Pattern A — real module with
-// the two readers overridden so each test controls the carried value.
-let mockAudience: 'learner' | 'parent' | null = 'learner';
+// exercise the family + add-child redirect path. Set to 'supporter' (WI-2225,
+// non-authorizing pre-auth intent) to verify it falls through the same
+// learner-shaped path as 'parent' does NOT — see "audience-driven
+// first-profile setup" below. Pattern A — real module with the two readers
+// overridden so each test controls the carried value.
+let mockAudience: 'learner' | 'parent' | 'supporter' | null = 'learner';
 jest.mock(
   '../lib/pre-auth-audience' /* gc1-allow: pattern-a conversion; pre-auth-audience reads SecureStore which is a native storage boundary */,
   () => ({
@@ -2026,6 +2029,40 @@ describe('CreateProfileScreen', () => {
           reason: 'first-profile-created',
         },
         requestCount: 1,
+      });
+    });
+
+    // [WI-2225] 'supporter' is a non-authorizing pre-auth intent — it must
+    // NOT get the 'parent' family-context/add-child treatment. A zero-edge
+    // supporter's first profile is created exactly like a zero-edge adult
+    // learner's: no family-context PATCH, no add-child redirect, no person
+    // scope granted. This is the client-side half of the WI's no-leak
+    // guarantee (the server-side Support-Hub zero-edge routing is WI-2237's).
+    it('supporter audience (adult): no PATCH, no add-child redirect, remains learner-shaped', async () => {
+      mockAudience = 'supporter';
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ profile: adultOwner }), { status: 200 }),
+      );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+      });
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockSwitchProfile).toHaveBeenCalledWith(PROFILE_IDS.adult);
+      });
+      // Single POST only — no family PATCH (no person scope, no family
+      // context granted from a bare supporter intent).
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      // handleClose → back (canGoBack true); NOT the add-child redirect.
+      expect(mockBack).toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalledWith({
+        pathname: '/create-profile',
+        params: { for: 'child' },
       });
     });
 
