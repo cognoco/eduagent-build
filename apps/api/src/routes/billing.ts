@@ -43,14 +43,12 @@ import {
   getOrCreateStripeCustomerV2,
   ensureFreeSubscriptionV2,
   markSubscriptionCancelledV2,
-  getEffectiveAccessForSubscriptionV2,
   getOrProvisionProfileQuotaUsageV2,
   addProfileToSubscriptionV2,
   removeProfileFromSubscriptionV2,
-  getFamilyPoolStatusV2,
+  resolveCoherentBillingAccessV2,
   getUsageBreakdownForProfileV2,
   ProfileRemovalNotImplementedErrorV2,
-  StaleFamilyAccessSnapshotErrorV2,
 } from '../services/billing/billing-v2';
 import {
   resolveWarningLevel,
@@ -79,64 +77,6 @@ import { requireAccount } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 
 const logger = createLogger();
-
-async function resolveCoherentBillingAccess(
-  db: Database,
-  subscriptionId: string,
-) {
-  let access = await getEffectiveAccessForSubscriptionV2(db, subscriptionId);
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (!access) {
-      return {
-        kind: 'available' as const,
-        access: null,
-        sharedPoolStatus: null,
-      };
-    }
-    if (
-      getTierConfig(access.effectiveAccessTier).quotaModel !== 'shared-pool'
-    ) {
-      return {
-        kind: 'available' as const,
-        access,
-        sharedPoolStatus: null,
-      };
-    }
-
-    try {
-      const sharedPoolStatus = await getFamilyPoolStatusV2(
-        db,
-        subscriptionId,
-        access,
-      );
-      if (!sharedPoolStatus) {
-        return {
-          kind: 'shared-pool-unavailable' as const,
-          access,
-        };
-      }
-      return {
-        kind: 'available' as const,
-        access,
-        sharedPoolStatus,
-      };
-    } catch (error) {
-      if (
-        !(error instanceof StaleFamilyAccessSnapshotErrorV2) ||
-        attempt === 1
-      ) {
-        throw error;
-      }
-      access = await getEffectiveAccessForSubscriptionV2(db, subscriptionId);
-    }
-  }
-
-  return {
-    kind: 'shared-pool-unavailable' as const,
-    access,
-  };
-}
 
 // [WI-994] Local schema for the Stripe cancel response. The Stripe SDK v20
 // does not expose `current_period_end` at subscription level in its TypeScript
@@ -226,7 +166,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
     }
 
-    const coherentAccess = await resolveCoherentBillingAccess(
+    const coherentAccess = await resolveCoherentBillingAccessV2(
       db,
       subscription.id,
     );
@@ -625,7 +565,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
     const activeProfileId = c.get('profileId');
     const activeProfileMeta = c.get('profileMeta');
-    const coherentAccess = await resolveCoherentBillingAccess(
+    const coherentAccess = await resolveCoherentBillingAccessV2(
       db,
       subscription.id,
     );
@@ -980,7 +920,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
     }
 
-    const coherentAccess = await resolveCoherentBillingAccess(
+    const coherentAccess = await resolveCoherentBillingAccessV2(
       db,
       subscription.id,
     );
@@ -1079,7 +1019,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       return notFound(c, 'No subscription found');
     }
 
-    const coherentAccess = await resolveCoherentBillingAccess(
+    const coherentAccess = await resolveCoherentBillingAccessV2(
       db,
       subscription.id,
     );

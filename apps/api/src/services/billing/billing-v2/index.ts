@@ -80,6 +80,7 @@ export {
   addProfileToSubscriptionV2,
   removeProfileFromSubscriptionV2,
   getFamilyPoolStatusV2,
+  resolveCoherentBillingAccessV2,
   ProfileRemovalNotImplementedErrorV2,
   StaleFamilyAccessSnapshotErrorV2,
 } from './family-v2';

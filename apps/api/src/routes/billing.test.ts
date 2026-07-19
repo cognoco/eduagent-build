@@ -121,6 +121,7 @@ jest.mock('../services/account', () => {
 const mockGetSubscriptionByAccountId = jest.fn();
 const mockEnsureFreeSubscription = jest.fn();
 const mockGetEffectiveAccessForSubscription = jest.fn();
+const mockResolveCoherentBillingAccess = jest.fn();
 const mockGetOrProvisionProfileQuotaUsage = jest.fn();
 const mockGetQuotaPool = jest.fn();
 const mockLinkStripeCustomer = jest.fn();
@@ -219,6 +220,8 @@ jest.mock(
         mockMarkSubscriptionCancelled(...args),
       getEffectiveAccessForSubscriptionV2: (...args: unknown[]) =>
         mockGetEffectiveAccessForSubscription(...args),
+      resolveCoherentBillingAccessV2: (...args: unknown[]) =>
+        mockResolveCoherentBillingAccess(...args),
       getOrProvisionProfileQuotaUsageV2: (...args: unknown[]) =>
         mockGetOrProvisionProfileQuotaUsage(...args),
       listFamilyMembersV2: (...args: unknown[]) =>
@@ -390,6 +393,42 @@ beforeEach(() => {
   mockGetSubscriptionByAccountId.mockResolvedValue(null);
   mockGetEffectiveAccessForSubscription.mockResolvedValue(
     mockEffectiveAccess(),
+  );
+  mockResolveCoherentBillingAccess.mockImplementation(
+    async (_db: unknown, subscriptionId: string) => {
+      let access = await mockGetEffectiveAccessForSubscription();
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        if (!access) {
+          return { kind: 'available', access: null, sharedPoolStatus: null };
+        }
+        if (
+          access.effectiveAccessTier !== 'family' &&
+          access.effectiveAccessTier !== 'pro'
+        ) {
+          return { kind: 'available', access, sharedPoolStatus: null };
+        }
+        try {
+          const sharedPoolStatus = await mockGetFamilyPoolStatus(
+            _db,
+            subscriptionId,
+            access,
+          );
+          return sharedPoolStatus
+            ? { kind: 'available', access, sharedPoolStatus }
+            : { kind: 'shared-pool-unavailable', access };
+        } catch (error) {
+          if (
+            !(error instanceof Error) ||
+            error.name !== 'StaleFamilyAccessSnapshotErrorV2' ||
+            attempt === 1
+          ) {
+            throw error;
+          }
+          access = await mockGetEffectiveAccessForSubscription();
+        }
+      }
+      return { kind: 'shared-pool-unavailable', access };
+    },
   );
   mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(mockProfileQuota());
   mockGetQuotaPool.mockResolvedValue(null);

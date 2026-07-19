@@ -38,7 +38,10 @@ import {
 } from '@eduagent/database';
 import { getTierConfig } from '../../subscription';
 import { updateSubscriptionFromRevenuecatWebhookV2 } from './revenuecat-v2';
-import { handleInitialPurchaseV2 } from './revenuecat-webhook-handler-v2';
+import {
+  handleInitialPurchaseV2,
+  handleRenewalV2,
+} from './revenuecat-webhook-handler-v2';
 import { getEffectiveAccessForSubscriptionV2 } from './access-v2';
 import { getFamilyPoolStatusV2 } from './family-v2';
 import { addMonthsClamped } from '../billing-shared';
@@ -404,6 +407,132 @@ const RUN = !!process.env.DATABASE_URL;
       ).resolves.toMatchObject({
         cycleStartAt: purchasedAt.toISOString(),
         cycleResetAt: expectedResetAt.toISOString(),
+        usedThisMonth: 1,
+      });
+    });
+
+    it('[WI-2194] advances a delayed Family renewal from the provider cycle anchor', async () => {
+      const seeded = await seedIdentityWithFreeSubscription();
+      const initialStartMs = Date.now() - 35 * 24 * 60 * 60 * 1000;
+      const initialResetAt = addMonthsClamped(new Date(initialStartMs), 1);
+      await handleInitialPurchaseV2(
+        db,
+        undefined,
+        familyShareEvent(seeded.clerkUserId, {
+          is_family_share: false,
+          product_id: 'com.eduagent.family.monthly',
+          purchased_at_ms: initialStartMs,
+          expiration_at_ms: initialResetAt.getTime(),
+          event_timestamp_ms: initialStartMs + 60 * 60 * 1000,
+        }),
+      );
+
+      const renewalStartMs = Date.now() - 2 * 24 * 60 * 60 * 1000;
+      const renewalStartAt = new Date(renewalStartMs);
+      const renewalResetAt = addMonthsClamped(renewalStartAt, 1);
+      await db.insert(usageEvents).values([
+        {
+          subscriptionId: seeded.subscriptionId,
+          profileId: seeded.payerPersonId,
+          occurredAt: new Date(renewalStartMs - 1),
+          delta: 1,
+        },
+        {
+          subscriptionId: seeded.subscriptionId,
+          profileId: seeded.payerPersonId,
+          occurredAt: renewalStartAt,
+          delta: 1,
+        },
+      ]);
+
+      await handleRenewalV2(
+        db,
+        undefined,
+        familyShareEvent(seeded.clerkUserId, {
+          type: 'RENEWAL',
+          product_id: 'com.eduagent.family.monthly',
+          purchased_at_ms: renewalStartMs,
+          expiration_at_ms: renewalResetAt.getTime(),
+          event_timestamp_ms: Date.now(),
+        }),
+      );
+
+      const access = await getEffectiveAccessForSubscriptionV2(
+        db,
+        seeded.subscriptionId,
+      );
+      expect(access).not.toBeNull();
+      if (!access) throw new Error('Expected renewed Family effective access');
+      await expect(
+        getFamilyPoolStatusV2(db, seeded.subscriptionId, access),
+      ).resolves.toMatchObject({
+        cycleStartAt: renewalStartAt.toISOString(),
+        cycleResetAt: renewalResetAt.toISOString(),
+        usedThisMonth: 1,
+      });
+    });
+
+    it('[WI-2194] reanchors a Plus-to-Family renewal without carrying the old denominator', async () => {
+      const seeded = await seedIdentityWithFreeSubscription();
+      const plusStartMs = Date.now() - 15 * 24 * 60 * 60 * 1000;
+      const plusResetAt = addMonthsClamped(new Date(plusStartMs), 1);
+      await handleInitialPurchaseV2(
+        db,
+        undefined,
+        familyShareEvent(seeded.clerkUserId, {
+          is_family_share: false,
+          product_id: 'com.eduagent.plus.monthly',
+          purchased_at_ms: plusStartMs,
+          expiration_at_ms: plusResetAt.getTime(),
+          event_timestamp_ms: plusStartMs + 60 * 60 * 1000,
+        }),
+      );
+      await db
+        .update(quotaPools)
+        .set({ usedThisMonth: 9, usedToday: 3 })
+        .where(eq(quotaPools.subscriptionId, seeded.subscriptionId));
+
+      const familyStartMs = Date.now() - 24 * 60 * 60 * 1000;
+      const familyStartAt = new Date(familyStartMs);
+      const familyResetAt = addMonthsClamped(familyStartAt, 1);
+      await db.insert(usageEvents).values([
+        {
+          subscriptionId: seeded.subscriptionId,
+          profileId: seeded.payerPersonId,
+          occurredAt: new Date(familyStartMs - 1),
+          delta: 1,
+        },
+        {
+          subscriptionId: seeded.subscriptionId,
+          profileId: seeded.payerPersonId,
+          occurredAt: familyStartAt,
+          delta: 1,
+        },
+      ]);
+
+      await handleRenewalV2(
+        db,
+        undefined,
+        familyShareEvent(seeded.clerkUserId, {
+          type: 'RENEWAL',
+          product_id: 'com.eduagent.family.monthly',
+          purchased_at_ms: familyStartMs,
+          expiration_at_ms: familyResetAt.getTime(),
+          event_timestamp_ms: Date.now(),
+        }),
+      );
+
+      const access = await getEffectiveAccessForSubscriptionV2(
+        db,
+        seeded.subscriptionId,
+      );
+      expect(access).not.toBeNull();
+      if (!access) throw new Error('Expected Family effective access');
+      await expect(
+        getFamilyPoolStatusV2(db, seeded.subscriptionId, access),
+      ).resolves.toMatchObject({
+        cycleStartAt: familyStartAt.toISOString(),
+        cycleResetAt: familyResetAt.toISOString(),
         usedThisMonth: 1,
       });
     });

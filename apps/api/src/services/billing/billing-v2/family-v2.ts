@@ -33,7 +33,7 @@ import type { FamilyMember, SubscriptionTier } from '@eduagent/schemas';
 import { getTierConfig, resolveEffectiveAccessTier } from '../../subscription';
 import type { SubscriptionRow } from '../types';
 import { createLogger } from '../../logger';
-import { captureException } from '../../sentry';
+import { captureException, captureMessage } from '../../sentry';
 import { addMonthsClamped } from '../billing-shared';
 import { getSubscriptionByAccountIdV2 } from './subscription-core-v2';
 import {
@@ -217,6 +217,79 @@ export class StaleFamilyAccessSnapshotErrorV2 extends Error {
     super('Family access changed before quota snapshot assembly');
     this.name = 'StaleFamilyAccessSnapshotErrorV2';
   }
+}
+
+/**
+ * Assemble one billing-access snapshot for quota-bearing routes. Shared-pool
+ * readers retry once when the subscription changes between the access read and
+ * the locked Family snapshot; the retry is an observable billing recovery.
+ */
+export async function resolveCoherentBillingAccessV2(
+  db: Database,
+  subscriptionId: string,
+) {
+  let access = await getEffectiveAccessForSubscriptionV2(db, subscriptionId);
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (!access) {
+      return {
+        kind: 'available' as const,
+        access: null,
+        sharedPoolStatus: null,
+      };
+    }
+    if (
+      getTierConfig(access.effectiveAccessTier).quotaModel !== 'shared-pool'
+    ) {
+      return {
+        kind: 'available' as const,
+        access,
+        sharedPoolStatus: null,
+      };
+    }
+
+    try {
+      const sharedPoolStatus = await getFamilyPoolStatusV2(
+        db,
+        subscriptionId,
+        access,
+      );
+      if (!sharedPoolStatus) {
+        return {
+          kind: 'shared-pool-unavailable' as const,
+          access,
+        };
+      }
+      return {
+        kind: 'available' as const,
+        access,
+        sharedPoolStatus,
+      };
+    } catch (error) {
+      if (
+        !(error instanceof StaleFamilyAccessSnapshotErrorV2) ||
+        attempt === 1
+      ) {
+        throw error;
+      }
+      logger.warn('[billing] retrying stale Family access snapshot', {
+        event: 'billing.family.access_snapshot_retry',
+        subscriptionId,
+        attempt: attempt + 1,
+      });
+      captureMessage('billing.family.access_snapshot_retry', {
+        level: 'warning',
+        extra: { subscriptionId, attempt: attempt + 1 },
+        tags: { surface: 'billing.family.v2' },
+      });
+      access = await getEffectiveAccessForSubscriptionV2(db, subscriptionId);
+    }
+  }
+
+  return {
+    kind: 'shared-pool-unavailable' as const,
+    access,
+  };
 }
 
 /**
@@ -506,6 +579,25 @@ export async function getFamilyPoolStatusV2(
           updatedAt: new Date(),
         })
         .where(eq(quotaPools.id, pool.id));
+      logger.warn('[billing] repaired Family quota enforcement counter', {
+        event: 'billing.family.quota_counter_repaired',
+        subscriptionId,
+        previousMonthlyLimit: pool.monthlyLimit,
+        monthlyLimit: tierConfig.monthlyQuota,
+        previousUsedThisMonth: pool.usedThisMonth,
+        usedThisMonth: enforcedUsedThisMonth,
+      });
+      captureMessage('billing.family.quota_counter_repaired', {
+        level: 'warning',
+        extra: {
+          subscriptionId,
+          previousMonthlyLimit: pool.monthlyLimit,
+          monthlyLimit: tierConfig.monthlyQuota,
+          previousUsedThisMonth: pool.usedThisMonth,
+          usedThisMonth: enforcedUsedThisMonth,
+        },
+        tags: { surface: 'billing.family.v2' },
+      });
     }
 
     return {

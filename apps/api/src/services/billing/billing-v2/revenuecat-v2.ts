@@ -95,15 +95,23 @@ export async function updateSubscriptionFromRevenuecatWebhookV2(
   },
 ): Promise<AppliedSubscriptionRow | null> {
   return db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    const existing = await lockSubscriptionByOrganizationId__unscoped(
+      txDb,
+      organizationId,
+    );
     const updated = await applySubscriptionUpdateFromRevenuecatV2(
-      tx as unknown as Database,
+      txDb,
       organizationId,
       updates,
     );
     if (updated && updated.webhookApplied !== false) {
-      await reconcileQuotaStateForSubscriptionV2(
-        tx as unknown as Database,
-        updated.id,
+      await reconcileRevenuecatQuotaCycleV2(
+        txDb,
+        updated,
+        existing ? parseSubscriptionV2PlanTier(existing.planTier) : undefined,
+        existing?.periodStartAt ?? null,
+        updates,
       );
     }
     return updated;
@@ -121,6 +129,7 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhookV2(
 ): Promise<AppliedSubscriptionRow | null> {
   let reattributedCount = 0;
   let previousTier: SubscriptionTier | undefined;
+  let previousPeriodStartAt: Date | null = null;
   const now = new Date();
 
   const result = await db.transaction(async (tx) => {
@@ -137,6 +146,7 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhookV2(
     previousTier = existing
       ? parseSubscriptionV2PlanTier(existing.planTier)
       : undefined;
+    previousPeriodStartAt = existing?.periodStartAt ?? null;
 
     const updated = await applySubscriptionUpdateFromRevenuecatV2(
       txDb,
@@ -145,7 +155,13 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhookV2(
     );
 
     if (updated && updated.webhookApplied !== false) {
-      await reconcileQuotaStateForSubscriptionV2(txDb, updated.id);
+      await reconcileRevenuecatQuotaCycleV2(
+        txDb,
+        updated,
+        previousTier,
+        previousPeriodStartAt,
+        updates,
+      );
 
       if (previousTier && updates.tier && previousTier !== updates.tier) {
         reattributedCount = await reattributeTopUpCreditsOnModelChangeV2(
@@ -173,6 +189,49 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhookV2(
   }
 
   return result;
+}
+
+async function reconcileRevenuecatQuotaCycleV2(
+  db: Database,
+  updated: AppliedSubscriptionRow,
+  previousTier: SubscriptionTier | undefined,
+  previousPeriodStartAt: Date | null,
+  updates: RevenuecatWebhookUpdate,
+): Promise<void> {
+  await reconcileQuotaStateForSubscriptionV2(db, updated.id);
+
+  const providerPeriodStartAt = updates.currentPeriodStart
+    ? new Date(updates.currentPeriodStart)
+    : null;
+  if (
+    !providerPeriodStartAt ||
+    getTierConfig(updated.tier).quotaModel !== 'shared-pool'
+  ) {
+    return;
+  }
+
+  const previousQuotaModel = previousTier
+    ? getTierConfig(previousTier).quotaModel
+    : null;
+  const providerCycleChanged =
+    previousPeriodStartAt?.getTime() !== providerPeriodStartAt.getTime();
+  if (previousQuotaModel === 'shared-pool' && !providerCycleChanged) {
+    return;
+  }
+
+  const [reanchoredPool] = await db
+    .update(quotaPools)
+    .set({
+      usedThisMonth: 0,
+      usedToday: 0,
+      cycleResetAt: addMonthsClamped(providerPeriodStartAt, 1),
+      updatedAt: new Date(),
+    })
+    .where(eq(quotaPools.subscriptionId, updated.id))
+    .returning({ id: quotaPools.id });
+  if (!reanchoredPool) {
+    throw new Error('RevenueCat shared-pool cycle re-anchor returned no row');
+  }
 }
 
 async function applySubscriptionUpdateFromRevenuecatV2(
