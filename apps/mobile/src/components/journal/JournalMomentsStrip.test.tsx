@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react-native';
 import { JournalMomentsStrip } from './JournalMomentsStrip';
+import { ScopeContextProvider } from '../../lib/scope-context';
 
 const mockPush = jest.fn();
 const mockUseNowFeed = jest.fn();
@@ -53,7 +54,11 @@ describe('JournalMomentsStrip', () => {
       refetch: jest.fn(),
     });
 
-    const rendered = render(<JournalMomentsStrip />);
+    const rendered = render(
+      <ScopeContextProvider initialScopeList={{ shape: 'learner' }}>
+        <JournalMomentsStrip />
+      </ScopeContextProvider>,
+    );
 
     expect(
       rendered.getByText('Locked in changing signs in Algebra.'),
