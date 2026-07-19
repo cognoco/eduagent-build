@@ -71,6 +71,45 @@ describe('[WI-2452] isActive', () => {
   });
 });
 
+describe('[WI-2452] expires — impossible calendar date (bounce #3 regression)', () => {
+  // Date.parse silently NORMALIZES an impossible calendar date instead of
+  // rejecting it: '2026-02-30T00:00:00.000Z' parses to 2026-03-02T...Z. A
+  // malformed "expires" could therefore silently EXTEND a mute past its
+  // declared calendar expiry. Assert the outcome (registry rejected, and the
+  // quarantine does not remain active), not the parser call.
+  const IMPOSSIBLE_EXPIRES = '2026-02-30T00:00:00.000Z';
+
+  it('validate() rejects a ledger entry whose expires is an impossible calendar date', () => {
+    const problems = validate([
+      {
+        id: 'smoke-parent-flaky',
+        project: 'smoke-parent',
+        owner: 'jorn',
+        wi: 'WI-1234',
+        reason: 'races on seeded staging data under parallel workers',
+        expires: IMPOSSIBLE_EXPIRES,
+      },
+    ]);
+    expect(problems.some((p) => p.includes('invalid "expires"'))).toBe(true);
+  });
+
+  it('does not keep the quarantine active past its declared (impossible) expiry', () => {
+    // Date.parse rolls IMPOSSIBLE_EXPIRES forward to 2026-03-02, so a naive
+    // isActive() would still report "active" on 2026-03-01. The property
+    // under test is that it must NOT — an invalid expires fails toward core.
+    const afterDeclaredExpiry = new Date('2026-03-01T00:00:00.000Z');
+    expect(isActive({ expires: IMPOSSIBLE_EXPIRES }, afterDeclaredExpiry)).toBe(
+      false,
+    );
+
+    const { core, advisory } = resolveLanes(afterDeclaredExpiry, [
+      { project: 'smoke-parent', expires: IMPOSSIBLE_EXPIRES },
+    ]);
+    expect(advisory).toEqual([]);
+    expect(core).toEqual([...DECLARED_CORE_PROJECTS]);
+  });
+});
+
 describe('[WI-2452] loadRegistry — malformed top-level structure', () => {
   let dir: string;
 
