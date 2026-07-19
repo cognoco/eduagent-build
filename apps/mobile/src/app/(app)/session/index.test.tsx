@@ -2532,13 +2532,17 @@ describe('SessionScreen homework flow', () => {
       testScreen.unmount();
     }, 15000);
 
-    it('returns to the Mentor tab when returnTo=mentor', async () => {
+    it('[WI-2234] invalidates only the active profile Now feed before returning to Mentor', async () => {
       getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
       (useLocalSearchParams as jest.Mock).mockReturnValue(
         MENTOR_HOMEWORK_PARAMS,
       );
 
       const testScreen = renderSessionScreen();
+      const invalidateSpy = jest.spyOn(
+        activeRender!.queryClient,
+        'invalidateQueries',
+      );
 
       await act(async () => {
         await Promise.resolve();
@@ -2550,6 +2554,13 @@ describe('SessionScreen homework flow', () => {
       });
 
       expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['now-feed', ACTIVE_PROFILE_ID],
+        exact: true,
+      });
+      expect(invalidateSpy.mock.invocationCallOrder[0]).toBeLessThan(
+        mockReplace.mock.invocationCallOrder[0]!,
+      );
 
       testScreen.unmount();
     }, 15000);

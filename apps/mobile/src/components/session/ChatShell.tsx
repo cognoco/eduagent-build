@@ -46,6 +46,8 @@ export interface ChatMessage {
   verificationBadge?: VerificationBadge;
   eventId?: string;
   isSystemPrompt?: boolean;
+  /** Set only after a real assistant reply has completed successfully. */
+  isResponseComplete?: boolean;
   /** BUG-373: True for programmatically auto-sent messages (homework OCR, queued
    *  multi-problem). Used to exclude from userMessageCount so the voice/text
    *  toggle stays visible until the user deliberately sends a message. */
@@ -200,6 +202,17 @@ interface ChatMessageRowProps {
   renderMessageActions?: (message: ChatMessage) => React.ReactNode;
 }
 
+function isCompletedAssistantResponse(message: ChatMessage): boolean {
+  return (
+    message.role === 'assistant' &&
+    message.isResponseComplete === true &&
+    message.content.trim().length > 0 &&
+    message.streaming !== true &&
+    message.kind == null &&
+    message.isSystemPrompt !== true
+  );
+}
+
 const ChatMessageRow = memo(function ChatMessageRow({
   msg,
   index,
@@ -210,7 +223,13 @@ const ChatMessageRow = memo(function ChatMessageRow({
   const [imageFailed, setImageFailed] = useState(false);
 
   return (
-    <View>
+    <View
+      testID={
+        isCompletedAssistantResponse(msg)
+          ? `assistant-response-complete-${index}`
+          : undefined
+      }
+    >
       {msg.imageUri && !imageFailed && (
         <View className="self-end max-w-[85%] mb-1">
           {/* [BUG-NOTION-257] Hint the platform image cache so homework

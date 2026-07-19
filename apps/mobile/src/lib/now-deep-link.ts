@@ -4,6 +4,7 @@ import {
   type NowDeepLink,
   type NowDeepLinkRoute,
 } from '@eduagent/schemas';
+import { MENTOR_RETURN_TO } from './navigation';
 
 export type SubjectHubTarget = 'legacy-shelf' | 'v2-subject-hub';
 
@@ -27,7 +28,7 @@ const PATH_BUILDERS: Record<NowDeepLinkRoute, PathBuilder> = {
   'session.resume': (params) =>
     `/(app)/session?sessionId=${encodeURIComponent(
       requiredParam(params, 'sessionId', 'session.resume'),
-    )}`,
+    )}&returnTo=${MENTOR_RETURN_TO}`,
   // [WI-1121 review fix] Matches the path buildSessionDetailHref() builds for
   // a completed session (session-detail-navigation.ts) — the recap/summary
   // screen, distinct from 'session.resume' (the live session chat).

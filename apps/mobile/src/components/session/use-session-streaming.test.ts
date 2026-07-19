@@ -439,6 +439,17 @@ describe('useSessionStreaming', () => {
       expect(opts.setExchangeCount).toHaveBeenCalledWith(1);
       expect(opts.setEscalationRung).toHaveBeenCalledWith(0);
       expect(opts.setIsStreaming).toHaveBeenCalledWith(false);
+      expect(
+        applyMessageUpdates((opts.setMessages as jest.Mock).mock.calls, []),
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'assistant',
+            content: 'Helpful answer',
+            isResponseComplete: true,
+          }),
+        ]),
+      );
     });
 
     it('stores challenge round affordances from the typed done payload', async () => {

@@ -52,6 +52,10 @@ export function useSessionTranscriptHydration({
         content: entry.content,
         eventId: entry.eventId,
         isSystemPrompt: entry.isSystemPrompt,
+        isResponseComplete:
+          entry.role === 'assistant' &&
+          entry.isSystemPrompt !== true &&
+          entry.content.trim().length > 0,
         escalationRung: entry.escalationRung,
       }));
 

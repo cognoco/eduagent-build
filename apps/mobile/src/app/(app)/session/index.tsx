@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
-import { goBackOrReplace } from '../../../lib/navigation';
+import { goBackOrReplace, MENTOR_RETURN_TO } from '../../../lib/navigation';
 import { shouldShowBookLink } from '../../../lib/show-book-link';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
@@ -301,6 +302,7 @@ function SessionScreenInner() {
     imageMimeType?: string;
   }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const navigationContract = useNavigationContract();
@@ -356,8 +358,16 @@ function SessionScreenInner() {
   // don't always resolve on web — the chevron looked clickable but the URL
   // never changed. Supplying an explicit handler that uses Expo Router's
   // typed object form makes the navigation reliable across web + native.
+  const refreshMentorFeedBeforeReturn = useCallback(() => {
+    if (returnTo !== MENTOR_RETURN_TO || !activeProfile?.id) return;
+    void queryClient.invalidateQueries({
+      queryKey: ['now-feed', activeProfile.id],
+      exact: true,
+    });
+  }, [activeProfile?.id, queryClient, returnTo]);
   const handleChatBackPress = useCallback(() => {
     if (returnTo) {
+      refreshMentorFeedBeforeReturn();
       router.replace(homeBackHref as Href);
       return;
     }
@@ -369,15 +379,22 @@ function SessionScreenInner() {
       return;
     }
     router.replace('/(app)/home' as Href);
-  }, [returnTo, subjectId, homeBackHref, router]);
+  }, [
+    returnTo,
+    subjectId,
+    homeBackHref,
+    refreshMentorFeedBeforeReturn,
+    router,
+  ]);
   const handleHomeBack = useCallback(() => {
     if (returnTo) {
+      refreshMentorFeedBeforeReturn();
       router.replace(homeBackHref as Href);
       return;
     }
 
     goBackOrReplace(router, homeBackHref);
-  }, [homeBackHref, returnTo, router]);
+  }, [homeBackHref, refreshMentorFeedBeforeReturn, returnTo, router]);
   const handleStartNewSession = useCallback(() => {
     router.replace({
       pathname: '/(app)/session',

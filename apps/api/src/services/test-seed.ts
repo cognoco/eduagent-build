@@ -80,6 +80,7 @@ export type SeedScenario =
   | 'onboarding-complete'
   | 'onboarding-no-subject'
   | 'learning-active'
+  | 'v2-returning-learner'
   | 'retention-due'
   | 'failed-recall-3x'
   | 'parent-with-children'
@@ -1251,6 +1252,96 @@ async function seedLearningActive(
     email,
     password,
     ids: { subjectId, bookId, sessionId, topicId: firstTopicId },
+  };
+}
+
+/**
+ * V2 returning-learner release fixture.
+ *
+ * Intentionally contains one live session and one overdue retention card on
+ * different topics. Keeping the graph this small makes each Mentor card an
+ * independently guaranteed consequence of the seed rather than an incidental
+ * by-product of a broader learning-history fixture.
+ */
+async function seedV2ReturningLearner(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Returning Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
+  });
+  const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'World History',
+  );
+  const sessionTopicId = topicIds[0];
+  const dueReviewTopicId = topicIds[1];
+  if (!sessionTopicId || !dueReviewTopicId) {
+    throw new Error('Returning-learner seed requires two curriculum topics');
+  }
+
+  const sessionId = generateUUIDv7();
+  await db.insert(learningSessions).values({
+    id: sessionId,
+    profileId,
+    subjectId,
+    topicId: sessionTopicId,
+    sessionType: 'learning',
+    status: 'active',
+    exchangeCount: 1,
+  });
+  await db.insert(sessionEvents).values([
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      eventType: 'user_message',
+      content: 'Why did the Romans build so many roads?',
+    },
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      eventType: 'ai_response',
+      content: 'They connected cities, trade, armies, and new ideas.',
+    },
+  ]);
+
+  const retentionCardId = generateUUIDv7();
+  await db.insert(retentionCards).values({
+    id: retentionCardId,
+    profileId,
+    topicId: dueReviewTopicId,
+    easeFactor: 2.5,
+    intervalDays: 7,
+    repetitions: 2,
+    nextReviewAt: pastDate(1),
+    lastReviewedAt: pastDate(8),
+  });
+
+  return {
+    scenario: 'v2-returning-learner',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: {
+      subjectId,
+      bookId,
+      sessionId,
+      sessionTopicId,
+      dueReviewTopicId,
+      retentionCardId,
+    },
   };
 }
 
@@ -5845,6 +5936,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'onboarding-complete': seedOnboardingComplete,
   'onboarding-no-subject': seedOnboardingNoSubject,
   'learning-active': seedLearningActive,
+  'v2-returning-learner': seedV2ReturningLearner,
   'retention-due': seedRetentionDue,
   'failed-recall-3x': seedFailedRecall3x,
   'parent-with-children': seedParentWithChildren,

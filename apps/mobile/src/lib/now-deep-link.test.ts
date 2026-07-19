@@ -71,7 +71,7 @@ describe('pushNowDeepLink', () => {
     expect(router.push).toHaveBeenNthCalledWith(2, '/(app)/topic/topic-1');
   });
 
-  it('pushes a session resume route once when the chain is empty', () => {
+  it('[WI-2234] resumes a Now-feed session with an explicit Mentor return destination', () => {
     const router = { push: jest.fn() };
 
     pushNowDeepLink(router, {
@@ -82,7 +82,7 @@ describe('pushNowDeepLink', () => {
 
     expect(router.push).toHaveBeenCalledTimes(1);
     expect(router.push).toHaveBeenCalledWith(
-      '/(app)/session?sessionId=session-1',
+      '/(app)/session?sessionId=session-1&returnTo=mentor',
     );
   });
 

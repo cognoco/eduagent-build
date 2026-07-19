@@ -3,10 +3,12 @@ import * as path from 'path';
 
 import { ENGAGEMENT_SIGNALS } from '@eduagent/schemas';
 import {
+  learningSessions,
   profileQuotaUsage,
   person,
   login,
   membership,
+  retentionCards,
   type Database,
 } from '@eduagent/database';
 import { inArray } from 'drizzle-orm';
@@ -106,6 +108,7 @@ describe('VALID_SCENARIOS', () => {
       'onboarding-complete',
       'onboarding-no-subject',
       'learning-active',
+      'v2-returning-learner',
       'retention-due',
       'failed-recall-3x',
       'parent-with-children',
@@ -314,6 +317,46 @@ describe('seedScenario', () => {
       }
     },
   );
+
+  it('[WI-2234] seeds exactly one unfinished session and one due review on distinct topics', async () => {
+    const db = createMockDb();
+    const result = await seedScenario(
+      db,
+      'v2-returning-learner' as SeedScenario,
+      'returning@example.com',
+    );
+    const insertMock = db.insert as unknown as jest.Mock;
+    const valuesMock = insertMock.mock.results[0]?.value.values as jest.Mock;
+    const insertedRowsFor = (table: unknown): unknown[] =>
+      insertMock.mock.calls.flatMap(([insertedTable], index) => {
+        if (insertedTable !== table) return [];
+        const value = valuesMock.mock.calls[index]?.[0];
+        return Array.isArray(value) ? value : [value];
+      });
+
+    const seededSessions = insertedRowsFor(learningSessions) as Array<{
+      id: string;
+      status: string;
+      topicId: string;
+    }>;
+    const seededReviews = insertedRowsFor(retentionCards) as Array<{
+      id: string;
+      nextReviewAt: Date;
+      topicId: string;
+    }>;
+
+    expect(seededSessions).toHaveLength(1);
+    expect(seededSessions[0]).toMatchObject({
+      id: result.ids.sessionId,
+      status: 'active',
+    });
+    expect(seededReviews).toHaveLength(1);
+    expect(seededReviews[0]).toMatchObject({
+      id: result.ids.retentionCardId,
+    });
+    expect(seededReviews[0]!.nextReviewAt.getTime()).toBeLessThan(Date.now());
+    expect(seededReviews[0]!.topicId).not.toBe(seededSessions[0]!.topicId);
+  });
 
   it('throws for unknown scenario', async () => {
     const db = createMockDb();

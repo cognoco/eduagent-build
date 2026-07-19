@@ -1,0 +1,61 @@
+# WI-2234: returning learner release journey.
+# The composite seed guarantees one unfinished session and one due review.
+appId: com.mentomate.app
+tags:
+  - v2
+  - learning
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'v2-returning-learner'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+
+# Both exact seeded obligations must reach Mentor; neither assertion is optional.
+- assertVisible:
+    id: 'now-card-unfinished_session'
+- assertVisible:
+    id: 'now-card-retention_due'
+
+# The unfinished session outranks the due review, so its primary action is first.
+- tapOn:
+    id: 'now-card-continue'
+    index: 0
+
+- extendedWaitUntil:
+    visible:
+      id: 'chat-input'
+    timeout: 30000
+
+- tapOn:
+    id: 'chat-input'
+- inputText: 'How did Roman roads help people exchange ideas?'
+- hideKeyboard
+- tapOn:
+    id: 'send-button'
+
+# The seed contains exactly one prior completed assistant response. A second
+# semantic completion marker proves this resumed session received a non-empty
+# reply, not merely a streaming/thinking or reconnect/fallback row.
+- extendedWaitUntil:
+    visible:
+      id: 'assistant-response-complete-.*'
+      index: 1
+    timeout: 60000
+
+- tapOn:
+    id: 'chat-shell-back'
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+- assertVisible:
+    id: 'now-card-unfinished_session'
+- assertVisible:
+    id: 'now-card-retention_due'

@@ -829,6 +829,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
 
     expect(plan).toEqual([
+      // [WI-2234] Returning learner release case — exact unfinished session
+      // resume, new assistant exchange, supported Mentor return, and refreshed
+      // Me-scope feed with the unfinished session and due review still present.
+      {
+        flow: 'flows/v2/v2-returning-learner-resume.yaml',
+        scenario: 'v2-returning-learner',
+        shard: 1,
+      },
       {
         flow: 'flows/v2/v2-shell-navigation.yaml',
         scenario: 'learning-active',
@@ -883,6 +891,42 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/assertNotVisible:/g)).toHaveLength(6);
     expect(flow.match(/id: ['"]tab-subjects['"]/g)).toHaveLength(3);
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
+  });
+
+  it('[WI-2234] waits for a completed assistant response before returning to Mentor', () => {
+    const maestroFlow = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/v2/v2-returning-learner-resume.yaml',
+      ),
+      'utf8',
+    );
+    const playwrightFlow = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e-web/flows/v2/returning-learner-resume.spec.ts',
+      ),
+      'utf8',
+    );
+    const marker = 'assistant-response-complete-';
+
+    const maestroMarkerIndex = maestroFlow.indexOf(marker);
+    const maestroBackIndex = maestroFlow.indexOf("id: 'chat-shell-back'");
+    expect(maestroMarkerIndex).toBeGreaterThan(-1);
+    expect(maestroBackIndex).toBeGreaterThan(maestroMarkerIndex);
+    expect(
+      maestroFlow.slice(maestroMarkerIndex, maestroBackIndex),
+    ).not.toContain('optional: true');
+
+    const playwrightMarkerIndex = playwrightFlow.indexOf(marker);
+    const playwrightBackIndex = playwrightFlow.indexOf(
+      "page.getByTestId('chat-shell-back')",
+    );
+    expect(playwrightMarkerIndex).toBeGreaterThan(-1);
+    expect(playwrightBackIndex).toBeGreaterThan(playwrightMarkerIndex);
+    expect(
+      playwrightFlow.slice(playwrightMarkerIndex, playwrightBackIndex),
+    ).toContain('toBeGreaterThan');
   });
 
   it('keeps the generated Android APK free of the duplicate OSGI manifest', () => {
