@@ -440,6 +440,10 @@ module.exports = { GATE_STATES, runCanary, classifyFailure, decide };
       process.exit(0);
     }
     if (mode === '--classify') {
+      if (!args[3])
+        process.stderr.write(
+          'PLAYWRIGHT_API_URL is required for staging-gate classification\n',
+        );
       const resultFile = args[2];
       const resultText =
         resultFile && existsSync(resultFile)

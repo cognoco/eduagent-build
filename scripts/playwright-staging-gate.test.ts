@@ -741,6 +741,23 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
         expect(result.status).toBe(0);
         expect(result.stdout).toContain(`FAILURE_CLASS=${expected}`);
       }
+      writeFileSync(resultFile, TARGET_TRANSPORT_RESULT);
+      const missingTarget = spawnSync(
+        process.execPath,
+        [
+          join(process.cwd(), 'scripts/playwright-staging-gate.cjs'),
+          '--classify',
+          root,
+          '1',
+          resultFile,
+        ],
+        { encoding: 'utf8' },
+      );
+      expect(missingTarget.status).toBe(0);
+      expect(missingTarget.stdout).toContain('FAILURE_CLASS=unknown');
+      expect(missingTarget.stderr).toContain(
+        'PLAYWRIGHT_API_URL is required for staging-gate classification',
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

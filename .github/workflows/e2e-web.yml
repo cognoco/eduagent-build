@@ -184,6 +184,8 @@ jobs:
           fi
 
       - name: Run Playwright smoke suite (via doppler run -c stg)
+        # The classifier artifact root below mirrors `outputDir` in
+        # apps/mobile/playwright.config.ts; update both locations together.
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
         run: |
