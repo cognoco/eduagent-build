@@ -22,6 +22,7 @@ interface EnvelopeLike {
   reply?: unknown;
   signals?: {
     noticed_gap?: {
+      observed?: unknown;
       answerEventId?: unknown;
       learnerQuote?: unknown;
     };
@@ -82,7 +83,10 @@ function evaluateResponse(
     ];
   }
 
-  const noticedGap = envelope.signals?.noticed_gap;
+  const noticedGap =
+    envelope.signals?.noticed_gap?.observed === false
+      ? undefined
+      : envelope.signals?.noticed_gap;
   const issues: QualityIssue[] = [];
 
   if (input.expectedNotice && !noticedGap) {

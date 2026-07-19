@@ -43,6 +43,7 @@ async function seedFixture(label: string) {
     displayName: `Mentor Notice ${label}`,
     birthYear: 2010,
     isOwner: true,
+    seedBaselineSubscription: false,
   });
   const [subject] = await db
     .insert(subjects)

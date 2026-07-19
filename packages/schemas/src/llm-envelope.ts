@@ -338,6 +338,19 @@ export const noticedGapSignalSchema = z.object({
 });
 export type NoticedGapSignal = z.infer<typeof noticedGapSignalSchema>;
 
+function normalizeNoticedGapDecision(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return value;
+  }
+
+  const input = value as Record<string, unknown>;
+  if (input['observed'] === false) return null;
+  if (input['observed'] !== true) return value;
+
+  const { observed: _observed, ...evidence } = input;
+  return evidence;
+}
+
 export const noticeRecheckSignalSchema = z.object({
   noticeId: z.string().uuid(),
   verdict: z.enum(['locked_in', 'not_yet', 'dismissed', 'deferred']),
@@ -392,7 +405,10 @@ const signalsSchema = z.preprocess(
         .max(10)
         .optional(),
       /** Homework felt moment: proposed learner-safe notice, accepted only after DB-backed evidence checks. */
-      noticed_gap: noticedGapSignalSchema.optional(),
+      noticed_gap: z.preprocess(
+        normalizeNoticedGapDecision,
+        noticedGapSignalSchema.nullable().optional(),
+      ),
       /** Mentor notice re-check verdict, accepted only after DB-backed evidence checks. */
       notice_recheck: noticeRecheckSignalSchema.optional(),
     })

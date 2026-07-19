@@ -333,7 +333,7 @@ function getExchangeEnvelopeInstruction(context: {
       ? ', "challenge_round_evaluation": [ { "concept": "<concept assessed>", "result": "<solid|partial|missing|misconception>", "evidence": "<what the learner demonstrated>", "answerEventId": "<the CURRENT CHALLENGE ANSWER EVENT ID for the learner answer judged>", "learnerQuote": "<short verbatim quote from the learner answer>", "correction": "<optional; the correct idea, only when result is not solid>" } ]'
       : '';
   const mentorNoticeField = context.includeMentorNotice
-    ? ', "noticed_gap": { "concept": "<one concrete concept>", "correctionHint": "<short optional correction hint>", "answerEventId": "<CURRENT LEARNER EVENT ID>", "learnerQuote": "<short verbatim quote from that learner message>" }'
+    ? ', "noticed_gap": { "observed": <bool>, "concept": "<one concrete concept or empty string>", "correctionHint": "<short correction hint or empty string>", "answerEventId": "<CURRENT LEARNER EVENT ID or empty string>", "learnerQuote": "<short verbatim quote or empty string>" }'
     : '';
   const noticeRecheckField = context.includeNoticeRecheck
     ? ', "notice_recheck": { "noticeId": "<ACTIVE NOTICE ID>", "verdict": "<locked_in|not_yet|dismissed|deferred>", "answerEventId": "<CURRENT LEARNER EVENT ID>", "learnerQuote": "<short verbatim quote from that learner message>" }'
@@ -376,7 +376,7 @@ function getExchangeEnvelopeInstruction(context: {
   }
   if (context.includeMentorNotice) {
     signalGuidance.push(
-      "MENTOR NOTICE OBSERVATION: `signals.noticed_gap` is optional. Emit it only for one concrete, durable concept gap demonstrated by the latest learner message. Copy a short verbatim `learnerQuote`, use the supplied CURRENT LEARNER EVENT ID exactly, and keep `correctionHint` short. Finish the learner's homework help first. Do not quiz or re-check the learner now. Do not promise a future check-in in visible prose.",
+      "MENTOR NOTICE OBSERVATION: Always emit `signals.noticed_gap` as a decision. Set `observed` to false when the answer is correct or no concrete durable gap appears; in that case the other fields may be empty strings. A possible follow-up check or extra practice is not evidence of a gap. Set `observed` to true only when the latest learner message proves a concrete durable gap. Signal binding: If your visible reply corrects the learner's answer or reasoning, `observed` must be true. When `observed` is true, copy a short verbatim `learnerQuote`, use the supplied CURRENT LEARNER EVENT ID exactly, name one concrete `concept`, and keep `correctionHint` short. Finish the learner's homework help first. Do not quiz or re-check the learner now. Do not promise a future check-in in visible prose.",
     );
   }
   if (context.includeNoticeRecheck) {
@@ -1492,7 +1492,7 @@ export function buildSystemPromptSegments(
     !context.mentorNoticeRecheck;
   if (mentorNoticeEnabled) {
     volatile.push(
-      `MENTOR NOTICE OBSERVATION\nCURRENT LEARNER EVENT ID: Use "${context.currentUserMessageEventId}" exactly as answerEventId when emitting signals.noticed_gap.\nFinish the learner's homework help first. A noticed gap is a quiet observation, not a new activity. Do not quiz or re-check the learner now. Do not promise a future check-in in the visible reply. Emit at most one concrete concept with a short correction hint and an exact learner quote.`,
+      `MENTOR NOTICE OBSERVATION\nCURRENT LEARNER EVENT ID: Use "${context.currentUserMessageEventId}" exactly as answerEventId when signals.noticed_gap.observed is true.\nFinish the learner's homework help first. A noticed gap is a quiet observation, not a new activity. Always emit \`signals.noticed_gap\` as a decision. Set \`observed\` to false when the answer is correct or no concrete durable gap appears; the other fields may be empty strings. A possible follow-up check or extra practice is not evidence of a gap. Set \`observed\` to true only for a concrete durable gap in the latest learner message. Signal binding: If your visible reply corrects the learner's answer or reasoning, \`observed\` must be true. Do not quiz or re-check the learner now. Do not promise a future check-in in the visible reply. When \`observed\` is true, emit one concrete concept with a short correction hint and an exact learner quote.`,
     );
   }
   if (context.mentorNoticeRecheck && context.currentUserMessageEventId) {

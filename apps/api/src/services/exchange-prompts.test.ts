@@ -388,6 +388,24 @@ describe('buildSystemPrompt — homework mentor notices', () => {
     expect(prompt).toContain("Finish the learner's homework help first");
     expect(prompt).toContain('Do not quiz or re-check the learner now');
     expect(prompt).toContain('Do not promise a future check-in');
+    expect(prompt).toContain(
+      'Set `observed` to false when the answer is correct',
+    );
+    expect(prompt).toContain(
+      'A possible follow-up check or extra practice is not evidence of a gap',
+    );
+    expect(prompt).toContain('Always emit `signals.noticed_gap` as a decision');
+    expect(prompt).toContain(
+      "If your visible reply corrects the learner's answer or reasoning, `observed` must be true",
+    );
+    const responseFormat = prompt.slice(
+      prompt.indexOf('RESPONSE FORMAT — CRITICAL:'),
+      prompt.indexOf('Signal guidance:'),
+    );
+    expect(responseFormat).toContain('"noticed_gap": { "observed": <bool>');
+    expect(prompt).toContain(
+      'When `observed` is true, copy a short verbatim `learnerQuote`',
+    );
   });
 
   it.each([

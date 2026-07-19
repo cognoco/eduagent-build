@@ -781,6 +781,16 @@ describe('mentor notice envelope fields', () => {
     expect(parsed.signals?.noticed_gap?.answerEventId).toBe(answerEventId);
   });
 
+  it('accepts an explicit null noticed_gap when no gap was observed', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'That answer is correct.',
+      signals: { noticed_gap: null },
+    });
+
+    expect(parsed.signals?.noticed_gap).toBeNull();
+    expect(normaliseSignals(parsed.signals).noticed_gap).toBeNull();
+  });
+
   it('rejects a noticed_gap proposal without learner evidence', () => {
     expect(
       llmResponseEnvelopeSchema.safeParse({

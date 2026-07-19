@@ -55,6 +55,36 @@ describe('homeworkNoticeFlow', () => {
     ).resolves.toBeNull();
   });
 
+  it('treats observed=false as no noticed gap in the quality gate', async () => {
+    const profile = PROFILES[0];
+    if (!profile) throw new Error('Expected at least one eval profile');
+    const scenario = (
+      homeworkNoticeFlow.enumerateScenarios?.(profile) ?? []
+    ).find((candidate) => candidate.scenarioId === 'clean-homework');
+    if (!scenario) throw new Error('Expected the clean-homework eval scenario');
+
+    const issues = await homeworkNoticeFlow.evaluateQuality?.({
+      input: scenario.input,
+      messages: homeworkNoticeFlow.buildPrompt(scenario.input),
+      profile,
+      scenarioId: scenario.scenarioId,
+      liveResponse: JSON.stringify({
+        reply: 'That is correct.',
+        signals: {
+          noticed_gap: {
+            observed: false,
+            concept: '',
+            correctionHint: '',
+            answerEventId: '',
+            learnerQuote: '',
+          },
+        },
+      }),
+    });
+
+    expect(issues).toEqual([]);
+  });
+
   it('flags provenance failures and visible future promises', async () => {
     const profile = PROFILES[0];
     if (!profile) throw new Error('Expected at least one eval profile');

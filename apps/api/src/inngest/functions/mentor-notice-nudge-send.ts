@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (profileId from event scopes all notice reads and writes)
 import { inngest } from '../client';
 import { getStepDatabase, getStepMentorNoticeEnabled } from '../helpers';
 import {
