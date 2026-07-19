@@ -164,6 +164,14 @@ function feed(cards: NowCard[], overflowCount = 0): NowResponse {
   };
 }
 
+function firstCallOrder(mockFn: jest.Mock): number {
+  const order = mockFn.mock.invocationCallOrder[0];
+  if (order === undefined) {
+    throw new Error('expected mock to have been called');
+  }
+  return order;
+}
+
 function renderMentorScreen(
   profileOverrides: Pick<RenderScreenOptions, 'profile' | 'profiles'> = {},
 ): void {
@@ -295,9 +303,9 @@ describe('MentorScreen', () => {
       kind: 'supporter-hub',
     });
     expect(mockPush).toHaveBeenCalledWith('/(app)/mentor');
-    expect(
-      mockScopeContext.setActiveScope.mock.invocationCallOrder[0],
-    ).toBeLessThan(mockPush.mock.invocationCallOrder[0]);
+    expect(firstCallOrder(mockScopeContext.setActiveScope)).toBeLessThan(
+      firstCallOrder(mockPush),
+    );
   });
 
   // [WI-2223 AC-3] the Support-hub Mentor surface and the Me Mentor surface

@@ -95,6 +95,14 @@ jest.mock(
   }),
 );
 
+function firstCallOrder(mockFn: jest.Mock): number {
+  const order = mockFn.mock.invocationCallOrder[0];
+  if (order === undefined) {
+    throw new Error('expected mock to have been called');
+  }
+  return order;
+}
+
 function query<T>(data: T) {
   return {
     data,
@@ -317,8 +325,8 @@ describe('JournalTabView', () => {
 
     expect(mockSetActiveScope).toHaveBeenCalledWith({ kind: 'supporter-hub' });
     expect(mockPush).toHaveBeenCalledWith('/(app)/mentor');
-    expect(mockSetActiveScope.mock.invocationCallOrder[0]).toBeLessThan(
-      mockPush.mock.invocationCallOrder[0],
+    expect(firstCallOrder(mockSetActiveScope)).toBeLessThan(
+      firstCallOrder(mockPush),
     );
   });
 

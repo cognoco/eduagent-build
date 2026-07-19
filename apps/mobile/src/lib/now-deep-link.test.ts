@@ -18,13 +18,20 @@ const personScope = {
   displayName: 'Emma',
 };
 
+function firstCallOrder(mockFn: jest.Mock): number {
+  const order = mockFn.mock.invocationCallOrder[0];
+  if (order === undefined) {
+    throw new Error('expected mock to have been called');
+  }
+  return order;
+}
+
 function scopeWrapperFor(scopeList: SupporterScopeList) {
   return function Wrapper({ children }: { children: ReactNode }) {
-    return React.createElement(
-      ScopeContextProvider,
-      { initialScopeList: scopeList },
+    return React.createElement(ScopeContextProvider, {
+      initialScopeList: scopeList,
       children,
-    );
+    });
   };
 }
 
@@ -191,8 +198,8 @@ describe('pushNowDeepLink', () => {
 
     expect(setActiveScope).toHaveBeenCalledWith({ kind: 'supporter-hub' });
     expect(router.push).toHaveBeenCalledWith('/(app)/mentor');
-    expect(setActiveScope.mock.invocationCallOrder[0]).toBeLessThan(
-      router.push.mock.invocationCallOrder[0],
+    expect(firstCallOrder(setActiveScope)).toBeLessThan(
+      firstCallOrder(router.push),
     );
   });
 
