@@ -1,13 +1,14 @@
 name: E2E Web
 
-# Secret-backed Playwright smoke. The 'Playwright web smoke' job is the required
-# branch-protection check and reports an HONEST result in every case:
-#   - trusted same-repo PR that touches the web/mobile surface -> the real smoke
-#     suite runs and the required check gates on its actual outcome;
+# Secret-backed Playwright release coverage. The 'Playwright web smoke' job is
+# the required branch-protection check and reports an HONEST result in every case:
+#   - trusted same-repo PR that touches the web/mobile surface -> the isolated
+#     v2-release project runs and the required check gates on its actual outcome;
 #   - fork/untrusted PR (secrets unavailable) -> pass-through (cannot run a
-#     secret-bearing smoke; reviewers run it via workflow_dispatch after review);
+#     secret-bearing gate; reviewers run it via workflow_dispatch after review);
 #   - PR with no web/mobile surface changes -> pass-through report (~seconds);
-#   - manual workflow_dispatch -> the real smoke suite always runs.
+#   - manual workflow_dispatch -> the V2 gate always runs.
+# Legacy smoke runs afterward in the same prepared job as a visible advisory step.
 on:
   pull_request:
     branches:
@@ -54,11 +55,11 @@ jobs:
           # Same-repo PRs are trusted (secrets are exposed to them); forks are not.
           IS_SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         run: |
-          # Manual dispatch always runs the full suite (secrets available).
+          # Manual dispatch always runs the V2 gate (secrets available).
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "trusted=true" >> "$GITHUB_OUTPUT"
             echo "run-real=true" >> "$GITHUB_OUTPUT"
-            echo "Manual dispatch — running full E2E suite"
+            echo "Manual dispatch — running the V2 release gate"
             exit 0
           fi
 
@@ -80,7 +81,7 @@ jobs:
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             case "$f" in
-              apps/*|packages/*|pnpm-lock.yaml|.github/workflows/e2e-web.yml|scripts/playwright-staging-gate*)
+              apps/*|packages/*|package.json|pnpm-lock.yaml|.github/workflows/e2e-web.yml|scripts/playwright-staging-gate*)
                 SURFACE_CHANGED=true
                 break
                 ;;
@@ -95,13 +96,15 @@ jobs:
     needs: changes
     if: needs.changes.outputs.run-real == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Preserve the original 20-minute setup/V2 budget and reserve bounded
+    # headroom for the advisory legacy step plus cleanup/artifact handling.
+    timeout-minutes: 30
     env:
       CI: true
       PLAYWRIGHT_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
       # [BUG-239] Non-secret config still surfaced via env: so workflow logs
       # can show what we're pointing at. The seed secret / Clerk secret are
-      # injected via Doppler at runtime (see "Run Playwright smoke suite"
+      # injected via Doppler at runtime (see "Run V2 release Playwright gate"
       # below) instead of being read straight from GitHub Actions secrets —
       # the local-vs-CI parity rule in memory project_playwright_e2e_setup.md
       # is "always run with doppler -c stg so TEST_SEED_SECRET matches the
@@ -185,7 +188,7 @@ jobs:
             exit 1
           fi
 
-      - name: Run Playwright smoke suite (via doppler run -c stg)
+      - name: Run V2 release Playwright gate
         # The classifier artifact root below mirrors `outputDir` in
         # apps/mobile/playwright.config.ts; update both locations together.
         env:
@@ -211,7 +214,7 @@ jobs:
               exit \$?; \
             fi; \
             set +e; \
-            pnpm run test:e2e:web:smoke > \"\${RUNNER_TEMP}/playwright-result.log\" 2>&1; \
+            pnpm run test:e2e:web:v2 > \"\${RUNNER_TEMP}/playwright-result.log\" 2>&1; \
             SUITE_STATUS=\$?; \
             cat \"\${RUNNER_TEMP}/playwright-result.log\"; \
             set -e; \
@@ -223,6 +226,37 @@ jobs:
             cat \"\${CLASSIFY_STATE_FILE}\"; \
             FAILURE_CLASS=\$(cut -d= -f2 \"\${CLASSIFY_STATE_FILE}\"); \
             node scripts/playwright-staging-gate.cjs --decide \"\${PRE_STATE}\" \"\${POST_STATE}\" \"\${FAILURE_CLASS}\" \"\${SUITE_STATUS}\""
+
+      - name: Upload V2 Playwright artifacts
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: playwright-web-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/mobile/e2e-web/playwright-report
+            apps/mobile/e2e-web/test-results
+          retention-days: 14
+
+      - name: Run legacy Playwright smoke (advisory)
+        id: legacy-smoke
+        if: ${{ always() && !cancelled() }}
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+        run: |
+          if [ -z "${DOPPLER_TOKEN:-}" ]; then
+            echo "::error title=Doppler token missing::DOPPLER_TOKEN_STG is not set; legacy Playwright smoke cannot use the staging seed contract."
+            exit 1
+          fi
+          doppler run -p mentomate -c stg --command "\
+            export PLAYWRIGHT_TEST_SEED_SECRET=\"\$TEST_SEED_SECRET\"; \
+            export CLERK_SECRET_KEY=\"\$CLERK_SECRET_KEY\"; \
+            export PLAYWRIGHT_API_URL=\"${PLAYWRIGHT_API_URL}\"; \
+            export PLAYWRIGHT_ARTIFACT_LANE=legacy; \
+            pnpm run test:e2e:web:smoke"
 
       # [BUG-979 / CCR-PR123-M-3] Reset seeded staging accounts independently
       # of Playwright's globalTeardown. Reason: this workflow uses
@@ -265,40 +299,22 @@ jobs:
             "${PLAYWRIGHT_API_URL}/v1/__test/reset?prefix=${PREFIX}" \
             || echo "::warning::seed reset returned non-2xx; nightly cleanup will sweep"
 
-      - name: Upload Playwright artifacts
-        if: always()
+      - name: Upload legacy Playwright artifacts
+        if: ${{ always() && (steps.legacy-smoke.outcome == 'success' || steps.legacy-smoke.outcome == 'failure') }}
+        continue-on-error: true
+        timeout-minutes: 2
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: playwright-web-smoke
+          name: playwright-web-legacy-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            apps/mobile/e2e-web/playwright-report
-            apps/mobile/e2e-web/test-results
+            apps/mobile/e2e-web/playwright-report-legacy
+            apps/mobile/e2e-web/test-results-legacy
           retention-days: 14
 
-  # Required branch-protection check. Intentional, documented PASS-THROUGH:
-  # it reports the required check name and exits 0; it does NOT gate on the
-  # run-smoke result.
-  #
-  # Why a pass-through and not a hard gate on the real smoke: the secret-backed
-  # Playwright staging smoke is ADVISORY-ONLY today. DOPPLER_TOKEN_STG IS
-  # provisioned as a GitHub Actions secret (proven by WI-796), so run-smoke
-  # genuinely runs against staging on every trusted web-surface PR — it is NOT
-  # un-runnable. The reason it stays advisory is suite stability against a live
-  # staging target, not a missing secret. Hard-gating the required check on it
-  # would let staging flake / data drift block all web PRs repo-wide — worse than
-  # the gap this check addresses. So run-smoke runs as its own advisory check
-  # (red is visible to reviewers but does not block), and this required check
-  # stays a pass-through.
-  #
-  # This is NOT the original always-green-by-accident bug: that one had the
-  # required check silently pass because run-smoke was skipped with no signal.
-  # Here run-smoke genuinely runs for trusted web-surface PRs and surfaces its
-  # real result as an advisory check; the pass-through is a deliberate policy.
-  # Promoting the smoke to a hard gate is a separate future effort, blocked on
-  # stabilizing the suite against a live staging target.
-  #
-  # The change-detection outputs (trusted / run-real) are used only to print an
-  # accurate status message — they never affect the exit code.
+  # Required branch-protection check. Trusted surface changes and manual
+  # dispatches hard-gate on the isolated v2-release result. Fork/untrusted PRs
+  # and trusted PRs with no web/mobile surface remain explicit pass-throughs.
+  # Legacy smoke is advisory inside run-smoke and cannot alter its job result.
   smoke:
     name: Playwright web smoke
     if: always()
@@ -313,14 +329,29 @@ jobs:
           RUN_REAL: ${{ needs.changes.outputs.run-real }}
           TRUSTED: ${{ needs.changes.outputs.trusted }}
         run: |
-          if [[ "$RUN_REAL" == "true" ]]; then
-            echo "Advisory Playwright smoke ran (result: $SMOKE_RESULT). It is advisory-only;"
-            echo "see the run-smoke check for its real outcome. This required check does not"
-            echo "gate on it (the smoke is advisory until the suite is stabilized against the"
-            echo "live staging target). Required check passes."
-          elif [[ "$TRUSTED" == "false" ]]; then
-            echo "Fork/untrusted PR — secret-backed smoke cannot run; validate via workflow_dispatch after review. Required check passes."
-          else
-            echo "No web/mobile surface changes — advisory smoke not run. Required check passes."
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
+            echo "::error::E2E change detection did not succeed (result: $CHANGES_RESULT)."
+            exit 1
           fi
-          exit 0
+
+          if [[ "$RUN_REAL" == "true" ]]; then
+            if [[ "$SMOKE_RESULT" != "success" ]]; then
+              echo "::error::V2 release Playwright gate did not succeed (result: $SMOKE_RESULT)."
+              exit 1
+            fi
+            echo "V2 release Playwright gate succeeded. Required check passes."
+            exit 0
+          fi
+
+          if [[ "$TRUSTED" == "false" ]]; then
+            echo "Fork/untrusted PR — secret-backed V2 gate cannot run; validate via workflow_dispatch after review. Required check passes."
+            exit 0
+          fi
+
+          if [[ "$RUN_REAL" == "false" && "$TRUSTED" == "true" ]]; then
+            echo "No web/mobile surface changes — V2 gate not run. Required check passes."
+            exit 0
+          fi
+
+          echo "::error::Invalid E2E gate outputs: run-real=$RUN_REAL trusted=$TRUSTED"
+          exit 1

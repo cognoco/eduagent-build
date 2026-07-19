@@ -843,20 +843,20 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
   // the pre-suite early exit; classifyFailure never emits it.
   it.each([
     [
-      'preflight unavailable neutral',
+      'preflight unavailable without suite execution fails closed',
       GATE_STATES.UNAVAILABLE,
       GATE_STATES.NOT_RUN,
       'not-run',
       0,
-      0,
+      1,
     ],
     [
-      'preflight unavailable not-run failure neutral',
+      'preflight unavailable with a nonzero workflow exit fails closed',
       GATE_STATES.UNAVAILABLE,
       GATE_STATES.NOT_RUN,
       'not-run',
       1,
-      0,
+      1,
     ],
     [
       'preflight not-run fail closed',
