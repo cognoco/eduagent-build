@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { InngestTestEngine } from '@inngest/test';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
@@ -44,6 +45,8 @@ const emailApiCalls: Array<{
 }> = [];
 const originalFetch = globalThis.fetch;
 const originalResendApiKey = process.env['RESEND_API_KEY'];
+let expoPushResponseStatus = 200;
+let expoPushTicketId = 'ticket-integration';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -268,6 +271,17 @@ async function seedWeeklyEmailPrefs(profileId: string): Promise<void> {
   });
 }
 
+async function seedWeeklyPushAndEmailPrefs(profileId: string): Promise<void> {
+  await db.insert(notificationPreferences).values({
+    profileId,
+    weeklyProgressEmail: true,
+    weeklyProgressPush: true,
+    pushEnabled: true,
+    maxDailyPush: 3,
+    expoPushToken: 'ExponentPushToken[integration]',
+  });
+}
+
 async function seedFamilyLink(
   parentProfileId: string,
   childProfileId: string,
@@ -307,6 +321,48 @@ async function seedSubject(input: {
     profileId: input.profileId,
     name: input.name,
   });
+}
+
+async function seedWeeklyDeliveryScenario(): Promise<{
+  guardianPersonId: string;
+  chargePersonId: string;
+}> {
+  const { profileId: guardianPersonId } = await seedProfile({
+    displayName: 'Delivery Guardian',
+    timezone: 'UTC',
+  });
+  const { profileId: chargePersonId } = await seedProfile({
+    displayName: 'Delivery Charge',
+    timezone: 'UTC',
+    credentialed: false,
+  });
+  await seedFamilyLink(guardianPersonId, chargePersonId);
+  await seedWeeklyPushAndEmailPrefs(guardianPersonId);
+
+  const latestSnapshotDate = isoDate(new Date());
+  const previousSnapshotDate = isoDate(
+    subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7),
+  );
+  await seedSnapshot({
+    profileId: chargePersonId,
+    snapshotDate: previousSnapshotDate,
+    metrics: buildProgressMetrics({
+      totalSessions: 1,
+      topicsMastered: 1,
+      vocabularyTotal: 5,
+    }),
+  });
+  await seedSnapshot({
+    profileId: chargePersonId,
+    snapshotDate: latestSnapshotDate,
+    metrics: buildProgressMetrics({
+      totalSessions: 3,
+      topicsMastered: 4,
+      vocabularyTotal: 9,
+    }),
+  });
+
+  return { guardianPersonId, chargePersonId };
 }
 
 function migrationStatements(path: string): string[] {
@@ -413,8 +469,16 @@ beforeAll(async () => {
         body: body.body as string,
         data: body.data,
       });
+      if (expoPushResponseStatus !== 200) {
+        return new Response(JSON.stringify({ error: 'push unavailable' }), {
+          status: expoPushResponseStatus,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       return new Response(
-        JSON.stringify({ data: { id: 'ticket-integration', status: 'ok' } }),
+        JSON.stringify({
+          data: { id: expoPushTicketId, status: 'ok' },
+        }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
     }
@@ -447,6 +511,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   pushApiCalls.length = 0;
   emailApiCalls.length = 0;
+  expoPushResponseStatus = 200;
+  expoPushTicketId = 'ticket-integration';
 });
 
 afterAll(async () => {
@@ -479,6 +545,114 @@ afterAll(async () => {
 }, 30_000);
 
 describe('weekly progress push integration', () => {
+  describe('[WI-1997] push delivery controls the email fallback', () => {
+    it('restores a delivered-but-unlogged push result across durable replay and suppresses email', async () => {
+      const { guardianPersonId } = await seedWeeklyDeliveryScenario();
+      // PostgreSQL text rejects NUL. The external Expo boundary still reports a
+      // successful ticket, then the real notificationLog insert throws and the
+      // real push service returns { sent: true, reason: 'log_write_failed' }.
+      expoPushTicketId = 'ticket-delivered-but-unlogged\u0000';
+
+      const event = {
+        name: 'app/weekly-progress-push.generate',
+        data: { parentId: guardianPersonId },
+      };
+      const pushEngine = new InngestTestEngine({
+        function: weeklyProgressPushGenerate,
+        events: [event],
+      });
+      const pushCheckpoint = await pushEngine.executeStep(
+        'send-weekly-progress-push',
+      );
+
+      // Persist every completed step output through JSON, then start a fresh
+      // engine from only that serialized durable state. The email gate cannot
+      // see an in-memory pushResult from the first engine.
+      const serializedCompletedSteps = JSON.parse(
+        JSON.stringify(
+          await Promise.all([
+            ...Object.entries(pushCheckpoint.state).map(
+              async ([id, dataPromise]) => ({ id, data: await dataPromise }),
+            ),
+            Promise.resolve({
+              id: pushCheckpoint.step.id,
+              data: pushCheckpoint.result,
+            }),
+          ]),
+        ),
+      ) as Array<{ id: string; data: unknown }>;
+      expect(serializedCompletedSteps).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            data: expect.objectContaining({
+              sent: true,
+              reason: 'log_write_failed',
+            }),
+          }),
+        ]),
+      );
+
+      const replayEngine = new InngestTestEngine({
+        function: weeklyProgressPushGenerate,
+        events: [event],
+        steps: serializedCompletedSteps.map(({ id, data }) => ({
+          id,
+          idIsHashed: true,
+          handler: () => data,
+        })),
+      });
+      const { result, state: replayState } = await replayEngine.execute();
+
+      expect(result).toEqual({
+        status: 'completed',
+        parentId: guardianPersonId,
+      });
+      expect(await Promise.all(Object.values(replayState))).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            sent: true,
+            reason: 'log_write_failed',
+          }),
+          { sent: false, reason: 'push_sent' },
+        ]),
+      );
+      expect(pushApiCalls).toHaveLength(1);
+      expect(emailApiCalls).toHaveLength(0);
+      const storedNotifications = await db.query.notificationLog.findMany({
+        where: and(
+          eq(notificationLog.profileId, guardianPersonId),
+          eq(notificationLog.type, 'weekly_progress'),
+        ),
+      });
+      expect(storedNotifications).toHaveLength(0);
+    });
+
+    it('sends fallback email when push genuinely fails', async () => {
+      const { guardianPersonId } = await seedWeeklyDeliveryScenario();
+      expoPushResponseStatus = 503;
+
+      const result = await executeGenerateHandler(guardianPersonId);
+
+      expect(result).toEqual({
+        status: 'completed',
+        parentId: guardianPersonId,
+      });
+      expect(pushApiCalls).toHaveLength(1);
+      expect(emailApiCalls).toHaveLength(1);
+    });
+
+    it('does not re-send a successful fallback email on retry', async () => {
+      const { guardianPersonId } = await seedWeeklyDeliveryScenario();
+      expoPushResponseStatus = 503;
+
+      await executeGenerateHandler(guardianPersonId);
+      await executeGenerateHandler(guardianPersonId);
+
+      expect(pushApiCalls).toHaveLength(1);
+      expect(emailApiCalls).toHaveLength(1);
+    });
+  });
+
   it('queues only parents whose real account timezone resolves to local 9am', async () => {
     const now = new Date();
     const matchingTimezone = findTimezoneForHour(9, now);

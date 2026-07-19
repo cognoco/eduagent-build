@@ -33,7 +33,11 @@ import {
   type EligibleManagedPerson,
 } from '../../hooks/use-eligible-supportees';
 import { useAnnounce } from '../../hooks/use-announce';
-import { useNowFeed, useNowOverflow } from '../../hooks/use-now-feed';
+import {
+  useMentorNoticeActions,
+  useNowFeed,
+  useNowOverflow,
+} from '../../hooks/use-now-feed';
 import { useSubjectsIndex } from '../../hooks/use-subjects-index';
 import { matchBarIntent } from '../../lib/bar-intent-match';
 import { hasFirstRealState } from '../../lib/first-real-state';
@@ -97,6 +101,7 @@ function pushMentorHomeworkCamera(router: ReturnType<typeof useRouter>): void {
 function LearnerMentorScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
+  const { setActiveScope } = useScopeContext();
   const announce = useAnnounce();
   const { width: windowWidth } = useWindowDimensions();
   const nowFeed = useNowFeed();
@@ -143,6 +148,7 @@ function LearnerMentorScreen(): React.ReactElement {
     announce(clarificationAnnouncement);
   }, [announce, clarificationAnnouncement, clarificationRevision]);
   const overflow = useNowOverflow(showOverflow);
+  const mentorNoticeActions = useMentorNoticeActions();
   const feed = nowFeed.data ?? nowFeed.fallbackFeed ?? undefined;
   const firstRealState = hasFirstRealState({
     // Count ACTIVE subjects only. useSubjectsIndex now surfaces every status
@@ -166,15 +172,50 @@ function LearnerMentorScreen(): React.ReactElement {
   const getArcState = (card: NowCard): NowCardArcState | undefined =>
     cardArcStates[getNowCardDismissKey(card)];
 
-  const handleContinue = (card: NowCard): void => {
+  const handleContinue = async (card: NowCard): Promise<void> => {
     setArcState(card, 'advancing');
+    if (card.kind === 'mentor_notice') {
+      const noticeId = card.deepLink.params.noticeId;
+      if (!noticeId) {
+        await mentorNoticeActions.invalidate();
+        setArcState(card, 'due');
+        return;
+      }
+      try {
+        const result = await mentorNoticeActions.recheck.mutateAsync(noticeId);
+        router.push(
+          `/(app)/session?sessionId=${encodeURIComponent(result.sessionId)}` as Href,
+        );
+      } catch (error) {
+        if ((error as { status?: number }).status === 409) {
+          await mentorNoticeActions.invalidate();
+        }
+        setArcState(card, 'due');
+      }
+      return;
+    }
     pushNowDeepLink(router, card.deepLink, {
       subjectHubTarget: 'v2-subject-hub',
       returnTo: MENTOR_RETURN_TO,
+      setActiveScope,
     });
   };
 
-  const handleDecline = (card: NowCard): void => {
+  const handleDecline = async (card: NowCard): Promise<void> => {
+    if (card.kind === 'mentor_notice') {
+      const noticeId = card.deepLink.params.noticeId;
+      if (!noticeId) {
+        await mentorNoticeActions.invalidate();
+        return;
+      }
+      try {
+        await mentorNoticeActions.defer.mutateAsync(noticeId);
+      } catch (error) {
+        if ((error as { status?: number }).status === 409) {
+          await mentorNoticeActions.invalidate();
+        }
+      }
+    }
     setDismissedKeys((current) => {
       const next = new Set(current);
       next.add(getNowCardDismissKey(card));
@@ -212,6 +253,7 @@ function LearnerMentorScreen(): React.ReactElement {
       pushNowDeepLink(router, result.deepLink, {
         subjectHubTarget: 'v2-subject-hub',
         returnTo: MENTOR_RETURN_TO,
+        setActiveScope,
       });
       return;
     }
@@ -293,6 +335,7 @@ function LearnerMentorScreen(): React.ReactElement {
         pushNowDeepLink(router, resumeLink, {
           subjectHubTarget: 'v2-subject-hub',
           returnTo: MENTOR_RETURN_TO,
+          setActiveScope,
         });
         return;
       }

@@ -6,6 +6,7 @@ export type NowScope = z.infer<typeof nowScopeSchema>;
 export const nowCardKindSchema = z.enum([
   'billing_alert',
   'unfinished_session',
+  'mentor_notice',
   'retention_due',
   'parked_item',
   'needs_deepening',
@@ -21,6 +22,7 @@ export const nowDeepLinkRouteSchema = z.enum([
   'billing.manage',
   'session.resume',
   'session.summary',
+  'notice.recheck',
   'subject.topic',
   'subject.hub',
   'retention.review',
@@ -47,6 +49,7 @@ export const nowCardParamsSchema = z.record(z.string(), z.unknown()).and(
     subjectId: z.string().uuid().optional(),
     bookId: z.string().uuid().optional(),
     topicId: z.string().uuid().optional(),
+    noticeId: z.string().uuid().optional(),
   }),
 );
 export type NowCardParams = z.infer<typeof nowCardParamsSchema>;

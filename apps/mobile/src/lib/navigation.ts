@@ -14,6 +14,9 @@ export const JOURNAL_RETURN_TO = 'journal';
 export const JOURNAL_HREF = '/(app)/journal';
 export const MENTOR_RETURN_TO = 'mentor';
 export const MENTOR_HREF = '/(app)/mentor';
+export const SUBJECTS_RETURN_TO = 'subjects';
+export const SUBJECTS_HREF = '/(app)/subjects';
+export const SETTINGS_RETURN_TO = 'settings';
 export const FAMILY_RECAPS_RETURN_TO = 'family-recaps';
 export const FAMILY_RECAPS_HREF = '/(app)/recaps';
 export const FAMILY_PROGRESS_RETURN_TO = 'family-progress';
@@ -22,6 +25,19 @@ export const STUDY_PROGRESS_RETURN_TO = 'study-progress';
 export const STUDY_PROGRESS_HREF = '/(app)/progress';
 export const FAMILY_CHILDREN_RETURN_TO = 'family-children';
 export const FAMILY_CHILDREN_HREF = '/(app)/home';
+
+export function isSessionForwardableReturnTo(
+  returnTo: string | undefined,
+): returnTo is
+  | typeof SUBJECTS_RETURN_TO
+  | typeof LEARNER_HOME_RETURN_TO
+  | typeof OWN_LEARNING_RETURN_TO {
+  return (
+    returnTo === SUBJECTS_RETURN_TO ||
+    returnTo === LEARNER_HOME_RETURN_TO ||
+    returnTo === OWN_LEARNING_RETURN_TO
+  );
+}
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -51,6 +67,7 @@ export function homeHrefForReturnTo(
   if (token === PRACTICE_RETURN_TO) return PRACTICE_HREF as Href;
   if (token === JOURNAL_RETURN_TO) return JOURNAL_HREF as Href;
   if (token === MENTOR_RETURN_TO) return MENTOR_HREF as Href;
+  if (token === SUBJECTS_RETURN_TO) return SUBJECTS_HREF as Href;
   if (token === FAMILY_RECAPS_RETURN_TO && id) {
     return {
       pathname: '/(app)/recaps/[recapId]',

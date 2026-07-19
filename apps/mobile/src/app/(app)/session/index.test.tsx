@@ -4,6 +4,7 @@ import { Alert } from 'react-native';
 import { fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { QuotaExceededError } from '../../../lib/api-client';
+import * as Sentry from '@sentry/react-native';
 import {
   fetchCallsMatching,
   extractJsonBody,
@@ -195,6 +196,17 @@ jest.mock(
           ],
         },
       },
+      [`/sessions/${SESSION_ID}/summary`]: {
+        summary: {
+          id: '80000000-0000-4000-8000-000000000001',
+          sessionId: SESSION_ID,
+          content: 'I learned that equations stay balanced on both sides.',
+          aiFeedback: null,
+          status: 'accepted',
+          baseXp: 12,
+          reflectionBonusXp: 6,
+        },
+      },
       '/sessions': { session: { id: SESSION_ID } },
       '/homework-state': {
         metadata: { problemCount: 2, currentProblemIndex: 0, problems: [] },
@@ -327,12 +339,13 @@ function renderSessionScreen(profile = ACTIVE_PROFILE) {
 }
 
 // ---------------------------------------------------------------------------
-// Session hook mocks (use-sessions stays mocked because useStreamMessage's
+// Session hook mocks (most of use-sessions stays mocked because useStreamMessage's
 // `stream` runs over XHR via streamSSEViaXHR — it bypasses useApiClient and
 // cannot be intercepted through the routed mock fetch. The synthetic
 // onChunk/onDone payloads driven through mockStream (challengeRound /
 // draftedNote / fallback / quota) are this suite's primary control surface, so
-// the whole use-sessions mutation/query set is kept together for consistency.)
+// the stream-dependent mutation/query set stays synthetic. useSubmitSummary
+// remains real so its TanStack state and fetch/parser boundary are exercised.)
 // ---------------------------------------------------------------------------
 
 const mockStartSession = jest.fn();
@@ -343,7 +356,6 @@ const mockRecordSystemPrompt = jest.fn();
 const mockRecordSessionEvent = jest.fn();
 const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
-const mockSubmitSummary = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
 
@@ -373,6 +385,7 @@ const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
 jest.mock(
   '../../../hooks/use-sessions' /* gc1-allow: useStreamMessage streams over XHR (bypasses useApiClient); synthetic onDone payloads are the test control surface */,
   () => ({
+    ...jest.requireActual('../../../hooks/use-sessions'),
     useSession: () => ({ data: null }),
     useStartSession: () => ({
       mutateAsync: mockStartSession,
@@ -393,11 +406,6 @@ jest.mock(
     useRecordSessionEvent: () => ({ mutateAsync: mockRecordSessionEvent }),
     useSetSessionInputMode: () => ({ mutateAsync: mockSetSessionInputMode }),
     useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
-    useSubmitSummary: () => ({
-      mutateAsync: mockSubmitSummary,
-      isPending: false,
-      isError: false,
-    }),
     useParkingLot: () => ({ data: [], isLoading: false }),
     useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
   }),
@@ -766,9 +774,9 @@ describe('SessionScreen homework flow', () => {
     mockFlagSessionContent.mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
     });
-    mockSubmitSummary.mockResolvedValue({
+    mockFetch.setRoute(`/sessions/${SESSION_ID}/summary`, {
       summary: {
-        id: 'summary-1',
+        id: '80000000-0000-4000-8000-000000000001',
         sessionId: SESSION_ID,
         content: 'I learned that equations stay balanced on both sides.',
         aiFeedback: null,
@@ -2729,6 +2737,33 @@ describe('SessionScreen homework flow', () => {
       return testScreen;
     }
 
+    async function renderFirstSessionWrapUp() {
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+      const testScreen = await renderAndCloseFreeformSession({
+        mode: 'freeform',
+        entrySource: 'mentor',
+        returnTo: 'mentor',
+      });
+
+      await waitFor(() => {
+        testScreen.getByTestId('first-session-wrap-up');
+      });
+
+      return testScreen;
+    }
+
+    const firstSessionReflection =
+      'I learned that balancing equations keeps both sides equal.';
+
+    function enterFirstSessionReflection(
+      testScreen: ReturnType<typeof renderSessionScreen>,
+    ) {
+      fireEvent.changeText(
+        testScreen.getByTestId('first-session-reflection-input'),
+        firstSessionReflection,
+      );
+    }
+
     it('navigates to summary without filing prompt when a freeform session is closed', async () => {
       const testScreen = await renderAndCloseFreeformSession();
 
@@ -2745,17 +2780,8 @@ describe('SessionScreen homework flow', () => {
       testScreen.unmount();
     }, 15000);
 
-    it('renders the V2 first-session Mentor wrap-up and saves Your Words through the summary boundary', async () => {
-      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
-      const testScreen = await renderAndCloseFreeformSession({
-        mode: 'freeform',
-        entrySource: 'mentor',
-        returnTo: 'mentor',
-      });
-
-      await waitFor(() => {
-        testScreen.getByTestId('first-session-wrap-up');
-      });
+    it('[WI-2095] renders the reflection receipt and settles saving after a successful submit', async () => {
+      const testScreen = await renderFirstSessionWrapUp();
 
       expect(mockReplace).not.toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2766,18 +2792,20 @@ describe('SessionScreen homework flow', () => {
         testScreen.getByText(/I'll remember what you write here/),
       ).toBeTruthy();
 
-      const reflection =
-        'I learned that balancing equations keeps both sides equal.';
-      fireEvent.changeText(
-        testScreen.getByTestId('first-session-reflection-input'),
-        reflection,
-      );
+      enterFirstSessionReflection(testScreen);
       fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
 
       await waitFor(() => {
-        expect(mockSubmitSummary).toHaveBeenCalledWith({
-          content: reflection,
-        });
+        expect(
+          fetchCallsMatching(mockFetch, `/sessions/${SESSION_ID}/summary`),
+        ).toHaveLength(1);
+      });
+      const [summaryCall] = fetchCallsMatching(
+        mockFetch,
+        `/sessions/${SESSION_ID}/summary`,
+      );
+      expect(extractJsonBody(summaryCall?.init)).toEqual({
+        content: firstSessionReflection,
       });
 
       // The reward receipt renders on a state update that settles a tick after
@@ -2792,7 +2820,174 @@ describe('SessionScreen homework flow', () => {
       expect(
         testScreen.getAllByText(/You chose the next step/).length,
       ).toBeGreaterThan(0);
+      expect(testScreen.queryByText('Saving...')).toBeNull();
       testScreen.unmount();
+    }, 15000);
+
+    it('[WI-2095] shows localized retry feedback and settles saving after a 5xx failure', async () => {
+      mockFetch.setRoute(
+        `/sessions/${SESSION_ID}/summary`,
+        new Response(JSON.stringify({ error: 'Server error' }), {
+          status: 500,
+        }),
+      );
+      const testScreen = await renderFirstSessionWrapUp();
+
+      enterFirstSessionReflection(testScreen);
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+
+      await waitFor(() => {
+        expect(
+          testScreen.getByText(
+            "Couldn't save your summary. Check your connection and try again — your work won't be lost.",
+          ),
+        ).toBeTruthy();
+      });
+      expect(testScreen.queryByText('Saving...')).toBeNull();
+      expect(
+        testScreen.getByTestId('first-session-reflection-input').props.value,
+      ).toBe(firstSessionReflection);
+      expect(
+        testScreen.getByTestId('first-session-wrap-submit'),
+      ).not.toBeDisabled();
+      testScreen.unmount();
+    }, 15000);
+
+    it('[WI-2095] times out a stalled reflection request and shows localized retry feedback', async () => {
+      mockFetch.setRoute(
+        `/sessions/${SESSION_ID}/summary`,
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(
+                new DOMException('The operation was aborted', 'AbortError'),
+              );
+            });
+          }),
+      );
+      const testScreen = await renderFirstSessionWrapUp();
+
+      enterFirstSessionReflection(testScreen);
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(35_000);
+      });
+
+      expect(
+        testScreen.getByText(
+          "Couldn't save your summary. Check your connection and try again — your work won't be lost.",
+        ),
+      ).toBeTruthy();
+      expect(testScreen.queryByText('Saving...')).toBeNull();
+      expect(
+        testScreen.getByTestId('first-session-reflection-input').props.value,
+      ).toBe(firstSessionReflection);
+      expect(
+        testScreen.getByTestId('first-session-wrap-submit'),
+      ).not.toBeDisabled();
+      testScreen.unmount();
+    }, 15000);
+
+    it('[WI-2095] shows localized retry feedback for a malformed summary response', async () => {
+      mockFetch.setRoute(
+        `/sessions/${SESSION_ID}/summary`,
+        new Response('{not valid json', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      const testScreen = await renderFirstSessionWrapUp();
+
+      enterFirstSessionReflection(testScreen);
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+
+      await waitFor(() => {
+        expect(
+          testScreen.getByText(
+            "Couldn't save your summary. Check your connection and try again — your work won't be lost.",
+          ),
+        ).toBeTruthy();
+      });
+      expect(testScreen.queryByText('Saving...')).toBeNull();
+      expect(
+        testScreen.getByTestId('first-session-reflection-input').props.value,
+      ).toBe(firstSessionReflection);
+      expect(
+        testScreen.getByTestId('first-session-wrap-submit'),
+      ).not.toBeDisabled();
+      testScreen.unmount();
+    }, 15000);
+
+    it('[WI-2095] retains reflection text and re-enables submit after a failed save', async () => {
+      mockFetch.setRoute(
+        `/sessions/${SESSION_ID}/summary`,
+        new Response(JSON.stringify({ error: 'Server error' }), {
+          status: 500,
+        }),
+      );
+      const testScreen = await renderFirstSessionWrapUp();
+
+      enterFirstSessionReflection(testScreen);
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+
+      await waitFor(() => {
+        expect(
+          testScreen.getByTestId('first-session-wrap-submit'),
+        ).not.toBeDisabled();
+      });
+      expect(
+        testScreen.getByTestId('first-session-reflection-input').props.value,
+      ).toBe(firstSessionReflection);
+      testScreen.unmount();
+    }, 15000);
+
+    it('[WI-2095] sends one reflection request for two submit presses in the same frame', async () => {
+      const testScreen = await renderFirstSessionWrapUp();
+
+      enterFirstSessionReflection(testScreen);
+      const submitButton = testScreen.getByTestId('first-session-wrap-submit');
+      fireEvent.press(submitButton);
+      fireEvent.press(submitButton);
+
+      await waitFor(() => {
+        expect(
+          fetchCallsMatching(mockFetch, `/sessions/${SESSION_ID}/summary`),
+        ).toHaveLength(1);
+      });
+      testScreen.unmount();
+    }, 15000);
+
+    it('[WI-2095] aborts the reflection request on unmount without reporting it', async () => {
+      let requestSignal: AbortSignal | undefined;
+      mockFetch.setRoute(
+        `/sessions/${SESSION_ID}/summary`,
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            requestSignal = init?.signal ?? undefined;
+            requestSignal?.addEventListener('abort', () => {
+              reject(
+                new DOMException('The operation was aborted', 'AbortError'),
+              );
+            });
+          }),
+      );
+      const captureExceptionSpy = jest.spyOn(Sentry, 'captureException');
+      const testScreen = await renderFirstSessionWrapUp();
+
+      enterFirstSessionReflection(testScreen);
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+      await waitFor(() => {
+        expect(requestSignal).toBeInstanceOf(AbortSignal);
+      });
+      testScreen.unmount();
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(requestSignal?.aborted).toBe(true);
+      expect(captureExceptionSpy).not.toHaveBeenCalled();
+      captureExceptionSpy.mockRestore();
     }, 15000);
 
     it('keeps later V2 Mentor sessions on the existing summary path', async () => {

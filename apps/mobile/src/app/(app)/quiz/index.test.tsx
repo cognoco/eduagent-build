@@ -10,6 +10,7 @@ import {
   createRoutedMockFetch,
   fetchCallsMatching,
 } from '../../../test-utils/mock-api-routes';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // i18n mock — returns English values for quiz.index namespace so tests can
 // assert on the same English strings as before the migration.
@@ -324,6 +325,38 @@ describe('QuizIndexScreen', () => {
     it('shows the locked Vocabulary card when there are no four_strands subjects', () => {
       render(<QuizIndexScreen />, { wrapper: Wrapper });
       screen.getByTestId('quiz-vocab-locked');
+    });
+
+    describe('locked Vocabulary card CTA destination [WI-2219]', () => {
+      let originalV2: boolean;
+
+      beforeEach(() => {
+        originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      });
+
+      afterEach(() => {
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = originalV2;
+      });
+
+      it('navigates to library when V2 nav is off', () => {
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = false;
+        render(<QuizIndexScreen />, { wrapper: Wrapper });
+        fireEvent.press(screen.getByTestId('quiz-vocab-locked'));
+        expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+      });
+
+      it('navigates to V2 Subjects when V2 nav is on', () => {
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = true;
+        render(<QuizIndexScreen />, { wrapper: Wrapper });
+        fireEvent.press(screen.getByTestId('quiz-vocab-locked'));
+        expect(mockPush).toHaveBeenCalledWith('/(app)/subjects');
+      });
     });
 
     // [BUG-926] Per-language stats: stat rows now include languageCode so each

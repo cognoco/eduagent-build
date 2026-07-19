@@ -801,21 +801,26 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             // the send-weekly-progress-push step above). The notificationLog
             // `weekly_progress` slot is shared across channels — a parent
             // receives at most one weekly-progress notification per 24h
-            // regardless of push/email. The push step runs first; if it sent,
-            // its log makes this count > 0 and the email is suppressed (push
-            // preferred). If push was skipped/failed (no log written), the email
-            // still goes out as the fallback channel. Reading inside this step
-            // (not the prepare step) keeps the gate retry-safe: an email-step
-            // retry re-reads the log written by its own first attempt and skips
-            // the re-send, matching the [WI-998] rationale on the push side.
+            // regardless of push/email. The push step runs first; its `sent`
+            // result suppresses email even if its own log write failed. If push
+            // was skipped/failed, email remains the fallback channel. Reading
+            // the ledger inside this step (not prepare) also keeps the gate
+            // retry-safe: an email-step retry re-reads the row written by its
+            // own first attempt and skips the re-send.
             const recentEmailCount = await getRecentNotificationCount(
               db,
               parentId,
               'weekly_progress',
               24,
             );
-            if (recentEmailCount > 0) {
-              return { sent: false, reason: 'dedup_24h' as const };
+            if (pushResult?.sent === true || recentEmailCount > 0) {
+              return {
+                sent: false,
+                reason:
+                  pushResult?.sent === true
+                    ? ('push_sent' as const)
+                    : ('dedup_24h' as const),
+              };
             }
             const emailPayload = formatWeeklyProgressEmail(
               parentEmail,

@@ -944,6 +944,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                   isResponseComplete: true,
                   eventId: result.aiEventId,
                   escalationRung: result.escalationRung,
+                  mentorNotice: result.mentorNotice,
                 };
               }),
             );

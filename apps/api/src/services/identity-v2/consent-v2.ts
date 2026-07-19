@@ -1202,18 +1202,14 @@ export async function restoreConsentV2(
  * The post-authorization core of restore: take the per-person advisory lock,
  * re-read the current grant, enforce the grace window, APPEND a new
  * un-withdrawn grant, and clear `archived_at` — all in one serialized
- * transaction. Carries NO authority check; callers authorize first (edge or
- * verified bearer token). Idempotent on an already-restored grant (returns
- * without appending).
+ * transaction. Carries NO authority check; callers authorize first via the
+ * authenticated guardian-restore path. Idempotent on an already-restored
+ * grant (returns without appending).
  *
- * [WI-2347] `expectedTokenId`, when passed, must satisfy
- * `current.withdrawalTokenId === null || current.withdrawalTokenId ===
- * expectedTokenId` (same non-enumerating check as `stampWithdrawal`,
- * including the `cw1`-vs-superseded-`cw2`-grant tightening). The appended
- * row always carries the current grant's `withdrawalTokenId` forward —
- * restore is a continuation of the same consent relationship, not a new
- * one, so the one email link stays valid across withdraw/restore cycles
- * regardless of which path (edge or token) performed the restore.
+ * The appended row always carries the current grant's `withdrawalTokenId`
+ * forward — restore is a continuation of the same consent relationship, not
+ * a new one, so the one email link stays valid across withdraw/restore
+ * cycles.
  */
 async function appendRestoreGrant(
   db: Database,
@@ -1610,9 +1606,11 @@ export async function getPersonDisplayNameV2(
  * no grant exists (never approved, or already deleted past grace) so the GET
  * `/consent-page/withdraw` route can render "nothing to withdraw"; otherwise
  * `{ withdrawnAt }` lets it choose between the confirm page (not withdrawn) and
- * the undo landing (withdrawn). Carries NO authority check — the route has
- * already verified the signed bearer token. The grace window itself is enforced
- * authoritatively by `restoreConsentByToken`, not here.
+ * the informational withdrawn landing (withdrawn). Carries NO authority check —
+ * the route has already verified the signed bearer token. Bearer-token restore
+ * is removed (MMT-ADR-0029, amended, WI-2348): the surviving restore mechanism
+ * is `appendRestoreGrant`, reached only via the authenticated `restoreConsentV2`
+ * path, not this read.
  */
 export async function getGdprGrantWithdrawalStateV2(
   db: Database,

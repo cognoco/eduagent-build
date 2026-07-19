@@ -20,6 +20,7 @@ import {
   curriculumBooks,
   curriculumTopics,
   learningSessions,
+  mentorNotices,
   mentorActivityLedger,
   needsDeepeningTopics,
   parkingLotItems,
@@ -57,6 +58,7 @@ import {
 } from './linking-ceremony';
 import { getAssessmentEligibleTopics } from './retention-data';
 import { resolveEffectiveAccessTier } from './subscription';
+import { getLearningDayStart, getProfileTimeZone } from './mentor-notices';
 
 export const PARKED_AGING_WINDOW_DAYS = 7;
 export const DEEPENING_SURFACE_LEAD_DAYS = 2;
@@ -70,6 +72,7 @@ export const LEDGER_PROJECTION_RECENCY_DAYS = 3;
 export const RANKING = {
   BILLING_ALERT: -1,
   UNFINISHED_SESSION: 0,
+  MENTOR_NOTICE: 0.5,
   RETENTION_DUE: 1,
   PROMOTED_AGING: 1.5,
   NEEDS_DEEPENING: 2,
@@ -93,6 +96,7 @@ export const ROUTE_CATALOG = {
   // rows) — distinct from 'session.resume', which reopens the LIVE session
   // chat and is wrong for a "recap is ready" moment on an ended session.
   'session.summary': { params: ['sessionId'], chain: [] },
+  'notice.recheck': { params: ['noticeId', 'subjectId'], chain: [] },
   'subject.hub': { params: ['subjectId'], chain: [] },
   'subject.topic': {
     params: ['subjectId', 'bookId', 'topicId'],
@@ -156,6 +160,8 @@ function basePriority(kind: NowCardKind): number {
       return RANKING.BILLING_ALERT;
     case 'unfinished_session':
       return RANKING.UNFINISHED_SESSION;
+    case 'mentor_notice':
+      return RANKING.MENTOR_NOTICE;
     case 'retention_due':
       return RANKING.RETENTION_DUE;
     case 'needs_deepening':
@@ -305,6 +311,7 @@ export async function buildNowFeed(
   db: Database,
   profileId: string,
   query: NowScope | NowQuery = 'self',
+  options: { mentorNoticeEnabled?: boolean } = {},
 ): Promise<NowResponse> {
   const now = new Date();
   const request = normalizeNowQuery(query);
@@ -316,6 +323,7 @@ export async function buildNowFeed(
     now,
     target.edgeId,
     profileId,
+    options.mentorNoticeEnabled === true,
   );
   const sorted =
     request.scope === 'supporter-hub'
@@ -342,6 +350,7 @@ export async function buildNowOverflow(
   db: Database,
   profileId: string,
   query: NowScope | NowQuery = 'self',
+  options: { mentorNoticeEnabled?: boolean } = {},
 ): Promise<NowOverflowResponse> {
   const now = new Date();
   const request = normalizeNowQuery(query);
@@ -353,6 +362,7 @@ export async function buildNowOverflow(
     now,
     target.edgeId,
     profileId,
+    options.mentorNoticeEnabled === true,
   );
   if (request.scope === 'supporter-hub') {
     return {
@@ -427,6 +437,7 @@ export async function collectCandidatesForRequest(
   now: Date,
   edgeId: string | undefined,
   viewerPersonId: string,
+  mentorNoticeEnabled = false,
 ): Promise<NowFeedCandidate[]> {
   if (request.scope === 'supporter-hub') {
     return collectSupporterHubCandidates(db, personId, now);
@@ -440,6 +451,7 @@ export async function collectCandidatesForRequest(
     request.scope === 'self' ? 'self' : 'supporter',
     edgeId,
     request.scope === 'self' ? undefined : viewerPersonId,
+    mentorNoticeEnabled,
   );
 
   if (request.scope !== 'self') return candidates;
@@ -520,6 +532,7 @@ async function collectNowCandidates(
   visibility: 'self' | 'supporter' = 'self',
   edgeId?: string,
   supporterPersonId?: string,
+  mentorNoticeEnabled = false,
 ): Promise<NowFeedCandidate[]> {
   // [WI-2237] Self-authorizing re-check embedded directly in every
   // supporter-scoped candidate read below, mirroring
@@ -537,6 +550,7 @@ async function collectNowCandidates(
   const [
     billing,
     unfinished,
+    mentorNotice,
     dueRetention,
     needsDeepening,
     challengeReady,
@@ -545,11 +559,15 @@ async function collectNowCandidates(
     topicMastered,
     recapReady,
     snapshotReady,
+    noticeLockedIn,
   ] = await Promise.all([
     visibility === 'self' && scope === 'self'
       ? collectBillingAlertCandidates(db, profileId, now)
       : Promise.resolve([]),
     collectUnfinishedSessionCandidates(db, profileId, scope, accessGuard),
+    mentorNoticeEnabled && visibility === 'self' && scope === 'self'
+      ? collectMentorNoticeCandidates(db, profileId, scope, now)
+      : Promise.resolve([]),
     collectRetentionDueCandidates(db, profileId, scope, now, accessGuard),
     collectNeedsDeepeningCandidates(db, profileId, scope, now, accessGuard),
     collectChallengeReadyCandidates(
@@ -573,11 +591,15 @@ async function collectNowCandidates(
     visibility === 'self'
       ? collectSnapshotReadyCandidates(db, profileId, scope, now)
       : Promise.resolve([]),
+    mentorNoticeEnabled && visibility === 'self' && scope === 'self'
+      ? collectNoticeLockedInCandidates(db, profileId, scope, now)
+      : Promise.resolve([]),
   ]);
 
   return [
     ...billing,
     ...unfinished,
+    ...mentorNotice,
     ...dueRetention,
     ...needsDeepening,
     ...challengeReady,
@@ -586,10 +608,119 @@ async function collectNowCandidates(
     ...topicMastered,
     ...recapReady,
     ...snapshotReady,
+    ...noticeLockedIn,
   ].map((candidate) => ({
     ...candidate,
     ...(scope === 'person' ? { personId: profileId } : {}),
     ...(edgeId ? { edgeId } : {}),
+  }));
+}
+
+async function collectNoticeLockedInCandidates(
+  db: Database,
+  profileId: string,
+  scope: NowScope,
+  now: Date,
+): Promise<NowFeedCandidate[]> {
+  const cutoff = new Date(
+    now.getTime() - LEDGER_PROJECTION_RECENCY_DAYS * DAY_MS,
+  );
+  const rows = await db
+    .select({
+      id: mentorNotices.id,
+      subjectId: mentorNotices.subjectId,
+      subjectName: subjects.name,
+      concept: mentorNotices.concept,
+      resolvedAt: mentorNotices.resolvedAt,
+    })
+    .from(mentorNotices)
+    .innerJoin(subjects, eq(subjects.id, mentorNotices.subjectId))
+    .where(
+      and(
+        eq(mentorNotices.profileId, profileId),
+        eq(subjects.profileId, profileId),
+        eq(mentorNotices.status, 'locked_in'),
+        isNotNull(mentorNotices.resolvedAt),
+        gt(mentorNotices.resolvedAt, cutoff),
+      ),
+    )
+    .orderBy(desc(mentorNotices.resolvedAt), asc(mentorNotices.id))
+    .limit(10);
+
+  return rows.flatMap((row) =>
+    row.resolvedAt
+      ? [
+          {
+            id: `notice-locked-in:${row.id}`,
+            kind: 'ledger_moment' as const,
+            createdAt: row.resolvedAt,
+            sortAt: row.resolvedAt,
+            templateKey: 'now.ledger_moment.notice_locked_in',
+            params: {
+              ledgerKind: 'notice_locked_in',
+              noticeId: row.id,
+              subjectId: row.subjectId,
+              subjectName: row.subjectName,
+              concept: row.concept,
+            },
+            deepLink: resolveDeepLink('subject.hub', {
+              subjectId: row.subjectId,
+            }),
+            scope,
+          },
+        ]
+      : [],
+  );
+}
+
+async function collectMentorNoticeCandidates(
+  db: Database,
+  profileId: string,
+  scope: NowScope,
+  now: Date,
+): Promise<NowFeedCandidate[]> {
+  const timezone = await getProfileTimeZone(db, profileId);
+  const learningDayStart = getLearningDayStart(now, timezone);
+  const rows = await db
+    .select({
+      id: mentorNotices.id,
+      subjectId: mentorNotices.subjectId,
+      subjectName: subjects.name,
+      concept: mentorNotices.concept,
+      createdAt: mentorNotices.createdAt,
+    })
+    .from(mentorNotices)
+    .innerJoin(subjects, eq(subjects.id, mentorNotices.subjectId))
+    .where(
+      and(
+        eq(mentorNotices.profileId, profileId),
+        eq(subjects.profileId, profileId),
+        eq(mentorNotices.status, 'open'),
+        or(
+          isNull(mentorNotices.lastDeferredAt),
+          lt(mentorNotices.lastDeferredAt, learningDayStart),
+        ),
+      ),
+    )
+    .orderBy(asc(mentorNotices.createdAt), asc(mentorNotices.id))
+    .limit(1);
+
+  return rows.map((row) => ({
+    id: row.id,
+    kind: 'mentor_notice' as const,
+    createdAt: row.createdAt,
+    templateKey: 'now.mentor_notice.default',
+    params: {
+      noticeId: row.id,
+      subjectId: row.subjectId,
+      subjectName: row.subjectName,
+      concept: row.concept,
+    },
+    deepLink: resolveDeepLink('notice.recheck', {
+      noticeId: row.id,
+      subjectId: row.subjectId,
+    }),
+    scope,
   }));
 }
 

@@ -34,6 +34,7 @@ import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { DeskLampAnimation, MagicPenAnimation } from '../common';
 import Animated, { FadeOut } from 'react-native-reanimated';
+import type { MentorNoticeAccepted } from '@eduagent/schemas';
 
 export interface ChatMessage {
   id: string;
@@ -54,6 +55,8 @@ export interface ChatMessage {
   isAutoSent?: boolean;
   /** Local file URI of a homework image attached to this message */
   imageUri?: string;
+  /** Durable homework observation accepted on this completed assistant turn. */
+  mentorNotice?: MentorNoticeAccepted;
 }
 
 interface ChatShellProps {
@@ -270,6 +273,7 @@ const ChatMessageRow = memo(function ChatMessageRow({
         outboxStatus={msg.outboxStatus}
         escalationRung={msg.escalationRung}
         verificationBadge={msg.verificationBadge}
+        mentorNotice={msg.mentorNotice}
         actions={renderMessageActions?.(msg)}
         testID={`message-bubble-${msg.role}-${index}`}
       />

@@ -1,3 +1,5 @@
+import { isAdultOwner as isSharedAdultOwner } from '@eduagent/schemas';
+
 import {
   PROFILE_FACTORY_ISO as ISO,
   PROFILE_FACTORY_CHILD_BIRTH_YEAR as CHILD_BIRTH_YEAR,
@@ -760,6 +762,51 @@ describe('resolveNavigationContract route predicates', () => {
     ]);
   });
 
+  it.each([
+    {
+      shell: 'V0',
+      flags: {
+        MODE_NAV_V0_ENABLED: true,
+        MODE_NAV_V1_ENABLED: false,
+        MODE_NAV_V2_ENABLED: false,
+      },
+      subjectsAvailable: false,
+      legacyLibraryAvailable: true,
+    },
+    {
+      shell: 'V1',
+      flags: {
+        MODE_NAV_V0_ENABLED: false,
+        MODE_NAV_V1_ENABLED: true,
+        MODE_NAV_V2_ENABLED: false,
+      },
+      subjectsAvailable: false,
+      legacyLibraryAvailable: true,
+    },
+    {
+      shell: 'V2',
+      flags: {
+        MODE_NAV_V0_ENABLED: false,
+        MODE_NAV_V1_ENABLED: true,
+        MODE_NAV_V2_ENABLED: true,
+      },
+      subjectsAvailable: true,
+      legacyLibraryAvailable: null,
+    },
+  ])(
+    '$shell exposes the intended learner subject-creation entry',
+    ({ flags, subjectsAvailable, legacyLibraryAvailable }) => {
+      const contract = resolveNavigationContract(makeContext({ flags }));
+
+      expect(contract.canEnter('subjects')).toBe(subjectsAvailable);
+      expect(contract.isSurfaced('subjects')).toBe(subjectsAvailable);
+      if (legacyLibraryAvailable !== null) {
+        expect(contract.canEnter('library')).toBe(legacyLibraryAvailable);
+        expect(contract.isSurfaced('library')).toBe(legacyLibraryAvailable);
+      }
+    },
+  );
+
   it('keeps V2 root routes behind active-profile and proxy guards', () => {
     const noProfileContract = resolveNavigationContract(
       makeContext({
@@ -1398,6 +1445,41 @@ describe('resolveNavigationContract snapshot surface', () => {
     );
 
     expect(contract.gates.showAddChild).toBe(false);
+  });
+
+  it('[WI-1993] agrees with the shared adult-owner gate before the 18th birthday', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-01-15T12:00:00Z'));
+
+    try {
+      const boundaryOwner = makeProfile({
+        id: '00000000-0000-7000-a000-000000000807',
+        birthYear: 2008,
+        birthMonth: 12,
+        birthDay: 1,
+        isOwner: true,
+        hasFamilyLinks: false,
+      });
+
+      const contract = resolveNavigationContract(
+        makeContext({
+          activeProfile: boundaryOwner,
+          profiles: [boundaryOwner],
+          role: 'owner',
+          subscription: { status: 'ready', tier: 'family' },
+        }),
+      );
+      const sharedDecision = isSharedAdultOwner({
+        role: 'owner',
+        birthYear: boundaryOwner.birthYear,
+        birthMonth: boundaryOwner.birthMonth,
+        birthDay: boundaryOwner.birthDay,
+      });
+
+      expect(sharedDecision).toBe(false);
+      expect(contract.gates.showAddChild).toBe(sharedDecision);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

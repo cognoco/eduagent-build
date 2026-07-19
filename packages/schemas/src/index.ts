@@ -14,6 +14,7 @@ export * from './account';
 // Onboarding & Curriculum (Epic 1)
 export * from './subjects';
 export * from './sessions';
+export * from './mentor-notices';
 export * from './language';
 export * from './bookmarks';
 

@@ -35,7 +35,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, parseAllDocuments } from 'yaml';
 
 const repoRoot = join(__dirname, '..');
 
@@ -558,6 +558,62 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }>;
   }
 
+  function runStartApiScript(script: string, useV2Fixture: boolean) {
+    const root = mkdtempSync(join(tmpdir(), 'wi-2215-api-start-'));
+    const binDir = join(root, 'bin');
+    const pnpmMarker = join(root, 'pnpm-argv');
+    const pnpm = join(binDir, 'pnpm');
+    const curl = join(binDir, 'curl');
+
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(
+      pnpm,
+      [
+        '#!/usr/bin/env bash',
+        'printf \'%s\\n\' "$@" > "$FAKE_PNPM_MARKER"',
+        '',
+      ].join('\n'),
+    );
+    writeFileSync(
+      curl,
+      [
+        '#!/usr/bin/env bash',
+        'for _ in {1..100}; do',
+        '  if [ -s "$FAKE_PNPM_MARKER" ]; then exit 0; fi',
+        '  sleep 0.01',
+        'done',
+        'exit 1',
+        '',
+      ].join('\n'),
+    );
+    chmodSync(pnpm, 0o755);
+    chmodSync(curl, 0o755);
+
+    try {
+      const result = spawnSync(
+        'bash',
+        ['-e', '-u', '-o', 'pipefail', '-c', script],
+        {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${binDir}:${process.env.PATH ?? ''}`,
+            BASH_ENV: '',
+            FAKE_PNPM_MARKER: pnpmMarker,
+            USE_MAESTRO_V2_FIXTURE: useV2Fixture ? 'true' : 'false',
+          },
+        },
+      );
+      const pnpmArgv = existsSync(pnpmMarker)
+        ? readFileSync(pnpmMarker, 'utf8').trim().split('\n')
+        : [];
+      return { result, pnpmArgv };
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
   it('declares recursive workspace discovery instead of the root-only default', () => {
     expect(workspaceConfig.flows).toContain('flows/**');
   });
@@ -593,6 +649,27 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     try {
       const result = runCiMaestro(harness, {
         FAKE_MAESTRO_DRAIN_STDIN: '1',
+      });
+      const invocations = readFileSync(harness.maestroMarker, 'utf8')
+        .trim()
+        .split('\n');
+
+      expect(result.status).toBe(0);
+      expect(invocations).toHaveLength(expectedFlows);
+    } finally {
+      rmSync(harness.root, { recursive: true, force: true });
+    }
+  });
+
+  it('executes every planned shard entry even when adb consumes stdin', () => {
+    const harness = createMaestroHarness(0);
+    const expectedFlows = loadPlan('pr').filter(
+      (entry) => entry.shard === 1,
+    ).length;
+
+    try {
+      const result = runCiMaestro(harness, {
+        FAKE_ADB_DRAIN_STDIN: '1',
       });
       const invocations = readFileSync(harness.maestroMarker, 'utf8')
         .trim()
@@ -698,6 +775,36 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(writeVarsScript).toContain('SEED_PASSWORD');
     expect(writeVarsScript).toContain('TEST_SEED_SECRET');
     expect(writeVarsScript).not.toContain('${{ secrets.');
+  });
+
+  it('selects the tested Photosynthesis worker when USE_MAESTRO_V2_FIXTURE is true', () => {
+    const startApiStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Start API server (background)',
+    );
+    const startApiScript = String(startApiStep?.run ?? '');
+
+    expect(startApiStep).toBeDefined();
+    const { result, pnpmArgv } = runStartApiScript(startApiScript, true);
+    expect(result.status).toBe(0);
+    expect(pnpmArgv).toEqual([
+      '--dir',
+      'apps/api',
+      'exec',
+      'wrangler',
+      'dev',
+      'src/test-utils/maestro-e2e-worker.ts',
+    ]);
+  });
+
+  it('keeps ordinary Wrangler startup when USE_MAESTRO_V2_FIXTURE is false', () => {
+    const startApiStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Start API server (background)',
+    );
+    const startApiScript = String(startApiStep?.run ?? '');
+
+    const { result, pnpmArgv } = runStartApiScript(startApiScript, false);
+    expect(result.status).toBe(0);
+    expect(pnpmArgv).toEqual(['--dir', 'apps/api', 'exec', 'wrangler', 'dev']);
   });
 
   it('allows the release APK to reach the local HTTP API only in E2E builds', () => {
@@ -842,6 +949,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'learning-active',
         shard: 1,
       },
+      {
+        flow: 'flows/v2/v2-subject-create-round-trip.yaml',
+        scenario: 'onboarding-no-subject',
+        shard: 1,
+      },
       // [WI-2241] Supporter scope journey — Support hub -> person scope ->
       // Mentor -> Subjects -> Journal -> Support hub, structural/negative
       // walls, empty-record honest-empty-state, revoked-edge affordance
@@ -893,40 +1005,126 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
   });
 
-  it('[WI-2234] waits for a completed assistant response before returning to Mentor', () => {
-    const maestroFlow = readFileSync(
+  it('[WI-2241] hard-selects the exact rich supportee through the Support hub before and after relaunch', () => {
+    const supporterFlow = readFileSync(
       join(
         repoRoot,
-        'apps/mobile/e2e/flows/v2/v2-returning-learner-resume.yaml',
+        'apps/mobile/e2e/flows/v2/v2-supporter-scope-journey.yaml',
       ),
       'utf8',
     );
-    const playwrightFlow = readFileSync(
-      join(
-        repoRoot,
-        'apps/mobile/e2e-web/flows/v2/returning-learner-resume.spec.ts',
-      ),
-      'utf8',
-    );
-    const marker = 'assistant-response-complete-';
+    const commands = parseAllDocuments(supporterFlow)[1]?.toJS() as unknown;
 
-    const maestroMarkerIndex = maestroFlow.indexOf(marker);
-    const maestroBackIndex = maestroFlow.indexOf("id: 'chat-shell-back'");
-    expect(maestroMarkerIndex).toBeGreaterThan(-1);
-    expect(maestroBackIndex).toBeGreaterThan(maestroMarkerIndex);
-    expect(
-      maestroFlow.slice(maestroMarkerIndex, maestroBackIndex),
-    ).not.toContain('optional: true');
-
-    const playwrightMarkerIndex = playwrightFlow.indexOf(marker);
-    const playwrightBackIndex = playwrightFlow.indexOf(
-      "page.getByTestId('chat-shell-back')",
+    expect(Array.isArray(commands)).toBe(true);
+    if (!Array.isArray(commands)) {
+      throw new Error('supporter scope Maestro commands must be a YAML list');
+    }
+    const firstHubReady = commands.findIndex(
+      (command) =>
+        JSON.stringify(command) ===
+        JSON.stringify({
+          extendedWaitUntil: {
+            visible: { id: 'support-hub-mentor-tab' },
+            timeout: 30000,
+          },
+        }),
     );
-    expect(playwrightMarkerIndex).toBeGreaterThan(-1);
-    expect(playwrightBackIndex).toBeGreaterThan(playwrightMarkerIndex);
-    expect(
-      playwrightFlow.slice(playwrightMarkerIndex, playwrightBackIndex),
-    ).toContain('toBeGreaterThan');
+    const relaunchStart = commands.findIndex(
+      (command) => command === 'stopApp',
+    );
+
+    expect(firstHubReady).toBeGreaterThanOrEqual(0);
+    expect(commands.slice(firstHubReady, firstHubReady + 5)).toEqual([
+      {
+        extendedWaitUntil: {
+          visible: { id: 'support-hub-mentor-tab' },
+          timeout: 30000,
+        },
+      },
+      {
+        scrollUntilVisible: {
+          element: {
+            id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}',
+          },
+          direction: 'DOWN',
+          timeout: 5000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'support-hub-mentor-person-${SUPPORTEE_PERSON_ID}',
+        },
+      },
+      {
+        assertNotVisible: {
+          id: 'scope-chip-option-person-${REVOKED_SUPPORTEE_PERSON_ID}',
+        },
+      },
+      {
+        tapOn: {
+          id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}',
+        },
+      },
+    ]);
+    expect(relaunchStart).toBeGreaterThanOrEqual(0);
+    expect(commands.slice(relaunchStart, relaunchStart + 12)).toEqual([
+      'stopApp',
+      { launchApp: { clearState: false } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'scope-chip' },
+          timeout: 30000,
+        },
+      },
+      {
+        tapOn: {
+          id: 'scope-chip-option-supporter-hub',
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'support-hub-mentor-tab' },
+          timeout: 15000,
+        },
+      },
+      {
+        scrollUntilVisible: {
+          element: {
+            id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}',
+          },
+          direction: 'DOWN',
+          timeout: 5000,
+        },
+      },
+      {
+        tapOn: {
+          id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}',
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'person-scope-mentor-tab' },
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'support-hub-mentor-person-${SUPPORTEE_PERSON_ID}',
+        },
+      },
+      { tapOn: { id: 'tab-journal', retryTapIfNoChange: true } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'person-scope-journal-placeholder' },
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'visibility-shared-record',
+        },
+      },
+    ]);
   });
 
   it('keeps the generated Android APK free of the duplicate OSGI manifest', () => {
@@ -995,6 +1193,7 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
     adb,
     [
       '#!/usr/bin/env bash',
+      'if [ "${FAKE_ADB_DRAIN_STDIN:-0}" = "1" ]; then cat >/dev/null; fi',
       'case "$*" in',
       '  "exec-out screencap -p") printf fake-png ;;',
       '  "exec-out cat /sdcard/ci-maestro-entry.xml") printf \'<node resource-id="welcome-chooser"/>\' ;;',

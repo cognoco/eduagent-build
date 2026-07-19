@@ -888,7 +888,8 @@
       "verificationBadge": {
         "evaluate": "THINK-DEEPER BESTANDEN",
         "teachBack": "TEACH-BACK BESTANDEN"
-      }
+      },
+      "mentorNotice": "Unterwegs aufgefallen: {{concept}}"
     },
     "noteInput": {
       "cancel": "Abbrechen",
@@ -3063,7 +3064,9 @@
       "title": "Möchtest du eine tägliche Erinnerung?",
       "message": "Wir können dir eine sanfte Erinnerung schicken, damit du deinen Streak nicht verlierst. Du kannst sie jederzeit in den Einstellungen deaktivieren.",
       "allow": "Erlauben",
-      "notNow": "Nicht jetzt"
+      "notNow": "Nicht jetzt",
+      "noticeTitle": "Möchtest du eine sanfte Erinnerung?",
+      "noticeMessage": "Wir können dich daran erinnern, das zu wiederholen, was dein Mentor heute bemerkt hat. Du kannst das jederzeit in den Einstellungen deaktivieren."
     },
     "masteredRow": {
       "title": "Du hast gemeistert:"
@@ -3176,6 +3179,9 @@
         "language_focus": "Nächstes Mal: Wir arbeiten an Grammatikmustern",
         "fluency": "Nächstes Mal: ein kurzer Flüssigkeitssprint"
       }
+    },
+    "mentorNotice": {
+      "title": "Unterwegs aufgefallen"
     }
   },
   "sessionTranscript": {
@@ -3994,6 +4000,14 @@
         "currentAccess": "Dein bezahlter Zugang bleibt bis zum {{deadline}} aktiv.",
         "freeFallback": "Dein Konto hat jetzt kostenlosen Zugang. Aktualisiere die Zahlung, um deinen Plan wiederherzustellen.",
         "currentAccessNoDeadline": "Dein bezahlter Zugang ist noch aktiv."
+      },
+      "mentor_notice": {
+        "title": "Eine Idee, die du dir ansehen solltest",
+        "cta": "Jetzt prüfen",
+        "notNow": "Nicht jetzt",
+        "arcDue": "Bereit, wenn du es bist",
+        "arcAdvancing": "Kurzer Check startet",
+        "arcMastered": "Gefestigt"
       }
     },
     "ledger": {
@@ -4006,6 +4020,9 @@
       },
       "quota": {
         "title": "Ein Lernmoment wurde gespeichert."
+      },
+      "notice_locked_in": {
+        "title": "Du hast {{concept}} gefestigt."
       }
     },
     "overflow": {
@@ -4212,7 +4229,8 @@
       "recap_ready": "Zusammenfassung ist fertig.",
       "snapshot_ready": "Eine Lern-Momentaufnahme ist fertig.",
       "reflection_bonus": "Reflexionsbonus gespeichert.",
-      "quiz_personal_best": "Bestleistung gespeichert."
+      "quiz_personal_best": "Bestleistung gespeichert.",
+      "notice_locked_in": "{{concept}} in {{subjectName}} gefestigt."
     },
     "recaps": {
       "error": "Deine Zusammenfassungen konnten nicht geladen werden.",

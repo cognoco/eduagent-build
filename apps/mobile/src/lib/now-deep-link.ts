@@ -3,29 +3,39 @@ import {
   nowDeepLinkRouteSchema,
   type NowDeepLink,
   type NowDeepLinkRoute,
+  type ScopeDescriptor,
 } from '@eduagent/schemas';
+
 export type SubjectHubTarget = 'legacy-shelf' | 'v2-subject-hub';
 
-export interface PushNowDeepLinkOptions {
+interface NowPathOptions {
   subjectHubTarget?: SubjectHubTarget;
   returnTo?: string;
 }
 
-type ResolvedPushNowDeepLinkOptions = {
+export interface PushNowDeepLinkOptions extends NowPathOptions {
+  // WI-2223: a support.hub pointer must select the Support-hub scope before
+  // the Mentor tab opens, or the learner Mentor surface renders instead
+  // (activeScope is otherwise unchanged by the push). Callers that hold
+  // useScopeContext pass their setActiveScope through here.
+  setActiveScope?: (scope: ScopeDescriptor) => void;
+}
+
+type ResolvedNowPathOptions = {
   subjectHubTarget: SubjectHubTarget;
   returnTo?: string;
 };
 
 type PathBuilder = (
   params: Record<string, string>,
-  options: ResolvedPushNowDeepLinkOptions,
+  options: ResolvedNowPathOptions,
 ) => string;
 
-const DEFAULT_OPTIONS: ResolvedPushNowDeepLinkOptions = {
+const DEFAULT_OPTIONS: ResolvedNowPathOptions = {
   subjectHubTarget: 'legacy-shelf',
 };
 
-const PATH_BUILDERS: Record<NowDeepLinkRoute, PathBuilder> = {
+const PATH_BUILDERS: Partial<Record<NowDeepLinkRoute, PathBuilder>> = {
   'settings.more': () => '/(app)/more',
   'settings.account': () => '/(app)/more/account',
   'billing.manage': () => '/(app)/subscription',
@@ -93,9 +103,14 @@ function requiredParam(
 export function buildNowPath(
   route: NowDeepLinkRoute,
   params: Record<string, string>,
-  options: PushNowDeepLinkOptions = {},
+  options: NowPathOptions = {},
 ): string {
-  return PATH_BUILDERS[route](params, { ...DEFAULT_OPTIONS, ...options });
+  if (route === 'notice.recheck') {
+    throw new Error('notice.recheck is an action route, not a navigation path');
+  }
+  const builder = PATH_BUILDERS[route];
+  if (!builder) throw new Error(`Unsupported now path route: ${route}`);
+  return builder(params, { ...DEFAULT_OPTIONS, ...options });
 }
 
 export function pushNowDeepLink(
@@ -105,6 +120,9 @@ export function pushNowDeepLink(
 ): void {
   for (const route of [...deepLink.chain, deepLink.route]) {
     assertSupportedRoute(route);
+    if (route === 'support.hub') {
+      options.setActiveScope?.({ kind: 'supporter-hub' });
+    }
     router.push(buildNowPath(route, deepLink.params, options) as Href);
   }
 }

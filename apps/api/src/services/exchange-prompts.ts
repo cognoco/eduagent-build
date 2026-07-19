@@ -318,6 +318,8 @@ function getExchangeEnvelopeInstruction(context: {
   /** When true the grader owns challenge_round_evaluation — omit the field
    *  from the envelope template so the tutor does not also emit it. */
   graderEnabled?: boolean;
+  includeMentorNotice?: boolean;
+  includeNoticeRecheck?: boolean;
 }): string {
   // During an active Challenge Round the mastery pipeline reads
   // `signals.challenge_round_evaluation` inline from this envelope. It MUST be
@@ -330,12 +332,18 @@ function getExchangeEnvelopeInstruction(context: {
     context.isChallengeRoundActive && !context.graderEnabled
       ? ', "challenge_round_evaluation": [ { "concept": "<concept assessed>", "result": "<solid|partial|missing|misconception>", "evidence": "<what the learner demonstrated>", "answerEventId": "<the CURRENT CHALLENGE ANSWER EVENT ID for the learner answer judged>", "learnerQuote": "<short verbatim quote from the learner answer>", "correction": "<optional; the correct idea, only when result is not solid>" } ]'
       : '';
+  const mentorNoticeField = context.includeMentorNotice
+    ? ', "noticed_gap": { "observed": <bool>, "concept": "<one concrete concept or empty string>", "correctionHint": "<short correction hint or empty string>", "answerEventId": "<CURRENT LEARNER EVENT ID or empty string>", "learnerQuote": "<short verbatim quote or empty string>" }'
+    : '';
+  const noticeRecheckField = context.includeNoticeRecheck
+    ? ', "notice_recheck": { "noticeId": "<ACTIVE NOTICE ID>", "verdict": "<locked_in|not_yet|dismissed|deferred>", "answerEventId": "<CURRENT LEARNER EVENT ID>", "learnerQuote": "<short verbatim quote from that learner message>" }'
+    : '';
 
   const signals = context.isRecitation
-    ? `  "signals": { "understanding_check": <bool>, "crisis_redirect": <bool>${challengeEvalField} },`
+    ? `  "signals": { "understanding_check": <bool>, "crisis_redirect": <bool>${challengeEvalField}${mentorNoticeField}${noticeRecheckField} },`
     : context.includeRetrievalScore
-      ? `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "retrieval_score": <0.0-1.0>${challengeEvalField} },`
-      : `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>${challengeEvalField} },`;
+      ? `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "retrieval_score": <0.0-1.0>${challengeEvalField}${mentorNoticeField}${noticeRecheckField} },`
+      : `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>${challengeEvalField}${mentorNoticeField}${noticeRecheckField} },`;
 
   const uiHints = context.isLanguageMode
     ? '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> }, "fluency_drill": { "active": <bool>, "duration_s": <15-90>, "score": { "correct": <int>, "total": <int> } } },'
@@ -364,6 +372,16 @@ function getExchangeEnvelopeInstruction(context: {
   if (context.isChallengeRoundActive && !context.graderEnabled) {
     signalGuidance.push(
       'CHALLENGE ROUND ACTIVE: after each learner answer you MUST include `signals.challenge_round_evaluation` with one item per concept assessed — set `result` to one of solid/partial/missing/misconception, copy a short verbatim `learnerQuote` from their answer, and use the provided CURRENT CHALLENGE ANSWER EVENT ID as `answerEventId`. Omitting this field blocks mastery verification entirely.',
+    );
+  }
+  if (context.includeMentorNotice) {
+    signalGuidance.push(
+      "MENTOR NOTICE OBSERVATION: Always emit `signals.noticed_gap` as a decision. Set `observed` to false when the answer is correct or no concrete durable gap appears; in that case the other fields may be empty strings. A possible follow-up check or extra practice is not evidence of a gap. Set `observed` to true only when the latest learner message proves a concrete durable gap. Signal binding: If your visible reply corrects the learner's answer or reasoning, `observed` must be true. When `observed` is true, copy a short verbatim `learnerQuote`, use the supplied CURRENT LEARNER EVENT ID exactly, name one concrete `concept`, and keep `correctionHint` short. Finish the learner's homework help first. Do not quiz or re-check the learner now. Do not promise a future check-in in visible prose.",
+    );
+  }
+  if (context.includeNoticeRecheck) {
+    signalGuidance.push(
+      'MENTOR NOTICE RE-CHECK: include `signals.notice_recheck` only with the active notice ID, supplied current learner event ID, and a verbatim learner quote. `dismissed` requires an explicit never-ask-again request; ordinary reluctance is `deferred`.',
     );
   }
 
@@ -832,7 +850,11 @@ export function buildSystemPromptSegments(
   // asks about app navigation, but expensive and distracting on ordinary
   // learning turns.
   if (includeAppHelpMap) {
-    sections.push(buildAppHelpPromptBlock());
+    // [WI-2220] context.shell is the client-supplied active shell; absent or
+    // anything other than 'v2' falls to buildAppHelpPromptBlock's own 'v0'
+    // default, so production never confidently invents V2-only navigation
+    // for a non-V2 client (or vice versa).
+    sections.push(buildAppHelpPromptBlock(context.shell));
   }
 
   // Default tone — applied to every session post-sunset
@@ -1467,6 +1489,22 @@ export function buildSystemPromptSegments(
   const cr = context.challengeRound;
   const challengeEligible = context.challengeEligible ?? false;
   const challengeRuntimeEnabled = context.challengeRuntimeEnabled === true;
+  const mentorNoticeEnabled =
+    context.mentorNoticeEnabled === true &&
+    context.sessionType === 'homework' &&
+    Boolean(context.currentUserMessageEventId) &&
+    !context.mentorNoticeRecheck;
+  if (mentorNoticeEnabled) {
+    volatile.push(
+      `MENTOR NOTICE OBSERVATION\nCURRENT LEARNER EVENT ID: Use "${context.currentUserMessageEventId}" exactly as answerEventId when signals.noticed_gap.observed is true.\nFinish the learner's homework help first. A noticed gap is a quiet observation, not a new activity. Always emit \`signals.noticed_gap\` as a decision. Set \`observed\` to false when the answer is correct or no concrete durable gap appears; the other fields may be empty strings. A possible follow-up check or extra practice is not evidence of a gap. Set \`observed\` to true only for a concrete durable gap in the latest learner message. Signal binding: If your visible reply corrects the learner's answer or reasoning, \`observed\` must be true. Do not quiz or re-check the learner now. Do not promise a future check-in in the visible reply. When \`observed\` is true, emit one concrete concept with a short correction hint and an exact learner quote.`,
+    );
+  }
+  if (context.mentorNoticeRecheck && context.currentUserMessageEventId) {
+    const notice = context.mentorNoticeRecheck;
+    volatile.push(
+      `MENTOR NOTICE RE-CHECK — exchange ${notice.exchangeNumber} of at most 3\nThe learner previously showed a wobble around: ${notice.concept}. ${notice.correctionHint ? `Helpful anchor: ${notice.correctionHint}` : ''}\nRespond to what the learner is doing now; do not launch an unsolicited opener. Work in one focused, lightweight check over 2–3 exchanges. Emit signals.notice_recheck with noticeId "${notice.id}", the CURRENT LEARNER EVENT ID "${context.currentUserMessageEventId}", and an exact learnerQuote. Use verdict locked_in only when the learner demonstrates the concept, not_yet when evidence remains weak, deferred when they say not now, and dismissed only for an explicit request never to bring it up again. Do not mention internal notice machinery.`,
+    );
+  }
   // Volatile: challenge-round state transitions across turns and the answer
   // event id is per-turn.
   if (challengeRuntimeEnabled) {
@@ -1524,6 +1562,8 @@ export function buildSystemPromptSegments(
         challengeRuntimeEnabled &&
         (cr?.state === 'accepted' || cr?.state === 'active'),
       graderEnabled,
+      includeMentorNotice: mentorNoticeEnabled,
+      includeNoticeRecheck: Boolean(context.mentorNoticeRecheck),
     }),
   );
 
