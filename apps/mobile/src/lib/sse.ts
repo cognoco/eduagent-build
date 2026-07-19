@@ -142,6 +142,8 @@ export interface StreamDoneEvent {
   draftedNote?: DraftedChallengeNoteEvent;
   /** F6: LLM self-reported confidence. Absent or 'medium'/'high' = no indicator. Only 'low' shows a UI prompt. */
   confidence?: 'low' | 'medium' | 'high';
+  /** Server-accepted homework observation; never present on token/fallback frames. */
+  mentorNotice?: import('@eduagent/schemas').MentorNoticeAccepted;
 }
 
 export interface StreamErrorEvent {

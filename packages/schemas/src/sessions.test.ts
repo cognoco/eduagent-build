@@ -55,6 +55,30 @@ import {
   outboxSpilloverResultSchema,
 } from './sessions.js';
 
+describe('mentor notice session summary contract', () => {
+  it('parses the persisted noticed-along-the-way receipt', () => {
+    const parsed = sessionSummarySchema.parse({
+      id: '00000000-0000-4000-8000-000000000001',
+      sessionId: '00000000-0000-4000-8000-000000000002',
+      content: 'Summary content',
+      aiFeedback: null,
+      status: 'accepted',
+      closingLine: null,
+      learnerRecap: null,
+      nextTopicId: null,
+      nextTopicTitle: null,
+      nextTopicReason: null,
+      mentorNotice: {
+        id: '00000000-0000-4000-8000-000000000003',
+        concept: 'Sign changes when moving terms',
+        correctionHint: null,
+      },
+    });
+
+    expect(parsed.mentorNotice?.concept).toBe('Sign changes when moving terms');
+  });
+});
+
 const UUID = '550e8400-e29b-41d4-a716-446655440000';
 
 // ---------------------------------------------------------------------------

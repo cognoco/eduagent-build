@@ -888,7 +888,8 @@
       "verificationBadge": {
         "evaluate": "思考力アップクリア",
         "teachBack": "ティーチバッククリア"
-      }
+      },
+      "mentorNotice": "学習中に気づいたこと：{{concept}}"
     },
     "noteInput": {
       "cancel": "キャンセル",
@@ -3063,7 +3064,9 @@
       "title": "毎日のリマインダーを受け取りますか？",
       "message": "ストリークを途切れさせないよう、優しいリマインダーをお送りします。設定からいつでも無効にできます。",
       "allow": "許可する",
-      "notNow": "今はしない"
+      "notNow": "今はしない",
+      "noticeTitle": "簡単な復習をしませんか？",
+      "noticeMessage": "今日メンターが気づいたことを復習するよう、リマインダーを設定できます。この設定はいつでも「設定」からオフにできます。"
     },
     "masteredRow": {
       "title": "マスターしました："
@@ -3181,7 +3184,10 @@
     "feedbackUnavailableMessage": "概要は保存されました。再送信せずにフィードバックを再試行できます。",
     "feedbackStillUnavailable": "フィードバックはまだ利用できませんが、概要は安全に保存されています。準備ができたら、再試行または続行できます。",
     "retryFeedback": "フィードバックを再試行",
-    "retryingFeedback": "フィードバックを再試行中..."
+    "retryingFeedback": "フィードバックを再試行中...",
+    "mentorNotice": {
+      "title": "学習中に気づいたこと"
+    }
   },
   "sessionTranscript": {
     "archived": {
@@ -3999,6 +4005,14 @@
         "currentAccess": "有料プランは{{deadline}}まで有効です。",
         "freeFallback": "現在、無料プランをご利用中です。プランを復元するには、お支払い情報を更新してください。",
         "currentAccessNoDeadline": "有料アクセスはまだ有効です。"
+      },
+      "mentor_notice": {
+        "title": "確認しておきたいアイデア",
+        "cta": "今すぐ確認",
+        "notNow": "後で",
+        "arcDue": "いつでも始められます",
+        "arcAdvancing": "クイックチェックを開始中",
+        "arcMastered": "定着しました"
       }
     },
     "ledger": {
@@ -4011,6 +4025,9 @@
       },
       "quota": {
         "title": "学習の記録が保存されました。"
+      },
+      "notice_locked_in": {
+        "title": "{{concept}}が定着しました。"
       }
     },
     "overflow": {
@@ -4217,7 +4234,8 @@
       "recap_ready": "要約の準備ができました。",
       "snapshot_ready": "学習スナップショットの準備ができました。",
       "reflection_bonus": "振り返りボーナスが保存されました。",
-      "quiz_personal_best": "自己ベストが保存されました。"
+      "quiz_personal_best": "自己ベストが保存されました。",
+      "notice_locked_in": "{{subjectName}}で{{concept}}を定着させました。"
     },
     "recaps": {
       "error": "概要を読み込めませんでした。",

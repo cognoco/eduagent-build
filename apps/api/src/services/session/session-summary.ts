@@ -31,6 +31,7 @@ import {
   releaseCoordinationClaim,
   type ExpiringCoordinationClaim,
 } from '../webhook-idempotency';
+import { getMentorNoticeReceipt } from '../mentor-notices';
 
 const logger = createLogger();
 
@@ -38,18 +39,25 @@ export async function getSessionSummary(
   db: Database,
   profileId: string,
   sessionId: string,
+  options: { mentorNoticeEnabled?: boolean } = {},
 ): Promise<SessionSummary | null> {
   const row = await findSessionSummaryRow(db, profileId, sessionId);
   if (!row) {
     return null;
   }
 
-  const xpInfo = await getSessionXpEntry(db, profileId, sessionId);
+  const [xpInfo, mentorNotice] = await Promise.all([
+    getSessionXpEntry(db, profileId, sessionId),
+    options.mentorNoticeEnabled === true
+      ? getMentorNoticeReceipt(db, profileId, sessionId)
+      : Promise.resolve(null),
+  ]);
   const summary = mapSummaryRow(row);
   const enrichedSummary: SessionSummary = {
     ...summary,
     baseXp: xpInfo?.baseXp ?? null,
     reflectionBonusXp: xpInfo?.reflectionBonusXp ?? null,
+    mentorNotice: mentorNotice ?? undefined,
   };
   if (!row.nextTopicId) {
     return enrichedSummary;
