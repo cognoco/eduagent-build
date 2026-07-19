@@ -64,6 +64,7 @@ export async function acceptMentorNotice(
   await safeSend(
     () =>
       inngest.send({
+        // orphan-allow: observability-only lifecycle marker; no in-process handler.
         name: 'app/notice.created',
         data: { noticeId: accepted.id, profileId: input.profileId },
       }),
@@ -173,6 +174,7 @@ export async function applyMentorNoticeOutcome(
       await safeSend(
         () =>
           inngest.send({
+            // orphan-allow: observability-only lifecycle marker; no in-process handler.
             name: 'app/notice.recheck_outcome',
             data: {
               noticeId: deferred.id,
@@ -227,6 +229,7 @@ export async function applyMentorNoticeOutcome(
   await safeSend(
     () =>
       inngest.send({
+        // orphan-allow: observability-only lifecycle marker; no in-process handler.
         name: 'app/notice.recheck_outcome',
         data: {
           noticeId: updated.id,
@@ -244,6 +247,7 @@ export async function fadeStaleMentorNotices(
   db: Database,
   cutoff: Date,
 ): Promise<number> {
+  // scope-allow: system maintenance job intentionally fades stale open notices across profiles.
   const faded = await db
     .update(mentorNotices)
     .set({

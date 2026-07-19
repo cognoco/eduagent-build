@@ -131,6 +131,7 @@ export async function sendReservedMentorNoticeNudge(
     await safeSend(
       () =>
         inngest.send({
+          // orphan-allow: observability-only lifecycle marker; no in-process handler.
           name: 'app/notice.nudge_sent',
           data: { noticeId: input.noticeId, profileId: input.profileId },
         }),

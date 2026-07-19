@@ -102,6 +102,7 @@ export async function startMentorNoticeRecheck(
     await safeSend(
       () =>
         inngest.send({
+          // orphan-allow: observability-only lifecycle marker; no in-process handler.
           name: 'app/notice.recheck_started',
           data: { noticeId, profileId, sessionId: result.sessionId },
         }),
