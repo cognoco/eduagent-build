@@ -23,6 +23,19 @@ export const STUDY_PROGRESS_HREF = '/(app)/progress';
 export const FAMILY_CHILDREN_RETURN_TO = 'family-children';
 export const FAMILY_CHILDREN_HREF = '/(app)/home';
 
+export function isSessionForwardableReturnTo(
+  returnTo: string | undefined,
+): returnTo is
+  | typeof SUBJECTS_RETURN_TO
+  | typeof LEARNER_HOME_RETURN_TO
+  | typeof OWN_LEARNING_RETURN_TO {
+  return (
+    returnTo === SUBJECTS_RETURN_TO ||
+    returnTo === LEARNER_HOME_RETURN_TO ||
+    returnTo === OWN_LEARNING_RETURN_TO
+  );
+}
+
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }

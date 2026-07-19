@@ -38,6 +38,9 @@ tags:
     visible:
       id: 'create-subject-name'
     timeout: 15000
+- tapOn:
+    id: 'create-subject-name'
+- inputText: 'Cancel path subject'
 - hideKeyboard
 - scrollUntilVisible:
     element:

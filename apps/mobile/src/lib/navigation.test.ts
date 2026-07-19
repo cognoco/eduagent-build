@@ -2,12 +2,14 @@ import {
   childProfileHref,
   FAMILY_HOME_PATH,
   homeHrefForReturnTo,
+  isSessionForwardableReturnTo,
   goBackOrReplace,
   pushLearningResumeTarget,
   pushChildReport,
   pushChildWeeklyReport,
   LEARNER_HOME_HREF,
   LEARNER_HOME_RETURN_TO,
+  OWN_LEARNING_RETURN_TO,
   PRACTICE_HREF,
   PRACTICE_RETURN_TO,
   JOURNAL_HREF,
@@ -30,6 +32,20 @@ import type { Router } from 'expo-router';
 describe('navigation constants', () => {
   it('exports FAMILY_HOME_PATH for family-facing navigation', () => {
     expect(FAMILY_HOME_PATH).toBe('/(app)/home');
+  });
+});
+
+describe('isSessionForwardableReturnTo', () => {
+  it('accepts each return token that session entry points may forward', () => {
+    expect(isSessionForwardableReturnTo(SUBJECTS_RETURN_TO)).toBe(true);
+    expect(isSessionForwardableReturnTo(LEARNER_HOME_RETURN_TO)).toBe(true);
+    expect(isSessionForwardableReturnTo(OWN_LEARNING_RETURN_TO)).toBe(true);
+  });
+
+  it('rejects unrelated and absent return tokens', () => {
+    expect(isSessionForwardableReturnTo(PRACTICE_RETURN_TO)).toBe(false);
+    expect(isSessionForwardableReturnTo('settings')).toBe(false);
+    expect(isSessionForwardableReturnTo(undefined)).toBe(false);
   });
 });
 

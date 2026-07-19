@@ -32,8 +32,7 @@ import { errorHasCode } from '../components/session/session-types';
 import {
   homeHrefForReturnTo,
   goBackOrReplace,
-  LEARNER_HOME_RETURN_TO,
-  OWN_LEARNING_RETURN_TO,
+  isSessionForwardableReturnTo,
   SUBJECTS_HREF,
   SUBJECTS_RETURN_TO,
 } from '../lib/navigation';
@@ -121,12 +120,9 @@ function CreateSubjectScreenAuthenticated() {
     returnTo?: string;
     chatTopic?: string;
   }>();
-  const sessionReturnTo =
-    returnTo === SUBJECTS_RETURN_TO ||
-    returnTo === LEARNER_HOME_RETURN_TO ||
-    returnTo === OWN_LEARNING_RETURN_TO
-      ? returnTo
-      : undefined;
+  const sessionReturnTo = isSessionForwardableReturnTo(returnTo)
+    ? returnTo
+    : undefined;
   const colors = useThemeColors();
   const createSubject = useCreateSubject();
   const resolveSubject = useResolveSubject();
