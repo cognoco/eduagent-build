@@ -128,6 +128,16 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
       });
       writeFileSync(
         join(root, 'run', 'trace.trace'),
+        JSON.stringify({
+          type: 'requestfailed',
+          errorText: 'disconnect notice',
+        }),
+      );
+      expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
+        kind: 'unknown',
+      });
+      writeFileSync(
+        join(root, 'run', 'trace.trace'),
         JSON.stringify({ type: 'console', text: '503 in prose' }),
       );
       expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
@@ -188,8 +198,9 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
     }
   });
 
-  // `not-run` models the workflow's pre-suite early exit; classifyFailure
-  // never emits it. These rows document the shared gate contract.
+  // Each row maps to a workflow branch: preflight-unavailable, suite success,
+  // product/unknown/cancel failure, or infra-plus-postflight. `not-run` models
+  // the pre-suite early exit; classifyFailure never emits it.
   it.each([
     [
       'preflight unavailable neutral',
