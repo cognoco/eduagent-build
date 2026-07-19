@@ -207,6 +207,11 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     ['V2 failure', { SMOKE_RESULT: 'failure' }, 1],
     ['V2 cancellation', { SMOKE_RESULT: 'cancelled' }, 1],
     ['trusted V2 skip', { SMOKE_RESULT: 'skipped' }, 1],
+    [
+      'missing run-real output fails closed',
+      { RUN_REAL: '', TRUSTED: 'true', SMOKE_RESULT: 'skipped' },
+      1,
+    ],
     ['V2 success', {}, 0],
     [
       'fork pass-through',

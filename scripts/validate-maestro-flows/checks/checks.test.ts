@@ -637,7 +637,25 @@ describe('C6 — unjustified optional: true', () => {
     expect(result.passed).toBe(false);
     expect(result.checkedCount).toBe(2);
     expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]?.line).toBe(6);
     expect(result.violations[0]?.reason).toMatch(/hard assertion/i);
+  });
+
+  it('permits an aliased V2 action justified at its anchor definition', () => {
+    const flow = mkFlow(
+      'flows/v2/aliased-action.yaml',
+      [
+        'tags: [v2]',
+        '---',
+        '- tapOn: &conditional-options',
+        '    id: "dismiss-dialog"',
+        '    optional: true # justified: dialog is conditional',
+        '- tapOn: *conditional-options',
+      ].join('\n'),
+    );
+    const result = runC6(baseInputs({ flows: [flow] }));
+    expect(result.passed).toBe(true);
+    expect(result.checkedCount).toBe(2);
   });
 
   it('permits a justified optional inline-map non-assert action in a v2 flow', () => {

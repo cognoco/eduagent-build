@@ -46,7 +46,12 @@ function scanOptional(flow: FlowFile): {
 }
 
 function scanV2Semantics(flow: FlowFile): {
-  optionals: Array<{ command: string; assertion: boolean; line?: number }>;
+  optionals: Array<{
+    command: string;
+    assertion: boolean;
+    line?: number;
+    definitionLine?: number;
+  }>;
   parseError?: string;
 } {
   try {
@@ -67,6 +72,7 @@ function scanV2Semantics(flow: FlowFile): {
       command: string;
       assertion: boolean;
       line?: number;
+      definitionLine?: number;
     }> = [];
     const keyText = (key: unknown): string | undefined =>
       isScalar(key) ? String(key.value).trim() : undefined;
@@ -83,13 +89,21 @@ function scanV2Semantics(flow: FlowFile): {
       command: string,
       document: Document,
       aliases: Set<string>,
+      aliasLine?: number,
     ): void => {
       if (isAlias(node)) {
         if (aliases.has(node.source)) return;
         const resolved = node.resolve(document);
         if (!resolved) return;
         aliases.add(node.source);
-        inspectOptions(resolved, command, document, aliases);
+        const offset = node.range?.[0];
+        inspectOptions(
+          resolved,
+          command,
+          document,
+          aliases,
+          offset === undefined ? aliasLine : lineCounter.linePos(offset).line,
+        );
         aliases.delete(node.source);
         return;
       }
@@ -101,10 +115,12 @@ function scanV2Semantics(flow: FlowFile): {
           pair.value.value === true,
       );
       if (!optionalPair) return;
+      const definitionLine = optionalLine(optionalPair.key, optionalPair.value);
       optionals.push({
         command,
         assertion: /^assert[A-Za-z0-9_]*$/.test(command),
-        line: optionalLine(optionalPair.key, optionalPair.value),
+        line: aliasLine ?? definitionLine,
+        definitionLine,
       });
     };
     const walk = (
@@ -188,16 +204,18 @@ export function runC6(inputs: ValidatorInputs): CheckResult {
           continue;
         }
         if (allowedFiles.has(relPath)) continue;
-        const currentLine = optional.line
-          ? (flow.lines[optional.line - 1] ?? '')
-          : '';
-        const precedingLine =
-          optional.line && optional.line > 1
-            ? (flow.lines[optional.line - 2] ?? '')
-            : '';
+        const isJustifiedAt = (line: number | undefined): boolean => {
+          const currentLine = line ? (flow.lines[line - 1] ?? '') : '';
+          const precedingLine =
+            line && line > 1 ? (flow.lines[line - 2] ?? '') : '';
+          return (
+            JUSTIFIED_INLINE_RE.test(currentLine) ||
+            JUSTIFIED_PRECEDING_RE.test(precedingLine)
+          );
+        };
         if (
-          JUSTIFIED_INLINE_RE.test(currentLine) ||
-          JUSTIFIED_PRECEDING_RE.test(precedingLine)
+          isJustifiedAt(optional.line) ||
+          isJustifiedAt(optional.definitionLine)
         ) {
           continue;
         }

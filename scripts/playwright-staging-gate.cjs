@@ -465,12 +465,11 @@ function classifyFailure({ artifactRoot, apiUrl, exitCode, resultText = '' }) {
   return networkSignal ? { kind: 'infra-signalled' } : { kind: 'unknown' };
 }
 
-function decide({ preflight, postflight, classification, exitCode }) {
+function decide({ postflight, classification, exitCode }) {
   // This is the workflow's sole pass/fail decision point. The shell only
   // gathers canary, suite, and classifier inputs before invoking --decide.
   // `not-run` models the workflow's pre-suite bail; classifyFailure never emits it.
-  if (preflight === GATE_STATES.UNAVAILABLE && classification === 'not-run')
-    return 0;
+  if (classification === 'not-run') return exitCode || 1;
   if (exitCode === 0) return 0;
   if (
     classification === 'cancellation' ||
