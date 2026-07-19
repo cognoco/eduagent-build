@@ -33,11 +33,15 @@ import {
   membership,
   subscription,
   quotaPools,
+  usageEvents,
   type Database,
 } from '@eduagent/database';
 import { getTierConfig } from '../../subscription';
 import { updateSubscriptionFromRevenuecatWebhookV2 } from './revenuecat-v2';
 import { handleInitialPurchaseV2 } from './revenuecat-webhook-handler-v2';
+import { getEffectiveAccessForSubscriptionV2 } from './access-v2';
+import { getFamilyPoolStatusV2 } from './family-v2';
+import { addMonthsClamped } from '../billing-shared';
 import type { RevenueCatEvent } from '../revenuecat-shared';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../../..'));
@@ -225,6 +229,8 @@ const RUN = !!process.env.DATABASE_URL;
     async function seedIdentityWithFreeSubscription(): Promise<{
       organizationId: string;
       clerkUserId: string;
+      subscriptionId: string;
+      payerPersonId: string;
     }> {
       const clerkUserId = `clerk_${generateUUIDv7()}`;
       const email = `wi693rcfs_${generateUUIDv7()}@test.local`;
@@ -279,7 +285,12 @@ const RUN = !!process.env.DATABASE_URL;
         cycleResetAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      return { organizationId: org!.id, clerkUserId };
+      return {
+        organizationId: org!.id,
+        clerkUserId,
+        subscriptionId: subId,
+        payerPersonId: personRow!.id,
+      };
     }
 
     function familyShareEvent(
@@ -349,6 +360,52 @@ const RUN = !!process.env.DATABASE_URL;
       // the seeded id already tracked in seededSubIds).
       expect(after!.planTier).toBe('plus');
       expect(after!.status).toBe('active');
+    });
+
+    it('[WI-2194] anchors a RevenueCat Family purchase to one readable shared-pool cycle', async () => {
+      const seeded = await seedIdentityWithFreeSubscription();
+      const purchasedAtMs = Date.now() - 24 * 60 * 60 * 1000;
+      const purchasedAt = new Date(purchasedAtMs);
+      const expectedResetAt = addMonthsClamped(purchasedAt, 1);
+      await db.insert(usageEvents).values([
+        {
+          subscriptionId: seeded.subscriptionId,
+          profileId: seeded.payerPersonId,
+          occurredAt: new Date(purchasedAtMs - 1),
+          delta: 1,
+        },
+        {
+          subscriptionId: seeded.subscriptionId,
+          profileId: seeded.payerPersonId,
+          occurredAt: purchasedAt,
+          delta: 1,
+        },
+      ]);
+
+      await handleInitialPurchaseV2(
+        db,
+        undefined,
+        familyShareEvent(seeded.clerkUserId, {
+          is_family_share: false,
+          product_id: 'com.eduagent.family.monthly',
+          purchased_at_ms: purchasedAtMs,
+          expiration_at_ms: expectedResetAt.getTime(),
+        }),
+      );
+
+      const access = await getEffectiveAccessForSubscriptionV2(
+        db,
+        seeded.subscriptionId,
+      );
+      expect(access).not.toBeNull();
+      if (!access) throw new Error('Expected Family effective access');
+      await expect(
+        getFamilyPoolStatusV2(db, seeded.subscriptionId, access),
+      ).resolves.toMatchObject({
+        cycleStartAt: purchasedAt.toISOString(),
+        cycleResetAt: expectedResetAt.toISOString(),
+        usedThisMonth: 1,
+      });
     });
 
     it('[BREAK BUG-116] concurrent same-event-id RevenueCat deliveries write only once (v2)', async () => {
