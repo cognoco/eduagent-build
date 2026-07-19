@@ -21,9 +21,10 @@ tags:
 - tapOn:
     id: 'tab-journal'
     retryTapIfNoChange: true
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: 'journal-recaps-empty'
+    direction: DOWN
     timeout: 15000
 - assertVisible:
     id: 'journal-recaps-empty-start-session'
