@@ -35,7 +35,8 @@ tags:
     text: '^Open account settings for Test Child$'
 - assertVisible:
     id: 'subjects-browse-row-${SUBJECT_ID}'
-    text: '^Child Learning Data$'
+    containsDescendants:
+      - text: '^Child Learning Data$'
 - tapOn:
     id: 'account-avatar-button'
 - extendedWaitUntil:
@@ -101,6 +102,7 @@ tags:
     text: '^Open account settings for Test Child$'
 - assertVisible:
     id: 'subjects-browse-row-${SUBJECT_ID}'
-    text: '^Child Learning Data$'
+    containsDescendants:
+      - text: '^Child Learning Data$'
 - assertNotVisible:
     id: 'learner-screen'

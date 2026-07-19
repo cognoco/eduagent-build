@@ -486,6 +486,7 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
     command: string;
     id?: string;
     text?: string;
+    descendantText?: string;
     selected?: boolean;
     value?: string;
   };
@@ -527,12 +528,17 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
 
     const record = value as Record<string, unknown>;
     if (expected.id !== undefined) {
-      const serialized = JSON.stringify(value);
-      if (
-        record.id !== expected.id &&
-        !serialized.includes(`"id":"${expected.id}"`)
-      ) {
+      if (expected.descendantText !== undefined && record.id !== expected.id) {
         return false;
+      }
+      if (expected.descendantText === undefined) {
+        const serialized = JSON.stringify(value);
+        if (
+          record.id !== expected.id &&
+          !serialized.includes(`"id":"${expected.id}"`)
+        ) {
+          return false;
+        }
       }
     }
     if (expected.text !== undefined) {
@@ -540,6 +546,21 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
       if (
         record.text !== expected.text &&
         !serialized.includes(`"text":"${expected.text}"`)
+      ) {
+        return false;
+      }
+    }
+    if (expected.descendantText !== undefined) {
+      const containsDescendants = record.containsDescendants;
+      if (
+        !Array.isArray(containsDescendants) ||
+        !containsDescendants.some(
+          (descendant) =>
+            typeof descendant === 'object' &&
+            descendant !== null &&
+            (descendant as Record<string, unknown>).text ===
+              expected.descendantText,
+        )
       ) {
         return false;
       }
@@ -590,6 +611,14 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
   const waitVisible = (id: string): MaestroExpectation => ({
     command: 'extendedWaitUntil',
     id,
+  });
+  const visibleWithDescendant = (
+    id: string,
+    descendantText: string,
+  ): MaestroExpectation => ({
+    command: 'assertVisible',
+    id,
+    descendantText,
   });
   const tap = (id: string): MaestroExpectation => ({
     command: 'tapOn',
@@ -790,7 +819,10 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
         'account-avatar-button',
         '^Open account settings for Test Child$',
       ),
-      visible('subjects-browse-row-${SUBJECT_ID}', '^Child Learning Data$'),
+      visibleWithDescendant(
+        'subjects-browse-row-${SUBJECT_ID}',
+        '^Child Learning Data$',
+      ),
       tap('account-avatar-button'),
       waitVisible('account-screen'),
       visible(undefined, '^Test Child$'),
@@ -801,8 +833,33 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
         'account-avatar-button',
         '^Open account settings for Test Child$',
       ),
-      visible('subjects-browse-row-${SUBJECT_ID}', '^Child Learning Data$'),
+      visibleWithDescendant(
+        'subjects-browse-row-${SUBJECT_ID}',
+        '^Child Learning Data$',
+      ),
     ]);
+  });
+
+  it('rejects a common ancestor whose sibling descendants split the expected row id and title', () => {
+    const commonAncestor = {
+      assertVisible: {
+        id: 'subjects-browse-list',
+        containsDescendants: [
+          { id: 'subjects-browse-row-${SUBJECT_ID}' },
+          { text: '^Child Learning Data$' },
+        ],
+      },
+    };
+
+    expect(
+      matchesMaestroCommand(
+        commonAncestor,
+        visibleWithDescendant(
+          'subjects-browse-row-${SUBJECT_ID}',
+          '^Child Learning Data$',
+        ),
+      ),
+    ).toBe(false);
   });
 
   it('keeps every WI-2240 Maestro assertion hard', () => {
