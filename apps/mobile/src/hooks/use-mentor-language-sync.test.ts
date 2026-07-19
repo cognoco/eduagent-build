@@ -80,6 +80,24 @@ describe('useMentorLanguageSync', () => {
     );
   });
 
+  it('[WI-2098 recovery] retries automatic sync after one marker-read failure for an unmarked profile', async () => {
+    jest
+      .mocked(ExpoSecureStore.getItemAsync)
+      .mockRejectedValueOnce(new Error('storage unavailable'));
+    renderHook(() => useMentorLanguageSync());
+
+    await i18next.changeLanguage('ja');
+    await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
+    await i18next.changeLanguage('de');
+
+    await waitFor(() =>
+      expect(mockMutate).toHaveBeenCalledWith(
+        { conversationLanguage: 'de' },
+        expect.any(Object),
+      ),
+    );
+  });
+
   it('[WI-2098 AC-1] preserves an explicitly selected mentor language when app language changes', async () => {
     await ExpoSecureStore.setItemAsync(
       'mentorLanguageExplicitOverride_profile-1',

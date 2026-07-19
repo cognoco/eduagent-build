@@ -1,6 +1,7 @@
 import i18nextInstance from 'i18next';
 import * as ExpoSecureStore from 'expo-secure-store';
 import { fireEvent, act, waitFor } from '@testing-library/react-native';
+import { useQuery } from '@tanstack/react-query';
 import {
   renderScreen,
   cleanupScreen,
@@ -10,6 +11,9 @@ import {
   fetchCallsMatching,
   extractJsonBody,
 } from '../../../test-utils/mock-api-routes';
+import { useMentorLanguageSync } from '../../../hooks/use-mentor-language-sync';
+import { queryKeys } from '../../../lib/query-keys';
+import { clearProfileSecureStorageOnSignOut } from '../../../lib/sign-out-cleanup';
 
 // ─── Boundary mocks (native/external runtime only) ──────────────────────
 //
@@ -63,6 +67,22 @@ jest.mock(/* gc1-allow: native-boundary — wraps native Alert */ '../../../lib/
 
 const MentorLanguageScreen = require('./mentor-language').default;
 
+function MentorLanguageWithSync({
+  onProfilesRefetch,
+}: {
+  onProfilesRefetch?: () => Promise<void>;
+}): React.ReactElement {
+  useMentorLanguageSync();
+  useQuery({
+    queryKey: queryKeys.profiles.list(undefined),
+    queryFn: async () => {
+      await onProfilesRefetch?.();
+      return [];
+    },
+  });
+  return <MentorLanguageScreen />;
+}
+
 // ─── Fixtures ────────────────────────────────────────────────────────────
 
 const owner = createTestProfile({
@@ -93,10 +113,18 @@ describe('MentorLanguageScreen', () => {
     mockCanGoBack.mockReturnValue(false);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     if (active) active.cleanup();
     active = null;
     cleanupScreen();
+    await clearProfileSecureStorageOnSignOut([
+      'profile-1',
+      'profile-race',
+      'profile-unmount',
+      'profile-retry',
+      'profile-failure',
+    ]);
+    await i18nextInstance.changeLanguage('en');
     jest.clearAllMocks();
   });
 
@@ -185,6 +213,213 @@ describe('MentorLanguageScreen', () => {
       'mentorLanguageExplicitOverride_profile-1',
       'true',
     );
+  });
+
+  it('[WI-2098 adversarial] protects an explicit choice during profile invalidation before the screen callback can run', async () => {
+    const raceProfile = createTestProfile({
+      ...owner,
+      id: 'profile-race',
+      conversationLanguage: 'de',
+    });
+    const patchLanguages: string[] = [];
+    let refetches = 0;
+    await i18nextInstance.changeLanguage('de');
+
+    active = renderScreen(
+      <MentorLanguageWithSync
+        onProfilesRefetch={async () => {
+          refetches += 1;
+          if (refetches === 2) {
+            i18nextInstance.emit('languageChanged', 'de');
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+        }}
+      />,
+      {
+        profile: raceProfile,
+        routes: {
+          '/onboarding/': (_url: string, init?: RequestInit) => {
+            const body = JSON.parse(String(init?.body)) as {
+              conversationLanguage: string;
+            };
+            patchLanguages.push(body.conversationLanguage);
+            raceProfile.conversationLanguage = body.conversationLanguage;
+            return { success: true };
+          },
+        },
+      },
+    );
+
+    await waitFor(() => expect(refetches).toBe(1));
+    fireEvent.press(active.result.getByTestId('mentor-language-option-en'));
+
+    await waitFor(() => expect(refetches).toBeGreaterThanOrEqual(2));
+    await waitFor(() =>
+      expect(
+        ExpoSecureStore.getItemAsync(
+          'mentorLanguageExplicitOverride_profile-race',
+        ),
+      ).resolves.toBe('true'),
+    );
+    expect(patchLanguages).toEqual(['en']);
+    expect(raceProfile.conversationLanguage).toBe('en');
+  });
+
+  it('[WI-2098 AC-4] preserves API order and marker across explicit choice, app change, and explicit choice back', async () => {
+    const orderedProfile = createTestProfile({
+      ...owner,
+      id: 'profile-race',
+      conversationLanguage: 'de',
+    });
+    const patchLanguages: string[] = [];
+    await i18nextInstance.changeLanguage('de');
+
+    active = renderScreen(<MentorLanguageWithSync />, {
+      profile: orderedProfile,
+      routes: {
+        '/onboarding/': (_url: string, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body)) as {
+            conversationLanguage: string;
+          };
+          patchLanguages.push(body.conversationLanguage);
+          orderedProfile.conversationLanguage = body.conversationLanguage;
+          return { success: true };
+        },
+      },
+    });
+
+    fireEvent.press(active.result.getByTestId('mentor-language-option-en'));
+    await waitFor(() => expect(patchLanguages).toEqual(['en']));
+    await act(async () => {
+      await i18nextInstance.changeLanguage('ja');
+    });
+    fireEvent.press(active.result.getByTestId('mentor-language-option-de'));
+
+    await waitFor(() => expect(patchLanguages).toEqual(['en', 'de']));
+    expect(orderedProfile.conversationLanguage).toBe('de');
+    await expect(
+      ExpoSecureStore.getItemAsync(
+        'mentorLanguageExplicitOverride_profile-race',
+      ),
+    ).resolves.toBe('true');
+  });
+
+  it('[WI-2098 lifecycle] persists the marker when the screen unmounts before the API resolves', async () => {
+    let resolveSave!: () => void;
+    const saveGate = new Promise<void>((resolve) => {
+      resolveSave = resolve;
+    });
+    const unmountProfile = createTestProfile({
+      ...owner,
+      id: 'profile-unmount',
+    });
+    active = renderScreen(<MentorLanguageScreen />, {
+      profile: unmountProfile,
+      routes: {
+        '/onboarding/': async () => {
+          await saveGate;
+          return { success: true };
+        },
+      },
+    });
+
+    fireEvent.press(active.result.getByTestId('mentor-language-option-es'));
+    active.result.unmount();
+    resolveSave();
+
+    await waitFor(() =>
+      expect(
+        ExpoSecureStore.getItemAsync(
+          'mentorLanguageExplicitOverride_profile-unmount',
+        ),
+      ).resolves.toBe('true'),
+    );
+  });
+
+  it('[WI-2098 recovery] protects the explicit value and retries marker persistence after one storage failure', async () => {
+    const retryProfile = createTestProfile({
+      ...owner,
+      id: 'profile-retry',
+      conversationLanguage: 'de',
+    });
+    const patchLanguages: string[] = [];
+    const realSetItem = ExpoSecureStore.setItemAsync.getMockImplementation();
+    ExpoSecureStore.setItemAsync
+      .mockRejectedValueOnce(new Error('storage unavailable'))
+      .mockImplementation(realSetItem!);
+    await i18nextInstance.changeLanguage('de');
+    active = renderScreen(<MentorLanguageWithSync />, {
+      profile: retryProfile,
+      routes: {
+        '/onboarding/': (_url: string, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body)) as {
+            conversationLanguage: string;
+          };
+          patchLanguages.push(body.conversationLanguage);
+          retryProfile.conversationLanguage = body.conversationLanguage;
+          return { success: true };
+        },
+      },
+    });
+
+    fireEvent.press(active.result.getByTestId('mentor-language-option-en'));
+    await waitFor(() => expect(patchLanguages).toEqual(['en']));
+    await act(async () => {
+      await i18nextInstance.changeLanguage('ja');
+    });
+
+    await waitFor(() =>
+      expect(
+        ExpoSecureStore.getItemAsync(
+          'mentorLanguageExplicitOverride_profile-retry',
+        ),
+      ).resolves.toBe('true'),
+    );
+    expect(patchLanguages).toEqual(['en']);
+  });
+
+  it('[WI-2098 failure] clears in-flight coordination after API failure without creating a marker', async () => {
+    const failureProfile = createTestProfile({
+      ...owner,
+      id: 'profile-failure',
+      conversationLanguage: 'de',
+    });
+    const patchLanguages: string[] = [];
+    let failExplicit = true;
+    await i18nextInstance.changeLanguage('de');
+    active = renderScreen(<MentorLanguageWithSync />, {
+      profile: failureProfile,
+      routes: {
+        '/onboarding/': (_url: string, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body)) as {
+            conversationLanguage: string;
+          };
+          patchLanguages.push(body.conversationLanguage);
+          if (failExplicit) {
+            failExplicit = false;
+            return new Response(JSON.stringify({ error: 'save failed' }), {
+              status: 500,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          failureProfile.conversationLanguage = body.conversationLanguage;
+          return { success: true };
+        },
+      },
+    });
+
+    fireEvent.press(active.result.getByTestId('mentor-language-option-en'));
+    await waitFor(() => expect(mockPlatformAlert).toHaveBeenCalled());
+    await act(async () => {
+      await i18nextInstance.changeLanguage('ja');
+    });
+
+    await waitFor(() => expect(patchLanguages).toEqual(['en', 'ja']));
+    await expect(
+      ExpoSecureStore.getItemAsync(
+        'mentorLanguageExplicitOverride_profile-failure',
+      ),
+    ).resolves.toBeNull();
   });
 
   it('writes a linked child conversation language via the guardian route, keyed by childProfileId', async () => {

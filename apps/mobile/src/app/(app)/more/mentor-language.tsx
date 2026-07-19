@@ -16,9 +16,8 @@ import {
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useProfile } from '../../../lib/profile';
-import * as SecureStore from '../../../lib/secure-storage';
-import { mentorLanguageExplicitOverrideKey } from '../../../lib/secure-store-keys';
 import { useThemeColors } from '../../../lib/theme';
+import { beginExplicitMentorLanguageUpdate } from '../../../lib/mentor-language-coordination';
 
 // WI-1496 — reads/writes profiles.conversationLanguage (the LLM tutor-prose
 // language) via the existing onboarding hook. This screen must NEVER touch
@@ -71,21 +70,19 @@ export default function MentorLanguageScreen(): React.ReactElement {
     (lang: ConversationLanguage) => {
       if (lang === currentLanguage) return;
       const targetProfileId = targetProfile?.id;
+      if (!targetProfileId) return;
+      const explicitOperation =
+        beginExplicitMentorLanguageUpdate(targetProfileId);
       updateConversationLanguage.mutate(
         {
           conversationLanguage: lang,
+          explicitOperation,
           childProfileId:
             canEditChildPreferences && childProfileId
               ? childProfileId
               : undefined,
         },
         {
-          onSuccess: async () => {
-            if (!targetProfileId) return;
-            const markerKey =
-              mentorLanguageExplicitOverrideKey(targetProfileId);
-            await SecureStore.setItemAsync(markerKey, 'true');
-          },
           onError: () => {
             platformAlert(
               t('more.errors.couldNotSaveSetting'),

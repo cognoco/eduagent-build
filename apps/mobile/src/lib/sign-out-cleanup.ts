@@ -14,6 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearMentorLanguageCoordination } from './mentor-language-coordination';
 
 import * as SecureStore from './secure-storage';
 import { sanitizeSecureStoreKey } from './secure-storage';
@@ -261,6 +262,7 @@ const ASYNCSTORAGE_PREFIX_WIPE: ReadonlyArray<string> = [
 export async function clearProfileSecureStorageOnSignOut(
   profileIds: ReadonlyArray<string>,
 ): Promise<void> {
+  clearMentorLanguageCoordination(profileIds);
   const keys = new Set<string>();
 
   for (const profileId of profileIds) {

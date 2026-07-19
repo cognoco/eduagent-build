@@ -9,6 +9,11 @@
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ExpoSecureStore from 'expo-secure-store';
+import {
+  beginExplicitMentorLanguageUpdate,
+  completeExplicitMentorLanguageUpdate,
+  shouldSuppressMentorLanguageAutoSync,
+} from './mentor-language-coordination';
 
 const mockDelete = jest.mocked(ExpoSecureStore.deleteItemAsync);
 
@@ -81,6 +86,27 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
         ]),
       );
     }
+  });
+
+  it('[WI-2098 coordination] clears only the signed-out profiles in memory as well as durable storage', async () => {
+    await completeExplicitMentorLanguageUpdate(
+      beginExplicitMentorLanguageUpdate('profile-a'),
+    );
+    await completeExplicitMentorLanguageUpdate(
+      beginExplicitMentorLanguageUpdate('profile-b'),
+    );
+
+    await clearProfileSecureStorageOnSignOut(['profile-a']);
+
+    await expect(
+      ExpoSecureStore.getItemAsync('mentorLanguageExplicitOverride_profile-a'),
+    ).resolves.toBeNull();
+    await expect(
+      shouldSuppressMentorLanguageAutoSync('profile-a'),
+    ).resolves.toBe(false);
+    await expect(
+      shouldSuppressMentorLanguageAutoSync('profile-b'),
+    ).resolves.toBe(true);
   });
 
   it('survives per-key delete failures (best-effort)', async () => {
