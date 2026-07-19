@@ -58,34 +58,6 @@ export function nextMonthlyReset(now: Date): Date {
 }
 
 /**
- * Shift a UTC billing-cycle anchor by whole months without Date's end-of-month
- * overflow (for example, March 31 minus one month is February 28/29, never
- * March 3). The time-of-day is preserved.
- */
-export function shiftUtcMonthClamped(anchor: Date, monthOffset: number): Date {
-  const firstOfTargetMonth = new Date(
-    Date.UTC(
-      anchor.getUTCFullYear(),
-      anchor.getUTCMonth() + monthOffset,
-      1,
-      anchor.getUTCHours(),
-      anchor.getUTCMinutes(),
-      anchor.getUTCSeconds(),
-      anchor.getUTCMilliseconds(),
-    ),
-  );
-  const lastTargetDay = new Date(
-    Date.UTC(
-      firstOfTargetMonth.getUTCFullYear(),
-      firstOfTargetMonth.getUTCMonth() + 1,
-      0,
-    ),
-  ).getUTCDate();
-  firstOfTargetMonth.setUTCDate(Math.min(anchor.getUTCDate(), lastTargetDay));
-  return firstOfTargetMonth;
-}
-
-/**
  * Extract per-profile quota limits for a tier + role pair.
  * Returns null when the tier does not use the per-profile quota model, or when
  * the monthly limit for this role is null (shared-pool tiers set ownerMonthlyQuota=null).

@@ -34,7 +34,7 @@ import { getTierConfig, resolveEffectiveAccessTier } from '../../subscription';
 import type { SubscriptionRow } from '../types';
 import { createLogger } from '../../logger';
 import { captureException } from '../../sentry';
-import { shiftUtcMonthClamped } from '../billing-shared';
+import { addMonthsClamped } from '../billing-shared';
 import { getSubscriptionByAccountIdV2 } from './subscription-core-v2';
 import {
   getEffectiveAccessForSubscriptionV2,
@@ -380,10 +380,7 @@ export async function getFamilyPoolStatusV2(
     // Family/Pro quotas reset monthly even when the paid subscription period
     // is annual. The locked quota row owns that monthly boundary; using the
     // subscription period start would leak earlier months into this cycle.
-    const cycleStartAt = shiftUtcMonthClamped(
-      pool.cycleResetAt,
-      -1,
-    ).toISOString();
+    const cycleStartAt = addMonthsClamped(pool.cycleResetAt, -1).toISOString();
 
     const members = await tx
       .select({
