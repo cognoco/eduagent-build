@@ -9,6 +9,7 @@ import {
   login,
   membership,
   retentionCards,
+  sessionEvents,
   usageEvents,
   type Database,
 } from '@eduagent/database';
@@ -320,7 +321,7 @@ describe('seedScenario', () => {
     },
   );
 
-  it('[WI-2234] seeds exactly one unfinished session and one due review on distinct topics', async () => {
+  it('[WI-2234] seeds one unfinished session and due review on distinct topics with scoped transcript events', async () => {
     const db = createMockDb();
     const result = await seedScenario(
       db,
@@ -346,6 +347,10 @@ describe('seedScenario', () => {
       nextReviewAt: Date;
       topicId: string;
     }>;
+    const transcriptEvents = insertedRowsFor(sessionEvents) as Array<{
+      sessionId: string;
+      topicId?: string;
+    }>;
 
     expect(seededSessions).toHaveLength(1);
     expect(seededSessions[0]).toMatchObject({
@@ -358,6 +363,14 @@ describe('seedScenario', () => {
     });
     expect(seededReviews[0]!.nextReviewAt.getTime()).toBeLessThan(Date.now());
     expect(seededReviews[0]!.topicId).not.toBe(seededSessions[0]!.topicId);
+    expect(transcriptEvents).not.toHaveLength(0);
+    expect(
+      transcriptEvents.every(
+        (event) =>
+          event.sessionId === seededSessions[0]!.id &&
+          event.topicId === seededSessions[0]!.topicId,
+      ),
+    ).toBe(true);
   });
 
   it('throws for unknown scenario', async () => {
