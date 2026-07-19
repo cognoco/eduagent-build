@@ -1,4 +1,58 @@
 {
+  "celebrationEarnedContext": {
+    "polar_star": {
+      "child": "Estrella Polar: ¡tu primera respuesta independiente!",
+      "adult": "Estrella Polar: primera respuesta independiente."
+    },
+    "twin_stars": {
+      "child": "Estrellas Gemelas: ¡tres respuestas sólidas seguidas!",
+      "adult": "Estrellas Gemelas: tres respuestas sólidas seguidas."
+    },
+    "comet": {
+      "child": "Cometa: ¡lo has entendido!",
+      "adult": "Cometa: un concepto quedó claro."
+    },
+    "orions_belt": {
+      "child": "Cinturón de Orión: ¡cinco seguidas sin ayuda!",
+      "adult": "Cinturón de Orión: cinco respuestas independientes seguidas."
+    },
+    "deep_diver": {
+      "child": "Exploración Profunda: ¡respuestas muy bien pensadas!",
+      "adult": "Exploración Profunda: hito logrado con respuestas reflexivas."
+    },
+    "persistent": {
+      "child": "Perseverancia: ¡seguiste después de una corrección!",
+      "adult": "Perseverancia: continuó después de una corrección."
+    },
+    "topic_mastered": {
+      "child": "Cometa: ¡has dominado este tema!",
+      "adult": "Cometa: tema dominado."
+    },
+    "evaluate_success": {
+      "child": "Estrellas Gemelas: ¡detectaste el fallo!",
+      "adult": "Estrellas Gemelas: respuesta evaluada correctamente."
+    },
+    "teach_back_success": {
+      "child": "Estrellas Gemelas: ¡lo explicaste con claridad!",
+      "adult": "Estrellas Gemelas: explicación clara completada."
+    },
+    "streak_7": {
+      "child": "Cometa: ¡siete días aprendiendo seguidos!",
+      "adult": "Cometa: racha de aprendizaje de siete días."
+    },
+    "streak_30": {
+      "child": "Cinturón de Orión: ¡30 días aprendiendo seguidos!",
+      "adult": "Cinturón de Orión: racha de aprendizaje de treinta días."
+    },
+    "curriculum_complete": {
+      "child": "Cometa: ¡has completado el plan de estudios!",
+      "adult": "Cometa: plan de estudios completado."
+    },
+    "default": {
+      "child": "Hito conseguido: ¡bien hecho!",
+      "adult": "Hito conseguido."
+    }
+  },
   "common": {
     "cancel": "Cancelar",
     "ok": "Aceptar",

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text } from 'react-native';
 import type { ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type {
   AccommodationMode,
   CelebrationLevel,
@@ -10,9 +12,15 @@ import type {
 } from '@eduagent/schemas';
 import { Comet, OrionsBelt, PolarStar, TwinStars } from '../components/common';
 import { resolveCelebrationLevelForAccommodation } from '../lib/celebration-level';
-import { getMilestoneLabel } from './use-milestone-tracker';
 
 type QueueEntry = PendingCelebration;
+type ProfileDeliveryState = {
+  profileId: string | null;
+  activeEntry: QueueEntry | null;
+  pendingQueue: QueueEntry[];
+  generation: number;
+  completedGeneration: number;
+};
 
 const CELEBRATION_REGISTRY: Record<
   CelebrationName,
@@ -33,8 +41,65 @@ const CELEBRATION_REGISTRY: Record<
   orions_belt: { tier: 4, Component: OrionsBelt },
 };
 
-function getCelebrationMessage(reason: CelebrationReason): string {
-  return getMilestoneLabel(reason);
+function getCelebrationMessage(
+  t: TFunction,
+  reason: CelebrationReason,
+  audience: 'child' | 'adult',
+): string {
+  switch (reason) {
+    case 'polar_star':
+      return audience === 'child'
+        ? t('celebrationEarnedContext.polar_star.child')
+        : t('celebrationEarnedContext.polar_star.adult');
+    case 'twin_stars':
+      return audience === 'child'
+        ? t('celebrationEarnedContext.twin_stars.child')
+        : t('celebrationEarnedContext.twin_stars.adult');
+    case 'comet':
+      return audience === 'child'
+        ? t('celebrationEarnedContext.comet.child')
+        : t('celebrationEarnedContext.comet.adult');
+    case 'orions_belt':
+      return audience === 'child'
+        ? t('celebrationEarnedContext.orions_belt.child')
+        : t('celebrationEarnedContext.orions_belt.adult');
+    case 'deep_diver':
+      return audience === 'child'
+        ? t('celebrationEarnedContext.deep_diver.child')
+        : t('celebrationEarnedContext.deep_diver.adult');
+    case 'persistent':
+      return audience === 'child'
+        ? t('celebrationEarnedContext.persistent.child')
+        : t('celebrationEarnedContext.persistent.adult');
+    case 'topic_mastered':
+      return audience === 'child'
+        ? t('celebrationEarnedContext.topic_mastered.child')
+        : t('celebrationEarnedContext.topic_mastered.adult');
+    case 'evaluate_success':
+      return audience === 'child'
+        ? t('celebrationEarnedContext.evaluate_success.child')
+        : t('celebrationEarnedContext.evaluate_success.adult');
+    case 'teach_back_success':
+      return audience === 'child'
+        ? t('celebrationEarnedContext.teach_back_success.child')
+        : t('celebrationEarnedContext.teach_back_success.adult');
+    case 'streak_7':
+      return audience === 'child'
+        ? t('celebrationEarnedContext.streak_7.child')
+        : t('celebrationEarnedContext.streak_7.adult');
+    case 'streak_30':
+      return audience === 'child'
+        ? t('celebrationEarnedContext.streak_30.child')
+        : t('celebrationEarnedContext.streak_30.adult');
+    case 'curriculum_complete':
+      return audience === 'child'
+        ? t('celebrationEarnedContext.curriculum_complete.child')
+        : t('celebrationEarnedContext.curriculum_complete.adult');
+    default:
+      return audience === 'child'
+        ? t('celebrationEarnedContext.default.child')
+        : t('celebrationEarnedContext.default.adult');
+  }
 }
 
 function filterByLevel(
@@ -60,34 +125,28 @@ export function useCelebration(options?: {
   celebrationLevel?: CelebrationLevel;
   accommodationMode?: AccommodationMode;
   audience?: 'child' | 'adult';
-  onAllComplete?: () => void;
+  onAllComplete?: (profileId: string | null) => void;
 }) {
+  const { t } = useTranslation();
   const celebrationLevel = resolveCelebrationLevelForAccommodation(
     options?.accommodationMode,
     options?.celebrationLevel ?? 'all',
   );
-  const [activeEntry, setActiveEntry] = useState<QueueEntry | null>(null);
-  const [pendingQueue, setPendingQueue] = useState<QueueEntry[]>([]);
+  const [deliveryByProfile, setDeliveryByProfile] = useState<
+    Map<string, ProfileDeliveryState>
+  >(new Map());
   const seenQueueKeysByProfileRef = useRef<Map<string, Set<string>>>(new Map());
-  const profileKey = options?.profileId ?? '__default__';
+  const notifiedGenerationByProfileRef = useRef<Map<string, number>>(new Map());
+  const profileId = options?.profileId ?? null;
+  const profileKey = profileId ?? '__default__';
+  const activeDelivery = deliveryByProfile.get(profileKey);
+  const activeEntry = activeDelivery?.activeEntry ?? null;
+  const audience = options?.audience ?? 'child';
 
-  // Keep a ref to the latest options so callbacks (e.g. onAllComplete) are
-  // always current without re-creating flushNext on every render.
-  // Assign during render (not in a post-render effect) so the ref is
-  // immediately up-to-date if flushNext fires synchronously in the same cycle.
+  // Keep completion callbacks current without coupling them to queue state.
+  // Assign during render so a completion effect always sees the latest caller.
   const optionsRef = useRef(options);
   optionsRef.current = options;
-
-  const flushNext = useCallback(() => {
-    setPendingQueue((current) => {
-      const [next, ...rest] = current;
-      setActiveEntry(next ?? null);
-      if (!next) {
-        optionsRef.current?.onAllComplete?.();
-      }
-      return rest;
-    });
-  }, []);
 
   useEffect(() => {
     if (!options?.queue || options.queue.length === 0) return;
@@ -96,30 +155,85 @@ export function useCelebration(options?: {
       seenQueueKeys = new Set();
       seenQueueKeysByProfileRef.current.set(profileKey, seenQueueKeys);
     }
-    const unseen = options.queue
-      .map((entry) => ({ entry, key: getQueueEntryKey(entry) }))
-      .filter(
-        ({ entry, key }) =>
-          !seenQueueKeys.has(key) && filterByLevel(entry, celebrationLevel),
-      );
-
-    if (unseen.length === 0) return;
-
-    for (const { key } of unseen) {
-      seenQueueKeys.add(key);
+    const admissionKeys = new Set(seenQueueKeys);
+    const unseen: QueueEntry[] = [];
+    for (const entry of options.queue) {
+      const key = getQueueEntryKey(entry);
+      if (admissionKeys.has(key) || !filterByLevel(entry, celebrationLevel)) {
+        continue;
+      }
+      admissionKeys.add(key);
+      unseen.push(entry);
     }
 
-    setPendingQueue((current) => [
-      ...current,
-      ...unseen.map(({ entry }) => entry),
-    ]);
-  }, [celebrationLevel, options?.queue, profileKey]);
+    const firstUnseen = unseen[0];
+    if (!firstUnseen) return;
+
+    seenQueueKeysByProfileRef.current.set(profileKey, admissionKeys);
+    const remainingUnseen = unseen.slice(1);
+
+    setDeliveryByProfile((current) => {
+      const next = new Map(current);
+      const existing = next.get(profileKey) ?? {
+        profileId,
+        activeEntry: null,
+        pendingQueue: [],
+        generation: 0,
+        completedGeneration: 0,
+      };
+      const isIdle =
+        existing.activeEntry === null && existing.pendingQueue.length === 0;
+      next.set(profileKey, {
+        ...existing,
+        profileId,
+        activeEntry: isIdle ? firstUnseen : existing.activeEntry,
+        pendingQueue: isIdle
+          ? remainingUnseen
+          : [...existing.pendingQueue, ...unseen],
+        generation: isIdle ? existing.generation + 1 : existing.generation,
+      });
+      return next;
+    });
+  }, [celebrationLevel, options?.queue, profileId, profileKey]);
 
   useEffect(() => {
-    if (!activeEntry && pendingQueue.length > 0) {
-      flushNext();
-    }
-  }, [activeEntry, flushNext, pendingQueue.length]);
+    const delivery = deliveryByProfile.get(profileKey);
+    if (!delivery) return;
+    const notifiedGeneration =
+      notifiedGenerationByProfileRef.current.get(profileKey) ?? 0;
+    if (delivery.completedGeneration <= notifiedGeneration) return;
+    notifiedGenerationByProfileRef.current.set(
+      profileKey,
+      delivery.completedGeneration,
+    );
+    optionsRef.current?.onAllComplete?.(delivery.profileId);
+  }, [deliveryByProfile, profileKey]);
+
+  const completeActiveEntry = useCallback(
+    (ownerKey: string, entryKey: string) => {
+      setDeliveryByProfile((current) => {
+        const existing = current.get(ownerKey);
+        if (
+          !existing?.activeEntry ||
+          getQueueEntryKey(existing.activeEntry) !== entryKey
+        ) {
+          return current;
+        }
+        const [nextEntry, ...remaining] = existing.pendingQueue;
+        const next = new Map(current);
+        next.set(ownerKey, {
+          ...existing,
+          activeEntry: nextEntry ?? null,
+          pendingQueue: remaining,
+          completedGeneration: nextEntry
+            ? existing.completedGeneration
+            : existing.generation,
+        });
+        return next;
+      });
+    },
+    [],
+  );
 
   const trigger = useCallback(
     (entry: Omit<QueueEntry, 'queuedAt'>) => {
@@ -130,14 +244,35 @@ export function useCelebration(options?: {
       if (!filterByLevel(nextEntry, celebrationLevel)) {
         return;
       }
-      setPendingQueue((current) => [...current, nextEntry]);
+      setDeliveryByProfile((current) => {
+        const next = new Map(current);
+        const existing = next.get(profileKey) ?? {
+          profileId,
+          activeEntry: null,
+          pendingQueue: [],
+          generation: 0,
+          completedGeneration: 0,
+        };
+        const isIdle =
+          existing.activeEntry === null && existing.pendingQueue.length === 0;
+        next.set(profileKey, {
+          ...existing,
+          activeEntry: isIdle ? nextEntry : existing.activeEntry,
+          pendingQueue: isIdle
+            ? existing.pendingQueue
+            : [...existing.pendingQueue, nextEntry],
+          generation: isIdle ? existing.generation + 1 : existing.generation,
+        });
+        return next;
+      });
     },
-    [celebrationLevel],
+    [celebrationLevel, profileId, profileKey],
   );
 
   const CelebrationOverlay = useMemo(() => {
     if (!activeEntry) return null;
     const Component = CELEBRATION_REGISTRY[activeEntry.celebration].Component;
+    const activeEntryKey = getQueueEntryKey(activeEntry);
 
     return (
       <View
@@ -145,13 +280,14 @@ export function useCelebration(options?: {
         className="absolute top-24 left-0 right-0 items-center z-50"
       >
         <Component
+          key={`${profileKey}:${activeEntryKey}`}
           onComplete={() => {
-            setActiveEntry(null);
+            completeActiveEntry(profileKey, activeEntryKey);
           }}
         />
         <View className="mt-2 bg-surface/95 rounded-full px-4 py-2">
           <Text className="text-body-sm font-semibold text-text-primary">
-            {getCelebrationMessage(activeEntry.reason)}
+            {getCelebrationMessage(t, activeEntry.reason, audience)}
           </Text>
           {activeEntry.detail ? (
             <Text className="text-caption text-text-secondary text-center mt-1">
@@ -161,7 +297,7 @@ export function useCelebration(options?: {
         </View>
       </View>
     );
-  }, [activeEntry]);
+  }, [activeEntry, audience, completeActiveEntry, profileKey, t]);
 
   return {
     CelebrationOverlay,

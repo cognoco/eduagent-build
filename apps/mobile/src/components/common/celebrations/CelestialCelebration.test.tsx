@@ -1,4 +1,6 @@
 import { act, render, screen } from '@testing-library/react-native';
+import i18next from 'i18next';
+import de from '../../../i18n/locales/de.json';
 
 import { CelestialCelebration } from './CelestialCelebration';
 import { PolarStar } from './PolarStar';
@@ -14,6 +16,8 @@ import type { PendingCelebration } from '@eduagent/schemas';
  * test-setup.ts with a jest.fn() that individual tests can override.
  */
 const mockReduceMotion = jest.fn(() => false);
+const mockDeferTimingCompletion = jest.fn(() => false);
+const mockTimingCompletionCallbacks: Array<(finished: boolean) => void> = [];
 
 jest.mock('react-native-reanimated', () => {
   const { View } = require('react-native');
@@ -42,7 +46,11 @@ jest.mock('react-native-reanimated', () => {
       // on the withTiming callback (e.g., the runOnJS(onComplete) call that
       // fires after the fade-out). This models the external Reanimated
       // runtime's behaviour of calling the callback with finished=true.
-      cb?.(true);
+      if (cb && mockDeferTimingCompletion()) {
+        mockTimingCompletionCallbacks.push(cb);
+      } else {
+        cb?.(true);
+      }
       return v;
     },
     withSpring: (v: unknown) => v,
@@ -65,6 +73,8 @@ jest.mock('react-native-reanimated', () => {
 describe('CelestialCelebration', () => {
   afterEach(() => {
     mockReduceMotion.mockReturnValue(false);
+    mockDeferTimingCompletion.mockReturnValue(false);
+    mockTimingCompletionCallbacks.length = 0;
   });
 
   it('is hidden from assistive technology (decorative animation)', () => {
@@ -117,10 +127,70 @@ describe('CelestialCelebration', () => {
     expect(onComplete).not.toHaveBeenCalled();
 
     act(() => {
-      jest.advanceTimersByTime(1500);
+      jest.advanceTimersByTime(1199);
+    });
+    expect(onComplete).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(1);
     });
 
     expect(onComplete).toHaveBeenCalledTimes(1);
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
+  it('uses the latest callback at the reduced-motion boundary', () => {
+    jest.useFakeTimers();
+    mockReduceMotion.mockReturnValue(true);
+    const firstCallback = jest.fn();
+    const replacementCallback = jest.fn();
+    const { rerender } = render(
+      <CelestialCelebration
+        color="#f7c948"
+        accentColor="#fce588"
+        onComplete={firstCallback}
+      />,
+    );
+
+    rerender(
+      <CelestialCelebration
+        color="#f7c948"
+        accentColor="#fce588"
+        onComplete={replacementCallback}
+      />,
+    );
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+
+    expect(firstCallback).not.toHaveBeenCalled();
+    expect(replacementCallback).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
+  it('cleans up the reduced-motion timer on unmount', () => {
+    jest.useFakeTimers();
+    mockReduceMotion.mockReturnValue(true);
+    const onComplete = jest.fn();
+    const { unmount } = render(
+      <CelestialCelebration
+        color="#f7c948"
+        accentColor="#fce588"
+        onComplete={onComplete}
+      />,
+    );
+
+    unmount();
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+
+    expect(onComplete).not.toHaveBeenCalled();
     jest.useRealTimers();
   });
 
@@ -169,14 +239,54 @@ describe('CelestialCelebration', () => {
 
 function ReducedMotionMilestoneQueue({
   queue,
+  profileId,
+  audience = 'child',
+  onAllComplete,
 }: {
   queue: PendingCelebration[];
+  profileId?: string;
+  audience?: 'child' | 'adult';
+  onAllComplete?: (profileId: string | null) => void;
 }) {
   const { CelebrationOverlay } = useCelebration({
     queue,
+    profileId,
     celebrationLevel: 'all',
+    audience,
+    onAllComplete,
   });
   return CelebrationOverlay;
+}
+
+function milestoneQueue(profile: string, count = 3): PendingCelebration[] {
+  const queuedAt = '2026-01-01T10:00:00.000Z';
+  return [
+    {
+      celebration: 'polar_star',
+      reason: 'polar_star',
+      detail: `${profile} first detail`,
+      queuedAt,
+    },
+    {
+      celebration: 'twin_stars',
+      reason: 'twin_stars',
+      detail: `${profile} second detail`,
+      queuedAt,
+    },
+    {
+      celebration: 'orions_belt',
+      reason: 'orions_belt',
+      detail: `${profile} third detail`,
+      queuedAt,
+    },
+  ].slice(0, count) as PendingCelebration[];
+}
+
+function expectExactlyOneCelestialNode(testID: string): void {
+  expect(
+    screen.getAllByTestId(/^celebration-/, { includeHiddenElements: true }),
+  ).toHaveLength(1);
+  screen.getByTestId(testID, { includeHiddenElements: true });
 }
 
 describe('reduced-motion milestone queue', () => {
@@ -191,50 +301,281 @@ describe('reduced-motion milestone queue', () => {
     mockReduceMotion.mockReturnValue(false);
   });
 
-  it('shows three distinct static confirmations instead of skipping visibility', () => {
-    const queuedAt = '2026-01-01T10:00:00.000Z';
+  it('mounts and drains three confirmations, then completes exactly once', () => {
+    const onAllComplete = jest.fn();
+    const queue = milestoneQueue('profile-A');
     render(
       <ReducedMotionMilestoneQueue
-        queue={[
-          {
-            celebration: 'polar_star',
-            reason: 'polar_star',
-            detail: null,
-            queuedAt,
-          },
-          {
-            celebration: 'twin_stars',
-            reason: 'twin_stars',
-            detail: null,
-            queuedAt,
-          },
-          {
-            celebration: 'orions_belt',
-            reason: 'orions_belt',
-            detail: null,
-            queuedAt,
-          },
-        ]}
+        profileId="profile-A"
+        queue={queue}
+        onAllComplete={onAllComplete}
       />,
     );
 
+    expect(onAllComplete).not.toHaveBeenCalled();
+    expectExactlyOneCelestialNode('celebration-polar-star');
     expect(
       screen.getByText('Polar Star - first independent answer'),
     ).toBeTruthy();
 
     act(() => {
-      jest.advanceTimersByTime(1500);
+      jest.advanceTimersByTime(1200);
     });
+    expectExactlyOneCelestialNode('celebration-twin-stars');
     expect(
       screen.getByText('Twin Stars - three strong answers in a row'),
     ).toBeTruthy();
+    expect(onAllComplete).not.toHaveBeenCalled();
 
     act(() => {
-      jest.advanceTimersByTime(1500);
+      jest.advanceTimersByTime(1200);
     });
+    expectExactlyOneCelestialNode('celebration-orions-belt');
     expect(
       screen.getByText("Orion's Belt - 5 in a row without help!"),
     ).toBeTruthy();
+
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+    expect(
+      screen.queryAllByTestId(/^celebration-/, { includeHiddenElements: true }),
+    ).toHaveLength(0);
+    expect(onAllComplete).toHaveBeenCalledTimes(1);
+    expect(onAllComplete).toHaveBeenCalledWith('profile-A');
+
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(onAllComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not complete on an initial empty render or an ordinary rerender', () => {
+    const onAllComplete = jest.fn();
+    const { rerender } = render(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-A"
+        queue={[]}
+        onAllComplete={onAllComplete}
+      />,
+    );
+
+    rerender(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-A"
+        queue={[]}
+        onAllComplete={onAllComplete}
+      />,
+    );
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+
+    expect(onAllComplete).not.toHaveBeenCalled();
+  });
+
+  it('keeps delivery profile-owned across A to B to A switches', () => {
+    const onAllComplete = jest.fn();
+    const queueA = milestoneQueue('profile-A');
+    const queueB = milestoneQueue('profile-B', 2);
+    const { rerender } = render(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-A"
+        queue={queueA}
+        onAllComplete={onAllComplete}
+      />,
+    );
+
+    expectExactlyOneCelestialNode('celebration-polar-star');
+    screen.getByText('profile-A first detail');
+
+    rerender(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-B"
+        queue={queueB}
+        onAllComplete={onAllComplete}
+      />,
+    );
+    expect(screen.queryByText(/profile-A .* detail/)).toBeNull();
+    screen.getByText('profile-B first detail');
+
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+    screen.getByText('profile-B second detail');
+    expect(screen.queryByText(/profile-A .* detail/)).toBeNull();
+
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+    expect(onAllComplete).toHaveBeenCalledTimes(1);
+    expect(onAllComplete).toHaveBeenLastCalledWith('profile-B');
+
+    rerender(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-A"
+        queue={queueA}
+        onAllComplete={onAllComplete}
+      />,
+    );
+    screen.getByText('profile-A first detail');
+    expect(screen.queryByText(/profile-B .* detail/)).toBeNull();
+
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+    screen.getByText('profile-A second detail');
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+    screen.getByText('profile-A third detail');
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+
+    expect(onAllComplete).toHaveBeenCalledTimes(2);
+    expect(onAllComplete).toHaveBeenLastCalledWith('profile-A');
+  });
+
+  it('admits one confirmation for exact duplicates in one snapshot', () => {
+    const onAllComplete = jest.fn();
+    const entry = milestoneQueue('profile-A', 1)[0]!;
+    render(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-A"
+        queue={[entry, entry]}
+        onAllComplete={onAllComplete}
+      />,
+    );
+
+    expectExactlyOneCelestialNode('celebration-polar-star');
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+
+    expect(
+      screen.queryAllByTestId(/^celebration-/, { includeHiddenElements: true }),
+    ).toHaveLength(0);
+    expect(onAllComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses fresh completion callback after rerender', () => {
+    const firstCallback = jest.fn();
+    const replacementCallback = jest.fn();
+    const queue = milestoneQueue('profile-A', 1);
+    const { rerender } = render(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-A"
+        queue={queue}
+        onAllComplete={firstCallback}
+      />,
+    );
+
+    rerender(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-A"
+        queue={queue}
+        onAllComplete={replacementCallback}
+      />,
+    );
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+
+    expect(firstCallback).not.toHaveBeenCalled();
+    expect(replacementCallback).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders localized child and adult earned-context copy', async () => {
+    const originalLanguage = i18next.language;
+    i18next.addResourceBundle('de', 'translation', de, true, true);
+    await i18next.changeLanguage('de');
+
+    const queue = milestoneQueue('profile-A', 1);
+    const { rerender, unmount } = render(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-A"
+        queue={queue}
+        audience="child"
+      />,
+    );
+    screen.getByText('Polarstern – deine erste selbstständige Antwort!');
+
+    rerender(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-B"
+        queue={queue}
+        audience="adult"
+      />,
+    );
+    screen.getByText('Polarstern – erste selbstständige Antwort.');
+
+    unmount();
+    await act(async () => {
+      await i18next.changeLanguage(originalLanguage);
+    });
+  });
+});
+
+describe('animated milestone completion ownership', () => {
+  beforeEach(() => {
+    mockReduceMotion.mockReturnValue(false);
+    mockDeferTimingCompletion.mockReturnValue(true);
+    mockTimingCompletionCallbacks.length = 0;
+  });
+
+  afterEach(() => {
+    mockDeferTimingCompletion.mockReturnValue(false);
+    mockTimingCompletionCallbacks.length = 0;
+  });
+
+  it('defers a late completion until its owner is active again', () => {
+    const onProfileAComplete = jest.fn();
+    const onProfileBComplete = jest.fn();
+    const queueA = milestoneQueue('profile-A', 1);
+    const { rerender } = render(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-A"
+        queue={queueA}
+        onAllComplete={onProfileAComplete}
+      />,
+    );
+    const completeProfileAAnimation = mockTimingCompletionCallbacks[0];
+    expect(completeProfileAAnimation).toBeDefined();
+
+    rerender(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-B"
+        queue={[]}
+        onAllComplete={onProfileBComplete}
+      />,
+    );
+    act(() => {
+      completeProfileAAnimation?.(true);
+    });
+
+    expect(onProfileAComplete).not.toHaveBeenCalled();
+    expect(onProfileBComplete).not.toHaveBeenCalled();
+
+    rerender(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-A"
+        queue={queueA}
+        onAllComplete={onProfileAComplete}
+      />,
+    );
+    expect(onProfileAComplete).toHaveBeenCalledTimes(1);
+    expect(onProfileAComplete).toHaveBeenCalledWith('profile-A');
+    expect(onProfileBComplete).not.toHaveBeenCalled();
+
+    rerender(
+      <ReducedMotionMilestoneQueue
+        profileId="profile-A"
+        queue={queueA}
+        onAllComplete={onProfileAComplete}
+      />,
+    );
+    expect(onProfileAComplete).toHaveBeenCalledTimes(1);
   });
 });
 
