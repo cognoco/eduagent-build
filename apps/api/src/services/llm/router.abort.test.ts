@@ -4,6 +4,7 @@ import {
   registerProvider,
   routeAndCall,
   routeAndStream,
+  setLlmRoutingV2Enabled,
 } from './router';
 import { createMockProvider } from './providers/mock';
 import { makeChatStreamResult } from './types';
@@ -22,10 +23,16 @@ function createFailingChatStream() {
 }
 
 describe('routeAndCall cancellation [WI-2183]', () => {
-  afterEach(() => {
+  beforeEach(() => {
+    setLlmRoutingV2Enabled(true);
     _clearProviders();
     _resetCircuits();
-    registerProvider(createMockProvider('gemini'));
+  });
+
+  afterEach(() => {
+    setLlmRoutingV2Enabled(false);
+    _clearProviders();
+    _resetCircuits();
   });
 
   it('aborts provider work without retrying or falling back', async () => {
@@ -40,7 +47,7 @@ describe('routeAndCall cancellation [WI-2183]', () => {
     });
 
     registerProvider({
-      ...createMockProvider('gemini'),
+      ...createMockProvider('cerebras'),
       chat: (_messages, _config, signal) => {
         primaryCalls += 1;
         resolveEnteredProvider();
@@ -78,7 +85,7 @@ describe('routeAndCall cancellation [WI-2183]', () => {
     let fallbackCalls = 0;
 
     registerProvider({
-      ...createMockProvider('gemini'),
+      ...createMockProvider('cerebras'),
       async chat() {
         primaryCalls += 1;
         throw new Error('transient provider failure');
@@ -121,7 +128,7 @@ describe('routeAndCall cancellation [WI-2183]', () => {
 
     try {
       registerProvider({
-        ...createMockProvider('gemini'),
+        ...createMockProvider('cerebras'),
         chatStream() {
           return createFailingChatStream();
         },
@@ -146,7 +153,7 @@ describe('routeAndCall cancellation [WI-2183]', () => {
         resolveEnteredProvider = resolve;
       });
       registerProvider({
-        ...createMockProvider('gemini'),
+        ...createMockProvider('cerebras'),
         chat: (_messages, _config, signal) => {
           resolveEnteredProvider();
           return new Promise((_resolve, reject) => {
@@ -164,10 +171,10 @@ describe('routeAndCall cancellation [WI-2183]', () => {
       controller.abort(new Error('summary timeout'));
       await expect(probe).rejects.toThrow('summary timeout');
 
-      registerProvider(createMockProvider('gemini'));
+      registerProvider(createMockProvider('cerebras'));
       await expect(
         routeAndCall([{ role: 'user', content: 'test' }], 1),
-      ).resolves.toMatchObject({ provider: 'gemini' });
+      ).resolves.toMatchObject({ provider: 'cerebras' });
     } finally {
       nowSpy.mockRestore();
       warnSpy.mockRestore();
@@ -182,7 +189,7 @@ describe('routeAndCall cancellation [WI-2183]', () => {
 
     try {
       registerProvider({
-        ...createMockProvider('gemini'),
+        ...createMockProvider('cerebras'),
         chatStream() {
           return createFailingChatStream();
         },
@@ -200,7 +207,7 @@ describe('routeAndCall cancellation [WI-2183]', () => {
         }).rejects.toThrow('transient stream failure');
       }
 
-      registerProvider(createMockProvider('gemini'));
+      registerProvider(createMockProvider('cerebras'));
       for (let attempt = 0; attempt < 3; attempt += 1) {
         const controller = new AbortController();
         let resolveEnteredFallback!: () => void;

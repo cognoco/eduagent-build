@@ -8,6 +8,7 @@ import {
   ConflictError,
   NotFoundError,
   type ConversationLanguage,
+  type RetrySummaryFeedbackResult,
   type SessionSummary,
   type SummarySubmitInput,
 } from '@eduagent/schemas';
@@ -355,17 +356,6 @@ export async function submitSummary(
     },
   };
 }
-
-type RetrySummaryFeedbackResult = {
-  summary: {
-    id: string;
-    sessionId: string;
-    content: string;
-    aiFeedback: string | null;
-    feedbackStatus: 'available' | 'unavailable';
-    status: 'accepted' | 'submitted';
-  };
-};
 
 const SUMMARY_FEEDBACK_RETRY_COOLDOWN_MS = 60_000;
 const SUMMARY_FEEDBACK_RETRY_LEASE_MS = 30_000;
