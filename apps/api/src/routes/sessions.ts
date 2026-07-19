@@ -40,6 +40,7 @@ import {
   SubjectInactiveError,
   CurriculumSessionNotReadyError,
   SessionExchangeLimitError,
+  ConsentWithdrawnError,
   getSession,
   clearContinuationDepth,
   processMessage,
@@ -550,6 +551,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           );
         }
 
+        // [WI-2372] Consent withdrawn — gate threw before any LLM dispatch.
+        if (err instanceof ConsentWithdrawnError) {
+          return apiError(c, 403, ERROR_CODES.CONSENT_WITHDRAWN, err.message);
+        }
+
         // Refund quota on LLM failure — user should not be charged for a failed exchange
         // [BUG-661 / A-21] safeRefundQuota escalates if the refund itself fails.
         // [BUG-821] refundQuotaOrEscalate escalates if a decrement happened but
@@ -705,6 +711,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             ERROR_CODES.EXCHANGE_LIMIT_EXCEEDED,
             err.message,
           );
+        }
+        // [WI-2372] Consent withdrawn — gate threw before any streaming began.
+        if (err instanceof ConsentWithdrawnError) {
+          return apiError(c, 403, ERROR_CODES.CONSENT_WITHDRAWN, err.message);
         }
         throw err;
       }
