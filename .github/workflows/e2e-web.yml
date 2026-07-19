@@ -75,6 +75,7 @@ jobs:
           # Trusted same-repo PR: run the real smoke iff the change set touches
           # the web/mobile surface or the staging-gate controller. Workflow-
           # only changes pass through; workflow_dispatch supplies their hard proof.
+          # Do not merge a workflow-only change without linking that manual run.
           FILES=$(git diff --name-only "origin/${BASE_REF}...HEAD")
           SURFACE_CHANGED=false
           while IFS= read -r f; do

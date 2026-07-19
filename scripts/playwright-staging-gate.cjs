@@ -334,6 +334,8 @@ module.exports = { GATE_STATES, runCanary, classifyFailure, decide };
         resultText,
       });
       process.stdout.write(`FAILURE_CLASS=${result.kind}\n`);
+      // Exit zero means an infra signal was found; callers read authoritative
+      // FAILURE_CLASS stdout, while this status is informational only.
       process.exit(result.kind === 'infra-signalled' ? 0 : 1);
     }
     if (mode === '--decide') {
