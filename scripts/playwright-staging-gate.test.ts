@@ -1,5 +1,12 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from '@jest/globals';
@@ -64,9 +71,14 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
       writeFileSync(
         join(root, 'run', 'trace.trace'),
         [
-          JSON.stringify({ type: 'response', status: 503 }),
+          JSON.stringify({
+            type: 'response',
+            url: 'https://api-stg.example.test/v1/profiles',
+            status: 503,
+          }),
           JSON.stringify({
             type: 'requestfailed',
+            url: 'https://api-stg.example.test/v1/profiles',
             errorText: 'net::ERR_CONNECTION_RESET',
           }),
           JSON.stringify({
@@ -82,21 +94,74 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
           }),
         ].join('\n'),
       );
-      expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
-        kind: 'infra-signalled',
-      });
       expect(
         classifyFailure({
           artifactRoot: root,
           exitCode: 1,
-          resultText: 'Unknown error while the API transport was unavailable',
+          resultText: 'TypeError: fetch failed',
         }),
       ).toEqual({ kind: 'infra-signalled' });
       expect(
         classifyFailure({
           artifactRoot: root,
           exitCode: 1,
+          resultText: 'Unknown error while the API transport was unavailable',
+        }),
+      ).toEqual({ kind: 'product' });
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
           resultText: 'handles cancellation flow',
+        }),
+      ).toEqual({ kind: 'unknown' });
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText:
+            '> playwright test --config=apps/mobile/playwright.config.ts',
+        }),
+      ).toEqual({ kind: 'unknown' });
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: 'Configuration error: unable to load config',
+        }),
+      ).toEqual({ kind: 'product' });
+      for (const resultText of [
+        'Invalid configuration',
+        'ConfigError: invalid project definition',
+        'config validation failed',
+        'Error: navigation contract mismatch',
+        'Error: retry banner was not rendered after API returned 503',
+        'Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home',
+        'Error [ERR_MODULE_NOT_FOUND]: Cannot find package',
+      ]) {
+        expect(
+          classifyFailure({ artifactRoot: root, exitCode: 1, resultText }),
+        ).toEqual({ kind: 'product' });
+      }
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: 'TypeError: fetch failed',
+        }),
+      ).toEqual({ kind: 'infra-signalled' });
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: 'ELIFECYCLE Command failed with exit code 1.',
+        }),
+      ).toEqual({ kind: 'unknown' });
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: 'Error: apiRequestContext.get: ECONNRESET',
         }),
       ).toEqual({ kind: 'infra-signalled' });
       expect(
@@ -123,14 +188,30 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
           },
         }),
       );
-      expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
-        kind: 'infra-signalled',
-      });
+      expect(
+        classifyFailure({
+          artifactRoot: root,
+          exitCode: 1,
+          resultText: 'TypeError: fetch failed',
+        }),
+      ).toEqual({ kind: 'infra-signalled' });
       writeFileSync(
         join(root, 'run', 'trace.trace'),
         JSON.stringify({
           type: 'requestfailed',
+          url: 'https://api-stg.example.test/v1/profiles',
           errorText: 'disconnect notice',
+        }),
+      );
+      expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
+        kind: 'unknown',
+      });
+      writeFileSync(
+        join(root, 'run', 'trace.trace'),
+        JSON.stringify({
+          type: 'response',
+          url: 'https://cdn.example.test/app.js',
+          status: 503,
         }),
       );
       expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
@@ -166,8 +247,86 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
         );
         execFileSync('zip', ['-q', 'trace.zip', 'trace.trace'], { cwd: root });
         rmSync(trace);
+        expect(
+          classifyFailure({
+            artifactRoot: root,
+            exitCode: 1,
+            resultText: 'TypeError: fetch failed',
+          }),
+        ).toEqual({ kind: 'infra-signalled' });
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  (process.platform === 'win32' ? it.skip : it)(
+    'reads trace members from an archive larger than the old whole-zip cap',
+    () => {
+      const root = mkdtempSync(join(tmpdir(), 'wi-2228-large-trace-zip-'));
+      try {
+        writeFileSync(
+          join(root, 'trace.network'),
+          JSON.stringify({
+            type: 'resource-snapshot',
+            snapshot: {
+              request: { url: 'https://api-stg.example.test/v1/profiles' },
+              response: { status: 503 },
+            },
+          }),
+        );
+        writeFileSync(join(root, 'resource.bin'), randomBytes(9 * 1024 * 1024));
+        execFileSync(
+          'zip',
+          ['-q', 'trace.zip', 'trace.network', 'resource.bin'],
+          {
+            cwd: root,
+          },
+        );
+        expect(statSync(join(root, 'trace.zip')).size).toBeGreaterThan(
+          8 * 1024 * 1024,
+        );
+        expect(
+          classifyFailure({
+            artifactRoot: root,
+            exitCode: 1,
+            resultText: 'TypeError: fetch failed',
+          }),
+        ).toEqual({ kind: 'infra-signalled' });
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  (process.platform === 'win32' ? it.skip : it)(
+    'fails closed when a trace archive exceeds the cumulative member budget',
+    () => {
+      const root = mkdtempSync(join(tmpdir(), 'wi-2228-member-cap-'));
+      try {
+        const members: string[] = [];
+        for (let index = 0; index <= 64; index += 1) {
+          const member = `${index}-trace.network`;
+          members.push(member);
+          writeFileSync(
+            join(root, member),
+            index === 0
+              ? JSON.stringify({
+                  type: 'resource-snapshot',
+                  snapshot: {
+                    request: {
+                      url: 'https://api-stg.example.test/v1/profiles',
+                    },
+                    response: { status: 503 },
+                  },
+                })
+              : '{}',
+          );
+        }
+        execFileSync('zip', ['-q', 'trace.zip', ...members], { cwd: root });
+        for (const member of members) rmSync(join(root, member));
         expect(classifyFailure({ artifactRoot: root, exitCode: 1 })).toEqual({
-          kind: 'infra-signalled',
+          kind: 'unknown',
         });
       } finally {
         rmSync(root, { recursive: true, force: true });
@@ -274,4 +433,46 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
       );
     },
   );
+
+  it.each([
+    ['infra outage neutral', GATE_STATES.UNAVAILABLE, 'infra-signalled', 1, 0],
+    ['product failure red', GATE_STATES.UNAVAILABLE, 'product', 1, 1],
+  ])(
+    'uses the decision module from the workflow CLI: %s',
+    (_name, postflight, classification, exitCode, expected) => {
+      const result = spawnSync(
+        process.execPath,
+        [
+          join(process.cwd(), 'scripts/playwright-staging-gate.cjs'),
+          '--decide',
+          GATE_STATES.HEALTHY,
+          postflight,
+          classification,
+          String(exitCode),
+        ],
+        { encoding: 'utf8' },
+      );
+      expect(result.status).toBe(expected);
+      expect(result.stdout).toContain(
+        `GATE_DECISION=${expected === 0 ? 'pass' : 'fail'}`,
+      );
+    },
+  );
+
+  it('fails closed when workflow decision state is malformed', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(process.cwd(), 'scripts/playwright-staging-gate.cjs'),
+        '--decide',
+        GATE_STATES.HEALTHY,
+        'corrupt-state',
+        'infra-signalled',
+        '1',
+      ],
+      { encoding: 'utf8' },
+    );
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('Invalid staging-gate decision input');
+  });
 });

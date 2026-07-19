@@ -195,13 +195,10 @@ jobs:
             set -eu; \
             CANARY_STATE_FILE=\"\${RUNNER_TEMP}/playwright-canary-pre.state\"; \
             node scripts/playwright-staging-gate.cjs --canary > \"\${CANARY_STATE_FILE}\"; \
-            if grep -qx 'GATE_STATE=confirmed-unavailable' \"\${CANARY_STATE_FILE}\"; then \
-              echo 'Playwright staging canary confirmed unavailable; suite not run.'; \
-              exit 0; \
-            fi; \
-            if ! grep -qx 'GATE_STATE=healthy' \"\${CANARY_STATE_FILE}\"; then \
-              echo '::error::Playwright staging canary did not reach a trusted state'; \
-              exit 1; \
+            PRE_STATE=\$(cut -d= -f2 \"\${CANARY_STATE_FILE}\"); \
+            if [ \"\${PRE_STATE}\" != 'healthy' ]; then \
+              node scripts/playwright-staging-gate.cjs --decide \"\${PRE_STATE}\" 'not-run' 'not-run' 1; \
+              exit \$?; \
             fi; \
             set +e; \
             pnpm run test:e2e:web:smoke > \"\${RUNNER_TEMP}/playwright-result.log\" 2>&1; \
@@ -211,17 +208,13 @@ jobs:
             POST_STATE_FILE=\"\${RUNNER_TEMP}/playwright-canary-post.state\"; \
             node scripts/playwright-staging-gate.cjs --canary > \"\${POST_STATE_FILE}\"; \
             POST_STATE=\$(cut -d= -f2 \"\${POST_STATE_FILE}\"); \
+            CLASSIFY_STATE_FILE=\"\${RUNNER_TEMP}/playwright-classification.state\"; \
             set +e; \
-            node scripts/playwright-staging-gate.cjs --classify apps/mobile/e2e-web/test-results \"\${SUITE_STATUS}\" \"\${RUNNER_TEMP}/playwright-result.log\"; \
-            CLASSIFY_STATUS=\$?; \
+            node scripts/playwright-staging-gate.cjs --classify apps/mobile/e2e-web/test-results \"\${SUITE_STATUS}\" \"\${RUNNER_TEMP}/playwright-result.log\" > \"\${CLASSIFY_STATE_FILE}\"; \
             set -e; \
-            # Keep this runtime decision aligned with decide() in playwright-staging-gate.cjs. \
-            if [ \"\${SUITE_STATUS}\" -eq 0 ]; then exit 0; fi; \
-            if [ \"\${CLASSIFY_STATUS}\" -eq 0 ] && [ \"\${POST_STATE}\" = 'confirmed-unavailable' ]; then \
-              echo 'Playwright failure had a trace-backed staging transport signal and confirmed postflight outage; neutral pass-through.'; \
-              exit 0; \
-            fi; \
-            exit \"\${SUITE_STATUS}\""
+            cat \"\${CLASSIFY_STATE_FILE}\"; \
+            FAILURE_CLASS=\$(cut -d= -f2 \"\${CLASSIFY_STATE_FILE}\"); \
+            node scripts/playwright-staging-gate.cjs --decide \"\${PRE_STATE}\" \"\${POST_STATE}\" \"\${FAILURE_CLASS}\" \"\${SUITE_STATUS}\""
 
       # [BUG-979 / CCR-PR123-M-3] Reset seeded staging accounts independently
       # of Playwright's globalTeardown. Reason: this workflow uses
