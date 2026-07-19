@@ -10,16 +10,12 @@
 //           field — the exact injection shape.
 //
 //   F-157 — e2e-web.yml had a REQUIRED `Playwright web smoke` check that
-//           silently reported success on every PR: the real smoke job was
-//           skipped (secrets unavailable) and the required gate inherited that
-//           skip as success — an always-green required gate that let surface
-//           regressions merge with no E2E signal. The fix makes the required
-//           check an HONEST, documented pass-through (reports the required name,
-//           exits 0 on every path, never gates on run-smoke's pass/fail), with
-//           the real `run-smoke` running as its own NON-required advisory check.
-//           These tests fail if the required check regresses to the original
-//           shape (gating its exit on run-smoke, or the required name migrating
-//           onto the real smoke job so a skip silently passes).
+//           silently reported success on every PR. WI-2228 promotes the isolated
+//           v2-release project to the hard signal for trusted surface changes,
+//           while forks, untrusted PRs, and no-surface changes remain explicit
+//           pass-throughs. Legacy smoke stays visible but advisory in the same
+//           setup job. These tests execute the required gate's shell matrix and
+//           assert that legacy coverage cannot mask the V2 result.
 //
 // Style + harness match the sibling workflow-structure tests in this directory
 // (e.g. e2e-web-cleanup.test.ts): parse the committed YAML with the `yaml`
@@ -33,11 +29,12 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 
 const repoRoot = join(__dirname, '..');
@@ -70,30 +67,6 @@ function allRunScripts(workflow: Record<string, unknown>): string[] {
     }
   }
   return scripts;
-}
-
-const SMOKE_RESULT_EXPR = /needs\s*\.\s*run-smoke\s*\.\s*result/;
-
-/**
- * True if a single gate step branches its exit on the run-smoke result — i.e.
- * it either references `needs.run-smoke.result` inline in the script, or it
- * surfaces that result via an env var that then appears inside an `if [[ … ]]`
- * test condition (the shape a hard gate uses to drive a failing exit). Used by
- * the F-157 gate guard, which scans EVERY gate run: step with this predicate.
- */
-function gateStepBranchesOnSmokeResult(step: Record<string, unknown>): boolean {
-  const script = typeof step.run === 'string' ? step.run : '';
-  if (SMOKE_RESULT_EXPR.test(script)) return true;
-
-  const stepEnv = (step.env ?? {}) as Record<string, unknown>;
-  const smokeEnvVars = Object.entries(stepEnv)
-    .filter(([, v]) => SMOKE_RESULT_EXPR.test(String(v)))
-    .map(([k]) => k);
-  for (const v of smokeEnvVars) {
-    const conditionRef = new RegExp(String.raw`if\s*\[\[[^\n]*\$\{?${v}\b`);
-    if (conditionRef.test(script)) return true;
-  }
-  return false;
 }
 
 describe('[F-151] e2e-ci.yml has no workflow_run.pull_requests injection sink', () => {
@@ -172,14 +145,36 @@ describe('[F-151] e2e-ci.yml has no workflow_run.pull_requests injection sink', 
   });
 });
 
-describe('[F-157] e2e-web.yml required smoke check is an honest pass-through', () => {
+describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => {
   const workflow = loadWorkflow('e2e-web.yml');
   const jobs = workflow.jobs as Record<string, Job>;
-
   const REQUIRED_CHECK_NAME = 'Playwright web smoke';
 
   function jobsWithName(name: string): Array<[string, Job]> {
     return Object.entries(jobs).filter(([, j]) => j.name === name);
+  }
+
+  function stepNamed(job: Job, name: string) {
+    return job.steps?.find((step) => step.name === name);
+  }
+
+  function runRequiredGate(overrides: Record<string, string>) {
+    const [[, gate]] = jobsWithName(REQUIRED_CHECK_NAME);
+    const script = String(
+      gate.steps?.find((step) => typeof step.run === 'string')?.run ?? '',
+    );
+    return spawnSync('bash', ['-c', script], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        CHANGES_RESULT: 'success',
+        SMOKE_RESULT: 'success',
+        RUN_REAL: 'true',
+        TRUSTED: 'true',
+        ...overrides,
+      },
+    });
   }
 
   it('exactly one job carries the required check name', () => {
@@ -207,87 +202,255 @@ describe('[F-157] e2e-web.yml required smoke check is an honest pass-through', (
     expect(ifVal === 'always()' || ifVal === '${{always()}}').toBe(true);
   });
 
-  it('the required gate exits 0 and no gate step branches its exit on the run-smoke result', () => {
-    const [[, gate]] = jobsWithName(REQUIRED_CHECK_NAME);
-    const runSteps = (gate.steps ?? []).filter(
-      (s) => typeof s.run === 'string',
-    );
-    expect(runSteps.length).toBeGreaterThan(0);
-
-    // Honest pass-through: at least one gate step reaches exit 0 ...
-    const combinedScript = runSteps.map((s) => String(s.run)).join('\n');
-    expect(combinedScript).toMatch(/exit 0/);
-
-    // ... and NO gate step branches its exit code on run-smoke's outcome. That
-    // is the precise F-157 invariant: the required check is advisory-only over
-    // the smoke (secret-backed smoke is un-runnable in CI until DOPPLER_TOKEN_STG
-    // is provisioned, so gating on it would make the required check permanently
-    // red on trusted web PRs). We scan EVERY run: step (not just the first) and
-    // its env mapping, so a regression that splits the gate into a harmless
-    // logging step followed by a second step that branches on the smoke result
-    // is still caught.
-    const branching = runSteps.filter(gateStepBranchesOnSmokeResult);
-    expect(branching).toEqual([]);
+  it.each([
+    ['change detector failure', { CHANGES_RESULT: 'failure' }, 1],
+    ['change detector skipped', { CHANGES_RESULT: 'skipped' }, 1],
+    ['V2 failure', { SMOKE_RESULT: 'failure' }, 1],
+    ['V2 cancellation', { SMOKE_RESULT: 'cancelled' }, 1],
+    ['trusted V2 skip', { SMOKE_RESULT: 'skipped' }, 1],
+    [
+      'missing run-real output fails closed',
+      { RUN_REAL: '', TRUSTED: 'true', SMOKE_RESULT: 'skipped' },
+      1,
+    ],
+    ['V2 success', {}, 0],
+    [
+      'fork pass-through',
+      { RUN_REAL: 'false', TRUSTED: 'false', SMOKE_RESULT: 'skipped' },
+      0,
+    ],
+    [
+      'no-surface pass-through',
+      { RUN_REAL: 'false', TRUSTED: 'true', SMOKE_RESULT: 'skipped' },
+      0,
+    ],
+  ])('executes the required gate matrix: %s', (_name, env, expected) => {
+    const result = runRequiredGate(env as Record<string, string>);
+    expect(result.status).toBe(expected);
   });
 
-  it('the multi-step gate scan catches a SECOND step that branches on the smoke result (not just the first)', () => {
-    // Synthetic proof of the P2-fixed coverage: a regression that hides the
-    // hard gate in a later step — a benign `exit 0` logging step first, then a
-    // step that branches to `exit 1` on the smoke result — must be detected.
-    // Exercises the exact predicate the real-workflow guard above uses.
-    const gateSteps: Array<Record<string, unknown>> = [
-      { run: 'echo "advisory smoke ran"; exit 0' },
-      {
-        env: { SMOKE_RESULT: '${{ needs.run-smoke.result }}' },
-        run: 'if [[ "$SMOKE_RESULT" == "failure" ]]; then exit 1; fi',
-      },
-    ];
-    const runSteps = gateSteps.filter((s) => typeof s.run === 'string');
-
-    // First step alone looks innocent ...
-    expect(gateStepBranchesOnSmokeResult(runSteps[0]!)).toBe(false);
-    // ... but the second step branches on the smoke result and is caught.
-    expect(gateStepBranchesOnSmokeResult(runSteps[1]!)).toBe(true);
-    // The whole-gate scan (every step) therefore flags the regression.
-    expect(runSteps.some(gateStepBranchesOnSmokeResult)).toBe(true);
-
-    // Also catch the inline (no-env) form in a later step.
-    const inlineLater: Array<Record<string, unknown>> = [
-      { run: 'echo "log"; exit 0' },
-      {
-        run: 'if [[ "${{ needs.run-smoke.result }}" != "success" ]]; then exit 1; fi',
-      },
-    ];
-    expect(inlineLater.some(gateStepBranchesOnSmokeResult)).toBe(true);
-  });
-
-  it('run-smoke runs the real suite, is reachable (not if:false), and is advisory only', () => {
-    // run-smoke must exist and run the real Playwright smoke ...
+  it('runs the V2 release gate first and keeps legacy smoke advisory in one setup job', () => {
     const runSmoke = jobs['run-smoke'];
     expect(runSmoke).toBeDefined();
-    const runSmokeScript = (runSmoke.steps ?? [])
-      .map((s) => (typeof s.run === 'string' ? s.run : ''))
-      .join('\n');
-    expect(runSmokeScript).toMatch(/test:e2e:web:smoke/);
-    expect(runSmokeScript).toMatch(/playwright-staging-gate\.cjs --decide/);
-    const classifyCommand = runSmokeScript
+    const v2Step = stepNamed(runSmoke, 'Run V2 release Playwright gate');
+    const uploadV2 = stepNamed(runSmoke, 'Upload V2 Playwright artifacts');
+    const legacyStep = stepNamed(
+      runSmoke,
+      'Run legacy Playwright smoke (advisory)',
+    );
+    const resetStep = stepNamed(
+      runSmoke,
+      'Reset seeded staging accounts (always)',
+    );
+    const uploadLegacy = stepNamed(
+      runSmoke,
+      'Upload legacy Playwright artifacts',
+    );
+    const stepNames = (runSmoke.steps ?? []).map((step) => step.name);
+    const allWorkflowSteps = Object.values(jobs).flatMap(
+      (job) => job.steps ?? [],
+    );
+    const v2Script = String(v2Step?.run ?? '');
+    const legacyScript = String(legacyStep?.run ?? '');
+    const classifyCommand = v2Script
       .split('\n')
       .find((line) => line.includes('--classify'));
+
+    expect(v2Step).toBeDefined();
+    expect(v2Step?.['continue-on-error']).not.toBe(true);
+    expect(v2Script).toContain('pnpm run test:e2e:web:v2');
+    expect(v2Script).not.toContain('pnpm run test:e2e:web:smoke');
+    expect(v2Script).toContain('playwright-staging-gate.cjs --decide');
     expect(classifyCommand).toBeDefined();
     expect(classifyCommand).toContain('${PLAYWRIGHT_API_URL}');
-    const dopplerIndex = runSmokeScript.indexOf('doppler run');
-    expect(dopplerIndex).toBeGreaterThan(-1);
-    const dopplerCommand = runSmokeScript.slice(dopplerIndex);
-    expect(dopplerCommand).not.toMatch(/^\s*#.*\\\s*$/m);
 
-    // ... it must be reachable — a permanently-disabled `if: false` would make
-    // the advisory check a silent no-op, hollowing out the real signal.
-    const runSmokeIf = String(runSmoke.if ?? '').replace(/\s+/g, '');
-    expect(runSmokeIf).not.toBe('false');
-    expect(runSmokeIf).not.toBe('${{false}}');
+    expect(uploadV2?.if).toBe('always()');
+    expect(uploadV2?.['continue-on-error']).toBe(true);
+    expect(Number(uploadV2?.['timeout-minutes'])).toBeGreaterThan(0);
+    expect(String((uploadV2?.with as Record<string, unknown>)?.name)).toContain(
+      'playwright-web-v2-${{ github.run_id }}-${{ github.run_attempt }}',
+    );
+    expect(legacyStep?.['continue-on-error']).toBe(true);
+    expect(Number(legacyStep?.['timeout-minutes'])).toBeGreaterThan(0);
+    expect(
+      Number(runSmoke['timeout-minutes']) -
+        Number(legacyStep?.['timeout-minutes']),
+    ).toBeGreaterThanOrEqual(20);
+    expect(String(legacyStep?.if).replace(/\s+/g, '')).toContain(
+      'always()&&!cancelled()',
+    );
+    expect(legacyStep?.env?.DOPPLER_TOKEN).toBe(v2Step?.env?.DOPPLER_TOKEN);
+    expect(legacyScript).toContain('doppler run -p mentomate -c stg');
+    for (const mapping of [
+      'PLAYWRIGHT_TEST_SEED_SECRET',
+      'CLERK_SECRET_KEY',
+      'PLAYWRIGHT_API_URL',
+    ]) {
+      expect(v2Script).toContain(mapping);
+      expect(legacyScript).toContain(mapping);
+    }
+    expect(legacyScript).toContain('PLAYWRIGHT_ARTIFACT_LANE=legacy');
+    expect(legacyScript).toContain('pnpm run test:e2e:web:smoke');
+    for (const legacyOnlyStep of [legacyStep, uploadLegacy]) {
+      expect(legacyOnlyStep?.['continue-on-error']).toBe(true);
+      expect(Number(legacyOnlyStep?.['timeout-minutes'])).toBeGreaterThan(0);
+    }
+    expect(String(uploadLegacy?.if)).toContain(
+      "steps.legacy-smoke.outcome == 'success'",
+    );
+    expect(String(uploadLegacy?.if)).toContain(
+      "steps.legacy-smoke.outcome == 'failure'",
+    );
+    expect(
+      String((uploadLegacy?.with as Record<string, unknown>)?.name),
+    ).toContain(
+      'playwright-web-legacy-${{ github.run_id }}-${{ github.run_attempt }}',
+    );
+    const v2ArtifactPaths = String(
+      (uploadV2?.with as Record<string, unknown>)?.path,
+    );
+    const legacyArtifactPaths = String(
+      (uploadLegacy?.with as Record<string, unknown>)?.path,
+    );
+    expect(v2ArtifactPaths).toContain('playwright-report');
+    expect(v2ArtifactPaths).toContain('test-results');
+    expect(v2ArtifactPaths).not.toContain('playwright-report-legacy');
+    expect(v2ArtifactPaths).not.toContain('test-results-legacy');
+    expect(legacyArtifactPaths).toContain('playwright-report-legacy');
+    expect(legacyArtifactPaths).toContain('test-results-legacy');
 
-    // ... but it must NOT be a required-check name-bearer (advisory only).
+    expect(stepNames.indexOf(uploadV2?.name)).toBe(
+      stepNames.indexOf(v2Step?.name) + 1,
+    );
+    expect(stepNames.indexOf(uploadV2?.name)).toBeLessThan(
+      stepNames.indexOf(legacyStep?.name),
+    );
+    expect(stepNames.indexOf(legacyStep?.name)).toBeLessThan(
+      stepNames.indexOf(resetStep?.name),
+    );
+    expect(stepNames.indexOf(resetStep?.name)).toBeLessThan(
+      stepNames.indexOf(uploadLegacy?.name),
+    );
+    expect(
+      allWorkflowSteps.filter(
+        (step) => step.name === 'Reset seeded staging accounts (always)',
+      ),
+    ).toHaveLength(1);
+    expect(
+      allWorkflowSteps.filter((step) =>
+        String(step.uses ?? '').startsWith('actions/setup-node@'),
+      ),
+    ).toHaveLength(1);
+    expect(
+      allWorkflowSteps.filter((step) =>
+        String(step.uses ?? '').startsWith('pnpm/action-setup@'),
+      ),
+    ).toHaveLength(1);
     expect(runSmoke.name).not.toBe(REQUIRED_CHECK_NAME);
+  });
+
+  it('treats root package.json as a trusted E2E surface change', () => {
+    const changes = jobs['changes']!;
+    const detector = stepNamed(
+      changes,
+      'Decide whether to run the real smoke suite',
+    );
+    expect(String(detector?.run)).toMatch(
+      /apps\/\*\|packages\/\*\|package\.json\|pnpm-lock\.yaml/,
+    );
+  });
+
+  it('routes only the validated legacy lane to distinct Playwright artifact paths', () => {
+    const inspectSource = [
+      "import config from './apps/mobile/playwright.config.ts';",
+      'const reporters = config.reporter as unknown as Array<[string, Record<string, string>?]>;',
+      "const html = reporters.find(([name]) => name === 'html');",
+      'process.stdout.write(JSON.stringify({ outputDir: config.outputDir, reportDir: html?.[1]?.outputFolder }));',
+    ].join(' ');
+    const inspect = (lane?: string) => {
+      const env = { ...process.env };
+      if (lane === undefined) delete env.PLAYWRIGHT_ARTIFACT_LANE;
+      else env.PLAYWRIGHT_ARTIFACT_LANE = lane;
+      return spawnSync('pnpm', ['exec', 'tsx', '-e', inspectSource], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env,
+      });
+    };
+
+    const defaultResult = inspect();
+    expect(defaultResult.status).toBe(0);
+    const defaultArtifacts = JSON.parse(
+      defaultResult.stdout.trim().split('\n').at(-1)!,
+    ) as { outputDir: string; reportDir: string };
+    expect(
+      Object.fromEntries(
+        Object.entries(defaultArtifacts).map(([key, value]) => [
+          key,
+          value.replaceAll('\\', '/'),
+        ]),
+      ),
+    ).toMatchObject({
+      outputDir: expect.stringMatching(/e2e-web\/test-results$/),
+      reportDir: expect.stringMatching(/e2e-web\/playwright-report$/),
+    });
+
+    const legacyResult = inspect('legacy');
+    expect(legacyResult.status).toBe(0);
+    const legacyArtifacts = JSON.parse(
+      legacyResult.stdout.trim().split('\n').at(-1)!,
+    ) as { outputDir: string; reportDir: string };
+    expect(
+      Object.fromEntries(
+        Object.entries(legacyArtifacts).map(([key, value]) => [
+          key,
+          value.replaceAll('\\', '/'),
+        ]),
+      ),
+    ).toMatchObject({
+      outputDir: expect.stringMatching(/e2e-web\/test-results-legacy$/),
+      reportDir: expect.stringMatching(/e2e-web\/playwright-report-legacy$/),
+    });
+
+    const invalidResult = inspect('not-a-lane');
+    expect(invalidResult.status).not.toBe(0);
+    expect(invalidResult.stderr).toContain('PLAYWRIGHT_ARTIFACT_LANE');
+  });
+
+  it('wires the V2 Playwright project and hard workflow-dispatch Maestro plan', () => {
+    const packageJson = JSON.parse(
+      readFileSync(join(repoRoot, 'package.json'), 'utf8'),
+    ) as { scripts: Record<string, string> };
+    const playwrightConfig = readFileSync(
+      join(repoRoot, 'apps/mobile/playwright.config.ts'),
+      'utf8',
+    );
+    const docsWorkflow = loadWorkflow('docs-checks.yml');
+    const docsJobs = docsWorkflow.jobs as Record<string, Job>;
+    const docsOn = docsWorkflow.on as Record<string, unknown>;
+    const maestroValidator = docsJobs['maestro-validator']!;
+    const maestroScripts = (maestroValidator.steps ?? [])
+      .map((step) => String(step.run ?? ''))
+      .join('\n');
+
+    expect(packageJson.scripts['test:e2e:web:v2']).toContain(
+      '--project=v2-release',
+    );
+    expect(playwrightConfig).toContain("name: 'v2-release'");
+    expect(docsOn).toHaveProperty('workflow_dispatch');
+    for (const event of ['push', 'pull_request']) {
+      const trigger = docsOn[event] as { paths?: string[] };
+      expect(trigger.paths).toEqual(
+        expect.arrayContaining([
+          'apps/mobile/e2e/ci-maestro-manifest.json',
+          'apps/mobile/e2e/scripts/ci-maestro-plan.mjs',
+        ]),
+      );
+    }
+    expect(maestroValidator['continue-on-error']).not.toBe(true);
+    expect(maestroScripts).toContain(
+      'ci-maestro-plan.mjs --suite v2 --all --format json',
+    );
   });
 });
 
@@ -615,6 +778,38 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       expect(source).toContain('OPQ-26');
       expect(nightlyFlows).not.toContain(flow);
     }
+  });
+
+  it('keeps V2-tagged Maestro flows and the V2 manifest bidirectionally discoverable', () => {
+    const e2eRoot = join(repoRoot, 'apps/mobile/e2e');
+    const flowsRoot = join(e2eRoot, 'flows');
+    const manifest = JSON.parse(
+      readFileSync(join(e2eRoot, 'ci-maestro-manifest.json'), 'utf8'),
+    ) as { v2: Array<{ flow: string }> };
+    const walkYaml = (directory: string): string[] =>
+      readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(directory, entry.name);
+        if (entry.isDirectory()) return walkYaml(path);
+        return /\.ya?ml$/.test(entry.name) ? [path] : [];
+      });
+    const taggedV2 = walkYaml(flowsRoot)
+      .filter((path) => {
+        const source = readFileSync(path, 'utf8');
+        const header = parseYaml(source.split(/^---$/m)[0] ?? '') as {
+          tags?: string[];
+        };
+        return header.tags?.includes('v2');
+      })
+      .map((path) => relative(e2eRoot, path).replaceAll('\\', '/'))
+      .sort();
+    const manifestV2 = manifest.v2.map(({ flow }) => flow).sort();
+
+    expect(
+      loadPlan('v2')
+        .map(({ flow }) => flow)
+        .sort(),
+    ).toEqual(manifestV2);
+    expect(taggedV2).toEqual(manifestV2);
   });
 
   it('[WI-1400] defines a V2-only native publish-readiness suite with interaction coverage', () => {
