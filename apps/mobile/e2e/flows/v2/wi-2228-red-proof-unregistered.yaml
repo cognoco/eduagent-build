@@ -1,0 +1,7 @@
+# Temporary WI-2228 hard-gate proof. Remove before landing.
+appId: com.mentomate.app
+tags:
+  - v2
+---
+- assertVisible:
+    id: 'mentor-screen'
