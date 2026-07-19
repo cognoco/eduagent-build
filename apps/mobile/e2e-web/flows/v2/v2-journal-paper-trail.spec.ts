@@ -3,6 +3,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 
+test.use({ storageState: { cookies: [], origins: [] } });
+
 async function openJournal(page: Page): Promise<void> {
   await pressableClick(page.getByTestId('tab-journal'));
   await expect(page).toHaveURL(/\/journal$/);
@@ -288,7 +290,7 @@ test('[WI-2239] onboarding-complete: Journal without recap artifacts offers the 
 
   await openJournal(page);
   await expect(page.getByTestId('journal-recaps-empty')).toBeVisible();
-  await pressableClick(page.getByTestId('journal-recaps-empty-start-session'));
+  await pressableClick(page.getByTestId('recaps-empty-start-session'));
   await expect(page).toHaveURL(/\/mentor$/);
   await expect(page.getByTestId('mentor-screen')).toBeVisible();
 });

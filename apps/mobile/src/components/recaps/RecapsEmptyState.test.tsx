@@ -19,18 +19,12 @@ describe('RecapsEmptyState', () => {
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 
-  it('honours overridden testIDs so two surfaces can embed it distinctly', () => {
+  it('honours an overridden card testID while preserving the shared CTA anchor', () => {
     render(
-      <RecapsEmptyState
-        onStart={jest.fn()}
-        testID="journal-recaps-empty"
-        ctaTestID="journal-recaps-empty-start-session"
-      />,
+      <RecapsEmptyState onStart={jest.fn()} testID="journal-recaps-empty" />,
     );
 
     expect(screen.getByTestId('journal-recaps-empty')).toBeTruthy();
-    expect(
-      screen.getByTestId('journal-recaps-empty-start-session'),
-    ).toBeTruthy();
+    expect(screen.getByTestId('recaps-empty-start-session')).toBeTruthy();
   });
 });

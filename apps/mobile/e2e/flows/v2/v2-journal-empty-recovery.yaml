@@ -27,9 +27,9 @@ tags:
     direction: DOWN
     timeout: 15000
 - assertVisible:
-    id: 'journal-recaps-empty-start-session'
+    id: 'recaps-empty-start-session'
 - tapOn:
-    id: 'journal-recaps-empty-start-session'
+    id: 'recaps-empty-start-session'
 - extendedWaitUntil:
     visible:
       id: 'mentor-screen'

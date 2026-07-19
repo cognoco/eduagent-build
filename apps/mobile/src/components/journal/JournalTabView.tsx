@@ -92,7 +92,6 @@ function JournalRecapsSection(): React.ReactElement {
         </View>
         <RecapsEmptyState
           testID="journal-recaps-empty"
-          ctaTestID="journal-recaps-empty-start-session"
           onStart={() => router.push('/(app)/mentor' as Href)}
         />
       </View>

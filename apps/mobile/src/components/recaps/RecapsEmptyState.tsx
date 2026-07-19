@@ -11,17 +11,15 @@ import { Button } from '../common';
  * the same welcoming empty state (with a CTA) instead of its own bare
  * one-liner. The CTA destination differs per surface (the standalone screen
  * goes Home; the Journal goes to the Mentor tab), so it is injected via
- * `onStart` rather than hard-coded. testIDs are overridable so both surfaces
- * can embed the component while keeping distinct, assertable testIDs.
+ * `onStart` rather than hard-coded. The card testID is overridable so both
+ * surfaces can embed the component with distinct, assertable anchors.
  */
 export function RecapsEmptyState({
   onStart,
   testID,
-  ctaTestID,
 }: {
   onStart: () => void;
   testID?: string;
-  ctaTestID?: string;
 }): React.ReactElement {
   const { t } = useTranslation();
 
@@ -40,7 +38,7 @@ export function RecapsEmptyState({
         variant="primary"
         label={t('recaps.emptyCtaStartSession')}
         onPress={onStart}
-        testID={ctaTestID ?? 'recaps-empty-start-session'}
+        testID="recaps-empty-start-session"
       />
     </View>
   );
