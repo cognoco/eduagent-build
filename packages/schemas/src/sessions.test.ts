@@ -1112,6 +1112,29 @@ describe('sessionMessageSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  // [WI-2220] Active app shell — see appShellSchema.
+  it('accepts a v0 or v2 shell', () => {
+    expect(
+      sessionMessageSchema.safeParse({ message: 'Hello', shell: 'v0' }).success,
+    ).toBe(true);
+    expect(
+      sessionMessageSchema.safeParse({ message: 'Hello', shell: 'v2' }).success,
+    ).toBe(true);
+  });
+
+  it('accepts a message without a shell', () => {
+    const result = sessionMessageSchema.safeParse({ message: 'Hello' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an invalid shell value', () => {
+    const result = sessionMessageSchema.safeParse({
+      message: 'Hello',
+      shell: 'v1',
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

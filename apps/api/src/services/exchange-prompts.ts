@@ -832,7 +832,11 @@ export function buildSystemPromptSegments(
   // asks about app navigation, but expensive and distracting on ordinary
   // learning turns.
   if (includeAppHelpMap) {
-    sections.push(buildAppHelpPromptBlock());
+    // [WI-2220] context.shell is the client-supplied active shell; absent or
+    // anything other than 'v2' falls to buildAppHelpPromptBlock's own 'v0'
+    // default, so production never confidently invents V2-only navigation
+    // for a non-V2 client (or vice versa).
+    sections.push(buildAppHelpPromptBlock(context.shell));
   }
 
   // Default tone — applied to every session post-sunset
