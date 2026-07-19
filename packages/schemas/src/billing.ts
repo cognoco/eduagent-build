@@ -164,6 +164,7 @@ export const familySubscriptionSchema = z.object({
   monthlyLimit: z.number().int(),
   usedThisMonth: z.number().int(),
   remainingQuestions: z.number().int(),
+  cycleResetAt: isoDateField,
   profileCount: z.number().int(),
   maxProfiles: z.number().int(),
   members: z.array(familyMemberSchema),

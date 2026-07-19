@@ -87,11 +87,21 @@ async function resolveCoherentBillingAccess(
   let access = await getEffectiveAccessForSubscriptionV2(db, subscriptionId);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (!access) return { access: null, sharedPoolStatus: null };
+    if (!access) {
+      return {
+        kind: 'available' as const,
+        access: null,
+        sharedPoolStatus: null,
+      };
+    }
     if (
       getTierConfig(access.effectiveAccessTier).quotaModel !== 'shared-pool'
     ) {
-      return { access, sharedPoolStatus: null };
+      return {
+        kind: 'available' as const,
+        access,
+        sharedPoolStatus: null,
+      };
     }
 
     try {
@@ -100,7 +110,17 @@ async function resolveCoherentBillingAccess(
         subscriptionId,
         access,
       );
-      return { access, sharedPoolStatus };
+      if (!sharedPoolStatus) {
+        return {
+          kind: 'shared-pool-unavailable' as const,
+          access,
+        };
+      }
+      return {
+        kind: 'available' as const,
+        access,
+        sharedPoolStatus,
+      };
     } catch (error) {
       if (
         !(error instanceof StaleFamilyAccessSnapshotErrorV2) ||
@@ -112,7 +132,10 @@ async function resolveCoherentBillingAccess(
     }
   }
 
-  return { access, sharedPoolStatus: null };
+  return {
+    kind: 'shared-pool-unavailable' as const,
+    access,
+  };
 }
 
 // [WI-994] Local schema for the Stripe cancel response. The Stripe SDK v20
@@ -203,10 +226,19 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
     }
 
-    const { access, sharedPoolStatus } = await resolveCoherentBillingAccess(
+    const coherentAccess = await resolveCoherentBillingAccess(
       db,
       subscription.id,
     );
+    if (coherentAccess.kind === 'shared-pool-unavailable') {
+      return apiError(
+        c,
+        503,
+        ERROR_CODES.SERVICE_UNAVAILABLE,
+        'Shared quota is temporarily unavailable. Please retry.',
+      );
+    }
+    const { access, sharedPoolStatus } = coherentAccess;
     const subscriptionSnapshot = access?.subscription ?? subscription;
     const effectiveAccessTier =
       access?.effectiveAccessTier ?? subscriptionSnapshot.tier;
@@ -593,10 +625,19 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
     const activeProfileId = c.get('profileId');
     const activeProfileMeta = c.get('profileMeta');
-    const { access, sharedPoolStatus } = await resolveCoherentBillingAccess(
+    const coherentAccess = await resolveCoherentBillingAccess(
       db,
       subscription.id,
     );
+    if (coherentAccess.kind === 'shared-pool-unavailable') {
+      return apiError(
+        c,
+        503,
+        ERROR_CODES.SERVICE_UNAVAILABLE,
+        'Shared quota is temporarily unavailable. Please retry.',
+      );
+    }
+    const { access, sharedPoolStatus } = coherentAccess;
     const subscriptionSnapshot = access?.subscription ?? subscription;
     const effectiveAccessTier =
       access?.effectiveAccessTier ?? subscriptionSnapshot.tier;
@@ -661,13 +702,16 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       sharedPoolStatus?.usedToday ??
       quota?.usedToday ??
       0;
-    const remaining = calculateRemainingQuestions({
-      monthlyLimit,
-      usedThisMonth,
-      topUpCreditsRemaining,
-      dailyLimit,
-      usedToday,
-    });
+    const remaining =
+      quotaModel === 'shared-pool'
+        ? Math.max(0, monthlyLimit - usedThisMonth)
+        : calculateRemainingQuestions({
+            monthlyLimit,
+            usedThisMonth,
+            topUpCreditsRemaining,
+            dailyLimit,
+            usedToday,
+          });
     // [BUG-640] Emit 'top-up-available' when monthly exhausted but credits remain
     const warningLevel = resolveWarningLevel(
       usedThisMonth,
@@ -936,10 +980,19 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       );
     }
 
-    const { access, sharedPoolStatus } = await resolveCoherentBillingAccess(
+    const coherentAccess = await resolveCoherentBillingAccess(
       db,
       subscription.id,
     );
+    if (coherentAccess.kind === 'shared-pool-unavailable') {
+      return apiError(
+        c,
+        503,
+        ERROR_CODES.SERVICE_UNAVAILABLE,
+        'Shared quota is temporarily unavailable. Please retry.',
+      );
+    }
+    const { access, sharedPoolStatus } = coherentAccess;
     const subscriptionSnapshot = access?.subscription ?? subscription;
     const effectiveAccessTier =
       access?.effectiveAccessTier ?? subscriptionSnapshot.tier;
@@ -1026,8 +1079,14 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       return notFound(c, 'No subscription found');
     }
 
-    const { access, sharedPoolStatus: poolStatus } =
-      await resolveCoherentBillingAccess(db, subscription.id);
+    const coherentAccess = await resolveCoherentBillingAccess(
+      db,
+      subscription.id,
+    );
+    if (coherentAccess.kind === 'shared-pool-unavailable') {
+      return notFound(c, 'No quota pool found');
+    }
+    const { access, sharedPoolStatus: poolStatus } = coherentAccess;
     if (!access) {
       return notFound(c, 'No subscription found');
     }

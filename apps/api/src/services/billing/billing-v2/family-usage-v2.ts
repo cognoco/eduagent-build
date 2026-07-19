@@ -242,12 +242,11 @@ export async function getUsageBreakdownForProfileV2(
       ? await getFamilyPoolBreakdownSharing(db, familyOwnerPersonId)
       : false;
 
-  // The gating logic below is byte-identical to the legacy function — only the
-  // INPUTS (org members + guardianship edges) are sourced from the v2 store.
-  // The former-member exception keeps the new presentation bucket visible to
-  // an owner after removing their last active child, when no live edge remains.
+  // An authenticated organization owner may always inspect their own
+  // shared-pool breakdown, including before the first child is linked. The
+  // sharing branch remains edge-gated, so this does not widen non-owner access.
   const isOwnerBreakdownViewer =
-    (viewerIsOwner && (hasChildLink || formerMemberUsed > 0)) ||
+    viewerIsOwner ||
     (sharingEnabled && familyOwnerPersonId != null && hasChildLink && !isChild);
   const visibleRows = isOwnerBreakdownViewer
     ? profileRows

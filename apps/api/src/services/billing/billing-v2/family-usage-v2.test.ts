@@ -190,6 +190,29 @@ describe('getUsageBreakdownForProfileV2 (WI-722)', () => {
     });
   });
 
+  it('shows an owner-only shared pool to its authenticated owner without weakening non-owner privacy', async () => {
+    const db = createV2Db({
+      organizationId: 'org-1',
+      viewer: { id: 'owner-1', displayName: 'Owner', roles: ['admin'] },
+      orgMembers: [{ id: 'owner-1', displayName: 'Owner', roles: ['admin'] }],
+      usageRows: [],
+    });
+
+    const result = await getUsageBreakdownForProfileV2(db, {
+      subscriptionId: 'sub-1',
+      activeProfileId: 'owner-1',
+      monthlyLimit: 1500,
+      cycleStartAt: '2026-06-01T00:00:00.000Z',
+      dayStartAt: '2026-06-15T00:00:00.000Z',
+    });
+
+    expect(result.isOwnerBreakdownViewer).toBe(true);
+    expect(result.byProfile).toEqual([
+      expect.objectContaining({ profile_id: 'owner-1', used: 0 }),
+    ]);
+    expect(result.familyAggregate).toEqual({ used: 0, limit: 1500 });
+  });
+
   it('shows the full breakdown to a non-owner adult when the owner shares it', async () => {
     sharingSpy.mockResolvedValue(true);
     chargeSpy.mockResolvedValue(['child-1']); // co-parent is a guardian

@@ -460,7 +460,8 @@ only; `formerMemberUsed` is the non-negative bucket retained from profiles
 removed during that cycle. Therefore
 `sum(byProfile.used) + (formerMemberUsed ?? 0) === familyAggregate.used`.
 The bucket is omitted by older servers and treated as zero for rolling-client
-compatibility. It never changes a profile's attributed usage or the monthly
+compatibility. It never changes an active member's attributed usage. It does
+participate in the family aggregate and in the repaired plan-funded monthly
 enforcement counter.
 
 ### Frontend Architecture

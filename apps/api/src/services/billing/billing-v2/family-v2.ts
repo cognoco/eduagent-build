@@ -302,7 +302,7 @@ export async function getFamilyPoolStatusV2(
   remainingQuestions: number;
   profileCount: number;
   maxProfiles: number;
-  /** Internal coherent-cycle fields are stripped by the public family schema. */
+  /** Only cycleStartAt remains internal and is stripped by the public schema. */
   cycleStartAt: string;
   cycleResetAt: string;
   dailyLimit: number | null;

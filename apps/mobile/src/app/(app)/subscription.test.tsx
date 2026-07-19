@@ -279,6 +279,7 @@ function makeFamilySnapshot(input: {
     monthlyLimit: limit,
     usedThisMonth: input.used,
     remainingQuestions: Math.max(limit - input.used, 0),
+    cycleResetAt: '2026-06-01T00:00:00Z',
     profileCount: 2,
     maxProfiles,
     members: [
@@ -301,6 +302,8 @@ function setCoherentFamilyQuotaRoutes(input: {
   formerMemberUsed?: number;
   topUpCreditsRemaining?: number;
   cycleResetAt?: string;
+  familyCycleResetAt?: string;
+  usageRemainingQuestions?: number;
   tier?: FamilySubscription['tier'];
   limit?: number;
 }) {
@@ -339,7 +342,7 @@ function setCoherentFamilyQuotaRoutes(input: {
             monthlyLimit: limit,
             usedThisMonth: input.used,
             remainingQuestions:
-              Math.max(limit - input.used, 0) + topUpCreditsRemaining,
+              input.usageRemainingQuestions ?? Math.max(limit - input.used, 0),
             topUpCreditsRemaining,
             warningLevel:
               input.used >= limit
@@ -382,6 +385,10 @@ function setCoherentFamilyQuotaRoutes(input: {
             monthlyLimit: limit,
             usedThisMonth: input.used,
             remainingQuestions: Math.max(limit - input.used, 0),
+            cycleResetAt:
+              input.familyCycleResetAt ??
+              input.cycleResetAt ??
+              '2026-07-01T00:00:00.000Z',
             profileCount: 2,
             maxProfiles,
             members: [
@@ -916,6 +923,7 @@ describe('SubscriptionScreen', () => {
               monthlyLimit: 1500,
               usedThisMonth: 0,
               remainingQuestions: 1500,
+              cycleResetAt: '2026-06-01T00:00:00Z',
               profileCount: 1,
               maxProfiles: 6,
               members: [
@@ -1840,6 +1848,7 @@ describe('SubscriptionScreen', () => {
               monthlyLimit: 1500,
               usedThisMonth: 14,
               remainingQuestions: 1486,
+              cycleResetAt: '2026-06-01T00:00:00Z',
               profileCount: 3,
               maxProfiles: 4,
               members: [
@@ -1933,6 +1942,7 @@ describe('SubscriptionScreen', () => {
               monthlyLimit: 1500,
               usedThisMonth: 14,
               remainingQuestions: 1486,
+              cycleResetAt: '2026-06-01T00:00:00Z',
               profileCount: 1,
               maxProfiles: 4,
               members: [],
@@ -1968,6 +1978,7 @@ describe('SubscriptionScreen', () => {
               monthlyLimit: 1500,
               usedThisMonth: 14,
               remainingQuestions: 1486,
+              cycleResetAt: '2026-07-01T00:00:00.000Z',
               profileCount: 2,
               maxProfiles: 4,
               members: [
@@ -1993,6 +2004,114 @@ describe('SubscriptionScreen', () => {
     await waitFor(() => screen.getByTestId('family-quota-error'));
     expect(screen.queryByText('14 / 1500 questions used')).toBeNull();
     expect(screen.queryByTestId('family-pool-section')).toBeNull();
+  });
+
+  it('rejects equal arithmetic from different shared-pool cycles', async () => {
+    setCoherentFamilyQuotaRoutes({
+      used: 14,
+      cycleResetAt: '2026-07-01T00:00:00.000Z',
+      familyCycleResetAt: '2026-08-01T00:00:00.000Z',
+    });
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('family-quota-error'));
+    expect(screen.queryByText('14 / 1500 questions used')).toBeNull();
+    expect(screen.queryByTestId('family-pool-section')).toBeNull();
+  });
+
+  it('rejects a top-up-inflated shared-pool remaining value', async () => {
+    setCoherentFamilyQuotaRoutes({
+      used: 1501,
+      topUpCreditsRemaining: 10,
+      usageRemainingQuestions: 10,
+    });
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('family-quota-error'));
+    expect(screen.queryByText('1501 / 1500 questions used')).toBeNull();
+    expect(screen.queryByTestId('family-pool-section')).toBeNull();
+  });
+
+  it('renders a coherent owner-only Family pool with no child or former-member usage', async () => {
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: makeSubscription({
+              tier: 'family',
+              monthlyLimit: 1500,
+              usedThisMonth: 0,
+              remainingQuestions: 1500,
+              dailyLimit: null,
+              dailyRemainingQuestions: null,
+            }),
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/usage',
+      () =>
+        new Response(
+          JSON.stringify({
+            usage: {
+              ...DEFAULT_USAGE,
+              monthlyLimit: 1500,
+              usedThisMonth: 0,
+              remainingQuestions: 1500,
+              cycleResetAt: '2026-07-01T00:00:00.000Z',
+              dailyLimit: null,
+              dailyRemainingQuestions: null,
+              byProfile: [
+                {
+                  profile_id: FAMILY_OWNER_ID,
+                  name: 'Owner',
+                  used: 0,
+                  usedToday: 0,
+                  is_self: true,
+                },
+              ],
+              familyAggregate: { used: 0, limit: 1500 },
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/subscription/family',
+      () =>
+        new Response(
+          JSON.stringify({
+            family: {
+              tier: 'family',
+              monthlyLimit: 1500,
+              usedThisMonth: 0,
+              remainingQuestions: 1500,
+              cycleResetAt: '2026-07-01T00:00:00.000Z',
+              profileCount: 1,
+              maxProfiles: 4,
+              members: [
+                {
+                  profileId: FAMILY_OWNER_ID,
+                  displayName: 'Owner',
+                  isOwner: true,
+                },
+              ],
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('family-pool-section'));
+    screen.getByText('1 of 4 profiles connected');
+    screen.getByText(/1500 shared questions left/i);
+    expect(screen.queryByTestId('family-quota-error')).toBeNull();
   });
 
   it.each([
@@ -2323,6 +2442,7 @@ describe('SubscriptionScreen', () => {
               monthlyLimit: 1500,
               usedThisMonth: 300,
               remainingQuestions: 1200,
+              cycleResetAt: '2026-06-01T00:00:00Z',
               profileCount: 2,
               maxProfiles: 4,
               members: [
@@ -3180,6 +3300,7 @@ describe('SubscriptionScreen', () => {
                 monthlyLimit: 1500,
                 usedThisMonth,
                 remainingQuestions: 1500 - usedThisMonth,
+                cycleResetAt: '2026-06-01T00:00:00Z',
                 profileCount: members.length,
                 maxProfiles: 4,
                 members,

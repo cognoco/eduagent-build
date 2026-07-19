@@ -108,11 +108,13 @@ function sharedPoolQuotaSnapshotsAgree(
     aggregate.limit === usage.monthlyLimit &&
     aggregate.used === usage.usedThisMonth &&
     family.usedThisMonth === usage.usedThisMonth &&
+    usage.remainingQuestions === planRemaining &&
     memberTotal + formerMemberUsed === aggregate.used &&
     rows.length === family.profileCount &&
     family.members.length === family.profileCount &&
     sameProfileSet &&
-    family.remainingQuestions === planRemaining
+    family.remainingQuestions === planRemaining &&
+    family.cycleResetAt === usage.cycleResetAt
   );
 }
 
