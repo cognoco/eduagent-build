@@ -35,6 +35,7 @@ import { captureException } from '../../sentry';
 import { createLogger } from '../../logger';
 import { findOwnerPersonId } from '../../identity-v2/helpers';
 import { type AppliedSubscriptionRow, type SubscriptionRow } from '../types';
+import { addMonthsClamped } from '../billing-shared';
 import type {
   RevenuecatWebhookUpdate,
   RevenuecatQuotaUpdate,
@@ -414,8 +415,7 @@ export async function activateSubscriptionFromRevenuecatV2(
         throw new Error('Subscription insert did not return a row');
 
       const now = new Date();
-      const cycleResetAt = new Date(now);
-      cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
+      const cycleResetAt = addMonthsClamped(now, 1);
 
       await tx.insert(quotaPools).values({
         subscriptionId: inserted.id,
