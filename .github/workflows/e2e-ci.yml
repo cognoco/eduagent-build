@@ -338,8 +338,14 @@ jobs:
 
       # Start API server in background (NODE_ENV=test enables __test/* routes)
       - name: Start API server (background)
+        env:
+          USE_MAESTRO_V2_FIXTURE: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_suite == 'v2' }}
         run: |
-          pnpm --dir apps/api exec wrangler dev &
+          if [ "$USE_MAESTRO_V2_FIXTURE" = "true" ]; then
+            pnpm --dir apps/api exec wrangler dev src/test-utils/maestro-e2e-worker.ts &
+          else
+            pnpm --dir apps/api exec wrangler dev &
+          fi
           echo "Waiting for API server..."
           for i in $(seq 1 30); do
             if curl -sf http://localhost:8787/v1/health > /dev/null 2>&1; then

@@ -385,6 +385,62 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }>;
   }
 
+  function runStartApiScript(script: string, useV2Fixture: boolean) {
+    const root = mkdtempSync(join(tmpdir(), 'wi-2215-api-start-'));
+    const binDir = join(root, 'bin');
+    const pnpmMarker = join(root, 'pnpm-argv');
+    const pnpm = join(binDir, 'pnpm');
+    const curl = join(binDir, 'curl');
+
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(
+      pnpm,
+      [
+        '#!/usr/bin/env bash',
+        'printf \'%s\\n\' "$@" > "$FAKE_PNPM_MARKER"',
+        '',
+      ].join('\n'),
+    );
+    writeFileSync(
+      curl,
+      [
+        '#!/usr/bin/env bash',
+        'for _ in {1..100}; do',
+        '  if [ -s "$FAKE_PNPM_MARKER" ]; then exit 0; fi',
+        '  sleep 0.01',
+        'done',
+        'exit 1',
+        '',
+      ].join('\n'),
+    );
+    chmodSync(pnpm, 0o755);
+    chmodSync(curl, 0o755);
+
+    try {
+      const result = spawnSync(
+        'bash',
+        ['-e', '-u', '-o', 'pipefail', '-c', script],
+        {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${binDir}:${process.env.PATH ?? ''}`,
+            BASH_ENV: '',
+            FAKE_PNPM_MARKER: pnpmMarker,
+            USE_MAESTRO_V2_FIXTURE: useV2Fixture ? 'true' : 'false',
+          },
+        },
+      );
+      const pnpmArgv = existsSync(pnpmMarker)
+        ? readFileSync(pnpmMarker, 'utf8').trim().split('\n')
+        : [];
+      return { result, pnpmArgv };
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
   it('declares recursive workspace discovery instead of the root-only default', () => {
     expect(workspaceConfig.flows).toContain('flows/**');
   });
@@ -546,6 +602,36 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(writeVarsScript).toContain('SEED_PASSWORD');
     expect(writeVarsScript).toContain('TEST_SEED_SECRET');
     expect(writeVarsScript).not.toContain('${{ secrets.');
+  });
+
+  it('selects the tested Photosynthesis worker when USE_MAESTRO_V2_FIXTURE is true', () => {
+    const startApiStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Start API server (background)',
+    );
+    const startApiScript = String(startApiStep?.run ?? '');
+
+    expect(startApiStep).toBeDefined();
+    const { result, pnpmArgv } = runStartApiScript(startApiScript, true);
+    expect(result.status).toBe(0);
+    expect(pnpmArgv).toEqual([
+      '--dir',
+      'apps/api',
+      'exec',
+      'wrangler',
+      'dev',
+      'src/test-utils/maestro-e2e-worker.ts',
+    ]);
+  });
+
+  it('keeps ordinary Wrangler startup when USE_MAESTRO_V2_FIXTURE is false', () => {
+    const startApiStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Start API server (background)',
+    );
+    const startApiScript = String(startApiStep?.run ?? '');
+
+    const { result, pnpmArgv } = runStartApiScript(startApiScript, false);
+    expect(result.status).toBe(0);
+    expect(pnpmArgv).toEqual(['--dir', 'apps/api', 'exec', 'wrangler', 'dev']);
   });
 
   it('allows the release APK to reach the local HTTP API only in E2E builds', () => {
