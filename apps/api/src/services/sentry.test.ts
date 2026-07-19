@@ -295,7 +295,12 @@ describe('scrubSentryEvent', () => {
     );
   });
 
-  it('leaves an unrelated exception value untouched', () => {
+  // [WI-2339 Gate-2 rework note] Still untouched under the generalized
+  // redaction: this TypeError message uses SINGLE quotes ('foo'), and
+  // QUOTED_SNIPPET_PATTERN only matches DOUBLE-quoted substrings — single
+  // quotes are near-universally property/variable names in this shape, not
+  // free text, so they are deliberately left intact for debuggability.
+  it('leaves a single-quoted (non-PII-shaped) exception value untouched', () => {
     const event = {
       exception: {
         values: [
@@ -312,6 +317,64 @@ describe('scrubSentryEvent', () => {
     expect(scrubbed.exception?.values?.[0]?.value).toBe(
       "Cannot read properties of undefined (reading 'foo')",
     );
+  });
+
+  // [WI-2339 Gate-2 rework — AC-1] Red-green regression: the original fix
+  // scoped quoted-snippet redaction to ONLY the JSON.parse SyntaxError
+  // message shape (gated on isJsonParseSyntaxErrorMessage) — Gate-2 review
+  // correctly flagged that AC-1 requires general event.exception coverage,
+  // not just that one shape. Before this fix, a non-JSON-parse exception
+  // whose message embeds a double-quoted free-text substring (e.g. a
+  // validation error echoing a learner-entered field value) passed through
+  // UNREDACTED and this assertion FAILED; after removing the JSON-parse-only
+  // gate it PASSES.
+  it('redacts a double-quoted substring from a general (non-JSON-parse) exception value', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'ValidationError',
+            value:
+              'Invalid value "my mom said we live at 123 Main St" for field homeworkAnswer',
+          },
+        ],
+      },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    const redactedValue = scrubbed.exception?.values?.[0]?.value;
+    expect(redactedValue).not.toContain('123 Main St');
+    expect(redactedValue).toBe(
+      'Invalid value "[redacted]" for field homeworkAnswer',
+    );
+  });
+
+  // [WI-2339 Gate-2 rework — AC-1] Red-green regression: event.message (the
+  // raw string passed to captureMessage()) was not scrubbed at all before
+  // this fix — a call site passing free text there would have leaked it
+  // unredacted, and this assertion FAILED; after applying the same
+  // redactQuotedSnippets pass to event.message it PASSES.
+  it('redacts a double-quoted substring from event.message', () => {
+    const event = {
+      message:
+        'unexpected value "learner said their dad picks them up at 5pm" received',
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.message).not.toContain('dad picks them up');
+    expect(scrubbed.message).toBe('unexpected value "[redacted]" received');
+  });
+
+  it('leaves an event.message with no quoted substring unchanged', () => {
+    const event = {
+      message: 'billing.trial_expiry_failed',
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.message).toBe('billing.trial_expiry_failed');
   });
 
   // [WI-2353] Red-green regression: @sentry/cloudflare's default
@@ -494,17 +557,34 @@ describe('scrubSentryEvent', () => {
     );
   });
 
-  it('leaves a non-plain-object event.request.data unchanged', () => {
+  // [WI-2339 Gate-2 rework] Red-green regression: .agents/skills/tech/
+  // sentry-scrubbing/SKILL.md's checklist requires beforeSend to strip
+  // request bodies unconditionally, not only plain-object bodies. Before
+  // this fix, a non-plain-object request.data (a raw string body) was left
+  // UNCHANGED and this assertion FAILED (the literal secret passed through);
+  // after wholesale-stripping any truthy non-plain-object body it PASSES.
+  it('strips a non-plain-object (string) event.request.data wholesale', () => {
     const event = {
       request: {
         url: 'https://api.example.com/v1/sessions',
-        data: 'raw text body',
+        data: 'raw text body containing SECRET-abc123',
       },
     } as unknown as Parameters<typeof scrubSentryEvent>[0];
 
     const scrubbed = scrubSentryEvent(event);
 
-    expect(scrubbed.request?.data).toBe('raw text body');
+    expect(scrubbed.request?.data).not.toContain('SECRET-abc123');
+    expect(scrubbed.request?.data).toBe('[stripped]');
+  });
+
+  it('leaves an absent event.request.data unchanged', () => {
+    const event = {
+      request: { url: 'https://api.example.com/v1/sessions' },
+    } as unknown as Parameters<typeof scrubSentryEvent>[0];
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.data).toBeUndefined();
   });
 
   // [WI-2339] Red-green regression: the Fetch integration (active by default
