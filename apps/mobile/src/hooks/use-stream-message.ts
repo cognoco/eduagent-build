@@ -11,6 +11,7 @@ import {
 } from '../lib/api-client';
 import { getApiUrl } from '../lib/api';
 import { NetworkError, UpstreamError } from '../lib/api-errors';
+import { FEATURE_FLAGS } from '../lib/feature-flags';
 import { useProfile } from '../lib/profile';
 import {
   streamSSEViaXHR,
@@ -154,6 +155,10 @@ export function useStreamMessage(sessionId: string): {
           const url = `${getApiUrl()}/v1/sessions/${effectiveSessionId}/stream`;
           const body: SessionMessageInput = {
             message,
+            // [WI-2220] Active app shell — lets production app-help prompt
+            // composition answer from the correct destination map instead of
+            // silently defaulting to V0 for V2 clients.
+            shell: FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? 'v2' : 'v0',
             ...(options?.homeworkMode
               ? { homeworkMode: options.homeworkMode }
               : {}),

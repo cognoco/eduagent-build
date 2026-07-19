@@ -38,6 +38,7 @@ import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
 import { useTheme, useThemeColors } from '../../../lib/theme';
 import { getSubjectTint } from '../../../lib/subject-tints';
 import { withOpacity } from '../../../lib/color-opacity';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 const PRACTICE_WEB_MAX_WIDTH = 560;
 
@@ -598,7 +599,13 @@ export default function PracticeScreen(): React.ReactElement {
                 <Pressable
                   testID="review-empty-browse"
                   className="mt-3"
-                  onPress={() => router.push('/(app)/library' as Href)}
+                  onPress={() =>
+                    router.push(
+                      (FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+                        ? '/(app)/subjects'
+                        : '/(app)/library') as Href,
+                    )
+                  }
                 >
                   <Text className="text-body-sm text-primary font-semibold">
                     {t('practiceHub.review.browseTopics')}

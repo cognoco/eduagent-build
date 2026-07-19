@@ -92,6 +92,11 @@ export type InputMode = z.infer<typeof inputModeSchema>;
 export const homeworkModeSchema = z.enum(['help_me', 'check_answer']);
 export type HomeworkMode = z.infer<typeof homeworkModeSchema>;
 
+/** Active app nav shell (WI-2220). V1 maps to 'v0' client-side — see
+ *  apps/api/src/services/app-help-map.ts for the shell-to-map contract. */
+export const appShellSchema = z.enum(['v0', 'v2']);
+export type AppShell = z.infer<typeof appShellSchema>;
+
 export const homeworkProblemSourceSchema = z.enum(['ocr', 'manual']);
 export type HomeworkProblemSource = z.infer<typeof homeworkProblemSourceSchema>;
 
@@ -339,6 +344,10 @@ export const sessionMessageSchema = z
     imageBase64: z.string().max(IMAGE_BASE64_MAX).optional(),
     /** MIME type of the attached image */
     imageMimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']).optional(),
+    /** [WI-2220] Active app nav shell, sourced client-side from
+     *  FEATURE_FLAGS.MODE_NAV_V2_ENABLED at send time — drives which app-help
+     *  destination map the mentor answers app-navigation questions from. */
+    shell: appShellSchema.optional(),
   })
   .strict()
   .refine((data) => !!data.imageBase64 === !!data.imageMimeType, {

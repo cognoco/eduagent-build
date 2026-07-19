@@ -56,6 +56,7 @@ import { buildStripeCustomerCreateKey } from '../../dedupe-key';
 import { computeTrialEndDate } from '../../trial';
 import { inngest } from '../../../inngest/client';
 import { findOwnerPersonId } from '../../identity-v2/helpers';
+import { addMonthsClamped } from '../billing-shared';
 import {
   mapQuotaPoolRow,
   type SubscriptionRow,
@@ -170,8 +171,7 @@ export async function createSubscriptionV2(
     if (!subRow) throw new Error('Subscription insert did not return a row');
 
     const now = new Date();
-    const cycleResetAt = new Date(now);
-    cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
+    const cycleResetAt = addMonthsClamped(now, 1);
 
     const tierConfig = getTierConfig(tier);
     await tx.insert(quotaPools).values({
@@ -479,8 +479,7 @@ export async function resetMonthlyQuotaV2(
   }
 
   const now = new Date();
-  const nextReset = new Date(now);
-  nextReset.setMonth(nextReset.getMonth() + 1);
+  const nextReset = addMonthsClamped(now, 1);
 
   const [updated] = await db
     .update(quotaPools)
@@ -554,8 +553,7 @@ export async function ensureInitialTrialSubscriptionV2(
     if (already) return already;
 
     const now = new Date();
-    const cycleResetAt = new Date(now);
-    cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
+    const cycleResetAt = addMonthsClamped(now, 1);
     const trialEndsAt = computeTrialEndDate(
       now,
       timezone ?? orgRow.timezone ?? null,
@@ -641,8 +639,7 @@ export async function ensureFreeSubscriptionV2(
   }
 
   const now = new Date();
-  const cycleResetAt = new Date(now);
-  cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
+  const cycleResetAt = addMonthsClamped(now, 1);
   const tierConfig = getTierConfig('free');
 
   const provisioned = await db.transaction(async (tx) => {

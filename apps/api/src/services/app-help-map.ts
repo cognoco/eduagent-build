@@ -1,6 +1,7 @@
 // App Help Map - server-owned static map of user-facing destinations.
 //
 import type {
+  AppShell,
   ChallengeRoundEvaluationItem,
   ChallengeRoundNoteDraftHint,
 } from '@eduagent/schemas';
@@ -21,7 +22,7 @@ import type {
 // existing caller (and production) is byte-identical until the S6 cutover flips
 // V2 to the default and T13 deletes the V0 variant.
 
-export type AppShell = 'v0' | 'v2';
+export type { AppShell };
 
 const APP_HELP_MAP_V0 = `APP HELP (map version 2026-05-30):
 This section means the current learner message is an internal MentoMate app question. You DO have access to the app map below, and you are allowed and expected to answer internal app-navigation questions from it. Do not say you cannot help with the app. Do not treat app questions as off-topic. Do not treat app questions as assessment answers. Answer in plain chat text using the visible destination labels below.
