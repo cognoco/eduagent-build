@@ -87,6 +87,24 @@ per-flow quarantine-with-expiry escape hatch WI-2452 was designed to provide,
 or a formal quarantine ledger for the legacy advisory set to replace its
 current unconditional (non-expiring) `continue-on-error`.
 
+### Wiring TODO — CI-execution asymmetry between the two tools
+
+Neither tool is wired into a *workflow*, by design, but their unit tests are
+not equally reachable by CI today. `scripts/run-smoke-failure-class-annotate.test.ts`
+rides the existing `scripts/jest.config.cjs` config, which `ci.yml` already
+invokes as a standalone step ("scripts/\* tests") — its tests run in CI now.
+`tools/quarantine/run-smoke-lanes.test.ts` has its own new
+`tools/quarantine/jest.config.cjs` (mirroring the same pattern
+`tools/scripts/jest.config.cjs` uses), but nothing in `ci.yml` invokes it —
+`tools/` is not an Nx-inferred project, and adding the invoking step is itself
+a `.github/workflows/ci.yml` edit, which this PR deliberately makes none of.
+Until that step is added, `run-smoke-lanes.test.ts` only runs when someone
+invokes it directly (`pnpm exec jest --config tools/quarantine/jest.config.cjs
+--no-coverage`), not automatically on every PR. Wiring that CI step is part of
+the deferred gate-structure work — bundle it with whichever future PR wires
+the lane split itself, rather than adding a lone `ci.yml` step ahead of the
+decision it exists to serve.
+
 ## Keep/kill recommendation: WI-2458
 
 WI-2458 ("Enact run-smoke required-check split on branch protection") was
