@@ -29,6 +29,17 @@ export const subscriptionStatusSchema = z.enum([
 ]);
 export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
 
+export type CoherentBillingAccessResultV2<TAccess, TSharedPoolStatus> =
+  | {
+      kind: 'available';
+      access: TAccess | null;
+      sharedPoolStatus: TSharedPoolStatus | null;
+    }
+  | {
+      kind: 'shared-pool-unavailable';
+      access: TAccess | null;
+    };
+
 export const subscriptionSchema = z
   .object({
     tier: subscriptionTierSchema,

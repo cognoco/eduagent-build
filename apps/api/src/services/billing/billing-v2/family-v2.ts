@@ -29,7 +29,11 @@ import {
   usageEvents,
   type Database,
 } from '@eduagent/database';
-import type { FamilyMember, SubscriptionTier } from '@eduagent/schemas';
+import type {
+  CoherentBillingAccessResultV2,
+  FamilyMember,
+  SubscriptionTier,
+} from '@eduagent/schemas';
 import { getTierConfig, resolveEffectiveAccessTier } from '../../subscription';
 import type { SubscriptionRow } from '../types';
 import { createLogger } from '../../logger';
@@ -219,17 +223,6 @@ export class StaleFamilyAccessSnapshotErrorV2 extends Error {
   }
 }
 
-export type CoherentBillingAccessResultV2 =
-  | {
-      kind: 'available';
-      access: EffectiveSubscriptionAccessV2 | null;
-      sharedPoolStatus: Awaited<ReturnType<typeof getFamilyPoolStatusV2>>;
-    }
-  | {
-      kind: 'shared-pool-unavailable';
-      access: EffectiveSubscriptionAccessV2 | null;
-    };
-
 /**
  * Assemble one billing-access snapshot for quota-bearing routes. Shared-pool
  * readers retry once when the subscription changes between the access read and
@@ -238,7 +231,12 @@ export type CoherentBillingAccessResultV2 =
 export async function resolveCoherentBillingAccessV2(
   db: Database,
   subscriptionId: string,
-): Promise<CoherentBillingAccessResultV2> {
+): Promise<
+  CoherentBillingAccessResultV2<
+    EffectiveSubscriptionAccessV2,
+    NonNullable<Awaited<ReturnType<typeof getFamilyPoolStatusV2>>>
+  >
+> {
   let access = await getEffectiveAccessForSubscriptionV2(db, subscriptionId);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {

@@ -81,7 +81,6 @@ export {
   removeProfileFromSubscriptionV2,
   getFamilyPoolStatusV2,
   resolveCoherentBillingAccessV2,
-  type CoherentBillingAccessResultV2,
   ProfileRemovalNotImplementedErrorV2,
   StaleFamilyAccessSnapshotErrorV2,
 } from './family-v2';
