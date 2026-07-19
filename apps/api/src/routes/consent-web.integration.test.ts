@@ -902,7 +902,7 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     expect(html).toContain('/v1/consent-page/withdraw');
   });
 
-  it('GET withdraw: valid token + already withdrawn (in grace) → undo landing', async () => {
+  it('GET withdraw: valid token + already withdrawn (in grace) → informational landing, no restore form [WI-2348]', async () => {
     const { token } = await seedApprovedGrant({
       displayName: 'Wade',
       withdrawnAt: new Date(),
@@ -913,8 +913,11 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain('Consent withdrawn');
-    expect(html).toContain('Undo — restore consent');
-    expect(html).toContain('/v1/consent-page/restore');
+    expect(html).toContain('signing in');
+    // [WI-2348 / OPQ-114] bearer possession no longer restores — the page
+    // must not offer a self-service restore form/action anymore.
+    expect(html).not.toContain('Undo — restore consent');
+    expect(html).not.toContain('/v1/consent-page/restore');
   });
 
   it('GET withdraw: valid token but no grant → "nothing to withdraw"', async () => {
@@ -975,7 +978,13 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     expect(html).toContain('Invalid link');
   });
 
-  it('POST restore: within grace re-grants → "consent restored"', async () => {
+  // [WI-2348 / OPQ-114, AC-3] The negative path this WI exists to prove: a
+  // bare bearer link — valid, unexpired, within the restore grace window —
+  // must NOT be able to restore consent anymore. Possession of the link is
+  // the only thing this request presents; no authenticated session. The
+  // guaranteed property is that the grant stays withdrawn and no new row is
+  // appended, not merely that the response text changed.
+  it('POST restore: a valid bearer link within grace CANNOT restore consent — no authenticated session (AC-3)', async () => {
     const { childId, token } = await seedApprovedGrant({
       displayName: 'Remy',
       withdrawnAt: new Date(Date.now() - 60_000),
@@ -983,28 +992,26 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     const res = await postW('/v1/consent-page/restore', { token });
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain('Consent restored');
+    expect(html).not.toContain('Consent restored');
+    expect(html).toContain('Sign in');
 
     const db = createIntegrationDb();
     const grants = await db.query.consentGrant.findMany({
       where: eq(consentGrant.chargePersonId, childId),
     });
-    // Restore APPENDS a new un-withdrawn grant (does not un-stamp the old one).
-    const restored = grants.find(
-      (g) => g.priorValue === false && g.withdrawnAt === null,
-    );
-    expect(restored?.granted).toBe(true);
+    // No new row was appended, and the original grant is still withdrawn —
+    // the link had zero mutating effect.
+    expect(grants).toHaveLength(1);
+    expect(grants[0]!.withdrawnAt).toBeTruthy();
   });
 
-  it('POST restore: after the 7-day grace → 410 grace-expired page', async () => {
-    const { token } = await seedApprovedGrant({
-      displayName: 'Gus',
-      withdrawnAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+  it('POST restore: forged/invalid token → 400 invalid-link page (unchanged; still never mutates)', async () => {
+    const res = await postW('/v1/consent-page/restore', {
+      token: 'forged.token',
     });
-    const res = await postW('/v1/consent-page/restore', { token });
-    expect(res.status).toBe(410);
+    expect(res.status).toBe(400);
     const html = await res.text();
-    expect(html).toContain('Grace period has expired');
+    expect(html).toContain('Invalid link');
   });
 
   it('the signed withdrawal token round-trips through verifyWithdrawalToken', async () => {
