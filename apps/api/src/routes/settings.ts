@@ -29,7 +29,10 @@ import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireAccount } from '../middleware/profile-scope';
 import { withProfile } from '../route-utils/route-context';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
-import { assertOwnerProfile } from '../services/family-access';
+import {
+  assertOwnerProfile,
+  assertCallerIsAccountOwner,
+} from '../services/family-access';
 import {
   getNotificationPrefs,
   upsertNotificationPrefs,
@@ -118,6 +121,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       // links today, but gating only on the link diverges from the pattern.
       if (query.childProfileId) {
         assertOwnerProfile(c);
+        // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+        await assertCallerIsAccountOwner(c);
       }
       const celebrationLevel = query.childProfileId
         ? await getChildCelebrationLevel(db, profileId, query.childProfileId)
@@ -143,6 +148,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       // routes.
       if (body.childProfileId) {
         assertOwnerProfile(c);
+        // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+        await assertCallerIsAccountOwner(c);
       }
       const result = body.childProfileId
         ? await upsertChildCelebrationLevel(
@@ -170,6 +177,8 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     // owner predicate ever changes (an inline isOwner read could be quietly
     // removed by a future refactor thinking it's duplicative).
     assertOwnerProfile(c);
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(c);
     const { db, profileId } = withProfile(c);
     const value = await getWithdrawalArchivePreference(db, profileId);
     return c.json(

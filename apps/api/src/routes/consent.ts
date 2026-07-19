@@ -36,6 +36,7 @@ import { notFound, forbidden, unauthorized, apiError } from '../errors';
 import {
   assertOwnerProfile,
   assertOwnerAndParentAccess,
+  assertCallerIsAccountOwner,
 } from '../services/family-access';
 import {
   requestConsentV2,
@@ -157,6 +158,14 @@ async function assertCanRequestConsentForChild<E extends ConsentRouteEnv>(
   // profile or an owner with no link to this child (IDOR).
   // [WI-786] Flag-gated: flag-on resolves via guardianship, flag-off via family_links.
   await assertOwnerAndParentAccess(c, db, activeProfileId, childProfileId);
+  // [WI-1989] Caller-identity gate — assertOwnerAndParentAccess derives
+  // authority from profileMeta (the X-Profile-Id-resolved profile), which a
+  // non-owner can spoof to the owner's id within the same org. See
+  // assertCallerIsAccountOwner doc (services/family-access.ts).
+  await assertCallerIsAccountOwner(
+    c,
+    'Only the account owner can perform administrative actions on child profiles.',
+  );
 }
 
 type ConsentRouteEnv = {
@@ -485,6 +494,11 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
 
     // [CR-2026-05-19-H1] Only the account owner can read child consent status.
     assertOwnerProfile(c, 'Only the account owner can manage child consent.');
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can manage child consent.',
+    );
 
     try {
       const state = await getChildConsentForParentV2(
@@ -523,6 +537,11 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
 
     // [CR-2026-05-19-H1] Only the account owner can revoke child consent.
     assertOwnerProfile(c, 'Only the account owner can revoke child consent.');
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can revoke child consent.',
+    );
 
     try {
       const { status, revokedAt } = await revokeChildConsentV2(
@@ -649,6 +668,11 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
 
     // [CR-2026-05-19-H1] Only the account owner can restore child consent.
     assertOwnerProfile(c, 'Only the account owner can restore child consent.');
+    // [WI-1989] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can restore child consent.',
+    );
 
     try {
       const state = await restoreChildConsentV2(
