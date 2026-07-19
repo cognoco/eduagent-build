@@ -65,6 +65,7 @@ async function runCanary({
   const endpoint = new URL('/v1/__test/reset', target);
   endpoint.search = query.toString();
   let last = 'unknown';
+  let sawRetryableHttp = false;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -92,6 +93,7 @@ async function runCanary({
       ) {
         return { state: GATE_STATES.NOT_RUN, reason: last, terminal: true };
       }
+      if (RETRYABLE.has(response.status)) sawRetryableHttp = true;
     } catch (error) {
       last = error?.name === 'AbortError' ? 'timeout' : 'transport';
     } finally {
@@ -100,7 +102,9 @@ async function runCanary({
     if (attempt + 1 < attempts)
       await sleep(100 * 2 ** attempt + Math.floor(random() * 100));
   }
-  return { state: GATE_STATES.UNAVAILABLE, reason: last };
+  return sawRetryableHttp
+    ? { state: GATE_STATES.UNAVAILABLE, reason: last }
+    : { state: GATE_STATES.NOT_RUN, reason: last, terminal: true };
 }
 
 function traceFiles(root) {

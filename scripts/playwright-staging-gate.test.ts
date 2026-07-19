@@ -46,6 +46,23 @@ describe('[WI-2228] staging canary and fail-closed classification', () => {
     },
   );
 
+  it('fails closed when the API target is transport-unreachable', async () => {
+    const result = await runCanary({
+      apiUrl: 'https://typo.example.test',
+      secret: 'test-secret',
+      fetchImpl: async () => {
+        throw new TypeError('fetch failed');
+      },
+      attempts: 3,
+      random: () => 0,
+    });
+    expect(result).toMatchObject({
+      state: GATE_STATES.NOT_RUN,
+      reason: 'transport',
+      terminal: true,
+    });
+  });
+
   it.each([401, 403, 404, 500])(
     'fails closed on terminal HTTP %s',
     async (status) => {
