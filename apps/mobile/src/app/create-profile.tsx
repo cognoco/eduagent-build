@@ -46,7 +46,7 @@ import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
 import { platformAlert } from '../lib/platform-alert';
 import { errorHasCode } from '../components/session/session-types';
-import { requestMentorBornCeremony } from '../lib/mentor-born-ceremony';
+import { queueMentorBornCeremony } from '../lib/mentor-born-ceremony';
 
 // Captured at module load — safe because these screens are portrait-locked.
 // On web, cap at a mobile-like height to avoid massive whitespace.
@@ -460,7 +460,7 @@ export default function CreateProfileScreen() {
         });
       } else if (!needsConsentFlow) {
         if (isFirstProfileCreation && !isAddingChild) {
-          requestMentorBornCeremony({
+          await queueMentorBornCeremony({
             profileId: profile.id,
             reason: 'first-profile-created',
           });

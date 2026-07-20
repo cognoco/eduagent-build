@@ -13,7 +13,10 @@ import {
   __resetMentorBornCeremonyForTests,
   getMentorBornCeremonySnapshot,
 } from '../lib/mentor-born-ceremony';
-import { mentorBirthSeenKey } from '../lib/secure-store-keys';
+import {
+  MENTOR_BORN_PENDING_KEY,
+  mentorBirthSeenKey,
+} from '../lib/secure-store-keys';
 
 import {
   resolveNavigationContract,
@@ -421,7 +424,7 @@ describe('CreateProfileScreen', () => {
     }
   });
 
-  it('calls POST and navigates back on successful submit (adult, no consent needed)', async () => {
+  it('[WI-2105 AC-1] durably queues the ceremony after successful first-profile creation', async () => {
     const newProfile = makeProfileResponse({
       id: PROFILE_IDS.new,
       displayName: 'Sam',
@@ -461,6 +464,14 @@ describe('CreateProfileScreen', () => {
         reason: 'first-profile-created',
       },
       requestCount: 1,
+    });
+    expect(
+      JSON.parse(
+        expoSecureStoreMock.__store.get(MENTOR_BORN_PENDING_KEY) ?? 'null',
+      ),
+    ).toMatchObject({
+      profileId: PROFILE_IDS.new,
+      reason: 'first-profile-created',
     });
   });
 
