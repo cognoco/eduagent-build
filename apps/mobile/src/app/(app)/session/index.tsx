@@ -15,6 +15,7 @@ import type {
   HomeworkCaptureSource,
   HomeworkProblem,
   InputMode,
+  LearningSession,
   PendingCelebration,
   ChallengeRoundSessionState,
 } from '@eduagent/schemas';
@@ -148,6 +149,42 @@ function isChallengeRoundInFlight(
     round?.state === 'accepted' ||
     round?.state === 'active' ||
     round?.state === 'drafting'
+  );
+}
+
+function isExactManualHomeworkSessionAssociated({
+  isE2EBuild,
+  isMentorHomeworkFrame,
+  allocatedSessionIds,
+  activeSessionId,
+  activeSession,
+  effectiveSubjectId,
+  initialProblemText,
+}: {
+  isE2EBuild: boolean;
+  isMentorHomeworkFrame: boolean;
+  allocatedSessionIds: readonly string[];
+  activeSessionId: string | null;
+  activeSession: LearningSession | null | undefined;
+  effectiveSubjectId: string | undefined;
+  initialProblemText: string | undefined;
+}): boolean {
+  const persistedHomework = activeSession?.metadata?.homework;
+  const persistedProblem = persistedHomework?.problems[0];
+
+  return (
+    isE2EBuild &&
+    isMentorHomeworkFrame &&
+    allocatedSessionIds.length === 1 &&
+    allocatedSessionIds[0] === activeSessionId &&
+    activeSession?.id === activeSessionId &&
+    activeSession?.subjectId === effectiveSubjectId &&
+    activeSession?.sessionType === 'homework' &&
+    persistedHomework?.problemCount === 1 &&
+    persistedHomework?.currentProblemIndex === 0 &&
+    persistedHomework?.problems.length === 1 &&
+    persistedProblem?.source === 'manual' &&
+    persistedProblem?.text.trim() === initialProblemText?.trim()
   );
 }
 
@@ -1774,21 +1811,16 @@ function SessionScreenInner() {
       },
     });
 
-  const persistedHomework = activeSession.data?.metadata?.homework;
-  const persistedProblem = persistedHomework?.problems[0];
   const exactManualHomeworkSessionAssociated =
-    isE2EBuild &&
-    isMentorHomeworkFrame &&
-    e2eAllocatedSessionIds.length === 1 &&
-    e2eAllocatedSessionIds[0] === activeSessionId &&
-    activeSession.data?.id === activeSessionId &&
-    activeSession.data?.subjectId === effectiveSubjectId &&
-    activeSession.data?.sessionType === 'homework' &&
-    persistedHomework?.problemCount === 1 &&
-    persistedHomework?.currentProblemIndex === 0 &&
-    persistedHomework?.problems.length === 1 &&
-    persistedProblem?.source === 'manual' &&
-    persistedProblem?.text.trim() === initialProblemText?.trim();
+    isExactManualHomeworkSessionAssociated({
+      isE2EBuild,
+      isMentorHomeworkFrame,
+      allocatedSessionIds: e2eAllocatedSessionIds,
+      activeSessionId,
+      activeSession: activeSession.data,
+      effectiveSubjectId,
+      initialProblemText,
+    });
   const multipleHomeworkSessionsCreated =
     isE2EBuild && isMentorHomeworkFrame && e2eAllocatedSessionIds.length > 1;
 
