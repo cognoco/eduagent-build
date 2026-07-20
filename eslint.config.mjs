@@ -1,6 +1,7 @@
 import nx from '@nx/eslint-plugin';
 import noInternalJestMock from './eslint-rules/no-internal-jest-mock.mjs';
 import inngestAdminTag from './eslint-rules/inngest-admin-tag.mjs';
+import noRawErrorToSentry from './eslint-rules/no-raw-error-to-sentry.mjs';
 
 // Filter out jsx-a11y/accessible-emoji rule from react config
 // (deprecated in eslint-plugin-jsx-a11y v6.6.0, removed in later versions)
@@ -20,6 +21,7 @@ const govPlugin = {
   rules: {
     'no-internal-jest-mock': noInternalJestMock,
     'inngest-admin-tag': inngestAdminTag,
+    'no-raw-error-to-sentry': noRawErrorToSentry,
   },
 };
 
@@ -500,6 +502,36 @@ export default [
             'Default exports are reserved for the Worker entrypoint (apps/api/src/index.ts). Use a named export elsewhere. See AGENTS.md.',
         },
       ],
+    },
+  },
+  // -------------------------------------------------------------------------
+  // no-raw-error-to-sentry (WI-2352) — forbid a JSON.parse/Zod-.parse/
+  // DB-driver catch binding reaching captureException/captureMessage
+  // directly or via `.message`; the wrapped content-free
+  // `new Error(label, { cause: {...} })` pattern (services/llm/providers/
+  // errors.ts) must be used instead. Scoped to apps/api/src production code,
+  // same as the other governance rules above — test files are excluded
+  // since they may legitimately construct raw-error fixtures.
+  // See eslint-rules/no-raw-error-to-sentry.mjs for the full heuristic.
+  //
+  // Severity `warn` for now — same forward-only-ratchet shape as GC1/GC5
+  // above: a pre-existing backlog of 20 call sites across 17 files (found
+  // when this rule was authored, including namespaced call sites like
+  // Sentry.captureException and deps.captureException) is tracked in
+  // WI-2527 (burn down the backlog + promote this rule to `error`). This
+  // rule's job today is to stop NEW violations landing, not to block on
+  // the legacy backlog.
+  // -------------------------------------------------------------------------
+  {
+    files: ['apps/api/src/**/*.ts'],
+    ignores: [
+      'apps/api/src/**/*.test.ts',
+      'apps/api/src/**/*.spec.ts',
+      'apps/api/src/**/*.integration.test.ts',
+    ],
+    plugins: { gov: govPlugin },
+    rules: {
+      'gov/no-raw-error-to-sentry': 'warn',
     },
   },
   // -------------------------------------------------------------------------
