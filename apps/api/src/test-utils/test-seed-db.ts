@@ -31,37 +31,28 @@ export function createRecordingDb(): {
     }),
   };
 
-  let currentInsertTable: unknown;
-  const insertResult = {
-    values: jest.fn(
-      (values: Record<string, unknown> | Array<Record<string, unknown>>) => {
-        if (
-          currentInsertTable === practiceActivityEvents &&
-          !Array.isArray(values)
-        ) {
-          const persistedValues = {
-            ...values,
-            id: '019d14f4-735f-7e11-8800-000000000001',
-          };
-          inserts.push({ table: currentInsertTable, values: persistedValues });
-          return {
-            onConflictDoNothing: jest.fn().mockReturnValue({
-              returning: jest.fn().mockResolvedValue([persistedValues]),
-            }),
-          };
-        }
-
-        inserts.push({ table: currentInsertTable, values });
-        return Promise.resolve(undefined);
-      },
-    ),
-  };
-
   const db = {
-    insert: jest.fn((table: unknown) => {
-      currentInsertTable = table;
-      return insertResult;
-    }),
+    insert: jest.fn((table: unknown) => ({
+      values: jest.fn(
+        (values: Record<string, unknown> | Array<Record<string, unknown>>) => {
+          if (table === practiceActivityEvents && !Array.isArray(values)) {
+            const persistedValues = {
+              ...values,
+              id: '019d14f4-735f-7e11-8800-000000000001',
+            };
+            inserts.push({ table, values: persistedValues });
+            return {
+              onConflictDoNothing: jest.fn().mockReturnValue({
+                returning: jest.fn().mockResolvedValue([persistedValues]),
+              }),
+            };
+          }
+
+          inserts.push({ table, values });
+          return Promise.resolve(undefined);
+        },
+      ),
+    })),
     update: jest.fn().mockReturnValue(updateChain),
     select: jest.fn().mockReturnValue(selectChain),
     delete: jest.fn().mockReturnValue({

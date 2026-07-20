@@ -106,11 +106,12 @@ export default function SessionSummaryScreen() {
     sessionType?: string;
     filedSubjectId?: string;
     filedBookId?: string;
-    returnTo?: string;
+    returnTo?: string | string[];
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const summaryHomeHref = homeHrefForReturnTo(returnTo);
+  const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  const summaryHomeHref = homeHrefForReturnTo(resolvedReturnTo);
   const colors = useThemeColors();
   const { t } = useTranslation();
   const announce = useAnnounce();
@@ -443,7 +444,7 @@ export default function SessionSummaryScreen() {
   };
 
   const finishSummaryNavigation = (): void => {
-    if (returnTo === JOURNAL_RETURN_TO) {
+    if (resolvedReturnTo === JOURNAL_RETURN_TO) {
       goBackOrReplace(router, JOURNAL_HREF);
       return;
     }

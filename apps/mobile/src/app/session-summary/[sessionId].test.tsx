@@ -26,7 +26,7 @@ const mockParams = {
   subjectName: 'Mathematics',
   exchangeCount: '5',
   escalationRung: '2',
-} as Record<string, string | undefined>;
+} as Record<string, string | string[] | undefined>;
 
 const mockTestProfileId = '10000000-0000-4000-8000-000000000001';
 const mockTestAccountId = '10000000-0000-4000-8000-000000000002';
@@ -2029,6 +2029,35 @@ describe('SessionSummaryScreen', () => {
       mockParams.subjectId = mockSubjectId;
       mockParams.topicId = mockSuggestedTopicAId;
       mockParams.returnTo = 'journal';
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('summary-close-button');
+      });
+      fireEvent.press(screen.getByTestId('summary-close-button'));
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/journal');
+      });
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/topic/[topicId]',
+        }),
+      );
+    });
+
+    it('keeps Journal precedence when duplicate returnTo parameters produce an array', async () => {
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440005',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Existing Biology recap.',
+        aiFeedback: 'Helpful reflection.',
+        status: 'submitted',
+      };
+      mockParams.subjectId = mockSubjectId;
+      mockParams.topicId = mockSuggestedTopicAId;
+      mockParams.returnTo = ['journal', 'learner-home'];
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 

@@ -290,10 +290,14 @@ describe('seedScenario', () => {
       const db = createMockDb();
       await seedScenario(db, scenario, 'test@example.com');
 
-      const firstInsertResult = (db.insert as unknown as jest.Mock).mock
-        .results[0];
-      const valuesMock = firstInsertResult?.value.values as jest.Mock;
-      const parentProfileInsert = valuesMock.mock.calls
+      const insertMock = db.insert as unknown as jest.Mock;
+      const parentProfileInsert = insertMock.mock.calls
+        .flatMap(([table], index) =>
+          table === person
+            ? ((insertMock.mock.results[index]?.value.values as jest.Mock).mock
+                .calls ?? [])
+            : [],
+        )
         .map(([value]) => value as { displayName?: string })
         .find((value) => value.displayName === parentName);
 

@@ -198,6 +198,28 @@ describe('ProgressMonthlyReportDetail', () => {
     );
   });
 
+  it('labels and routes Journal error recovery to the exact Journal caller', () => {
+    mockSearchParams = { reportId: 'report-uuid-1', returnTo: 'journal' };
+    mockUseProfileReportDetail.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('Network failure'),
+      refetch: mockRefetch,
+    });
+
+    render(<ProgressMonthlyReportDetail />);
+
+    const backAction = screen.getByTestId('progress-report-error-back');
+    screen.getByText('Go back');
+    expect(screen.queryByText('Back to reports')).toBeNull();
+    fireEvent.press(backAction);
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/journal',
+    );
+  });
+
   it('renders the headline stat value, label, and comparison when data loads', () => {
     mockUseProfileReportDetail.mockReturnValue({
       data: MONTHLY_REPORT,

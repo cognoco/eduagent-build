@@ -195,6 +195,31 @@ describe('ProgressWeeklyReportDetail', () => {
     );
   });
 
+  it('labels and routes Journal error recovery to the exact Journal caller', () => {
+    mockSearchParams = {
+      weeklyReportId: 'weekly-uuid-1',
+      returnTo: 'journal',
+    };
+    mockUseProfileWeeklyReportDetail.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('Network failure'),
+      refetch: mockRefetch,
+    });
+
+    render(<ProgressWeeklyReportDetail />);
+
+    const backAction = screen.getByTestId('progress-weekly-report-error-back');
+    screen.getByText('Go back');
+    expect(screen.queryByText('Back to reports')).toBeNull();
+    fireEvent.press(backAction);
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/journal',
+    );
+  });
+
   it('renders the headline stat value, label, and comparison when data loads', () => {
     mockUseProfileWeeklyReportDetail.mockReturnValue({
       data: WEEKLY_REPORT,

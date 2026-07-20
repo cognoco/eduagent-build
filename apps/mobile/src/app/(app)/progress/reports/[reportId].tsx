@@ -106,7 +106,7 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
               testID: 'progress-report-error-retry',
             }}
             secondaryAction={{
-              label: t('parentView.report.backToReports'),
+              label: t('common.goBack'),
               onPress: () => goBackOrReplace(router, reportsHref),
               testID: 'progress-report-error-back',
             }}
