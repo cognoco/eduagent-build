@@ -89,7 +89,7 @@ tags:
 
 - assertNotVisible:
     id: 'message-bubble-assistant-2'
-    text: '(?i).*(what|which).*(recite|recitation|poem)|.*(title|author|model answer|polished version|start with:).*'
+    text: '(?i).*(what|which).*(recite|recitation|poem)|.*(title|author|model answer|polished version|start with:|traveller from an antique land|vast and trunkless legs|look on my works|lone and level sands).*'
 
 - takeScreenshot: recitation-03-message-sent
 

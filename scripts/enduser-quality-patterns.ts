@@ -4,6 +4,8 @@
 // DB/config graph). Only the WI-1823-relevant patterns live here; the remaining
 // gate regexes stay inline in enduser-session-pass.ts.
 
+import { recitationSetupLeaksSourceContent } from '../apps/api/src/services/session/session-recitation-setup';
+
 // Fires when a recitation polish/feedback carries an unsupported speed claim.
 // The recitation fixture source states "made trade easier" (not "faster"), so a
 // polished version that says trade moved "faster" has added an unsupported fact.
@@ -48,11 +50,15 @@ const RECITATION_SETUP_REASK_RE =
 const RECITATION_PREMATURE_MODEL_RE =
   /\b(?:you could say|to actually recite|polished version|final version|model answer)\b|\b(?:begin|start) with\s*:/i;
 
-export function recitationSetupReplyAdvances(response: string): boolean {
+export function recitationSetupReplyAdvances(
+  response: string,
+  sourceText?: string,
+): boolean {
   return (
     RECITATION_READY_TO_BEGIN_RE.test(response) &&
     !RECITATION_SETUP_REASK_RE.test(response) &&
-    !RECITATION_PREMATURE_MODEL_RE.test(response)
+    !RECITATION_PREMATURE_MODEL_RE.test(response) &&
+    !recitationSetupLeaksSourceContent(response, sourceText)
   );
 }
 

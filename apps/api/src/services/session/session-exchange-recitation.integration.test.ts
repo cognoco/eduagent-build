@@ -36,7 +36,7 @@ import {
   persistExchangeResult,
 } from './session-exchange';
 import { startSession } from './session-crud';
-import { mapSessionRow } from './session-events';
+import { mapSessionRow, setSessionInputMode } from './session-events';
 import { RECITATION_SETUP_CLAIM_METADATA_KEY } from './session-recitation-setup';
 
 // The workspace root is 5 levels up from apps/api/src/services/session/.
@@ -457,6 +457,109 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
     expect(persistedClaim).toEqual(beforeReplayClaim);
     expect(JSON.stringify(persistedClaim)).not.toContain("I don't know");
     expect(JSON.stringify(persistedClaim)).not.toContain('still not sure');
+  });
+
+  it('serializes headerless recitation turns through the same clarification cap', async () => {
+    const { profileId, subjectId } = await seedProfile(db);
+    const secondDb = createDatabase(process.env.DATABASE_URL!);
+    const session = await startSession(db, profileId, subjectId, {
+      subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
+      metadata: { effectiveMode: 'recitation' },
+    });
+
+    const transitions = await Promise.all([
+      claimRecitationSetupTransition(db, profileId, session.id, "I don't know"),
+      claimRecitationSetupTransition(
+        secondDb,
+        profileId,
+        session.id,
+        'still not sure',
+      ),
+    ]);
+
+    expect(transitions.map((transition) => transition?.action).sort()).toEqual([
+      'clarify_selection',
+      'invite_after_cap',
+    ]);
+
+    const [persistedSession] = await db
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(eq(learningSessions.id, session.id));
+    expect(persistedSession?.metadata).toMatchObject({
+      [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+        phase: 'ready',
+        clarificationCount: 1,
+        lastAction: 'invite_after_cap',
+        recentClaims: [],
+      },
+    });
+    expect(
+      (persistedSession?.metadata as Record<string, Record<string, unknown>>)[
+        RECITATION_SETUP_CLAIM_METADATA_KEY
+      ],
+    ).not.toHaveProperty('lastClientId');
+  });
+
+  it('preserves a claimed setup transition across an interleaved input-mode write', async () => {
+    const { profileId, subjectId } = await seedProfile(db);
+    const secondDb = createDatabase(process.env.DATABASE_URL!);
+    const session = await startSession(db, profileId, subjectId, {
+      subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
+      metadata: { effectiveMode: 'recitation' },
+    });
+    let inputModeUpdate: ReturnType<typeof setSessionInputMode> | undefined;
+
+    await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select({ metadata: learningSessions.metadata })
+        .from(learningSessions)
+        .where(eq(learningSessions.id, session.id))
+        .for('update')
+        .limit(1);
+
+      inputModeUpdate = setSessionInputMode(secondDb, profileId, session.id, {
+        inputMode: 'voice',
+      });
+      await new Promise<void>((resolveWait) => setTimeout(resolveWait, 500));
+
+      await tx
+        .update(learningSessions)
+        .set({
+          metadata: {
+            ...((current?.metadata as Record<string, unknown> | null) ?? {}),
+            [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+              phase: 'ready',
+              clarificationCount: 1,
+              lastAction: 'invite_after_cap',
+              recentClaims: [],
+            },
+          },
+        })
+        .where(eq(learningSessions.id, session.id));
+    });
+
+    await inputModeUpdate;
+    const [persistedSession] = await db
+      .select({
+        inputMode: learningSessions.inputMode,
+        metadata: learningSessions.metadata,
+      })
+      .from(learningSessions)
+      .where(eq(learningSessions.id, session.id));
+    expect(persistedSession?.inputMode).toBe('voice');
+    expect(persistedSession?.metadata).toMatchObject({
+      inputMode: 'voice',
+      [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+        phase: 'ready',
+        clarificationCount: 1,
+        lastAction: 'invite_after_cap',
+      },
+    });
   });
 
   it('replays the same recitation setup claim without consuming the clarification cap', async () => {

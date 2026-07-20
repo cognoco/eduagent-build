@@ -21,6 +21,44 @@ export function stripInternalRecitationSetupClaim(metadata: unknown): unknown {
   return sanitized;
 }
 
+function normalizedRecitationWords(value: string): string[] {
+  return (
+    value
+      .normalize('NFKC')
+      .toLocaleLowerCase('en-US')
+      .match(/[\p{L}\p{N}]+/gu) ?? []
+  );
+}
+
+export function recitationSetupLeaksSourceContent(
+  response: string,
+  sourceText: string | undefined,
+): boolean {
+  if (!sourceText) return false;
+  const responseWords = normalizedRecitationWords(response);
+  const sourceWords = normalizedRecitationWords(sourceText);
+  const minimumPhraseWords = 4;
+  if (
+    responseWords.length < minimumPhraseWords ||
+    sourceWords.length < minimumPhraseWords
+  ) {
+    return false;
+  }
+
+  const responseText = ` ${responseWords.join(' ')} `;
+  for (
+    let index = 0;
+    index <= sourceWords.length - minimumPhraseWords;
+    index++
+  ) {
+    const phrase = sourceWords
+      .slice(index, index + minimumPhraseWords)
+      .join(' ');
+    if (responseText.includes(` ${phrase} `)) return true;
+  }
+  return false;
+}
+
 interface ResolveRecitationSetupInput {
   effectiveMode: string | undefined;
   exchangeCount?: number;

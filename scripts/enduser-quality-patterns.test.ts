@@ -34,6 +34,23 @@ describe('recitationSetupReplyAdvances', () => {
   ])('rejects a repeated setup question or premature model: %s', (reply) => {
     expect(recitationSetupReplyAdvances(reply)).toBe(false);
   });
+
+  it('rejects a content-bearing invitation that copies the fixture source', () => {
+    const source =
+      'Roman roads helped armies travel, connected towns, and made trade easier across the empire.';
+    const contentBearingReply =
+      "I'm ready. Roman roads helped armies travel across the empire. Begin whenever you are.";
+
+    expect(recitationSetupReplyAdvances(contentBearingReply, source)).toBe(
+      false,
+    );
+    expect(
+      recitationSetupReplyAdvances(
+        "I'm ready to hear about Roman roads. Begin whenever you are.",
+        source,
+      ),
+    ).toBe(true);
+  });
 });
 
 const learningSourcePointCount = (text: string): number =>

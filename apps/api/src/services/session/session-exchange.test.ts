@@ -26,6 +26,7 @@ import { MAX_INTERVIEW_EXCHANGES } from '../exchanges';
 import { SessionExchangeLimitError } from './session-crud';
 import { computeNextPracticePointer } from '../language-session-engine';
 import { resetSessionStaticContextCache } from './session-cache';
+import { RECITATION_SETUP_CLAIM_METADATA_KEY } from './session-recitation-setup';
 
 type ExchangeHistoryEntry = ReturnType<typeof buildExchangeHistory>[number];
 
@@ -1382,6 +1383,7 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       innerJoin: () => typeof node;
       leftJoin: () => typeof node;
       limit: () => typeof node;
+      for: () => typeof node;
       then: (resolve: (v: unknown[]) => void) => void;
     } = {
       where: () => node,
@@ -1389,6 +1391,7 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       innerJoin: () => node,
       leftJoin: () => node,
       limit: () => node,
+      for: () => node,
       then: (resolve) => resolve(rows),
     };
     return node;
@@ -1410,13 +1413,28 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       }>;
     },
   ) {
+    const sessionRow = options?.sessionRow ?? buildSessionRow();
     const subjectsFindFirst = jest.fn().mockResolvedValue(subjectRow);
+    const transactionDb = {
+      select: jest.fn(() => ({
+        from: () =>
+          makeChainNode([
+            {
+              metadata: sessionRow.metadata,
+              exchangeCount: sessionRow.exchangeCount,
+            },
+          ]),
+      })),
+      update: jest.fn(() => ({
+        set: jest.fn(() => ({
+          where: jest.fn().mockResolvedValue(undefined),
+        })),
+      })),
+    };
     return {
       query: {
         learningSessions: {
-          findFirst: jest
-            .fn()
-            .mockResolvedValue(options?.sessionRow ?? buildSessionRow()),
+          findFirst: jest.fn().mockResolvedValue(sessionRow),
         },
         subjects: { findFirst: subjectsFindFirst },
         sessionEvents: {
@@ -1436,6 +1454,10 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
             ? makeChainNode([personRow])
             : makeChainNode([]),
       })),
+      transaction: jest.fn(
+        async (callback: (tx: typeof transactionDb) => unknown) =>
+          callback(transactionDb),
+      ),
     } as never;
   }
 
@@ -1482,7 +1504,15 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       {
         sessionRow: buildSessionRow({
           exchangeCount: 1,
-          metadata: { effectiveMode: 'recitation' },
+          metadata: {
+            effectiveMode: 'recitation',
+            [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+              phase: 'awaiting_selection',
+              clarificationCount: 1,
+              lastAction: 'clarify_selection',
+              recentClaims: [],
+            },
+          },
         }),
         events: [
           { eventType: 'user_message', content: 'unclear' },
@@ -1508,6 +1538,9 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       { semanticMemoryRetrievalEnabled: false },
     );
 
+    expect(
+      (db as unknown as { transaction: jest.Mock }).transaction,
+    ).toHaveBeenCalledTimes(1);
     expect(result.context.recitationSetup).toEqual({
       action: 'invite_to_begin',
       state: { phase: 'ready', clarificationCount: 1 },

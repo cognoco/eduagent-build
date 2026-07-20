@@ -2330,13 +2330,13 @@ export async function prepareExchangeContext(
     | Record<string, unknown>
     | undefined) ?? {}) as Record<string, unknown>;
   const claimedRecitationSetup =
-    sessionMeta['effectiveMode'] === 'recitation' && options?.clientId
+    sessionMeta['effectiveMode'] === 'recitation'
       ? await claimRecitationSetupTransition(
           db,
           profileId,
           sessionId,
           userMessage,
-          options.clientId,
+          options?.clientId,
         )
       : undefined;
   const isFreeform =

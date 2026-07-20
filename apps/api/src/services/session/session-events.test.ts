@@ -451,123 +451,103 @@ describe('insertSessionEvent', () => {
 // ---------------------------------------------------------------------------
 
 describe('setSessionInputMode', () => {
-  it('throws NotFoundError when scoped repo returns null', async () => {
-    // The scoped repo is createScopedRepository(db, profileId). We cannot
-    // mock its internals (GC1). Instead, we drive the error path through a
-    // db stub whose query chain terminates with null — which causes the
-    // RETURNING clause to return no row, triggering the throw.
-    //
-    // Minimal approach: build a db stub that returns an empty RETURNING array.
-    const returningChain = jest.fn().mockResolvedValue([]);
-    const whereChain = { returning: returningChain };
-    const setChain = { where: jest.fn().mockReturnValue(whereChain) };
-    const updateChain = { set: jest.fn().mockReturnValue(setChain) };
+  function makeTransactionDb(
+    selectedRows: Array<ReturnType<typeof makeSessionRow>>,
+    updatedRows: Array<ReturnType<typeof makeSessionRow>>,
+  ) {
+    let capturedSet: Record<string, unknown> | undefined;
+    let capturedWhere: unknown;
+    const selectLimit = jest.fn().mockResolvedValue(selectedRows);
+    const selectFor = jest.fn().mockReturnValue({ limit: selectLimit });
+    const selectWhere = jest.fn().mockReturnValue({ for: selectFor });
+    const selectFrom = jest.fn().mockReturnValue({ where: selectWhere });
+    const select = jest.fn().mockReturnValue({ from: selectFrom });
+    const returning = jest.fn().mockImplementation(async () =>
+      updatedRows.map((row) => ({
+        ...row,
+        ...capturedSet,
+      })),
+    );
+    const updateWhere = jest.fn((predicate: unknown) => {
+      capturedWhere = predicate;
+      return { returning };
+    });
+    const updateSet = jest.fn((values: Record<string, unknown>) => {
+      capturedSet = values;
+      return { where: updateWhere };
+    });
+    const update = jest.fn().mockReturnValue({ set: updateSet });
+    const tx = { select, update };
+    const transaction = jest.fn(
+      async (callback: (value: typeof tx) => unknown) => callback(tx),
+    );
 
-    // The scoped repo calls db.select internally. We satisfy the duck-type
-    // by providing a select that returns the findFirst chain.
-    const selectLimit = jest.fn().mockResolvedValue([]);
-    const selectWhere = { limit: selectLimit };
-    const selectInnerJoin = { where: jest.fn().mockReturnValue(selectWhere) };
-    const selectFrom = {
-      innerJoin: jest.fn().mockReturnValue(selectInnerJoin),
-      where: jest.fn().mockReturnValue(selectWhere),
+    return {
+      db: { transaction } as never,
+      transaction,
+      selectFor,
+      update,
+      returning,
+      getCapturedSet: () => capturedSet,
+      getCapturedWhere: () => capturedWhere,
     };
-    const selectStart = { from: jest.fn().mockReturnValue(selectFrom) };
+  }
 
-    const db = {
-      select: jest.fn().mockReturnValue(selectStart),
-      update: jest.fn().mockReturnValue(updateChain),
-      query: {
-        learningSessions: {
-          findFirst: jest.fn().mockResolvedValue(null),
-        },
-      },
-    } as never;
+  it('throws NotFoundError when the locked scoped read returns no row', async () => {
+    const { db, transaction, update } = makeTransactionDb([], []);
 
     await expect(
       setSessionInputMode(db, 'prof-1', 'sess-1', { inputMode: 'voice' }),
     ).rejects.toBeInstanceOf(NotFoundError);
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(update).not.toHaveBeenCalled();
   });
 
   it('[WI-650] throws NotFoundError when UPDATE … RETURNING yields no row', async () => {
-    // Covers the second guard in setSessionInputMode: the scoped-repo
-    // findFirst DOES return a row, but the session is deleted (or re-scoped)
-    // between the read and the write, so the UPDATE … RETURNING comes back
-    // empty and the !updated guard fires.
     const fakeRow = makeSessionRow({
       id: 'sess-gone',
       profileId: 'prof-1',
       metadata: {},
     });
-
-    const returningChain = jest.fn().mockResolvedValue([]);
-    const whereChain = { returning: returningChain };
-    const setChain = { where: jest.fn().mockReturnValue(whereChain) };
-    const updateChain = { set: jest.fn().mockReturnValue(setChain) };
-
-    const db = {
-      update: jest.fn().mockReturnValue(updateChain),
-      query: {
-        learningSessions: {
-          findFirst: jest.fn().mockResolvedValue(fakeRow),
-        },
-      },
-    } as never;
+    const { db, returning } = makeTransactionDb([fakeRow], []);
 
     await expect(
       setSessionInputMode(db, 'prof-1', 'sess-gone', { inputMode: 'voice' }),
     ).rejects.toBeInstanceOf(NotFoundError);
-    expect(returningChain).toHaveBeenCalledTimes(1);
+    expect(returning).toHaveBeenCalledTimes(1);
   });
 
-  it('includes profileId in the WHERE predicate when updating', async () => {
-    let capturedWhere: unknown = undefined;
-
-    // Simulate scoped repo finding a row — we need the select chain to return
-    // the session row so the function proceeds to update.
+  it('locks the fresh row and preserves private metadata when updating', async () => {
     const fakeRow = makeSessionRow({
       id: 'sess-2',
       profileId: 'prof-update',
-      metadata: {},
-    });
-
-    const returningChain = jest
-      .fn()
-      .mockResolvedValue([{ ...fakeRow, inputMode: 'voice' }]);
-    const whereUpdateChain = {
-      returning: returningChain,
-    };
-    const setChain = {
-      where: jest.fn((pred: unknown) => {
-        capturedWhere = pred;
-        return whereUpdateChain;
-      }),
-    };
-    const updateChain = { set: jest.fn().mockReturnValue(setChain) };
-
-    const selectLimit = jest.fn().mockResolvedValue([fakeRow]);
-    const selectWhere = { limit: selectLimit };
-    const selectFrom = { where: jest.fn().mockReturnValue(selectWhere) };
-    const selectStart = { from: jest.fn().mockReturnValue(selectFrom) };
-
-    const db = {
-      select: jest.fn().mockReturnValue(selectStart),
-      update: jest.fn().mockReturnValue(updateChain),
-      query: {
-        learningSessions: {
-          findFirst: jest.fn().mockResolvedValue(fakeRow),
+      metadata: {
+        effectiveMode: 'recitation',
+        __serverRecitationSetupClaim: {
+          phase: 'ready',
+          clarificationCount: 1,
+          lastAction: 'invite_after_cap',
+          recentClaims: [],
         },
       },
-    } as never;
+    });
+    const { db, selectFor, getCapturedSet, getCapturedWhere } =
+      makeTransactionDb([fakeRow], [fakeRow]);
 
     await setSessionInputMode(db, 'prof-update', 'sess-2', {
       inputMode: 'voice',
     });
 
-    // The WHERE predicate is a Drizzle SQL object (circular, not JSON-serializable).
-    // We verify the WHERE was passed to the update chain — the profileId scoping
-    // is enforced by the AND predicate containing both session id AND profileId.
-    expect(capturedWhere).toBeDefined();
-    expect(setChain.where).toHaveBeenCalledTimes(1);
+    expect(selectFor).toHaveBeenCalledWith('update');
+    expect(getCapturedSet()).toEqual(
+      expect.objectContaining({
+        inputMode: 'voice',
+        metadata: {
+          ...(fakeRow.metadata as Record<string, unknown>),
+          inputMode: 'voice',
+        },
+      }),
+    );
+    expect(getCapturedWhere()).toBeDefined();
   });
 });

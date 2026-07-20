@@ -251,6 +251,22 @@ describe('exchangesFlow', () => {
           }),
         ]),
       );
+      expect(
+        await exchangesFlow.evaluateQuality?.({
+          profile: generalProfile,
+          scenarioId: text.scenarioId,
+          input: text.input,
+          messages,
+          liveResponse:
+            '{"reply":"I am ready. I met a traveller from an antique land. Begin whenever you are."}',
+        }),
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'recitation-ready.premature-content',
+          }),
+        ]),
+      );
     });
 
     it('renders the production system prompt and exposes the last user turn', () => {

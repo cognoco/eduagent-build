@@ -19,6 +19,7 @@ import {
   processMessage,
   startSession,
 } from '../apps/api/src/services/session/index';
+import { recitationSetupLeaksSourceContent } from '../apps/api/src/services/session/session-recitation-setup';
 import type {
   ExchangeSourceAudit,
   FluencyDrillAnnotation,
@@ -1201,7 +1202,11 @@ function analyzeTurn(input: {
   if (
     definition.mode === 'recitation' &&
     turnIndex === 1 &&
-    RECITATION_SETUP_PREMATURE_MODEL_RE.test(response)
+    (RECITATION_SETUP_PREMATURE_MODEL_RE.test(response) ||
+      recitationSetupLeaksSourceContent(
+        response,
+        definition.topicOverride?.description,
+      ))
   ) {
     issues.push({
       severity: 'fail',
@@ -1217,7 +1222,10 @@ function analyzeTurn(input: {
   if (
     definition.mode === 'recitation' &&
     turnIndex === 1 &&
-    !recitationSetupReplyAdvances(response)
+    !recitationSetupReplyAdvances(
+      response,
+      definition.topicOverride?.description,
+    )
   ) {
     issues.push({
       severity: 'fail',

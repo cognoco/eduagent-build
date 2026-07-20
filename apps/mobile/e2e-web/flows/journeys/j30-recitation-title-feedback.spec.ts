@@ -58,7 +58,7 @@ test('J-30 learner → Practice → title-only recitation → feedback', async (
     /\b(?:ready|begin|start|go ahead|recite)\b/i,
   );
   await expect(readyReply).not.toContainText(
-    /\b(?:what|which).*(?:recite|recitation|poem)|\b(?:title|author|model answer|polished version)\b|\b(?:start|begin) with\s*:/i,
+    /\b(?:what|which).*(?:recite|recitation|poem)|\b(?:title|author|model answer|polished version)\b|\b(?:start|begin) with\s*:|\b(?:traveller from an antique land|vast and trunkless legs|look on my works|lone and level sands)\b/i,
   );
 
   await fillTextInput(

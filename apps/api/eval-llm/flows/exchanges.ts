@@ -6,6 +6,7 @@ import {
 import { isAppHelpQuery } from '../../src/services/app-help-map';
 import { resolveAgeBracket } from '../../src/services/exchange-prompts';
 import { buildMemoryBlock } from '../../src/services/learner-profile';
+import { recitationSetupLeaksSourceContent } from '../../src/services/session/session-recitation-setup';
 import type { ChatMessage } from '../../src/services/llm/types';
 import { llmResponseEnvelopeSchema } from '@eduagent/schemas';
 import type { EvalProfile } from '../fixtures/profiles';
@@ -574,6 +575,13 @@ function isRecitationReadyScenario(input: ExchangeScenarioInput): boolean {
   );
 }
 
+const RECITATION_READY_SOURCE_ANCHORS = [
+  'I met a traveller from an antique land',
+  'Two vast and trunkless legs of stone',
+  'Look on my works ye Mighty and despair',
+  'The lone and level sands stretch far away',
+] as const;
+
 // ---------------------------------------------------------------------------
 // Context synthesis — deterministic, derived from the profile.
 // ---------------------------------------------------------------------------
@@ -856,6 +864,9 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     if (
       /\b(?:model answer|polished version|you could say|start with\s*:|begin with\s*:)/i.test(
         reply,
+      ) ||
+      RECITATION_READY_SOURCE_ANCHORS.some((sourceText) =>
+        recitationSetupLeaksSourceContent(reply, sourceText),
       )
     ) {
       issues.push(
