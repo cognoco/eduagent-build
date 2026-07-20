@@ -917,6 +917,73 @@ describe('Quiz routes', () => {
       expect(body.questions[0].distractors).toBeUndefined();
     });
 
+    it('[WI-2190] reconstructs a legacy completed result answer from the server-owned question', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
+        ...COMPLETED_ROUND,
+        results: [
+          {
+            questionIndex: 0,
+            correct: false,
+            answerGiven: 'Salzburg',
+            timeMs: 5000,
+            disputed: true,
+          },
+        ],
+      });
+
+      const res = await app.request(
+        `/v1/quiz/rounds/${ROUND_ID_COMPLETED}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        results: [
+          {
+            questionIndex: 0,
+            correct: false,
+            correctAnswer: 'Vienna',
+            answerGiven: 'Salzburg',
+            disputed: true,
+          },
+        ],
+      });
+    });
+
+    it('[WI-2190] returns typed 409 conflict for an unreconstructable malformed completed result', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
+        ...COMPLETED_ROUND,
+        results: [{ totallyMadeUpField: 'nope' }],
+      });
+
+      const res = await app.request(
+        `/v1/quiz/rounds/${ROUND_ID_COMPLETED}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({
+        code: 'CONFLICT',
+      });
+    });
+
+    it('[WI-2190] returns an empty typed result list for a completed round without grades', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue({ ...COMPLETED_ROUND, results: [] });
+
+      const res = await app.request(
+        `/v1/quiz/rounds/${ROUND_ID_COMPLETED}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ results: [] });
+    });
+
     it('does NOT expose correctAnswer or acceptedAliases for in-progress rounds [F-032 break test]', async () => {
       (mockDb as any).query.quizRounds.findFirst = jest
         .fn()
