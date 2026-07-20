@@ -3,7 +3,7 @@
 // threads ageBracket to the router's under-18 vendor-exclusion gate.
 //
 // Before this fix, callBookGenerationJson never supplied ageBracket to
-// routeAndCall — it only omitted providerPolicy: 'gemini_only' for a
+// routeAndCall — it only omitted the gemini_only providerPolicy value for a
 // non-adult learnerAge, which stops the caller from actively REQUESTING
 // Gemini but does not stop the router's own DEFAULT branch from picking
 // Gemini for a registered provider on the legacy (routing V2 off) path
