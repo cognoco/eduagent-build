@@ -79,8 +79,8 @@ jest.mock('../../lib/theme', /* gc1-allow: theme hook requires native ColorSchem
 const mockSentryCaptureMessage = jest.fn();
 const mockSentryCaptureException = jest.fn();
 jest.mock(
-  '../../lib/sentry',
-  /* gc1-allow: external-boundary: @sentry/react-native native crash handlers */ () => ({
+  '../../lib/sentry' /* gc1-allow: external-boundary: @sentry/react-native native crash handlers */,
+  () => ({
     Sentry: {
       addBreadcrumb: jest.fn(),
       captureMessage: (...args: unknown[]) => mockSentryCaptureMessage(...args),
@@ -226,6 +226,7 @@ let mockSessionSummaryData: {
   aiFeedback: string | null;
   feedbackStatus?: 'available' | 'unavailable';
   status: 'pending' | 'submitted' | 'accepted' | 'skipped' | 'auto_closed';
+  learnerRecap?: string | null;
   baseXp?: number | null;
   reflectionBonusXp?: number | null;
   purgedAt?: string | null;
@@ -661,6 +662,30 @@ describe('SessionSummaryScreen', () => {
     // 5 exchanges, rung 2 → "strong independent thinking"
     screen.getByText(/worked through 5 exchanges/);
     screen.getByText(/strong independent thinking/);
+  });
+
+  it('owns two persisted learner recap points with exact text at stable indexed row IDs', async () => {
+    const learningPoints = [
+      'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
+      'Chlorophyll captures the light energy that powers this process.',
+    ] as const;
+    mockSessionSummaryData = {
+      ...BASE_MOCK_SUMMARY,
+      learnerRecap: learningPoints.join('\n'),
+    };
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    expect(
+      await screen.findByTestId('session-recap-learning-point-0'),
+    ).toHaveTextContent(
+      /^We traced how photosynthesis stores sunlight as chemical energy in glucose\.$/,
+    );
+    expect(
+      screen.getByTestId('session-recap-learning-point-1'),
+    ).toHaveTextContent(
+      /^Chlorophyll captures the light energy that powers this process\.$/,
+    );
   });
 
   it('renders a persisted mentor notice receipt after reload', async () => {

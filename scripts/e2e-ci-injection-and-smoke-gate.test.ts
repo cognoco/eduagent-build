@@ -62,9 +62,18 @@ const JOURNAL_NOTE_BINDINGS = [
 ] as const;
 const HARD_JOURNAL_RECAP_ASSERTION = {
   assertVisible: {
-    id: 'session-recap-card',
-    containsDescendants: [{ text: JOURNAL_RECAP_TEXT }],
+    id: 'session-recap-learning-point-0',
+    text: JOURNAL_RECAP_TEXT,
   },
+} as const;
+const HARD_JOURNAL_RECAP_WAIT = {
+  extendedWaitUntil: {
+    visible: { id: 'session-recap-card' },
+    timeout: 15000,
+  },
+} as const;
+const HARD_JOURNAL_RECAP_CLOSE = {
+  assertVisible: { id: 'summary-close-button' },
 } as const;
 
 function assertHardMaestroTextOwnership(
@@ -163,52 +172,68 @@ function assertCommandsInOrder(
 }
 
 function assertHardJournalRecapOwnership(commands: unknown[]): void {
-  const recapCardAssertions = commands.filter((command) => {
+  const recapPointAssertions = commands.filter((command) => {
     if (!command || typeof command !== 'object') return false;
     const selector = (command as Record<string, unknown>).assertVisible;
     return (
       !!selector &&
       typeof selector === 'object' &&
-      (selector as Record<string, unknown>).id === 'session-recap-card'
+      (selector as Record<string, unknown>).id ===
+        HARD_JOURNAL_RECAP_ASSERTION.assertVisible.id
     );
   });
-  const recapCommand = recapCardAssertions[0] as
+  const recapCommand = recapPointAssertions[0] as
     | Record<string, unknown>
     | undefined;
   const recapSelector = recapCommand?.assertVisible as
     | Record<string, unknown>
     | undefined;
-  const descendants = recapSelector?.containsDescendants;
-  const exactRecapDescendants = Array.isArray(descendants)
-    ? descendants.filter(
+  if (
+    recapPointAssertions.length !== 1 ||
+    recapCommand?.optional === true ||
+    recapSelector?.optional === true ||
+    recapSelector?.text !== JOURNAL_RECAP_TEXT ||
+    recapSelector?.containsDescendants !== undefined
+  ) {
+    throw new Error(
+      'Journal recap text must be mandatory on its exact learning-point owner ID',
+    );
+  }
+
+  const hasSplitOrAdjacentRecapText = commands.some((command) => {
+    if (!command || typeof command !== 'object') return false;
+    const selector = (command as Record<string, unknown>).assertVisible;
+    if (!selector || typeof selector !== 'object') return false;
+    const fields = selector as Record<string, unknown>;
+    if (
+      fields.id === HARD_JOURNAL_RECAP_ASSERTION.assertVisible.id &&
+      fields.text === JOURNAL_RECAP_TEXT
+    ) {
+      return false;
+    }
+    if (fields.text === JOURNAL_RECAP_TEXT) return true;
+    const descendants = fields.containsDescendants;
+    return (
+      Array.isArray(descendants) &&
+      descendants.some(
         (descendant) =>
           !!descendant &&
           typeof descendant === 'object' &&
           (descendant as Record<string, unknown>).text === JOURNAL_RECAP_TEXT,
       )
-    : [];
-  if (
-    recapCardAssertions.length !== 1 ||
-    recapCommand?.optional === true ||
-    recapSelector?.optional === true ||
-    exactRecapDescendants.length !== 1 ||
-    (exactRecapDescendants[0] as Record<string, unknown>).optional === true
-  ) {
+    );
+  });
+  if (hasSplitOrAdjacentRecapText) {
     throw new Error(
-      'Journal recap text must be a mandatory descendant of the exact recap card',
+      'Journal recap text must not be split from or assigned to an adjacent owner',
     );
   }
 
-  const hasGlobalRecapText = commands.some((command) => {
-    if (!command || typeof command !== 'object') return false;
-    const selector = (command as Record<string, unknown>).assertVisible;
-    if (!selector || typeof selector !== 'object') return false;
-    const fields = selector as Record<string, unknown>;
-    return fields.text === JOURNAL_RECAP_TEXT && fields.id === undefined;
-  });
-  if (hasGlobalRecapText) {
-    throw new Error('Journal recap text must not be asserted globally');
-  }
+  assertCommandsInOrder(commands, [
+    HARD_JOURNAL_RECAP_WAIT,
+    HARD_JOURNAL_RECAP_ASSERTION,
+    HARD_JOURNAL_RECAP_CLOSE,
+  ]);
 }
 
 function loadWorkflowRaw(name: string): string {
@@ -1181,7 +1206,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
   });
 
-  it('[WI-2239] binds the seeded recap row to Biology and exact recap text to its owning card', () => {
+  it('[WI-2239] binds the seeded recap row to Biology and exact recap text to its owning learning point', () => {
     const journalFlow = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-journal-paper-trail.yaml'),
       'utf8',
@@ -1201,45 +1226,98 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         containsDescendants: [{ text: 'Biology / Biology Topic 1' }],
       },
     });
+    expect(commands).toContainEqual(HARD_JOURNAL_RECAP_ASSERTION);
     expect(() => assertHardJournalRecapOwnership(commands)).not.toThrow();
   });
 
-  it('[WI-2239] rejects split/global and optionalized recap ownership evidence', () => {
+  it('[WI-2239] rejects deleted, wrong-owner, adjacent-text, descendant, optional, and reordered recap evidence', () => {
     expect(() =>
       assertHardJournalRecapOwnership([
-        { assertVisible: { id: 'session-recap-card' } },
-        { assertVisible: { text: JOURNAL_RECAP_TEXT } },
+        HARD_JOURNAL_RECAP_WAIT,
+        HARD_JOURNAL_RECAP_CLOSE,
       ]),
-    ).toThrow(/mandatory descendant|globally/);
+    ).toThrow(/mandatory.*owner/i);
 
     expect(() =>
       assertHardJournalRecapOwnership([
+        HARD_JOURNAL_RECAP_WAIT,
+        {
+          assertVisible: {
+            id: 'session-recap-card',
+            text: JOURNAL_RECAP_TEXT,
+          },
+        },
+        HARD_JOURNAL_RECAP_CLOSE,
+      ]),
+    ).toThrow(/mandatory.*owner/i);
+
+    expect(() =>
+      assertHardJournalRecapOwnership([
+        HARD_JOURNAL_RECAP_WAIT,
+        {
+          assertVisible: {
+            id: HARD_JOURNAL_RECAP_ASSERTION.assertVisible.id,
+            text: 'Chlorophyll captures light energy that powers photosynthesis.',
+          },
+        },
+        HARD_JOURNAL_RECAP_CLOSE,
+      ]),
+    ).toThrow(/mandatory.*owner/i);
+
+    expect(() =>
+      assertHardJournalRecapOwnership([
+        HARD_JOURNAL_RECAP_WAIT,
+        {
+          assertVisible: {
+            id: HARD_JOURNAL_RECAP_ASSERTION.assertVisible.id,
+            containsDescendants: [{ text: JOURNAL_RECAP_TEXT }],
+          },
+        },
+        HARD_JOURNAL_RECAP_CLOSE,
+      ]),
+    ).toThrow(/mandatory.*owner/i);
+
+    expect(() =>
+      assertHardJournalRecapOwnership([
+        HARD_JOURNAL_RECAP_WAIT,
         {
           assertVisible: {
             ...HARD_JOURNAL_RECAP_ASSERTION.assertVisible,
             optional: true,
           },
         },
+        HARD_JOURNAL_RECAP_CLOSE,
       ]),
-    ).toThrow(/mandatory descendant/);
+    ).toThrow(/mandatory.*owner/i);
 
     expect(() =>
       assertHardJournalRecapOwnership([
+        HARD_JOURNAL_RECAP_WAIT,
         {
           assertVisible: {
-            id: 'session-recap-card',
-            containsDescendants: [{ text: JOURNAL_RECAP_TEXT, optional: true }],
+            id: HARD_JOURNAL_RECAP_ASSERTION.assertVisible.id,
           },
         },
+        { assertVisible: { text: JOURNAL_RECAP_TEXT } },
+        HARD_JOURNAL_RECAP_CLOSE,
       ]),
-    ).toThrow(/mandatory descendant/);
+    ).toThrow(/mandatory.*owner|split.*adjacent/i);
 
     expect(() =>
       assertHardJournalRecapOwnership([
         HARD_JOURNAL_RECAP_ASSERTION,
-        { assertVisible: { text: JOURNAL_RECAP_TEXT, optional: true } },
+        HARD_JOURNAL_RECAP_WAIT,
+        HARD_JOURNAL_RECAP_CLOSE,
       ]),
-    ).toThrow(/globally/);
+    ).toThrow(/missing ordered/i);
+
+    expect(() =>
+      assertHardJournalRecapOwnership([
+        HARD_JOURNAL_RECAP_WAIT,
+        HARD_JOURNAL_RECAP_CLOSE,
+        HARD_JOURNAL_RECAP_ASSERTION,
+      ]),
+    ).toThrow(/missing ordered/i);
   });
 
   it('[WI-2239] binds each seeded note text to its exact Journal and My Notes owner IDs', () => {

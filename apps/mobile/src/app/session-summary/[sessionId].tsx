@@ -1156,7 +1156,10 @@ export default function SessionSummaryScreen() {
                   <Text className="text-body text-text-secondary me-2">
                     {'\u2022'}
                   </Text>
-                  <Text className="text-body text-text-primary flex-1">
+                  <Text
+                    className="text-body text-text-primary flex-1"
+                    testID={`session-recap-learning-point-${index}`}
+                  >
                     {bullet.replace(/^- /, '')}
                   </Text>
                 </View>

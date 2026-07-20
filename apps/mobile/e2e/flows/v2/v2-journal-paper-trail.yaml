@@ -48,9 +48,8 @@ tags:
       id: 'session-recap-card'
     timeout: 15000
 - assertVisible:
-    id: 'session-recap-card'
-    containsDescendants:
-      - text: 'We traced how photosynthesis stores sunlight as chemical energy in glucose.'
+    id: 'session-recap-learning-point-0'
+    text: 'We traced how photosynthesis stores sunlight as chemical energy in glucose.'
 - assertVisible:
     id: 'summary-close-button'
 - tapOn:
