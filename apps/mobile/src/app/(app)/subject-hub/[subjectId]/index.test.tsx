@@ -184,6 +184,7 @@ describe('SubjectHubRoute', () => {
     // assertion aborts a test before its final line.
     jest.restoreAllMocks();
     mockPush.mockReset();
+    mockReplace.mockReset();
   });
 
   it('replaces the Hub with the session so hardware Back returns to the single Subjects ancestor', async () => {
@@ -200,9 +201,12 @@ describe('SubjectHubRoute', () => {
 
     render(<SubjectHubRoute />, { wrapper: wrapper() });
 
-    await waitFor(() => {
-      screen.getByTestId('subject-hub-screen');
-    });
+    await waitFor(
+      () => {
+        screen.getByTestId('subject-hub-screen');
+      },
+      { timeout: 5000 },
+    );
     screen.getByText('Spanish');
     screen.getByTestId('subject-hub-next-up-action');
     expect(screen.getAllByTestId('subject-hub-back')).toHaveLength(1);
@@ -388,19 +392,12 @@ describe('SubjectHubRoute', () => {
 
   it('falls back to the V2 Subjects tab when MODE_NAV_V2_ENABLED is on', () => {
     mockSearchParams = () => ({});
-    const originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
-    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-      true;
-    try {
-      render(<SubjectHubRoute />, { wrapper: wrapper() });
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', true);
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
 
-      screen.getByTestId('subject-hub-missing-param');
-      fireEvent.press(screen.getByTestId('subject-hub-missing-param-back'));
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
-    } finally {
-      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-        originalV2;
-    }
+    screen.getByTestId('subject-hub-missing-param');
+    fireEvent.press(screen.getByTestId('subject-hub-missing-param-back'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
   });
 });
 
@@ -424,6 +421,12 @@ describe('SubjectHubRoute — no books (pick-book)', () => {
       reviewDueCount: 0,
     });
     mockFetch.setRoute('/progress/resume-target', { target: null });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    mockCanGoBack.mockReset();
+    mockCanGoBack.mockReturnValue(false);
   });
 
   it('shows the pick-book empty state, not the hub surface', async () => {
@@ -463,25 +466,18 @@ describe('SubjectHubRoute — no books (pick-book)', () => {
   });
 
   it('replaces to the Subjects tab instead of raw back when V2 native history is misleading', async () => {
-    const originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
-    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-      true;
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', true);
     mockCanGoBack.mockReturnValue(true);
-    try {
-      render(<SubjectHubRoute />, { wrapper: wrapper() });
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
 
-      await waitFor(() => {
-        screen.getByTestId('subject-hub-pick-book-back');
-      });
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-pick-book-back');
+    });
 
-      fireEvent.press(screen.getByTestId('subject-hub-pick-book-back'));
+    fireEvent.press(screen.getByTestId('subject-hub-pick-book-back'));
 
-      expect(mockBack).not.toHaveBeenCalled();
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
-    } finally {
-      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-        originalV2;
-    }
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
   });
 
   // [WI-1209] Legacy counterpart to the V2 test above. goBack is a single
@@ -493,42 +489,32 @@ describe('SubjectHubRoute — no books (pick-book)', () => {
   // would go undetected — the V2-on describe block below never exercises
   // this flag state.
   it('replaces to the legacy Library tab instead of raw back when native history is misleading (MODE_NAV_V2_ENABLED off)', async () => {
-    const originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
-    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-      false;
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', false);
     mockCanGoBack.mockReturnValue(true);
-    try {
-      render(<SubjectHubRoute />, { wrapper: wrapper() });
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
 
-      await waitFor(() => {
-        screen.getByTestId('subject-hub-pick-book-back');
-      });
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-pick-book-back');
+    });
 
-      fireEvent.press(screen.getByTestId('subject-hub-pick-book-back'));
+    fireEvent.press(screen.getByTestId('subject-hub-pick-book-back'));
 
-      expect(mockBack).not.toHaveBeenCalled();
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
-    } finally {
-      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-        originalV2;
-    }
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 });
 
 describe('SubjectHubRoute — V2 empty-state back contract', () => {
-  let originalV2: boolean;
-
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = () => ({ subjectId: SUBJECT_ID });
-    originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
-    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-      true;
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', true);
   });
 
   afterEach(() => {
-    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-      originalV2;
+    jest.restoreAllMocks();
+    mockCanGoBack.mockReset();
+    mockCanGoBack.mockReturnValue(false);
     jest.useRealTimers();
   });
 

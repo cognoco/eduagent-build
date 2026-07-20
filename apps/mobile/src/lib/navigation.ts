@@ -170,7 +170,9 @@ export function pushLearningResumeTarget(
     return;
   }
 
-  router.push(homeHrefForReturnTo(returnTo));
+  router.push(
+    returnTo ? homeHrefForReturnTo(returnTo) : ('/(app)/home' as Href),
+  );
   router.push(sessionHref);
 }
 
