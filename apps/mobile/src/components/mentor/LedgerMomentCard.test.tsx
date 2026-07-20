@@ -69,6 +69,37 @@ describe('LedgerMomentCard', () => {
     expect(getByText('You locked in changing signs.')).toBeTruthy();
   });
 
+  it('renders milestone copy and preserves its Journal continue and dismiss actions', () => {
+    const onContinue = jest.fn();
+    const onDecline = jest.fn();
+    const milestoneCard: NowCardData = {
+      ...ledgerCard,
+      templateKey: 'now.ledger_moment.milestone_reached',
+      params: {
+        ledgerKind: 'milestone_reached',
+        milestoneType: 'session_count',
+        threshold: 5,
+      },
+      deepLink: { route: 'journal', params: {}, chain: [] },
+    };
+    const { getByTestId, getByText } = render(
+      <LedgerMomentCard
+        card={milestoneCard}
+        onContinue={onContinue}
+        onDecline={onDecline}
+      />,
+    );
+
+    expect(getByText('5 learning sessions completed')).toBeTruthy();
+
+    fireEvent.press(getByTestId('now-ledger-moment'));
+    expect(onContinue).toHaveBeenCalledWith(milestoneCard);
+
+    fireEvent.press(getByTestId('now-ledger-dismiss'));
+    expect(onDecline).toHaveBeenCalledWith(milestoneCard);
+    expect(onContinue).toHaveBeenCalledTimes(1);
+  });
+
   it('fires continue on card press', () => {
     const onContinue = jest.fn();
     const { getByTestId } = render(
