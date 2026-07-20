@@ -32,7 +32,14 @@
  *
  * DENYLIST — two categories, each requires a citation, per the WI's explicit
  * "add to an explicit denylist constant with a comment citing the open scope
- * question — do NOT expand this WI to fix them" instruction:
+ * question — do NOT expand this WI to fix them" instruction. AC-3 is a
+ * FORWARD RATCHET, not a mandate to fix every LEARNER_FACING_FLOWS site —
+ * the denylist deferral is the binding AC-3 interpretation (Option (a),
+ * PM-ruled on the WI-2432 Cosmo page after the initial reviewer bounce).
+ * Both categories below are now keyed to their REASON (not a bare Set) so
+ * each entry is self-documenting on its own line, and both are covered by
+ * the rot-check below (not just category 1's flow tags) — see that test's
+ * comment for what "covered" means.
  *
  *   1. Guardian-consumed / open scope question (§10.1): `monthly.report` and
  *      `progress-summary-generation` are LEARNER_FACING_FLOWS members that
@@ -43,7 +50,15 @@
  *      ratification — 2026-07-20" (Cosmo page 3a38bce9-1f7c-81b1-9cb2-
  *      db3ea0d5feba), itself citing the BID-4 leads doc §2
  *      (_wip/mvp-roadmap-findings/2026-07-19-safety-floor-batch-adversarial-
- *      pass.md).
+ *      pass.md). Verified by hand 2026-07-21 (WI-2432 rework, requirement 3):
+ *      neither call site passes an `ageBracket:` key today —
+ *      `monthly-report.ts:232-235` (routeAndCall for `monthly.report`, only
+ *      `conversationLanguage` threaded, derived from the report TARGET's
+ *      — i.e. the parent's — profile in monthly-report-cron.ts:459-464) and
+ *      `progress-summary.ts:237-241` (routeAndCall for
+ *      `progress-summary-generation`, only `sessionId`/`conversationLanguage`
+ *      threaded). Neither call site's surrounding function computes or has
+ *      an `ageBracket`/`computeAgeBracketFromDate` value in scope at all.
  *
  *   2. Deferred sweep, tracked (AGENTS.md > Fix Development Rules — "3+
  *      sibling locations ... document a deferred sweep with tracked ID"):
@@ -111,30 +126,38 @@ if (!fs.existsSync(path.join(REPO_ROOT, 'apps/api'))) {
 }
 
 // Category 1 — guardian-consumed / open §10.1 scope question. See file-header
-// citation above. Keyed by flow tag (both sites share the same open question,
-// not a per-file quirk).
-const OPEN_SCOPE_QUESTION_FLOWS: ReadonlySet<string> = new Set([
-  'monthly.report',
-  'progress-summary-generation',
-]);
+// citation above. Keyed by flow tag (both sites share the same open
+// question, not a per-file quirk) to its reason, so each entry documents
+// itself rather than relying on a shared comment above the collection.
+const OPEN_SCOPE_QUESTION_FLOWS: Readonly<Record<string, string>> = {
+  'monthly.report': 'guardian-consumed, not learner-facing',
+  'progress-summary-generation': 'guardian-consumed, not learner-facing',
+};
 
 // Category 2 — deferred sweep, tracked as WI-2520. Keyed by `file:line` (the
-// same siteKey shape findRouteAndCallSites produces) so a genuinely-fixed
-// site naturally drops out and a NEW unrelated site at the same line number
-// in a denylisted file still gets caught by the ratchet.
-const WI_2520_DEFERRED_SITES: ReadonlySet<string> = new Set([
-  'apps/api/src/services/book-suggestion-generation.ts:114',
-  'apps/api/src/services/curriculum.ts:129',
-  'apps/api/src/services/curriculum.ts:204',
-  'apps/api/src/services/curriculum.ts:2754',
-  'apps/api/src/services/dictation/generate.ts:213',
-  'apps/api/src/services/dictation/prepare-homework.ts:82',
-  'apps/api/src/services/dictation/review.ts:220',
-  'apps/api/src/services/homework-summary.ts:310',
-  'apps/api/src/services/session-llm-summary.ts:317',
-  'apps/api/src/services/summaries.ts:160',
-  'apps/api/src/inngest/functions/post-session-suggestions.ts:182',
-]);
+// same siteKey shape findRouteAndCallSites produces) to its reason, so a
+// genuinely-fixed site naturally drops out and a NEW unrelated site at the
+// same line number in a denylisted file still gets caught by the ratchet.
+const WI_2520_DEFERRED_SITES: Readonly<Record<string, string>> = {
+  'apps/api/src/services/book-suggestion-generation.ts:114':
+    'deferred, tracked as WI-2520',
+  'apps/api/src/services/curriculum.ts:129': 'deferred, tracked as WI-2520',
+  'apps/api/src/services/curriculum.ts:204': 'deferred, tracked as WI-2520',
+  'apps/api/src/services/curriculum.ts:2754': 'deferred, tracked as WI-2520',
+  'apps/api/src/services/dictation/generate.ts:213':
+    'deferred, tracked as WI-2520',
+  'apps/api/src/services/dictation/prepare-homework.ts:82':
+    'deferred, tracked as WI-2520',
+  'apps/api/src/services/dictation/review.ts:220':
+    'deferred, tracked as WI-2520',
+  'apps/api/src/services/homework-summary.ts:310':
+    'deferred, tracked as WI-2520',
+  'apps/api/src/services/session-llm-summary.ts:317':
+    'deferred, tracked as WI-2520',
+  'apps/api/src/services/summaries.ts:160': 'deferred, tracked as WI-2520',
+  'apps/api/src/inngest/functions/post-session-suggestions.ts:182':
+    'deferred, tracked as WI-2520',
+};
 
 interface CallSite {
   startLine: number;
@@ -332,56 +355,122 @@ function hasAgeBracket(optionsText: string): boolean {
   );
 }
 
+interface ScannedSite {
+  siteKey: string;
+  flow: string;
+  callName: string;
+  hasAgeBracket: boolean;
+}
+
+/**
+ * Scans SCAN_ROOTS for every routeAndCall/routeAndCallForQuiz/routeAndStream
+ * site whose `flow:` literal is a LEARNER_FACING_FLOWS member, denylisted or
+ * not — the raw facts, before either denylist is applied. Shared by both the
+ * ratchet test (which applies the denylists) and the rot-check test (which
+ * needs the raw facts to tell whether a denylist entry is still accurate).
+ */
+function scanLearnerFacingSites(): ScannedSite[] {
+  const files: string[] = [];
+  for (const root of SCAN_ROOTS) walkDir(root, files);
+
+  const results: ScannedSite[] = [];
+  for (const f of files) {
+    const rel = path.relative(REPO_ROOT, f).replaceAll('\\', '/');
+    const rawSrc = fs.readFileSync(f, 'utf-8');
+    const maskedSrc = maskComments(rawSrc);
+    const sites = findRouteAndCallSites(rawSrc);
+    for (const site of sites) {
+      // The flow VALUE must come from the RAW source — maskComments blanks
+      // string-literal bodies (that's how it keeps brace-balancing safe
+      // from quotes/braces inside strings), so reading it from the masked
+      // slice would always see spaces, never the actual flow tag.
+      const rawOptionsText = rawSrc.slice(site.optionsStart, site.optionsEnd);
+      const flow = extractFlowLiteral(rawOptionsText);
+      if (flow === null || !LEARNER_FACING_FLOWS.has(flow)) continue;
+
+      // The ageBracket KEY check is safe on the masked slice (a comment or
+      // string body containing the word "ageBracket" can't false-match).
+      const maskedOptionsText = maskedSrc.slice(
+        site.optionsStart,
+        site.optionsEnd,
+      );
+      results.push({
+        siteKey: `${rel}:${site.startLine}`,
+        flow,
+        callName: site.callName,
+        hasAgeBracket: hasAgeBracket(maskedOptionsText),
+      });
+    }
+  }
+  return results;
+}
+
 describe('routeAndCall sites must thread ageBracket for LEARNER_FACING_FLOWS (WI-2432 ratchet)', () => {
   it('every call site whose flow: literal is a LEARNER_FACING_FLOWS member threads ageBracket', () => {
-    const files: string[] = [];
-    for (const root of SCAN_ROOTS) walkDir(root, files);
-    expect(files.length).toBeGreaterThan(0);
+    const sites = scanLearnerFacingSites();
+    expect(sites.length).toBeGreaterThan(0);
 
     const violations: string[] = [];
-    for (const f of files) {
-      const rel = path.relative(REPO_ROOT, f).replaceAll('\\', '/');
-      const rawSrc = fs.readFileSync(f, 'utf-8');
-      const maskedSrc = maskComments(rawSrc);
-      const sites = findRouteAndCallSites(rawSrc);
-      for (const site of sites) {
-        // The flow VALUE must come from the RAW source — maskComments blanks
-        // string-literal bodies (that's how it keeps brace-balancing safe
-        // from quotes/braces inside strings), so reading it from the masked
-        // slice would always see spaces, never the actual flow tag.
-        const rawOptionsText = rawSrc.slice(site.optionsStart, site.optionsEnd);
-        const flow = extractFlowLiteral(rawOptionsText);
-        if (flow === null || !LEARNER_FACING_FLOWS.has(flow)) continue;
-
-        const siteKey = `${rel}:${site.startLine}`;
-        if (OPEN_SCOPE_QUESTION_FLOWS.has(flow)) continue;
-        if (WI_2520_DEFERRED_SITES.has(siteKey)) continue;
-
-        // The ageBracket KEY check is safe on the masked slice (a comment or
-        // string body containing the word "ageBracket" can't false-match).
-        const maskedOptionsText = maskedSrc.slice(
-          site.optionsStart,
-          site.optionsEnd,
+    for (const site of sites) {
+      if (site.flow in OPEN_SCOPE_QUESTION_FLOWS) continue;
+      if (site.siteKey in WI_2520_DEFERRED_SITES) continue;
+      if (!site.hasAgeBracket) {
+        violations.push(
+          `${site.siteKey} — ${site.callName} flow='${site.flow}' without ageBracket`,
         );
-        if (!hasAgeBracket(maskedOptionsText)) {
-          violations.push(
-            `${siteKey} — ${site.callName} flow='${flow}' without ageBracket`,
-          );
-        }
       }
     }
     expect(violations).toEqual([]);
   });
 
-  // Confirms the two denylist categories still resolve to real, currently-true
-  // facts rather than rotting silently — if a site is fixed, its entry should
-  // be removed (not left as a permanent bypass) and this test would still
-  // pass (the ratchet above only fails on a MISSING ageBracket, never on an
-  // unnecessary denylist entry), so this is a documentation/traceability
-  // check, not an enforcement gate.
-  it('denylisted flow tags are genuinely LEARNER_FACING_FLOWS members (no stale entries)', () => {
-    for (const flow of OPEN_SCOPE_QUESTION_FLOWS) {
-      expect(LEARNER_FACING_FLOWS.has(flow)).toBe(true);
+  // Confirms all 13 denylist entries — both categories — still resolve to
+  // real, currently-true facts rather than rotting silently. If a denylisted
+  // site is fixed, moved, or renamed (its ageBracket now threads, or its
+  // file:line no longer matches a real non-threading call site), this test
+  // FAILS — the debt list cannot silently narrow the ratchet's coverage
+  // without someone noticing and removing the stale entry. (The ratchet
+  // test above only fails on a MISSING ageBracket at a NON-denylisted site;
+  // it would happily pass even if every denylist entry were stale, which is
+  // exactly the gap this test closes — reviewer finding, WI-2432 rework.)
+  it('all 13 denylist entries are genuinely current (no stale/rotted entries)', () => {
+    const sites = scanLearnerFacingSites();
+    const nonThreadingSiteKeys = new Set(
+      sites.filter((s) => !s.hasAgeBracket).map((s) => s.siteKey),
+    );
+    const nonThreadingFlows = new Set(
+      sites.filter((s) => !s.hasAgeBracket).map((s) => s.flow),
+    );
+
+    const stale: string[] = [];
+
+    // Category 2 (11 site entries): each key must still name a real,
+    // currently non-threading call site. A fixed/moved/renamed site drops
+    // out of nonThreadingSiteKeys and is flagged here.
+    for (const [siteKey, reason] of Object.entries(WI_2520_DEFERRED_SITES)) {
+      if (!nonThreadingSiteKeys.has(siteKey)) {
+        stale.push(
+          `${siteKey} (${reason}) — no longer a non-threading LEARNER_FACING_FLOWS call site; remove from WI_2520_DEFERRED_SITES`,
+        );
+      }
     }
+
+    // Category 1 (2 flow entries): each flow must still (a) be a real
+    // LEARNER_FACING_FLOWS member and (b) have at least one current
+    // non-threading call site — i.e. the underlying fact the denylist
+    // documents ("this flow is exempt because it never threads
+    // ageBracket") must still hold, not just the flow name.
+    for (const [flow, reason] of Object.entries(OPEN_SCOPE_QUESTION_FLOWS)) {
+      if (!LEARNER_FACING_FLOWS.has(flow)) {
+        stale.push(
+          `${flow} (${reason}) — no longer a LEARNER_FACING_FLOWS member; remove from OPEN_SCOPE_QUESTION_FLOWS`,
+        );
+      } else if (!nonThreadingFlows.has(flow)) {
+        stale.push(
+          `${flow} (${reason}) — every call site for this flow now threads ageBracket; remove from OPEN_SCOPE_QUESTION_FLOWS`,
+        );
+      }
+    }
+
+    expect(stale).toEqual([]);
   });
 });
