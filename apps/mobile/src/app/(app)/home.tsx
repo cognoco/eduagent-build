@@ -32,7 +32,8 @@ export default function HomeScreen(): React.ReactElement {
     celebrationLevel,
     accommodationMode: learnerProfile?.accommodationMode,
     audience: isOwner ? 'adult' : 'child',
-    onAllComplete: () => {
+    onAllComplete: (completedProfileId) => {
+      if (completedProfileId !== (activeProfile?.id ?? null)) return;
       if (navigationContract.isParentProxy) return;
       markCelebrationsSeen
         .mutateAsync({
