@@ -4,6 +4,11 @@
 
 const mockFindFirst = jest.fn();
 const mockTopicFindFirst = jest.fn();
+// [WI-2432] generateRecallBridge now calls getPersonAgeBracket(db, profileId),
+// which reads db.query.person.findFirst. Undefined (no row) is the pre-existing
+// helper's own conservative default (getPersonAgeBracket -> 'adult'), matching
+// every test below's existing behavior since none assert on ageBracket.
+const mockPersonFindFirst = jest.fn().mockResolvedValue(undefined);
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
@@ -22,6 +27,9 @@ const mockDatabaseModule = createDatabaseModuleMock({
     // BUG-354: recall-bridge now joins through curriculumBooks → subjects
     curriculumBooks: { id: 'id', subjectId: 'subjectId' },
     subjects: { id: 'id', profileId: 'profileId' },
+    // [WI-2432] getPersonAgeBracket (identity-v2/helpers.ts) references
+    // person.id for its db.query.person.findFirst where-clause.
+    person: { id: 'id' },
   },
 });
 
@@ -65,7 +73,9 @@ function createMockDb(): any {
   });
 
   return {
-    query: {},
+    query: {
+      person: { findFirst: mockPersonFindFirst },
+    },
     select: selectMock,
   };
 }

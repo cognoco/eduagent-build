@@ -166,9 +166,15 @@ describe('generateRecallBridge (integration)', () => {
   beforeAll(async () => {
     db = createDatabase(requireDatabaseUrl());
 
-    // Register mock LLM provider — the ONLY mocked external boundary
-    unregisterProvider('gemini');
-    registerProvider(createMockProvider('gemini'));
+    // Register mock LLM provider — the ONLY mocked external boundary.
+    // [WI-2432] seedProfile() seeds a 15-year-old (birthYear = this year - 15),
+    // and generateRecallBridge now threads that profile's ageBracket to the
+    // router's under-18 vendor-exclusion gate, so a provider registered under
+    // 'gemini' is correctly excluded as a candidate. Register the mock under
+    // an approved-vendor id instead — 'cerebras' is the router's universal
+    // default and the first candidate approvedTextFallbackConfig checks.
+    unregisterProvider('cerebras');
+    registerProvider(createMockProvider('cerebras'));
   });
 
   afterAll(async () => {
@@ -182,7 +188,7 @@ describe('generateRecallBridge (integration)', () => {
       seededProfileIds.length = 0;
     }
 
-    unregisterProvider('gemini');
+    unregisterProvider('cerebras');
   });
 
   // -------------------------------------------------------------------------
