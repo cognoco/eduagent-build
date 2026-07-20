@@ -218,53 +218,43 @@ describe('SubjectsScreen', () => {
     };
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('renders the exact active row and omits the paused row while V2 is off', () => {
-    const originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
-    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-      false;
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', false);
     mockSubjectsIndex = {
       ...mockSubjectsIndex,
       subjects: [...SUBJECTS, PAUSED_SUBJECT],
     };
 
-    try {
-      render(<SubjectsScreen />);
+    render(<SubjectsScreen />);
 
-      within(
-        screen.getByTestId(`subjects-browse-row-${SUBJECTS[0]!.subjectId}`),
-      ).getByText(/^Spanish$/);
-      expect(
-        screen.queryByTestId(`subjects-browse-row-${PAUSED_SUBJECT.subjectId}`),
-      ).toBeNull();
-      expect(screen.queryByText(/^Paused Physics$/)).toBeNull();
-    } finally {
-      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-        originalV2;
-    }
+    within(
+      screen.getByTestId(`subjects-browse-row-${SUBJECTS[0]!.subjectId}`),
+    ).getByText(/^Spanish$/);
+    expect(
+      screen.queryByTestId(`subjects-browse-row-${PAUSED_SUBJECT.subjectId}`),
+    ).toBeNull();
+    expect(screen.queryByText(/^Paused Physics$/)).toBeNull();
   });
 
   it('renders the exact paused row and preserves the active row while V2 is on', () => {
-    const originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
-    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-      true;
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', true);
     mockSubjectsIndex = {
       ...mockSubjectsIndex,
       subjects: [...SUBJECTS, PAUSED_SUBJECT],
     };
 
-    try {
-      render(<SubjectsScreen />);
+    render(<SubjectsScreen />);
 
-      within(
-        screen.getByTestId(`subjects-browse-row-${SUBJECTS[0]!.subjectId}`),
-      ).getByText(/^Spanish$/);
-      within(
-        screen.getByTestId(`subjects-browse-row-${PAUSED_SUBJECT.subjectId}`),
-      ).getByText(/^Paused Physics$/);
-    } finally {
-      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
-        originalV2;
-    }
+    within(
+      screen.getByTestId(`subjects-browse-row-${SUBJECTS[0]!.subjectId}`),
+    ).getByText(/^Spanish$/);
+    within(
+      screen.getByTestId(`subjects-browse-row-${PAUSED_SUBJECT.subjectId}`),
+    ).getByText(/^Paused Physics$/);
   });
 
   it('routes a row to its exact hub without pushing the current Subjects tab again', () => {

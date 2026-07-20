@@ -1738,6 +1738,141 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         compactBody.includes(
           "awaitexpectSubjectHub(page,subjectId,'Biology');",
         );
+
+      const isExactTopicRowLocator = (node: ts.Expression): boolean => {
+        if (
+          !ts.isCallExpression(node) ||
+          node.arguments.length !== 1 ||
+          !ts.isPropertyAccessExpression(node.expression) ||
+          !ts.isIdentifier(node.expression.expression) ||
+          node.expression.expression.text !== 'page' ||
+          node.expression.name.text !== 'getByTestId'
+        ) {
+          return false;
+        }
+        const selector = node.arguments[0];
+        return Boolean(
+          selector &&
+          ts.isTemplateExpression(selector) &&
+          selector.head.text === 'subject-hub-topic-' &&
+          selector.templateSpans.length === 1 &&
+          ts.isIdentifier(selector.templateSpans[0]?.expression) &&
+          selector.templateSpans[0].expression.text === 'topicId' &&
+          selector.templateSpans[0].literal.text === '',
+        );
+      };
+      const topicRowOwners = new Map<string, number>();
+      for (const statement of caseBody.statements) {
+        if (
+          !ts.isVariableStatement(statement) ||
+          (statement.declarationList.flags & ts.NodeFlags.Const) === 0
+        ) {
+          continue;
+        }
+        for (const declaration of statement.declarationList.declarations) {
+          if (
+            ts.isIdentifier(declaration.name) &&
+            declaration.initializer &&
+            isExactTopicRowLocator(declaration.initializer)
+          ) {
+            topicRowOwners.set(declaration.name.text, statement.getStart());
+          }
+        }
+      }
+
+      const hasExactTrueOption = (node: ts.Expression | undefined): boolean =>
+        Boolean(
+          node &&
+          ts.isObjectLiteralExpression(node) &&
+          node.properties.some(
+            (property) =>
+              ts.isPropertyAssignment(property) &&
+              ((ts.isIdentifier(property.name) &&
+                property.name.text === 'exact') ||
+                (ts.isStringLiteral(property.name) &&
+                  property.name.text === 'exact')) &&
+              property.initializer.kind === ts.SyntaxKind.TrueKeyword,
+          ),
+        );
+      let exactOwnedTopicAssertionPosition: number | undefined;
+      let reviewActionPosition: number | undefined;
+      const visitTopicOwnership = (node: ts.Node): void => {
+        if (
+          ts.isCallExpression(node) &&
+          ts.isPropertyAccessExpression(node.expression) &&
+          node.expression.name.text === 'toBeVisible' &&
+          node.arguments.length === 0 &&
+          ts.isAwaitExpression(node.parent)
+        ) {
+          const expectCall = node.expression.expression;
+          const textCall =
+            ts.isCallExpression(expectCall) &&
+            ts.isIdentifier(expectCall.expression) &&
+            expectCall.expression.text === 'expect'
+              ? expectCall.arguments[0]
+              : undefined;
+          if (
+            textCall &&
+            ts.isCallExpression(textCall) &&
+            ts.isPropertyAccessExpression(textCall.expression) &&
+            textCall.expression.name.text === 'getByText' &&
+            ts.isIdentifier(textCall.expression.expression) &&
+            topicRowOwners.has(textCall.expression.expression.text) &&
+            ts.isStringLiteral(textCall.arguments[0]) &&
+            textCall.arguments[0].text === 'Biology Topic 1' &&
+            hasExactTrueOption(textCall.arguments[1])
+          ) {
+            const assertionPosition = node.getStart();
+            const ownerPosition = topicRowOwners.get(
+              textCall.expression.expression.text,
+            );
+            if (
+              ownerPosition !== undefined &&
+              ownerPosition < assertionPosition &&
+              (exactOwnedTopicAssertionPosition === undefined ||
+                assertionPosition < exactOwnedTopicAssertionPosition)
+            ) {
+              exactOwnedTopicAssertionPosition = assertionPosition;
+            }
+          }
+        }
+
+        if (
+          ts.isCallExpression(node) &&
+          ts.isIdentifier(node.expression) &&
+          node.expression.text === 'pressableClick' &&
+          ts.isAwaitExpression(node.parent)
+        ) {
+          const target = node.arguments[0];
+          if (
+            target &&
+            ts.isCallExpression(target) &&
+            ts.isPropertyAccessExpression(target.expression) &&
+            ts.isIdentifier(target.expression.expression) &&
+            target.expression.expression.text === 'page' &&
+            target.expression.name.text === 'getByTestId' &&
+            ts.isStringLiteral(target.arguments[0]) &&
+            target.arguments[0].text === 'subject-hub-next-up-action'
+          ) {
+            const actionPosition = node.getStart();
+            if (
+              reviewActionPosition === undefined ||
+              actionPosition < reviewActionPosition
+            ) {
+              reviewActionPosition = actionPosition;
+            }
+          }
+        }
+        ts.forEachChild(node, visitTopicOwnership);
+      };
+      visitTopicOwnership(caseBody);
+      // Structural source protection only; Playwright runtime evidence remains
+      // responsible for proving the rendered text and interaction property.
+      const hasExactOwnedTopicBeforeReview =
+        exactOwnedTopicAssertionPosition !== undefined &&
+        reviewActionPosition !== undefined &&
+        exactOwnedTopicAssertionPosition < reviewActionPosition;
+
       let hasObservedUrlPolling = false;
       const visitPoll = (node: ts.Node): void => {
         if (
@@ -1915,6 +2050,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         hasBothSeedIds &&
         hasFailClosedIdGuard &&
         hasExactSubjectFlow &&
+        hasExactOwnedTopicBeforeReview &&
         hasObservedUrlPolling
       );
     };
@@ -1930,6 +2066,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         await expectSubjectRow(page, subjectId, 'Biology');
         await pressableClick(page.getByTestId(\`subjects-browse-row-\${subjectId}\`));
         await expectSubjectHub(page, subjectId, 'Biology');
+        const biologyTopicRow = page.getByTestId(\`subject-hub-topic-\${topicId}\`);
+        await expect(
+          biologyTopicRow.getByText('Biology Topic 1', { exact: true }),
+        ).toBeVisible();
+        await pressableClick(page.getByTestId('subject-hub-next-up-action'));
         await expect.poll(() => {
           const url = new URL(page.url());
           return {
@@ -1943,6 +2084,30 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       });
     `;
     expect(hasSeedOwnedRetentionRouteBinding(exactBindingFixture)).toBe(true);
+
+    const retentionTopicOwnershipMutations = [
+      exactBindingFixture.replace(
+        `        const biologyTopicRow = page.getByTestId(\`subject-hub-topic-\${topicId}\`);
+        await expect(
+          biologyTopicRow.getByText('Biology Topic 1', { exact: true }),
+        ).toBeVisible();
+`,
+        '',
+      ),
+      exactBindingFixture.replace(
+        'page.getByTestId(`subject-hub-topic-${topicId}`)',
+        "page.getByTestId('subject-hub-topic-adjacent-topic-id')",
+      ),
+      exactBindingFixture.replace(
+        "biologyTopicRow.getByText('Biology Topic 1', { exact: true })",
+        "page.getByText('Biology Topic 1', { exact: true })",
+      ),
+    ];
+    expect(
+      retentionTopicOwnershipMutations.map((mutation) =>
+        hasSeedOwnedRetentionRouteBinding(mutation),
+      ),
+    ).toEqual([false, false, false]);
 
     for (const mutation of [
       exactBindingFixture.replace(
