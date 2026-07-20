@@ -2773,6 +2773,49 @@ describe('SessionScreen homework flow', () => {
       testScreen.unmount();
     }, 15000);
 
+    it('[WI-2095 bounce 1] treats a zero-XP success as terminal and idempotent', async () => {
+      mockFetch.setRoute(`/sessions/${SESSION_ID}/summary`, {
+        summary: {
+          id: '80000000-0000-4000-8000-000000000001',
+          sessionId: SESSION_ID,
+          content: firstSessionReflection,
+          aiFeedback: null,
+          feedbackStatus: 'unavailable',
+          status: 'accepted',
+          baseXp: 0,
+          reflectionBonusXp: 0,
+        },
+      });
+      const testScreen = await renderFirstSessionWrapUp();
+
+      enterFirstSessionReflection(testScreen);
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+
+      await waitFor(() => {
+        testScreen.getByTestId('first-session-wrap-receipt');
+      });
+      expect(testScreen.getByTestId('mentor-reward-value').props.children).toBe(
+        '1.5x / 0',
+      );
+      expect(
+        testScreen.getByTestId('first-session-wrap-celebration'),
+      ).toBeTruthy();
+      expect(
+        testScreen.getByTestId('first-session-wrap-submit'),
+      ).toBeDisabled();
+
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(
+        fetchCallsMatching(mockFetch, `/sessions/${SESSION_ID}/summary`),
+      ).toHaveLength(1);
+      expect(testScreen.getAllByText(firstSessionReflection)).toHaveLength(1);
+      testScreen.unmount();
+    }, 15000);
+
     it('[WI-2095] shows localized retry feedback and settles saving after a 5xx failure', async () => {
       mockFetch.setRoute(
         `/sessions/${SESSION_ID}/summary`,
