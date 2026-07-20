@@ -65,7 +65,10 @@ const PATH_BUILDERS: Partial<Record<NowDeepLinkRoute, PathBuilder>> = {
       requiredParam(params, 'topicId', 'challenge.start'),
     )}?mode=challenge`,
   'support.hub': () => '/(app)/mentor',
-  journal: () => '/(app)/journal',
+  journal: (params) =>
+    params['section']
+      ? `/(app)/journal?section=${encodeURIComponent(params['section'])}`
+      : '/(app)/journal',
 };
 
 function assertSupportedRoute(

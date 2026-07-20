@@ -7,6 +7,8 @@ import {
   checkRowIdCrossLinks,
   checkFlagTokens,
   checkLegacyTags,
+  checkNavShellMatrixTabShapes,
+  extractTabSetLiteral,
   type FileIndex,
 } from './check-flow-inventory-cite-rot';
 
@@ -303,5 +305,160 @@ describe('checkLegacyTags', () => {
     const failures = checkLegacyTags(body);
     expect(failures).toHaveLength(1);
     expect(failures[0].token).toBe('legacy-v2-mode');
+  });
+});
+
+describe('extractTabSetLiteral', () => {
+  const source = [
+    'const STUDY_TABS: ReadonlySet<TabKey> = new Set([',
+    "  'home',",
+    "  'library',",
+    "  'progress',",
+    "  'more',",
+    ']);',
+    '',
+    'const DYNAMIC_TABS: ReadonlySet<TabKey> = new Set(buildTabList());',
+  ].join('\n');
+
+  it('extracts a literal Set([...]) declaration', () => {
+    expect(extractTabSetLiteral(source, 'STUDY_TABS')).toEqual(
+      new Set(['home', 'library', 'progress', 'more']),
+    );
+  });
+
+  it('returns null when the symbol is not declared at all', () => {
+    expect(extractTabSetLiteral(source, 'NO_SUCH_TABS')).toBeNull();
+  });
+
+  it('returns null for a non-literal declaration (function call, not an array) — H1', () => {
+    expect(extractTabSetLiteral(source, 'DYNAMIC_TABS')).toBeNull();
+  });
+});
+
+describe('checkNavShellMatrixTabShapes', () => {
+  const LEGACY_FILE = 'apps/mobile/src/lib/legacy-navigation-contract.ts';
+  const CONTRACT_FILE = 'apps/mobile/src/lib/navigation-contract.ts';
+  const V2_FILE = 'apps/mobile/src/hooks/use-navigation-contract.ts';
+
+  const legacySource = [
+    'const LEARNER_TABS: ReadonlySet<string> = new Set([',
+    "  'home',",
+    "  'library',",
+    "  'progress',",
+    "  'more',",
+    ']);',
+    '',
+    'const STUDY_MODE_TABS: ReadonlySet<string> = new Set([',
+    "  'home',",
+    "  'library',",
+    "  'progress',",
+    "  'more',",
+    ']);',
+  ].join('\n');
+  const contractSource = [
+    'const STUDY_TABS: ReadonlySet<TabKey> = new Set([',
+    "  'home',",
+    "  'library',",
+    "  'progress',",
+    "  'more',",
+    ']);',
+    '',
+    'const PROXY_TABS: ReadonlySet<TabKey> = new Set(computeProxyTabs());',
+  ].join('\n');
+  const v2Source =
+    "const V2_TABS: ReadonlySet<string> = new Set(['mentor', 'subjects', 'journal']);";
+
+  const contractSources: Record<string, string> = {
+    [LEGACY_FILE]: legacySource,
+    [CONTRACT_FILE]: contractSource,
+    [V2_FILE]: v2Source,
+  };
+
+  function docWithMatrixRow(cellText: string): string {
+    return [
+      '## Navigation shell matrix',
+      '',
+      '| Audience | flags-off | prod build |',
+      '|---|---|---|',
+      `| Solo-owner learner | ${cellText} | same |`,
+      '',
+      '## Next section',
+    ].join('\n');
+  }
+
+  it("passes when a cell's claimed tab list matches the real Set", () => {
+    const body = docWithMatrixRow(
+      '4: home, library, progress, more (`LEARNER_TABS`, legacy:1-6)',
+    );
+    expect(checkNavShellMatrixTabShapes(body, contractSources)).toEqual([]);
+  });
+
+  it("fails when a cell's claimed tab list does not match the real Set", () => {
+    const body = docWithMatrixRow(
+      '3: home, library, progress (`LEARNER_TABS`, legacy:1-6)',
+    );
+    const failures = checkNavShellMatrixTabShapes(body, contractSources);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].symbol).toBe('LEARNER_TABS');
+    expect(failures[0].reason).toContain(
+      'doc claims {home, library, progress}',
+    );
+    expect(failures[0].reason).toContain(
+      'LEARNER_TABS resolves to {home, library, more, progress}',
+    );
+  });
+
+  it('skips a shorthand cell that cites a real symbol but names no tabs', () => {
+    const body = docWithMatrixRow('same (`STUDY_MODE_TABS`, legacy:8-13)');
+    expect(checkNavShellMatrixTabShapes(body, contractSources)).toEqual([]);
+  });
+
+  it("fails loudly (not silently) when a cited symbol's Set literal cannot be resolved — H1", () => {
+    const body = docWithMatrixRow(
+      '3: home, library, progress (`PROXY_TABS`, contract:1-2)',
+    );
+    const failures = checkNavShellMatrixTabShapes(body, contractSources);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].symbol).toBe('PROXY_TABS');
+    expect(failures[0].reason).toContain('could not be resolved');
+  });
+
+  it("passes regardless of claim-token order relative to the Set literal's declaration order", () => {
+    const body = docWithMatrixRow(
+      '4: more, progress, library, home (`LEARNER_TABS`, legacy:1-6)',
+    );
+    expect(checkNavShellMatrixTabShapes(body, contractSources)).toEqual([]);
+  });
+
+  it('does not read a tab token from trailing commentary after the citation as part of the claim', () => {
+    // "library" only appears AFTER the citation's closing paren — must not be
+    // folded into LEARNER_TABS's claim (which would wrongly pass a
+    // 5-tab claim against the real 4-tab set, or otherwise corrupt it).
+    const body = docWithMatrixRow(
+      '4: home, progress, more (`LEARNER_TABS`, legacy:1-6) — library tab unrelated commentary',
+    );
+    const failures = checkNavShellMatrixTabShapes(body, contractSources);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].reason).toContain('doc claims {home, more, progress}');
+  });
+
+  it("scopes each symbol's claim to its own semicolon-separated clause, not the whole cell", () => {
+    const body = docWithMatrixRow(
+      'family mode (default): home, more, progress (`STUDY_MODE_TABS`, legacy:8-13); study: 4 (`LEARNER_TABS`, legacy:1-6)',
+    );
+    // STUDY_MODE_TABS's clause claims {home, more, progress} — 3 tabs, but its
+    // real Set has 4 (missing "library"), so THIS clause must fail...
+    const failures = checkNavShellMatrixTabShapes(body, contractSources);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].symbol).toBe('STUDY_MODE_TABS');
+    // ...while LEARNER_TABS's clause ("study: 4 (...)") names no tabs at all
+    // and must be skipped, not incorrectly inheriting the other clause's tabs.
+  });
+
+  it('passes the real Navigation shell matrix cells unchanged (V2_TABS)', () => {
+    const body = docWithMatrixRow(
+      '**3: mentor, subjects, journal** (`V2_TABS`, use-navigation-contract.ts:22)',
+    );
+    expect(checkNavShellMatrixTabShapes(body, contractSources)).toEqual([]);
   });
 });

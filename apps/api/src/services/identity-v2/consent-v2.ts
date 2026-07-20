@@ -1111,13 +1111,16 @@ export async function withdrawConsentByToken(
  * [WI-2347] `expectedTokenId`, when passed (bearer-token callers always pass
  * one — `string` for `cw2`, `null` for legacy `cw1`; omitted entirely by the
  * edge-authorized `revokeConsentV2` path, which skips this check), must
- * satisfy `current.withdrawalTokenId === null || current.withdrawalTokenId
- * === expectedTokenId` or this throws `ConsentRecordNotFoundError` — the
- * same outcome as "no grant", so a superseded link is indistinguishable from
- * a never-approved one (no enumeration). This also closes the `cw1`-vs-
- * newer-`cw2`-grant gap: a `cw1` token (`expectedTokenId: null`) only passes
- * while the current grant's `withdrawalTokenId` is still null; once a fresh
- * `cw2` mint sets it, the old `cw1` link stops working.
+ * satisfy EXACT equality — `current.withdrawalTokenId === expectedTokenId`
+ * — or this throws `ConsentRecordNotFoundError` — the same outcome as "no
+ * grant", so a superseded link is indistinguishable from a never-approved
+ * one (no enumeration). `null` is a value to match, never a wildcard: a
+ * `cw1` token (`expectedTokenId: null`) only passes while the current
+ * grant's `withdrawalTokenId` is still null; once a fresh `cw2` mint sets
+ * it, the old `cw1` link stops working. Symmetrically — [WI-2434] — a `cw2`
+ * token only passes while the current grant's `withdrawalTokenId` still
+ * equals that exact id; a newer grant that has reverted to `null` (e.g. a
+ * fresh tokenless re-consent) rejects the old `cw2` link too.
  */
 async function stampWithdrawal(
   db: Database,
@@ -1133,7 +1136,6 @@ async function stampWithdrawal(
   }
   if (
     expectedTokenId !== undefined &&
-    current.withdrawalTokenId !== null &&
     current.withdrawalTokenId !== expectedTokenId
   ) {
     throw new ConsentRecordNotFoundError();
@@ -1618,7 +1620,9 @@ export async function getGdprGrantWithdrawalStateV2(
   organizationId: string,
   /** [WI-2347] Same non-enumerating supersession check as `stampWithdrawal`
    * (`string` for `cw2`, `null` for legacy `cw1`, `undefined` only to skip
-   * the check entirely) — a mismatch returns `null`, identical to
+   * the check entirely) — EXACT equality against the current grant's
+   * `withdrawalTokenId` ([WI-2434]; `null` matches only `null`, never a
+   * wildcard for any id); a mismatch returns `null`, identical to
    * "no grant". */
   expectedTokenId?: string | null,
 ): Promise<{ withdrawnAt: Date | null } | null> {
@@ -1631,7 +1635,6 @@ export async function getGdprGrantWithdrawalStateV2(
   if (!current) return null;
   if (
     expectedTokenId !== undefined &&
-    current.withdrawalTokenId !== null &&
     current.withdrawalTokenId !== expectedTokenId
   ) {
     return null;

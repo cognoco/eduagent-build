@@ -398,7 +398,8 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
                 } catch {
                   // Log malformed chunks so SSE format changes are detectable
                   logger.warn('[anthropic] Malformed SSE chunk', {
-                    chunk: jsonStr.slice(0, 120),
+                    chunkLength: jsonStr.length,
+                    errorKind: 'json_parse',
                   });
                 }
               }

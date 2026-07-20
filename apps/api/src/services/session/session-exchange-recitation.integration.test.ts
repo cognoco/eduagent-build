@@ -31,8 +31,13 @@ import {
   ensureV2IdentityForLegacyProfileTest,
 } from '../../test-utils/legacy-identity-anchors';
 import { buildPracticeActivityDedupeKey } from '../practice-activity-events';
-import { persistExchangeResult } from './session-exchange';
-import { mapSessionRow } from './session-events';
+import {
+  claimRecitationSetupTransition,
+  persistExchangeResult,
+} from './session-exchange';
+import { startSession } from './session-crud';
+import { mapSessionRow, setSessionInputMode } from './session-events';
+import { recitationSetupClaimMetadataKey } from './session-recitation-setup';
 
 // The workspace root is 5 levels up from apps/api/src/services/session/.
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -249,5 +254,365 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
       );
 
     expect(rows).toHaveLength(1);
+  });
+
+  it('persists setup state only with a new assistant event and does not advance it on client replay', async () => {
+    const { profileId, subjectId } = await seedProfile(db);
+    const [sessionRow] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        sessionType: 'learning',
+        inputMode: 'text',
+        status: 'active',
+        escalationRung: 1,
+        exchangeCount: 0,
+        metadata: { effectiveMode: 'recitation' },
+      })
+      .returning();
+    const session = mapSessionRow(sessionRow!);
+    const clientId = `recitation-setup-${profileId}`;
+    const sensitiveAuditText = 'learner recitation must not persist';
+
+    const first = await persistExchangeResult(
+      db,
+      profileId,
+      session.id,
+      session,
+      'selection',
+      'ready',
+      1,
+      {
+        recitationSetup: { phase: 'ready', clarificationCount: 0 },
+        sourceAudit: {
+          status: 'ok',
+          reliedOnSourceIds: ['recitation_text'],
+          reliableReliedOnSourceIds: ['recitation_text'],
+          unsupportedSourceIds: [],
+          availableReliableSourceIds: ['recitation_text'],
+          insufficient: false,
+          reason: sensitiveAuditText,
+          evidence: [
+            {
+              id: 'recitation_text',
+              kind: 'recitation_text',
+              reliability: 'learner_provided',
+              label: 'Learner recitation',
+              excerpt: sensitiveAuditText,
+              reliableForFacts: true,
+            },
+          ],
+        },
+      },
+      clientId,
+    );
+    const duplicate = await persistExchangeResult(
+      db,
+      profileId,
+      session.id,
+      session,
+      'duplicate selection',
+      'duplicate reply',
+      1,
+      {
+        recitationSetup: {
+          phase: 'awaiting_selection',
+          clarificationCount: 1,
+        },
+      },
+      clientId,
+    );
+
+    expect(first.persistedUserMessage).toBe(true);
+    expect(duplicate.persistedUserMessage).toBe(false);
+
+    const assistantEvents = await db
+      .select({ metadata: sessionEvents.metadata })
+      .from(sessionEvents)
+      .where(
+        and(
+          eq(sessionEvents.sessionId, session.id),
+          eq(sessionEvents.eventType, 'ai_response'),
+        ),
+      );
+    expect(assistantEvents).toHaveLength(1);
+    expect(assistantEvents[0]?.metadata).toMatchObject({
+      recitationSetup: { phase: 'ready', clarificationCount: 0 },
+      sourceAudit: {
+        status: 'ok',
+        reliedOnSourceIds: ['recitation_text'],
+        reason: '[redacted: source audit reason present]',
+        evidence: [
+          {
+            id: 'recitation_text',
+            excerpt: '[redacted: source evidence excerpt present]',
+          },
+        ],
+      },
+    });
+    expect(JSON.stringify(assistantEvents[0]?.metadata)).not.toContain(
+      sensitiveAuditText,
+    );
+
+    const [persistedSession] = await db
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(eq(learningSessions.id, session.id));
+    expect(persistedSession?.metadata).toEqual({ effectiveMode: 'recitation' });
+  });
+
+  it('serializes distinct recitation setup turns so only one clarification is claimed', async () => {
+    const { profileId, subjectId } = await seedProfile(db);
+    const secondDb = createDatabase(process.env.DATABASE_URL!);
+    const session = await startSession(db, profileId, subjectId, {
+      subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
+      metadata: { effectiveMode: 'recitation' },
+    });
+
+    const clientIds = ['recitation-race-a', 'recitation-race-b'] as const;
+    const messages = ["I don't know", 'still not sure'] as const;
+    const transitions = await Promise.all([
+      claimRecitationSetupTransition(
+        db,
+        profileId,
+        session.id,
+        messages[0],
+        clientIds[0],
+      ),
+      claimRecitationSetupTransition(
+        secondDb,
+        profileId,
+        session.id,
+        messages[1],
+        clientIds[1],
+      ),
+    ]);
+
+    expect(transitions.map((transition) => transition?.action).sort()).toEqual([
+      'clarify_selection',
+      'invite_after_cap',
+    ]);
+
+    const [beforeReplaySession] = await db
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(eq(learningSessions.id, session.id));
+    const beforeReplayClaim = (
+      beforeReplaySession?.metadata as Record<string, unknown>
+    )[recitationSetupClaimMetadataKey];
+
+    const clarificationIndex = transitions.findIndex(
+      (transition) => transition?.action === 'clarify_selection',
+    );
+    const replay = await claimRecitationSetupTransition(
+      db,
+      profileId,
+      session.id,
+      messages[clarificationIndex]!,
+      clientIds[clarificationIndex]!,
+    );
+    expect(replay?.action).toBe('clarify_selection');
+
+    const moderationFlags = await db
+      .select({ id: sessionEvents.id })
+      .from(sessionEvents)
+      .where(
+        and(
+          eq(sessionEvents.sessionId, session.id),
+          eq(sessionEvents.eventType, 'flag'),
+        ),
+      );
+    expect(moderationFlags).toHaveLength(0);
+
+    const [startEvent] = await db
+      .select({ metadata: sessionEvents.metadata })
+      .from(sessionEvents)
+      .where(
+        and(
+          eq(sessionEvents.sessionId, session.id),
+          eq(sessionEvents.eventType, 'session_start'),
+        ),
+      );
+    expect(startEvent?.metadata).not.toHaveProperty('recitationSetup');
+
+    const [persistedSession] = await db
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(eq(learningSessions.id, session.id));
+    expect(persistedSession?.metadata).toMatchObject({
+      effectiveMode: 'recitation',
+      inputMode: 'text',
+      [recitationSetupClaimMetadataKey]: {
+        phase: 'ready',
+        clarificationCount: 1,
+        lastAction: 'invite_after_cap',
+      },
+    });
+    const persistedClaim = (
+      persistedSession?.metadata as Record<string, unknown>
+    )[recitationSetupClaimMetadataKey];
+    expect(persistedClaim).toEqual(beforeReplayClaim);
+    expect(JSON.stringify(persistedClaim)).not.toContain("I don't know");
+    expect(JSON.stringify(persistedClaim)).not.toContain('still not sure');
+  });
+
+  it('serializes headerless recitation turns through the same clarification cap', async () => {
+    const { profileId, subjectId } = await seedProfile(db);
+    const secondDb = createDatabase(process.env.DATABASE_URL!);
+    const session = await startSession(db, profileId, subjectId, {
+      subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
+      metadata: { effectiveMode: 'recitation' },
+    });
+
+    const transitions = await Promise.all([
+      claimRecitationSetupTransition(db, profileId, session.id, "I don't know"),
+      claimRecitationSetupTransition(
+        secondDb,
+        profileId,
+        session.id,
+        'still not sure',
+      ),
+    ]);
+
+    expect(transitions.map((transition) => transition?.action).sort()).toEqual([
+      'clarify_selection',
+      'invite_after_cap',
+    ]);
+
+    const [persistedSession] = await db
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(eq(learningSessions.id, session.id));
+    expect(persistedSession?.metadata).toMatchObject({
+      [recitationSetupClaimMetadataKey]: {
+        phase: 'ready',
+        clarificationCount: 1,
+        lastAction: 'invite_after_cap',
+        recentClaims: [],
+      },
+    });
+    expect(
+      (persistedSession?.metadata as Record<string, Record<string, unknown>>)[
+        recitationSetupClaimMetadataKey
+      ],
+    ).not.toHaveProperty('lastClientId');
+  });
+
+  it('preserves a claimed setup transition across an interleaved input-mode write', async () => {
+    const { profileId, subjectId } = await seedProfile(db);
+    const secondDb = createDatabase(process.env.DATABASE_URL!);
+    const session = await startSession(db, profileId, subjectId, {
+      subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
+      metadata: { effectiveMode: 'recitation' },
+    });
+    let inputModeUpdate: ReturnType<typeof setSessionInputMode> | undefined;
+
+    await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select({ metadata: learningSessions.metadata })
+        .from(learningSessions)
+        .where(eq(learningSessions.id, session.id))
+        .for('update')
+        .limit(1);
+
+      inputModeUpdate = setSessionInputMode(secondDb, profileId, session.id, {
+        inputMode: 'voice',
+      });
+      await new Promise<void>((resolveWait) => setTimeout(resolveWait, 500));
+
+      await tx
+        .update(learningSessions)
+        .set({
+          metadata: {
+            ...((current?.metadata as Record<string, unknown> | null) ?? {}),
+            [recitationSetupClaimMetadataKey]: {
+              phase: 'ready',
+              clarificationCount: 1,
+              lastAction: 'invite_after_cap',
+              recentClaims: [],
+            },
+          },
+        })
+        .where(eq(learningSessions.id, session.id));
+    });
+
+    await inputModeUpdate;
+    const [persistedSession] = await db
+      .select({
+        inputMode: learningSessions.inputMode,
+        metadata: learningSessions.metadata,
+      })
+      .from(learningSessions)
+      .where(eq(learningSessions.id, session.id));
+    expect(persistedSession?.inputMode).toBe('voice');
+    expect(persistedSession?.metadata).toMatchObject({
+      inputMode: 'voice',
+      [recitationSetupClaimMetadataKey]: {
+        phase: 'ready',
+        clarificationCount: 1,
+        lastAction: 'invite_after_cap',
+      },
+    });
+  });
+
+  it('replays the same recitation setup claim without consuming the clarification cap', async () => {
+    const { profileId, subjectId } = await seedProfile(db);
+    const secondDb = createDatabase(process.env.DATABASE_URL!);
+    const session = await startSession(db, profileId, subjectId, {
+      subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
+      metadata: { effectiveMode: 'recitation' },
+    });
+    const clientId = 'recitation-replay';
+
+    const transitions = await Promise.all([
+      claimRecitationSetupTransition(
+        db,
+        profileId,
+        session.id,
+        "I don't know",
+        clientId,
+      ),
+      claimRecitationSetupTransition(
+        secondDb,
+        profileId,
+        session.id,
+        "I don't know",
+        clientId,
+      ),
+    ]);
+
+    expect(transitions.map((transition) => transition?.action)).toEqual([
+      'clarify_selection',
+      'clarify_selection',
+    ]);
+    const [persistedSession] = await db
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(eq(learningSessions.id, session.id));
+    expect(persistedSession?.metadata).toMatchObject({
+      [recitationSetupClaimMetadataKey]: {
+        phase: 'awaiting_selection',
+        clarificationCount: 1,
+        lastAction: 'clarify_selection',
+        lastClientId: clientId,
+        recentClaims: [
+          {
+            clientId,
+            action: 'clarify_selection',
+            phase: 'awaiting_selection',
+            clarificationCount: 1,
+          },
+        ],
+      },
+    });
   });
 });

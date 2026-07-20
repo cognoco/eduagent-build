@@ -573,6 +573,7 @@ function SessionScreenInner() {
   } | null>(null);
   const animationCleanupRef = useRef<(() => void) | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionEndedRef = useRef(false);
   const lastAiAtRef = useRef<number | null>(null);
   const lastExpectedMinutesRef = useRef(10);
   const hasAutoSentRef = useRef(false);
@@ -595,6 +596,18 @@ function SessionScreenInner() {
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
   const activeSession = useSession(activeSessionId ?? '');
+  const cancelSilencePrompt = useCallback(() => {
+    if (!silenceTimerRef.current) return;
+    clearTimeout(silenceTimerRef.current);
+    silenceTimerRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    sessionEndedRef.current = Boolean(activeSession.data?.endedAt);
+    if (sessionEndedRef.current) {
+      cancelSilencePrompt();
+    }
+  }, [activeSession.data?.endedAt, activeSessionId, cancelSilencePrompt]);
   const clearContinuationDepth = useClearContinuationDepth(
     activeSessionId ?? '',
   );
@@ -957,6 +970,7 @@ function SessionScreenInner() {
     liveTranscriptMilestones: liveTranscript?.session.milestonesReached,
     hydrate,
     hasHydratedRecoveryRef,
+    cancelSilencePrompt,
   });
 
   const {
@@ -1010,6 +1024,7 @@ function SessionScreenInner() {
     notePromptOffered,
     animationCleanupRef,
     silenceTimerRef,
+    sessionEndedRef,
     lastAiAtRef,
     lastExpectedMinutesRef,
     lastRetryPayloadRef,
@@ -1415,6 +1430,8 @@ function SessionScreenInner() {
     parkingLotDraft,
     setParkingLotDraft,
     closedSessionRef,
+    silenceTimerRef,
+    sessionEndedRef,
     queuedProblemTextRef,
     activeProfileId: activeProfile?.id,
     closeSession,

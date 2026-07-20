@@ -4,6 +4,8 @@
 // DB/config graph). Only the WI-1823-relevant patterns live here; the remaining
 // gate regexes stay inline in enduser-session-pass.ts.
 
+import { recitationSetupLeaksSourceContent } from '../apps/api/src/services/session/session-recitation-setup';
+
 // Fires when a recitation polish/feedback carries an unsupported speed claim.
 // The recitation fixture source states "made trade easier" (not "faster"), so a
 // polished version that says trade moved "faster" has added an unsupported fact.
@@ -39,6 +41,25 @@ export function recitationPolishAddedFact(response: string): boolean {
   const segment = recitationPolishSegment(response);
   if (segment === null) return false;
   return RECITATION_UNSUPPORTED_POLISH_RE.test(segment);
+}
+
+const RECITATION_READY_TO_BEGIN_RE =
+  /\bi(?:'m| am) ready\b.*\b(?:begin|start|go ahead)\b|\bgo ahead\b(?:.*\b(?:begin|start|recite)\b)?|\b(?:you can )?(?:begin|start|recite)(?: your)?(?: recitation)? (?:now|when|whenever)\b/i;
+const RECITATION_SETUP_REASK_RE =
+  /\b(?:what would you like to recite|what (?:are|will) you reciting|which (?:poem|recitation|selection)|tell(?:ing)? me (?:which |the )?(?:poem|recitation|selection|title|author)|giv(?:e|ing) me (?:the )?(?:title|author)|title,? author,? or (?:a )?(?:short )?description)\b/i;
+const RECITATION_PREMATURE_MODEL_RE =
+  /\b(?:you could say|to actually recite|polished version|final version|model answer)\b|\b(?:begin|start) with\s*:/i;
+
+export function recitationSetupReplyAdvances(
+  response: string,
+  sourceText?: string,
+): boolean {
+  return (
+    RECITATION_READY_TO_BEGIN_RE.test(response) &&
+    !RECITATION_SETUP_REASK_RE.test(response) &&
+    !RECITATION_PREMATURE_MODEL_RE.test(response) &&
+    !recitationSetupLeaksSourceContent(response, sourceText)
+  );
 }
 
 // Fail-statuses on the private source audit that indicate the reply was not
