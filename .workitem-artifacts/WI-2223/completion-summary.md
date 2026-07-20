@@ -155,3 +155,22 @@ locally-run API server built from this repo's current source instead
 (pointed at via `PLAYWRIGHT_API_URL` and `EXPO_PUBLIC_API_URL`, bypassing
 the stale deployed worker), which is how the CI job would need to run this
 scenario too until that worker is redeployed.
+
+**PM ruling (Q1–Q3, 2026-07-20) — AC-3 evidence mapping + captured
+follow-ups.** The PM cleared the 00:42 escalation and ruled AC-3 SATISFIED
+(not revised), with each clause mapped to the venue that can exercise it:
+the named full-nav-shell e2e (`apps/mobile/e2e-web/flows/v2/nav-shell.spec.ts`)
+evidences the real-Back + visible-layout clause on reachable scopes, and the
+co-located jest (`mentor.support-hub-return.test.tsx`) evidences the "does
+not duplicate support content into the Me scope" clause via a constructed
+Me-containing scope list — because the into-Me half is verifiably unreachable
+end-to-end (the `scope-resolution.ts` server gate + the dead-code
+`SupporterSelfLearningDoorway`, both asserted at runtime above). Per Q2, the
+local wrangler-dev run is accepted as the executed e2e evidence with the
+staging constraint recorded; the staging-CI re-run is tracked as a
+venue-upgrade follow-up, **WI-2524** (re-run v2 nav-shell.spec.ts against
+staging CI once the worker redeploys — Blocked-by the staging redeploy /
+shepherd task #23), not waived. Per Q3, the SupporterSelfLearningDoorway
+dead-code gap is captured as product-triage follow-up **WI-2525** (route to
+product / Zuzka for MVP-scope). Both follow-ups are non-blocking per the
+ruling.
