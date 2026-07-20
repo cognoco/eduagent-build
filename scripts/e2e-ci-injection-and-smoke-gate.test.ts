@@ -1104,6 +1104,18 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         hasRunFlowWithEnv(entry, file, expectedEnv),
       );
     };
+    const hasExactCommandSequence = (
+      value: unknown,
+      expected: Selector[],
+    ): boolean =>
+      Array.isArray(value) &&
+      expected.length > 0 &&
+      value.some((_, start) =>
+        expected.every(
+          (command, offset) =>
+            JSON.stringify(value[start + offset]) === JSON.stringify(command),
+        ),
+      );
     const loadCommands = (...segments: string[]): unknown =>
       parseAllDocuments(
         readFileSync(
@@ -1122,6 +1134,79 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       '_setup',
       'assert-v2-active-profile-and-return.yaml',
     );
+
+    const impossibleSearchAbsence: Selector[] = [
+      { tapOn: { id: 'subjects-browse-search' } },
+      { inputText: 'zzzz-no-such-subject-2238' },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'library-search-empty' },
+          timeout: 15000,
+        },
+      },
+      {
+        assertNotVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+        },
+      },
+      { tapOn: { id: 'library-search-clear-results' } },
+    ];
+    const closedTopicSheetAbsence: Selector[] = [
+      { tapOn: { id: 'subject-hub-topic-sheet-close' } },
+      { assertNotVisible: { id: 'subject-hub-topic-sheet' } },
+      {
+        assertVisible: {
+          id: 'subject-hub-screen',
+          containsDescendants: [{ text: '^World History$' }],
+        },
+      },
+    ];
+
+    expect(hasExactCommandSequence(resume, impossibleSearchAbsence)).toBe(true);
+    expect(hasExactCommandSequence(resume, closedTopicSheetAbsence)).toBe(true);
+    for (const mutation of [
+      // Removal.
+      impossibleSearchAbsence.filter((_, index) => index !== 3),
+      // Optionalization.
+      impossibleSearchAbsence.with(3, {
+        assertNotVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          optional: true,
+        },
+      }),
+      // Wrong owner.
+      impossibleSearchAbsence.with(3, {
+        assertNotVisible: { id: 'subjects-browse-row-adjacent' },
+      }),
+      // Reordering after the recovery action.
+      impossibleSearchAbsence
+        .with(3, impossibleSearchAbsence[4]!)
+        .with(4, impossibleSearchAbsence[3]!),
+      // Removal.
+      closedTopicSheetAbsence.filter((_, index) => index !== 1),
+      // Optionalization.
+      closedTopicSheetAbsence.with(1, {
+        assertNotVisible: {
+          id: 'subject-hub-topic-sheet',
+          optional: true,
+        },
+      }),
+      // Wrong owner.
+      closedTopicSheetAbsence.with(1, {
+        assertNotVisible: { id: 'subject-hub-screen' },
+      }),
+      // Reordering after the next Subject Hub assertion.
+      closedTopicSheetAbsence
+        .with(1, closedTopicSheetAbsence[2]!)
+        .with(2, closedTopicSheetAbsence[1]!),
+    ]) {
+      expect(hasExactCommandSequence(mutation, impossibleSearchAbsence)).toBe(
+        false,
+      );
+      expect(hasExactCommandSequence(mutation, closedTopicSheetAbsence)).toBe(
+        false,
+      );
+    }
 
     expect(Array.isArray(subjectCreate)).toBe(true);
     if (!Array.isArray(subjectCreate)) {
