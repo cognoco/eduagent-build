@@ -41,6 +41,20 @@ RED exited 1 with `Expected: false` and `Received: true`. The maximum gate was
 moved ahead of strict item parsing, after which the boundary case and the
 whole-signal case both exited 0.
 
+The PR review then identified a second malformed-signal shape: a non-array
+`challenge_round_evaluation` still failed before the tolerant item pipeline.
+The named wrong-type case was added before production changed:
+
+```bash
+pnpm exec jest --config packages/schemas/jest.config.cjs packages/schemas/src/llm-envelope.test.ts --runInBand --no-coverage -t 'keeps the envelope when challenge evaluation has the wrong type'
+```
+
+RED exited 1 with `Expected: true` and `Received: false`. Preprocessing only
+non-arrays to `undefined` made the same command exit 0, while arrays still pass
+through the unchanged maximum before item validation. The focused boundary run
+then exercised wrong-type, mixed-malformed, ordinary over-cap, and
+mixed-malformed over-cap cases together and exited 0.
+
 For the production-revert check, only the final
 `challenge_round_evaluation` recovery was temporarily restored to the prior
 strict array schema. The whole-signal command exited 1 because envelope
@@ -55,8 +69,10 @@ production correction.
   the named API case proves an absent verdict yields no evaluation/mastery.
 - AC-2 — the direct provenance-item schema still rejects missing
   `answerEventId` and missing `learnerQuote`; the named whole-signal case proves
-  one malformed item drops the complete Challenge evaluation. Named valid,
-  over-cap, and mixed malformed/over-cap cases exercise both guarantees.
+  one malformed item drops the complete Challenge evaluation. A named
+  wrong-type case proves a non-array signal also degrades without rejecting the
+  envelope. Named valid, over-cap, and mixed malformed/over-cap cases exercise
+  both guarantees.
 - AC-3 — the diff contains no prompt files. The deterministic LLM harness was
   executed before integration and produced no snapshot diff. After rebasing
   onto newer `main`, the harness reflected an unrelated source-identity rule
@@ -74,7 +90,7 @@ pnpm exec prettier --check packages/schemas/src/llm-envelope.ts packages/schemas
 git diff --cached --check
 ```
 
-Each command exited 0. The schema suite exercised 104 cases and the API suite
+Each command exited 0. The schema suite exercised 105 cases and the API suite
 exercised 34 cases. Typechecking covered the API and its five dependencies.
 The emitted `MaxListenersExceededWarning` did not fail a typecheck task.
 

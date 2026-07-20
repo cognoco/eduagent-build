@@ -155,8 +155,7 @@ const evaluateAssessmentSignalSchema = z.preprocess(
   z
     .object({
       challenge_passed: z
-        .preprocess(nullToUndefined, z.boolean())
-        .optional()
+        .preprocess(nullToUndefined, z.boolean().optional())
         .catch(undefined),
       flaw_identified: z.preprocess((value) => {
         if (typeof value !== 'string') return undefined;
@@ -406,9 +405,10 @@ const signalsSchema = z.preprocess(
       challenge_round_offer: optionalBooleanSchema,
       /** Challenge Round: per-concept evaluation of the learner's explanations. Drives mastery + note + weak-spot persistence. */
       challenge_round_evaluation: z
-        .array(z.unknown())
-        .max(10)
-        .optional()
+        .preprocess(
+          (value) => (Array.isArray(value) ? value : undefined),
+          z.array(z.unknown()).max(10).optional(),
+        )
         .pipe(
           z
             .array(challengeRoundEvaluationItemSchema)

@@ -1037,6 +1037,22 @@ describe('challenge round envelope fields', () => {
     expect(result.data.signals?.challenge_round_evaluation).toBeUndefined();
   });
 
+  it('[WI-1995] keeps the envelope when challenge evaluation has the wrong type', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'The learner-visible reply still matters.',
+      signals: {
+        ready_to_finish: true,
+        challenge_round_evaluation: 'not an array',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.reply).toBe('The learner-visible reply still matters.');
+    expect(result.data.signals?.ready_to_finish).toBe(true);
+    expect(result.data.signals?.challenge_round_evaluation).toBeUndefined();
+  });
+
   it('caps challenge_round_evaluation array at 10 items', () => {
     const item = {
       concept: 'x',
