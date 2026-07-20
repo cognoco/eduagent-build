@@ -44,7 +44,12 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   await openJournal(page);
 
   // Exact seeded recap -> exact session/subject/topic -> Journal Me.
-  await pressableClick(page.getByTestId(`journal-recap-row-${recapId}`));
+  const recapRow = page.getByTestId(`journal-recap-row-${recapId}`);
+  await expect(recapRow).toBeVisible();
+  await expect(
+    recapRow.getByText('Biology / Biology Topic 1', { exact: true }),
+  ).toBeVisible();
+  await pressableClick(recapRow);
   await expect
     .poll(() => {
       const url = new URL(page.url());
@@ -71,15 +76,16 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   ).toBeVisible();
   await pressableClick(page.getByTestId('summary-close-button'));
   await expectJournalReturn(page);
-  await expect(page.getByTestId(`journal-recap-row-${recapId}`)).toBeVisible();
+  await expect(recapRow).toBeVisible();
 
   // Mine + exact glucose search finds only the seeded learner-authored note,
   // which then opens the Notes owner list without swapping source identity.
   await pressableClick(page.getByTestId('journal-tab-notes'));
   await pressableClick(page.getByTestId('journal-notes-filter-mine'));
-  await expect(
-    page.getByTestId(`journal-note-note:${learnerNoteId}`),
-  ).toBeVisible();
+  const journalLearnerNote = page.getByTestId(
+    `journal-note-note:${learnerNoteId}`,
+  );
+  await expect(journalLearnerNote).toBeVisible();
   await expect(
     page.getByTestId(`journal-note-bookmark:${bookmarkId}`),
   ).toHaveCount(0);
@@ -95,8 +101,9 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
     page.getByTestId(`journal-note-note:${learnerNoteId}`),
   ).toBeVisible();
   await expect(
-    page.getByText(
+    journalLearnerNote.getByText(
       'Photosynthesis stores sunlight as chemical energy in glucose for the plant.',
+      { exact: true },
     ),
   ).toBeVisible();
   await expect(
@@ -106,10 +113,11 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   await expect(page).toHaveURL(/\/my-notes\/notes\?returnTo=journal$/);
   const learnerNote = page.getByTestId(`my-notes-row-notes-${learnerNoteId}`);
   await expect(learnerNote).toBeVisible();
-  await expect(learnerNote.getByText('Biology')).toBeVisible();
+  await expect(learnerNote.getByText('Biology', { exact: true })).toBeVisible();
   await expect(
     learnerNote.getByText(
       'Photosynthesis stores sunlight as chemical energy in glucose for the plant.',
+      { exact: true },
     ),
   ).toBeVisible();
   await expect(
@@ -124,9 +132,10 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   // which then opens the Bookmarks owner list without swapping source identity.
   await pressableClick(page.getByTestId('journal-tab-notes'));
   await pressableClick(page.getByTestId('journal-notes-filter-mentor'));
-  await expect(
-    page.getByTestId(`journal-note-bookmark:${bookmarkId}`),
-  ).toBeVisible();
+  const journalBookmark = page.getByTestId(
+    `journal-note-bookmark:${bookmarkId}`,
+  );
+  await expect(journalBookmark).toBeVisible();
   await expect(
     page.getByTestId(`journal-note-note:${learnerNoteId}`),
   ).toHaveCount(0);
@@ -142,8 +151,9 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
     page.getByTestId(`journal-note-bookmark:${bookmarkId}`),
   ).toBeVisible();
   await expect(
-    page.getByText(
+    journalBookmark.getByText(
       'Chlorophyll captures light energy that powers photosynthesis.',
+      { exact: true },
     ),
   ).toBeVisible();
   await expect(
@@ -153,10 +163,11 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   await expect(page).toHaveURL(/\/my-notes\/bookmarks\?returnTo=journal$/);
   const bookmark = page.getByTestId(`my-notes-row-bookmarks-${bookmarkId}`);
   await expect(bookmark).toBeVisible();
-  await expect(bookmark.getByText('Biology')).toBeVisible();
+  await expect(bookmark.getByText('Biology', { exact: true })).toBeVisible();
   await expect(
     bookmark.getByText(
       'Chlorophyll captures light energy that powers photosynthesis.',
+      { exact: true },
     ),
   ).toBeVisible();
   await expect(
@@ -198,7 +209,12 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
   await expect(
     page.getByTestId('progress-weekly-report-metric-sessions'),
   ).toBeVisible();
-  await expect(page.getByText('4 sessions this week')).toBeVisible();
+  await expect(
+    page.getByText('4 sessions this week', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('14 sessions this week', { exact: true }),
+  ).toHaveCount(0);
   await pressableClick(page.getByTestId('progress-weekly-report-back'));
   await expectJournalReturn(page);
   await pressableClick(page.getByTestId('journal-tab-reports'));
@@ -215,7 +231,12 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
     page.getByTestId('progress-report-metric-sessions'),
   ).toBeVisible();
   await expect(page.getByText('July 2026')).toBeVisible();
-  await expect(page.getByText('12 topics mastered')).toBeVisible();
+  await expect(
+    page.getByText('12 topics mastered', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('112 topics mastered', { exact: true }),
+  ).toHaveCount(0);
   await pressableClick(page.getByTestId('progress-report-back'));
   await expectJournalReturn(page);
   await pressableClick(page.getByTestId('journal-tab-reports'));

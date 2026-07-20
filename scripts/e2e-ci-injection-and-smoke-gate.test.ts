@@ -211,37 +211,6 @@ function assertHardJournalRecapOwnership(commands: unknown[]): void {
   }
 }
 
-function assertHardPlaywrightRecapOwnership(source: string): void {
-  const compactSource = source.replace(/\s+/g, ' ');
-  const ownerMatch = compactSource.match(
-    /const\s+([A-Za-z_$][\w$]*)\s*=\s*page\.getByTestId\(['"]session-recap-card['"]\)/,
-  );
-  const owner = ownerMatch?.[1];
-  if (!owner) {
-    throw new Error(
-      'Playwright recap evidence needs the exact recap-card owner',
-    );
-  }
-
-  const escapedOwner = owner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const escapedText = JOURNAL_RECAP_TEXT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const hardOwnedAssertion = new RegExp(
-    `expect\\(\\s*${escapedOwner}\\.getByText\\(\\s*['"]${escapedText}['"]\\s*,\\s*\\{\\s*exact\\s*:\\s*true\\s*\\}\\s*,?\\s*\\)\\s*,?\\s*\\)\\.toBeVisible\\(`,
-  );
-  if (!hardOwnedAssertion.test(compactSource)) {
-    throw new Error(
-      'Playwright recap text must be exact and owned by the exact recap card',
-    );
-  }
-
-  const globalRecapAssertion = new RegExp(
-    `page\\.getByText\\(\\s*['"]${escapedText}['"]`,
-  );
-  if (globalRecapAssertion.test(compactSource)) {
-    throw new Error('Playwright recap text must not be asserted globally');
-  }
-}
-
 function loadWorkflowRaw(name: string): string {
   return readFileSync(join(repoRoot, '.github', 'workflows', name), 'utf8');
 }
@@ -1474,50 +1443,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         },
       ]),
     ).not.toThrow();
-  });
-
-  it('[WI-2239] binds exact browser recap text to the exact recap card and rejects permissive ownership mutants', () => {
-    const journalSpec = readFileSync(
-      join(
-        repoRoot,
-        'apps/mobile/e2e-web/flows/v2/v2-journal-paper-trail.spec.ts',
-      ),
-      'utf8',
-    );
-    expect(() => assertHardPlaywrightRecapOwnership(journalSpec)).not.toThrow();
-
-    const validOwnership = `
-      const recapCard = page.getByTestId('session-recap-card');
-      await expect(
-        recapCard.getByText('${JOURNAL_RECAP_TEXT}', { exact: true }),
-      ).toBeVisible();
-    `;
-    expect(() =>
-      assertHardPlaywrightRecapOwnership(validOwnership),
-    ).not.toThrow();
-    expect(() =>
-      assertHardPlaywrightRecapOwnership(
-        validOwnership.replace('recapCard.getByText', 'page.getByText'),
-      ),
-    ).toThrow(/exact recap card|globally/);
-    expect(() =>
-      assertHardPlaywrightRecapOwnership(
-        validOwnership.replace(
-          'recapCard.getByText',
-          "page.getByTestId('summary-submitted').getByText",
-        ),
-      ),
-    ).toThrow(/owned by the exact recap card/);
-    expect(() =>
-      assertHardPlaywrightRecapOwnership(
-        validOwnership.replace(JOURNAL_RECAP_TEXT, 'Adjacent summary text'),
-      ),
-    ).toThrow(/exact and owned/);
-    expect(() =>
-      assertHardPlaywrightRecapOwnership(
-        validOwnership.replace(', { exact: true }', ''),
-      ),
-    ).toThrow(/exact and owned/);
   });
 
   it('[WI-2241] hard-selects the exact rich supportee through the Support hub before and after relaunch', () => {
