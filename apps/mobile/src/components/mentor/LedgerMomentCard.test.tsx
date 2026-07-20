@@ -83,6 +83,83 @@ describe('LedgerMomentCard', () => {
     expect(onContinue).toHaveBeenCalledWith(ledgerCard);
   });
 
+  it('[WI-2110 AC-1] adds the Practice section to quiz personal-best Journal cards', () => {
+    const onContinue = jest.fn();
+    const quizBestCard: NowCardData = {
+      ...ledgerCard,
+      templateKey: 'now.ledger_moment.quiz_personal_best',
+      params: { ledgerKind: 'quiz_personal_best', score: 9 },
+      deepLink: { route: 'journal', params: {}, chain: [] },
+    };
+    const { getByTestId } = render(
+      <LedgerMomentCard
+        card={quizBestCard}
+        onContinue={onContinue}
+        onDecline={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(getByTestId('now-ledger-moment'));
+
+    expect(onContinue).toHaveBeenCalledWith({
+      ...quizBestCard,
+      deepLink: {
+        ...quizBestCard.deepLink,
+        params: { section: 'practice' },
+      },
+    });
+  });
+
+  it('[WI-2110 AC-2] leaves an ambiguous Journal moment at the Journal root', () => {
+    const onContinue = jest.fn();
+    const futureCard: NowCardData = {
+      ...ledgerCard,
+      templateKey: 'now.ledger_moment.future_kind',
+      params: { ledgerKind: 'future_kind' },
+      deepLink: {
+        route: 'journal',
+        params: { section: 'notes', source: 'legacy' },
+        chain: [],
+      },
+    };
+    const { getByTestId } = render(
+      <LedgerMomentCard
+        card={futureCard}
+        onContinue={onContinue}
+        onDecline={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(getByTestId('now-ledger-moment'));
+
+    expect(onContinue).toHaveBeenCalledWith({
+      ...futureCard,
+      deepLink: {
+        ...futureCard.deepLink,
+        params: { source: 'legacy' },
+      },
+    });
+  });
+
+  it('[WI-2110 AC-5] leaves non-Journal moment destinations unchanged', () => {
+    const onContinue = jest.fn();
+    const subjectCard: NowCardData = {
+      ...ledgerCard,
+      params: { ledgerKind: 'quiz_personal_best' },
+    };
+    const { getByTestId } = render(
+      <LedgerMomentCard
+        card={subjectCard}
+        onContinue={onContinue}
+        onDecline={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(getByTestId('now-ledger-moment'));
+
+    expect(onContinue).toHaveBeenCalledWith(subjectCard);
+  });
+
   it('fires decline on dismiss without continuing the card', () => {
     const onContinue = jest.fn();
     const onDecline = jest.fn();
