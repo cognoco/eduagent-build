@@ -515,10 +515,12 @@ export default [
   // See eslint-rules/no-raw-error-to-sentry.mjs for the full heuristic.
   //
   // Severity `warn` for now — same forward-only-ratchet shape as GC1/GC5
-  // above: a pre-existing backlog of 18 call sites across 16 files (found
-  // when this rule was authored) is tracked in WI-2527 (burn down the
-  // backlog + promote this rule to `error`). This rule's job today is to
-  // stop NEW violations landing, not to block on the legacy backlog.
+  // above: a pre-existing backlog of 20 call sites across 17 files (found
+  // when this rule was authored, including namespaced call sites like
+  // Sentry.captureException and deps.captureException) is tracked in
+  // WI-2527 (burn down the backlog + promote this rule to `error`). This
+  // rule's job today is to stop NEW violations landing, not to block on
+  // the legacy backlog.
   // -------------------------------------------------------------------------
   {
     files: ['apps/api/src/**/*.ts'],

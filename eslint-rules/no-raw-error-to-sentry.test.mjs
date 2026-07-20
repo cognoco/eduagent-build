@@ -51,6 +51,15 @@ ruleTester.run('no-raw-error-to-sentry', rule, {
         captureException(err);
       }
     }`,
+    // Namespaced SDK form (Sentry.captureException), content-free wrapper —
+    // mirrors the compliant sentry.ts:45 shape.
+    `async function f() {
+      try {
+        return JSON.parse(jsonStr);
+      } catch (err) {
+        Sentry.captureException(new Error('parse failed', { cause: { len: jsonStr.length } }));
+      }
+    }`,
   ],
   invalid: [
     // Direct pass-through of a JSON.parse-derived catch binding.
@@ -94,6 +103,29 @@ ruleTester.run('no-raw-error-to-sentry', rule, {
           await db.insert(sessions).values(row);
         } catch (err) {
           captureException(err, { tags: { surface: 'sessions' } });
+        }
+      }`,
+      errors: [{ messageId: 'rawErrorToSentry' }],
+    },
+    // Namespaced SDK form (Sentry.captureException) — the form used inside
+    // services/sentry.ts itself (sentry.ts:45). AC-1 covers "ANY" call site.
+    {
+      code: `function f() {
+        try {
+          JSON.parse(jsonStr);
+        } catch (err) {
+          Sentry.captureException(err);
+        }
+      }`,
+      errors: [{ messageId: 'rawErrorToSentry' }],
+    },
+    // Namespaced SDK form of captureMessage, via .message.
+    {
+      code: `function f() {
+        try {
+          return quizOutputSchema.parse(raw);
+        } catch (err) {
+          Sentry.captureMessage(err.message);
         }
       }`,
       errors: [{ messageId: 'rawErrorToSentry' }],

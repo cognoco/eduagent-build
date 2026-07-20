@@ -22,6 +22,13 @@
  * flagged: its argument is a `NewExpression`, not the catch binding (or
  * `.message` off it), so the shape check below never matches it.
  *
+ * Matches both call forms: the bare identifier (`captureException(err)`, the
+ * convention at every call site outside services/sentry.ts, which imports
+ * the wrapper functions by name) and the namespaced SDK form
+ * (`Sentry.captureException(err)`, used inside services/sentry.ts itself —
+ * see sentry.ts:45,77). AC-1 says "ANY captureException/captureMessage call
+ * site," and the namespaced form is real, not hypothetical.
+ *
  * HEURISTIC (bounded, not full data-flow/taint analysis — see AC-2):
  * "flags a catch-block variable passed directly or via `.message` to
  * captureException/captureMessage when the SAME try/catch statement also
@@ -32,12 +39,19 @@
  * violation and every fixed sibling site takes in this codebase (parse in
  * `try`, capture in the paired `catch`). This is deliberately narrow: it
  * does not follow the error through a wrapper function call, a
- * reassignment, or a rethrow into an outer catch.
+ * reassignment, or a rethrow into an outer catch. Because the structural
+ * bound is the FULL TryStatement text (try block + catch block, not just
+ * the try block), a `.parse(`/DB call written inside the catch body itself
+ * (not just the try) also counts — silence a genuine false positive there
+ * the same way as anywhere else: wrap in the content-free `new Error(...)`
+ * pattern rather than passing the catch binding.
  *
  * Severity is `warn` (see the rule's registration in root eslint.config.mjs):
- * a pre-existing backlog of 18 call sites across 16 files was found when
- * this rule was authored, tracked in WI-2527 (burn down the backlog +
- * promote to `error`). This rule's job today is to stop NEW violations.
+ * a pre-existing backlog of 20 call sites across 17 files was found when
+ * this rule was authored (including namespaced call sites like
+ * `Sentry.captureException` and `deps.captureException`), tracked in
+ * WI-2527 (burn down the backlog + promote to `error`). This rule's job
+ * today is to stop NEW violations.
  *
  * See AGENTS.md > Non-Negotiable Engineering Rules; WI-2352, WI-2527.
  */
@@ -61,6 +75,25 @@ function findEnclosingCatchClause(node) {
     current = current.parent;
   }
   return null;
+}
+
+// Resolves the captured Sentry call name for both the bare-identifier form
+// (`captureException(...)`) and the namespaced SDK form
+// (`Sentry.captureException(...)`, used in services/sentry.ts itself).
+// Returns undefined for anything else so the caller can bail out uniformly.
+function sentryCalleeName(callee) {
+  if (callee.type === 'Identifier' && SENTRY_CALL_NAMES.has(callee.name)) {
+    return callee.name;
+  }
+  if (
+    callee.type === 'MemberExpression' &&
+    !callee.computed &&
+    callee.property.type === 'Identifier' &&
+    SENTRY_CALL_NAMES.has(callee.property.name)
+  ) {
+    return callee.property.name;
+  }
+  return undefined;
 }
 
 function argMatchesCatchBinding(arg, catchParamName) {
@@ -101,12 +134,8 @@ const rule = {
 
     return {
       CallExpression(node) {
-        if (
-          node.callee.type !== 'Identifier' ||
-          !SENTRY_CALL_NAMES.has(node.callee.name)
-        ) {
-          return;
-        }
+        const calleeName = sentryCalleeName(node.callee);
+        if (!calleeName) return;
 
         const arg = node.arguments[0];
         if (!arg) return;
@@ -127,7 +156,7 @@ const rule = {
           node: arg,
           messageId: 'rawErrorToSentry',
           data: {
-            calleeName: node.callee.name,
+            calleeName,
             viaMessage: arg.type === 'MemberExpression' ? ' (via .message)' : '',
           },
         });
