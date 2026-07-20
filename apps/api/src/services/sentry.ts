@@ -243,20 +243,18 @@ const STRIPPED_BODY_MARKER = '[stripped]';
  * this SDK/runtime for any request shape (see [WI-2339] Risk/Impact) — this
  * is a forward guard, not a live-leak fix.
  *
- * [WI-2339 Gate-2 rework #2] The FIRST rework denylist-scrubbed a plain-
- * object body (reusing the `extra`/`contexts`/breadcrumb-`data` mechanism)
- * and only wholesale-stripped non-object bodies. Gate-2 correctly flagged
- * that this leaves any field NOT on `PII_DENYLIST_KEYS` (the reviewer's
- * repro: a `homeworkAnswer` field) surviving inside an object body — the
- * denylist is a curated list of KNOWN-bad keys, not a guarantee that every
- * field of an arbitrary request body is safe, and SKILL.md's checklist asks
- * for the body to be stripped, not selectively filtered. `event.request.data`
- * is now wholesale-stripped for EVERY truthy shape, object included — no
- * shape-based branching. (This intentionally differs from `event.extra`/
- * `event.contexts`, which stay denylist-scrubbed: those are populated by
- * THIS repo's own `captureException`/`captureMessage` call sites, whose
- * key shapes are known and curated; `event.request.data` is an arbitrary
- * request body whose shape this scrubber has no visibility into.)
+ * `event.request.data` is wholesale-stripped for EVERY truthy shape, object
+ * included — no shape-based branching. A denylist-only scrub of an object
+ * body (reusing the `extra`/`contexts`/breadcrumb-`data` mechanism) would
+ * leave any field NOT on `PII_DENYLIST_KEYS` (e.g. a `homeworkAnswer` field)
+ * surviving — the denylist is a curated list of KNOWN-bad keys, not a
+ * guarantee that every field of an arbitrary request body is safe, and
+ * SKILL.md's checklist asks for the body to be stripped, not selectively
+ * filtered. (This intentionally differs from `event.extra`/`event.contexts`,
+ * which stay denylist-scrubbed: those are populated by THIS repo's own
+ * `captureException`/`captureMessage` call sites, whose key shapes are known
+ * and curated; `event.request.data` is an arbitrary request body whose
+ * shape this scrubber has no visibility into.)
  *
  * [Gate-2 fix] `query_string` is typed by the SDK as `string |
  * Record<string, unknown> | Array<[string, string]>` — a `typeof ===
@@ -364,29 +362,21 @@ function scrubBreadcrumbUrl(
  * distinct value groups as a new issue); the redacted structural message
  * groups correctly.
  *
- * [AC-1 amended 2026-07-20, pm:claude:mentomate ruling] A second Gate-2
- * bounce demanded WHOLESALE-redacting all free text in `event.message`/
- * `exception.value` — rejected by PM: it exceeds `.agents/skills/tech/
- * sentry-scrubbing/SKILL.md`'s own authority (that doc doesn't name
- * message/exception as free-text-redaction targets at all — it prescribes
- * a `beforeSend` → `null` CLASS-drop for "known-noisy or sensitive paths",
- * not per-value redaction) and would gut observability for a channel this
- * WI's own Risk/Impact rates INERT. Amended AC-1 requires: (a) the
- * denylist/targeted-redaction backstop above stays as-is (already
- * conformant — the quoted-substring redaction is targeted, not wholesale),
- * and (b) `beforeSend` → `null` class-dropping for any KNOWN-sensitive event
- * class, grounded in actual analysis rather than invented. Analysis: no
- * known-sensitive event class exists at the `beforeSend` (whole-event)
- * level today. The one identified class-level bypass — `console.*` calls
- * turning into breadcrumbs carrying raw structured-log strings — is ALREADY
- * dropped via `beforeBreadcrumb` → `null` (`dropConsoleBreadcrumb` below);
- * that's the `beforeBreadcrumb`-level instance of the same SKILL.md pattern.
- * No `captureException`/`captureMessage` call site in this API is known to
- * emit a whole EVENT class that should never reach Sentry at all (as
- * opposed to a field within an event that needs scrubbing, which the
- * denylist/redaction backstops above already cover) — grounding a
- * `beforeSend` → `null` drop here would mean inventing a class that
- * doesn't exist. If a genuinely sensitive event class is identified in the
+ * `.agents/skills/tech/sentry-scrubbing/SKILL.md` also asks for `beforeSend`
+ * to drop known-sensitive event classes entirely (`return null`), as a
+ * complement to the per-field denylist/redaction backstops above — a
+ * distinct mechanism, not a substitute: dropping a whole event class is for
+ * event shapes that should never reach Sentry at all, whereas the
+ * denylist/redaction above handles fields within an event that DOES get
+ * sent. No known-sensitive event class exists at the `beforeSend`
+ * (whole-event) level today. The one identified class-level bypass —
+ * `console.*` calls turning into breadcrumbs carrying raw structured-log
+ * strings — is already dropped via `beforeBreadcrumb` → `null`
+ * (`dropConsoleBreadcrumb` below); that's the `beforeBreadcrumb`-level
+ * instance of the same pattern. No `captureException`/`captureMessage` call
+ * site in this API is known to emit a whole event class that should never
+ * reach Sentry — inventing one to drop here would misrepresent the
+ * analysis. If a genuinely sensitive event class is identified in the
  * future (e.g. a specific error type that should never be reported), add a
  * targeted `return null` branch for it here, following
  * `dropConsoleBreadcrumb`'s pattern.
