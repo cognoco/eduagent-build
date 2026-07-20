@@ -1131,11 +1131,21 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'subject-no-match-card',
       'subject-use-my-words',
     );
+    const replaceAt = <T>(
+      values: readonly T[],
+      index: number,
+      value: T,
+    ): T[] => {
+      const copy = [...values];
+      copy[index] = value;
+      return copy;
+    };
     for (const mutation of [
       // Removal: the branch cannot act without first proving its owner/action.
       outcomeSequence.filter((_, index) => index !== 4),
       // Global proof: sibling assertions do not bind the action to its card.
-      outcomeSequence.with(
+      replaceAt(
+        outcomeSequence,
         4,
         branch('subject-no-match-card', [
           { assertVisible: { id: 'subject-no-match-card' } },
@@ -1144,7 +1154,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         ]),
       ),
       // Adjacent case: the correct action under the wrong result owner.
-      outcomeSequence.with(
+      replaceAt(
+        outcomeSequence,
         4,
         branch(
           'subject-no-match-card',
@@ -1152,7 +1163,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         ),
       ),
       // Wrong action: accepting a suggestion does not exercise no-match.
-      outcomeSequence.with(
+      replaceAt(
+        outcomeSequence,
         4,
         branch(
           'subject-no-match-card',
@@ -1160,11 +1172,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         ),
       ),
       // Optional assertions do not establish evidence.
-      outcomeSequence.with(
+      replaceAt(
+        outcomeSequence,
         4,
         branch(
           'subject-no-match-card',
-          noMatchCommands.with(0, {
+          replaceAt(noMatchCommands, 0, {
             assertVisible: {
               id: 'subject-no-match-card',
               containsDescendants: [{ id: 'subject-use-my-words' }],
@@ -1174,7 +1187,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         ),
       ),
       // An action before its assertion can mutate away the evidence.
-      outcomeSequence.with(
+      replaceAt(
+        outcomeSequence,
         4,
         branch('subject-no-match-card', [
           noMatchCommands[1]!,
@@ -1182,7 +1196,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         ]),
       ),
       // The ambiguous-card assertion is hard and precedes every outcome.
-      outcomeSequence.with(1, {
+      replaceAt(outcomeSequence, 1, {
         assertNotVisible: {
           id: 'subject-suggestion-card',
           optional: true,
