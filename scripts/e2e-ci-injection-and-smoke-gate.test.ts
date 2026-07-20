@@ -1237,6 +1237,92 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         expect(hasExactCommandSequence(mutation, checkpoint)).toBe(false);
       }
     }
+
+    const exactBiologyHubTitle: Selector = {
+      assertVisible: {
+        id: 'subject-hub-title-${SUBJECT_ID}',
+        text: '^Biology$',
+      },
+    };
+    const exactDueReviewHubEntry: Selector[] = [
+      { tapOn: { id: 'subjects-browse-row-${SUBJECT_ID}' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subject-hub-screen' },
+          timeout: 15000,
+        },
+      },
+      exactBiologyHubTitle,
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up',
+          containsDescendants: [
+            { text: '^Biology Topic 1$' },
+            { id: 'subject-hub-next-up-action', text: '^Review$' },
+          ],
+        },
+      },
+    ];
+    const exactDueReviewPostTopicBack: Selector[] = [
+      { pressKey: 'back' },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subject-hub-screen' },
+          timeout: 15000,
+        },
+      },
+      exactBiologyHubTitle,
+      {
+        assertVisible: {
+          id: 'subject-hub-topic-${TOPIC_ID}',
+          containsDescendants: [{ text: '^Biology Topic 1$' }],
+        },
+      },
+    ];
+    const dueReviewTitleMutations = (checkpoint: Selector[]): Selector[][] => {
+      const titleIndex = checkpoint.findIndex((command) =>
+        isDeepStrictEqual(command, exactBiologyHubTitle),
+      );
+      if (titleIndex < 0) {
+        throw new Error('Due-review Hub checkpoint is missing its exact title');
+      }
+      const replaceTitle = (titleSelector: Selector): Selector[] =>
+        checkpoint.with(titleIndex, { assertVisible: titleSelector });
+
+      return [
+        // Removing the exact title leaves the seeded subject identity unproved.
+        checkpoint.filter((_, index) => index !== titleIndex),
+        // The generic Hub screen cannot own the exact Biology title property.
+        replaceTitle({
+          id: 'subject-hub-screen',
+          containsDescendants: [{ text: '^Biology$' }],
+        }),
+        // Global text can be rendered outside the seeded Subject Hub title.
+        replaceTitle({ text: '^Biology$' }),
+        // An adjacent title owner proves a different seeded subject.
+        replaceTitle({
+          id: 'subject-hub-title-adjacent-subject',
+          text: '^Biology$',
+        }),
+        // Optional title evidence does not establish the guaranteed property.
+        replaceTitle({
+          id: 'subject-hub-title-${SUBJECT_ID}',
+          text: '^Biology$',
+          optional: true,
+        }),
+        // The exact title must follow readiness of its Subject Hub ancestor.
+        checkpoint.with(1, checkpoint[2]!).with(2, checkpoint[1]!),
+      ];
+    };
+    for (const checkpoint of [
+      exactDueReviewHubEntry,
+      exactDueReviewPostTopicBack,
+    ]) {
+      expect(hasExactCommandSequence(dueReview, checkpoint)).toBe(true);
+      for (const mutation of dueReviewTitleMutations(checkpoint)) {
+        expect(hasExactCommandSequence(mutation, checkpoint)).toBe(false);
+      }
+    }
     for (const mutation of [
       // No-result row-absence removal.
       exactWorldHistoryRestore.filter((_, index) => index !== 3),

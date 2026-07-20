@@ -45,9 +45,8 @@ tags:
       id: 'subject-hub-screen'
     timeout: 15000
 - assertVisible:
-    id: 'subject-hub-screen'
-    containsDescendants:
-      - text: '^Biology$'
+    id: 'subject-hub-title-${SUBJECT_ID}'
+    text: '^Biology$'
 - assertVisible:
     id: 'subject-hub-next-up'
     containsDescendants:
@@ -79,9 +78,8 @@ tags:
       id: 'subject-hub-screen'
     timeout: 15000
 - assertVisible:
-    id: 'subject-hub-screen'
-    containsDescendants:
-      - text: '^Biology$'
+    id: 'subject-hub-title-${SUBJECT_ID}'
+    text: '^Biology$'
 - assertVisible:
     id: 'subject-hub-topic-${TOPIC_ID}'
     containsDescendants:
