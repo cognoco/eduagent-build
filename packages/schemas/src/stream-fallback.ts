@@ -251,6 +251,8 @@ export const streamDoneFrameSchema = z.object({
   challengeRound: challengeRoundSessionStateSchema.optional(),
   challengeOffer: streamChallengeOfferSchema.optional(),
   draftedNote: streamDraftedNoteSchema.optional(),
+  /** [WI-2107] Model opened a topic without delivering content or a question this turn. */
+  topicOpenedPendingContent: z.boolean().optional(),
   mentorNotice: mentorNoticeAcceptedSchema.optional(),
   answerEvaluation: answerEvaluationSchema.optional(),
 });
