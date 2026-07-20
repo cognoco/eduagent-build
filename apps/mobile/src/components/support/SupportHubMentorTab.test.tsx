@@ -403,7 +403,18 @@ describe('SupportHubMentorTab', () => {
         <SupportHubMentorTab personScopes={[EMMA_SCOPE]} />,
       );
 
+      // `supporter-cold-start-error` is QueryStateView's container testID —
+      // shared by loading, error, AND success (it's just the testID prop
+      // SupporterColdStart passes through), so its presence alone doesn't
+      // distinguish loading from error. Pin loading specifically: the
+      // pre-timeout TimeoutLoader spinner carries
+      // `accessibilityLabel: t('common.timeoutLoader.loading')` ("Loading,
+      // please wait") — a label ErrorFallback's markup never sets — and the
+      // retry affordance (`supporter-cold-start-retry`) only exists in the
+      // error branch, so its absence here rules out error specifically.
       screen.getByTestId('supporter-cold-start-error');
+      screen.getByLabelText('Loading, please wait');
+      expect(screen.queryByTestId('supporter-cold-start-retry')).toBeNull();
       expect(screen.queryByTestId('supporter-cold-start')).toBeNull();
       expect(
         screen.queryByTestId(
