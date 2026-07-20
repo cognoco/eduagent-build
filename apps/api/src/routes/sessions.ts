@@ -28,9 +28,11 @@ import {
 import type { Database } from '@eduagent/database';
 import { z } from 'zod';
 import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import { idempotencyPreflight } from '../middleware/idempotency';
 import { type ProfileMeta } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertCanReadProfile } from '../services/family-access';
 import { withProfile } from '../route-utils/route-context';
 import { streamSSEUtf8 } from '../route-utils/sse-utf8';
 import { addBreadcrumb, captureException } from '../services/sentry';
@@ -165,6 +167,10 @@ type SessionRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
+    account: Account;
+    // [WI-2416] The authenticated caller's own person id, resolved
+    // server-side by accountMiddleware — required by assertCanReadProfile.
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     subscriptionId: string;
     subscriptionTier: SubscriptionTier | undefined;
@@ -191,6 +197,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   )
   .get('/sessions/resume-nudge', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
     const nudge = await getResumeNudgeCandidate(db, profileId);
     return c.json({ nudge });
   })
@@ -200,6 +209,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', z.object({ subjectId: z.string().uuid() })),
     async (c) => {
       const { db, profileId } = withProfile(c);
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { subjectId } = c.req.valid('param');
       const sessions = await getSubjectSessions(db, profileId, subjectId);
       return c.json(getSubjectSessionsResponseSchema.parse({ sessions }));
@@ -282,6 +294,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
       const { db, profileId } = withProfile(c);
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const session = await getSession(
         db,
         profileId,
@@ -590,6 +605,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
       const { db, profileId } = withProfile(c);
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const transcript = await getSessionTranscript(
         db,
         profileId,
@@ -912,6 +930,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
       const { db, profileId } = withProfile(c);
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { sessionId } = c.req.valid('param');
       const summary = await getSessionSummary(db, profileId, sessionId, {
         mentorNoticeEnabled: isMentorNoticeEnabled(c.env.MENTOR_NOTICE_ENABLED),

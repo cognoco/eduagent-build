@@ -17,6 +17,14 @@
 // caller-vs-X-Profile-Id-spoof distinction this guard exists to enforce is
 // covered by the real-DB break test in
 // tests/integration/wi1989-owner-idor.integration.test.ts.
+//
+// [WI-2416] Same rationale for verifyPersonOwnershipV2, called by
+// assertCanReadProfile (GET /recaps/self) — this file's mock db (`{}`)
+// cannot satisfy its raw membership query either. Every /recaps/self
+// scenario here is a caller-self scenario (makeApp defaults callerPersonId
+// to the same PROFILE_ID as the active profile); the cross-account read
+// attack this guard exists to close is covered by the real-DB break test in
+// tests/integration/wi2416-read-idor.integration.test.ts.
 jest.mock('../services/identity-v2/ownership-v2', () => {
   const actual = jest.requireActual(
     '../services/identity-v2/ownership-v2',
@@ -24,6 +32,7 @@ jest.mock('../services/identity-v2/ownership-v2', () => {
   return {
     ...actual,
     verifyPersonIsOrgAdminV2: jest.fn().mockResolvedValue(true),
+    verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
   };
 });
 

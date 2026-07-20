@@ -33,6 +33,7 @@ import {
 import { parseLearnerInput } from '../services/learner-input';
 import {
   assertCanManageOwnConsent,
+  assertCanReadProfile,
   assertChargeNotCredentialed,
   assertOwnerAndParentAccess,
 } from '../services/family-access';
@@ -63,6 +64,9 @@ type LearnerProfileRouteEnv = {
 export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
   .get('/learner-profile', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify caller
+    // authority (self or guardian of an uncredentialed charge) before reading.
+    await assertCanReadProfile(c, profileId);
     const projection = await getOrCreateMemoryProjection(db, profileId, {
       memoryFactsReadEnabled: isMemoryFactsReadEnabled(
         c.env.MEMORY_FACTS_READ_ENABLED,
@@ -76,6 +80,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
   })
   .get('/learner-profile/export-text', async (c) => {
     const { db, profileId } = withProfile(c);
+    // [WI-2416] Header-resolved profileId is only org-checked; verify caller
+    // authority (self or guardian of an uncredentialed charge) before reading.
+    await assertCanReadProfile(c, profileId);
     const profile = await getOrCreateLearningProfile(db, profileId);
     return c.json(
       learnerProfileExportTextResponseSchema.parse({
