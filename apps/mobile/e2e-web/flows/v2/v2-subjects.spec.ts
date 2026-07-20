@@ -98,13 +98,29 @@ async function expectSubjectHub(
 async function expectMeIdentity(
   page: Page,
   displayName: string,
+  profileId: string,
 ): Promise<void> {
   await pressableClick(page.getByTestId('account-avatar-button'));
   await expect(page.getByTestId('account-screen')).toBeVisible({
     timeout: 60_000,
   });
-  const profile = page.getByTestId('account-admin-profile');
-  await expect(profile.getByText(displayName, { exact: true })).toBeVisible();
+  const accountProfile = page.getByTestId('account-admin-profile');
+  await expect(
+    accountProfile.getByText(displayName, { exact: true }),
+  ).toBeVisible();
+  await pressableClick(accountProfile);
+  await expect(page.getByTestId('profiles-screen')).toBeVisible({
+    timeout: 60_000,
+  });
+  const activeProfile = page.getByTestId(`profile-row-${profileId}`);
+  await expect(
+    activeProfile.getByText(displayName, { exact: true }),
+  ).toBeVisible();
+  await expect(activeProfile.getByTestId('profile-active-check')).toBeVisible();
+  await pressableClick(page.getByTestId('profiles-close'));
+  await expect(page.getByTestId('account-screen')).toBeVisible({
+    timeout: 60_000,
+  });
   await pressableClick(page.getByTestId('account-back'));
   await expectSubjectsPath(page);
 }
@@ -240,7 +256,7 @@ test('WI-2238 multi-subject case: exact status rows, Physics search/no-result cl
       .getByTestId(`search-subject-row-${activeSubjectId}`)
       .getByText('Physics', { exact: true }),
   ).toBeVisible({ timeout: 60_000 });
-  await expectMeIdentity(page, 'Multi-Subject Learner');
+  await expectMeIdentity(page, 'Multi-Subject Learner', seed.profileId);
 
   await fillTextInput(search, 'impossible-wi-2238-subject');
   await expect(page.getByTestId('library-search-empty')).toBeVisible({
@@ -295,7 +311,7 @@ test('WI-2238 learning-active case: exact World History resume IDs and visible s
 
   await expectSubjectsPath(page);
   await expectSubjectRow(page, subjectId, 'World History');
-  await expectMeIdentity(page, 'Active Learner');
+  await expectMeIdentity(page, 'Active Learner', seed.profileId);
 });
 
 test('WI-2238 retention-due case: exact Biology Topic 1 review and visible Back controls restore Biology Hub, Subjects, and Review Learner Me identity', async ({
@@ -349,7 +365,7 @@ test('WI-2238 retention-due case: exact Biology Topic 1 review and visible Back 
   await pressableClick(page.getByTestId('subject-hub-back'));
   await expectSubjectsPath(page);
   await expectSubjectRow(page, subjectId, 'Biology');
-  await expectMeIdentity(page, 'Review Learner');
+  await expectMeIdentity(page, 'Review Learner', seed.profileId);
 });
 
 test('WI-2238 Subjects API recovery case: a visible failure stays recoverable and Retry restores the exact seeded World History row', async ({
@@ -504,5 +520,5 @@ test('WI-2238 onboarding-no-subject case: Add creates exact Photosynthesis first
   await expectSubjectsPath(page);
   await expectSubjectRow(page, PHOTOSYNTHESIS_SUBJECT_ID, 'Photosynthesis');
   await expect(page.url()).not.toMatch(/\/(?:home|library)(?:\?|$)/);
-  await expectMeIdentity(page, 'Test Learner');
+  await expectMeIdentity(page, 'Test Learner', seed.profileId);
 });

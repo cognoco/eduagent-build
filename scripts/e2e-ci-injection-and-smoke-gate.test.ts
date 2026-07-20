@@ -1774,6 +1774,198 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ).toBe(false);
   });
 
+  it('[WI-2238] binds every browser Me check to the exact seeded active profile ID', () => {
+    const hasExactSeedProfileMeIdentity = (source: string): boolean => {
+      const sourceFile = ts.createSourceFile(
+        'v2-subjects.spec.ts',
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      );
+      let helper: ts.FunctionDeclaration | undefined;
+      const identityCalls: ts.CallExpression[] = [];
+
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isFunctionDeclaration(node) &&
+          node.name?.text === 'expectMeIdentity'
+        ) {
+          helper = node;
+        } else if (
+          ts.isCallExpression(node) &&
+          ts.isIdentifier(node.expression) &&
+          node.expression.text === 'expectMeIdentity'
+        ) {
+          identityCalls.push(node);
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sourceFile);
+
+      if (!helper?.body || helper.parameters.length !== 3) return false;
+      const [pageParameter, displayNameParameter, profileIdParameter] =
+        helper.parameters;
+      if (
+        !pageParameter ||
+        !displayNameParameter ||
+        !profileIdParameter ||
+        !ts.isIdentifier(pageParameter.name) ||
+        !ts.isIdentifier(displayNameParameter.name) ||
+        !ts.isIdentifier(profileIdParameter.name)
+      ) {
+        return false;
+      }
+
+      const profileRowVariables = new Set<string>();
+      const collectProfileRows = (node: ts.Node): void => {
+        if (
+          ts.isVariableDeclaration(node) &&
+          ts.isIdentifier(node.name) &&
+          node.initializer &&
+          ts.isCallExpression(node.initializer) &&
+          ts.isPropertyAccessExpression(node.initializer.expression) &&
+          ts.isIdentifier(node.initializer.expression.expression) &&
+          node.initializer.expression.expression.text ===
+            pageParameter.name.text &&
+          node.initializer.expression.name.text === 'getByTestId'
+        ) {
+          const selector = node.initializer.arguments[0];
+          if (
+            selector &&
+            ts.isTemplateExpression(selector) &&
+            selector.head.text === 'profile-row-' &&
+            selector.templateSpans.length === 1 &&
+            ts.isIdentifier(selector.templateSpans[0]?.expression) &&
+            selector.templateSpans[0].expression.text ===
+              profileIdParameter.name.text &&
+            selector.templateSpans[0].literal.text === ''
+          ) {
+            profileRowVariables.add(node.name.text);
+          }
+        }
+        ts.forEachChild(node, collectProfileRows);
+      };
+      collectProfileRows(helper.body);
+      if (profileRowVariables.size !== 1) return false;
+
+      let hasExactDisplayName = false;
+      let hasActiveCheck = false;
+      const isAwaitedVisibleAssertion = (
+        locator: ts.CallExpression,
+      ): boolean => {
+        const expectation = locator.parent;
+        if (
+          !ts.isCallExpression(expectation) ||
+          !ts.isIdentifier(expectation.expression) ||
+          expectation.expression.text !== 'expect' ||
+          expectation.arguments[0] !== locator
+        ) {
+          return false;
+        }
+        const matcher = expectation.parent;
+        if (
+          !ts.isPropertyAccessExpression(matcher) ||
+          matcher.expression !== expectation ||
+          matcher.name.text !== 'toBeVisible'
+        ) {
+          return false;
+        }
+        const invocation = matcher.parent;
+        return (
+          ts.isCallExpression(invocation) &&
+          invocation.expression === matcher &&
+          ts.isAwaitExpression(invocation.parent)
+        );
+      };
+      const inspectOwnedAssertions = (node: ts.Node): void => {
+        if (
+          ts.isCallExpression(node) &&
+          isAwaitedVisibleAssertion(node) &&
+          ts.isPropertyAccessExpression(node.expression) &&
+          ts.isIdentifier(node.expression.expression) &&
+          profileRowVariables.has(node.expression.expression.text)
+        ) {
+          const method = node.expression.name.text;
+          const firstArgument = node.arguments[0];
+          if (
+            method === 'getByTestId' &&
+            firstArgument &&
+            ts.isStringLiteral(firstArgument) &&
+            firstArgument.text === 'profile-active-check'
+          ) {
+            hasActiveCheck = true;
+          }
+          if (
+            method === 'getByText' &&
+            firstArgument &&
+            ts.isIdentifier(firstArgument) &&
+            firstArgument.text === displayNameParameter.name.text
+          ) {
+            const options = node.arguments[1];
+            hasExactDisplayName = Boolean(
+              options &&
+              ts.isObjectLiteralExpression(options) &&
+              options.properties.some(
+                (property) =>
+                  ts.isPropertyAssignment(property) &&
+                  ts.isIdentifier(property.name) &&
+                  property.name.text === 'exact' &&
+                  property.initializer.kind === ts.SyntaxKind.TrueKeyword,
+              ),
+            );
+          }
+        }
+        ts.forEachChild(node, inspectOwnedAssertions);
+      };
+      inspectOwnedAssertions(helper.body);
+
+      const everyCallUsesSeedProfileId =
+        identityCalls.length === 4 &&
+        identityCalls.every((call) => {
+          const profileId = call.arguments[2];
+          return Boolean(
+            profileId &&
+            ts.isPropertyAccessExpression(profileId) &&
+            ts.isIdentifier(profileId.expression) &&
+            profileId.expression.text === 'seed' &&
+            profileId.name.text === 'profileId',
+          );
+        });
+
+      return (
+        hasExactDisplayName && hasActiveCheck && everyCallUsesSeedProfileId
+      );
+    };
+
+    const subjectsSpec = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e-web/flows/v2/v2-subjects.spec.ts'),
+      'utf8',
+    );
+    expect(hasExactSeedProfileMeIdentity(subjectsSpec)).toBe(true);
+
+    for (const mutation of [
+      subjectsSpec.replace(
+        "activeProfile.getByTestId('profile-active-check')",
+        'activeProfile.getByText(displayName, { exact: true })',
+      ),
+      subjectsSpec.replace(
+        "await expect(activeProfile.getByTestId('profile-active-check')).toBeVisible();",
+        "activeProfile.getByTestId('profile-active-check');",
+      ),
+      subjectsSpec.replace(
+        'page.getByTestId(`profile-row-${profileId}`)',
+        "page.getByTestId('profile-row-adjacent-profile-id')",
+      ),
+      subjectsSpec.replace(
+        "expectMeIdentity(page, 'Multi-Subject Learner', seed.profileId)",
+        "expectMeIdentity(page, 'Multi-Subject Learner', activeSubjectId)",
+      ),
+    ]) {
+      expect(hasExactSeedProfileMeIdentity(mutation)).toBe(false);
+    }
+  });
+
   it('[WI-2238] structurally binds the retention-due browser case to seed-owned IDs and the observed route', () => {
     const hasSeedOwnedRetentionRouteBinding = (source: string): boolean => {
       const sourceFile = ts.createSourceFile(
