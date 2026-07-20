@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -39,33 +39,38 @@ export function HomeworkFirstResponseCompleteMarker({
   isStreaming,
   hasFailure,
 }: HomeworkFirstResponseCompleteMarkerProps) {
-  const normalizedProblem = problemText?.trim();
-  const problemIndex = normalizedProblem
-    ? messages.findIndex(
-        (message) =>
-          message.role === 'user' &&
-          message.isAutoSent === true &&
-          message.content.trim() === normalizedProblem,
-      )
-    : -1;
-  const messagesAfterProblem =
-    problemIndex >= 0 ? messages.slice(problemIndex + 1) : [];
-  const firstAssistantReply = messagesAfterProblem.find(
-    (message) => message.role === 'assistant',
-  );
-  const hasRecoveryOrFallback = messagesAfterProblem.some(
-    (message) => message.kind !== undefined || message.isSystemPrompt === true,
-  );
-  const complete =
-    active &&
-    !isStreaming &&
-    !hasFailure &&
-    !hasRecoveryOrFallback &&
-    firstAssistantReply !== undefined &&
-    firstAssistantReply.streaming !== true &&
-    typeof firstAssistantReply.eventId === 'string' &&
-    firstAssistantReply.eventId.trim().length > 0 &&
-    firstAssistantReply.content.trim().length > 0;
+  const complete = useMemo(() => {
+    const normalizedProblem = problemText?.trim();
+    const problemIndex = normalizedProblem
+      ? messages.findIndex(
+          (message) =>
+            message.role === 'user' &&
+            message.isAutoSent === true &&
+            message.content.trim() === normalizedProblem,
+        )
+      : -1;
+    const messagesAfterProblem =
+      problemIndex >= 0 ? messages.slice(problemIndex + 1) : [];
+    const firstAssistantReply = messagesAfterProblem.find(
+      (message) => message.role === 'assistant',
+    );
+    const hasRecoveryOrFallback = messagesAfterProblem.some(
+      (message) =>
+        message.kind !== undefined || message.isSystemPrompt === true,
+    );
+
+    return (
+      active &&
+      !isStreaming &&
+      !hasFailure &&
+      !hasRecoveryOrFallback &&
+      firstAssistantReply !== undefined &&
+      firstAssistantReply.streaming !== true &&
+      typeof firstAssistantReply.eventId === 'string' &&
+      firstAssistantReply.eventId.trim().length > 0 &&
+      firstAssistantReply.content.trim().length > 0
+    );
+  }, [active, problemText, messages, isStreaming, hasFailure]);
 
   return complete ? (
     <View

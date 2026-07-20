@@ -7,15 +7,6 @@ import {
   SubjectResolutionAccessory,
 } from './SessionAccessories';
 
-// prettier-ignore
-jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
-  useThemeColors: () => ({
-    primary: '#00b4d8',
-    textSecondary: '#999',
-    textInverse: '#fff',
-  }),
-}));
-
 describe('SessionToolAccessory stage gating', () => {
   const handleQuickChip = jest.fn();
 
@@ -344,7 +335,24 @@ describe('HomeworkModeChips problem text', () => {
   });
 });
 
-describe('MentorHomeworkFirstResponse manual-entry problem association', () => {
+describe('MentorHomeworkFirstResponse learner media association', () => {
+  it('renders the captured image as the sole learner media bubble', () => {
+    const imageUri = 'data:image/jpeg;base64,xxx';
+
+    const { getByTestId, queryByTestId } = render(
+      <MentorHomeworkFirstResponse
+        imageUri={imageUri}
+        problemText={undefined}
+        disabled={false}
+        onHelpMeSolve={jest.fn()}
+        onCheckMyAnswer={jest.fn()}
+      />,
+    );
+
+    getByTestId('homework-image-bubble');
+    expect(queryByTestId('homework-problem-text-bubble')).toBeNull();
+  });
+
   it('renders the entered manual problem as the learner bubble instead of an empty image placeholder', () => {
     const problemText = 'Solve 3x + 7 = 22';
 
