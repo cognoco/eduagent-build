@@ -1440,6 +1440,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
     expect(() =>
       assertCommandsInOrder(emptyFlow, [
+        {
+          scrollUntilVisible: {
+            element: { id: 'recaps-empty-start-session' },
+            direction: 'DOWN',
+            timeout: 15000,
+          },
+        },
         { assertVisible: { id: 'recaps-empty-start-session' } },
         { tapOn: { id: 'recaps-empty-start-session' } },
         {

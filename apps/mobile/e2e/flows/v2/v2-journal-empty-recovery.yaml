@@ -23,7 +23,7 @@ tags:
     retryTapIfNoChange: true
 - scrollUntilVisible:
     element:
-      id: 'journal-recaps-empty'
+      id: 'recaps-empty-start-session'
     direction: DOWN
     timeout: 15000
 - assertVisible:
