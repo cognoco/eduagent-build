@@ -95,7 +95,6 @@ import { mapSessionRow } from './session-events';
 import {
   streamSessionResponse,
   type CreateSseResponse,
-  type StreamSessionResponseDependencies,
 } from './session-stream-response';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -181,6 +180,7 @@ const GRADER_VERDICT_EMPTY = JSON.stringify({ items: [] });
 
 const GRADER_SYSTEM_MARKER = 'You are a precise grading assistant';
 const FALLBACK_PROVIDER_IDS = ['gemini', 'anthropic', 'cerebras', 'openai'];
+type TutorStreamFailurePhase = 'setup' | 'pre-first-byte' | 'mid-stream';
 
 function isGraderMessages(messages: ChatMessage[]): boolean {
   return messages.some(
@@ -192,6 +192,9 @@ function isGraderMessages(messages: ChatMessage[]): boolean {
 function createBranchingLlm() {
   let tutorResponse = TUTOR_ENVELOPE_NO_EVAL;
   let graderResponse = GRADER_VERDICT_SOLID;
+  let streamFailurePhase: TutorStreamFailurePhase | undefined;
+  let tutorChatCalls = 0;
+  let tutorChatStreamCalls = 0;
   const calls: ChatMessage[][] = [];
 
   function respond(messages: ChatMessage[]): string {
@@ -205,16 +208,30 @@ function createBranchingLlm() {
       messages: ChatMessage[],
       _config: ModelConfig,
     ): Promise<ChatResult> {
+      if (!isGraderMessages(messages)) tutorChatCalls++;
       return { content: respond(messages), stopReason: 'stop' };
     },
     chatStream(messages: ChatMessage[], _config: ModelConfig) {
+      const graderCall = isGraderMessages(messages);
+      if (!graderCall) tutorChatStreamCalls++;
       const content = respond(messages);
+      const tutorStreamFailure = graderCall ? undefined : streamFailurePhase;
+      if (tutorStreamFailure === 'setup') {
+        throw new Error('injected provider setup failure');
+      }
       let resolveStopReason!: (reason: StopReason) => void;
       const stopReasonPromise = new Promise<StopReason>((res) => {
         resolveStopReason = res;
       });
       async function* streamChunks(): AsyncIterable<string> {
         try {
+          if (tutorStreamFailure === 'pre-first-byte') {
+            throw new Error('injected pre-first-byte provider failure');
+          }
+          if (tutorStreamFailure === 'mid-stream') {
+            yield '{"reply":"partial visible reply';
+            throw new Error('injected mid-stream provider failure');
+          }
           yield content;
         } finally {
           resolveStopReason('stop');
@@ -239,12 +256,24 @@ function createBranchingLlm() {
     setGraderResponse(content: string): void {
       graderResponse = content;
     },
+    setStreamFailurePhase(phase: TutorStreamFailurePhase | undefined): void {
+      streamFailurePhase = phase;
+    },
+    tutorChatCallCount(): number {
+      return tutorChatCalls;
+    },
+    tutorChatStreamCallCount(): number {
+      return tutorChatStreamCalls;
+    },
     graderCallCount(): number {
       return calls.filter(isGraderMessages).length;
     },
     reset(): void {
       tutorResponse = TUTOR_ENVELOPE_NO_EVAL;
       graderResponse = GRADER_VERDICT_SOLID;
+      streamFailurePhase = undefined;
+      tutorChatCalls = 0;
+      tutorChatStreamCalls = 0;
       calls.length = 0;
     },
     // Unregister ONLY our own provider ids — never _clearProviders(), which
@@ -625,21 +654,6 @@ describeIfDb('session exchange production-path integration', () => {
     return { frames, createSseResponse };
   }
 
-  function fallbackDependencies(
-    injectedStreamMessage: typeof streamMessage,
-  ): StreamSessionResponseDependencies {
-    return {
-      streamMessage: injectedStreamMessage,
-      processMessage,
-      refundQuotaOrEscalate: jest.fn().mockResolvedValue({ refunded: true }),
-      markPersisted: jest.fn().mockResolvedValue(undefined),
-      sendEmptyReplyFallbackEvent: jest.fn().mockResolvedValue(undefined),
-      logger: { error: jest.fn(), warn: jest.fn() },
-      captureException: jest.fn(),
-      addBreadcrumb: jest.fn(),
-    } as unknown as StreamSessionResponseDependencies;
-  }
-
   it('[WI-1443] processMessage persists canonical answer evaluation by its returned aiEventId', async () => {
     const { profileId, session } = await seedAnswerEvaluationTurn();
 
@@ -686,26 +700,28 @@ describeIfDb('session exchange production-path integration', () => {
     await expectPersistedAnswerEvaluation(profileId, completed.aiEventId);
   });
 
-  it.each(['pre-stream', 'mid-stream'] as const)(
-    '[WI-1443] %s failure uses real processMessage fallback and persists its done aiEventId',
-    async (phase) => {
+  it.each([
+    {
+      phase: 'setup',
+      expectedFrameType: 'chunk',
+      expectedStreamCalls: 1,
+    },
+    {
+      phase: 'pre-first-byte',
+      expectedFrameType: 'chunk',
+      expectedStreamCalls: 2,
+    },
+    {
+      phase: 'mid-stream',
+      expectedFrameType: 'replace',
+      expectedStreamCalls: 1,
+    },
+  ] as const)(
+    '[WI-1443] $phase provider failure uses real processMessage fallback and persists its done aiEventId',
+    async ({ phase, expectedFrameType, expectedStreamCalls }) => {
       const { profileId, session } = await seedAnswerEvaluationTurn();
       const { frames, createSseResponse } = captureSseFrames();
-      const injectedStreamMessage = (
-        phase === 'pre-stream'
-          ? async () => {
-              throw new Error('injected pre-stream failure');
-            }
-          : async () => ({
-              stream: (async function* () {
-                yield 'partial visible reply';
-                throw new Error('injected mid-stream failure');
-              })(),
-              onComplete: async () => {
-                throw new Error('onComplete must not run after stream failure');
-              },
-            })
-      ) as typeof streamMessage;
+      llm.setStreamFailurePhase(phase);
 
       await streamSessionResponse({
         db,
@@ -724,18 +740,15 @@ describeIfDb('session exchange production-path integration', () => {
           answerEvaluationEnabled: true,
         },
         createSseResponse,
-        deps: fallbackDependencies(injectedStreamMessage),
       });
 
       const done = frames.find((frame) => frame.type === 'done');
       expect(done).toBeDefined();
-      expect(
-        frames.some((frame) =>
-          phase === 'pre-stream'
-            ? frame.type === 'chunk'
-            : frame.type === 'replace',
-        ),
-      ).toBe(true);
+      expect(frames.some((frame) => frame.type === expectedFrameType)).toBe(
+        true,
+      );
+      expect(llm.tutorChatStreamCallCount()).toBe(expectedStreamCalls);
+      expect(llm.tutorChatCallCount()).toBe(1);
       await expectPersistedAnswerEvaluation(
         profileId,
         done?.aiEventId as string | undefined,
