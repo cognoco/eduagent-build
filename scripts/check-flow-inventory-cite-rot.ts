@@ -207,7 +207,7 @@ const ID_LINE_START_RE = /^\|\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{1,3})\s*\|/;
 // WI-2198, whose prefixes ("BUG", "WI") never appear as a real row-ID
 // family, so they're never even considered.
 const ID_TOKEN_RE = /\b([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{1,3})\b/g;
-const REMOVED_SECTION_RE = /## Removed in this refresh\n([\s\S]*?)\n## /;
+const REMOVED_SECTION_RE = /## Removed in this refresh\n([\s\S]*?)(?=\n## |$)/;
 
 /** Pure: every row ID defined at the start of a table row, e.g. "HOME-03". */
 export function extractDefinedRowIds(docBody: string): Set<string> {
@@ -324,7 +324,7 @@ const VALID_LEGACY_TAGS = new Set([
   'legacy-superseded',
   'legacy-historical',
 ]);
-const LEGACY_TAG_RE = /\*\*(legacy-[a-z]+)\*\*/g;
+const LEGACY_TAG_RE = /\*\*(legacy-[a-zA-Z0-9-]+)\*\*/g;
 
 export interface LegacyTagFailure {
   token: string;

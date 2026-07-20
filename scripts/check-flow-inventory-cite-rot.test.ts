@@ -204,6 +204,15 @@ describe('extractRemovedRowIds', () => {
       new Set(['SUBJECT-16', 'PARENT-07']),
     );
   });
+
+  it('collects bolded IDs when the Removed section is at the end of the document', () => {
+    const body = [
+      '## Removed in this refresh',
+      '',
+      '- **SUBJECT-99** — last section',
+    ].join('\n');
+    expect(extractRemovedRowIds(body)).toEqual(new Set(['SUBJECT-99']));
+  });
 });
 
 describe('checkRowIdCrossLinks', () => {
@@ -287,5 +296,12 @@ describe('checkLegacyTags', () => {
     const failures = checkLegacyTags(body);
     expect(failures).toHaveLength(1);
     expect(failures[0].token).toBe('legacy-obsolete');
+  });
+
+  it('flags a typo containing numbers or hyphens', () => {
+    const body = 'Tagged **legacy-v2-mode** by mistake.';
+    const failures = checkLegacyTags(body);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].token).toBe('legacy-v2-mode');
   });
 });
