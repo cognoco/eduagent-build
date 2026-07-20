@@ -35,6 +35,7 @@ import {
   getRoundByIdOrThrow,
   listRecentCompletedRounds,
   markMissedItemsSurfaced,
+  normalizeCompletedRoundResults,
 } from '../services/quiz';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
@@ -284,7 +285,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
                       : undefined,
               };
             }),
-            results: round.results,
+            results: normalizeCompletedRoundResults(round.results, questions),
           }),
           200,
         );
