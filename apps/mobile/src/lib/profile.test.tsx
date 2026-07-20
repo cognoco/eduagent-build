@@ -417,6 +417,14 @@ describe('ProfileProvider', () => {
         key: ['resume-nudge', OWNER_PROFILE_ID],
         value: { topicId: 'topic-1' },
       },
+      {
+        key: ['now-feed', OWNER_PROFILE_ID],
+        value: { cards: [{ templateKey: 'profile-a-card' }] },
+      },
+      {
+        key: ['now-overflow', OWNER_PROFILE_ID],
+        value: { items: [{ templateKey: 'profile-a-overflow-item' }] },
+      },
     ];
     for (const { key, value } of profileScopedQueries) {
       queryClient.setQueryData(key, value);
@@ -485,6 +493,8 @@ describe('ProfileProvider', () => {
       ['quiz-recent', OWNER_PROFILE_ID],
       ['quiz-stats', OWNER_PROFILE_ID],
       ['topic-suggestions', 'subject-1', OWNER_PROFILE_ID],
+      ['now-feed', OWNER_PROFILE_ID],
+      ['now-overflow', OWNER_PROFILE_ID],
     ];
     const scopedPrefixes = new Set(
       [...profileScopedFactoryKeys, ...representativeScopedLiteralKeys].map(

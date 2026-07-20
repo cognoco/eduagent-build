@@ -4,7 +4,6 @@ import {
   useMutation,
   useQueryClient,
   type UseQueryResult,
-  keepPreviousData,
 } from '@tanstack/react-query';
 import {
   nowOverflowResponseSchema,
@@ -27,8 +26,11 @@ const NOW_FEED_STALE_TIME_MS = 30_000;
 const NOW_FEED_SLOW_FALLBACK_MS = 2_000;
 
 export function nowFeedQueryKey(
-  profileId: string | undefined,
-): readonly ['now-feed', string | undefined] {
+  profileId: string,
+): readonly ['now-feed', string] {
+  if (typeof profileId !== 'string') {
+    throw new Error('nowFeedQueryKey requires a profile ID');
+  }
   return ['now-feed', profileId];
 }
 
@@ -37,15 +39,24 @@ export type NowFeedQueryResult = UseQueryResult<NowResponse> & {
   isSlowFallback: boolean;
 };
 
+interface ProfileScopedNowFeedFallback {
+  profileId: string;
+  feed: NowResponse;
+  isSlowFallback: boolean;
+}
+
 export function useNowFeed(): NowFeedQueryResult {
   const client = useApiClient();
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id;
-  const [fallbackFeed, setFallbackFeed] = useState<NowResponse | null>(null);
-  const [isSlowFallback, setIsSlowFallback] = useState(false);
+  const [fallback, setFallback] = useState<ProfileScopedNowFeedFallback | null>(
+    null,
+  );
 
   const query = useQuery({
-    queryKey: nowFeedQueryKey(profileId),
+    queryKey: profileId
+      ? nowFeedQueryKey(profileId)
+      : (['now-feed', undefined] as const),
     queryFn: async ({ signal: querySignal }): Promise<NowResponse> => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -65,16 +76,16 @@ export function useNowFeed(): NowFeedQueryResult {
     },
     enabled: !!profileId,
     staleTime: NOW_FEED_STALE_TIME_MS,
-    placeholderData: keepPreviousData,
     refetchOnWindowFocus: true,
   });
 
   useEffect(() => {
     if (!profileId || !query.isFetching || query.data) {
-      setIsSlowFallback(false);
-      if (!query.isError) {
-        setFallbackFeed(null);
-      }
+      setFallback((current) => {
+        if (!query.isError) return null;
+        if (!current || current.profileId !== profileId) return current;
+        return { ...current, isSlowFallback: false };
+      });
       return undefined;
     }
 
@@ -82,8 +93,7 @@ export function useNowFeed(): NowFeedQueryResult {
     const timer = setTimeout(() => {
       void readCachedNowFeed(profileId).then((cached) => {
         if (cancelled || !cached) return;
-        setFallbackFeed(cached);
-        setIsSlowFallback(true);
+        setFallback({ profileId, feed: cached, isSlowFallback: true });
       });
     }, NOW_FEED_SLOW_FALLBACK_MS);
 
@@ -93,10 +103,13 @@ export function useNowFeed(): NowFeedQueryResult {
     };
   }, [profileId, query.data, query.isError, query.isFetching]);
 
+  const currentProfileFallback =
+    fallback?.profileId === profileId ? fallback : null;
+
   return {
     ...query,
-    fallbackFeed,
-    isSlowFallback,
+    fallbackFeed: currentProfileFallback?.feed ?? null,
+    isSlowFallback: currentProfileFallback?.isSlowFallback ?? false,
   };
 }
 
@@ -107,9 +120,10 @@ export function useMentorNoticeActions() {
   const issuedForProfileId = activeProfile?.id;
 
   const invalidate = async (): Promise<void> => {
+    if (!issuedForProfileId) return;
     await Promise.all([
       queryClient.invalidateQueries({
-        queryKey: ['now-feed', issuedForProfileId],
+        queryKey: nowFeedQueryKey(issuedForProfileId),
       }),
       queryClient.invalidateQueries({
         queryKey: ['now-overflow', issuedForProfileId],
