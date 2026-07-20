@@ -24,6 +24,7 @@ import {
   type LlmResponseEnvelope,
   type ChallengeRoundEvaluationItem,
   type ChallengeRoundNoteDraftHint,
+  type AnswerEvaluation,
 } from '@eduagent/schemas';
 import {
   buildSystemPromptSegments as _buildSystemPromptSegments,
@@ -516,6 +517,8 @@ export interface ExchangeResult {
   needsDeepening: boolean;
   /** Whether the LLM signalled partial progress (Gap 3) */
   partialProgress: boolean;
+  /** Canonical evaluation of the current ordinary learner answer. */
+  answerEvaluation?: AnswerEvaluation;
   provider: string;
   model: string;
   latencyMs: number;
@@ -529,6 +532,14 @@ export interface ExchangeResult {
   challengeRoundOffer?: boolean;
   /** Challenge Round: per-concept learner-answer evaluations. */
   challengeRoundEvaluation?: ChallengeRoundEvaluationItem[];
+  /** Homework mentor notice proposal. Caller must validate against durable evidence. */
+  noticedGap?: NonNullable<
+    NonNullable<LlmResponseEnvelope['signals']>['noticed_gap']
+  >;
+  /** Untrusted bounded re-check verdict; caller validates durable evidence. */
+  noticeRecheck?: NonNullable<
+    NonNullable<LlmResponseEnvelope['signals']>['notice_recheck']
+  >;
   /** Challenge Round: note draft UI hint, validated later before surfacing. */
   noteDraft?: ChallengeRoundNoteDraftHint | null;
   /** Fluency drill annotation (language sessions only) */
@@ -1129,6 +1140,19 @@ function isStuckReactionTurn(value: string): boolean {
   return clauses.every((clause) => STUCK_REACTION_CLAUSE.test(clause));
 }
 
+// [WI-2100] The learner references a specific book/poem/story/article they are
+// reading or working from by pronoun or bare demonstrative ("her book", "his
+// poems", "that article", "the story we're reading") without naming its title
+// or author. This function only runs once the server has already decided no
+// reliable source is available, so the generic "share your textbook/worksheet/
+// photo" fallback below would otherwise stand in for a targeted "which one do
+// you mean" question — the exact staging failure (assuming The Bell Jar) this
+// WI fixes. Mirrors the SOURCE_IDENTITY_CLARIFICATION_RULE prompt block
+// (exchange-prompts.ts) for the case where the model's own reply gets
+// hard-fallbacked before it can ask.
+const AMBIGUOUS_SOURCE_REFERENCE =
+  /\b(?:her|his|their|that|this)\s+(?:book|poems?|storys?|stories|article|novel|essay|text)\b|\bthe\s+(?:book|poem|poems|story|stories|article)\s+(?:we're|we are|i'm|i am|you're|you are|they're|they are)\b/i;
+
 function buildUnsupportedFactualReply(
   sourceAudit: ExchangeSourceAudit,
 ): string {
@@ -1158,6 +1182,18 @@ function buildUnsupportedFactualReply(
     return (
       'No problem — not being sure is a normal part of learning, not a wrong answer. ' +
       'Want a small hint to get started, or should I walk you through it step by step?'
+    );
+  }
+
+  // [WI-2100] Ask which source instead of falling through to the generic
+  // "share your textbook/worksheet/photo" template — must run before the
+  // keyword branches below so an ambiguous reference never gets swallowed by
+  // an unrelated keyword match (e.g. "start analyzing" matching the
+  // explain/start branch).
+  if (AMBIGUOUS_SOURCE_REFERENCE.test(lower)) {
+    return (
+      "I don't want to guess which one you mean, so before we go further: what's the title (or author) of what you're reading? " +
+      "A photo or short excerpt works too if that's easier."
     );
   }
 
@@ -1792,6 +1828,20 @@ function buildTripwireResult(
   };
 }
 
+export function shouldAcceptAnswerEvaluation(
+  context: ExchangeContext,
+  appHelpTurn: boolean,
+): boolean {
+  const challengeState = context.challengeRound?.state;
+  return (
+    context.answerEvaluationEnabled === true &&
+    !appHelpTurn &&
+    context.effectiveMode !== 'recitation' &&
+    challengeState !== 'accepted' &&
+    challengeState !== 'active'
+  );
+}
+
 export async function processExchange(
   context: ExchangeContext,
   userMessage: string,
@@ -1891,12 +1941,25 @@ export async function processExchange(
     responseFormat: 'json',
   });
 
+  const acceptAnswerEvaluation = shouldAcceptAnswerEvaluation(
+    context,
+    appHelpTurn,
+  );
   const parsed = parseExchangeEnvelope(result.response, {
     sessionId: context.sessionId,
     profileId: context.profileId,
     flow: 'processExchange',
+    acceptAnswerEvaluation,
   });
-  const finalParsed = appHelpTurn ? applyAppHelpSignalGuard(parsed) : parsed;
+  const appHelpGuarded = appHelpTurn ? applyAppHelpSignalGuard(parsed) : parsed;
+  const finalParsed = acceptAnswerEvaluation
+    ? {
+        ...appHelpGuarded,
+        partialProgress:
+          appHelpGuarded.answerEvaluation?.correctness === 'partial' ||
+          appHelpGuarded.partialProgress,
+      }
+    : { ...appHelpGuarded, answerEvaluation: undefined };
 
   // [H2/H7] Crisis redirect fired — emit the structured safety event before
   // anything else can short-circuit. safeSend guarantees a dispatch failure
@@ -2025,6 +2088,7 @@ export async function processExchange(
     ),
     needsDeepening: finalParsed.needsDeepening,
     partialProgress: finalParsed.partialProgress,
+    answerEvaluation: finalParsed.answerEvaluation,
     provider: result.provider,
     model: result.model,
     latencyMs: result.latencyMs,
@@ -2032,6 +2096,8 @@ export async function processExchange(
     notePromptPostSession: finalParsed.notePromptPostSession || undefined,
     challengeRoundOffer: finalParsed.challengeRoundOffer || undefined,
     challengeRoundEvaluation: finalParsed.challengeRoundEvaluation,
+    noticedGap: finalParsed.noticedGap,
+    noticeRecheck: finalParsed.noticeRecheck,
     noteDraft: finalParsed.noteDraft,
     fluencyDrill: finalParsed.fluencyDrill ?? undefined,
     confidence: finalParsed.confidence,
@@ -2206,6 +2272,8 @@ export interface ParsedExchangeEnvelope {
   cleanResponse: string;
   understandingCheck: boolean;
   partialProgress: boolean;
+  /** Canonical evaluation of the current ordinary learner answer. */
+  answerEvaluation?: AnswerEvaluation;
   needsDeepening: boolean;
   /** Safety: crisis-redirect rule fired this turn (H2, 2026-06-05 safety audit). Observational — drives structured safety logging, never flow control. */
   crisisRedirect: boolean;
@@ -2215,6 +2283,13 @@ export interface ParsedExchangeEnvelope {
   challengeRoundOffer: boolean;
   /** Challenge Round: per-concept answer evaluations. */
   challengeRoundEvaluation: ChallengeRoundEvaluationItem[];
+  /** Untrusted homework-notice proposal; validated after event persistence. */
+  noticedGap?: NonNullable<
+    NonNullable<LlmResponseEnvelope['signals']>['noticed_gap']
+  >;
+  noticeRecheck?: NonNullable<
+    NonNullable<LlmResponseEnvelope['signals']>['notice_recheck']
+  >;
   /** Challenge Round: learner-reviewed note draft hint from the envelope. */
   noteDraft: ChallengeRoundNoteDraftHint | null;
   fluencyDrill: FluencyDrillAnnotation | null;
@@ -2267,12 +2342,15 @@ const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
   cleanResponse: '',
   understandingCheck: false,
   partialProgress: false,
+  answerEvaluation: undefined,
   needsDeepening: false,
   crisisRedirect: false,
   notePrompt: false,
   notePromptPostSession: false,
   challengeRoundOffer: false,
   challengeRoundEvaluation: [],
+  noticedGap: undefined,
+  noticeRecheck: undefined,
   noteDraft: null,
   fluencyDrill: null,
   confidence: undefined,
@@ -2369,11 +2447,18 @@ function parsedFromVisibleFallbackText(text: string): ParsedExchangeEnvelope {
  */
 export function parseExchangeEnvelope(
   response: string,
-  context?: { sessionId?: string; profileId?: string; flow?: string },
+  context?: {
+    sessionId?: string;
+    profileId?: string;
+    flow?: string;
+    acceptAnswerEvaluation?: boolean;
+  },
 ): ParsedExchangeEnvelope {
   // [BUG-847] Tag the surface so parser-side telemetry can distinguish
   // session-flow parse failures from silent_classify ones below.
-  const parsed = parseEnvelope(response, 'exchange.session');
+  const parsed = parseEnvelope(response, 'exchange.session', {
+    ignoreAnswerEvaluation: context?.acceptAnswerEvaluation === false,
+  });
   if (!parsed.ok) {
     logger.warn('exchange.envelope_parse_failed', {
       flow: context?.flow,
@@ -2401,6 +2486,7 @@ export function parseExchangeEnvelope(
       cleanResponse: cleanLearnerVisibleReply(fallbackText),
       understandingCheck: detectUnderstandingCheckFromProse(fallbackText),
       partialProgress: false,
+      answerEvaluation: undefined,
       needsDeepening: false,
       crisisRedirect: false,
       notePrompt: false,
@@ -2462,12 +2548,15 @@ function envelopeToParsedExchange(
       // control-flow impact beyond the telemetry flag.
       detectUnderstandingCheckFromProse(cleanReply),
     partialProgress: signals.partial_progress === true,
+    answerEvaluation: signals.answer_evaluation,
     needsDeepening: signals.needs_deepening === true,
     crisisRedirect: signals.crisis_redirect === true,
     notePrompt: notePrompt?.show === true,
     notePromptPostSession: notePrompt?.post_session === true,
     challengeRoundOffer: signals.challenge_round_offer === true,
     challengeRoundEvaluation: signals.challenge_round_evaluation ?? [],
+    noticedGap: signals.noticed_gap ?? undefined,
+    noticeRecheck: signals.notice_recheck ?? undefined,
     noteDraft: uiHints.note_draft ?? null,
     fluencyDrill,
     confidence: envelope.confidence,
@@ -2584,11 +2673,22 @@ function extractKnownMarkerKey(response: string): string | null {
 // ---------------------------------------------------------------------------
 export function classifyExchangeOutcome(
   rawResponse: string,
-  _context?: { sessionId?: string; profileId?: string; flow?: string },
+  context?: {
+    sessionId?: string;
+    profileId?: string;
+    flow?: string;
+    acceptAnswerEvaluation?: boolean;
+  },
 ): ClassifiedExchangeOutcome {
   // [BUG-847] Distinct surface tag — silent_classify is the marker-only
   // fallback path, expected to fail full envelope validation more often.
-  const envelopeResult = parseEnvelope(rawResponse, 'exchange.silent_classify');
+  const envelopeResult = parseEnvelope(
+    rawResponse,
+    'exchange.silent_classify',
+    {
+      ignoreAnswerEvaluation: context?.acceptAnswerEvaluation === false,
+    },
+  );
 
   // Normal envelope path — parsed cleanly; classify empty reply here.
   // Pass the already-validated envelope to envelopeToParsedExchange so we

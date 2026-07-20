@@ -34,6 +34,7 @@ import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { DeskLampAnimation, MagicPenAnimation } from '../common';
 import Animated, { FadeOut } from 'react-native-reanimated';
+import type { MentorNoticeAccepted } from '@eduagent/schemas';
 
 export interface ChatMessage {
   id: string;
@@ -52,6 +53,8 @@ export interface ChatMessage {
   isAutoSent?: boolean;
   /** Local file URI of a homework image attached to this message */
   imageUri?: string;
+  /** Durable homework observation accepted on this completed assistant turn. */
+  mentorNotice?: MentorNoticeAccepted;
 }
 
 interface ChatShellProps {
@@ -251,6 +254,7 @@ const ChatMessageRow = memo(function ChatMessageRow({
         outboxStatus={msg.outboxStatus}
         escalationRung={msg.escalationRung}
         verificationBadge={msg.verificationBadge}
+        mentorNotice={msg.mentorNotice}
         actions={renderMessageActions?.(msg)}
         testID={`message-bubble-${msg.role}-${index}`}
       />
@@ -372,15 +376,6 @@ export function ChatShell({
     requestMicrophonePermission,
     getMicrophonePermissionStatus,
   } = useSpeechRecognition({ lang: speechRecognitionLanguage });
-
-  // Proactively prompt for microphone on session entry so voice input is
-  // ready without the user hunting for a toggle. Android forbids silent
-  // grants for RECORD_AUDIO, so this system dialog on first launch is the
-  // closest thing to "allowed by default". Once the user taps Allow, the
-  // grant sticks until they explicitly revoke it in Settings.
-  useEffect(() => {
-    void requestMicrophonePermission();
-  }, [requestMicrophonePermission]);
 
   // BUG-141: STT permission detection must classify-before-format. Previously
   // this branch string-matched `sttError.toLowerCase().includes('permission')`,

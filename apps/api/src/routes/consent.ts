@@ -37,6 +37,7 @@ import {
   assertOwnerProfile,
   assertOwnerAndParentAccess,
   assertCallerIsAccountOwner,
+  assertCanReadProfile,
 } from '../services/family-access';
 import {
   requestConsentV2,
@@ -475,6 +476,9 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         }),
       );
     }
+    // [WI-2416] Header-resolved profileId is only org-checked; verify caller
+    // authority (self or guardian of an uncredentialed charge) before reading.
+    await assertCanReadProfile(c, profileId);
     const db = c.get('db');
     const state = await getProfileConsentStateV2(db, profileId);
     const recipient = state?.guardianEmail ?? null;

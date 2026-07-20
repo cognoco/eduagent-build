@@ -144,6 +144,8 @@ export interface StreamDoneEvent {
   confidence?: 'low' | 'medium' | 'high';
   /** [WI-2107] LLM opened a topic without delivering content or a question this turn. */
   topicOpenedPendingContent?: boolean;
+  /** Server-accepted homework observation; never present on token/fallback frames. */
+  mentorNotice?: import('@eduagent/schemas').MentorNoticeAccepted;
 }
 
 export interface StreamErrorEvent {
@@ -349,7 +351,7 @@ export function streamSSEViaXHR(
   // sending data for IDLE_TIMEOUT_MS. The server may take 20s+ for LLM
   // streaming then another 10s for post-stream DB writes — the total easily
   // exceeds a fixed 30s timeout, but the stream is never truly idle.
-  const IDLE_TIMEOUT_MS = 45_000;
+  const IDLE_TIMEOUT_MS = 90_000;
   let idleTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
     if (done) return;
     const timeoutError = new Error(

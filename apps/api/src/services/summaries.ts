@@ -25,10 +25,34 @@ const summariesLogger = createLogger();
 
 /** Result of evaluating a learner's "Your Words" summary */
 export interface SummaryEvaluation {
-  feedback: string;
+  feedback: string | null;
+  feedbackStatus: 'available' | 'unavailable';
   hasUnderstandingGaps: boolean;
   gapAreas?: string[];
   isAccepted: boolean;
+}
+
+const SUMMARY_EVALUATION_TIMEOUT_MS = 12_000;
+const LEGACY_UNAVAILABLE_FEEDBACK =
+  "Your summary was saved. We couldn't provide AI feedback right now — you can try submitting again.";
+
+export function hasAvailableSummaryFeedback(
+  feedback: string | null | undefined,
+): feedback is string {
+  return (
+    typeof feedback === 'string' &&
+    feedback.trim().length > 0 &&
+    feedback !== LEGACY_UNAVAILABLE_FEEDBACK
+  );
+}
+
+function unavailableSummaryEvaluation(): SummaryEvaluation {
+  return {
+    feedback: null,
+    feedbackStatus: 'unavailable',
+    hasUnderstandingGaps: false,
+    isAccepted: false,
+  };
 }
 
 type SessionSummaryRow = typeof sessionSummaries.$inferSelect;
@@ -102,7 +126,10 @@ export async function evaluateSummary(
   topicTitle: string,
   topicDescription: string,
   summary: string,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    evaluationTimeoutMs?: number;
+  },
 ): Promise<SummaryEvaluation> {
   // [PROMPT-INJECT-8] topicTitle/description are stored LLM output;
   // summary is raw learner text that may span multiple sentences.
@@ -121,12 +148,35 @@ export async function evaluateSummary(
     },
   ];
 
-  const result = await routeAndCall(messages, 2, {
-    flow: 'summaries.generate',
-    conversationLanguage: options?.conversationLanguage,
-  });
+  const timeoutMs =
+    options?.evaluationTimeoutMs ?? SUMMARY_EVALUATION_TIMEOUT_MS;
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    timeout = setTimeout(
+      () => controller.abort(new Error('Summary evaluation timed out')),
+      timeoutMs,
+    );
+    const result = await routeAndCall(messages, 2, {
+      flow: 'summaries.generate',
+      conversationLanguage: options?.conversationLanguage,
+      signal: controller.signal,
+    });
 
-  return parseSummaryEvaluation(result.response);
+    return parseSummaryEvaluation(result.response);
+  } catch (error) {
+    const reason =
+      error instanceof Error && error.message === 'Summary evaluation timed out'
+        ? 'timeout'
+        : 'provider_error';
+    captureException(error, {
+      extra: { surface: 'summary-evaluation', reason },
+    });
+    summariesLogger.warn('[evaluateSummary] feedback unavailable', { reason });
+    return unavailableSummaryEvaluation();
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -135,13 +185,8 @@ export async function evaluateSummary(
 
 /**
  * Parses the LLM response into a SummaryEvaluation.
- * Falls back to a graceful default if JSON parsing fails.
+ * Returns an explicit unavailable state if JSON parsing fails.
  */
-/** [BUG-670 / S-16] Safe canned fallback feedback — never surface raw LLM
- *  output to the learner. */
-const SUMMARY_FALLBACK_FEEDBACK =
-  "Your summary was saved. We couldn't provide AI feedback right now — you can try submitting again.";
-
 function parseSummaryEvaluation(response: string): SummaryEvaluation {
   // [BUG-664 / S-4] Use extractFirstJsonObject (brace-depth walker) — see
   // assessments.ts for rationale on why the bare /\{[\s\S]*\}/ regex was wrong.
@@ -160,20 +205,17 @@ function parseSummaryEvaluation(response: string): SummaryEvaluation {
           },
         });
         summariesLogger.warn(
-          '[parseSummaryEvaluation] invalid schema — falling back to canned feedback',
+          '[parseSummaryEvaluation] invalid schema — feedback unavailable',
           { reason: 'invalid_schema' },
         );
-        return {
-          feedback: SUMMARY_FALLBACK_FEEDBACK,
-          hasUnderstandingGaps: false,
-          isAccepted: false,
-        };
+        return unavailableSummaryEvaluation();
       }
 
       const evaluation = parsed.data;
       // [BUG-670 / S-16] Use safe canned fallback rather than `?? response`.
       return {
         feedback: evaluation.feedback,
+        feedbackStatus: 'available',
         hasUnderstandingGaps: evaluation.hasUnderstandingGaps,
         gapAreas: evaluation.gapAreas,
         isAccepted: evaluation.isAccepted,
@@ -193,7 +235,7 @@ function parseSummaryEvaluation(response: string): SummaryEvaluation {
         },
       });
       summariesLogger.warn(
-        '[parseSummaryEvaluation] invalid JSON — falling back to canned feedback',
+        '[parseSummaryEvaluation] invalid JSON — feedback unavailable',
         { reason: 'invalid_json' },
       );
     }
@@ -210,7 +252,7 @@ function parseSummaryEvaluation(response: string): SummaryEvaluation {
       },
     );
     summariesLogger.warn(
-      '[parseSummaryEvaluation] no JSON object found — falling back to canned feedback',
+      '[parseSummaryEvaluation] no JSON object found — feedback unavailable',
       { reason: 'no_json_found', rawResponseLength: response.length },
     );
   }
@@ -218,11 +260,7 @@ function parseSummaryEvaluation(response: string): SummaryEvaluation {
   // Fallback — LLM response was unparseable. Do NOT accept — the summary was
   // not actually evaluated. isAccepted=false is consistent with the feedback:
   // the submission was saved but evaluation is unavailable.
-  return {
-    feedback: SUMMARY_FALLBACK_FEEDBACK,
-    hasUnderstandingGaps: false,
-    isAccepted: false,
-  };
+  return unavailableSummaryEvaluation();
 }
 
 // ---------------------------------------------------------------------------

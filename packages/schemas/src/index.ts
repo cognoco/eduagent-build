@@ -14,6 +14,7 @@ export * from './account';
 // Onboarding & Curriculum (Epic 1)
 export * from './subjects';
 export * from './sessions';
+export * from './mentor-notices';
 export * from './language';
 export * from './bookmarks';
 
@@ -91,3 +92,6 @@ export * from './activation-events';
 
 // Speaking-practice attempt persistence (WI-1777)
 export * from './speaking-practice';
+
+// Recitation setup state (server-owned deterministic transition contract)
+export * from './recitation-setup';

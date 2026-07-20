@@ -14,7 +14,11 @@ import {
   validateGuardianshipEdgeV2,
   validateGuardianChargeRelationshipV2,
 } from './identity-v2/family-bridge-v2';
-import { verifyPersonIsOrgAdminV2 } from './identity-v2/ownership-v2';
+import {
+  verifyPersonIsOrgAdminV2,
+  verifyPersonOwnershipV2,
+} from './identity-v2/ownership-v2';
+import { captureException } from './sentry';
 
 type ProfileMetaSource = {
   get(key: 'profileMeta'): ProfileMeta | undefined;
@@ -272,6 +276,129 @@ export async function assertCallerIsAccountOwner(
     account.id,
   );
   if (!isCallerAdmin) {
+    throw new ForbiddenError(message);
+  }
+}
+
+type CanReadProfileSource = {
+  get(key: 'db'): Database;
+  get(key: 'account'): { id: string } | undefined;
+  get(key: 'callerPersonId'): string | undefined;
+};
+
+/**
+ * [WI-2416 — read-side IDOR] Read-authority twin of assertCallerIsAccountOwner.
+ *
+ * Authorizes a READ of `targetProfileId` when the server-resolved caller
+ * (`callerPersonId`, set app-wide by accountMiddleware from the authenticated
+ * login->person binding, never request-supplied) is SELF or holds an active
+ * guardianship edge over an uncredentialed charge — mirroring the write-side
+ * authority rule in verifyPersonOwnershipV2. It deliberately does NOT accept a
+ * bare org-admin OR-clause: membership/admin role is existence-visibility,
+ * not data-read authority (canon §2A.4, ownership-v2.ts:11-15) — an org admin
+ * reading an adult sibling's private learning memory purely on admin role
+ * would be a privacy regression the owner-as-guardian path does not need,
+ * since an owner IS the guardian of their own uncredentialed charges.
+ *
+ * profileScopeMiddleware / getPersonScope only verify that the client-supplied
+ * X-Profile-Id belongs to the caller's organization — NOT that it is the
+ * caller's own identity or a charge they guard. Route handlers must call this
+ * (not rely on profileMeta/profileId alone) before reading another profile's
+ * data.
+ *
+ * verifyPersonOwnershipV2 throws a bare `Error` for "no authority" (designed
+ * for its write callers, which don't map errors to HTTP) and a
+ * `ForbiddenError` for the credentialed-charge suppression case. Both paths
+ * must surface as 403 on a read route, so both are remapped/passed through
+ * here.
+ */
+export async function assertCanReadProfile(
+  source: CanReadProfileSource,
+  targetProfileId: string,
+  message = 'You are not authorized to read this profile.',
+): Promise<void> {
+  const account = source.get('account');
+  const callerPersonId = source.get('callerPersonId');
+  if (!account || !callerPersonId) {
+    throw new ForbiddenError(message);
+  }
+  const db = source.get('db');
+  try {
+    await verifyPersonOwnershipV2(
+      db,
+      targetProfileId,
+      account.id,
+      callerPersonId,
+    );
+  } catch (err) {
+    // Credentialed-charge suppression already throws ForbiddenError — 403.
+    if (err instanceof ForbiddenError) throw err;
+    // Bare Error (self/guardian miss, non-membership, OR an underlying DB
+    // failure — verifyPersonOwnershipV2 does not distinguish "no authority"
+    // from infra errors by type) — fail closed to 403, but capture it so a
+    // DB outage surfaces in Sentry instead of silently reading as "denied"
+    // (repo rule: silent recovery without escalation is banned in auth code).
+    captureException(err, {
+      tags: { surface: 'family-access.assertCanReadProfile' },
+      extra: { targetProfileId },
+    });
+    throw new ForbiddenError(message);
+  }
+}
+
+type CanWriteProfileSource = CanReadProfileSource;
+
+/**
+ * [WI-2398 — write-side IDOR] Write-authority twin of assertCanReadProfile,
+ * used by assertNotProxyMode (middleware/proxy-guard.ts).
+ *
+ * assertNotProxyMode's pre-existing checks (isOwner === true, resolvedVia ===
+ * 'explicit-header') only prove that the client-supplied X-Profile-Id
+ * resolves to SOME owner-role profile in the caller's org — never that it is
+ * the caller's OWN identity. A non-owner member (own login, own
+ * callerPersonId) can send X-Profile-Id = a DIFFERENT owner/admin profile's
+ * id and pass those checks while acting as themselves, mutating that
+ * profile's self-service data (curriculum skip/unskip/challenge/topics,
+ * onboarding pronouns/interests, and every other write gated solely by
+ * assertNotProxyMode). That is the exact IDOR this guard closes.
+ *
+ * Currently logic-identical to assertCanReadProfile (both wrap
+ * verifyPersonOwnershipV2 with the same self-or-guardian authority rule and
+ * error remapping) — kept as a separate, named export for call-site clarity
+ * (a write call site should not read "assertCanReadProfile") and because read
+ * and write authority are independently ruled by product/security and may
+ * diverge in the future.
+ */
+export async function assertCanWriteProfile(
+  source: CanWriteProfileSource,
+  targetProfileId: string,
+  message = 'You are not authorized to modify this profile.',
+): Promise<void> {
+  const account = source.get('account');
+  const callerPersonId = source.get('callerPersonId');
+  if (!account || !callerPersonId) {
+    throw new ForbiddenError(message);
+  }
+  const db = source.get('db');
+  try {
+    await verifyPersonOwnershipV2(
+      db,
+      targetProfileId,
+      account.id,
+      callerPersonId,
+    );
+  } catch (err) {
+    // Credentialed-charge suppression already throws ForbiddenError — 403.
+    if (err instanceof ForbiddenError) throw err;
+    // Bare Error (self/guardian miss, non-membership, OR an underlying DB
+    // failure — verifyPersonOwnershipV2 does not distinguish "no authority"
+    // from infra errors by type) — fail closed to 403, but capture it so a
+    // DB outage surfaces in Sentry instead of silently reading as "denied"
+    // (repo rule: silent recovery without escalation is banned in auth code).
+    captureException(err, {
+      tags: { surface: 'family-access.assertCanWriteProfile' },
+      extra: { targetProfileId },
+    });
     throw new ForbiddenError(message);
   }
 }

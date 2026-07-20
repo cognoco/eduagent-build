@@ -415,6 +415,21 @@ jest.mock(
 // ---------------------------------------------------------------------------
 
 import { Hono, type ExecutionContext } from 'hono';
+// [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
+// calls verifyPersonOwnershipV2 — a raw db.select() membership query the
+// fully-mocked DB module cannot satisfy. Every scenario in this file that
+// reaches assertNotProxyMode's allow path is a caller-self write (the header
+// profile equals the authenticated caller's own person id, both
+// 'test-profile-id', via the seeded v2 identity graph); the cross-account
+// write attack this guard exists to close is covered by the real-DB break
+// test in tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's mock DB environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { app } from '../index';
 import { bookRoutes } from './books';
 import {
@@ -1367,6 +1382,13 @@ describe('POST generate-topics — pre-generation dispatch lifetime', () => {
         isOwner: true,
         resolvedVia: 'explicit-header',
       });
+      // [WI-2398] Caller-self identity — assertNotProxyMode now also calls
+      // assertCanWriteProfile, which requires account + callerPersonId.
+      // profileId equal to callerPersonId mirrors the legitimate
+      // owner-acting-as-self flow (verifyPersonOwnershipV2 is mocked to
+      // succeed at file scope regardless of the stub `db`).
+      c.set('account' as never, { id: 'test-account-id' });
+      c.set('callerPersonId' as never, 'test-profile-id');
       await next();
     });
     ownerApp.route('/', bookRoutes);

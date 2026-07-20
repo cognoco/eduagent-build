@@ -73,6 +73,20 @@ jest.mock(
   }),
 );
 
+// [WI-2416] assertCanReadProfile (GET /quiz/rounds/recent, /quiz/rounds/:id,
+// /quiz/stats) calls verifyPersonOwnershipV2, which — like getPersonScope
+// above — runs a raw db.select() membership query unrunnable on this unit
+// mock DB. Every scenario in this file is a caller-self read (the header
+// profile equals the authenticated caller's own person id); the
+// cross-account read attack this guard exists to close is covered by the
+// real-DB break test in tests/integration/wi2416-read-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's mock DB environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
 // [WI-867] billing-v2 seam — metering middleware calls ensureFreeSubscriptionV2
 // unconditionally post-collapse; account middleware calls ensureInitialTrialSubscriptionV2.
 // Both use db.execute()/db.transaction() paths the unit mock DB cannot satisfy.
@@ -915,6 +929,73 @@ describe('Quiz routes', () => {
       // reason to leak them. The only answer fields exposed are the
       // correct answer + its aliases.
       expect(body.questions[0].distractors).toBeUndefined();
+    });
+
+    it('[WI-2190] reconstructs a legacy completed result answer from the server-owned question', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
+        ...COMPLETED_ROUND,
+        results: [
+          {
+            questionIndex: 0,
+            correct: false,
+            answerGiven: 'Salzburg',
+            timeMs: 5000,
+            disputed: true,
+          },
+        ],
+      });
+
+      const res = await app.request(
+        `/v1/quiz/rounds/${ROUND_ID_COMPLETED}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        results: [
+          {
+            questionIndex: 0,
+            correct: false,
+            correctAnswer: 'Vienna',
+            answerGiven: 'Salzburg',
+            disputed: true,
+          },
+        ],
+      });
+    });
+
+    it('[WI-2190] returns typed 409 conflict for an unreconstructable malformed completed result', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest.fn().mockResolvedValue({
+        ...COMPLETED_ROUND,
+        results: [{ totallyMadeUpField: 'nope' }],
+      });
+
+      const res = await app.request(
+        `/v1/quiz/rounds/${ROUND_ID_COMPLETED}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({
+        code: 'CONFLICT',
+      });
+    });
+
+    it('[WI-2190] returns an empty typed result list for a completed round without grades', async () => {
+      (mockDb as any).query.quizRounds.findFirst = jest
+        .fn()
+        .mockResolvedValue({ ...COMPLETED_ROUND, results: [] });
+
+      const res = await app.request(
+        `/v1/quiz/rounds/${ROUND_ID_COMPLETED}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ results: [] });
     });
 
     it('does NOT expose correctAnswer or acceptedAliases for in-progress rounds [F-032 break test]', async () => {

@@ -36,6 +36,67 @@ beforeEach(() => {
   mockMarkdownDisplay.mockClear();
 });
 
+describe('MessageBubble — escaped Unicode streaming [WI-2124]', () => {
+  it('[WI-2124 AC-2b] decodes an escape completed across streamed chunks', () => {
+    const firstChunk = 'Rayleigh scattering follows 1/\\u03';
+    const { getByText, rerender } = render(
+      <MessageBubble sender="assistant" content={firstChunk} streaming />,
+    );
+
+    expect(getByText(firstChunk)).toBeTruthy();
+
+    rerender(
+      <MessageBubble
+        sender="assistant"
+        content={`${firstChunk}bb^4`}
+        streaming
+      />,
+    );
+
+    expect(getByText('Rayleigh scattering follows 1/λ^4')).toBeTruthy();
+  });
+});
+
+describe('MessageBubble — mentor notice receipt', () => {
+  const notice = {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    concept: 'keeping the same operation on both sides',
+    correctionHint: 'Subtract five before dividing.',
+  };
+
+  it('renders an understated receipt beneath a completed assistant reply', () => {
+    const { getByTestId, getByText } = render(
+      <MessageBubble
+        sender="assistant"
+        content="That gives x = 6."
+        mentorNotice={notice}
+      />,
+    );
+
+    expect(getByTestId('mentor-notice-chip')).toBeTruthy();
+    expect(getByText(/keeping the same operation on both sides/)).toBeTruthy();
+  });
+
+  it.each([
+    { sender: 'assistant' as const, streaming: true },
+    { sender: 'user' as const, streaming: false },
+  ])(
+    'does not render for sender=$sender streaming=$streaming',
+    ({ sender, streaming }) => {
+      const { queryByTestId } = render(
+        <MessageBubble
+          sender={sender}
+          content="Message"
+          streaming={streaming}
+          mentorNotice={notice}
+        />,
+      );
+
+      expect(queryByTestId('mentor-notice-chip')).toBeNull();
+    },
+  );
+});
+
 describe('MessageBubble — envelope leak regression [BUG-941]', () => {
   it('renders only the .reply field when AI content is a full envelope JSON', () => {
     // Mirrors the exact wire payload from BUG-941: a full schema-valid

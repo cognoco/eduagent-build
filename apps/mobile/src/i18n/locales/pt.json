@@ -1,4 +1,58 @@
 {
+  "celebrationEarnedContext": {
+    "polar_star": {
+      "child": "Estrela Polar — a tua primeira resposta independente!",
+      "adult": "Estrela Polar — primeira resposta independente."
+    },
+    "twin_stars": {
+      "child": "Estrelas Gémeas — três respostas fortes seguidas!",
+      "adult": "Estrelas Gémeas — três respostas fortes seguidas."
+    },
+    "comet": {
+      "child": "Cometa — agora fez sentido!",
+      "adult": "Cometa — um conceito ficou claro."
+    },
+    "orions_belt": {
+      "child": "Cinturão de Órion — cinco seguidas sem ajuda!",
+      "adult": "Cinturão de Órion — cinco respostas independentes seguidas."
+    },
+    "deep_diver": {
+      "child": "Mergulho Profundo — respostas muito bem pensadas!",
+      "adult": "Mergulho Profundo — marco alcançado com respostas ponderadas."
+    },
+    "persistent": {
+      "child": "Persistência — continuaste depois de uma correção!",
+      "adult": "Persistência — continuou depois de uma correção."
+    },
+    "topic_mastered": {
+      "child": "Cometa — dominaste este tema!",
+      "adult": "Cometa — tema dominado."
+    },
+    "evaluate_success": {
+      "child": "Estrelas Gémeas — encontraste a falha!",
+      "adult": "Estrelas Gémeas — resposta avaliada corretamente."
+    },
+    "teach_back_success": {
+      "child": "Estrelas Gémeas — explicaste com clareza!",
+      "adult": "Estrelas Gémeas — explicação clara concluída."
+    },
+    "streak_7": {
+      "child": "Cometa — sete dias de aprendizagem seguidos!",
+      "adult": "Cometa — sequência de aprendizagem de sete dias."
+    },
+    "streak_30": {
+      "child": "Cinturão de Órion — 30 dias de aprendizagem seguidos!",
+      "adult": "Cinturão de Órion — sequência de aprendizagem de trinta dias."
+    },
+    "curriculum_complete": {
+      "child": "Cometa — concluíste o currículo!",
+      "adult": "Cometa — currículo concluído."
+    },
+    "default": {
+      "child": "Marco alcançado — muito bem!",
+      "adult": "Marco alcançado."
+    }
+  },
   "common": {
     "cancel": "Cancelar",
     "ok": "OK",
@@ -915,7 +969,8 @@
       "verificationBadge": {
         "evaluate": "PENSAMENTO APROFUNDADO CONCLUÍDO",
         "teachBack": "RECAPITULAÇÃO CONCLUÍDA"
-      }
+      },
+      "mentorNotice": "Nota do mentor: {{concept}}"
     },
     "noteInput": {
       "cancel": "Cancelar",
@@ -3072,6 +3127,7 @@
       "yourShare": "A tua parte",
       "yourUsage": "A tua utilização",
       "questionsUsed": "{{count}} perguntas",
+      "formerMembers": "Membros anteriores",
       "familyAggregate": "Total da família",
       "quotaResets": "A quota é reposta a {{date}}",
       "renews": "A subscrição renova a {{date}}",
@@ -3090,7 +3146,9 @@
       "title": "Quer um lembrete diário?",
       "message": "Podemos enviar um lembrete gentil para você não perder sua sequência. Você pode desativar a qualquer momento nas Configurações.",
       "allow": "Permitir",
-      "notNow": "Agora não"
+      "notNow": "Agora não",
+      "noticeTitle": "Quer um lembrete amigável?",
+      "noticeMessage": "Podemos lembrar você de rever o que seu mentor notou hoje. Você pode desativar isso a qualquer momento nas Configurações."
     },
     "masteredRow": {
       "title": "Você dominou:"
@@ -3203,6 +3261,14 @@
         "language_focus": "Próxima vez: vamos trabalhar nos padrões gramaticais",
         "fluency": "Próxima vez: um sprint rápido de fluência"
       }
+    },
+    "feedbackUnavailableTitle": "O feedback ainda não está disponível",
+    "feedbackUnavailableMessage": "O seu resumo está guardado. Pode tentar obter o feedback novamente sem o submeter outra vez.",
+    "feedbackStillUnavailable": "O feedback ainda não está disponível, mas o seu resumo está seguro. Pode tentar novamente ou continuar quando quiser.",
+    "retryFeedback": "Tentar novamente",
+    "retryingFeedback": "A tentar novamente...",
+    "mentorNotice": {
+      "title": "Observações do mentor"
     }
   },
   "sessionTranscript": {
@@ -3994,6 +4060,14 @@
         "currentAccess": "Seu acesso pago permanece ativo até {{deadline}}.",
         "freeFallback": "Sua conta está usando o acesso gratuito agora. Atualize o pagamento para restaurar seu plano.",
         "currentAccessNoDeadline": "O seu acesso pago ainda está ativo."
+      },
+      "mentor_notice": {
+        "title": "Uma pequena ideia para rever",
+        "cta": "Conferir agora",
+        "notNow": "Agora não",
+        "arcDue": "Pronto quando quiser",
+        "arcAdvancing": "Abrindo uma revisão rápida",
+        "arcMastered": "Dominado"
       }
     },
     "ledger": {
@@ -4006,6 +4080,9 @@
       },
       "quota": {
         "title": "Um momento de aprendizado foi salvo."
+      },
+      "notice_locked_in": {
+        "title": "Você dominou {{concept}}."
       }
     },
     "overflow": {
@@ -4212,7 +4289,8 @@
       "recap_ready": "Um resumo está pronto.",
       "snapshot_ready": "Um resumo do seu aprendizado está pronto.",
       "reflection_bonus": "Bônus de reflexão salvo.",
-      "quiz_personal_best": "Recorde pessoal salvo."
+      "quiz_personal_best": "Recorde pessoal salvo.",
+      "notice_locked_in": "Dominou {{concept}} em {{subjectName}}."
     },
     "recaps": {
       "error": "Não foi possível carregar seus resumos.",

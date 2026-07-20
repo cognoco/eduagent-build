@@ -6,10 +6,12 @@ import {
   isProfileInChallengeRoundCohort,
   isChallengeRoundEnabledForProfile,
   isChallengeRoundGraderEnabled,
+  isAnswerEvaluationRuntimeEnabled,
   isReviewContinuityOpenerEnabled,
   isManagedTierActive,
   isMaintenanceProductionEnabled,
   isTopicIntentMatcherEnabled,
+  isMentorNoticeEnabled,
   validateEnv,
   validateProductionBindings,
   validateProductionKeys,
@@ -46,6 +48,7 @@ describe('validateProductionKeys', () => {
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: '0',
     MATCHER_ENABLED: 'false',
     CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
+    ANSWER_EVALUATION_RUNTIME_ENABLED: 'false',
     REVIEW_CALLBACK_OPENER_ENABLED: 'false',
     ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
     ADULT_OWNER_GATE_ENABLED: 'true',
@@ -674,6 +677,35 @@ describe('validateEnv', () => {
     expect(isChallengeRoundRuntimeEnabled('yes')).toBe(false);
   });
 
+  it('ANSWER_EVALUATION_RUNTIME_ENABLED defaults to "false" when unset', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.ANSWER_EVALUATION_RUNTIME_ENABLED).toBe('false');
+    expect(
+      isAnswerEvaluationRuntimeEnabled(env.ANSWER_EVALUATION_RUNTIME_ENABLED),
+    ).toBe(false);
+  });
+
+  it('isAnswerEvaluationRuntimeEnabled returns true only for "true"', () => {
+    expect(isAnswerEvaluationRuntimeEnabled('true')).toBe(true);
+    expect(isAnswerEvaluationRuntimeEnabled('false')).toBe(false);
+    expect(isAnswerEvaluationRuntimeEnabled(undefined)).toBe(false);
+    expect(isAnswerEvaluationRuntimeEnabled('yes')).toBe(false);
+  });
+
+  it('MENTOR_NOTICE_ENABLED defaults off and enables only for "true"', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.MENTOR_NOTICE_ENABLED).toBe('false');
+    expect(isMentorNoticeEnabled(env.MENTOR_NOTICE_ENABLED)).toBe(false);
+    expect(isMentorNoticeEnabled('true')).toBe(true);
+    expect(isMentorNoticeEnabled('yes')).toBe(false);
+  });
+
   it('CHALLENGE_ROUND_COHORT_PROFILE_IDS defaults to "" when unset', () => {
     const env = validateEnv({
       ENVIRONMENT: 'development',
@@ -788,6 +820,8 @@ describe('validateProductionBindings', () => {
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: 0,
     MATCHER_ENABLED: 'false',
     CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
+    ANSWER_EVALUATION_RUNTIME_ENABLED: 'false',
+    MENTOR_NOTICE_ENABLED: 'false',
     CHALLENGE_ROUND_COHORT_PROFILE_IDS: '',
     REVIEW_CALLBACK_OPENER_ENABLED: 'false',
     JUDGE_FRAMEWORK_ENABLED: 'false',

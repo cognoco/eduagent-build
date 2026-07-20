@@ -136,7 +136,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
   // Generates age-appropriate dictation content from the learner's study context.
   // -------------------------------------------------------------------------
   .post('/dictation/generate', async (c) => {
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
     const profileMeta = c.get('profileMeta');
@@ -177,7 +177,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       );
     }),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const input = c.req.valid('json');

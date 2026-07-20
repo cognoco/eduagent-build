@@ -22,6 +22,23 @@ function card(overrides: Partial<NowCardData> = {}): NowCardData {
 }
 
 describe('NowCard', () => {
+  it('[WI-2113 AC-2] labels spaced-retrieval work Review rather than Challenge', () => {
+    const { getByTestId, getByText, queryByText } = render(
+      <NowCard
+        card={card({
+          kind: 'retention_due',
+          templateKey: 'now.retention_due.default',
+        })}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+      />,
+    );
+
+    expect(getByTestId('now-card-retention_due')).toBeTruthy();
+    expect(getByText('Review')).toBeTruthy();
+    expect(queryByText('Challenge')).toBeNull();
+  });
+
   it('renders the mapped title for a known server template', () => {
     const { getByTestId, getByText } = render(
       <NowCard card={card()} onContinue={jest.fn()} onDecline={jest.fn()} />,
@@ -41,6 +58,28 @@ describe('NowCard', () => {
     );
 
     expect(getByText('Open your next learning step')).toBeTruthy();
+  });
+
+  it('renders the mentor notice actions with translated quiet copy', () => {
+    const notice = card({
+      kind: 'mentor_notice',
+      templateKey: 'now.mentor_notice.default',
+      params: { concept: 'changing signs', subjectName: 'Algebra' },
+      deepLink: {
+        route: 'notice.recheck',
+        params: { noticeId: 'notice-1', subjectId: 'subject-1' },
+        chain: [],
+      },
+    });
+    const onDecline = jest.fn();
+    const rendered = render(
+      <NowCard card={notice} onContinue={jest.fn()} onDecline={onDecline} />,
+    );
+
+    expect(rendered.getByText('A small idea worth checking')).toBeTruthy();
+    expect(rendered.getByText('Check it now')).toBeTruthy();
+    fireEvent.press(rendered.getByText('Not now'));
+    expect(onDecline).toHaveBeenCalledWith(notice);
   });
 
   it('fires continue, decline, and completion callbacks with the card', () => {

@@ -173,7 +173,11 @@ export function makeChatStreamResult(
 /** Provider interface — all LLM providers implement this */
 export interface LLMProvider {
   id: string;
-  chat(messages: ChatMessage[], config: ModelConfig): Promise<ChatResult>;
+  chat(
+    messages: ChatMessage[],
+    config: ModelConfig,
+    signal?: AbortSignal,
+  ): Promise<ChatResult>;
   chatStream(messages: ChatMessage[], config: ModelConfig): ChatStreamResult;
 }
 

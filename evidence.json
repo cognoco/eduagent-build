@@ -1,0 +1,66 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Verify-first re-confirmation of the 8 gaps (G1-G8) grounded at current main; assertCanReadProfile primitive (self OR guardian-of-uncredentialed-charge, mirrors verifyPersonOwnershipV2/assertCallerIsAccountOwner) applied to every confirmed READ gap: G1 recaps/self, G2 learner-profile, G3 learner-profile/export-text, G4 notes x7, G5 consent/my-status, G7 progress x15, G8 sessions x5 + quiz x3. G6 (consent write-branch) is out of scope per PM ruling.",
+      "pointer": "apps/api/src/services/family-access.ts:314"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "G1 recaps/self guard call site",
+      "pointer": "apps/api/src/routes/recaps.ts:69"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "G2/G3 learner-profile + export-text guard call sites",
+      "pointer": "apps/api/src/routes/learner-profile.ts:69"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "G4 notes guard call sites (7 GET handlers)",
+      "pointer": "apps/api/src/routes/notes.ts:119"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "G5 consent/my-status guard call site",
+      "pointer": "apps/api/src/routes/consent.ts:481"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "G7 progress guard call sites (15 GET handlers)",
+      "pointer": "apps/api/src/routes/progress.ts:75"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "G8 sessions guard call sites (5 GET handlers incl. G8d transcript)",
+      "pointer": "apps/api/src/routes/sessions.ts:202"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "G8 quiz guard call sites (3 GET handlers)",
+      "pointer": "apps/api/src/routes/quiz.ts:228"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Break test per HIGH cluster: authenticated as owner A, X-Profile-Id spoofed to credentialed peer B (same org, no authority relationship) -> 403 and response body contains none of B's seeded data. Representative route per cluster: G1 recaps/self, G2 learner-profile, G3 export-text, G4 notes book route.",
+      "pointer": "tests/integration/wi2416-read-idor.integration.test.ts:241"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Guardian/self allowed negative control: caller reading own profile (self) returns 200 with own data; guardian of an uncredentialed charge reading X-Profile-Id=charge returns 200 with the charge's data (recaps + learner-profile); non-owner peer self-read is not owner-gated.",
+      "pointer": "tests/integration/wi2416-read-idor.integration.test.ts:334"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Red-green-revert on GET /recaps/self (representative HIGH route): fails at current main (peer's recap leaks, 200 instead of 403), passes after the fix (403), fails again on revert (200), restored to green. Executed cycle recorded in wi2416-rgr-evidence.md.",
+      "pointer": "tests/integration/wi2416-read-idor.integration.test.ts:241"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "Forward-only TS-AST route-scanner ratchet: walks apps/api/src/routes/*.ts for GET handlers consuming the header-resolved profileId (withProfile/requireProfileId/bare c.get('profileId')) without a assertCanReadProfile call; every pre-existing gap outside G1-G8 scope is grandfathered in profile-read-authority-baseline.json (73 entries); demonstrated red on a synthetic unguarded route and on a live regression (temporarily removing the G1 guard), then reverted to green.",
+      "pointer": "apps/api/src/services/profile-read-authority.guard.test.ts:205"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "tests/integration/wi2416-read-idor.integration.test.ts:241"
+}

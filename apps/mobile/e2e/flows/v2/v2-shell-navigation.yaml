@@ -92,9 +92,10 @@ tags:
     timeout: 15000
 - tapOn:
     id: 'journal-tab-practice'
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: 'journal-practice-section'
+    direction: DOWN
     timeout: 15000
 - tapOn:
     id: 'journal-practice-open-hub'

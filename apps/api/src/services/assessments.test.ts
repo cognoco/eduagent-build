@@ -1,5 +1,8 @@
 import {
   registerProvider,
+  setLlmRoutingV2Enabled,
+  _clearProviders,
+  _resetCircuits,
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
@@ -10,6 +13,7 @@ import { makeChatStreamResult } from './llm/types';
 import {
   generateQuickCheck,
   evaluateAssessmentAnswer,
+  evaluateQuickCheckAnswer,
   getNextVerificationDepth,
   calculateMasteryScore,
   createAssessment,
@@ -1552,4 +1556,240 @@ describe('mapAssessmentRow — parseAssessmentExchangeHistory integration [BUG-3
     expect(result).toHaveLength(1);
     expect(result[0]!.content).toBe('Hello');
   });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2432] ageBracket threads to the router's under-18 vendor-exclusion gate.
+//
+// Before this fix, none of generateQuickCheck / evaluateAssessmentAnswer /
+// evaluateQuickCheckAnswer supplied ageBracket to routeAndCall, so the
+// router's under-18 Gemini/Vertex exclusion (isUnder18AgeBracket, router.ts)
+// could never fire for these calls on the legacy (routing V2 off) path — a
+// registered Gemini provider would silently serve a minor. These tests force
+// the legacy path and an under-18 ageBracket, then assert the Gemini
+// provider is never invoked (using the REAL router — registerProvider +
+// setLlmRoutingV2Enabled(false) — this file does not mock ./llm).
+// ---------------------------------------------------------------------------
+describe('[WI-2432] ageBracket threads to vendor-exclusion (legacy path)', () => {
+  let geminiSpy: jest.Mock;
+
+  function approvedQuickCheckProvider(
+    id: string,
+    questions: string[],
+  ): LLMProvider {
+    return {
+      id,
+      async chat(_messages: ChatMessage[], _config: ModelConfig) {
+        return {
+          content: JSON.stringify({ questions }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield JSON.stringify({ questions });
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+  }
+
+  /**
+   * [WI-2432] Mock provider whose chat() fails `failCount` times then
+   * succeeds — same pattern as router.test.ts's local
+   * `createTransientFailProvider` (not exported from providers/mock, so
+   * re-declared per file). Used to force the primary provider past
+   * MAX_RETRIES(3) (4 attempts) so routeAndCall actually reaches
+   * getFallbackConfig (router.ts:1064), not just getModelConfig
+   * (router.ts:908) — the two sites have independent isUnder18AgeBracket
+   * gates, so a test that only exercises the primary path would not prove
+   * ageBracket also reaches the fallback call.
+   */
+  function createTransientFailProvider(
+    id: string,
+    failCount: number,
+    successContent: string,
+  ): LLMProvider & { callCount: number } {
+    let calls = 0;
+    return {
+      id,
+      async chat(): Promise<{ content: string; stopReason: StopReason }> {
+        calls++;
+        if (calls <= failCount) {
+          throw new Error(
+            `[WI-2432 test] simulated transient failure #${calls}`,
+          );
+        }
+        return { content: successContent, stopReason: 'stop' };
+      },
+      get callCount() {
+        return calls;
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+  }
+
+  function approvedEvalProvider(
+    id: string,
+    evaluation: {
+      feedback: string;
+      passed: boolean;
+      shouldEscalateDepth: boolean;
+      rawScore: number;
+      qualityRating: number;
+    },
+  ): LLMProvider {
+    return {
+      id,
+      async chat(_messages: ChatMessage[], _config: ModelConfig) {
+        return {
+          content: JSON.stringify(evaluation),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield JSON.stringify(evaluation);
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+  }
+
+  beforeEach(() => {
+    _clearProviders();
+    _resetCircuits();
+    setLlmRoutingV2Enabled(false);
+    geminiSpy = jest.fn();
+    registerProvider({
+      id: 'gemini',
+      async chat(...args: Parameters<LLMProvider['chat']>) {
+        geminiSpy(...args);
+        return {
+          content: JSON.stringify({
+            questions: ['GEMINI SHOULD NEVER SERVE AN UNDER-18 SUBJECT', 'Q2?'],
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    });
+  });
+
+  afterEach(() => {
+    _clearProviders();
+    setLlmRoutingV2Enabled(false);
+    registerProvider(createMockProvider('gemini'));
+  });
+
+  it.each(['child', 'adolescent'] as const)(
+    'generateQuickCheck never calls Gemini for an under-18 subject (%s)',
+    async (ageBracket) => {
+      registerProvider(
+        approvedQuickCheckProvider('cerebras', [
+          'Can you explain why we use let instead of var?',
+          'What happens if you try to reassign a const variable?',
+        ]),
+      );
+
+      const result = await generateQuickCheck(quickCheckContext, {
+        ageBracket,
+      });
+
+      expect(geminiSpy).not.toHaveBeenCalled();
+      expect(result.questions.length).toBeGreaterThanOrEqual(2);
+    },
+  );
+
+  it.each(['child', 'adolescent'] as const)(
+    'evaluateAssessmentAnswer never calls Gemini for an under-18 subject (%s)',
+    async (ageBracket) => {
+      registerProvider(
+        approvedEvalProvider('cerebras', {
+          feedback: 'Good progress.',
+          passed: true,
+          shouldEscalateDepth: false,
+          rawScore: 0.8,
+          qualityRating: 3,
+        }),
+      );
+
+      const result = await evaluateAssessmentAnswer(
+        assessmentContext,
+        'A variable stores data.',
+        { ageBracket },
+      );
+
+      expect(geminiSpy).not.toHaveBeenCalled();
+      expect(result.feedback).toContain('Good progress.');
+    },
+  );
+
+  it.each(['child', 'adolescent'] as const)(
+    'evaluateQuickCheckAnswer never calls Gemini for an under-18 subject (%s)',
+    async (ageBracket) => {
+      registerProvider(
+        approvedEvalProvider('cerebras', {
+          feedback: 'Nicely done.',
+          passed: true,
+          shouldEscalateDepth: false,
+          rawScore: 0.8,
+          qualityRating: 3,
+        }),
+      );
+
+      const result = await evaluateQuickCheckAnswer(
+        assessmentContext,
+        'A variable stores data.',
+        { ageBracket },
+      );
+
+      expect(geminiSpy).not.toHaveBeenCalled();
+      expect(result.feedback).toBe('Nicely done.');
+    },
+  );
+
+  it('an unambiguously adult subject is unaffected (no regression) — Gemini remains eligible', async () => {
+    const result = await generateQuickCheck(quickCheckContext, {
+      ageBracket: 'adult',
+    });
+
+    expect(geminiSpy).toHaveBeenCalledTimes(1);
+    expect(result.questions.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('forces a primary-provider failure past MAX_RETRIES, driving generateQuickCheck through getFallbackConfig — still never selects Gemini for an under-18 subject', async () => {
+    const flakyCerebras = createTransientFailProvider(
+      'cerebras',
+      4, // 1 + MAX_RETRIES(3) — exhausts the primary's withRetry loop
+      JSON.stringify({
+        questions: [
+          'Can you explain why we use let instead of var?',
+          'What happens if you try to reassign a const variable?',
+        ],
+      }),
+    );
+    registerProvider(flakyCerebras);
+
+    const result = await generateQuickCheck(quickCheckContext, {
+      ageBracket: 'child',
+    });
+
+    expect(geminiSpy).not.toHaveBeenCalled();
+    expect(result.questions.length).toBeGreaterThanOrEqual(2);
+    // 4 failing primary attempts + 1 succeeding fallback attempt: proves
+    // execution actually reached getFallbackConfig's isUnder18AgeBracket
+    // gate (router.ts:1064), not just getModelConfig's (router.ts:908).
+    expect(flakyCerebras.callCount).toBe(5);
+  }, 15000);
 });

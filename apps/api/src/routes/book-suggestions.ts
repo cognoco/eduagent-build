@@ -70,7 +70,7 @@ export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
       const db = c.get('db');
       const { subjectId } = c.req.valid('param');
 
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
 
       // i18n Phase 1 — forward the active profile's conversation_language.
       const profileMeta = c.get('profileMeta');

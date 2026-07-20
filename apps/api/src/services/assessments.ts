@@ -19,6 +19,7 @@ import {
   type AssessmentStatus,
   type ChatExchange,
   type ConversationLanguage,
+  type AgeBracket,
 } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import type { ChatMessage } from './llm';
@@ -268,7 +269,10 @@ export function resolveAssessmentStatus(input: {
  */
 export async function generateQuickCheck(
   context: QuickCheckContext,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
+  },
 ): Promise<QuickCheckResult> {
   // [PROMPT-INJECT-8] topic fields are stored content; exchange history is
   // raw learner+assistant text. Sanitize titles, entity-encode the joined
@@ -296,6 +300,7 @@ export async function generateQuickCheck(
   const result = await routeAndCall(messages, 2, {
     flow: 'assessment.evaluate',
     conversationLanguage: options?.conversationLanguage,
+    ageBracket: options?.ageBracket,
   });
   return parseQuickCheckResult(result.response);
 }
@@ -334,6 +339,7 @@ export async function evaluateAssessmentAnswer(
   options?: {
     assessmentStatus?: AssessmentStatus;
     conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
   },
 ): Promise<AssessmentEvaluation> {
   if (
@@ -349,6 +355,7 @@ export async function evaluateAssessmentAnswer(
   const result = await routeAndCall(messages, 2, {
     flow: 'assessment.evaluate',
     conversationLanguage: options?.conversationLanguage,
+    ageBracket: options?.ageBracket,
   });
   const evaluation = parseAssessmentEvaluation(
     result.response,
@@ -481,6 +488,7 @@ export async function submitAssessmentAnswer(
   answer: string,
   options: {
     conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
     deps?: SubmitAssessmentAnswerDependencies;
   } = {},
 ): Promise<SubmitAssessmentAnswerResult | null> {
@@ -533,6 +541,7 @@ export async function submitAssessmentAnswer(
             {
               assessmentStatus: snapshot.status,
               conversationLanguage: options.conversationLanguage,
+              ageBracket: options.ageBracket,
             },
           );
 
@@ -639,7 +648,10 @@ export async function submitAssessmentAnswer(
 export async function evaluateQuickCheckAnswer(
   context: AssessmentContext,
   answer: string,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    ageBracket?: AgeBracket;
+  },
 ): Promise<AssessmentEvaluation> {
   const safeTopicTitle = sanitizeXmlValue(context.topicTitle, 200);
   const safeTopicDescription = sanitizeXmlValue(context.topicDescription, 500);
@@ -660,6 +672,7 @@ export async function evaluateQuickCheckAnswer(
   const result = await routeAndCall(messages, 2, {
     flow: 'assessment.evaluate',
     conversationLanguage: options?.conversationLanguage,
+    ageBracket: options?.ageBracket,
   });
   return parseAssessmentEvaluation(result.response, context.currentDepth);
 }

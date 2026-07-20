@@ -9,6 +9,8 @@ import type { NowResponse } from '@eduagent/schemas';
 import { JournalTabView } from './JournalTabView';
 
 const mockPush = jest.fn();
+const mockSetActiveScope = jest.fn();
+let mockJournalSection: string | undefined;
 let mockNowFeed: {
   data: NowResponse | undefined;
   isLoading: boolean;
@@ -26,7 +28,15 @@ let lastPracticeOpts: { limit?: number; type?: string } | undefined;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
+  useLocalSearchParams: () => ({ section: mockJournalSection }),
 }));
+
+jest.mock(
+  '../../lib/scope-context' /* gc1-allow: real hook throws without its provider and resolves persisted scope asynchronously; this composition test only needs a stable setActiveScope spy */,
+  () => ({
+    useScopeContext: () => ({ setActiveScope: mockSetActiveScope }),
+  }),
+);
 
 jest.mock(
   '../../hooks/use-now-feed' /* gc1-allow: Journal moments consume the already-tested feed hook; component test pins feed states */,
@@ -86,6 +96,14 @@ jest.mock(
     }),
   }),
 );
+
+function firstCallOrder(mockFn: jest.Mock): number {
+  const order = mockFn.mock.invocationCallOrder[0];
+  if (order === undefined) {
+    throw new Error('expected mock to have been called');
+  }
+  return order;
+}
 
 function query<T>(data: T) {
   return {
@@ -155,6 +173,7 @@ const monthlyReport = {
 describe('JournalTabView', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockJournalSection = undefined;
     mockNowFeed = {
       data: {
         scope: 'self',
@@ -280,6 +299,40 @@ describe('JournalTabView', () => {
     screen.getByTestId(`journal-recap-row-${recap.recapId}`);
   });
 
+  // [WI-2223 AC-1] activating a support.hub-linked ledger moment must select
+  // the Support-hub scope BEFORE the Mentor tab opens — the second
+  // pushNowDeepLink caller (the first is mentor.tsx, covered in
+  // mentor.test.tsx), or the learner Mentor surface renders instead.
+  it('[WI-2223] AC-1: selects the Support-hub scope before pushing a support.hub-linked moment', () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: {
+        scope: 'self',
+        generatedAt: '2026-06-14T00:00:00.000Z',
+        overflowCount: 0,
+        cards: [
+          {
+            kind: 'ledger_moment',
+            templateKey: 'now.ledger_moment.session_filed',
+            params: { ledgerKind: 'session_filed', topicTitle: 'Emma' },
+            deepLink: { route: 'support.hub', params: {}, chain: [] },
+            scope: 'self',
+          },
+        ],
+      },
+    };
+
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-moment-session_filed'));
+
+    expect(mockSetActiveScope).toHaveBeenCalledWith({ kind: 'supporter-hub' });
+    expect(mockPush).toHaveBeenCalledWith('/(app)/mentor');
+    expect(firstCallOrder(mockSetActiveScope)).toBeLessThan(
+      firstCallOrder(mockPush),
+    );
+  });
+
   it('renders all five section buttons in the two-row control', () => {
     render(<JournalTabView />);
 
@@ -291,6 +344,41 @@ describe('JournalTabView', () => {
     // Full labels render (no truncation/font-shrink) — the original bug.
     screen.getByText('Sessions');
     screen.getByText('Practice');
+  });
+
+  it('[WI-2110 AC-1/4] temporarily overrides a warm organic section and restores it', () => {
+    const { rerender } = render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+    screen.getByTestId('journal-notes-section');
+
+    mockJournalSection = 'practice';
+    rerender(<JournalTabView />);
+    screen.getByTestId('journal-practice-section');
+    screen.getByTestId('journal-moments-strip');
+
+    mockJournalSection = undefined;
+    rerender(<JournalTabView />);
+    screen.getByTestId('journal-notes-section');
+  });
+
+  it('[WI-2110 AC-3] selects Practice for a cold-start section override', () => {
+    mockJournalSection = 'practice';
+
+    render(<JournalTabView />);
+
+    screen.getByTestId('journal-practice-section');
+  });
+
+  it('[WI-2110 AC-2] ignores an unknown section and preserves organic selection', () => {
+    const { rerender } = render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+    mockJournalSection = 'future-section';
+    rerender(<JournalTabView />);
+
+    screen.getByTestId('journal-notes-section');
+    screen.getByTestId('journal-moments-strip');
   });
 
   it('opens the practice hub from the Practice section', () => {

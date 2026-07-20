@@ -67,7 +67,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
   })
 
   .get('/retention/assessment-eligible', async (c) => {
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const topics = await getAssessmentEligibleTopics(db, profileId);
@@ -107,7 +107,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     '/retention/recall-test',
     zValidator('json', recallTestSubmitSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const input = c.req.valid('json');
@@ -122,7 +122,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     '/retention/relearn',
     zValidator('json', relearnTopicSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const input = c.req.valid('json');
@@ -169,7 +169,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     zValidator('json', teachingPreferenceSchema),
     async (c) => {
       // [WI-165 / DS-076] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId } = c.req.valid('param');
@@ -201,7 +201,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     zValidator('param', subjectParamSchema),
     async (c) => {
       // [WI-165 / DS-076] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId } = c.req.valid('param');

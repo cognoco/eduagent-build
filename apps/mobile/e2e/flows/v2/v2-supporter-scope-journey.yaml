@@ -36,9 +36,14 @@ tags:
       id: 'support-hub-mentor-tab'
     timeout: 30000
 
-# Support hub: the seeded person chip for the rich supportee is present; the
-# revoked supportee has NO scope-chip affordance at all (fails closed with no
-# dangling UI pointing at it — mirrors j29-supporter-scope-journey.spec.ts).
+# Support hub: locate the exact rich supportee through its person-specific
+# action before asserting the card. The empty-record card can be first in the
+# vertical viewport, so an assertion before this scroll proves only layout.
+- scrollUntilVisible:
+    element:
+      id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}'
+    direction: DOWN
+    timeout: 15000
 - assertVisible:
     id: 'support-hub-mentor-person-${SUPPORTEE_PERSON_ID}'
 - assertNotVisible:
@@ -85,6 +90,8 @@ tags:
     visible:
       id: 'person-scope-structural-subjects'
     timeout: 15000
+- assertVisible:
+    id: 'person-scope-subject-${SUBJECT_ID}'
 
 # Journal (same person/edge, still the rich supportee).
 - tapOn:
@@ -103,16 +110,47 @@ tags:
 - assertNotVisible:
     text: 'PRIVATE'
 
-# Relaunch: kill and restart the app, then confirm the SAME person/edge is
-# still active (scope-context.tsx persists activeScope via SecureStore keyed
-# on profileId, re-hydrated on next mount) — not reverted to the hub.
+# Relaunch: kill and restart the app. SecureStore scope persistence is
+# fire-and-forget, so the cold launch may hydrate the hub, the rich person, or
+# the empty-record person. Wait for the shared scope chrome, then deliberately
+# enter the Support hub before re-acquiring the exact rich supportee through
+# its person-specific card. The rich shared-record assertion below cannot pass
+# on Empty-Record.
 - stopApp
 - launchApp:
     clearState: false
 - extendedWaitUntil:
     visible:
-      id: 'person-scope-journal-placeholder'
+      id: 'scope-chip'
     timeout: 30000
+- tapOn:
+    id: 'scope-chip-option-supporter-hub'
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}'
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-mentor-tab'
+    timeout: 15000
+- assertVisible:
+    id: 'support-hub-mentor-person-${SUPPORTEE_PERSON_ID}'
+- tapOn:
+    id: 'tab-journal'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'person-scope-journal-placeholder'
+    timeout: 15000
+- assertVisible:
+    id: 'visibility-shared-record'
 
 # EMPTY SHARED RECORD: switching to the empty-record supportee renders an
 # honest empty state, not an error and no leaked private content.
@@ -127,10 +165,10 @@ tags:
 - assertVisible:
     id: 'person-scope-journal-empty-lamp'
 
-# Back to Support hub via the scope chip.
+# Back to Support hub via the scope chip, preserving the active Journal tab.
 - tapOn:
     id: 'scope-chip-option-supporter-hub'
 - extendedWaitUntil:
     visible:
-      id: 'support-hub-mentor-tab'
+      id: 'support-hub-journal-tab'
     timeout: 15000

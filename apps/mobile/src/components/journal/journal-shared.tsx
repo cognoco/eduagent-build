@@ -14,6 +14,14 @@ export type JournalSectionId =
   | 'memory'
   | 'reports';
 
+export const JOURNAL_SECTION_IDS: readonly JournalSectionId[] = [
+  'notes',
+  'sessions',
+  'practice',
+  'memory',
+  'reports',
+];
+
 /**
  * Builds the {primary, secondary} ErrorFallback action pair from a RAW error.
  * Classifies the raw error first (never string-matches formatted output), then

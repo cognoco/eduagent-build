@@ -38,6 +38,7 @@ import {
   contentFlagSchema,
   summarySubmitSchema,
   sessionSummarySchema,
+  submitSummaryResultSchema,
   skipSummaryResponseSchema,
   parkingLotAddSchema,
   parkingLotItemSchema,
@@ -53,6 +54,30 @@ import {
   homeworkStartResponseSchema,
   outboxSpilloverResultSchema,
 } from './sessions.js';
+
+describe('mentor notice session summary contract', () => {
+  it('parses the persisted noticed-along-the-way receipt', () => {
+    const parsed = sessionSummarySchema.parse({
+      id: '00000000-0000-4000-8000-000000000001',
+      sessionId: '00000000-0000-4000-8000-000000000002',
+      content: 'Summary content',
+      aiFeedback: null,
+      status: 'accepted',
+      closingLine: null,
+      learnerRecap: null,
+      nextTopicId: null,
+      nextTopicTitle: null,
+      nextTopicReason: null,
+      mentorNotice: {
+        id: '00000000-0000-4000-8000-000000000003',
+        concept: 'Sign changes when moving terms',
+        correctionHint: null,
+      },
+    });
+
+    expect(parsed.mentorNotice?.concept).toBe('Sign changes when moving terms');
+  });
+});
 
 const UUID = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -957,6 +982,23 @@ describe('summarySubmitSchema', () => {
 // sessionSummarySchema
 // ---------------------------------------------------------------------------
 describe('sessionSummarySchema', () => {
+  it('keeps feedbackStatus optional for backwards-compatible GET parsing', () => {
+    const result = sessionSummarySchema.safeParse({
+      id: UUID,
+      sessionId: UUID,
+      content: 'Summary content here',
+      aiFeedback: null,
+      status: 'submitted',
+      closingLine: null,
+      learnerRecap: null,
+      nextTopicId: null,
+      nextTopicTitle: null,
+      nextTopicReason: null,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it('accepts a complete session summary', () => {
     const result = sessionSummarySchema.safeParse({
       id: UUID,
@@ -1036,6 +1078,36 @@ describe('sessionSummarySchema', () => {
   });
 });
 
+describe('submitSummaryResultSchema', () => {
+  const currentSubmitResult = {
+    summary: {
+      id: UUID,
+      sessionId: UUID,
+      content: 'Summary content here',
+      aiFeedback: null,
+      feedbackStatus: 'unavailable' as const,
+      status: 'submitted' as const,
+      baseXp: null,
+      reflectionBonusXp: null,
+    },
+  };
+
+  it('requires feedbackStatus on current POST responses', () => {
+    const { feedbackStatus: _feedbackStatus, ...legacyShape } =
+      currentSubmitResult.summary;
+
+    expect(
+      submitSummaryResultSchema.safeParse({ summary: legacyShape }).success,
+    ).toBe(false);
+  });
+
+  it('accepts an explicit feedbackStatus on current POST responses', () => {
+    expect(
+      submitSummaryResultSchema.safeParse(currentSubmitResult).success,
+    ).toBe(true);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // skipSummaryResponseSchema
 // ---------------------------------------------------------------------------
@@ -1109,6 +1181,29 @@ describe('sessionMessageSchema', () => {
       message: 'Hello',
       imageBase64: 'iVBORw0KGgoAAAANS==',
       imageMimeType: 'application/pdf',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // [WI-2220] Active app shell — see appShellSchema.
+  it('accepts a v0 or v2 shell', () => {
+    expect(
+      sessionMessageSchema.safeParse({ message: 'Hello', shell: 'v0' }).success,
+    ).toBe(true);
+    expect(
+      sessionMessageSchema.safeParse({ message: 'Hello', shell: 'v2' }).success,
+    ).toBe(true);
+  });
+
+  it('accepts a message without a shell', () => {
+    const result = sessionMessageSchema.safeParse({ message: 'Hello' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an invalid shell value', () => {
+    const result = sessionMessageSchema.safeParse({
+      message: 'Hello',
+      shell: 'v1',
     });
     expect(result.success).toBe(false);
   });

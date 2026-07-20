@@ -1,0 +1,31 @@
+{
+  "workItem": "WI-2012",
+  "phase": "exact production restore",
+  "command": "pnpm exec jest --config apps/api/jest.integration.config.cjs apps/api/src/services/learner-profile.integration.test.ts --runInBand --no-coverage -t \"memory channel toggle concurrency\"",
+  "exitCode": 0,
+  "testSuites": {
+    "passed": 1,
+    "total": 1
+  },
+  "tests": {
+    "passed": 2,
+    "skipped": 11,
+    "total": 13
+  },
+  "productionState": {
+    "diffFromOriginMain": "none",
+    "testsChangedForRun": false
+  },
+  "namedCases": [
+    {
+      "name": "serializes injection=true before collection=false and preserves injection in memoryEnabled",
+      "durationMs": 1647,
+      "result": "passed"
+    },
+    {
+      "name": "serializes collection=true before injection=false and preserves collection in memoryEnabled",
+      "durationMs": 1892,
+      "result": "passed"
+    }
+  ]
+}

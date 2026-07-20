@@ -201,7 +201,7 @@ else
       echo ""
       echo "── jest [${project_dir}] ──────────────────────────────────────"
       # shellcheck disable=SC2086
-      if ! (cd "$WORKSPACE_ROOT/$project_dir" && IDENTITY_V2_ENABLED=false pnpm exec jest --findRelatedTests $abs_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
+      if ! (cd "$WORKSPACE_ROOT/$project_dir" && IDENTITY_V2_ENABLED=false node "$WORKSPACE_ROOT/node_modules/jest/bin/jest.js" --findRelatedTests $abs_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
         JEST_FAILED=1
       fi
     }
@@ -230,7 +230,7 @@ else
       echo ""
       echo "── jest [apps/mobile] ─────────────────────────────────────────"
       # shellcheck disable=SC2086
-      if ! (cd "$WORKSPACE_ROOT/apps/mobile" && NODE_OPTIONS='--max-old-space-size=6144' pnpm exec jest --findRelatedTests $mobile_files_for_jest --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
+      if ! (cd "$WORKSPACE_ROOT/apps/mobile" && NODE_OPTIONS='--max-old-space-size=6144' node "$WORKSPACE_ROOT/node_modules/jest/bin/jest.js" --findRelatedTests $mobile_files_for_jest --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
         JEST_FAILED=1
       fi
     fi

@@ -47,6 +47,44 @@ describe('parseEnvelope', () => {
     }
   });
 
+  it('normalizes an explicit no-gap observation decision to null', () => {
+    const result = parseEnvelope(
+      '{"reply":"done","signals":{"noticed_gap":{"observed":false}}}',
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.signals?.noticed_gap).toBeNull();
+    }
+  });
+
+  it('normalizes an observed gap decision to the evidence payload', () => {
+    const result = parseEnvelope(
+      JSON.stringify({
+        reply: 'done',
+        signals: {
+          noticed_gap: {
+            observed: true,
+            concept: 'moving a negative term across an equation',
+            correctionHint: 'The sign changes when adding three to both sides.',
+            answerEventId: '550e8400-e29b-41d4-a716-446655440010',
+            learnerQuote: 'I kept it negative',
+          },
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.signals?.noticed_gap).toEqual({
+        concept: 'moving a negative term across an equation',
+        correctionHint: 'The sign changes when adding three to both sides.',
+        answerEventId: '550e8400-e29b-41d4-a716-446655440010',
+        learnerQuote: 'I kept it negative',
+      });
+    }
+  });
+
   it('[WI-1823] parses a four-strands t5 drill-start envelope with a degenerate 0/0 score', () => {
     // Captured four-strands t5 fluency-turn payload (staging enduser gate,
     // gpt-oss-120b): the model correctly sets active:true to START the drill but
@@ -373,14 +411,15 @@ describe('parseEnvelope', () => {
 
   it('[BUG-847] emits llm.envelope.parse_failed on no_json_found, tagged with surface', () => {
     const { spy, entries } = captureLoggerWarns();
-    parseEnvelope('just prose, no JSON', 'filing');
+    const response = 'just prose, no JSON';
+    parseEnvelope(response, 'filing');
     const [entry] = entries();
     expect(entry?.message).toBe('llm.envelope.parse_failed');
     expect(entry?.context).toEqual(
       expect.objectContaining({
         surface: 'filing',
         reason: 'no_json_found',
-        rawSnippet: 'just prose, no JSON',
+        responseLength: response.length,
       }),
     );
     spy.mockRestore();
@@ -434,14 +473,15 @@ describe('parseEnvelope', () => {
     spy.mockRestore();
   });
 
-  it('[BUG-847] truncates the raw snippet at 200 chars to bound log volume', () => {
+  it('[BUG-847] logs response length without retaining response content', () => {
     const { spy, entries } = captureLoggerWarns();
-    const long = 'x'.repeat(500);
-    parseEnvelope(long, 'filing');
+    const sensitiveResponse = 'PRIVATE_RECITATION_SENTINEL'.repeat(20);
+    parseEnvelope(sensitiveResponse, 'filing');
     const [entry] = entries();
-    expect(
-      (entry?.context as { rawSnippet?: string })?.rawSnippet?.length,
-    ).toBe(200);
+    expect(entry?.context).toEqual(
+      expect.objectContaining({ responseLength: sensitiveResponse.length }),
+    );
+    expect(JSON.stringify(entry)).not.toContain('PRIVATE_RECITATION_SENTINEL');
     spy.mockRestore();
   });
 });

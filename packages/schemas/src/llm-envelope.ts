@@ -154,7 +154,9 @@ const evaluateAssessmentSignalSchema = z.preprocess(
   optionalObjectInput,
   z
     .object({
-      challenge_passed: z.preprocess(nullToUndefined, z.boolean()),
+      challenge_passed: z
+        .preprocess(nullToUndefined, z.boolean().optional())
+        .catch(undefined),
       flaw_identified: z.preprocess((value) => {
         if (typeof value !== 'string') return undefined;
         const trimmed = value.trim();
@@ -330,6 +332,43 @@ export type ChallengeRoundGraderDegradedEvent = z.infer<
   typeof challengeRoundGraderDegradedEventSchema
 >;
 
+export const noticedGapSignalSchema = z.object({
+  concept: z.string().min(1).max(200),
+  correctionHint: z.string().min(1).max(500).optional(),
+  answerEventId: z.string().uuid(),
+  learnerQuote: z.string().min(1).max(500),
+  /** Required by the server for interleaved retrieval; omitted elsewhere. */
+  topicId: z.string().uuid().optional(),
+});
+export type NoticedGapSignal = z.infer<typeof noticedGapSignalSchema>;
+
+function normalizeNoticedGapDecision(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return value;
+  }
+
+  const input = value as Record<string, unknown>;
+  if (input['observed'] === false) return null;
+  if (input['observed'] !== true) return value;
+
+  const { observed: _observed, ...evidence } = input;
+  return evidence;
+}
+
+export const noticeRecheckSignalSchema = z.object({
+  noticeId: z.string().uuid(),
+  verdict: z.enum(['locked_in', 'not_yet', 'dismissed', 'deferred']),
+  answerEventId: z.string().uuid(),
+  learnerQuote: z.string().min(1).max(500),
+});
+export type NoticeRecheckSignal = z.infer<typeof noticeRecheckSignalSchema>;
+
+export const answerEvaluationSchema = z.object({
+  correctness: z.enum(['correct', 'partial', 'incorrect', 'na']),
+  concept: z.string().min(1).max(200).optional(),
+});
+export type AnswerEvaluation = z.infer<typeof answerEvaluationSchema>;
+
 const signalsSchema = z.preprocess(
   optionalObjectInput,
   z
@@ -346,6 +385,8 @@ const signalsSchema = z.preprocess(
       topic_opened_pending_content: optionalBooleanSchema,
       /** Main loop: learner response showed partial understanding — hold escalation. */
       partial_progress: optionalBooleanSchema,
+      /** Ordinary learning loop: evaluation of the current learner answer. */
+      answer_evaluation: answerEvaluationSchema.optional(),
       /** Main loop: rung-5 exit protocol fired — queue topic for remediation. */
       needs_deepening: optionalBooleanSchema,
       /** Main loop: the AI message contains an understanding check. Observational. */
@@ -380,9 +421,23 @@ const signalsSchema = z.preprocess(
       challenge_round_offer: optionalBooleanSchema,
       /** Challenge Round: per-concept evaluation of the learner's explanations. Drives mastery + note + weak-spot persistence. */
       challenge_round_evaluation: z
-        .array(challengeRoundEvaluationItemSchema)
-        .max(10)
-        .optional(),
+        .preprocess(
+          (value) => (Array.isArray(value) ? value : undefined),
+          z.array(z.unknown()).max(10).optional(),
+        )
+        .pipe(
+          z
+            .array(challengeRoundEvaluationItemSchema)
+            .optional()
+            .catch(undefined),
+        ),
+      /** Personal-mentor felt moment: proposed learner-safe notice, accepted only after DB-backed evidence checks. */
+      noticed_gap: z.preprocess(
+        normalizeNoticedGapDecision,
+        noticedGapSignalSchema.nullable().optional(),
+      ),
+      /** Mentor notice re-check verdict, accepted only after DB-backed evidence checks. */
+      notice_recheck: noticeRecheckSignalSchema.optional(),
     })
     .optional(),
 );
@@ -527,6 +582,8 @@ export interface NormalisedEnvelopeSignals {
   ready_to_finish: boolean;
   /** Main loop: learner response showed partial understanding — hold escalation. */
   partial_progress: boolean;
+  /** Ordinary learning loop: canonical answer evaluation. Null when absent. */
+  answer_evaluation: AnswerEvaluation | null;
   /** Main loop: rung-5 exit protocol fired — queue topic for remediation. */
   needs_deepening: boolean;
   /** Main loop: the AI message contains an understanding check. Observational. */
@@ -543,6 +600,10 @@ export interface NormalisedEnvelopeSignals {
   challenge_round_evaluation: ChallengeRoundEvaluationItem[];
   /** [WI-2107] Model opened a topic without delivering content or a question this turn. */
   topic_opened_pending_content: boolean;
+  /** Personal-mentor felt moment proposal. Null when absent. */
+  noticed_gap: NoticedGapSignal | null;
+  /** Mentor notice re-check verdict. Null when absent. */
+  notice_recheck: NoticeRecheckSignal | null;
 }
 
 export function normaliseSignals(
@@ -554,6 +615,7 @@ export function normaliseSignals(
   return {
     ready_to_finish: signals?.ready_to_finish ?? false,
     partial_progress: signals?.partial_progress ?? false,
+    answer_evaluation: signals?.answer_evaluation ?? null,
     needs_deepening: signals?.needs_deepening ?? false,
     understanding_check: signals?.understanding_check ?? false,
     retrieval_score: signals?.retrieval_score ?? null,
@@ -562,6 +624,8 @@ export function normaliseSignals(
     challenge_round_evaluation: signals?.challenge_round_evaluation ?? [],
     topic_opened_pending_content:
       signals?.topic_opened_pending_content ?? false,
+    noticed_gap: signals?.noticed_gap ?? null,
+    notice_recheck: signals?.notice_recheck ?? null,
   };
 }
 

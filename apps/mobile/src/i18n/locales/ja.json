@@ -1,4 +1,58 @@
 {
+  "celebrationEarnedContext": {
+    "polar_star": {
+      "child": "北極星 — はじめて自分の力で答えられたね！",
+      "adult": "北極星 — 初めて自力で回答しました。"
+    },
+    "twin_stars": {
+      "child": "ふたご星 — しっかりした答えが3回続いたね！",
+      "adult": "ふたご星 — 的確な回答が3回続きました。"
+    },
+    "comet": {
+      "child": "彗星 — ひらめいたね！",
+      "adult": "彗星 — ひとつの考え方を理解しました。"
+    },
+    "orions_belt": {
+      "child": "オリオンの三つ星 — 助けなしで5回答えられたね！",
+      "adult": "オリオンの三つ星 — 自力での回答が5回続きました。"
+    },
+    "deep_diver": {
+      "child": "深掘り名人 — じっくり考えた答えがすてき！",
+      "adult": "深掘り名人 — よく考えた回答で達成しました。"
+    },
+    "persistent": {
+      "child": "ねばり強さ — 直したあとも続けられたね！",
+      "adult": "ねばり強さ — 修正後も学習を続けました。"
+    },
+    "topic_mastered": {
+      "child": "彗星 — このトピックをマスターしたね！",
+      "adult": "彗星 — トピックを習得しました。"
+    },
+    "evaluate_success": {
+      "child": "ふたご星 — まちがいに気づけたね！",
+      "adult": "ふたご星 — 回答を正しく評価しました。"
+    },
+    "teach_back_success": {
+      "child": "ふたご星 — わかりやすく説明できたね！",
+      "adult": "ふたご星 — 明確に説明し返せました。"
+    },
+    "streak_7": {
+      "child": "彗星 — 7日連続で学べたね！",
+      "adult": "彗星 — 7日間の学習継続を達成しました。"
+    },
+    "streak_30": {
+      "child": "オリオンの三つ星 — 30日連続で学べたね！",
+      "adult": "オリオンの三つ星 — 30日間の学習継続を達成しました。"
+    },
+    "curriculum_complete": {
+      "child": "彗星 — カリキュラムをやりきったね！",
+      "adult": "彗星 — カリキュラムを完了しました。"
+    },
+    "default": {
+      "child": "マイルストーン達成 — よくできたね！",
+      "adult": "マイルストーンを達成しました。"
+    }
+  },
   "common": {
     "cancel": "キャンセル",
     "ok": "OK",
@@ -888,7 +942,8 @@
       "verificationBadge": {
         "evaluate": "思考力アップクリア",
         "teachBack": "ティーチバッククリア"
-      }
+      },
+      "mentorNotice": "学習中に気づいたこと：{{concept}}"
     },
     "noteInput": {
       "cancel": "キャンセル",
@@ -3045,6 +3100,7 @@
       "yourShare": "あなたの割り当て",
       "yourUsage": "あなたの使用状況",
       "questionsUsed": "{{count}}件の質問",
+      "formerMembers": "以前のメンバー",
       "familyAggregate": "家族の合計",
       "quotaResets": "割り当ては{{date}}にリセットされます",
       "renews": "サブスクリプションは{{date}}に更新されます",
@@ -3063,7 +3119,9 @@
       "title": "毎日のリマインダーを受け取りますか？",
       "message": "ストリークを途切れさせないよう、優しいリマインダーをお送りします。設定からいつでも無効にできます。",
       "allow": "許可する",
-      "notNow": "今はしない"
+      "notNow": "今はしない",
+      "noticeTitle": "簡単な復習をしませんか？",
+      "noticeMessage": "今日メンターが気づいたことを復習するよう、リマインダーを設定できます。この設定はいつでも「設定」からオフにできます。"
     },
     "masteredRow": {
       "title": "マスターしました："
@@ -3176,6 +3234,14 @@
         "language_focus": "次回は、文法パターンに取り組みましょう",
         "fluency": "次回: 流暢さの短期集中トレーニング"
       }
+    },
+    "feedbackUnavailableTitle": "フィードバックはまだ利用できません",
+    "feedbackUnavailableMessage": "概要は保存されました。再送信せずにフィードバックを再試行できます。",
+    "feedbackStillUnavailable": "フィードバックはまだ利用できませんが、概要は安全に保存されています。準備ができたら、再試行または続行できます。",
+    "retryFeedback": "フィードバックを再試行",
+    "retryingFeedback": "フィードバックを再試行中...",
+    "mentorNotice": {
+      "title": "学習中に気づいたこと"
     }
   },
   "sessionTranscript": {
@@ -3994,6 +4060,14 @@
         "currentAccess": "有料プランは{{deadline}}まで有効です。",
         "freeFallback": "現在、無料プランをご利用中です。プランを復元するには、お支払い情報を更新してください。",
         "currentAccessNoDeadline": "有料アクセスはまだ有効です。"
+      },
+      "mentor_notice": {
+        "title": "確認しておきたいアイデア",
+        "cta": "今すぐ確認",
+        "notNow": "後で",
+        "arcDue": "いつでも始められます",
+        "arcAdvancing": "クイックチェックを開始中",
+        "arcMastered": "定着しました"
       }
     },
     "ledger": {
@@ -4006,6 +4080,9 @@
       },
       "quota": {
         "title": "学習の記録が保存されました。"
+      },
+      "notice_locked_in": {
+        "title": "{{concept}}が定着しました。"
       }
     },
     "overflow": {
@@ -4212,7 +4289,8 @@
       "recap_ready": "要約の準備ができました。",
       "snapshot_ready": "学習スナップショットの準備ができました。",
       "reflection_bonus": "振り返りボーナスが保存されました。",
-      "quiz_personal_best": "自己ベストが保存されました。"
+      "quiz_personal_best": "自己ベストが保存されました。",
+      "notice_locked_in": "{{subjectName}}で{{concept}}を定着させました。"
     },
     "recaps": {
       "error": "概要を読み込めませんでした。",

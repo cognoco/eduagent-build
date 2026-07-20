@@ -35,6 +35,7 @@ export function useSessionRecovery({
   liveTranscriptMilestones,
   hydrate,
   hasHydratedRecoveryRef,
+  cancelSilencePrompt,
 }: {
   activeProfileId: string | undefined;
   activeSessionId: string | null;
@@ -48,6 +49,7 @@ export function useSessionRecovery({
   liveTranscriptMilestones: readonly CelebrationReason[] | undefined;
   hydrate: (state: MilestoneTrackerState) => void;
   hasHydratedRecoveryRef: React.MutableRefObject<boolean>;
+  cancelSilencePrompt: () => void;
 }): void {
   useEffect(() => {
     if (!routeSessionId || hasHydratedRecoveryRef.current) return;
@@ -92,6 +94,9 @@ export function useSessionRecovery({
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        cancelSilencePrompt();
+      }
       if (
         (nextState === 'background' || nextState === 'inactive') &&
         activeSessionId
@@ -117,6 +122,7 @@ export function useSessionRecovery({
   }, [
     activeSessionId,
     activeProfileId,
+    cancelSilencePrompt,
     effectiveMode,
     effectiveSubjectId,
     effectiveSubjectName,

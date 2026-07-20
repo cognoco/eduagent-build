@@ -13,7 +13,10 @@ import {
   __resetMentorBornCeremonyForTests,
   getMentorBornCeremonySnapshot,
 } from '../lib/mentor-born-ceremony';
-import { mentorBirthSeenKey } from '../lib/secure-store-keys';
+import {
+  MENTOR_BORN_PENDING_KEY,
+  mentorBirthSeenKey,
+} from '../lib/secure-store-keys';
 
 import {
   resolveNavigationContract,
@@ -421,7 +424,7 @@ describe('CreateProfileScreen', () => {
     }
   });
 
-  it('calls POST and navigates back on successful submit (adult, no consent needed)', async () => {
+  it('[WI-2105 AC-1] durably queues the ceremony after successful first-profile creation', async () => {
     const newProfile = makeProfileResponse({
       id: PROFILE_IDS.new,
       displayName: 'Sam',
@@ -461,6 +464,14 @@ describe('CreateProfileScreen', () => {
         reason: 'first-profile-created',
       },
       requestCount: 1,
+    });
+    expect(
+      JSON.parse(
+        expoSecureStoreMock.__store.get(MENTOR_BORN_PENDING_KEY) ?? 'null',
+      ),
+    ).toMatchObject({
+      profileId: PROFILE_IDS.new,
+      reason: 'first-profile-created',
     });
   });
 
@@ -1235,6 +1246,11 @@ describe('CreateProfileScreen', () => {
   });
 
   describe('parent adding child', () => {
+    const previewV1NavigationFlags = {
+      MODE_NAV_V0_ENABLED: true,
+      MODE_NAV_V1_ENABLED: true,
+    } as const;
+
     const parentProfile: NavigationProfile = {
       id: PROFILE_IDS.parent,
       accountId: TEST_ACCOUNT_ID,
@@ -1465,7 +1481,126 @@ describe('CreateProfileScreen', () => {
       }
     });
 
-    it('[WI-1611] keeps the owner active and updates owner family context when adding another child', async () => {
+    it('[WI-2123 AC-1/2/3] restores the preview family shell from the refreshed profiles cache after first-child creation and relaunch', async () => {
+      const patchedOwner: NavigationProfile = {
+        ...parentProfile,
+        defaultAppContext: 'family',
+        hasFamilyLinks: true,
+      };
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: true,
+        isSignedIn: true,
+        userId: 'clerk-user-test',
+      });
+      queryClient.setQueryDefaults(['profiles', 'clerk-user-test'], {
+        gcTime: Infinity,
+      });
+      queryClient.setQueryData(
+        ['profiles', 'clerk-user-test'],
+        [parentProfile],
+      );
+      const nativeAlertDismissed = jest.fn();
+      (Alert.alert as jest.Mock).mockImplementationOnce(() => {
+        nativeAlertDismissed();
+      });
+      mockFetch
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: childProfile }), {
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ profile: patchedOwner }), {
+            status: 200,
+          }),
+        );
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
+      fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+      await act(() => {
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
+      });
+      fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'Profile created',
+          "Lily's profile is ready. You can open it from Family mode.",
+          undefined,
+          undefined,
+        );
+      });
+      expect(nativeAlertDismissed).toHaveBeenCalledTimes(1);
+
+      const refreshedProfiles = queryClient.getQueryData<NavigationProfile[]>([
+        'profiles',
+        'clerk-user-test',
+      ]);
+      expect(refreshedProfiles).toEqual([
+        expect.objectContaining({
+          id: PROFILE_IDS.parent,
+          defaultAppContext: 'family',
+          hasFamilyLinks: true,
+          isOwner: true,
+        }),
+        expect.objectContaining({
+          id: PROFILE_IDS.childNew,
+          hasFamilyLinks: true,
+          isOwner: false,
+        }),
+      ]);
+
+      const resolvePreviewContract = (
+        profiles: ReadonlyArray<NavigationProfile>,
+      ) =>
+        resolveNavigationContract({
+          activeProfile: profiles[0] ?? null,
+          appContext: 'family',
+          flags: previewV1NavigationFlags,
+          isParentProxy: false,
+          profiles,
+          role: 'owner',
+          subscription: {
+            status: 'ready',
+            tier: 'family',
+            effectiveAccessTier: 'family',
+            billingAccess: null,
+          },
+        });
+
+      const postDismissalContract = resolvePreviewContract(
+        refreshedProfiles ?? [],
+      );
+      expect(postDismissalContract.home.screen).toBe('FamilyHome');
+      expect(postDismissalContract.isFamilyCapable).toBe(true);
+      expect(postDismissalContract.effectiveAppContext).toBe('family');
+      expect(refreshedProfiles?.[0]?.id).toBe(PROFILE_IDS.parent);
+      expect(
+        postDismissalContract.canEnter('child/[profileId]', {
+          profileId: PROFILE_IDS.childNew,
+        }),
+      ).toBe(true);
+
+      const mutationsBeforeRelaunch = mockFetch.mock.calls.length;
+      const relaunchedProfiles = JSON.parse(
+        JSON.stringify(refreshedProfiles),
+      ) as NavigationProfile[];
+      const coldRelaunchContract = resolvePreviewContract(relaunchedProfiles);
+      expect(coldRelaunchContract.home.screen).toBe('FamilyHome');
+      expect(
+        coldRelaunchContract.canEnter('child/[profileId]', {
+          profileId: PROFILE_IDS.childNew,
+        }),
+      ).toBe(true);
+      expect(mockFetch).toHaveBeenCalledTimes(mutationsBeforeRelaunch);
+    });
+
+    it('[WI-2123 AC-4 / WI-1611] keeps the family shell when the owner adds a second child', async () => {
       const existingChild: NavigationProfile = {
         id: PROFILE_IDS.childExisting,
         accountId: TEST_ACCOUNT_ID,
@@ -1500,6 +1635,18 @@ describe('CreateProfileScreen', () => {
         activeProfile: familyOwner,
         profiles: [familyOwner, existingChild],
       });
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: true,
+        isSignedIn: true,
+        userId: 'clerk-user-test',
+      });
+      queryClient.setQueryDefaults(['profiles', 'clerk-user-test'], {
+        gcTime: Infinity,
+      });
+      queryClient.setQueryData(
+        ['profiles', 'clerk-user-test'],
+        [familyOwner, existingChild],
+      );
       mockFetch
         .mockResolvedValueOnce(
           new Response(JSON.stringify({ profile: childProfile }), {
@@ -1531,6 +1678,50 @@ describe('CreateProfileScreen', () => {
       );
       expect(mockSwitchProfile).not.toHaveBeenCalled();
       expect(mockSwitchProfile).not.toHaveBeenCalledWith(PROFILE_IDS.childNew);
+
+      const refreshedProfiles = queryClient.getQueryData<NavigationProfile[]>([
+        'profiles',
+        'clerk-user-test',
+      ]);
+      expect(refreshedProfiles).toEqual([
+        expect.objectContaining({
+          id: PROFILE_IDS.parent,
+          defaultAppContext: 'family',
+          hasFamilyLinks: true,
+          isOwner: true,
+        }),
+        existingChild,
+        expect.objectContaining({
+          id: PROFILE_IDS.childNew,
+          hasFamilyLinks: true,
+          isOwner: false,
+        }),
+      ]);
+      const contract = resolveNavigationContract({
+        activeProfile: refreshedProfiles?.[0] ?? null,
+        appContext: 'family',
+        flags: previewV1NavigationFlags,
+        isParentProxy: false,
+        profiles: refreshedProfiles ?? [],
+        role: 'owner',
+        subscription: {
+          status: 'ready',
+          tier: 'family',
+          effectiveAccessTier: 'family',
+          billingAccess: null,
+        },
+      });
+      expect(contract.home.screen).toBe('FamilyHome');
+      expect(
+        contract.canEnter('child/[profileId]', {
+          profileId: PROFILE_IDS.childExisting,
+        }),
+      ).toBe(true);
+      expect(
+        contract.canEnter('child/[profileId]', {
+          profileId: PROFILE_IDS.childNew,
+        }),
+      ).toBe(true);
     });
 
     it('[WI-1611] preserves child creation and shows a family-mode recovery action when owner context PATCH fails', async () => {

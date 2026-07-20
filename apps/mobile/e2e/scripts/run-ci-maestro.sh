@@ -167,8 +167,8 @@ run_flow() {
 }
 
 index=0
-while IFS=$'\t' read -r scenario flow; do
+while IFS=$'\t' read -r scenario flow <&3; do
   index=$((index + 1))
   echo "[ci-maestro] [$index/$FLOW_COUNT] scenario=$scenario flow=$flow"
   run_flow "$scenario" "$flow"
-done < "$PLAN_FILE"
+done 3< "$PLAN_FILE"

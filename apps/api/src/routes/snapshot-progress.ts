@@ -89,7 +89,7 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
   )
   .post('/progress/refresh', async (c) => {
     // [WI-174 / DS-085] Server-derived proxy-mode write guard.
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const { db, profileId } = withProfile(c);
 
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.

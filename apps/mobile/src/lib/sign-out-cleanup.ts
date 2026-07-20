@@ -14,6 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearMentorLanguageStateOnSignOut } from './mentor-language-coordination';
 
 import * as SecureStore from './secure-storage';
 import { sanitizeSecureStoreKey } from './secure-storage';
@@ -29,6 +30,8 @@ import {
   notificationFirstAskKey,
   guardianNotificationAskKey,
   mentorBirthSeenKey,
+  MENTOR_BORN_PENDING_KEY,
+  mentorLanguageExplicitOverrideKey,
 } from './secure-store-keys';
 
 // Per-profile key constructors. Each takes a profileId and returns the exact
@@ -81,6 +84,8 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   guardianNotificationAskKey,
   // session/index.tsx — one-shot mentor-born ceremony for managed child learners.
   mentorBirthSeenKey,
+  // more/mentor-language.tsx — explicit Mentor-language selection marker.
+  mentorLanguageExplicitOverrideKey,
   // session-types.ts — getInputModeKey, sanitized
   (id) => sanitizeSecureStoreKey(`voice-input-mode-${id}`),
   // [CR-PR129-M6] (app)/_layout.tsx — ACCENT_STORE_PREFIX: accent preset per profile, sanitized.
@@ -138,6 +143,8 @@ export const GLOBAL_KEYS: ReadonlyArray<string> = [
   // user's parent/learner/supporter choice (WI-2225 added the third,
   // non-authorizing 'supporter' value to this same carrier). Spec: docs/plans/2026-05-28-parent-audience-add-child-onboarding.md
   'preAuthAudience.v1',
+  // mentor-born-ceremony.ts — transient first-profile ceremony handoff.
+  MENTOR_BORN_PENDING_KEY,
 ];
 
 // [CR-SECURESTORE-REGISTRY-11] Documented exceptions — specific callsites that
@@ -258,6 +265,7 @@ const ASYNCSTORAGE_PREFIX_WIPE: ReadonlyArray<string> = [
 export async function clearProfileSecureStorageOnSignOut(
   profileIds: ReadonlyArray<string>,
 ): Promise<void> {
+  const mentorLanguageCleanup = clearMentorLanguageStateOnSignOut(profileIds);
   const keys = new Set<string>();
 
   for (const profileId of profileIds) {
@@ -323,6 +331,7 @@ export async function clearProfileSecureStorageOnSignOut(
         })
       : Promise.resolve(),
     prefixScanRemoval,
+    mentorLanguageCleanup,
   ]);
 
   // [CR-SIGNOUT-TIMEOUT-10] Hard cap so a stuck Keychain/Keystore can't

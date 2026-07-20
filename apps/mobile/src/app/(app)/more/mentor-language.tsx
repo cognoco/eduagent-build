@@ -17,6 +17,7 @@ import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useProfile } from '../../../lib/profile';
 import { useThemeColors } from '../../../lib/theme';
+import { beginExplicitMentorLanguageUpdate } from '../../../lib/mentor-language-coordination';
 
 // WI-1496 — reads/writes profiles.conversationLanguage (the LLM tutor-prose
 // language) via the existing onboarding hook. This screen must NEVER touch
@@ -68,9 +69,14 @@ export default function MentorLanguageScreen(): React.ReactElement {
   const handleSelectLanguage = useCallback(
     (lang: ConversationLanguage) => {
       if (lang === currentLanguage) return;
+      const targetProfileId = targetProfile?.id;
+      if (!targetProfileId) return;
+      const explicitOperation =
+        beginExplicitMentorLanguageUpdate(targetProfileId);
       updateConversationLanguage.mutate(
         {
           conversationLanguage: lang,
+          languageOperation: explicitOperation,
           childProfileId:
             canEditChildPreferences && childProfileId
               ? childProfileId
@@ -91,6 +97,7 @@ export default function MentorLanguageScreen(): React.ReactElement {
       childProfileId,
       currentLanguage,
       t,
+      targetProfile?.id,
       updateConversationLanguage,
     ],
   );
@@ -125,6 +132,7 @@ export default function MentorLanguageScreen(): React.ReactElement {
         <Text
           className="text-h2 font-bold text-text-primary flex-1"
           numberOfLines={1}
+          accessibilityRole="header"
         >
           {title}
         </Text>

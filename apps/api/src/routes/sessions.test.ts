@@ -150,6 +150,21 @@ jest.mock(
   }),
 );
 
+// [WI-2416] assertCanReadProfile (GET /sessions/resume-nudge,
+// /subjects/:subjectId/sessions, /sessions/:sessionId, transcript, summary)
+// calls verifyPersonOwnershipV2, which — like getPersonScope above — runs a
+// raw db.select() membership query unrunnable on this unit mock DB. Every
+// scenario in this file is a caller-self read (the header profile equals
+// the authenticated caller's own person id); the cross-account read attack
+// this guard exists to close is covered by the real-DB break test in
+// tests/integration/wi2416-read-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's mock DB environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
 // ---------------------------------------------------------------------------
 // Mock billing service — metering middleware calls these on LLM routes
 // ---------------------------------------------------------------------------
@@ -171,6 +186,24 @@ const mockSubscription = {
 };
 
 const mockIncrementQuota = jest.fn().mockResolvedValue(undefined);
+const mockDecrementQuota = jest.fn().mockResolvedValue({
+  success: true,
+  source: 'monthly',
+  remainingMonthly: 489,
+  remainingTopUp: 0,
+  remainingDaily: null,
+});
+const mockGetOrProvisionProfileQuotaUsage = jest.fn().mockResolvedValue({
+  id: 'pqu-1',
+  subscriptionId: 'sub-1',
+  profileId: 'test-profile-id',
+  role: 'owner',
+  monthlyLimit: 700,
+  usedThisMonth: 10,
+  dailyLimit: null,
+  usedToday: 0,
+  cycleResetAt: new Date().toISOString(),
+});
 // [BUG-661] safeRefundQuota replaces direct incrementQuota in routes; the
 // mock proxies through mockIncrementQuota so existing assertions about
 // "refund happened with subscriptionId" still apply.
@@ -223,24 +256,9 @@ jest.mock('../services/billing', () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }),
-    getOrProvisionProfileQuotaUsage: jest.fn().mockResolvedValue({
-      id: 'pqu-1',
-      subscriptionId: 'sub-1',
-      profileId: 'test-profile-id',
-      role: 'owner',
-      monthlyLimit: 700,
-      usedThisMonth: 10,
-      dailyLimit: null,
-      usedToday: 0,
-      cycleResetAt: new Date().toISOString(),
-    }),
-    decrementQuota: jest.fn().mockResolvedValue({
-      success: true,
-      source: 'monthly',
-      remainingMonthly: 489,
-      remainingTopUp: 0,
-      remainingDaily: null,
-    }),
+    getOrProvisionProfileQuotaUsage: (...args: unknown[]) =>
+      mockGetOrProvisionProfileQuotaUsage(...args),
+    decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
     getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
     incrementQuota: (...args: unknown[]) => mockIncrementQuota(...args),
     safeRefundQuota: (...args: unknown[]) =>
@@ -290,17 +308,8 @@ jest.mock(
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }),
-      getOrProvisionProfileQuotaUsageV2: jest.fn().mockResolvedValue({
-        id: 'pqu-1',
-        subscriptionId: 'sub-1',
-        profileId: 'test-profile-id',
-        role: 'owner',
-        monthlyLimit: 700,
-        usedThisMonth: 10,
-        dailyLimit: null,
-        usedToday: 0,
-        cycleResetAt: new Date().toISOString(),
-      }),
+      getOrProvisionProfileQuotaUsageV2: (...args: unknown[]) =>
+        mockGetOrProvisionProfileQuotaUsage(...args),
     };
   },
 );
@@ -427,6 +436,14 @@ jest.mock('../services/session', () => {
       filedAt: null,
       filingStatus: null,
       filingRetryCount: 0,
+      metadata: {
+        effectiveMode: 'recitation',
+        __serverRecitationSetupClaim: {
+          phase: 'ready',
+          clarificationCount: 1,
+          lastClientId: 'private-replay-key',
+        },
+      },
     }),
     processMessage: jest.fn().mockResolvedValue({
       response: 'Mock AI tutor response',
@@ -498,7 +515,13 @@ jest.mock('../services/session', () => {
         id: sessionId,
         subjectId: SUBJECT_ID,
         topicId: null,
+        topicTitle: null,
+        subjectName: null,
+        bookId: null,
+        bookTitle: null,
         sessionType: 'learning',
+        inputMode: input.inputMode,
+        verificationType: null,
         status: 'active',
         escalationRung: 1,
         exchangeCount: 2,
@@ -506,7 +529,10 @@ jest.mock('../services/session', () => {
         lastActivityAt: new Date().toISOString(),
         endedAt: null,
         durationSeconds: null,
-        inputMode: input.inputMode,
+        wallClockSeconds: null,
+        filedAt: null,
+        filingStatus: null,
+        filingRetryCount: 0,
       })),
     flagContent: jest.fn().mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
@@ -536,6 +562,21 @@ jest.mock('../services/session', () => {
           sessionId,
           content: input.content,
           aiFeedback: 'Great summary! You captured the key concepts.',
+          feedbackStatus: 'available',
+          status: 'accepted',
+          baseXp: null,
+          reflectionBonusXp: null,
+        },
+      })),
+    retrySummaryFeedback: jest
+      .fn()
+      .mockImplementation((_db, _profileId, sessionId) => ({
+        summary: {
+          id: '880e8400-e29b-41d4-a716-446655440001',
+          sessionId,
+          content: 'Saved learner summary',
+          aiFeedback: 'Clear explanation.',
+          feedbackStatus: 'available',
           status: 'accepted',
         },
       })),
@@ -618,6 +659,21 @@ jest.mock('../services/recall-bridge', () => {
   };
 });
 
+const mockGetMentorNoticeReceipt = jest.fn().mockResolvedValue(null);
+jest.mock(
+  '../services/mentor-notices' /* gc1-allow: session route unit test injects receipt lookup outcomes; mentor-notice services have direct unit and integration coverage */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/mentor-notices',
+    ) as typeof import('../services/mentor-notices');
+    return {
+      ...actual,
+      getMentorNoticeReceipt: (...args: unknown[]) =>
+        mockGetMentorNoticeReceipt(...args),
+    };
+  },
+);
+
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
@@ -656,11 +712,15 @@ import {
   requestSessionLibraryFiling,
   restoreSessionForAutoFiling,
   resetFilingForRetry,
+  submitSummary,
+  retrySummaryFeedback,
+  getSessionSummary,
 } from '../services/session';
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, MAX_HOMEWORK_PROBLEMS } from '@eduagent/schemas';
 import { FILING_CONFIG } from '../config/filing';
+import { generateRecallBridge } from '../services/recall-bridge';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -679,8 +739,34 @@ describe('session routes', () => {
   });
 
   beforeEach(() => {
+    mockGetMentorNoticeReceipt.mockResolvedValue(null);
     clearJWKSCache();
   });
+  describe('POST /v1/sessions/:sessionId/recall-bridge mentor notice suppression', () => {
+    it('returns typed 409 before invoking the Recall Bridge generator', async () => {
+      jest.mocked(getSession).mockResolvedValueOnce({
+        sessionType: 'homework',
+      } as never);
+      mockGetMentorNoticeReceipt.mockResolvedValue({
+        id: '550e8400-e29b-41d4-a716-446655440099',
+        concept: 'Changing signs',
+        correctionHint: null,
+      });
+
+      const response = await app.request(
+        `/v1/sessions/${SESSION_ID}/recall-bridge`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        { ...TEST_ENV, MENTOR_NOTICE_ENABLED: 'true' },
+      );
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'RECALL_BRIDGE_SUPPRESSED',
+      });
+      expect(generateRecallBridge).not.toHaveBeenCalled();
+    });
+  });
+
   // -------------------------------------------------------------------------
   // GET /v1/subjects/:subjectId/sessions
   // -------------------------------------------------------------------------
@@ -855,6 +941,7 @@ describe('session routes', () => {
 
       const body = await res.json();
       expect(body).toHaveProperty('session');
+      expect(body.session.metadata).toEqual({ effectiveMode: 'recitation' });
     });
 
     it('returns 401 without auth header', async () => {
@@ -1966,6 +2053,28 @@ describe('session routes', () => {
 
       const body = await res.json();
       expect(body).toHaveProperty('summary');
+      expect(getSessionSummary).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        SESSION_ID,
+        { mentorNoticeEnabled: false },
+      );
+    });
+
+    it('enables the mentor-notice receipt only when the rollout flag is on', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary`,
+        { headers: AUTH_HEADERS },
+        { ...TEST_ENV, MENTOR_NOTICE_ENABLED: 'true' },
+      );
+
+      expect(res.status).toBe(200);
+      expect(getSessionSummary).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        SESSION_ID,
+        { mentorNoticeEnabled: true },
+      );
     });
 
     it('returns 401 without auth header', async () => {
@@ -2031,6 +2140,42 @@ describe('session routes', () => {
       expect(res.status).toBe(400);
     });
 
+    it('[WI-2183] omits qualityRating when feedback evaluation is unavailable', async () => {
+      jest.mocked(submitSummary).mockResolvedValueOnce({
+        summary: {
+          id: '880e8400-e29b-41d4-a716-446655440001',
+          sessionId: SESSION_ID,
+          content:
+            'Photosynthesis converts light energy into chemical energy in plants.',
+          aiFeedback: null,
+          feedbackStatus: 'unavailable',
+          status: 'submitted',
+          baseXp: null,
+          reflectionBonusXp: null,
+        },
+      });
+      mockInngestSend.mockClear();
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            content:
+              'Photosynthesis converts light energy into chemical energy in plants.',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockInngestSend).toHaveBeenCalledTimes(1);
+      expect(mockInngestSend.mock.calls[0]?.[0].data).not.toHaveProperty(
+        'qualityRating',
+      );
+    });
+
     it('returns 401 without auth header', async () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary`,
@@ -2045,6 +2190,122 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('POST /v1/sessions/:sessionId/summary/retry-feedback [WI-2183]', () => {
+    beforeEach(() => {
+      mockDecrementQuota.mockClear();
+      mockGetOrProvisionProfileQuotaUsage.mockReset().mockResolvedValue({
+        id: 'pqu-1',
+        subscriptionId: 'sub-1',
+        profileId: 'test-profile-id',
+        role: 'owner',
+        monthlyLimit: 700,
+        usedThisMonth: 10,
+        dailyLimit: null,
+        usedToday: 0,
+        cycleResetAt: new Date().toISOString(),
+      });
+      mockRefundQuotaOrEscalate.mockClear();
+      mockInngestSend.mockClear();
+    });
+
+    it('returns recovered feedback without decrement/refund and emits truthful quota headers', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.summary).toEqual(
+        expect.objectContaining({
+          sessionId: SESSION_ID,
+          feedbackStatus: 'available',
+          aiFeedback: 'Clear explanation.',
+        }),
+      );
+      expect(res.headers.get('X-Quota-Remaining')).toBe('690');
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockRefundQuotaOrEscalate).not.toHaveBeenCalled();
+      expect(mockInngestSend).not.toHaveBeenCalled();
+    });
+
+    it('returns unavailable recovery without decrement/refund or false feedback', async () => {
+      jest.mocked(retrySummaryFeedback).mockResolvedValueOnce({
+        summary: {
+          id: '880e8400-e29b-41d4-a716-446655440001',
+          sessionId: SESSION_ID,
+          content: 'Saved learner summary',
+          aiFeedback: null,
+          feedbackStatus: 'unavailable',
+          status: 'submitted',
+        },
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(
+        expect.objectContaining({
+          summary: expect.objectContaining({
+            aiFeedback: null,
+            feedbackStatus: 'unavailable',
+          }),
+        }),
+      );
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockRefundQuotaOrEscalate).not.toHaveBeenCalled();
+    });
+
+    it('remains available at zero quota and reports zero remaining', async () => {
+      mockGetOrProvisionProfileQuotaUsage.mockResolvedValueOnce({
+        id: 'pqu-1',
+        subscriptionId: 'sub-1',
+        profileId: 'test-profile-id',
+        role: 'owner',
+        monthlyLimit: 700,
+        usedThisMonth: 700,
+        dailyLimit: null,
+        usedToday: 0,
+        cycleResetAt: new Date().toISOString(),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('X-Quota-Remaining')).toBe('0');
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockRefundQuotaOrEscalate).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 without authentication', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
+        { method: 'POST' },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 400 for a non-UUID session id before evaluation', async () => {
+      const res = await app.request(
+        '/v1/sessions/not-a-uuid/summary/retry-feedback',
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+      expect(mockRefundQuotaOrEscalate).not.toHaveBeenCalled();
     });
   });
 
@@ -3321,6 +3582,10 @@ describe('session routes', () => {
       id: SESSION_ID,
       subjectId: SUBJECT_ID,
       topicId: null,
+      topicTitle: null,
+      subjectName: null,
+      bookId: null,
+      bookTitle: null,
       sessionType: overrides.sessionType ?? 'learning',
       inputMode: 'text',
       verificationType: null,

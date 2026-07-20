@@ -191,7 +191,28 @@ function repairBareQuotesInsideJsonStrings(jsonStr: string): string | null {
   return changed && !inString ? repaired : null;
 }
 
-function parseEnvelopeRaw(response: string): ParseEnvelopeResult {
+export interface ParseEnvelopeOptions {
+  /**
+   * Removes only `signals.answer_evaluation` from syntactically valid JSON
+   * before shared-envelope schema validation. Excluded/disabled exchange
+   * paths use this so an unsolicited malformed optional signal cannot discard
+   * an otherwise valid reply or unrelated signals. Every other field remains
+   * strict, and enabled ordinary exchanges leave this false.
+   */
+  ignoreAnswerEvaluation?: boolean;
+  /**
+   * When `true`, suppresses the per-call `llm.envelope.parse_failed` warn.
+   * Use this on batch/loop call sites (e.g. transcript hydration) where
+   * the caller aggregates failures itself and emits a single summary log.
+   * Other callers must NOT set this — per-call logging is required by [BUG-847].
+   */
+  silent?: boolean;
+}
+
+function parseEnvelopeRaw(
+  response: string,
+  options: ParseEnvelopeOptions,
+): ParseEnvelopeResult {
   const jsonStr = extractFirstJsonObject(response);
   if (!jsonStr) {
     return { ok: false, reason: 'no_json_found', raw: response };
@@ -209,6 +230,25 @@ function parseEnvelopeRaw(response: string): ParseEnvelopeResult {
       parsed = JSON.parse(repairedJsonStr);
     } catch {
       return { ok: false, reason: 'invalid_json', raw: response, error };
+    }
+  }
+
+  if (
+    options.ignoreAnswerEvaluation === true &&
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    !Array.isArray(parsed)
+  ) {
+    const envelope = parsed as Record<string, unknown>;
+    const rawSignals = envelope['signals'];
+    if (
+      typeof rawSignals === 'object' &&
+      rawSignals !== null &&
+      !Array.isArray(rawSignals)
+    ) {
+      const signals = { ...(rawSignals as Record<string, unknown>) };
+      delete signals['answer_evaluation'];
+      parsed = { ...envelope, signals };
     }
   }
 
@@ -232,30 +272,19 @@ function parseEnvelopeRaw(response: string): ParseEnvelopeResult {
   return { ok: true, envelope };
 }
 
-export interface ParseEnvelopeOptions {
-  /**
-   * When `true`, suppresses the per-call `llm.envelope.parse_failed` warn.
-   * Use this on batch/loop call sites (e.g. transcript hydration) where
-   * the caller aggregates failures itself and emits a single summary log.
-   * Other callers must NOT set this — per-call logging is required by [BUG-847].
-   */
-  silent?: boolean;
-}
-
 export function parseEnvelope(
   response: string,
   surface: EnvelopeSurface = 'unknown',
   options: ParseEnvelopeOptions = {},
 ): ParseEnvelopeResult {
-  const result = parseEnvelopeRaw(response);
+  const result = parseEnvelopeRaw(response, options);
   if (!result.ok && !options.silent) {
     logger.warn('llm.envelope.parse_failed', {
       surface,
       reason: result.reason,
-      // 200-char snippet keeps log volume bounded while still giving a triage
-      // hand-hold; full raw response is in `result.raw` for callers that need
-      // it but is too noisy to ship to log aggregation by default.
-      rawSnippet: response.slice(0, 200),
+      // Response bodies can contain learner text. Length preserves a useful
+      // format-drift signal without shipping content to log aggregation.
+      responseLength: response.length,
     });
   }
   return result;

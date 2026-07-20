@@ -1,4 +1,58 @@
 {
+  "celebrationEarnedContext": {
+    "polar_star": {
+      "child": "Polar Star - first independent answer",
+      "adult": "Polar Star - first independent answer."
+    },
+    "twin_stars": {
+      "child": "Twin Stars - three strong answers in a row",
+      "adult": "Twin Stars - three strong answers in a row."
+    },
+    "comet": {
+      "child": "Comet - you had a breakthrough!",
+      "adult": "Comet - a concept clicked."
+    },
+    "orions_belt": {
+      "child": "Orion's Belt - 5 in a row without help!",
+      "adult": "Orion's Belt - five independent answers in a row."
+    },
+    "deep_diver": {
+      "child": "Deep Diver - great thoughtful responses!",
+      "adult": "Deep Diver - thoughtful responses earned this milestone."
+    },
+    "persistent": {
+      "child": "Persistent - you kept going after a correction!",
+      "adult": "Persistent - kept going after a correction."
+    },
+    "topic_mastered": {
+      "child": "Comet - you mastered this topic!",
+      "adult": "Comet - topic mastered."
+    },
+    "evaluate_success": {
+      "child": "Twin Stars - you spotted the flaw!",
+      "adult": "Twin Stars - accurately evaluated the answer."
+    },
+    "teach_back_success": {
+      "child": "Twin Stars - you taught it clearly!",
+      "adult": "Twin Stars - clear teach-back completed."
+    },
+    "streak_7": {
+      "child": "Comet - a 7-day learning streak!",
+      "adult": "Comet - seven-day learning streak."
+    },
+    "streak_30": {
+      "child": "Orion's Belt - a 30-day learning streak!",
+      "adult": "Orion's Belt - thirty-day learning streak."
+    },
+    "curriculum_complete": {
+      "child": "Comet - you completed the curriculum!",
+      "adult": "Comet - curriculum completed."
+    },
+    "default": {
+      "child": "Milestone earned - nice work!",
+      "adult": "Milestone earned."
+    }
+  },
   "time": {
     "relative": {
       "today": "Today",
@@ -857,6 +911,7 @@
       "guidedResponse": "Guided response",
       "pendingSync": "Message pending sync",
       "sending": "Sending…",
+      "mentorNotice": "Noticed along the way: {{concept}}",
       "escalation": {
         "stepByStep": "Step-by-step",
         "letMeShowYou": "Let me show you",
@@ -3050,6 +3105,14 @@
         "arcAdvancing": "You are moving this forward",
         "arcMastered": "Session wrapped"
       },
+      "mentor_notice": {
+        "title": "A small idea worth checking",
+        "cta": "Check it now",
+        "notNow": "Not now",
+        "arcDue": "Ready when you are",
+        "arcAdvancing": "Opening a quick check",
+        "arcMastered": "Locked in"
+      },
       "retention_due": {
         "title": "Review what is due",
         "cta": "Review",
@@ -3092,6 +3155,9 @@
       },
       "session_filed": {
         "title": "Saved {{topicTitle}} to your learning record."
+      },
+      "notice_locked_in": {
+        "title": "You locked in {{concept}}."
       },
       "quota": {
         "title": "A learning moment was saved."
@@ -3289,6 +3355,7 @@
       "topic_mastered": "Marked {{topicTitle}} as mastered.",
       "recap_ready": "A recap is ready.",
       "snapshot_ready": "A learning snapshot is ready.",
+      "notice_locked_in": "Locked in {{concept}} in {{subjectName}}.",
       "reflection_bonus": "Reflection bonus saved.",
       "quiz_personal_best": "Personal best saved."
     },
@@ -3487,6 +3554,7 @@
       "yourShare": "Your share",
       "yourUsage": "Your usage",
       "questionsUsed": "{{count}} questions",
+      "formerMembers": "Former members",
       "familyAggregate": "Family aggregate",
       "quotaResets": "Quota resets {{date}}",
       "renews": "Subscription renews {{date}}",
@@ -3521,8 +3589,13 @@
     "notificationPrimer": {
       "title": "Want a daily nudge?",
       "message": "We can send a gentle reminder so you don't lose your streak. You can turn it off anytime in Settings.",
+      "noticeTitle": "Want a gentle follow-up?",
+      "noticeMessage": "We can remind you to revisit what your mentor noticed today. You can turn this off anytime in Settings.",
       "allow": "Allow",
       "notNow": "Not now"
+    },
+    "mentorNotice": {
+      "title": "Noticed along the way"
     },
     "masteredRow": {
       "title": "You mastered:"
@@ -3563,6 +3636,11 @@
     "doneHeadHome": "Done — head home",
     "yourWords": "Your Words",
     "mateFeedback": "Mate feedback",
+    "feedbackUnavailableTitle": "Feedback isn't available yet",
+    "feedbackUnavailableMessage": "Your summary is saved. You can retry the feedback without submitting it again.",
+    "feedbackStillUnavailable": "Feedback still isn't available, but your summary is safe. You can retry or continue whenever you're ready.",
+    "retryFeedback": "Retry feedback",
+    "retryingFeedback": "Retrying feedback...",
     "skippedNotice": "You skipped writing a summary for this session.",
     "resumeReflectionBanner": "You started a reflection but didn't submit it last time. Finish it below and submit to save your words.",
     "writePrompt": "Write a short summary of what you learned. This helps you remember and helps me plan what comes next.",

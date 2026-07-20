@@ -21,6 +21,103 @@ function makeContext(
   };
 }
 
+describe('buildSystemPrompt — per-turn answer evaluation [WI-1443]', () => {
+  const answerEvaluationKey = '"answer_evaluation":';
+
+  it('requires the canonical classification set for an enabled ordinary turn', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        answerEvaluationEnabled: true,
+        exchangeCount: 2,
+        exchangeHistory: [
+          { role: 'assistant', content: 'What is 6 × 7?' },
+          { role: 'user', content: '42' },
+        ],
+      }),
+    );
+
+    expect(prompt).toContain(answerEvaluationKey);
+    expect(prompt).toContain(
+      '"answer_evaluation": { "correctness": "<correct|partial|incorrect|na>", "concept": "<optional; concept just assessed; omit key when absent>" }',
+    );
+    expect(prompt).toContain(
+      'immediately preceding ordinary learning question',
+    );
+    expect(prompt).toContain(
+      'Use `partial` or `incorrect` only when the message is a substantive but incomplete or wrong answer',
+    );
+    expect(prompt).toContain('you MUST use `correct`');
+    expect(prompt).toContain('never your own reply or the new question');
+    expect(prompt).toContain(
+      'Omit `concept` entirely rather than returning an empty string',
+    );
+  });
+
+  it('requires na when no immediately preceding ordinary question exists', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ answerEvaluationEnabled: true, exchangeCount: 0 }),
+    );
+
+    expect(prompt).toContain(answerEvaluationKey);
+    expect(prompt).toContain('set `correctness` to `na`');
+    expect(prompt).toContain('first turn');
+  });
+
+  it('omits the signal when the runtime flag is disabled', () => {
+    expect(buildSystemPrompt(makeContext())).not.toContain(answerEvaluationKey);
+  });
+
+  it('omits the signal from app-help turns', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ answerEvaluationEnabled: true }),
+      { includeAppHelpMap: true },
+    );
+
+    expect(prompt).not.toContain(answerEvaluationKey);
+  });
+
+  it('omits the signal from recitation turns', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        answerEvaluationEnabled: true,
+        effectiveMode: 'recitation',
+      }),
+    );
+
+    expect(prompt).not.toContain(answerEvaluationKey);
+  });
+
+  it.each([
+    ['accepted', false],
+    ['accepted', true],
+    ['active', false],
+    ['active', true],
+  ] as const)(
+    'omits ordinary evaluation for Challenge Round state=%s when runtime=%s',
+    (state, challengeRuntimeEnabled) => {
+      const prompt = buildSystemPrompt(
+        makeContext({
+          answerEvaluationEnabled: true,
+          challengeRuntimeEnabled,
+          challengeRound: {
+            state,
+            offerCount: 0,
+            declinedDontAskAgain: false,
+            evaluations: [],
+          },
+        }),
+      );
+
+      expect(prompt).not.toContain(answerEvaluationKey);
+      if (challengeRuntimeEnabled) {
+        expect(prompt).toContain('"challenge_round_evaluation":');
+      } else {
+        expect(prompt).not.toContain('"challenge_round_evaluation":');
+      }
+    },
+  );
+});
+
 describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
   it('includes the ANTI-FABRICATION block in language-mode prompts', () => {
     const prompt = buildSystemPrompt(
@@ -109,6 +206,42 @@ describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
   });
 });
 
+describe('buildSystemPrompt — source identity clarification [WI-2100]', () => {
+  // WI-2100: a learner saying they are reading "her book" with no title
+  // given must not cause the mentor to guess a specific work (staging
+  // observed it assume The Bell Jar) and teach from that unsupported guess.
+  it('includes a rule to ask which source before teaching an unnamed one', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'learning',
+        effectiveMode: 'freeform',
+        topicTitle: undefined,
+        topicDescription: undefined,
+      }),
+    );
+
+    expect(prompt).toMatch(/SOURCE IDENTITY/i);
+    expect(prompt).toMatch(
+      /do not guess which work they mean|never guess a title/i,
+    );
+    expect(prompt).toMatch(/ask\b[^.]*\b(title|author)\b/i);
+  });
+
+  it('applies the rule regardless of session type (not freeform-only)', () => {
+    // The bug is about source identity, not conversational mode — a
+    // homework or review session can equally reference an unnamed book.
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'homework',
+        topicTitle: 'Ancient trade',
+        topicDescription: 'Ancient civilizations traded goods.',
+      }),
+    );
+
+    expect(prompt).toMatch(/SOURCE IDENTITY/i);
+  });
+});
+
 describe('buildSystemPrompt — app-help block', () => {
   it('does not include the APP HELP map on ordinary learning prompts', () => {
     const prompt = buildSystemPrompt(makeContext());
@@ -155,6 +288,68 @@ describe('buildSystemPrompt — app-help block', () => {
     const appHelpSection = prompt.slice(appHelpStart, appHelpStart + 2000);
     expect(appHelpSection).not.toMatch(/\/\(app\)/);
     expect(appHelpSection).not.toMatch(/\[.*Id\]/);
+  });
+});
+
+describe('buildSystemPromptSegments — app shell threading [WI-2220]', () => {
+  const appHelpOptions = { includeAppHelpMap: true };
+
+  it('emits the V2 map when ctx.shell is v2', () => {
+    const { stablePrefix } = buildSystemPromptSegments(
+      makeContext({ shell: 'v2' }),
+      appHelpOptions,
+    );
+    expect(stablePrefix).toContain(
+      'APP HELP (map version 2026-06-27, V2 shell)',
+    );
+    expect(stablePrefix).not.toContain('APP HELP (map version 2026-05-30)');
+  });
+
+  it('emits the V0 map when ctx.shell is v0', () => {
+    const { stablePrefix } = buildSystemPromptSegments(
+      makeContext({ shell: 'v0' }),
+      appHelpOptions,
+    );
+    expect(stablePrefix).toContain('APP HELP (map version 2026-05-30)');
+    expect(stablePrefix).not.toContain(
+      'APP HELP (map version 2026-06-27, V2 shell)',
+    );
+  });
+
+  it('[AC-3] defaults to the V0 map when shell is absent', () => {
+    const { stablePrefix } = buildSystemPromptSegments(
+      makeContext(),
+      appHelpOptions,
+    );
+    expect(stablePrefix).toContain('APP HELP (map version 2026-05-30)');
+    expect(stablePrefix).not.toContain('V2 shell');
+  });
+
+  it('[AC-3] defaults to the V0 map when shell is an invalid value', () => {
+    const { stablePrefix } = buildSystemPromptSegments(
+      makeContext({
+        shell: 'v3' as unknown as ExchangeContext['shell'],
+      }),
+      appHelpOptions,
+    );
+    expect(stablePrefix).toContain('APP HELP (map version 2026-05-30)');
+    expect(stablePrefix).not.toContain('V2 shell');
+  });
+
+  it('[AC-3] honors a shell value that changes between turns of the same session', () => {
+    const session = makeContext({ sessionId: 'sess-mid-shell-change' });
+    const v0Turn = buildSystemPromptSegments(
+      { ...session, shell: 'v0' },
+      appHelpOptions,
+    );
+    const v2Turn = buildSystemPromptSegments(
+      { ...session, shell: 'v2' },
+      appHelpOptions,
+    );
+    expect(v0Turn.stablePrefix).toContain('APP HELP (map version 2026-05-30)');
+    expect(v2Turn.stablePrefix).toContain(
+      'APP HELP (map version 2026-06-27, V2 shell)',
+    );
   });
 });
 
@@ -370,6 +565,121 @@ describe('buildSystemPrompt — homework brevity', () => {
   });
 });
 
+describe('buildSystemPrompt — session-neutral mentor notices', () => {
+  const eventId = '550e8400-e29b-41d4-a716-446655440010';
+  const interleavedTopicId = '550e8400-e29b-41d4-a716-446655440011';
+
+  it.each([
+    {
+      label: 'teen homework',
+      overrides: {
+        sessionType: 'homework' as const,
+        birthYear: new Date().getFullYear() - 15,
+      },
+    },
+    {
+      label: 'adult learning',
+      overrides: {
+        sessionType: 'learning' as const,
+        birthYear: new Date().getFullYear() - 50,
+      },
+    },
+    {
+      label: 'interleaved retrieval',
+      overrides: {
+        sessionType: 'interleaved' as const,
+        interleavedTopics: [
+          { topicId: interleavedTopicId, title: 'Cell division' },
+        ],
+      },
+    },
+  ])(
+    'injects the same evidence-bound observation contract for $label',
+    ({ overrides }) => {
+      const prompt = buildSystemPrompt(
+        makeContext({
+          ...overrides,
+          mentorNoticeEnabled: true,
+          currentUserMessageEventId: eventId,
+        }),
+      );
+
+      expect(prompt).toContain('MENTOR NOTICE OBSERVATION');
+      expect(prompt).toContain('signals.noticed_gap');
+      expect(prompt).toContain(eventId);
+      expect(prompt).toContain("Finish the learner's immediate goal first");
+      expect(prompt).toContain('Do not quiz or re-check the learner now');
+      expect(prompt).toContain('Do not promise a future check-in');
+      expect(prompt).toContain(
+        'Set `observed` to false when the answer is correct',
+      );
+      expect(prompt).toContain(
+        'A possible follow-up check or extra practice is not evidence of a gap',
+      );
+      expect(prompt).toContain(
+        'Always emit `signals.noticed_gap` as a decision',
+      );
+      expect(prompt).toContain(
+        "If your visible reply corrects the learner's answer or reasoning, `observed` must be true",
+      );
+      const responseFormat = prompt.slice(
+        prompt.indexOf('RESPONSE FORMAT — CRITICAL:'),
+        prompt.indexOf('Signal guidance:'),
+      );
+      expect(responseFormat).toContain('"noticed_gap": { "observed": <bool>');
+      expect(prompt).toContain(
+        'When `observed` is true, copy a short verbatim `learnerQuote`',
+      );
+    },
+  );
+
+  it('enumerates the only valid topic target for an interleaved notice', () => {
+    const otherTopicId = '550e8400-e29b-41d4-a716-446655440012';
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'interleaved',
+        mentorNoticeEnabled: true,
+        currentUserMessageEventId: eventId,
+        interleavedTopics: [
+          { topicId: interleavedTopicId, title: 'Cell division' },
+          { topicId: otherTopicId, title: 'Genetics' },
+        ],
+      }),
+    );
+
+    expect(prompt).toContain('INTERLEAVED NOTICE TARGETS');
+    expect(prompt).toContain(interleavedTopicId);
+    expect(prompt).toContain(otherTopicId);
+    expect(prompt).toContain('topicId');
+  });
+
+  it.each([
+    {
+      label: 'feature disabled',
+      overrides: { mentorNoticeEnabled: false },
+    },
+    {
+      label: 'active re-check',
+      overrides: {
+        mentorNoticeEnabled: true,
+        mentorNoticeRecheck: {
+          id: '550e8400-e29b-41d4-a716-446655440013',
+          concept: 'Cell division',
+          correctionHint: null,
+          exchangeNumber: 1,
+        },
+      },
+    },
+  ])('omits new-observation instructions when $label', ({ overrides }) => {
+    const prompt = buildSystemPrompt(
+      makeContext({ ...overrides, currentUserMessageEventId: eventId }),
+    );
+
+    expect(prompt).not.toContain('MENTOR NOTICE OBSERVATION');
+    expect(prompt).not.toContain('signals.noticed_gap');
+  });
+});
+
 describe('buildSystemPrompt — no-recall recovery', () => {
   it('sets a higher bar for concrete next practice and specific feedback', () => {
     const prompt = buildSystemPrompt(makeContext());
@@ -571,6 +881,145 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain('Session type: RECITATION PRACTICE');
     expect(prompt).toContain('give a small starting cue');
     expect(prompt).not.toContain('NO-RECALL RECOVERY');
+  });
+
+  it('advances an accepted recitation selection without asking for it again', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'invite_to_begin',
+          state: { phase: 'ready', clarificationCount: 0 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: INVITE TO BEGIN');
+    expect(prompt).toContain(
+      'Do not ask for the title, author, or description',
+    );
+    expect(prompt).toContain('Do NOT provide any of the recitation');
+    expect(prompt).not.toContain(
+      '1. Ask what they would like to recite (title, author, or description).',
+    );
+  });
+
+  it('asks exactly one focused recitation-selection clarification', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'clarify_selection',
+          state: { phase: 'awaiting_selection', clarificationCount: 1 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: CLARIFY SELECTION');
+    expect(prompt).toContain('Ask exactly one focused question');
+    expect(prompt).toContain('This is the only allowed setup clarification');
+  });
+
+  it('moves past setup when the clarification cap has been reached', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'invite_after_cap',
+          state: { phase: 'ready', clarificationCount: 1 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: CLARIFICATION CAP');
+    expect(prompt).toContain('Do not ask another setup question');
+    expect(prompt).toContain('invite them to begin whenever they are ready');
+  });
+
+  it('treats post-setup input as recitation feedback material', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'coach_recitation',
+          state: { phase: 'ready', clarificationCount: 0 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: COACH RECITATION');
+    expect(prompt).toContain('Setup is complete');
+    expect(prompt).toContain('do not restart the title/author question');
+  });
+
+  it('invites the learner to recite after a readiness acknowledgement without supplying content', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'invite_recitation',
+          state: { phase: 'ready', clarificationCount: 0 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: INVITE RECITATION');
+    expect(prompt).toContain(
+      'invite the learner to perform the actual recitation',
+    );
+    expect(prompt).toContain('Do not give feedback, a cue, a starting line');
+  });
+
+  it('asks for a replacement selection after a command-only edit', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'clarify_edit',
+          state: { phase: 'ready', clarificationCount: 0 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: CLARIFY EDIT');
+    expect(prompt).toContain('ask what selection they want instead');
+    expect(prompt).toContain('Do not supply recitation content');
+  });
+
+  it('defers a safety disclosure to the global safety rules without advancing setup', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'handle_non_recitation',
+          state: { phase: 'awaiting_selection', clarificationCount: 0 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain(
+      'SERVER-OWNED SETUP ACTION: HANDLE NON-RECITATION',
+    );
+    expect(prompt).toContain('SAFETY — NON-NEGOTIABLE RULES');
+    expect(prompt).toContain(
+      'Do not treat this message as a selection or recitation',
+    );
+  });
+
+  it('honours an explicit recitation leave without restarting setup', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'leave_recitation',
+          state: { phase: 'ready', clarificationCount: 1 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: LEAVE RECITATION');
+    expect(prompt).toContain('Do not ask another setup question');
+    expect(prompt).toContain('Do not provide recitation content');
   });
 
   it('keeps text recitation feedback scoped to wording, not heard delivery', () => {
@@ -1446,5 +1895,45 @@ describe('buildSystemPromptSegments — cache-friendly stable prefix (WI-1779)',
     // And the volatile suffixes genuinely differ (proves the varied content
     // landed in the suffix, not that both are empty).
     expect(turn2.volatileSuffix).not.toBe(turn1.volatileSuffix);
+  });
+
+  it('keeps turn-varying recitation setup actions in the volatile suffix', () => {
+    const stable = {
+      effectiveMode: 'recitation' as const,
+      inputMode: 'text' as const,
+    };
+    const clarify = buildSystemPromptSegments(
+      makeContext({
+        ...stable,
+        recitationSetup: {
+          action: 'clarify_selection',
+          state: { phase: 'awaiting_selection', clarificationCount: 1 },
+        },
+      }),
+    );
+    const invite = buildSystemPromptSegments(
+      makeContext({
+        ...stable,
+        recitationSetup: {
+          action: 'invite_to_begin',
+          state: { phase: 'ready', clarificationCount: 1 },
+        },
+      }),
+    );
+
+    expect(invite.stablePrefix).toBe(clarify.stablePrefix);
+    expect(clarify.stablePrefix).not.toContain(
+      'SERVER-OWNED SETUP ACTION: CLARIFY SELECTION',
+    );
+    expect(invite.stablePrefix).not.toContain(
+      'SERVER-OWNED SETUP ACTION: INVITE TO BEGIN',
+    );
+    expect(clarify.volatileSuffix).toContain(
+      'SERVER-OWNED SETUP ACTION: CLARIFY SELECTION',
+    );
+    expect(invite.volatileSuffix).toContain(
+      'SERVER-OWNED SETUP ACTION: INVITE TO BEGIN',
+    );
+    expect(invite.volatileSuffix).not.toBe(clarify.volatileSuffix);
   });
 });

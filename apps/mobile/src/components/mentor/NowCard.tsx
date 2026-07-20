@@ -41,6 +41,11 @@ const CARD_COPY_KEYS: Partial<
     title: 'mentorHome.cards.unfinished_session.title',
     cta: 'mentorHome.cards.unfinished_session.cta',
   },
+  mentor_notice: {
+    templateKey: 'now.mentor_notice.default',
+    title: 'mentorHome.cards.mentor_notice.title',
+    cta: 'mentorHome.cards.mentor_notice.cta',
+  },
   retention_due: {
     templateKey: 'now.retention_due.default',
     title: 'mentorHome.cards.retention_due.title',
@@ -186,10 +191,16 @@ export function NowCard({
           accessibilityLabel={t('home.coachBand.a11yDismiss')}
           hitSlop={8}
           onPress={() => onDecline(card)}
-          className="absolute right-2 top-2 p-1"
+          className={
+            card.kind === 'mentor_notice'
+              ? 'mt-2 self-start p-1'
+              : 'absolute right-2 top-2 p-1'
+          }
         >
           <Text className="text-text-secondary">
-            {t('mentorHome.cards.dismissIcon')}
+            {card.kind === 'mentor_notice'
+              ? t('mentorHome.cards.mentor_notice.notNow')
+              : t('mentorHome.cards.dismissIcon')}
           </Text>
         </Pressable>
       ) : null}

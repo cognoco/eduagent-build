@@ -148,36 +148,30 @@ function scrubKeys(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
- * Matches the quoted literal snippet V8 embeds in a JSON.parse SyntaxError
- * message once it recognizes the input isn't JSON, e.g.:
- *   Unexpected token 'S', "Sure! Here'sthe answer to your..." is not valid JSON
- * Older/other V8 shapes (`Unexpected token S in JSON at position 0`,
- * `Unexpected end of JSON input`) carry no quoted snippet and are left as-is
- * — only content actually embedded in quotes is redacted.
+ * Matches any double-quoted substring in a free-text Sentry message field.
+ * Originally scoped to the literal snippet V8 embeds in a JSON.parse
+ * SyntaxError message (e.g. `Unexpected token 'S', "Sure! Here'sthe answer to
+ * your..." is not valid JSON`) — [WI-2339 Gate-2 rework] generalized to
+ * `event.message` and every `event.exception.values[].value`, per AC-1's
+ * requirement to scrub/denylist PII from those two channels. A quoted
+ * substring is the highest-risk shape for carrying arbitrary free text
+ * (a value, a field, an echoed input) in an otherwise-structural error
+ * message; the structural, unquoted part of the message (needed for Sentry
+ * issue grouping) is left intact. Single-quoted fragments (e.g. `reading
+ * 'foo'`, common in TypeError messages) are NOT matched — those are
+ * near-universally property/variable names, not free text, and leaving them
+ * intact preserves debuggability for the overwhelming majority of ordinary
+ * exceptions.
  */
 const QUOTED_SNIPPET_PATTERN = /"[^"]*"/g;
 
 /**
- * Recognizes the message shapes V8's JSON.parse throws for malformed input —
- * the surface this backstop targets. Matched on message content, not
- * `exception.type`, because a call site that already wraps the raw error
- * (`new Error('parse failed', { cause: err })`) or re-throws under a
- * different constructor still carries the same telltale phrase in `.message`.
+ * Redacts every double-quoted substring in `value`, leaving the structural
+ * (unquoted) part of the message intact for Sentry issue grouping. Used for
+ * `event.message` and every `event.exception.values[].value` — see
+ * `QUOTED_SNIPPET_PATTERN`'s doc comment for the shape/rationale.
  */
-function isJsonParseSyntaxErrorMessage(value: string): boolean {
-  return (
-    value.includes('is not valid JSON') ||
-    value.includes('Unexpected end of JSON input') ||
-    (value.includes('Unexpected token') && value.includes('JSON')) ||
-    value.includes('Unexpected non-whitespace character after JSON')
-  );
-}
-
-/**
- * Redacts the quoted snippet (if any) out of a recognized JSON.parse
- * SyntaxError message, leaving the structural part intact for grouping.
- */
-function redactJsonParseSyntaxErrorValue(value: string): string {
+function redactQuotedSnippets(value: string): string {
   return value.replace(QUOTED_SNIPPET_PATTERN, '"[redacted]"');
 }
 
@@ -205,42 +199,194 @@ function scrubAuthorizationHeader(headers: Record<string, unknown>): void {
   }
 }
 
+/** Marker substituted for a stripped query string / URL query segment. */
+const STRIPPED_QUERY_MARKER = '[stripped]';
+
 /**
- * `beforeSend` scrubber for the API's Sentry init — recursively strips
- * denylisted PII-bearing keys from `event.extra`, every `event.contexts`
- * entry, and every breadcrumb's `data`; redacts any `JSON.parse`
- * SyntaxError-shaped `exception.value` (see rationale below); and strips the
- * `authorization` header from `event.request.headers` [WI-2353] before the
- * event leaves the process. Defense-in-depth, not a substitute for
- * call-site discipline. [WI-1990]
+ * [WI-2339] `@sentry/cloudflare`'s default `requestDataIntegration` copies
+ * `event.request.query_string` and the full `event.request.url` (query
+ * string included) verbatim — `include.query_string` defaults to `true` and
+ * is independent of `sendDefaultPii` (unlike cookies), so it is not covered
+ * by the WI-2353 auth-header fix or by `sendDefaultPii: false`. Verified
+ * empirically against this repo's real `Sentry.withSentry` pipeline
+ * (`@sentry/cloudflare@10.39.0`): a request to `/throws?token=SECRET-abc123`
+ * ships `request.query_string: "token=SECRET-abc123&foo=bar"` and the same
+ * literal in `request.url` unless scrubbed here.
  *
- * [WI-1990 rework] `exception.type`/`exception.value` is the one Sentry
- * event surface neither the key-based `extra`/`contexts`/breadcrumb
- * scrubbing above nor `dropConsoleBreadcrumb` touches — it's not a keyed
- * field and it's not a breadcrumb. `JSON.parse(malformedText)` throws a
- * `SyntaxError` whose `.message` embeds a literal snippet of the malformed
- * text (V8: `Unexpected token 'S', "Sure! Here'sthe answer"... is not valid
- * JSON`); passing that error straight to `captureException` — as 5 sibling
- * sites did before this rework (dictation/{prepare-homework,review,
- * generate}.ts, quiz/generate-round.ts x2) — puts a slice of the LLM's raw
- * response (which routinely echoes learner homework/quiz-answer content)
- * directly into `exception.value`, unreachable by a scrubber that only
- * rewrites `extra`/`contexts`/breadcrumb `data`. Those 5 sites were fixed at
- * the source (they now synthesize a content-free `Error` carrying only a
- * length in `cause`, per `services/llm/providers/errors.ts`'s established
- * pattern — `cause` is a plain object, not an `Error`, so Sentry's default
- * `linkedErrorsIntegration` — which only chains `cause` when it's itself an
- * `Error` instance — never surfaces it). This redaction is the forward
- * guard: a future 6th site that copies the pre-fix pattern (hands the raw
- * `JSON.parse`/`schema.parse` catch error to `captureException`) is safe by
- * default. Redacting the quoted snippet, rather than dropping the whole
- * value, is also a grouping IMPROVEMENT, not a tradeoff — the raw snippet is
- * high-cardinality (every malformed response groups as a new issue); the
- * redacted structural message groups correctly.
+ * No GET route in this API currently carries free-text or secret query
+ * params (see the WI's Risk/Impact note) — this is a forward guard, not a
+ * live-leak fix. Wholesale-stripping the query string (rather than
+ * pattern-matching known-bad param names, as `.agents/skills/tech/
+ * sentry-scrubbing/SKILL.md`'s `stripUrlSecrets` example does) is the
+ * allowlist-shaped choice AC5 asks for: a denylist of param names misses the
+ * next one added; dropping the whole query string is safe by default and
+ * loses nothing since no query param carries diagnostic value today.
  */
-export function scrubSentryEvent<T extends Sentry.ErrorEvent>(event: T): T {
+function stripQueryString(url: string): string {
+  const queryIndex = url.indexOf('?');
+  return queryIndex === -1
+    ? url
+    : `${url.slice(0, queryIndex)}?${STRIPPED_QUERY_MARKER}`;
+}
+
+/** Marker substituted for a stripped request body. */
+const STRIPPED_BODY_MARKER = '[stripped]';
+
+/**
+ * Strips `event.request.query_string`, the query segment of
+ * `event.request.url`, and `event.request.data` (the request body) —
+ * `.agents/skills/tech/sentry-scrubbing/SKILL.md`'s review checklist
+ * requires `beforeSend` to strip request bodies unconditionally ("Is there a
+ * `beforeSend` that strips request query strings, `authorization`/`cookie`
+ * headers, and **bodies**?"), with no carve-out for "when the body happens
+ * to be a plain object with no denylisted keys." Not currently populated by
+ * this SDK/runtime for any request shape (see [WI-2339] Risk/Impact) — this
+ * is a forward guard, not a live-leak fix.
+ *
+ * `event.request.data` is wholesale-stripped for EVERY truthy shape, object
+ * included — no shape-based branching. A denylist-only scrub of an object
+ * body (reusing the `extra`/`contexts`/breadcrumb-`data` mechanism) would
+ * leave any field NOT on `PII_DENYLIST_KEYS` (e.g. a `homeworkAnswer` field)
+ * surviving — the denylist is a curated list of KNOWN-bad keys, not a
+ * guarantee that every field of an arbitrary request body is safe, and
+ * SKILL.md's checklist asks for the body to be stripped, not selectively
+ * filtered. (This intentionally differs from `event.extra`/`event.contexts`,
+ * which stay denylist-scrubbed: those are populated by THIS repo's own
+ * `captureException`/`captureMessage` call sites, whose key shapes are known
+ * and curated; `event.request.data` is an arbitrary request body whose
+ * shape this scrubber has no visibility into.)
+ *
+ * [Gate-2 fix] `query_string` is typed by the SDK as `string |
+ * Record<string, unknown> | Array<[string, string]>` — a `typeof ===
+ * 'string'` guard would silently no-op (PII passes through unscrubbed) for
+ * the object/array forms, exactly the future-shape this is meant to
+ * pre-empt. Strip wholesale on any truthy value regardless of type, rather
+ * than trying to parse/preserve the object/array forms — this matches the
+ * function's own stated allowlist-shaped intent (nothing kept, so nothing
+ * missed next quarter).
+ *
+ * Mutates `request` in place (mirrors `scrubAuthorizationHeader` above and
+ * the `event.extra`/`event.contexts` handling in `scrubSentryEvent` below);
+ * `scrubBreadcrumbUrl` returns a new object instead because it runs inside
+ * the breadcrumb `.map()`, which is already building a new array.
+ */
+function scrubRequestUrlFields(
+  request: NonNullable<Sentry.ErrorEvent['request']>,
+): void {
+  if (request.query_string) {
+    request.query_string = STRIPPED_QUERY_MARKER;
+  }
+  if (typeof request.url === 'string') {
+    request.url = stripQueryString(request.url);
+  }
+  if (request.data) {
+    request.data = STRIPPED_BODY_MARKER;
+  }
+}
+
+/**
+ * [WI-2339] The `Fetch` integration (active by default on
+ * `@sentry/cloudflare`) records outbound `fetch()` calls as breadcrumbs
+ * whose `data.url` carries the full request URL, query string included —
+ * the same leak vector as `event.request.url` above, but keyed under `url`
+ * rather than caught by `PII_DENYLIST_KEYS` (the key itself, `url`, is
+ * legitimate breadcrumb data; only the query segment is the risk). Applied
+ * after the key-based `scrubKeys` pass in `scrubSentryEvent`'s breadcrumb
+ * map so a denylisted key nested under `data.url`'s sibling fields is still
+ * caught by the existing mechanism.
+ */
+function scrubBreadcrumbUrl(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  if (typeof data.url === 'string') {
+    return { ...data, url: stripQueryString(data.url) };
+  }
+  return data;
+}
+
+/**
+ * `beforeSend`/`beforeSendTransaction` scrubber for the API's Sentry init —
+ * recursively strips denylisted PII-bearing keys from `event.extra`, every
+ * `event.contexts` entry, and every breadcrumb's `data`; redacts quoted
+ * substrings from `event.message` and every `event.exception.values[].value`
+ * (see `QUOTED_SNIPPET_PATTERN`'s doc comment); strips the `authorization`
+ * header from `event.request.headers` [WI-2353]; and [WI-2339] strips
+ * `event.request.query_string`, the query segment of `event.request.url`,
+ * `event.request.data` (wholesale-stripped for every shape — see
+ * `scrubRequestUrlFields`'s doc comment for why this isn't denylist-scrubbed
+ * like `extra`/`contexts`), and the query segment of any breadcrumb's
+ * `data.url` before the event leaves the process. Defense-in-depth, not a
+ * substitute for call-site discipline. [WI-1990]
+ *
+ * [WI-2353 rework] Wired to BOTH `beforeSend` (error events) AND
+ * `beforeSendTransaction` (sampled transaction events) in
+ * apps/api/src/index.ts — `requestDataIntegration` attaches the same
+ * `request.headers` to transaction events whenever `tracesSampleRate` is
+ * non-zero, so `beforeSend` alone leaves the Authorization header
+ * unredacted on every sampled transaction. Accepts `Sentry.Event` (the base
+ * type both `ErrorEvent` and `TransactionEvent` extend) rather than
+ * `Sentry.ErrorEvent` specifically, since every field this function reads
+ * or writes (`request`, `extra`, `contexts`, `breadcrumbs`, `exception`,
+ * `message`) is declared on the shared base, not on the error-only
+ * `type: undefined` discriminant.
+ *
+ * [WI-1990 rework; WI-2339 Gate-2 rework generalizes scope] `event.message`
+ * and `exception.type`/`exception.value` are the two Sentry event surfaces
+ * neither the key-based `extra`/`contexts`/breadcrumb scrubbing above nor
+ * `dropConsoleBreadcrumb` touches — neither is a keyed field, and neither is
+ * a breadcrumb. `event.message` is the raw string passed to
+ * `captureMessage()` (all current call sites use static templates — verified
+ * — but AC-1 requires the scrubber itself to cover this channel as a forward
+ * guard, not rely on that call-site discipline). `JSON.parse(malformedText)`
+ * throws a `SyntaxError` whose `.message` embeds a literal snippet of the
+ * malformed text (V8: `Unexpected token 'S', "Sure! Here'sthe answer"... is
+ * not valid JSON`); passing that error straight to `captureException` — as 5
+ * sibling sites did before the original WI-1990 rework (dictation/{prepare-
+ * homework,review,generate}.ts, quiz/generate-round.ts x2) — puts a slice of
+ * the LLM's raw response (which routinely echoes learner homework/quiz-
+ * answer content) directly into `exception.value`, unreachable by a scrubber
+ * that only rewrites `extra`/`contexts`/breadcrumb `data`. Those 5 sites were
+ * fixed at the source (they now synthesize a content-free `Error` carrying
+ * only a length in `cause`, per `services/llm/providers/errors.ts`'s
+ * established pattern). The ORIGINAL fix scoped the redaction to only the
+ * JSON.parse-SyntaxError message shape; Gate-2 review on WI-2339 correctly
+ * flagged that AC-1 requires general `exception.value` coverage, not just
+ * that one shape — a future exception type whose `.message` embeds free text
+ * (not necessarily JSON.parse-shaped) was still an unredacted gap. Every
+ * string `exception.value` (and `event.message`) is now redacted via
+ * `redactQuotedSnippets` unconditionally, which is a strict generalization of
+ * the prior gate (the JSON.parse case still redacts identically; every other
+ * shape now also gets its quoted substrings redacted). Redacting quoted
+ * substrings rather than dropping the whole value is also a grouping
+ * IMPROVEMENT, not a tradeoff — free-text content is high-cardinality (every
+ * distinct value groups as a new issue); the redacted structural message
+ * groups correctly.
+ *
+ * `.agents/skills/tech/sentry-scrubbing/SKILL.md` also asks for `beforeSend`
+ * to drop known-sensitive event classes entirely (`return null`), as a
+ * complement to the per-field denylist/redaction backstops above — a
+ * distinct mechanism, not a substitute: dropping a whole event class is for
+ * event shapes that should never reach Sentry at all, whereas the
+ * denylist/redaction above handles fields within an event that DOES get
+ * sent. No known-sensitive event class exists at the `beforeSend`
+ * (whole-event) level today. The one identified class-level bypass —
+ * `console.*` calls turning into breadcrumbs carrying raw structured-log
+ * strings — is already dropped via `beforeBreadcrumb` → `null`
+ * (`dropConsoleBreadcrumb` below); that's the `beforeBreadcrumb`-level
+ * instance of the same pattern. No `captureException`/`captureMessage` call
+ * site in this API is known to emit a whole event class that should never
+ * reach Sentry — inventing one to drop here would misrepresent the
+ * analysis. If a genuinely sensitive event class is identified in the
+ * future (e.g. a specific error type that should never be reported), add a
+ * targeted `return null` branch for it here, following
+ * `dropConsoleBreadcrumb`'s pattern.
+ */
+export function scrubSentryEvent<T extends Sentry.Event>(event: T): T {
   if (event.request?.headers) {
     scrubAuthorizationHeader(event.request.headers);
+  }
+  if (event.request) {
+    scrubRequestUrlFields(event.request);
   }
   if (event.extra) {
     event.extra = scrubKeys(event.extra);
@@ -254,16 +400,20 @@ export function scrubSentryEvent<T extends Sentry.ErrorEvent>(event: T): T {
   }
   if (event.breadcrumbs) {
     event.breadcrumbs = event.breadcrumbs.map((crumb) =>
-      crumb.data ? { ...crumb, data: scrubKeys(crumb.data) } : crumb,
+      crumb.data
+        ? { ...crumb, data: scrubBreadcrumbUrl(scrubKeys(crumb.data)) }
+        : crumb,
     );
+  }
+  if (typeof event.message === 'string') {
+    event.message = redactQuotedSnippets(event.message);
   }
   if (event.exception?.values) {
     event.exception.values = event.exception.values.map((exceptionValue) =>
-      typeof exceptionValue.value === 'string' &&
-      isJsonParseSyntaxErrorMessage(exceptionValue.value)
+      typeof exceptionValue.value === 'string'
         ? {
             ...exceptionValue,
-            value: redactJsonParseSyntaxErrorValue(exceptionValue.value),
+            value: redactQuotedSnippets(exceptionValue.value),
           }
         : exceptionValue,
     );

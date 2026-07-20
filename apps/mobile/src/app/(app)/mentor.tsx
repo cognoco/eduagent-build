@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import type { NowCard, NowDeepLink, NowResponse } from '@eduagent/schemas';
 
 import {
@@ -33,10 +33,16 @@ import {
   type EligibleManagedPerson,
 } from '../../hooks/use-eligible-supportees';
 import { useAnnounce } from '../../hooks/use-announce';
-import { useNowFeed, useNowOverflow } from '../../hooks/use-now-feed';
+import {
+  useMentorNoticeActions,
+  useNowFeed,
+  useNowOverflow,
+  type NowFeedQueryResult,
+} from '../../hooks/use-now-feed';
 import { useSubjectsIndex } from '../../hooks/use-subjects-index';
 import { matchBarIntent } from '../../lib/bar-intent-match';
 import { hasFirstRealState } from '../../lib/first-real-state';
+import { useProfile } from '../../lib/profile';
 import {
   pushAddChildForSupport,
   pushLinkInitiateForManagedPerson,
@@ -86,6 +92,59 @@ function rewardReceiptFromFeed(
   return null;
 }
 
+function useTransitionBoundFeed(
+  nowFeed: NowFeedQueryResult,
+  profileId: string | undefined,
+): NowResponse | undefined {
+  const incoming = nowFeed.data ?? nowFeed.fallbackFeed ?? undefined;
+  const latestRef = useRef({ profileId, feed: incoming });
+  latestRef.current = { profileId, feed: incoming };
+  const acceptedRef = useRef(Boolean(incoming));
+  const [snapshot, setSnapshot] = useState<{
+    profileId: string | undefined;
+    feed: NowResponse | undefined;
+  }>(() => ({ profileId, feed: incoming }));
+
+  useEffect(() => {
+    if (snapshot.profileId !== profileId) {
+      acceptedRef.current = Boolean(incoming);
+      setSnapshot({ profileId, feed: incoming });
+      return;
+    }
+    if (!acceptedRef.current && incoming) {
+      acceptedRef.current = true;
+      setSnapshot({ profileId, feed: incoming });
+    }
+  }, [incoming, profileId, snapshot.profileId]);
+
+  const refetch = nowFeed.refetch;
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const boundary = latestRef.current;
+      acceptedRef.current = Boolean(boundary.feed);
+      setSnapshot(boundary);
+
+      void (async () => {
+        try {
+          const result = await refetch();
+          if (!active || !result.data) return;
+          acceptedRef.current = true;
+          setSnapshot({ profileId, feed: result.data });
+        } catch {
+          // React Query retains the error state for the route's retry UI.
+        }
+      })();
+
+      return () => {
+        active = false;
+      };
+    }, [profileId, refetch]),
+  );
+
+  return snapshot.profileId === profileId ? snapshot.feed : incoming;
+}
+
 function pushMentorHomeworkCamera(router: ReturnType<typeof useRouter>): void {
   router.push({
     pathname: '/(app)/homework/camera',
@@ -94,8 +153,10 @@ function pushMentorHomeworkCamera(router: ReturnType<typeof useRouter>): void {
 }
 
 function LearnerMentorScreen(): React.ReactElement {
+  const { activeProfile } = useProfile();
   const { t } = useTranslation();
   const router = useRouter();
+  const { setActiveScope } = useScopeContext();
   const announce = useAnnounce();
   const { width: windowWidth } = useWindowDimensions();
   const nowFeed = useNowFeed();
@@ -142,7 +203,8 @@ function LearnerMentorScreen(): React.ReactElement {
     announce(clarificationAnnouncement);
   }, [announce, clarificationAnnouncement, clarificationRevision]);
   const overflow = useNowOverflow(showOverflow);
-  const feed = nowFeed.data ?? nowFeed.fallbackFeed ?? undefined;
+  const mentorNoticeActions = useMentorNoticeActions();
+  const feed = useTransitionBoundFeed(nowFeed, activeProfile?.id);
   const firstRealState = hasFirstRealState({
     // Count ACTIVE subjects only. useSubjectsIndex now surfaces every status
     // (paused/archived included) for the Subjects browse grouping, so the
@@ -165,14 +227,49 @@ function LearnerMentorScreen(): React.ReactElement {
   const getArcState = (card: NowCard): NowCardArcState | undefined =>
     cardArcStates[getNowCardDismissKey(card)];
 
-  const handleContinue = (card: NowCard): void => {
+  const handleContinue = async (card: NowCard): Promise<void> => {
     setArcState(card, 'advancing');
+    if (card.kind === 'mentor_notice') {
+      const noticeId = card.deepLink.params.noticeId;
+      if (!noticeId) {
+        await mentorNoticeActions.invalidate();
+        setArcState(card, 'due');
+        return;
+      }
+      try {
+        const result = await mentorNoticeActions.recheck.mutateAsync(noticeId);
+        router.push(
+          `/(app)/session?sessionId=${encodeURIComponent(result.sessionId)}` as Href,
+        );
+      } catch (error) {
+        if ((error as { status?: number }).status === 409) {
+          await mentorNoticeActions.invalidate();
+        }
+        setArcState(card, 'due');
+      }
+      return;
+    }
     pushNowDeepLink(router, card.deepLink, {
       subjectHubTarget: 'v2-subject-hub',
+      setActiveScope,
     });
   };
 
-  const handleDecline = (card: NowCard): void => {
+  const handleDecline = async (card: NowCard): Promise<void> => {
+    if (card.kind === 'mentor_notice') {
+      const noticeId = card.deepLink.params.noticeId;
+      if (!noticeId) {
+        await mentorNoticeActions.invalidate();
+        return;
+      }
+      try {
+        await mentorNoticeActions.defer.mutateAsync(noticeId);
+      } catch (error) {
+        if ((error as { status?: number }).status === 409) {
+          await mentorNoticeActions.invalidate();
+        }
+      }
+    }
     setDismissedKeys((current) => {
       const next = new Set(current);
       next.add(getNowCardDismissKey(card));
@@ -209,6 +306,7 @@ function LearnerMentorScreen(): React.ReactElement {
       setBarClarification(null);
       pushNowDeepLink(router, result.deepLink, {
         subjectHubTarget: 'v2-subject-hub',
+        setActiveScope,
       });
       return;
     }
@@ -289,6 +387,7 @@ function LearnerMentorScreen(): React.ReactElement {
       if (resumeLink) {
         pushNowDeepLink(router, resumeLink, {
           subjectHubTarget: 'v2-subject-hub',
+          setActiveScope,
         });
         return;
       }

@@ -54,6 +54,11 @@ function deepLinkFor(kind: CandidateKind, id: string) {
       return resolveDeepLink('billing.manage', {});
     case 'unfinished_session':
       return resolveDeepLink('session.resume', { sessionId: `session-${id}` });
+    case 'mentor_notice':
+      return resolveDeepLink('notice.recheck', {
+        noticeId: id,
+        subjectId: SUBJECT_ID,
+      });
     case 'retention_due':
       return resolveDeepLink('retention.review', {
         subjectId: SUBJECT_ID,

@@ -1,4 +1,58 @@
 {
+  "celebrationEarnedContext": {
+    "polar_star": {
+      "child": "Polarstern – deine erste selbstständige Antwort!",
+      "adult": "Polarstern – erste selbstständige Antwort."
+    },
+    "twin_stars": {
+      "child": "Zwillingssterne – drei starke Antworten hintereinander!",
+      "adult": "Zwillingssterne – drei starke Antworten in Folge."
+    },
+    "comet": {
+      "child": "Komet – jetzt hat es Klick gemacht!",
+      "adult": "Komet – ein Konzept wurde verstanden."
+    },
+    "orions_belt": {
+      "child": "Orions Gürtel – fünf Antworten in Folge ohne Hilfe!",
+      "adult": "Orions Gürtel – fünf selbstständige Antworten in Folge."
+    },
+    "deep_diver": {
+      "child": "Tiefseetaucher – richtig gut nachgedacht!",
+      "adult": "Tiefseetaucher – für durchdachte Antworten verdient."
+    },
+    "persistent": {
+      "child": "Drangeblieben – nach einer Korrektur weitergemacht!",
+      "adult": "Drangeblieben – nach einer Korrektur weitergearbeitet."
+    },
+    "topic_mastered": {
+      "child": "Komet – du beherrschst dieses Thema!",
+      "adult": "Komet – Thema gemeistert."
+    },
+    "evaluate_success": {
+      "child": "Zwillingssterne – du hast den Fehler entdeckt!",
+      "adult": "Zwillingssterne – die Antwort richtig beurteilt."
+    },
+    "teach_back_success": {
+      "child": "Zwillingssterne – du hast es klar erklärt!",
+      "adult": "Zwillingssterne – verständlich zurückerklärt."
+    },
+    "streak_7": {
+      "child": "Komet – sieben Tage Lernen in Folge!",
+      "adult": "Komet – siebentägige Lernserie."
+    },
+    "streak_30": {
+      "child": "Orions Gürtel – 30 Tage Lernen in Folge!",
+      "adult": "Orions Gürtel – dreißigtägige Lernserie."
+    },
+    "curriculum_complete": {
+      "child": "Komet – du hast den Lernplan abgeschlossen!",
+      "adult": "Komet – Lernplan abgeschlossen."
+    },
+    "default": {
+      "child": "Meilenstein erreicht – gut gemacht!",
+      "adult": "Meilenstein erreicht."
+    }
+  },
   "common": {
     "cancel": "Abbrechen",
     "ok": "OK",
@@ -888,7 +942,8 @@
       "verificationBadge": {
         "evaluate": "THINK-DEEPER BESTANDEN",
         "teachBack": "TEACH-BACK BESTANDEN"
-      }
+      },
+      "mentorNotice": "Unterwegs aufgefallen: {{concept}}"
     },
     "noteInput": {
       "cancel": "Abbrechen",
@@ -3045,6 +3100,7 @@
       "yourShare": "Dein Anteil",
       "yourUsage": "Deine Nutzung",
       "questionsUsed": "{{count}} Fragen",
+      "formerMembers": "Frühere Mitglieder",
       "familyAggregate": "Familie gesamt",
       "quotaResets": "Kontingent wird am {{date}} zurückgesetzt",
       "renews": "Abo erneuert sich am {{date}}",
@@ -3063,7 +3119,9 @@
       "title": "Möchtest du eine tägliche Erinnerung?",
       "message": "Wir können dir eine sanfte Erinnerung schicken, damit du deinen Streak nicht verlierst. Du kannst sie jederzeit in den Einstellungen deaktivieren.",
       "allow": "Erlauben",
-      "notNow": "Nicht jetzt"
+      "notNow": "Nicht jetzt",
+      "noticeTitle": "Möchtest du eine sanfte Erinnerung?",
+      "noticeMessage": "Wir können dich daran erinnern, das zu wiederholen, was dein Mentor heute bemerkt hat. Du kannst das jederzeit in den Einstellungen deaktivieren."
     },
     "masteredRow": {
       "title": "Du hast gemeistert:"
@@ -3176,6 +3234,14 @@
         "language_focus": "Nächstes Mal: Wir arbeiten an Grammatikmustern",
         "fluency": "Nächstes Mal: ein kurzer Flüssigkeitssprint"
       }
+    },
+    "feedbackUnavailableTitle": "Feedback ist noch nicht verfügbar",
+    "feedbackUnavailableMessage": "Deine Zusammenfassung ist gespeichert. Du kannst das Feedback erneut anfordern, ohne sie nochmals einzureichen.",
+    "feedbackStillUnavailable": "Feedback ist immer noch nicht verfügbar, aber deine Zusammenfassung ist sicher. Du kannst es erneut versuchen oder fortfahren, wann immer du bereit bist.",
+    "retryFeedback": "Feedback wiederholen",
+    "retryingFeedback": "Feedback wird wiederholt...",
+    "mentorNotice": {
+      "title": "Unterwegs aufgefallen"
     }
   },
   "sessionTranscript": {
@@ -3994,6 +4060,14 @@
         "currentAccess": "Dein bezahlter Zugang bleibt bis zum {{deadline}} aktiv.",
         "freeFallback": "Dein Konto hat jetzt kostenlosen Zugang. Aktualisiere die Zahlung, um deinen Plan wiederherzustellen.",
         "currentAccessNoDeadline": "Dein bezahlter Zugang ist noch aktiv."
+      },
+      "mentor_notice": {
+        "title": "Eine Idee, die du dir ansehen solltest",
+        "cta": "Jetzt prüfen",
+        "notNow": "Nicht jetzt",
+        "arcDue": "Bereit, wenn du es bist",
+        "arcAdvancing": "Kurzer Check startet",
+        "arcMastered": "Gefestigt"
       }
     },
     "ledger": {
@@ -4006,6 +4080,9 @@
       },
       "quota": {
         "title": "Ein Lernmoment wurde gespeichert."
+      },
+      "notice_locked_in": {
+        "title": "Du hast {{concept}} gefestigt."
       }
     },
     "overflow": {
@@ -4212,7 +4289,8 @@
       "recap_ready": "Zusammenfassung ist fertig.",
       "snapshot_ready": "Eine Lern-Momentaufnahme ist fertig.",
       "reflection_bonus": "Reflexionsbonus gespeichert.",
-      "quiz_personal_best": "Bestleistung gespeichert."
+      "quiz_personal_best": "Bestleistung gespeichert.",
+      "notice_locked_in": "{{concept}} in {{subjectName}} gefestigt."
     },
     "recaps": {
       "error": "Deine Zusammenfassungen konnten nicht geladen werden.",

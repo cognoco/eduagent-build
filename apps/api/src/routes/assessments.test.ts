@@ -85,6 +85,20 @@ jest.mock(
   },
 );
 
+// [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
+// calls verifyPersonOwnershipV2 — a raw db.select() membership query the
+// stub `db` in this file's mini Hono app cannot satisfy. Every isOwner:true
+// scenario in this file is a caller-self write (makeApp sets callerPersonId
+// equal to profileId below); the cross-account write attack this guard
+// exists to close is covered by the real-DB break test in
+// tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's stub-db environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
@@ -125,6 +139,9 @@ type TestEnv = {
     db: Database;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
+    // [WI-2398] Required by assertCanWriteProfile (see makeApp below).
+    account: { id: string } | undefined;
+    callerPersonId: string | undefined;
   };
 };
 
@@ -136,6 +153,13 @@ function makeApp(opts?: { isOwner?: boolean; profileId?: string }) {
   app.use('*', async (c, next) => {
     c.set('db', makeStubDb() as unknown as Database);
     c.set('profileId', profileId);
+    // [WI-2398] Caller-self identity — assertNotProxyMode now also calls
+    // assertCanWriteProfile, which requires account + callerPersonId.
+    // callerPersonId equal to profileId mirrors the legitimate
+    // owner-acting-as-self flow (verifyPersonOwnershipV2 is mocked to
+    // succeed at file scope regardless of the stub `db`).
+    c.set('account', { id: 'test-account-id' });
+    c.set('callerPersonId', profileId);
     c.set('profileMeta', {
       birthYear: 2000,
       location: 'EU',
@@ -201,6 +225,9 @@ function makeMeteredApp(opts?: {
   app.use('*', async (c, next) => {
     c.set('db', makeStubDb() as unknown as Database);
     c.set('profileId', profileId);
+    // [WI-2398] Caller-self identity — see makeApp's comment above.
+    c.set('account', { id: 'test-account-id' });
+    c.set('callerPersonId', profileId);
     c.set('profileMeta', {
       birthYear: 2000,
       location: 'EU',
@@ -288,7 +315,7 @@ describe('POST /v1/subjects/:subjectId/topics/:topicId/assessments', () => {
     expect(createAssessmentIfNoneActiveMock).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when profileId is absent (missing profile context)', async () => {
+  it('returns 403 when profileId is absent (missing profile context)', async () => {
     const app = new Hono<TestEnv>();
     app.use('*', async (c, next) => {
       c.set('db', makeStubDb() as unknown as Database);
@@ -302,13 +329,20 @@ describe('POST /v1/subjects/:subjectId/topics/:topicId/assessments', () => {
         isOwner: true,
         resolvedVia: 'explicit-header',
       });
+      // Deliberately omit account/callerPersonId too — this state (profileMeta
+      // present, profileId absent) never occurs in production: real
+      // profileScopeMiddleware always sets profileId and profileMeta together.
       await next();
     });
     app.route('/v1', assessmentRoutes);
 
     const res = await app.request(path, { method: 'POST' });
-    // requireProfileId throws HTTPException(400) when profileId is undefined
-    expect(res.status).toBe(400);
+    // [WI-2398] assertNotProxyMode now fails closed (403) when profileId is
+    // absent, before requireProfileId's own 400 ever runs — the safer
+    // response when write authority cannot be established. Pre-WI-2398 this
+    // asserted 400 from requireProfileId; that later check is now
+    // unreachable for this synthetic (production-impossible) state.
+    expect(res.status).toBe(403);
   });
 });
 
@@ -412,7 +446,10 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       PROFILE_ID,
       ASSESSMENT_ID,
       'Water is H2O',
-      { conversationLanguage: 'en' },
+      // [WI-2432] ageBracket now threads from profileMeta.birthYear (2000 ->
+      // always 'adult', since 2000 + PARENT_ACCOUNT_MINIMUM_AGE(18) has long
+      // passed) alongside conversationLanguage.
+      { conversationLanguage: 'en', ageBracket: 'adult' },
     );
   });
 
@@ -528,6 +565,9 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       app.use('*', async (c, next) => {
         c.set('db', makeStubDb() as unknown as Database);
         c.set('profileId', PROFILE_ID);
+        // [WI-2398] Caller-self identity — see makeApp's comment above.
+        c.set('account', { id: 'test-account-id' });
+        c.set('callerPersonId', PROFILE_ID);
         c.set('profileMeta', {
           birthYear: 2000,
           location: 'EU',
@@ -627,6 +667,9 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       innerApp.use('*', async (c, next) => {
         c.set('db', makeStubDb() as unknown as Database);
         c.set('profileId', PROFILE_ID);
+        // [WI-2398] Caller-self identity — see makeApp's comment above.
+        c.set('account', { id: 'test-account-id' });
+        c.set('callerPersonId', PROFILE_ID);
         c.set('profileMeta', {
           birthYear: 2000,
           location: 'EU',

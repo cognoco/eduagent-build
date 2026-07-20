@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { NowCard as NowCardData } from '@eduagent/schemas';
 
 import type { TranslateKey } from '../../i18n';
+import { renderMilestoneMomentText } from '../../lib/milestone-moment-copy';
 import { useThemeColors } from '../../lib/theme';
 
 export interface LedgerMomentCardProps {
@@ -13,16 +14,44 @@ export interface LedgerMomentCardProps {
 
 const SUPPORTED_LEDGER_COPY_KEYS: Partial<Record<string, TranslateKey>> = {
   session_filed: 'mentorHome.ledger.session_filed.title',
+  notice_locked_in: 'mentorHome.ledger.notice_locked_in.title',
 };
 
+function ledgerKind(card: NowCardData): string {
+  return typeof card.params['ledgerKind'] === 'string'
+    ? card.params['ledgerKind']
+    : card.templateKey.replace('now.ledger_moment.', '');
+}
+
 function ledgerCopyKey(card: NowCardData): TranslateKey {
-  const ledgerKind =
-    typeof card.params['ledgerKind'] === 'string'
-      ? card.params['ledgerKind']
-      : card.templateKey.replace('now.ledger_moment.', '');
   return (
-    SUPPORTED_LEDGER_COPY_KEYS[ledgerKind] ?? 'mentorHome.ledger.generic.title'
+    SUPPORTED_LEDGER_COPY_KEYS[ledgerKind(card)] ??
+    'mentorHome.ledger.generic.title'
   );
+}
+
+function withJournalSectionIntent(card: NowCardData): NowCardData {
+  if (card.deepLink.route !== 'journal') return card;
+
+  if (ledgerKind(card) === 'quiz_personal_best') {
+    return {
+      ...card,
+      deepLink: {
+        ...card.deepLink,
+        params: { ...card.deepLink.params, section: 'practice' },
+      },
+    };
+  }
+
+  // TODO: Map a future Journal-routed ledger kind only after product assigns
+  // it to one of the existing Journal sections; unknown kinds stay at root.
+  if (!('section' in card.deepLink.params)) return card;
+  const rootParams = { ...card.deepLink.params };
+  delete rootParams['section'];
+  return {
+    ...card,
+    deepLink: { ...card.deepLink, params: rootParams },
+  };
 }
 
 export function LedgerMomentCard({
@@ -37,7 +66,7 @@ export function LedgerMomentCard({
     <Pressable
       testID="now-ledger-moment"
       accessibilityRole="button"
-      onPress={() => onContinue(card)}
+      onPress={() => onContinue(withJournalSectionIntent(card))}
       className="rounded-xl p-3"
       style={{
         backgroundColor: colors.surface,
@@ -49,7 +78,9 @@ export function LedgerMomentCard({
         {t('mentorHome.ledger.label')}
       </Text>
       <Text className="mt-1 font-semibold text-text-primary">
-        {t(ledgerCopyKey(card), card.params)}
+        {ledgerKind(card) === 'milestone_reached'
+          ? renderMilestoneMomentText(card.params, t)
+          : t(ledgerCopyKey(card), card.params)}
       </Text>
       <View className="mt-3 flex-row items-center justify-between">
         <Text className="text-sm text-primary">

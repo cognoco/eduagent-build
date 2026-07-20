@@ -61,6 +61,7 @@ import { curriculumRoutes } from './routes/curriculum';
 import { bookRoutes } from './routes/books';
 import { noteRoutes } from './routes/notes';
 import { sessionRoutes } from './routes/sessions';
+import { mentorNoticeRoutes } from './routes/mentor-notices';
 import { bookmarkRoutes } from './routes/bookmarks';
 import { parkingLotRoutes } from './routes/parking-lot';
 import { homeworkRoutes } from './routes/homework';
@@ -188,6 +189,8 @@ type Bindings = {
   ALLOW_MISSING_IDEMPOTENCY_KV?: string;
   ADULT_OWNER_GATE_ENABLED?: string;
   CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
+  ANSWER_EVALUATION_RUNTIME_ENABLED?: string;
+  MENTOR_NOTICE_ENABLED?: string;
   CHALLENGE_ROUND_COHORT_PROFILE_IDS?: string;
   CHALLENGE_ROUND_GRADER_ENABLED?: string;
   JUDGE_FRAMEWORK_ENABLED?: string;
@@ -375,6 +378,7 @@ const routes = api
   .route('/', bookRoutes)
   .route('/', noteRoutes)
   .route('/', sessionRoutes)
+  .route('/', mentorNoticeRoutes)
   .route('/', bookmarkRoutes)
   .route('/', parkingLotRoutes)
   .route('/', homeworkRoutes)
@@ -637,10 +641,25 @@ export default Sentry.withSentry(
     dsn: (env as unknown as Bindings).SENTRY_DSN,
     tracesSampleRate:
       (env as unknown as Bindings).ENVIRONMENT === 'production' ? 0.1 : 1.0,
+    // [WI-2339] @sentry/cloudflare's sdk.js already defaults
+    // sendDefaultPii to false (verified: sdk.js:14, `options.sendDefaultPii
+    // ?? false`) — this line changes no runtime behavior. Set explicitly so
+    // the PII-attachment posture is asserted in code, not inherited from an
+    // SDK default that could change on a future upgrade.
+    sendDefaultPii: false,
     // [WI-1990] Defense-in-depth PII backstop — strips denylisted keys
     // (learner free-text, names, etc.) from extra/contexts before an event
     // leaves the API. Not a substitute for call-site discipline.
     beforeSend: scrubSentryEvent,
+    // [WI-2353 rework] beforeSend only fires on error events — with
+    // tracesSampleRate non-zero, requestDataIntegration attaches the same
+    // event.request.headers (including Authorization) to sampled
+    // TRANSACTION events too, and those bypass beforeSend entirely. Wire
+    // the same scrub to beforeSendTransaction so the Authorization
+    // redaction (and the pre-existing cookie exclusion) applies uniformly
+    // to both event types. Mirrors the two-hook pattern already used by
+    // apps/mobile/src/lib/sentry.ts.
+    beforeSendTransaction: scrubSentryEvent,
     // [WI-1990 rework] The SDK's default consoleIntegration() turns every
     // console.* call into a breadcrumb with the raw args embedded in a
     // string (message / data.arguments) — content a key-based scrubber

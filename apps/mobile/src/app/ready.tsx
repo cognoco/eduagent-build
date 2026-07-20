@@ -9,6 +9,7 @@ import { MentorBirthErrorBoundary } from '../components/common/MentorBirthErrorB
 import { MentorBirthAnimation } from '../components/common/MentorBirthAnimation';
 import { CheckmarkPopAnimation } from '../components/common/CheckmarkPopAnimation';
 import { Button } from '../components/common/Button';
+import { isSessionForwardableReturnTo } from '../lib/navigation';
 
 const SCREEN_HEIGHT =
   Platform.OS === 'web'
@@ -56,6 +57,7 @@ export default function ReadyScreen() {
     topicId?: string;
     topicName?: string;
     rawInput?: string;
+    returnTo?: string;
   }>();
 
   const subject = (params.subject ?? '').trim();
@@ -92,6 +94,8 @@ export default function ReadyScreen() {
     if (params.topicId) sessionParams.topicId = params.topicId;
     if (params.topicName) sessionParams.topicName = params.topicName;
     if (params.rawInput) sessionParams.rawInput = params.rawInput;
+    if (isSessionForwardableReturnTo(params.returnTo))
+      sessionParams.returnTo = params.returnTo;
 
     router.replace({
       pathname: '/(app)/session',
@@ -105,6 +109,7 @@ export default function ReadyScreen() {
     params.topicId,
     params.topicName,
     params.rawInput,
+    params.returnTo,
   ]);
 
   // /ready always runs as the learner whose profile is now active —
