@@ -1,5 +1,6 @@
 import {
   bookmarks,
+  consentGrant,
   guardianship,
   learningProfiles,
   learningSessions,
@@ -9,68 +10,16 @@ import {
   supportership,
   topicNotes,
   weeklyReports,
-  generateUUIDv7,
-  type Database,
 } from '@eduagent/database';
 
+import {
+  createRecordingDb,
+  type TestSeedInsertRecord,
+} from '../test-utils/test-seed-db';
 import { seedScenario } from './test-seed';
 
-type InsertRecord = {
-  table: unknown;
-  values: Record<string, unknown> | Array<Record<string, unknown>>;
-};
-
-function createRecordingDb(): {
-  db: Database;
-  inserts: InsertRecord[];
-} {
-  const inserts: InsertRecord[] = [];
-  const selectChain = {
-    from: jest.fn().mockReturnThis(),
-    where: jest.fn().mockResolvedValue([]),
-    limit: jest.fn().mockResolvedValue([]),
-  };
-
-  const db = {
-    insert: jest.fn((table: unknown) => ({
-      values: jest.fn(
-        (values: Record<string, unknown> | Array<Record<string, unknown>>) => {
-          if (table === practiceActivityEvents) {
-            const persistedValues = {
-              ...(values as Record<string, unknown>),
-              id: generateUUIDv7(),
-            };
-            inserts.push({ table, values: persistedValues });
-            return {
-              onConflictDoNothing: jest.fn().mockReturnValue({
-                returning: jest.fn().mockResolvedValue([persistedValues]),
-              }),
-            };
-          }
-          inserts.push({ table, values });
-          return Promise.resolve(undefined);
-        },
-      ),
-    })),
-    update: jest.fn().mockReturnValue({
-      set: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(undefined),
-      }),
-    }),
-    select: jest.fn().mockReturnValue(selectChain),
-    delete: jest.fn().mockReturnValue({
-      where: jest.fn().mockReturnValue({
-        returning: jest.fn().mockResolvedValue([]),
-      }),
-    }),
-    execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-  } as unknown as Database;
-
-  return { db, inserts };
-}
-
 function insertedRow(
-  inserts: InsertRecord[],
+  inserts: TestSeedInsertRecord[],
   table: unknown,
   id: string,
 ): Record<string, unknown> {
@@ -117,6 +66,21 @@ describe('v2-journal-paper-trail seed', () => {
     expect(result.scenario).toBe('v2-journal-paper-trail');
     expect(result.ids.learnerProfileId).toBe(result.profileId);
     expect(result.ids.recapId).toBe(sessionId);
+    expect(
+      inserts
+        .filter((record) => record.table === consentGrant)
+        .flatMap((record) =>
+          Array.isArray(record.values) ? record.values : [record.values],
+        ),
+    ).toContainEqual(
+      expect.objectContaining({
+        chargePersonId: result.profileId,
+        organizationId: result.accountId,
+        purpose: 'platform_use',
+        lawfulBasis: 'art6_1_a',
+        granted: true,
+      }),
+    );
     for (const id of [
       subjectId,
       topicId,

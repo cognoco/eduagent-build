@@ -8,7 +8,6 @@ import {
   login,
   membership,
   usageEvents,
-  practiceActivityEvents,
   type Database,
 } from '@eduagent/database';
 import { inArray } from 'drizzle-orm';
@@ -25,6 +24,7 @@ import {
   SEED_CLERK_PREFIX,
   type SeedScenario,
 } from './test-seed';
+import { createRecordingDb } from '../test-utils/test-seed-db';
 import { getTierConfig } from './subscription';
 
 // ---------------------------------------------------------------------------
@@ -32,93 +32,7 @@ import { getTierConfig } from './subscription';
 // ---------------------------------------------------------------------------
 
 function createMockDb(): Database {
-  const deleteWhere = jest.fn().mockReturnValue({
-    returning: jest.fn().mockResolvedValue([]),
-  });
-
-  // Fluent select chain: db.select({}).from(table).where(...) / .innerJoin(...).where(...).limit(n)
-  // Returns [] by default (no existing seed data — idempotency check finds nothing to clean up).
-  const selectChain = {
-    from: jest.fn().mockReturnThis(),
-    where: jest.fn().mockResolvedValue([]),
-    innerJoin: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockResolvedValue([]),
-  };
-  // Make `.where()` after `.innerJoin()` also resolve to []:
-  selectChain.innerJoin.mockReturnValue({
-    where: jest.fn().mockReturnValue({
-      limit: jest.fn().mockResolvedValue([]),
-    }),
-  });
-
-  // Fluent update chain: db.update(table).set({}).where(...)
-  const updateChain = {
-    set: jest.fn().mockReturnValue({
-      where: jest.fn().mockResolvedValue(undefined),
-    }),
-  };
-
-  // Keep one shared values mock because scenario-shape tests inspect all
-  // inserted values through the first db.insert() result. Track the current
-  // table only to emulate recordPracticeActivityEvent's returning chain.
-  let currentInsertTable: unknown;
-  const insertResult = {
-    values: jest.fn((values: Record<string, unknown>) => {
-      if (currentInsertTable === practiceActivityEvents) {
-        return {
-          onConflictDoNothing: jest.fn().mockReturnValue({
-            returning: jest.fn().mockResolvedValue([
-              {
-                ...values,
-                id: '019d14f4-735f-7e11-8800-000000000001',
-              },
-            ]),
-          }),
-        };
-      }
-      return Promise.resolve(undefined);
-    }),
-  };
-
-  return {
-    insert: jest.fn((table: unknown) => {
-      currentInsertTable = table;
-      return insertResult;
-    }),
-    update: jest.fn().mockReturnValue(updateChain),
-    select: jest.fn().mockReturnValue(selectChain),
-    delete: jest.fn().mockReturnValue({
-      where: deleteWhere,
-    }),
-    // db.execute is used only by the WI-788 legacy-table existence probe
-    // (to_regclass). The unit mock has no legacy tables → return an empty
-    // result so tableExists() resolves false and the conditional legacy writes
-    // self-inert, keeping these tests focused on the v2 path.
-    execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
-    query: {
-      // Extended for scenarios that query curricula/topics (e.g. parent-subject-with-retention)
-      curricula: {
-        findFirst: jest.fn().mockResolvedValue({
-          id: 'mock-curriculum-id',
-          subjectId: 'mock-subject-id',
-        }),
-      },
-      curriculumTopics: {
-        findFirst: jest.fn().mockResolvedValue({
-          id: 'mock-topic-id',
-          curriculumId: 'mock-curriculum-id',
-        }),
-        findMany: jest
-          .fn()
-          .mockResolvedValue([
-            { id: 'mock-topic-id', curriculumId: 'mock-curriculum-id' },
-          ]),
-      },
-      subjects: {
-        findMany: jest.fn().mockResolvedValue([]),
-      },
-    },
-  } as unknown as Database;
+  return createRecordingDb().db;
 }
 
 // ---------------------------------------------------------------------------

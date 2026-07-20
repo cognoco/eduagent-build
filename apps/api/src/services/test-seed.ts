@@ -5076,7 +5076,7 @@ async function seedV2JournalPaperTrail(
     chargePersonId: profileId,
     organizationId: accountId,
     purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
+    lawfulBasis: 'art6_1_a',
     granted: true,
   });
 
