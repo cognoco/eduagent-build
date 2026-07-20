@@ -2,13 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { SessionFooter } from './SessionFooter';
 
-jest.mock(
-  '../session' /* gc1-allow: footer tests isolate prompt/button behavior from sibling session components */,
-  () => ({
-    QuestionCounter: () => null,
-    LibraryPrompt: () => null,
-  }),
-);
+const mockPush = jest.fn();
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
 
 jest.mock(
   '../../hooks/use-speech-recognition' /* gc1-allow: native speech recognition is an external device boundary for NoteInput rendering */,
@@ -203,5 +201,28 @@ describe('SessionFooter', () => {
     expect(screen.queryByTestId('session-freeform-keep-prompt')).toBeNull();
     expect(screen.queryByTestId('session-freeform-keep-deferred')).toBeNull();
     expect(screen.getByTestId('session-note-prompt')).toBeTruthy();
+  });
+
+  it('renders the real question counter when question count is enabled', () => {
+    const props = createProps({
+      showQuestionCount: true,
+      userMessageCount: 3,
+    });
+
+    render(<SessionFooter {...(props as any)} />);
+
+    expect(screen.getByTestId('question-counter')).toBeTruthy();
+    expect(screen.getByLabelText('Question 3')).toBeTruthy();
+  });
+
+  it('renders the real Library prompt when the book link is enabled', () => {
+    const props = createProps({ showBookLink: true });
+
+    render(<SessionFooter {...(props as any)} />);
+
+    fireEvent.press(screen.getByTestId('session-library-link'));
+
+    expect(screen.getByLabelText('Go to the Library')).toBeTruthy();
+    expect(mockPush).toHaveBeenCalledWith('/(app)/library');
   });
 });

@@ -82,6 +82,8 @@ export default function SubjectHubRoute(): React.ReactElement {
   // the sheet on the 'active' fallback would show the wrong action set for a
   // deep-linked paused/archived subject (pause+archive instead of resume/restore).
   const manageReady = canManage && !!subjectsQuery.data;
+  const showHubBack = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+  const showHubHeader = showHubBack || manageReady;
   const updateSubject = useUpdateSubject();
 
   const handleChangeStatus = useCallback(
@@ -149,15 +151,14 @@ export default function SubjectHubRoute(): React.ReactElement {
 
   const handleReviewTopic = useCallback(
     (topicId: string, bookId?: string | null) => {
+      const usesSubjectHubReturn = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
       router.push({
         pathname: '/(app)/topic/[topicId]',
         params: {
           subjectId,
           topicId,
-          ...(bookId ? { bookId } : {}),
-          ...(FEATURE_FLAGS.MODE_NAV_V2_ENABLED
-            ? { returnTo: SUBJECT_HUB_RETURN_TO }
-            : {}),
+          ...(usesSubjectHubReturn && bookId ? { bookId } : {}),
+          ...(usesSubjectHubReturn ? { returnTo: SUBJECT_HUB_RETURN_TO } : {}),
         },
       } as Href);
     },
@@ -304,34 +305,42 @@ export default function SubjectHubRoute(): React.ReactElement {
         />
       ) : hubData ? (
         <View className="flex-1" testID="subject-hub-screen">
-          <View className="flex-row items-center justify-between px-5 pt-3">
-            {FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? (
-              <Pressable
-                testID="subject-hub-back"
-                accessibilityRole="button"
-                accessibilityLabel={t('common.goBackAction')}
-                onPress={goBack}
-                className="min-h-[40px] justify-center rounded-button px-3"
-              >
-                <Text className="text-body-sm font-semibold text-primary">
-                  {t('common.goBack')}
-                </Text>
-              </Pressable>
-            ) : null}
-            {manageReady ? (
-              <Pressable
-                testID="subject-hub-manage"
-                accessibilityRole="button"
-                accessibilityLabel={t('subjectHub.manage.accessibilityLabel')}
-                onPress={() => setManageOpen(true)}
-                className="min-h-[40px] justify-center rounded-button px-3"
-              >
-                <Text className="text-body-sm font-semibold text-primary">
-                  {t('subjectHub.manage.open')}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
+          {showHubHeader ? (
+            <View
+              className="flex-row items-center px-5 pt-3"
+              style={{
+                justifyContent: showHubBack ? 'space-between' : 'flex-end',
+              }}
+              testID="subject-hub-header"
+            >
+              {showHubBack ? (
+                <Pressable
+                  testID="subject-hub-back"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.goBackAction')}
+                  onPress={goBack}
+                  className="min-h-[40px] justify-center rounded-button px-3"
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    {t('common.goBack')}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {manageReady ? (
+                <Pressable
+                  testID="subject-hub-manage"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('subjectHub.manage.accessibilityLabel')}
+                  onPress={() => setManageOpen(true)}
+                  className="min-h-[40px] justify-center rounded-button px-3"
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    {t('subjectHub.manage.open')}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
           <SubjectHub
             data={hubData}
             onNextUpPress={handleNextUp}

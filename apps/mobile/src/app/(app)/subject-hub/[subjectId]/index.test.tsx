@@ -250,16 +250,19 @@ describe('SubjectHubRoute', () => {
     );
   });
 
-  it('does not expose the V2 Subjects Back control while V2 navigation is disabled', async () => {
+  it('right-aligns the sole Manage control while V2 navigation is disabled', async () => {
     jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', false);
 
     render(<SubjectHubRoute />, { wrapper: wrapper() });
 
     await waitFor(() => {
-      screen.getByTestId('subject-hub-screen');
+      screen.getByTestId('subject-hub-manage');
     });
 
     expect(screen.queryByTestId('subject-hub-back')).toBeNull();
+    expect(screen.getByTestId('subject-hub-header')).toHaveStyle({
+      justifyContent: 'flex-end',
+    });
     expect(mockReplace).not.toHaveBeenCalledWith('/(app)/subjects');
   });
 
@@ -274,6 +277,12 @@ describe('SubjectHubRoute', () => {
 
     const backControls = screen.getAllByTestId('subject-hub-back');
     expect(backControls).toHaveLength(1);
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-manage');
+    });
+    expect(screen.getByTestId('subject-hub-header')).toHaveStyle({
+      justifyContent: 'space-between',
+    });
     fireEvent.press(backControls[0]!);
 
     expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
@@ -320,6 +329,49 @@ describe('SubjectHubRoute', () => {
         topicId: TOPIC_ID,
         bookId: BOOK_ID,
         returnTo: 'subject-hub',
+      },
+    });
+  });
+
+  it('preserves the V0 due-review topic route without V2 return or book context', async () => {
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', false);
+    mockFetch.setRoute('/progress/resume-target', { target: null });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+      topics: [
+        {
+          topicId: TOPIC_ID,
+          topicTitle: 'Greetings',
+          bookId: BOOK_ID,
+          easeFactor: 2.5,
+          intervalDays: 1,
+          repetitions: 0,
+          xpStatus: 'pending',
+          masteredAt: null,
+          nextReviewAt: '2026-06-13T00:00:00.000Z',
+          lastReviewedAt: null,
+          daysSinceLastReview: null,
+          failureCount: 0,
+        },
+      ],
+      reviewDueCount: 1,
+    });
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(
+      () => {
+        screen.getByTestId('subject-hub-screen');
+      },
+      { timeout: 5000 },
+    );
+
+    fireEvent.press(screen.getByTestId('subject-hub-next-up-action'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/topic/[topicId]',
+      params: {
+        subjectId: SUBJECT_ID,
+        topicId: TOPIC_ID,
       },
     });
   });
@@ -1383,6 +1435,20 @@ describe('SubjectHubRoute — manage entry (WI-1119)', () => {
       screen.getByTestId('subject-hub-screen');
     });
 
+    expect(screen.queryByTestId('subject-hub-manage')).toBeNull();
+  });
+
+  it('omits the successful-hub header when V0 has no available control', async () => {
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', false);
+
+    render(<SubjectHubRoute />, { wrapper: proxyWrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-screen');
+    });
+
+    expect(screen.queryByTestId('subject-hub-header')).toBeNull();
+    expect(screen.queryByTestId('subject-hub-back')).toBeNull();
     expect(screen.queryByTestId('subject-hub-manage')).toBeNull();
   });
 
