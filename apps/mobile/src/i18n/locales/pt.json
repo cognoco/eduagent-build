@@ -1,4 +1,58 @@
 {
+  "celebrationEarnedContext": {
+    "polar_star": {
+      "child": "Estrela Polar — a tua primeira resposta independente!",
+      "adult": "Estrela Polar — primeira resposta independente."
+    },
+    "twin_stars": {
+      "child": "Estrelas Gémeas — três respostas fortes seguidas!",
+      "adult": "Estrelas Gémeas — três respostas fortes seguidas."
+    },
+    "comet": {
+      "child": "Cometa — agora fez sentido!",
+      "adult": "Cometa — um conceito ficou claro."
+    },
+    "orions_belt": {
+      "child": "Cinturão de Órion — cinco seguidas sem ajuda!",
+      "adult": "Cinturão de Órion — cinco respostas independentes seguidas."
+    },
+    "deep_diver": {
+      "child": "Mergulho Profundo — respostas muito bem pensadas!",
+      "adult": "Mergulho Profundo — marco alcançado com respostas ponderadas."
+    },
+    "persistent": {
+      "child": "Persistência — continuaste depois de uma correção!",
+      "adult": "Persistência — continuou depois de uma correção."
+    },
+    "topic_mastered": {
+      "child": "Cometa — dominaste este tema!",
+      "adult": "Cometa — tema dominado."
+    },
+    "evaluate_success": {
+      "child": "Estrelas Gémeas — encontraste a falha!",
+      "adult": "Estrelas Gémeas — resposta avaliada corretamente."
+    },
+    "teach_back_success": {
+      "child": "Estrelas Gémeas — explicaste com clareza!",
+      "adult": "Estrelas Gémeas — explicação clara concluída."
+    },
+    "streak_7": {
+      "child": "Cometa — sete dias de aprendizagem seguidos!",
+      "adult": "Cometa — sequência de aprendizagem de sete dias."
+    },
+    "streak_30": {
+      "child": "Cinturão de Órion — 30 dias de aprendizagem seguidos!",
+      "adult": "Cinturão de Órion — sequência de aprendizagem de trinta dias."
+    },
+    "curriculum_complete": {
+      "child": "Cometa — concluíste o currículo!",
+      "adult": "Cometa — currículo concluído."
+    },
+    "default": {
+      "child": "Marco alcançado — muito bem!",
+      "adult": "Marco alcançado."
+    }
+  },
   "common": {
     "cancel": "Cancelar",
     "ok": "OK",
