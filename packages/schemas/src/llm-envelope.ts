@@ -336,6 +336,14 @@ const signalsSchema = z.preprocess(
     .object({
       /** Interview flow: model believes it has enough to conclude. Ignored by server if exchange < cap. */
       ready_to_finish: optionalBooleanSchema,
+      /**
+       * [WI-2107] Model opened a new topic (e.g. "Let's talk about X") but did
+       * not deliver content or ask a question this turn. The app immediately
+       * requests another turn rather than leaving the learner with a bare
+       * promise. Client-side hard cap: at most one auto-requested follow-up
+       * per learner turn (see use-session-streaming.ts).
+       */
+      topic_opened_pending_content: optionalBooleanSchema,
       /** Main loop: learner response showed partial understanding — hold escalation. */
       partial_progress: optionalBooleanSchema,
       /** Main loop: rung-5 exit protocol fired — queue topic for remediation. */
@@ -533,6 +541,8 @@ export interface NormalisedEnvelopeSignals {
   challenge_round_offer: boolean;
   /** Challenge Round: per-concept evaluations. Empty array when not in a round. */
   challenge_round_evaluation: ChallengeRoundEvaluationItem[];
+  /** [WI-2107] Model opened a topic without delivering content or a question this turn. */
+  topic_opened_pending_content: boolean;
 }
 
 export function normaliseSignals(
@@ -550,6 +560,8 @@ export function normaliseSignals(
     crisis_redirect: signals?.crisis_redirect ?? false,
     challenge_round_offer: signals?.challenge_round_offer ?? false,
     challenge_round_evaluation: signals?.challenge_round_evaluation ?? [],
+    topic_opened_pending_content:
+      signals?.topic_opened_pending_content ?? false,
   };
 }
 

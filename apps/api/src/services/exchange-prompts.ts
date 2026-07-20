@@ -334,8 +334,8 @@ function getExchangeEnvelopeInstruction(context: {
   const signals = context.isRecitation
     ? `  "signals": { "understanding_check": <bool>, "crisis_redirect": <bool>${challengeEvalField} },`
     : context.includeRetrievalScore
-      ? `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "retrieval_score": <0.0-1.0>${challengeEvalField} },`
-      : `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>${challengeEvalField} },`;
+      ? `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "retrieval_score": <0.0-1.0>, "topic_opened_pending_content": <bool>${challengeEvalField} },`
+      : `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "topic_opened_pending_content": <bool>${challengeEvalField} },`;
 
   const uiHints = context.isLanguageMode
     ? '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> }, "fluency_drill": { "active": <bool>, "duration_s": <15-90>, "score": { "correct": <int>, "total": <int> } } },'
@@ -356,6 +356,11 @@ function getExchangeEnvelopeInstruction(context: {
   signalGuidance.push(
     'Set `signals.crisis_redirect` to true when the SAFETY crisis rule fired this turn — the learner expressed distress, self-harm ideation, bullying, abuse, or another safeguarding concern and your reply redirected them to a parent, guardian, trusted adult, or helpline. Observational only — it never changes what you say to the learner. Do NOT set it for ordinary frustration with the schoolwork itself.',
   );
+  if (!context.isRecitation) {
+    signalGuidance.push(
+      'NEVER end your `reply` with only a forward promise like "Let\'s talk about X" or "We\'ll explore Y next" and nothing else — the learner is left with no content and no question. Every reply must either deliver substantive content (an explanation, a fact, an example) or ask the learner a specific question. If you genuinely cannot deliver content this turn (e.g. you are only acknowledging a topic switch), set `signals.topic_opened_pending_content` to true so the app immediately gives you another turn to deliver it — never leave the learner hanging on a bare promise.',
+    );
+  }
   if (context.includeRetrievalScore) {
     signalGuidance.push(
       'For this continuation opener scoring turn, set `signals.retrieval_score` from 0.0 (no recall) to 1.0 (perfect recall). Do not mention the score to the learner.',

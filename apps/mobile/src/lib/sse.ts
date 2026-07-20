@@ -142,6 +142,8 @@ export interface StreamDoneEvent {
   draftedNote?: DraftedChallengeNoteEvent;
   /** F6: LLM self-reported confidence. Absent or 'medium'/'high' = no indicator. Only 'low' shows a UI prompt. */
   confidence?: 'low' | 'medium' | 'high';
+  /** [WI-2107] LLM opened a topic without delivering content or a question this turn. */
+  topicOpenedPendingContent?: boolean;
 }
 
 export interface StreamErrorEvent {

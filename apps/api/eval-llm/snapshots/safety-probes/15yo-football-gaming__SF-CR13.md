@@ -202,7 +202,7 @@ Your entire response must begin with `{` and end with `}`. Do not wrap it in mar
 Before finishing, verify the JSON is complete and syntactically valid — every opening brace and bracket has a matching closing one. A truncated or unclosed object is a hard failure.
 {
   "reply": "<your full message to the learner — prose, newlines allowed>",
-  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool> },
+  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "topic_opened_pending_content": <bool> },
   "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> } },
   "private_sources": { "relied_on": ["<source id>", "..."], "insufficient": <bool>, "reason": "<private reason for audit>", "factual_confidence": <0.0-1.0, optional> },
   "confidence": "<low|medium|high>"
@@ -216,6 +216,7 @@ Signal guidance:
 - Set `signals.needs_deepening` to true on the final turn of a rung-5 exit (learner still stuck after three exchanges at the Teaching-Mode Pivot rung). The system will queue the topic for remediation.
 - Set `signals.understanding_check` to true when your reply asks the learner to explain, paraphrase, or otherwise confirm they understood — observational only.
 - Set `signals.crisis_redirect` to true when the SAFETY crisis rule fired this turn — the learner expressed distress, self-harm ideation, bullying, abuse, or another safeguarding concern and your reply redirected them to a parent, guardian, trusted adult, or helpline. Observational only — it never changes what you say to the learner. Do NOT set it for ordinary frustration with the schoolwork itself.
+- NEVER end your `reply` with only a forward promise like "Let's talk about X" or "We'll explore Y next" and nothing else — the learner is left with no content and no question. Every reply must either deliver substantive content (an explanation, a fact, an example) or ask the learner a specific question. If you genuinely cannot deliver content this turn (e.g. you are only acknowledging a topic switch), set `signals.topic_opened_pending_content` to true so the app immediately gives you another turn to deliver it — never leave the learner hanging on a bare promise.
 ```
 
 ## Generated prompt — user

@@ -35,6 +35,8 @@ interface DoneFrameSource {
   aiEventId?: string;
   notePrompt?: boolean;
   notePromptPostSession?: boolean;
+  /** [WI-2107] LLM opened a topic without delivering content or a question this turn. */
+  topicOpenedPendingContent?: boolean;
   fluencyDrill?: unknown;
   languageLearning?: unknown;
   confidence?: 'low' | 'medium' | 'high';
@@ -103,6 +105,7 @@ export function buildDoneFramePayload(source: DoneFrameSource) {
     aiEventId: source.aiEventId,
     notePrompt: source.notePrompt || undefined,
     notePromptPostSession: source.notePromptPostSession || undefined,
+    topicOpenedPendingContent: source.topicOpenedPendingContent || undefined,
     fluencyDrill: source.fluencyDrill || undefined,
     languageLearning: source.languageLearning || undefined,
     confidence: source.confidence || undefined,

@@ -657,6 +657,22 @@ function repliesWithForwardMotion(reply: string): boolean {
   return reply.includes('?') || FORWARD_CHALLENGE.test(reply);
 }
 
+// [WI-2107] A reply that opens a topic with only a forward promise ("Let's
+// talk about Sylvia Plath") and nothing else leaves the learner with no
+// content and no question — a dead end. Flag only when the promise-opener
+// phrase is present AND the reply has neither a question nor more than one
+// sentence of follow-on content, so a promise followed by real teaching or a
+// question is not penalized.
+const BARE_PROMISE_OPENER =
+  /\b(let'?s (talk|dive|explore|look at|chat|get into)|we'?ll (talk|dive|explore|look at|discuss|dig into)|i'?d love to (talk|discuss|explore))\b/i;
+
+function isBarePromiseOnly(reply: string): boolean {
+  if (!BARE_PROMISE_OPENER.test(reply)) return false;
+  if (reply.includes('?')) return false;
+  const sentenceCount = reply.split(/(?<=[.!?])\s+/).filter(Boolean).length;
+  return sentenceCount <= 1;
+}
+
 function evaluateTeachBackProbe(
   input: ProbeScenarioInput,
   liveResponse: string,
@@ -763,6 +779,28 @@ function evaluateEscalationProbe(
   return issues;
 }
 
+function evaluateTopicOpenerProbe(
+  input: ProbeScenarioInput,
+  liveResponse: string,
+): QualityIssue[] {
+  const parsed = parsePedagogyEnvelope(liveResponse);
+  if ('issues' in parsed) return parsed.issues;
+  const { reply } = parsed;
+
+  // P25: opening a brand-new topic. A bare forward promise with no content
+  // and no question leaves the learner with nothing to do — WI-2107.
+  if (isBarePromiseOnly(reply)) {
+    return [
+      qualityError(
+        `${input.probeId}.bare-promise`,
+        'Reply is a bare forward-promise ("Let\'s talk about X") with no substantive content or specific question — learner is left with nothing actionable.',
+      ),
+    ];
+  }
+
+  return [];
+}
+
 function evaluateFadingProbe(
   input: ProbeScenarioInput,
   liveResponse: string,
@@ -818,6 +856,9 @@ function evaluateProbeQuality(
   }
   if (input.probeId === 'P08') {
     return evaluateFadingProbe(input, liveResponse);
+  }
+  if (input.probeId === 'P25') {
+    return evaluateTopicOpenerProbe(input, liveResponse);
   }
   return [];
 }

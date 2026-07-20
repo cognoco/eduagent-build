@@ -557,6 +557,14 @@ export interface ExchangeResult {
    */
   readyToFinish: boolean;
   /**
+   * [WI-2107] LLM signalled `signals.topic_opened_pending_content` — it opened
+   * a new topic but did not deliver content or ask a question this turn.
+   * Server-side hard cap lives client-side (no server loop for this signal —
+   * each auto-continuation is a discrete request): see
+   * `use-session-streaming.ts`'s `autoContinuationFiredRef`.
+   */
+  topicOpenedPendingContent: boolean;
+  /**
    * Bug #348: EVALUATE assessment signal (snake_case wire shape) lifted from
    * `envelope.signals.evaluate_assessment`. The session-exchange persistence
    * layer writes this under `aiMetadata.signals.evaluate_assessment` where
@@ -1744,6 +1752,7 @@ function buildImageUnscreenedResult(context: ExchangeContext): ExchangeResult {
     model: IMAGE_UNSCREENED_MODEL,
     latencyMs: 0,
     readyToFinish: false,
+    topicOpenedPendingContent: false,
   };
 }
 
@@ -1779,6 +1788,7 @@ function buildTripwireResult(
     model: `deterministic:${category}`,
     latencyMs: 0,
     readyToFinish: false,
+    topicOpenedPendingContent: false,
   };
 }
 
@@ -2035,6 +2045,7 @@ export async function processExchange(
     // applyAppHelpSignalGuard for app-help turns. Hard cap stays the caller's
     // responsibility — never trust this flag alone.
     readyToFinish: finalParsed.readyToFinish,
+    topicOpenedPendingContent: finalParsed.topicOpenedPendingContent,
     // Bug #348: pass the EVALUATE / TEACH_BACK assessment signals through to
     // session-exchange.persistExchangeResult so they land at
     // aiMetadata.signals.{evaluate_assessment,teach_back_assessment} on the
@@ -2225,6 +2236,11 @@ export interface ParsedExchangeEnvelope {
    */
   readyToFinish: boolean;
   /**
+   * [WI-2107] LLM signalled `signals.topic_opened_pending_content` in the
+   * envelope. False for every fallback-shaped parse result.
+   */
+  topicOpenedPendingContent: boolean;
+  /**
    * Bug #348: EVALUATE assessment signal (snake_case wire shape) lifted from
    * `envelope.signals.evaluate_assessment`. Forwarded verbatim so the
    * persistence layer can write it under `aiMetadata.signals.evaluate_assessment`
@@ -2263,6 +2279,7 @@ const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
   retrievalScore: undefined,
   privateSources: undefined,
   readyToFinish: false,
+  topicOpenedPendingContent: false,
   evaluateAssessment: undefined,
   teachBackAssessment: undefined,
 };
@@ -2393,6 +2410,7 @@ export function parseExchangeEnvelope(
       noteDraft: null,
       fluencyDrill: null,
       readyToFinish: false,
+      topicOpenedPendingContent: false,
       envelopeParseFailed: true,
       envelopeParseFailureReason: parsed.reason,
     };
@@ -2459,6 +2477,7 @@ function envelopeToParsedExchange(
         ? signals.retrieval_score
         : undefined,
     readyToFinish: signals.ready_to_finish === true,
+    topicOpenedPendingContent: signals.topic_opened_pending_content === true,
     // Bug #348: forward EVALUATE / TEACH_BACK assessment signals verbatim
     // (snake_case wire shape). The persistence layer writes them under
     // aiMetadata.signals.{evaluate_assessment,teach_back_assessment} where the
