@@ -18,19 +18,10 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: 'scope-chip-option-me'
-    timeout: 30000
-- tapOn:
-    id: 'scope-chip-option-me'
-- extendedWaitUntil:
-    visible:
       id: 'mentor-screen'
     timeout: 15000
 - assertVisible:
     id: 'tab-mentor'
-    selected: true
-- assertVisible:
-    id: 'scope-chip-option-me'
     selected: true
 - assertVisible:
     id: 'account-avatar-button'
@@ -80,9 +71,6 @@ tags:
     id: 'tab-mentor'
     selected: true
 - assertVisible:
-    id: 'scope-chip-option-me'
-    selected: true
-- assertVisible:
     id: 'account-avatar-button'
     text: '^Open account settings for Test Parent$'
 - assertVisible:
@@ -101,9 +89,6 @@ tags:
     timeout: 15000
 - assertVisible:
     id: 'tab-subjects'
-    selected: true
-- assertVisible:
-    id: 'scope-chip-option-me'
     selected: true
 - assertVisible:
     id: 'account-avatar-button'
@@ -127,9 +112,6 @@ tags:
     id: 'tab-subjects'
     selected: true
 - assertVisible:
-    id: 'scope-chip-option-me'
-    selected: true
-- assertVisible:
     id: 'account-avatar-button'
     text: '^Open account settings for Test Parent$'
 - assertVisible:
@@ -150,9 +132,6 @@ tags:
     timeout: 15000
 - assertVisible:
     id: 'tab-journal'
-    selected: true
-- assertVisible:
-    id: 'scope-chip-option-me'
     selected: true
 - assertVisible:
     id: 'account-avatar-button'
@@ -191,9 +170,6 @@ tags:
     timeout: 15000
 - assertVisible:
     id: 'tab-journal'
-    selected: true
-- assertVisible:
-    id: 'scope-chip-option-me'
     selected: true
 - assertVisible:
     id: 'account-avatar-button'

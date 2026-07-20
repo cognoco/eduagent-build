@@ -708,22 +708,18 @@ describe('[WI-2240] V2 Account manifest and Maestro YAML contract validation', (
     );
   });
 
-  it('requires the native owner learner scope and Account round-trip sequence', () => {
+  it('requires the native owner learner identity and Account round-trip sequence without a supporter-only scope chip', () => {
     const commands = parseMaestroCommands(ownerNative);
     const selectorIds = selectorValues('id', commands);
-    expect(
-      selectorIds.filter((id) => id.startsWith('scope-chip-option-person-')),
-    ).toEqual([]);
+    expect(selectorIds.filter((id) => id.startsWith('scope-chip'))).toEqual([]);
     expect(selectorIds.filter((id) => id.startsWith('person-scope-'))).toEqual(
       [],
     );
 
     expect(
       hasMaestroOrder(commands, [
-        tap('scope-chip-option-me'),
         waitVisible('mentor-screen'),
         visible('tab-mentor', undefined, true),
-        visible('scope-chip-option-me', undefined, true),
         visible(
           'account-avatar-button',
           '^Open account settings for Test Parent$',
