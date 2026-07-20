@@ -31,7 +31,7 @@ async function expectTestChildSubjectsScope(
 test('V2 credentialed non-owner child keeps permitted Account rows and has no owner-only administration', async ({
   page,
 }) => {
-  const seed = await readSeedData('v2-account-non-owner-child');
+  const seed = await readSeedData('non-owner-child');
   const subjectId = seed.ids.subjectId;
 
   await page.goto('/subjects', { waitUntil: 'commit' });
