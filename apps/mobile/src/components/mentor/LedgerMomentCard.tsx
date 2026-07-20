@@ -4,6 +4,7 @@ import type { NowCard as NowCardData } from '@eduagent/schemas';
 
 import type { TranslateKey } from '../../i18n';
 import { renderMilestoneMomentText } from '../../lib/milestone-moment-copy';
+import { withJournalSectionIntent } from '../../lib/now-deep-link';
 import { useThemeColors } from '../../lib/theme';
 
 export interface LedgerMomentCardProps {
@@ -28,30 +29,6 @@ function ledgerCopyKey(card: NowCardData): TranslateKey {
     SUPPORTED_LEDGER_COPY_KEYS[ledgerKind(card)] ??
     'mentorHome.ledger.generic.title'
   );
-}
-
-function withJournalSectionIntent(card: NowCardData): NowCardData {
-  if (card.deepLink.route !== 'journal') return card;
-
-  if (ledgerKind(card) === 'quiz_personal_best') {
-    return {
-      ...card,
-      deepLink: {
-        ...card.deepLink,
-        params: { ...card.deepLink.params, section: 'practice' },
-      },
-    };
-  }
-
-  // TODO: Map a future Journal-routed ledger kind only after product assigns
-  // it to one of the existing Journal sections; unknown kinds stay at root.
-  if (!('section' in card.deepLink.params)) return card;
-  const rootParams = { ...card.deepLink.params };
-  delete rootParams['section'];
-  return {
-    ...card,
-    deepLink: { ...card.deepLink, params: rootParams },
-  };
 }
 
 export function LedgerMomentCard({
