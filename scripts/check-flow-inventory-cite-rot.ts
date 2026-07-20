@@ -28,6 +28,24 @@
 //      -superseded / -historical) — catches a typo'd tag silently reading
 //      as prose instead of a real classification.
 //
+// WI-2198 bounce-3 (AC-7, second finding): axis 2 above only checked flag-name
+// *spelling*, not whether a row's declared shell state actually matches what
+// the navigation contract resolves — a row could name a real flag while
+// asserting the wrong tabs and still pass. Bounded to the "Navigation shell
+// matrix" table (the one place in the doc that makes machine-checkable
+// tab-shape claims via a cited constant name), not the 288 flow rows' free
+// prose (that would be a full semantic-diff harness, out of scope per the
+// AC's own refinement note):
+//   4. Nav-shell-matrix tab shapes: every cell in the matrix that both cites
+//      a known tab-set constant (`LEARNER_TABS`, `V2_TABS`, ...) AND spells
+//      out the tab names it claims (many cells use "same"/count-only
+//      shorthand and make no independently-checkable claim — those are
+//      skipped, not failed) must match that constant's actual `new Set([...])`
+//      literal in navigation-contract.ts / legacy-navigation-contract.ts /
+//      use-navigation-contract.ts. A cited constant whose Set literal can't be
+//      resolved (non-literal declaration) is reported as a failure, never
+//      silently skipped — an unresolvable symbol is a real gap, not a pass.
+//
 // Resolution model — deliberately basename-based, not exact-path:
 //   The doc's own citation convention is inconsistent about directory
 //   prefixes (a Coverage cell often reads `auth/sign-in.yaml`, `-devclient.yaml`
@@ -350,6 +368,214 @@ export function checkLegacyTags(docBody: string): LegacyTagFailure[] {
   return failures;
 }
 
+// ── Nav-shell-matrix tab-shape check (AC-7 axis 4) ─────────────────────
+
+// The tab-set constants the "Navigation shell matrix" table cites, and the
+// one source file each is literally declared in. Deliberately a closed,
+// hardcoded list (mirrors FLAG_TOKEN_RE's own hardcoded flag shape) — this
+// check only ever verifies claims about these specific constants; it does
+// not go looking for new ones.
+const TAB_SET_SOURCE_FILES = {
+  LEARNER_TABS: 'apps/mobile/src/lib/legacy-navigation-contract.ts',
+  GUARDIAN_TABS: 'apps/mobile/src/lib/legacy-navigation-contract.ts',
+  PARENT_PROXY_TABS: 'apps/mobile/src/lib/legacy-navigation-contract.ts',
+  FAMILY_MODE_TABS: 'apps/mobile/src/lib/legacy-navigation-contract.ts',
+  STUDY_MODE_TABS: 'apps/mobile/src/lib/legacy-navigation-contract.ts',
+  STUDY_TABS: 'apps/mobile/src/lib/navigation-contract.ts',
+  FAMILY_TABS: 'apps/mobile/src/lib/navigation-contract.ts',
+  PROXY_TABS: 'apps/mobile/src/lib/navigation-contract.ts',
+  V2_TABS: 'apps/mobile/src/hooks/use-navigation-contract.ts',
+} as const;
+type TabSetSymbol = keyof typeof TAB_SET_SOURCE_FILES;
+const TAB_SET_SYMBOLS = new Set(Object.keys(TAB_SET_SOURCE_FILES));
+
+// The doc's tab vocabulary (TabKey in navigation-contract.ts) — the only
+// words this check will ever read out of a cell's prose as a "claimed tab".
+const KNOWN_TAB_NAMES = [
+  'mentor',
+  'subjects',
+  'journal',
+  'home',
+  'own-learning',
+  'library',
+  'recaps',
+  'progress',
+  'more',
+];
+const TAB_NAME_RE = new RegExp(`\\b(?:${KNOWN_TAB_NAMES.join('|')})\\b`, 'g');
+
+const TAB_SET_SYMBOL_RE = /`([A-Z][A-Z0-9_]*)`/g;
+
+/** Pure: extracts the string-literal contents of
+ * `const SYMBOL: ReadonlySet<...> = new Set([...])` from source text.
+ * Returns `null` if `symbol` isn't declared in that literal shape at all
+ * (spread, function call, conditional, renamed export, or removed) — the
+ * caller must treat `null` as a loud failure, never a silent skip, since an
+ * unresolvable symbol is a real gap in what this check can verify. */
+export function extractTabSetLiteral(
+  source: string,
+  symbol: string,
+): Set<string> | null {
+  const declRe = new RegExp(
+    `\\b${symbol}\\s*:\\s*ReadonlySet<[^>]*>\\s*=\\s*new Set\\(`,
+  );
+  const declMatch = declRe.exec(source);
+  if (!declMatch) return null;
+  const openParenIndex = declMatch.index + declMatch[0].length - 1;
+  let depth = 0;
+  let closeParenIndex = -1;
+  for (let i = openParenIndex; i < source.length; i++) {
+    if (source[i] === '(') depth++;
+    else if (source[i] === ')') {
+      depth--;
+      if (depth === 0) {
+        closeParenIndex = i;
+        break;
+      }
+    }
+  }
+  if (closeParenIndex === -1) return null;
+  const inner = source.slice(openParenIndex + 1, closeParenIndex);
+  // Must be a literal array `[...]` — not a spread, identifier, or call —
+  // so a future refactor to something non-literal is caught, not misread.
+  const arrayMatch = inner.match(/^\s*\[([\s\S]*)\]\s*$/);
+  if (!arrayMatch) return null;
+  const items = [...arrayMatch[1].matchAll(/'([^']*)'|"([^"]*)"/g)].map(
+    (m) => m[1] ?? m[2],
+  );
+  return new Set(items);
+}
+
+/** Pure: returns the [start, end] (inclusive) index pairs of every
+ * TOP-LEVEL parenthesized group in `text` — a group's own nested parens
+ * (e.g. a citation like `` `(app)/_layout.tsx:827` ``) don't split it into
+ * two groups, they stay nested inside the one enclosing group. */
+function findTopLevelParenGroups(text: string): Array<[number, number]> {
+  const groups: Array<[number, number]> = [];
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '(') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (text[i] === ')') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        groups.push([start, i]);
+        start = -1;
+      }
+    }
+  }
+  return groups;
+}
+
+/** Pure: locates the "Navigation shell matrix" section's audience x
+ * flag-combo table specifically — that section has two tables, and the
+ * build-profile one above starts "| Build profile |", not "| Audience |". */
+function extractNavShellMatrixTable(docBody: string): string | null {
+  const sectionMatch = docBody.match(
+    /## Navigation shell matrix\n([\s\S]*?)(?=\n## )/,
+  );
+  if (!sectionMatch) return null;
+  const section = sectionMatch[1];
+  const lines = section.split('\n');
+  const headerIndex = lines.findIndex((l) => l.startsWith('| Audience |'));
+  if (headerIndex === -1) return null;
+  const tableLines: string[] = [];
+  for (let i = headerIndex; i < lines.length; i++) {
+    if (!lines[i].startsWith('|')) break;
+    tableLines.push(lines[i]);
+  }
+  return tableLines.join('\n');
+}
+
+export interface NavShellTabShapeFailure {
+  symbol: string;
+  reason: string;
+}
+
+/** Pure given the real contract sources: for every cell in the doc's
+ * Navigation shell matrix that both cites a known tab-set constant AND
+ * spells out the tab names it claims (in the span between the previous
+ * parenthetical group and the one containing the citation — so trailing
+ * commentary after the citation, e.g. "— More tab removed entirely", is
+ * never read as part of the claim), compares that claimed set against the
+ * constant's real `new Set([...])` literal. Cells that only cite a symbol
+ * via shorthand ("same", "4 (`STUDY_TABS`)") with no tab names in their span
+ * make no independently-checkable claim and are skipped, not failed. A cited
+ * symbol whose literal can't be resolved from source is always a failure
+ * (see `extractTabSetLiteral`), never a skip. */
+export function checkNavShellMatrixTabShapes(
+  docBody: string,
+  contractSources: Readonly<Record<string, string>>,
+): NavShellTabShapeFailure[] {
+  const failures: NavShellTabShapeFailure[] = [];
+  const table = extractNavShellMatrixTable(docBody);
+  if (!table) return failures;
+
+  const literalCache = new Map<string, Set<string> | null>();
+  const resolveLiteral = (symbol: TabSetSymbol): Set<string> | null => {
+    if (literalCache.has(symbol)) return literalCache.get(symbol) ?? null;
+    const source = contractSources[TAB_SET_SOURCE_FILES[symbol]] ?? '';
+    const literal = extractTabSetLiteral(source, symbol);
+    literalCache.set(symbol, literal);
+    return literal;
+  };
+
+  // Row lines only (skip the header and the "|---|" separator).
+  const rows = table
+    .split('\n')
+    .slice(2)
+    .filter((l) => l.trim().length > 0);
+
+  for (const row of rows) {
+    // Drop the leading/trailing empty entries a "|a|b|" split produces.
+    const cells = row.split('|').slice(1, -1);
+    // Column 0 is the audience label — the environment columns start at 1.
+    for (const cell of cells.slice(1)) {
+      for (const clause of cell.split(';')) {
+        const groups = findTopLevelParenGroups(clause);
+        for (const symbolMatch of clause.matchAll(TAB_SET_SYMBOL_RE)) {
+          const symbol = symbolMatch[1];
+          if (!TAB_SET_SYMBOLS.has(symbol)) continue;
+          const symbolPos = symbolMatch.index ?? -1;
+          const groupIdx = groups.findIndex(
+            ([s, e]) => symbolPos >= s && symbolPos <= e,
+          );
+          if (groupIdx === -1) continue; // malformed — nothing to anchor to
+          const claimStart = groupIdx === 0 ? 0 : groups[groupIdx - 1][1] + 1;
+          const claimText = clause.slice(claimStart, groups[groupIdx][0]);
+          const claimedTabs = new Set(
+            [...claimText.matchAll(TAB_NAME_RE)].map((m) => m[0]),
+          );
+          if (claimedTabs.size === 0) continue; // shorthand cell, no claim to check
+
+          const actualTabs = resolveLiteral(symbol as TabSetSymbol);
+          if (actualTabs === null) {
+            failures.push({
+              symbol,
+              reason: `cited in the Navigation shell matrix but its Set literal could not be resolved from ${TAB_SET_SOURCE_FILES[symbol as TabSetSymbol]} (expected "const ${symbol}: ReadonlySet<...> = new Set([...])")`,
+            });
+            continue;
+          }
+          const claimedSorted = [...claimedTabs].sort();
+          const actualSorted = [...actualTabs].sort();
+          const same =
+            claimedSorted.length === actualSorted.length &&
+            claimedSorted.every((t, i) => t === actualSorted[i]);
+          if (!same) {
+            failures.push({
+              symbol,
+              reason: `doc claims {${claimedSorted.join(', ')}} but ${symbol} resolves to {${actualSorted.join(', ')}} in ${TAB_SET_SOURCE_FILES[symbol as TabSetSymbol]}`,
+            });
+          }
+        }
+      }
+    }
+  }
+  return failures;
+}
+
 /** Pure given a line-count lookup — resolves one citation against the index.
  * `getLineCount` is injected so tests can avoid touching the real filesystem. */
 export function resolveCitation(
@@ -434,11 +660,24 @@ function main(): number {
   const flagTokenFailures = checkFlagTokens(docBody, featureFlagsSource);
   const legacyTagFailures = checkLegacyTags(docBody);
 
+  const contractSources: Record<string, string> = {};
+  for (const file of new Set(Object.values(TAB_SET_SOURCE_FILES))) {
+    const filePath = path.join(REPO_ROOT, file);
+    contractSources[file] = fs.existsSync(filePath)
+      ? fs.readFileSync(filePath, 'utf8')
+      : '';
+  }
+  const navShellTabShapeFailures = checkNavShellMatrixTabShapes(
+    docBody,
+    contractSources,
+  );
+
   const totalFailures =
     failures.length +
     rowIdFailures.length +
     flagTokenFailures.length +
-    legacyTagFailures.length;
+    legacyTagFailures.length +
+    navShellTabShapeFailures.length;
 
   if (totalFailures > 0) {
     process.stderr.write(
@@ -456,11 +695,14 @@ function main(): number {
     for (const f of legacyTagFailures) {
       process.stderr.write(`  [legacy-tag] ${f.token} — ${f.reason}\n`);
     }
+    for (const f of navShellTabShapeFailures) {
+      process.stderr.write(`  [nav-shell-tabs] ${f.symbol} — ${f.reason}\n`);
+    }
     return 1;
   }
 
   process.stdout.write(
-    `flow-inventory-cite-rot: clean (${citations.length} citations, ${extractDefinedRowIds(docBody).size} row IDs, row-id links, flag tokens, and legacy tags all resolve).\n`,
+    `flow-inventory-cite-rot: clean (${citations.length} citations, ${extractDefinedRowIds(docBody).size} row IDs, row-id links, flag tokens, legacy tags, and nav-shell-matrix tab shapes all resolve).\n`,
   );
   return 0;
 }
