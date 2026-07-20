@@ -147,6 +147,7 @@ describe('VALID_SCENARIOS', () => {
       'quiz-malformed-round',
       'quiz-deterministic-wrong-answer',
       'quiz-answer-check-fails',
+      'quiz-completed-history-detail',
       'review-empty',
       'dictation-with-mistakes',
       'dictation-perfect-score',
@@ -1011,6 +1012,10 @@ describe('new Stage-0 scenarios return required IDs', () => {
       requiredIds: ['subjectId', 'roundId'],
     },
     {
+      scenario: 'quiz-completed-history-detail',
+      requiredIds: ['subjectId', 'roundId'],
+    },
+    {
       scenario: 'dictation-with-mistakes',
       requiredIds: ['subjectId'],
     },
@@ -1039,6 +1044,43 @@ describe('new Stage-0 scenarios return required IDs', () => {
       expect(mockDb.insert).toHaveBeenCalled();
     },
   );
+
+  it('[WI-2190] seeds a completed quiz round in the schema-valid graded detail shape', async () => {
+    const mockDb = createMockDb();
+    const result = await seedScenario(
+      mockDb,
+      'quiz-completed-history-detail' as SeedScenario,
+      'test@example.com',
+    );
+
+    expect(result.ids.roundId).toBeTruthy();
+    const valuesMock = (mockDb.insert as jest.Mock).mock.results[0]?.value
+      .values as jest.Mock;
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: result.ids.roundId,
+        activityType: 'capitals',
+        status: 'completed',
+        score: 0,
+        xpEarned: 0,
+        questions: [
+          expect.objectContaining({
+            type: 'capitals',
+            correctAnswer: 'Paris',
+          }),
+        ],
+        results: [
+          {
+            questionIndex: 0,
+            correct: false,
+            correctAnswer: 'Paris',
+            answerGiven: 'Berlin',
+            timeMs: 1250,
+          },
+        ],
+      }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

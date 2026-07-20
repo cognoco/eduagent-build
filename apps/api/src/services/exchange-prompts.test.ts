@@ -109,6 +109,42 @@ describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
   });
 });
 
+describe('buildSystemPrompt — source identity clarification [WI-2100]', () => {
+  // WI-2100: a learner saying they are reading "her book" with no title
+  // given must not cause the mentor to guess a specific work (staging
+  // observed it assume The Bell Jar) and teach from that unsupported guess.
+  it('includes a rule to ask which source before teaching an unnamed one', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'learning',
+        effectiveMode: 'freeform',
+        topicTitle: undefined,
+        topicDescription: undefined,
+      }),
+    );
+
+    expect(prompt).toMatch(/SOURCE IDENTITY/i);
+    expect(prompt).toMatch(
+      /do not guess which work they mean|never guess a title/i,
+    );
+    expect(prompt).toMatch(/ask\b[^.]*\b(title|author)\b/i);
+  });
+
+  it('applies the rule regardless of session type (not freeform-only)', () => {
+    // The bug is about source identity, not conversational mode — a
+    // homework or review session can equally reference an unnamed book.
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'homework',
+        topicTitle: 'Ancient trade',
+        topicDescription: 'Ancient civilizations traded goods.',
+      }),
+    );
+
+    expect(prompt).toMatch(/SOURCE IDENTITY/i);
+  });
+});
+
 describe('buildSystemPrompt — app-help block', () => {
   it('does not include the APP HELP map on ordinary learning prompts', () => {
     const prompt = buildSystemPrompt(makeContext());
@@ -432,58 +468,119 @@ describe('buildSystemPrompt — homework brevity', () => {
   });
 });
 
-describe('buildSystemPrompt — homework mentor notices', () => {
+describe('buildSystemPrompt — session-neutral mentor notices', () => {
   const eventId = '550e8400-e29b-41d4-a716-446655440010';
+  const interleavedTopicId = '550e8400-e29b-41d4-a716-446655440011';
 
-  it('injects the evidence-bound detection instruction only for enabled homework turns', () => {
+  it.each([
+    {
+      label: 'teen homework',
+      overrides: {
+        sessionType: 'homework' as const,
+        birthYear: new Date().getFullYear() - 15,
+      },
+    },
+    {
+      label: 'adult learning',
+      overrides: {
+        sessionType: 'learning' as const,
+        birthYear: new Date().getFullYear() - 50,
+      },
+    },
+    {
+      label: 'interleaved retrieval',
+      overrides: {
+        sessionType: 'interleaved' as const,
+        interleavedTopics: [
+          { topicId: interleavedTopicId, title: 'Cell division' },
+        ],
+      },
+    },
+  ])(
+    'injects the same evidence-bound observation contract for $label',
+    ({ overrides }) => {
+      const prompt = buildSystemPrompt(
+        makeContext({
+          ...overrides,
+          mentorNoticeEnabled: true,
+          currentUserMessageEventId: eventId,
+        }),
+      );
+
+      expect(prompt).toContain('MENTOR NOTICE OBSERVATION');
+      expect(prompt).toContain('signals.noticed_gap');
+      expect(prompt).toContain(eventId);
+      expect(prompt).toContain("Finish the learner's immediate goal first");
+      expect(prompt).toContain('Do not quiz or re-check the learner now');
+      expect(prompt).toContain('Do not promise a future check-in');
+      expect(prompt).toContain(
+        'Set `observed` to false when the answer is correct',
+      );
+      expect(prompt).toContain(
+        'A possible follow-up check or extra practice is not evidence of a gap',
+      );
+      expect(prompt).toContain(
+        'Always emit `signals.noticed_gap` as a decision',
+      );
+      expect(prompt).toContain(
+        "If your visible reply corrects the learner's answer or reasoning, `observed` must be true",
+      );
+      const responseFormat = prompt.slice(
+        prompt.indexOf('RESPONSE FORMAT — CRITICAL:'),
+        prompt.indexOf('Signal guidance:'),
+      );
+      expect(responseFormat).toContain('"noticed_gap": { "observed": <bool>');
+      expect(prompt).toContain(
+        'When `observed` is true, copy a short verbatim `learnerQuote`',
+      );
+    },
+  );
+
+  it('enumerates the only valid topic target for an interleaved notice', () => {
+    const otherTopicId = '550e8400-e29b-41d4-a716-446655440012';
     const prompt = buildSystemPrompt(
       makeContext({
-        sessionType: 'homework',
+        sessionType: 'interleaved',
         mentorNoticeEnabled: true,
         currentUserMessageEventId: eventId,
+        interleavedTopics: [
+          { topicId: interleavedTopicId, title: 'Cell division' },
+          { topicId: otherTopicId, title: 'Genetics' },
+        ],
       }),
     );
 
-    expect(prompt).toContain('MENTOR NOTICE OBSERVATION');
-    expect(prompt).toContain('signals.noticed_gap');
-    expect(prompt).toContain(eventId);
-    expect(prompt).toContain("Finish the learner's homework help first");
-    expect(prompt).toContain('Do not quiz or re-check the learner now');
-    expect(prompt).toContain('Do not promise a future check-in');
-    expect(prompt).toContain(
-      'Set `observed` to false when the answer is correct',
-    );
-    expect(prompt).toContain(
-      'A possible follow-up check or extra practice is not evidence of a gap',
-    );
-    expect(prompt).toContain('Always emit `signals.noticed_gap` as a decision');
-    expect(prompt).toContain(
-      "If your visible reply corrects the learner's answer or reasoning, `observed` must be true",
-    );
-    const responseFormat = prompt.slice(
-      prompt.indexOf('RESPONSE FORMAT — CRITICAL:'),
-      prompt.indexOf('Signal guidance:'),
-    );
-    expect(responseFormat).toContain('"noticed_gap": { "observed": <bool>');
-    expect(prompt).toContain(
-      'When `observed` is true, copy a short verbatim `learnerQuote`',
-    );
+    expect(prompt).toContain('INTERLEAVED NOTICE TARGETS');
+    expect(prompt).toContain(interleavedTopicId);
+    expect(prompt).toContain(otherTopicId);
+    expect(prompt).toContain('topicId');
   });
 
   it.each([
-    { mentorNoticeEnabled: false, sessionType: 'homework' as const },
-    { mentorNoticeEnabled: true, sessionType: 'learning' as const },
-  ])(
-    'omits notice instructions for $sessionType when enabled=$mentorNoticeEnabled',
-    (overrides) => {
-      const prompt = buildSystemPrompt(
-        makeContext({ ...overrides, currentUserMessageEventId: eventId }),
-      );
-
-      expect(prompt).not.toContain('MENTOR NOTICE OBSERVATION');
-      expect(prompt).not.toContain('signals.noticed_gap');
+    {
+      label: 'feature disabled',
+      overrides: { mentorNoticeEnabled: false },
     },
-  );
+    {
+      label: 'active re-check',
+      overrides: {
+        mentorNoticeEnabled: true,
+        mentorNoticeRecheck: {
+          id: '550e8400-e29b-41d4-a716-446655440013',
+          concept: 'Cell division',
+          correctionHint: null,
+          exchangeNumber: 1,
+        },
+      },
+    },
+  ])('omits new-observation instructions when $label', ({ overrides }) => {
+    const prompt = buildSystemPrompt(
+      makeContext({ ...overrides, currentUserMessageEventId: eventId }),
+    );
+
+    expect(prompt).not.toContain('MENTOR NOTICE OBSERVATION');
+    expect(prompt).not.toContain('signals.noticed_gap');
+  });
 });
 
 describe('buildSystemPrompt — no-recall recovery', () => {

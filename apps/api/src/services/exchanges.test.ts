@@ -2711,6 +2711,66 @@ describe('source provenance audit', () => {
     expect(safe.sourceAudit.reason).toMatch(/no-source safety fallback/i);
   });
 
+  // [WI-2100] Reproduces staging session 019f675d-64a9-7d87-ae22-01f5a97a77e7:
+  // a learner referenced "her book" with no title given, and the mentor
+  // assumed a specific well-known work (The Bell Jar) instead of asking which
+  // one. The no-source hard fallback must ask for the title/author instead of
+  // falling through to the generic "share your textbook/worksheet/photo"
+  // template — the generic template doesn't ask which work is meant.
+  it('asks which source instead of the generic template for an unnamed book', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['learner_message'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        "I'm reading her book for my English assignment. Can you help me figure out what to say about the main character?",
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Here is an unsupported claim about the main character.',
+      audit,
+    );
+
+    expect(safe.response).toMatch(/which one you mean/i);
+    expect(safe.response).toMatch(/title.*author|author.*title/i);
+    expect(safe.response).not.toMatch(/share the textbook passage/i);
+  });
+
+  it('asks which source instead of the generic template for unnamed poems', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['learner_message'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        "I have to write about his poems for homework. I don't know how to start analyzing the imagery in the second stanza.",
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Here is an unsupported claim about the imagery.',
+      audit,
+    );
+
+    expect(safe.response).toMatch(/which one you mean/i);
+    expect(safe.response).not.toMatch(/share the textbook passage/i);
+  });
+
+  it('does not ask which source when the work is already named', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['learner_message'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        'I am reading The Great Gatsby by F. Scott Fitzgerald and need help with the green light symbolism.',
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Here is an unsupported claim about the green light.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/which one you mean/i);
+  });
+
   // [BREAK] A learner's first message of bare "yes" / "yeah" / "good" used to
   // hit the acknowledgement branch and reply "You're welcome", which is
   // nonsensical with no prior assistant turn to thank. Weak tokens now require

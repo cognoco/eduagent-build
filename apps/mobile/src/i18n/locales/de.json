@@ -1,4 +1,58 @@
 {
+  "celebrationEarnedContext": {
+    "polar_star": {
+      "child": "Polarstern – deine erste selbstständige Antwort!",
+      "adult": "Polarstern – erste selbstständige Antwort."
+    },
+    "twin_stars": {
+      "child": "Zwillingssterne – drei starke Antworten hintereinander!",
+      "adult": "Zwillingssterne – drei starke Antworten in Folge."
+    },
+    "comet": {
+      "child": "Komet – jetzt hat es Klick gemacht!",
+      "adult": "Komet – ein Konzept wurde verstanden."
+    },
+    "orions_belt": {
+      "child": "Orions Gürtel – fünf Antworten in Folge ohne Hilfe!",
+      "adult": "Orions Gürtel – fünf selbstständige Antworten in Folge."
+    },
+    "deep_diver": {
+      "child": "Tiefseetaucher – richtig gut nachgedacht!",
+      "adult": "Tiefseetaucher – für durchdachte Antworten verdient."
+    },
+    "persistent": {
+      "child": "Drangeblieben – nach einer Korrektur weitergemacht!",
+      "adult": "Drangeblieben – nach einer Korrektur weitergearbeitet."
+    },
+    "topic_mastered": {
+      "child": "Komet – du beherrschst dieses Thema!",
+      "adult": "Komet – Thema gemeistert."
+    },
+    "evaluate_success": {
+      "child": "Zwillingssterne – du hast den Fehler entdeckt!",
+      "adult": "Zwillingssterne – die Antwort richtig beurteilt."
+    },
+    "teach_back_success": {
+      "child": "Zwillingssterne – du hast es klar erklärt!",
+      "adult": "Zwillingssterne – verständlich zurückerklärt."
+    },
+    "streak_7": {
+      "child": "Komet – sieben Tage Lernen in Folge!",
+      "adult": "Komet – siebentägige Lernserie."
+    },
+    "streak_30": {
+      "child": "Orions Gürtel – 30 Tage Lernen in Folge!",
+      "adult": "Orions Gürtel – dreißigtägige Lernserie."
+    },
+    "curriculum_complete": {
+      "child": "Komet – du hast den Lernplan abgeschlossen!",
+      "adult": "Komet – Lernplan abgeschlossen."
+    },
+    "default": {
+      "child": "Meilenstein erreicht – gut gemacht!",
+      "adult": "Meilenstein erreicht."
+    }
+  },
   "common": {
     "cancel": "Abbrechen",
     "ok": "OK",

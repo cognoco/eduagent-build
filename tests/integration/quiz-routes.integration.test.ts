@@ -297,6 +297,17 @@ const GUESS_WHO_QUESTION: QuizQuestion = {
   isLibraryItem: false,
 };
 
+const VOCABULARY_QUESTION: QuizQuestion = {
+  type: 'vocabulary',
+  term: 'der Hund',
+  correctAnswer: 'dog',
+  acceptedAnswers: ['dog', 'hound'],
+  distractors: ['cat', 'bird', 'fish'],
+  funFact: 'Hund is the German word for dog.',
+  cefrLevel: 'A1',
+  isLibraryItem: false,
+};
+
 function quizAuthHeaders(profileId: string): Record<string, string> {
   return buildAuthHeaders(
     { sub: QUIZ_AUTH_USER_ID, email: QUIZ_AUTH_EMAIL },
@@ -355,6 +366,14 @@ function completeRound(
   );
 }
 
+function getRoundDetail(roundId: string, profileId: string) {
+  return app.request(
+    `/v1/quiz/rounds/${roundId}`,
+    { headers: quizAuthHeaders(profileId) },
+    TEST_ENV,
+  );
+}
+
 describe('Integration: quiz scoring integrity [WI-89]', () => {
   it('[BREAK/WI-163] does not retro-score a wrong capitals answer after the correct answer is revealed', async () => {
     const profileId = await createQuizProfile();
@@ -397,6 +416,19 @@ describe('Integration: quiz scoring integrity [WI-89]', () => {
     expect(body.questionResults[0]).toMatchObject({
       questionIndex: 0,
       correct: false,
+    });
+
+    const detail = await getRoundDetail(roundId, profileId);
+    expect(detail.status).toBe(200);
+    expect(await detail.json()).toMatchObject({
+      results: [
+        {
+          questionIndex: 0,
+          correct: false,
+          correctAnswer: 'Paris',
+          answerGiven: 'Berlin',
+        },
+      ],
     });
   });
 
@@ -450,5 +482,139 @@ describe('Integration: quiz scoring integrity [WI-89]', () => {
       questionIndex: 0,
       correct: true,
     });
+
+    const detail = await getRoundDetail(roundId, profileId);
+    expect(detail.status).toBe(200);
+    expect(await detail.json()).toMatchObject({
+      results: [
+        {
+          questionIndex: 0,
+          correct: true,
+          correctAnswer: 'Albert Einstein',
+          answerGiven: 'Albert Einstein',
+          cluesUsed: 3,
+        },
+      ],
+    });
+  });
+
+  it('[WI-2190] carries a disputed wrong vocabulary answer from check through completed detail', async () => {
+    const profileId = await createQuizProfile();
+    const roundId = await seedActiveRound(profileId, 'vocabulary', [
+      VOCABULARY_QUESTION,
+    ]);
+
+    const checked = await checkAnswer(roundId, profileId, {
+      questionIndex: 0,
+      answerGiven: 'cat',
+      answerMode: 'multiple_choice',
+    });
+    expect(checked.status).toBe(200);
+
+    const completed = await completeRound(roundId, profileId, [
+      {
+        questionIndex: 0,
+        correct: false,
+        answerGiven: 'cat',
+        timeMs: 1000,
+        disputed: true,
+      },
+    ]);
+    expect(completed.status).toBe(200);
+
+    const detail = await getRoundDetail(roundId, profileId);
+    expect(detail.status).toBe(200);
+    expect(await detail.json()).toMatchObject({
+      results: [
+        {
+          questionIndex: 0,
+          correct: false,
+          correctAnswer: 'dog',
+          answerGiven: 'cat',
+          disputed: true,
+        },
+      ],
+    });
+  });
+
+  it('[WI-2190] persists a skipped Guess Who final attempt and keeps route replays idempotent', async () => {
+    const profileId = await createQuizProfile();
+    const roundId = await seedActiveRound(profileId, 'guess_who', [
+      GUESS_WHO_QUESTION,
+    ]);
+    const skippedAnswer = {
+      questionIndex: 0,
+      answerGiven: '[skipped]',
+      answerMode: 'free_text',
+      finalAttempt: true,
+      cluesUsed: 5,
+    };
+
+    const checked = await checkAnswer(roundId, profileId, skippedAnswer);
+    expect(checked.status).toBe(200);
+    expect(await checked.json()).toMatchObject({
+      correct: false,
+      correctAnswer: 'Albert Einstein',
+    });
+
+    const repeatedCheck = await checkAnswer(roundId, profileId, skippedAnswer);
+    expect(repeatedCheck.status).toBe(200);
+
+    const db = createIntegrationDb();
+    const activeRound = await db.query.quizRounds.findFirst({
+      where: eq(quizRounds.id, roundId),
+    });
+    expect(activeRound?.results).toEqual([
+      expect.objectContaining({
+        questionIndex: 0,
+        answerGiven: '[skipped]',
+        finalAttempt: true,
+      }),
+    ]);
+
+    const completionBody = [
+      {
+        questionIndex: 0,
+        correct: false,
+        answerGiven: '[skipped]',
+        timeMs: 0,
+        cluesUsed: 5,
+        answerMode: 'free_text',
+      },
+    ];
+    const completed = await completeRound(roundId, profileId, completionBody);
+    expect(completed.status).toBe(200);
+    expect(await completed.json()).toMatchObject({
+      score: 0,
+      xpEarned: 0,
+      questionResults: [
+        {
+          questionIndex: 0,
+          correct: false,
+          correctAnswer: 'Albert Einstein',
+          answerGiven: '[skipped]',
+        },
+      ],
+    });
+
+    const detail = await getRoundDetail(roundId, profileId);
+    expect(detail.status).toBe(200);
+    expect(await detail.json()).toMatchObject({
+      results: [
+        {
+          questionIndex: 0,
+          correct: false,
+          correctAnswer: 'Albert Einstein',
+          answerGiven: '[skipped]',
+        },
+      ],
+    });
+
+    const repeatedComplete = await completeRound(
+      roundId,
+      profileId,
+      completionBody,
+    );
+    expect(repeatedComplete.status).toBe(409);
   });
 });
