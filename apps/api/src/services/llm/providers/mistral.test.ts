@@ -144,4 +144,37 @@ describe('Mistral Provider', () => {
     expect(chunks).toEqual(['Bon', 'jour']);
     expect(JSON.parse(mockFetch.mock.calls[0][1].body).stream).toBe(true);
   });
+
+  it('logs malformed stream metadata without response content', async () => {
+    const sensitiveText = 'PRIVATE_RECITATION_SENTINEL';
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            [
+              `data: {${sensitiveText}}`,
+              'data: {"choices":[{"delta":{"content":"ok"}}]}',
+              'data: [DONE]',
+            ].join('\n') + '\n',
+          ),
+        );
+        controller.close();
+      },
+    });
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, body });
+
+    const chunks: string[] = [];
+    for await (const chunk of provider.chatStream(MESSAGES, CFG)) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual(['ok']);
+    expect(warnSpy).toHaveBeenCalled();
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(sensitiveText);
+    warnSpy.mockRestore();
+  });
 });

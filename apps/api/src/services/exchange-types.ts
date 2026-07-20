@@ -19,6 +19,7 @@ import type {
   VerificationType,
   ExtractedInterviewSignals,
   ChallengeRoundSessionState,
+  RecitationSetupTransition,
 } from '@eduagent/schemas';
 import type {
   EscalationRung,
@@ -203,6 +204,8 @@ export interface ExchangeContext {
   correctStreak?: number;
   /** Client-side effective mode — drives mode-specific prompt sections (e.g. recitation) */
   effectiveMode?: string;
+  /** Server-owned recitation setup transition for this exchange. */
+  recitationSetup?: RecitationSetupTransition;
   /**
    * [WI-2220] Active app nav shell, threaded from the client per exchange
    * (mirrors effectiveMode above). Selects which app-help destination map

@@ -1014,16 +1014,68 @@ export function buildSystemPromptSegments(
 
   // Recitation mode — overrides teaching/escalation behaviour
   if (isRecitation) {
+    const recitationSetupInstruction = (() => {
+      switch (context.recitationSetup?.action) {
+        case 'invite_to_begin':
+          return (
+            'SERVER-OWNED SETUP ACTION: INVITE TO BEGIN\n' +
+            'The server has accepted the current learner message as their recitation selection. Acknowledge it briefly and invite them to begin. Do not ask for the title, author, or description again. Do NOT provide any of the recitation, a model answer, polished wording, or a starting line.'
+          );
+        case 'clarify_selection':
+          return (
+            'SERVER-OWNED SETUP ACTION: CLARIFY SELECTION\n' +
+            "Acknowledge the learner's message. Ask exactly one focused question for the title, author, or a short description. This is the only allowed setup clarification; do not teach or provide recitation content."
+          );
+        case 'invite_after_cap':
+          return (
+            'SERVER-OWNED SETUP ACTION: CLARIFICATION CAP\n' +
+            'The one allowed setup clarification has already been used. Do not ask another setup question. Say you are ready, and invite them to begin whenever they are ready without guessing or supplying recitation content.'
+          );
+        case 'invite_recitation':
+          return (
+            'SERVER-OWNED SETUP ACTION: INVITE RECITATION\n' +
+            'The learner has acknowledged readiness. Briefly invite the learner to perform the actual recitation now. Do not give feedback, a cue, a starting line, suggested wording, or any recitation content.'
+          );
+        case 'clarify_edit':
+          return (
+            'SERVER-OWNED SETUP ACTION: CLARIFY EDIT\n' +
+            'The learner wants to change the setup but has not supplied a replacement. Briefly ask what selection they want instead. Do not supply recitation content, a cue, or a model answer.'
+          );
+        case 'handle_non_recitation':
+          return (
+            'SERVER-OWNED SETUP ACTION: HANDLE NON-RECITATION\n' +
+            'The current message requires the applicable global rules, including SAFETY — NON-NEGOTIABLE RULES when relevant. Follow those rules first. Do not treat this message as a selection or recitation, do not provide recitation content, and do not advance or restart setup.'
+          );
+        case 'coach_recitation':
+          return (
+            'SERVER-OWNED SETUP ACTION: COACH RECITATION\n' +
+            'Setup is complete. Treat the current learner message as recitation or a recitation-related request, and do not restart the title/author question. Follow the feedback and no-recall rules below.'
+          );
+        case 'leave_recitation':
+          return (
+            'SERVER-OWNED SETUP ACTION: LEAVE RECITATION\n' +
+            'The learner explicitly wants to stop or leave recitation. Acknowledge that briefly. Do not ask another setup question. Do not provide recitation content, feedback, or invented navigation instructions.'
+          );
+        default:
+          return '';
+      }
+    })();
+    if (recitationSetupInstruction) {
+      volatile.push(recitationSetupInstruction);
+    }
     const recitationFeedbackScope =
       context.inputMode === 'voice'
         ? '   - Because this is voice input, comment briefly on delivery: pace, confidence, expression.\n'
         : '   - Because this is text input, do NOT claim to hear pace, confidence, expression, pronunciation, or delivery. Comment only on wording, structure, completeness, and clarity of the written recitation.\n';
+    const recitationSetupStep = context.recitationSetup
+      ? '1. Follow the turn-specific SERVER-OWNED SETUP ACTION; it determines the current step and must not be overridden by the general flow.\n'
+      : '1. Ask what they would like to recite (title, author, or description).\n';
     sections.push(
       'Session type: RECITATION PRACTICE (BETA)\n' +
         'The learner wants to recite something from memory — a poem, song lyrics, multiplication tables, or other memorised text.\n' +
         'Your role is to LISTEN and give feedback. Do NOT teach, quiz, or use the escalation ladder.\n\n' +
         'Flow:\n' +
-        '1. Ask what they would like to recite (title, author, or description).\n' +
+        recitationSetupStep +
         '2. Once they tell you, say you are ready and encourage them to begin. Do NOT provide a model answer, polished version, or suggested wording before the learner has recited.\n' +
         '3. After they recite, provide honest but kind feedback:\n' +
         '   - Quote the parts that came through clearly.\n' +
