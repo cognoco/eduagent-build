@@ -1414,6 +1414,344 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ).toBe(false);
   });
 
+  it('[WI-2238] binds the retention-due browser case to the exact seeded Topic identity', () => {
+    const hasExactRetentionTopicBinding = (source: string): boolean => {
+      const sourceFile = ts.createSourceFile(
+        'v2-subjects.spec.ts',
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      );
+      let caseBody: ts.Block | undefined;
+
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isCallExpression(node) &&
+          ts.isIdentifier(node.expression) &&
+          node.expression.text === 'test' &&
+          ts.isStringLiteral(node.arguments[0]) &&
+          node.arguments[0].text.startsWith('WI-2238 retention-due case:')
+        ) {
+          const callback = node.arguments[1];
+          if (
+            (ts.isArrowFunction(callback) ||
+              ts.isFunctionExpression(callback)) &&
+            ts.isBlock(callback.body)
+          ) {
+            caseBody = callback.body;
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sourceFile);
+      if (!caseBody) return false;
+
+      const compactBody = caseBody.getText(sourceFile).replace(/\s+/g, '');
+      const hasBothSeedIds =
+        compactBody.includes('constsubjectId=seed.ids.subjectId;') &&
+        compactBody.includes('consttopicId=seed.ids.topicId;');
+      const hasFailClosedIdGuard =
+        compactBody.includes('if(!subjectId||!topicId){thrownewError(') ||
+        compactBody.includes('if(!topicId||!subjectId){thrownewError(');
+      const hasExactSubjectFlow =
+        compactBody.includes(
+          "awaitexpectSubjectRow(page,subjectId,'Biology');",
+        ) &&
+        compactBody.includes(
+          'awaitpressableClick(page.getByTestId(`subjects-browse-row-${subjectId}`));',
+        ) &&
+        compactBody.includes(
+          "awaitexpectSubjectHub(page,subjectId,'Biology');",
+        );
+      const exactTopicRow =
+        'constbiologyTopicRow=page.getByTestId(`subject-hub-topic-${topicId}`);';
+      const hasExactNamedRow =
+        compactBody.includes(exactTopicRow) &&
+        compactBody.includes(
+          "expect(biologyTopicRow).toContainText('BiologyTopic1')",
+        );
+      let hasObservedUrlPolling = false;
+      const visitPoll = (node: ts.Node): void => {
+        if (
+          ts.isCallExpression(node) &&
+          ts.isPropertyAccessExpression(node.expression) &&
+          node.expression.name.text === 'toEqual' &&
+          ts.isCallExpression(node.expression.expression)
+        ) {
+          const pollCall = node.expression.expression;
+          if (
+            ts.isPropertyAccessExpression(pollCall.expression) &&
+            ts.isIdentifier(pollCall.expression.expression) &&
+            pollCall.expression.expression.text === 'expect' &&
+            pollCall.expression.name.text === 'poll'
+          ) {
+            const callback = pollCall.arguments[0];
+            if (
+              (ts.isArrowFunction(callback) ||
+                ts.isFunctionExpression(callback)) &&
+              ts.isBlock(callback.body)
+            ) {
+              const urlDeclarations = callback.body.statements.flatMap(
+                (statement) =>
+                  ts.isVariableStatement(statement)
+                    ? statement.declarationList.declarations.filter(
+                        (declaration) =>
+                          ts.isIdentifier(declaration.name) &&
+                          declaration.name.text === 'url',
+                      )
+                    : [],
+              );
+              const urlDeclaration = urlDeclarations[0];
+              const urlInitializer = urlDeclaration?.initializer;
+              const pageUrlArgument =
+                urlInitializer && ts.isNewExpression(urlInitializer)
+                  ? urlInitializer.arguments?.[0]
+                  : undefined;
+              let hasUrlWrite = false;
+              const visitUrlWrites = (candidate: ts.Node): void => {
+                if (
+                  ts.isBinaryExpression(candidate) &&
+                  ts.isIdentifier(candidate.left) &&
+                  candidate.left.text === 'url' &&
+                  candidate.operatorToken.kind >=
+                    ts.SyntaxKind.FirstAssignment &&
+                  candidate.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+                ) {
+                  hasUrlWrite = true;
+                }
+                if (
+                  (ts.isPrefixUnaryExpression(candidate) ||
+                    ts.isPostfixUnaryExpression(candidate)) &&
+                  (candidate.operator === ts.SyntaxKind.PlusPlusToken ||
+                    candidate.operator === ts.SyntaxKind.MinusMinusToken) &&
+                  ts.isIdentifier(candidate.operand) &&
+                  candidate.operand.text === 'url'
+                ) {
+                  hasUrlWrite = true;
+                }
+                ts.forEachChild(candidate, visitUrlWrites);
+              };
+              visitUrlWrites(callback.body);
+              const hasExactObservedUrlBinding =
+                urlDeclarations.length === 1 &&
+                Boolean(
+                  urlDeclaration &&
+                  ts.isVariableDeclarationList(urlDeclaration.parent) &&
+                  (urlDeclaration.parent.flags & ts.NodeFlags.Const) !== 0,
+                ) &&
+                !hasUrlWrite &&
+                Boolean(
+                  urlInitializer &&
+                  ts.isNewExpression(urlInitializer) &&
+                  ts.isIdentifier(urlInitializer.expression) &&
+                  urlInitializer.expression.text === 'URL' &&
+                  urlInitializer.arguments?.length === 1 &&
+                  pageUrlArgument &&
+                  ts.isCallExpression(pageUrlArgument) &&
+                  pageUrlArgument.arguments.length === 0 &&
+                  ts.isPropertyAccessExpression(pageUrlArgument.expression) &&
+                  ts.isIdentifier(pageUrlArgument.expression.expression) &&
+                  pageUrlArgument.expression.expression.text === 'page' &&
+                  pageUrlArgument.expression.name.text === 'url',
+                );
+              const returnedObjects = callback.body.statements.flatMap(
+                (statement) =>
+                  ts.isReturnStatement(statement) &&
+                  statement.expression &&
+                  ts.isObjectLiteralExpression(statement.expression)
+                    ? [statement.expression]
+                    : [],
+              );
+              const returnedObject = returnedObjects[0];
+              const hasExactPollStatements =
+                callback.body.statements.length === 2 &&
+                ts.isVariableStatement(callback.body.statements[0]) &&
+                callback.body.statements[0].declarationList.declarations
+                  .length === 1 &&
+                callback.body.statements[0].declarationList.declarations[0] ===
+                  urlDeclaration &&
+                ts.isReturnStatement(callback.body.statements[1]) &&
+                callback.body.statements[1].expression === returnedObject;
+              const pathnameProperty = returnedObject?.properties.find(
+                (property) =>
+                  ts.isPropertyAssignment(property) &&
+                  ts.isIdentifier(property.name) &&
+                  property.name.text === 'pathname',
+              );
+              const subjectIdProperty = returnedObject?.properties.find(
+                (property) =>
+                  ts.isPropertyAssignment(property) &&
+                  ts.isIdentifier(property.name) &&
+                  property.name.text === 'subjectId',
+              );
+              const hasExactObservedReturn = Boolean(
+                returnedObjects.length === 1 &&
+                returnedObject?.properties.length === 2 &&
+                returnedObject.properties.every((property) =>
+                  ts.isPropertyAssignment(property),
+                ) &&
+                pathnameProperty &&
+                ts.isPropertyAssignment(pathnameProperty) &&
+                ts.isPropertyAccessExpression(pathnameProperty.initializer) &&
+                ts.isIdentifier(pathnameProperty.initializer.expression) &&
+                pathnameProperty.initializer.expression.text === 'url' &&
+                pathnameProperty.initializer.name.text === 'pathname' &&
+                subjectIdProperty &&
+                ts.isPropertyAssignment(subjectIdProperty) &&
+                ts.isCallExpression(subjectIdProperty.initializer) &&
+                subjectIdProperty.initializer.arguments.length === 1 &&
+                ts.isStringLiteral(
+                  subjectIdProperty.initializer.arguments[0],
+                ) &&
+                subjectIdProperty.initializer.arguments[0].text ===
+                  'subjectId' &&
+                ts.isPropertyAccessExpression(
+                  subjectIdProperty.initializer.expression,
+                ) &&
+                subjectIdProperty.initializer.expression.name.text === 'get' &&
+                ts.isPropertyAccessExpression(
+                  subjectIdProperty.initializer.expression.expression,
+                ) &&
+                ts.isIdentifier(
+                  subjectIdProperty.initializer.expression.expression
+                    .expression,
+                ) &&
+                subjectIdProperty.initializer.expression.expression.expression
+                  .text === 'url' &&
+                subjectIdProperty.initializer.expression.expression.name
+                  .text === 'searchParams',
+              );
+              const compactExpected = node.arguments[0]
+                ?.getText(sourceFile)
+                .replace(/\s+/g, '');
+              const hasExactExpectedUrl =
+                compactExpected ===
+                  '{pathname:`/topic/${topicId}`,subjectId}' ||
+                compactExpected === '{pathname:`/topic/${topicId}`,subjectId,}';
+              if (
+                hasExactPollStatements &&
+                hasExactObservedUrlBinding &&
+                hasExactObservedReturn &&
+                hasExactExpectedUrl
+              ) {
+                hasObservedUrlPolling = true;
+              }
+            }
+          }
+        }
+        ts.forEachChild(node, visitPoll);
+      };
+      visitPoll(caseBody);
+
+      return (
+        hasBothSeedIds &&
+        hasFailClosedIdGuard &&
+        hasExactSubjectFlow &&
+        hasExactNamedRow &&
+        hasObservedUrlPolling
+      );
+    };
+
+    const exactBindingFixture = `
+      test('WI-2238 retention-due case: exact seeded Topic fixture', async ({ page }) => {
+        const seed = await seedAndSignIn(page, { scenario: 'retention-due' });
+        const subjectId = seed.ids.subjectId;
+        const topicId = seed.ids.topicId;
+        if (!subjectId || !topicId) {
+          throw new Error('retention-due seed did not return subjectId and topicId');
+        }
+        await expectSubjectRow(page, subjectId, 'Biology');
+        await pressableClick(page.getByTestId(\`subjects-browse-row-\${subjectId}\`));
+        await expectSubjectHub(page, subjectId, 'Biology');
+        const biologyTopicRow = page.getByTestId(\`subject-hub-topic-\${topicId}\`);
+        await expect(biologyTopicRow).toContainText('Biology Topic 1');
+        await expect.poll(() => {
+          const url = new URL(page.url());
+          return {
+            pathname: url.pathname,
+            subjectId: url.searchParams.get('subjectId'),
+          };
+        }).toEqual({
+          pathname: \`/topic/\${topicId}\`,
+          subjectId,
+        });
+      });
+    `;
+    expect(hasExactRetentionTopicBinding(exactBindingFixture)).toBe(true);
+
+    for (const mutation of [
+      exactBindingFixture.replace(
+        'const url = new URL(page.url());',
+        "const url = new URL(page.url());\n          url.pathname = `/topic/${topicId}`;\n          url.searchParams.set('subjectId', subjectId);",
+      ),
+      exactBindingFixture.replace(
+        'const url = new URL(page.url());',
+        'let url = new URL(page.url());\n          url = new URL(`https://example.test/topic/${topicId}?subjectId=${subjectId}`);',
+      ),
+      exactBindingFixture.replace(
+        "subjectId: url.searchParams.get('subjectId'),\n          };",
+        "subjectId: url.searchParams.get('subjectId'),\n            ...{ pathname: `/topic/${topicId}`, subjectId },\n          };",
+      ),
+      exactBindingFixture.replace(
+        'const url = new URL(page.url());',
+        'const observedUrl = new URL(page.url());\n          const url = new URL(`https://example.test/topic/${topicId}?subjectId=${subjectId}`);',
+      ),
+      exactBindingFixture.replace(
+        "return {\n            pathname: url.pathname,\n            subjectId: url.searchParams.get('subjectId'),\n          };",
+        "const observedUrl = {\n            pathname: url.pathname,\n            subjectId: url.searchParams.get('subjectId'),\n          };\n          return { pathname: `/topic/${topicId}`, subjectId };",
+      ),
+      exactBindingFixture.replace(
+        'const topicId = seed.ids.topicId;',
+        "const topicId = 'adjacent-topic-id';",
+      ),
+      exactBindingFixture.replace(
+        'if (!subjectId || !topicId)',
+        'if (!subjectId)',
+      ),
+      exactBindingFixture.replace(
+        'const url = new URL(page.url());',
+        'const url = new URL(`https://example.test/topic/${topicId}?subjectId=${subjectId}`);',
+      ),
+      exactBindingFixture.replace(
+        "expectSubjectRow(page, subjectId, 'Biology')",
+        "expectSubjectRow(page, 'adjacent-subject-id', 'Biology')",
+      ),
+      exactBindingFixture.replace(
+        'page.getByTestId(`subjects-browse-row-${subjectId}`)',
+        "page.getByTestId('subjects-browse-row-adjacent-subject-id')",
+      ),
+      exactBindingFixture.replace(
+        "expectSubjectHub(page, subjectId, 'Biology')",
+        "expectSubjectHub(page, 'adjacent-subject-id', 'Biology')",
+      ),
+      exactBindingFixture.replace(
+        'page.getByTestId(`subject-hub-topic-${topicId}`)',
+        "page.getByTestId(/^subject-hub-topic-/).filter({ hasText: 'Biology Topic 1' }).first()",
+      ),
+      exactBindingFixture.replace(
+        "expect(biologyTopicRow).toContainText('Biology Topic 1')",
+        "expect(page.getByText('Biology Topic 1').first()).toBeVisible()",
+      ),
+      exactBindingFixture.replace(
+        'pathname: `/topic/${topicId}`',
+        "pathname: '/topic/adjacent-topic-id'",
+      ),
+      exactBindingFixture.replace(
+        'pathname: `/topic/${topicId}`,\n          subjectId,',
+        "pathname: `/topic/${topicId}`,\n          subjectId: 'adjacent-subject-id',",
+      ),
+    ]) {
+      expect(hasExactRetentionTopicBinding(mutation)).toBe(false);
+    }
+
+    const subjectsSpec = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e-web/flows/v2/v2-subjects.spec.ts'),
+      'utf8',
+    );
+    expect(hasExactRetentionTopicBinding(subjectsSpec)).toBe(true);
+  });
+
   it('[WI-2238] starts the self-seeded Playwright cases from empty storage', () => {
     const hasEmptyStorageStateBeforeCases = (source: string): boolean => {
       const sourceFile = ts.createSourceFile(

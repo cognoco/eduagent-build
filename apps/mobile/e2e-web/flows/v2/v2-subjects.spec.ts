@@ -296,8 +296,9 @@ test('WI-2238 retention-due case: exact Biology Topic 1 review and visible Back 
     landingPath: '/subjects',
   });
   const subjectId = seed.ids.subjectId;
-  if (!subjectId) {
-    throw new Error('retention-due seed did not return subjectId');
+  const topicId = seed.ids.topicId;
+  if (!subjectId || !topicId) {
+    throw new Error('retention-due seed did not return subjectId and topicId');
   }
 
   await expectSubjectRow(page, subjectId, 'Biology');
@@ -310,16 +311,9 @@ test('WI-2238 retention-due case: exact Biology Topic 1 review and visible Back 
     'Review',
   );
 
-  const biologyTopicRow = page
-    .getByTestId(/^subject-hub-topic-/)
-    .filter({ hasText: 'Biology Topic 1' })
-    .first();
+  const biologyTopicRow = page.getByTestId(`subject-hub-topic-${topicId}`);
   await expect(biologyTopicRow).toBeVisible();
-  const topicRowTestId = await biologyTopicRow.getAttribute('data-testid');
-  const topicId = topicRowTestId?.replace('subject-hub-topic-', '');
-  if (!topicId || topicId === topicRowTestId) {
-    throw new Error('Biology Topic 1 row did not expose its exact topic ID');
-  }
+  await expect(biologyTopicRow).toContainText('Biology Topic 1');
 
   await pressableClick(page.getByTestId('subject-hub-next-up-action'));
   await expect(page.getByTestId('topic-detail-scroll')).toBeVisible({

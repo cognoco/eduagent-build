@@ -53,6 +53,17 @@ describe('SessionFooter', () => {
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
 
+  it('calls onHomeBack from the expired-session home action', () => {
+    const onHomeBack = jest.fn();
+    const props = createProps({ sessionExpired: true, onHomeBack });
+
+    render(<SessionFooter {...(props as any)} />);
+
+    fireEvent.press(screen.getByTestId('session-expired-go-home'));
+
+    expect(onHomeBack).toHaveBeenCalledTimes(1);
+  });
+
   it('note input calls createNote.mutate with topicId, content, and sessionId', () => {
     const props = createProps({
       notePromptOffered: true,
