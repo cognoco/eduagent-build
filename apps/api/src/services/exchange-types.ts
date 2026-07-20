@@ -143,6 +143,8 @@ export interface ExchangeContext {
   /** Multiple topics for interleaved retrieval sessions (FR92) */
   interleavedTopics?: Array<{
     topicId: string;
+    /** Server-resolved owner of this topic; never supplied by the model. */
+    subjectId?: string;
     title: string;
     description?: string;
   }>;

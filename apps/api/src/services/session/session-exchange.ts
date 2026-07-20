@@ -95,8 +95,8 @@ import {
 import { buildMemoryBlock, buildAccommodationBlock } from '../learner-profile';
 import { applyAppHelpSignalGuard, isAppHelpQuery } from '../app-help-map';
 import {
-  acceptMentorNotice,
   applyMentorNoticeOutcome,
+  createMentorNoticeFromExchange,
   getLearningDayStart,
   getProfileTimeZone,
   resolveMentorNoticeRecheckContext,
@@ -2640,6 +2640,7 @@ export async function prepareExchangeContext(
         }
         resolvedTopics.push({
           topicId: owned.topicId,
+          subjectId: owned.subjectId,
           title: owned.topicTitle,
           description: owned.topicDescription ?? undefined,
         });
@@ -4075,27 +4076,17 @@ export async function processMessage(
   let mentorNotice: MentorNoticeAccepted | undefined;
   if (
     options?.mentorNoticeEnabled === true &&
-    context.sessionType === 'homework' &&
     persisted.persistedUserMessage &&
     result.noticedGap
   ) {
-    const evidence = await validateNoticeEvidence(
-      db,
-      profileId,
-      sessionId,
-      result.noticedGap,
-    );
-    if (evidence) {
-      mentorNotice =
-        (await acceptMentorNotice(db, {
-          profileId,
-          subjectId: session.subjectId,
-          topicId: session.topicId,
-          sourceSessionId: session.id,
-          concept: evidence.concept,
-          correctionHint: evidence.correctionHint,
-        })) ?? undefined;
-    }
+    mentorNotice =
+      (await createMentorNoticeFromExchange(db, {
+        profileId,
+        session,
+        signal: result.noticedGap,
+        interleavedTopics: context.interleavedTopics,
+        isMentorNoticeRecheck: Boolean(context.mentorNoticeRecheck),
+      })) ?? undefined;
   }
 
   if (
@@ -4674,27 +4665,17 @@ export async function streamMessage(
       let mentorNotice: MentorNoticeAccepted | undefined;
       if (
         options?.mentorNoticeEnabled === true &&
-        context.sessionType === 'homework' &&
         persisted.persistedUserMessage &&
         parsed.noticedGap
       ) {
-        const evidence = await validateNoticeEvidence(
-          db,
-          profileId,
-          sessionId,
-          parsed.noticedGap,
-        );
-        if (evidence) {
-          mentorNotice =
-            (await acceptMentorNotice(db, {
-              profileId,
-              subjectId: session.subjectId,
-              topicId: session.topicId,
-              sourceSessionId: session.id,
-              concept: evidence.concept,
-              correctionHint: evidence.correctionHint,
-            })) ?? undefined;
-        }
+        mentorNotice =
+          (await createMentorNoticeFromExchange(db, {
+            profileId,
+            session,
+            signal: parsed.noticedGap,
+            interleavedTopics: context.interleavedTopics,
+            isMentorNoticeRecheck: Boolean(context.mentorNoticeRecheck),
+          })) ?? undefined;
       }
 
       if (

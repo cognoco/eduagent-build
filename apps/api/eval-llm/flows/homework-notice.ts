@@ -1,4 +1,5 @@
 import { llmResponseEnvelopeSchema } from '@eduagent/schemas';
+import type { SessionType } from '@eduagent/schemas';
 
 import { validateEvidenceOverlap } from '../../src/services/evidence-overlap';
 import type { EvalProfile } from '../fixtures/profiles';
@@ -12,9 +13,13 @@ import type {
 import { exchangesFlow, type ExchangeScenarioInput } from './exchanges';
 
 const EVENT_ID = '550e8400-e29b-41d4-a716-446655440020';
+const INTERLEAVED_TOPIC_ID = '550e8400-e29b-41d4-a716-446655440021';
+const SECOND_INTERLEAVED_TOPIC_ID = '550e8400-e29b-41d4-a716-446655440022';
+const HOMEWORK_PROBLEM = 'Solve x - 3 = 5.';
 
 interface HomeworkNoticeScenarioInput extends ExchangeScenarioInput {
   expectedNotice: boolean;
+  expectedTopicId?: string;
   learnerMessage: string;
 }
 
@@ -25,6 +30,7 @@ interface EnvelopeLike {
       observed?: unknown;
       answerEventId?: unknown;
       learnerQuote?: unknown;
+      topicId?: unknown;
     };
   };
 }
@@ -38,6 +44,8 @@ function buildScenario(
   scenarioId: string,
   learnerMessage: string,
   expectedNotice: boolean,
+  sessionType: SessionType,
+  expectedTopicId?: string,
 ): Scenario<HomeworkNoticeScenarioInput> | null {
   const homework = exchangesFlow
     .enumerateScenarios?.(profile)
@@ -50,12 +58,35 @@ function buildScenario(
       ...homework.input,
       scenarioId,
       scenarioPurpose: expectedNotice
-        ? 'Genuine homework slip should produce one grounded noticed_gap without promising a future check-in'
-        : 'Clean homework reasoning should not produce noticed_gap',
+        ? 'A genuine learner slip should produce one grounded noticed_gap without promising a future check-in'
+        : 'Clean learner reasoning should not produce noticed_gap',
       expectedNotice,
+      expectedTopicId,
       learnerMessage,
       context: {
         ...homework.input.context,
+        subjectName: 'Mathematics',
+        topicTitle: 'Solving linear equations',
+        topicDescription: undefined,
+        sessionType,
+        rawInput: sessionType === 'homework' ? HOMEWORK_PROBLEM : undefined,
+        homeworkMode:
+          sessionType === 'homework'
+            ? homework.input.context.homeworkMode
+            : undefined,
+        interleavedTopics:
+          sessionType === 'interleaved'
+            ? [
+                {
+                  topicId: INTERLEAVED_TOPIC_ID,
+                  title: 'Solving linear equations',
+                },
+                {
+                  topicId: SECOND_INTERLEAVED_TOPIC_ID,
+                  title: 'Order of operations',
+                },
+              ]
+            : undefined,
         exchangeCount: 2,
         mentorNoticeEnabled: true,
         currentUserMessageEventId: EVENT_ID,
@@ -101,7 +132,7 @@ function evaluateResponse(
     issues.push(
       issue(
         'homework-notice.false-positive',
-        'The clean homework answer produced signals.noticed_gap.',
+        'The clean learner answer produced signals.noticed_gap.',
       ),
     );
   }
@@ -111,6 +142,14 @@ function evaluateResponse(
         issue(
           'homework-notice.event-id',
           'noticed_gap did not preserve the supplied learner event ID.',
+        ),
+      );
+    }
+    if (input.expectedTopicId && noticedGap.topicId !== input.expectedTopicId) {
+      issues.push(
+        issue(
+          'homework-notice.topic-id',
+          'noticed_gap did not preserve the server-supplied interleaved topic ID.',
         ),
       );
     }
@@ -150,7 +189,7 @@ function evaluateResponse(
 
 export const homeworkNoticeFlow: FlowDefinition<HomeworkNoticeScenarioInput> = {
   id: 'homework-notice',
-  name: 'Homework mentor notice',
+  name: 'Mentor notice across sessions',
   sourceFile: 'apps/api/src/services/exchange-prompts.ts',
   emitsEnvelope: true,
   expectedResponseSchema: llmResponseEnvelopeSchema,
@@ -165,15 +204,32 @@ export const homeworkNoticeFlow: FlowDefinition<HomeworkNoticeScenarioInput> = {
     return [
       buildScenario(
         profile,
-        'genuine-slip',
+        'genuine-homework-slip',
         'I moved minus three to the other side and kept it negative, so x equals two.',
         true,
+        'homework',
       ),
       buildScenario(
         profile,
-        'clean-homework',
+        'genuine-learning-slip',
+        'I moved minus three to the other side and kept it negative, so x equals two.',
+        true,
+        'learning',
+      ),
+      buildScenario(
+        profile,
+        'genuine-interleaved-slip',
+        'I moved minus three to the other side and kept it negative, so x equals two.',
+        true,
+        'interleaved',
+        INTERLEAVED_TOPIC_ID,
+      ),
+      buildScenario(
+        profile,
+        'clean-learning',
         'I added three to both sides, so x equals eight.',
         false,
+        'learning',
       ),
     ].filter(
       (scenario): scenario is Scenario<HomeworkNoticeScenarioInput> =>
