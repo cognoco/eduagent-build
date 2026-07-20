@@ -1,5 +1,7 @@
 # Homework Notice — the two felt moments
 
+> **Scope amendment — 2026-07-20:** The product ruling is now session- and age-neutral. Homework remains a high-value first-use example, but it is not an eligibility gate: the mentor may create the same evidence-backed notice in learning, homework, or interleaved sessions for a learner of any age. For interleaved retrieval, the proposal must bind to one server-supplied topic target so the server persists the correct subject/topic. This amendment supersedes the homework-only wording below where the two conflict; the quiet-default, evidence, privacy, and human-override constraints remain unchanged. Implementation: `docs/plans/2026-07-20-mentor-notices-all-sessions.md`.
+
 **Status:** draft v2 (design ratified in principle by founder 2026-07-19; v2 incorporates the 8-finding adversarial review of same date; decisions D1–D4 open)
 **Owner:** Zuzana (product) / unassigned (build)
 **Thesis:** MentoMate's differentiation (a learning relationship over time) is invisible during the first-use window where users decide "this is just ChatGPT." We do not *explain* the loop to learners — we engineer two felt moments that demonstrate it: (1) the mentor **notices** a shaky concept *while helping with homework* and the app visibly writes it down with a promise to bring it back; (2) it **comes back** — via a next-day nudge or naturally when the topic resurfaces. North-star activation (reach): % of all new learners whose first homework session leads to a completed re-check within 48h.
