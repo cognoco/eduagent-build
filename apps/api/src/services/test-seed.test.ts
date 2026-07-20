@@ -372,6 +372,12 @@ describe('seedScenario', () => {
     expect(insertedRows).not.toContainEqual(
       expect.objectContaining({ roles: expect.arrayContaining(['admin']) }),
     );
+    expect(insertedRows).not.toContainEqual(
+      expect.objectContaining({
+        chargePersonId: result.profileId,
+        lawfulBasis: expect.any(String),
+      }),
+    );
   });
 
   it('[WI-2240] exposes the parent-multi-child owner learner subject separately from every child subject', async () => {

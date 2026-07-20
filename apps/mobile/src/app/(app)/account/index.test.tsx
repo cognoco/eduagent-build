@@ -55,6 +55,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
   useLocalSearchParams: () => ({ returnTo: mockReturnTo }),
   useFocusEffect: (callback: () => void | (() => void)) => {
+    // Keep the latest registered handler; AccountScreen owns one focus effect per render.
     mockFocusEffectCallback = callback;
   },
 }));

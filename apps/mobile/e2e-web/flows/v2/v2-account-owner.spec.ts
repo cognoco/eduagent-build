@@ -138,7 +138,10 @@ test('V2 Account empty history falls back to Journal and never legacy Home', asy
 }) => {
   const seed = await readSeedData('owner-with-children');
   const ownerSubjectId = seed.ids.ownerSubjectId;
-  const journalEntry = ENTRY_CASES[2];
+  const journalEntry = ENTRY_CASES.find((entry) => entry.name === 'Journal');
+  if (!journalEntry) {
+    throw new Error('Journal entry case is required');
+  }
 
   await page.goto('/journal', { waitUntil: 'commit' });
   await selectOwnerLearnerScope(page);
@@ -192,6 +195,7 @@ test('V2 Test Parent sign-out keeps its General Knowledge row behind the unauthe
   await expectSignedOutWithoutTestParentData(page);
 
   await page.goBack({ waitUntil: 'commit' });
+  await expect(page).toHaveURL(/\/sign-in(?:\?.*)?$/);
   await expectSignedOutWithoutTestParentData(page);
 
   const context = page.context();

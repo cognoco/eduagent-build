@@ -209,16 +209,10 @@ describe('AccountAdminSheet', () => {
     screen.getByTestId('account-admin-sign-out');
   });
 
-  it('shows only permitted rows for a non-owner child and keeps owner-only rows absent', () => {
+  it('keeps every owner-only row absent for a non-owner even when adjacent feature gates are stale true', () => {
     mockGates = {
+      ...mockGates,
       sessionIsOwner: false,
-      showBilling: false,
-      showAccountSecurity: false,
-      showExportDelete: false,
-      showAddChild: false,
-      showRemoveFamilyMember: false,
-      showAccommodationChildEditor: false,
-      showMentorLanguageChildEditor: false,
     };
     mockActiveProfile = { id: 'child-1', displayName: 'Child', isOwner: false };
     mockProfiles = [mockActiveProfile];

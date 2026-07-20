@@ -1220,15 +1220,6 @@ async function seedV2AccountNonOwnerChild(
   });
   await db.update(person).set({ loginId }).where(eq(person.id, profileId));
 
-  await db.insert(consentGrant).values({
-    id: generateUUIDv7(),
-    chargePersonId: profileId,
-    organizationId: accountId,
-    purpose: 'platform_use',
-    lawfulBasis: 'gdpr_parental_consent',
-    granted: true,
-  });
-
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
