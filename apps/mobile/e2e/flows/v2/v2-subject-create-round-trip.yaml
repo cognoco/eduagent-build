@@ -78,8 +78,10 @@ tags:
     timeout: 15000
 
 # Create a specific topic and carry the Subjects return token through the
-# first-subject ready handoff. A direct resolver match creates immediately;
-# a resolved/corrected match first requires explicit confirmation.
+# first-subject ready handoff. Each resolver result is handled explicitly:
+# direct matches reach Ready without another action; corrected/resolved
+# matches require confirmation; no-match uses the learner's exact words;
+# ambiguous matches fail closed instead of selecting an arbitrary option.
 - tapOn:
     id: 'subjects-browse-create'
 - extendedWaitUntil:
@@ -104,13 +106,47 @@ tags:
     notVisible:
       id: 'subject-resolve-loading'
     timeout: 60000
+- assertNotVisible:
+    id: 'subject-suggestion-card'
 - runFlow:
     when:
       visible:
-        id: 'subject-suggestion-accept'
+        id: 'subject-confident-card'
     commands:
+      - assertVisible:
+          id: 'subject-confident-card'
+          containsDescendants:
+            - id: 'subject-suggestion-accept'
       - tapOn:
           id: 'subject-suggestion-accept'
+          childOf:
+            id: 'subject-confident-card'
+- runFlow:
+    when:
+      visible:
+        id: 'subject-single-suggestion-card'
+    commands:
+      - assertVisible:
+          id: 'subject-single-suggestion-card'
+          containsDescendants:
+            - id: 'subject-suggestion-accept'
+      - tapOn:
+          id: 'subject-suggestion-accept'
+          childOf:
+            id: 'subject-single-suggestion-card'
+- runFlow:
+    when:
+      visible:
+        id: 'subject-no-match-card'
+    commands:
+      - assertVisible:
+          id: 'subject-no-match-card'
+          containsDescendants:
+            - id: 'subject-use-my-words'
+      - tapOn:
+          id: 'subject-use-my-words'
+          childOf:
+            id: 'subject-no-match-card'
 - extendedWaitUntil:
     visible:
       id: 'ready-screen'

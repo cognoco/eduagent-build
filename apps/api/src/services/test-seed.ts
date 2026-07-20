@@ -121,6 +121,7 @@ export type SeedScenario =
   | 'quiz-malformed-round'
   | 'quiz-deterministic-wrong-answer'
   | 'quiz-answer-check-fails'
+  | 'quiz-completed-history-detail'
   | 'dictation-with-mistakes'
   | 'dictation-perfect-score'
   | 'review-empty'
@@ -4184,6 +4185,62 @@ async function seedQuizAnswerCheckFails(
 }
 
 // ---------------------------------------------------------------------------
+// Scenario: quiz-completed-history-detail
+// A completed round in the production-persisted shape consumed by detail reads.
+// The full Playwright history-open specification uses this seed so it never
+// depends on a prior quiz run or mutates state during the browser assertion.
+// ---------------------------------------------------------------------------
+
+async function seedQuizCompletedHistoryDetail(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const base = await seedOnboardingComplete(db, email, env);
+  const roundId = generateUUIDv7();
+
+  await db.insert(quizRounds).values({
+    id: roundId,
+    profileId: base.profileId,
+    subjectId: base.ids.subjectId,
+    activityType: 'capitals',
+    theme: 'European Capitals',
+    questions: [
+      {
+        type: 'capitals',
+        country: 'France',
+        correctAnswer: 'Paris',
+        acceptedAliases: ['Paris'],
+        distractors: ['Berlin', 'Madrid', 'Rome'],
+        funFact: 'Paris is known as the City of Light.',
+        isLibraryItem: false,
+      },
+    ],
+    results: [
+      {
+        questionIndex: 0,
+        correct: false,
+        correctAnswer: 'Paris',
+        answerGiven: 'Berlin',
+        timeMs: 1250,
+      },
+    ],
+    score: 0,
+    total: 1,
+    xpEarned: 0,
+    libraryQuestionIndices: [],
+    status: 'completed',
+    completedAt: new Date(),
+  });
+
+  return {
+    ...base,
+    scenario: 'quiz-completed-history-detail',
+    ids: { ...base.ids, roundId },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Scenario: daily-limit-reached
 // Free-tier user who has hit the daily question cap (10/10) but still has
 // monthly quota remaining. Next LLM request should trigger 402 QUOTA_EXCEEDED
@@ -5950,6 +6007,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'quiz-malformed-round': seedQuizMalformedRound,
   'quiz-deterministic-wrong-answer': seedQuizDeterministicWrongAnswer,
   'quiz-answer-check-fails': seedQuizAnswerCheckFails,
+  'quiz-completed-history-detail': seedQuizCompletedHistoryDetail,
   'review-empty': seedReviewEmpty,
   'dictation-with-mistakes': seedDictationWithMistakes,
   'dictation-perfect-score': seedDictationPerfectScore,

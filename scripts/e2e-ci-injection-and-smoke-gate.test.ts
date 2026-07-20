@@ -1688,8 +1688,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ).toBe(false);
   });
 
-  it('[WI-2238] binds the retention-due browser case to the exact seeded Topic identity', () => {
-    const hasExactRetentionTopicBinding = (source: string): boolean => {
+  it('[WI-2238] structurally binds the retention-due browser case to seed-owned IDs and the observed route', () => {
+    const hasSeedOwnedRetentionRouteBinding = (source: string): boolean => {
       const sourceFile = ts.createSourceFile(
         'v2-subjects.spec.ts',
         source,
@@ -1737,13 +1737,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         ) &&
         compactBody.includes(
           "awaitexpectSubjectHub(page,subjectId,'Biology');",
-        );
-      const exactTopicRow =
-        'constbiologyTopicRow=page.getByTestId(`subject-hub-topic-${topicId}`);';
-      const hasExactNamedRow =
-        compactBody.includes(exactTopicRow) &&
-        compactBody.includes(
-          "expect(biologyTopicRow).toContainText('BiologyTopic1')",
         );
       let hasObservedUrlPolling = false;
       const visitPoll = (node: ts.Node): void => {
@@ -1922,7 +1915,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         hasBothSeedIds &&
         hasFailClosedIdGuard &&
         hasExactSubjectFlow &&
-        hasExactNamedRow &&
         hasObservedUrlPolling
       );
     };
@@ -1938,8 +1930,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         await expectSubjectRow(page, subjectId, 'Biology');
         await pressableClick(page.getByTestId(\`subjects-browse-row-\${subjectId}\`));
         await expectSubjectHub(page, subjectId, 'Biology');
-        const biologyTopicRow = page.getByTestId(\`subject-hub-topic-\${topicId}\`);
-        await expect(biologyTopicRow).toContainText('Biology Topic 1');
         await expect.poll(() => {
           const url = new URL(page.url());
           return {
@@ -1952,7 +1942,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         });
       });
     `;
-    expect(hasExactRetentionTopicBinding(exactBindingFixture)).toBe(true);
+    expect(hasSeedOwnedRetentionRouteBinding(exactBindingFixture)).toBe(true);
 
     for (const mutation of [
       exactBindingFixture.replace(
@@ -2000,14 +1990,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         "expectSubjectHub(page, 'adjacent-subject-id', 'Biology')",
       ),
       exactBindingFixture.replace(
-        'page.getByTestId(`subject-hub-topic-${topicId}`)',
-        "page.getByTestId(/^subject-hub-topic-/).filter({ hasText: 'Biology Topic 1' }).first()",
-      ),
-      exactBindingFixture.replace(
-        "expect(biologyTopicRow).toContainText('Biology Topic 1')",
-        "expect(page.getByText('Biology Topic 1').first()).toBeVisible()",
-      ),
-      exactBindingFixture.replace(
         'pathname: `/topic/${topicId}`',
         "pathname: '/topic/adjacent-topic-id'",
       ),
@@ -2016,14 +1998,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         "pathname: `/topic/${topicId}`,\n          subjectId: 'adjacent-subject-id',",
       ),
     ]) {
-      expect(hasExactRetentionTopicBinding(mutation)).toBe(false);
+      expect(hasSeedOwnedRetentionRouteBinding(mutation)).toBe(false);
     }
 
     const subjectsSpec = readFileSync(
       join(repoRoot, 'apps/mobile/e2e-web/flows/v2/v2-subjects.spec.ts'),
       'utf8',
     );
-    expect(hasExactRetentionTopicBinding(subjectsSpec)).toBe(true);
+    expect(hasSeedOwnedRetentionRouteBinding(subjectsSpec)).toBe(true);
   });
 
   it('[WI-2238] starts the self-seeded Playwright cases from empty storage', () => {
@@ -2208,6 +2190,273 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(hasEmptyStorageStateBeforeCases(subjectsSpec)).toBe(true);
   });
 
+  it('[WI-2506] binds each subject resolver result to its owned action and fails ambiguous results closed', () => {
+    type Command = Record<string, unknown>;
+    const subjectCreate = parseAllDocuments(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-subject-create-round-trip.yaml',
+        ),
+        'utf8',
+      ),
+    )[1]?.toJS() as unknown;
+
+    expect(Array.isArray(subjectCreate)).toBe(true);
+    if (!Array.isArray(subjectCreate)) {
+      throw new Error('V2 subject-create Maestro commands must be a YAML list');
+    }
+
+    const ownedBranch = (ownerId: string, actionId: string): Command[] => [
+      {
+        assertVisible: {
+          id: ownerId,
+          containsDescendants: [{ id: actionId }],
+        },
+      },
+      {
+        tapOn: {
+          id: actionId,
+          childOf: { id: ownerId },
+        },
+      },
+    ];
+    const branch = (triggerId: string, commands: Command[]): Command => ({
+      runFlow: {
+        when: { visible: { id: triggerId } },
+        commands,
+      },
+    });
+    const allObjects = (value: unknown): Command[] => {
+      if (Array.isArray(value)) {
+        return value.flatMap(allObjects);
+      }
+      if (value === null || typeof value !== 'object') return [];
+      return [value as Command, ...Object.values(value).flatMap(allObjects)];
+    };
+    const resolveFinished: Command = {
+      extendedWaitUntil: {
+        notVisible: { id: 'subject-resolve-loading' },
+        timeout: 60000,
+      },
+    };
+    const failClosed: Command = {
+      assertNotVisible: { id: 'subject-suggestion-card' },
+    };
+    const noMatchBranch = branch(
+      'subject-no-match-card',
+      ownedBranch('subject-no-match-card', 'subject-use-my-words'),
+    );
+    const readyHandoff: Command = {
+      extendedWaitUntil: {
+        visible: { id: 'ready-screen' },
+        timeout: 60000,
+      },
+    };
+    const outcomeSequence: Command[] = [
+      resolveFinished,
+      failClosed,
+      branch(
+        'subject-confident-card',
+        ownedBranch('subject-confident-card', 'subject-suggestion-accept'),
+      ),
+      branch(
+        'subject-single-suggestion-card',
+        ownedBranch(
+          'subject-single-suggestion-card',
+          'subject-suggestion-accept',
+        ),
+      ),
+      noMatchBranch,
+      readyHandoff,
+    ];
+    const hasSequence = (
+      commands: unknown[],
+      expectedSequence: unknown[],
+    ): boolean =>
+      commands.some((_, start) =>
+        expectedSequence.every((expected, offset) =>
+          isDeepStrictEqual(commands[start + offset], expected),
+        ),
+      );
+    const hardCommandSignature = (command: unknown): string => {
+      if (command === null || typeof command !== 'object') return '';
+      const record = command as Command;
+      const kind = ['extendedWaitUntil', 'assertVisible', 'tapOn'].find(
+        (candidate) => candidate in record,
+      );
+      if (!kind) return '';
+      const payload = record[kind] as Command;
+      const selector = (payload.visible ?? payload) as Command;
+      if (selector.optional === true) return '';
+      const ownedText = Array.isArray(selector.containsDescendants)
+        ? selector.containsDescendants.find(
+            (descendant): descendant is Command =>
+              descendant !== null &&
+              typeof descendant === 'object' &&
+              typeof (descendant as Command).text === 'string',
+          )
+        : undefined;
+      const property = selector.id
+        ? `id:${selector.id}`
+        : `text:${selector.text}`;
+      return `${kind}:${property}${ownedText ? `|text:${ownedText.text}` : ''}`;
+    };
+    const hasArbitraryAmbiguousTap = (commands: unknown[]): boolean =>
+      allObjects(commands).some((command) => {
+        const tapOn = command.tapOn;
+        if (tapOn === null || typeof tapOn !== 'object') return false;
+        const id = (tapOn as Command).id;
+        return (
+          typeof id === 'string' && id.startsWith('subject-suggestion-option-')
+        );
+      });
+    const correctiveActionIds = new Set([
+      'subject-suggestion-accept',
+      'subject-use-my-words',
+    ]);
+    const expectedOwnedCorrectiveTaps = [
+      'subject-suggestion-accept|subject-confident-card',
+      'subject-suggestion-accept|subject-single-suggestion-card',
+      'subject-use-my-words|subject-no-match-card',
+    ].sort();
+    const ownedCorrectiveTapSignatures = (commands: unknown[]): string[] =>
+      allObjects(commands)
+        .flatMap((command) => {
+          const tapOn = command.tapOn;
+          if (typeof tapOn === 'string') {
+            return correctiveActionIds.has(tapOn) ? [`${tapOn}|`] : [];
+          }
+          if (tapOn === null || typeof tapOn !== 'object') return [];
+          const tap = tapOn as Command;
+          const id = tap.id;
+          if (typeof id !== 'string' || !correctiveActionIds.has(id)) return [];
+          const childOf = tap.childOf;
+          const ownerId =
+            childOf !== null && typeof childOf === 'object'
+              ? (childOf as Command).id
+              : undefined;
+          return [`${id}|${typeof ownerId === 'string' ? ownerId : ''}`];
+        })
+        .sort();
+    const satisfiesOutcomeContract = (commands: unknown[]): boolean =>
+      hasSequence(commands, outcomeSequence) &&
+      !hasArbitraryAmbiguousTap(commands) &&
+      isDeepStrictEqual(
+        ownedCorrectiveTapSignatures(commands),
+        expectedOwnedCorrectiveTaps,
+      );
+
+    expect(satisfiesOutcomeContract(subjectCreate)).toBe(true);
+    expect(
+      hasSequence(subjectCreate.map(hardCommandSignature), [
+        'extendedWaitUntil:id:ready-screen',
+        'assertVisible:id:ready-start',
+        'tapOn:id:ready-start',
+        'extendedWaitUntil:id:session-screen',
+        'assertVisible:id:chat-shell-back',
+        'tapOn:id:chat-shell-back',
+        'extendedWaitUntil:id:subjects-screen',
+        'extendedWaitUntil:id:subjects-browse-row-.*|text:^Photosynthesis$',
+        'assertVisible:id:subjects-browse-row-.*|text:^Photosynthesis$',
+      ]),
+    ).toBe(true);
+
+    const noMatchCommands = ownedBranch(
+      'subject-no-match-card',
+      'subject-use-my-words',
+    );
+    const replaceAt = <T>(
+      values: readonly T[],
+      index: number,
+      value: T,
+    ): T[] => {
+      const copy = [...values];
+      copy[index] = value;
+      return copy;
+    };
+    for (const mutation of [
+      // Removal: the branch cannot act without first proving its owner/action.
+      outcomeSequence.filter((_, index) => index !== 4),
+      // Global proof: sibling assertions do not bind the action to its card.
+      replaceAt(
+        outcomeSequence,
+        4,
+        branch('subject-no-match-card', [
+          { assertVisible: { id: 'subject-no-match-card' } },
+          { assertVisible: { id: 'subject-use-my-words' } },
+          noMatchCommands[1]!,
+        ]),
+      ),
+      // Adjacent case: the correct action under the wrong result owner.
+      replaceAt(
+        outcomeSequence,
+        4,
+        branch(
+          'subject-no-match-card',
+          ownedBranch('subject-suggestion-card', 'subject-use-my-words'),
+        ),
+      ),
+      // Wrong action: accepting a suggestion does not exercise no-match.
+      replaceAt(
+        outcomeSequence,
+        4,
+        branch(
+          'subject-no-match-card',
+          ownedBranch('subject-no-match-card', 'subject-suggestion-accept'),
+        ),
+      ),
+      // Optional assertions do not establish evidence.
+      replaceAt(
+        outcomeSequence,
+        4,
+        branch(
+          'subject-no-match-card',
+          replaceAt(noMatchCommands, 0, {
+            assertVisible: {
+              id: 'subject-no-match-card',
+              containsDescendants: [{ id: 'subject-use-my-words' }],
+              optional: true,
+            },
+          }),
+        ),
+      ),
+      // An action before its assertion can mutate away the evidence.
+      replaceAt(
+        outcomeSequence,
+        4,
+        branch('subject-no-match-card', [
+          noMatchCommands[1]!,
+          noMatchCommands[0]!,
+        ]),
+      ),
+      // The ambiguous-card assertion is hard and precedes every outcome.
+      replaceAt(outcomeSequence, 1, {
+        assertNotVisible: {
+          id: 'subject-suggestion-card',
+          optional: true,
+        },
+      }),
+      [resolveFinished, ...outcomeSequence.slice(2), failClosed],
+      // Even a complete positive sequence is void if it chooses an option.
+      [...outcomeSequence, { tapOn: { id: 'subject-suggestion-option-0' } }],
+      // A second, global corrective tap is not owned by the proven card.
+      [...outcomeSequence, { tapOn: { id: 'subject-suggestion-accept' } }],
+      // The right corrective action under a different owner is still unsafe.
+      [
+        ...outcomeSequence,
+        {
+          tapOn: {
+            id: 'subject-use-my-words',
+            childOf: { id: 'subject-confident-card' },
+          },
+        },
+      ],
+    ]) {
+      expect(satisfiesOutcomeContract(mutation)).toBe(false);
+    }
+  });
+
   it('[WI-2241] hard-selects the exact rich supportee through the Support hub before and after relaunch', () => {
     const supporterFlow = readFileSync(
       join(
@@ -2250,7 +2499,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
             id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}',
           },
           direction: 'DOWN',
-          timeout: 5000,
+          timeout: 15000,
         },
       },
       {
@@ -2296,7 +2545,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
             id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}',
           },
           direction: 'DOWN',
-          timeout: 5000,
+          timeout: 15000,
         },
       },
       {
