@@ -36,6 +36,27 @@ beforeEach(() => {
   mockMarkdownDisplay.mockClear();
 });
 
+describe('MessageBubble — escaped Unicode streaming [WI-2124]', () => {
+  it('[WI-2124 AC-2b] decodes an escape completed across streamed chunks', () => {
+    const firstChunk = 'Rayleigh scattering follows 1/\\u03';
+    const { getByText, rerender } = render(
+      <MessageBubble sender="assistant" content={firstChunk} streaming />,
+    );
+
+    expect(getByText(firstChunk)).toBeTruthy();
+
+    rerender(
+      <MessageBubble
+        sender="assistant"
+        content={`${firstChunk}bb^4`}
+        streaming
+      />,
+    );
+
+    expect(getByText('Rayleigh scattering follows 1/λ^4')).toBeTruthy();
+  });
+});
+
 describe('MessageBubble — mentor notice receipt', () => {
   const notice = {
     id: '550e8400-e29b-41d4-a716-446655440000',
