@@ -44,8 +44,14 @@ import {
   FOUR_STRANDS_EXPLAINS_EN_RE,
   LEARNING_SOURCE_POINT_RE,
   recitationPolishAddedFact,
+  recitationSetupReplyAdvances,
   sourceAuditGateFires,
 } from './enduser-quality-patterns';
+import {
+  redactPersistedEventForEvidence,
+  redactRecitationTextForEvidence,
+  redactSourceAuditForEvidence,
+} from './enduser-recitation-evidence';
 
 type Mode =
   | 'freeform'
@@ -378,8 +384,7 @@ const runDefinitions: RunDefinition[] = [
         // authored job is to invite the learner to recite first, not
         // provide the answer (RECITATION_SETUP_PREMATURE_MODEL_RE already
         // encodes this expectation).
-        message:
-          'I want to recite a short explanation of why Roman roads mattered.',
+        message: 'Roman roads',
         exemptSourceAudit: true,
       },
       {
@@ -674,6 +679,7 @@ async function getTopicTitle(
 async function getPersistedEvents(
   db: ReturnType<typeof createDatabase>,
   sessionId: string,
+  mode: Mode,
 ): Promise<ModeResult['persistedEvents']> {
   const rows = await db
     .select({
@@ -686,12 +692,14 @@ async function getPersistedEvents(
     .where(eq(sessionEvents.sessionId, sessionId))
     .orderBy(sessionEvents.createdAt);
 
-  return rows.map((row) => ({
-    eventType: row.eventType,
-    content: row.content,
-    metadata: row.metadata,
-    createdAt: row.createdAt.toISOString(),
-  }));
+  return rows.map((row) =>
+    redactPersistedEventForEvidence(mode, {
+      eventType: row.eventType,
+      content: row.content,
+      metadata: row.metadata,
+      createdAt: row.createdAt.toISOString(),
+    }),
+  );
 }
 
 const VISIBLE_ENVELOPE_RE =
@@ -1208,6 +1216,22 @@ function analyzeTurn(input: {
 
   if (
     definition.mode === 'recitation' &&
+    turnIndex === 1 &&
+    !recitationSetupReplyAdvances(response)
+  ) {
+    issues.push({
+      severity: 'fail',
+      code: 'recitation_setup_did_not_advance',
+      message:
+        'A valid title-only first turn should advance directly to a ready-to-begin invitation.',
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (
+    definition.mode === 'recitation' &&
     turnIndex >= 4 &&
     recitationPolishAddedFact(response)
   ) {
@@ -1379,7 +1403,13 @@ async function runMode(
   const plannedTurns = definition.turns({ subjectName, topicTitle });
 
   for (const [index, planned] of plannedTurns.entries()) {
-    console.log(`[${definition.mode}] turn ${index + 1}: ${planned.message}`);
+    console.log(
+      `[${definition.mode}] turn ${index + 1}: ${redactRecitationTextForEvidence(
+        definition.mode,
+        'learner_input',
+        planned.message,
+      )}`,
+    );
     const turnStarted = Date.now();
     const result = await processMessage(
       db,
@@ -1414,10 +1444,31 @@ async function runMode(
       exemptSourceAudit: planned.exemptSourceAudit,
     });
 
+    const evidenceQualityIssues = qualityIssues.map((issue) => ({
+      ...issue,
+      ...(issue.snippet
+        ? {
+            snippet: redactRecitationTextForEvidence(
+              definition.mode,
+              'quality_snippet',
+              issue.snippet,
+            ),
+          }
+        : {}),
+    }));
+
     turns.push({
       index: index + 1,
-      user: planned.message,
-      assistant: result.response,
+      user: redactRecitationTextForEvidence(
+        definition.mode,
+        'learner_input',
+        planned.message,
+      ),
+      assistant: redactRecitationTextForEvidence(
+        definition.mode,
+        'assistant_reply',
+        result.response,
+      ),
       exchangeCount: result.exchangeCount,
       escalationRung: result.escalationRung,
       isUnderstandingCheck: result.isUnderstandingCheck,
@@ -1426,9 +1477,12 @@ async function runMode(
       homeworkMode: planned.homeworkMode,
       envelopeParseFailed: result.envelopeParseFailed,
       envelopeParseFailureReason: result.envelopeParseFailureReason,
-      sourceAudit: result.sourceAudit,
+      sourceAudit: redactSourceAuditForEvidence(
+        definition.mode,
+        result.sourceAudit,
+      ),
       fluencyDrill: result.fluencyDrill,
-      qualityIssues,
+      qualityIssues: evidenceQualityIssues,
       durationMs: Date.now() - turnStarted,
     });
     for (const issue of qualityIssues) {
@@ -1437,11 +1491,19 @@ async function runMode(
       );
     }
     console.log(
-      `[${definition.mode}] turn ${index + 1} reply: ${result.response.replace(/\s+/g, ' ').slice(0, 220)}`,
+      `[${definition.mode}] turn ${index + 1} reply: ${redactRecitationTextForEvidence(
+        definition.mode,
+        'assistant_reply',
+        result.response,
+      )}`,
     );
   }
 
-  const persistedEvents = await getPersistedEvents(db, session.id);
+  const persistedEvents = await getPersistedEvents(
+    db,
+    session.id,
+    definition.mode,
+  );
   const qualityIssues = turns.flatMap((turn) => turn.qualityIssues);
 
   return {
@@ -1457,7 +1519,14 @@ async function runMode(
     topicTitle,
     sessionId: session.id,
     sessionType: definition.sessionType,
-    rawInput: definition.rawInput,
+    rawInput:
+      definition.rawInput === undefined
+        ? undefined
+        : redactRecitationTextForEvidence(
+            definition.mode,
+            'learner_input',
+            definition.rawInput,
+          ),
     startedAt,
     completedAt: new Date().toISOString(),
     turns,

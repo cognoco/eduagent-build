@@ -27,6 +27,7 @@ import type {
 } from './llm';
 import type { LLMTier } from './subscription';
 import type { LanguageSessionState } from './language-session-engine';
+import type { RecitationSetupTransition } from './session/session-recitation-setup';
 
 // ---------------------------------------------------------------------------
 // Source evidence types
@@ -201,6 +202,8 @@ export interface ExchangeContext {
   correctStreak?: number;
   /** Client-side effective mode — drives mode-specific prompt sections (e.g. recitation) */
   effectiveMode?: string;
+  /** Server-owned recitation setup transition for this exchange. */
+  recitationSetup?: RecitationSetupTransition;
   /**
    * [WI-2220] Active app nav shell, threaded from the client per exchange
    * (mirrors effectiveMode above). Selects which app-help destination map

@@ -1298,7 +1298,7 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
   const SESSION_ID = 'sess-wi1552';
   const SUBJECT_ID = 'subj-wi1552';
 
-  function buildSessionRow() {
+  function buildSessionRow(overrides: Record<string, unknown> = {}) {
     return {
       id: SESSION_ID,
       profileId: PROFILE_ID,
@@ -1322,6 +1322,7 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       metadata: null,
       updatedAt: new Date('2026-01-02T10:00:00Z'),
       createdAt: new Date('2026-01-02T10:00:00Z'),
+      ...overrides,
     };
   }
 
@@ -1343,8 +1344,8 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       name: 'Spanish',
       rawInput: null,
       status: 'active',
-      pedagogyMode: 'four_strands',
-      languageCode: 'es',
+      pedagogyMode: 'four_strands' as string | null,
+      languageCode: 'es' as string | null,
       createdAt: new Date('2026-01-01T09:00:00Z'),
       updatedAt: new Date('2026-01-01T09:00:00Z'),
       urgencyBoostUntil: null,
@@ -1398,15 +1399,29 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
   // that as the dispatch key to hand back the seeded person row; every other
   // .select() call site (vocabulary reads, urgency read, last-session-summary
   // read, fetchPriorTopics, fetchCrossSubjectHighlights) gets an empty result.
-  function makeDb(subjectRow: ReturnType<typeof buildSubjectRow>) {
+  function makeDb(
+    subjectRow: ReturnType<typeof buildSubjectRow>,
+    options?: {
+      sessionRow?: ReturnType<typeof buildSessionRow>;
+      events?: Array<{
+        eventType: string;
+        content: string;
+        metadata?: unknown;
+      }>;
+    },
+  ) {
     const subjectsFindFirst = jest.fn().mockResolvedValue(subjectRow);
     return {
       query: {
         learningSessions: {
-          findFirst: jest.fn().mockResolvedValue(buildSessionRow()),
+          findFirst: jest
+            .fn()
+            .mockResolvedValue(options?.sessionRow ?? buildSessionRow()),
         },
         subjects: { findFirst: subjectsFindFirst },
-        sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
+        sessionEvents: {
+          findMany: jest.fn().mockResolvedValue(options?.events ?? []),
+        },
         teachingPreferences: {
           findFirst: jest.fn().mockResolvedValue(undefined),
         },
@@ -1459,5 +1474,43 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
     expect(result.context.languageSessionState?.activeStrand).toBe(
       'meaning_input',
     );
+  });
+
+  it('restores recitation setup state and resolves the current turn in shared context preparation', async () => {
+    const db = makeDb(
+      { ...buildSubjectRow(null), pedagogyMode: null, languageCode: null },
+      {
+        sessionRow: buildSessionRow({
+          exchangeCount: 1,
+          metadata: { effectiveMode: 'recitation' },
+        }),
+        events: [
+          { eventType: 'user_message', content: 'unclear' },
+          {
+            eventType: 'ai_response',
+            content: 'clarification',
+            metadata: {
+              recitationSetup: {
+                phase: 'awaiting_selection',
+                clarificationCount: 1,
+              },
+            },
+          },
+        ],
+      },
+    );
+
+    const result = await prepareExchangeContext(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      'Ozymandias',
+      { semanticMemoryRetrievalEnabled: false },
+    );
+
+    expect(result.context.recitationSetup).toEqual({
+      action: 'invite_to_begin',
+      state: { phase: 'ready', clarificationCount: 1 },
+    });
   });
 });

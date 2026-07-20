@@ -41,6 +41,21 @@ export function recitationPolishAddedFact(response: string): boolean {
   return RECITATION_UNSUPPORTED_POLISH_RE.test(segment);
 }
 
+const RECITATION_READY_TO_BEGIN_RE =
+  /\bi(?:'m| am) ready\b.*\b(?:begin|start|go ahead)\b|\bgo ahead\b(?:.*\b(?:begin|start|recite)\b)?|\b(?:you can )?(?:begin|start|recite)(?: your)?(?: recitation)? (?:now|when|whenever)\b/i;
+const RECITATION_SETUP_REASK_RE =
+  /\b(?:what would you like to recite|what (?:are|will) you reciting|which (?:poem|recitation|selection)|tell(?:ing)? me (?:which |the )?(?:poem|recitation|selection|title|author)|giv(?:e|ing) me (?:the )?(?:title|author)|title,? author,? or (?:a )?(?:short )?description)\b/i;
+const RECITATION_PREMATURE_MODEL_RE =
+  /\b(?:you could say|to actually recite|polished version|final version|model answer)\b|\b(?:begin|start) with\s*:/i;
+
+export function recitationSetupReplyAdvances(response: string): boolean {
+  return (
+    RECITATION_READY_TO_BEGIN_RE.test(response) &&
+    !RECITATION_SETUP_REASK_RE.test(response) &&
+    !RECITATION_PREMATURE_MODEL_RE.test(response)
+  );
+}
+
 // Fail-statuses on the private source audit that indicate the reply was not
 // backed by a valid reliable-source trail.
 export const SOURCE_AUDIT_FAIL_STATUSES = new Set([

@@ -149,6 +149,15 @@ import { projectAiResponseContent } from '../llm/project-response';
 import { resolveSuitabilityJudgeDispatch } from '../policy-engine/judge-dispatch';
 import { isSubstantiveCalibrationAnswer } from './review-calibration';
 import {
+  recitationOpeningForLog,
+  readPersistedRecitationSetupState,
+  resolveRecitationSetupTransition,
+  sanitizeRecitationSourceAudit,
+  type RecitationSetupAction,
+  type RecitationSetupState,
+  type RecitationSetupTransition,
+} from './session-recitation-setup';
+import {
   recordPracticeActivityEvent,
   type RecordPracticeActivityEventInput,
 } from '../practice-activity-events';
@@ -325,6 +334,8 @@ export interface ExchangeBehavioralMetrics {
   llmModel?: string;
   /** True when streaming fell back from the initial provider before first byte. */
   llmFallbackUsed?: boolean;
+  /** Server-owned recitation setup phase persisted on the assistant event. */
+  recitationSetup?: RecitationSetupState;
   /**
    * Bug #348: EVALUATE assessment signal (snake_case wire shape) emitted by the
    * LLM in `envelope.signals.evaluate_assessment`. Persisted under
@@ -2140,6 +2151,231 @@ export function resolvePromptLearnerName(profile: {
   return profile.displayName ?? undefined;
 }
 
+interface RecitationSetupReplayClaim extends RecitationSetupState {
+  clientId: string;
+  action: RecitationSetupAction;
+}
+
+interface PersistedRecitationSetupClaim extends RecitationSetupState {
+  lastAction: RecitationSetupAction;
+  lastClientId?: string;
+  recentClaims: RecitationSetupReplayClaim[];
+}
+
+const MAX_RECITATION_SETUP_REPLAY_CLAIMS = MAX_EXCHANGES_PER_SESSION;
+
+function isRecitationSetupAction(
+  value: unknown,
+): value is RecitationSetupAction {
+  return (
+    value === 'clarify_selection' ||
+    value === 'invite_to_begin' ||
+    value === 'invite_after_cap' ||
+    value === 'invite_recitation' ||
+    value === 'clarify_edit' ||
+    value === 'handle_non_recitation' ||
+    value === 'coach_recitation' ||
+    value === 'leave_recitation'
+  );
+}
+
+function parsePersistedRecitationSetupClaim(
+  value: unknown,
+): PersistedRecitationSetupClaim | undefined {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  const candidate = value as Record<string, unknown>;
+  const phase = candidate['phase'];
+  const clarificationCount = candidate['clarificationCount'];
+  const lastAction = candidate['lastAction'];
+  if (
+    (phase !== 'awaiting_selection' && phase !== 'ready') ||
+    (clarificationCount !== 0 && clarificationCount !== 1) ||
+    !isRecitationSetupAction(lastAction)
+  ) {
+    return undefined;
+  }
+  const lastClientId = candidate['lastClientId'];
+  const recentClaims = Array.isArray(candidate['recentClaims'])
+    ? candidate['recentClaims']
+        .flatMap((value): RecitationSetupReplayClaim[] => {
+          if (
+            value == null ||
+            typeof value !== 'object' ||
+            Array.isArray(value)
+          ) {
+            return [];
+          }
+          const replay = value as Record<string, unknown>;
+          if (
+            typeof replay['clientId'] !== 'string' ||
+            replay['clientId'].length === 0 ||
+            !isRecitationSetupAction(replay['action']) ||
+            (replay['phase'] !== 'awaiting_selection' &&
+              replay['phase'] !== 'ready') ||
+            (replay['clarificationCount'] !== 0 &&
+              replay['clarificationCount'] !== 1)
+          ) {
+            return [];
+          }
+          return [
+            {
+              clientId: replay['clientId'],
+              action: replay['action'],
+              phase: replay['phase'],
+              clarificationCount: replay['clarificationCount'],
+            },
+          ];
+        })
+        .slice(-MAX_RECITATION_SETUP_REPLAY_CLAIMS)
+    : [];
+  return {
+    phase,
+    clarificationCount,
+    lastAction,
+    ...(typeof lastClientId === 'string' && lastClientId.length > 0
+      ? { lastClientId }
+      : {}),
+    recentClaims,
+  };
+}
+
+/**
+ * Atomically reserves the recitation setup transition before model dispatch.
+ *
+ * The existing session row is only a lock; private setup state lives on the
+ * guaranteed `session_start` audit event so it is excluded from session API
+ * responses and transcript/history projection. The transaction commits before
+ * any LLM work, avoiding a connection held across provider latency.
+ */
+export async function claimRecitationSetupTransition(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  message: string,
+  clientId?: string,
+): Promise<RecitationSetupTransition | undefined> {
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({
+        metadata: learningSessions.metadata,
+        exchangeCount: learningSessions.exchangeCount,
+      })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .for('update')
+      .limit(1);
+    if (!current) return undefined;
+
+    const sessionMetadata =
+      (current.metadata as Record<string, unknown> | null) ?? {};
+    if (sessionMetadata['effectiveMode'] !== 'recitation') return undefined;
+
+    const [startEvent] = await tx
+      .select({ id: sessionEvents.id, metadata: sessionEvents.metadata })
+      .from(sessionEvents)
+      .where(
+        and(
+          eq(sessionEvents.sessionId, sessionId),
+          eq(sessionEvents.profileId, profileId),
+          eq(sessionEvents.eventType, 'session_start'),
+        ),
+      )
+      .orderBy(sessionEvents.createdAt)
+      .limit(1);
+    if (!startEvent) {
+      logger.warn('[session-exchange] recitation setup anchor missing', {
+        sessionId,
+      });
+      return undefined;
+    }
+
+    const eventMetadata =
+      (startEvent.metadata as Record<string, unknown> | null) ?? {};
+    const persisted = parsePersistedRecitationSetupClaim(
+      eventMetadata['recitationSetup'],
+    );
+    const replayClaim = clientId
+      ? [...(persisted?.recentClaims ?? [])]
+          .reverse()
+          .find((claim) => claim.clientId === clientId)
+      : undefined;
+    if (replayClaim) {
+      return {
+        action: replayClaim.action,
+        state: {
+          phase: replayClaim.phase,
+          clarificationCount: replayClaim.clarificationCount,
+        },
+      };
+    }
+    if (clientId && persisted?.lastClientId === clientId) {
+      return {
+        action: persisted.lastAction,
+        state: {
+          phase: persisted.phase,
+          clarificationCount: persisted.clarificationCount,
+        },
+      };
+    }
+
+    const transition = resolveRecitationSetupTransition({
+      effectiveMode: 'recitation',
+      exchangeCount: current.exchangeCount,
+      message,
+      previousState: persisted
+        ? {
+            phase: persisted.phase,
+            clarificationCount: persisted.clarificationCount,
+          }
+        : undefined,
+    });
+    if (!transition) return undefined;
+
+    const recentClaims = clientId
+      ? [
+          ...(persisted?.recentClaims ?? []).filter(
+            (claim) => claim.clientId !== clientId,
+          ),
+          {
+            clientId,
+            action: transition.action,
+            ...transition.state,
+          },
+        ].slice(-MAX_RECITATION_SETUP_REPLAY_CLAIMS)
+      : (persisted?.recentClaims ?? []);
+
+    await tx
+      .update(sessionEvents)
+      .set({
+        metadata: {
+          ...eventMetadata,
+          recitationSetup: {
+            ...transition.state,
+            lastAction: transition.action,
+            ...(clientId ? { lastClientId: clientId } : {}),
+            recentClaims,
+          },
+        },
+      })
+      .where(
+        and(
+          eq(sessionEvents.id, startEvent.id),
+          eq(sessionEvents.sessionId, sessionId),
+          eq(sessionEvents.profileId, profileId),
+        ),
+      );
+
+    return transition;
+  });
+}
+
 export async function prepareExchangeContext(
   db: Database,
   profileId: string,
@@ -2162,6 +2398,7 @@ export async function prepareExchangeContext(
     mentorNoticeEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
     currentUserMessageEventId?: string;
+    clientId?: string;
   },
 ): Promise<ExchangePrep> {
   // 1. Load session
@@ -2173,6 +2410,16 @@ export async function prepareExchangeContext(
   const sessionMeta = ((session.metadata as
     | Record<string, unknown>
     | undefined) ?? {}) as Record<string, unknown>;
+  const claimedRecitationSetup =
+    sessionMeta['effectiveMode'] === 'recitation' && options?.clientId
+      ? await claimRecitationSetupTransition(
+          db,
+          profileId,
+          sessionId,
+          userMessage,
+          options.clientId,
+        )
+      : undefined;
   const isFreeform =
     session.sessionType === 'learning' &&
     !session.topicId &&
@@ -2490,6 +2737,14 @@ export async function prepareExchangeContext(
         : 'problem_first'
     : 'full'; // default for new topics
   const exchangeHistory = buildExchangeHistory(events);
+  const recitationSetup =
+    claimedRecitationSetup ??
+    resolveRecitationSetupTransition({
+      effectiveMode: sessionMeta['effectiveMode'] as string | undefined,
+      exchangeCount: session.exchangeCount,
+      message: userMessage,
+      previousState: readPersistedRecitationSetupState(events),
+    });
 
   const rawSilentClassification = sessionMeta['silentClassification'];
   const silentClassification =
@@ -3218,6 +3473,7 @@ export async function prepareExchangeContext(
     // Client-side effective mode — drives mode-specific prompt sections (e.g. recitation)
     effectiveMode: (session.metadata as Record<string, unknown> | null)
       ?.effectiveMode as string | undefined,
+    recitationSetup,
     // [WI-2220] Active app shell, passed from client per exchange
     shell: options?.shell,
     gapAreas: Array.isArray(sessionMetadata?.gaps)
@@ -3277,6 +3533,13 @@ export async function persistExchangeResult(
   userMessageEventId?: string;
 }> {
   const previousRung = session.escalationRung;
+  const persistenceEffectiveMode = (
+    session.metadata as Record<string, unknown> | null
+  )?.['effectiveMode'];
+  const persistedSourceAudit = sanitizeRecitationSourceAudit(
+    persistenceEffectiveMode,
+    behavioral?.sourceAudit,
+  );
 
   // Build ai_response metadata — always includes escalationRung,
   // enriched with behavioral metrics when available (UX-18)
@@ -3310,8 +3573,8 @@ export async function persistExchangeResult(
       ...(behavioral.envelopeParseFailureReason !== undefined && {
         envelopeParseFailureReason: behavioral.envelopeParseFailureReason,
       }),
-      ...(behavioral.sourceAudit !== undefined && {
-        sourceAudit: behavioral.sourceAudit,
+      ...(persistedSourceAudit !== undefined && {
+        sourceAudit: persistedSourceAudit,
       }),
       ...(behavioral.llmTier !== undefined && {
         llmTier: behavioral.llmTier,
@@ -3342,6 +3605,9 @@ export async function persistExchangeResult(
       }),
       ...(behavioral.llmFallbackUsed !== undefined && {
         llmFallbackUsed: behavioral.llmFallbackUsed,
+      }),
+      ...(behavioral.recitationSetup !== undefined && {
+        recitationSetup: behavioral.recitationSetup,
       }),
       ...(behavioral.challengeRound !== undefined && {
         challengeRound: behavioral.challengeRound,
@@ -3597,7 +3863,7 @@ export async function persistExchangeResult(
     logger.info('[session-exchange] tone check', {
       event: 'llm.tone_check',
       sessionId,
-      firstSixWords,
+      firstSixWords: recitationOpeningForLog(effectiveMode, firstSixWords),
       wordCount: words.length,
       startsWithFiller,
     });
@@ -3864,6 +4130,7 @@ export async function processMessage(
         context.languageSessionState?.previousComprehension,
       llmProvider: result.provider,
       llmModel: result.model,
+      recitationSetup: context.recitationSetup?.state,
       // Bug #348: forward EVALUATE / TEACH_BACK assessment signals onto
       // aiMetadata.signals so parseEvaluate/TeachBackAssessment can read them.
       evaluateAssessment: result.evaluateAssessment,
@@ -4416,6 +4683,7 @@ export async function streamMessage(
           llmProvider: result.provider,
           llmModel: result.model,
           llmFallbackUsed: result.fallbackUsed === true,
+          recitationSetup: context.recitationSetup?.state,
           // Bug #348: forward EVALUATE / TEACH_BACK assessment signals from
           // the parsed envelope onto aiMetadata.signals.
           evaluateAssessment: parsed.evaluateAssessment,

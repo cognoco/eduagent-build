@@ -10,6 +10,7 @@ import type { ChatMessage } from '../../src/services/llm/types';
 import { llmResponseEnvelopeSchema } from '@eduagent/schemas';
 import type { EvalProfile } from '../fixtures/profiles';
 import { runHarnessLlm } from '../runner/llm-client';
+import { parseFirstJsonObject } from '../runner/quality';
 import {
   HISTORY_S1_RUNG1,
   HISTORY_S2_RUNG2,
@@ -29,7 +30,12 @@ import {
   HISTORY_APP_HELP_NOTES,
   HISTORY_APP_HELP_PREFERENCES,
 } from '../fixtures/exchange-histories-app-help';
-import type { FlowDefinition, PromptMessages, Scenario } from '../runner/types';
+import type {
+  FlowDefinition,
+  PromptMessages,
+  QualityIssue,
+  Scenario,
+} from '../runner/types';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Main tutoring loop (exchanges.buildSystemPrompt)
@@ -521,7 +527,52 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     },
     appliesTo: () => true,
   },
+  {
+    id: 'S23-recitation-title-only-ready',
+    purpose:
+      'Title-only text recitation advances directly to a content-free invitation to begin',
+    history: [],
+    contextOverrides: {
+      rawInput: 'Ozymandias',
+      effectiveMode: 'recitation',
+      inputMode: 'text',
+      exchangeCount: 0,
+      recitationSetup: {
+        action: 'invite_to_begin',
+        state: { phase: 'ready', clarificationCount: 0 },
+      },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S24-recitation-voice-title-only-ready',
+    purpose:
+      'Title-only voice recitation uses the same ready transition without supplying content',
+    history: [],
+    contextOverrides: {
+      rawInput: 'Ozymandias',
+      effectiveMode: 'recitation',
+      inputMode: 'voice',
+      exchangeCount: 0,
+      recitationSetup: {
+        action: 'invite_to_begin',
+        state: { phase: 'ready', clarificationCount: 0 },
+      },
+    },
+    appliesTo: (profile) => profile.id === '12yo-dinosaurs',
+  },
 ];
+
+function recitationIssue(code: string, message: string): QualityIssue {
+  return { severity: 'error', code, message };
+}
+
+function isRecitationReadyScenario(input: ExchangeScenarioInput): boolean {
+  return (
+    input.scenarioId === 'S23-recitation-title-only-ready' ||
+    input.scenarioId === 'S24-recitation-voice-title-only-ready'
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Context synthesis — deterministic, derived from the profile.
@@ -736,6 +787,85 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
         `expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs`,
       ],
     };
+  },
+
+  evaluateDeterministic({ input, messages }): QualityIssue[] {
+    if (!isRecitationReadyScenario(input)) return [];
+    const issues: QualityIssue[] = [];
+    if (messages.user !== input.context.rawInput) {
+      issues.push(
+        recitationIssue(
+          'recitation-ready.user-input',
+          'Prompt did not preserve the title-only learner input.',
+        ),
+      );
+    }
+    for (const required of [
+      'SERVER-OWNED SETUP ACTION: INVITE TO BEGIN',
+      'Do NOT provide any of the recitation',
+    ]) {
+      if (!messages.system.includes(required)) {
+        issues.push(
+          recitationIssue(
+            'recitation-ready.prompt-contract',
+            `Prompt omitted required setup contract: ${required}`,
+          ),
+        );
+      }
+    }
+    if (
+      messages.system.includes(
+        '1. Ask what they would like to recite (title, author, or description).',
+      )
+    ) {
+      issues.push(
+        recitationIssue(
+          'recitation-ready.prompt-reask',
+          'Prompt retained the legacy selection question after accepting a title.',
+        ),
+      );
+    }
+    return issues;
+  },
+
+  evaluateQuality({ input, liveResponse }): QualityIssue[] {
+    if (!isRecitationReadyScenario(input)) return [];
+    const parsed = parseFirstJsonObject<{ reply?: unknown }>(liveResponse);
+    const reply = typeof parsed?.reply === 'string' ? parsed.reply : '';
+    const issues: QualityIssue[] = [];
+    if (!/\b(?:ready|begin|start|go ahead|recite)\b/i.test(reply)) {
+      issues.push(
+        recitationIssue(
+          'recitation-ready.no-invitation',
+          'Reply did not invite the learner to begin reciting.',
+        ),
+      );
+    }
+    if (
+      /\b(?:what|which).*(?:recite|recitation|poem)|\b(?:tell(?:ing)?|giv(?:e|ing)) me (?:which |the )?(?:poem|recitation|title|author)|\b(?:title|author)\b/i.test(
+        reply,
+      )
+    ) {
+      issues.push(
+        recitationIssue(
+          'recitation-ready.reasked-selection',
+          'Reply asked for the selection again after accepting the title.',
+        ),
+      );
+    }
+    if (
+      /\b(?:model answer|polished version|you could say|start with\s*:|begin with\s*:)/i.test(
+        reply,
+      )
+    ) {
+      issues.push(
+        recitationIssue(
+          'recitation-ready.premature-content',
+          'Reply supplied recitation content before the learner recited.',
+        ),
+      );
+    }
+    return issues;
   },
 
   // Uses messages.system as-is — production adds buildOrphanSystemAddendum but the harness omits it so the live run validates the same prompt the Tier-1 snapshot displays.

@@ -689,6 +689,145 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).not.toContain('NO-RECALL RECOVERY');
   });
 
+  it('advances an accepted recitation selection without asking for it again', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'invite_to_begin',
+          state: { phase: 'ready', clarificationCount: 0 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: INVITE TO BEGIN');
+    expect(prompt).toContain(
+      'Do not ask for the title, author, or description',
+    );
+    expect(prompt).toContain('Do NOT provide any of the recitation');
+    expect(prompt).not.toContain(
+      '1. Ask what they would like to recite (title, author, or description).',
+    );
+  });
+
+  it('asks exactly one focused recitation-selection clarification', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'clarify_selection',
+          state: { phase: 'awaiting_selection', clarificationCount: 1 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: CLARIFY SELECTION');
+    expect(prompt).toContain('Ask exactly one focused question');
+    expect(prompt).toContain('This is the only allowed setup clarification');
+  });
+
+  it('moves past setup when the clarification cap has been reached', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'invite_after_cap',
+          state: { phase: 'ready', clarificationCount: 1 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: CLARIFICATION CAP');
+    expect(prompt).toContain('Do not ask another setup question');
+    expect(prompt).toContain('invite them to begin whenever they are ready');
+  });
+
+  it('treats post-setup input as recitation feedback material', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'coach_recitation',
+          state: { phase: 'ready', clarificationCount: 0 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: COACH RECITATION');
+    expect(prompt).toContain('Setup is complete');
+    expect(prompt).toContain('do not restart the title/author question');
+  });
+
+  it('invites the learner to recite after a readiness acknowledgement without supplying content', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'invite_recitation',
+          state: { phase: 'ready', clarificationCount: 0 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: INVITE RECITATION');
+    expect(prompt).toContain(
+      'invite the learner to perform the actual recitation',
+    );
+    expect(prompt).toContain('Do not give feedback, a cue, a starting line');
+  });
+
+  it('asks for a replacement selection after a command-only edit', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'clarify_edit',
+          state: { phase: 'ready', clarificationCount: 0 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: CLARIFY EDIT');
+    expect(prompt).toContain('ask what selection they want instead');
+    expect(prompt).toContain('Do not supply recitation content');
+  });
+
+  it('defers a safety disclosure to the global safety rules without advancing setup', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'handle_non_recitation',
+          state: { phase: 'awaiting_selection', clarificationCount: 0 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain(
+      'SERVER-OWNED SETUP ACTION: HANDLE NON-RECITATION',
+    );
+    expect(prompt).toContain('SAFETY — NON-NEGOTIABLE RULES');
+    expect(prompt).toContain(
+      'Do not treat this message as a selection or recitation',
+    );
+  });
+
+  it('honours an explicit recitation leave without restarting setup', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'recitation',
+        recitationSetup: {
+          action: 'leave_recitation',
+          state: { phase: 'ready', clarificationCount: 1 },
+        },
+      }),
+    );
+
+    expect(prompt).toContain('SERVER-OWNED SETUP ACTION: LEAVE RECITATION');
+    expect(prompt).toContain('Do not ask another setup question');
+    expect(prompt).toContain('Do not provide recitation content');
+  });
+
   it('keeps text recitation feedback scoped to wording, not heard delivery', () => {
     const prompt = buildSystemPrompt(
       makeContext({ effectiveMode: 'recitation', inputMode: 'text' }),
@@ -1562,5 +1701,45 @@ describe('buildSystemPromptSegments — cache-friendly stable prefix (WI-1779)',
     // And the volatile suffixes genuinely differ (proves the varied content
     // landed in the suffix, not that both are empty).
     expect(turn2.volatileSuffix).not.toBe(turn1.volatileSuffix);
+  });
+
+  it('keeps turn-varying recitation setup actions in the volatile suffix', () => {
+    const stable = {
+      effectiveMode: 'recitation' as const,
+      inputMode: 'text' as const,
+    };
+    const clarify = buildSystemPromptSegments(
+      makeContext({
+        ...stable,
+        recitationSetup: {
+          action: 'clarify_selection',
+          state: { phase: 'awaiting_selection', clarificationCount: 1 },
+        },
+      }),
+    );
+    const invite = buildSystemPromptSegments(
+      makeContext({
+        ...stable,
+        recitationSetup: {
+          action: 'invite_to_begin',
+          state: { phase: 'ready', clarificationCount: 1 },
+        },
+      }),
+    );
+
+    expect(invite.stablePrefix).toBe(clarify.stablePrefix);
+    expect(clarify.stablePrefix).not.toContain(
+      'SERVER-OWNED SETUP ACTION: CLARIFY SELECTION',
+    );
+    expect(invite.stablePrefix).not.toContain(
+      'SERVER-OWNED SETUP ACTION: INVITE TO BEGIN',
+    );
+    expect(clarify.volatileSuffix).toContain(
+      'SERVER-OWNED SETUP ACTION: CLARIFY SELECTION',
+    );
+    expect(invite.volatileSuffix).toContain(
+      'SERVER-OWNED SETUP ACTION: INVITE TO BEGIN',
+    );
+    expect(invite.volatileSuffix).not.toBe(clarify.volatileSuffix);
   });
 });

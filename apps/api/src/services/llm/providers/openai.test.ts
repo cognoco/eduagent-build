@@ -349,9 +349,13 @@ describe('OpenAI Provider', () => {
     });
 
     it('skips malformed JSON chunks', async () => {
+      const sensitiveText = 'PRIVATE_RECITATION_SENTINEL';
+      const warnSpy = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => undefined);
       const body = createSseStream(
         'data: {"choices":[{"delta":{"content":"ok"}}]}',
-        'data: {not valid json}',
+        `data: {${sensitiveText}}`,
         'data: {"choices":[{"delta":{"content":"!"}}]}',
         'data: [DONE]',
       );
@@ -366,6 +370,9 @@ describe('OpenAI Provider', () => {
       }
 
       expect(chunks).toEqual(['ok', '!']);
+      expect(warnSpy).toHaveBeenCalled();
+      expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(sensitiveText);
+      warnSpy.mockRestore();
     });
 
     it('skips empty delta content', async () => {
