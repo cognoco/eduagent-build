@@ -13,6 +13,7 @@ import {
   type SupporterColdStart,
   type SupporterColdStartCard,
 } from '@eduagent/schemas';
+import { getPersonOrganizationId, isPersonInOrg } from './identity-v2/helpers';
 
 type EdgeRow = {
   edgeId: string;
@@ -107,9 +108,28 @@ export async function resolveSupporterColdStart(
     });
   }
 
+  // [WI-2226 owner-gate] A managed card's CTA (ManagedCard -> switchProfile)
+  // only works when the supportee is a profile on the SUPPORTER's own
+  // account — POST /profiles/switch (getPersonScope) rejects a cross-org
+  // person with 403. initiateLink performs no org check, so a
+  // hasOwnAccount=false candidate is not guaranteed to be same-org (PM
+  // ruling, bounce-recovery WI-2226: a CTA that no-ops/403s is a correctness
+  // defect). Resolve the supporter's own org once, only when a managed
+  // candidate exists, and suppress the card for any candidate outside it.
+  const hasManagedCandidate = edges.some((edge) => !edge.hasOwnAccount);
+  const supporterOrganizationId = hasManagedCandidate
+    ? await getPersonOrganizationId(db, supporterPersonId)
+    : null;
+
   const cards: SupporterColdStartCard[] = [];
   for (const edge of edges) {
     if (!edge.hasOwnAccount) {
+      if (
+        !supporterOrganizationId ||
+        !(await isPersonInOrg(db, edge.personId, supporterOrganizationId))
+      ) {
+        continue;
+      }
       cards.push({
         personId: edge.personId,
         edgeId: edge.edgeId,

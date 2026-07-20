@@ -5,6 +5,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import type {
   ScopeDescriptor,
   SharedRecord,
@@ -21,6 +22,7 @@ import {
   type RoutedMockFetch,
 } from '../../test-utils/mock-api-routes';
 import { ScopeContextProvider } from '../../lib/scope-context';
+import { ProfileContext, type ProfileContextValue } from '../../lib/profile';
 import { SupportHubMentorTab } from './SupportHubMentorTab';
 
 jest.mock(
@@ -124,7 +126,10 @@ const EMPTY_SHARED_RECORD: SharedRecord = {
   },
 };
 
-function renderWithProfile(ui: React.ReactElement): QueryClient {
+function renderWithProfile(
+  ui: React.ReactElement,
+  options: { switchProfileMock?: ProfileContextValue['switchProfile'] } = {},
+): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
@@ -138,17 +143,50 @@ function renderWithProfile(ui: React.ReactElement): QueryClient {
   // throws. `defaultScopeIndex: 0` -> `activeScope.kind === 'supporter-hub'`,
   // matching every test in this file (none exercise the person-scope branch).
   function Wrapper({ children }: { children: React.ReactNode }) {
+    // [WI-2226 owner-gate] A nested ProfileContext.Provider stacked on top of
+    // createScreenWrapper's own — the same {success:true} default behavior
+    // for every test that doesn't pass switchProfileMock, but a REAL
+    // stateful switch (activeProfile actually flips) when it does. The RGR
+    // mount test uses this to prove the CTA reachable from the real
+    // production tree performs a real switchProfile call, not merely that
+    // ManagedCard renders.
+    const [activeProfile, setActiveProfile] = useState(createTestProfile());
+    const switchProfile: ProfileContextValue['switchProfile'] = async (
+      profileId,
+      opts,
+    ) => {
+      const result = options.switchProfileMock
+        ? await options.switchProfileMock(profileId, opts)
+        : { success: true };
+      if (result.success) {
+        setActiveProfile(createTestProfile({ id: profileId }));
+      }
+      return result;
+    };
     return (
       <ProfileWrapper>
-        <ScopeContextProvider
-          initialScopeList={{
-            shape: 'supporter',
-            scopes: [{ kind: 'supporter-hub' }],
-            defaultScopeIndex: 0,
+        <ProfileContext.Provider
+          value={{
+            profiles: [activeProfile],
+            activeProfile,
+            isExplicitProxyMode: false,
+            switchProfile,
+            isLoading: false,
+            profileLoadError: null,
+            profileWasRemoved: false,
+            acknowledgeProfileRemoval: () => undefined,
           }}
         >
-          {children}
-        </ScopeContextProvider>
+          <ScopeContextProvider
+            initialScopeList={{
+              shape: 'supporter',
+              scopes: [{ kind: 'supporter-hub' }],
+              defaultScopeIndex: 0,
+            }}
+          >
+            {children}
+          </ScopeContextProvider>
+        </ProfileContext.Provider>
       </ProfileWrapper>
     );
   }
@@ -367,7 +405,7 @@ describe('SupportHubMentorTab', () => {
     // null either way (mounted-but-empty is indistinguishable from
     // not-mounted), so it cannot prove reachability. Red/green evidence:
     // apps/mobile/src/components/support/wi2226-rgr-evidence.md.
-    it('[WI-2226 RGR] renders the managed-family cold-start card from the mounted Support hub tree', async () => {
+    it('[WI-2226 RGR] renders the managed-family cold-start card from the mounted Support hub tree, and its CTA performs a real switch', async () => {
       const coldStart: SupporterColdStartData = {
         variant: 'per-child',
         cards: [
@@ -383,14 +421,31 @@ describe('SupportHubMentorTab', () => {
       };
       mockFetch.setRoute('/scopes/coldstart', coldStart);
 
+      // [WI-2226 bounce-recovery] switchProfileMock proves the CTA reachable
+      // from the real production tree calls switchProfile (not the old
+      // setActiveScope no-op) — the same real-effect assertion as
+      // SupporterColdStart.test.tsx, exercised one level higher, from the
+      // actual mount site.
+      const switchProfileSpy = jest.fn(async () => ({ success: true }));
       queryClient = renderWithProfile(
         <SupportHubMentorTab personScopes={[EMMA_SCOPE]} />,
+        { switchProfileMock: switchProfileSpy },
       );
 
       await waitFor(() => {
         screen.getByTestId(`supporter-cold-start-managed-${MANAGED_PERSON_ID}`);
       });
       screen.getByText('Liam');
+
+      fireEvent.press(
+        screen.getByTestId(`supporter-cold-start-handoff-${MANAGED_PERSON_ID}`),
+      );
+      await waitFor(() => {
+        expect(switchProfileSpy).toHaveBeenCalledWith(
+          MANAGED_PERSON_ID,
+          undefined,
+        );
+      });
     });
 
     it('shows the cold-start loading state before the query resolves', () => {
