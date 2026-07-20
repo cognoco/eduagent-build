@@ -322,6 +322,14 @@ jest.mock(
 // isOwner check, before this guard runs) — the caller-vs-X-Profile-Id-spoof
 // distinction this guard exists to enforce is covered by the real-DB break
 // test in tests/integration/wi1989-owner-idor.integration.test.ts.
+//
+// [WI-2416] Same rationale for verifyPersonOwnershipV2, called by
+// assertCanReadProfile (GET /consent/my-status) — the same raw membership
+// query is unrunnable here. Every /consent/my-status scenario in this file
+// is a caller-self read (X-Profile-Id === the authenticated caller's own
+// id); the cross-account read attack this guard exists to close is covered
+// by the real-DB break test in
+// tests/integration/wi2416-read-idor.integration.test.ts.
 jest.mock('../services/identity-v2/ownership-v2', () => {
   const actual = jest.requireActual(
     '../services/identity-v2/ownership-v2',
@@ -329,6 +337,7 @@ jest.mock('../services/identity-v2/ownership-v2', () => {
   return {
     ...actual,
     verifyPersonIsOrgAdminV2: jest.fn().mockResolvedValue(true),
+    verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -1140,8 +1149,15 @@ describe('consent routes', () => {
 
     it('[BUG-625 / A-10] does NOT leak full parent email to child profile session', async () => {
       // WI-867: seed real db — real getProfileConsentStateV2 runs.
+      // [WI-2416] X-Profile-Id must be the AUTHENTICATED caller's own id
+      // ('test-profile-id', per AUTH_HEADERS/TEST_JWT_CLAIMS) — a "child
+      // profile session" reading its OWN /my-status, not a spoofed
+      // cross-profile read (that spoof is exactly the read-side IDOR gap
+      // WI-2416 closes; it's covered by the real-DB break test in
+      // tests/integration/wi2416-read-idor.integration.test.ts, not this
+      // BUG-625/A-10 masking test).
       seedConsentState(mockDatabaseModule.db, {
-        personId: 'child-profile-id',
+        personId: 'test-profile-id',
         state: 'PCR',
         details: { guardianEmail: 'sensitive.parent.email@example.com' },
       });
@@ -1149,7 +1165,7 @@ describe('consent routes', () => {
       const res = await app.request(
         '/v1/consent/my-status',
         {
-          headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'child-profile-id' },
+          headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
         },
         TEST_ENV,
       );

@@ -28,6 +28,7 @@ const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
+  useFocusEffect: () => undefined,
 }));
 
 let mockNowFeed: {

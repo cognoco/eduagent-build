@@ -19,6 +19,7 @@ import { notFound } from '../errors';
 import {
   assertOwnerProfile,
   assertCallerIsAccountOwner,
+  assertCanReadProfile,
 } from '../services/family-access';
 import {
   getRecapForParent,
@@ -60,11 +61,12 @@ export const recapsRoutes = new Hono<RecapsRouteEnv>()
     return c.json(recapsResponseSchema.parse({ recaps }));
   })
   .get('/recaps/self', zValidator('query', recapsQuerySchema), async (c) => {
-    // Self-scoped: lists the caller's OWN recaps via their own profileId, so
-    // (unlike the parent-scoped /recaps and /recaps/:recapId routes, which read
-    // another profile's data and therefore call assertOwnerProfile) no owner
-    // guard is needed here — there is no other profile to authorize against.
+    // [WI-2416] Self-scoped: lists recaps for the header-resolved profileId.
+    // profileScopeMiddleware only checks org membership, not caller-self —
+    // assertCanReadProfile closes that gap (self OR guardian of an
+    // uncredentialed charge).
     const { db, profileId } = withProfile(c);
+    await assertCanReadProfile(c, profileId);
     const query = c.req.valid('query');
 
     const recaps = await listRecapsForProfile(db, profileId, {

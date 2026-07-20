@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import {
@@ -376,11 +376,26 @@ describe('Integration: now routes', () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      cards: Array<{ params: Record<string, unknown> }>;
+      cards: Array<{
+        kind: string;
+        templateKey: string;
+        params: Record<string, unknown>;
+      }>;
     };
     expect(body.cards).toHaveLength(1);
+    expect(body.cards[0]?.kind).toBe('ledger_moment');
+    expect(body.cards[0]?.templateKey).toBe(
+      'now.ledger_moment.milestone_reached',
+    );
     expect(body.cards[0]?.params.marker).toBe('profile-a-only');
+    expect(body.cards[0]?.params.ledgerKind).toBe('milestone_reached');
     expect(JSON.stringify(body)).not.toContain('profile-b-only');
+
+    const [surfacedMoment] = await db
+      .select({ surfacedAt: mentorActivityLedger.surfacedAt })
+      .from(mentorActivityLedger)
+      .where(eq(mentorActivityLedger.profileId, profileA));
+    expect(surfacedMoment?.surfacedAt).not.toBeNull();
   });
 
   it('ranks due retention cards ahead of ledger moments for the active profile', async () => {
@@ -422,11 +437,11 @@ describe('Integration: now routes', () => {
     expect(body.cards[1]?.params.marker).toBe('ranking-ledger');
   });
 
-  it('caps the visible now cards at three and reports the overflow count', async () => {
+  it('keeps a lower-ranked milestone reachable in self-scope overflow', async () => {
     const profileId = await seedProfile(db, 'overflow');
 
     await Promise.all(
-      Array.from({ length: 4 }, (_, index) =>
+      Array.from({ length: 3 }, (_, index) =>
         seedRetentionDue(
           db,
           profileId,
@@ -435,6 +450,17 @@ describe('Integration: now routes', () => {
         ),
       ),
     );
+    await db.insert(mentorActivityLedger).values({
+      profileId,
+      actorJob: 'test',
+      kind: 'milestone_reached',
+      params: {
+        marker: 'overflow-milestone',
+        milestoneId: 'milestone-overflow',
+        milestoneType: 'session_count',
+        threshold: 3,
+      },
+    });
 
     const res = await makeApp(db, profileId).request('/v1/now?scope=self');
 
@@ -448,6 +474,28 @@ describe('Integration: now routes', () => {
       true,
     );
     expect(body.overflowCount).toBe(1);
+
+    const overflowRes = await makeApp(db, profileId).request(
+      '/v1/now/overflow?scope=self',
+    );
+    expect(overflowRes.status).toBe(200);
+    const overflowBody = (await overflowRes.json()) as {
+      items: Array<{
+        kind: string;
+        templateKey: string;
+        params: Record<string, unknown>;
+      }>;
+    };
+    expect(overflowBody.items).toEqual([
+      expect.objectContaining({
+        kind: 'ledger_moment',
+        templateKey: 'now.ledger_moment.milestone_reached',
+        params: expect.objectContaining({
+          ledgerKind: 'milestone_reached',
+          marker: 'overflow-milestone',
+        }),
+      }),
+    ]);
   });
 
   it('surfaces unfinished, needs-deepening, and challenge-ready cards from DB state', async () => {
