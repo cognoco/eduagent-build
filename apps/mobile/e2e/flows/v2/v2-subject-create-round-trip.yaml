@@ -133,7 +133,22 @@ tags:
     timeout: 15000
 - extendedWaitUntil:
     visible:
-      text: 'Photosynthesis'
+      id: 'subjects-browse-row-.*'
+      containsDescendants:
+        - text: '^Photosynthesis$'
     timeout: 15000
 - assertVisible:
-    text: 'Photosynthesis'
+    id: 'subjects-browse-row-.*'
+    containsDescendants:
+      - text: '^Photosynthesis$'
+
+# Prove the same seeded learner remains active, then require the exact
+# Photosynthesis row owner again after returning to Subjects.
+- runFlow:
+    file: ../_setup/assert-v2-active-profile-and-return.yaml
+    env:
+      PROFILE_ID: ${PROFILE_ID}
+      PROFILE_NAME: 'Test Learner'
+      RETURN_SCREEN_ID: 'subjects-screen'
+      RETURN_ROW_ID: 'subjects-browse-row-.*'
+      RETURN_ROW_NAME: 'Photosynthesis'

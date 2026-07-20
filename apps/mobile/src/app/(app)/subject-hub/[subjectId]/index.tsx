@@ -82,8 +82,8 @@ export default function SubjectHubRoute(): React.ReactElement {
   // the sheet on the 'active' fallback would show the wrong action set for a
   // deep-linked paused/archived subject (pause+archive instead of resume/restore).
   const manageReady = canManage && !!subjectsQuery.data;
-  const showHubBack = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
-  const showHubHeader = showHubBack || manageReady;
+  const isV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+  const showHubHeader = isV2 || manageReady;
   const updateSubject = useUpdateSubject();
 
   const handleChangeStatus = useCallback(
@@ -111,15 +111,13 @@ export default function SubjectHubRoute(): React.ReactElement {
     // The Subjects tab moves to /(app)/subjects under the V2 shell; fall back to
     // the legacy Library tab only when V2 nav is off, so a back-stack-exhausted
     // user lands on the tab they actually came from.
-    const fallback = (
-      FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/subjects' : '/(app)/library'
-    ) as Href;
+    const fallback = (isV2 ? '/(app)/subjects' : '/(app)/library') as Href;
     // Subject-hub entries are cross-stack pushes from tab surfaces. On native,
     // canGoBack() can still be true for a one-deep synthesized stack, and
     // router.back() then falls through to the Tabs first route (Home). This
     // exit is intentionally contextual, so replace to the owning tab directly.
     router.replace(fallback);
-  }, [router]);
+  }, [isV2, router]);
 
   const goPickBook = useCallback(() => {
     router.push({
@@ -151,30 +149,28 @@ export default function SubjectHubRoute(): React.ReactElement {
 
   const handleReviewTopic = useCallback(
     (topicId: string, bookId?: string | null) => {
-      const usesSubjectHubReturn = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
       router.push({
         pathname: '/(app)/topic/[topicId]',
         params: {
           subjectId,
           topicId,
-          ...(usesSubjectHubReturn && bookId ? { bookId } : {}),
-          ...(usesSubjectHubReturn ? { returnTo: SUBJECT_HUB_RETURN_TO } : {}),
+          ...(isV2 && bookId ? { bookId } : {}),
+          ...(isV2 ? { returnTo: SUBJECT_HUB_RETURN_TO } : {}),
         },
       } as Href);
     },
-    [router, subjectId],
+    [isV2, router, subjectId],
   );
 
   const handleNextUp = useCallback(
     (nextUp: HubNextUp) => {
       if (!nextUp.topicId) return;
       if (nextUp.kind === 'resume' && hub.data?.nextUp.resumeTarget) {
-        const usesSubjectsReturn = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
         pushLearningResumeTarget(
           router,
           hub.data.nextUp.resumeTarget,
-          usesSubjectsReturn ? SUBJECTS_RETURN_TO : undefined,
-          { replaceTarget: usesSubjectsReturn },
+          isV2 ? SUBJECTS_RETURN_TO : undefined,
+          { replaceTarget: isV2 },
         );
         return;
       }
@@ -185,7 +181,7 @@ export default function SubjectHubRoute(): React.ReactElement {
 
       openTopic(nextUp.topicId, nextUp.bookId);
     },
-    [handleReviewTopic, hub.data?.nextUp.resumeTarget, openTopic, router],
+    [handleReviewTopic, hub.data?.nextUp.resumeTarget, isV2, openTopic, router],
   );
 
   // HIGH-3: surface a platform alert when the retry mutation fails so the
@@ -309,11 +305,11 @@ export default function SubjectHubRoute(): React.ReactElement {
             <View
               className="flex-row items-center px-5 pt-3"
               style={{
-                justifyContent: showHubBack ? 'space-between' : 'flex-end',
+                justifyContent: isV2 ? 'space-between' : 'flex-end',
               }}
               testID="subject-hub-header"
             >
-              {showHubBack ? (
+              {isV2 ? (
                 <Pressable
                   testID="subject-hub-back"
                   accessibilityRole="button"

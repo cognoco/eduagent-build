@@ -1338,6 +1338,221 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       { assertNotVisible: { id: 'subjects-browse-row-.*' } },
     ]);
 
+    const exactPhotosynthesisRow: Selector = {
+      assertVisible: {
+        id: 'subjects-browse-row-.*',
+        containsDescendants: [{ text: '^Photosynthesis$' }],
+      },
+    };
+    const exactCreatedSubjectReturn: Selector[] = [
+      {
+        extendedWaitUntil: {
+          visible: {
+            id: 'subjects-browse-row-.*',
+            containsDescendants: [{ text: '^Photosynthesis$' }],
+          },
+          timeout: 15000,
+        },
+      },
+      exactPhotosynthesisRow,
+      {
+        runFlow: {
+          file: '../_setup/assert-v2-active-profile-and-return.yaml',
+          env: {
+            PROFILE_ID: '${PROFILE_ID}',
+            PROFILE_NAME: 'Test Learner',
+            RETURN_SCREEN_ID: 'subjects-screen',
+            RETURN_ROW_ID: 'subjects-browse-row-.*',
+            RETURN_ROW_NAME: 'Photosynthesis',
+          },
+        },
+      },
+    ];
+    const exactActiveProfileReturn: Selector[] = [
+      {
+        assertVisible: {
+          id: 'profile-row-${PROFILE_ID}',
+          containsDescendants: [
+            { text: '^${PROFILE_NAME}$' },
+            { id: 'profile-active-check' },
+          ],
+        },
+      },
+      { tapOn: { id: 'profiles-close' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'account-admin-sheet' },
+          timeout: 10000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'account-admin-sheet',
+          containsDescendants: [{ text: '^${PROFILE_NAME}$' }],
+        },
+      },
+      { tapOn: { id: 'account-back' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: '${RETURN_SCREEN_ID}' },
+          timeout: 15000,
+        },
+      },
+      { assertVisible: { id: '${RETURN_SCREEN_ID}' } },
+      {
+        assertVisible: {
+          id: '${RETURN_ROW_ID}',
+          containsDescendants: [{ text: '^${RETURN_ROW_NAME}$' }],
+        },
+      },
+    ];
+    const hasExactCreatedSubjectIdentityReturn = (
+      subjectCommands: unknown,
+      identityCommands: unknown,
+    ): boolean =>
+      hasExactCommandSequence(subjectCommands, exactCreatedSubjectReturn) &&
+      hasExactCommandSequence(identityCommands, exactActiveProfileReturn);
+    expect(
+      hasExactCreatedSubjectIdentityReturn(subjectCreate, profileIdentity),
+    ).toBe(true);
+
+    const replaceCreatedReturn = (
+      index: number,
+      replacement: Selector[],
+    ): Selector[] => [
+      ...exactCreatedSubjectReturn.slice(0, index),
+      ...replacement,
+      ...exactCreatedSubjectReturn.slice(index + 1),
+    ];
+    for (const mutation of [
+      // Global text can be rendered outside the created Subject row.
+      replaceCreatedReturn(1, [
+        { assertVisible: { text: '^Photosynthesis$' } },
+      ]),
+      // Split sibling assertions do not prove the name belongs to the row.
+      replaceCreatedReturn(1, [
+        { assertVisible: { id: 'subjects-browse-row-.*' } },
+        { assertVisible: { text: '^Photosynthesis$' } },
+      ]),
+      // Optional row evidence does not establish the guaranteed property.
+      replaceCreatedReturn(1, [
+        {
+          assertVisible: {
+            id: 'subjects-browse-row-.*',
+            containsDescendants: [{ text: '^Photosynthesis$' }],
+            optional: true,
+          },
+        },
+      ]),
+      // The correct owner with an adjacent name proves the wrong case.
+      replaceCreatedReturn(1, [
+        {
+          assertVisible: {
+            id: 'subjects-browse-row-.*',
+            containsDescendants: [{ text: '^Biology$' }],
+          },
+        },
+      ]),
+      // The active seeded learner must be verified after the return.
+      exactCreatedSubjectReturn.slice(0, -1),
+    ]) {
+      expect(
+        hasExactCreatedSubjectIdentityReturn(mutation, profileIdentity),
+      ).toBe(false);
+    }
+
+    const replaceActiveProfileReturn = (
+      index: number,
+      replacement: Selector[],
+    ): Selector[] => [
+      ...exactActiveProfileReturn.slice(0, index),
+      ...replacement,
+      ...exactActiveProfileReturn.slice(index + 1),
+    ];
+    for (const mutation of [
+      // Removing the active-profile property leaves the named learner unproved.
+      exactActiveProfileReturn.slice(1),
+      // Optional identity evidence does not establish the guaranteed property.
+      replaceActiveProfileReturn(0, [
+        {
+          assertVisible: {
+            id: 'profile-row-${PROFILE_ID}',
+            containsDescendants: [
+              { text: '^${PROFILE_NAME}$' },
+              { id: 'profile-active-check' },
+            ],
+            optional: true,
+          },
+        },
+      ]),
+      // An adjacent profile row cannot own the active Test Learner evidence.
+      replaceActiveProfileReturn(0, [
+        {
+          assertVisible: {
+            id: 'profile-row-adjacent',
+            containsDescendants: [
+              { text: '^${PROFILE_NAME}$' },
+              { id: 'profile-active-check' },
+            ],
+          },
+        },
+      ]),
+      // The correct profile row with an adjacent name proves the wrong case.
+      replaceActiveProfileReturn(0, [
+        {
+          assertVisible: {
+            id: 'profile-row-${PROFILE_ID}',
+            containsDescendants: [
+              { text: '^Adjacent Learner$' },
+              { id: 'profile-active-check' },
+            ],
+          },
+        },
+      ]),
+      // Identity must be established before the return navigation begins.
+      exactActiveProfileReturn
+        .with(0, exactActiveProfileReturn[1]!)
+        .with(1, exactActiveProfileReturn[0]!),
+      // Removing the returned row loses the post-return Photosynthesis proof.
+      exactActiveProfileReturn.slice(0, -1),
+      // Optional returned-row evidence does not establish the property.
+      replaceActiveProfileReturn(7, [
+        {
+          assertVisible: {
+            id: '${RETURN_ROW_ID}',
+            containsDescendants: [{ text: '^${RETURN_ROW_NAME}$' }],
+            optional: true,
+          },
+        },
+      ]),
+      // The returned name must belong to the same row owner from the caller.
+      replaceActiveProfileReturn(7, [
+        {
+          assertVisible: {
+            id: 'subjects-browse-row-adjacent',
+            containsDescendants: [{ text: '^${RETURN_ROW_NAME}$' }],
+          },
+        },
+      ]),
+      // The returned row must own the exact Photosynthesis case name.
+      replaceActiveProfileReturn(7, [
+        {
+          assertVisible: {
+            id: '${RETURN_ROW_ID}',
+            containsDescendants: [{ text: '^Adjacent Science$' }],
+          },
+        },
+      ]),
+      // The owned row proof must follow restoration of its return screen.
+      exactActiveProfileReturn
+        .with(6, exactActiveProfileReturn[7]!)
+        .with(7, exactActiveProfileReturn[6]!),
+    ]) {
+      expect(
+        hasExactCreatedSubjectIdentityReturn(subjectCreate, mutation),
+      ).toBe(false);
+    }
+
     const expectedBindings: Array<[unknown, string, Selector[]]> = [
       [
         resume,

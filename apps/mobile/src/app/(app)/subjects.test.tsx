@@ -1,6 +1,12 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 
 import { ProfileContext, type Profile } from '../../lib/profile';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { createTestProfile } from '../../test-utils/app-hook-test-utils';
 import type { SubjectIndexItem } from '../../hooks/use-subjects-index';
 
@@ -37,7 +43,14 @@ jest.mock('expo-router', () => ({
 jest.mock(
   '../../hooks/use-subjects-index' /* gc1-allow: route screen test pins hook state; hook behavior is covered in use-subjects-index.test.tsx */,
   () => ({
-    useSubjectsIndex: () => mockSubjectsIndex,
+    useSubjectsIndex: (options?: { includeInactive?: boolean }) => ({
+      ...mockSubjectsIndex,
+      subjects: options?.includeInactive
+        ? mockSubjectsIndex.subjects
+        : mockSubjectsIndex.subjects.filter(
+            (subject) => subject.status === 'active',
+          ),
+    }),
   }),
 );
 
@@ -169,6 +182,18 @@ const SUBJECTS: SubjectIndexItem[] = [
   },
 ];
 
+const PAUSED_SUBJECT: SubjectIndexItem = {
+  subjectId: '550e8400-e29b-41d4-a716-446655440001',
+  subjectName: 'Paused Physics',
+  status: 'paused',
+  urgencyBoostUntil: null,
+  mastered: 1,
+  learning: 0,
+  total: 4,
+  dueReviews: 0,
+  books: [],
+};
+
 describe('SubjectsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -191,6 +216,55 @@ describe('SubjectsScreen', () => {
       ],
       setActiveScope: jest.fn(),
     };
+  });
+
+  it('renders the exact active row and omits the paused row while V2 is off', () => {
+    const originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      false;
+    mockSubjectsIndex = {
+      ...mockSubjectsIndex,
+      subjects: [...SUBJECTS, PAUSED_SUBJECT],
+    };
+
+    try {
+      render(<SubjectsScreen />);
+
+      within(
+        screen.getByTestId(`subjects-browse-row-${SUBJECTS[0]!.subjectId}`),
+      ).getByText(/^Spanish$/);
+      expect(
+        screen.queryByTestId(`subjects-browse-row-${PAUSED_SUBJECT.subjectId}`),
+      ).toBeNull();
+      expect(screen.queryByText(/^Paused Physics$/)).toBeNull();
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    }
+  });
+
+  it('renders the exact paused row and preserves the active row while V2 is on', () => {
+    const originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
+    mockSubjectsIndex = {
+      ...mockSubjectsIndex,
+      subjects: [...SUBJECTS, PAUSED_SUBJECT],
+    };
+
+    try {
+      render(<SubjectsScreen />);
+
+      within(
+        screen.getByTestId(`subjects-browse-row-${SUBJECTS[0]!.subjectId}`),
+      ).getByText(/^Spanish$/);
+      within(
+        screen.getByTestId(`subjects-browse-row-${PAUSED_SUBJECT.subjectId}`),
+      ).getByText(/^Paused Physics$/);
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    }
   });
 
   it('routes a row to its exact hub without pushing the current Subjects tab again', () => {
