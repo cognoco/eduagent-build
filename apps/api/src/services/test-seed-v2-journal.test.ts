@@ -5,6 +5,7 @@ import {
   learningProfiles,
   learningSessions,
   monthlyReports,
+  person,
   practiceActivityEvents,
   sessionSummaries,
   supportership,
@@ -40,7 +41,7 @@ function requiredId(ids: Record<string, string>, key: string): string {
 }
 
 describe('v2-journal-paper-trail seed', () => {
-  it('returns learner-owned identities for every Journal paper-trail artifact', async () => {
+  it('persists a solo adult owner and every Journal paper-trail artifact', async () => {
     const { db, inserts } = createRecordingDb();
 
     const result = await seedScenario(
@@ -66,6 +67,17 @@ describe('v2-journal-paper-trail seed', () => {
     expect(result.scenario).toBe('v2-journal-paper-trail');
     expect(result.ids.learnerProfileId).toBe(result.profileId);
     expect(result.ids.recapId).toBe(sessionId);
+    const journalLearner = insertedRow(inserts, person, result.profileId);
+    expect(journalLearner).toEqual(
+      expect.objectContaining({
+        id: result.profileId,
+        birthDate: '1985-01-01',
+      }),
+    );
+    expect(
+      new Date().getUTCFullYear() -
+        Number(String(journalLearner.birthDate).slice(0, 4)),
+    ).toBeGreaterThanOrEqual(18);
     expect(
       inserts
         .filter((record) => record.table === consentGrant)

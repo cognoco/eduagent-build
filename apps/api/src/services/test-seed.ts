@@ -5065,7 +5065,7 @@ async function seedV2JournalPaperTrail(
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
   const profileId = await createBaseProfile(db, accountId, {
     displayName: 'Journal Learner',
-    birthYear: LEARNER_BIRTH_YEAR,
+    birthYear: 1985,
     isOwner: true,
     email,
     clerkUserId,
