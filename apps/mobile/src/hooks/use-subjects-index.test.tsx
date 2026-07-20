@@ -201,9 +201,9 @@ describe('useSubjectsIndex', () => {
       }
       return subjectsRequest;
     } finally {
+      fetchSpy.mockRestore();
       harness.queryClient.clear();
       setActiveProfileId(undefined);
-      fetchSpy.mockRestore();
     }
   }
 
