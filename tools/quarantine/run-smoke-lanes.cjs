@@ -36,6 +36,24 @@ const DECLARED_CORE_PROJECTS = Object.freeze([
 
 const WI_RE = /^WI-\d+$/;
 
+// Date.parse silently NORMALIZES an impossible calendar date instead of
+// rejecting it — e.g. 2026-02-30T00:00:00.000Z parses to
+// 2026-03-02T00:00:00.000Z — so a malformed "expires" could otherwise
+// silently EXTEND a mute past its declared calendar expiry. This re-derives
+// the UTC year/month/day Date.parse actually landed on and compares it
+// against the Y-M-D the string literally asked for; a mismatch means the
+// input's calendar date was impossible and must be rejected outright.
+function isValidExpiresTimestamp(value) {
+  if (typeof value !== 'string') return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) return false;
+  const parsedMs = Date.parse(value);
+  if (Number.isNaN(parsedMs)) return false;
+  const parsed = new Date(parsedMs);
+  const roundTrip = `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, '0')}-${String(parsed.getUTCDate()).padStart(2, '0')}`;
+  return roundTrip === `${match[1]}-${match[2]}-${match[3]}`;
+}
+
 // registryPath defaults to REGISTRY_PATH but is injectable so tests can point
 // this at a temp fixture instead of mutating the real committed registry.
 function loadRegistry(registryPath = REGISTRY_PATH) {
@@ -76,8 +94,8 @@ function loadRegistry(registryPath = REGISTRY_PATH) {
 // "silently stay advisory".
 function isActive(entry, now) {
   if (!entry || typeof entry.expires !== 'string') return false;
+  if (!isValidExpiresTimestamp(entry.expires)) return false;
   const expiresAt = Date.parse(entry.expires);
-  if (Number.isNaN(expiresAt)) return false;
   return expiresAt > now.getTime();
 }
 
@@ -137,7 +155,7 @@ function validate(entries) {
     if (!e.reason) {
       problems.push(`${where}: missing "reason"`);
     }
-    if (typeof e.expires !== 'string' || Number.isNaN(Date.parse(e.expires))) {
+    if (typeof e.expires !== 'string' || !isValidExpiresTimestamp(e.expires)) {
       problems.push(
         `${where}: missing/invalid "expires" (expected an ISO 8601 date, got ${JSON.stringify(e.expires)})`,
       );

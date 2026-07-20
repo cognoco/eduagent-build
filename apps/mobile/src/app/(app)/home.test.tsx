@@ -36,12 +36,16 @@ jest.mock(
     require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
-let mockOnAllComplete: (() => void) | null = null;
+let mockOnAllComplete: ((profileId: string | null) => void) | null = null;
 
 jest.mock(
   '../../hooks/use-celebration' /* gc1-allow: avoids native celebration animation timers and async side effects in render tests */,
   () => ({
-    useCelebration: ({ onAllComplete }: { onAllComplete: () => void }) => {
+    useCelebration: ({
+      onAllComplete,
+    }: {
+      onAllComplete: (profileId: string | null) => void;
+    }) => {
       mockOnAllComplete = onAllComplete;
       return { CelebrationOverlay: null };
     },
@@ -431,7 +435,7 @@ describe('HomeScreen WI-270: proxy mode — markCelebrationsSeen is suppressed',
 
     expect(mockOnAllComplete).not.toBeNull();
     await act(async () => {
-      mockOnAllComplete?.();
+      mockOnAllComplete?.('p1');
     });
 
     expect(mockFetch).not.toHaveBeenCalledWith(
@@ -588,6 +592,29 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
     mockNavigationIsParentProxy = false;
   });
 
+  it('does not acknowledge a completed generation owned by another profile', async () => {
+    const owner = createTestProfile({
+      id: 'p1',
+      displayName: 'Alex',
+      isOwner: true,
+    });
+    const { wrapper } = createScreenWrapper({
+      activeProfile: owner,
+      profiles: [owner],
+    });
+
+    render(<HomeScreen />, { wrapper });
+    expect(mockOnAllComplete).not.toBeNull();
+    await act(async () => {
+      mockOnAllComplete?.('p2');
+    });
+
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/celebrations/seen'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
   it('logs error when markCelebrationsSeen.mutateAsync rejects — no unhandled rejection [SF-1]', async () => {
     let queryClient:
       | ReturnType<typeof createScreenWrapper>['queryClient']
@@ -632,7 +659,7 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
       expect(mockOnAllComplete).not.toBeNull();
       await act(async () => {
         debugHomeTest('onAllComplete start');
-        mockOnAllComplete?.();
+        mockOnAllComplete?.('p1');
         debugHomeTest('onAllComplete returned');
       });
 

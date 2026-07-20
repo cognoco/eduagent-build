@@ -408,6 +408,62 @@ function evaluateSourceGroundingProbe(
     }
   }
 
+  // WI-2100: ask which source the learner means instead of assuming a book.
+  // Reproduces staging session 019f675d-64a9-7d87-ae22-01f5a97a77e7.
+  const ASKS_WHICH_SOURCE =
+    /\b(which|what)\b[^.?!]{0,40}\b(book|poem|poems|story|text|title|author|poet)\b[^.?!]*\?/i;
+
+  if (input.probeId === 'SGA07') {
+    if (!ASKS_WHICH_SOURCE.test(lowerReply) || !lowerReply.includes('?')) {
+      issues.push(
+        qualityError(
+          'SGA07.no-clarifying-question',
+          'No title/author was given for "her book" — reply should ask which book before analyzing it.',
+        ),
+      );
+    }
+    if (containsAny(lowerReply, [/\bbell jar\b/i])) {
+      issues.push(
+        qualityError(
+          'SGA07.assumed-title',
+          'Reply appears to have assumed a specific book title (the exact staging hallucination) instead of asking.',
+        ),
+      );
+    }
+  }
+
+  if (input.probeId === 'SGA08') {
+    if (!ASKS_WHICH_SOURCE.test(lowerReply) || !lowerReply.includes('?')) {
+      issues.push(
+        qualityError(
+          'SGA08.no-clarifying-question',
+          'No poet/title was given for "his poems" — reply should ask which poems/poet before analyzing imagery.',
+        ),
+      );
+    }
+    if (
+      containsAny(lowerReply, [/\brobert frost\b/i, /\bthe road not taken\b/i])
+    ) {
+      issues.push(
+        qualityError(
+          'SGA08.assumed-title',
+          'Reply appears to have assumed a specific poet/poem instead of asking which one.',
+        ),
+      );
+    }
+  }
+
+  if (input.probeId === 'SGA09') {
+    if (ASKS_WHICH_SOURCE.test(lowerReply) && lowerReply.includes('?')) {
+      issues.push(
+        qualityError(
+          'SGA09.over-triggered-clarify',
+          'The book was already named ("The Great Gatsby by F. Scott Fitzgerald") — reply should not ask which book.',
+        ),
+      );
+    }
+  }
+
   return issues;
 }
 

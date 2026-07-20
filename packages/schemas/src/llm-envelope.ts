@@ -335,6 +335,8 @@ export const noticedGapSignalSchema = z.object({
   correctionHint: z.string().min(1).max(500).optional(),
   answerEventId: z.string().uuid(),
   learnerQuote: z.string().min(1).max(500),
+  /** Required by the server for interleaved retrieval; omitted elsewhere. */
+  topicId: z.string().uuid().optional(),
 });
 export type NoticedGapSignal = z.infer<typeof noticedGapSignalSchema>;
 
@@ -404,7 +406,7 @@ const signalsSchema = z.preprocess(
         .array(challengeRoundEvaluationItemSchema)
         .max(10)
         .optional(),
-      /** Homework felt moment: proposed learner-safe notice, accepted only after DB-backed evidence checks. */
+      /** Personal-mentor felt moment: proposed learner-safe notice, accepted only after DB-backed evidence checks. */
       noticed_gap: z.preprocess(
         normalizeNoticedGapDecision,
         noticedGapSignalSchema.nullable().optional(),
@@ -569,7 +571,7 @@ export interface NormalisedEnvelopeSignals {
   challenge_round_offer: boolean;
   /** Challenge Round: per-concept evaluations. Empty array when not in a round. */
   challenge_round_evaluation: ChallengeRoundEvaluationItem[];
-  /** Homework felt moment proposal. Null when absent. */
+  /** Personal-mentor felt moment proposal. Null when absent. */
   noticed_gap: NoticedGapSignal | null;
   /** Mentor notice re-check verdict. Null when absent. */
   notice_recheck: NoticeRecheckSignal | null;

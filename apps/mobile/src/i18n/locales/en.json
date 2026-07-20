@@ -1,4 +1,58 @@
 {
+  "celebrationEarnedContext": {
+    "polar_star": {
+      "child": "Polar Star - first independent answer",
+      "adult": "Polar Star - first independent answer."
+    },
+    "twin_stars": {
+      "child": "Twin Stars - three strong answers in a row",
+      "adult": "Twin Stars - three strong answers in a row."
+    },
+    "comet": {
+      "child": "Comet - you had a breakthrough!",
+      "adult": "Comet - a concept clicked."
+    },
+    "orions_belt": {
+      "child": "Orion's Belt - 5 in a row without help!",
+      "adult": "Orion's Belt - five independent answers in a row."
+    },
+    "deep_diver": {
+      "child": "Deep Diver - great thoughtful responses!",
+      "adult": "Deep Diver - thoughtful responses earned this milestone."
+    },
+    "persistent": {
+      "child": "Persistent - you kept going after a correction!",
+      "adult": "Persistent - kept going after a correction."
+    },
+    "topic_mastered": {
+      "child": "Comet - you mastered this topic!",
+      "adult": "Comet - topic mastered."
+    },
+    "evaluate_success": {
+      "child": "Twin Stars - you spotted the flaw!",
+      "adult": "Twin Stars - accurately evaluated the answer."
+    },
+    "teach_back_success": {
+      "child": "Twin Stars - you taught it clearly!",
+      "adult": "Twin Stars - clear teach-back completed."
+    },
+    "streak_7": {
+      "child": "Comet - a 7-day learning streak!",
+      "adult": "Comet - seven-day learning streak."
+    },
+    "streak_30": {
+      "child": "Orion's Belt - a 30-day learning streak!",
+      "adult": "Orion's Belt - thirty-day learning streak."
+    },
+    "curriculum_complete": {
+      "child": "Comet - you completed the curriculum!",
+      "adult": "Comet - curriculum completed."
+    },
+    "default": {
+      "child": "Milestone earned - nice work!",
+      "adult": "Milestone earned."
+    }
+  },
   "time": {
     "relative": {
       "today": "Today",
