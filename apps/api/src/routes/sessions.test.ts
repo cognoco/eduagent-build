@@ -421,6 +421,14 @@ jest.mock('../services/session', () => {
       filedAt: null,
       filingStatus: null,
       filingRetryCount: 0,
+      metadata: {
+        effectiveMode: 'recitation',
+        __serverRecitationSetupClaim: {
+          phase: 'ready',
+          clarificationCount: 1,
+          lastClientId: 'private-replay-key',
+        },
+      },
     }),
     processMessage: jest.fn().mockResolvedValue({
       response: 'Mock AI tutor response',
@@ -492,7 +500,13 @@ jest.mock('../services/session', () => {
         id: sessionId,
         subjectId: SUBJECT_ID,
         topicId: null,
+        topicTitle: null,
+        subjectName: null,
+        bookId: null,
+        bookTitle: null,
         sessionType: 'learning',
+        inputMode: input.inputMode,
+        verificationType: null,
         status: 'active',
         escalationRung: 1,
         exchangeCount: 2,
@@ -500,7 +514,10 @@ jest.mock('../services/session', () => {
         lastActivityAt: new Date().toISOString(),
         endedAt: null,
         durationSeconds: null,
-        inputMode: input.inputMode,
+        wallClockSeconds: null,
+        filedAt: null,
+        filingStatus: null,
+        filingRetryCount: 0,
       })),
     flagContent: jest.fn().mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
@@ -909,6 +926,7 @@ describe('session routes', () => {
 
       const body = await res.json();
       expect(body).toHaveProperty('session');
+      expect(body.session.metadata).toEqual({ effectiveMode: 'recitation' });
     });
 
     it('returns 401 without auth header', async () => {
@@ -3549,6 +3567,10 @@ describe('session routes', () => {
       id: SESSION_ID,
       subjectId: SUBJECT_ID,
       topicId: null,
+      topicTitle: null,
+      subjectName: null,
+      bookId: null,
+      bookTitle: null,
       sessionType: overrides.sessionType ?? 'learning',
       inputMode: 'text',
       verificationType: null,

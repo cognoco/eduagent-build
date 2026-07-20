@@ -252,10 +252,9 @@ export function parseEnvelope(
     logger.warn('llm.envelope.parse_failed', {
       surface,
       reason: result.reason,
-      // 200-char snippet keeps log volume bounded while still giving a triage
-      // hand-hold; full raw response is in `result.raw` for callers that need
-      // it but is too noisy to ship to log aggregation by default.
-      rawSnippet: response.slice(0, 200),
+      // Response bodies can contain learner text. Length preserves a useful
+      // format-drift signal without shipping content to log aggregation.
+      responseLength: response.length,
     });
   }
   return result;

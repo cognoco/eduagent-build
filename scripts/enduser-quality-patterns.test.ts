@@ -8,9 +8,51 @@ import {
   FOUR_STRANDS_EXPLAINS_EN_RE,
   LEARNING_SOURCE_POINT_RE,
   RECITATION_UNSUPPORTED_POLISH_RE,
+  recitationSetupReplyAdvances,
   recitationPolishAddedFact,
   sourceAuditGateFires,
 } from './enduser-quality-patterns';
+
+describe('recitationSetupReplyAdvances', () => {
+  it.each([
+    "I'm ready. Begin whenever you are.",
+    'Go ahead and start when you are ready.',
+    'You can begin your recitation now.',
+  ])('accepts a ready-to-begin reply: %s', (reply) => {
+    expect(recitationSetupReplyAdvances(reply)).toBe(true);
+  });
+
+  it.each([
+    'What would you like to recite?',
+    'Tell me the title or author.',
+    'Begin by telling me which poem.',
+    'Which recitation should we do?',
+    'Start by giving me the title.',
+    'Start with: Roman roads connected towns and helped armies travel.',
+    'Here is a polished version you can recite.',
+    'I can give you a model answer first.',
+    "You can begin now — here's a polished version to try first.",
+  ])('rejects a repeated setup question or premature model: %s', (reply) => {
+    expect(recitationSetupReplyAdvances(reply)).toBe(false);
+  });
+
+  it('rejects a content-bearing invitation that copies the fixture source', () => {
+    const source =
+      'Roman roads helped armies travel, connected towns, and made trade easier across the empire.';
+    const contentBearingReply =
+      "I'm ready. Roman roads helped armies travel across the empire. Begin whenever you are.";
+
+    expect(recitationSetupReplyAdvances(contentBearingReply, source)).toBe(
+      false,
+    );
+    expect(
+      recitationSetupReplyAdvances(
+        "I'm ready to hear about Roman roads. Begin whenever you are.",
+        source,
+      ),
+    ).toBe(true);
+  });
+});
 
 const learningSourcePointCount = (text: string): number =>
   LEARNING_SOURCE_POINT_RE.filter((pattern) => pattern.test(text)).length;

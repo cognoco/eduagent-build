@@ -76,6 +76,8 @@ export interface UseSessionActionsOptions {
     wallClockSeconds: number;
     fastCelebrations: PendingCelebration[];
   } | null>;
+  silenceTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  sessionEndedRef: React.MutableRefObject<boolean>;
   queuedProblemTextRef: React.MutableRefObject<string | null>;
 
   // Profile
@@ -144,6 +146,8 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     parkingLotDraft,
     setParkingLotDraft,
     closedSessionRef,
+    silenceTimerRef,
+    sessionEndedRef,
     queuedProblemTextRef,
     activeProfileId,
     closeSession,
@@ -353,6 +357,11 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         {
           text: i18next.t('session.endPrompt.confirm'),
           onPress: async () => {
+            sessionEndedRef.current = true;
+            if (silenceTimerRef.current) {
+              clearTimeout(silenceTimerRef.current);
+              silenceTimerRef.current = null;
+            }
             let timeoutId: ReturnType<typeof setTimeout> | undefined;
             try {
               const timeoutPromise = new Promise<never>((_, reject) => {
@@ -415,6 +424,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 fastCelebrations,
               );
             } catch (err: unknown) {
+              sessionEndedRef.current = false;
               if (timeoutId) {
                 clearTimeout(timeoutId);
               }
@@ -474,6 +484,8 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     router,
     setIsClosing,
     closedSessionRef,
+    sessionEndedRef,
+    silenceTimerRef,
   ]);
 
   const handleQuickChip = useCallback(

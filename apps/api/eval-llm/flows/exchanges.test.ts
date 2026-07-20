@@ -24,7 +24,7 @@ describe('exchangesFlow', () => {
   }
 
   describe('enumerateScenarios', () => {
-    it('returns 24 scenario inputs for a general (non-language) profile', () => {
+    it('returns 26 scenario inputs for a general (non-language) profile', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
       expect(scenarios.map((s) => s.scenarioId)).not.toContain(
@@ -35,7 +35,7 @@ describe('exchangesFlow', () => {
       expect(scenarios.map((s) => s.scenarioId)).not.toContain(
         'S13-first-session-subject-turn0',
       );
-      expect(scenarios).toHaveLength(24);
+      expect(scenarios).toHaveLength(26);
       expect(scenarios.map((s) => s.scenarioId)).toEqual(
         expect.arrayContaining([
           'S1-rung1-teach-new',
@@ -55,6 +55,8 @@ describe('exchangesFlow', () => {
           'S20-challenge-offered',
           'S21-challenge-active',
           'S22-challenge-drafting',
+          'S23-recitation-title-only-ready',
+          'S24-recitation-voice-title-only-ready',
           'S2-rung2-revisit',
           'S3-rung3-evaluate',
           'S4-rung4-teach-back',
@@ -66,16 +68,22 @@ describe('exchangesFlow', () => {
       );
     });
 
-    it('returns 25 scenarios for a language-learning profile (includes S7 + S9 + S20-S22)', () => {
+    it('returns 26 scenarios for a language-learning profile (includes S7 + S9 + S20-S23)', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(languageProfile) ?? [];
-      expect(scenarios).toHaveLength(25);
+      expect(scenarios).toHaveLength(26);
       expect(scenarios.map((s) => s.scenarioId)).toContain(
         'S7-language-fluency',
       );
       expect(scenarios.map((s) => s.scenarioId)).toContain('S9-correct-streak');
       expect(scenarios.map((s) => s.scenarioId)).toContain(
         'S20-challenge-offered',
+      );
+      expect(scenarios.map((s) => s.scenarioId)).toContain(
+        'S23-recitation-title-only-ready',
+      );
+      expect(scenarios.map((s) => s.scenarioId)).not.toContain(
+        'S24-recitation-voice-title-only-ready',
       );
     });
 
@@ -191,6 +199,76 @@ describe('exchangesFlow', () => {
   });
 
   describe('buildPrompt', () => {
+    it('pins text and voice title-only recitation readiness prompts and validators', async () => {
+      const scenarios =
+        exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
+      const text = scenarios.find(
+        (scenario) => scenario.scenarioId === 'S23-recitation-title-only-ready',
+      );
+      const voice = scenarios.find(
+        (scenario) =>
+          scenario.scenarioId === 'S24-recitation-voice-title-only-ready',
+      );
+      if (!text || !voice) throw new Error('recitation scenarios missing');
+
+      expect(text.input.context.inputMode).toBe('text');
+      expect(voice.input.context.inputMode).toBe('voice');
+      expect(text.input.context.recitationSetup).toEqual({
+        action: 'invite_to_begin',
+        state: { phase: 'ready', clarificationCount: 0 },
+      });
+      const messages = exchangesFlow.buildPrompt(text.input);
+      expect(messages.user).toBe('Ozymandias');
+      expect(
+        exchangesFlow.evaluateDeterministic?.({
+          profile: generalProfile,
+          scenarioId: text.scenarioId,
+          input: text.input,
+          messages,
+        }),
+      ).toEqual([]);
+      expect(
+        await exchangesFlow.evaluateQuality?.({
+          profile: generalProfile,
+          scenarioId: text.scenarioId,
+          input: text.input,
+          messages,
+          liveResponse: '{"reply":"I am ready. Begin whenever you are."}',
+        }),
+      ).toEqual([]);
+      expect(
+        await exchangesFlow.evaluateQuality?.({
+          profile: generalProfile,
+          scenarioId: text.scenarioId,
+          input: text.input,
+          messages,
+          liveResponse: '{"reply":"Start by giving me the title."}',
+        }),
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'recitation-ready.reasked-selection',
+          }),
+        ]),
+      );
+      expect(
+        await exchangesFlow.evaluateQuality?.({
+          profile: generalProfile,
+          scenarioId: text.scenarioId,
+          input: text.input,
+          messages,
+          liveResponse:
+            '{"reply":"I am ready. I met a traveller from an antique land. Begin whenever you are."}',
+        }),
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'recitation-ready.premature-content',
+          }),
+        ]),
+      );
+    });
+
     it('renders the production system prompt and exposes the last user turn', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];

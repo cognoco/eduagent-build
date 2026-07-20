@@ -153,6 +153,21 @@ function seedRoutes() {
       reason: 'You were in the middle of this.',
     },
   });
+  mockFetch.setRoute('/progress/inventory', {
+    profileId: '990e8400-e29b-41d4-a716-446655440004',
+    snapshotDate: '2026-07-20',
+    global: {
+      topicsAttempted: 0,
+      topicsMastered: 0,
+      vocabularyTotal: 0,
+      vocabularyMastered: 0,
+      totalSessions: 0,
+      totalActiveMinutes: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+    },
+    subjects: [],
+  });
   mockFetch.setRoute('/notes', { notes: [], nextCursor: null });
   mockFetch.setRoute('/bookmarks', { bookmarks: [], nextCursor: null });
   mockFetch.setRoute('/subjects', {
@@ -242,12 +257,18 @@ describe('SubjectHubRoute', () => {
     );
   });
 
-  it('renders a recoverable error when subjectId is missing', () => {
+  it('renders a recoverable error without loading vocabulary when subjectId is missing', async () => {
     mockSearchParams = () => ({});
 
     render(<SubjectHubRoute />, { wrapper: wrapper() });
 
     screen.getByTestId('subject-hub-missing-param');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchCallsMatching(mockFetch, '/progress/inventory')).toHaveLength(
+      0,
+    );
     fireEvent.press(screen.getByTestId('subject-hub-missing-param-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
@@ -301,6 +322,9 @@ describe('SubjectHubRoute — no books (pick-book)', () => {
     screen.getByTestId('subject-hub-pick-book-cta');
     screen.getByTestId('subject-hub-pick-book-back');
     expect(screen.queryByTestId('subject-hub-screen')).toBeNull();
+    expect(fetchCallsMatching(mockFetch, '/progress/inventory')).toHaveLength(
+      0,
+    );
   });
 
   it('routes to pick-book from the CTA', async () => {
@@ -608,6 +632,9 @@ describe('SubjectHubRoute — preparing curriculum', () => {
     screen.getByTestId('subject-hub-preparing-back');
     expect(screen.queryByTestId('subject-hub-screen')).toBeNull();
     expect(screen.queryByTestId('subject-hub-pick-book')).toBeNull();
+    expect(fetchCallsMatching(mockFetch, '/progress/inventory')).toHaveLength(
+      0,
+    );
   });
 });
 
@@ -666,6 +693,9 @@ describe('SubjectHubRoute — stuck curriculum', () => {
     });
     screen.getByTestId('subject-hub-stuck-retry');
     expect(screen.queryByTestId('subject-hub-screen')).toBeNull();
+    expect(fetchCallsMatching(mockFetch, '/progress/inventory')).toHaveLength(
+      0,
+    );
 
     fireEvent.press(screen.getByTestId('subject-hub-stuck-retry'));
 
@@ -1233,6 +1263,192 @@ function proxyWrapper() {
     isExplicitProxyMode: true,
   }).wrapper;
 }
+
+function seedVocabularyInventory(
+  pedagogyMode: 'socratic' | 'four_strands' = 'four_strands',
+  vocabularyTotal = 42,
+) {
+  const hasVocabulary = vocabularyTotal > 0;
+  mockFetch.setRoute('/subjects', {
+    subjects: [
+      {
+        id: SUBJECT_ID,
+        profileId: '990e8400-e29b-41d4-a716-446655440004',
+        name: 'Spanish',
+        status: 'active',
+        curriculumStatus: 'ready',
+        pedagogyMode,
+        createdAt: '2026-06-01T00:00:00.000Z',
+        updatedAt: '2026-06-01T00:00:00.000Z',
+      },
+    ],
+  });
+  mockFetch.setRoute('/progress/inventory', {
+    profileId: '990e8400-e29b-41d4-a716-446655440004',
+    snapshotDate: '2026-07-20',
+    global: {
+      topicsAttempted: 5,
+      topicsMastered: 3,
+      vocabularyTotal,
+      vocabularyMastered: hasVocabulary ? 20 : 0,
+      totalSessions: 10,
+      totalActiveMinutes: 120,
+      currentStreak: 3,
+      longestStreak: 5,
+    },
+    subjects: [
+      {
+        subjectId: SUBJECT_ID,
+        subjectName: 'Spanish',
+        pedagogyMode,
+        topics: {
+          total: 10,
+          explored: 5,
+          mastered: 3,
+          inProgress: 2,
+          notStarted: 5,
+        },
+        vocabulary: {
+          total: vocabularyTotal,
+          mastered: hasVocabulary ? 20 : 0,
+          learning: hasVocabulary ? 15 : 0,
+          new: hasVocabulary ? 7 : 0,
+          byCefrLevel: hasVocabulary ? { A1: 18, A2: 14, B1: 10 } : {},
+        },
+        estimatedProficiency: 'A2',
+        estimatedProficiencyLabel: 'Elementary',
+        lastSessionAt: null,
+        activeMinutes: 60,
+        sessionsCount: 5,
+      },
+    ],
+  });
+}
+
+describe('SubjectHubRoute — V2 vocabulary entry', () => {
+  let originalV2: boolean;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+    originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
+    seedRoutes();
+  });
+
+  afterEach(() => {
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      originalV2;
+  });
+
+  it('shows the language-subject totals and CEFR breakdown and opens the existing browser', async () => {
+    seedVocabularyInventory();
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-vocabulary');
+    });
+    screen.getByText('42 words tracked in this subject');
+    screen.getByText('20 mastered • 15 learning • 7 new');
+    screen.getByText('A1');
+    screen.getByText('18 words');
+    screen.getByText('A2');
+    screen.getByText('14 words');
+
+    fireEvent.press(screen.getByTestId('subject-hub-vocabulary-open'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/vocabulary/[subjectId]',
+      params: { subjectId: SUBJECT_ID },
+    });
+  });
+
+  it('hides the entry when vocabulary data belongs to a non-language subject', async () => {
+    seedVocabularyInventory('socratic');
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-screen');
+    });
+    expect(screen.queryByTestId('subject-hub-vocabulary')).toBeNull();
+    expect(fetchCallsMatching(mockFetch, '/progress/inventory')).toHaveLength(
+      0,
+    );
+  });
+
+  it('hides the entry when a language subject has no vocabulary data yet', async () => {
+    seedVocabularyInventory('four_strands', 0);
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-screen');
+    });
+    expect(screen.queryByTestId('subject-hub-vocabulary')).toBeNull();
+  });
+
+  it('hides the entry in the unsupported supporter-proxy scope', async () => {
+    seedVocabularyInventory();
+
+    render(<SubjectHubRoute />, { wrapper: proxyWrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-screen');
+    });
+    expect(screen.queryByTestId('subject-hub-vocabulary')).toBeNull();
+    expect(fetchCallsMatching(mockFetch, '/progress/inventory')).toHaveLength(
+      0,
+    );
+  });
+
+  it('keeps the legacy off-flag Subject Hub unchanged', async () => {
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      false;
+    seedVocabularyInventory();
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-screen');
+    });
+    expect(screen.queryByTestId('subject-hub-vocabulary')).toBeNull();
+    expect(fetchCallsMatching(mockFetch, '/progress/inventory')).toHaveLength(
+      0,
+    );
+  });
+
+  it('shows an inline inventory error and retries only that request', async () => {
+    seedVocabularyInventory();
+    mockFetch.setRoute('/progress/inventory', () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ message: 'Inventory unavailable' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-vocabulary-error');
+    });
+    expect(fetchCallsMatching(mockFetch, '/progress/inventory')).toHaveLength(
+      1,
+    );
+
+    fireEvent.press(screen.getByTestId('subject-hub-vocabulary-retry'));
+
+    await waitFor(() => {
+      expect(fetchCallsMatching(mockFetch, '/progress/inventory')).toHaveLength(
+        2,
+      );
+    });
+  });
+});
 
 describe('SubjectHubRoute — manage entry (WI-1119)', () => {
   beforeEach(() => {
