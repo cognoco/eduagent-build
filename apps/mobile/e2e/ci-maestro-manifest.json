@@ -50,6 +50,10 @@
     {
       "flow": "flows/v2/v2-supporter-scope-journey.yaml",
       "scenario": "v2-supporter-accepted"
+    },
+    {
+      "flow": "flows/v2/v2-supporter-coldstart-mount.yaml",
+      "scenario": "v2-supporter-accepted"
     }
   ],
   "scenarioOverrides": {

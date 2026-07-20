@@ -1,0 +1,76 @@
+# [WI-2226] V2 native supporter cold-start mount.
+#
+# Companion to v2-supporter-scope-journey.yaml (WI-2241) — same
+# `v2-supporter-accepted` seed, but scoped to proving SupporterColdStart
+# actually renders from the mounted Support hub Mentor tab: the
+# empty-record supportee (own account, zero learning state) surfaces a
+# granted-idle kickstart nudge; the rich supportee (own account, real
+# learning state) surfaces none, per resolveSupporterColdStart's `continue`
+# past learners who already have activity. Neither seeded child produces the
+# `managed` state (both are v2 owner identities with their own account) —
+# that state is exercised at the RTL/unit level instead
+# (SupportHubMentorTab.test.tsx's `[WI-2226 RGR]` case,
+# SupporterColdStart.test.tsx).
+#
+# [Disclosure, per WI-2226 build report] Written and testID-verified against
+# source (SupporterColdStart.tsx, SupportHubMentorTab.tsx,
+# test-seed-v2-supporter.ts), and registered in ci-maestro-manifest.json /
+# scripts/e2e-ci-injection-and-smoke-gate.test.ts's exhaustive v2-suite plan
+# assertion (that consistency check IS runnable and was run locally without
+# an emulator — ci-maestro-plan.mjs fails closed on a v2-tagged flow missing
+# from the manifest). What was NOT run is the flow itself: no Android
+# emulator or staging DB is reachable in this build environment, so the
+# actual Maestro walk (this file's tapOn/assertVisible steps against a real
+# app) has not been executed — do not read a passing CI run into this file
+# until the `v2` workflow-dispatch suite has actually run it.
+#
+# SEED_SCENARIO: 'v2-supporter-accepted'
+appId: com.mentomate.app
+tags:
+  - v2
+  - navigation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'v2-supporter-accepted'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'support-hub-mentor-tab'
+    timeout: 30000
+
+# The empty-record supportee's granted-idle cold-start card is visible on
+# landing (own account, no learning state yet).
+- scrollUntilVisible:
+    element:
+      id: 'supporter-cold-start-granted-${EMPTY_SUPPORTEE_PERSON_ID}'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: 'supporter-cold-start-kickstart-${EMPTY_SUPPORTEE_PERSON_ID}'
+
+# The rich supportee already has real learning state — no cold-start card of
+# any kind for them (resolveSupporterColdStart `continue`s past this edge).
+- assertNotVisible:
+    id: 'supporter-cold-start-granted-${SUPPORTEE_PERSON_ID}'
+- assertNotVisible:
+    id: 'supporter-cold-start-managed-${SUPPORTEE_PERSON_ID}'
+
+# The cold-start section co-exists with the ordinary person-scope card list
+# below it — mounting it didn't replace or hide the existing list.
+- scrollUntilVisible:
+    element:
+      id: 'support-hub-mentor-person-${SUPPORTEE_PERSON_ID}'
+    direction: DOWN
+    timeout: 15000
+
+# The kickstart CTA is present but inert for this flow (WI-1136, the
+# encouragement-composer wiring, is a separate deferred fast-follow — see
+# SupporterColdStart.tsx's onKickstart prop comment). Pressing it must not
+# navigate away from the Support hub.
+- tapOn:
+    id: 'supporter-cold-start-kickstart-${EMPTY_SUPPORTEE_PERSON_ID}'
+- assertVisible:
+    id: 'support-hub-mentor-tab'

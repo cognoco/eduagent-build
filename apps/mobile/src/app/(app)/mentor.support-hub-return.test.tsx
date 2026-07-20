@@ -138,6 +138,19 @@ describe('MentorScreen — support-hub return path (real ScopeContextProvider)',
         <ScopeCapture />
         <MentorScreen />
       </ScopeContextProvider>,
+      {
+        routes: {
+          // [WI-2226] SupportHubMentorTab now mounts SupporterColdStart,
+          // whose query fires once the support.hub switch below makes
+          // activeScope.kind === 'supporter-hub'. Empty fixture renders
+          // nothing — this test isn't exercising the cold-start doorway.
+          '/scopes/coldstart': {
+            variant: 'per-child',
+            cards: [],
+            selfLearningDoorway: true,
+          },
+        },
+      },
     );
     cleanupRender = rendered.cleanup;
 
