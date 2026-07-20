@@ -130,5 +130,19 @@ ruleTester.run('no-raw-error-to-sentry', rule, {
       }`,
       errors: [{ messageId: 'rawErrorToSentry' }],
     },
+    // DI-wrapper namespaced form (deps.captureException) — the shape that
+    // found the real session-stream-response.ts backlog sites. Locks the
+    // MemberExpression/DI-wrapper path against regression if
+    // sentryCalleeName is ever narrowed back to Identifier-only.
+    {
+      code: `function f() {
+        try {
+          JSON.parse(raw);
+        } catch (err) {
+          deps.captureException(err);
+        }
+      }`,
+      errors: [{ messageId: 'rawErrorToSentry' }],
+    },
   ],
 });
