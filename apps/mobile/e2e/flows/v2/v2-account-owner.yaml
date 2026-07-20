@@ -26,13 +26,10 @@ tags:
 - assertVisible:
     id: 'account-avatar-button'
     text: '^Open account settings for Test Parent$'
-- assertVisible:
-    id: 'mentor-screen'
-    containsDescendants:
-      - text: '^General Knowledge$'
 
 # Owner learner Mentor -> Account -> named back to the same selected tab and
-# the owner's seeded General Knowledge content.
+# the exact Test Parent learner scope. Mentor renders actionable Now-feed cards,
+# not the raw subject inventory proven separately on Subjects below.
 - tapOn:
     id: 'account-avatar-button'
 - extendedWaitUntil:
@@ -73,10 +70,6 @@ tags:
 - assertVisible:
     id: 'account-avatar-button'
     text: '^Open account settings for Test Parent$'
-- assertVisible:
-    id: 'mentor-screen'
-    containsDescendants:
-      - text: '^General Knowledge$'
 
 # Owner learner Subjects -> Account -> Android Back returns to the selected
 # Subjects tab and the owner's seeded General Knowledge row.

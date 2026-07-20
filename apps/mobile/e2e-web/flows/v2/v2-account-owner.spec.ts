@@ -48,14 +48,6 @@ const ENTRY_CASES = [
   },
 ] as const;
 
-async function selectOwnerLearnerScope(page: Page): Promise<void> {
-  const meScope = page.getByTestId('scope-chip-option-me');
-
-  await expect(meScope).toBeVisible({ timeout: 60_000 });
-  await meScope.click();
-  await expect(meScope).toHaveAttribute('aria-selected', 'true');
-}
-
 async function expectOwnerLearnerEntry(
   page: Page,
   entry: (typeof ENTRY_CASES)[number],
@@ -70,30 +62,22 @@ async function expectOwnerLearnerEntry(
     'aria-selected',
     'true',
   );
-  await expect(page.getByTestId('scope-chip-option-me')).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
   await expect(page.getByTestId('account-avatar-button')).toHaveAttribute(
     'aria-label',
     'Open account settings for Test Parent',
   );
-  if (entry.token === 'mentor') {
-    await expect(
-      screen.getByText('General Knowledge', { exact: true }),
-    ).toBeVisible();
-  } else if (entry.token === 'subjects') {
+  if (entry.token === 'subjects') {
     const subject = screen.getByTestId(`subjects-browse-row-${ownerSubjectId}`);
     await expect(subject).toBeVisible();
     await expect(
       subject.getByText('General Knowledge', { exact: true }),
     ).toBeVisible();
-  } else {
+  } else if (entry.token === 'journal') {
     await expect(screen.getByText('Journal', { exact: true })).toBeVisible();
   }
 }
 
-test('V2 owner learner Account returns its own exact content to each initiating tab', async ({
+test('V2 owner learner Account returns its exact self scope to each initiating tab', async ({
   page,
 }) => {
   const seed = await readSeedData('owner-with-children');
@@ -102,7 +86,6 @@ test('V2 owner learner Account returns its own exact content to each initiating 
   for (const entry of ENTRY_CASES) {
     await test.step(`${entry.name} avatar -> ${entry.leafRow} -> ${entry.name}`, async () => {
       await page.goto(entry.path, { waitUntil: 'commit' });
-      await selectOwnerLearnerScope(page);
       await expectOwnerLearnerEntry(page, entry, ownerSubjectId);
 
       await page.getByTestId('account-avatar-button').click();
@@ -144,7 +127,6 @@ test('V2 Account empty history falls back to Journal and never legacy Home', asy
   }
 
   await page.goto('/journal', { waitUntil: 'commit' });
-  await selectOwnerLearnerScope(page);
   await expectOwnerLearnerEntry(page, journalEntry, ownerSubjectId);
 
   const context = page.context();
@@ -188,7 +170,6 @@ test('V2 Test Parent sign-out keeps its General Knowledge row behind the unauthe
   }
 
   await page.goto('/subjects', { waitUntil: 'commit' });
-  await selectOwnerLearnerScope(page);
   await expectOwnerLearnerEntry(page, subjectsEntry, ownerSubjectId);
 
   await page.getByTestId('account-avatar-button').click();

@@ -724,7 +724,6 @@ describe('[WI-2240] V2 Account manifest and Maestro YAML contract validation', (
           'account-avatar-button',
           '^Open account settings for Test Parent$',
         ),
-        visibleWithDescendant('mentor-screen', '^General Knowledge$'),
         tap('account-avatar-button'),
         waitVisible('account-screen'),
         visible('account-admin-profile'),
