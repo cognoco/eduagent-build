@@ -2,23 +2,23 @@
   "claims": [
     {
       "acRef": "AC-1",
-      "description": "red-state fixture: current GDPR grant is tokenless (withdrawalTokenId=null) after a prior cw2 mint existed",
-      "pointer": "apps/api/src/services/identity-v2/consent-v2.integration.test.ts:886"
+      "description": "red-state fixture constructs the state at the DB layer (an earlier cw2-minted grant withdrawn via that token, then a fresh tokenless grant appended after, as the CURRENT grant) — a precautionary construction per AC-1's 'constructible state' wording; no live apps/api write path today produces this sequence for the same person+org+basis (verified: processConsentResponseV2 mints a token on every approve, createDirectConsentGrant only fires for a brand-new person, appendRestoreGrant carries the token forward unchanged)",
+      "pointer": "apps/api/src/services/identity-v2/consent-v2.integration.test.ts:919"
     },
     {
       "acRef": "AC-2",
-      "description": "old cw2 token vs current tokenless grant -> ConsentRecordNotFoundError, grant left un-withdrawn; red-green-revert executed",
-      "pointer": "apps/api/src/services/identity-v2/consent-v2.integration.test.ts:886"
+      "description": "old cw2 token vs current tokenless grant -> ConsentRecordNotFoundError, current grant left un-withdrawn; red-green-revert executed",
+      "pointer": "apps/api/src/services/identity-v2/consent-v2.integration.test.ts:919"
     },
     {
       "acRef": "AC-3",
       "description": "getGdprGrantWithdrawalStateV2 state-read parity returns null for the same old-cw2-vs-tokenless case",
-      "pointer": "apps/api/src/services/identity-v2/consent-v2.integration.test.ts:908"
+      "pointer": "apps/api/src/services/identity-v2/consent-v2.integration.test.ts:950"
     },
     {
       "acRef": "AC-4",
-      "description": "exhaustive six-row matching matrix (cw1/current-null accept, cw1/current-id reject, cw2 matching accept, cw2 mismatch reject, cw2/current-null reject, expectedTokenId undefined skip)",
-      "pointer": "apps/api/src/services/identity-v2/consent-v2.integration.test.ts:927"
+      "description": "exhaustive six-row matching matrix, exercised against BOTH stampWithdrawal (write path) and getGdprGrantWithdrawalStateV2 (read path) per iteration",
+      "pointer": "apps/api/src/services/identity-v2/consent-v2.integration.test.ts:970"
     },
     {
       "acRef": "AC-5",

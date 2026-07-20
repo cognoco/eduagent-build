@@ -20,22 +20,63 @@ Reject old cw2 bearer tokens against newer tokenless consent grants.
   refinement notes. Fix scope = `stampWithdrawal` + `getGdprGrantWithdrawalStateV2`
   only.
 
+## Reachability caveat (surfaced by pre-PR adversarial review)
+
+The comparison-logic bug itself is unambiguously confirmed by reading the
+source (the null-wildcard condition is exactly as described above). Separately,
+the AC-1 "old cw2-tokened grant, then a later tokenless grant, same
+person+org+basis" state is **not currently reachable through any live
+`apps/api` write path** — verified by tracing every `insert(consentGrant)`
+site for the `gdpr_parental_consent` basis:
+- `processConsentResponseV2` mints `withdrawalTokenId = crypto.randomUUID()`
+  on every `approved` branch (`consent-v2.ts:822`) — never `null` after an
+  approve.
+- `createDirectConsentGrant` (the only tokenless-grant writer) is called
+  exclusively from `createChildProfileV2` (`child-profile-v2.ts:210`) inside
+  the same transaction as the person's own creation — it cannot fire for a
+  `chargePersonId` that already holds a prior grant.
+- `appendRestoreGrant` carries the **current** grant's `withdrawalTokenId`
+  forward unchanged (`consent-v2.ts:1273`) — it cannot null it.
+- No `UPDATE` anywhere in the repo sets `withdrawalTokenId` to `null`
+  (grepped repo-wide).
+
+AC-1's literal wording asks for a "constructible state" with a "test fixture
+building that grant sequence" — which is what the tests below do, directly at
+the DB layer. The fix is correct, necessary boolean-logic hardening (exact
+equality is strictly more correct than the null-wildcard it replaces) and
+matches the AC's literal ask; it should ship regardless. But the test
+comments and evidence below deliberately do NOT claim this is a
+currently-exploitable production path — only that the state is constructible
+and that the guard now handles it correctly. Flagged to the shepherd/PM in
+the final report; not resolved by narrowing or reinterpreting the AC (no
+authority to do that as builder) — resolved by keeping the evidence honest
+about what "reachable" means here.
+
 ## Cycle executed
 
 Test file:
 `apps/api/src/services/identity-v2/consent-v2.integration.test.ts`
 (new `describe('[WI-2434] exact-match token equality (no null-as-wildcard)', ...)`
-block, ~lines 859-975: two named regression tests + an `it.each` six-row
-matrix.)
+block: two named regression tests (AC-1/AC-2 construct the state at the DB
+layer — an earlier cw2-minted grant withdrawn via that token, then a fresh
+tokenless grant appended after, per the reachability caveat above; AC-3 the
+read-path twin) + an `it.each` six-row matrix (AC-4) exercised against BOTH
+`stampWithdrawal` (write path via `withdrawConsentByToken`) and
+`getGdprGrantWithdrawalStateV2` (read path) per row.)
 
-1. **RED (pre-fix, current origin/main code)** — ran the new WI-2434 tests
-   (`-t "WI-2434"`) against the unmodified `consent-v2.ts`:
+Cycle run twice — once with the initial (lone-row) fixtures, then again
+after strengthening AC-1's fixture to the real reachable sequence and
+extending AC-4 to drive both functions (post-review). Final cycle:
+
+1. **RED (pre-fix, current origin/main code)** — `git checkout a7608f5a1 --
+   apps/api/src/services/identity-v2/consent-v2.ts` (restores the exact
+   pre-fix file content) with the new tests in place; ran `-t "WI-2434"`:
    `PASS (5) FAIL (3) skipped (59)`. The 3 failures were exactly the two
    named regression tests (AC-1/AC-2, AC-3) and the matrix row
    `"cw2 id vs tokenless current grant -> REJECT (WI-2434 fix target)"` — the
    old-cw2-vs-tokenless case was wrongly ACCEPTED / returned non-null state.
-   The other 5 matrix rows (unaffected pre-existing behavior) already
-   passed.
+   The other 5 matrix rows (unaffected pre-existing behavior, both write and
+   read paths) already passed.
 2. **Fix applied** — replaced the null-wildcard condition with exact
    equality (`expectedTokenId !== undefined && current.withdrawalTokenId !== expectedTokenId`)
    in both functions; corrected the two docblocks that described the
@@ -43,12 +84,12 @@ matrix.)
 3. **GREEN (post-fix)** — ran the full file:
    `PASS (67) FAIL (0)`. All existing withdrawal/restore/idempotency/
    non-enumeration/expiry coverage stayed green alongside the new tests.
-4. **REVERT** — `git stash push -- apps/api/src/services/identity-v2/consent-v2.ts`
-   to restore the pre-fix code with the new tests still in place; re-ran
-   `-t "WI-2434"`: `PASS (5) FAIL (3) skipped (59)` — identical 3 failures
-   reproduced.
-5. **RESTORE** — `git stash pop`; re-ran the full file:
-   `PASS (67) FAIL (0)`.
+4. **REVERT** — `git checkout a7608f5a1 -- apps/api/src/services/identity-v2/consent-v2.ts`
+   again, to restore the pre-fix code with the new tests still in place;
+   re-ran `-t "WI-2434"`: `PASS (5) FAIL (3) skipped (59)` — identical 3
+   failures reproduced.
+5. **RESTORE** — `git checkout HEAD -- apps/api/src/services/identity-v2/consent-v2.ts`;
+   re-ran the full file: `PASS (67) FAIL (0)`.
 
 ## Additional regression coverage run
 
