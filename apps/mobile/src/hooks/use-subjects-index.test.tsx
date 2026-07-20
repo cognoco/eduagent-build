@@ -141,34 +141,6 @@ describe('useSubjectsIndex', () => {
   async function captureSubjectsRequest(
     callback: () => ReturnType<typeof useSubjectsIndex>,
   ): Promise<string> {
-    const originalFetch = globalThis.fetch;
-    const mockFetch = jest.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === 'string' ? input : input.toString();
-
-      if (url.includes('/subjects')) {
-        return new Response(JSON.stringify({ subjects: [] }), { status: 200 });
-      }
-      if (url.includes('/library/books')) {
-        return new Response(
-          JSON.stringify({ subjects: [], nextCursor: null }),
-          { status: 200 },
-        );
-      }
-      if (url.includes('/progress/overview')) {
-        return new Response(
-          JSON.stringify({
-            subjects: [],
-            totalTopicsCompleted: 0,
-            totalTopicsVerified: 0,
-            totalTopicsMastered: 0,
-            totalTopicsLearning: 0,
-          }),
-          { status: 200 },
-        );
-      }
-
-      throw new Error(`Unexpected request: ${url}`);
-    });
     const harness = createHookWrapper({
       activeProfile: createTestProfile({ id: 'subjects-index-profile' }),
     });
@@ -179,18 +151,47 @@ describe('useSubjectsIndex', () => {
         createElement(AppContextProvider, null, children),
       );
     }
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input.toString();
 
-    setActiveProfileId('subjects-index-profile');
-    globalThis.fetch = mockFetch as typeof fetch;
+        if (url.includes('/subjects')) {
+          return new Response(JSON.stringify({ subjects: [] }), {
+            status: 200,
+          });
+        }
+        if (url.includes('/library/books')) {
+          return new Response(
+            JSON.stringify({ subjects: [], nextCursor: null }),
+            { status: 200 },
+          );
+        }
+        if (url.includes('/progress/overview')) {
+          return new Response(
+            JSON.stringify({
+              subjects: [],
+              totalTopicsCompleted: 0,
+              totalTopicsVerified: 0,
+              totalTopicsMastered: 0,
+              totalTopicsLearning: 0,
+            }),
+            { status: 200 },
+          );
+        }
+
+        throw new Error(`Unexpected request: ${url}`);
+      });
 
     try {
+      setActiveProfileId('subjects-index-profile');
       const { result } = renderHook(callback, { wrapper: Wrapper });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      const subjectsRequest = mockFetch.mock.calls
+      const subjectsRequest = fetchSpy.mock.calls
         .map(([input]) =>
           typeof input === 'string' ? input : input.toString(),
         )
@@ -202,7 +203,7 @@ describe('useSubjectsIndex', () => {
     } finally {
       harness.queryClient.clear();
       setActiveProfileId(undefined);
-      globalThis.fetch = originalFetch;
+      fetchSpy.mockRestore();
     }
   }
 
