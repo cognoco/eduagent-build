@@ -84,9 +84,13 @@ tags:
     id: 'journal-note-note:${LEARNER_NOTE_ID}'
 - tapOn:
     id: 'journal-notes-search-input'
-- eraseText: 19
+    point: '95%,50%'
+- eraseText: 32
 - inputText: 'glucose'
 - hideKeyboard
+- assertVisible:
+    id: 'journal-notes-search-input'
+    text: 'glucose'
 - scrollUntilVisible:
     element:
       id: 'journal-note-note:${LEARNER_NOTE_ID}'
@@ -148,9 +152,13 @@ tags:
     id: 'journal-note-bookmark:${BOOKMARK_ID}'
 - tapOn:
     id: 'journal-notes-search-input'
-- eraseText: 19
+    point: '95%,50%'
+- eraseText: 32
 - inputText: 'chlorophyll'
 - hideKeyboard
+- assertVisible:
+    id: 'journal-notes-search-input'
+    text: 'chlorophyll'
 - scrollUntilVisible:
     element:
       id: 'journal-note-bookmark:${BOOKMARK_ID}'
