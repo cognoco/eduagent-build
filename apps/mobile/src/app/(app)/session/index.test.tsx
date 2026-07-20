@@ -358,6 +358,10 @@ const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
+const mockUseSession = jest.fn<
+  { data: null | Record<string, unknown> },
+  [string?]
+>(() => ({ data: null }));
 
 type TranscriptMockReturn = {
   data: null | {
@@ -386,7 +390,7 @@ jest.mock(
   '../../../hooks/use-sessions' /* gc1-allow: useStreamMessage streams over XHR (bypasses useApiClient); synthetic onDone payloads are the test control surface */,
   () => ({
     ...jest.requireActual('../../../hooks/use-sessions'),
-    useSession: () => ({ data: null }),
+    useSession: (sessionId: string) => mockUseSession(sessionId),
     useStartSession: () => ({
       mutateAsync: mockStartSession,
     }),
@@ -717,6 +721,7 @@ describe('SessionScreen homework flow', () => {
     getMockFeatureFlags().MODE_NAV_V2_ENABLED = false;
     mockFetch.mockClear();
     mockUseSessionTranscript.mockReturnValue({ data: null });
+    mockUseSession.mockReturnValue({ data: null });
     mockReadAsStringAsync.mockResolvedValue('base64-homework-image');
     // Default: no active session (null response body)
     mockFetch.setRoute('/progress/topic', null);
@@ -2452,6 +2457,7 @@ describe('SessionScreen homework flow', () => {
   // first-response actions — "help me solve this" / "check my answer" — and NO
   // subject-picking preamble. returnTo=mentor returns to the Mentor tab.
   describe('V2 mentor-homework round-trip (T23)', () => {
+    const originalE2E = process.env.EXPO_PUBLIC_E2E;
     const MENTOR_HOMEWORK_PARAMS = {
       mode: 'homework',
       subjectId: SUBJECT_ID,
@@ -2465,6 +2471,74 @@ describe('SessionScreen homework flow', () => {
         { id: 'problem-1', text: 'Solve 2x + 5 = 17', source: 'ocr' },
       ]),
     };
+    const MENTOR_MANUAL_HOMEWORK_PARAMS = {
+      ...MENTOR_HOMEWORK_PARAMS,
+      imageUri: undefined,
+      imageMimeType: undefined,
+      homeworkProblems: JSON.stringify([
+        { id: 'problem-1', text: 'Solve 2x + 5 = 17', source: 'manual' },
+      ]),
+    };
+
+    const persistedManualHomeworkSession = (
+      overrides: {
+        id?: string;
+        subjectId?: string;
+        homework?: Record<string, unknown>;
+      } = {},
+    ) => ({
+      id: overrides.id ?? SESSION_ID,
+      subjectId: overrides.subjectId ?? SUBJECT_ID,
+      topicId: null,
+      sessionType: 'homework',
+      metadata: {
+        homework: {
+          problemCount: 1,
+          currentProblemIndex: 0,
+          problems: [
+            {
+              id: 'problem-1',
+              text: 'Solve 2x + 5 = 17',
+              source: 'manual',
+            },
+          ],
+          ...overrides.homework,
+        },
+      },
+    });
+
+    async function startManualHomeworkHelp(
+      testScreen: ReturnType<typeof renderSessionScreen>,
+    ): Promise<void> {
+      await act(async () => {
+        await Promise.resolve();
+        jest.advanceTimersByTime(700);
+      });
+      expect(mockStream).not.toHaveBeenCalled();
+      await act(async () => {
+        fireEvent.press(testScreen.getByTestId('homework-help-me-solve'));
+      });
+      await act(async () => {
+        await Promise.resolve();
+        jest.advanceTimersByTime(700);
+      });
+      await flushAsyncWork();
+      await waitFor(() => {
+        testScreen.getByTestId('homework-first-response-complete');
+      });
+    }
+
+    beforeEach(() => {
+      process.env.EXPO_PUBLIC_E2E = 'true';
+    });
+
+    afterEach(() => {
+      if (originalE2E === undefined) {
+        delete process.env.EXPO_PUBLIC_E2E;
+      } else {
+        process.env.EXPO_PUBLIC_E2E = originalE2E;
+      }
+    });
 
     it('renders the captured image as a learner bubble with deterministic help/check buttons as the first in-thread response, with no subject preamble', async () => {
       getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
@@ -2500,31 +2574,18 @@ describe('SessionScreen homework flow', () => {
       testScreen.unmount();
     }, 15000);
 
-    it('starts the tutoring turn with the chosen homework mode after the learner taps "help me solve"', async () => {
+    it('creates exactly one associated manual homework session after the learner taps "help me solve"', async () => {
       getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
       (useLocalSearchParams as jest.Mock).mockReturnValue(
-        MENTOR_HOMEWORK_PARAMS,
+        MENTOR_MANUAL_HOMEWORK_PARAMS,
       );
+      mockUseSession.mockReturnValue({
+        data: persistedManualHomeworkSession(),
+      });
 
       const testScreen = renderSessionScreen();
 
-      await act(async () => {
-        await Promise.resolve();
-        jest.advanceTimersByTime(700);
-      });
-
-      // No turn before the learner picks a deterministic action.
-      expect(mockStream).not.toHaveBeenCalled();
-
-      await act(async () => {
-        fireEvent.press(testScreen.getByTestId('homework-help-me-solve'));
-      });
-      // Picking a mode re-enables the (previously deferred) auto-send.
-      await act(async () => {
-        await Promise.resolve();
-        jest.advanceTimersByTime(700);
-      });
-      await flushAsyncWork();
+      await startManualHomeworkHelp(testScreen);
 
       await waitFor(() => {
         expect(mockStream).toHaveBeenCalledWith(
@@ -2535,13 +2596,143 @@ describe('SessionScreen homework flow', () => {
           expect.objectContaining({ homeworkMode: 'help_me' }),
         );
       });
-      await waitFor(() => {
-        testScreen.getByTestId('homework-first-response-complete');
-      });
+      testScreen.getByTestId('homework-session-associated-once');
+      expect(
+        testScreen.queryByTestId('homework-session-created-more-than-once'),
+      ).toBeNull();
+      expect(mockStartSession).toHaveBeenCalledTimes(1);
+      expect(mockStartSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionType: 'homework',
+          metadata: expect.objectContaining({
+            homework: expect.objectContaining({
+              problemCount: 1,
+              problems: [
+                expect.objectContaining({
+                  text: 'Solve 2x + 5 = 17',
+                  source: 'manual',
+                }),
+              ],
+            }),
+          }),
+        }),
+      );
 
       // Once consumed, the deterministic first-response block is gone.
       expect(testScreen.queryByTestId('homework-help-me-solve')).toBeNull();
 
+      testScreen.unmount();
+    }, 15000);
+
+    it.each([
+      [
+        'a persisted session without homework metadata',
+        { ...persistedManualHomeworkSession(), metadata: {} },
+      ],
+      [
+        'a different persisted session identity',
+        persistedManualHomeworkSession({ id: RESUMED_SESSION_ID }),
+      ],
+      [
+        'a different persisted subject identity',
+        persistedManualHomeworkSession({ subjectId: SECOND_SUBJECT_ID }),
+      ],
+      [
+        'the wrong persisted problem count',
+        persistedManualHomeworkSession({ homework: { problemCount: 2 } }),
+      ],
+      [
+        'the wrong persisted problems cardinality',
+        persistedManualHomeworkSession({
+          homework: {
+            problems: [
+              {
+                id: 'problem-1',
+                text: 'Solve 2x + 5 = 17',
+                source: 'manual',
+              },
+              {
+                id: 'problem-2',
+                text: 'Factor x^2 + 3x + 2',
+                source: 'manual',
+              },
+            ],
+          },
+        }),
+      ],
+      [
+        'the wrong persisted current problem index',
+        persistedManualHomeworkSession({
+          homework: { currentProblemIndex: 1 },
+        }),
+      ],
+      [
+        'different persisted problem text',
+        persistedManualHomeworkSession({
+          homework: {
+            problems: [
+              {
+                id: 'problem-1',
+                text: 'Solve a different equation',
+                source: 'manual',
+              },
+            ],
+          },
+        }),
+      ],
+      [
+        'a non-manual persisted problem source',
+        persistedManualHomeworkSession({
+          homework: {
+            problems: [
+              {
+                id: 'problem-1',
+                text: 'Solve 2x + 5 = 17',
+                source: 'ocr',
+              },
+            ],
+          },
+        }),
+      ],
+    ])(
+      'keeps the association marker absent when the server returns %s',
+      async (_case, persistedSession) => {
+        getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+        (useLocalSearchParams as jest.Mock).mockReturnValue(
+          MENTOR_MANUAL_HOMEWORK_PARAMS,
+        );
+        mockUseSession.mockReturnValue({ data: persistedSession });
+
+        const testScreen = renderSessionScreen();
+        await startManualHomeworkHelp(testScreen);
+
+        expect(
+          testScreen.queryByTestId('homework-session-associated-once'),
+        ).toBeNull();
+        testScreen.unmount();
+      },
+      15000,
+    );
+
+    it('does not render session-allocation evidence outside an EXPO_PUBLIC_E2E build', async () => {
+      process.env.EXPO_PUBLIC_E2E = 'false';
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+      (useLocalSearchParams as jest.Mock).mockReturnValue(
+        MENTOR_MANUAL_HOMEWORK_PARAMS,
+      );
+      mockUseSession.mockReturnValue({
+        data: persistedManualHomeworkSession(),
+      });
+
+      const testScreen = renderSessionScreen();
+      await startManualHomeworkHelp(testScreen);
+
+      expect(
+        testScreen.queryByTestId('homework-session-associated-once'),
+      ).toBeNull();
+      expect(
+        testScreen.queryByTestId('homework-session-created-more-than-once'),
+      ).toBeNull();
       testScreen.unmount();
     }, 15000);
 

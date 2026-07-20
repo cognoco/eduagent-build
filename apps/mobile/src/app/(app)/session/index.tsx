@@ -258,6 +258,7 @@ export default function SessionScreen() {
 }
 
 function SessionScreenInner() {
+  const isE2EBuild = process.env.EXPO_PUBLIC_E2E === 'true';
   const {
     mode,
     subjectId,
@@ -447,6 +448,12 @@ function SessionScreenInner() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
     routeSessionId ?? null,
   );
+  const [e2eAllocatedSessionIds, setE2EAllocatedSessionIds] = useState<
+    string[]
+  >([]);
+  const handleE2ESessionCreated = useCallback((createdSessionId: string) => {
+    setE2EAllocatedSessionIds((current) => [...current, createdSessionId]);
+  }, []);
   const [showMentorBirthMoment, setShowMentorBirthMoment] = useState(false);
   const [pendingClassification, setPendingClassification] = useState(false);
   const [classifyError, setClassifyError] = useState<string | null>(null);
@@ -1013,6 +1020,7 @@ function SessionScreenInner() {
     trigger,
     createLocalMessageId,
     responseHistory,
+    onSessionCreated: isE2EBuild ? handleE2ESessionCreated : undefined,
   });
 
   // BUG-373: Exclude auto-sent messages (homework OCR, queued multi-problem)
@@ -1748,6 +1756,24 @@ function SessionScreenInner() {
       },
     });
 
+  const persistedHomework = activeSession.data?.metadata?.homework;
+  const persistedProblem = persistedHomework?.problems[0];
+  const exactManualHomeworkSessionAssociated =
+    isE2EBuild &&
+    isMentorHomeworkFrame &&
+    e2eAllocatedSessionIds.length === 1 &&
+    e2eAllocatedSessionIds[0] === activeSessionId &&
+    activeSession.data?.id === activeSessionId &&
+    activeSession.data.subjectId === effectiveSubjectId &&
+    activeSession.data.sessionType === 'homework' &&
+    persistedHomework?.problemCount === 1 &&
+    persistedHomework.currentProblemIndex === 0 &&
+    persistedHomework.problems.length === 1 &&
+    persistedProblem?.source === 'manual' &&
+    persistedProblem.text.trim() === initialProblemText?.trim();
+  const multipleHomeworkSessionsCreated =
+    isE2EBuild && isMentorHomeworkFrame && e2eAllocatedSessionIds.length > 1;
+
   return (
     <View className="flex-1" testID="session-screen">
       <ChatShell
@@ -1807,6 +1833,18 @@ function SessionScreenInner() {
         rightAction={headerRight}
         inputAccessory={
           <>
+            {exactManualHomeworkSessionAssociated ? (
+              <View
+                testID="homework-session-associated-once"
+                style={{ width: 1, height: 1 }}
+              />
+            ) : null}
+            {multipleHomeworkSessionsCreated ? (
+              <View
+                testID="homework-session-created-more-than-once"
+                style={{ width: 1, height: 1 }}
+              />
+            ) : null}
             <HomeworkFirstResponseCompleteMarker
               active={isMentorHomeworkFrame && !!mentorHomeworkChoice}
               problemText={initialProblemText}

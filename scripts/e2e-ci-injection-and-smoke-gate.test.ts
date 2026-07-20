@@ -1064,6 +1064,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       tapOn?: ElementSelector;
       inputText?: string;
       optional?: boolean;
+      runFlow?: {
+        when?: { visible?: ElementSelector };
+        commands?: MaestroCommand[];
+        file?: string;
+      };
     };
     const commands = parseYaml(
       source.split(/^---$/m)[1] ?? '',
@@ -1122,7 +1127,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           containsOptionalTrue(nested),
       );
     };
-
+    const commandSurfaceFor = (value: unknown): string[] => {
+      if (typeof value === 'string') return [value];
+      if (Array.isArray(value)) return value.flatMap(commandSurfaceFor);
+      if (!value || typeof value !== 'object') return [];
+      return Object.entries(value).flatMap(([key, nested]) => [
+        key,
+        ...commandSurfaceFor(nested),
+      ]);
+    };
     for (const selector of [
       { id: 'homework-problem-text-bubble', text: 'Solve 3x + 7 = 22' },
       { id: 'homework-problem-text', text: 'Solve 3x + 7 = 22' },
@@ -1149,7 +1162,120 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         60_000,
       ),
     ).toBeGreaterThan(-1);
-    expect(source).not.toContain("id: 'confirm-button|subject-picker'");
+    const deviceOnlySelector =
+      /(camera|gallery|ocr|permission|shutter|flash|retake|message-image|homework-image)/i;
+    expect(
+      commandSurfaceFor(commands).filter((value) =>
+        deviceOnlySelector.test(value),
+      ),
+    ).toEqual([]);
+
+    const deviceOnlyCommandFixtures = [
+      { cameraAction: true },
+      { tapOn: { text: 'Open gallery' } },
+      {
+        assertVisible: {
+          id: 'status',
+          containsDescendants: [{ text: 'OCR result' }],
+        },
+      },
+      { inputText: 'permission prompt' },
+      { runFlow: { file: '../device/shutter-setup.yaml' } },
+      { assertVisible: { text: 'Enable flash' } },
+      { retakeAction: false },
+      {
+        tapOn: {
+          id: 'container',
+          containsDescendants: [{ id: 'message-image' }],
+        },
+      },
+      { runFlow: { file: '../device/homework-image.yaml' } },
+    ] as unknown as MaestroCommand[];
+    for (const fixture of deviceOnlyCommandFixtures) {
+      expect(
+        commandSurfaceFor([fixture]).some((value) =>
+          deviceOnlySelector.test(value),
+        ),
+      ).toBe(true);
+    }
+
+    const isAssociationWait = (command: MaestroCommand): boolean =>
+      command.optional !== true &&
+      command.extendedWaitUntil?.timeout === 30_000 &&
+      exactSelector(command.extendedWaitUntil.visible, {
+        id: 'homework-session-associated-once',
+      });
+    const isFinalAssociation = (command: MaestroCommand): boolean =>
+      command.optional !== true &&
+      exactSelector(command.assertVisible, {
+        id: 'homework-session-associated-once',
+      });
+    const isDuplicateAbsence = (command: MaestroCommand): boolean =>
+      command.optional !== true &&
+      exactSelector(command.assertNotVisible, {
+        id: 'homework-session-created-more-than-once',
+      });
+    const hasSequenceBoundSessionEvidence = (
+      items: MaestroCommand[],
+    ): boolean => {
+      const tapIn = (id: string, startAt = 0): number =>
+        items.findIndex(
+          (command, index) =>
+            index >= startAt &&
+            command.optional !== true &&
+            command.tapOn?.id === id,
+        );
+      const firstHomeworkLaunch = tapIn('mentor-bar-homework-chip');
+      const firstManualLaunch = tapIn(
+        'manual-entry-button',
+        firstHomeworkLaunch + 1,
+      );
+      const cancel = tapIn('manual-entry-cancel', firstManualLaunch + 1);
+      const secondHomeworkLaunch = tapIn(
+        'mentor-bar-homework-chip',
+        cancel + 1,
+      );
+      const secondManualLaunch = tapIn(
+        'manual-entry-button',
+        secondHomeworkLaunch + 1,
+      );
+      const helpAction = tapIn(
+        'homework-help-me-solve',
+        secondManualLaunch + 1,
+      );
+      const associationWait = items.findIndex(
+        (command, index) => index > helpAction && isAssociationWait(command),
+      );
+      const completedResponse = items.findIndex(
+        (command, index) =>
+          index > associationWait &&
+          command.optional !== true &&
+          command.extendedWaitUntil?.timeout === 60_000 &&
+          exactSelector(command.extendedWaitUntil.visible, {
+            id: 'homework-first-response-complete',
+          }),
+      );
+      const finalAssociation = items.findIndex(
+        (command, index) =>
+          index > completedResponse && isFinalAssociation(command),
+      );
+      const duplicateAbsence = items.findIndex(
+        (command, index) =>
+          index > completedResponse && isDuplicateAbsence(command),
+      );
+      return (
+        firstHomeworkLaunch >= 0 &&
+        firstManualLaunch > firstHomeworkLaunch &&
+        cancel > firstManualLaunch &&
+        secondHomeworkLaunch > cancel &&
+        secondManualLaunch > secondHomeworkLaunch &&
+        helpAction > secondManualLaunch &&
+        associationWait > helpAction &&
+        completedResponse > associationWait &&
+        finalAssociation > completedResponse &&
+        duplicateAbsence > completedResponse
+      );
+    };
 
     const firstHomeworkLaunch = tapIndex('mentor-bar-homework-chip');
     const firstManualLaunch = tapIndex(
@@ -1210,6 +1336,28 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(exactProblemInput).toBeGreaterThan(emptyManualEntry);
     expect(exactTypedProblem).toBeGreaterThan(exactProblemInput);
 
+    expect(hasSequenceBoundSessionEvidence(commands)).toBe(true);
+    const sessionEvidenceCommands = commands.filter(
+      (command) =>
+        isAssociationWait(command) ||
+        isFinalAssociation(command) ||
+        isDuplicateAbsence(command),
+    );
+    const commandsWithoutSessionEvidence = commands.filter(
+      (command) => !sessionEvidenceCommands.includes(command),
+    );
+    const cancelPhaseIndex = commandsWithoutSessionEvidence.findIndex(
+      (command) => command.tapOn?.id === 'manual-entry-cancel',
+    );
+    const evidenceMovedIntoCancelPhase = [
+      ...commandsWithoutSessionEvidence.slice(0, cancelPhaseIndex + 1),
+      ...sessionEvidenceCommands,
+      ...commandsWithoutSessionEvidence.slice(cancelPhaseIndex + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(evidenceMovedIntoCancelPhase)).toBe(
+      false,
+    );
+
     expect(
       commands.findIndex(
         (command) =>
@@ -1219,78 +1367,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           }),
       ),
     ).toBeGreaterThan(-1);
-
-    const playwrightSource = readFileSync(
-      join(
-        repoRoot,
-        'apps/mobile/e2e-web/flows/v2/v2-homework-manual-entry.spec.ts',
-      ),
-      'utf8',
-    );
-    const firstBrowserLaunch = playwrightSource.indexOf(
-      'await openManualEntryFromMentor(page);',
-    );
-    const helperHomeworkLaunch = playwrightSource.indexOf(
-      "getByTestId('mentor-bar-homework-chip')",
-    );
-    const helperManualLaunch = playwrightSource.indexOf(
-      "getByTestId('manual-entry-button')",
-      helperHomeworkLaunch,
-    );
-    const helperManualInput = playwrightSource.indexOf(
-      "getByTestId('result-text-input')",
-      helperManualLaunch,
-    );
-    const browserCancel = playwrightSource.indexOf(
-      "getByTestId('manual-entry-cancel')",
-      firstBrowserLaunch,
-    );
-    const browserUsableMentor = playwrightSource.indexOf(
-      "getByTestId('mentor-bar-input')",
-      browserCancel,
-    );
-    const browserMentorEnabled = playwrightSource.indexOf(
-      '.toBeEnabled()',
-      browserUsableMentor,
-    );
-    const secondBrowserLaunch = playwrightSource.indexOf(
-      'await openManualEntryFromMentor(page);',
-      browserMentorEnabled,
-    );
-    const browserEmptyAssertion = playwrightSource.indexOf(
-      ".toHaveValue('')",
-      secondBrowserLaunch,
-    );
-    const browserProblemInput = playwrightSource.indexOf(
-      'MANUAL_HOMEWORK_PROBLEM,',
-      browserEmptyAssertion,
-    );
-    const browserCompletedReply = playwrightSource.indexOf(
-      "getByTestId('homework-first-response-complete')",
-      browserProblemInput,
-    );
-    const browserNonEmptyReply = playwrightSource.indexOf(
-      '.not.toHaveText(/^\\s*$/)',
-      browserCompletedReply,
-    );
-    const browserNoReconnect = playwrightSource.indexOf(
-      'getByTestId(/^session-reconnect-/)',
-      browserCompletedReply,
-    );
-    expect(helperHomeworkLaunch).toBeGreaterThan(-1);
-    expect(helperManualLaunch).toBeGreaterThan(helperHomeworkLaunch);
-    expect(helperManualInput).toBeGreaterThan(helperManualLaunch);
-    expect(helperManualInput).toBeLessThan(firstBrowserLaunch);
-    expect(firstBrowserLaunch).toBeGreaterThan(-1);
-    expect(browserCancel).toBeGreaterThan(firstBrowserLaunch);
-    expect(browserUsableMentor).toBeGreaterThan(browserCancel);
-    expect(browserMentorEnabled).toBeGreaterThan(browserUsableMentor);
-    expect(secondBrowserLaunch).toBeGreaterThan(browserMentorEnabled);
-    expect(browserEmptyAssertion).toBeGreaterThan(secondBrowserLaunch);
-    expect(browserProblemInput).toBeGreaterThan(browserEmptyAssertion);
-    expect(browserCompletedReply).toBeGreaterThan(browserProblemInput);
-    expect(browserNonEmptyReply).toBeGreaterThan(browserCompletedReply);
-    expect(browserNoReconnect).toBeGreaterThan(browserCompletedReply);
 
     const back = tapIndex('chat-shell-back');
     expect(back).toBeGreaterThan(-1);

@@ -118,6 +118,10 @@ tags:
 - assertVisible:
     id: 'homework-problem-text'
     text: 'Solve 3x + 7 = 22'
+- extendedWaitUntil:
+    visible:
+      id: 'homework-session-associated-once'
+    timeout: 30000
 - assertVisible:
     id: 'message-bubble-user-1'
     containsDescendants:
@@ -132,6 +136,10 @@ tags:
     id: 'thinking-bulb-animation'
 - assertNotVisible:
     id: 'session-reconnect-.*'
+- assertVisible:
+    id: 'homework-session-associated-once'
+- assertNotVisible:
+    id: 'homework-session-created-more-than-once'
 
 - tapOn:
     id: 'finish-homework-chip'
