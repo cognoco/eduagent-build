@@ -1,4 +1,7 @@
 import {
+  buildDeescalationTelemetry,
+  buildCorrectStreakOfferTelemetry,
+  buildDownwardRungMovementAudit,
   buildExchangeHistory,
   mergeMemoryContexts,
   computeCorrectStreak,
@@ -23,12 +26,53 @@ import {
 } from '@eduagent/schemas';
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import { MAX_INTERVIEW_EXCHANGES } from '../exchanges';
+import { buildSystemPrompt } from '../exchange-prompts';
 import { SessionExchangeLimitError } from './session-crud';
 import { computeNextPracticePointer } from '../language-session-engine';
 import { resetSessionStaticContextCache } from './session-cache';
 import { recitationSetupClaimMetadataKey } from './session-recitation-setup';
 
 type ExchangeHistoryEntry = ReturnType<typeof buildExchangeHistory>[number];
+
+describe('downward rung audit', () => {
+  it('builds the exact non-escalation persistence and telemetry payloads', () => {
+    const movement = buildDownwardRungMovementAudit(5, 4, {
+      rungMovementStreak: 4,
+      rungDirection: 'down',
+      rungReason: 'Four correct answers at the current rung — reducing support',
+    });
+
+    expect(movement).toEqual({
+      fromRung: 5,
+      toRung: 4,
+      action: 'deescalate',
+      direction: 'down',
+      streak: 4,
+      reason: 'Four correct answers at the current rung — reducing support',
+    });
+    expect(buildDeescalationTelemetry('session-1', movement!)).toEqual({
+      event: 'llm.deescalation_applied',
+      sessionId: 'session-1',
+      fromRung: 5,
+      toRung: 4,
+      action: 'deescalate',
+      direction: 'down',
+      streak: 4,
+      reason: 'Four correct answers at the current rung — reducing support',
+    });
+  });
+});
+
+describe('correct-streak offer telemetry', () => {
+  it('does not label a stuck-driven upward movement as a correct-streak offer', () => {
+    expect(
+      buildCorrectStreakOfferTelemetry('session-1', {
+        correctStreak: 4,
+        rungDirection: 'up',
+      }),
+    ).toBeUndefined();
+  });
+});
 
 describe('buildExchangeHistory', () => {
   it('filters out non-conversational event types', () => {
@@ -336,6 +380,96 @@ describe('computeCorrectStreak', () => {
     ];
     // Scanning backwards: first event (index 2) = correct → streak 1;
     // second event (index 1) = false → break. Result: 1.
+    expect(computeCorrectStreak(events, 2)).toBe(1);
+  });
+
+  it('prefers canonical correct over a conflicting legacy false', () => {
+    const events = [
+      {
+        eventType: 'ai_response',
+        metadata: {
+          escalationRung: 2,
+          answerEvaluation: { correctness: 'correct' },
+          correctAnswer: false,
+        },
+      },
+    ];
+
+    expect(computeCorrectStreak(events, 2)).toBe(1);
+  });
+
+  it.each(['partial', 'incorrect'] as const)(
+    'canonical %s resets even when legacy boolean conflicts',
+    (correctness) => {
+      const events = [
+        {
+          eventType: 'ai_response',
+          metadata: {
+            escalationRung: 2,
+            answerEvaluation: { correctness: 'correct' },
+          },
+        },
+        {
+          eventType: 'ai_response',
+          metadata: {
+            escalationRung: 2,
+            answerEvaluation: { correctness },
+            correctAnswer: true,
+          },
+        },
+      ];
+
+      expect(computeCorrectStreak(events, 2)).toBe(0);
+    },
+  );
+
+  it('resets at canonical partial within correct → partial → correct', () => {
+    const events = [
+      {
+        eventType: 'ai_response',
+        metadata: {
+          escalationRung: 2,
+          answerEvaluation: { correctness: 'correct' },
+        },
+      },
+      {
+        eventType: 'ai_response',
+        metadata: {
+          escalationRung: 2,
+          answerEvaluation: { correctness: 'partial' },
+        },
+      },
+      {
+        eventType: 'ai_response',
+        metadata: {
+          escalationRung: 2,
+          answerEvaluation: { correctness: 'correct' },
+        },
+      },
+    ];
+
+    expect(computeCorrectStreak(events, 2)).toBe(1);
+  });
+
+  it('skips canonical na and unevaluated turns', () => {
+    const events = [
+      {
+        eventType: 'ai_response',
+        metadata: {
+          escalationRung: 2,
+          answerEvaluation: { correctness: 'correct' },
+        },
+      },
+      {
+        eventType: 'ai_response',
+        metadata: {
+          escalationRung: 2,
+          answerEvaluation: { correctness: 'na' },
+        },
+      },
+      { eventType: 'ai_response', metadata: { escalationRung: 2 } },
+    ];
+
     expect(computeCorrectStreak(events, 2)).toBe(1);
   });
 });
@@ -1545,5 +1679,219 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
       action: 'invite_to_begin',
       state: { phase: 'ready', clarificationCount: 1 },
     });
+  });
+
+  it('applies 5→4 from a source-rung streak without prompting upward escalation', async () => {
+    const events = Array.from({ length: 4 }, (_, index) => ({
+      id: `ai-${index}`,
+      eventType: 'ai_response',
+      content: 'Keep going.',
+      metadata: {
+        escalationRung: 5,
+        answerEvaluation: { correctness: 'correct' },
+        correctAnswer: true,
+      },
+      createdAt: new Date(`2026-01-02T10:0${index}:00Z`),
+    }));
+    const db = makeDb(buildSubjectRow(null), {
+      sessionRow: buildSessionRow({ escalationRung: 5, exchangeCount: 4 }),
+      events,
+    });
+
+    const result = await prepareExchangeContext(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      '42',
+      {
+        semanticMemoryRetrievalEnabled: false,
+        answerEvaluationEnabled: true,
+      },
+    );
+
+    expect(result.sourceCorrectStreak).toBe(4);
+    expect(result.escalationDecision).toMatchObject({
+      action: 'deescalate',
+      direction: 'down',
+      newRung: 4,
+    });
+    expect(result.context.correctStreak).toBeUndefined();
+    expect(buildSystemPrompt(result.context)).not.toContain(
+      'ADAPTIVE ESCALATION',
+    );
+    expect(result.effectiveRung).toBe(4);
+  });
+
+  it('keeps a source streak for audit but removes it from the prompt on stuck 3→4 movement', async () => {
+    const events = Array.from({ length: 4 }, (_, index) => ({
+      id: `ai-up-${index}`,
+      eventType: 'ai_response',
+      content: 'Keep going.',
+      metadata: {
+        escalationRung: 3,
+        answerEvaluation: { correctness: 'correct' },
+      },
+      createdAt: new Date(`2026-01-02T10:0${index}:00Z`),
+    }));
+    const db = makeDb(buildSubjectRow(null), {
+      sessionRow: buildSessionRow({ escalationRung: 3, exchangeCount: 4 }),
+      events,
+    });
+
+    const result = await prepareExchangeContext(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      "I don't know",
+      {
+        semanticMemoryRetrievalEnabled: false,
+        answerEvaluationEnabled: true,
+      },
+    );
+
+    expect(result.sourceCorrectStreak).toBe(4);
+    expect(result.escalationDecision).toMatchObject({
+      action: 'escalate',
+      direction: 'up',
+      newRung: 4,
+    });
+    expect(result.context.correctStreak).toBeUndefined();
+    expect(buildSystemPrompt(result.context)).not.toContain(
+      'ADAPTIVE ESCALATION',
+    );
+  });
+
+  it.each([
+    {
+      label: 'app-help',
+      message: 'Where do I find my notes?',
+      metadata: null,
+    },
+    {
+      label: 'recitation',
+      message: "I don't know",
+      metadata: { effectiveMode: 'recitation' },
+    },
+    {
+      label: 'Challenge accepted',
+      message: "I don't know",
+      metadata: {
+        challengeRound: {
+          state: 'accepted',
+          offerCount: 1,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+      },
+    },
+    {
+      label: 'Challenge active',
+      message: "I don't know",
+      metadata: {
+        challengeRound: {
+          state: 'active',
+          offerCount: 1,
+          questionIndex: 1,
+          totalQuestions: 4,
+          declinedDontAskAgain: false,
+          evaluations: [],
+        },
+      },
+    },
+  ])(
+    'prepareExchangeContext freezes $label turns without prompt or telemetry streak leakage',
+    async ({ message, metadata }) => {
+      const events = Array.from({ length: 4 }, (_, index) => ({
+        id: `ai-freeze-${index}`,
+        eventType: 'ai_response',
+        content: 'Keep going.',
+        metadata: {
+          escalationRung: 3,
+          answerEvaluation: { correctness: 'correct' },
+        },
+        createdAt: new Date(`2026-01-02T10:0${index}:00Z`),
+      }));
+      const db = makeDb(buildSubjectRow(null), {
+        sessionRow: buildSessionRow({
+          escalationRung: 3,
+          exchangeCount: 4,
+          metadata,
+        }),
+        events,
+      });
+
+      const result = await prepareExchangeContext(
+        db,
+        PROFILE_ID,
+        SESSION_ID,
+        message,
+        {
+          semanticMemoryRetrievalEnabled: false,
+          answerEvaluationEnabled: true,
+        },
+      );
+
+      expect(result.sourceCorrectStreak).toBe(4);
+      expect(result.escalationDecision).toMatchObject({
+        action: 'hold',
+        direction: 'none',
+        newRung: 3,
+      });
+      expect(result.effectiveRung).toBe(3);
+      expect({
+        promptCorrectStreak: result.context.correctStreak,
+        promptIncludesAdaptiveEscalation: buildSystemPrompt(
+          result.context,
+        ).includes('ADAPTIVE ESCALATION'),
+        offerTelemetry: buildCorrectStreakOfferTelemetry(SESSION_ID, {
+          correctStreak: result.context.correctStreak,
+          rungDirection: result.escalationDecision.direction,
+        }),
+      }).toEqual({
+        promptCorrectStreak: undefined,
+        promptIncludesAdaptiveEscalation: false,
+        offerTelemetry: undefined,
+      });
+    },
+  );
+
+  it('scopes question and streak counts to the latest contiguous rung visit', async () => {
+    const makeEvent = (id: string, escalationRung: number) => ({
+      id,
+      eventType: 'ai_response',
+      content: 'Keep going.',
+      metadata: {
+        escalationRung,
+        answerEvaluation: { correctness: 'correct' },
+      },
+      createdAt: new Date('2026-01-02T10:00:00Z'),
+    });
+    // findMany returns DESC and prepareExchangeContext reverses to chronological.
+    const events = [
+      makeEvent('new-r3', 3),
+      makeEvent('visit-r4', 4),
+      makeEvent('old-r3-3', 3),
+      makeEvent('old-r3-2', 3),
+      makeEvent('old-r3-1', 3),
+    ];
+    const db = makeDb(buildSubjectRow(null), {
+      sessionRow: buildSessionRow({ escalationRung: 3, exchangeCount: 5 }),
+      events,
+    });
+
+    const result = await prepareExchangeContext(
+      db,
+      PROFILE_ID,
+      SESSION_ID,
+      'maybe',
+      {
+        semanticMemoryRetrievalEnabled: false,
+        answerEvaluationEnabled: true,
+      },
+    );
+
+    expect(result.sourceCorrectStreak).toBe(1);
+    expect(result.escalationDecision.direction).toBe('none');
+    expect(result.effectiveRung).toBe(3);
   });
 });

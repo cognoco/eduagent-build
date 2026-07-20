@@ -7,6 +7,7 @@ import {
   streamFallbackFrameSchema,
   UpstreamLlmError,
   type QuotaModel,
+  type AnswerEvaluation,
   type SubscriptionTier,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -43,6 +44,7 @@ interface DoneFrameSource {
   challengeOffer?: { pitch: string };
   draftedNote?: unknown;
   mentorNotice?: unknown;
+  answerEvaluation?: AnswerEvaluation;
 }
 
 type SessionMessageInput = Parameters<typeof processMessage>[3];
@@ -112,6 +114,7 @@ export function buildDoneFramePayload(source: DoneFrameSource) {
     challengeOffer: source.challengeOffer,
     draftedNote: source.draftedNote,
     mentorNotice: source.mentorNotice,
+    answerEvaluation: source.answerEvaluation,
   });
 }
 
@@ -168,6 +171,7 @@ function buildProcessOptions(
     memoryFactsReadEnabled: options.memoryFactsReadEnabled,
     memoryFactsRelevanceEnabled: options.memoryFactsRelevanceEnabled,
     challengeRoundRuntimeEnabled: options.challengeRoundRuntimeEnabled,
+    answerEvaluationEnabled: options.answerEvaluationEnabled,
     mentorNoticeEnabled: options.mentorNoticeEnabled,
     reviewCallbackOpenerEnabled: options.reviewCallbackOpenerEnabled,
     judgeFrameworkEnabled: options.judgeFrameworkEnabled,

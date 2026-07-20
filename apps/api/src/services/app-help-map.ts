@@ -4,6 +4,7 @@ import type {
   AppShell,
   ChallengeRoundEvaluationItem,
   ChallengeRoundNoteDraftHint,
+  AnswerEvaluation,
 } from '@eduagent/schemas';
 
 // Every label MUST match the exact string visible in the app. Tests in
@@ -364,6 +365,7 @@ interface ParsedSignals {
   notePromptPostSession: boolean;
   challengeRoundOffer?: boolean;
   challengeRoundEvaluation?: ChallengeRoundEvaluationItem[];
+  answerEvaluation?: AnswerEvaluation;
   noteDraft?: ChallengeRoundNoteDraftHint | null;
   fluencyDrill: unknown;
   readyToFinish: boolean;
@@ -379,6 +381,7 @@ export function applyAppHelpSignalGuard<T extends ParsedSignals>(parsed: T): T {
     notePromptPostSession: false,
     challengeRoundOffer: false,
     challengeRoundEvaluation: [],
+    answerEvaluation: undefined,
     noteDraft: null,
     readyToFinish: false,
     fluencyDrill: null,
