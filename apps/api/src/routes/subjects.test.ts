@@ -73,6 +73,20 @@ jest.mock(
   },
 );
 
+// [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
+// calls verifyPersonOwnershipV2 — a raw db.select() membership query the
+// stub `db` ({}) in this file cannot satisfy. Every isOwner:true scenario in
+// this file is a caller-self write (makeApp sets callerPersonId equal to
+// profileId); the cross-account write attack this guard exists to close is
+// covered by the real-DB break test in
+// tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's stub-db environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -111,6 +125,9 @@ type TestEnv = {
     profileMeta:
       | { isOwner: boolean; resolvedVia: 'auto' | 'explicit-header' }
       | undefined;
+    // [WI-2398] Required by assertCanWriteProfile (see makeApp below).
+    account: { id: string } | undefined;
+    callerPersonId: string | undefined;
   };
 };
 
@@ -121,11 +138,18 @@ function makeApp(opts?: {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
     c.set('db', {} as Database);
-    c.set('profileId', opts?.profileId ?? PROFILE_ID);
+    const profileId = opts?.profileId ?? PROFILE_ID;
+    c.set('profileId', profileId);
     c.set(
       'profileMeta',
       opts?.profileMeta ?? { isOwner: true, resolvedVia: 'explicit-header' },
     );
+    // [WI-2398] Caller-self identity — assertNotProxyMode now also calls
+    // assertCanWriteProfile, which requires account + callerPersonId.
+    // verifyPersonOwnershipV2 is mocked to succeed at file scope regardless
+    // of the stub `db`, so any non-null callerPersonId satisfies the guard.
+    c.set('account', { id: 'test-account-id' });
+    c.set('callerPersonId', profileId);
     await next();
   });
   app.onError((err, c) =>

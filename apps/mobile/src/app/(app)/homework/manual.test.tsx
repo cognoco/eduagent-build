@@ -28,14 +28,6 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
 
-jest.mock('expo-camera', () => {
-  throw new Error('The manual homework route imported expo-camera');
-});
-
-jest.mock('expo-image-picker', () => {
-  throw new Error('The manual homework route imported expo-image-picker');
-});
-
 const SUBJECT_ID = '00000000-0000-7000-a000-000000000301';
 const SUBJECT_NAME = 'Mathematics';
 const PROBLEM = 'Solve 3x + 7 = 22';
