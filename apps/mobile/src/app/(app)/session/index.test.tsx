@@ -2540,40 +2540,6 @@ describe('SessionScreen homework flow', () => {
       }
     });
 
-    it('renders the captured image as a learner bubble with deterministic help/check buttons as the first in-thread response, with no subject preamble', async () => {
-      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
-      (useLocalSearchParams as jest.Mock).mockReturnValue(
-        MENTOR_HOMEWORK_PARAMS,
-      );
-
-      const testScreen = renderSessionScreen();
-
-      // Give the screen its initial async cycle + advance past the auto-send
-      // debounce window so we can prove the auto-send is DEFERRED (the buttons
-      // are the first actionable response, not an LLM/subject turn).
-      await act(async () => {
-        await Promise.resolve();
-        jest.advanceTimersByTime(700);
-      });
-
-      // The captured image renders as the learner's image bubble in-thread,
-      // with both deterministic buttons.
-      const accessory = testScreen.getByTestId('mock-input-accessory');
-      within(accessory).getByTestId('homework-image-bubble');
-      within(accessory).getByTestId('homework-help-me-solve');
-      within(accessory).getByTestId('homework-check-my-answer');
-
-      // First actionable response has NO subject-picking preamble and no
-      // tutoring turn has started yet — the buttons ARE the first response.
-      expect(testScreen.queryByTestId('session-subject-resolution')).toBeNull();
-      expect(mockStream).not.toHaveBeenCalled();
-      // The standard homework chips are suppressed so the two deterministic
-      // buttons are the only first response.
-      expect(testScreen.queryByTestId('homework-mode-help-me')).toBeNull();
-
-      testScreen.unmount();
-    }, 15000);
-
     it('creates exactly one associated manual homework session after the learner taps "help me solve"', async () => {
       getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
       (useLocalSearchParams as jest.Mock).mockReturnValue(

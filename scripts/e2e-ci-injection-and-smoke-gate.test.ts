@@ -1118,6 +1118,29 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           command.optional !== true &&
           command.tapOn?.id === id,
       );
+    const hasSequenceBoundSubjectReadiness = (
+      items: MaestroCommand[],
+    ): boolean => {
+      const exactTypedProblem = items.findIndex(
+        (command) =>
+          command.optional !== true &&
+          exactSelector(command.assertVisible, {
+            id: 'result-text-input',
+            text: 'Solve 3x + 7 = 22',
+          }),
+      );
+      const subjectReadiness = items.findIndex(
+        (command, index) =>
+          index > exactTypedProblem &&
+          command.optional !== true &&
+          command.extendedWaitUntil?.timeout === 60_000 &&
+          exactSelector(command.extendedWaitUntil.visible, {
+            id: 'homework-subject-resolution-ready',
+          }),
+      );
+
+      return exactTypedProblem >= 0 && subjectReadiness > exactTypedProblem;
+    };
     const containsOptionalTrue = (value: unknown): boolean => {
       if (Array.isArray(value)) return value.some(containsOptionalTrue);
       if (!value || typeof value !== 'object') return false;
@@ -1155,12 +1178,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ).toBeGreaterThan(-1);
     expect(
       mandatoryExtendedWait({ id: 'homework-first-response-complete' }, 60_000),
-    ).toBeGreaterThan(-1);
-    expect(
-      mandatoryExtendedWait(
-        { id: 'homework-subject-resolution-ready' },
-        60_000,
-      ),
     ).toBeGreaterThan(-1);
     const deviceOnlySelector =
       /(camera|gallery|ocr|permission|shutter|flash|retake|message-image|homework-image)/i;
@@ -1335,6 +1352,33 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(emptyManualEntry).toBeGreaterThan(secondManualLaunch);
     expect(exactProblemInput).toBeGreaterThan(emptyManualEntry);
     expect(exactTypedProblem).toBeGreaterThan(exactProblemInput);
+
+    expect(hasSequenceBoundSubjectReadiness(commands)).toBe(true);
+    const subjectReadinessCommands = commands.filter(
+      (command) =>
+        command.optional !== true &&
+        command.extendedWaitUntil?.timeout === 60_000 &&
+        exactSelector(command.extendedWaitUntil.visible, {
+          id: 'homework-subject-resolution-ready',
+        }),
+    );
+    const commandsWithoutSubjectReadiness = commands.filter(
+      (command) => !subjectReadinessCommands.includes(command),
+    );
+    const readinessCancelPhaseIndex = commandsWithoutSubjectReadiness.findIndex(
+      (command) => command.tapOn?.id === 'manual-entry-cancel',
+    );
+    const readinessMovedIntoCancelPhase = [
+      ...commandsWithoutSubjectReadiness.slice(
+        0,
+        readinessCancelPhaseIndex + 1,
+      ),
+      ...subjectReadinessCommands,
+      ...commandsWithoutSubjectReadiness.slice(readinessCancelPhaseIndex + 1),
+    ];
+    expect(
+      hasSequenceBoundSubjectReadiness(readinessMovedIntoCancelPhase),
+    ).toBe(false);
 
     expect(hasSequenceBoundSessionEvidence(commands)).toBe(true);
     const sessionEvidenceCommands = commands.filter(
