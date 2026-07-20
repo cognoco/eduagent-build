@@ -127,7 +127,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       // otherwise unguarded (not metered), so a parent acting as a child could
       // erase the child's memory items here. assertCanManageOwnConsent is not
       // used because erasure is not a consent toggle.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
@@ -344,7 +344,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       // parent acting as a child (isOwner === false) must not inject
       // mentor-memory content via the child's self screen; the owner-gated
       // /:profileId/tell route is the sanctioned parent path.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { text } = c.req.valid('json');
       const result = await parseLearnerInput(db, profileId, text, 'learner');
@@ -380,7 +380,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       // inference is a memory-content write, not a consent toggle, and the
       // self route was unguarded. Proxy callers use the owner-gated
       // /:profileId/unsuppress route.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;
@@ -426,7 +426,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       // the self route, bypassing the owner + parent-link verification on the
       // /:profileId/accommodation-mode route. A proxy caller must use that
       // owner-gated route instead.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const accountId = requireAccount(c.get('account')).id;

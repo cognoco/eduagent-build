@@ -75,7 +75,7 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
     zValidator('json', parkingLotAddSchema),
     async (c) => {
       // [WI-161 / DS-072] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { question } = c.req.valid('json');
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));

@@ -577,7 +577,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // Metering runs before route handlers. Run the proxy guard here too so a
     // parent viewing a child profile cannot burn quota on a request that the
     // endpoint would later reject.
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
 
     if (!profileId) {
       return profileRequiredResponse(c);

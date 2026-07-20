@@ -34,7 +34,7 @@ type HomeworkRouteEnv = {
 export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
   // Start a homework help session
   .post('/subjects/:subjectId/homework', async (c) => {
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');

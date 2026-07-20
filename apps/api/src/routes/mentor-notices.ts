@@ -40,7 +40,7 @@ export const mentorNoticeRoutes = new Hono<MentorNoticeRouteEnv>()
     '/mentor-notices/:noticeId/recheck',
     zValidator('param', noticeParamsSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       if (!isMentorNoticeEnabled(c.env.MENTOR_NOTICE_ENABLED)) {
         return apiError(
           c,
@@ -68,7 +68,7 @@ export const mentorNoticeRoutes = new Hono<MentorNoticeRouteEnv>()
     '/mentor-notices/:noticeId/defer',
     zValidator('param', noticeParamsSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       if (!isMentorNoticeEnabled(c.env.MENTOR_NOTICE_ENABLED)) {
         return apiError(
           c,

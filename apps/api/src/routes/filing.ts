@@ -65,7 +65,7 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
     zValidator('json', retryRequestSchema),
     async (c) => {
       // [WI-153 / DS-064] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { sessionId, sessionMode } = c.req.valid('json');
@@ -116,7 +116,7 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
   )
   .post('/filing', zValidator('json', filingRequestSchema), async (c) => {
     // [WI-153 / DS-064] Server-derived proxy-mode write guard.
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
     const body = c.req.valid('json');

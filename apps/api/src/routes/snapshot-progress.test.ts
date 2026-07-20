@@ -24,14 +24,30 @@ jest.mock(
   },
 );
 
+// [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
+// calls verifyPersonOwnershipV2 — a raw db.select() membership query the
+// stub `db` ({}) in this file cannot satisfy. The isOwner:true scenarios
+// below are caller-self writes (callerPersonId is set equal to profileId in
+// makeProxyApp); the cross-account write attack this guard exists to close
+// is covered by the real-DB break test in
+// tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's stub-db environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { Hono } from 'hono';
 import { snapshotProgressRoutes } from './snapshot-progress';
+
+const PROFILE_ID = 'a0000000-0000-4000-a000-000000000001';
 
 function makeProxyApp(opts?: { isOwner?: boolean }) {
   const app = new Hono();
   app.use('*', async (c, next) => {
     c.set('db' as never, {});
-    c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+    c.set('profileId' as never, PROFILE_ID);
     c.set('account' as never, { id: 'test-account-id' });
     c.set('user' as never, { id: 'test-user' });
     const isOwner = opts?.isOwner ?? false;
@@ -39,6 +55,9 @@ function makeProxyApp(opts?: { isOwner?: boolean }) {
       isOwner,
       resolvedVia: isOwner ? 'explicit-header' : 'auto',
     });
+    // [WI-2398] Caller-self identity — assertNotProxyMode now also calls
+    // assertCanWriteProfile, which requires account + callerPersonId.
+    c.set('callerPersonId' as never, PROFILE_ID);
     await next();
   });
   app.route('/', snapshotProgressRoutes);

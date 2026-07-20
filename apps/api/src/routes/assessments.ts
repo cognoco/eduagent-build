@@ -49,7 +49,7 @@ type AssessmentRouteEnv = RouteEnv & {
 export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
   // Start a topic completion assessment
   .post('/subjects/:subjectId/topics/:topicId/assessments', async (c) => {
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const { db, profileId } = withProfile(c);
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
@@ -101,7 +101,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
     '/assessments/:assessmentId/answer',
     zValidator('json', assessmentAnswerSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const assessmentId = c.req.param('assessmentId');
       const { answer } = c.req.valid('json');
@@ -183,7 +183,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
   )
 
   .patch('/assessments/:assessmentId/decline-refresh', async (c) => {
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const { db, profileId } = withProfile(c);
     const assessmentId = c.req.param('assessmentId');
 

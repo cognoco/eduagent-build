@@ -345,3 +345,60 @@ export async function assertCanReadProfile(
     throw new ForbiddenError(message);
   }
 }
+
+type CanWriteProfileSource = CanReadProfileSource;
+
+/**
+ * [WI-2398 — write-side IDOR] Write-authority twin of assertCanReadProfile,
+ * used by assertNotProxyMode (middleware/proxy-guard.ts).
+ *
+ * assertNotProxyMode's pre-existing checks (isOwner === true, resolvedVia ===
+ * 'explicit-header') only prove that the client-supplied X-Profile-Id
+ * resolves to SOME owner-role profile in the caller's org — never that it is
+ * the caller's OWN identity. A non-owner member (own login, own
+ * callerPersonId) can send X-Profile-Id = a DIFFERENT owner/admin profile's
+ * id and pass those checks while acting as themselves, mutating that
+ * profile's self-service data (curriculum skip/unskip/challenge/topics,
+ * onboarding pronouns/interests, and every other write gated solely by
+ * assertNotProxyMode). That is the exact IDOR this guard closes.
+ *
+ * Currently logic-identical to assertCanReadProfile (both wrap
+ * verifyPersonOwnershipV2 with the same self-or-guardian authority rule and
+ * error remapping) — kept as a separate, named export for call-site clarity
+ * (a write call site should not read "assertCanReadProfile") and because read
+ * and write authority are independently ruled by product/security and may
+ * diverge in the future.
+ */
+export async function assertCanWriteProfile(
+  source: CanWriteProfileSource,
+  targetProfileId: string,
+  message = 'You are not authorized to modify this profile.',
+): Promise<void> {
+  const account = source.get('account');
+  const callerPersonId = source.get('callerPersonId');
+  if (!account || !callerPersonId) {
+    throw new ForbiddenError(message);
+  }
+  const db = source.get('db');
+  try {
+    await verifyPersonOwnershipV2(
+      db,
+      targetProfileId,
+      account.id,
+      callerPersonId,
+    );
+  } catch (err) {
+    // Credentialed-charge suppression already throws ForbiddenError — 403.
+    if (err instanceof ForbiddenError) throw err;
+    // Bare Error (self/guardian miss, non-membership, OR an underlying DB
+    // failure — verifyPersonOwnershipV2 does not distinguish "no authority"
+    // from infra errors by type) — fail closed to 403, but capture it so a
+    // DB outage surfaces in Sentry instead of silently reading as "denied"
+    // (repo rule: silent recovery without escalation is banned in auth code).
+    captureException(err, {
+      tags: { surface: 'family-access.assertCanWriteProfile' },
+      extra: { targetProfileId },
+    });
+    throw new ForbiddenError(message);
+  }
+}

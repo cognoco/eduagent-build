@@ -181,7 +181,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       // [WI-160 / DS-071] Self-edit must be from an owner-profile session.
       // A parent in proxy mode (active profile = child, but old enough) should
       // use the /onboarding/:profileId/pronouns route instead.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { pronouns } = c.req.valid('json');
       try {
         await dispatchUpdatePronouns(db, profileId, account.id, pronouns);
@@ -237,7 +237,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       // /onboarding/:profileId/interests/context route instead, not the
       // self-edit path. (The prior "interests are personal" comment described
       // child-as-owner self-editing, which assertNotProxyMode preserves.)
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { interests } = c.req.valid('json');
       try {
         await updateInterestsContext(db, profileId, account.id, interests);
