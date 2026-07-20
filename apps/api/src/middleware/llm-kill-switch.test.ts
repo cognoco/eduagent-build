@@ -87,7 +87,6 @@ import { writeLlmKillSwitch, LLM_KILL_SWITCH_KEY } from '../services/kv';
 
 type LlmTestEnv = {
   Bindings: {
-    GEMINI_API_KEY?: string;
     OPENAI_API_KEY?: string;
     ANTHROPIC_API_KEY?: string;
     CEREBRAS_API_KEY?: string;
