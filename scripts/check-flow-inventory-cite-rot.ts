@@ -1,12 +1,32 @@
 // scripts/check-flow-inventory-cite-rot.ts
 //
 // Cite-rot guard for docs/flows/mobile-app-flow-inventory.md (WI-2198 AC-7).
-// The inventory's ~280 rows cite source files (with or without `:line` /
+// The inventory's ~290 rows cite source files (with or without `:line` /
 // `:start-end`), Playwright specs, Maestro flow yamls, and eas.json — every
 // citation is backtick-quoted. This is the "consistency check" the AC's
 // preamble calls for: it flags rows whose declared shell/flag state cites a
 // file or line that no longer exists, i.e. exactly the "stale referenced test
 // files/routes" clause.
+//
+// WI-2198 rework (AC-7): the original pass only checked file/line existence
+// — a citation-existence axis. The rejected review found that insufficient:
+// the AC also requires flagging "inventory rows whose declared flag/shell
+// state no longer matches the canonical navigation contract." Three more
+// mechanical (still cite-rot-style, not a new harness — the AC's own
+// refinement note) checks cover that axis:
+//   1. Row-ID cross-links: a bare (non-backtick) token shaped like a row ID
+//      referenced from another row's prose (e.g. "(V2-05)") must resolve to
+//      a real defined row or an explicitly-removed one (## Removed in this
+//      refresh). This is the exact class of bug a prior pass introduced —
+//      the V2 section intro cited a nonexistent "V2-05" instead of the real
+//      V2-SCOPE-01/02 rows.
+//   2. Flag tokens: every `MODE_NAV_V\d_ENABLED` / `EXPO_PUBLIC_ENABLE_MODE_NAV*`
+//      token cited must be a real symbol in feature-flags.ts — catches a
+//      flag name drifting out of sync with the doc's own nav-shell claims.
+//   3. Legacy tags: every `**legacy-xxx**` inline tag must be one of the
+//      three tags the Status legend defines (legacy-current /
+//      -superseded / -historical) — catches a typo'd tag silently reading
+//      as prose instead of a real classification.
 //
 // Resolution model — deliberately basename-based, not exact-path:
 //   The doc's own citation convention is inconsistent about directory
@@ -178,6 +198,158 @@ export interface Failure {
   reason: string;
 }
 
+// ── Row-ID cross-link check (AC-7 axis 1) ──────────────────────────────
+
+const ID_LINE_START_RE = /^\|\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{1,3})\s*\|/;
+// Any bare (non-backtick) ID-shaped token appearing anywhere in the doc —
+// deliberately broad; the prefix allowlist below (built from real defined
+// IDs) is what keeps this from matching unrelated things like BUG-236 or
+// WI-2198, whose prefixes ("BUG", "WI") never appear as a real row-ID
+// family, so they're never even considered.
+const ID_TOKEN_RE = /\b([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{1,3})\b/g;
+const REMOVED_SECTION_RE = /## Removed in this refresh\n([\s\S]*?)(?=\n## |$)/;
+
+/** Pure: every row ID defined at the start of a table row, e.g. "HOME-03". */
+export function extractDefinedRowIds(docBody: string): Set<string> {
+  const ids = new Set<string>();
+  for (const line of docBody.split('\n')) {
+    const m = line.match(ID_LINE_START_RE);
+    if (m) ids.add(m[1]);
+  }
+  return ids;
+}
+
+/** Pure: IDs the doc explicitly documents as removed (e.g. "SUBJECT-16" in
+ * "## Removed in this refresh") — a reference to one of these is a
+ * deliberate historical pointer, not a stale cross-link. */
+export function extractRemovedRowIds(docBody: string): Set<string> {
+  const section = docBody.match(REMOVED_SECTION_RE)?.[1] ?? '';
+  const ids = new Set<string>();
+  for (const m of section.matchAll(/\*\*([A-Z][A-Z0-9-]+)\*\*/g)) {
+    ids.add(m[1]);
+  }
+  return ids;
+}
+
+/** Pure: the family-prefix of a row ID — "HOME-03" -> "HOME",
+ * "V2-CHROME-01" -> "V2-CHROME". Only the part before the trailing numeric
+ * segment. */
+function idFamily(id: string): string {
+  return id.replace(/-\d{1,3}$/, '');
+}
+
+export interface RowIdLinkFailure {
+  token: string;
+  reason: string;
+}
+
+/** Pure: scans the doc body for bare ID-shaped tokens and flags any whose
+ * family matches a real row-ID family (defined or explicitly-removed) but
+ * whose full token does not resolve to either set — plus the special case
+ * of a bare "V2-NN" token, which is never a real ID shape (real V2-shell
+ * rows are always three-part: V2-CHROME-01, V2-SCOPE-01, ...). */
+export function checkRowIdCrossLinks(docBody: string): RowIdLinkFailure[] {
+  const defined = extractDefinedRowIds(docBody);
+  const removed = extractRemovedRowIds(docBody);
+  const knownFamilies = new Set<string>();
+  for (const id of defined) knownFamilies.add(idFamily(id));
+  for (const id of removed) knownFamilies.add(idFamily(id));
+
+  const failures: RowIdLinkFailure[] = [];
+  const seen = new Set<string>();
+  for (const m of docBody.matchAll(ID_TOKEN_RE)) {
+    const token = m[1];
+    if (seen.has(token)) continue;
+    seen.add(token);
+    if (defined.has(token) || removed.has(token)) continue;
+
+    if (/^V2-\d{1,3}$/.test(token)) {
+      failures.push({
+        token,
+        reason:
+          'looks like a V2-shell row reference but real V2 rows are three-part IDs (V2-CHROME-01, V2-SCOPE-01, ...) — this bare form never resolves',
+      });
+      continue;
+    }
+
+    const family = idFamily(token);
+    if (knownFamilies.has(family)) {
+      failures.push({
+        token,
+        reason: `no row is defined with this ID, and it is not in "## Removed in this refresh"`,
+      });
+    }
+  }
+  return failures;
+}
+
+// ── Flag-token check (AC-7 axis 2) ─────────────────────────────────────
+
+const FLAG_TOKEN_RE =
+  /\b(MODE_NAV_V\d_ENABLED|EXPO_PUBLIC_ENABLE_MODE_NAV(?:_V\d)?)\b/g;
+
+export interface FlagTokenFailure {
+  token: string;
+  reason: string;
+}
+
+/** Pure given feature-flags.ts source: every `MODE_NAV_V*_ENABLED` /
+ * `EXPO_PUBLIC_ENABLE_MODE_NAV*` token cited in the doc must appear as a
+ * real symbol in the flags file — catches a flag name drifting out of sync
+ * with the doc's own nav-shell claims. */
+export function checkFlagTokens(
+  docBody: string,
+  featureFlagsSource: string,
+): FlagTokenFailure[] {
+  const failures: FlagTokenFailure[] = [];
+  const seen = new Set<string>();
+  for (const m of docBody.matchAll(FLAG_TOKEN_RE)) {
+    const token = m[1];
+    if (seen.has(token)) continue;
+    seen.add(token);
+    if (!featureFlagsSource.includes(token)) {
+      failures.push({
+        token,
+        reason: `not found in apps/mobile/src/lib/feature-flags.ts`,
+      });
+    }
+  }
+  return failures;
+}
+
+// ── Legacy-tag validity check (AC-7 axis 3) ────────────────────────────
+
+const VALID_LEGACY_TAGS = new Set([
+  'legacy-current',
+  'legacy-superseded',
+  'legacy-historical',
+]);
+const LEGACY_TAG_RE = /\*\*(legacy-[a-zA-Z0-9-]+)\*\*/g;
+
+export interface LegacyTagFailure {
+  token: string;
+  reason: string;
+}
+
+/** Pure: every `**legacy-xxx**` inline tag must be one of the three tags
+ * the Status legend defines — catches a typo silently reading as prose. */
+export function checkLegacyTags(docBody: string): LegacyTagFailure[] {
+  const failures: LegacyTagFailure[] = [];
+  const seen = new Set<string>();
+  for (const m of docBody.matchAll(LEGACY_TAG_RE)) {
+    const token = m[1];
+    if (seen.has(token)) continue;
+    seen.add(token);
+    if (!VALID_LEGACY_TAGS.has(token)) {
+      failures.push({
+        token,
+        reason: `not one of the defined V0/V1 legacy-insurance tags (${[...VALID_LEGACY_TAGS].join(', ')})`,
+      });
+    }
+  }
+  return failures;
+}
+
 /** Pure given a line-count lookup — resolves one citation against the index.
  * `getLineCount` is injected so tests can avoid touching the real filesystem. */
 export function resolveCitation(
@@ -251,18 +423,44 @@ function main(): number {
     if (failure) failures.push(failure);
   }
 
-  if (failures.length > 0) {
+  const featureFlagsPath = path.join(
+    REPO_ROOT,
+    'apps/mobile/src/lib/feature-flags.ts',
+  );
+  const featureFlagsSource = fs.existsSync(featureFlagsPath)
+    ? fs.readFileSync(featureFlagsPath, 'utf8')
+    : '';
+  const rowIdFailures = checkRowIdCrossLinks(docBody);
+  const flagTokenFailures = checkFlagTokens(docBody, featureFlagsSource);
+  const legacyTagFailures = checkLegacyTags(docBody);
+
+  const totalFailures =
+    failures.length +
+    rowIdFailures.length +
+    flagTokenFailures.length +
+    legacyTagFailures.length;
+
+  if (totalFailures > 0) {
     process.stderr.write(
-      `flow-inventory-cite-rot: ${failures.length} of ${citations.length} citation(s) in ${path.relative(REPO_ROOT, DOC_PATH)} are stale:\n`,
+      `flow-inventory-cite-rot: ${totalFailures} problem(s) in ${path.relative(REPO_ROOT, DOC_PATH)}:\n`,
     );
     for (const f of failures) {
-      process.stderr.write(`  ${f.citation} — ${f.reason}\n`);
+      process.stderr.write(`  [citation] ${f.citation} — ${f.reason}\n`);
+    }
+    for (const f of rowIdFailures) {
+      process.stderr.write(`  [row-id] ${f.token} — ${f.reason}\n`);
+    }
+    for (const f of flagTokenFailures) {
+      process.stderr.write(`  [flag] ${f.token} — ${f.reason}\n`);
+    }
+    for (const f of legacyTagFailures) {
+      process.stderr.write(`  [legacy-tag] ${f.token} — ${f.reason}\n`);
     }
     return 1;
   }
 
   process.stdout.write(
-    `flow-inventory-cite-rot: clean (${citations.length} citations resolved).\n`,
+    `flow-inventory-cite-rot: clean (${citations.length} citations, ${extractDefinedRowIds(docBody).size} row IDs, row-id links, flag tokens, and legacy tags all resolve).\n`,
   );
   return 0;
 }
