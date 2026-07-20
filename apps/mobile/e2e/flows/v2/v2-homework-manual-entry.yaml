@@ -83,6 +83,8 @@ tags:
 - assertVisible:
     id: 'homework-help-me-solve'
     enabled: true
+- assertNotVisible:
+    id: 'session-subject-resolution'
 - tapOn:
     id: 'homework-help-me-solve'
 

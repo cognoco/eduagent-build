@@ -94,6 +94,7 @@ test('V2 Mentor trial-active manual homework creates one associated session, rec
       isSessionCreate(response.request()) && response.status() === 201,
     { timeout: 60_000 },
   );
+  await expect(page.getByTestId('session-subject-resolution')).toHaveCount(0);
   await pressableClick(page.getByTestId('homework-help-me-solve'));
   const createdResponse = await created;
   const createdSession = (

@@ -1266,35 +1266,203 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const hasSequenceBoundSessionEvidence = (
       items: MaestroCommand[],
     ): boolean => {
-      const tapIn = (id: string, startAt = 0): number =>
-        items.findIndex(
-          (command, index) =>
-            index >= startAt &&
-            command.optional !== true &&
-            command.tapOn?.id === id,
+      type RawCommandObject = Record<string, unknown>;
+      const asCommandObject = (value: unknown): RawCommandObject | null =>
+        value !== null && typeof value === 'object' && !Array.isArray(value)
+          ? (value as RawCommandObject)
+          : null;
+      let hasInvalidExecutableChild = false;
+      const directExecutableChildren = (
+        command: MaestroCommand,
+      ): MaestroCommand[] =>
+        Object.values(command as unknown as RawCommandObject).flatMap(
+          (operatorValue) => {
+            const operator = asCommandObject(operatorValue);
+            const rawChildren = operator?.['commands'];
+            if (!Array.isArray(rawChildren)) return [];
+            return rawChildren.flatMap((child) => {
+              if (!asCommandObject(child)) {
+                hasInvalidExecutableChild = true;
+                return [];
+              }
+              return [child as MaestroCommand];
+            });
+          },
         );
-      const manualMarkerWaitIn = (startAt: number): number =>
-        items.findIndex(
-          (command, index) =>
-            index >= startAt &&
-            command.optional !== true &&
-            command.extendedWaitUntil?.timeout === 15_000 &&
-            exactSelector(command.extendedWaitUntil.visible, {
-              id: 'homework-entry-mode-manual',
-            }),
-        );
-      const firstHomeworkLaunch = tapIn('mentor-bar-homework-chip');
-      const firstManualMarker = manualMarkerWaitIn(firstHomeworkLaunch + 1);
-      const cancel = tapIn('manual-entry-cancel', firstManualMarker + 1);
-      const secondHomeworkLaunch = tapIn(
+      const collectNestedCommands = (
+        commands: MaestroCommand[],
+      ): MaestroCommand[] =>
+        commands.flatMap((command) => {
+          const nested = directExecutableChildren(command);
+          return [...nested, ...collectNestedCommands(nested)];
+        });
+      const nestedCommands = collectNestedCommands(items);
+      const criticalTapIds = new Set([
         'mentor-bar-homework-chip',
-        cancel + 1,
-      );
-      const secondManualMarker = manualMarkerWaitIn(secondHomeworkLaunch + 1);
-      const helpAction = tapIn(
+        'manual-entry-cancel',
+        'confirm-button',
         'homework-help-me-solve',
-        secondManualMarker + 1,
+      ]);
+      const criticalWaitIds = new Set([
+        'homework-entry-mode-manual',
+        'homework-subject-resolution-ready',
+        'session-screen',
+      ]);
+      const targetsCriticalJourney = (command: MaestroCommand): boolean =>
+        (command.tapOn?.id !== undefined &&
+          criticalTapIds.has(command.tapOn.id)) ||
+        (command.extendedWaitUntil?.visible?.id !== undefined &&
+          criticalWaitIds.has(command.extendedWaitUntil.visible.id)) ||
+        command.assertVisible?.id === 'homework-help-me-solve' ||
+        command.assertNotVisible?.id === 'session-subject-resolution' ||
+        command.inputText === 'Solve 3x + 7 = 22';
+      const rawOperator = (
+        command: MaestroCommand,
+        name: 'runFlow' | 'retry',
+      ): unknown => (command as unknown as RawCommandObject)[name];
+      const hasOpaqueExecutableReference = (
+        command: MaestroCommand,
+        topLevelIndex?: number,
+      ): boolean =>
+        (['runFlow', 'retry'] as const).some((name) => {
+          const raw = rawOperator(command, name);
+          if (raw === undefined) return false;
+          const operator = asCommandObject(raw);
+          if (!operator) return true;
+          if (operator['file'] === undefined) return false;
+          return !(
+            name === 'runFlow' &&
+            topLevelIndex === 0 &&
+            operator['file'] === '../_setup/seed-and-sign-in.yaml'
+          );
+        });
+      const canonicalSetup = asCommandObject(rawOperator(items[0]!, 'runFlow'));
+      if (
+        hasInvalidExecutableChild ||
+        canonicalSetup?.['file'] !== '../_setup/seed-and-sign-in.yaml' ||
+        items.some((command, index) =>
+          hasOpaqueExecutableReference(command, index),
+        ) ||
+        nestedCommands.some((command) =>
+          hasOpaqueExecutableReference(command),
+        ) ||
+        nestedCommands.some(targetsCriticalJourney)
+      ) {
+        return false;
+      }
+      const matchingIndices = (
+        predicate: (command: MaestroCommand) => boolean,
+      ): number[] =>
+        items.flatMap((command, index) => (predicate(command) ? [index] : []));
+      const tapTargets = (id: string): number[] =>
+        matchingIndices((command) => command.tapOn?.id === id);
+      const waitTargets = (id: string): number[] =>
+        matchingIndices(
+          (command) => command.extendedWaitUntil?.visible?.id === id,
+        );
+      const visibleTargets = (id: string): number[] =>
+        matchingIndices((command) => command.assertVisible?.id === id);
+      const notVisibleTargets = (id: string): number[] =>
+        matchingIndices((command) => command.assertNotVisible?.id === id);
+      const homeworkLaunches = tapTargets('mentor-bar-homework-chip');
+      const manualMarkers = waitTargets('homework-entry-mode-manual');
+      const cancels = tapTargets('manual-entry-cancel');
+      const exactProblemInputs = matchingIndices(
+        (command) => command.inputText === 'Solve 3x + 7 = 22',
       );
+      const subjectReadinessWaits = waitTargets(
+        'homework-subject-resolution-ready',
+      );
+      const confirms = tapTargets('confirm-button');
+      const sessionArrivals = waitTargets('session-screen');
+      const enabledHelpActions = visibleTargets('homework-help-me-solve');
+      const subjectResolutionAbsences = notVisibleTargets(
+        'session-subject-resolution',
+      );
+      const helpActions = tapTargets('homework-help-me-solve');
+      if (
+        homeworkLaunches.length !== 2 ||
+        manualMarkers.length !== 2 ||
+        cancels.length !== 1 ||
+        exactProblemInputs.length !== 1 ||
+        subjectReadinessWaits.length !== 1 ||
+        confirms.length !== 1 ||
+        sessionArrivals.length !== 1 ||
+        enabledHelpActions.length !== 1 ||
+        subjectResolutionAbsences.length !== 1 ||
+        helpActions.length !== 1
+      ) {
+        return false;
+      }
+      const exactTapAt = (index: number, id: string): boolean => {
+        const command = items[index]!;
+        return (
+          command.optional !== true && exactSelector(command.tapOn, { id })
+        );
+      };
+      const hardWaitAt = (
+        index: number,
+        id: string,
+        timeout: number,
+      ): boolean => {
+        const command = items[index]!;
+        return (
+          command.optional !== true &&
+          command.extendedWaitUntil?.timeout === timeout &&
+          exactSelector(command.extendedWaitUntil.visible, { id })
+        );
+      };
+      if (
+        !homeworkLaunches.every((index) =>
+          exactTapAt(index, 'mentor-bar-homework-chip'),
+        ) ||
+        !manualMarkers.every((index) =>
+          hardWaitAt(index, 'homework-entry-mode-manual', 15_000),
+        ) ||
+        !cancels.every((index) => exactTapAt(index, 'manual-entry-cancel')) ||
+        !exactProblemInputs.every((index) => items[index]!.optional !== true) ||
+        !subjectReadinessWaits.every((index) =>
+          hardWaitAt(index, 'homework-subject-resolution-ready', 60_000),
+        ) ||
+        !confirms.every((index) => exactTapAt(index, 'confirm-button')) ||
+        !sessionArrivals.every((index) =>
+          hardWaitAt(index, 'session-screen', 30_000),
+        ) ||
+        !enabledHelpActions.every((index) => {
+          const command = items[index]!;
+          return (
+            command.optional !== true &&
+            exactSelector(command.assertVisible, {
+              id: 'homework-help-me-solve',
+              enabled: true,
+            })
+          );
+        }) ||
+        !subjectResolutionAbsences.every((index) => {
+          const command = items[index]!;
+          return (
+            command.optional !== true &&
+            exactSelector(command.assertNotVisible, {
+              id: 'session-subject-resolution',
+            })
+          );
+        }) ||
+        !helpActions.every((index) =>
+          exactTapAt(index, 'homework-help-me-solve'),
+        )
+      ) {
+        return false;
+      }
+      const [firstHomeworkLaunch, secondHomeworkLaunch] = homeworkLaunches;
+      const [firstManualMarker, secondManualMarker] = manualMarkers;
+      const cancel = cancels[0]!;
+      const exactProblemInput = exactProblemInputs[0]!;
+      const subjectReadiness = subjectReadinessWaits[0]!;
+      const confirm = confirms[0]!;
+      const sessionArrival = sessionArrivals[0]!;
+      const enabledHelpAction = enabledHelpActions[0]!;
+      const subjectResolutionAbsent = subjectResolutionAbsences[0]!;
+      const helpAction = helpActions[0]!;
       const associationWait = items.findIndex(
         (command, index) => index > helpAction && isAssociationWait(command),
       );
@@ -1321,7 +1489,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         cancel > firstManualMarker &&
         secondHomeworkLaunch > cancel &&
         secondManualMarker > secondHomeworkLaunch &&
-        helpAction > secondManualMarker &&
+        exactProblemInput > secondManualMarker &&
+        subjectReadiness > exactProblemInput &&
+        confirm > subjectReadiness &&
+        sessionArrival > confirm &&
+        enabledHelpAction > sessionArrival &&
+        subjectResolutionAbsent > enabledHelpAction &&
+        helpAction === subjectResolutionAbsent + 1 &&
         associationWait > helpAction &&
         completedResponse > associationWait &&
         finalAssociation > completedResponse &&
@@ -1438,6 +1612,236 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ).toBe(false);
 
     expect(hasSequenceBoundSessionEvidence(commands)).toBe(true);
+    const duplicateEarlyProblemInput = [
+      ...commands.slice(0, secondManualMarker + 1),
+      { inputText: 'Solve 3x + 7 = 22' },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(duplicateEarlyProblemInput)).toBe(
+      false,
+    );
+    const duplicateEarlySubjectReadiness = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        extendedWaitUntil: {
+          visible: { id: 'homework-subject-resolution-ready' },
+          timeout: 60_000,
+        },
+      },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(
+      hasSequenceBoundSessionEvidence(duplicateEarlySubjectReadiness),
+    ).toBe(false);
+    const nearShapeThirdJourney = [
+      {
+        tapOn: {
+          id: 'manual-entry-cancel',
+          retryTapIfNoChange: true,
+        },
+      },
+      {
+        tapOn: {
+          id: 'mentor-bar-homework-chip',
+          retryTapIfNoChange: true,
+        },
+      },
+      {
+        extendedWaitUntil: {
+          visible: {
+            id: 'homework-entry-mode-manual',
+            enabled: true,
+          },
+          timeout: 15_000,
+        },
+      },
+    ] as unknown as MaestroCommand[];
+    const nearShapeThirdJourneyAfterSecondMarker = [
+      ...commands.slice(0, secondManualMarker + 1),
+      ...nearShapeThirdJourney,
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(
+      hasSequenceBoundSessionEvidence(nearShapeThirdJourneyAfterSecondMarker),
+    ).toBe(false);
+    const nestedThirdJourneyCommands: MaestroCommand[] = [
+      { tapOn: { id: 'manual-entry-cancel' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'mentor-screen' },
+          timeout: 15_000,
+        },
+      },
+      { tapOn: { id: 'mentor-bar-homework-chip' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'homework-entry-mode-manual' },
+          timeout: 15_000,
+        },
+      },
+    ];
+    const nestedThirdJourneyAfterSecondMarker = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        runFlow: {
+          when: { visible: { id: 'homework-entry-mode-manual' } },
+          commands: nestedThirdJourneyCommands,
+        },
+      },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(
+      hasSequenceBoundSessionEvidence(nestedThirdJourneyAfterSecondMarker),
+    ).toBe(false);
+    const lateOpaqueSubflow = [
+      ...commands.slice(0, secondManualMarker + 1),
+      { runFlow: { file: '../_setup/opaque-journey.yaml' } },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(lateOpaqueSubflow)).toBe(false);
+    const lateScalarSubflow = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        runFlow: '../_setup/opaque-journey.yaml',
+      } as unknown as MaestroCommand,
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(lateScalarSubflow)).toBe(false);
+    const deepScalarSubflow = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        runFlow: {
+          commands: [
+            {
+              runFlow: {
+                commands: [
+                  {
+                    runFlow: '../_setup/opaque-journey.yaml',
+                  } as unknown as MaestroCommand,
+                ],
+              },
+            },
+          ],
+        },
+      },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(deepScalarSubflow)).toBe(false);
+    const repeatThirdJourney = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        repeat: { times: 1, commands: nestedThirdJourneyCommands },
+      } as unknown as MaestroCommand,
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(repeatThirdJourney)).toBe(false);
+    const retryThirdJourney = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        retry: { maxRetries: 1, commands: nestedThirdJourneyCommands },
+      } as unknown as MaestroCommand,
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(retryThirdJourney)).toBe(false);
+    const opaqueRetryFile = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        retry: { file: '../_setup/opaque-journey.yaml' },
+      } as unknown as MaestroCommand,
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(opaqueRetryFile)).toBe(false);
+    const deepMixedThirdJourney = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        runFlow: {
+          commands: [
+            {
+              repeat: {
+                times: 1,
+                commands: [
+                  {
+                    retry: {
+                      maxRetries: 1,
+                      commands: nestedThirdJourneyCommands,
+                    },
+                  } as unknown as MaestroCommand,
+                ],
+              },
+            } as unknown as MaestroCommand,
+          ],
+        },
+      },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(deepMixedThirdJourney)).toBe(false);
+    const harmlessNestedCommand = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        runFlow: {
+          when: { visible: { id: 'mentor-screen' } },
+          commands: [{ assertVisible: { id: 'mentor-screen' } }],
+        },
+      },
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(harmlessNestedCommand)).toBe(true);
+    const harmlessRepeatAndRetry = [
+      ...commands.slice(0, secondManualMarker + 1),
+      {
+        repeat: {
+          times: 1,
+          commands: [{ assertVisible: { id: 'mentor-screen' } }],
+        },
+      } as unknown as MaestroCommand,
+      {
+        retry: {
+          maxRetries: 1,
+          commands: [{ assertVisible: { id: 'mentor-screen' } }],
+        },
+      } as unknown as MaestroCommand,
+      ...commands.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(harmlessRepeatAndRetry)).toBe(true);
+    const subjectResolutionAbsenceCommands = commands.filter(
+      (command) =>
+        command.optional !== true &&
+        exactSelector(command.assertNotVisible, {
+          id: 'session-subject-resolution',
+        }),
+    );
+    expect(subjectResolutionAbsenceCommands).toHaveLength(1);
+    const commandsWithoutSubjectResolutionAbsence = commands.filter(
+      (command) => !subjectResolutionAbsenceCommands.includes(command),
+    );
+    const subjectAbsenceInCancelPhase = [
+      ...commandsWithoutSubjectResolutionAbsence.slice(0, cancel + 1),
+      ...subjectResolutionAbsenceCommands,
+      ...commandsWithoutSubjectResolutionAbsence.slice(cancel + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(subjectAbsenceInCancelPhase)).toBe(
+      false,
+    );
+    const subjectResolutionAbsenceIndex = commands.indexOf(
+      subjectResolutionAbsenceCommands[0]!,
+    );
+    const prematureSubjectPair = commands.slice(
+      subjectResolutionAbsenceIndex,
+      subjectResolutionAbsenceIndex + 2,
+    );
+    const commandsWithoutSubjectPair = commands.filter(
+      (_command, index) =>
+        index < subjectResolutionAbsenceIndex ||
+        index >= subjectResolutionAbsenceIndex + 2,
+    );
+    const subjectPairBeforeProblemEntry = [
+      ...commandsWithoutSubjectPair.slice(0, secondManualMarker + 1),
+      ...prematureSubjectPair,
+      ...commandsWithoutSubjectPair.slice(secondManualMarker + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(subjectPairBeforeProblemEntry)).toBe(
+      false,
+    );
     const sessionEvidenceCommands = commands.filter(
       (command) =>
         isAssociationWait(command) ||
@@ -1456,6 +1860,46 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ...commandsWithoutSessionEvidence.slice(cancelPhaseIndex + 1),
     ];
     expect(hasSequenceBoundSessionEvidence(evidenceMovedIntoCancelPhase)).toBe(
+      false,
+    );
+    const thirdJourneyOwnedCommands = commands.filter(
+      (command, index) =>
+        (index >= subjectResolutionAbsenceIndex &&
+          index < subjectResolutionAbsenceIndex + 2) ||
+        isAssociationWait(command) ||
+        (command.optional !== true &&
+          command.extendedWaitUntil?.timeout === 60_000 &&
+          exactSelector(command.extendedWaitUntil.visible, {
+            id: 'homework-first-response-complete',
+          })) ||
+        isFinalAssociation(command) ||
+        isDuplicateAbsence(command),
+    );
+    const commandsWithoutThirdJourneyEvidence = commands.filter(
+      (command) => !thirdJourneyOwnedCommands.includes(command),
+    );
+    const secondHelpVisibility = commandsWithoutThirdJourneyEvidence.findIndex(
+      (command) =>
+        command.optional !== true &&
+        exactSelector(command.assertVisible, {
+          id: 'homework-help-me-solve',
+          enabled: true,
+        }),
+    );
+    const evidenceOwnedByThirdJourney = [
+      ...commandsWithoutThirdJourneyEvidence.slice(0, secondHelpVisibility + 1),
+      { tapOn: { id: 'manual-entry-cancel' } },
+      { tapOn: { id: 'mentor-bar-homework-chip' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'homework-entry-mode-manual' },
+          timeout: 15_000,
+        },
+      },
+      ...thirdJourneyOwnedCommands,
+      ...commandsWithoutThirdJourneyEvidence.slice(secondHelpVisibility + 1),
+    ];
+    expect(hasSequenceBoundSessionEvidence(evidenceOwnedByThirdJourney)).toBe(
       false,
     );
 
