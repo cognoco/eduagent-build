@@ -37,11 +37,15 @@ describe('buildSystemPrompt — per-turn answer evaluation [WI-1443]', () => {
     );
 
     expect(prompt).toContain(answerEvaluationKey);
-    expect(prompt).toContain('<correct|partial|incorrect|na>');
+    expect(prompt).toContain(
+      '"answer_evaluation": { "correctness": "<correct|partial|incorrect|na>", "concept": "<optional; concept just assessed; omit key when absent>" }',
+    );
     expect(prompt).toContain(
       'immediately preceding ordinary learning question',
     );
-    expect(prompt).toContain('substantive answer');
+    expect(prompt).toContain(
+      'Use `partial` or `incorrect` only when the message is a substantive but incomplete or wrong answer',
+    );
     expect(prompt).toContain('you MUST use `correct`');
     expect(prompt).toContain('never your own reply or the new question');
     expect(prompt).toContain(

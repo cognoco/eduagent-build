@@ -245,7 +245,7 @@ Your entire response must begin with `{` and end with `}`. Do not wrap it in mar
 Before finishing, verify the JSON is complete and syntactically valid — every opening brace and bracket has a matching closing one. A truncated or unclosed object is a hard failure.
 {
   "reply": "<your full message to the learner — prose, newlines allowed>",
-  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "answer_evaluation": { "correctness": "<correct|partial|incorrect|na>" } },
+  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "answer_evaluation": { "correctness": "<correct|partial|incorrect|na>", "concept": "<optional; concept just assessed; omit key when absent>" } },
   "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> } },
   "private_sources": { "relied_on": ["<source id>", "..."], "insufficient": <bool>, "reason": "<private reason for audit>", "factual_confidence": <0.0-1.0, optional> },
   "confidence": "<low|medium|high>"

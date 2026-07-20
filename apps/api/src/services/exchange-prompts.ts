@@ -343,7 +343,7 @@ function getExchangeEnvelopeInstruction(context: {
       ? ', "challenge_round_evaluation": [ { "concept": "<concept assessed>", "result": "<solid|partial|missing|misconception>", "evidence": "<what the learner demonstrated>", "answerEventId": "<the CURRENT CHALLENGE ANSWER EVENT ID for the learner answer judged>", "learnerQuote": "<short verbatim quote from the learner answer>", "correction": "<optional; the correct idea, only when result is not solid>" } ]'
       : '';
   const answerEvaluationField = context.includeAnswerEvaluation
-    ? ', "answer_evaluation": { "correctness": "<correct|partial|incorrect|na>" }'
+    ? ', "answer_evaluation": { "correctness": "<correct|partial|incorrect|na>", "concept": "<optional; concept just assessed; omit key when absent>" }'
     : '';
   const mentorNoticeTopicField = context.mentorNoticeRequiresTopicTarget
     ? ', "topicId": "<one topic ID from INTERLEAVED NOTICE TARGETS or empty string>"'

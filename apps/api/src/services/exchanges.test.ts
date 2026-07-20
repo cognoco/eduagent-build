@@ -1481,6 +1481,49 @@ describe('buildSystemPrompt', () => {
 // ---------------------------------------------------------------------------
 
 describe('processExchange', () => {
+  it('forces legacy partial progress when an enabled answer evaluation is partial', async () => {
+    const partialEvaluationProvider: LLMProvider = {
+      id: 'cerebras',
+      async chat() {
+        return {
+          content: JSON.stringify({
+            reply: 'You have the first step; now finish the calculation.',
+            signals: {
+              partial_progress: false,
+              answer_evaluation: {
+                correctness: 'partial',
+                concept: 'quadratic formula',
+              },
+            },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(partialEvaluationProvider);
+
+    try {
+      const result = await processExchange(
+        { ...baseContext, answerEvaluationEnabled: true },
+        'I can substitute a, b, and c, but I am not sure what comes next.',
+      );
+
+      expect(result.answerEvaluation).toEqual({
+        correctness: 'partial',
+        concept: 'quadratic formula',
+      });
+      expect(result.partialProgress).toBe(true);
+    } finally {
+      registerProvider(createMockProvider('cerebras'));
+    }
+  });
+
   it('surfaces enabled ordinary answer evaluation and discards it when disabled or excluded', async () => {
     const evaluationProvider: LLMProvider = {
       id: 'cerebras',
