@@ -1,4 +1,11 @@
-import { AccessibilityInfo, Dimensions, Platform } from 'react-native';
+import { useState } from 'react';
+import {
+  AccessibilityInfo,
+  Dimensions,
+  Platform,
+  Pressable,
+  Text,
+} from 'react-native';
 import { fireEvent, screen, within } from '@testing-library/react-native';
 import type {
   NowCard,
@@ -13,6 +20,11 @@ import {
   renderScreen,
   type RenderScreenOptions,
 } from '../../test-utils/screen-render';
+import {
+  ProfileContext,
+  type Profile,
+  type ProfileContextValue,
+} from '../../lib/profile';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
@@ -20,6 +32,10 @@ const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
 const mockPush = jest.fn();
 const mockNowRefetch = jest.fn();
+const mockNowOverflow = jest.fn((_enabled: boolean) => ({
+  data: undefined,
+  isLoading: false,
+}));
 const LEARNER_CAPABILITY_CASES = MENTOR_CAPABILITY_CASES.filter(
   ({ scope }) => scope === 'learner',
 );
@@ -68,7 +84,7 @@ jest.mock(
     return {
       ...actual,
       useNowFeed: () => mockNowFeed,
-      useNowOverflow: () => ({ data: undefined, isLoading: false }),
+      useNowOverflow: (enabled: boolean) => mockNowOverflow(enabled),
     };
   },
 );
@@ -182,6 +198,39 @@ function renderMentorScreen(
     ...profileOverrides,
   });
   cleanupRender = rendered.cleanup;
+}
+
+function ProfileSwitchHarness({
+  profileA,
+  profileB,
+}: {
+  profileA: Profile;
+  profileB: Profile;
+}): React.ReactElement {
+  const profiles = [profileA, profileB];
+  const [activeProfile, setActiveProfile] = useState(profileA);
+  const profileContext: ProfileContextValue = {
+    profiles,
+    activeProfile,
+    isExplicitProxyMode: false,
+    switchProfile: async () => ({ success: true }),
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: () => undefined,
+  };
+
+  return (
+    <ProfileContext.Provider value={profileContext}>
+      <Pressable
+        testID="switch-to-profile-b"
+        onPress={() => setActiveProfile(profileB)}
+      >
+        <Text>Switch learner</Text>
+      </Pressable>
+      <MentorScreen />
+    </ProfileContext.Provider>
+  );
 }
 
 function expectFreeformRoute(rawInput: string): void {
@@ -904,6 +953,62 @@ describe('MentorScreen', () => {
 
     screen.getByText('Session wrapped');
     screen.getByText('You chose the next step.');
+  });
+
+  it('profile-switch matching-card isolation — B sees the card and none of A’s card, overflow, or celebration state', () => {
+    const profileA = {
+      ...NAMED_PROFILES.soloLearner,
+      id: 'profile-a',
+      displayName: 'Learner A',
+    };
+    const profileB = {
+      ...NAMED_PROFILES.soloLearner,
+      id: 'profile-b',
+      displayName: 'Learner B',
+    };
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([card(), card({ kind: 'retention_due' })], 1),
+    };
+
+    const rendered = renderScreen(
+      <ProfileSwitchHarness profileA={profileA} profileB={profileB} />,
+      { profile: profileA, profiles: [profileA, profileB] },
+    );
+    cleanupRender = rendered.cleanup;
+
+    fireEvent.press(
+      within(screen.getByTestId('now-card-unfinished_session')).getByTestId(
+        'now-card-dismiss',
+      ),
+    );
+    expect(screen.queryByTestId('now-card-unfinished_session')).toBeNull();
+    screen.getByTestId('mentor-light-practice');
+
+    fireEvent.press(
+      within(screen.getByTestId('now-card-retention_due')).getByTestId(
+        'now-card-complete',
+      ),
+    );
+    within(screen.getByTestId('now-card-retention_due')).getByText(
+      'Review cleared',
+    );
+    screen.getByText('You chose the next step.');
+
+    fireEvent.press(screen.getByTestId('now-overflow-entry'));
+    expect(mockNowOverflow).toHaveBeenLastCalledWith(true);
+
+    fireEvent.press(screen.getByTestId('switch-to-profile-b'));
+
+    screen.getByTestId('now-card-unfinished_session');
+    expect(
+      within(screen.getByTestId('now-card-retention_due')).queryByTestId(
+        'now-card-arc',
+      ),
+    ).toBeNull();
+    expect(screen.queryByText('You chose the next step.')).toBeNull();
+    expect(screen.queryByTestId('mentor-light-practice')).toBeNull();
+    expect(mockNowOverflow).toHaveBeenLastCalledWith(false);
   });
 
   // WI-1393: the V2 shell previously had zero forward navigation to

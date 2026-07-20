@@ -48,6 +48,7 @@ import {
   pushLinkInitiatePicker,
 } from '../../lib/navigation';
 import { pushNowDeepLink } from '../../lib/now-deep-link';
+import { useProfile } from '../../lib/profile';
 import { useScopeContext } from '../../lib/scope-context';
 import { isSchoolDayEvening } from '../../lib/school-day-evening';
 
@@ -485,6 +486,7 @@ function LearnerMentorScreen(): React.ReactElement {
 }
 
 export default function MentorScreen(): React.ReactElement {
+  const { activeProfile } = useProfile();
   const { activeScope, availableScopes, setActiveScope } = useScopeContext();
   const router = useRouter();
   const eligiblePersons = useEligibleManagedPersons();
@@ -534,5 +536,5 @@ export default function MentorScreen(): React.ReactElement {
     );
   }
 
-  return <LearnerMentorScreen />;
+  return <LearnerMentorScreen key={activeProfile?.id ?? 'no-profile'} />;
 }
