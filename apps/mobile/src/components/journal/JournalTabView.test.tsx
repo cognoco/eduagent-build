@@ -685,9 +685,10 @@ describe('JournalTabView', () => {
     screen.getByTestId('journal-memory-section');
     fireEvent.press(screen.getByTestId('journal-memory-open'));
 
-    expect(mockPush).toHaveBeenCalledWith(
-      '/(app)/mentor-memory?returnTo=journal',
-    );
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/mentor-memory',
+      params: { returnTo: 'journal' },
+    });
   });
 
   it('keeps feed failures retryable without blanking the paper trail', () => {

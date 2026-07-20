@@ -249,7 +249,10 @@ function JournalMemorySection(): React.ReactElement {
         accessibilityRole="button"
         accessibilityLabel={t('journal.memory.open')}
         onPress={() =>
-          router.push('/(app)/mentor-memory?returnTo=journal' as Href)
+          router.push({
+            pathname: '/(app)/mentor-memory',
+            params: { returnTo: JOURNAL_RETURN_TO },
+          } as Href)
         }
         testID="journal-memory-open"
         className="mt-4 self-start rounded-button bg-primary px-4 py-2"
