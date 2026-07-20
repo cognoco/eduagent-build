@@ -176,7 +176,8 @@ function FirstSessionWrapUpCard({
   onMarkCelebrationSeen,
 }: FirstSessionWrapUpCardProps) {
   const { t } = useTranslation();
-  const canSubmit = value.trim().length >= 10 && !isSubmitting;
+  const hasSubmitted = reflectionTotalXp != null;
+  const canSubmit = value.trim().length >= 10 && !isSubmitting && !hasSubmitted;
 
   return (
     <View
@@ -195,7 +196,7 @@ function FirstSessionWrapUpCard({
         multiline
         value={value}
         onChangeText={onChangeText}
-        editable={!isSubmitting}
+        editable={!isSubmitting && !hasSubmitted}
         className="mt-3 min-h-20 rounded-xl border border-border px-3 py-2 text-text-primary"
       />
       {hasError ? (
@@ -1351,7 +1352,7 @@ function SessionScreenInner() {
       ]);
       const totalXp =
         (result.summary.baseXp ?? 0) + (result.summary.reflectionBonusXp ?? 0);
-      setFirstSessionReflectionTotalXp(totalXp > 0 ? totalXp : null);
+      setFirstSessionReflectionTotalXp(totalXp);
     } catch (err) {
       if (
         !firstSessionReflectionMountedRef.current ||
