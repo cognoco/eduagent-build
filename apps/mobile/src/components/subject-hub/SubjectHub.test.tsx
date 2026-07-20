@@ -119,6 +119,27 @@ describe('SubjectHub', () => {
     });
   });
 
+  it('renders scrambled vocabulary levels in CEFR progression order', () => {
+    render(
+      <SubjectHub
+        data={baseData}
+        vocabulary={{
+          total: 21,
+          mastered: 6,
+          learning: 7,
+          new: 8,
+          byCefrLevel: { C2: 6, A2: 2, B1: 3, A1: 1, C1: 5, B2: 4 },
+        }}
+      />,
+    );
+
+    const renderedLevels = screen
+      .getAllByText(/^(A1|A2|B1|B2|C1|C2)$/)
+      .map((node) => node.props.children);
+
+    expect(renderedLevels).toEqual(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
+  });
+
   it('keeps masked structural data visible while hiding study and notes affordances', () => {
     render(
       <SubjectHub

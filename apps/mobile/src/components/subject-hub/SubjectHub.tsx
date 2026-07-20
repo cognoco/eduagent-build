@@ -27,6 +27,19 @@ import { SubjectHubNotesSection } from './SubjectHubNotesSection';
 import { SubjectHubProgressSummary } from './SubjectHubProgressSummary';
 import { TopicDetailSheet } from './TopicDetailSheet';
 
+const CEFR_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+
+function sortCefrEntries(entries: [string, number][]): [string, number][] {
+  return [...entries].sort(([a], [b]) => {
+    const aIndex = CEFR_ORDER.indexOf(a);
+    const bIndex = CEFR_ORDER.indexOf(b);
+    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+    if (aIndex === -1) return 1;
+    if (bIndex === -1) return -1;
+    return aIndex - bIndex;
+  });
+}
+
 // Spec section 6.3: this hub renders only the data it is handed. Future supporter
 // scopes mask the data before it reaches this component.
 interface SubjectHubProps {
@@ -157,19 +170,21 @@ export function SubjectHub({
               })}
             </Text>
             <View className="mt-4 gap-2">
-              {Object.entries(vocabulary.byCefrLevel).map(([level, count]) => (
-                <View
-                  key={level}
-                  className="flex-row items-center justify-between"
-                >
-                  <Text className="text-body-sm font-medium text-text-primary">
-                    {level}
-                  </Text>
-                  <Text className="text-body-sm text-text-secondary">
-                    {t('progress.subject.wordCount', { count })}
-                  </Text>
-                </View>
-              ))}
+              {sortCefrEntries(Object.entries(vocabulary.byCefrLevel)).map(
+                ([level, count]) => (
+                  <View
+                    key={level}
+                    className="flex-row items-center justify-between"
+                  >
+                    <Text className="text-body-sm font-medium text-text-primary">
+                      {level}
+                    </Text>
+                    <Text className="text-body-sm text-text-secondary">
+                      {t('progress.subject.wordCount', { count })}
+                    </Text>
+                  </View>
+                ),
+              )}
             </View>
             {onOpenVocabulary ? (
               <Pressable
