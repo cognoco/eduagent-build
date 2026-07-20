@@ -12,6 +12,7 @@ import type { ScopeDescriptor, SharedRecord } from '@eduagent/schemas';
 import type { EligibleManagedPerson } from '../../hooks/use-eligible-supportees';
 import { StructuralFactCard } from '../learning-surface';
 import { SupportPersonPickerSheet } from './SupportPersonPickerSheet';
+import { SupporterColdStart } from './SupporterColdStart';
 import { useSharedRecord } from './use-shared-record';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
@@ -240,6 +241,14 @@ export function SupportHubMentorTab({
           </Pressable>
         ) : null}
       </View>
+
+      {/* [WI-2226] The cold-start doorway (managed-family handoff / granted-
+          idle kickstart nudges) only applies to the unfiltered Support hub
+          view, not a single person's scope — the component self-guards on
+          `activeScope.kind`, but that guard fires after its query hook, so
+          gate the mount itself to avoid an unnecessary fetch while a person
+          scope is active. */}
+      {!activePersonScope ? <SupporterColdStart /> : null}
 
       <View className="mt-4 gap-3">
         {personScopes.length === 0 ? (

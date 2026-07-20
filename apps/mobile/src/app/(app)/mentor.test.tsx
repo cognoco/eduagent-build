@@ -182,6 +182,16 @@ function renderMentorScreen(
   const rendered = renderScreen(<MentorScreen />, {
     routes: {
       [`/visibility/reports/${PERSON_ID}/shared-record`]: SHARED_RECORD,
+      // [WI-2226] SupportHubMentorTab now mounts SupporterColdStart, whose
+      // query fires whenever activeScope.kind === 'supporter-hub'. Default
+      // to the empty per-child fixture (renders nothing) so mounting it
+      // doesn't change any assertion in this file, which isn't testing the
+      // cold-start doorway itself (see SupportHubMentorTab.test.tsx).
+      '/scopes/coldstart': {
+        variant: 'per-child',
+        cards: [],
+        selfLearningDoorway: true,
+      },
     },
     ...profileOverrides,
   });
