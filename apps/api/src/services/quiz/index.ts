@@ -11,6 +11,7 @@ export {
   checkQuizAnswerWithCorrect,
   completeQuizRound,
   getCelebrationTier,
+  normalizeCompletedRoundResults,
 } from './complete-round';
 export {
   buildVocabularyMasteryQuestion,

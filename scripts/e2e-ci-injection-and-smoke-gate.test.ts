@@ -1252,7 +1252,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
             id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}',
           },
           direction: 'DOWN',
-          timeout: 5000,
+          timeout: 15000,
         },
       },
       {
@@ -1298,7 +1298,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
             id: 'support-hub-mentor-open-${SUPPORTEE_PERSON_ID}',
           },
           direction: 'DOWN',
-          timeout: 5000,
+          timeout: 15000,
         },
       },
       {

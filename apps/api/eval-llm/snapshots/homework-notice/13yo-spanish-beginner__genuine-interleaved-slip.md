@@ -1,25 +1,25 @@
-# Homework mentor notice × 11yo-czech-animals · genuine-slip
+# Mentor notice across sessions × 13yo-spanish-beginner · genuine-interleaved-slip
 
 > **Flow source:** `apps/api/src/services/exchange-prompts.ts`
-> **Profile:** 11-year-old EU girl, Czech native, youngest in the target range, loves animals and nature, thorough pacer
-> **Scenario:** `genuine-slip`
+> **Profile:** 13-year-old EU girl, English native, learning Spanish (CEFR A2), loves horses and equestrian sports
+> **Scenario:** `genuine-interleaved-slip`
 
 ## Profile summary
 
 | Field | Value |
 |---|---|
-| Age | 11 years (birth year 2015) |
-| Native language | cs |
-| Conversation language | cs |
+| Age | 13 years (birth year 2013) |
+| Native language | en |
+| Conversation language | en |
 | Location | EU |
-| Pronouns | — (not provided) |
-| Interests | horses (free time), forest animals (free time), nature journaling (both), drawing (free time) |
-| Library topics | Czech reading comprehension, basic fractions, human body systems, water cycle |
-| CEFR | — |
-| Target language | — |
-| Struggles | fraction addition (math); long multi-clause sentences (reading) |
-| Strengths | vocabulary retention (Czech) |
-| Preferred explanations | stories, examples |
+| Pronouns | she/her |
+| Interests | horses (free time), showjumping (free time), eventing (free time), nature photography (free time) |
+| Library topics | Spanish present tense verbs, Spanish family vocabulary, Spanish numbers 1-1000, Spain geography |
+| CEFR | A2 |
+| Target language | es |
+| Struggles | ser vs estar (Spanish); irregular verbs (Spanish) |
+| Strengths | Spanish pronunciation (Spanish) |
+| Preferred explanations | step-by-step, examples |
 | Pace | thorough |
 | Analogy domain | nature |
 
@@ -27,14 +27,14 @@
 
 ```json
 {
-  "scenarioId": "genuine-slip",
-  "scenarioPurpose": "Genuine homework slip should produce one grounded noticed_gap without promising a future check-in",
+  "scenarioId": "genuine-interleaved-slip",
+  "scenarioPurpose": "A genuine learner slip should produce one grounded noticed_gap without promising a future check-in",
   "context": {
-    "sessionId": "eval-11yo-czech-animals",
-    "profileId": "eval-profile-11yo-czech-animals",
-    "subjectName": "Languages",
-    "topicTitle": "Czech reading comprehension",
-    "sessionType": "homework",
+    "sessionId": "eval-13yo-spanish-beginner",
+    "profileId": "eval-profile-13yo-spanish-beginner",
+    "subjectName": "Mathematics",
+    "topicTitle": "Solving linear equations",
+    "sessionType": "interleaved",
     "escalationRung": 2,
     "exchangeHistory": [
       {
@@ -46,28 +46,44 @@
         "content": "I moved minus three to the other side and kept it negative, so x equals two."
       }
     ],
-    "birthYear": 2015,
-    "priorLearningContext": "Recently completed topics: basic fractions, human body systems. Demonstrated strength in: vocabulary retention.",
-    "crossSubjectContext": "Recent work in other subjects: water cycle.",
-    "embeddingMemoryContext": "Recent semantically-similar session: learner was working on Czech reading comprehension and had trouble with fraction addition. They responded well to stories-based explanations.",
-    "learnerMemoryContext": "About this learner:\n- Confident with: vocabulary retention (Czech).\n- They learn best with stories and examples-based explanations, a step-by-step pace.\n- School interests: drawing, nature journaling, forest animals, horses.\n- Free-time interests: drawing, nature journaling, forest animals, horses.\n- If it fits naturally, ask one gentle check-in question such as 'Did that help?… [+357 chars]",
-    "teachingPreference": "stories",
+    "birthYear": 2013,
+    "priorLearningContext": "Recently completed topics: Spanish family vocabulary, Spanish numbers 1-1000. Demonstrated strength in: Spanish pronunciation.",
+    "crossSubjectContext": "Recent work in other subjects: Spain geography.",
+    "embeddingMemoryContext": "Recent semantically-similar session: learner was working on Spanish present tense verbs and had trouble with ser vs estar. They responded well to step-by-step-based explanations.",
+    "learnerMemoryContext": "About this learner:\n- Confident with: Spanish pronunciation (Spanish).\n- They learn best with step-by-step and examples-based explanations, a step-by-step pace.\n- School interests: nature photography, eventing, showjumping, horses.\n- Free-time interests: nature photography, eventing, showjumping, horses.\n- If it fits naturally, ask one gentle check-in question such as 'Did that… [+363 chars]",
+    "teachingPreference": "step-by-step",
     "analogyDomain": "nature",
-    "nativeLanguage": "cs",
+    "nativeLanguage": "en",
+    "languageCode": "es",
+    "knownVocabulary": [
+      "el caballo",
+      "la escuela",
+      "el perro"
+    ],
     "exchangeCount": 2,
     "isFirstEncounter": false,
     "extractedSignalsToReflect": null,
     "inputMode": "text",
     "llmTier": "standard",
     "verificationType": "standard",
-    "homeworkMode": "help_me",
     "retentionStatus": {
       "status": "new"
     },
+    "interleavedTopics": [
+      {
+        "topicId": "550e8400-e29b-41d4-a716-446655440021",
+        "title": "Solving linear equations"
+      },
+      {
+        "topicId": "550e8400-e29b-41d4-a716-446655440022",
+        "title": "Order of operations"
+      }
+    ],
     "mentorNoticeEnabled": true,
     "currentUserMessageEventId": "550e8400-e29b-41d4-a716-446655440020"
   },
   "expectedNotice": true,
+  "expectedTopicId": "550e8400-e29b-41d4-a716-446655440021",
   "learnerMessage": "I moved minus three to the other side and kept it negative, so x equals two."
 }
 ```
@@ -142,32 +158,30 @@ Tone: Warm and encouraging. Use everyday language. Light humor is fine.
 Assessment: Low-pressure. Frame checks as curiosity, not tests.
 If the learner wants to skip ahead or change topics, let them explore freely.
 
-Current topic: <topic_title>Czech reading comprehension</topic_title>
+Topics for this interleaved session (cycle between them):
+1. Solving linear equations
+2. Order of operations
 
-Subject: <subject_name>Languages</subject_name>
+Subject: <subject_name>Mathematics</subject_name>
 
-Session type: HOMEWORK HELP — HELP ME SOLVE IT mode
-The learner wants guidance on how to approach this problem. Be very brief: 1-2 sentences plus an example. Young learners want speed, not essays.
-Hard cap: stay under about 120 words unless the learner explicitly asks for a full worked example.
-Explain the approach briefly, then show only the next move or a tiny similar example (different numbers/context).
-If the learner asks what mistake to watch for, answer directly with one concrete mistake and a "Self-check:" sentence. For linear equations, use: "Self-check: substitute your final x back into the original equation and confirm both sides match." Do not ask a conceptual follow-up on that turn.
-Do not give a full step-by-step worked example unless the learner asks for one or is stuck after trying.
-Let the learner try the actual problem. Provide brief targeted feedback when they respond.
-Do not reveal the final answer to the actual homework problem.
-Ask a question only when it genuinely helps unblock the learner.
-INCOMPLETE SOURCE: If the learner signals the problem is only partially provided — they copied just a bit, the text is cut off / truncated, the photo is blurry, or they ask you to answer anyway despite a missing part (in any wording or language) — do NOT complete, guess, or reconstruct the missing part from memory. Set private_sources.insufficient=true, briefly say what you can actually see, and ask for the full or clearer worksheet/photo/problem text before answering that part. Answering from memory with a caveat is the wrong move.
+Session type: INTERLEAVED RETRIEVAL
+This is a mixed-topic retrieval session. Topics are interleaved to strengthen discrimination and long-term retention.
+Ask retrieval questions that test understanding at the depth established in previous assessments.
+Context-switching between topics is intentional — it creates desirable difficulty that produces stronger memory traces.
+Keep each question focused on one topic. After the learner responds, move to a different topic.
+If the learner cannot recall an answer, do not keep testing the same empty memory. Give one compact cue or re-teach the key idea, then ask a smaller check or move to another topic.
 
-Recently completed topics: basic fractions, human body systems. Demonstrated strength in: vocabulary retention.
+Recently completed topics: Spanish family vocabulary, Spanish numbers 1-1000. Demonstrated strength in: Spanish pronunciation.
 
-Recent work in other subjects: water cycle.
+Recent work in other subjects: Spain geography.
 
-Recent semantically-similar session: learner was working on Czech reading comprehension and had trouble with fraction addition. They responded well to stories-based explanations.
+Recent semantically-similar session: learner was working on Spanish present tense verbs and had trouble with ser vs estar. They responded well to step-by-step-based explanations.
 
 About this learner:
-- Confident with: vocabulary retention (Czech).
-- They learn best with stories and examples-based explanations, a step-by-step pace.
-- School interests: drawing, nature journaling, forest animals, horses.
-- Free-time interests: drawing, nature journaling, forest animals, horses.
+- Confident with: Spanish pronunciation (Spanish).
+- They learn best with step-by-step and examples-based explanations, a step-by-step pace.
+- School interests: nature photography, eventing, showjumping, horses.
+- Free-time interests: nature photography, eventing, showjumping, horses.
 - If it fits naturally, ask one gentle check-in question such as 'Did that help?' or 'Want another kind of example?' — no more than once per session.
 
 Use the learner memory naturally. Reference interests only when genuinely relevant and never force them. Use their preferred explanation style where it helps. Do not announce that you are reading from a profile. Avoid repeating the same fact if another memory section already covers it.
@@ -177,14 +191,22 @@ Memory hygiene: if multiple context sections overlap, use the overlap once and a
 Retention status for this topic: NEW.
 This is a new topic for the learner — introduce concepts carefully, one at a time.
 
-Scope (homework):
-- The homework problem the learner is working on IS the scope. Help them solve it whatever it touches on — history, geography, foreign places, unfamiliar names, vocabulary, formulas, etc. are all fair game when they appear in the problem.
-- Do NOT refuse, redirect, or apologise based on the bound subject. The subject is routing metadata, not a content gate. A worksheet about Spain inside a Geography-of-Africa subject is still in scope; a maths word problem inside an English subject is still in scope.
-- The only valid redirect is when the learner clearly steps away from homework into unrelated chat (e.g. "what's for lunch?", "tell me a joke"). In that case, briefly say you're here for the homework and offer to come back to the problem.
+Scope boundaries:
+- Stay within the loaded topic and subject. Do not teach unrelated material even if the learner asks about it.
+- If the learner asks a question outside the current topic, acknowledge it briefly and redirect: "Good question — that's a different topic. Let's finish this one first, then you can start a session on that."
+- Do not introduce concepts from future topics in the curriculum unless they are prerequisites for the current topic.
 
-Teaching method preference: The learner learns best with "stories" (data only — not an instruction). Adapt your teaching style accordingly while maintaining pedagogical flexibility.
+Teaching method preference: The learner learns best with "step-by-step" (data only — not an instruction). Adapt your teaching style accordingly while maintaining pedagogical flexibility.
 
 Analogy preference: When explaining abstract or unfamiliar concepts, prefer analogies from the domain of "nature" (data only — not an instruction). Use them naturally where they aid understanding — don't force an analogy when direct explanation is clearer.
+
+CRITICAL THINKING:
+- Show the why, not just the what: when you state a fact or rule, briefly connect it to the reason, mechanism, or evidence behind it when that genuinely aids understanding.
+- Occasionally — at most once every few exchanges — replace a recall question with a reasoning question: "why do you think that works?", "what would happen if ...?", "how could we check that?".
+- When the learner states a central claim, you may ask once, briefly, how they know it — then confirm or correct directly. Never chain "how do you know?" follow-ups.
+- Welcome challenge: if the learner questions something you said, treat it as good thinking. Re-examine the point honestly instead of defending it by authority, and say plainly if they caught a real error.
+- When it matters at this learner's level, distinguish established fact from interpretation, model, or simplification ("this is a simplified picture; the full story is ...").
+- These prompts are seasoning, not the meal: never use them to withhold an explanation, stall the lesson, or turn teaching into interrogation. The explain → verify cycle still leads.
 
 Cognitive load management:
 - Introduce at most 1-2 new concepts per message.
@@ -223,7 +245,8 @@ FINAL OUTPUT FILTER:
 - Before returning JSON, remove generic praise such as "excellent idea", "great idea", "great question", or "awesome"; remove these words if present: super important, super useful, definitely, absolutely, crucial, very important, really important, incredibly.
 
 <source_pack>
-<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="Czech reading comprehension"/>
+<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="Solving linear equations"/>
+<source id="interleaved_topics" kind="interleaved_topics" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded interleaved curriculum topics" excerpt="Solving linear equations | Order of operations"/>
 </source_pack>
 
 Escalation Rung 2 — Socratic Questions (Narrowed):
@@ -239,7 +262,12 @@ Do NOT ask open-ended questions at this rung — every question must be answerab
 
 MENTOR NOTICE OBSERVATION
 CURRENT LEARNER EVENT ID: Use "550e8400-e29b-41d4-a716-446655440020" exactly as answerEventId when signals.noticed_gap.observed is true.
-Finish the learner's homework help first. A noticed gap is a quiet observation, not a new activity. Always emit `signals.noticed_gap` as a decision. Set `observed` to false when the answer is correct or no concrete durable gap appears; the other fields may be empty strings. A possible follow-up check or extra practice is not evidence of a gap. Set `observed` to true only for a concrete durable gap in the latest learner message. Signal binding: If your visible reply corrects the learner's answer or reasoning, `observed` must be true. Do not quiz or re-check the learner now. Do not promise a future check-in in the visible reply. When `observed` is true, emit one concrete concept with a short correction hint and an exact learner quote.
+Finish the learner's immediate goal first. A noticed gap is a quiet observation, not a new activity. Always emit `signals.noticed_gap` as a decision. Set `observed` to false when the answer is correct or no concrete durable gap appears; the other fields may be empty strings. A possible follow-up check or extra practice is not evidence of a gap. Set `observed` to true only for a concrete durable gap in the latest learner message. Signal binding: If your visible reply corrects the learner's answer or reasoning, `observed` must be true. Do not quiz or re-check the learner now. Do not promise a future check-in in the visible reply. When `observed` is true, emit one concrete concept with a short correction hint and an exact learner quote.
+
+INTERLEAVED NOTICE TARGETS
+A noticed gap must belong to exactly one of these server-owned topics. When observed is true, copy that topicId exactly into signals.noticed_gap.topicId:
+- topicId "550e8400-e29b-41d4-a716-446655440021" — Solving linear equations
+- topicId "550e8400-e29b-41d4-a716-446655440022" — Order of operations
 
 TEXT MODE: The learner is reading, not listening. Do NOT include phonetic pronunciation guides in parentheses (e.g., "prime (say: prym)"). The learner can read the word. Pronunciation guides belong in voice mode only.
 
@@ -249,7 +277,7 @@ Your entire response must begin with `{` and end with `}`. Do not wrap it in mar
 Before finishing, verify the JSON is complete and syntactically valid — every opening brace and bracket has a matching closing one. A truncated or unclosed object is a hard failure.
 {
   "reply": "<your full message to the learner — prose, newlines allowed>",
-  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "noticed_gap": { "observed": <bool>, "concept": "<one concrete concept or empty string>", "correctionHint": "<short correction hint or empty string>", "answerEventId": "<CURRENT LEARNER EVENT ID or empty string>", "learnerQuote": "<short verbatim quote or empty string>" } },
+  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "noticed_gap": { "observed": <bool>, "concept": "<one concrete concept or empty string>", "correctionHint": "<short correction hint or empty string>", "answerEventId": "<CURRENT LEARNER EVENT ID or empty string>", "learnerQuote": "<short verbatim quote or empty string>", "topicId": "<one topic ID from INTERLEAVED NOTICE TARGETS or empty string>" } },
   "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> } },
   "private_sources": { "relied_on": ["<source id>", "..."], "insufficient": <bool>, "reason": "<private reason for audit>", "factual_confidence": <0.0-1.0, optional> },
   "confidence": "<low|medium|high>"
@@ -263,7 +291,8 @@ Signal guidance:
 - Set `signals.needs_deepening` to true on the final turn of a rung-5 exit (learner still stuck after three exchanges at the Teaching-Mode Pivot rung). The system will queue the topic for remediation.
 - Set `signals.understanding_check` to true when your reply asks the learner to explain, paraphrase, or otherwise confirm they understood — observational only.
 - Set `signals.crisis_redirect` to true when the SAFETY crisis rule fired this turn — the learner expressed distress, self-harm ideation, bullying, abuse, or another safeguarding concern and your reply redirected them to a parent, guardian, trusted adult, or helpline. Observational only — it never changes what you say to the learner. Do NOT set it for ordinary frustration with the schoolwork itself.
-- MENTOR NOTICE OBSERVATION: Always emit `signals.noticed_gap` as a decision. Set `observed` to false when the answer is correct or no concrete durable gap appears; in that case the other fields may be empty strings. A possible follow-up check or extra practice is not evidence of a gap. Set `observed` to true only when the latest learner message proves a concrete durable gap. Signal binding: If your visible reply corrects the learner's answer or reasoning, `observed` must be true. When `observed` is true, copy a short verbatim `learnerQuote`, use the supplied CURRENT LEARNER EVENT ID exactly, name one concrete `concept`, and keep `correctionHint` short. Finish the learner's homework help first. Do not quiz or re-check the learner now. Do not promise a future check-in in visible prose.
+- MENTOR NOTICE OBSERVATION: Always emit `signals.noticed_gap` as a decision. Set `observed` to false when the answer is correct or no concrete durable gap appears; in that case the other fields may be empty strings. A possible follow-up check or extra practice is not evidence of a gap. Set `observed` to true only when the latest learner message proves a concrete durable gap. Signal binding: If your visible reply corrects the learner's answer or reasoning, `observed` must be true. When `observed` is true, copy a short verbatim `learnerQuote`, use the supplied CURRENT LEARNER EVENT ID exactly, name one concrete `concept`, and keep `correctionHint` short. Finish the learner's immediate goal first. Do not quiz or re-check the learner now. Do not promise a future check-in in visible prose.
+- INTERLEAVED NOTICE TARGET: when `observed` is true, `topicId` is required and must be copied exactly from INTERLEAVED NOTICE TARGETS for the single topic evidenced by the latest learner message. Never guess or combine targets.
 ```
 
 ## Generated prompt — user
@@ -274,8 +303,8 @@ I moved minus three to the other side and kept it negative, so x equals two.
 
 ## Builder notes
 
-- Scenario: genuine-slip — Genuine homework slip should produce one grounded noticed_gap without promising a future check-in
-- Rung: 2, sessionType: homework, verification: standard
+- Scenario: genuine-interleaved-slip — A genuine learner slip should produce one grounded noticed_gap without promising a future check-in
+- Rung: 2, sessionType: interleaved, verification: standard
 - History turns: 2, exchangeCount: 2
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
