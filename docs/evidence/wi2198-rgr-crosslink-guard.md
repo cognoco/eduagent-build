@@ -4,8 +4,8 @@
 **Bug DoD:** executed red-green-revert against the AC-7 guard, independently verifiable.
 
 **Under test:** `scripts/check-flow-inventory-cite-rot.ts`'s row-ID cross-link check
-(`checkRowIdCrossLinks`, lines 251-284) — specifically its dedicated rule for a bare
-`V2-NN` token (lines 266-273):
+(`checkRowIdCrossLinks`, lines 269-302) — specifically its dedicated rule for a bare
+`V2-NN` token (lines 284-291):
 
 ```ts
     if (/^V2-\d{1,3}$/.test(token)) {
@@ -103,7 +103,7 @@ Exit code `0`. The co-located unit suite was re-run after restoring and stays gr
 
 ```
 Test Suites: 1 passed, 1 total
-Tests:       29 passed, 29 total
+Tests:       40 passed, 40 total
 ```
 
 Red → Green → Revert-red → Restore-green confirmed: the guard's bare-`V2-NN` rule flags
