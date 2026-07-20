@@ -27,11 +27,7 @@ export interface HomeworkFirstResponseCompleteMarkerProps {
   hasFailure: boolean;
 }
 
-/**
- * Semantic E2E readiness marker for the first V2 Mentor homework reply.
- * A visible assistant bubble alone is insufficient because it can contain a
- * partial stream or a reconnect/fallback prompt.
- */
+// E2E completion marker excludes partial streams and reconnect/fallback replies.
 export function HomeworkFirstResponseCompleteMarker({
   active,
   problemText,
