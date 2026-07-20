@@ -1,4 +1,5 @@
 import {
+  challengeRoundEvaluationItemSchema,
   challengeRoundGraderDegradedEventSchema,
   challengeRoundGraderVerdictSchema,
   llmAssessmentEvaluationSchema,
@@ -638,16 +639,77 @@ describe('signals.evaluate_assessment', () => {
     expect(parsed.signals?.evaluate_assessment).toBeUndefined();
   });
 
-  it('rejects evaluate_assessment without challenge_passed (required field)', () => {
+  it('[WI-1995] keeps the reply and sibling signals when challenge_passed is missing', () => {
     const result = llmResponseEnvelopeSchema.safeParse({
-      reply: 'ok',
+      reply: 'Nice work — tell me more about why that step follows.',
       signals: {
+        ready_to_finish: true,
         evaluate_assessment: {
+          flaw_identified: 'inverted cause-effect',
           quality: 4,
         },
       },
     });
-    expect(result.success).toBe(false);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.reply).toBe(
+      'Nice work — tell me more about why that step follows.',
+    );
+    expect(result.data.signals?.ready_to_finish).toBe(true);
+    expect(result.data.signals?.evaluate_assessment).toEqual({
+      challenge_passed: undefined,
+      flaw_identified: 'inverted cause-effect',
+      quality: 4,
+    });
+  });
+
+  it('[WI-1995] keeps the reply and sibling signals when challenge_passed has the wrong type', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'Your explanation still matters.',
+      signals: {
+        partial_progress: true,
+        evaluate_assessment: {
+          challenge_passed: 'yes',
+          flaw_identified: 'missed the boundary case',
+          quality: 3,
+        },
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.reply).toBe('Your explanation still matters.');
+    expect(result.data.signals?.partial_progress).toBe(true);
+    expect(result.data.signals?.evaluate_assessment).toEqual({
+      challenge_passed: undefined,
+      flaw_identified: 'missed the boundary case',
+      quality: 3,
+    });
+  });
+
+  it('[WI-1995] preserves a valid challenge_passed verdict', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'You found the flaw.',
+      signals: {
+        understanding_check: true,
+        evaluate_assessment: {
+          challenge_passed: true,
+          flaw_identified: 'unsupported premise',
+          quality: 5,
+        },
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.reply).toBe('You found the flaw.');
+    expect(result.data.signals?.understanding_check).toBe(true);
+    expect(result.data.signals?.evaluate_assessment).toEqual({
+      challenge_passed: true,
+      flaw_identified: 'unsupported premise',
+      quality: 5,
+    });
   });
 });
 
@@ -918,40 +980,61 @@ describe('challenge round envelope fields', () => {
     );
   });
 
-  it('rejects evaluation item missing answerEventId (HIGH-6 grounding requirement)', () => {
-    const result = llmResponseEnvelopeSchema.safeParse({
-      reply: 'OK.',
-      signals: {
-        challenge_round_evaluation: [
-          {
-            concept: 'x',
-            result: 'solid',
-            evidence: 'ok',
-            // missing answerEventId
-            learnerQuote: 'something',
-          },
-        ],
-      },
+  it('rejects an item missing answerEventId (HIGH-6 grounding requirement)', () => {
+    const result = challengeRoundEvaluationItemSchema.safeParse({
+      concept: 'x',
+      result: 'solid',
+      evidence: 'ok',
+      // missing answerEventId
+      learnerQuote: 'something',
     });
     expect(result.success).toBe(false);
   });
 
-  it('rejects evaluation item missing learnerQuote (HIGH-6 grounding requirement)', () => {
+  it('rejects an item missing learnerQuote (HIGH-6 grounding requirement)', () => {
+    const result = challengeRoundEvaluationItemSchema.safeParse({
+      concept: 'x',
+      result: 'solid',
+      evidence: 'ok',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      // missing learnerQuote
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('[WI-1995] drops the whole challenge evaluation when any item is malformed', () => {
+    const validItem = {
+      concept: 'photosynthesis vs respiration',
+      result: 'solid' as const,
+      evidence: 'learner described both directions of energy flow',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      learnerQuote:
+        'photosynthesis stores energy in glucose and respiration releases it',
+    };
     const result = llmResponseEnvelopeSchema.safeParse({
-      reply: 'OK.',
+      reply: 'Strong work — your valid explanation is preserved.',
       signals: {
+        ready_to_finish: true,
         challenge_round_evaluation: [
+          validItem,
           {
-            concept: 'x',
-            result: 'solid',
-            evidence: 'ok',
-            answerEventId: '00000000-0000-4000-8000-000000000001',
-            // missing learnerQuote
+            concept: 'role of ATP',
+            result: 'partial',
+            evidence: 'mentioned energy currency, missed structure',
+            answerEventId: '00000000-0000-4000-8000-000000000002',
+            // missing learnerQuote: the whole Challenge signal must be discarded
           },
         ],
       },
     });
-    expect(result.success).toBe(false);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.reply).toBe(
+      'Strong work — your valid explanation is preserved.',
+    );
+    expect(result.data.signals?.ready_to_finish).toBe(true);
+    expect(result.data.signals?.challenge_round_evaluation).toBeUndefined();
   });
 
   it('caps challenge_round_evaluation array at 10 items', () => {
@@ -968,6 +1051,32 @@ describe('challenge round envelope fields', () => {
         challenge_round_evaluation: Array.from({ length: 11 }, () => item),
       },
     });
+    expect(result.success).toBe(false);
+  });
+
+  it('[WI-1995] rejects an over-cap evaluation even when one item is malformed', () => {
+    const validItem = {
+      concept: 'x',
+      result: 'solid' as const,
+      evidence: 'ok',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      learnerQuote: 'q',
+    };
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'OK.',
+      signals: {
+        challenge_round_evaluation: [
+          ...Array.from({ length: 10 }, () => validItem),
+          {
+            concept: 'malformed overflow item',
+            result: 'partial',
+            evidence: 'missing provenance quote',
+            answerEventId: '00000000-0000-4000-8000-000000000002',
+          },
+        ],
+      },
+    });
+
     expect(result.success).toBe(false);
   });
 
