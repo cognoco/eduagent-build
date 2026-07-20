@@ -27,6 +27,7 @@ function renderRecoveryHook(
 ) {
   const hydrate = jest.fn();
   const hasHydratedRecoveryRef = { current: false };
+  const cancelSilencePrompt = jest.fn();
 
   const result = renderHook(() =>
     useSessionRecovery({
@@ -42,11 +43,17 @@ function renderRecoveryHook(
       liveTranscriptMilestones: undefined,
       hydrate,
       hasHydratedRecoveryRef,
+      cancelSilencePrompt,
       ...overrides,
     }),
   );
 
-  return { ...result, hydrate, hasHydratedRecoveryRef };
+  return {
+    ...result,
+    hydrate,
+    hasHydratedRecoveryRef,
+    cancelSilencePrompt,
+  };
 }
 
 describe('useSessionRecovery', () => {
@@ -186,6 +193,37 @@ describe('useSessionRecovery', () => {
       milestoneTracker: trackerState,
       updatedAt: expect.any(String),
     });
+  });
+
+  it('[WI-2103 AC-3] cancels the active silence timer across background end and foreground return', () => {
+    jest.useFakeTimers();
+    const latePrompt = jest.fn();
+    const timerRef: {
+      current: ReturnType<typeof setTimeout> | null;
+    } = {
+      current: setTimeout(latePrompt, 2 * 60 * 1000) as unknown as ReturnType<
+        typeof setTimeout
+      >,
+    };
+    const cancelSilencePrompt = jest.fn(() => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = null;
+    });
+
+    try {
+      renderRecoveryHook({ cancelSilencePrompt });
+
+      act(() => {
+        appStateListener?.('background');
+        appStateListener?.('active');
+        jest.advanceTimersByTime(2 * 60 * 1000 + 1);
+      });
+
+      expect(cancelSilencePrompt).toHaveBeenCalled();
+      expect(latePrompt).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('silently skips recovery when SecureStore marker read fails', async () => {

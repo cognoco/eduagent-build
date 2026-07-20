@@ -189,6 +189,7 @@ export interface UseSessionStreamingOptions {
   // Refs (passed directly so the hook doesn't create its own)
   animationCleanupRef: React.MutableRefObject<(() => void) | null>;
   silenceTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  sessionEndedRef: React.MutableRefObject<boolean>;
   lastAiAtRef: React.MutableRefObject<number | null>;
   lastExpectedMinutesRef: React.MutableRefObject<number>;
   lastRetryPayloadRef: React.MutableRefObject<{
@@ -275,6 +276,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     draftText,
     notePromptOffered,
     silenceTimerRef,
+    sessionEndedRef,
     lastAiAtRef,
     lastExpectedMinutesRef,
     lastRetryPayloadRef,
@@ -509,7 +511,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     (sessionIdToUse: string, expectedResponseMinutes: number) => {
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
       }
+      if (sessionEndedRef.current) return;
 
       const thresholdMinutes = Math.min(
         20,
@@ -521,7 +525,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
       silenceTimerRef.current = setTimeout(
         async () => {
-          if (draftTextRef.current.trim()) return;
+          silenceTimerRef.current = null;
+          if (sessionEndedRef.current || draftTextRef.current.trim()) return;
 
           const prompt =
             "Still working on it? Take your time - I'm here when you're ready.";
@@ -575,6 +580,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       effectiveSubjectName,
       recordSystemPrompt,
       responseHistory,
+      sessionEndedRef,
       setMessages,
       silenceTimerRef,
       topicId,

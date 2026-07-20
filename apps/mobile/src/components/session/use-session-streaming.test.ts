@@ -115,6 +115,7 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
 
     animationCleanupRef: { current: null },
     silenceTimerRef,
+    sessionEndedRef: { current: false },
     lastAiAtRef: { current: null },
     lastExpectedMinutesRef: { current: 10 },
     lastRetryPayloadRef: { current: null },
@@ -1665,6 +1666,35 @@ describe('useSessionStreaming', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+  });
+
+  describe('WI-2103 ended-session silence guard', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('[WI-2103 AC-2] lets session completion win when the timer fires in the same tick', async () => {
+      const opts = makeOpts({ activeSessionId: 'session-1', draftText: '' });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      act(() => {
+        result.current.scheduleSilencePrompt('session-1', 2);
+        opts.sessionEndedRef.current = true;
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(20 * 60 * 1000 + 1000);
+        await Promise.resolve();
+      });
+
+      expect(opts.setMessages).not.toHaveBeenCalled();
+      expect(opts.recordSystemPrompt.mutateAsync).not.toHaveBeenCalled();
+      expect(mockWriteRecoveryMarker).not.toHaveBeenCalled();
     });
   });
 
