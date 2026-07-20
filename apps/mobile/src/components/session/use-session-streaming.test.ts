@@ -1,5 +1,6 @@
 import { renderHook, act } from '@testing-library/react-native';
 import {
+  AUTO_CONTINUATION_TRIGGER_TEXT,
   buildSessionApiMessage,
   useSessionStreaming,
 } from './use-session-streaming';
@@ -1525,11 +1526,11 @@ describe('useSessionStreaming', () => {
         expect.any(String),
         expect.anything(),
       );
-      // The auto-follow-up text is not the learner's original message.
+      // Pin the exact auto-follow-up trigger text, not just "non-empty and
+      // different" — a wrong/renamed trigger persists server-side in the
+      // transcript and would otherwise go undetected.
       const secondCallText = (opts.streamMessage as jest.Mock).mock.calls[1][0];
-      expect(secondCallText).not.toBe('Tell me about Sylvia Plath.');
-      expect(typeof secondCallText).toBe('string');
-      expect(secondCallText.length).toBeGreaterThan(0);
+      expect(secondCallText).toBe(AUTO_CONTINUATION_TRIGGER_TEXT);
     });
 
     it('caps auto-continuation at exactly one follow-up per learner turn (hard cap)', async () => {

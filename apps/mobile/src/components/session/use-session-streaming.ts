@@ -61,7 +61,7 @@ const FIRST_TOPIC_ACK_PATTERN =
  * `handleSend` layer above does that), so this text is never shown live, but
  * it is persisted server-side and would render on a transcript reload.
  */
-const AUTO_CONTINUATION_TRIGGER_TEXT = 'Yes, please continue.';
+export const AUTO_CONTINUATION_TRIGGER_TEXT = 'Yes, please continue.';
 
 type ImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp';
 export type SessionImageAttachment = {
