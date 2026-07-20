@@ -16,6 +16,7 @@ import {
   type Profile,
   type ProfileContextValue,
 } from '../../../lib/profile';
+import { queryKeys } from '../../../lib/query-keys';
 import { createTestProfile } from '../../../test-utils/app-hook-test-utils';
 
 // ---------------------------------------------------------------------------
@@ -30,7 +31,6 @@ const SUBJECT_ID = '11111111-1111-7111-8111-111111111111';
 const TOPIC_ID = '22222222-2222-7222-8222-222222222222';
 const BOOK_ID = '33333333-3333-7333-8333-333333333333';
 const SESSION_ID = '44444444-4444-7444-8444-444444444444';
-const SECOND_SESSION_ID = '55555555-5555-7555-8555-555555555555';
 const NOTE_ID = '66666666-6666-7666-8666-666666666666';
 const BOOKMARK_ID = '77777777-7777-7777-8777-777777777777';
 const BOOKMARK_EVENT_ID = '99999999-9999-7999-8999-999999999999';
@@ -858,7 +858,29 @@ describe('TopicDetailScreen rendering details', () => {
     screen.getByText('No sessions yet. Start one below!');
   });
 
-  it('shows session count and total time when sessions exist', async () => {
+  it('[WI-2184] converges stale history to one row across refetch and revisit', async () => {
+    setupRoutes({ sessions: [] });
+    const { queryClient, Wrapper } = createWrapper();
+    const topicHistoryKey = queryKeys.topicSessions(
+      SUBJECT_ID,
+      TOPIC_ID,
+      PROFILE_ID,
+    );
+    queryClient.setQueryDefaults(topicHistoryKey, { gcTime: Infinity });
+    queryClient.setQueryData(topicHistoryKey, []);
+
+    const firstVisit = render(<TopicDetailScreen />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByText('No sessions yet');
+    });
+    fireEvent.press(screen.getByTestId('topic-sessions-strip'));
+    screen.getByTestId('topic-sessions-empty');
+
+    const fetchesBeforeInvalidation = fetchCallsMatching(
+      mockFetch,
+      `/topics/${TOPIC_ID}/sessions`,
+    ).length;
     setupRoutes({
       sessions: [
         {
@@ -867,22 +889,57 @@ describe('TopicDetailScreen rendering details', () => {
           durationSeconds: 120,
           createdAt: '2026-04-30T12:00:00.000Z',
         },
-        {
-          id: SECOND_SESSION_ID,
-          sessionType: 'learning',
-          durationSeconds: 45,
-          createdAt: '2026-04-29T12:00:00.000Z',
-        },
       ],
     });
-
-    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+    await act(async () => {
+      await queryClient.invalidateQueries({
+        queryKey: topicHistoryKey,
+        exact: true,
+      });
+    });
 
     await waitFor(() => {
-      screen.getByText('2 sessions · 2 min total');
+      screen.getByText('1 session · 2 min total');
+    });
+    expect(
+      fetchCallsMatching(mockFetch, `/topics/${TOPIC_ID}/sessions`).length,
+    ).toBeGreaterThan(fetchesBeforeInvalidation);
+    screen.getByTestId('topic-sessions-list');
+    expect(screen.getAllByTestId(`session-row-${SESSION_ID}`)).toHaveLength(1);
+    expect(screen.queryByTestId('topic-sessions-empty')).toBeNull();
+
+    await act(async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: topicHistoryKey,
+          exact: true,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: topicHistoryKey,
+          exact: true,
+        }),
+      ]);
+    });
+    expect(screen.getAllByTestId(`session-row-${SESSION_ID}`)).toHaveLength(1);
+
+    firstVisit.unmount();
+    render(<TopicDetailScreen />, { wrapper: Wrapper });
+    await waitFor(() => {
+      screen.getByText('1 session · 2 min total');
     });
     fireEvent.press(screen.getByTestId('topic-sessions-strip'));
-    screen.getByTestId('topic-sessions-list');
+    expect(screen.getAllByTestId(`session-row-${SESSION_ID}`)).toHaveLength(1);
+    expect(screen.queryByTestId('topic-sessions-empty')).toBeNull();
+
+    fireEvent.press(screen.getByTestId(`session-row-${SESSION_ID}`));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/session-summary/[sessionId]',
+      params: {
+        sessionId: SESSION_ID,
+        subjectId: SUBJECT_ID,
+        topicId: TOPIC_ID,
+      },
+    });
   });
 
   it('keeps note actions inside the notes strip when no notes exist', async () => {
