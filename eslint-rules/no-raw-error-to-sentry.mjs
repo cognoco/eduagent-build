@@ -53,6 +53,28 @@
  * WI-2527 (burn down the backlog + promote to `error`). This rule's job
  * today is to stop NEW violations.
  *
+ * WRAPPER VALIDATION (bounded — Gate-2 rework, closes an AC-1/AC-5 gap):
+ * the rule used to treat ANY `new Error(...)` as compliant, without
+ * inspecting it — so `captureException(new Error(err.message))` or
+ * `captureException(new Error('label', { cause: err }))` passed silently,
+ * shipping the raw parse-error content the rule exists to stop (errors.ts's
+ * header, ~L23/L80: the label "MUST be a content-free constant … never"
+ * content-bearing). A `new Error(...)` wrapper is now flagged too when EITHER:
+ *   1. its first arg (the label) is the catch binding itself, a member of
+ *      it (`err.message`/`.stack`), or a template/string-concat that
+ *      interpolates it (`` `...${err}...` ``, `'x' + err.message`) — the
+ *      label must be a static constant, per errors.ts's own contract; or
+ *   2. it passes the raw catch binding directly as `cause`
+ *      (`{ cause: err }`) — the content-free shape is a STRUCTURED cause
+ *      object (`{ cause: { statusLength, jsonStrLength, ... } }`), not the
+ *      raw error.
+ * Deliberately bounded to those two named bypasses, not full taint analysis
+ * of the cause object's contents (e.g. `{ cause: { text: err.message } }`
+ * buried a level deeper is not walked) — the genuine errors.ts shape
+ * (static label + structured cause) stays recognized as compliant so the
+ * existing AC-5 fixtures (dictation/prepare-homework.ts's real pattern)
+ * keep passing.
+ *
  * See AGENTS.md > Non-Negotiable Engineering Rules; WI-2352, WI-2527.
  */
 
@@ -114,6 +136,72 @@ function argMatchesCatchBinding(arg, catchParamName) {
   return false;
 }
 
+function isErrorWrapperCall(node) {
+  return (
+    node.type === 'NewExpression' &&
+    node.callee.type === 'Identifier' &&
+    node.callee.name === 'Error'
+  );
+}
+
+// True iff `node` is, or (through a template/string-concat) interpolates,
+// the catch binding — any member access off it (`.message`, `.stack`, …)
+// counts too. Bounded: only direct references, TemplateLiteral expressions,
+// and `+`-concat operands are walked; a reference nested inside a function
+// call or another expression shape is not followed (see file header).
+function referencesCatchBinding(node, catchParamName) {
+  if (!node) return false;
+  if (node.type === 'Identifier' && node.name === catchParamName) return true;
+  if (
+    node.type === 'MemberExpression' &&
+    !node.computed &&
+    node.object.type === 'Identifier' &&
+    node.object.name === catchParamName
+  ) {
+    return true;
+  }
+  if (node.type === 'TemplateLiteral') {
+    return node.expressions.some((expr) =>
+      referencesCatchBinding(expr, catchParamName),
+    );
+  }
+  if (node.type === 'BinaryExpression' && node.operator === '+') {
+    return (
+      referencesCatchBinding(node.left, catchParamName) ||
+      referencesCatchBinding(node.right, catchParamName)
+    );
+  }
+  return false;
+}
+
+// Bounded compliance check for a `new Error(...)` wrapper — see the file
+// header's WRAPPER VALIDATION note. Returns a human-readable bypass reason,
+// or null when the wrapper is recognized as content-free.
+function wrapperContentLeakReason(newExprNode, catchParamName) {
+  const label = newExprNode.arguments[0];
+  if (referencesCatchBinding(label, catchParamName)) {
+    return 'its label references the catch binding — the label must be a static, content-free constant';
+  }
+
+  const options = newExprNode.arguments[1];
+  if (options && options.type === 'ObjectExpression') {
+    for (const prop of options.properties) {
+      if (
+        prop.type === 'Property' &&
+        !prop.computed &&
+        ((prop.key.type === 'Identifier' && prop.key.name === 'cause') ||
+          (prop.key.type === 'Literal' && prop.key.value === 'cause')) &&
+        prop.value.type === 'Identifier' &&
+        prop.value.name === catchParamName
+      ) {
+        return 'its cause is the raw catch-clause error — cause must be a structured, content-free object, not the raw error';
+      }
+    }
+  }
+
+  return null;
+}
+
 /** @type {import('eslint').Rule.RuleModule} */
 const rule = {
   meta: {
@@ -126,6 +214,8 @@ const rule = {
     messages: {
       rawErrorToSentry:
         "Do not pass the raw catch-clause error{{ viaMessage }} to {{ calleeName }} — a JSON.parse/.parse()/DB-driver error's message can embed the parsed/queried content. Synthesize a content-free `new Error(label, { cause: {...} })` instead (see services/llm/providers/errors.ts) and pass that. See AGENTS.md.",
+      nonContentFreeWrapper:
+        'The `new Error(...)` wrapper passed to {{ calleeName }} is not content-free: {{ reason }}. See services/llm/providers/errors.ts for the compliant pattern. See AGENTS.md.',
     },
   },
 
@@ -144,7 +234,6 @@ const rule = {
         if (!catchClause || catchClause.param?.type !== 'Identifier') return;
 
         const catchParamName = catchClause.param.name;
-        if (!argMatchesCatchBinding(arg, catchParamName)) return;
 
         const tryStatement = catchClause.parent;
         const tryCatchText = sourceCode.getText(tryStatement);
@@ -152,14 +241,28 @@ const rule = {
           return;
         }
 
-        context.report({
-          node: arg,
-          messageId: 'rawErrorToSentry',
-          data: {
-            calleeName,
-            viaMessage: arg.type === 'MemberExpression' ? ' (via .message)' : '',
-          },
-        });
+        if (argMatchesCatchBinding(arg, catchParamName)) {
+          context.report({
+            node: arg,
+            messageId: 'rawErrorToSentry',
+            data: {
+              calleeName,
+              viaMessage: arg.type === 'MemberExpression' ? ' (via .message)' : '',
+            },
+          });
+          return;
+        }
+
+        if (isErrorWrapperCall(arg)) {
+          const reason = wrapperContentLeakReason(arg, catchParamName);
+          if (reason) {
+            context.report({
+              node: arg,
+              messageId: 'nonContentFreeWrapper',
+              data: { calleeName, reason },
+            });
+          }
+        }
       },
     };
   },

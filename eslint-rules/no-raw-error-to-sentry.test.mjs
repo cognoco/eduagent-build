@@ -60,6 +60,15 @@ ruleTester.run('no-raw-error-to-sentry', rule, {
         Sentry.captureException(new Error('parse failed', { cause: { len: jsonStr.length } }));
       }
     }`,
+    // Compliant — static template-literal label (no interpolation of the
+    // catch binding) is still content-free.
+    `function f() {
+      try {
+        JSON.parse(raw);
+      } catch (err) {
+        captureException(new Error(\`static label, no interpolation\`));
+      }
+    }`,
   ],
   invalid: [
     // Direct pass-through of a JSON.parse-derived catch binding.
@@ -143,6 +152,53 @@ ruleTester.run('no-raw-error-to-sentry', rule, {
         }
       }`,
       errors: [{ messageId: 'rawErrorToSentry' }],
+    },
+    // Wrapper bypass #1 (Gate-2 rework): the label interpolates the catch
+    // binding's .message directly — content-free in shape only, not in fact.
+    {
+      code: `function f() {
+        try {
+          JSON.parse(raw);
+        } catch (err) {
+          captureException(new Error(err.message));
+        }
+      }`,
+      errors: [{ messageId: 'nonContentFreeWrapper' }],
+    },
+    // Wrapper bypass #2 (Gate-2 rework): a static label, but cause carries
+    // the raw catch binding instead of a structured content-free object.
+    {
+      code: `function f() {
+        try {
+          JSON.parse(raw);
+        } catch (err) {
+          captureException(new Error('static label', { cause: err }));
+        }
+      }`,
+      errors: [{ messageId: 'nonContentFreeWrapper' }],
+    },
+    // Wrapper bypass, via .stack (same shape as .message, doc comment names
+    // both explicitly).
+    {
+      code: `function f() {
+        try {
+          JSON.parse(raw);
+        } catch (err) {
+          captureException(new Error(err.stack));
+        }
+      }`,
+      errors: [{ messageId: 'nonContentFreeWrapper' }],
+    },
+    // Wrapper bypass via template-literal interpolation of the binding.
+    {
+      code: `function f() {
+        try {
+          JSON.parse(raw);
+        } catch (err) {
+          captureException(new Error(\`parse failed: \${err.message}\`));
+        }
+      }`,
+      errors: [{ messageId: 'nonContentFreeWrapper' }],
     },
   ],
 });
