@@ -187,6 +187,14 @@ function makeMeteredApp(input: {
       isOwner: true,
       resolvedVia: 'explicit-header',
     });
+    // [WI-2398] Caller-self identity — meteringMiddleware's assertNotProxyMode
+    // now also calls assertCanWriteProfile, which requires callerPersonId.
+    // Self (callerPersonId === profileId) keeps the deliberate
+    // profileMeta/DB-membership mismatch above untouched — this test is
+    // about metering's quota-role lookup, not caller-identity authority.
+    // MeteringEnv doesn't declare this Variable (assertNotProxyMode reads it
+    // via an internal cast), hence `as never`.
+    c.set('callerPersonId' as never, input.profileId as never);
     await next();
   });
   app.use('*', meteringMiddleware);

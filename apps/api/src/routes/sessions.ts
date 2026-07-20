@@ -224,7 +224,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/subjects/:subjectId/sessions/first-curriculum',
     zValidator('json', firstCurriculumSessionStartSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
@@ -263,7 +263,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/subjects/:subjectId/sessions',
     zValidator('json', sessionStartSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
@@ -313,7 +313,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/clear-continuation-depth',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
       const session = await clearContinuationDepth(db, profileId, sessionId);
@@ -326,7 +326,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/retry-filing',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
@@ -410,7 +410,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       // [F-117] Server-derived proxy-mode write guard — a non-owner proxy
       // caller must not mutate a child's library-filing state.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
@@ -431,7 +431,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       // [F-117] Server-derived proxy-mode write guard — also blocks the
       // Inngest auto-file dispatch below from firing on a child's behalf.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
@@ -463,7 +463,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       // [F-117] Server-derived proxy-mode write guard — also blocks the
       // Inngest auto-file dispatch below from firing on a child's behalf.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
@@ -495,7 +495,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionMessageSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const subscriptionId = c.get('subscriptionId');
       const sessionId = c.req.valid('param').sessionId;
@@ -642,7 +642,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       // The stream endpoint persists messages and triggers LLM exchanges
       // (DeepSec Found-In lines 868, 924, 943, 956, 972, 991 — all inside
       // this handler's write paths).
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const subscriptionId = c.get('subscriptionId');
       const sessionId = c.req.valid('param').sessionId;
@@ -781,7 +781,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       // [WI-171 / DS-082] Server-derived proxy-mode write guard.
       // close persists session state + dispatches the completion event
       // (DeepSec Found-In lines 1020, 1056).
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const body = c.req.valid('json');
 
@@ -852,7 +852,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     // The schema rejects any `content` field (the former injection vector).
     zValidator('json', systemPromptIntentSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const intent = c.req.valid('json');
 
@@ -873,7 +873,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionAnalyticsEventSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const body = c.req.valid('json');
 
@@ -892,7 +892,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionInputModeSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const session = await setSessionInputMode(
         db,
@@ -910,7 +910,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', homeworkStateSyncSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
 
       const result = await syncHomeworkState(
@@ -930,7 +930,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', contentFlagSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const result = await flagContent(
         db,
@@ -963,7 +963,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/summary/skip',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
       const previousSummary = await getSessionSummary(db, profileId, sessionId);
@@ -1000,7 +1000,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/summary/retry-feedback',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
       const profileMeta = c.get('profileMeta');
@@ -1020,7 +1020,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', summarySubmitSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
       const previousSummary = await getSessionSummary(db, profileId, sessionId);
@@ -1071,7 +1071,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/interleaved',
     zValidator('json', interleavedSessionStartSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const input = c.req.valid('json');
 
@@ -1092,7 +1092,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/recall-bridge',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 

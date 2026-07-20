@@ -178,7 +178,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       );
     }),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const input = c.req.valid('json');
       const result = await generateRoundFromInput(c, input);
       if ('error' in result) return result.error;
@@ -209,7 +209,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       );
     }),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const input = c.req.valid('json');
       const result = await generateRoundFromInput(c, input);
       if ('error' in result) return result.error;
@@ -321,7 +321,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     zValidator('param', roundIdParamSchema),
     zValidator('json', questionCheckInputSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const { id: roundId } = c.req.valid('param');
@@ -362,7 +362,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     zValidator('param', roundIdParamSchema),
     zValidator('json', completeRoundInputSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const { id: roundId } = c.req.valid('param');
@@ -395,7 +395,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       );
     }),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const { activityType } = c.req.valid('json');

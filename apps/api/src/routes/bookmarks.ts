@@ -45,7 +45,7 @@ export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()
     // already enforces this; POST creates a bookmark on the resolved profile,
     // which is just as much a write a parent acting on a child must not be
     // permitted to make.
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const bookmark = await createBookmark(
       c.get('db'),
       requireProfileId(c.get('profileId')),
@@ -85,7 +85,7 @@ export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()
     '/bookmarks/:id',
     zValidator('param', bookmarkIdParamSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       await deleteBookmark(
         c.get('db'),
         requireProfileId(c.get('profileId')),

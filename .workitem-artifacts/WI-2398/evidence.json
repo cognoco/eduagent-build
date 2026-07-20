@@ -1,0 +1,31 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Write IDOR break test: non-owner member (own login) sends X-Profile-Id=owner's admin profile id against POST /v1/subjects/:subjectId/curriculum/skip -> 403, target topic row unchanged (skipped stays false); owner acting as themselves still succeeds (200, skipped becomes true). Red-green-revert executed manually against a real Postgres DB (tests/integration): fails at pre-fix code (200, mutation applies), passes after the fix, fails again on revert, restored.",
+      "pointer": "tests/integration/wi2398-write-idor.integration.test.ts:153"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Onboarding self-service write break test: same attack against PATCH /v1/onboarding/pronouns -> 403, person.pronouns not mutated; owner acting as themselves still succeeds (200, pronouns updated).",
+      "pointer": "tests/integration/wi2398-write-idor.integration.test.ts:220"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Owner-still-allowed positive control for the onboarding write, proving the gate authorizes (not blanket-denies).",
+      "pointer": "tests/integration/wi2398-write-idor.integration.test.ts:246"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Owner-still-allowed positive control for the curriculum write.",
+      "pointer": "tests/integration/wi2398-write-idor.integration.test.ts:185"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Sweep: every assertNotProxyMode call site (97 sites across 24 route files + metering.ts) is covered by a single centralized fix inside assertNotProxyMode itself (middleware/proxy-guard.ts), which now also calls the new assertCanWriteProfile (services/family-access.ts) -- the write-authority twin of WI-2416's assertCanReadProfile. Because every call site delegates to the same shared primitive, fixing it once closes the gap everywhere without a per-route sweep; no site is out-of-scope.",
+      "pointer": "apps/api/src/middleware/proxy-guard.ts:62"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "tests/integration/wi2398-write-idor.integration.test.ts:153"
+}

@@ -51,7 +51,7 @@ export const speakingPracticeRoutes = new Hono<SpeakingPracticeRouteEnv>().post(
     );
   }),
   async (c) => {
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
     const input = c.req.valid('json');

@@ -232,7 +232,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     async (c) => {
       // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
       // A parent operating in proxy mode must not create notes on their child's profile.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId, topicId } = c.req.valid('param');
@@ -261,7 +261,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     zValidator('json', updateNoteInputSchema),
     async (c) => {
       // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { noteId } = c.req.valid('param');
@@ -284,7 +284,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     zValidator('param', topicParamSchema),
     async (c) => {
       // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId, topicId } = c.req.valid('param');
@@ -310,7 +310,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     zValidator('param', noteIdParamSchema),
     async (c) => {
       // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { noteId } = c.req.valid('param');

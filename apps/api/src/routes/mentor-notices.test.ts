@@ -18,6 +18,20 @@ jest.mock(
   }),
 );
 
+// [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
+// calls verifyPersonOwnershipV2 — a raw db.select() membership query the
+// stub `db` in this file cannot satisfy. Every scenario in this file is a
+// caller-self write (makeApp sets callerPersonId equal to profileId below);
+// the cross-account write attack this guard exists to close is covered by
+// the real-DB break test in
+// tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's stub-db environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
 const PROFILE_ID = '550e8400-e29b-41d4-a716-446655440001';
 const NOTICE_ID = '550e8400-e29b-41d4-a716-446655440002';
 const SESSION_ID = '550e8400-e29b-41d4-a716-446655440003';
@@ -32,6 +46,10 @@ function makeApp(enabled = true) {
       isOwner: true,
       resolvedVia: 'explicit-header',
     });
+    // [WI-2398] Caller-self identity — assertNotProxyMode now also calls
+    // assertCanWriteProfile, which requires account + callerPersonId.
+    c.set('account' as never, { id: 'test-account-id' });
+    c.set('callerPersonId' as never, PROFILE_ID);
     c.env = { MENTOR_NOTICE_ENABLED: enabled ? 'true' : 'false' } as never;
     await next();
   });
