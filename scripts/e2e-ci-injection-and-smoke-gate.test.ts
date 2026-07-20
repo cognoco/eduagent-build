@@ -35,6 +35,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import * as ts from 'typescript';
 import { parse as parseYaml, parseAllDocuments } from 'yaml';
 
@@ -1194,9 +1195,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       true,
     );
     const titleCheckpointMutations = (checkpoint: Selector[]): Selector[][] => {
-      const titleIndex = checkpoint.length - 1;
-      const replaceTitle = (assertVisible: Selector): Selector[] =>
-        checkpoint.with(titleIndex, { assertVisible });
+      const titleIndex = checkpoint.findIndex((command) =>
+        isDeepStrictEqual(command, exactWorldHistoryHubTitle),
+      );
+      if (titleIndex < 0) {
+        throw new Error('Subject Hub checkpoint is missing its exact title');
+      }
+      const replaceTitle = (titleSelector: Selector): Selector[] =>
+        checkpoint.with(titleIndex, { assertVisible: titleSelector });
 
       return [
         checkpoint.filter((_, index) => index !== titleIndex),
@@ -1221,6 +1227,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           ...checkpoint.slice(0, titleIndex),
           { assertVisible: { id: 'subject-hub-title-${SUBJECT_ID}' } },
           { assertVisible: { text: '^World History$' } },
+          ...checkpoint.slice(titleIndex + 1),
         ],
       ];
     };
@@ -1299,6 +1306,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       exactPostSheetCloseHub
         .with(1, exactPostSheetCloseHub[2]!)
         .with(2, exactPostSheetCloseHub[1]!),
+      // Exact title reordering before Subject Hub readiness.
+      exactPostSheetCloseHub
+        .with(2, exactPostSheetCloseHub[3]!)
+        .with(3, exactPostSheetCloseHub[2]!),
     ]) {
       expect(hasExactCommandSequence(mutation, exactPostSheetCloseHub)).toBe(
         false,
