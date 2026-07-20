@@ -13,6 +13,8 @@ import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
 // (makeApp sets callerPersonId === profileId); the cross-account read attack
 // this guard exists to close is covered by the real-DB break test in
 // tests/integration/wi2416-read-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's shift-queue mock DB.
 jest.mock('../services/identity-v2/ownership-v2', () => ({
   ...jest.requireActual('../services/identity-v2/ownership-v2'),
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
