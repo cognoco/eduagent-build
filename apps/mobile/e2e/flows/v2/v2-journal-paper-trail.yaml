@@ -67,9 +67,10 @@ tags:
     id: 'journal-tab-notes'
 - tapOn:
     id: 'journal-notes-filter-mine'
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: 'journal-note-note:${LEARNER_NOTE_ID}'
+    direction: DOWN
     timeout: 15000
 - assertNotVisible:
     id: 'journal-note-bookmark:${BOOKMARK_ID}'
@@ -86,6 +87,11 @@ tags:
 - eraseText: 19
 - inputText: 'glucose'
 - hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: 'journal-note-note:${LEARNER_NOTE_ID}'
+    direction: DOWN
+    timeout: 15000
 - assertVisible:
     id: 'journal-note-note:${LEARNER_NOTE_ID}'
     containsDescendants:
@@ -125,9 +131,10 @@ tags:
     id: 'journal-tab-notes'
 - tapOn:
     id: 'journal-notes-filter-mentor'
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: 'journal-note-bookmark:${BOOKMARK_ID}'
+    direction: DOWN
     timeout: 15000
 - assertNotVisible:
     id: 'journal-note-note:${LEARNER_NOTE_ID}'
@@ -144,6 +151,11 @@ tags:
 - eraseText: 19
 - inputText: 'chlorophyll'
 - hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: 'journal-note-bookmark:${BOOKMARK_ID}'
+    direction: DOWN
+    timeout: 15000
 - assertVisible:
     id: 'journal-note-bookmark:${BOOKMARK_ID}'
     containsDescendants:
