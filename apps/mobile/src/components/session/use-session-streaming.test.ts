@@ -17,12 +17,6 @@ jest.mock(
   }),
 );
 
-// Mock ChatShell directly so the hook can avoid the session barrel cycle.
-// prettier-ignore
-jest.mock('./ChatShell', () => ({ // gc1-allow: hook test avoids the session barrel cycle; only the animation helper is needed
-  animateResponse: jest.fn(() => jest.fn()),
-}));
-
 // Mock session recovery
 const mockWriteRecoveryMarker = jest.fn().mockResolvedValue(undefined);
 // prettier-ignore
@@ -41,7 +35,8 @@ jest.mock(
   }),
 );
 
-const WATCHDOG_RECONNECT_TEXT = 'Connection dropped — Try again';
+const RECONNECT_ERROR_TEXT =
+  'Lost connection — check your network and tap Reconnect to try again.';
 
 function applyMessageUpdates(
   calls: Array<[unknown]>,
@@ -1009,10 +1004,7 @@ describe('useSessionStreaming', () => {
       // transcript as a plain AI message — user got un-actionable text and
       // had no retry path. The fallback now appends a typed system message
       // (kind: 'reconnect_prompt'), which activates the inline Reconnect
-      // affordance via SessionMessageActions. animateResponse must NOT be
-      // called in this path.
-      const { animateResponse } = require('./ChatShell');
-      expect(animateResponse).not.toHaveBeenCalled();
+      // affordance via SessionMessageActions.
 
       // Verify a reconnect-prompt system message was appended.
       const setMessagesCalls = (opts.setMessages as jest.Mock).mock.calls;
@@ -1264,50 +1256,209 @@ describe('useSessionStreaming', () => {
       expect(stillStreaming).toHaveLength(0);
     });
 
-    it('does not overwrite watchdog reconnect prompts during finalization', async () => {
+    it('[WI-2102] keeps the mentor-writing indicator mounted for the sparse t=0/25/79s stream', async () => {
       jest.useFakeTimers();
 
-      let finishStream:
-        | ((result?: Record<string, unknown>) => Promise<void>)
-        | undefined;
-
+      let currentMessages: Array<Record<string, unknown>> = [];
+      let isStreaming = false;
+      const streamingTransitions: boolean[] = [];
+      let releaseCompletion!: () => void;
+      const completionGate = new Promise<void>((resolve) => {
+        releaseCompletion = resolve;
+      });
       const opts = makeOpts({
-        streamMessage: jest.fn(
+        setMessages: jest.fn(
           (
+            update:
+              | Array<Record<string, unknown>>
+              | ((
+                  previous: Array<Record<string, unknown>>,
+                ) => Array<Record<string, unknown>>),
+          ) => {
+            currentMessages =
+              typeof update === 'function' ? update(currentMessages) : update;
+          },
+        ),
+        setIsStreaming: jest.fn((next: boolean) => {
+          if (next !== isStreaming) streamingTransitions.push(next);
+          isStreaming = next;
+        }),
+        streamMessage: jest.fn(
+          async (
             _text: string,
-            _onChunk: (accumulated: string) => void,
+            onChunk: (accumulated: string) => void,
             onComplete: (result: Record<string, unknown>) => Promise<void>,
             _sessionId: string,
-          ) =>
-            new Promise<void>((resolve) => {
-              finishStream = async (
-                result = {
-                  aiEventId: 'ai-event-late',
-                  exchangeCount: 1,
-                  escalationRung: 0,
-                },
-              ) => {
-                await onComplete(result);
-                resolve();
-              };
+          ) => {
+            onChunk('t=0');
+            await new Promise((resolve) => setTimeout(resolve, 25_000));
+            onChunk('t=25');
+            await new Promise((resolve) => setTimeout(resolve, 54_000));
+            onChunk('t=79');
+            await completionGate;
+            await onComplete({
+              aiEventId: 'ai-event-sparse',
+              exchangeCount: 1,
+              escalationRung: 0,
+            });
+          },
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      let pending: Promise<void> | undefined;
+      try {
+        await act(async () => {
+          pending = result.current.continueWithMessage('retry later');
+          await Promise.resolve();
+        });
+
+        expect(isStreaming).toBe(true);
+        expect(currentMessages).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: 'assistant',
+              content: 't=0',
+              streaming: true,
             }),
+          ]),
+        );
+
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(25_000);
+        });
+        expect(isStreaming).toBe(true);
+        expect(currentMessages).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: 'assistant',
+              content: 't=25',
+              streaming: true,
+            }),
+          ]),
+        );
+
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(45_000);
+        });
+        expect(isStreaming).toBe(true);
+        expect(currentMessages).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: 'assistant',
+              content: 't=25',
+              streaming: true,
+            }),
+          ]),
+        );
+
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(9_000);
+        });
+        expect(isStreaming).toBe(true);
+        expect(currentMessages).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: 'assistant',
+              content: 't=79',
+              streaming: true,
+            }),
+          ]),
+        );
+
+        releaseCompletion();
+        await act(async () => {
+          await pending;
+        });
+
+        expect(isStreaming).toBe(false);
+        expect(streamingTransitions).toEqual([true, false]);
+        expect(currentMessages).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: 'assistant',
+              content: 't=79',
+              streaming: false,
+              eventId: 'ai-event-sparse',
+            }),
+          ]),
+        );
+        expect(currentMessages[0]).not.toHaveProperty('kind');
+      } finally {
+        releaseCompletion();
+        try {
+          await act(async () => {
+            await jest.advanceTimersByTimeAsync(79_000);
+            await pending;
+          });
+        } finally {
+          jest.clearAllTimers();
+          jest.useRealTimers();
+        }
+      }
+    });
+
+    it('[WI-2102] finalizes a completed reply exactly once', async () => {
+      const onCompleteCalls = jest.fn();
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (
+            _text: string,
+            onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+          ) => {
+            onChunk('Complete answer');
+            onCompleteCalls();
+            await onComplete({
+              aiEventId: 'ai-event-complete',
+              exchangeCount: 1,
+              escalationRung: 0,
+            });
+          },
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('finish once');
+      });
+
+      const indicatorUnmounts = (opts.setIsStreaming as jest.Mock).mock.calls
+        .map(([next]) => next)
+        .filter((next) => next === false);
+      expect(onCompleteCalls).toHaveBeenCalledTimes(1);
+      expect(indicatorUnmounts).toHaveLength(1);
+      expect(opts.trackExchange).toHaveBeenCalledTimes(1);
+    });
+
+    it('[WI-2102] clears the indicator and surfaces the existing error when aborted at t=40s', async () => {
+      jest.useFakeTimers();
+      const abortError = Object.assign(new Error('The operation was aborted'), {
+        name: 'AbortError',
+      });
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (_text: string, onChunk: (accumulated: string) => void) => {
+            onChunk('Partial answer');
+            await new Promise((resolve) => setTimeout(resolve, 40_000));
+            throw abortError;
+          },
         ),
       });
       const { result } = renderHook(() => useSessionStreaming(opts as any));
 
       try {
-        let pending: Promise<void> | undefined;
+        let pending!: Promise<void>;
         await act(async () => {
-          pending = result.current.continueWithMessage('retry later');
-        });
-
-        await act(async () => {
-          jest.advanceTimersByTime(45_000);
+          pending = result.current.continueWithMessage('abort at forty');
           await Promise.resolve();
         });
 
+        expect(opts.setIsStreaming).toHaveBeenCalledWith(true);
+        expect(opts.setIsStreaming).not.toHaveBeenCalledWith(false);
+
         await act(async () => {
-          await finishStream?.();
+          await jest.advanceTimersByTimeAsync(40_000);
           await pending;
         });
 
@@ -1315,17 +1466,17 @@ describe('useSessionStreaming', () => {
           (opts.setMessages as jest.Mock).mock.calls,
           [],
         );
-
+        expect(opts.setIsStreaming).toHaveBeenCalledWith(false);
         expect(finalMessages).toEqual(
           expect.arrayContaining([
             expect.objectContaining({
               role: 'assistant',
+              content: RECONNECT_ERROR_TEXT,
+              streaming: false,
               kind: 'reconnect_prompt',
-              content: WATCHDOG_RECONNECT_TEXT,
             }),
           ]),
         );
-        expect(finalMessages[0]).not.toHaveProperty('isSystemPrompt');
       } finally {
         jest.useRealTimers();
       }
