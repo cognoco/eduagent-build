@@ -229,7 +229,7 @@ function stripQueryString(url: string): string {
     : `${url.slice(0, queryIndex)}?${STRIPPED_QUERY_MARKER}`;
 }
 
-/** Marker substituted for a stripped (non-plain-object) request body. */
+/** Marker substituted for a stripped request body. */
 const STRIPPED_BODY_MARKER = '[stripped]';
 
 /**
@@ -238,19 +238,25 @@ const STRIPPED_BODY_MARKER = '[stripped]';
  * `.agents/skills/tech/sentry-scrubbing/SKILL.md`'s review checklist
  * requires `beforeSend` to strip request bodies unconditionally ("Is there a
  * `beforeSend` that strips request query strings, `authorization`/`cookie`
- * headers, and **bodies**?"), not only when the body happens to be a plain
- * object. Not currently populated by this SDK/runtime for any request shape
- * (see [WI-2339] Risk/Impact) — this is a forward guard, not a live-leak fix.
+ * headers, and **bodies**?"), with no carve-out for "when the body happens
+ * to be a plain object with no denylisted keys." Not currently populated by
+ * this SDK/runtime for any request shape (see [WI-2339] Risk/Impact) — this
+ * is a forward guard, not a live-leak fix.
  *
- * [WI-2339 Gate-2 rework] A plain-object body is recursively denylist-scrubbed
- * (reuses the same key-based mechanism as `extra`/`contexts`/breadcrumb
- * `data` — consistent structural handling, and the object shape is where a
- * JSON request body naturally lands). Any OTHER truthy body — a raw string,
- * a Buffer/ArrayBuffer, or anything else — is wholesale-stripped, matching
- * the checklist's unconditional "strips ... bodies" requirement; a string
- * body carries no denylist-able keys, so there is nothing to selectively
- * scrub, and preserving it (the prior behavior this rework replaces) left
- * the checklist's requirement unmet for that shape.
+ * [WI-2339 Gate-2 rework #2] The FIRST rework denylist-scrubbed a plain-
+ * object body (reusing the `extra`/`contexts`/breadcrumb-`data` mechanism)
+ * and only wholesale-stripped non-object bodies. Gate-2 correctly flagged
+ * that this leaves any field NOT on `PII_DENYLIST_KEYS` (the reviewer's
+ * repro: a `homeworkAnswer` field) surviving inside an object body — the
+ * denylist is a curated list of KNOWN-bad keys, not a guarantee that every
+ * field of an arbitrary request body is safe, and SKILL.md's checklist asks
+ * for the body to be stripped, not selectively filtered. `event.request.data`
+ * is now wholesale-stripped for EVERY truthy shape, object included — no
+ * shape-based branching. (This intentionally differs from `event.extra`/
+ * `event.contexts`, which stay denylist-scrubbed: those are populated by
+ * THIS repo's own `captureException`/`captureMessage` call sites, whose
+ * key shapes are known and curated; `event.request.data` is an arbitrary
+ * request body whose shape this scrubber has no visibility into.)
  *
  * [Gate-2 fix] `query_string` is typed by the SDK as `string |
  * Record<string, unknown> | Array<[string, string]>` — a `typeof ===
@@ -275,9 +281,7 @@ function scrubRequestUrlFields(
   if (typeof request.url === 'string') {
     request.url = stripQueryString(request.url);
   }
-  if (isPlainObject(request.data)) {
-    request.data = scrubKeys(request.data);
-  } else if (request.data) {
+  if (request.data) {
     request.data = STRIPPED_BODY_MARKER;
   }
 }
@@ -310,10 +314,11 @@ function scrubBreadcrumbUrl(
  * (see `QUOTED_SNIPPET_PATTERN`'s doc comment); strips the `authorization`
  * header from `event.request.headers` [WI-2353]; and [WI-2339] strips
  * `event.request.query_string`, the query segment of `event.request.url`,
- * `event.request.data` (denylist-scrubbed if a plain object, wholesale-
- * stripped otherwise), and the query segment of any breadcrumb's `data.url`
- * before the event leaves the process. Defense-in-depth, not a substitute
- * for call-site discipline. [WI-1990]
+ * `event.request.data` (wholesale-stripped for every shape — see
+ * `scrubRequestUrlFields`'s doc comment for why this isn't denylist-scrubbed
+ * like `extra`/`contexts`), and the query segment of any breadcrumb's
+ * `data.url` before the event leaves the process. Defense-in-depth, not a
+ * substitute for call-site discipline. [WI-1990]
  *
  * [WI-2353 rework] Wired to BOTH `beforeSend` (error events) AND
  * `beforeSendTransaction` (sampled transaction events) in
@@ -358,6 +363,33 @@ function scrubBreadcrumbUrl(
  * IMPROVEMENT, not a tradeoff — free-text content is high-cardinality (every
  * distinct value groups as a new issue); the redacted structural message
  * groups correctly.
+ *
+ * [AC-1 amended 2026-07-20, pm:claude:mentomate ruling] A second Gate-2
+ * bounce demanded WHOLESALE-redacting all free text in `event.message`/
+ * `exception.value` — rejected by PM: it exceeds `.agents/skills/tech/
+ * sentry-scrubbing/SKILL.md`'s own authority (that doc doesn't name
+ * message/exception as free-text-redaction targets at all — it prescribes
+ * a `beforeSend` → `null` CLASS-drop for "known-noisy or sensitive paths",
+ * not per-value redaction) and would gut observability for a channel this
+ * WI's own Risk/Impact rates INERT. Amended AC-1 requires: (a) the
+ * denylist/targeted-redaction backstop above stays as-is (already
+ * conformant — the quoted-substring redaction is targeted, not wholesale),
+ * and (b) `beforeSend` → `null` class-dropping for any KNOWN-sensitive event
+ * class, grounded in actual analysis rather than invented. Analysis: no
+ * known-sensitive event class exists at the `beforeSend` (whole-event)
+ * level today. The one identified class-level bypass — `console.*` calls
+ * turning into breadcrumbs carrying raw structured-log strings — is ALREADY
+ * dropped via `beforeBreadcrumb` → `null` (`dropConsoleBreadcrumb` below);
+ * that's the `beforeBreadcrumb`-level instance of the same SKILL.md pattern.
+ * No `captureException`/`captureMessage` call site in this API is known to
+ * emit a whole EVENT class that should never reach Sentry at all (as
+ * opposed to a field within an event that needs scrubbing, which the
+ * denylist/redaction backstops above already cover) — grounding a
+ * `beforeSend` → `null` drop here would mean inventing a class that
+ * doesn't exist. If a genuinely sensitive event class is identified in the
+ * future (e.g. a specific error type that should never be reported), add a
+ * targeted `return null` branch for it here, following
+ * `dropConsoleBreadcrumb`'s pattern.
  */
 export function scrubSentryEvent<T extends Sentry.Event>(event: T): T {
   if (event.request?.headers) {
