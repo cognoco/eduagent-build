@@ -23,8 +23,8 @@ export interface UseSpeechRecognitionResult {
   clearTranscript: () => void;
   /**
    * Prompt the user for microphone permission without starting the listener.
-   * Safe to call on mount — the OS will only show a dialog the first time;
-   * subsequent calls return the cached grant silently.
+   * Intended for explicit, user-initiated inline permission recovery;
+   * `startListening` owns the normal permission-and-recording flow.
    * Returns `true` if granted (or already granted), `false` otherwise.
    */
   requestMicrophonePermission: () => Promise<boolean>;
@@ -238,8 +238,9 @@ export function useSpeechRecognition(
         const { granted } = await speechModule.requestPermissionsAsync();
         return granted;
       } catch {
-        // Swallow errors: this is a best-effort pre-warm. The button-press path
-        // will surface a user-facing error if permission is still missing later.
+        // Swallow errors: inline permission recovery is best-effort. The
+        // existing STT error remains surfaced, and a later startListening
+        // attempt will report a permission failure if access is still missing.
         return false;
       }
     }, [loadModule]);

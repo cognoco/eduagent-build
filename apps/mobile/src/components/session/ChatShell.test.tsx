@@ -156,6 +156,12 @@ describe('ChatShell', () => {
   // Basic rendering (regression — existing behaviour)
   // -----------------------------------------------------------------------
 
+  it('does not request microphone permission when mounted in text mode', () => {
+    renderChatShell();
+
+    expect(mockRequestMicrophonePermission).not.toHaveBeenCalled();
+  });
+
   // [BUG-887] On small phones (Galaxy S10e ~5.8") the Text/Voice mode
   // toggle eats vertical space the composer needs when the soft keyboard
   // opens. Onboarding interview opts in to hide the toggle.
@@ -408,14 +414,15 @@ describe('ChatShell', () => {
   // -----------------------------------------------------------------------
 
   describe('voice recording', () => {
-    it('calls startListening when mic button is pressed', async () => {
+    it('starts listening once without a duplicate permission request on mic press', async () => {
       renderChatShell({ verificationType: 'teach_back' });
 
       await act(async () => {
         fireEvent.press(screen.getByTestId('voice-record-button'));
       });
 
-      expect(mockStartListening).toHaveBeenCalled();
+      expect(mockStartListening).toHaveBeenCalledTimes(1);
+      expect(mockRequestMicrophonePermission).not.toHaveBeenCalled();
     });
 
     it('enables voice mode and starts listening from the compact mic button', async () => {
@@ -1260,10 +1267,6 @@ describe('ChatShell', () => {
       const buttons = alertSpy.mock.calls.at(-1)?.[2] as AlertBtn[] | undefined;
       const actionButton = buttons?.find((b) => b.style !== 'cancel');
       expect(actionButton).toBeDefined();
-
-      // ChatShell pre-warms requestMicrophonePermission on mount — clear that
-      // call so we measure only the button tap.
-      mockRequestMicrophonePermission.mockClear();
 
       await act(async () => {
         actionButton?.onPress?.();

@@ -22,6 +22,23 @@ function card(overrides: Partial<NowCardData> = {}): NowCardData {
 }
 
 describe('NowCard', () => {
+  it('[WI-2113 AC-2] labels spaced-retrieval work Review rather than Challenge', () => {
+    const { getByTestId, getByText, queryByText } = render(
+      <NowCard
+        card={card({
+          kind: 'retention_due',
+          templateKey: 'now.retention_due.default',
+        })}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+      />,
+    );
+
+    expect(getByTestId('now-card-retention_due')).toBeTruthy();
+    expect(getByText('Review')).toBeTruthy();
+    expect(queryByText('Challenge')).toBeNull();
+  });
+
   it('renders the mapped title for a known server template', () => {
     const { getByTestId, getByText } = render(
       <NowCard card={card()} onContinue={jest.fn()} onDecline={jest.fn()} />,
