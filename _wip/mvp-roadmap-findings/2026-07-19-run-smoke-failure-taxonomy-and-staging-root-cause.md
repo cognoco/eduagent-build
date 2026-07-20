@@ -265,6 +265,7 @@ run above (`29688502157`, 13:21:22.4–13:21:28.9 UTC):
   curl -sS -G "https://de.sentry.io/api/0/organizations/zwizzly/events/" \
     -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
     --data-urlencode "project=4511717632704592" \
+    --data-urlencode "dataset=discover" \
     --data-urlencode "field=timestamp" \
     --data-urlencode "field=transaction" \
     --data-urlencode "field=transaction.status" \
@@ -277,7 +278,12 @@ run above (`29688502157`, 13:21:22.4–13:21:28.9 UTC):
   `zwizzly`, resolved via `GET /api/0/organizations/zwizzly/projects/`. This
   is a discrete per-transaction event list, not a sampled/aggregated
   dataset — no separate sampling field applies; each row below is one real
-  transaction Sentry recorded.)
+  transaction Sentry recorded. `dataset=discover` is pinned explicitly here
+  and on the other three Sentry queries below — it is the endpoint's
+  default when the param is omitted, confirmed on all four calls' own
+  response `meta.dataset: "discover"` / `meta.datasetReason: "unchanged"` /
+  `meta.dataScanned: "full"`, not inferred — but pinning it removes any
+  dependency on that default holding at re-run time.)
 
   **Raw result (sanitized — timestamp + status only, event IDs omitted; 26
   rows, all `ok`):**
@@ -298,6 +304,7 @@ run above (`29688502157`, 13:21:22.4–13:21:28.9 UTC):
   curl -sS -G "https://de.sentry.io/api/0/organizations/zwizzly/events/" \
     -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
     --data-urlencode "project=4511717632704592" \
+    --data-urlencode "dataset=discover" \
     --data-urlencode "field=timestamp" \
     --data-urlencode "field=title" \
     --data-urlencode "field=level" \
@@ -336,11 +343,15 @@ run above (`29688502157`, 13:21:22.4–13:21:28.9 UTC):
   estimated 22 at `13:21:18Z` — roughly 44% and 59% respectively, not
   ~100%). Even at that lower end, a dataset sampling well under half of
   estimated traffic at one-to-two-second granularity would still be
-  expected to register at least one raw sample somewhere across a
+  expected to register at least one sampled data point somewhere across a
   sustained 14-second span if traffic had continued through it — none
-  appears, at any status, anywhere in the gap — so the zero-count gap
-  remains a real absence, not a sampling artifact, on the corrected
-  sampling-rate reading.
+  appears, at any status, anywhere in the gap: no sampled rows are
+  observed in the window, on the corrected sampling-rate reading. This
+  document does not treat that sampling silence, by itself, as proof of a
+  traffic absence — the root-cause conclusion below rests on it
+  converging with two independent signals (the client-side
+  `net::ERR_FAILED` timing and the Sentry `/v1/profiles` transaction gap),
+  not on the Cloudflare reading in isolation.
 
   **Raw query, re-run 2026-07-20 for this rework** (includes a
   `confidence(level: 0.95)` selection alongside `sum` — introspected from
@@ -364,7 +375,9 @@ run above (`29688502157`, 13:21:22.4–13:21:28.9 UTC):
   credential; disclosed for the same reason the zone/script names already
   are: so the query is independently re-runnable. **Sampling field relied
   on:** `confidence(level: 0.95).sum.requests`, specifically its
-  `sampleSize` (raw events actually captured) and `estimate` (the
+  `sampleSize` (the count of sampled data points Cloudflare's sampler
+  captured to compute the estimate — not an independently verified
+  raw-event count) and `estimate` (the
   extrapolated `sum.requests` figure this document's earlier claims cite)
   sub-fields — found by introspecting `AccountWorkersInvocationsAdaptive`'s
   field list and `Confidence`'s field list via `__type` queries. This
@@ -376,7 +389,8 @@ run above (`29688502157`, 13:21:22.4–13:21:28.9 UTC):
   bucket returned by the query; `errors`/`subrequests` omitted as noise,
   `requests` = extrapolated `sum.requests`/`confidence.estimate` — always
   identical, the same figure the earlier version of this evidence cited —
-  `sampleSize` = raw events actually captured, newly added):
+  `sampleSize` = sampled data-point count feeding the estimate (not a
+  verified raw-event count), newly added):
   ```
   datetime(UTC)  status              colo  requests  sampleSize
   13:21:00       success             SEA   7         7
@@ -400,16 +414,18 @@ run above (`29688502157`, 13:21:22.4–13:21:28.9 UTC):
   13:21:57       success             SEA   1         1
   ```
   Confirmed directly, not just narrated: the last row before the gap is
-  `13:21:18` (`success`, 22 estimated requests from 13 raw-sampled
-  events — the exact `requests` figure cited above, now with its sampling
-  basis on record), the first row after is `13:21:33`; nothing in between
-  at any status. That is a 14-second span (`13:21:19`–`13:21:32`
-  inclusive) with zero rows of any kind, matching the claimed "14-second
-  total gap" precisely. All rows in this window are colo `SEA`, matching
-  the claimed colo. `sampleSize` equals `requests` for 17 of the 19 rows
-  (full 1:1 sampling); the two exceptions (`13:21:11Z` `clientDisconnected`
-  and `13:21:18Z` `success`) are the two busiest rows and are the basis for
-  the 44%/59% figures in the narration above.
+  `13:21:18` (`success`, an extrapolated `estimate`/`requests` of 22
+  computed from a `sampleSize` of 13 sampled data points — the same
+  figures cited above, now with the sampling basis on record; `sampleSize`
+  is not itself a verified count of 13 raw events), the first row after is
+  `13:21:33`; nothing in between at any status. That is a 14-second span
+  (`13:21:19`–`13:21:32` inclusive) with zero rows of any kind, matching
+  the claimed "14-second total gap" precisely. All rows in this window are
+  colo `SEA`, matching the claimed colo. `sampleSize` equals
+  `requests`/`estimate` for 17 of the 19 rows (no extrapolation applied on
+  those rows); the two exceptions (`13:21:11Z` `clientDisconnected` and
+  `13:21:18Z` `success`) are the two busiest rows and are the basis for the
+  44%/59% figures in the narration above.
 
 A Worker cold start, a Neon connection-pool exhaustion, a Neon cold-resume
 (the PM ruling's named candidate — Neon's serverless compute can take
@@ -471,6 +487,7 @@ this run instead):**
   curl -sS -G "https://de.sentry.io/api/0/organizations/zwizzly/events/" \
     -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
     --data-urlencode "project=4511717632704592" \
+    --data-urlencode "dataset=discover" \
     --data-urlencode "field=timestamp" \
     --data-urlencode "field=transaction" \
     --data-urlencode "field=transaction.status" \
@@ -503,6 +520,7 @@ this run instead):**
   curl -sS -G "https://de.sentry.io/api/0/organizations/zwizzly/events/" \
     -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
     --data-urlencode "project=4511717632704592" \
+    --data-urlencode "dataset=discover" \
     --data-urlencode "field=timestamp" \
     --data-urlencode "field=title" \
     --data-urlencode "field=level" \
@@ -532,8 +550,9 @@ this run instead):**
   ```
 
   **Raw result (sanitized — same shape as incident 1's; `requests` =
-  extrapolated `sum.requests`/`confidence.estimate`, `sampleSize` = raw
-  events actually captured):**
+  extrapolated `sum.requests`/`confidence.estimate`, `sampleSize` =
+  sampled data-point count feeding the estimate, not a verified
+  raw-event count):**
   ```
   datetime(UTC)  status              colo  requests  sampleSize
   03:38:26       clientDisconnected  SJC   1         1
@@ -549,9 +568,9 @@ this run instead):**
   end at `03:38:50`, matching the claimed "last invocation at 03:38:32Z,
   none through the end of the query window" exactly. All rows are colo
   `SJC`, matching the claimed colo and confirming it differs from incident
-  1's `SEA`. Unlike incident 1, `sampleSize` equals `requests` on every
-  row here — full 1:1 sampling throughout this window, so no
-  partial-sampling correction applies to incident 2's reading.
+  1's `SEA`. Unlike incident 1, `sampleSize` equals `requests`/`estimate`
+  on every row here — no extrapolation applied anywhere in this window,
+  so no partial-sampling correction applies to incident 2's reading.
 
 **Residual discriminator (not resolved — genuinely out of reach here, not
 guessed at):** the two-colo reproduction is most consistent with a DNS
