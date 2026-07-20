@@ -119,7 +119,7 @@ export async function readSubscriptionStatus(
 // WI-1505 — Aggregate LLM traffic kill switch
 //
 // llmMiddleware carries SUBSCRIPTION_KV with zero I/O. The first
-// routeAndCall/routeAndStream choke point reads this key lazily, and
+// LLM router choke points read this key lazily, and
 // request-local AsyncLocalStorage memoizes the promise/result once per LLM
 // request. This lets an operator stop or degrade learner-facing LLM traffic on
 // the next LLM request without a mobile release or Worker redeploy. Reuses

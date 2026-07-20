@@ -152,7 +152,7 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
   }
   // Request-scoped routing values must not live in isolate globals: Workers
   // can overlap requests in one isolate. The kill switch binding is carried
-  // without I/O here and read lazily by routeAndCall/routeAndStream.
+  // without I/O here and read lazily at the LLM router choke points.
   const subscriptionKv = c.env?.SUBSCRIPTION_KV;
   await runWithLlmRequestContext(
     {
