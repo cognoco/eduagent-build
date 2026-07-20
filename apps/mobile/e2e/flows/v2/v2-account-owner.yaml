@@ -1,7 +1,8 @@
 # [WI-2240] V2 owner Account entry, return, row-gating, and sign-out boundary.
-# WHICH cases: family owner enters from Mentor/Subjects/Journal; Account Back
-# and Android Back return to the exact initiating tab; owner contract rows are
-# present; sign-out + cold relaunch expose no prior identity or learning shell.
+# WHICH cases: an owner learner enters from their own Mentor/Subjects/Journal
+# scope; Account Back and Android Back return to the exact initiating tab and
+# owner data; owner contract rows are present; sign-out + cold relaunch expose
+# no prior identity or learning shell.
 appId: com.mentomate.app
 tags:
   - v2
@@ -17,30 +18,30 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: 'mentor-screen'
+      id: 'scope-chip-option-me'
     timeout: 30000
 - tapOn:
-    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
+    id: 'scope-chip-option-me'
 - extendedWaitUntil:
     visible:
-      id: 'person-scope-mentor-tab'
+      id: 'mentor-screen'
     timeout: 15000
 - assertVisible:
     id: 'tab-mentor'
     selected: true
 - assertVisible:
-    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
+    id: 'scope-chip-option-me'
     selected: true
 - assertVisible:
     id: 'account-avatar-button'
     text: '^Open account settings for Test Parent$'
 - assertVisible:
-    id: 'support-hub-mentor-person-${CHILD1_PROFILE_ID}'
+    id: 'mentor-screen'
     containsDescendants:
-      - text: '^Emma$'
+      - text: '^General Knowledge$'
 
-# Mentor in Emma's exact person scope -> Account -> named back to the same
-# selected tab, person chip, and Emma content.
+# Owner learner Mentor -> Account -> named back to the same selected tab and
+# the owner's seeded General Knowledge content.
 - tapOn:
     id: 'account-avatar-button'
 - extendedWaitUntil:
@@ -73,40 +74,44 @@ tags:
     id: 'account-back'
 - extendedWaitUntil:
     visible:
-      id: 'person-scope-mentor-tab'
+      id: 'mentor-screen'
     timeout: 15000
 - assertVisible:
     id: 'tab-mentor'
     selected: true
 - assertVisible:
-    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
+    id: 'scope-chip-option-me'
     selected: true
 - assertVisible:
     id: 'account-avatar-button'
     text: '^Open account settings for Test Parent$'
 - assertVisible:
-    id: 'support-hub-mentor-person-${CHILD1_PROFILE_ID}'
+    id: 'mentor-screen'
     containsDescendants:
-      - text: '^Emma$'
+      - text: '^General Knowledge$'
 
-# Subjects in Emma's exact person scope -> Account -> Android Back returns to
-# the selected Subjects tab, exact person chip, and seeded Mathematics row.
+# Owner learner Subjects -> Account -> Android Back returns to the selected
+# Subjects tab and the owner's seeded General Knowledge row.
 - tapOn:
     id: 'tab-subjects'
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
-      id: 'person-scope-structural-subjects'
+      id: 'subjects-screen'
     timeout: 15000
 - assertVisible:
     id: 'tab-subjects'
     selected: true
 - assertVisible:
-    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
+    id: 'scope-chip-option-me'
     selected: true
 - assertVisible:
-    id: 'person-scope-subject-${SUBJECT1_ID}'
-    text: '^Mathematics$'
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+- assertVisible:
+    id: 'subjects-browse-row-${OWNER_SUBJECT_ID}'
+    containsDescendants:
+      - text: '^General Knowledge$'
 - tapOn:
     id: 'account-avatar-button'
 - extendedWaitUntil:
@@ -116,42 +121,44 @@ tags:
 - pressKey: back
 - extendedWaitUntil:
     visible:
-      id: 'person-scope-structural-subjects'
+      id: 'subjects-screen'
     timeout: 15000
 - assertVisible:
     id: 'tab-subjects'
     selected: true
 - assertVisible:
-    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
-    selected: true
-- assertVisible:
-    id: 'person-scope-subject-${SUBJECT1_ID}'
-    text: '^Mathematics$'
-- assertNotVisible:
-    id: 'learner-screen'
-
-# Journal in Emma's exact person scope -> Account -> representative Privacy
-# leaf -> Account -> the same selected tab, person chip, and Emma content.
-- tapOn:
-    id: 'tab-journal'
-    retryTapIfNoChange: true
-- extendedWaitUntil:
-    visible:
-      id: 'person-scope-journal-placeholder'
-    timeout: 15000
-- assertVisible:
-    id: 'tab-journal'
-    selected: true
-- assertVisible:
-    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
+    id: 'scope-chip-option-me'
     selected: true
 - assertVisible:
     id: 'account-avatar-button'
     text: '^Open account settings for Test Parent$'
 - assertVisible:
-    id: 'person-scope-journal-placeholder'
+    id: 'subjects-browse-row-${OWNER_SUBJECT_ID}'
     containsDescendants:
-      - text: '^Emma$'
+      - text: '^General Knowledge$'
+- assertNotVisible:
+    id: 'learner-screen'
+
+# Owner learner Journal -> Account -> representative Privacy leaf -> Account
+# -> the same selected owner Journal tab.
+- tapOn:
+    id: 'tab-journal'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'journal-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-journal'
+    selected: true
+- assertVisible:
+    id: 'scope-chip-option-me'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+- assertVisible:
+    id: 'journal-screen'
 - tapOn:
     id: 'account-avatar-button'
 - extendedWaitUntil:
@@ -163,6 +170,8 @@ tags:
       id: 'account-admin-privacy'
     direction: DOWN
     timeout: 15000
+- assertVisible:
+    id: 'account-admin-privacy'
 - tapOn:
     id: 'account-admin-privacy'
 - extendedWaitUntil:
@@ -178,21 +187,19 @@ tags:
     id: 'account-back'
 - extendedWaitUntil:
     visible:
-      id: 'person-scope-journal-placeholder'
+      id: 'journal-screen'
     timeout: 15000
 - assertVisible:
     id: 'tab-journal'
     selected: true
 - assertVisible:
-    id: 'scope-chip-option-person-${CHILD1_PROFILE_ID}'
+    id: 'scope-chip-option-me'
     selected: true
 - assertVisible:
     id: 'account-avatar-button'
     text: '^Open account settings for Test Parent$'
 - assertVisible:
-    id: 'person-scope-journal-placeholder'
-    containsDescendants:
-      - text: '^Emma$'
+    id: 'journal-screen'
 
 # Sign out from Account and hard-prove the unauthenticated/no-data boundary.
 - tapOn:

@@ -373,6 +373,22 @@ describe('seedScenario', () => {
     );
   });
 
+  it('[WI-2240] exposes the parent-multi-child owner learner subject separately from every child subject', async () => {
+    const db = createMockDb();
+    const result = await seedScenario(
+      db,
+      'parent-multi-child',
+      'owner@example.com',
+    );
+
+    expect(result.ids.ownerSubjectId).toEqual(expect.any(String));
+    expect([
+      result.ids.subject1Id,
+      result.ids.subject2Id,
+      result.ids.subject3Id,
+    ]).not.toContain(result.ids.ownerSubjectId);
+  });
+
   it.each([
     ['parent-with-children', 'Test Parent'],
     ['parent-multi-child', 'Test Parent'],

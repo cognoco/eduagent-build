@@ -22,7 +22,7 @@ const ENTRY_CASES = [
   {
     name: 'Mentor',
     path: '/mentor',
-    screen: 'person-scope-mentor-tab',
+    screen: 'mentor-screen',
     tab: 'tab-mentor',
     token: 'mentor',
     leafRow: 'account-admin-profile',
@@ -31,7 +31,7 @@ const ENTRY_CASES = [
   {
     name: 'Subjects',
     path: '/subjects',
-    screen: 'person-scope-structural-subjects',
+    screen: 'subjects-screen',
     tab: 'tab-subjects',
     token: 'subjects',
     leafRow: 'account-admin-privacy',
@@ -40,7 +40,7 @@ const ENTRY_CASES = [
   {
     name: 'Journal',
     path: '/journal',
-    screen: 'person-scope-journal-placeholder',
+    screen: 'journal-screen',
     tab: 'tab-journal',
     token: 'journal',
     leafRow: 'account-admin-notifications',
@@ -48,63 +48,62 @@ const ENTRY_CASES = [
   },
 ] as const;
 
-async function expectEmmaPersonScopedEntry(
+async function selectOwnerLearnerScope(page: Page): Promise<void> {
+  const meScope = page.getByTestId('scope-chip-option-me');
+
+  await expect(meScope).toBeVisible({ timeout: 60_000 });
+  await meScope.click();
+  await expect(meScope).toHaveAttribute('aria-selected', 'true');
+}
+
+async function expectOwnerLearnerEntry(
   page: Page,
   entry: (typeof ENTRY_CASES)[number],
-  childProfileId: string,
-  subjectId: string,
+  ownerSubjectId: string,
 ): Promise<void> {
-  await expect(page.getByTestId(entry.screen)).toBeVisible({
+  const screen = page.getByTestId(entry.screen);
+
+  await expect(screen).toBeVisible({
     timeout: 60_000,
   });
   await expect(page.getByTestId(entry.tab)).toHaveAttribute(
     'aria-selected',
     'true',
   );
-  await expect(
-    page.getByTestId(`scope-chip-option-person-${childProfileId}`),
-  ).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('scope-chip-option-me')).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(page.getByTestId('account-avatar-button')).toHaveAttribute(
     'aria-label',
     'Open account settings for Test Parent',
   );
   if (entry.token === 'mentor') {
     await expect(
-      page
-        .getByTestId(`support-hub-mentor-person-${childProfileId}`)
-        .getByText('Emma', { exact: true }),
+      screen.getByText('General Knowledge', { exact: true }),
     ).toBeVisible();
   } else if (entry.token === 'subjects') {
-    const subject = page.getByTestId(`person-scope-subject-${subjectId}`);
+    const subject = screen.getByTestId(`subjects-browse-row-${ownerSubjectId}`);
     await expect(subject).toBeVisible();
     await expect(
-      subject.getByText('Mathematics', { exact: true }),
+      subject.getByText('General Knowledge', { exact: true }),
     ).toBeVisible();
   } else {
-    await expect(
-      page
-        .getByTestId('person-scope-journal-placeholder')
-        .getByText('Emma', { exact: true }),
-    ).toBeVisible();
+    await expect(screen.getByText('Journal', { exact: true })).toBeVisible();
   }
 }
 
-test('V2 owner Account returns Emma person scope and exact seeded content to each initiating tab', async ({
+test('V2 owner learner Account returns its own exact content to each initiating tab', async ({
   page,
 }) => {
   const seed = await readSeedData('owner-with-children');
-  const childProfileId = seed.ids.child1ProfileId;
-  const subjectId = seed.ids.subject1Id;
-  const personChip = `scope-chip-option-person-${childProfileId}`;
+  const ownerSubjectId = seed.ids.ownerSubjectId;
 
   for (const entry of ENTRY_CASES) {
     await test.step(`${entry.name} avatar -> ${entry.leafRow} -> ${entry.name}`, async () => {
       await page.goto(entry.path, { waitUntil: 'commit' });
-      await expect(page.getByTestId(personChip)).toBeVisible({
-        timeout: 60_000,
-      });
-      await page.getByTestId(personChip).click();
-      await expectEmmaPersonScopedEntry(page, entry, childProfileId, subjectId);
+      await selectOwnerLearnerScope(page);
+      await expectOwnerLearnerEntry(page, entry, ownerSubjectId);
 
       await page.getByTestId('account-avatar-button').click();
       await expect(page).toHaveURL(
@@ -129,7 +128,7 @@ test('V2 owner Account returns Emma person scope and exact seeded content to eac
 
       await page.getByTestId('account-back').click();
       await expect(page).toHaveURL(new RegExp(`${entry.path}(?:\\?.*)?$`));
-      await expectEmmaPersonScopedEntry(page, entry, childProfileId, subjectId);
+      await expectOwnerLearnerEntry(page, entry, ownerSubjectId);
     });
   }
 });
@@ -137,16 +136,27 @@ test('V2 owner Account returns Emma person scope and exact seeded content to eac
 test('V2 Account empty history falls back to Journal and never legacy Home', async ({
   page,
 }) => {
-  await page.goto('/account?returnTo=journal', { waitUntil: 'commit' });
-  await expect(page.getByTestId('account-screen')).toBeVisible({
+  const seed = await readSeedData('owner-with-children');
+  const ownerSubjectId = seed.ids.ownerSubjectId;
+  const journalEntry = ENTRY_CASES[2];
+
+  await page.goto('/journal', { waitUntil: 'commit' });
+  await selectOwnerLearnerScope(page);
+  await expectOwnerLearnerEntry(page, journalEntry, ownerSubjectId);
+
+  const context = page.context();
+  await page.close();
+  const directPage = await context.newPage();
+  await directPage.goto('/account?returnTo=journal', { waitUntil: 'commit' });
+  await expect(directPage.getByTestId('account-screen')).toBeVisible({
     timeout: 60_000,
   });
 
-  await page.getByTestId('account-back').click();
+  await directPage.getByTestId('account-back').click();
 
-  await expect(page).toHaveURL(/\/journal(?:\?.*)?$/);
-  await expect(page.getByTestId('journal-screen')).toBeVisible();
-  await expect(page).not.toHaveURL(/\/home(?:\?.*)?$/);
+  await expect(directPage).toHaveURL(/\/journal(?:\?.*)?$/);
+  await expectOwnerLearnerEntry(directPage, journalEntry, ownerSubjectId);
+  await expect(directPage).not.toHaveURL(/\/home(?:\?.*)?$/);
 });
 
 async function expectSignedOutWithoutOwnerData(page: Page): Promise<void> {
@@ -170,29 +180,12 @@ test('V2 owner sign-out keeps prior account and learning data behind the unauthe
   page,
 }) => {
   const seed = await readSeedData('owner-with-children');
-  const childProfileId = seed.ids.child1ProfileId;
-  const subjectId = seed.ids.subject1Id;
-  const emmaChip = page.getByTestId(
-    `scope-chip-option-person-${childProfileId}`,
-  );
-  const mathematicsSubject = page.getByTestId(
-    `person-scope-subject-${subjectId}`,
-  );
+  const ownerSubjectId = seed.ids.ownerSubjectId;
+  const subjectsEntry = ENTRY_CASES[1];
 
   await page.goto('/subjects', { waitUntil: 'commit' });
-  await expect(emmaChip).toBeVisible({
-    timeout: 60_000,
-  });
-  await emmaChip.click();
-  await expect(
-    page.getByTestId('person-scope-structural-subjects'),
-  ).toBeVisible();
-  await expect(emmaChip).toHaveAttribute('aria-selected', 'true');
-  await expect(emmaChip.getByText('Emma', { exact: true })).toBeVisible();
-  await expect(mathematicsSubject).toBeVisible();
-  await expect(
-    mathematicsSubject.getByText('Mathematics', { exact: true }),
-  ).toBeVisible();
+  await selectOwnerLearnerScope(page);
+  await expectOwnerLearnerEntry(page, subjectsEntry, ownerSubjectId);
 
   await page.getByTestId('account-avatar-button').click();
   await expect(page.getByText('Test Parent', { exact: true })).toBeVisible();

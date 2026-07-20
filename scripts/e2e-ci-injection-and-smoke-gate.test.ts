@@ -508,10 +508,116 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
     }
   }
 
+  function hasSourceOrder(source: string, markers: string[]): boolean {
+    let cursor = 0;
+    for (const marker of markers) {
+      const index = source.indexOf(marker, cursor);
+      if (index < 0) return false;
+      cursor = index + marker.length;
+    }
+    return true;
+  }
+
+  function sourceSection(source: string, start: string, end?: string): string {
+    const startIndex = source.indexOf(start);
+    if (startIndex < 0) return '';
+    const endIndex = end ? source.indexOf(end, startIndex + start.length) : -1;
+    return source.slice(startIndex, endIndex >= 0 ? endIndex : source.length);
+  }
+
+  function hasHardBrowserOwnerMeContract(source: string): boolean {
+    const selectionHelper = sourceSection(
+      source,
+      'async function selectOwnerLearnerScope',
+      'async function expectOwnerLearnerEntry',
+    );
+    const entryHelper = sourceSection(
+      source,
+      'async function expectOwnerLearnerEntry',
+      "test('V2 owner learner Account",
+    );
+    const ownerJourney = sourceSection(
+      source,
+      "test('V2 owner learner Account",
+      "test('V2 Account empty history",
+    );
+    const emptyHistoryJourney = sourceSection(
+      source,
+      "test('V2 Account empty history",
+      'async function expectSignedOutWithoutOwnerData',
+    );
+    const signOutJourney = sourceSection(source, "test('V2 owner sign-out");
+
+    return (
+      hasSourceOrder(selectionHelper, [
+        "getByTestId('scope-chip-option-me')",
+        'toBeVisible',
+        'await meScope.click()',
+        'toHaveAttribute',
+        "'aria-selected'",
+        "'true'",
+      ]) &&
+      hasSourceOrder(entryHelper, [
+        "getByTestId('scope-chip-option-me')",
+        'toHaveAttribute',
+        "'aria-selected'",
+        "'true'",
+        "getByTestId('account-avatar-button')",
+      ]) &&
+      hasSourceOrder(ownerJourney, [
+        'page.goto(entry.path',
+        'selectOwnerLearnerScope(page)',
+        'expectOwnerLearnerEntry(',
+        "getByTestId('account-avatar-button')",
+      ]) &&
+      hasSourceOrder(emptyHistoryJourney, [
+        "page.goto('/journal'",
+        'selectOwnerLearnerScope(page)',
+        'expectOwnerLearnerEntry(',
+        'await page.close()',
+        'await context.newPage()',
+        "directPage.goto('/account?returnTo=journal'",
+        "getByTestId('account-back')",
+        'expectOwnerLearnerEntry(directPage',
+      ]) &&
+      hasSourceOrder(signOutJourney, [
+        "page.goto('/subjects'",
+        'selectOwnerLearnerScope(page)',
+        'expectOwnerLearnerEntry(',
+        "getByTestId('account-avatar-button')",
+      ])
+    );
+  }
+
   function parseMaestroCommands(source: string): MaestroCommand[] {
     const document = source.split(/^---$/m)[1];
     expect(document).toBeDefined();
     return parseYaml(document!) as MaestroCommand[];
+  }
+
+  function maestroSelectorIds(value: unknown): string[] {
+    if (Array.isArray(value)) return value.flatMap(maestroSelectorIds);
+    if (typeof value !== 'object' || value === null) return [];
+
+    return Object.entries(value).flatMap(([key, nested]) =>
+      key === 'id' && typeof nested === 'string'
+        ? [nested]
+        : maestroSelectorIds(nested),
+    );
+  }
+
+  function maestroSelectorRoot(
+    command: string,
+    value: unknown,
+  ): Record<string, unknown> | null {
+    if (typeof value !== 'object' || value === null) return null;
+    const commandRoot = value as Record<string, unknown>;
+
+    if (command !== 'extendedWaitUntil') return commandRoot;
+    const visibleRoot = commandRoot.visible;
+    return typeof visibleRoot === 'object' && visibleRoot !== null
+      ? (visibleRoot as Record<string, unknown>)
+      : null;
   }
 
   function matchesMaestroCommand(
@@ -524,34 +630,17 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
     if (!(expected.command in actual)) return false;
     const value = actual[expected.command];
     if (expected.value !== undefined) return value === expected.value;
-    if (typeof value !== 'object' || value === null) return false;
+    const selectorRoot = maestroSelectorRoot(expected.command, value);
+    if (!selectorRoot) return false;
 
-    const record = value as Record<string, unknown>;
-    if (expected.id !== undefined) {
-      if (expected.descendantText !== undefined && record.id !== expected.id) {
-        return false;
-      }
-      if (expected.descendantText === undefined) {
-        const serialized = JSON.stringify(value);
-        if (
-          record.id !== expected.id &&
-          !serialized.includes(`"id":"${expected.id}"`)
-        ) {
-          return false;
-        }
-      }
+    if (expected.id !== undefined && selectorRoot.id !== expected.id) {
+      return false;
     }
-    if (expected.text !== undefined) {
-      const serialized = JSON.stringify(value);
-      if (
-        record.text !== expected.text &&
-        !serialized.includes(`"text":"${expected.text}"`)
-      ) {
-        return false;
-      }
+    if (expected.text !== undefined && selectorRoot.text !== expected.text) {
+      return false;
     }
     if (expected.descendantText !== undefined) {
-      const containsDescendants = record.containsDescendants;
+      const containsDescendants = selectorRoot.containsDescendants;
       if (
         !Array.isArray(containsDescendants) ||
         !containsDescendants.some(
@@ -567,7 +656,7 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
     }
     if (
       expected.selected !== undefined &&
-      record.selected !== expected.selected
+      selectorRoot.selected !== expected.selected
     ) {
       return false;
     }
@@ -591,6 +680,22 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
       }
       cursor = index + 1;
     }
+  }
+
+  function hasMaestroOrder(
+    commands: MaestroCommand[],
+    expected: MaestroExpectation[],
+  ): boolean {
+    let cursor = 0;
+    for (const step of expected) {
+      const index = commands.findIndex(
+        (command, commandIndex) =>
+          commandIndex >= cursor && matchesMaestroCommand(command, step),
+      );
+      if (index < 0) return false;
+      cursor = index + 1;
+    }
+    return true;
   }
 
   const visible = (
@@ -695,6 +800,78 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
     );
   });
 
+  it('binds the browser owner case to owner learner content, never an adjacent person scope', () => {
+    const signedInOwnerJourney = ownerBrowser.slice(
+      0,
+      ownerBrowser.indexOf('async function expectSignedOutWithoutOwnerData'),
+    );
+
+    expect(ownerBrowser).not.toContain('scope-chip-option-person-');
+    expect(ownerBrowser).not.toContain('person-scope-');
+    expect(signedInOwnerJourney).not.toContain("getByText('Emma'");
+    expectSourceOrder(ownerBrowser, [
+      'async function expectOwnerLearnerEntry',
+      'getByTestId(entry.screen)',
+      "getByTestId('account-avatar-button')",
+      "'Open account settings for Test Parent'",
+      "screen.getByText('General Knowledge', { exact: true })",
+      '`subjects-browse-row-${ownerSubjectId}`',
+      "subject.getByText('General Knowledge', { exact: true })",
+      "test('V2 owner learner Account returns its own exact content",
+      "readSeedData('owner-with-children')",
+      'seed.ids.ownerSubjectId',
+      'expectOwnerLearnerEntry(page, entry, ownerSubjectId)',
+      "getByTestId('account-avatar-button').click()",
+      'for (const row of OWNER_ROWS)',
+      "getByTestId('account-back').click()",
+      'expectOwnerLearnerEntry(page, entry, ownerSubjectId)',
+    ]);
+  });
+
+  it('rejects missing, wrong, late, or unconfirmed browser Me selection', () => {
+    expect(hasHardBrowserOwnerMeContract(ownerBrowser)).toBe(true);
+
+    const mutations = [
+      [
+        'missing',
+        ownerBrowser.replace('async function selectOwnerLearnerScope', ''),
+      ],
+      [
+        'wrong',
+        ownerBrowser.replace(
+          "getByTestId('scope-chip-option-me')",
+          "getByTestId('scope-chip-option-supporter-hub')",
+        ),
+      ],
+      [
+        'late',
+        ownerBrowser.replace(
+          `      await selectOwnerLearnerScope(page);
+      await expectOwnerLearnerEntry(page, entry, ownerSubjectId);`,
+          `      await expectOwnerLearnerEntry(page, entry, ownerSubjectId);
+      await selectOwnerLearnerScope(page);`,
+        ),
+      ],
+      [
+        'unconfirmed',
+        ownerBrowser.replace(
+          "await expect(meScope).toHaveAttribute('aria-selected', 'true');",
+          'await expect(meScope).toBeVisible();',
+        ),
+      ],
+    ];
+    for (const [name, mutation] of mutations) {
+      expect({ name, changed: mutation !== ownerBrowser }).toEqual({
+        name,
+        changed: true,
+      });
+      expect({
+        name,
+        accepted: hasHardBrowserOwnerMeContract(mutation),
+      }).toEqual({ name, accepted: false });
+    }
+  });
+
   it('uses real browser clicks, hard-visible owner rows, and exact scoped data before sign-out', () => {
     const noLeakHelper = ownerBrowser.slice(
       ownerBrowser.indexOf('async function expectSignedOutWithoutOwnerData'),
@@ -725,13 +902,9 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
     ]);
     expectSourceOrder(signOutJourney, [
       "readSeedData('owner-with-children')",
-      'seed.ids.child1ProfileId',
-      'seed.ids.subject1Id',
+      'seed.ids.ownerSubjectId',
       "page.goto('/subjects'",
-      'await emmaChip.click()',
-      "getByTestId('person-scope-structural-subjects')",
-      "emmaChip.getByText('Emma', { exact: true })",
-      "mathematicsSubject.getByText('Mathematics', { exact: true })",
+      'expectOwnerLearnerEntry(page, subjectsEntry, ownerSubjectId)',
       "getByTestId('account-avatar-button').click()",
       "getByTestId('account-admin-sign-out').click()",
       'expectSignedOutWithoutOwnerData(page)',
@@ -742,49 +915,172 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
       "freshPage.goto('/subjects'",
       'expectSignedOutWithoutOwnerData(freshPage)',
     ]);
-    for (const data of ['Test Parent', 'Emma', 'Mathematics']) {
-      expect(signOutJourney).toContain(data);
+    for (const data of [
+      'Test Parent',
+      'General Knowledge',
+      'Emma',
+      'Mathematics',
+    ]) {
+      expect(noLeakHelper).toContain(data);
+    }
+  });
+
+  it('binds the native owner case to the owner learner scope, never an adjacent child scope', () => {
+    const commands = parseMaestroCommands(ownerNative);
+    const selectorIds = maestroSelectorIds(commands);
+
+    expect(
+      selectorIds.filter((id) => id.startsWith('scope-chip-option-person-')),
+    ).toEqual([]);
+    expect(selectorIds.filter((id) => id.startsWith('person-scope-'))).toEqual(
+      [],
+    );
+    expect(
+      commands.some((command) =>
+        matchesMaestroCommand(command, visible(undefined, '^Emma$')),
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects missing, wrong, late, or unconfirmed native Me selection', () => {
+    const commands = parseMaestroCommands(ownerNative);
+    const meTap = tap('scope-chip-option-me');
+    const meSelected = visible('scope-chip-option-me', undefined, true);
+    const contract = [
+      meTap,
+      waitVisible('mentor-screen'),
+      meSelected,
+      tap('account-avatar-button'),
+      tap('account-back'),
+      waitVisible('mentor-screen'),
+      meSelected,
+      tap('tab-subjects'),
+      waitVisible('subjects-screen'),
+      meSelected,
+      tap('account-avatar-button'),
+      { command: 'pressKey', value: 'back' },
+      waitVisible('subjects-screen'),
+      meSelected,
+      tap('tab-journal'),
+      waitVisible('journal-screen'),
+      meSelected,
+      tap('account-avatar-button'),
+      tap('account-back'),
+      waitVisible('journal-screen'),
+      meSelected,
+      tap('account-avatar-button'),
+      tap('account-admin-sign-out'),
+    ];
+
+    expect(hasMaestroOrder(commands, contract)).toBe(true);
+
+    const withoutMeTap = commands.filter(
+      (command) => !matchesMaestroCommand(command, meTap),
+    );
+    const wrongMeTap = commands.map((command) =>
+      matchesMaestroCommand(command, meTap)
+        ? { tapOn: { id: 'scope-chip-option-supporter-hub' } }
+        : command,
+    );
+    const lateMeTap = [...commands];
+    const meTapIndex = lateMeTap.findIndex((command) =>
+      matchesMaestroCommand(command, meTap),
+    );
+    const firstMentorIndex = lateMeTap.findIndex((command) =>
+      matchesMaestroCommand(command, waitVisible('mentor-screen')),
+    );
+    expect(meTapIndex).toBeGreaterThanOrEqual(0);
+    expect(firstMentorIndex).toBeGreaterThan(meTapIndex);
+    const [removedMeTap] = lateMeTap.splice(meTapIndex, 1);
+    lateMeTap.splice(firstMentorIndex, 0, removedMeTap!);
+    const withoutConfirmation = commands.filter(
+      (command) => !matchesMaestroCommand(command, meSelected),
+    );
+
+    for (const mutation of [
+      withoutMeTap,
+      wrongMeTap,
+      lateMeTap,
+      withoutConfirmation,
+    ]) {
+      expect(hasMaestroOrder(mutation, contract)).toBe(false);
     }
   });
 
   it('hard-proves native owner round trips and the post-relaunch no-data boundary in order', () => {
     const commands = parseMaestroCommands(ownerNative);
-    const childChip = 'scope-chip-option-person-${CHILD1_PROFILE_ID}';
 
     expectMaestroOrder(commands, [
-      tap(childChip),
+      tap('scope-chip-option-me'),
+      waitVisible('mentor-screen'),
       visible('tab-mentor', undefined, true),
-      visible(childChip, undefined, true),
-      visible('support-hub-mentor-person-${CHILD1_PROFILE_ID}', '^Emma$'),
+      visible('scope-chip-option-me', undefined, true),
+      visible(
+        'account-avatar-button',
+        '^Open account settings for Test Parent$',
+      ),
+      visibleWithDescendant('mentor-screen', '^General Knowledge$'),
       tap('account-avatar-button'),
       waitVisible('account-screen'),
       visible('account-admin-profile'),
       visible('account-admin-notifications'),
       ...ownerOnlyRows.map((row) => visible(row)),
       tap('account-back'),
+      waitVisible('mentor-screen'),
       visible('tab-mentor', undefined, true),
-      visible(childChip, undefined, true),
-      visible('support-hub-mentor-person-${CHILD1_PROFILE_ID}', '^Emma$'),
+      visible('scope-chip-option-me', undefined, true),
+      visible(
+        'account-avatar-button',
+        '^Open account settings for Test Parent$',
+      ),
+      visibleWithDescendant('mentor-screen', '^General Knowledge$'),
       tap('tab-subjects'),
+      waitVisible('subjects-screen'),
       visible('tab-subjects', undefined, true),
-      visible(childChip, undefined, true),
-      visible('person-scope-subject-${SUBJECT1_ID}', '^Mathematics$'),
+      visible('scope-chip-option-me', undefined, true),
+      visible(
+        'account-avatar-button',
+        '^Open account settings for Test Parent$',
+      ),
+      visibleWithDescendant(
+        'subjects-browse-row-${OWNER_SUBJECT_ID}',
+        '^General Knowledge$',
+      ),
       tap('account-avatar-button'),
       { command: 'pressKey', value: 'back' },
+      waitVisible('subjects-screen'),
       visible('tab-subjects', undefined, true),
-      visible(childChip, undefined, true),
-      visible('person-scope-subject-${SUBJECT1_ID}', '^Mathematics$'),
+      visible('scope-chip-option-me', undefined, true),
+      visible(
+        'account-avatar-button',
+        '^Open account settings for Test Parent$',
+      ),
+      visibleWithDescendant(
+        'subjects-browse-row-${OWNER_SUBJECT_ID}',
+        '^General Knowledge$',
+      ),
       tap('tab-journal'),
+      waitVisible('journal-screen'),
       visible('tab-journal', undefined, true),
-      visible(childChip, undefined, true),
-      visible('person-scope-journal-placeholder', '^Emma$'),
+      visible('scope-chip-option-me', undefined, true),
+      visible(
+        'account-avatar-button',
+        '^Open account settings for Test Parent$',
+      ),
+      visible('journal-screen'),
       tap('account-avatar-button'),
+      visible('account-admin-privacy'),
       tap('account-admin-privacy'),
       { command: 'pressKey', value: 'back' },
       tap('account-back'),
+      waitVisible('journal-screen'),
       visible('tab-journal', undefined, true),
-      visible(childChip, undefined, true),
-      visible('person-scope-journal-placeholder', '^Emma$'),
+      visible('scope-chip-option-me', undefined, true),
+      visible(
+        'account-avatar-button',
+        '^Open account settings for Test Parent$',
+      ),
+      visible('journal-screen'),
       tap('account-avatar-button'),
       tap('account-admin-sign-out'),
       waitVisible('sign-in-button'),
@@ -857,6 +1153,45 @@ describe('[WI-2240] V2 Account evidence keeps exact browser and native contracts
         visibleWithDescendant(
           'subjects-browse-row-${SUBJECT_ID}',
           '^Child Learning Data$',
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects a selected common ancestor whose descendant is the Me scope chip', () => {
+    const commonAncestor = {
+      assertVisible: {
+        id: 'scope-chip',
+        selected: true,
+        containsDescendants: [{ id: 'scope-chip-option-me' }],
+      },
+    };
+
+    expect(
+      matchesMaestroCommand(
+        commonAncestor,
+        visible('scope-chip-option-me', undefined, true),
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects an avatar common ancestor whose sibling descendants split the exact id and label', () => {
+    const commonAncestor = {
+      assertVisible: {
+        id: 'app-header',
+        containsDescendants: [
+          { id: 'account-avatar-button' },
+          { text: '^Open account settings for Test Parent$' },
+        ],
+      },
+    };
+
+    expect(
+      matchesMaestroCommand(
+        commonAncestor,
+        visible(
+          'account-avatar-button',
+          '^Open account settings for Test Parent$',
         ),
       ),
     ).toBe(false);
