@@ -1,7 +1,15 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { SubjectInventory } from '@eduagent/schemas';
 
+import { ErrorFallback } from '../common/ErrorFallback';
 import { withOpacity } from '../../lib/color-opacity';
 import { useSubjectTint } from '../../lib/theme';
 import {
@@ -23,6 +31,11 @@ import { TopicDetailSheet } from './TopicDetailSheet';
 // scopes mask the data before it reaches this component.
 interface SubjectHubProps {
   data: SubjectHubData;
+  vocabulary?: SubjectInventory['vocabulary'];
+  onOpenVocabulary?: () => void;
+  isVocabularyLoading?: boolean;
+  vocabularyError?: boolean;
+  onRetryVocabulary?: () => void;
   onNextUpPress?: (nextUp: HubNextUp) => void;
   onStudyTopic?: (topicId: string) => void;
   onReviewTopic?: (topicId: string) => void;
@@ -35,6 +48,11 @@ interface SubjectHubProps {
 
 export function SubjectHub({
   data,
+  vocabulary,
+  onOpenVocabulary,
+  isVocabularyLoading = false,
+  vocabularyError = false,
+  onRetryVocabulary,
   onNextUpPress,
   onStudyTopic,
   onReviewTopic,
@@ -93,6 +111,81 @@ export function SubjectHub({
           canStudy={data.canStudy}
           onPressNextUp={onNextUpPress}
         />
+
+        {isVocabularyLoading ? (
+          <View
+            className="mt-5 flex-row items-center gap-3 rounded-card bg-surface p-4"
+            testID="subject-hub-vocabulary-loading"
+          >
+            <ActivityIndicator accessibilityLabel={t('common.loading')} />
+            <Text className="text-body-sm text-text-secondary">
+              {t('progress.subject.loadingTitle')}
+            </Text>
+          </View>
+        ) : vocabularyError && onRetryVocabulary ? (
+          <View className="mt-5">
+            <ErrorFallback
+              variant="card"
+              title={t('progress.vocabulary.errorTitle')}
+              message={t('progress.vocabulary.errorMessage')}
+              primaryAction={{
+                label: t('common.tryAgain'),
+                onPress: onRetryVocabulary,
+                testID: 'subject-hub-vocabulary-retry',
+              }}
+              testID="subject-hub-vocabulary-error"
+            />
+          </View>
+        ) : vocabulary ? (
+          <View
+            className="mt-5 rounded-card bg-surface p-4"
+            testID="subject-hub-vocabulary"
+          >
+            <Text className="text-h3 font-semibold text-text-primary">
+              {t('progress.subject.vocabularyTitle')}
+            </Text>
+            <Text className="mt-1 text-body-sm text-text-secondary">
+              {t('progress.subject.wordsTracked', {
+                count: vocabulary.total,
+              })}
+            </Text>
+            <Text className="mt-1 text-body-sm text-text-secondary">
+              {t('progress.subject.vocabularyBreakdown', {
+                mastered: vocabulary.mastered,
+                learning: vocabulary.learning,
+                new: vocabulary.new,
+              })}
+            </Text>
+            <View className="mt-4 gap-2">
+              {Object.entries(vocabulary.byCefrLevel).map(([level, count]) => (
+                <View
+                  key={level}
+                  className="flex-row items-center justify-between"
+                >
+                  <Text className="text-body-sm font-medium text-text-primary">
+                    {level}
+                  </Text>
+                  <Text className="text-body-sm text-text-secondary">
+                    {t('progress.subject.wordCount', { count })}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            {onOpenVocabulary ? (
+              <Pressable
+                onPress={onOpenVocabulary}
+                className="mt-3 min-h-[44px] self-start justify-center py-2"
+                accessibilityRole="button"
+                accessibilityLabel={t('progress.subject.viewAllVocab')}
+                testID="subject-hub-vocabulary-open"
+              >
+                <Text className="text-body-sm font-semibold text-primary">
+                  {t('progress.subject.viewAllVocabLink')}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
 
         {data.showSearchFilter ? (
           <SubjectHubSearchFilter
