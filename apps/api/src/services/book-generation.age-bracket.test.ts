@@ -19,6 +19,7 @@ import {
   registerProvider,
   setLlmRoutingV2Enabled,
   _clearProviders,
+  _resetCircuits,
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
@@ -153,6 +154,7 @@ describe('[WI-2432] book-generation never routes an under-18 learner to Gemini (
 
   beforeEach(() => {
     _clearProviders();
+    _resetCircuits();
     setLlmRoutingV2Enabled(false);
     geminiSpy = jest.fn();
     const geminiProvider: LLMProvider = {

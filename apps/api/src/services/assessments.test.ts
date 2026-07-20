@@ -2,6 +2,7 @@ import {
   registerProvider,
   setLlmRoutingV2Enabled,
   _clearProviders,
+  _resetCircuits,
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
@@ -1662,6 +1663,7 @@ describe('[WI-2432] ageBracket threads to vendor-exclusion (legacy path)', () =>
 
   beforeEach(() => {
     _clearProviders();
+    _resetCircuits();
     setLlmRoutingV2Enabled(false);
     geminiSpy = jest.fn();
     registerProvider({

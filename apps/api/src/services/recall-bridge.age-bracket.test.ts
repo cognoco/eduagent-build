@@ -18,6 +18,7 @@ import {
   registerProvider,
   setLlmRoutingV2Enabled,
   _clearProviders,
+  _resetCircuits,
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
@@ -120,6 +121,7 @@ describe('[WI-2432] generateRecallBridge never routes an under-18 subject to Gem
 
   beforeEach(() => {
     _clearProviders();
+    _resetCircuits();
     setLlmRoutingV2Enabled(false);
     geminiSpy = jest.fn();
     const geminiProvider: LLMProvider = {
