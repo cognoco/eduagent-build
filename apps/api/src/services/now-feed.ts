@@ -547,13 +547,18 @@ async function collectNowCandidates(
       ? acceptedSupporterAccessExists(db, supporterPersonId, profileId)
       : undefined;
 
+  // [WI-2351] Challenge candidates are intentionally absent. A recently
+  // completed session does not prove the server-owned readiness gate
+  // (struggle, streak, solid-answer evidence, quota, cooldown, and live-round
+  // state). Until Now can project that exact gate or resume a genuinely
+  // offered round, "Start challenge" would be a false action promise.
+
   const [
     billing,
     unfinished,
     mentorNotice,
     dueRetention,
     needsDeepening,
-    challengeReady,
     parked,
     ledgerMoments,
     topicMastered,
@@ -570,12 +575,6 @@ async function collectNowCandidates(
       : Promise.resolve([]),
     collectRetentionDueCandidates(db, profileId, scope, now, accessGuard),
     collectNeedsDeepeningCandidates(db, profileId, scope, now, accessGuard),
-    collectChallengeReadyCandidates(
-      db,
-      profileId,
-      scope,
-      visibility === 'supporter' ? supporterPersonId : undefined,
-    ),
     visibility === 'self'
       ? collectParkedItemCandidates(db, profileId, scope)
       : Promise.resolve([]),
@@ -602,7 +601,6 @@ async function collectNowCandidates(
     ...mentorNotice,
     ...dueRetention,
     ...needsDeepening,
-    ...challengeReady,
     ...parked,
     ...ledgerMoments,
     ...topicMastered,
