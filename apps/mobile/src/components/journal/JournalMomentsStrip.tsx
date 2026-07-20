@@ -8,6 +8,7 @@ import type { NowCard } from '@eduagent/schemas';
 import { ErrorFallback, TimeoutLoader } from '../common';
 import { BookPageFlipAnimation } from '../common/BookPageFlipAnimation';
 import { useNowFeed } from '../../hooks/use-now-feed';
+import { renderMilestoneMomentText } from '../../lib/milestone-moment-copy';
 import { pushNowDeepLink } from '../../lib/now-deep-link';
 import { useScopeContext } from '../../lib/scope-context';
 import { useSectionErrorActions } from './journal-shared';
@@ -24,45 +25,6 @@ function ledgerCopyKey(card: NowCard): string {
   return `journal.moments.${kind}`;
 }
 
-function stringParam(
-  params: Record<string, unknown>,
-  key: string,
-): string | undefined {
-  const value = params[key];
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
-}
-
-function numberParam(
-  params: Record<string, unknown>,
-  key: string,
-): number | undefined {
-  const value = params[key];
-  return typeof value === 'number' && Number.isFinite(value)
-    ? value
-    : undefined;
-}
-
-function renderMilestoneMomentText(card: NowCard, t: TFunction): string {
-  const milestoneType = stringParam(card.params, 'milestoneType');
-  const threshold = numberParam(card.params, 'threshold');
-  if (!milestoneType || threshold == null) {
-    return t('journal.moments.generic', card.params);
-  }
-
-  switch (milestoneType) {
-    case 'vocabulary_count':
-      return t('milestoneCard.wordCount', { count: threshold });
-    case 'topic_mastered_count':
-      return t('milestoneCard.topicCount', { count: threshold });
-    case 'session_count':
-      return t('milestoneCard.sessionCount', { count: threshold });
-    case 'learning_time':
-      return t('milestoneCard.hourCount', { count: threshold });
-    default:
-      return t('journal.moments.generic', card.params);
-  }
-}
-
 function renderLedgerMomentText(card: NowCard, t: TFunction): string {
   switch (ledgerCopyKey(card)) {
     case 'journal.moments.session_filed':
@@ -76,7 +38,7 @@ function renderLedgerMomentText(card: NowCard, t: TFunction): string {
     case 'journal.moments.notice_locked_in':
       return t('journal.moments.notice_locked_in', card.params);
     case 'journal.moments.milestone_reached':
-      return renderMilestoneMomentText(card, t);
+      return renderMilestoneMomentText(card.params, t);
     case 'journal.moments.reflection_bonus':
       return t('journal.moments.reflection_bonus', card.params);
     case 'journal.moments.quiz_personal_best':
