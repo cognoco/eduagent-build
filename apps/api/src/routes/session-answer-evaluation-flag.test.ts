@@ -8,10 +8,31 @@ const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
 const SESSION_ID = '00000000-0000-4000-8000-000000000002';
 type TestEnv = typeof sessionRoutes extends Hono<infer E> ? E : never;
 
+function createBoundaryDb(): Database {
+  return {
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => [{ personId: PROFILE_ID }],
+        }),
+      }),
+    }),
+  } as unknown as Database;
+}
+
 function createBoundaryApp() {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
-    c.set('db', {} as Database);
+    c.set('db', createBoundaryDb());
+    c.set('account', {
+      id: 'test-account-id',
+      clerkUserId: 'test-clerk-user-id',
+      email: 'learner@example.com',
+      timezone: 'UTC',
+      createdAt: '2026-07-20T00:00:00.000Z',
+      updatedAt: '2026-07-20T00:00:00.000Z',
+    });
+    c.set('callerPersonId', PROFILE_ID);
     c.set('profileId', PROFILE_ID);
     c.set('profileMeta', {
       birthYear: 2014,
