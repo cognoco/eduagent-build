@@ -176,6 +176,44 @@ function loadWorkflow(name: string): Record<string, unknown> {
   return parseYaml(loadWorkflowRaw(name)) as Record<string, unknown>;
 }
 
+type ElementSelector = {
+  id?: string;
+  text?: string;
+  enabled?: boolean;
+  containsDescendants?: ElementSelector[];
+};
+
+type MaestroCommand = {
+  assertVisible?: ElementSelector;
+  assertNotVisible?: ElementSelector;
+  extendedWaitUntil?: {
+    visible?: ElementSelector;
+    timeout?: number;
+  };
+  tapOn?: ElementSelector;
+  inputText?: string;
+  optional?: boolean;
+  runFlow?: {
+    when?: { visible?: ElementSelector };
+    commands?: MaestroCommand[];
+    file?: string;
+  };
+};
+
+function parseMaestroCommands(source: string): MaestroCommand[] {
+  return parseYaml(source.split(/^---$/m)[1] ?? '') as MaestroCommand[];
+}
+
+function maestroSelectorIds(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(maestroSelectorIds);
+  if (!value || typeof value !== 'object') return [];
+  return Object.entries(value).flatMap(([key, nested]) =>
+    key === 'id' && typeof nested === 'string'
+      ? [nested]
+      : maestroSelectorIds(nested),
+  );
+}
+
 type Job = {
   name?: string;
   if?: unknown;
@@ -1063,7 +1101,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       join(repoRoot, 'apps/mobile/e2e/CONVENTIONS.md'),
       'utf8',
     );
-
     expect(plan).toEqual([
       {
         flow: 'flows/v2/v2-homework-manual-entry.yaml',
@@ -1111,8 +1148,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'tab-journal',
       'mentor-screen',
       'mentor-bar-homework-chip',
-      'camera-view',
-      'close-button',
+      'homework-entry-mode-manual',
+      'manual-entry-cancel',
       'subjects-screen',
       'subjects-browse-row-${SUBJECT_ID}',
       'subject-hub-screen',
@@ -1138,6 +1175,41 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/assertNotVisible:/g)).toHaveLength(6);
     expect(flow.match(/id: ['"]tab-subjects['"]/g)).toHaveLength(3);
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
+  });
+
+  it('[WI-2236] routes the V2 shell Mentor homework action through manual entry and back to Mentor', () => {
+    const flow = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-shell-navigation.yaml'),
+      'utf8',
+    );
+    const commands = parseMaestroCommands(flow);
+
+    const homeworkLaunch = commands.findIndex(
+      (command) =>
+        command.optional !== true &&
+        command.tapOn?.id === 'mentor-bar-homework-chip',
+    );
+    expect(commands.slice(homeworkLaunch, homeworkLaunch + 4)).toEqual([
+      { tapOn: { id: 'mentor-bar-homework-chip' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'homework-entry-mode-manual' },
+          timeout: 15_000,
+        },
+      },
+      { tapOn: { id: 'manual-entry-cancel' } },
+      {
+        extendedWaitUntil: {
+          visible: { id: 'mentor-screen' },
+          timeout: 15_000,
+        },
+      },
+    ]);
+    expect(
+      maestroSelectorIds(commands).filter((id) =>
+        ['camera-view', 'close-button'].includes(id),
+      ),
+    ).toEqual([]);
   });
 
   it('[WI-2236] registers the manual homework case in the V2 Maestro manifest', () => {
@@ -1241,31 +1313,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-homework-manual-entry.yaml'),
       'utf8',
     );
-    type ElementSelector = {
-      id?: string;
-      text?: string;
-      enabled?: boolean;
-      containsDescendants?: ElementSelector[];
-    };
-    type MaestroCommand = {
-      assertVisible?: ElementSelector;
-      assertNotVisible?: ElementSelector;
-      extendedWaitUntil?: {
-        visible?: ElementSelector;
-        timeout?: number;
-      };
-      tapOn?: ElementSelector;
-      inputText?: string;
-      optional?: boolean;
-      runFlow?: {
-        when?: { visible?: ElementSelector };
-        commands?: MaestroCommand[];
-        file?: string;
-      };
-    };
-    const commands = parseYaml(
-      source.split(/^---$/m)[1] ?? '',
-    ) as MaestroCommand[];
+    const commands = parseMaestroCommands(source);
 
     const exactSelector = (
       actual: ElementSelector | undefined,

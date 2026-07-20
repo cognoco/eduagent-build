@@ -2507,7 +2507,7 @@ describe('SessionScreen homework flow', () => {
       },
     });
 
-    async function startManualHomeworkHelp(
+    async function triggerManualHomeworkHelp(
       testScreen: ReturnType<typeof renderSessionScreen>,
     ): Promise<void> {
       await act(async () => {
@@ -2523,6 +2523,12 @@ describe('SessionScreen homework flow', () => {
         jest.advanceTimersByTime(700);
       });
       await flushAsyncWork();
+    }
+
+    async function startManualHomeworkHelp(
+      testScreen: ReturnType<typeof renderSessionScreen>,
+    ): Promise<void> {
+      await triggerManualHomeworkHelp(testScreen);
       await waitFor(() => {
         testScreen.getByTestId('homework-first-response-complete');
       });
@@ -2680,7 +2686,7 @@ describe('SessionScreen homework flow', () => {
       15000,
     );
 
-    it('does not render session-allocation evidence outside an EXPO_PUBLIC_E2E build', async () => {
+    it('does not render E2E session evidence outside an EXPO_PUBLIC_E2E build', async () => {
       process.env.EXPO_PUBLIC_E2E = 'false';
       getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
       (useLocalSearchParams as jest.Mock).mockReturnValue(
@@ -2691,13 +2697,16 @@ describe('SessionScreen homework flow', () => {
       });
 
       const testScreen = renderSessionScreen();
-      await startManualHomeworkHelp(testScreen);
+      await triggerManualHomeworkHelp(testScreen);
 
       expect(
         testScreen.queryByTestId('homework-session-associated-once'),
       ).toBeNull();
       expect(
         testScreen.queryByTestId('homework-session-created-more-than-once'),
+      ).toBeNull();
+      expect(
+        testScreen.queryByTestId('homework-first-response-complete'),
       ).toBeNull();
       testScreen.unmount();
     }, 15000);

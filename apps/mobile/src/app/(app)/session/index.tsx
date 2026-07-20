@@ -1864,7 +1864,9 @@ function SessionScreenInner() {
               />
             ) : null}
             <HomeworkFirstResponseCompleteMarker
-              active={isMentorHomeworkFrame && !!mentorHomeworkChoice}
+              active={
+                isE2EBuild && isMentorHomeworkFrame && !!mentorHomeworkChoice
+              }
               problemText={initialProblemText}
               messages={messages}
               isStreaming={isStreaming}
