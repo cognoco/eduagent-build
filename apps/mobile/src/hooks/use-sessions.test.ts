@@ -134,6 +134,34 @@ describe('useStartSession', () => {
     expect(body.inputMode).toBe('voice');
   });
 
+  it('[WI-2184] does not invalidate completed-session history when starting a session', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ session: makeLearningSession() }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const wrapper = createWrapper();
+    const topicHistoryKey = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      'test-profile-id',
+    );
+    queryClient.setQueryDefaults(topicHistoryKey, { gcTime: Infinity });
+    queryClient.setQueryData(topicHistoryKey, []);
+    const { result } = renderHook(() => useStartSession('subject-1'), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ subjectId: 'subject-1' });
+    });
+
+    expect(queryClient.getQueryState(topicHistoryKey)?.isInvalidated).toBe(
+      false,
+    );
+  });
+
   it('starts the first curriculum session through the scoped fast-path endpoint', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -371,6 +399,121 @@ describe('useCloseSession', () => {
     });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['resume-nudge'] });
   });
+
+  it('[WI-2184] invalidates each session-history list only for the active profile after close', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message: 'Session closed',
+          sessionId: 'session-1',
+          wallClockSeconds: 600,
+          summaryStatus: 'pending',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const { result } = renderHook(() => useCloseSession('session-1'), {
+      wrapper: createWrapper(),
+    });
+    const activeProfileKeys = [
+      queryKeys.topicSessions('subject-1', 'topic-1', 'test-profile-id'),
+      queryKeys.bookSessions('subject-1', 'book-1', 'test-profile-id'),
+      queryKeys.subjectSessions('subject-1', 'test-profile-id'),
+    ];
+    const otherProfileKeys = [
+      queryKeys.topicSessions('subject-1', 'topic-1', 'other-profile-id'),
+      queryKeys.bookSessions('subject-1', 'book-1', 'other-profile-id'),
+      queryKeys.subjectSessions('subject-1', 'other-profile-id'),
+    ];
+
+    for (const key of [...activeProfileKeys, ...otherProfileKeys]) {
+      queryClient.setQueryDefaults(key, { gcTime: Infinity });
+      queryClient.setQueryData(key, []);
+    }
+
+    await act(async () => {
+      await result.current.mutateAsync({ reason: 'user_ended' });
+    });
+
+    for (const key of activeProfileKeys) {
+      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    }
+    for (const key of otherProfileKeys) {
+      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(false);
+    }
+  });
+
+  it('[WI-2184] keeps a deferred close bound to the profile active at invocation', async () => {
+    let resolveClose!: (response: Response) => void;
+    mockFetch.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveClose = resolve;
+        }),
+    );
+
+    const profileA = createTestProfile({ id: 'profile-A' });
+    const profileB = createTestProfile({ id: 'profile-B' });
+    const hookHarness = createHookWrapper({
+      activeProfile: profileA,
+      profiles: [profileA, profileB],
+    });
+    queryClient = hookHarness.queryClient;
+    const profileAHistory = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      profileA.id,
+    );
+    const profileBHistory = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      profileB.id,
+    );
+    for (const key of [profileAHistory, profileBHistory]) {
+      queryClient.setQueryDefaults(key, { gcTime: Infinity });
+      queryClient.setQueryData(key, []);
+    }
+
+    const { result, rerender } = renderHook(
+      () => useCloseSession('session-1'),
+      { wrapper: hookHarness.wrapper },
+    );
+    act(() => {
+      result.current.mutate({ reason: 'user_ended' });
+    });
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(true);
+    });
+
+    hookHarness.profileContextValue.activeProfile = profileB;
+    setActiveProfileId(profileB.id);
+    rerender(undefined);
+
+    await act(async () => {
+      resolveClose(
+        new Response(
+          JSON.stringify({
+            message: 'Session closed',
+            sessionId: 'session-1',
+            wallClockSeconds: 600,
+            summaryStatus: 'pending',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(queryClient.getQueryState(profileAHistory)?.isInvalidated).toBe(
+      true,
+    );
+    expect(queryClient.getQueryState(profileBHistory)?.isInvalidated).toBe(
+      false,
+    );
+  });
 });
 
 describe('useSyncHomeworkState', () => {
@@ -541,6 +684,13 @@ describe('useSubmitSummary', () => {
     const { result } = renderHook(() => useSubmitSummary('session-1'), {
       wrapper: createWrapper(),
     });
+    const topicHistoryKey = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      'test-profile-id',
+    );
+    queryClient.setQueryDefaults(topicHistoryKey, { gcTime: Infinity });
+    queryClient.setQueryData(topicHistoryKey, []);
 
     await act(async () => {
       result.current.mutate({ content: 'Gravity pulls objects toward Earth' });
@@ -555,9 +705,12 @@ describe('useSubmitSummary', () => {
       'Clear and accurate summary.',
     );
     expect(result.current.data?.summary.status).toBe('accepted');
+    expect(queryClient.getQueryState(topicHistoryKey)?.isInvalidated).toBe(
+      true,
+    );
   });
 
-  it('invalidates progress after accepting a summary', async () => {
+  it('[WI-2184] invalidates history after a saved-summary feedback soft failure', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -565,9 +718,9 @@ describe('useSubmitSummary', () => {
             id: '880e8400-e29b-41d4-a716-446655440001',
             sessionId: '660e8400-e29b-41d4-a716-446655440000',
             content: 'Gravity pulls objects toward Earth',
-            aiFeedback: 'Clear and accurate summary.',
-            feedbackStatus: 'available',
-            status: 'accepted',
+            aiFeedback: null,
+            feedbackStatus: 'unavailable',
+            status: 'submitted',
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -578,6 +731,13 @@ describe('useSubmitSummary', () => {
       wrapper: createWrapper(),
     });
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+    const topicHistoryKey = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      'test-profile-id',
+    );
+    queryClient.setQueryDefaults(topicHistoryKey, { gcTime: Infinity });
+    queryClient.setQueryData(topicHistoryKey, []);
 
     await act(async () => {
       await result.current.mutateAsync({
@@ -589,6 +749,9 @@ describe('useSubmitSummary', () => {
       expect.objectContaining({ predicate: expect.any(Function) }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+    expect(queryClient.getQueryState(topicHistoryKey)?.isInvalidated).toBe(
+      true,
+    );
   });
 
   it('[WI-2095] settles isPending after a 5xx response', async () => {
@@ -804,6 +967,102 @@ describe('useRetrySummaryFeedback', () => {
       expect.objectContaining({ method: 'POST' }),
     );
   });
+
+  it('[WI-2184] keeps deferred feedback retry invalidation bound to its invocation profile', async () => {
+    let resolveRetry!: (response: Response) => void;
+    mockFetch.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveRetry = resolve;
+        }),
+    );
+
+    const profileA = createTestProfile({ id: 'profile-A' });
+    const profileB = createTestProfile({ id: 'profile-B' });
+    const hookHarness = createHookWrapper({
+      activeProfile: profileA,
+      profiles: [profileA, profileB],
+    });
+    queryClient = hookHarness.queryClient;
+    const sessionId = '660e8400-e29b-41d4-a716-446655440000';
+    const profileASummary = queryKeys.sessions.summary(
+      'study',
+      sessionId,
+      profileA.id,
+    );
+    const profileBSummary = queryKeys.sessions.summary(
+      'study',
+      sessionId,
+      profileB.id,
+    );
+    const profileAHistory = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      profileA.id,
+    );
+    const profileBHistory = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      profileB.id,
+    );
+    for (const key of [profileASummary, profileBSummary]) {
+      queryClient.setQueryDefaults(key, { gcTime: Infinity });
+      queryClient.setQueryData(key, null);
+    }
+    for (const key of [profileAHistory, profileBHistory]) {
+      queryClient.setQueryDefaults(key, { gcTime: Infinity });
+      queryClient.setQueryData(key, []);
+    }
+
+    const { result, rerender } = renderHook(
+      () => useRetrySummaryFeedback(sessionId),
+      { wrapper: hookHarness.wrapper },
+    );
+    act(() => {
+      result.current.mutate();
+    });
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(true);
+    });
+
+    hookHarness.profileContextValue.activeProfile = profileB;
+    setActiveProfileId(profileB.id);
+    rerender(undefined);
+
+    await act(async () => {
+      resolveRetry(
+        new Response(
+          JSON.stringify({
+            summary: {
+              id: '880e8400-e29b-41d4-a716-446655440001',
+              sessionId,
+              content: 'Gravity pulls objects toward Earth',
+              aiFeedback: 'Clear and accurate summary.',
+              feedbackStatus: 'available',
+              status: 'accepted',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+    });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(queryClient.getQueryState(profileASummary)?.isInvalidated).toBe(
+      true,
+    );
+    expect(queryClient.getQueryState(profileBSummary)?.isInvalidated).toBe(
+      false,
+    );
+    expect(queryClient.getQueryState(profileAHistory)?.isInvalidated).toBe(
+      false,
+    );
+    expect(queryClient.getQueryState(profileBHistory)?.isInvalidated).toBe(
+      false,
+    );
+  });
 });
 
 describe('useSkipSummary', () => {
@@ -857,6 +1116,13 @@ describe('useSkipSummary', () => {
       wrapper: createWrapper(),
     });
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+    const topicHistoryKey = queryKeys.topicSessions(
+      'subject-1',
+      'topic-1',
+      'test-profile-id',
+    );
+    queryClient.setQueryDefaults(topicHistoryKey, { gcTime: Infinity });
+    queryClient.setQueryData(topicHistoryKey, []);
 
     await act(async () => {
       await result.current.mutateAsync();
@@ -866,6 +1132,9 @@ describe('useSkipSummary', () => {
       expect.objectContaining({ predicate: expect.any(Function) }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+    expect(queryClient.getQueryState(topicHistoryKey)?.isInvalidated).toBe(
+      true,
+    );
   });
 });
 
