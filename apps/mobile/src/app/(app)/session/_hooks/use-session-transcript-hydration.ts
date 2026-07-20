@@ -52,11 +52,14 @@ export function useSessionTranscriptHydration({
         content: entry.content,
         eventId: entry.eventId,
         isSystemPrompt: entry.isSystemPrompt,
+        // Historical transcripts project only persisted user_message,
+        // ai_response, and system_prompt rows. Reconnect/fallback kinds are
+        // client-local and fallback replies are not persisted; isSystemPrompt
+        // is therefore the historical non-reply discriminator. ChatShell
+        // separately excludes typed live rows from its completion marker.
         isResponseComplete:
           entry.role === 'assistant' &&
           entry.isSystemPrompt !== true &&
-          (entry as typeof entry & { kind?: ChatMessage['kind'] | null })
-            .kind == null &&
           entry.content.trim().length > 0,
         escalationRung: entry.escalationRung,
       }));

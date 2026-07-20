@@ -119,43 +119,6 @@ describe('useSessionTranscriptHydration', () => {
     expect(setters.setResumedBanner).toHaveBeenCalledWith(true);
   });
 
-  it('marks only real historical assistant responses complete, not typed prompt rows', () => {
-    type HistoricalExchange = LiveTranscriptResponse['exchanges'][number] & {
-      kind: ChatMessage['kind'] | null;
-    };
-    const exchanges = [
-      {
-        eventId: 'event-reconnect-1',
-        role: 'assistant',
-        content: 'Reconnect to continue this response.',
-        timestamp: '2026-05-26T08:00:01.000Z',
-        kind: 'reconnect_prompt',
-      },
-      {
-        eventId: 'event-ai-1',
-        role: 'assistant',
-        content: 'Roman roads made travel and communication more reliable.',
-        timestamp: '2026-05-26T08:00:02.000Z',
-        kind: null,
-      },
-    ] satisfies HistoricalExchange[];
-
-    const setters = renderHydrationHook({
-      liveTranscript: makeTranscript({ exchanges }),
-    });
-
-    expect(setters.setMessages).toHaveBeenCalledWith([
-      expect.objectContaining({
-        eventId: 'event-reconnect-1',
-        isResponseComplete: false,
-      }),
-      expect.objectContaining({
-        eventId: 'event-ai-1',
-        isResponseComplete: true,
-      }),
-    ]);
-  });
-
   it('uses the stable opening content ref when the transcript has no exchanges', () => {
     const setters = renderHydrationHook({
       openingContent: 'Stable opening',
