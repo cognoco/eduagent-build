@@ -21,6 +21,7 @@ import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { apiError, validationError } from '../errors';
 import {
   prepareHomework,
@@ -116,7 +117,10 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       );
     }),
     async (c) => {
-      requireProfileId(c.get('profileId'));
+      const profileId = requireProfileId(c.get('profileId'));
+      const db = c.get('db');
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      await assertLlmConsent(db, profileId);
       const { text } = c.req.valid('json');
       // i18n Phase 1 — read conversation_language from the active profile so
       // the LLM-detected language detection still produces the JSON in the
@@ -139,6 +143,8 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     await assertNotProxyMode(c);
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
+    // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+    await assertLlmConsent(db, profileId);
     const profileMeta = c.get('profileMeta');
     if (!profileMeta) {
       throw new Error(
@@ -231,6 +237,9 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
       const input = c.req.valid('json');
+
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      await assertLlmConsent(db, profileId);
 
       // [CR-4] Per-profile rate limit: 10 requests per minute.
       // Placed after validation so invalid input gets 400, not a DB hit.

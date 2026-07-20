@@ -26,6 +26,7 @@ import { requireProfileId } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import {
   getCurriculum,
   skipTopic,
@@ -202,6 +203,12 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
+      // [WI-2396] mode='preview' dispatches the LLM (previewCurriculumTopic);
+      // mode='create' is DB-only. Gated unconditionally (not branched on
+      // mode) — the metering allowlist for this same route accepts the same
+      // over-application ("create-mode requests over-bill by 1... accepted
+      // as a small false-positive vs the security risk", metering.ts).
+      await assertLlmConsent(db, profileId);
       try {
         const result = await addCurriculumTopic(
           db,
@@ -228,6 +235,8 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
       const { feedback } = c.req.valid('json');
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      await assertLlmConsent(db, profileId);
       try {
         const curriculum = await challengeCurriculum(
           db,
@@ -278,6 +287,8 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
+    // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+    await assertLlmConsent(db, profileId);
     try {
       const profileMeta = c.get('profileMeta');
       const explanation = await explainTopicOrdering(

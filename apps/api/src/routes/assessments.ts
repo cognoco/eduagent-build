@@ -15,6 +15,7 @@ import {
 } from '@eduagent/schemas';
 import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { withProfile, type RouteEnv } from '../route-utils/route-context';
 import {
   createAssessmentIfNoneActive,
@@ -105,6 +106,12 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
       const { db, profileId } = withProfile(c);
       const assessmentId = c.req.param('assessmentId');
       const { answer } = c.req.valid('json');
+
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // Gated unconditionally — the app_help/forceReview branches inside
+      // submitAssessmentAnswer are DB-only, but this endpoint's primary
+      // purpose (evaluateAssessmentAnswer) dispatches the LLM.
+      await assertLlmConsent(db, profileId);
 
       // [WI-2432] Safety-adjacent age gate (mirrors exchanges.ts's
       // ageBracket derivation) — the router consumes this to enforce the
@@ -258,6 +265,9 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
       const { db, profileId } = withProfile(c);
       const sessionId = c.req.param('sessionId');
       const { answer } = c.req.valid('json');
+
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      await assertLlmConsent(db, profileId);
 
       const session = await getSession(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');

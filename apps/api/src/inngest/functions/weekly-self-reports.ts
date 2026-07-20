@@ -202,6 +202,36 @@ export const weeklySelfReportGenerate = inngest.createFunction(
           };
         }
 
+        // [WI-2396] NOT switched to isLlmExchangeConsentAllowed — PM-ruled
+        // sanctioned exclusion (unlike monthly-report-cron.ts /
+        // progress-summary.ts, which DO dispatch LLM narrative generation and
+        // ARE switched). Gating a non-LLM flow on LLM-processing consent
+        // would be compliance-wrong in the other direction: it would wrongly
+        // block a legitimate non-LLM report for a user who withdrew only
+        // LLM-disclosure consent while platform_use / parental consent
+        // remains granted.
+        //
+        // Traced call chain (entrypoint → every direct import of this
+        // handler function), each checked for a routeAndCall/routeAndStream
+        // dispatch or an import of the llm service module — none found:
+        //   runWeeklySelfReportsGenerate (this handler)
+        //     -> generateWeeklyReportData        (../../services/weekly-report.ts)      — pure data aggregation, no LLM import
+        //     -> getPracticeActivitySummary       (../../services/practice-activity-summary.ts) — DB query only, no LLM import
+        //     -> filterProgressMetricsToActiveSubjects,
+        //        getLatestSnapshotOnOrBefore      (../../services/snapshot-aggregation.ts) — DB query only, no LLM import
+        //     -> listEligibleSelfReportPersonIdsV2,
+        //        listEligibleSelfReportPersonIdsAtLocalHour9V2
+        //                                         (../../services/identity-v2/solo-progress-reports-v2.ts) — DB query only, no LLM import
+        //     -> getGuardianPersonIds             (../../services/identity-v2/guardianship.ts) — DB query only, no LLM import
+        // Re-verify with (from apps/api/):
+        //   rg -i "routeAndCall|routeAndStream|from '.*llm'" src/inngest/functions/weekly-self-reports.ts \
+        //     src/services/weekly-report.ts src/services/practice-activity-summary.ts \
+        //     src/services/snapshot-aggregation.ts src/services/identity-v2/solo-progress-reports-v2.ts \
+        //     src/services/identity-v2/guardianship.ts
+        // A forward-only ratchet enforces this: weekly-self-reports.llm-dispatch.guard.test.ts
+        // fails the build the moment any of the traced files above gains an
+        // LLM-dispatch call while this line still reads the parental-only
+        // isGdprProcessingAllowedV2 — the failure message points back here.
         const gdprOk = await isGdprProcessingAllowedV2(db, profileId);
         if (!gdprOk) {
           return {

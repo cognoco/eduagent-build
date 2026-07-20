@@ -87,6 +87,20 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
+// [WI-2396] assertLlmConsent (called by POST /subjects, /subjects/resolve,
+// /subjects/classify) runs isLlmExchangeConsentAllowed, which reads
+// db.query.membership — the stub `db` ({}) in this file has no `.query`
+// property. Defaults to allowed (resolves undefined = no throw); individual
+// tests override with mockRejectedValueOnce(new ConsentWithdrawnError()) to
+// exercise the refusal path.
+// gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
+// consentGrant reads with no real implementation available in this file's
+// stub-db environment (same class as verifyPersonOwnershipV2 above).
+jest.mock('../services/identity-v2/consent-status-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+  assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -100,9 +114,11 @@ import {
 } from '../services/subject';
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { subjectRoutes } from './subjects';
 import { ERROR_CODES, SubjectNotFoundError } from '@eduagent/schemas';
 import { TEST_PROFILE_ID, TEST_PROFILE_ID_2 } from '@eduagent/test-utils';
+import { ConsentWithdrawnError } from '../services/session';
 
 // ---------------------------------------------------------------------------
 // Test constants
@@ -152,9 +168,16 @@ function makeApp(opts?: {
     c.set('callerPersonId', profileId);
     await next();
   });
-  app.onError((err, c) =>
-    c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500),
-  );
+  app.onError((err, c) => {
+    // [WI-2396] Mirrors index.ts's global ConsentWithdrawnError -> 403 mapping.
+    if (err instanceof ConsentWithdrawnError) {
+      return c.json(
+        { code: ERROR_CODES.CONSENT_WITHDRAWN, message: err.message },
+        403,
+      );
+    }
+    return c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500);
+  });
   app.route('/v1', subjectRoutes);
   return app;
 }
@@ -166,6 +189,7 @@ const updateSubjectMock = jest.mocked(updateSubject);
 const retryCurriculumForSubjectMock = jest.mocked(retryCurriculumForSubject);
 const resolveSubjectNameMock = jest.mocked(resolveSubjectName);
 const classifySubjectMock = jest.mocked(classifySubject);
+const assertLlmConsentMock = jest.mocked(assertLlmConsent);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -641,6 +665,114 @@ describe('POST /v1/subjects/classify', () => {
 
     expect(res.status).toBe(400);
     expect(classifySubjectMock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5)
+// ---------------------------------------------------------------------------
+
+describe('[WI-2396] subjects consent-withdrawal gate', () => {
+  it('POST /subjects refuses with 403 CONSENT_WITHDRAWN and never calls createSubjectWithStructure when consent is withdrawn', async () => {
+    assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+    const res = await makeApp().request('/v1/subjects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Chemistry' }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+    expect(createSubjectWithStructureMock).not.toHaveBeenCalled();
+  });
+
+  it('POST /subjects proceeds (LLM dispatched) when consent is active', async () => {
+    createSubjectWithStructureMock.mockResolvedValue({
+      subject: makeSubjectRecord(),
+      structureType: 'narrow',
+    });
+
+    const res = await makeApp().request('/v1/subjects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Chemistry' }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(assertLlmConsentMock).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+    );
+    expect(createSubjectWithStructureMock).toHaveBeenCalled();
+  });
+
+  it('POST /subjects/resolve refuses with 403 CONSENT_WITHDRAWN and never calls resolveSubjectName when consent is withdrawn', async () => {
+    assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+    const res = await makeApp().request('/v1/subjects/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rawInput: 'chem' }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+    expect(resolveSubjectNameMock).not.toHaveBeenCalled();
+  });
+
+  it('POST /subjects/resolve proceeds (LLM dispatched) when consent is active', async () => {
+    resolveSubjectNameMock.mockResolvedValue({
+      status: 'resolved',
+      resolvedName: 'Chemistry',
+      suggestions: [],
+      displayMessage: 'Found: Chemistry',
+    });
+
+    const res = await makeApp().request('/v1/subjects/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rawInput: 'chem' }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(resolveSubjectNameMock).toHaveBeenCalled();
+  });
+
+  it('POST /subjects/classify refuses with 403 CONSENT_WITHDRAWN and never calls classifySubject when consent is withdrawn', async () => {
+    assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+    const res = await makeApp().request('/v1/subjects/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'what is an atom?' }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+    expect(classifySubjectMock).not.toHaveBeenCalled();
+  });
+
+  it('POST /subjects/classify proceeds (LLM dispatched) when consent is active', async () => {
+    classifySubjectMock.mockResolvedValue({
+      candidates: [
+        { subjectId: SUBJECT_ID, subjectName: 'Chemistry', confidence: 0.9 },
+      ],
+      needsConfirmation: false,
+      suggestedSubjectName: null,
+    });
+
+    const res = await makeApp().request('/v1/subjects/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'what is an atom?' }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(classifySubjectMock).toHaveBeenCalled();
   });
 });
 

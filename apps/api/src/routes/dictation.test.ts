@@ -127,6 +127,20 @@ jest.mock(
   }),
 );
 
+// [WI-2396] assertLlmConsent (POST /dictation/prepare-homework, /generate,
+// /review) runs isLlmExchangeConsentAllowed, which reads db.query.membership.
+// Defaults to allowed (resolves undefined = no throw); individual tests
+// override with mockRejectedValueOnce(new ConsentWithdrawnError()) to
+// exercise the refusal path.
+// gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
+// consentGrant reads that the WI-774 v2App test's bare `{}` db (below)
+// cannot satisfy — same continuity-mock class as the other identity/db seams
+// mocked above in this file.
+jest.mock('../services/identity-v2/consent-status-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+  assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+}));
+
 // Mock the dictation services — they are the internal boundary
 jest.mock('../services/dictation', () => {
   const actual = jest.requireActual(
@@ -181,6 +195,8 @@ import {
   getDictationHistory,
   fetchGenerateContext,
 } from '../services/dictation';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
+import { ConsentWithdrawnError } from '../services/session';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
@@ -336,6 +352,56 @@ describe('POST /v1/dictation/prepare-homework', () => {
 
     expect(res.status).toBe(401);
   });
+
+  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
+  describe('[WI-2396] consent-withdrawal gate', () => {
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls prepareHomework when consent is withdrawn', async () => {
+      (assertLlmConsent as jest.Mock).mockRejectedValueOnce(
+        new ConsentWithdrawnError(),
+      );
+
+      const res = await app.request(
+        '/v1/dictation/prepare-homework',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ text: 'Hello world.' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe('CONSENT_WITHDRAWN');
+      expect(prepareHomework).not.toHaveBeenCalled();
+    });
+
+    it('proceeds (LLM dispatched) when consent is active', async () => {
+      (prepareHomework as jest.Mock).mockResolvedValueOnce({
+        sentences: [
+          {
+            text: 'Hello world.',
+            withPunctuation: 'Hello world period',
+            wordCount: 2,
+          },
+        ],
+        language: 'en',
+      });
+
+      const res = await app.request(
+        '/v1/dictation/prepare-homework',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ text: 'Hello world.' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(prepareHomework).toHaveBeenCalled();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -439,6 +505,56 @@ describe('POST /v1/dictation/generate', () => {
     );
 
     expect(res.status).toBe(401);
+  });
+
+  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
+  describe('[WI-2396] consent-withdrawal gate', () => {
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls generateDictation when consent is withdrawn', async () => {
+      (assertLlmConsent as jest.Mock).mockRejectedValueOnce(
+        new ConsentWithdrawnError(),
+      );
+
+      const res = await app.request(
+        '/v1/dictation/generate',
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe('CONSENT_WITHDRAWN');
+      expect(fetchGenerateContext).not.toHaveBeenCalled();
+      expect(generateDictation).not.toHaveBeenCalled();
+    });
+
+    it('proceeds (LLM dispatched) when consent is active', async () => {
+      (fetchGenerateContext as jest.Mock).mockResolvedValueOnce({
+        recentTopics: [],
+        nativeLanguage: 'cs',
+        ageYears: 10,
+      });
+      (generateDictation as jest.Mock).mockResolvedValueOnce({
+        sentences: [
+          {
+            text: 'Sopka chrlí lávu.',
+            withPunctuation: 'Sopka chrlí lávu tečka',
+            wordCount: 3,
+          },
+        ],
+        title: 'Sopky',
+        topic: 'Přírodní jevy',
+        language: 'cs',
+      });
+
+      const res = await app.request(
+        '/v1/dictation/generate',
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(generateDictation).toHaveBeenCalled();
+    });
   });
 });
 
@@ -888,6 +1004,51 @@ describe('POST /v1/dictation/review', () => {
     expect(body.correctCount).toBe(1);
     expect(body.mistakes).toHaveLength(1);
     expect(body.mistakes[0].error).toBe('spelling');
+  });
+
+  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
+  describe('[WI-2396] consent-withdrawal gate', () => {
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls reviewDictation when consent is withdrawn', async () => {
+      (assertLlmConsent as jest.Mock).mockRejectedValueOnce(
+        new ConsentWithdrawnError(),
+      );
+
+      const res = await app.request(
+        '/v1/dictation/review',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify(REVIEW_BODY),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe('CONSENT_WITHDRAWN');
+      expect(reviewDictation).not.toHaveBeenCalled();
+    });
+
+    it('proceeds (LLM dispatched) when consent is active', async () => {
+      (reviewDictation as jest.Mock).mockResolvedValueOnce({
+        totalSentences: 1,
+        correctCount: 1,
+        mistakes: [],
+      });
+
+      const res = await app.request(
+        '/v1/dictation/review',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify(REVIEW_BODY),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(reviewDictation).toHaveBeenCalled();
+    });
   });
 
   it('returns 400 when X-Profile-Id header is missing', async () => {

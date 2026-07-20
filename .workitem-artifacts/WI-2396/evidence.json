@@ -1,0 +1,25 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "6 request-time routes (curriculum, dictation, filing, subjects, assessments, book-suggestions — 13 gate call-sites total) refuse withdrawn-consent before LLM dispatch (consent-refusal status; service/LLM spy zero calls)",
+      "pointer": "apps/api/src/routes/subjects.test.ts:676"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "8 of the 9 enumerated background/Inngest callers switched from isGdprProcessingAllowedV2 (parental-only) to isLlmExchangeConsentAllowed (basis-inclusive); adult-self-withdrawn (art6_1_a) alone now blocks dispatch. weekly-self-reports.ts is a PM-ratified sanctioned exclusion (zero LLM dispatch in its traced call chain), enforced by a forward-only guard test.",
+      "pointer": "apps/api/src/inngest/functions/freeform-filing.test.ts:525"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Active-consent subject is not blocked on any converted request-time route surface",
+      "pointer": "apps/api/src/routes/subjects.test.ts:691"
+    },
+    {
+      "acRef": "AC-RIDER",
+      "description": "Copy-truthfulness pair (WI-2372 Finding 1): truthful 'learning sessions' claim + absence of 'processing'-family overstatement on both the rendered confirm (GET /consent-page/withdraw) and landing (POST /consent-page/withdraw) HTML",
+      "pointer": "apps/api/src/routes/consent-web.integration.test.ts:917"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13"
+}
