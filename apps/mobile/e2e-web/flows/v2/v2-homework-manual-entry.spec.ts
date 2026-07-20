@@ -21,10 +21,9 @@ function isSessionCreate(request: Request): boolean {
 
 async function openManualEntryFromMentor(page: Page): Promise<void> {
   await pressableClick(page.getByTestId('mentor-bar-homework-chip'));
-  await expect(page.getByTestId('manual-entry-button')).toBeVisible({
+  await expect(page.getByTestId('homework-entry-mode-manual')).toBeVisible({
     timeout: 30_000,
   });
-  await pressableClick(page.getByTestId('manual-entry-button'));
   await expect(page.getByTestId('result-text-input')).toBeVisible({
     timeout: 15_000,
   });
@@ -59,8 +58,8 @@ test('V2 Mentor trial-active manual homework creates one associated session, rec
   await expect(page.getByTestId('mentor-bar-input')).toBeEnabled();
   expect(sessionCreateRequests).toHaveLength(0);
 
-  // Case 2 — enter one visible manual problem and resolve its subject through
-  // whichever real classification result staging returns.
+  // Case 2 — enter one visible manual problem. The dedicated route receives
+  // Mentor's active subject or adopts the first active subject after loading.
   await openManualEntryFromMentor(page);
   await expect(page.getByTestId('result-text-input')).toHaveValue('');
   await fillTextInput(
@@ -71,25 +70,20 @@ test('V2 Mentor trial-active manual homework creates one associated session, rec
     MANUAL_HOMEWORK_PROBLEM,
   );
 
+  await expect(
+    page.getByTestId('homework-subject-resolution-ready'),
+  ).toBeVisible({ timeout: 60_000 });
   const confirm = page.getByTestId('confirm-button');
-  const seededSubject = page.getByTestId(`subject-pick-${seed.ids.subjectId}`);
-  await expect(confirm.or(seededSubject)).toBeVisible({ timeout: 60_000 });
-  if (await seededSubject.isVisible().catch(() => false)) {
-    await pressableClick(seededSubject);
-  } else {
-    await pressableClick(confirm);
-  }
+  await expect(confirm).toBeEnabled();
+  await pressableClick(confirm);
 
   await expect(page.getByTestId('session-screen')).toBeVisible({
     timeout: 30_000,
   });
-  // Staging may resolve the enrolled seed through the picker or auto-create
-  // the classifier's suggested subject. Bind the session to the subject that
-  // this exact browser journey actually resolved.
+  // Bind the association assertions to the subject this exact browser journey
+  // resolved, whether Mentor supplied it immediately or the route loaded it.
   const resolvedSubjectId = new URL(page.url()).searchParams.get('subjectId');
-  expect(resolvedSubjectId).toMatch(
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-  );
+  expect(resolvedSubjectId).toBe(seed.ids.subjectId);
   await expect(page.getByTestId('homework-problem-text-bubble')).toHaveText(
     MANUAL_HOMEWORK_PROBLEM,
   );

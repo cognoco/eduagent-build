@@ -30,13 +30,7 @@ tags:
     id: 'mentor-bar-homework-chip'
 - extendedWaitUntil:
     visible:
-      id: 'manual-entry-button'
-    timeout: 15000
-- tapOn:
-    id: 'manual-entry-button'
-- extendedWaitUntil:
-    visible:
-      id: 'manual-entry-cancel'
+      id: 'homework-entry-mode-manual'
     timeout: 15000
 - tapOn:
     id: 'manual-entry-cancel'
@@ -53,13 +47,7 @@ tags:
     id: 'mentor-bar-homework-chip'
 - extendedWaitUntil:
     visible:
-      id: 'manual-entry-button'
-    timeout: 15000
-- tapOn:
-    id: 'manual-entry-button'
-- extendedWaitUntil:
-    visible:
-      id: 'result-text-input'
+      id: 'homework-entry-mode-manual'
     timeout: 15000
 - extendedWaitUntil:
     visible:
@@ -73,28 +61,17 @@ tags:
     id: 'result-text-input'
     text: 'Solve 3x + 7 = 22'
 
-# Classification either resolves General Studies directly or asks the learner
-# to select it. The final session-screen assertion remains the hard outcome.
+# The route receives Mentor's active subject or deterministically adopts the
+# first active subject after its own query resolves. Readiness is a hard gate.
 - extendedWaitUntil:
     visible:
       id: 'homework-subject-resolution-ready'
     timeout: 60000
-- runFlow:
-    when:
-      visible:
-        id: 'subject-picker'
-    commands:
-      # The native runner maps the seed response's ids.subjectId to the global
-      # SUBJECT_ID Maestro variable before this flow (and its setup subflow) runs.
-      - tapOn:
-          id: 'subject-pick-${SUBJECT_ID}'
-- runFlow:
-    when:
-      visible:
-        id: 'confirm-button'
-    commands:
-      - tapOn:
-          id: 'confirm-button'
+- assertVisible:
+    id: 'confirm-button'
+    enabled: true
+- tapOn:
+    id: 'confirm-button'
 
 - extendedWaitUntil:
     visible:

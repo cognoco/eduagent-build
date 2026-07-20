@@ -31,14 +31,142 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+import * as ts from 'typescript';
 import { parse as parseYaml, parseAllDocuments } from 'yaml';
 
 const repoRoot = join(__dirname, '..');
+
+function parsedModuleSpecifiers(file: string): {
+  specifiers: string[];
+  unresolvedModuleExpressions: string[];
+} {
+  const source = readFileSync(file, 'utf8');
+  const parsed = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const specifiers: string[] = [];
+  const unresolvedModuleExpressions: string[] = [];
+
+  const visit = (node: ts.Node): void => {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      specifiers.push(node.moduleSpecifier.text);
+    }
+    if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference) &&
+      node.moduleReference.expression &&
+      ts.isStringLiteral(node.moduleReference.expression)
+    ) {
+      specifiers.push(node.moduleReference.expression.text);
+    }
+    if (ts.isCallExpression(node)) {
+      const isModuleCall =
+        node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) &&
+          node.expression.text === 'require');
+      if (isModuleCall) {
+        const argument = node.arguments[0];
+        if (
+          node.arguments.length === 1 &&
+          argument &&
+          ts.isStringLiteral(argument)
+        ) {
+          specifiers.push(argument.text);
+        } else {
+          const { line, character } = parsed.getLineAndCharacterOfPosition(
+            node.getStart(parsed),
+          );
+          unresolvedModuleExpressions.push(`${line + 1}:${character + 1}`);
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(parsed);
+
+  return { specifiers, unresolvedModuleExpressions };
+}
+
+function resolveLocalModules(importer: string, specifier: string): string[] {
+  if (!specifier.startsWith('.')) return [];
+  const base = resolve(dirname(importer), specifier);
+  const platformSuffixes = ['', '.native', '.android', '.ios', '.web'];
+  const extensions = ['.ts', '.tsx', '.js', '.jsx'];
+  const candidates = [
+    base,
+    ...platformSuffixes.flatMap((suffix) =>
+      extensions.map((extension) => `${base}${suffix}${extension}`),
+    ),
+    ...platformSuffixes.flatMap((suffix) =>
+      extensions.map((extension) => join(base, `index${suffix}${extension}`)),
+    ),
+  ];
+  return candidates.filter(
+    (candidate, index) =>
+      candidates.indexOf(candidate) === index &&
+      existsSync(candidate) &&
+      statSync(candidate).isFile(),
+  );
+}
+
+function parsedLocalImportGraph(entry: string): {
+  files: string[];
+  externalSpecifiers: string[];
+  unresolvedLocalSpecifiers: string[];
+  unresolvedModuleExpressions: string[];
+} {
+  const visited = new Set<string>();
+  const externalSpecifiers = new Set<string>();
+  const unresolvedLocalSpecifiers = new Set<string>();
+  const unresolvedModuleExpressions = new Set<string>();
+  const pending = [entry];
+
+  while (pending.length > 0) {
+    const file = pending.pop();
+    if (!file || visited.has(file)) continue;
+    visited.add(file);
+
+    const parsedImports = parsedModuleSpecifiers(file);
+    for (const location of parsedImports.unresolvedModuleExpressions) {
+      unresolvedModuleExpressions.add(
+        `${relative(repoRoot, file)}:${location}`,
+      );
+    }
+    for (const specifier of parsedImports.specifiers) {
+      const localModules = resolveLocalModules(file, specifier);
+      if (localModules.length > 0) {
+        pending.push(...localModules);
+      } else if (specifier.startsWith('.')) {
+        unresolvedLocalSpecifiers.add(
+          `${relative(repoRoot, file)}:${specifier}`,
+        );
+      } else {
+        externalSpecifiers.add(specifier);
+      }
+    }
+  }
+
+  return {
+    files: [...visited],
+    externalSpecifiers: [...externalSpecifiers],
+    unresolvedLocalSpecifiers: [...unresolvedLocalSpecifiers],
+    unresolvedModuleExpressions: [...unresolvedModuleExpressions],
+  };
+}
 
 function loadWorkflowRaw(name: string): string {
   return readFileSync(join(repoRoot, '.github', 'workflows', name), 'utf8');
@@ -1044,6 +1172,88 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     });
   });
 
+  it('[WI-2236] keeps the E2E manual route camera- and OCR-free across its parsed import graph', () => {
+    const entry = join(
+      repoRoot,
+      'apps/mobile/src/app/(app)/homework/manual.tsx',
+    );
+    if (!existsSync(entry)) {
+      expect(existsSync(entry)).toBe(true);
+      return;
+    }
+
+    const graph = parsedLocalImportGraph(entry);
+    const relativeFiles = graph.files.map((file) =>
+      relative(repoRoot, file).replaceAll('\\', '/'),
+    );
+    const bannedFiles = relativeFiles.filter((file) =>
+      /(?:homework\/camera|use-homework-ocr|camera-reducer)(?:\.[^/]*)?$/.test(
+        file,
+      ),
+    );
+    const bannedPackages = graph.externalSpecifiers.filter((specifier) =>
+      /^(?:expo-camera|expo-image-picker)$|(?:homework\/camera|use-homework-ocr|camera-reducer)/.test(
+        specifier,
+      ),
+    );
+
+    expect(graph.unresolvedLocalSpecifiers).toEqual([]);
+    expect(graph.unresolvedModuleExpressions).toEqual([]);
+    expect(bannedFiles).toEqual([]);
+    expect(bannedPackages).toEqual([]);
+  });
+
+  it('[WI-2236] fails the dependency graph closed across supported module edge shapes', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'wi-2236-import-graph-'));
+    try {
+      const entry = join(fixtureRoot, 'entry.ts');
+      writeFileSync(
+        entry,
+        [
+          "import './platform';",
+          "import equals = require('./equals');",
+          "const lazy = () => import('./dynamic');",
+          "const legacy = require('./required');",
+          "import './missing';",
+          "const unknown = './unknown';",
+          'void import(unknown);',
+          'void equals;',
+          'void lazy;',
+          'void legacy;',
+        ].join('\n'),
+      );
+      writeFileSync(join(fixtureRoot, 'platform.native.ts'), 'export {};\n');
+      writeFileSync(join(fixtureRoot, 'equals.ts'), 'export = {};\n');
+      writeFileSync(join(fixtureRoot, 'dynamic.ts'), 'export {};\n');
+      writeFileSync(
+        join(fixtureRoot, 'required.ts'),
+        "import 'expo-camera';\n",
+      );
+
+      const graph = parsedLocalImportGraph(entry);
+      const fixtureFiles = graph.files.map((file) =>
+        relative(fixtureRoot, file),
+      );
+
+      expect(fixtureFiles).toEqual(
+        expect.arrayContaining([
+          'entry.ts',
+          'platform.native.ts',
+          'equals.ts',
+          'dynamic.ts',
+          'required.ts',
+        ]),
+      );
+      expect(graph.externalSpecifiers).toContain('expo-camera');
+      expect(graph.unresolvedLocalSpecifiers).toEqual([
+        expect.stringContaining(':./missing'),
+      ]);
+      expect(graph.unresolvedModuleExpressions).toHaveLength(1);
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
   it('[WI-2236] hard-gates the exact guaranteed properties of the manual homework case', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-homework-manual-entry.yaml'),
@@ -1243,23 +1453,27 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
             command.optional !== true &&
             command.tapOn?.id === id,
         );
+      const manualMarkerWaitIn = (startAt: number): number =>
+        items.findIndex(
+          (command, index) =>
+            index >= startAt &&
+            command.optional !== true &&
+            command.extendedWaitUntil?.timeout === 15_000 &&
+            exactSelector(command.extendedWaitUntil.visible, {
+              id: 'homework-entry-mode-manual',
+            }),
+        );
       const firstHomeworkLaunch = tapIn('mentor-bar-homework-chip');
-      const firstManualLaunch = tapIn(
-        'manual-entry-button',
-        firstHomeworkLaunch + 1,
-      );
-      const cancel = tapIn('manual-entry-cancel', firstManualLaunch + 1);
+      const firstManualMarker = manualMarkerWaitIn(firstHomeworkLaunch + 1);
+      const cancel = tapIn('manual-entry-cancel', firstManualMarker + 1);
       const secondHomeworkLaunch = tapIn(
         'mentor-bar-homework-chip',
         cancel + 1,
       );
-      const secondManualLaunch = tapIn(
-        'manual-entry-button',
-        secondHomeworkLaunch + 1,
-      );
+      const secondManualMarker = manualMarkerWaitIn(secondHomeworkLaunch + 1);
       const helpAction = tapIn(
         'homework-help-me-solve',
-        secondManualLaunch + 1,
+        secondManualMarker + 1,
       );
       const associationWait = items.findIndex(
         (command, index) => index > helpAction && isAssociationWait(command),
@@ -1283,11 +1497,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       );
       return (
         firstHomeworkLaunch >= 0 &&
-        firstManualLaunch > firstHomeworkLaunch &&
-        cancel > firstManualLaunch &&
+        firstManualMarker > firstHomeworkLaunch &&
+        cancel > firstManualMarker &&
         secondHomeworkLaunch > cancel &&
-        secondManualLaunch > secondHomeworkLaunch &&
-        helpAction > secondManualLaunch &&
+        secondManualMarker > secondHomeworkLaunch &&
+        helpAction > secondManualMarker &&
         associationWait > helpAction &&
         completedResponse > associationWait &&
         finalAssociation > completedResponse &&
@@ -1296,11 +1510,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     };
 
     const firstHomeworkLaunch = tapIndex('mentor-bar-homework-chip');
-    const firstManualLaunch = tapIndex(
-      'manual-entry-button',
+    const firstManualMarker = mandatoryExtendedWait(
+      { id: 'homework-entry-mode-manual' },
+      15_000,
       firstHomeworkLaunch + 1,
     );
-    const cancel = tapIndex('manual-entry-cancel', firstManualLaunch + 1);
+    const cancel = tapIndex('manual-entry-cancel', firstManualMarker + 1);
     const mentorAfterCancel = mandatoryExtendedWait(
       { id: 'mentor-screen' },
       15_000,
@@ -1319,14 +1534,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'mentor-bar-homework-chip',
       usableMentorInput + 1,
     );
-    const secondManualLaunch = tapIndex(
-      'manual-entry-button',
+    const secondManualMarker = mandatoryExtendedWait(
+      { id: 'homework-entry-mode-manual' },
+      15_000,
       secondHomeworkLaunch + 1,
     );
     const emptyManualEntry = mandatoryExtendedWait(
       { id: 'homework-manual-entry-empty' },
       15_000,
-      secondManualLaunch + 1,
+      secondManualMarker + 1,
     );
     const exactProblemInput = commands.findIndex(
       (command, index) =>
@@ -1344,15 +1560,35 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         }),
     );
     expect(firstHomeworkLaunch).toBeGreaterThan(-1);
-    expect(firstManualLaunch).toBeGreaterThan(firstHomeworkLaunch);
-    expect(cancel).toBeGreaterThan(firstManualLaunch);
+    expect(firstManualMarker).toBeGreaterThan(firstHomeworkLaunch);
+    expect(cancel).toBeGreaterThan(firstManualMarker);
     expect(mentorAfterCancel).toBeGreaterThan(cancel);
     expect(usableMentorInput).toBeGreaterThan(mentorAfterCancel);
     expect(secondHomeworkLaunch).toBeGreaterThan(usableMentorInput);
-    expect(secondManualLaunch).toBeGreaterThan(secondHomeworkLaunch);
-    expect(emptyManualEntry).toBeGreaterThan(secondManualLaunch);
+    expect(secondManualMarker).toBeGreaterThan(secondHomeworkLaunch);
+    expect(emptyManualEntry).toBeGreaterThan(secondManualMarker);
     expect(exactProblemInput).toBeGreaterThan(emptyManualEntry);
     expect(exactTypedProblem).toBeGreaterThan(exactProblemInput);
+    expect(tapIndex('manual-entry-button')).toBe(-1);
+
+    const resolvedSubject = mandatoryExtendedWait(
+      { id: 'homework-subject-resolution-ready' },
+      60_000,
+      exactTypedProblem + 1,
+    );
+    const enabledConfirm = commands.findIndex(
+      (command, index) =>
+        index > resolvedSubject &&
+        command.optional !== true &&
+        exactSelector(command.assertVisible, {
+          id: 'confirm-button',
+          enabled: true,
+        }),
+    );
+    const confirmTap = tapIndex('confirm-button', enabledConfirm + 1);
+    expect(resolvedSubject).toBeGreaterThan(exactTypedProblem);
+    expect(enabledConfirm).toBeGreaterThan(resolvedSubject);
+    expect(confirmTap).toBeGreaterThan(enabledConfirm);
 
     expect(hasSequenceBoundSubjectReadiness(commands)).toBe(true);
     const subjectReadinessCommands = commands.filter(
