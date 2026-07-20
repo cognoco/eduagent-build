@@ -3,19 +3,11 @@ import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
-import type { JournalSectionId } from './journal-shared';
+import { JOURNAL_SECTION_IDS, type JournalSectionId } from './journal-shared';
 
 // Landing order drives the two-row count-driven grid: the first row fills with
 // the first three, the rest wrap. Adding a sixth button simply flows to the
 // next row — no layout change required.
-const JOURNAL_SECTIONS: JournalSectionId[] = [
-  'notes',
-  'sessions',
-  'practice',
-  'memory',
-  'reports',
-];
-
 function sectionTitle(section: JournalSectionId, t: TFunction): string {
   switch (section) {
     case 'notes':
@@ -50,7 +42,7 @@ export function JournalSegmentedControl({
       className="flex-row flex-wrap gap-2"
       testID="journal-segmented-control"
     >
-      {JOURNAL_SECTIONS.map((section) => {
+      {JOURNAL_SECTION_IDS.map((section) => {
         const selected = value === section;
         return (
           <Pressable

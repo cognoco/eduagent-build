@@ -216,4 +216,31 @@ describe('recordRetrievalEvent round-trip (integration) [Flow 2 / T3]', () => {
     expect(row.evidenceUsed).toEqual([]);
     expect(row.llmRoutingRung).toBeNull();
   });
+
+  it('uses a deterministic receipt id to make a retry insert idempotent', async () => {
+    const seed = await seedProfileWithTopic(db, 'receipt');
+    const receiptId = generateUUIDv7();
+    const input = {
+      receiptId,
+      profileId: seed.profileId,
+      subjectId: seed.subjectId,
+      topicId: seed.topicId,
+      promptText: 'Explain cellular respiration',
+      learnerAnswer: 'Cells release usable energy from glucose.',
+      quality: 4,
+      verdict: 'solid' as const,
+      nextAction: 'advance' as const,
+      gradedBy: 'llm' as const,
+      rubricRationale: 'Correctly describes the core energy conversion.',
+    };
+
+    await expect(recordRetrievalEvent(db, input)).resolves.toBe(true);
+    await expect(recordRetrievalEvent(db, input)).resolves.toBe(false);
+
+    const rows = await db
+      .select({ id: retrievalEvents.id })
+      .from(retrievalEvents)
+      .where(eq(retrievalEvents.id, receiptId));
+    expect(rows).toEqual([{ id: receiptId }]);
+  });
 });
