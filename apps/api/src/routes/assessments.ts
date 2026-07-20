@@ -10,6 +10,7 @@ import {
   chatExchangeSchema,
   declineAssessmentRefreshResponseSchema,
   getActiveAssessmentResponseSchema,
+  computeAgeBracketFromDate,
   type QuotaModel,
 } from '@eduagent/schemas';
 import { parseConversationLanguage } from '../services/llm';
@@ -105,6 +106,11 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
       const assessmentId = c.req.param('assessmentId');
       const { answer } = c.req.valid('json');
 
+      // [WI-2432] Safety-adjacent age gate (mirrors exchanges.ts's
+      // ageBracket derivation) — the router consumes this to enforce the
+      // under-18 Gemini/Vertex vendor exclusion (MMT-ADR-0016 §1.5) on the
+      // legacy routing path.
+      const profileMeta = c.get('profileMeta');
       const result = await submitAssessmentAnswer(
         db,
         profileId,
@@ -112,8 +118,12 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
         answer,
         {
           conversationLanguage: parseConversationLanguage(
-            c.get('profileMeta')?.conversationLanguage,
+            profileMeta?.conversationLanguage,
           ),
+          ageBracket:
+            profileMeta?.birthYear != null
+              ? computeAgeBracketFromDate(profileMeta.birthYear)
+              : undefined,
         },
       );
       if (!result) return notFound(c, 'Assessment not found');
@@ -277,6 +287,12 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
           conversationLanguage: parseConversationLanguage(
             quickCheckProfileMeta?.conversationLanguage,
           ),
+          // [WI-2432] Safety-adjacent age gate — see submitAssessmentAnswer
+          // call above for rationale.
+          ageBracket:
+            quickCheckProfileMeta?.birthYear != null
+              ? computeAgeBracketFromDate(quickCheckProfileMeta.birthYear)
+              : undefined,
         },
       );
 

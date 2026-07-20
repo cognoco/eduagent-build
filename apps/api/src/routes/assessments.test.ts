@@ -412,7 +412,10 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       PROFILE_ID,
       ASSESSMENT_ID,
       'Water is H2O',
-      { conversationLanguage: 'en' },
+      // [WI-2432] ageBracket now threads from profileMeta.birthYear (2000 ->
+      // always 'adult', since 2000 + PARENT_ACCOUNT_MINIMUM_AGE(18) has long
+      // passed) alongside conversationLanguage.
+      { conversationLanguage: 'en', ageBracket: 'adult' },
     );
   });
 
