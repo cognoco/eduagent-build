@@ -3085,6 +3085,7 @@ export async function prepareExchangeContext(
     userMessage,
   );
   const effectiveRung = escalationDecision.newRung;
+  // B.3 is a stationary-turn offer: frozen modes or any rung movement suppress it.
   const correctStreak =
     !freezeRung && escalationDecision.direction === 'none'
       ? sourceCorrectStreak
