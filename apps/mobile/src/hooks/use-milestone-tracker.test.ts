@@ -130,6 +130,24 @@ describe('useMilestoneTracker', () => {
 });
 
 describe('advanceMilestoneTracker', () => {
+  it("earns Polar Star, Twin Stars, and Orion's Belt on exchanges 1, 3, and 5", () => {
+    let state = INITIAL_MILESTONE_TRACKER_STATE;
+    const milestonesByExchange: string[][] = [];
+
+    for (let exchange = 1; exchange <= 5; exchange += 1) {
+      const result = advanceMilestoneTracker(state, {
+        userMessage: `Independent answer ${exchange}`,
+        escalationRung: 2,
+      });
+      milestonesByExchange.push(result.triggered);
+      state = result.trackerState;
+    }
+
+    expect(milestonesByExchange[0]).toEqual(['polar_star']);
+    expect(milestonesByExchange[2]).toEqual(['twin_stars']);
+    expect(milestonesByExchange[4]).toEqual(['orions_belt']);
+  });
+
   it('returns the next tracker snapshot for persistence', () => {
     const result = advanceMilestoneTracker(INITIAL_MILESTONE_TRACKER_STATE, {
       userMessage:

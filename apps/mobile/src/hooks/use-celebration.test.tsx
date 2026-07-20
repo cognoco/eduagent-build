@@ -255,30 +255,84 @@ describe('useCelebration — queue prop', () => {
     );
   });
 
-  it('caps queue at 2 celebrations per batch (MAX_TOASTS_PER_BATCH)', async () => {
+  it('preserves and renders all same-tick 1/3/5 milestones with earned context', async () => {
     const batchTime = '2026-01-01T10:00:00.000Z';
     const entries: PendingCelebration[] = [
       makeEntry('polar_star', 'polar_star', { queuedAt: batchTime }),
       makeEntry('twin_stars', 'twin_stars', { queuedAt: batchTime }),
-      makeEntry('comet', 'comet', { queuedAt: batchTime }),
+      makeEntry('orions_belt', 'orions_belt', { queuedAt: batchTime }),
     ];
 
     const { result } = renderHook(() =>
       useCelebration({ queue: entries, celebrationLevel: 'all' }),
     );
 
+    const renderedCopy: string[] = [];
+
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
     });
 
-    // Only 2 should be queued (not 3) due to MAX_TOASTS_PER_BATCH = 2.
-    // We can't directly inspect pendingQueue (internal state), but we can
-    // verify overlay is showing (at least 1 was queued/shown) and subsequent
-    // entries in same batch are throttled.
-    expect(result.current.CelebrationOverlay).not.toBeNull();
+    for (const _entry of entries) {
+      const text = collectText(result.current.CelebrationOverlay).join(' ');
+      renderedCopy.push(text);
+
+      await act(async () => {
+        completeActiveCelebration(result.current.CelebrationOverlay);
+        await new Promise((r) => setTimeout(r, 0));
+      });
+    }
+
+    expect(renderedCopy).toEqual([
+      'Polar Star - first independent answer',
+      'Twin Stars - three strong answers in a row',
+      "Orion's Belt - 5 in a row without help!",
+    ]);
+    expect(result.current.CelebrationOverlay).toBeNull();
   });
 
-  it('keeps over-cap entries eligible for a later batch instead of marking them seen', async () => {
+  it('keeps one active overlay while three synchronous triggers drain FIFO', async () => {
+    const { result } = renderHook(() =>
+      useCelebration({ celebrationLevel: 'all' }),
+    );
+
+    await act(async () => {
+      result.current.trigger({
+        celebration: 'polar_star',
+        reason: 'polar_star',
+      });
+      result.current.trigger({
+        celebration: 'twin_stars',
+        reason: 'twin_stars',
+      });
+      result.current.trigger({
+        celebration: 'orions_belt',
+        reason: 'orions_belt',
+      });
+    });
+
+    expect(collectText(result.current.CelebrationOverlay)).toEqual([
+      'Polar Star - first independent answer',
+    ]);
+
+    await act(async () => {
+      completeActiveCelebration(result.current.CelebrationOverlay);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(collectText(result.current.CelebrationOverlay)).toEqual([
+      'Twin Stars - three strong answers in a row',
+    ]);
+
+    await act(async () => {
+      completeActiveCelebration(result.current.CelebrationOverlay);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(collectText(result.current.CelebrationOverlay)).toEqual([
+      "Orion's Belt - 5 in a row without help!",
+    ]);
+  });
+
+  it('does not replay drained entries when a later queue batch arrives', async () => {
     const firstBatchTime = '2026-01-01T10:00:00.000Z';
     const nextBatchTime = '2026-01-01T10:05:00.000Z';
     const entries: PendingCelebration[] = [
@@ -325,6 +379,14 @@ describe('useCelebration — queue prop', () => {
       completeActiveCelebration(result.current.CelebrationOverlay);
       await new Promise((r) => setTimeout(r, 0));
     });
+    expect(collectText(result.current.CelebrationOverlay)).toContain(
+      'third overflow celebration',
+    );
+
+    await act(async () => {
+      completeActiveCelebration(result.current.CelebrationOverlay);
+      await new Promise((r) => setTimeout(r, 0));
+    });
     expect(result.current.CelebrationOverlay).toBeNull();
 
     rerender({ queue: [...entries, nextBatchEntry] });
@@ -334,7 +396,7 @@ describe('useCelebration — queue prop', () => {
     });
 
     expect(collectText(result.current.CelebrationOverlay)).toContain(
-      'third overflow celebration',
+      'new batch celebration',
     );
   });
 
