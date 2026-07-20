@@ -86,6 +86,8 @@ const AMBIGUOUS_SELECTIONS = new Set([
   'help',
   'hello',
   'hi',
+  'thanks',
+  'thank you',
   "i'm not sure",
   'i am not sure',
   "i don't know",
@@ -121,15 +123,25 @@ const OFF_TOPIC_SELECTION_RE =
 const QUESTION_WORD_TITLE_RE =
   /^(?:Am|Are|Can|Could|Did|Do|Does|Had|Has|Have|How|Is|May|Might|Must|Shall|Should|Was|Were|What|When|Where|Which|Who|Whom|Whose|Why|Will|Would)\b/iu;
 const MULTILINGUAL_QUESTION_PREFIX_RE =
-  /^(?:(?:qué|que|cuál|cuáles|cómo|dónde|cuándo|por qué|quién|quiénes|qui|quel|quelle|quels|quelles|comment|où|pourquoi|was|welche|welcher|welches|wie|wo|wann|warum|wer|hva|hvilken|hvilket|hvordan|hvor|når|hvem|co|który|która|które|jak|gdzie|kiedy|dlaczego|kto|o que|qual|quais|como|onde|quando|por que)(?=\s|[?？]|$)|(?:何|なに|どの|どこ|いつ|なぜ|どう|誰|だれ))/iu;
+  /^(?:(?:qué|que|cuál|cuáles|cómo|dónde|cuándo|por qué|porque|quién|quiénes|qui|quel|quelle|quels|quelles|comment|où|pourquoi|was|welche|welcher|welches|wie|wo|wann|warum|wer|hva|hvilken|hvilket|hvordan|hvor|hvorfor|når|hvem|co|który|która|które|jak|gdzie|kiedy|dlaczego|czemu|kto|o que|qual|quais|como|onde|quando|por que)(?=\s|[?？]|$)|(?:何|なに|どの|どれ|どこ|いつ|なぜ|どう|誰|だれ))/iu;
 const TITLE_AUTHOR_RE =
-  /^(?<title>.{1,220})\s(?:by|de|von|av|przez|por)\s+\p{Lu}[\p{L}'’.-]*(?:\s+\p{Lu}[\p{L}'’.-]*){0,5}$/u;
+  /^(?<title>.{1,220})\s(?<separator>by|de|von|av|przez|por)\s+(?<author>[\p{L}\p{N}'’&/.\-\s]{1,120})$/iu;
+const QUOTED_TITLE_RE =
+  /^(?:["“][\s\S]+["”]|['‘][\s\S]+['’]|「[\s\S]+」|『[\s\S]+』)$/u;
+const GENERIC_TITLE_RE = /^some random words?(?:\s+(?:here|by\b.*))?$/iu;
+const NON_TITLE_POSSESSIVE_RE =
+  /^(?:My|Your)\s+(?:Account|Homework|Money|Settings|Help)$/iu;
+const NON_TITLE_FIRST_PERSON_RE = /^I\b.*\b(?:homework|hungry|money)\b/iu;
+const ATTRIBUTION_SENTENCE_RE =
+  /(?:^|\s)(?:am|is|are|was|were|been|being|looks?|seems?|appears?|feels?|gets?|got|wurde|ist|fue|está|foi|ble|er|zostało|jest)(?=\s|$)/iu;
+const ATTRIBUTION_PARTICIPLE_RE =
+  /^(?:built|sent|made|written|driven|powered|designed|created|produced|hosted|published|edited|creado|gebaut|laget|napisane)$/iu;
+const NON_CREATOR_COMPLEMENT_RE =
+  /(?:\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|\b(?:next|this|last)\b|\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|noon|christmas|sunset|station|boulevard|road|street|store|tree|hand|me|fear)\b|bus\/train)/iu;
 const NON_RECITATION_TOPIC_RE =
-  /\b(?:weather|account|subscription|settings)\b/iu;
+  /\b(?:weather|account|subscription|settings|clima|tiempo|configuraci[oó]n|cuenta|météo|compte|paramètres|wetter|konto|einstellungen|vær|innstillinger|pogoda|ustawienia|tempo|conta|configurações)\b/iu;
 const SELECTION_QUESTION_RE =
   /^(?:what|which).*(?:recite|recitation|poem|selection|title|author)\b/iu;
-const EXPLICIT_SELECTION_EDIT_RE =
-  /^(?:actually[\s,]+)?(?:change|switch|edit)\b|^(?:actually[\s,]+)?(?:i(?:'d| would) rather|let(?:'s| us) do)\b|^(?:cámbialo|cambiar|prefiero|ändern|wechseln|lieber|endre|bytt|heller|zmień|przełącz|wolę|mudar|trocar|prefiro|変えて|変更|代わりに)\b/iu;
 const COMMAND_ONLY_EDIT_RE =
   /^(?:change|switch|edit|cambiar|ändern|wechseln|endre|bytt|zmień|przełącz|mudar|trocar|変えて|変更)$/iu;
 const UNCERTAIN_SELECTION_RE =
@@ -140,6 +152,8 @@ const BEGIN_OR_ACKNOWLEDGEMENT_RE =
   /^(?:begin|start|go ahead|i(?:'m| am) ready|ok|okay|yes|sure|estoy list[oa]|ich bin bereit|jeg er klar|jestem gotow[ay]|estou pront[oa]|準備できた)$/iu;
 const CONVERSATIONAL_INTENT_PREFIX_RE =
   /^(?:i|i'm|i am|we|you|my|your|please|can|could|would|should|do|does|is|are|tell|show|give|make|write|explain|help)\b/iu;
+const MULTILINGUAL_CONVERSATIONAL_PREFIX_RE =
+  /^(?:yo|vamos|quiero|estoy|tengo|necesito|puedo|voy|vengo|ella va|je|j'|nous|tu|veux|suis|dois|vais|on va|ich|wir|du|komm|komme|gehe|möchte|brauche|kann|reise|er geht|jeg|vi|vil|trenger|går|hun går|idę|idziemy|lubię|chcę|potrzebuję|mogę|ona idzie|eu|nós|quero|estou|tenho|preciso|posso|vou|viajo|feito|ela vai)(?=\s|$)/iu;
 const GENERIC_REQUEST_RE =
   /^(?:tell|show|give|make|write|explain|help)(?: me)?\b/iu;
 const SENTENCE_LIKE_SELECTION_RE =
@@ -150,6 +164,9 @@ const LEAVE_SELECTIONS = new Set([
   'stop',
   'exit',
   'back',
+  'bye',
+  'goodbye',
+  'quit',
   'nevermind',
   'never mind',
   'salir',
@@ -173,7 +190,9 @@ const LEAVE_SELECTIONS = new Set([
   '戻る',
 ]);
 const NATURAL_LEAVE_RE =
-  /^(?:please )?stop$|^i (?:want|need|would like) to (?:leave|stop|exit)$|^(?:puedo|quiero) salir$|^ich möchte (?:aufhören|gehen)$|^jeg vil (?:avslutte|gå ut)$|^chcę (?:wyjść|zakończyć)$|^quero (?:sair|parar)$|^(?:やめたい|終了したい)$/iu;
+  /^(?:please )?(?:(?:stop|cancel|exit|leave|quit|end)(?: the)?(?: recitation)?|go back)$|^i (?:want|need|would like) to (?:leave|stop|exit|quit|stop reciting)$|^i(?:['’]m| am) done$|^(?:puedo|quiero) salir$|^ich möchte (?:aufhören|gehen)$|^jeg vil (?:avslutte|gå ut)$|^chcę (?:wyjść|zakończyć)$|^quero (?:sair|parar)$|^(?:やめたい|終了したい)$/iu;
+const JAPANESE_CONVERSATIONAL_ENDING_RE =
+  /(?:行きます|行く|行こう|遊びたい|したい|します|です|ます|助けて(?:ください|ほしい)?|名前を教えて|天気が(?:いい|悪い)|お腹が空いた|(?:何|なに|誰|だれ|どこ|いつ|なぜ|どう|どれ)(?:ですか)?|ですか|ますか)$/u;
 
 function normalizeIntent(message: string): string {
   return message
@@ -182,6 +201,28 @@ function normalizeIntent(message: string): string {
     .replace(/^[¿¡]+/u, '')
     .replace(/[.!?…。！？]+$/u, '')
     .toLocaleLowerCase('en-US');
+}
+
+function extractExplicitSelectionEdit(message: string): string | undefined {
+  const normalized = message.trim().replace(/\s+/g, ' ');
+  const english = normalized.match(
+    /^(?:actually[\s,]+)?(?:(?:please|(?:can|could) we)\s+)?(?:(?:change|switch)(?:(?:\s+it|\s+(?:my|the) selection)?\s+to)|edit(?:\s+it)?(?:\s+to)?|i(?:['’]d| would) rather(?:\s+do)?|let(?:['’]s| us) do|i want to (?:change|switch)(?: it)? to)\s+(?<selection>.+)$/iu,
+  )?.groups?.['selection'];
+  if (english) return english.trim();
+
+  const instead = normalized.match(
+    /^(?:please\s+)?use\s+(?<selection>.+)\s+instead$/iu,
+  )?.groups?.['selection'];
+  if (instead) return instead.trim();
+
+  const supportedLanguage = normalized.match(
+    /^(?:(?:cámbialo|cambiar)(?:\s+(?:a|por))?|prefiero(?:\s+(?:a|por))?|(?:ändern|wechseln)(?:\s+zu)?|lieber|(?:endre|bytt)(?:\s+til)?|heller|(?:zmień|przełącz)(?:\s+na)?|wolę|(?:mudar|trocar)(?:\s+para)?|prefiro)\s+(?<selection>.+)$/iu,
+  )?.groups?.['selection'];
+  if (supportedLanguage) return supportedLanguage.trim();
+
+  return normalized
+    .match(/^(?:変更|変えて|代わりに)\s+(?<selection>.+)$/u)
+    ?.groups?.['selection']?.trim();
 }
 
 function isLeaveIntent(message: string): boolean {
@@ -205,21 +246,49 @@ function isUncertainOrNonSelection(message: string): boolean {
 }
 
 function isTitleAuthorSelection(message: string): boolean {
-  const title = message.match(TITLE_AUTHOR_RE)?.groups?.['title']?.trim();
-  if (!title) return false;
-  if (/^(?:["“][\s\S]+["”]|['‘][\s\S]+['’])$/u.test(title)) return true;
+  const match = message.match(TITLE_AUTHOR_RE);
+  const title = match?.groups?.['title']?.trim();
+  const author = match?.groups?.['author']?.trim();
+  const separator = match?.groups?.['separator']?.toLocaleLowerCase('en-US');
+  if (!title || !author || !/\p{L}/u.test(author)) return false;
+  if (QUOTED_TITLE_RE.test(title)) return true;
+  const titleQuestionSelection =
+    /[?？]$/u.test(title) &&
+    (title.match(/(?:^|\s)\p{Lu}[\p{L}'’]*/gu)?.length ?? 0) >= 2;
+  const strongTitleCaseSelection =
+    (title.match(/(?:^|\s)\p{Lu}[\p{L}'’]*/gu)?.length ?? 0) >= 3;
   if (
-    CONVERSATIONAL_INTENT_PREFIX_RE.test(title) ||
-    GENERIC_REQUEST_RE.test(title) ||
-    SENTENCE_LIKE_SELECTION_RE.test(title)
+    (isUncertainOrNonSelection(title) && !titleQuestionSelection) ||
+    isLeaveIntent(title) ||
+    GENERIC_TITLE_RE.test(title) ||
+    (CONVERSATIONAL_INTENT_PREFIX_RE.test(title) &&
+      !strongTitleCaseSelection) ||
+    (MULTILINGUAL_CONVERSATIONAL_PREFIX_RE.test(title) &&
+      !strongTitleCaseSelection) ||
+    GENERIC_REQUEST_RE.test(title)
   ) {
     return false;
   }
   const titleWords = title.split(' ');
+  const creatorSignal = /\p{Lu}/u.test(author) || /[&/]/u.test(author);
+  const invalidEnglishAttribution =
+    separator === 'by' &&
+    !strongTitleCaseSelection &&
+    (ATTRIBUTION_SENTENCE_RE.test(title) ||
+      (titleWords.length === 1 && ATTRIBUTION_PARTICIPLE_RE.test(title)) ||
+      NON_CREATOR_COMPLEMENT_RE.test(author));
+  const invalidLocalizedAttribution =
+    separator !== 'by' &&
+    !strongTitleCaseSelection &&
+    (ATTRIBUTION_SENTENCE_RE.test(title) ||
+      (titleWords.length === 1 && ATTRIBUTION_PARTICIPLE_RE.test(title)));
+
   return (
-    /^[\p{Lu}\p{Lt}]/u.test(title) ||
-    /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(title) ||
-    (titleWords.length >= 2 && titleWords.length <= 10)
+    titleWords.length >= 1 &&
+    titleWords.length <= 10 &&
+    creatorSignal &&
+    !invalidEnglishAttribution &&
+    !invalidLocalizedAttribution
   );
 }
 
@@ -247,31 +316,58 @@ function isLikelySelection(message: string): boolean {
     MULTILINGUAL_QUESTION_PREFIX_RE.test(questionCandidate);
   const titleCasedQuestion =
     hasTitleCaseSignal && (hasQuestionPrefix || terminalQuestion);
-  const explicitlyQuotedTitle = /^(?:["“][\s\S]+["”]|['‘][\s\S]+['’])$/u.test(
-    normalized,
-  );
+  const explicitlyQuotedTitle = QUOTED_TITLE_RE.test(normalized);
+  const titleAuthorSelection = isTitleAuthorSelection(normalized);
+  const rejectedTitleAuthorSyntax =
+    TITLE_AUTHOR_RE.test(normalized) && !titleAuthorSelection;
+  const shortStructuredTitle =
+    questionWordCount <= 5 &&
+    !NON_TITLE_POSSESSIVE_RE.test(normalized) &&
+    !NON_TITLE_FIRST_PERSON_RE.test(normalized) &&
+    (/[,;:]\s/u.test(normalized) ||
+      /^(?:The|A|An)\s+\p{Lu}[\p{L}'’.-]*/u.test(normalized) ||
+      /^(?:My|Your)\s+\p{Lu}[\p{L}'’.-]*/u.test(normalized) ||
+      /^I (?!Need\b).*\s\p{Lu}[\p{L}'’.-]*$/u.test(normalized) ||
+      /^We\s+(?:the\s+)?\p{Lu}[\p{L}'’.-]*$/u.test(normalized));
   if (
     ((isUncertainOrNonSelection(normalized) || hasQuestionPrefix) &&
       !titleCasedQuestion &&
       !explicitlyQuotedTitle) ||
     isLeaveIntent(normalized) ||
     isSafetyDisclosure(normalized) ||
+    NON_TITLE_FIRST_PERSON_RE.test(normalized) ||
+    rejectedTitleAuthorSyntax ||
+    (MULTILINGUAL_CONVERSATIONAL_PREFIX_RE.test(normalized) &&
+      !explicitlyQuotedTitle) ||
+    (NON_RECITATION_TOPIC_RE.test(normalized) &&
+      !explicitlyQuotedTitle &&
+      titleCaseWordCount < 2) ||
     COMMAND_ONLY_EDIT_RE.test(normalizeIntent(normalized))
   ) {
     return false;
   }
 
   const words = normalized.split(' ');
+  const singleWordTitle =
+    words.length === 1 &&
+    !/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(normalized);
+  const japaneseTitle =
+    /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(
+      normalized,
+    ) && !JAPANESE_CONVERSATIONAL_ENDING_RE.test(normalized);
   const titleLikePhrase =
-    words.length === 1 ||
+    singleWordTitle ||
+    japaneseTitle ||
     explicitlyQuotedTitle ||
+    shortStructuredTitle ||
     titleCasedQuestion ||
+    hasTitleCaseSignal ||
     (/^[\p{Lu}\p{Lt}]/u.test(normalized) &&
       !CONVERSATIONAL_INTENT_PREFIX_RE.test(normalized) &&
-      !SENTENCE_LIKE_SELECTION_RE.test(normalized)) ||
-    /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(normalized);
+      !MULTILINGUAL_CONVERSATIONAL_PREFIX_RE.test(normalized) &&
+      !SENTENCE_LIKE_SELECTION_RE.test(normalized));
   const hasSelectionShape =
-    isTitleAuthorSelection(normalized) ||
+    titleAuthorSelection ||
     /^(?:the |a |an |el |la |der |die |das )?(?:poem|speech|passage|story|monologue|sonnet|poema|gedicht|dikt|wiersz|詩)(?:\s|$)/iu.test(
       normalized,
     ) ||
@@ -392,6 +488,16 @@ export function resolveRecitationSetupTransition(
       return { action: 'invite_recitation', state: previous };
     }
 
+    const editedSelection = extractExplicitSelectionEdit(input.message);
+    if (editedSelection !== undefined) {
+      return {
+        action: isLikelySelection(editedSelection)
+          ? 'invite_to_begin'
+          : 'clarify_edit',
+        state: previous,
+      };
+    }
+
     if (
       COMMAND_ONLY_EDIT_RE.test(normalized) ||
       AMBIGUOUS_SELECTIONS.has(normalized) ||
@@ -408,14 +514,7 @@ export function resolveRecitationSetupTransition(
       return { action: 'handle_non_recitation', state: previous };
     }
 
-    return {
-      action:
-        EXPLICIT_SELECTION_EDIT_RE.test(input.message.trim()) &&
-        isLikelySelection(input.message)
-          ? 'invite_to_begin'
-          : 'coach_recitation',
-      state: previous,
-    };
+    return { action: 'coach_recitation', state: previous };
   }
 
   if (isLikelySelection(input.message)) {
