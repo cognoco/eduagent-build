@@ -186,6 +186,18 @@ describe('pushNowDeepLink', () => {
     expect(router.push).toHaveBeenCalledWith('/(app)/journal');
   });
 
+  it('[WI-2110 AC-1] carries a Journal section override in the route', () => {
+    const router = { push: jest.fn() };
+
+    pushNowDeepLink(router, {
+      route: 'journal',
+      params: { section: 'practice' },
+      chain: [],
+    });
+
+    expect(router.push).toHaveBeenCalledWith('/(app)/journal?section=practice');
+  });
+
   it('pushes support hub pointers to the Mentor tab', () => {
     const router = { push: jest.fn() };
 
