@@ -55,6 +55,8 @@ export function useSessionTranscriptHydration({
         isResponseComplete:
           entry.role === 'assistant' &&
           entry.isSystemPrompt !== true &&
+          (entry as typeof entry & { kind?: ChatMessage['kind'] | null })
+            .kind == null &&
           entry.content.trim().length > 0,
         escalationRung: entry.escalationRung,
       }));
