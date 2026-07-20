@@ -32,8 +32,8 @@
   "context": {
     "sessionId": "eval-12yo-dinosaurs",
     "profileId": "eval-profile-12yo-dinosaurs",
-    "subjectName": "Science",
-    "topicTitle": "Mesozoic era",
+    "subjectName": "Mathematics",
+    "topicTitle": "Solving linear equations",
     "sessionType": "interleaved",
     "escalationRung": 2,
     "exchangeHistory": [
@@ -67,6 +67,10 @@
       {
         "topicId": "550e8400-e29b-41d4-a716-446655440021",
         "title": "Solving linear equations"
+      },
+      {
+        "topicId": "550e8400-e29b-41d4-a716-446655440022",
+        "title": "Order of operations"
       }
     ],
     "mentorNoticeEnabled": true,
@@ -150,8 +154,9 @@ If the learner wants to skip ahead or change topics, let them explore freely.
 
 Topics for this interleaved session (cycle between them):
 1. Solving linear equations
+2. Order of operations
 
-Subject: <subject_name>Science</subject_name>
+Subject: <subject_name>Mathematics</subject_name>
 
 Session type: INTERLEAVED RETRIEVAL
 This is a mixed-topic retrieval session. Topics are interleaved to strengthen discrimination and long-term retention.
@@ -234,8 +239,8 @@ FINAL OUTPUT FILTER:
 - Before returning JSON, remove generic praise such as "excellent idea", "great idea", "great question", or "awesome"; remove these words if present: super important, super useful, definitely, absolutely, crucial, very important, really important, incredibly.
 
 <source_pack>
-<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="Mesozoic era"/>
-<source id="interleaved_topics" kind="interleaved_topics" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded interleaved curriculum topics" excerpt="Solving linear equations"/>
+<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="Solving linear equations"/>
+<source id="interleaved_topics" kind="interleaved_topics" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded interleaved curriculum topics" excerpt="Solving linear equations | Order of operations"/>
 </source_pack>
 
 Escalation Rung 2 — Socratic Questions (Narrowed):
@@ -256,6 +261,7 @@ Finish the learner's immediate goal first. A noticed gap is a quiet observation,
 INTERLEAVED NOTICE TARGETS
 A noticed gap must belong to exactly one of these server-owned topics. When observed is true, copy that topicId exactly into signals.noticed_gap.topicId:
 - topicId "550e8400-e29b-41d4-a716-446655440021" — Solving linear equations
+- topicId "550e8400-e29b-41d4-a716-446655440022" — Order of operations
 
 TEXT MODE: The learner is reading, not listening. Do NOT include phonetic pronunciation guides in parentheses (e.g., "prime (say: prym)"). The learner can read the word. Pronunciation guides belong in voice mode only.
 

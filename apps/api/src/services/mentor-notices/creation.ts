@@ -26,7 +26,7 @@ interface MentorNoticeTarget {
   topicId: string | null;
 }
 
-export function resolveMentorNoticeTarget(
+function resolveMentorNoticeTarget(
   session: NoticeSourceSession,
   signal: NoticedGapSignal,
   interleavedTopics: InterleavedNoticeTopic[] = [],
@@ -44,6 +44,11 @@ export function resolveMentorNoticeTarget(
     : null;
 }
 
+/**
+ * Validate and persist one evidence-backed mentor notice from an exchange.
+ * Session metadata owns regular targets; interleaved targets must match the
+ * server-resolved topic allow-list supplied in the exchange context.
+ */
 export async function createMentorNoticeFromExchange(
   db: Database,
   input: {

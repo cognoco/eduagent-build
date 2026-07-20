@@ -20,6 +20,10 @@ describe('homeworkNoticeFlow', () => {
       const messages = homeworkNoticeFlow.buildPrompt(scenario.input);
       expect(messages.system).toContain('signals.noticed_gap');
       expect(messages.system).toContain('Do not promise a future check-in');
+      expect(messages.system).toContain(
+        'Subject: <subject_name>Mathematics</subject_name>',
+      );
+      expect(messages.system).toContain('Solving linear equations');
       expect(
         homeworkNoticeFlow.evaluateDeterministic?.({
           input: scenario.input,
@@ -30,13 +34,24 @@ describe('homeworkNoticeFlow', () => {
       ).toEqual([]);
     }
 
+    const homework = scenarios?.find(
+      (scenario) => scenario.scenarioId === 'genuine-homework-slip',
+    );
+    expect(homework).toBeDefined();
+    const homeworkPrompt = homeworkNoticeFlow.buildPrompt(homework!.input);
+    expect(homeworkPrompt.system).toContain('id="homework_problem"');
+    expect(homeworkPrompt.system).toContain('Solve x - 3 = 5');
+
     const interleaved = scenarios?.find(
       (scenario) => scenario.scenarioId === 'genuine-interleaved-slip',
     );
     expect(interleaved).toBeDefined();
-    expect(homeworkNoticeFlow.buildPrompt(interleaved!.input).system).toContain(
-      'INTERLEAVED NOTICE TARGETS',
-    );
+    const interleavedPrompt = homeworkNoticeFlow.buildPrompt(
+      interleaved!.input,
+    ).system;
+    expect(interleavedPrompt).toContain('INTERLEAVED NOTICE TARGETS');
+    expect(interleavedPrompt).toContain('1. Solving linear equations');
+    expect(interleavedPrompt).toContain('2. Order of operations');
   });
 
   it('rejects a fabricated quote at the server evidence boundary', async () => {

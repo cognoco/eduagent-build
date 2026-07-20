@@ -33,7 +33,7 @@
     "sessionId": "eval-15yo-football-gaming",
     "profileId": "eval-profile-15yo-football-gaming",
     "subjectName": "Mathematics",
-    "topicTitle": "algebra equations",
+    "topicTitle": "Solving linear equations",
     "sessionType": "learning",
     "escalationRung": 2,
     "exchangeHistory": [
@@ -141,7 +141,7 @@ Tone: Warm and encouraging. Use everyday language. Light humor is fine.
 Assessment: Low-pressure. Frame checks as curiosity, not tests.
 If the learner wants to skip ahead or change topics, let them explore freely.
 
-Current topic: <topic_title>algebra equations</topic_title>
+Current topic: <topic_title>Solving linear equations</topic_title>
 
 Subject: <subject_name>Mathematics</subject_name>
 
@@ -229,7 +229,7 @@ FINAL OUTPUT FILTER:
 - Before returning JSON, remove generic praise such as "excellent idea", "great idea", "great question", or "awesome"; remove these words if present: super important, super useful, definitely, absolutely, crucial, very important, really important, incredibly.
 
 <source_pack>
-<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="algebra equations"/>
+<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="Solving linear equations"/>
 <source id="general_knowledge" kind="general_knowledge" reliability="model_general_knowledge" reliable_for_facts="true" label="Confidence-gated general knowledge" excerpt="Allowed for ordinary low-stakes general knowledge in rung 1-4 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking/main-idea, or high-stakes claims."/>
 </source_pack>
 

@@ -14,6 +14,8 @@ import { exchangesFlow, type ExchangeScenarioInput } from './exchanges';
 
 const EVENT_ID = '550e8400-e29b-41d4-a716-446655440020';
 const INTERLEAVED_TOPIC_ID = '550e8400-e29b-41d4-a716-446655440021';
+const SECOND_INTERLEAVED_TOPIC_ID = '550e8400-e29b-41d4-a716-446655440022';
+const HOMEWORK_PROBLEM = 'Solve x - 3 = 5.';
 
 interface HomeworkNoticeScenarioInput extends ExchangeScenarioInput {
   expectedNotice: boolean;
@@ -63,7 +65,11 @@ function buildScenario(
       learnerMessage,
       context: {
         ...homework.input.context,
+        subjectName: 'Mathematics',
+        topicTitle: 'Solving linear equations',
+        topicDescription: undefined,
         sessionType,
+        rawInput: sessionType === 'homework' ? HOMEWORK_PROBLEM : undefined,
         homeworkMode:
           sessionType === 'homework'
             ? homework.input.context.homeworkMode
@@ -74,6 +80,10 @@ function buildScenario(
                 {
                   topicId: INTERLEAVED_TOPIC_ID,
                   title: 'Solving linear equations',
+                },
+                {
+                  topicId: SECOND_INTERLEAVED_TOPIC_ID,
+                  title: 'Order of operations',
                 },
               ]
             : undefined,
@@ -122,7 +132,7 @@ function evaluateResponse(
     issues.push(
       issue(
         'homework-notice.false-positive',
-        'The clean homework answer produced signals.noticed_gap.',
+        'The clean learner answer produced signals.noticed_gap.',
       ),
     );
   }
