@@ -1,0 +1,31 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "red-state fixture: current GDPR grant is tokenless (withdrawalTokenId=null) after a prior cw2 mint existed",
+      "pointer": "apps/api/src/services/identity-v2/consent-v2.integration.test.ts:886"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "old cw2 token vs current tokenless grant -> ConsentRecordNotFoundError, grant left un-withdrawn; red-green-revert executed",
+      "pointer": "apps/api/src/services/identity-v2/consent-v2.integration.test.ts:886"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "getGdprGrantWithdrawalStateV2 state-read parity returns null for the same old-cw2-vs-tokenless case",
+      "pointer": "apps/api/src/services/identity-v2/consent-v2.integration.test.ts:908"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "exhaustive six-row matching matrix (cw1/current-null accept, cw1/current-id reject, cw2 matching accept, cw2 mismatch reject, cw2/current-null reject, expectedTokenId undefined skip)",
+      "pointer": "apps/api/src/services/identity-v2/consent-v2.integration.test.ts:927"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "exact-match comment correction in both functions (removes null-as-wildcard language) + full suite green (67/67) after fix",
+      "pointer": "apps/api/src/services/identity-v2/consent-v2.ts:1111"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13",
+  "redGreenPointer": "wi2434-rgr-evidence.md"
+}

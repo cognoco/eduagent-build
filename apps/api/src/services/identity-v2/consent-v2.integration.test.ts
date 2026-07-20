@@ -836,6 +836,176 @@ const COPPA = 'coppa_parental_consent';
           expect(grants.every((g) => g.withdrawnAt === null)).toBe(true);
         });
       });
+
+      // -----------------------------------------------------------------------
+      // [WI-2434] Reject old cw2 bearer tokens against newer tokenless
+      // consent grants. WI-2347's supersession check (above) used a
+      // null-wildcard comparison: it only rejected when
+      // `current.withdrawalTokenId !== null`, so a defined `expectedTokenId`
+      // (an old `cw2` link) matched ANY current grant whose
+      // `withdrawalTokenId` was null — including a FRESH tokenless grant
+      // appended after the `cw2`-minted grant it was originally issued
+      // against was withdrawn. That defeats per-link revocation: a
+      // leaked/retained old `cw2` link could act on a later, unrelated
+      // consent event for the same person+org.
+      //
+      // Fix: exact equality (`current.withdrawalTokenId === expectedTokenId`)
+      // for every DEFINED `expectedTokenId` (including `null`, the `cw1`
+      // case); only `expectedTokenId === undefined` (the edge-authorized
+      // path) skips the check. AC-4's exhaustive six-row matrix follows;
+      // AC-2/AC-3 cover the specific old-cw2-vs-tokenless regression named
+      // in the WI.
+      // -----------------------------------------------------------------------
+      describe('[WI-2434] exact-match token equality (no null-as-wildcard)', () => {
+        /** Seeds a single consent_grant row carrying the given
+         * withdrawalTokenId (or null for a tokenless grant), so
+         * `currentGrant()` resolves to exactly this row. */
+        async function seedGrantWithToken(
+          childId: string,
+          orgId: string,
+          withdrawalTokenId: string | null,
+        ): Promise<void> {
+          await db.insert(consentGrant).values({
+            chargePersonId: childId,
+            organizationId: orgId,
+            purpose: DEFAULT_CONSENT_PURPOSE,
+            lawfulBasis: 'gdpr_parental_consent',
+            granted: true,
+            grantedAt: new Date(),
+            priorValue: null,
+            auditFact: { source: 'consent_response_approved' },
+            withdrawalTokenId,
+          });
+        }
+
+        // AC-1 (red-state reachability) + AC-2 (withdraw property,
+        // red-green-revert) — the exact scenario the WI names: an old cw2
+        // token presented against a CURRENT tokenless grant. Under the
+        // null-wildcard bug this was wrongly ACCEPTED (current.withdrawalTokenId
+        // === null short-circuited the mismatch check); the fix REJECTS it.
+        it('withdrawConsentByToken REJECTS an old cw2 token against a newer tokenless current grant, and does not mutate it (AC-1, AC-2)', async () => {
+          const orgId = await seedOrg();
+          const childId = await seedPerson(orgId);
+          const oldCw2TokenId = generateUUIDv7();
+          // The CURRENT grant is tokenless — e.g. a fresh re-consent cycle
+          // appended after the earlier cw2-stamped withdrawal. This is the
+          // red-state fixture (AC-1).
+          await seedGrantWithToken(childId, orgId, null);
+
+          await expect(
+            withdrawConsentByToken(
+              db,
+              childId,
+              orgId,
+              undefined,
+              oldCw2TokenId,
+            ),
+          ).rejects.toBeInstanceOf(ConsentRecordNotFoundError);
+
+          const grant = await db.query.consentGrant.findFirst({
+            where: eq(consentGrant.chargePersonId, childId),
+          });
+          expect(grant?.withdrawnAt).toBeNull();
+        });
+
+        // AC-3 (state-read parity) — the same old-cw2-vs-tokenless case must
+        // read as "nothing to withdraw" (null), not leak the grant's
+        // withdrawal state to a stale link.
+        it('getGdprGrantWithdrawalStateV2 returns null for the same old-cw2-vs-tokenless case (AC-3)', async () => {
+          const orgId = await seedOrg();
+          const childId = await seedPerson(orgId);
+          const oldCw2TokenId = generateUUIDv7();
+          await seedGrantWithToken(childId, orgId, null);
+
+          const state = await getGdprGrantWithdrawalStateV2(
+            db,
+            childId,
+            orgId,
+            oldCw2TokenId,
+          );
+          expect(state).toBeNull();
+        });
+
+        // AC-4 — the exhaustive six-row matrix, table-driven, exercised
+        // against the write path (withdrawConsentByToken → stampWithdrawal).
+        // Rows 1-4 and 6 already had scattered coverage above; row 5 is the
+        // WI-2434 fix target. Collected here as one explicit matrix.
+        it.each([
+          [
+            'cw1 (null) vs tokenless current grant -> accept',
+            null as string | null,
+            null as string | null | undefined,
+            true,
+          ],
+          [
+            'cw1 (null) vs current grant with an id -> reject',
+            'CURRENT_ID',
+            null,
+            false,
+          ],
+          ['cw2 matching id -> accept', 'CURRENT_ID', 'CURRENT_ID', true],
+          ['cw2 mismatched id -> reject', 'CURRENT_ID', 'OTHER_ID', false],
+          [
+            'cw2 id vs tokenless current grant -> REJECT (WI-2434 fix target)',
+            null,
+            'OTHER_ID',
+            false,
+          ],
+          [
+            'expectedTokenId undefined -> skip check, always accept',
+            'CURRENT_ID',
+            undefined,
+            true,
+          ],
+        ] as const)(
+          '%s',
+          async (_name, currentSlot, presentedSlot, expectAccept) => {
+            const orgId = await seedOrg();
+            const childId = await seedPerson(orgId);
+            const currentId = generateUUIDv7();
+            const otherId = generateUUIDv7();
+            const resolveSlot = (
+              slot: 'CURRENT_ID' | 'OTHER_ID' | null | undefined,
+            ): string | null | undefined =>
+              slot === 'CURRENT_ID'
+                ? currentId
+                : slot === 'OTHER_ID'
+                  ? otherId
+                  : slot;
+            await seedGrantWithToken(
+              childId,
+              orgId,
+              resolveSlot(currentSlot) ?? null,
+            );
+            const presented = resolveSlot(presentedSlot);
+
+            if (expectAccept) {
+              const result = await withdrawConsentByToken(
+                db,
+                childId,
+                orgId,
+                undefined,
+                presented,
+              );
+              expect(result.withdrawnAt).toBeTruthy();
+            } else {
+              await expect(
+                withdrawConsentByToken(
+                  db,
+                  childId,
+                  orgId,
+                  undefined,
+                  presented,
+                ),
+              ).rejects.toBeInstanceOf(ConsentRecordNotFoundError);
+              const grant = await db.query.consentGrant.findFirst({
+                where: eq(consentGrant.chargePersonId, childId),
+              });
+              expect(grant?.withdrawnAt).toBeNull();
+            }
+          },
+        );
+      });
     });
 
     // -------------------------------------------------------------------------
