@@ -7,12 +7,27 @@ import {
   orderSupporterHubCandidates,
   buildNowFeedFromCandidates,
   buildNowOverflowFromCandidates,
+  isRetentionDueAt,
   rankCandidates,
   resolveDeepLink,
   type NowFeedCandidate,
 } from './now-feed';
 
 const now = new Date('2026-06-11T12:00:00.000Z');
+
+describe('WI-2113 retention transition', () => {
+  it('[WI-2113 AC-2] exposes retention only at or after its due timestamp', () => {
+    expect(isRetentionDueAt(new Date('2026-06-11T12:00:01.000Z'), now)).toBe(
+      false,
+    );
+    expect(isRetentionDueAt(new Date('2026-06-11T12:00:00.000Z'), now)).toBe(
+      true,
+    );
+    expect(isRetentionDueAt(new Date('2026-06-11T11:59:59.000Z'), now)).toBe(
+      true,
+    );
+  });
+});
 
 function candidate(
   overrides: Partial<NowFeedCandidate> & Pick<NowFeedCandidate, 'id' | 'kind'>,

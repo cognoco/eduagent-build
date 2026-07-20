@@ -9,6 +9,7 @@ import {
   isNotNull,
   isNull,
   lt,
+  lte,
   or,
   sql,
   type SQL,
@@ -870,7 +871,7 @@ async function collectRetentionDueCandidates(
         eq(retentionCards.profileId, profileId),
         eq(subjects.profileId, profileId),
         isNotNull(retentionCards.nextReviewAt),
-        lt(retentionCards.nextReviewAt, now),
+        lte(retentionCards.nextReviewAt, now),
         accessGuard,
       ),
     )
@@ -878,7 +879,7 @@ async function collectRetentionDueCandidates(
     .limit(20);
 
   return rows
-    .filter((row) => row.nextReviewAt)
+    .filter((row) => isRetentionDueAt(row.nextReviewAt, now))
     .map((row) => ({
       id: row.id,
       kind: 'retention_due',
@@ -897,6 +898,13 @@ async function collectRetentionDueCandidates(
       }),
       scope,
     }));
+}
+
+export function isRetentionDueAt(
+  nextReviewAt: Date | null,
+  now: Date,
+): boolean {
+  return nextReviewAt !== null && nextReviewAt.getTime() <= now.getTime();
 }
 
 async function collectNeedsDeepeningCandidates(

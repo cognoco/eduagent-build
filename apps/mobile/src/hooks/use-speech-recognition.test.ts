@@ -64,7 +64,7 @@ describe('useSpeechRecognition', () => {
     expect(result.current.error).toBeTruthy();
   });
 
-  it('starts listening when the module is available', async () => {
+  it('requests permission once before starting recognition', async () => {
     mockLoadSpeechModule.mockResolvedValue({
       requestPermissionsAsync: mockRequestPermissionsAsync,
       start: mockStart,
@@ -80,14 +80,41 @@ describe('useSpeechRecognition', () => {
       await result.current.startListening();
     });
 
-    expect(mockRequestPermissionsAsync).toHaveBeenCalled();
+    expect(mockRequestPermissionsAsync).toHaveBeenCalledTimes(1);
+    expect(mockStart).toHaveBeenCalledTimes(1);
     expect(mockStart).toHaveBeenCalledWith({
       lang: 'en-US',
       interimResults: true,
       continuous: true,
     });
+    expect(
+      mockRequestPermissionsAsync.mock.invocationCallOrder[0],
+    ).toBeLessThan(mockStart.mock.invocationCallOrder[0]!);
     expect(result.current.status).toBe('listening');
     expect(result.current.isListening).toBe(true);
+  });
+
+  it('does not start recognition when microphone permission is denied', async () => {
+    mockRequestPermissionsAsync.mockResolvedValue({ granted: false });
+    mockLoadSpeechModule.mockResolvedValue({
+      requestPermissionsAsync: mockRequestPermissionsAsync,
+      start: mockStart,
+      stop: mockStop,
+      addListener: mockAddListener,
+    });
+    const { result } = renderHook(() =>
+      useSpeechRecognition(mockLoadSpeechModule),
+    );
+    await flushEffects();
+
+    await act(async () => {
+      await result.current.startListening();
+    });
+
+    expect(mockRequestPermissionsAsync).toHaveBeenCalledTimes(1);
+    expect(mockStart).not.toHaveBeenCalled();
+    expect(result.current.status).toBe('error');
+    expect(result.current.isListening).toBe(false);
   });
 
   it('uses the configured language when provided', async () => {
