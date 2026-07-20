@@ -655,33 +655,6 @@ describe('[WI-1651] e2e-ci.yml propagates Maestro failures', () => {
       rmSync(harness.root, { recursive: true, force: true });
     }
   });
-
-  it('[WI-2236] passes the seeded Subject ID to the exact V2 manual-homework Maestro case', () => {
-    const harness = createMaestroHarness(0);
-    const subjectId = '11111111-2222-4333-8444-555555555555';
-
-    try {
-      const result = runCiMaestro(harness, {
-        MAESTRO_CI_SUITE: 'v2',
-        MAESTRO_CI_SHARD: '1',
-        FAKE_SEED_SUBJECT_ID: subjectId,
-      });
-      const manualHomeworkInvocation = readFileSync(
-        harness.maestroMarker,
-        'utf8',
-      )
-        .split('\n')
-        .find((invocation) =>
-          invocation.includes('flows/v2/v2-homework-manual-entry.yaml'),
-        );
-
-      expect(result.status).toBe(0);
-      expect(manualHomeworkInvocation).toBeDefined();
-      expect(manualHomeworkInvocation).toContain(`-e SUBJECT_ID=${subjectId}`);
-    } finally {
-      rmSync(harness.root, { recursive: true, force: true });
-    }
-  });
 });
 
 describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () => {
@@ -2105,7 +2078,7 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
     maestro,
     [
       '#!/usr/bin/env bash',
-      'printf "%s\\n" "$*" >> "$FAKE_MAESTRO_MARKER"',
+      'printf "ran\\n" >> "$FAKE_MAESTRO_MARKER"',
       'if [ "${FAKE_MAESTRO_DRAIN_STDIN:-0}" = "1" ]; then cat >/dev/null; fi',
       'exit "$FAKE_MAESTRO_EXIT"',
       '',
@@ -2130,13 +2103,7 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
       '#!/usr/bin/env bash',
       'if [ "${FAKE_CURL_EXIT:-0}" -ne 0 ]; then exit "$FAKE_CURL_EXIT"; fi',
       'case "$*" in',
-      '  */v1/__test/seed*)',
-      '    if [ -n "${FAKE_SEED_SUBJECT_ID:-}" ]; then',
-      '      printf \'{"email":"test@example.com","password":"pw","accountId":"account","profileId":"profile","ids":{"subjectId":"%s"}}\' "$FAKE_SEED_SUBJECT_ID"',
-      '    else',
-      '      printf \'{"email":"test@example.com","password":"pw","accountId":"account","profileId":"profile","ids":{}}\'',
-      '    fi',
-      '    ;;',
+      '  */v1/__test/seed*) printf \'{"email":"test@example.com","password":"pw","accountId":"account","profileId":"profile","ids":{}}\' ;;',
       "  *) printf '{}' ;;",
       'esac',
       '',

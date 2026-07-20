@@ -752,11 +752,6 @@ export default function CameraScreen(): React.ReactNode {
     router.replace(homeworkReturnHrefForReturnTo(returnTo));
   }, [returnTo, router]);
 
-  const handleCancelManualEntry = useCallback(() => {
-    handleRetake();
-    handleClose();
-  }, [handleClose, handleRetake]);
-
   // Intercept Android hardware back so it routes through handleClose too;
   // without this, the OS goBack() returns to whichever tab was active when
   // camera was pushed, which for cross-tab pushes is the tabs first-route.
@@ -962,30 +957,34 @@ export default function CameraScreen(): React.ReactNode {
             </View>
           </View>
 
-          <Pressable
-            testID="manual-entry-button"
-            onPress={handleStartManualEntry}
-            className="absolute left-6 right-6 flex-row items-center justify-center gap-2 rounded-full bg-white py-3 px-4"
-            style={{ bottom: insets.bottom + 96 }}
-            accessibilityLabel={t('homework.typeOrRecordInstead')}
-            accessibilityRole="button"
-          >
-            <Ionicons
-              name="create-outline"
-              size={18}
-              color={colors.textPrimary}
-            />
-            <Text className="text-body-sm font-semibold text-text-primary text-center">
-              {t('homework.typeOrRecordInstead')}
-            </Text>
-            <Ionicons name="mic-outline" size={18} color={colors.textPrimary} />
-          </Pressable>
-
           {/* Bottom controls: gallery + capture + flash */}
           <View
             className="flex-row items-center justify-center px-8 pb-4"
             style={{ paddingBottom: insets.bottom + 16 }}
           >
+            <Pressable
+              testID="manual-entry-button"
+              onPress={handleStartManualEntry}
+              className="absolute left-6 right-6 flex-row items-center justify-center gap-2 rounded-full bg-white py-3 px-4"
+              style={{ bottom: insets.bottom + 96 }}
+              accessibilityLabel={t('homework.typeOrRecordInstead')}
+              accessibilityRole="button"
+            >
+              <Ionicons
+                name="create-outline"
+                size={18}
+                color={colors.textPrimary}
+              />
+              <Text className="text-body-sm font-semibold text-text-primary text-center">
+                {t('homework.typeOrRecordInstead')}
+              </Text>
+              <Ionicons
+                name="mic-outline"
+                size={18}
+                color={colors.textPrimary}
+              />
+            </Pressable>
+
             <Pressable
               testID="gallery-button"
               onPress={() => void handlePickFromGallery()}
@@ -1134,11 +1133,6 @@ export default function CameraScreen(): React.ReactNode {
   // ---- Result phase ----
   if (state.phase === 'result') {
     const needsSubjectPick = !subjectId;
-    const subjectResolutionReady =
-      !needsSubjectPick ||
-      (!classifyMutation.isPending &&
-        ((!showSubjectPicker && autoDetectedSubject !== null) ||
-          (showSubjectPicker && !subjectsLoading)));
     const resultPrompt =
       state.imageUri || ocrText.trim().length > 0
         ? t('homework.problemsFound')
@@ -1151,21 +1145,6 @@ export default function CameraScreen(): React.ReactNode {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         testID="result-scroll"
       >
-        {subjectResolutionReady ? (
-          <View
-            testID="homework-subject-resolution-ready"
-            style={{ width: 1, height: 1 }}
-          />
-        ) : null}
-        {draftProblems.length === 1 &&
-        draftProblems[0]?.source === 'manual' &&
-        draftProblems[0].text.length === 0 ? (
-          <View
-            testID="homework-manual-entry-empty"
-            style={{ width: 1, height: 1 }}
-          />
-        ) : null}
-
         <Pressable
           testID="camera-back-button"
           onPress={handleRetake}
@@ -1178,21 +1157,6 @@ export default function CameraScreen(): React.ReactNode {
             {t('common.back')}
           </Text>
         </Pressable>
-
-        {homeworkEntrySource === 'mentor' &&
-          draftProblems.every((problem) => problem.source === 'manual') && (
-            <Pressable
-              testID="manual-entry-cancel"
-              onPress={handleCancelManualEntry}
-              className="self-start min-h-[48px] px-2 justify-center"
-              accessibilityLabel={t('homework.cancelAndGoBackLabel')}
-              accessibilityRole="button"
-            >
-              <Text className="text-body font-semibold text-primary">
-                {t('common.cancel')}
-              </Text>
-            </Pressable>
-          )}
 
         {showCelebration && (
           <View className="items-center mt-2">

@@ -523,77 +523,6 @@ describe('CameraScreen', () => {
     expect(queryByTestId('camera-view')).toBeNull();
   });
 
-  it('disposes a cancelled Mentor manual draft before returning to Mentor', () => {
-    (useLocalSearchParams as jest.Mock).mockReturnValue({
-      entrySource: 'mentor',
-      returnTo: 'mentor',
-    });
-    useCameraPermissions.mockReturnValue([
-      { granted: true, canAskAgain: true },
-      jest.fn(),
-      jest.fn().mockResolvedValue({ granted: true, canAskAgain: true }),
-    ]);
-
-    const { getByTestId, queryByTestId } = render(<CameraScreen />, {
-      wrapper: createWrapper(),
-    });
-
-    fireEvent.press(getByTestId('manual-entry-button'));
-    expect(getByTestId('result-text-input')).toBeTruthy();
-    expect(getByTestId('homework-manual-entry-empty')).toBeTruthy();
-    fireEvent.press(getByTestId('manual-entry-cancel'));
-
-    expect(mockRouter.replace).toHaveBeenCalledTimes(1);
-    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/mentor');
-    expect(queryByTestId('result-text-input')).toBeNull();
-    expect(getByTestId('manual-entry-button')).toBeTruthy();
-  });
-
-  it('[WI-2236] marks Mentor manual-entry subject resolution ready only after the exact typed problem reaches the picker', async () => {
-    (useLocalSearchParams as jest.Mock).mockReturnValue({
-      entrySource: 'mentor',
-      returnTo: 'mentor',
-    });
-    mockClassifyResult = {
-      needsConfirmation: true,
-      candidates: [
-        {
-          subjectId: MATH_SUBJECT_ID,
-          subjectName: 'Mathematics',
-          confidence: 0.55,
-        },
-        {
-          subjectId: PHYSICS_SUBJECT_ID,
-          subjectName: 'Physics',
-          confidence: 0.45,
-        },
-      ],
-    };
-
-    const { getByTestId, queryByTestId } = render(<CameraScreen />, {
-      wrapper: createWrapper(),
-    });
-
-    fireEvent.press(getByTestId('manual-entry-button'));
-    expect(getByTestId('homework-manual-entry-empty')).toBeTruthy();
-    expect(queryByTestId('homework-subject-resolution-ready')).toBeNull();
-
-    fireEvent.changeText(getByTestId('result-text-input'), 'Solve 3x + 7 = 22');
-
-    await waitFor(() => {
-      getByTestId('subject-picker');
-      getByTestId('homework-subject-resolution-ready');
-    });
-
-    const classifyCalls = fetchCallsMatching(mockFetch, 'subjects/classify');
-    expect(classifyCalls).toHaveLength(1);
-    expect(extractJsonBody(classifyCalls[0]?.init)).toEqual({
-      text: 'Solve 3x + 7 = 22',
-    });
-    expect(mockProcess).not.toHaveBeenCalled();
-    expect(queryByTestId('camera-view')).toBeNull();
-  });
-
   it('shows Settings link when permission denied and cannot ask again', () => {
     useCameraPermissions.mockReturnValue([
       { granted: false, canAskAgain: false },
@@ -1980,7 +1909,7 @@ describe('CameraScreen', () => {
       );
       withOcrDone('Some homework problem');
 
-      const { getByTestId, queryByTestId } = render(<CameraScreen />, {
+      const { getByTestId } = render(<CameraScreen />, {
         wrapper: createWrapper(),
       });
 
@@ -1988,7 +1917,6 @@ describe('CameraScreen', () => {
         getByTestId('classify-loading');
         getByTestId('classify-pending-retake');
       });
-      expect(queryByTestId('homework-subject-resolution-ready')).toBeNull();
       // Retake is actually pressable during the pending state.
       fireEvent.press(getByTestId('classify-pending-retake'));
       await waitFor(() => {
