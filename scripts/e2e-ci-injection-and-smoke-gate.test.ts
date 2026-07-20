@@ -1108,9 +1108,41 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           typeof id === 'string' && id.startsWith('subject-suggestion-option-')
         );
       });
+    const correctiveActionIds = new Set([
+      'subject-suggestion-accept',
+      'subject-use-my-words',
+    ]);
+    const expectedOwnedCorrectiveTaps = [
+      'subject-suggestion-accept|subject-confident-card',
+      'subject-suggestion-accept|subject-single-suggestion-card',
+      'subject-use-my-words|subject-no-match-card',
+    ].sort();
+    const ownedCorrectiveTapSignatures = (commands: unknown[]): string[] =>
+      allObjects(commands)
+        .flatMap((command) => {
+          const tapOn = command.tapOn;
+          if (typeof tapOn === 'string') {
+            return correctiveActionIds.has(tapOn) ? [`${tapOn}|`] : [];
+          }
+          if (tapOn === null || typeof tapOn !== 'object') return [];
+          const tap = tapOn as Command;
+          const id = tap.id;
+          if (typeof id !== 'string' || !correctiveActionIds.has(id)) return [];
+          const childOf = tap.childOf;
+          const ownerId =
+            childOf !== null && typeof childOf === 'object'
+              ? (childOf as Command).id
+              : undefined;
+          return [`${id}|${typeof ownerId === 'string' ? ownerId : ''}`];
+        })
+        .sort();
     const satisfiesOutcomeContract = (commands: unknown[]): boolean =>
       hasSequence(commands, outcomeSequence) &&
-      !hasArbitraryAmbiguousTap(commands);
+      !hasArbitraryAmbiguousTap(commands) &&
+      isDeepStrictEqual(
+        ownedCorrectiveTapSignatures(commands),
+        expectedOwnedCorrectiveTaps,
+      );
 
     expect(satisfiesOutcomeContract(subjectCreate)).toBe(true);
     expect(
@@ -1205,6 +1237,18 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       [resolveFinished, ...outcomeSequence.slice(2), failClosed],
       // Even a complete positive sequence is void if it chooses an option.
       [...outcomeSequence, { tapOn: { id: 'subject-suggestion-option-0' } }],
+      // A second, global corrective tap is not owned by the proven card.
+      [...outcomeSequence, { tapOn: { id: 'subject-suggestion-accept' } }],
+      // The right corrective action under a different owner is still unsafe.
+      [
+        ...outcomeSequence,
+        {
+          tapOn: {
+            id: 'subject-use-my-words',
+            childOf: { id: 'subject-confident-card' },
+          },
+        },
+      ],
     ]) {
       expect(satisfiesOutcomeContract(mutation)).toBe(false);
     }
