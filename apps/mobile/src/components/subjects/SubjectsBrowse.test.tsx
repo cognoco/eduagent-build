@@ -199,7 +199,11 @@ describe('SubjectsBrowse', () => {
       { wrapper },
     );
 
-    screen.getByText('No subjects yet');
+    const emptyState = screen.getByTestId('subjects-browse-empty');
+    within(emptyState).getByText('No subjects yet');
+    expect(
+      within(emptyState).queryByTestId(/^subjects-browse-row-/),
+    ).toBeNull();
     screen.getByTestId('subjects-browse-empty-book-animation', {
       includeHiddenElements: true,
     });
@@ -240,6 +244,50 @@ describe('SubjectsBrowse', () => {
     screen.getByText('Active One');
     screen.getByText('Paused One');
     screen.getByText('Archived One');
+  });
+
+  it('owns each exact subject row and name inside its status group', () => {
+    render(
+      <SubjectsBrowse
+        subjects={[
+          item({
+            subjectId: 'a-1',
+            subjectName: 'Active One',
+            status: 'active',
+          }),
+          item({
+            subjectId: 'p-1',
+            subjectName: 'Paused One',
+            status: 'paused',
+          }),
+        ]}
+        onOpenSubject={jest.fn()}
+        onCreateSubject={jest.fn()}
+      />,
+      { wrapper },
+    );
+
+    const activeGroup = within(
+      screen.getByTestId('subjects-browse-status-group-active'),
+    );
+    const activeRow = within(
+      activeGroup.getByTestId('subjects-browse-row-a-1'),
+    );
+    activeRow.getByText('Active One');
+    expect(activeRow.queryByText('Paused One')).toBeNull();
+    expect(activeGroup.queryByTestId('subjects-browse-row-p-1')).toBeNull();
+    expect(activeGroup.queryByText('Paused One')).toBeNull();
+
+    const pausedGroup = within(
+      screen.getByTestId('subjects-browse-status-group-paused'),
+    );
+    const pausedRow = within(
+      pausedGroup.getByTestId('subjects-browse-row-p-1'),
+    );
+    pausedRow.getByText('Paused One');
+    expect(pausedRow.queryByText('Active One')).toBeNull();
+    expect(pausedGroup.queryByTestId('subjects-browse-row-a-1')).toBeNull();
+    expect(pausedGroup.queryByText('Active One')).toBeNull();
   });
 
   it('omits a status section when it has no subjects', () => {

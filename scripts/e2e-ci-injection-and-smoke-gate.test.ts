@@ -946,6 +946,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'onboarding-no-subject',
         shard: 1,
       },
+      {
+        flow: 'flows/v2/v2-subjects-browse-resume.yaml',
+        scenario: 'learning-active',
+        shard: 1,
+      },
+      {
+        flow: 'flows/v2/v2-subjects-due-review.yaml',
+        scenario: 'retention-due',
+        shard: 1,
+      },
       // [WI-2241] Supporter scope journey — Support hub -> person scope ->
       // Mentor -> Subjects -> Journal -> Support hub, structural/negative
       // walls, empty-record honest-empty-state, revoked-edge affordance
@@ -995,6 +1005,279 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/assertNotVisible:/g)).toHaveLength(6);
     expect(flow.match(/id: ['"]tab-subjects['"]/g)).toHaveLength(3);
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
+  });
+
+  it('[WI-2238] binds exact case properties to their ID-bearing owners', () => {
+    type Selector = Record<string, unknown>;
+    const includesSelectorProperties = (
+      actual: unknown,
+      expected: Selector,
+    ): boolean =>
+      actual !== null &&
+      typeof actual === 'object' &&
+      Object.entries(expected).every(
+        ([key, value]) => (actual as Selector)[key] === value,
+      );
+    const hasHardOwnedAssertion = (
+      value: unknown,
+      ownerId: string,
+      descendants: Selector[],
+    ): boolean => {
+      if (Array.isArray(value)) {
+        return value.some((entry) =>
+          hasHardOwnedAssertion(entry, ownerId, descendants),
+        );
+      }
+      if (value === null || typeof value !== 'object') return false;
+
+      const record = value as Record<string, unknown>;
+      const asserted = record.assertVisible;
+      if (asserted !== null && typeof asserted === 'object') {
+        const selector = asserted as Selector;
+        const actualDescendants = selector.containsDescendants;
+        if (
+          selector.id === ownerId &&
+          selector.optional !== true &&
+          Array.isArray(actualDescendants) &&
+          descendants.every((expected) =>
+            actualDescendants.some((actual) =>
+              includesSelectorProperties(actual, expected),
+            ),
+          )
+        ) {
+          return true;
+        }
+      }
+
+      return Object.values(record).some((entry) =>
+        hasHardOwnedAssertion(entry, ownerId, descendants),
+      );
+    };
+    const hasHardIdAssertion = (value: unknown, ownerId: string): boolean => {
+      if (Array.isArray(value)) {
+        return value.some((entry) => hasHardIdAssertion(entry, ownerId));
+      }
+      if (value === null || typeof value !== 'object') return false;
+
+      const record = value as Record<string, unknown>;
+      const asserted = record.assertVisible;
+      if (asserted !== null && typeof asserted === 'object') {
+        const selector = asserted as Selector;
+        if (selector.id === ownerId && selector.optional !== true) return true;
+      }
+
+      return Object.values(record).some((entry) =>
+        hasHardIdAssertion(entry, ownerId),
+      );
+    };
+    const hasRunFlowWithEnv = (
+      value: unknown,
+      file: string,
+      expectedEnv: Selector,
+    ): boolean => {
+      if (Array.isArray(value)) {
+        return value.some((entry) =>
+          hasRunFlowWithEnv(entry, file, expectedEnv),
+        );
+      }
+      if (value === null || typeof value !== 'object') return false;
+
+      const record = value as Record<string, unknown>;
+      const runFlow = record.runFlow;
+      if (runFlow !== null && typeof runFlow === 'object') {
+        const command = runFlow as Record<string, unknown>;
+        const env = command.env;
+        if (
+          command.file === file &&
+          env !== null &&
+          typeof env === 'object' &&
+          Object.entries(expectedEnv).every(
+            ([key, expected]) =>
+              (env as Record<string, unknown>)[key] === expected,
+          )
+        ) {
+          return true;
+        }
+      }
+
+      return Object.values(record).some((entry) =>
+        hasRunFlowWithEnv(entry, file, expectedEnv),
+      );
+    };
+    const loadCommands = (...segments: string[]): unknown =>
+      parseAllDocuments(
+        readFileSync(
+          join(repoRoot, 'apps/mobile/e2e/flows', ...segments),
+          'utf8',
+        ),
+      )[1]?.toJS();
+
+    const resume = loadCommands('v2', 'v2-subjects-browse-resume.yaml');
+    const dueReview = loadCommands('v2', 'v2-subjects-due-review.yaml');
+    const subjectCreate = loadCommands(
+      'v2',
+      'v2-subject-create-round-trip.yaml',
+    );
+    const profileIdentity = loadCommands(
+      '_setup',
+      'assert-v2-active-profile-and-return.yaml',
+    );
+
+    expect(Array.isArray(subjectCreate)).toBe(true);
+    if (!Array.isArray(subjectCreate)) {
+      throw new Error('V2 subject-create Maestro commands must be a YAML list');
+    }
+    const initialSubjectsReady = subjectCreate.findIndex(
+      (command) =>
+        JSON.stringify(command) ===
+        JSON.stringify({
+          extendedWaitUntil: {
+            visible: { id: 'subjects-screen' },
+            timeout: 15000,
+          },
+        }),
+    );
+    expect(initialSubjectsReady).toBeGreaterThanOrEqual(0);
+    expect(
+      subjectCreate.slice(initialSubjectsReady + 1, initialSubjectsReady + 3),
+    ).toEqual([
+      { assertVisible: { id: 'subjects-browse-empty' } },
+      { assertNotVisible: { id: 'subjects-browse-row-.*' } },
+    ]);
+
+    const expectedBindings: Array<[unknown, string, Selector[]]> = [
+      [
+        resume,
+        'subjects-browse-row-${SUBJECT_ID}',
+        [{ text: '^World History$' }],
+      ],
+      [
+        resume,
+        'subject-hub-topic-${TOPIC_ID}',
+        [{ text: '^World History Topic 1$' }],
+      ],
+      [
+        resume,
+        'subject-hub-next-up',
+        [
+          { text: '^World History Topic 1$' },
+          { id: 'subject-hub-next-up-action', text: '^Resume$' },
+        ],
+      ],
+      [dueReview, 'subjects-browse-row-${SUBJECT_ID}', [{ text: '^Biology$' }]],
+      [
+        dueReview,
+        'subject-hub-next-up',
+        [
+          { text: '^Biology Topic 1$' },
+          { id: 'subject-hub-next-up-action', text: '^Review$' },
+        ],
+      ],
+      [profileIdentity, 'account-admin-sheet', [{ text: '^${PROFILE_NAME}$' }]],
+      [
+        profileIdentity,
+        'profile-row-${PROFILE_ID}',
+        [{ text: '^${PROFILE_NAME}$' }, { id: 'profile-active-check' }],
+      ],
+      [profileIdentity, '${RETURN_ROW_ID}', [{ text: '^${RETURN_ROW_NAME}$' }]],
+    ];
+
+    for (const [commands, ownerId, descendants] of expectedBindings) {
+      expect(hasHardOwnedAssertion(commands, ownerId, descendants)).toBe(true);
+    }
+
+    expect(hasHardIdAssertion(profileIdentity, '${RETURN_SCREEN_ID}')).toBe(
+      true,
+    );
+    expect(
+      hasRunFlowWithEnv(
+        resume,
+        '../_setup/assert-v2-active-profile-and-return.yaml',
+        {
+          PROFILE_ID: '${PROFILE_ID}',
+          PROFILE_NAME: 'Active Learner',
+          RETURN_SCREEN_ID: 'subjects-screen',
+          RETURN_ROW_ID: 'subjects-browse-row-${SUBJECT_ID}',
+          RETURN_ROW_NAME: 'World History',
+        },
+      ),
+    ).toBe(true);
+    expect(
+      hasRunFlowWithEnv(
+        dueReview,
+        '../_setup/assert-v2-active-profile-and-return.yaml',
+        {
+          PROFILE_ID: '${PROFILE_ID}',
+          PROFILE_NAME: 'Review Learner',
+          RETURN_SCREEN_ID: 'subjects-screen',
+          RETURN_ROW_ID: 'subjects-browse-row-${SUBJECT_ID}',
+          RETURN_ROW_NAME: 'Biology',
+        },
+      ),
+    ).toBe(true);
+
+    const splitAcrossSiblings = [
+      { assertVisible: { id: 'subjects-browse-row-${SUBJECT_ID}' } },
+      { assertVisible: { text: '^World History$' } },
+    ];
+    expect(
+      hasHardOwnedAssertion(
+        splitAcrossSiblings,
+        'subjects-browse-row-${SUBJECT_ID}',
+        [{ text: '^World History$' }],
+      ),
+    ).toBe(false);
+
+    const liftedToCommonAncestor = [
+      {
+        assertVisible: {
+          id: 'subjects-screen',
+          containsDescendants: [
+            { id: 'subjects-browse-row-${SUBJECT_ID}' },
+            { text: '^World History$' },
+          ],
+        },
+      },
+    ];
+    expect(
+      hasHardOwnedAssertion(
+        liftedToCommonAncestor,
+        'subjects-browse-row-${SUBJECT_ID}',
+        [{ text: '^World History$' }],
+      ),
+    ).toBe(false);
+
+    const adjacentSeedCase = [
+      {
+        assertVisible: {
+          id: 'subject-hub-next-up',
+          containsDescendants: [
+            { text: '^Biology Topic 2$' },
+            { id: 'subject-hub-next-up-action', text: '^Review$' },
+          ],
+        },
+      },
+    ];
+    expect(
+      hasHardOwnedAssertion(adjacentSeedCase, 'subject-hub-next-up', [
+        { text: '^Biology Topic 1$' },
+        { id: 'subject-hub-next-up-action', text: '^Review$' },
+      ]),
+    ).toBe(false);
+
+    expect(
+      hasRunFlowWithEnv(
+        resume,
+        '../_setup/assert-v2-active-profile-and-return.yaml',
+        {
+          PROFILE_ID: '${PROFILE_ID}',
+          PROFILE_NAME: 'Adjacent Learner',
+          RETURN_SCREEN_ID: 'subjects-screen',
+          RETURN_ROW_ID: 'subjects-browse-row-${SUBJECT_ID}',
+          RETURN_ROW_NAME: 'World History',
+        },
+      ),
+    ).toBe(false);
   });
 
   it('[WI-2241] hard-selects the exact rich supportee through the Support hub before and after relaunch', () => {

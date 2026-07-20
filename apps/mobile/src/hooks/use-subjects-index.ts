@@ -83,7 +83,7 @@ export function useSubjectsIndex(): {
   isError: boolean;
   refetch: () => void;
 } {
-  const subjectsQuery = useSubjects();
+  const subjectsQuery = useSubjects({ includeInactive: true });
   const libraryBooks = useAllBooks();
   const progressQuery = useOverallProgress();
 

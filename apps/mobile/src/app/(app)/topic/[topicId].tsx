@@ -46,7 +46,11 @@ import { formatShortDate } from '../../../lib/format-datetime';
 import { useThemeColors } from '../../../lib/theme';
 import { formatSourceLine } from '../../../lib/format-note-source';
 import { deriveRetentionStatus } from '../../../lib/retention-utils';
-import { pushLearningResumeTarget } from '../../../lib/navigation';
+import {
+  homeHrefForReturnTo,
+  pushLearningResumeTarget,
+  SUBJECT_HUB_RETURN_TO,
+} from '../../../lib/navigation';
 import { TimeoutLoader } from '../../../components/common';
 import { ShimmerSkeleton } from '../../../components/common/ShimmerSkeleton';
 import { TopicHeader } from '../../../components/library/TopicHeader';
@@ -283,13 +287,16 @@ export default function TopicDetailScreen() {
     topicId,
     chapter: paramChapter,
     mode: deepLinkMode,
+    returnTo: rawReturnTo,
   } = useLocalSearchParams<{
     subjectId: string;
     bookId?: string;
     topicId: string;
     chapter: string;
     mode?: string;
+    returnTo?: string | string[];
   }>();
+  const returnTo = Array.isArray(rawReturnTo) ? rawReturnTo[0] : rawReturnTo;
 
   // [H9] Attempt counter — incremented on Retry to force a new query key and a fresh network call.
   // Must be declared before useResolveTopicSubject so it can be passed as a key segment.
@@ -304,13 +311,15 @@ export default function TopicDetailScreen() {
   const subjectId = paramSubjectId || resolved?.subjectId;
   const topicBackFallback = useMemo(
     (): Href =>
-      subjectId && paramBookId
-        ? ({
-            pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-            params: { subjectId, bookId: paramBookId },
-          } as Href)
-        : ('/(app)/library' as Href),
-    [paramBookId, subjectId],
+      returnTo === SUBJECT_HUB_RETURN_TO && subjectId
+        ? homeHrefForReturnTo(returnTo, subjectId)
+        : subjectId && paramBookId
+          ? ({
+              pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+              params: { subjectId, bookId: paramBookId },
+            } as Href)
+          : ('/(app)/library' as Href),
+    [paramBookId, returnTo, subjectId],
   );
   const handleTopicBack = useCallback(() => {
     router.replace(topicBackFallback);

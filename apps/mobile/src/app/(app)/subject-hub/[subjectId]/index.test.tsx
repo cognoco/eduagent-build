@@ -174,11 +174,30 @@ function seedRoutes() {
 describe('SubjectHubRoute', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPush.mockReset();
     mockSearchParams = () => ({ subjectId: SUBJECT_ID });
     seedRoutes();
   });
 
-  it('renders hub data and resumes active sessions by sessionId', async () => {
+  afterEach(() => {
+    // Restores every jest.replaceProperty feature-flag override even when an
+    // assertion aborts a test before its final line.
+    jest.restoreAllMocks();
+    mockPush.mockReset();
+  });
+
+  it('replaces the Hub with the session so hardware Back returns to the single Subjects ancestor', async () => {
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', true);
+    const visibleStack = ['subjects', 'subject-hub'];
+    mockReplace.mockImplementation((href: unknown) => {
+      const pathname =
+        typeof href === 'string'
+          ? href
+          : (href as { pathname?: string }).pathname;
+      visibleStack[visibleStack.length - 1] =
+        pathname === '/(app)/session' ? 'session' : (pathname ?? 'unknown');
+    });
+
     render(<SubjectHubRoute />, { wrapper: wrapper() });
 
     await waitFor(() => {
@@ -186,22 +205,69 @@ describe('SubjectHubRoute', () => {
     });
     screen.getByText('Spanish');
     screen.getByTestId('subject-hub-next-up-action');
+    expect(screen.getAllByTestId('subject-hub-back')).toHaveLength(1);
 
     fireEvent.press(screen.getByTestId('subject-hub-next-up-action'));
 
-    expect(mockPush).toHaveBeenCalledWith(
+    // The current Hub route is replaced, leaving the exact Subjects screen as
+    // the sole history entry beneath Session for one Android hardware Back.
+    expect(visibleStack).toEqual(['subjects', 'session']);
+    expect(visibleStack.filter((route) => route === 'subjects')).toHaveLength(
+      1,
+    );
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/(app)/session',
         params: expect.objectContaining({
           subjectId: SUBJECT_ID,
           topicId: TOPIC_ID,
           sessionId: SESSION_ID,
+          returnTo: 'subjects',
+          returnStrategy: 'history',
         }),
       }),
     );
   });
 
-  it('routes due-review next-up actions into the existing topic review flow', async () => {
+  it('preserves the legacy resume route without the V2 Subjects return token', async () => {
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', false);
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-screen');
+    });
+
+    fireEvent.press(screen.getByTestId('subject-hub-next-up-action'));
+
+    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/home');
+    expect(mockPush).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        pathname: '/(app)/session',
+        params: expect.not.objectContaining({ returnTo: 'subjects' }),
+      }),
+    );
+  });
+
+  it('keeps a visible Back control on the successful hub and returns to V2 Subjects', async () => {
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', true);
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-screen');
+    });
+
+    const backControls = screen.getAllByTestId('subject-hub-back');
+    expect(backControls).toHaveLength(1);
+    fireEvent.press(backControls[0]!);
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+  });
+
+  it('routes the exact due-review topic back to its V2 Subject Hub', async () => {
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', true);
     mockFetch.setRoute('/progress/resume-target', { target: null });
     mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
       topics: [
@@ -234,12 +300,15 @@ describe('SubjectHubRoute', () => {
 
     fireEvent.press(screen.getByTestId('subject-hub-next-up-action'));
 
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/topic/[topicId]',
-        params: { subjectId: SUBJECT_ID, topicId: TOPIC_ID },
-      }),
-    );
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/topic/[topicId]',
+      params: {
+        subjectId: SUBJECT_ID,
+        topicId: TOPIC_ID,
+        bookId: BOOK_ID,
+        returnTo: 'subject-hub',
+      },
+    });
   });
 
   it('renders a recoverable error when subjectId is missing', () => {

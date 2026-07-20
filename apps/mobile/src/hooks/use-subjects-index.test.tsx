@@ -1,6 +1,14 @@
+import { createElement, type ReactElement, type ReactNode } from 'react';
+import { renderHook, waitFor } from '@testing-library/react-native';
 import type { CurriculumBook, Subject } from '@eduagent/schemas';
 
-import { buildSubjectsIndex } from './use-subjects-index';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { AppContextProvider } from '../lib/app-context';
+import { setActiveProfileId } from '../lib/api-client';
+import { buildSubjectsIndex, useSubjectsIndex } from './use-subjects-index';
 import type { OverallProgressResponse } from './use-progress';
 
 const SUBJECT_A = '550e8400-e29b-41d4-a716-446655440000';
@@ -126,5 +134,72 @@ describe('buildSubjectsIndex', () => {
     expect(result[2]).toEqual(
       expect.objectContaining({ subjectId: SUBJECT_C, status: 'archived' }),
     );
+  });
+});
+
+describe('useSubjectsIndex', () => {
+  it('requests inactive subjects so paused and archived rows can reach Subjects', async () => {
+    const originalFetch = globalThis.fetch;
+    const mockFetch = jest.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+
+      if (url.includes('/subjects')) {
+        return new Response(JSON.stringify({ subjects: [] }), { status: 200 });
+      }
+      if (url.includes('/library/books')) {
+        return new Response(
+          JSON.stringify({ subjects: [], nextCursor: null }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('/progress/overview')) {
+        return new Response(
+          JSON.stringify({
+            subjects: [],
+            totalTopicsCompleted: 0,
+            totalTopicsVerified: 0,
+            totalTopicsMastered: 0,
+            totalTopicsLearning: 0,
+          }),
+          { status: 200 },
+        );
+      }
+
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    const harness = createHookWrapper({
+      activeProfile: createTestProfile({ id: 'subjects-index-profile' }),
+    });
+    function Wrapper({ children }: { children: ReactNode }): ReactElement {
+      return createElement(
+        harness.wrapper,
+        null,
+        createElement(AppContextProvider, null, children),
+      );
+    }
+
+    setActiveProfileId('subjects-index-profile');
+    globalThis.fetch = mockFetch as typeof fetch;
+
+    try {
+      const { result } = renderHook(() => useSubjectsIndex(), {
+        wrapper: Wrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      const subjectsRequest = mockFetch.mock.calls
+        .map(([input]) =>
+          typeof input === 'string' ? input : input.toString(),
+        )
+        .find((url) => url.includes('/subjects'));
+      expect(subjectsRequest).toContain('includeInactive=true');
+    } finally {
+      harness.queryClient.clear();
+      setActiveProfileId(undefined);
+      globalThis.fetch = originalFetch;
+    }
   });
 });

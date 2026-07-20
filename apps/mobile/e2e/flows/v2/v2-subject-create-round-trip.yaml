@@ -29,6 +29,10 @@ tags:
       id: 'subjects-screen'
     timeout: 15000
 - assertVisible:
+    id: 'subjects-browse-empty'
+- assertNotVisible:
+    id: 'subjects-browse-row-.*'
+- assertVisible:
     id: 'subjects-browse-create'
 
 # Cancel returns semantically to Subjects rather than account onboarding.

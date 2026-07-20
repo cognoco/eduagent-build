@@ -172,6 +172,7 @@ const SUBJECTS: SubjectIndexItem[] = [
 describe('SubjectsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPush.mockReset();
     mockSubjectsIndex = {
       subjects: SUBJECTS,
       isLoading: false,
@@ -192,7 +193,19 @@ describe('SubjectsScreen', () => {
     };
   });
 
-  it('mounts the real browse list and routes rows to the V2 subject hub', () => {
+  it('routes a row to its exact hub without pushing the current Subjects tab again', () => {
+    const visibleStack = ['subjects'];
+    mockPush.mockImplementation((href: unknown) => {
+      const pathname =
+        typeof href === 'string'
+          ? href
+          : (href as { pathname?: string }).pathname;
+      if (pathname === '/(app)/subjects') visibleStack.push('subjects');
+      else if (pathname === '/(app)/subject-hub/[subjectId]')
+        visibleStack.push('subject-hub');
+      else visibleStack.push(pathname ?? 'unknown');
+    });
+
     render(<SubjectsScreen />);
 
     screen.getByTestId('subjects-screen');
@@ -203,6 +216,11 @@ describe('SubjectsScreen', () => {
       screen.getByTestId(`subjects-browse-row-${SUBJECTS[0]!.subjectId}`),
     );
 
+    expect(visibleStack).toEqual(['subjects', 'subject-hub']);
+    expect(visibleStack.filter((route) => route === 'subjects')).toHaveLength(
+      1,
+    );
+    expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/subject-hub/[subjectId]',
       params: { subjectId: SUBJECTS[0]!.subjectId },

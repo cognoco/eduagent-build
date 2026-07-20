@@ -20,7 +20,11 @@ import { useRetryCurriculum } from '../../../../hooks/use-books';
 import { useSubjects, useUpdateSubject } from '../../../../hooks/use-subjects';
 import { useCreateNote } from '../../../../hooks/use-notes';
 import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
-import { pushLearningResumeTarget } from '../../../../lib/navigation';
+import {
+  pushLearningResumeTarget,
+  SUBJECT_HUB_RETURN_TO,
+  SUBJECTS_RETURN_TO,
+} from '../../../../lib/navigation';
 import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 import { platformAlert } from '../../../../lib/platform-alert';
 import { formatApiError } from '../../../../lib/format-api-error';
@@ -144,10 +148,17 @@ export default function SubjectHubRoute(): React.ReactElement {
   );
 
   const handleReviewTopic = useCallback(
-    (topicId: string) => {
+    (topicId: string, bookId?: string | null) => {
       router.push({
         pathname: '/(app)/topic/[topicId]',
-        params: { subjectId, topicId },
+        params: {
+          subjectId,
+          topicId,
+          ...(bookId ? { bookId } : {}),
+          ...(FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+            ? { returnTo: SUBJECT_HUB_RETURN_TO }
+            : {}),
+        },
       } as Href);
     },
     [router, subjectId],
@@ -157,11 +168,17 @@ export default function SubjectHubRoute(): React.ReactElement {
     (nextUp: HubNextUp) => {
       if (!nextUp.topicId) return;
       if (nextUp.kind === 'resume' && hub.data?.nextUp.resumeTarget) {
-        pushLearningResumeTarget(router, hub.data.nextUp.resumeTarget);
+        const usesSubjectsReturn = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+        pushLearningResumeTarget(
+          router,
+          hub.data.nextUp.resumeTarget,
+          usesSubjectsReturn ? SUBJECTS_RETURN_TO : undefined,
+          { replaceTarget: usesSubjectsReturn },
+        );
         return;
       }
       if (nextUp.kind === 'review-due') {
-        handleReviewTopic(nextUp.topicId);
+        handleReviewTopic(nextUp.topicId, nextUp.bookId);
         return;
       }
 
@@ -287,8 +304,19 @@ export default function SubjectHubRoute(): React.ReactElement {
         />
       ) : hubData ? (
         <View className="flex-1" testID="subject-hub-screen">
-          {manageReady ? (
-            <View className="flex-row justify-end px-5 pt-3">
+          <View className="flex-row items-center justify-between px-5 pt-3">
+            <Pressable
+              testID="subject-hub-back"
+              accessibilityRole="button"
+              accessibilityLabel={t('common.goBackAction')}
+              onPress={goBack}
+              className="min-h-[40px] justify-center rounded-button px-3"
+            >
+              <Text className="text-body-sm font-semibold text-primary">
+                {t('common.goBack')}
+              </Text>
+            </Pressable>
+            {manageReady ? (
               <Pressable
                 testID="subject-hub-manage"
                 accessibilityRole="button"
@@ -300,8 +328,8 @@ export default function SubjectHubRoute(): React.ReactElement {
                   {t('subjectHub.manage.open')}
                 </Text>
               </Pressable>
-            </View>
-          ) : null}
+            ) : null}
+          </View>
           <SubjectHub
             data={hubData}
             onNextUpPress={handleNextUp}

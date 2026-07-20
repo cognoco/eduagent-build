@@ -794,6 +794,36 @@ describe('SessionScreen homework flow', () => {
     jest.useRealTimers();
   });
 
+  it('uses the existing Subjects history entry for the stack-safe Hub resume Back control', async () => {
+    const mockBack = jest.fn();
+    const mockCanGoBack = jest.fn(() => true);
+    (useRouter as jest.Mock).mockReturnValue({
+      back: mockBack,
+      canGoBack: mockCanGoBack,
+      replace: mockReplace,
+      setParams: mockSetParams,
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      returnTo: 'subjects',
+      returnStrategy: 'history',
+    });
+
+    const testScreen = renderSessionScreen();
+    await flushAsyncWork();
+    mockReplace.mockClear();
+
+    fireEvent.press(testScreen.getByTestId('mock-back-button'));
+
+    expect(mockCanGoBack).toHaveBeenCalledTimes(1);
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
   describe('managed-child mentor birth moment', () => {
     const childMentorBirthKey = `mentorBirthSeen_${CHILD_PROFILE_ID}`;
 

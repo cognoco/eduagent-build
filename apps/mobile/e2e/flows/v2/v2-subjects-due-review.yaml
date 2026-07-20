@@ -1,0 +1,108 @@
+# WI-2238: V2 Subjects due-review path and native ancestor restoration
+#
+# Exercises the retention-due case: exact Biology row, exact first due topic,
+# its review route, native Back through Biology Hub to Subjects, and Me identity.
+# Every case-specific assertion is hard; this flow has no optional assertions.
+appId: com.mentomate.app
+tags:
+  - v2
+  - subjects
+  - retention
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: 'retention-due'
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'mentor-screen'
+    timeout: 30000
+
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-browse-row-${SUBJECT_ID}'
+    timeout: 15000
+- assertVisible:
+    id: 'subjects-browse-row-${SUBJECT_ID}'
+    containsDescendants:
+      - text: '^Biology$'
+
+# The exact seeded subject must expose Biology Topic 1 as the hard due-review
+# Next Up target, not an adjacent topic or a generic topic-detail route.
+- tapOn:
+    id: 'subjects-browse-row-${SUBJECT_ID}'
+- extendedWaitUntil:
+    visible:
+      id: 'subject-hub-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'subject-hub-screen'
+    containsDescendants:
+      - text: '^Biology$'
+- assertVisible:
+    id: 'subject-hub-next-up'
+    containsDescendants:
+      - text: '^Biology Topic 1$'
+      - id: 'subject-hub-next-up-action'
+        text: '^Review$'
+- tapOn:
+    id: 'subject-hub-next-up-action'
+    text: '^Review$'
+    childOf:
+      id: 'subject-hub-next-up'
+- extendedWaitUntil:
+    visible:
+      id: 'topic-detail-scroll'
+    timeout: 30000
+- assertVisible:
+    id: 'topic-detail-scroll'
+    containsDescendants:
+      - text: '^Biology Topic 1$'
+      - text: '^Biology$'
+      - id: 'topic-retention-card'
+      - id: 'study-cta'
+
+# Android Back must restore the immediate Biology Hub ancestor first, then the
+# V2 Subjects list with the exact seeded row.
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'subject-hub-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'subject-hub-screen'
+    containsDescendants:
+      - text: '^Biology$'
+- assertVisible:
+    id: 'subject-hub-topic-${TOPIC_ID}'
+    containsDescendants:
+      - text: '^Biology Topic 1$'
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'subjects-browse-row-${SUBJECT_ID}'
+    containsDescendants:
+      - text: '^Biology$'
+
+# Prove Me identity through the shared Account/Profile assertion, then require
+# the same exact seeded Biology row on return.
+- runFlow:
+    file: ../_setup/assert-v2-active-profile-and-return.yaml
+    env:
+      PROFILE_ID: ${PROFILE_ID}
+      PROFILE_NAME: 'Review Learner'
+      RETURN_SCREEN_ID: 'subjects-screen'
+      RETURN_ROW_ID: 'subjects-browse-row-${SUBJECT_ID}'
+      RETURN_ROW_NAME: 'Biology'

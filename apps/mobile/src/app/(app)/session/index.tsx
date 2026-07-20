@@ -275,6 +275,7 @@ function SessionScreenInner() {
     gaps: rawGaps,
     returnTo: rawReturnTo,
     returnId: rawReturnId,
+    returnStrategy: rawReturnStrategy,
     verificationType: routeVerificationType,
     imageUri: rawImageUri,
     imageMimeType: rawImageMimeType,
@@ -296,6 +297,7 @@ function SessionScreenInner() {
     gaps?: string;
     returnTo?: string | string[];
     returnId?: string | string[];
+    returnStrategy?: string | string[];
     verificationType?: string;
     imageUri?: string;
     imageMimeType?: string;
@@ -313,6 +315,7 @@ function SessionScreenInner() {
     imageMimeType,
     returnTo,
     returnId,
+    returnStrategy,
     gaps,
     normalizedOcrText,
     homeworkCaptureSource,
@@ -334,6 +337,7 @@ function SessionScreenInner() {
         gaps: rawGaps,
         returnTo: rawReturnTo,
         returnId: rawReturnId,
+        returnStrategy: rawReturnStrategy,
         imageUri: rawImageUri,
         imageMimeType: rawImageMimeType,
       }),
@@ -348,6 +352,7 @@ function SessionScreenInner() {
       rawImageMimeType,
       rawImageUri,
       rawReturnId,
+      rawReturnStrategy,
       rawReturnTo,
       subjectId,
     ],
@@ -357,6 +362,10 @@ function SessionScreenInner() {
   // never changed. Supplying an explicit handler that uses Expo Router's
   // typed object form makes the navigation reliable across web + native.
   const handleChatBackPress = useCallback(() => {
+    if (returnStrategy === 'history') {
+      goBackOrReplace(router, homeBackHref);
+      return;
+    }
     if (returnTo) {
       router.replace(homeBackHref as Href);
       return;
@@ -369,7 +378,7 @@ function SessionScreenInner() {
       return;
     }
     router.replace('/(app)/home' as Href);
-  }, [returnTo, subjectId, homeBackHref, router]);
+  }, [returnStrategy, returnTo, subjectId, homeBackHref, router]);
   const handleHomeBack = useCallback(() => {
     if (returnTo) {
       router.replace(homeBackHref as Href);
