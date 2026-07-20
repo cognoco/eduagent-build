@@ -21,9 +21,11 @@ import {
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
+import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertCanReadProfile } from '../services/family-access';
 import { validationError, VocabularyContextError } from '../errors';
 import {
   checkQuizAnswerWithCorrect,
@@ -48,6 +50,10 @@ type QuizRouteEnv = {
   Variables: {
     user: AuthUser;
     db: Database;
+    account: Account;
+    // [WI-2416] The authenticated caller's own person id, resolved
+    // server-side by accountMiddleware — required by assertCanReadProfile.
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -217,6 +223,9 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
   .get('/quiz/rounds/recent', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
 
     const rounds = await listRecentCompletedRounds(db, profileId, 10);
 
@@ -243,6 +252,9 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     async (c) => {
       const profileId = requireProfileId(c.get('profileId'));
       const db = c.get('db');
+      // [WI-2416] Header-resolved profileId is only org-checked; verify
+      // caller authority (self or guardian of an uncredentialed charge).
+      await assertCanReadProfile(c, profileId);
       const { id: roundId } = c.req.valid('param');
 
       // Throws NotFoundError if the round doesn't exist OR belongs to a
@@ -400,6 +412,9 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
   .get('/quiz/stats', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
+    // [WI-2416] Header-resolved profileId is only org-checked; verify
+    // caller authority (self or guardian of an uncredentialed charge).
+    await assertCanReadProfile(c, profileId);
 
     const stats = await computeRoundStats(db, profileId);
     return c.json(quizStatsListResponseSchema.parse(stats), 200);
