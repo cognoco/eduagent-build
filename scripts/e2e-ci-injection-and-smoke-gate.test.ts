@@ -1411,6 +1411,26 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
   });
 
+  it('[WI-2240] passes generic ownerSubjectId injection to the exact owner Maestro flow', () => {
+    const harness = createMaestroHarness(0);
+
+    try {
+      const result = runCiMaestro(harness, { MAESTRO_CI_SUITE: 'v2' });
+      const ownerInvocation = readFileSync(harness.maestroArgvMarker, 'utf8')
+        .trim()
+        .split('\n')
+        .find((invocation) =>
+          invocation.includes('apps/mobile/e2e/flows/v2/v2-account-owner.yaml'),
+        );
+
+      expect(result.status).toBe(0);
+      expect(ownerInvocation).toBeDefined();
+      expect(ownerInvocation).toContain('-e OWNER_SUBJECT_ID=owner-subject');
+    } finally {
+      rmSync(harness.root, { recursive: true, force: true });
+    }
+  });
+
   it('executes every planned shard entry even when adb consumes stdin', () => {
     const harness = createMaestroHarness(0);
     const expectedFlows = loadPlan('pr').filter(
@@ -1918,6 +1938,7 @@ type MaestroHarness = {
   binDir: string;
   outputDir: string;
   maestroMarker: string;
+  maestroArgvMarker: string;
   bashEnv: string;
   maestroExit: number;
 };
@@ -1930,6 +1951,7 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
   const adb = join(binDir, 'adb');
   const curl = join(binDir, 'curl');
   const maestroMarker = join(root, 'maestro-ran');
+  const maestroArgvMarker = join(root, 'maestro-argv');
   const bashEnv = join(root, 'bash-env');
 
   mkdirSync(binDir, { recursive: true });
@@ -1938,6 +1960,8 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
     [
       '#!/usr/bin/env bash',
       'printf "ran\\n" >> "$FAKE_MAESTRO_MARKER"',
+      'printf "%q " "$@" >> "$FAKE_MAESTRO_ARGV_MARKER"',
+      'printf "\\n" >> "$FAKE_MAESTRO_ARGV_MARKER"',
       'if [ "${FAKE_MAESTRO_DRAIN_STDIN:-0}" = "1" ]; then cat >/dev/null; fi',
       'exit "$FAKE_MAESTRO_EXIT"',
       '',
@@ -1962,7 +1986,7 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
       '#!/usr/bin/env bash',
       'if [ "${FAKE_CURL_EXIT:-0}" -ne 0 ]; then exit "$FAKE_CURL_EXIT"; fi',
       'case "$*" in',
-      '  */v1/__test/seed*) printf \'{"email":"test@example.com","password":"pw","accountId":"account","profileId":"profile","ids":{}}\' ;;',
+      '  */v1/__test/seed*) printf \'{"email":"test@example.com","password":"pw","accountId":"account","profileId":"profile","ids":{"ownerSubjectId":"owner-subject"}}\' ;;',
       "  *) printf '{}' ;;",
       'esac',
       '',
@@ -1978,6 +2002,7 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
     binDir,
     outputDir,
     maestroMarker,
+    maestroArgvMarker,
     bashEnv,
     maestroExit,
   };
@@ -1999,6 +2024,7 @@ function runCiMaestro(
         BASH_ENV: harness.bashEnv,
         FAKE_MAESTRO_EXIT: String(harness.maestroExit),
         FAKE_MAESTRO_MARKER: harness.maestroMarker,
+        FAKE_MAESTRO_ARGV_MARKER: harness.maestroArgvMarker,
         MAESTRO_CI_SUITE: 'pr',
         MAESTRO_CI_SHARD: '1',
         MAESTRO_OUTPUT_DIR: harness.outputDir,
