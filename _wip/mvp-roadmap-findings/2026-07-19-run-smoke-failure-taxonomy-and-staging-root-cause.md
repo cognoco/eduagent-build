@@ -259,6 +259,54 @@ run above (`29688502157`, 13:21:22.4–13:21:28.9 UTC):
   (13:21:18Z → 13:21:38Z), and **zero `level:error` events of any kind**
   anywhere in a 20-minute window bracketing the failure (`13:15`–`13:35`
   UTC) — ruling out an application exception as the cause.
+
+  **Raw query, re-run 2026-07-20 for this rework (transactions):**
+  ```
+  curl -sS -G "https://de.sentry.io/api/0/organizations/zwizzly/events/" \
+    -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+    --data-urlencode "project=4511717632704592" \
+    --data-urlencode "field=timestamp" \
+    --data-urlencode "field=transaction" \
+    --data-urlencode "field=transaction.status" \
+    --data-urlencode "start=2026-07-19T13:15:00" \
+    --data-urlencode "end=2026-07-19T13:35:00" \
+    --data-urlencode 'query=transaction:"GET /v1/profiles"' \
+    --data-urlencode "sort=timestamp"
+  ```
+  (`project=4511717632704592` is the `mentomate-api` project ID under org
+  `zwizzly`, resolved via `GET /api/0/organizations/zwizzly/projects/`. This
+  is a discrete per-transaction event list, not a sampled/aggregated
+  dataset — no separate sampling field applies; each row below is one real
+  transaction Sentry recorded.)
+
+  **Raw result (sanitized — timestamp + status only, event IDs omitted; 26
+  rows, all `ok`):**
+  ```
+  13:17:31  13:17:54  13:18:05  13:18:05  13:18:05  13:18:24
+  13:18:47  13:18:50  13:18:56  13:19:01  13:19:06  13:19:10
+  13:19:11  13:19:17  13:20:26  13:20:33  13:20:41  13:20:44
+  13:20:46  13:20:49  13:21:00  13:21:10  13:21:11  13:21:18
+  13:21:38  13:21:47
+  ```
+  (all `2026-07-19T…Z`, `GET /v1/profiles`, `status: ok`.) Confirms the
+  claimed gap exactly: the row immediately before is `13:21:18`, the row
+  immediately after is `13:21:38` — nothing in between, a 20-second gap.
+
+  **Raw query, re-run 2026-07-20 for this rework (error events, same
+  window):**
+  ```
+  curl -sS -G "https://de.sentry.io/api/0/organizations/zwizzly/events/" \
+    -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+    --data-urlencode "project=4511717632704592" \
+    --data-urlencode "field=timestamp" \
+    --data-urlencode "field=title" \
+    --data-urlencode "field=level" \
+    --data-urlencode "start=2026-07-19T13:15:00" \
+    --data-urlencode "end=2026-07-19T13:35:00" \
+    --data-urlencode "query=level:error" \
+    --data-urlencode "sort=timestamp"
+  ```
+  **Raw result: 0 rows** — confirmed empty, not merely unchecked.
 - **Cloudflare** (`workersInvocationsAdaptive`, filtered
   `scriptName: "mentomate-api-stg"`, second-granularity `datetime`
   dimension) shows a burst of 22 `success` invocations at `13:21:18Z`
@@ -274,12 +322,94 @@ run above (`29688502157`, 13:21:22.4–13:21:28.9 UTC):
   SDK-external invocation log shows none occurred. The two sources cover
   each other's blind spot. `workersInvocationsAdaptive` is a sampled
   dataset by name, which could otherwise raise a "real zero or
-  sampled-out zero?" objection — but the same query returns all 22
-  individual invocations at `13:21:18Z`, one second before the gap opens,
-  at full per-invocation granularity; a dataset sampling below 1.0 at this
-  request volume would not resolve distinct invocations that precisely, so
-  the effective sampling rate here is ~1.0 and the zero-count gap is a real
-  absence, not a sampling artifact.
+  sampled-out zero?" objection. Cloudflare's schema exposes a direct
+  readout for this rather than requiring an inference: a
+  `confidence(level: 0.95)` field alongside `sum` that reports, per row,
+  the raw `sampleSize` actually captured versus the extrapolated
+  `estimate` (see the raw query/result below — this replaces an earlier,
+  less precise version of this argument that inferred a sampling rate of
+  "~1.0" from row counts alone, without querying the confidence field
+  directly). Across the 19 rows in the minute bracketing the gap, most
+  show `sampleSize == estimate` (1:1, no extrapolation applied); the two
+  busiest rows, including the `13:21:18Z` row cited above, show partial
+  sampling (`sampleSize` 7 of an estimated 16 at `13:21:11Z`, and 13 of an
+  estimated 22 at `13:21:18Z` — roughly 44% and 59% respectively, not
+  ~100%). Even at that lower end, a dataset sampling well under half of
+  estimated traffic at one-to-two-second granularity would still be
+  expected to register at least one raw sample somewhere across a
+  sustained 14-second span if traffic had continued through it — none
+  appears, at any status, anywhere in the gap — so the zero-count gap
+  remains a real absence, not a sampling artifact, on the corrected
+  sampling-rate reading.
+
+  **Raw query, re-run 2026-07-20 for this rework** (includes a
+  `confidence(level: 0.95)` selection alongside `sum` — introspected from
+  Cloudflare's own GraphQL schema for this rework specifically to read the
+  per-row sampling rate directly rather than infer it; see the "Sampling
+  field relied on" note below the query):
+  ```
+  curl -sS -X POST "https://api.cloudflare.com/client/v4/graphql" \
+    -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "query": "query WI($accountTag: string, $start: Time, $end: Time) { viewer { accounts(filter: {accountTag: $accountTag}) { workersInvocationsAdaptive(limit: 1000, filter: {scriptName: \"mentomate-api-stg\", datetime_geq: $start, datetime_leq: $end}) { dimensions { datetime status coloCode } sum { requests errors subrequests } confidence(level: 0.95) { sum { requests { estimate sampleSize lower upper isValid } } } } } } }",
+      "variables": {
+        "accountTag": "0bcf2a3befee2c8b247aad5a94b2354c",
+        "start": "2026-07-19T13:21:00Z",
+        "end": "2026-07-19T13:22:00Z"
+      }
+    }'
+  ```
+  (`accountTag` is the Cloudflare account ID — an identifier, not a
+  credential; disclosed for the same reason the zone/script names already
+  are: so the query is independently re-runnable. **Sampling field relied
+  on:** `confidence(level: 0.95).sum.requests`, specifically its
+  `sampleSize` (raw events actually captured) and `estimate` (the
+  extrapolated `sum.requests` figure this document's earlier claims cite)
+  sub-fields — found by introspecting `AccountWorkersInvocationsAdaptive`'s
+  field list and `Confidence`'s field list via `__type` queries. This
+  supersedes the prior version of this evidence block, which selected only
+  `dimensions`/`sum` and stated no sampling field was exposed; one existed
+  and had not yet been located.)
+
+  **Raw result (sanitized — one row per distinct `datetime`+`status`+`coloCode`
+  bucket returned by the query; `errors`/`subrequests` omitted as noise,
+  `requests` = extrapolated `sum.requests`/`confidence.estimate` — always
+  identical, the same figure the earlier version of this evidence cited —
+  `sampleSize` = raw events actually captured, newly added):
+  ```
+  datetime(UTC)  status              colo  requests  sampleSize
+  13:21:00       success             SEA   7         7
+  13:21:02       clientDisconnected  SEA   2         2
+  13:21:04       success             SEA   2         2
+  13:21:08       success             SEA   2         2
+  13:21:10       success             SEA   1         1
+  13:21:10       clientDisconnected  SEA   6         6
+  13:21:11       success             SEA   5         5
+  13:21:11       clientDisconnected  SEA   16        7
+  13:21:13       success             SEA   1         1
+  13:21:15       success             SEA   2         2
+  13:21:18       success             SEA   22        13
+  13:21:33       success             SEA   1         1
+  13:21:38       success             SEA   3         3
+  13:21:38       clientDisconnected  SEA   3         3
+  13:21:41       clientDisconnected  SEA   4         4
+  13:21:42       clientDisconnected  SEA   4         4
+  13:21:43       success             SEA   2         2
+  13:21:47       clientDisconnected  SEA   5         5
+  13:21:57       success             SEA   1         1
+  ```
+  Confirmed directly, not just narrated: the last row before the gap is
+  `13:21:18` (`success`, 22 estimated requests from 13 raw-sampled
+  events — the exact `requests` figure cited above, now with its sampling
+  basis on record), the first row after is `13:21:33`; nothing in between
+  at any status. That is a 14-second span (`13:21:19`–`13:21:32`
+  inclusive) with zero rows of any kind, matching the claimed "14-second
+  total gap" precisely. All rows in this window are colo `SEA`, matching
+  the claimed colo. `sampleSize` equals `requests` for 17 of the 19 rows
+  (full 1:1 sampling); the two exceptions (`13:21:11Z` `clientDisconnected`
+  and `13:21:18Z` `success`) are the two busiest rows and are the basis for
+  the 44%/59% figures in the narration above.
 
 A Worker cold start, a Neon connection-pool exhaustion, a Neon cold-resume
 (the PM ruling's named candidate — Neon's serverless compute can take
@@ -328,6 +458,100 @@ first incident's `SEA`. Reproducing across two colos rules out a single
 overloaded/faulty edge location as the cause; reproducing across a >9-hour,
 different-PR gap rules out a one-off coincidence tied to one moment of
 shared-staging load.
+
+**Raw telemetry, incident 2 — re-run 2026-07-20 for this rework (both
+systems, same query shapes as incident 1 above, windows shifted to bracket
+this run instead):**
+
+- **Sentry transactions** (same shape as incident 1's, this incident's
+  window):
+
+  **Raw query, re-run 2026-07-20 for this rework:**
+  ```
+  curl -sS -G "https://de.sentry.io/api/0/organizations/zwizzly/events/" \
+    -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+    --data-urlencode "project=4511717632704592" \
+    --data-urlencode "field=timestamp" \
+    --data-urlencode "field=transaction" \
+    --data-urlencode "field=transaction.status" \
+    --data-urlencode "start=2026-07-19T03:28:00" \
+    --data-urlencode "end=2026-07-19T03:48:00" \
+    --data-urlencode 'query=transaction:"GET /v1/profiles"' \
+    --data-urlencode "sort=timestamp"
+  ```
+
+  **Raw result (sanitized — timestamp + status only; 25 rows, all `ok`):**
+  ```
+  03:34:34  03:34:55  03:35:06  03:35:07  03:35:09  03:35:24
+  03:35:47  03:35:50  03:35:56  03:36:01  03:36:06  03:36:09
+  03:36:12  03:37:27  03:37:35  03:37:42  03:37:43  03:37:47
+  03:37:51  03:38:03  03:38:05  03:38:13  03:38:20  03:38:29
+  03:38:31
+  ```
+  The last row in this 20-minute window is `03:38:31` — no `/v1/profiles`
+  transaction reaches Sentry again before the window ends at `03:38:48`,
+  corroborating the same signature (clean stream immediately preceding the
+  outage, then silence) as incident 1. The doc does not claim a specific
+  gap duration from this Sentry query alone (unlike incident 1, where the
+  window closed shortly after the recovery) — this is presented as
+  corroboration, not a new timed claim.
+- **Sentry errors** (error-events query, same shape as incident 1's, this
+  incident's window):
+
+  **Raw query, re-run 2026-07-20 for this rework:**
+  ```
+  curl -sS -G "https://de.sentry.io/api/0/organizations/zwizzly/events/" \
+    -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+    --data-urlencode "project=4511717632704592" \
+    --data-urlencode "field=timestamp" \
+    --data-urlencode "field=title" \
+    --data-urlencode "field=level" \
+    --data-urlencode "start=2026-07-19T03:28:00" \
+    --data-urlencode "end=2026-07-19T03:48:00" \
+    --data-urlencode "query=level:error" \
+    --data-urlencode "sort=timestamp"
+  ```
+  **Raw result: 0 rows** — confirmed empty, not merely unchecked.
+- **Cloudflare** (same GraphQL query/shape as incident 1 — including the
+  `confidence(level: 0.95)` sampling-rate selection added for this
+  rework — this incident's window):
+
+  **Raw query, re-run 2026-07-20 for this rework:**
+  ```
+  curl -sS -X POST "https://api.cloudflare.com/client/v4/graphql" \
+    -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "query": "query WI($accountTag: string, $start: Time, $end: Time) { viewer { accounts(filter: {accountTag: $accountTag}) { workersInvocationsAdaptive(limit: 1000, filter: {scriptName: \"mentomate-api-stg\", datetime_geq: $start, datetime_leq: $end}) { dimensions { datetime status coloCode } sum { requests errors subrequests } confidence(level: 0.95) { sum { requests { estimate sampleSize lower upper isValid } } } } } } }",
+      "variables": {
+        "accountTag": "0bcf2a3befee2c8b247aad5a94b2354c",
+        "start": "2026-07-19T03:38:25Z",
+        "end": "2026-07-19T03:38:50Z"
+      }
+    }'
+  ```
+
+  **Raw result (sanitized — same shape as incident 1's; `requests` =
+  extrapolated `sum.requests`/`confidence.estimate`, `sampleSize` = raw
+  events actually captured):**
+  ```
+  datetime(UTC)  status              colo  requests  sampleSize
+  03:38:26       clientDisconnected  SJC   1         1
+  03:38:27       success             SJC   2         2
+  03:38:29       success             SJC   3         3
+  03:38:29       clientDisconnected  SJC   3         3
+  03:38:31       success             SJC   13        13
+  03:38:31       clientDisconnected  SJC   4         4
+  03:38:32       clientDisconnected  SJC   2         2
+  ```
+  Confirmed directly: the last row in this 25-second window is `03:38:32`
+  (`clientDisconnected`, colo `SJC`) — nothing after it through the window's
+  end at `03:38:50`, matching the claimed "last invocation at 03:38:32Z,
+  none through the end of the query window" exactly. All rows are colo
+  `SJC`, matching the claimed colo and confirming it differs from incident
+  1's `SEA`. Unlike incident 1, `sampleSize` equals `requests` on every
+  row here — full 1:1 sampling throughout this window, so no
+  partial-sampling correction applies to incident 2's reading.
 
 **Residual discriminator (not resolved — genuinely out of reach here, not
 guessed at):** the two-colo reproduction is most consistent with a DNS
