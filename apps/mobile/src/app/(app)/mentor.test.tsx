@@ -1,5 +1,5 @@
 import { AccessibilityInfo, Dimensions, Platform } from 'react-native';
-import { fireEvent, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import type {
   NowCard,
   NowResponse,
@@ -20,6 +20,7 @@ const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
 const mockPush = jest.fn();
 const mockNowRefetch = jest.fn();
+let mockFocusCallback: (() => void | (() => void)) | undefined;
 const LEARNER_CAPABILITY_CASES = MENTOR_CAPABILITY_CASES.filter(
   ({ scope }) => scope === 'learner',
 );
@@ -57,6 +58,9 @@ let mockScopeContext: {
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    mockFocusCallback = callback;
+  },
 }));
 
 jest.mock(
@@ -174,7 +178,7 @@ function firstCallOrder(mockFn: jest.Mock): number {
 
 function renderMentorScreen(
   profileOverrides: Pick<RenderScreenOptions, 'profile' | 'profiles'> = {},
-): void {
+) {
   const rendered = renderScreen(<MentorScreen />, {
     routes: {
       [`/visibility/reports/${PERSON_ID}/shared-record`]: SHARED_RECORD,
@@ -182,6 +186,7 @@ function renderMentorScreen(
     ...profileOverrides,
   });
   cleanupRender = rendered.cleanup;
+  return rendered;
 }
 
 function expectFreeformRoute(rawInput: string): void {
@@ -213,6 +218,7 @@ describe('MentorScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFocusCallback = undefined;
     mockSubjects = [
       {
         subjectId: 'subject-0',
@@ -241,6 +247,69 @@ describe('MentorScreen', () => {
       ],
       setActiveScope: jest.fn(),
     };
+  });
+
+  it('[WI-2113 AC-1] does not inject a Challenge during idle time and accepts it on the next focus boundary', async () => {
+    const start = new Date('2026-07-20T12:00:00.000Z').getTime();
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(start);
+    const initial = feed([card()]);
+    const challenge = card({
+      kind: 'challenge_ready',
+      templateKey: 'now.challenge_ready.default',
+      deepLink: {
+        route: 'challenge.start',
+        params: { subjectId: 'subject-1', topicId: 'topic-1' },
+        chain: [],
+      },
+    });
+    mockNowFeed = { ...mockNowFeed, data: initial };
+
+    try {
+      const rendered = renderMentorScreen();
+      expect(screen.queryByTestId('now-card-challenge_ready')).toBeNull();
+
+      nowSpy.mockReturnValue(start + 3 * 60 * 1000);
+      mockNowFeed = {
+        ...mockNowFeed,
+        data: feed([card(), challenge]),
+      };
+      rendered.result.rerender(<MentorScreen />);
+
+      expect(screen.queryByTestId('now-card-challenge_ready')).toBeNull();
+
+      mockNowRefetch.mockResolvedValueOnce({ data: mockNowFeed.data });
+      await act(async () => {
+        mockFocusCallback?.();
+        await Promise.resolve();
+      });
+
+      screen.getByTestId('now-card-challenge_ready');
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('[WI-2113 AC-3] keeps a mid-scroll refetch from inserting a new card', async () => {
+    const rendered = renderMentorScreen();
+    const challenge = card({
+      kind: 'challenge_ready',
+      templateKey: 'now.challenge_ready.default',
+      deepLink: {
+        route: 'challenge.start',
+        params: { subjectId: 'subject-1', topicId: 'topic-1' },
+        chain: [],
+      },
+    });
+    const refreshed = feed([card(), challenge]);
+    mockNowRefetch.mockResolvedValueOnce({ data: refreshed });
+
+    await act(async () => {
+      const result = await mockNowFeed.refetch();
+      mockNowFeed = { ...mockNowFeed, data: result.data };
+      rendered.result.rerender(<MentorScreen />);
+    });
+
+    expect(screen.queryByTestId('now-card-challenge_ready')).toBeNull();
   });
 
   it('renders the feed stack, on-track badge, and inline ask affordances', () => {

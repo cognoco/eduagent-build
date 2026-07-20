@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import type { NowCard, NowDeepLink, NowResponse } from '@eduagent/schemas';
 
 import {
@@ -37,10 +37,12 @@ import {
   useMentorNoticeActions,
   useNowFeed,
   useNowOverflow,
+  type NowFeedQueryResult,
 } from '../../hooks/use-now-feed';
 import { useSubjectsIndex } from '../../hooks/use-subjects-index';
 import { matchBarIntent } from '../../lib/bar-intent-match';
 import { hasFirstRealState } from '../../lib/first-real-state';
+import { useProfile } from '../../lib/profile';
 import {
   pushAddChildForSupport,
   pushLinkInitiateForManagedPerson,
@@ -90,6 +92,56 @@ function rewardReceiptFromFeed(
   return null;
 }
 
+function useTransitionBoundFeed(
+  nowFeed: NowFeedQueryResult,
+  profileId: string | undefined,
+): NowResponse | undefined {
+  const incoming = nowFeed.data ?? nowFeed.fallbackFeed ?? undefined;
+  const latestRef = useRef({ profileId, feed: incoming });
+  latestRef.current = { profileId, feed: incoming };
+  const acceptedRef = useRef(Boolean(incoming));
+  const [snapshot, setSnapshot] = useState<{
+    profileId: string | undefined;
+    feed: NowResponse | undefined;
+  }>(() => ({ profileId, feed: incoming }));
+
+  useEffect(() => {
+    if (snapshot.profileId !== profileId) {
+      acceptedRef.current = Boolean(incoming);
+      setSnapshot({ profileId, feed: incoming });
+      return;
+    }
+    if (!acceptedRef.current && incoming) {
+      acceptedRef.current = true;
+      setSnapshot({ profileId, feed: incoming });
+    }
+  }, [incoming, profileId, snapshot.profileId]);
+
+  const refetch = nowFeed.refetch;
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const boundary = latestRef.current;
+      acceptedRef.current = Boolean(boundary.feed);
+      setSnapshot(boundary);
+
+      void refetch()
+        .then((result) => {
+          if (!active || !result.data) return;
+          acceptedRef.current = true;
+          setSnapshot({ profileId, feed: result.data });
+        })
+        .catch(() => undefined);
+
+      return () => {
+        active = false;
+      };
+    }, [profileId, refetch]),
+  );
+
+  return snapshot.profileId === profileId ? snapshot.feed : incoming;
+}
+
 function pushMentorHomeworkCamera(router: ReturnType<typeof useRouter>): void {
   router.push({
     pathname: '/(app)/homework/camera',
@@ -98,6 +150,7 @@ function pushMentorHomeworkCamera(router: ReturnType<typeof useRouter>): void {
 }
 
 function LearnerMentorScreen(): React.ReactElement {
+  const { activeProfile } = useProfile();
   const { t } = useTranslation();
   const router = useRouter();
   const { setActiveScope } = useScopeContext();
@@ -148,7 +201,7 @@ function LearnerMentorScreen(): React.ReactElement {
   }, [announce, clarificationAnnouncement, clarificationRevision]);
   const overflow = useNowOverflow(showOverflow);
   const mentorNoticeActions = useMentorNoticeActions();
-  const feed = nowFeed.data ?? nowFeed.fallbackFeed ?? undefined;
+  const feed = useTransitionBoundFeed(nowFeed, activeProfile?.id);
   const firstRealState = hasFirstRealState({
     // Count ACTIVE subjects only. useSubjectsIndex now surfaces every status
     // (paused/archived included) for the Subjects browse grouping, so the
