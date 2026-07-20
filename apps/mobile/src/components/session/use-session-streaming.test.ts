@@ -288,8 +288,8 @@ describe('useSessionStreaming', () => {
       expect(opts.startSession.mutateAsync).not.toHaveBeenCalled();
     });
 
-    it('creates a new session via startSession when none exists', async () => {
-      process.env.EXPO_PUBLIC_E2E = 'true';
+    it('reports a supplied allocation callback exactly once regardless of the build flag', async () => {
+      process.env.EXPO_PUBLIC_E2E = 'false';
       const onSessionCreated = jest.fn();
       const opts = makeOpts({ onSessionCreated });
       const { result } = renderHook(() => useSessionStreaming(opts as any));
@@ -321,18 +321,19 @@ describe('useSessionStreaming', () => {
       expect(onSessionCreated).toHaveBeenCalledTimes(1);
     });
 
-    it('does not report session allocation outside an EXPO_PUBLIC_E2E build', async () => {
+    it('creates a session when the optional allocation callback is omitted', async () => {
       process.env.EXPO_PUBLIC_E2E = 'false';
-      const onSessionCreated = jest.fn();
-      const opts = makeOpts({ onSessionCreated });
+      const opts = makeOpts({ onSessionCreated: undefined });
       const { result } = renderHook(() => useSessionStreaming(opts as any));
 
+      let sessionId: string | null = null;
       await act(async () => {
-        await result.current.ensureSession();
+        sessionId = await result.current.ensureSession();
       });
 
+      expect(sessionId).toBe('new-session-1');
       expect(opts.startSession.mutateAsync).toHaveBeenCalledTimes(1);
-      expect(onSessionCreated).not.toHaveBeenCalled();
+      expect(opts.setActiveSessionId).toHaveBeenCalledWith('new-session-1');
     });
 
     it('uses API client directly when overrideSubjectId is provided', async () => {

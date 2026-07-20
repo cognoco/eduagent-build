@@ -219,7 +219,7 @@ export interface UseSessionStreamingOptions {
   // Helpers
   createLocalMessageId: (prefix: 'user' | 'ai') => string;
   responseHistory: Array<{ actualSeconds: number; expectedMinutes: number }>;
-  /** Reports each successfully allocated session in an E2E build only. */
+  /** Optional route-owned callback for reporting each allocated session. */
   onSessionCreated?: (sessionId: string) => void;
 }
 
@@ -469,9 +469,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       // up pair; React state does not re-render until this async turn yields.
       activeSessionIdRef.current = newId;
       setActiveSessionId(newId);
-      if (process.env.EXPO_PUBLIC_E2E === 'true') {
-        onSessionCreated?.(newId);
-      }
+      onSessionCreated?.(newId);
       if (effectiveMode === 'homework' && homeworkProblemsState.length > 0) {
         try {
           await syncHomeworkMetadata(
