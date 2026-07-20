@@ -5,14 +5,16 @@ import { PROFILES } from '../fixtures/profiles';
 import { homeworkNoticeFlow } from './homework-notice';
 
 describe('homeworkNoticeFlow', () => {
-  it('covers genuine-slip and clean-homework prompt branches', () => {
+  it('covers genuine slips across every session type plus a clean-answer branch', () => {
     const profile = PROFILES[0];
     if (!profile) throw new Error('Expected at least one eval profile');
     const scenarios = homeworkNoticeFlow.enumerateScenarios?.(profile);
 
     expect(scenarios?.map((scenario) => scenario.scenarioId)).toEqual([
-      'genuine-slip',
-      'clean-homework',
+      'genuine-homework-slip',
+      'genuine-learning-slip',
+      'genuine-interleaved-slip',
+      'clean-learning',
     ]);
     for (const scenario of scenarios ?? []) {
       const messages = homeworkNoticeFlow.buildPrompt(scenario.input);
@@ -27,6 +29,14 @@ describe('homeworkNoticeFlow', () => {
         }),
       ).toEqual([]);
     }
+
+    const interleaved = scenarios?.find(
+      (scenario) => scenario.scenarioId === 'genuine-interleaved-slip',
+    );
+    expect(interleaved).toBeDefined();
+    expect(homeworkNoticeFlow.buildPrompt(interleaved!.input).system).toContain(
+      'INTERLEAVED NOTICE TARGETS',
+    );
   });
 
   it('rejects a fabricated quote at the server evidence boundary', async () => {
@@ -60,8 +70,8 @@ describe('homeworkNoticeFlow', () => {
     if (!profile) throw new Error('Expected at least one eval profile');
     const scenario = (
       homeworkNoticeFlow.enumerateScenarios?.(profile) ?? []
-    ).find((candidate) => candidate.scenarioId === 'clean-homework');
-    if (!scenario) throw new Error('Expected the clean-homework eval scenario');
+    ).find((candidate) => candidate.scenarioId === 'clean-learning');
+    if (!scenario) throw new Error('Expected the clean-learning eval scenario');
 
     const issues = await homeworkNoticeFlow.evaluateQuality?.({
       input: scenario.input,
@@ -90,7 +100,7 @@ describe('homeworkNoticeFlow', () => {
     if (!profile) throw new Error('Expected at least one eval profile');
     const scenarios = homeworkNoticeFlow.enumerateScenarios?.(profile);
     const scenario = scenarios?.find(
-      (candidate) => candidate.scenarioId === 'genuine-slip',
+      (candidate) => candidate.scenarioId === 'genuine-learning-slip',
     );
     if (!scenario) throw new Error('Expected the genuine-slip eval scenario');
     const issues = await homeworkNoticeFlow.evaluateQuality?.({

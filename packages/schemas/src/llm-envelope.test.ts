@@ -781,6 +781,24 @@ describe('mentor notice envelope fields', () => {
     expect(parsed.signals?.noticed_gap?.answerEventId).toBe(answerEventId);
   });
 
+  it('preserves an optional interleaved topic target on a grounded proposal', () => {
+    const topicId = '00000000-0000-4000-8000-000000000003';
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'Let us straighten out that distinction.',
+      signals: {
+        noticed_gap: {
+          concept: 'Mitosis versus meiosis',
+          correctionHint: 'Mitosis keeps the chromosome count unchanged.',
+          answerEventId,
+          learnerQuote: 'meiosis makes identical cells',
+          topicId,
+        },
+      },
+    });
+
+    expect(parsed.signals?.noticed_gap?.topicId).toBe(topicId);
+  });
+
   it('accepts an explicit null noticed_gap when no gap was observed', () => {
     const parsed = llmResponseEnvelopeSchema.parse({
       reply: 'That answer is correct.',
