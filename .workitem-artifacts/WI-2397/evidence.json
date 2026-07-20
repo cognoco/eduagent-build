@@ -17,5 +17,5 @@
     }
   ],
   "noiseBaselineVersion": "2026-07-20",
-  "redGreenPointer": "tests/integration/wi1989-owner-idor.integration.test.ts"
+  "redGreenPointer": ".workitem-artifacts/WI-2397/red-green.md"
 }
