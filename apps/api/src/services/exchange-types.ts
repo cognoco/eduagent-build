@@ -19,6 +19,7 @@ import type {
   VerificationType,
   ExtractedInterviewSignals,
   ChallengeRoundSessionState,
+  RecitationSetupTransition,
 } from '@eduagent/schemas';
 import type {
   EscalationRung,
@@ -27,7 +28,6 @@ import type {
 } from './llm';
 import type { LLMTier } from './subscription';
 import type { LanguageSessionState } from './language-session-engine';
-import type { RecitationSetupTransition } from './session/session-recitation-setup';
 
 // ---------------------------------------------------------------------------
 // Source evidence types

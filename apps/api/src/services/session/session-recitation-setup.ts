@@ -1,21 +1,24 @@
-export interface RecitationSetupState {
-  phase: 'awaiting_selection' | 'ready';
-  clarificationCount: 0 | 1;
-}
+import {
+  recitationSetupStateSchema,
+  type RecitationSetupState,
+  type RecitationSetupTransition,
+} from '@eduagent/schemas';
+import type { ExchangeSourceAudit } from '../exchanges';
 
-export type RecitationSetupAction =
-  | 'clarify_selection'
-  | 'invite_to_begin'
-  | 'invite_after_cap'
-  | 'invite_recitation'
-  | 'clarify_edit'
-  | 'handle_non_recitation'
-  | 'coach_recitation'
-  | 'leave_recitation';
+export const RECITATION_SETUP_CLAIM_METADATA_KEY =
+  '__serverRecitationSetupClaim' as const;
 
-export interface RecitationSetupTransition {
-  action: RecitationSetupAction;
-  state: RecitationSetupState;
+export function stripInternalRecitationSetupClaim(metadata: unknown): unknown {
+  if (
+    metadata == null ||
+    typeof metadata !== 'object' ||
+    Array.isArray(metadata)
+  ) {
+    return metadata;
+  }
+  const sanitized = { ...(metadata as Record<string, unknown>) };
+  delete sanitized[RECITATION_SETUP_CLAIM_METADATA_KEY];
+  return sanitized;
 }
 
 interface ResolveRecitationSetupInput {
@@ -79,6 +82,10 @@ const OFF_TOPIC_SELECTION_RE =
   /^(?:can|could|would|will|what|which|where|when|why|how)\b|\b(?:weather|account|subscription|settings)\b/iu;
 const QUESTION_WORD_TITLE_RE =
   /^(?:Am|Are|Can|Could|Did|Do|Does|Had|Has|Have|How|Is|May|Might|Must|Shall|Should|Was|Were|What|When|Where|Which|Who|Whom|Whose|Why|Will|Would)\b/iu;
+const MULTILINGUAL_QUESTION_PREFIX_RE =
+  /^(?:(?:qué|que|cuál|cuáles|cómo|dónde|cuándo|por qué|quién|quiénes|qui|quel|quelle|quels|quelles|comment|où|pourquoi|was|welche|welcher|welches|wie|wo|wann|warum|wer|hva|hvilken|hvilket|hvordan|hvor|når|hvem|co|który|która|które|jak|gdzie|kiedy|dlaczego|kto|o que|qual|quais|como|onde|quando|por que)(?=\s|[?？]|$)|(?:何|なに|どの|どこ|いつ|なぜ|どう|誰|だれ))/iu;
+const TITLE_AUTHOR_RE =
+  /^(?<title>.{1,220})\s(?:by|de|von|av|przez|por)\s+\p{Lu}[\p{L}'’.-]*(?:\s+\p{Lu}[\p{L}'’.-]*){0,5}$/u;
 const NON_RECITATION_TOPIC_RE =
   /\b(?:weather|account|subscription|settings)\b/iu;
 const SELECTION_QUESTION_RE =
@@ -159,6 +166,25 @@ function isUncertainOrNonSelection(message: string): boolean {
   );
 }
 
+function isTitleAuthorSelection(message: string): boolean {
+  const title = message.match(TITLE_AUTHOR_RE)?.groups?.['title']?.trim();
+  if (!title) return false;
+  if (/^(?:["“][\s\S]+["”]|['‘][\s\S]+['’])$/u.test(title)) return true;
+  if (
+    CONVERSATIONAL_INTENT_PREFIX_RE.test(title) ||
+    GENERIC_REQUEST_RE.test(title) ||
+    SENTENCE_LIKE_SELECTION_RE.test(title)
+  ) {
+    return false;
+  }
+  const titleWords = title.split(' ');
+  return (
+    /^[\p{Lu}\p{Lt}]/u.test(title) ||
+    /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(title) ||
+    (titleWords.length >= 2 && titleWords.length <= 10)
+  );
+}
+
 function isLikelySelection(message: string): boolean {
   const normalized = message.trim().replace(/\s+/g, ' ');
   if (normalized.length === 0 || normalized.length > 300) return false;
@@ -169,18 +195,27 @@ function isLikelySelection(message: string): boolean {
   // such as "Where should I start?". Lower-case conversational questions remain
   // ambiguous and take the single clarification path.
   const questionCandidate = normalized.replace(/^[¿¡]+/u, '');
-  const titleCaseWordCount =
-    questionCandidate.match(/(?:^|\s)\p{Lu}[\p{L}'’]*/gu)?.length ?? 0;
-  const hasTitleCaseSignal = titleCaseWordCount >= 3;
+  const titleCaseWordCount = (
+    questionCandidate.match(/(?:^|\s)\p{Lu}[\p{L}'’]*/gu) ?? []
+  ).filter((word) => word.trim().length > 1).length;
+  const questionWordCount =
+    questionCandidate.match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
   const terminalQuestion = /[?？]\s*$/u.test(questionCandidate);
+  const hasTitleCaseSignal =
+    titleCaseWordCount >= 3 ||
+    (terminalQuestion && titleCaseWordCount >= 2 && questionWordCount <= 3);
+  const hasQuestionPrefix =
+    QUESTION_WORD_TITLE_RE.test(questionCandidate) ||
+    MULTILINGUAL_QUESTION_PREFIX_RE.test(questionCandidate);
   const titleCasedQuestion =
-    hasTitleCaseSignal &&
-    (QUESTION_WORD_TITLE_RE.test(questionCandidate) || terminalQuestion);
+    hasTitleCaseSignal && (hasQuestionPrefix || terminalQuestion);
   const explicitlyQuotedTitle = /^(?:["“][\s\S]+["”]|['‘][\s\S]+['’])$/u.test(
     normalized,
   );
   if (
-    (isUncertainOrNonSelection(normalized) && !titleCasedQuestion) ||
+    ((isUncertainOrNonSelection(normalized) || hasQuestionPrefix) &&
+      !titleCasedQuestion &&
+      !explicitlyQuotedTitle) ||
     isLeaveIntent(normalized) ||
     isSafetyDisclosure(normalized) ||
     COMMAND_ONLY_EDIT_RE.test(normalizeIntent(normalized))
@@ -198,7 +233,7 @@ function isLikelySelection(message: string): boolean {
       !SENTENCE_LIKE_SELECTION_RE.test(normalized)) ||
     /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(normalized);
   const hasSelectionShape =
-    /\b(?:by|de|von|av|przez|por)\b/iu.test(normalized) ||
+    isTitleAuthorSelection(normalized) ||
     /^(?:the |a |an |el |la |der |die |das )?(?:poem|speech|passage|story|monologue|sonnet|poema|gedicht|dikt|wiersz|詩)(?:\s|$)/iu.test(
       normalized,
     ) ||
@@ -210,27 +245,14 @@ function isLikelySelection(message: string): boolean {
 function parseRecitationSetupState(
   value: unknown,
 ): RecitationSetupState | undefined {
-  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  const phase = candidate['phase'];
-  const clarificationCount = candidate['clarificationCount'];
-  if (
-    (phase !== 'awaiting_selection' && phase !== 'ready') ||
-    (clarificationCount !== 0 && clarificationCount !== 1)
-  ) {
-    return undefined;
-  }
-
-  return { phase, clarificationCount };
+  const parsed = recitationSetupStateSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
 }
 
 /**
  * Reads the latest recitation setup phase from private assistant-event
- * metadata. Event metadata is server-owned and is not projected into the
- * transcript response, so this persists setup without extending an API shape.
+ * metadata. Assistant metadata preserves the state alongside a completed
+ * exchange without extending the public response shape.
  */
 export function readPersistedRecitationSetupState(
   events: RecitationSetupHistoryEvent[],
@@ -380,4 +402,3 @@ export function resolveRecitationSetupTransition(
     state: { phase: 'awaiting_selection', clarificationCount: 1 },
   };
 }
-import type { ExchangeSourceAudit } from '../exchanges';

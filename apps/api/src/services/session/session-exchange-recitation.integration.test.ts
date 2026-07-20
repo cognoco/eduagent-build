@@ -37,6 +37,7 @@ import {
 } from './session-exchange';
 import { startSession } from './session-crud';
 import { mapSessionRow } from './session-events';
+import { RECITATION_SETUP_CLAIM_METADATA_KEY } from './session-recitation-setup';
 
 // The workspace root is 5 levels up from apps/api/src/services/session/.
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -395,6 +396,14 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
       'invite_after_cap',
     ]);
 
+    const [beforeReplaySession] = await db
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(eq(learningSessions.id, session.id));
+    const beforeReplayClaim = (
+      beforeReplaySession?.metadata as Record<string, unknown>
+    )[RECITATION_SETUP_CLAIM_METADATA_KEY];
+
     const clarificationIndex = transitions.findIndex(
       (transition) => transition?.action === 'clarify_selection',
     );
@@ -407,11 +416,19 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
     );
     expect(replay?.action).toBe('clarify_selection');
 
+    const moderationFlags = await db
+      .select({ id: sessionEvents.id })
+      .from(sessionEvents)
+      .where(
+        and(
+          eq(sessionEvents.sessionId, session.id),
+          eq(sessionEvents.eventType, 'flag'),
+        ),
+      );
+    expect(moderationFlags).toHaveLength(0);
+
     const [startEvent] = await db
-      .select({
-        content: sessionEvents.content,
-        metadata: sessionEvents.metadata,
-      })
+      .select({ metadata: sessionEvents.metadata })
       .from(sessionEvents)
       .where(
         and(
@@ -419,27 +436,27 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
           eq(sessionEvents.eventType, 'session_start'),
         ),
       );
-    expect(startEvent?.content).toBe('');
-    expect(startEvent?.metadata).toMatchObject({
-      recitationSetup: {
-        phase: 'ready',
-        clarificationCount: 1,
-        lastAction: 'invite_after_cap',
-      },
-    });
-    expect(JSON.stringify(startEvent?.metadata)).not.toContain("I don't know");
-    expect(JSON.stringify(startEvent?.metadata)).not.toContain(
-      'still not sure',
-    );
+    expect(startEvent?.metadata).not.toHaveProperty('recitationSetup');
 
     const [persistedSession] = await db
       .select({ metadata: learningSessions.metadata })
       .from(learningSessions)
       .where(eq(learningSessions.id, session.id));
-    expect(persistedSession?.metadata).toEqual({
+    expect(persistedSession?.metadata).toMatchObject({
       effectiveMode: 'recitation',
       inputMode: 'text',
+      [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+        phase: 'ready',
+        clarificationCount: 1,
+        lastAction: 'invite_after_cap',
+      },
     });
+    const persistedClaim = (
+      persistedSession?.metadata as Record<string, unknown>
+    )[RECITATION_SETUP_CLAIM_METADATA_KEY];
+    expect(persistedClaim).toEqual(beforeReplayClaim);
+    expect(JSON.stringify(persistedClaim)).not.toContain("I don't know");
+    expect(JSON.stringify(persistedClaim)).not.toContain('still not sure');
   });
 
   it('replays the same recitation setup claim without consuming the clarification cap', async () => {
@@ -474,21 +491,24 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
       'clarify_selection',
       'clarify_selection',
     ]);
-    const [startEvent] = await db
-      .select({ metadata: sessionEvents.metadata })
-      .from(sessionEvents)
-      .where(
-        and(
-          eq(sessionEvents.sessionId, session.id),
-          eq(sessionEvents.eventType, 'session_start'),
-        ),
-      );
-    expect(startEvent?.metadata).toMatchObject({
-      recitationSetup: {
+    const [persistedSession] = await db
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(eq(learningSessions.id, session.id));
+    expect(persistedSession?.metadata).toMatchObject({
+      [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
         phase: 'awaiting_selection',
         clarificationCount: 1,
         lastAction: 'clarify_selection',
         lastClientId: clientId,
+        recentClaims: [
+          {
+            clientId,
+            action: 'clarify_selection',
+            phase: 'awaiting_selection',
+            clarificationCount: 1,
+          },
+        ],
       },
     });
   });

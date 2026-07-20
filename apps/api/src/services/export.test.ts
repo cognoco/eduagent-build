@@ -1,5 +1,6 @@
 import type { Database } from '@eduagent/database';
 import { generateExport, serializeDates } from './export';
+import { RECITATION_SETUP_CLAIM_METADATA_KEY } from './session/session-recitation-setup';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 
@@ -792,6 +793,31 @@ describe('generateExport', () => {
       expect(typeof sessions[0]!['startedAt']).toBe('string');
       expect(sessions[0]!['startedAt']).toBe('2025-04-15T09:00:00.000Z');
       expect(sessions[0]!['endedAt']).toBe('2025-04-15T09:00:00.000Z');
+    });
+
+    it('omits server-owned recitation setup coordination from data exports', async () => {
+      const profileRow = mockProfileRow('p1', 'Alice');
+      const sessionRow = mockLearningSessionRow({
+        metadata: {
+          effectiveMode: 'recitation',
+          [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+            phase: 'ready',
+            clarificationCount: 1,
+            lastAction: 'invite_after_cap',
+          },
+        },
+      });
+      const db = createMockDb({
+        profiles: [profileRow],
+        learningSessions: [sessionRow],
+      });
+
+      const result = await generateExport(db, 'account-1', {
+        learningOnlyProfileIds: ['p1'],
+      });
+
+      const [session] = result.learningSessions as Record<string, unknown>[];
+      expect(session?.['metadata']).toEqual({ effectiveMode: 'recitation' });
     });
 
     // [WI-1364] Retired: 'dataExportSchema.parse succeeds on export with

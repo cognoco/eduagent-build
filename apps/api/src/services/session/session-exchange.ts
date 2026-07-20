@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { eq, and, desc, inArray, lt, sql, gte, ne } from 'drizzle-orm';
+import { z } from 'zod';
 import {
   assessments,
   learningSessions,
@@ -38,6 +39,8 @@ import type {
   LanguageComprehensionEvaluation,
   LanguageNextPracticePointer,
   MentorNoticeAccepted,
+  RecitationSetupState,
+  RecitationSetupTransition,
 } from '@eduagent/schemas';
 import {
   computeAgeBracket,
@@ -53,6 +56,8 @@ import {
   extractedInterviewSignalsSchema,
   isUnambiguouslyAdult,
   languageNextPracticePointerSchema,
+  recitationSetupActionSchema,
+  recitationSetupStateSchema,
 } from '@eduagent/schemas';
 import { persistUserMessageOnly } from './persist-user-message-only';
 import {
@@ -149,13 +154,11 @@ import { projectAiResponseContent } from '../llm/project-response';
 import { resolveSuitabilityJudgeDispatch } from '../policy-engine/judge-dispatch';
 import { isSubstantiveCalibrationAnswer } from './review-calibration';
 import {
+  RECITATION_SETUP_CLAIM_METADATA_KEY,
   recitationOpeningForLog,
   readPersistedRecitationSetupState,
   resolveRecitationSetupTransition,
   sanitizeRecitationSourceAudit,
-  type RecitationSetupAction,
-  type RecitationSetupState,
-  type RecitationSetupTransition,
 } from './session-recitation-setup';
 import {
   recordPracticeActivityEvent,
@@ -2151,103 +2154,41 @@ export function resolvePromptLearnerName(profile: {
   return profile.displayName ?? undefined;
 }
 
-interface RecitationSetupReplayClaim extends RecitationSetupState {
-  clientId: string;
-  action: RecitationSetupAction;
-}
-
-interface PersistedRecitationSetupClaim extends RecitationSetupState {
-  lastAction: RecitationSetupAction;
-  lastClientId?: string;
-  recentClaims: RecitationSetupReplayClaim[];
-}
-
 const MAX_RECITATION_SETUP_REPLAY_CLAIMS = MAX_EXCHANGES_PER_SESSION;
 
-function isRecitationSetupAction(
-  value: unknown,
-): value is RecitationSetupAction {
-  return (
-    value === 'clarify_selection' ||
-    value === 'invite_to_begin' ||
-    value === 'invite_after_cap' ||
-    value === 'invite_recitation' ||
-    value === 'clarify_edit' ||
-    value === 'handle_non_recitation' ||
-    value === 'coach_recitation' ||
-    value === 'leave_recitation'
-  );
-}
+const recitationSetupReplayClaimSchema = recitationSetupStateSchema.extend({
+  clientId: z.string().min(1),
+  action: recitationSetupActionSchema,
+});
+const persistedRecitationSetupClaimSchema = recitationSetupStateSchema.extend({
+  lastAction: recitationSetupActionSchema,
+  lastClientId: z.string().min(1).optional(),
+  recentClaims: z.array(recitationSetupReplayClaimSchema),
+});
+type PersistedRecitationSetupClaim = z.infer<
+  typeof persistedRecitationSetupClaimSchema
+>;
 
 function parsePersistedRecitationSetupClaim(
   value: unknown,
 ): PersistedRecitationSetupClaim | undefined {
-  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-  const candidate = value as Record<string, unknown>;
-  const phase = candidate['phase'];
-  const clarificationCount = candidate['clarificationCount'];
-  const lastAction = candidate['lastAction'];
-  if (
-    (phase !== 'awaiting_selection' && phase !== 'ready') ||
-    (clarificationCount !== 0 && clarificationCount !== 1) ||
-    !isRecitationSetupAction(lastAction)
-  ) {
-    return undefined;
-  }
-  const lastClientId = candidate['lastClientId'];
-  const recentClaims = Array.isArray(candidate['recentClaims'])
-    ? candidate['recentClaims']
-        .flatMap((value): RecitationSetupReplayClaim[] => {
-          if (
-            value == null ||
-            typeof value !== 'object' ||
-            Array.isArray(value)
-          ) {
-            return [];
-          }
-          const replay = value as Record<string, unknown>;
-          if (
-            typeof replay['clientId'] !== 'string' ||
-            replay['clientId'].length === 0 ||
-            !isRecitationSetupAction(replay['action']) ||
-            (replay['phase'] !== 'awaiting_selection' &&
-              replay['phase'] !== 'ready') ||
-            (replay['clarificationCount'] !== 0 &&
-              replay['clarificationCount'] !== 1)
-          ) {
-            return [];
-          }
-          return [
-            {
-              clientId: replay['clientId'],
-              action: replay['action'],
-              phase: replay['phase'],
-              clarificationCount: replay['clarificationCount'],
-            },
-          ];
-        })
-        .slice(-MAX_RECITATION_SETUP_REPLAY_CLAIMS)
-    : [];
+  const parsed = persistedRecitationSetupClaimSchema.safeParse(value);
+  if (!parsed.success) return undefined;
   return {
-    phase,
-    clarificationCount,
-    lastAction,
-    ...(typeof lastClientId === 'string' && lastClientId.length > 0
-      ? { lastClientId }
-      : {}),
-    recentClaims,
+    ...parsed.data,
+    recentClaims: parsed.data.recentClaims.slice(
+      -MAX_RECITATION_SETUP_REPLAY_CLAIMS,
+    ),
   };
 }
 
 /**
  * Atomically reserves the recitation setup transition before model dispatch.
  *
- * The existing session row is only a lock; private setup state lives on the
- * guaranteed `session_start` audit event so it is excluded from session API
- * responses and transcript/history projection. The transaction commits before
- * any LLM work, avoiding a connection held across provider latency.
+ * Private setup state lives in the mutable learning-session metadata summary,
+ * while the immutable event log remains append-only. The public session schema
+ * strips this server-only key. The transaction commits before any LLM work,
+ * avoiding a connection held across provider latency.
  */
 export async function claimRecitationSetupTransition(
   db: Database,
@@ -2277,29 +2218,8 @@ export async function claimRecitationSetupTransition(
       (current.metadata as Record<string, unknown> | null) ?? {};
     if (sessionMetadata['effectiveMode'] !== 'recitation') return undefined;
 
-    const [startEvent] = await tx
-      .select({ id: sessionEvents.id, metadata: sessionEvents.metadata })
-      .from(sessionEvents)
-      .where(
-        and(
-          eq(sessionEvents.sessionId, sessionId),
-          eq(sessionEvents.profileId, profileId),
-          eq(sessionEvents.eventType, 'session_start'),
-        ),
-      )
-      .orderBy(sessionEvents.createdAt)
-      .limit(1);
-    if (!startEvent) {
-      logger.warn('[session-exchange] recitation setup anchor missing', {
-        sessionId,
-      });
-      return undefined;
-    }
-
-    const eventMetadata =
-      (startEvent.metadata as Record<string, unknown> | null) ?? {};
     const persisted = parsePersistedRecitationSetupClaim(
-      eventMetadata['recitationSetup'],
+      sessionMetadata[RECITATION_SETUP_CLAIM_METADATA_KEY],
     );
     const replayClaim = clientId
       ? [...(persisted?.recentClaims ?? [])]
@@ -2352,11 +2272,11 @@ export async function claimRecitationSetupTransition(
       : (persisted?.recentClaims ?? []);
 
     await tx
-      .update(sessionEvents)
+      .update(learningSessions)
       .set({
         metadata: {
-          ...eventMetadata,
-          recitationSetup: {
+          ...sessionMetadata,
+          [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
             ...transition.state,
             lastAction: transition.action,
             ...(clientId ? { lastClientId: clientId } : {}),
@@ -2366,9 +2286,8 @@ export async function claimRecitationSetupTransition(
       })
       .where(
         and(
-          eq(sessionEvents.id, startEvent.id),
-          eq(sessionEvents.sessionId, sessionId),
-          eq(sessionEvents.profileId, profileId),
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
         ),
       );
 
