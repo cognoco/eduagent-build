@@ -2,6 +2,9 @@
 
 import { practiceActivityEvents, type Database } from '@eduagent/database';
 
+const SEEDED_PRACTICE_ACTIVITY_EVENT_ID =
+  '019d14f4-735f-7e11-8800-000000000001';
+
 export type TestSeedInsertRecord = {
   table: unknown;
   values: Record<string, unknown> | Array<Record<string, unknown>>;
@@ -38,7 +41,7 @@ export function createRecordingDb(): {
           if (table === practiceActivityEvents && !Array.isArray(values)) {
             const persistedValues = {
               ...values,
-              id: '019d14f4-735f-7e11-8800-000000000001',
+              id: SEEDED_PRACTICE_ACTIVITY_EVENT_ID,
             };
             inserts.push({ table, values: persistedValues });
             return {

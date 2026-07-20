@@ -1,4 +1,8 @@
-import { learningSessions, person } from '@eduagent/database';
+import {
+  learningSessions,
+  person,
+  practiceActivityEvents,
+} from '@eduagent/database';
 
 import { createRecordingDb } from './test-seed-db';
 
@@ -15,5 +19,27 @@ describe('createRecordingDb', () => {
       { table: person, values: { id: 'person-1' } },
       { table: learningSessions, values: { id: 'session-1' } },
     ]);
+  });
+
+  it('persists and returns the stable seeded practice-activity identity', async () => {
+    const { db, inserts } = createRecordingDb();
+
+    const returnedRows = await db
+      .insert(practiceActivityEvents)
+      .values({ profileId: 'profile-1' } as never)
+      .onConflictDoNothing()
+      .returning();
+
+    expect(returnedRows).toEqual([
+      expect.objectContaining({
+        id: '019d14f4-735f-7e11-8800-000000000001',
+      }),
+    ]);
+    expect(inserts).toContainEqual({
+      table: practiceActivityEvents,
+      values: expect.objectContaining({
+        id: '019d14f4-735f-7e11-8800-000000000001',
+      }),
+    });
   });
 });
