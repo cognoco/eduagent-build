@@ -2514,6 +2514,7 @@ describe('SessionScreen homework flow', () => {
         await Promise.resolve();
         jest.advanceTimersByTime(700);
       });
+      expect(testScreen.queryByTestId('session-subject-resolution')).toBeNull();
       expect(mockStream).not.toHaveBeenCalled();
       await act(async () => {
         fireEvent.press(testScreen.getByTestId('homework-help-me-solve'));
