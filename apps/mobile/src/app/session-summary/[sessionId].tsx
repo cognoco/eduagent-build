@@ -45,6 +45,7 @@ import { usePostSessionNotificationAsk } from '../../hooks/use-post-session-noti
 import {
   goBackOrReplace,
   homeHrefForReturnTo,
+  JOURNAL_HREF,
   JOURNAL_RETURN_TO,
 } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
@@ -443,7 +444,7 @@ export default function SessionSummaryScreen() {
 
   const finishSummaryNavigation = (): void => {
     if (returnTo === JOURNAL_RETURN_TO) {
-      goBackOrReplace(router, summaryHomeHref);
+      goBackOrReplace(router, JOURNAL_HREF);
       return;
     }
 
