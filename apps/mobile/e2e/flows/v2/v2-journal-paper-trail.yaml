@@ -89,8 +89,8 @@ tags:
 - hideKeyboard
 - assertVisible:
     id: 'journal-note-note:${LEARNER_NOTE_ID}'
-- assertVisible:
-    text: 'Photosynthesis stores sunlight as chemical energy in glucose for the plant.'
+    containsDescendants:
+      - text: 'Photosynthesis stores sunlight as chemical energy in glucose for the plant.'
 - assertNotVisible:
     id: 'journal-note-bookmark:${BOOKMARK_ID}'
 - tapOn:
@@ -100,7 +100,9 @@ tags:
       id: 'my-notes-row-notes-${LEARNER_NOTE_ID}'
     timeout: 15000
 - assertVisible:
-    text: 'Photosynthesis stores sunlight as chemical energy in glucose for the plant.'
+    id: 'my-notes-row-notes-${LEARNER_NOTE_ID}'
+    containsDescendants:
+      - text: 'Photosynthesis stores sunlight as chemical energy in glucose for the plant.'
 - assertNotVisible:
     id: 'my-notes-row-bookmarks-${BOOKMARK_ID}'
 - tapOn:
@@ -145,8 +147,8 @@ tags:
 - hideKeyboard
 - assertVisible:
     id: 'journal-note-bookmark:${BOOKMARK_ID}'
-- assertVisible:
-    text: 'Chlorophyll captures light energy that powers photosynthesis.'
+    containsDescendants:
+      - text: 'Chlorophyll captures light energy that powers photosynthesis.'
 - assertNotVisible:
     id: 'journal-note-note:${LEARNER_NOTE_ID}'
 - tapOn:
@@ -156,7 +158,9 @@ tags:
       id: 'my-notes-row-bookmarks-${BOOKMARK_ID}'
     timeout: 15000
 - assertVisible:
-    text: 'Chlorophyll captures light energy that powers photosynthesis.'
+    id: 'my-notes-row-bookmarks-${BOOKMARK_ID}'
+    containsDescendants:
+      - text: 'Chlorophyll captures light energy that powers photosynthesis.'
 - assertNotVisible:
     id: 'my-notes-row-notes-${LEARNER_NOTE_ID}'
 - tapOn:

@@ -41,12 +41,125 @@ const repoRoot = join(__dirname, '..');
 
 const JOURNAL_RECAP_TEXT =
   'We traced how photosynthesis stores sunlight as chemical energy in glucose.';
+const JOURNAL_NOTE_BINDINGS = [
+  {
+    id: 'journal-note-note:${LEARNER_NOTE_ID}',
+    text: 'Photosynthesis stores sunlight as chemical energy in glucose for the plant.',
+  },
+  {
+    id: 'my-notes-row-notes-${LEARNER_NOTE_ID}',
+    text: 'Photosynthesis stores sunlight as chemical energy in glucose for the plant.',
+  },
+  {
+    id: 'journal-note-bookmark:${BOOKMARK_ID}',
+    text: 'Chlorophyll captures light energy that powers photosynthesis.',
+  },
+  {
+    id: 'my-notes-row-bookmarks-${BOOKMARK_ID}',
+    text: 'Chlorophyll captures light energy that powers photosynthesis.',
+  },
+] as const;
 const HARD_JOURNAL_RECAP_ASSERTION = {
   assertVisible: {
     id: 'session-recap-card',
     containsDescendants: [{ text: JOURNAL_RECAP_TEXT }],
   },
 } as const;
+
+function assertHardMaestroTextOwnership(
+  commands: unknown[],
+  bindings: ReadonlyArray<{ id: string; text: string }>,
+): void {
+  for (const { id, text } of bindings) {
+    const allowedOwnerIds = bindings
+      .filter((binding) => binding.text === text)
+      .map((binding) => binding.id);
+    const ownerAssertions = commands.filter((command) => {
+      if (!command || typeof command !== 'object') return false;
+      const selector = (command as Record<string, unknown>).assertVisible;
+      return (
+        !!selector &&
+        typeof selector === 'object' &&
+        (selector as Record<string, unknown>).id === id
+      );
+    });
+    const ownerCommand = ownerAssertions[0] as
+      | Record<string, unknown>
+      | undefined;
+    const ownerSelector = ownerCommand?.assertVisible as
+      | Record<string, unknown>
+      | undefined;
+    const descendants = ownerSelector?.containsDescendants;
+    const exactTextDescendants = Array.isArray(descendants)
+      ? descendants.filter(
+          (descendant) =>
+            !!descendant &&
+            typeof descendant === 'object' &&
+            (descendant as Record<string, unknown>).text === text,
+        )
+      : [];
+
+    if (
+      ownerAssertions.length !== 1 ||
+      ownerCommand?.optional === true ||
+      ownerSelector?.optional === true ||
+      exactTextDescendants.length !== 1 ||
+      (exactTextDescendants[0] as Record<string, unknown>).optional === true
+    ) {
+      throw new Error(
+        `Exact text must be a mandatory descendant of its owning Maestro ID: ${id}`,
+      );
+    }
+
+    const hasSplitOrAdjacentTextAssertion = commands.some((command) => {
+      if (!command || typeof command !== 'object') return false;
+      const selector = (command as Record<string, unknown>).assertVisible;
+      if (!selector || typeof selector !== 'object') return false;
+      const fields = selector as Record<string, unknown>;
+      if (fields.text === text) return true;
+      if (
+        typeof fields.id === 'string' &&
+        allowedOwnerIds.includes(fields.id)
+      ) {
+        return false;
+      }
+      const candidateDescendants = fields.containsDescendants;
+      return (
+        Array.isArray(candidateDescendants) &&
+        candidateDescendants.some(
+          (descendant) =>
+            !!descendant &&
+            typeof descendant === 'object' &&
+            (descendant as Record<string, unknown>).text === text,
+        )
+      );
+    });
+    if (hasSplitOrAdjacentTextAssertion) {
+      throw new Error(
+        `Exact text must not be split from or assigned to an adjacent Maestro ID: ${id}`,
+      );
+    }
+  }
+}
+
+function assertCommandsInOrder(
+  commands: unknown[],
+  expectedCommands: unknown[],
+): void {
+  let cursor = -1;
+  for (const expected of expectedCommands) {
+    const serializedExpected = JSON.stringify(expected);
+    cursor = commands.findIndex(
+      (command, index) =>
+        index > cursor && JSON.stringify(command) === serializedExpected,
+    );
+    if (cursor < 0) {
+      throw new Error(
+        `Missing ordered Maestro property: ${serializedExpected}`,
+      );
+    }
+  }
+}
 
 function assertHardJournalRecapOwnership(commands: unknown[]): void {
   const recapCardAssertions = commands.filter((command) => {
@@ -1157,6 +1270,175 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         { assertVisible: { text: JOURNAL_RECAP_TEXT, optional: true } },
       ]),
     ).toThrow(/globally/);
+  });
+
+  it('[WI-2239] binds each seeded note text to its exact Journal and My Notes owner IDs', () => {
+    const journalFlow = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-journal-paper-trail.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(journalFlow)[1]?.toJS() as unknown;
+
+    expect(Array.isArray(commands)).toBe(true);
+    if (!Array.isArray(commands)) {
+      throw new Error(
+        'Journal paper-trail Maestro commands must be a YAML list',
+      );
+    }
+
+    expect(() =>
+      assertHardMaestroTextOwnership(commands, JOURNAL_NOTE_BINDINGS),
+    ).not.toThrow();
+    for (const oppositeSourceId of [
+      'journal-note-bookmark:${BOOKMARK_ID}',
+      'my-notes-row-bookmarks-${BOOKMARK_ID}',
+      'journal-note-note:${LEARNER_NOTE_ID}',
+      'my-notes-row-notes-${LEARNER_NOTE_ID}',
+    ]) {
+      expect(commands).toContainEqual({
+        assertNotVisible: { id: oppositeSourceId },
+      });
+    }
+  });
+
+  it.each(JOURNAL_NOTE_BINDINGS)(
+    '[WI-2239] rejects split, adjacent-owner, and optional evidence for $id',
+    (binding) => {
+      const owner = (id: string, optional = false) => ({
+        assertVisible: {
+          id,
+          containsDescendants: [
+            { text: binding.text, ...(optional ? { optional } : {}) },
+          ],
+        },
+      });
+      expect(() =>
+        assertHardMaestroTextOwnership([owner(binding.id)], [binding]),
+      ).not.toThrow();
+      for (const mutant of [
+        [
+          { assertVisible: { id: binding.id } },
+          { assertVisible: { text: binding.text } },
+        ],
+        [
+          { assertVisible: { id: binding.id } },
+          owner(`${binding.id}-adjacent`),
+        ],
+        [owner(binding.id, true)],
+      ]) {
+        expect(() => assertHardMaestroTextOwnership(mutant, [binding])).toThrow(
+          /mandatory descendant|split|adjacent/,
+        );
+      }
+    },
+  );
+
+  it('[WI-2239] protects empty recovery plus exact Practice and report round-trip properties', () => {
+    const emptyFlow = parseAllDocuments(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/v2/v2-journal-empty-recovery.yaml',
+        ),
+        'utf8',
+      ),
+    )[1]?.toJS() as unknown;
+    const journalFlow = parseAllDocuments(
+      readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-journal-paper-trail.yaml'),
+        'utf8',
+      ),
+    )[1]?.toJS() as unknown;
+
+    expect(Array.isArray(emptyFlow)).toBe(true);
+    expect(Array.isArray(journalFlow)).toBe(true);
+    if (!Array.isArray(emptyFlow) || !Array.isArray(journalFlow)) {
+      throw new Error('Journal Maestro commands must be YAML lists');
+    }
+
+    expect(() =>
+      assertCommandsInOrder(emptyFlow, [
+        { assertVisible: { id: 'recaps-empty-start-session' } },
+        { tapOn: { id: 'recaps-empty-start-session' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'mentor-screen' },
+            timeout: 15000,
+          },
+        },
+        { assertVisible: { id: 'tab-mentor' } },
+      ]),
+    ).not.toThrow();
+
+    for (const reportProperties of [
+      [
+        { tapOn: { id: 'weekly-report-card-${WEEKLY_REPORT_ID}' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'progress-weekly-report-metric-sessions' },
+            timeout: 15000,
+          },
+        },
+        { assertVisible: { text: '4 sessions this week' } },
+        { tapOn: { id: 'progress-weekly-report-back' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'journal-screen' },
+            timeout: 15000,
+          },
+        },
+        { assertNotVisible: { id: 'scope-chip' } },
+        { assertVisible: { id: 'weekly-report-card-${WEEKLY_REPORT_ID}' } },
+      ],
+      [
+        { tapOn: { id: 'report-card-${MONTHLY_REPORT_ID}' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'progress-report-metric-sessions' },
+            timeout: 15000,
+          },
+        },
+        { assertVisible: { text: 'July 2026' } },
+        { assertVisible: { text: '12 topics mastered' } },
+        { tapOn: { id: 'progress-report-back' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'journal-screen' },
+            timeout: 15000,
+          },
+        },
+        { assertNotVisible: { id: 'scope-chip' } },
+        { assertVisible: { id: 'report-card-${MONTHLY_REPORT_ID}' } },
+      ],
+    ]) {
+      expect(() =>
+        assertCommandsInOrder(journalFlow, reportProperties),
+      ).not.toThrow();
+    }
+
+    expect(() =>
+      assertCommandsInOrder(journalFlow, [
+        {
+          assertVisible: {
+            id: 'journal-activity-${PRACTICE_ACTIVITY_EVENT_ID}',
+          },
+        },
+        { tapOn: { id: 'journal-practice-open-hub' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'practice-screen' },
+            timeout: 15000,
+          },
+        },
+        { tapOn: { id: 'practice-back' } },
+        {
+          extendedWaitUntil: {
+            visible: { id: 'journal-screen' },
+            timeout: 15000,
+          },
+        },
+      ]),
+    ).not.toThrow();
   });
 
   it('[WI-2239] binds exact browser recap text to the exact recap card and rejects permissive ownership mutants', () => {
