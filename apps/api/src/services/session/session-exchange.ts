@@ -41,6 +41,7 @@ import type {
   MentorNoticeAccepted,
   RecitationSetupState,
   RecitationSetupTransition,
+  AnswerEvaluation,
 } from '@eduagent/schemas';
 import {
   computeAgeBracket,
@@ -73,6 +74,7 @@ import {
   emitSuitabilityBlockedEvent,
   emitSuitabilityJudgeUnavailableEvent,
   inferObviousReliableSourceForAudit,
+  shouldAcceptAnswerEvaluation,
   type ExchangeFallback,
   type ExchangeSourceAudit,
   type FluencyDrillAnnotation,
@@ -87,6 +89,7 @@ import { isLlmExchangeConsentAllowed } from '../identity-v2/consent-status-v2';
 import {
   evaluateEscalation,
   getRetentionAwareStartingRung,
+  type EscalationDecision,
 } from '../escalation';
 import {
   buildPriorLearningContext,
@@ -275,9 +278,25 @@ export function computeCorrectStreak(
     if (!meta || typeof meta !== 'object') break;
     const m = meta as Record<string, unknown>;
     if (m.escalationRung !== currentRung) break;
-    // Explicit wrong answer resets the streak; unevaluated turns are skipped.
-    if (m.correctAnswer === false) break;
-    if (m.correctAnswer !== true) continue;
+    const answerEvaluation = m.answerEvaluation;
+    const canonicalCorrectness =
+      answerEvaluation &&
+      typeof answerEvaluation === 'object' &&
+      !Array.isArray(answerEvaluation)
+        ? (answerEvaluation as Record<string, unknown>).correctness
+        : undefined;
+    if (
+      canonicalCorrectness === 'partial' ||
+      canonicalCorrectness === 'incorrect'
+    ) {
+      break;
+    }
+    if (canonicalCorrectness === 'na') continue;
+    if (canonicalCorrectness !== 'correct') {
+      // Legacy rows remain readable when no valid canonical signal exists.
+      if (m.correctAnswer === false) break;
+      if (m.correctAnswer !== true) continue;
+    }
     streak++;
     if (streak >= MAX_CORRECT_STREAK) break;
   }
@@ -299,6 +318,8 @@ export interface ExchangeBehavioralMetrics {
   homeworkMode?: 'help_me' | 'check_answer';
   /** Envelope signal — read back next turn to hold escalation (F1.2) */
   partialProgress?: boolean;
+  /** Canonical ordinary-loop answer evaluation for this learner turn. */
+  answerEvaluation?: AnswerEvaluation;
   /** Envelope signal — used to queue topic for remediation (F1.3) */
   needsDeepening?: boolean;
   /** F6: LLM self-reported confidence — persisted so the next turn and analytics can read it. */
@@ -313,6 +334,12 @@ export interface ExchangeBehavioralMetrics {
   sourceAudit?: ExchangeSourceAudit;
   /** B.3 monitoring: consecutive correct-answer streak at the current escalation rung */
   correctStreak?: number;
+  /** Source-rung streak retained only for rung-movement audit evidence. */
+  rungMovementStreak?: number;
+  /** Explicit rung movement chosen before this exchange. */
+  rungAction?: EscalationDecision['action'];
+  rungDirection?: EscalationDecision['direction'];
+  rungReason?: string;
   /** Fluency-drill score correct count, when the envelope's ui_hints.fluency_drill.score was set. */
   drillCorrect?: number;
   /** Fluency-drill score total count, when the envelope's ui_hints.fluency_drill.score was set. */
@@ -363,6 +390,72 @@ export interface ExchangeBehavioralMetrics {
   challengeRoundVerdict?: ChallengeRoundVerdict;
   /** Learner-reviewed note draft payload surfaced by the runtime guard. */
   draftedNote?: DraftedChallengeNote;
+}
+
+export interface DownwardRungMovementAudit {
+  fromRung: number;
+  toRung: number;
+  action: 'deescalate';
+  direction: 'down';
+  streak?: number;
+  reason?: string;
+}
+
+export function buildDownwardRungMovementAudit(
+  previousRung: number,
+  effectiveRung: number,
+  behavioral?: Pick<
+    ExchangeBehavioralMetrics,
+    'rungDirection' | 'rungMovementStreak' | 'rungReason'
+  >,
+): DownwardRungMovementAudit | undefined {
+  if (previousRung === effectiveRung || behavioral?.rungDirection !== 'down') {
+    return undefined;
+  }
+
+  return {
+    fromRung: previousRung,
+    toRung: effectiveRung,
+    action: 'deescalate',
+    direction: 'down',
+    ...(behavioral.rungMovementStreak !== undefined && {
+      streak: behavioral.rungMovementStreak,
+    }),
+    ...(behavioral.rungReason && { reason: behavioral.rungReason }),
+  };
+}
+
+export function buildDeescalationTelemetry(
+  sessionId: string,
+  movement: DownwardRungMovementAudit,
+) {
+  return {
+    event: 'llm.deescalation_applied' as const,
+    sessionId,
+    ...movement,
+  };
+}
+
+export function buildCorrectStreakOfferTelemetry(
+  sessionId: string,
+  behavioral?: Pick<
+    ExchangeBehavioralMetrics,
+    'correctStreak' | 'rungDirection'
+  >,
+) {
+  if (
+    behavioral?.rungDirection !== 'none' ||
+    behavioral.correctStreak == null ||
+    behavioral.correctStreak < 4
+  ) {
+    return undefined;
+  }
+
+  return {
+    event: 'llm.escalation_offered' as const,
+    sessionId,
+    correctStreak: behavioral.correctStreak,
+  };
 }
 
 export interface ChallengeRoundVerdict {
@@ -1974,6 +2067,8 @@ interface ExchangePrep {
   effectiveRung: EscalationRung;
   hintCount: number;
   lastAiResponseAt: Date | null;
+  escalationDecision: EscalationDecision;
+  sourceCorrectStreak: number;
 }
 
 /**
@@ -2314,6 +2409,7 @@ export async function prepareExchangeContext(
     semanticMemoryRetrievalEnabled?: boolean;
     challengeRoundRuntimeEnabled?: boolean;
     challengeRoundGraderEnabled?: boolean;
+    answerEvaluationEnabled?: boolean;
     mentorNoticeEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
     currentUserMessageEventId?: string;
@@ -2892,13 +2988,23 @@ export async function prepareExchangeContext(
       computeDaysSinceLastReview(retentionCard.lastReviewedAt) ?? undefined;
   }
 
-  // 3c. Count questions at the current escalation rung + compute hint count
+  const currentRung =
+    session.exchangeCount === 0 && retentionStatusValue
+      ? getRetentionAwareStartingRung(retentionStatusValue)
+      : session.escalationRung;
+
+  // 3c. Count only the latest contiguous visit to the current rung. Older
+  // visits must not bounce the learner immediately after returning here.
   const aiResponseEvents = events.filter((e) => e.eventType === 'ai_response');
-  const questionsAtCurrentRung = aiResponseEvents.filter(
-    (e) =>
-      (e.metadata as Record<string, unknown> | null)?.escalationRung ===
-      session.escalationRung,
-  ).length;
+  const currentRungVisit = [] as typeof aiResponseEvents;
+  for (let i = aiResponseEvents.length - 1; i >= 0; i--) {
+    const event = aiResponseEvents[i];
+    const rung = (event?.metadata as Record<string, unknown> | null)
+      ?.escalationRung;
+    if (rung !== currentRung) break;
+    if (event) currentRungVisit.unshift(event);
+  }
+  const questionsAtCurrentRung = currentRungVisit.length;
   // Hint = AI response at escalation rung >= 2 (beyond basic Socratic)
   const hintCount = aiResponseEvents.filter((e) => {
     const rung = (e.metadata as Record<string, unknown> | null)?.escalationRung;
@@ -2912,7 +3018,7 @@ export async function prepareExchangeContext(
   // [PARTIAL_PROGRESS] marker; after the envelope migration the signal
   // lives in structured metadata persisted alongside the ai_response event.
   const previousResponseHadPartialProgress =
-    (lastAiResponseEvent?.metadata as Record<string, unknown> | null)
+    (currentRungVisit.at(-1)?.metadata as Record<string, unknown> | null)
       ?.partialProgress === true;
 
   // 3e. Count consecutive trailing ai_response events with partialProgress
@@ -2920,8 +3026,8 @@ export async function prepareExchangeContext(
   // walk backwards from the most recent ai_response; the streak breaks on
   // the first event without the flag.
   let consecutiveHolds = 0;
-  for (let i = aiResponseEvents.length - 1; i >= 0; i--) {
-    const meta = aiResponseEvents[i]?.metadata as Record<
+  for (let i = currentRungVisit.length - 1; i >= 0; i--) {
+    const meta = currentRungVisit[i]?.metadata as Record<
       string,
       unknown
     > | null;
@@ -2932,28 +3038,6 @@ export async function prepareExchangeContext(
     }
   }
 
-  // 4. Evaluate escalation (retention-aware + partial-progress-aware)
-  // On first exchange: use retention-aware starting rung (Gap 4)
-  const currentRung =
-    session.exchangeCount === 0 && retentionStatusValue
-      ? getRetentionAwareStartingRung(retentionStatusValue)
-      : session.escalationRung;
-
-  const escalationDecision = evaluateEscalation(
-    {
-      currentRung,
-      hintCount,
-      questionsAtCurrentRung,
-      totalExchanges: session.exchangeCount,
-      retentionStatus: retentionStatusValue,
-      previousResponseHadPartialProgress,
-      consecutiveHolds,
-    },
-    userMessage,
-  );
-  const effectiveRung = escalationDecision.shouldEscalate
-    ? escalationDecision.newRung
-    : currentRung;
   const parsedChallengeRound = challengeRoundSessionStateSchema.safeParse(
     sessionMeta['challengeRound'],
   );
@@ -2975,8 +3059,37 @@ export async function prepareExchangeContext(
     );
     challengeRound = challengeRoundStart.challengeRound;
   }
-  const correctStreak = computeCorrectStreak(events, effectiveRung);
-  const challengeCorrectStreak = computeCorrectStreak(events, currentRung);
+
+  const sourceCorrectStreak = computeCorrectStreak(events, currentRung);
+  const effectiveMode = (session.metadata as Record<string, unknown> | null)
+    ?.effectiveMode as string | undefined;
+  const freezeRung =
+    isAppHelpQuery(userMessage) ||
+    effectiveMode === 'recitation' ||
+    challengeRound?.state === 'accepted' ||
+    challengeRound?.state === 'active';
+
+  const escalationDecision = evaluateEscalation(
+    {
+      currentRung,
+      hintCount,
+      questionsAtCurrentRung,
+      totalExchanges: session.exchangeCount,
+      retentionStatus: retentionStatusValue,
+      previousResponseHadPartialProgress,
+      consecutiveHolds,
+      correctStreak: sourceCorrectStreak,
+      answerEvaluationEnabled: options?.answerEvaluationEnabled === true,
+      freezeRung,
+    },
+    userMessage,
+  );
+  const effectiveRung = escalationDecision.newRung;
+  const correctStreak =
+    !freezeRung && escalationDecision.direction === 'none'
+      ? sourceCorrectStreak
+      : undefined;
+  const challengeCorrectStreak = sourceCorrectStreak;
   const challengeQuotaRemainingTurns = options?.quotaRemainingTurns;
   const challengeQuotaFractionRemaining = options?.quotaFractionRemaining;
   const hasChallengeQuotaInputs =
@@ -3391,8 +3504,7 @@ export async function prepareExchangeContext(
     // Teach-first: expose exchange count so buildSystemPrompt can gate first-exchange behaviour
     exchangeCount: session.exchangeCount,
     // Client-side effective mode — drives mode-specific prompt sections (e.g. recitation)
-    effectiveMode: (session.metadata as Record<string, unknown> | null)
-      ?.effectiveMode as string | undefined,
+    effectiveMode,
     recitationSetup,
     // [WI-2220] Active app shell, passed from client per exchange
     shell: options?.shell,
@@ -3416,6 +3528,7 @@ export async function prepareExchangeContext(
     // B.3: Consecutive correct-answer streak at the current escalation rung.
     // Used by the prompt to trigger adaptive escalation when streak >= 4.
     correctStreak,
+    answerEvaluationEnabled: options?.answerEvaluationEnabled === true,
     challengeEligible: challengeReadiness.eligible,
     challengeRuntimeEnabled: challengeRoundRuntimeEnabled,
     mentorNoticeEnabled: options?.mentorNoticeEnabled === true,
@@ -3426,7 +3539,15 @@ export async function prepareExchangeContext(
     reviewCallback,
   };
 
-  return { session, context, effectiveRung, hintCount, lastAiResponseAt };
+  return {
+    session,
+    context,
+    effectiveRung,
+    hintCount,
+    lastAiResponseAt,
+    escalationDecision,
+    sourceCorrectStreak,
+  };
 }
 
 export async function persistExchangeResult(
@@ -3460,6 +3581,23 @@ export async function persistExchangeResult(
     persistenceEffectiveMode,
     behavioral?.sourceAudit,
   );
+  const answerEvaluation = behavioral?.answerEvaluation;
+  const persistedPartialProgress =
+    answerEvaluation?.correctness === 'partial'
+      ? true
+      : behavioral?.partialProgress;
+  const compatibilityCorrectAnswer =
+    answerEvaluation?.correctness === 'correct'
+      ? true
+      : answerEvaluation?.correctness === 'partial' ||
+          answerEvaluation?.correctness === 'incorrect'
+        ? false
+        : undefined;
+  const downwardRungMovement = buildDownwardRungMovementAudit(
+    previousRung,
+    effectiveRung,
+    behavioral,
+  );
 
   // Build ai_response metadata — always includes escalationRung,
   // enriched with behavioral metrics when available (UX-18)
@@ -3475,8 +3613,15 @@ export async function persistExchangeResult(
       expectedResponseMinutes: behavioral.expectedResponseMinutes,
       // Envelope signals persisted so the next turn can read them back for
       // escalation-hold (F1.2) and remediation-queue (F1.3) decisions.
-      ...(behavioral.partialProgress !== undefined && {
-        partialProgress: behavioral.partialProgress,
+      ...(persistedPartialProgress !== undefined && {
+        partialProgress: persistedPartialProgress,
+      }),
+      ...(answerEvaluation !== undefined && { answerEvaluation }),
+      ...(compatibilityCorrectAnswer !== undefined && {
+        correctAnswer: compatibilityCorrectAnswer,
+      }),
+      ...(downwardRungMovement !== undefined && {
+        rungMovement: downwardRungMovement,
       }),
       ...(behavioral.needsDeepening !== undefined && {
         needsDeepening: behavioral.needsDeepening,
@@ -3757,7 +3902,7 @@ export async function persistExchangeResult(
     });
   }
 
-  if (previousRung !== effectiveRung) {
+  if (previousRung !== effectiveRung && behavioral?.rungDirection !== 'down') {
     await safeWrite(
       () =>
         db.insert(sessionEvents).values({
@@ -3800,12 +3945,19 @@ export async function persistExchangeResult(
   }
 
   // B.3 monitoring: escalation offered on correct streak
-  if (behavioral?.correctStreak != null && behavioral.correctStreak >= 4) {
-    logger.info('[session-exchange] escalation offered', {
-      event: 'llm.escalation_offered',
+  if (downwardRungMovement) {
+    logger.info(
+      '[session-exchange] de-escalation applied',
+      buildDeescalationTelemetry(sessionId, downwardRungMovement),
+    );
+  } else {
+    const correctStreakOffer = buildCorrectStreakOfferTelemetry(
       sessionId,
-      correctStreak: behavioral.correctStreak,
-    });
+      behavioral,
+    );
+    if (correctStreakOffer) {
+      logger.info('[session-exchange] escalation offered', correctStreakOffer);
+    }
   }
 
   return {
@@ -3844,6 +3996,7 @@ export async function processMessage(
     reviewCallbackOpenerEnabled?: boolean;
     judgeFrameworkEnabled?: boolean;
     judgeEnforcementEnabled?: boolean;
+    answerEvaluationEnabled?: boolean;
   },
 ): Promise<{
   response: string;
@@ -3878,6 +4031,7 @@ export async function processMessage(
   challengeOffer?: { pitch: string };
   draftedNote?: DraftedChallengeNote;
   mentorNotice?: MentorNoticeAccepted;
+  answerEvaluation?: AnswerEvaluation;
 }> {
   // [WI-2372] Consent-withdrawal gate — first op, before any dispatch.
   await assertExchangeConsent(db, profileId);
@@ -3891,13 +4045,20 @@ export async function processMessage(
     options?.mentorNoticeEnabled === true
       ? generateUUIDv7()
       : undefined;
-  const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
-    await prepareExchangeContext(db, profileId, sessionId, input.message, {
-      ...options,
-      homeworkMode: input.homeworkMode,
-      shell: input.shell,
-      currentUserMessageEventId,
-    });
+  const {
+    session,
+    context,
+    effectiveRung,
+    hintCount,
+    lastAiResponseAt,
+    escalationDecision,
+    sourceCorrectStreak,
+  } = await prepareExchangeContext(db, profileId, sessionId, input.message, {
+    ...options,
+    homeworkMode: input.homeworkMode,
+    shell: input.shell,
+    currentUserMessageEventId,
+  });
 
   const imageData: ImageData | undefined =
     input.imageBase64 && input.imageMimeType
@@ -4032,6 +4193,7 @@ export async function processMessage(
       expectedResponseMinutes: result.expectedResponseMinutes,
       homeworkMode: input.homeworkMode,
       partialProgress: result.partialProgress,
+      answerEvaluation: result.answerEvaluation,
       needsDeepening: result.needsDeepening,
       confidence: result.confidence,
       retrievalScore: result.retrievalScore,
@@ -4051,6 +4213,11 @@ export async function processMessage(
       llmProvider: result.provider,
       llmModel: result.model,
       recitationSetup: context.recitationSetup?.state,
+      correctStreak: context.correctStreak,
+      rungMovementStreak: sourceCorrectStreak,
+      rungAction: escalationDecision.action,
+      rungDirection: escalationDecision.direction,
+      rungReason: escalationDecision.reason,
       // Bug #348: forward EVALUATE / TEACH_BACK assessment signals onto
       // aiMetadata.signals so parseEvaluate/TeachBackAssessment can read them.
       evaluateAssessment: result.evaluateAssessment,
@@ -4194,6 +4361,7 @@ export async function processMessage(
     challengeOffer: challengeRoundRuntime.challengeOffer,
     draftedNote: challengeRoundRuntime.draftedNote,
     mentorNotice,
+    answerEvaluation: result.answerEvaluation,
   };
 }
 
@@ -4223,6 +4391,7 @@ export async function streamMessage(
     reviewCallbackOpenerEnabled?: boolean;
     judgeFrameworkEnabled?: boolean;
     judgeEnforcementEnabled?: boolean;
+    answerEvaluationEnabled?: boolean;
   },
 ): Promise<{
   stream: AsyncIterable<string>;
@@ -4259,6 +4428,7 @@ export async function streamMessage(
     challengeOffer?: { pitch: string };
     draftedNote?: DraftedChallengeNote;
     mentorNotice?: MentorNoticeAccepted;
+    answerEvaluation?: AnswerEvaluation;
   }>;
 }> {
   // [WI-2372] Consent-withdrawal gate — first op, before any dispatch.
@@ -4273,13 +4443,20 @@ export async function streamMessage(
     options?.mentorNoticeEnabled === true
       ? generateUUIDv7()
       : undefined;
-  const { session, context, effectiveRung, hintCount, lastAiResponseAt } =
-    await prepareExchangeContext(db, profileId, sessionId, input.message, {
-      ...options,
-      homeworkMode: input.homeworkMode,
-      shell: input.shell,
-      currentUserMessageEventId,
-    });
+  const {
+    session,
+    context,
+    effectiveRung,
+    hintCount,
+    lastAiResponseAt,
+    escalationDecision,
+    sourceCorrectStreak,
+  } = await prepareExchangeContext(db, profileId, sessionId, input.message, {
+    ...options,
+    homeworkMode: input.homeworkMode,
+    shell: input.shell,
+    currentUserMessageEventId,
+  });
 
   // Compute time-to-answer before streaming begins.
   // [BUG-391] Same defensive cast as the non-streaming path above — ensure a
@@ -4356,10 +4533,16 @@ export async function streamMessage(
       // instead of falling back to `response.trim()` — the raw envelope JSON —
       // which would be written verbatim to ai_response.content and re-rendered
       // by the client as a raw JSON blob.
+      const appHelpTurn = isAppHelpQuery(input.message);
+      const acceptAnswerEvaluation = shouldAcceptAnswerEvaluation(
+        context,
+        appHelpTurn,
+      );
       const outcome = classifyExchangeOutcome(rawResponse, {
         sessionId,
         profileId,
         flow: 'streamMessage',
+        acceptAnswerEvaluation,
       });
 
       // [BUG-941] When the LLM emitted an unparseable / empty response, return
@@ -4409,9 +4592,17 @@ export async function streamMessage(
         };
       }
 
-      const parsed = isAppHelpQuery(input.message)
+      const modeGuarded = appHelpTurn
         ? applyAppHelpSignalGuard(outcome.parsed)
         : outcome.parsed;
+      const parsed = acceptAnswerEvaluation
+        ? {
+            ...modeGuarded,
+            partialProgress:
+              modeGuarded.answerEvaluation?.correctness === 'partial' ||
+              modeGuarded.partialProgress,
+          }
+        : { ...modeGuarded, answerEvaluation: undefined };
       const privateSourcesForAudit = inferObviousReliableSourceForAudit(
         parsed.privateSources,
         result.sourceEvidence,
@@ -4576,6 +4767,7 @@ export async function streamMessage(
           expectedResponseMinutes,
           homeworkMode: input.homeworkMode,
           partialProgress: parsed.partialProgress,
+          answerEvaluation: parsed.answerEvaluation,
           needsDeepening: parsed.needsDeepening,
           confidence: parsed.confidence,
           retrievalScore: parsed.retrievalScore,
@@ -4594,6 +4786,11 @@ export async function streamMessage(
           llmModel: result.model,
           llmFallbackUsed: result.fallbackUsed === true,
           recitationSetup: context.recitationSetup?.state,
+          correctStreak: context.correctStreak,
+          rungMovementStreak: sourceCorrectStreak,
+          rungAction: escalationDecision.action,
+          rungDirection: escalationDecision.direction,
+          rungReason: escalationDecision.reason,
           // Bug #348: forward EVALUATE / TEACH_BACK assessment signals from
           // the parsed envelope onto aiMetadata.signals.
           evaluateAssessment: parsed.evaluateAssessment,
@@ -4733,6 +4930,7 @@ export async function streamMessage(
         challengeOffer: challengeRoundRuntime.challengeOffer,
         draftedNote: challengeRoundRuntime.draftedNote,
         mentorNotice,
+        answerEvaluation: parsed.answerEvaluation,
       };
     },
   };

@@ -169,6 +169,8 @@ const envSchema = z.object({
   // See docs/plans/2026-05-18-challenge-round-targets.md "Rollout Gate".
   CHALLENGE_ROUND_RUNTIME_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  ANSWER_EVALUATION_RUNTIME_ENABLED: z.enum(['true', 'false']).default('false'),
+
   // Homework notice felt moments — single default-off kill switch covering
   // prompt proposals, durable acceptance, read surfaces, routes, and jobs.
   MENTOR_NOTICE_ENABLED: z.enum(['true', 'false']).default('false'),
@@ -400,6 +402,18 @@ export function isChallengeRoundEnabledForProfile(
  * REVIEW transition copy. See docs/specs/2026-06-27-rr1-rr13-warm-review-callback.md.
  */
 export function isReviewCallbackOpenerEnabled(
+  value: string | undefined,
+): boolean {
+  return value === 'true';
+}
+
+/**
+ * Per-turn answer-evaluation gate. Read at the session route boundary and
+ * threaded through prompt construction, parsing, persistence, and bounded
+ * downscaffolding. Default-closed so an absent or malformed binding preserves
+ * the legacy exchange path.
+ */
+export function isAnswerEvaluationRuntimeEnabled(
   value: string | undefined,
 ): boolean {
   return value === 'true';

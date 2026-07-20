@@ -88,14 +88,17 @@ import type { StopReason } from '../llm/stop-reason';
 import { MAX_CHALLENGE_QUESTIONS } from '../challenge-round/caps';
 import {
   processMessage,
+  streamMessage,
   finalizeChallengeRoundIfReady,
 } from './session-exchange';
 import { mapSessionRow } from './session-events';
+import {
+  streamSessionResponse,
+  type CreateSseResponse,
+  type StreamSessionResponseDependencies,
+} from './session-stream-response';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
-
-const hasDatabaseUrl = !!process.env.DATABASE_URL;
-const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
 
 // ---------------------------------------------------------------------------
 // LLM fixtures
@@ -122,6 +125,29 @@ const TUTOR_ENVELOPE_NO_EVAL = JSON.stringify({
     insufficient: false,
     reason: 'test envelope',
   },
+});
+
+const TUTOR_ENVELOPE_WITH_ANSWER_EVALUATION = JSON.stringify({
+  reply: 'The product is 42. What factor pair gives the same result?',
+  signals: {
+    partial_progress: false,
+    needs_deepening: false,
+    understanding_check: true,
+    ready_to_finish: false,
+    answer_evaluation: {
+      correctness: 'correct',
+      concept: 'multiplication',
+    },
+  },
+  ui_hints: {
+    note_prompt: { show: false, post_session: false },
+  },
+  private_sources: {
+    relied_on: ['current_topic'],
+    insufficient: false,
+    reason: 'The seeded current topic supports this deterministic question.',
+  },
+  confidence: 'high',
 });
 
 /** Solid grader verdict — matches the `challengeRoundGraderVerdictSchema`. */
@@ -346,6 +372,39 @@ async function seedActiveSession(
   return mapSessionRow(row!);
 }
 
+async function seedOrdinarySession(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  topicId: string,
+): Promise<ReturnType<typeof mapSessionRow>> {
+  const [row] = await db
+    .insert(learningSessions)
+    .values({
+      profileId,
+      subjectId,
+      topicId,
+      sessionType: 'learning',
+      inputMode: 'text',
+      status: 'active',
+      escalationRung: 1,
+      exchangeCount: 1,
+      metadata: {},
+    })
+    .returning();
+
+  const session = mapSessionRow(row!);
+  await seedPriorAiResponse(
+    db,
+    profileId,
+    subjectId,
+    session.id,
+    topicId,
+    'What is 6 multiplied by 7?',
+  );
+  return session;
+}
+
 /**
  * Seed a session already in `drafting` state with one solid evaluation.
  * Used for the finalizeChallengeRoundIfReady mastery-verification test.
@@ -459,14 +518,45 @@ async function readAssessmentsForSession(
     );
 }
 
+async function readAiEventById(
+  db: Database,
+  profileId: string,
+  aiEventId: string,
+): Promise<{ content: string; metadata: Record<string, unknown> } | undefined> {
+  const [row] = await db
+    .select({
+      content: sessionEvents.content,
+      metadata: sessionEvents.metadata,
+    })
+    .from(sessionEvents)
+    .where(
+      and(
+        eq(sessionEvents.id, aiEventId),
+        eq(sessionEvents.profileId, profileId),
+        eq(sessionEvents.eventType, 'ai_response'),
+      ),
+    );
+  return row
+    ? {
+        content: row.content,
+        metadata: row.metadata as Record<string, unknown>,
+      }
+    : undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describeIfDb('Challenge Round grader integration (T7)', () => {
+describe('session exchange production-path integration', () => {
   let db: Database;
 
   beforeAll(() => {
+    if (!process.env.DATABASE_URL) {
+      throw new Error(
+        'DATABASE_URL is required; this production-path integration suite must not skip.',
+      );
+    }
     db = createDatabase(process.env.DATABASE_URL!);
     llm.register();
   });
@@ -490,6 +580,170 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
     llm.reset();
     _resetCircuits();
   });
+
+  async function seedAnswerEvaluationTurn() {
+    const { profileId, subjectId } = await seedProfileAndSubject(db);
+    const topicId = await seedCurriculumTopic(db, subjectId);
+    const session = await seedOrdinarySession(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+    );
+    llm.setTutorResponse(TUTOR_ENVELOPE_WITH_ANSWER_EVALUATION);
+    return { profileId, session };
+  }
+
+  async function expectPersistedAnswerEvaluation(
+    profileId: string,
+    aiEventId: string | undefined,
+  ) {
+    expect(aiEventId).toEqual(expect.any(String));
+    const row = await readAiEventById(db, profileId, aiEventId!);
+    expect(row).toBeDefined();
+    expect(row?.content).toBe(
+      'The product is 42. What factor pair gives the same result?',
+    );
+    expect(row?.metadata.answerEvaluation).toEqual({
+      correctness: 'correct',
+      concept: 'multiplication',
+    });
+    expect(row?.metadata.correctAnswer).toBe(true);
+  }
+
+  function captureSseFrames(): {
+    frames: Array<Record<string, unknown>>;
+    createSseResponse: CreateSseResponse;
+  } {
+    const frames: Array<Record<string, unknown>> = [];
+    const createSseResponse: CreateSseResponse = async (handler) => {
+      await handler({
+        async writeSSE({ data }) {
+          frames.push(JSON.parse(data) as Record<string, unknown>);
+        },
+      });
+      return new Response(null, { status: 200 });
+    };
+    return { frames, createSseResponse };
+  }
+
+  function fallbackDependencies(
+    injectedStreamMessage: typeof streamMessage,
+  ): StreamSessionResponseDependencies {
+    return {
+      streamMessage: injectedStreamMessage,
+      processMessage,
+      refundQuotaOrEscalate: jest.fn().mockResolvedValue({ refunded: true }),
+      markPersisted: jest.fn().mockResolvedValue(undefined),
+      sendEmptyReplyFallbackEvent: jest.fn().mockResolvedValue(undefined),
+      logger: { error: jest.fn(), warn: jest.fn() },
+      captureException: jest.fn(),
+      addBreadcrumb: jest.fn(),
+    } as unknown as StreamSessionResponseDependencies;
+  }
+
+  it('[WI-1443] processMessage persists canonical answer evaluation by its returned aiEventId', async () => {
+    const { profileId, session } = await seedAnswerEvaluationTurn();
+
+    const result = await processMessage(
+      db,
+      profileId,
+      session.id,
+      { message: '42' },
+      {
+        semanticMemoryRetrievalEnabled: false,
+        answerEvaluationEnabled: true,
+      },
+    );
+
+    expect(result.answerEvaluation).toEqual({
+      correctness: 'correct',
+      concept: 'multiplication',
+    });
+    await expectPersistedAnswerEvaluation(profileId, result.aiEventId);
+  });
+
+  it('[WI-1443] drained streamMessage.onComplete persists canonical answer evaluation by its returned aiEventId', async () => {
+    const { profileId, session } = await seedAnswerEvaluationTurn();
+
+    const result = await streamMessage(
+      db,
+      profileId,
+      session.id,
+      { message: '42' },
+      {
+        semanticMemoryRetrievalEnabled: false,
+        answerEvaluationEnabled: true,
+      },
+    );
+    let visible = '';
+    for await (const chunk of result.stream) visible += chunk;
+    const completed = await result.onComplete();
+
+    expect(visible).toContain('The product is 42.');
+    expect(completed.answerEvaluation).toEqual({
+      correctness: 'correct',
+      concept: 'multiplication',
+    });
+    await expectPersistedAnswerEvaluation(profileId, completed.aiEventId);
+  });
+
+  it.each(['pre-stream', 'mid-stream'] as const)(
+    '[WI-1443] %s failure uses real processMessage fallback and persists its done aiEventId',
+    async (phase) => {
+      const { profileId, session } = await seedAnswerEvaluationTurn();
+      const { frames, createSseResponse } = captureSseFrames();
+      const injectedStreamMessage = (
+        phase === 'pre-stream'
+          ? async () => {
+              throw new Error('injected pre-stream failure');
+            }
+          : async () => ({
+              stream: (async function* () {
+                yield 'partial visible reply';
+                throw new Error('injected mid-stream failure');
+              })(),
+              onComplete: async () => {
+                throw new Error('onComplete must not run after stream failure');
+              },
+            })
+      ) as typeof streamMessage;
+
+      await streamSessionResponse({
+        db,
+        profileId,
+        sessionId: session.id,
+        input: { message: '42' },
+        session: { exchangeCount: session.exchangeCount },
+        subscriptionId: undefined,
+        quota: {
+          source: undefined,
+          quotaModel: undefined,
+          topUpCreditId: undefined,
+        },
+        streamOptions: {
+          semanticMemoryRetrievalEnabled: false,
+          answerEvaluationEnabled: true,
+        },
+        createSseResponse,
+        deps: fallbackDependencies(injectedStreamMessage),
+      });
+
+      const done = frames.find((frame) => frame.type === 'done');
+      expect(done).toBeDefined();
+      expect(
+        frames.some((frame) =>
+          phase === 'pre-stream'
+            ? frame.type === 'chunk'
+            : frame.type === 'replace',
+        ),
+      ).toBe(true);
+      await expectPersistedAnswerEvaluation(
+        profileId,
+        done?.aiEventId as string | undefined,
+      );
+    },
+  );
 
   // -------------------------------------------------------------------------
   // Mastery path (via finalizeChallengeRoundIfReady, no LLM call needed)

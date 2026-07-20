@@ -24,6 +24,7 @@ import {
   type LlmResponseEnvelope,
   type ChallengeRoundEvaluationItem,
   type ChallengeRoundNoteDraftHint,
+  type AnswerEvaluation,
 } from '@eduagent/schemas';
 import {
   buildSystemPromptSegments as _buildSystemPromptSegments,
@@ -516,6 +517,8 @@ export interface ExchangeResult {
   needsDeepening: boolean;
   /** Whether the LLM signalled partial progress (Gap 3) */
   partialProgress: boolean;
+  /** Canonical evaluation of the current ordinary learner answer. */
+  answerEvaluation?: AnswerEvaluation;
   provider: string;
   model: string;
   latencyMs: number;
@@ -1815,6 +1818,20 @@ function buildTripwireResult(
   };
 }
 
+export function shouldAcceptAnswerEvaluation(
+  context: ExchangeContext,
+  appHelpTurn: boolean,
+): boolean {
+  const challengeState = context.challengeRound?.state;
+  return (
+    context.answerEvaluationEnabled === true &&
+    !appHelpTurn &&
+    context.effectiveMode !== 'recitation' &&
+    challengeState !== 'accepted' &&
+    challengeState !== 'active'
+  );
+}
+
 export async function processExchange(
   context: ExchangeContext,
   userMessage: string,
@@ -1914,12 +1931,25 @@ export async function processExchange(
     responseFormat: 'json',
   });
 
+  const acceptAnswerEvaluation = shouldAcceptAnswerEvaluation(
+    context,
+    appHelpTurn,
+  );
   const parsed = parseExchangeEnvelope(result.response, {
     sessionId: context.sessionId,
     profileId: context.profileId,
     flow: 'processExchange',
+    acceptAnswerEvaluation,
   });
-  const finalParsed = appHelpTurn ? applyAppHelpSignalGuard(parsed) : parsed;
+  const appHelpGuarded = appHelpTurn ? applyAppHelpSignalGuard(parsed) : parsed;
+  const finalParsed = acceptAnswerEvaluation
+    ? {
+        ...appHelpGuarded,
+        partialProgress:
+          appHelpGuarded.answerEvaluation?.correctness === 'partial' ||
+          appHelpGuarded.partialProgress,
+      }
+    : { ...appHelpGuarded, answerEvaluation: undefined };
 
   // [H2/H7] Crisis redirect fired — emit the structured safety event before
   // anything else can short-circuit. safeSend guarantees a dispatch failure
@@ -2048,6 +2078,7 @@ export async function processExchange(
     ),
     needsDeepening: finalParsed.needsDeepening,
     partialProgress: finalParsed.partialProgress,
+    answerEvaluation: finalParsed.answerEvaluation,
     provider: result.provider,
     model: result.model,
     latencyMs: result.latencyMs,
@@ -2230,6 +2261,8 @@ export interface ParsedExchangeEnvelope {
   cleanResponse: string;
   understandingCheck: boolean;
   partialProgress: boolean;
+  /** Canonical evaluation of the current ordinary learner answer. */
+  answerEvaluation?: AnswerEvaluation;
   needsDeepening: boolean;
   /** Safety: crisis-redirect rule fired this turn (H2, 2026-06-05 safety audit). Observational — drives structured safety logging, never flow control. */
   crisisRedirect: boolean;
@@ -2293,6 +2326,7 @@ const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
   cleanResponse: '',
   understandingCheck: false,
   partialProgress: false,
+  answerEvaluation: undefined,
   needsDeepening: false,
   crisisRedirect: false,
   notePrompt: false,
@@ -2396,11 +2430,18 @@ function parsedFromVisibleFallbackText(text: string): ParsedExchangeEnvelope {
  */
 export function parseExchangeEnvelope(
   response: string,
-  context?: { sessionId?: string; profileId?: string; flow?: string },
+  context?: {
+    sessionId?: string;
+    profileId?: string;
+    flow?: string;
+    acceptAnswerEvaluation?: boolean;
+  },
 ): ParsedExchangeEnvelope {
   // [BUG-847] Tag the surface so parser-side telemetry can distinguish
   // session-flow parse failures from silent_classify ones below.
-  const parsed = parseEnvelope(response, 'exchange.session');
+  const parsed = parseEnvelope(response, 'exchange.session', {
+    ignoreAnswerEvaluation: context?.acceptAnswerEvaluation === false,
+  });
   if (!parsed.ok) {
     logger.warn('exchange.envelope_parse_failed', {
       flow: context?.flow,
@@ -2428,6 +2469,7 @@ export function parseExchangeEnvelope(
       cleanResponse: cleanLearnerVisibleReply(fallbackText),
       understandingCheck: detectUnderstandingCheckFromProse(fallbackText),
       partialProgress: false,
+      answerEvaluation: undefined,
       needsDeepening: false,
       crisisRedirect: false,
       notePrompt: false,
@@ -2488,6 +2530,7 @@ function envelopeToParsedExchange(
       // control-flow impact beyond the telemetry flag.
       detectUnderstandingCheckFromProse(cleanReply),
     partialProgress: signals.partial_progress === true,
+    answerEvaluation: signals.answer_evaluation,
     needsDeepening: signals.needs_deepening === true,
     crisisRedirect: signals.crisis_redirect === true,
     notePrompt: notePrompt?.show === true,
@@ -2611,11 +2654,22 @@ function extractKnownMarkerKey(response: string): string | null {
 // ---------------------------------------------------------------------------
 export function classifyExchangeOutcome(
   rawResponse: string,
-  _context?: { sessionId?: string; profileId?: string; flow?: string },
+  context?: {
+    sessionId?: string;
+    profileId?: string;
+    flow?: string;
+    acceptAnswerEvaluation?: boolean;
+  },
 ): ClassifiedExchangeOutcome {
   // [BUG-847] Distinct surface tag — silent_classify is the marker-only
   // fallback path, expected to fail full envelope validation more often.
-  const envelopeResult = parseEnvelope(rawResponse, 'exchange.silent_classify');
+  const envelopeResult = parseEnvelope(
+    rawResponse,
+    'exchange.silent_classify',
+    {
+      ignoreAnswerEvaluation: context?.acceptAnswerEvaluation === false,
+    },
+  );
 
   // Normal envelope path — parsed cleanly; classify empty reply here.
   // Pass the already-validated envelope to envelopeToParsedExchange so we

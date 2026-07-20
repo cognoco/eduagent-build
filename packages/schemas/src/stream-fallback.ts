@@ -6,6 +6,7 @@ import {
 } from './sessions.ts';
 import { cefrLevelSchema } from './language.ts';
 import { mentorNoticeAcceptedSchema } from './mentor-notices.ts';
+import { answerEvaluationSchema } from './llm-envelope.ts';
 
 // ---------------------------------------------------------------------------
 // Stream fallback contract — emitted as an SSE frame BEFORE the `done` frame
@@ -251,5 +252,6 @@ export const streamDoneFrameSchema = z.object({
   challengeOffer: streamChallengeOfferSchema.optional(),
   draftedNote: streamDraftedNoteSchema.optional(),
   mentorNotice: mentorNoticeAcceptedSchema.optional(),
+  answerEvaluation: answerEvaluationSchema.optional(),
 });
 export type StreamDoneFrame = z.infer<typeof streamDoneFrameSchema>;

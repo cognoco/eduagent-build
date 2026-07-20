@@ -323,6 +323,7 @@ function getExchangeEnvelopeInstruction(context: {
   isLanguageMode: boolean;
   includeRetrievalScore: boolean;
   isChallengeRoundActive: boolean;
+  includeAnswerEvaluation: boolean;
   /** When true the grader owns challenge_round_evaluation — omit the field
    *  from the envelope template so the tutor does not also emit it. */
   graderEnabled?: boolean;
@@ -341,6 +342,9 @@ function getExchangeEnvelopeInstruction(context: {
     context.isChallengeRoundActive && !context.graderEnabled
       ? ', "challenge_round_evaluation": [ { "concept": "<concept assessed>", "result": "<solid|partial|missing|misconception>", "evidence": "<what the learner demonstrated>", "answerEventId": "<the CURRENT CHALLENGE ANSWER EVENT ID for the learner answer judged>", "learnerQuote": "<short verbatim quote from the learner answer>", "correction": "<optional; the correct idea, only when result is not solid>" } ]'
       : '';
+  const answerEvaluationField = context.includeAnswerEvaluation
+    ? ', "answer_evaluation": { "correctness": "<correct|partial|incorrect|na>" }'
+    : '';
   const mentorNoticeTopicField = context.mentorNoticeRequiresTopicTarget
     ? ', "topicId": "<one topic ID from INTERLEAVED NOTICE TARGETS or empty string>"'
     : '';
@@ -352,10 +356,10 @@ function getExchangeEnvelopeInstruction(context: {
     : '';
 
   const signals = context.isRecitation
-    ? `  "signals": { "understanding_check": <bool>, "crisis_redirect": <bool>${challengeEvalField}${mentorNoticeField}${noticeRecheckField} },`
+    ? `  "signals": { "understanding_check": <bool>, "crisis_redirect": <bool>${answerEvaluationField}${challengeEvalField}${mentorNoticeField}${noticeRecheckField} },`
     : context.includeRetrievalScore
-      ? `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "retrieval_score": <0.0-1.0>${challengeEvalField}${mentorNoticeField}${noticeRecheckField} },`
-      : `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>${challengeEvalField}${mentorNoticeField}${noticeRecheckField} },`;
+      ? `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "retrieval_score": <0.0-1.0>${answerEvaluationField}${challengeEvalField}${mentorNoticeField}${noticeRecheckField} },`
+      : `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>${answerEvaluationField}${challengeEvalField}${mentorNoticeField}${noticeRecheckField} },`;
 
   const uiHints = context.isLanguageMode
     ? '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> }, "fluency_drill": { "active": <bool>, "duration_s": <15-90>, "score": { "correct": <int>, "total": <int> } } },'
@@ -368,6 +372,11 @@ function getExchangeEnvelopeInstruction(context: {
     );
     signalGuidance.push(
       'Set `signals.needs_deepening` to true on the final turn of a rung-5 exit (learner still stuck after three exchanges at the Teaching-Mode Pivot rung). The system will queue the topic for remediation.',
+    );
+  }
+  if (context.includeAnswerEvaluation) {
+    signalGuidance.push(
+      'ANSWER EVALUATION: classify the CURRENT learner message only against the immediately preceding ordinary learning question. This signal evaluates the learner message you are responding to — never your own reply or the new question in it. If the learner message directly and fully answers the preceding question, you MUST use `correct`, even when your reply acknowledges it and moves on. Use `partial` or `incorrect` only when the message is a substantive but incomplete or wrong answer; set `correctness` to `na` when there is no gradable learner answer, including the first turn, a question or request from the learner, a learner acknowledgement, or any turn without an immediately preceding ordinary learning question. `concept` is optional; when present, name only the concept just assessed. Omit `concept` entirely rather than returning an empty string.',
     );
   }
   signalGuidance.push(
@@ -1639,6 +1648,12 @@ export function buildSystemPromptSegments(
       isChallengeRoundActive:
         challengeRuntimeEnabled &&
         (cr?.state === 'accepted' || cr?.state === 'active'),
+      includeAnswerEvaluation:
+        context.answerEvaluationEnabled === true &&
+        !isRecitation &&
+        !includeAppHelpMap &&
+        cr?.state !== 'accepted' &&
+        cr?.state !== 'active',
       graderEnabled,
       includeMentorNotice: mentorNoticeEnabled,
       mentorNoticeRequiresTopicTarget:

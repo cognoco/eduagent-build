@@ -306,6 +306,106 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     appliesTo: () => true,
   },
   {
+    id: 'AE1-answer-correct',
+    purpose:
+      'Answer-evaluation enabled — a substantive correct answer to the immediately preceding ordinary question must emit correctness=correct',
+    history: [
+      {
+        role: 'assistant',
+        content: 'What are the three periods of the Mesozoic Era?',
+      },
+      { role: 'user', content: 'Triassic, Jurassic, and Cretaceous.' },
+    ],
+    contextOverrides: {
+      escalationRung: 2,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 2,
+      answerEvaluationEnabled: true,
+    },
+    appliesTo: (p) => p.id === '12yo-dinosaurs',
+  },
+  {
+    id: 'AE2-answer-partial',
+    purpose:
+      'Answer-evaluation enabled — an incomplete substantive answer to the immediately preceding ordinary question must emit correctness=partial',
+    history: [
+      {
+        role: 'assistant',
+        content: 'What are the three periods of the Mesozoic Era?',
+      },
+      { role: 'user', content: 'Triassic and Jurassic.' },
+    ],
+    contextOverrides: {
+      escalationRung: 2,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 2,
+      answerEvaluationEnabled: true,
+    },
+    appliesTo: (p) => p.id === '12yo-dinosaurs',
+  },
+  {
+    id: 'AE3-answer-incorrect',
+    purpose:
+      'Answer-evaluation enabled — a substantive wrong answer to the immediately preceding ordinary question must emit correctness=incorrect',
+    history: [
+      {
+        role: 'assistant',
+        content: 'Which period came first in the Mesozoic Era?',
+      },
+      { role: 'user', content: 'The Cretaceous period.' },
+    ],
+    contextOverrides: {
+      escalationRung: 2,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 2,
+      answerEvaluationEnabled: true,
+    },
+    appliesTo: (p) => p.id === '12yo-dinosaurs',
+  },
+  {
+    id: 'AE4-answer-na',
+    purpose:
+      'Answer-evaluation enabled — a request for explanation rather than an answer must emit correctness=na',
+    history: [
+      {
+        role: 'assistant',
+        content: 'Which period came first in the Mesozoic Era?',
+      },
+      { role: 'user', content: 'Can you explain how the periods are ordered?' },
+    ],
+    contextOverrides: {
+      escalationRung: 2,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 2,
+      answerEvaluationEnabled: true,
+    },
+    appliesTo: (p) => p.id === '12yo-dinosaurs',
+  },
+  {
+    id: 'AE5-answer-disabled',
+    purpose:
+      'Answer-evaluation disabled — the legacy prompt and response must omit signals.answer_evaluation',
+    history: [
+      {
+        role: 'assistant',
+        content: 'What are the three periods of the Mesozoic Era?',
+      },
+      { role: 'user', content: 'Triassic, Jurassic, and Cretaceous.' },
+    ],
+    contextOverrides: {
+      escalationRung: 2,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 2,
+      answerEvaluationEnabled: false,
+    },
+    appliesTo: (p) => p.id === '12yo-dinosaurs',
+  },
+  {
     id: 'S15-review-mode-opener',
     purpose:
       'Review mode turn-0 — calibration opener prompt fires for effectiveMode=review',
@@ -734,6 +834,74 @@ function buildScenarioContext(
   };
 }
 
+const EXPECTED_ANSWER_EVALUATION_BY_SCENARIO = {
+  'AE1-answer-correct': 'correct',
+  'AE2-answer-partial': 'partial',
+  'AE3-answer-incorrect': 'incorrect',
+  'AE4-answer-na': 'na',
+  'AE5-answer-disabled': 'omitted',
+} as const;
+
+export function evaluateAnswerEvaluationScenarioQuality(
+  scenarioId: string,
+  liveResponse: string,
+): QualityIssue[] {
+  const expected =
+    EXPECTED_ANSWER_EVALUATION_BY_SCENARIO[
+      scenarioId as keyof typeof EXPECTED_ANSWER_EVALUATION_BY_SCENARIO
+    ];
+  if (!expected) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(liveResponse);
+  } catch {
+    return [
+      {
+        severity: 'error',
+        code: 'answer_evaluation_unparseable',
+        message: `${scenarioId} returned non-JSON output, so answer_evaluation could not be checked`,
+      },
+    ];
+  }
+
+  const signals =
+    parsed && typeof parsed === 'object' && 'signals' in parsed
+      ? (parsed.signals as Record<string, unknown> | null | undefined)
+      : undefined;
+  const answerEvaluation =
+    signals && typeof signals === 'object'
+      ? (signals.answer_evaluation as
+          | { correctness?: unknown }
+          | null
+          | undefined)
+      : undefined;
+
+  if (expected === 'omitted') {
+    return answerEvaluation == null
+      ? []
+      : [
+          {
+            severity: 'error',
+            code: 'answer_evaluation_emitted_while_disabled',
+            message: `${scenarioId} emitted signals.answer_evaluation while the runtime flag was disabled`,
+          },
+        ];
+  }
+
+  return answerEvaluation?.correctness === expected
+    ? []
+    : [
+        {
+          severity: 'error',
+          code: 'answer_evaluation_wrong_or_missing',
+          message: `${scenarioId} expected correctness=${expected}, received ${String(
+            answerEvaluation?.correctness ?? 'missing',
+          )}`,
+        },
+      ];
+}
+
 export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
   id: 'exchanges',
   name: 'Exchanges (main tutoring loop)',
@@ -837,10 +1005,13 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
   },
 
   evaluateQuality({ input, liveResponse }): QualityIssue[] {
-    if (!isRecitationReadyScenario(input)) return [];
+    const issues = evaluateAnswerEvaluationScenarioQuality(
+      input.scenarioId,
+      liveResponse,
+    );
+    if (!isRecitationReadyScenario(input)) return issues;
     const parsed = parseFirstJsonObject<{ reply?: unknown }>(liveResponse);
     const reply = typeof parsed?.reply === 'string' ? parsed.reply : '';
-    const issues: QualityIssue[] = [];
     if (!/\b(?:ready|begin|start|go ahead|recite)\b/i.test(reply)) {
       issues.push(
         recitationIssue(

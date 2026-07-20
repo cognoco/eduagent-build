@@ -117,6 +117,60 @@ describe('llmResponseEnvelopeSchema', () => {
     expect(parsed.signals?.partial_progress).toBeUndefined();
   });
 
+  describe('signals.answer_evaluation', () => {
+    it.each(['correct', 'partial', 'incorrect', 'na'] as const)(
+      'accepts %s with an optional bounded concept',
+      (correctness) => {
+        const parsed = llmResponseEnvelopeSchema.parse({
+          reply: 'Keep going.',
+          signals: {
+            answer_evaluation: { correctness, concept: 'linear equations' },
+          },
+        });
+
+        expect(parsed.signals?.answer_evaluation).toEqual({
+          correctness,
+          concept: 'linear equations',
+        });
+      },
+    );
+
+    it('accepts an evaluation without a concept', () => {
+      const parsed = llmResponseEnvelopeSchema.parse({
+        reply: 'Keep going.',
+        signals: { answer_evaluation: { correctness: 'na' } },
+      });
+
+      expect(parsed.signals?.answer_evaluation).toEqual({ correctness: 'na' });
+    });
+
+    it.each([1, 200])(
+      'accepts a concept at the %i-character boundary',
+      (size) => {
+        const concept = 'x'.repeat(size);
+        const parsed = llmResponseEnvelopeSchema.parse({
+          reply: 'Keep going.',
+          signals: { answer_evaluation: { correctness: 'correct', concept } },
+        });
+
+        expect(parsed.signals?.answer_evaluation?.concept).toBe(concept);
+      },
+    );
+
+    it.each([
+      { correctness: 'mostly_correct' },
+      { correctness: 'correct', concept: '' },
+      { correctness: 'correct', concept: 'x'.repeat(201) },
+    ])('rejects malformed evaluation %#', (answer_evaluation) => {
+      expect(
+        llmResponseEnvelopeSchema.safeParse({
+          reply: 'Keep going.',
+          signals: { answer_evaluation },
+        }).success,
+      ).toBe(false);
+    });
+  });
+
   it('coerces signals when null/non-object is passed (optionalObjectInput)', () => {
     const parsed = llmResponseEnvelopeSchema.parse({
       reply: 'Test reply',
@@ -790,6 +844,7 @@ describe('normaliseSignals', () => {
     const result: NormalisedEnvelopeSignals = normaliseSignals({});
     expect(result.ready_to_finish).toBe(false);
     expect(result.partial_progress).toBe(false);
+    expect(result.answer_evaluation).toBeNull();
     expect(result.needs_deepening).toBe(false);
     expect(result.understanding_check).toBe(false);
     expect(result.retrieval_score).toBeNull();
