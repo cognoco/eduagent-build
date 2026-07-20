@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { useRouter, type Href } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 
 import { ErrorFallback, TimeoutLoader } from '../common';
 import { BookPageFlipAnimation } from '../common/BookPageFlipAnimation';
@@ -19,10 +19,18 @@ import { JournalPracticeSection } from './JournalPracticeSection';
 import { RecapRow } from './RecapRow';
 import { JOURNAL_RETURN_TO } from '../../lib/navigation';
 import {
+  JOURNAL_SECTION_IDS,
   PracticeReportsEmptyMotif,
   useSectionErrorActions,
   type JournalSectionId,
 } from './journal-shared';
+
+function journalSectionOverride(
+  value: string | string[] | undefined,
+): JournalSectionId | undefined {
+  const section = Array.isArray(value) ? value[0] : value;
+  return JOURNAL_SECTION_IDS.find((candidate) => candidate === section);
+}
 
 function sectionSubtitle(section: JournalSectionId, t: TFunction): string {
   switch (section) {
@@ -286,8 +294,10 @@ function ActiveSection({
 
 export function JournalTabView(): React.ReactElement {
   const { t } = useTranslation();
-  const [activeSection, setActiveSection] =
+  const { section } = useLocalSearchParams<{ section?: string | string[] }>();
+  const [organicSection, setOrganicSection] =
     useState<JournalSectionId>('sessions');
+  const activeSection = journalSectionOverride(section) ?? organicSection;
 
   return (
     <ScrollView
@@ -308,7 +318,7 @@ export function JournalTabView(): React.ReactElement {
 
       <JournalSegmentedControl
         value={activeSection}
-        onChange={setActiveSection}
+        onChange={setOrganicSection}
       />
       <Text className="text-body-sm text-text-secondary">
         {sectionSubtitle(activeSection, t)}

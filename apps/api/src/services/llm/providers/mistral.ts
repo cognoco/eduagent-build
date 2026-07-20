@@ -222,8 +222,8 @@ export function createMistralProvider(apiKey: string): LLMProvider {
                     logger.warn('[llm:mistral] malformed SSE chunk discarded', {
                       event: 'mistral.sse.malformed',
                       site: 'stream_loop',
-                      chunk: jsonStr.slice(0, 200),
-                      error: chunkParsed.error.message,
+                      chunkLength: jsonStr.length,
+                      errorKind: 'schema_validation',
                     });
                     continue;
                   }
@@ -236,8 +236,8 @@ export function createMistralProvider(apiKey: string): LLMProvider {
                   logger.warn('[llm:mistral] malformed SSE chunk discarded', {
                     event: 'mistral.sse.malformed',
                     site: 'stream_loop',
-                    chunk: jsonStr.slice(0, 200),
-                    error: err instanceof Error ? err.message : String(err),
+                    chunkLength: jsonStr.length,
+                    errorKind: 'json_parse',
                   });
                 }
               }
@@ -259,8 +259,8 @@ export function createMistralProvider(apiKey: string): LLMProvider {
                         {
                           event: 'mistral.sse.malformed',
                           site: 'flush_buffer',
-                          chunk: jsonStr.slice(0, 200),
-                          error: chunkParsed.error.message,
+                          chunkLength: jsonStr.length,
+                          errorKind: 'schema_validation',
                         },
                       );
                     } else {
@@ -274,8 +274,8 @@ export function createMistralProvider(apiKey: string): LLMProvider {
                     logger.warn('[llm:mistral] malformed SSE chunk discarded', {
                       event: 'mistral.sse.malformed',
                       site: 'flush_buffer',
-                      chunk: jsonStr.slice(0, 200),
-                      error: err instanceof Error ? err.message : String(err),
+                      chunkLength: jsonStr.length,
+                      errorKind: 'json_parse',
                     });
                   }
                 }

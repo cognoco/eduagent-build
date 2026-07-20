@@ -176,7 +176,8 @@ function FirstSessionWrapUpCard({
   onMarkCelebrationSeen,
 }: FirstSessionWrapUpCardProps) {
   const { t } = useTranslation();
-  const canSubmit = value.trim().length >= 10 && !isSubmitting;
+  const hasSubmitted = reflectionTotalXp != null;
+  const canSubmit = value.trim().length >= 10 && !isSubmitting && !hasSubmitted;
 
   return (
     <View
@@ -195,7 +196,7 @@ function FirstSessionWrapUpCard({
         multiline
         value={value}
         onChangeText={onChangeText}
-        editable={!isSubmitting}
+        editable={!isSubmitting && !hasSubmitted}
         className="mt-3 min-h-20 rounded-xl border border-border px-3 py-2 text-text-primary"
       />
       {hasError ? (
@@ -559,6 +560,7 @@ function SessionScreenInner() {
   } | null>(null);
   const animationCleanupRef = useRef<(() => void) | null>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionEndedRef = useRef(false);
   const lastAiAtRef = useRef<number | null>(null);
   const lastExpectedMinutesRef = useRef(10);
   const hasAutoSentRef = useRef(false);
@@ -581,6 +583,18 @@ function SessionScreenInner() {
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
   const activeSession = useSession(activeSessionId ?? '');
+  const cancelSilencePrompt = useCallback(() => {
+    if (!silenceTimerRef.current) return;
+    clearTimeout(silenceTimerRef.current);
+    silenceTimerRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    sessionEndedRef.current = Boolean(activeSession.data?.endedAt);
+    if (sessionEndedRef.current) {
+      cancelSilencePrompt();
+    }
+  }, [activeSession.data?.endedAt, activeSessionId, cancelSilencePrompt]);
   const clearContinuationDepth = useClearContinuationDepth(
     activeSessionId ?? '',
   );
@@ -943,6 +957,7 @@ function SessionScreenInner() {
     liveTranscriptMilestones: liveTranscript?.session.milestonesReached,
     hydrate,
     hasHydratedRecoveryRef,
+    cancelSilencePrompt,
   });
 
   const {
@@ -996,6 +1011,7 @@ function SessionScreenInner() {
     notePromptOffered,
     animationCleanupRef,
     silenceTimerRef,
+    sessionEndedRef,
     lastAiAtRef,
     lastExpectedMinutesRef,
     lastRetryPayloadRef,
@@ -1338,7 +1354,7 @@ function SessionScreenInner() {
       ]);
       const totalXp =
         (result.summary.baseXp ?? 0) + (result.summary.reflectionBonusXp ?? 0);
-      setFirstSessionReflectionTotalXp(totalXp > 0 ? totalXp : null);
+      setFirstSessionReflectionTotalXp(totalXp);
     } catch (err) {
       if (
         !firstSessionReflectionMountedRef.current ||
@@ -1401,6 +1417,8 @@ function SessionScreenInner() {
     parkingLotDraft,
     setParkingLotDraft,
     closedSessionRef,
+    silenceTimerRef,
+    sessionEndedRef,
     queuedProblemTextRef,
     activeProfileId: activeProfile?.id,
     closeSession,

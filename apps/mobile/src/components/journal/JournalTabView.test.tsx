@@ -10,6 +10,7 @@ import { JournalTabView } from './JournalTabView';
 
 const mockPush = jest.fn();
 const mockSetActiveScope = jest.fn();
+let mockJournalSection: string | undefined;
 let mockNowFeed: {
   data: NowResponse | undefined;
   isLoading: boolean;
@@ -27,6 +28,7 @@ let lastPracticeOpts: { limit?: number; type?: string } | undefined;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
+  useLocalSearchParams: () => ({ section: mockJournalSection }),
 }));
 
 jest.mock(
@@ -171,6 +173,7 @@ const monthlyReport = {
 describe('JournalTabView', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockJournalSection = undefined;
     mockNowFeed = {
       data: {
         scope: 'self',
@@ -341,6 +344,41 @@ describe('JournalTabView', () => {
     // Full labels render (no truncation/font-shrink) — the original bug.
     screen.getByText('Sessions');
     screen.getByText('Practice');
+  });
+
+  it('[WI-2110 AC-1/4] temporarily overrides a warm organic section and restores it', () => {
+    const { rerender } = render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+    screen.getByTestId('journal-notes-section');
+
+    mockJournalSection = 'practice';
+    rerender(<JournalTabView />);
+    screen.getByTestId('journal-practice-section');
+    screen.getByTestId('journal-moments-strip');
+
+    mockJournalSection = undefined;
+    rerender(<JournalTabView />);
+    screen.getByTestId('journal-notes-section');
+  });
+
+  it('[WI-2110 AC-3] selects Practice for a cold-start section override', () => {
+    mockJournalSection = 'practice';
+
+    render(<JournalTabView />);
+
+    screen.getByTestId('journal-practice-section');
+  });
+
+  it('[WI-2110 AC-2] ignores an unknown section and preserves organic selection', () => {
+    const { rerender } = render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+    mockJournalSection = 'future-section';
+    rerender(<JournalTabView />);
+
+    screen.getByTestId('journal-notes-section');
+    screen.getByTestId('journal-moments-strip');
   });
 
   it('opens the practice hub from the Practice section', () => {

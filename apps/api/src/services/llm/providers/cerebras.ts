@@ -349,8 +349,8 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
                       {
                         event: 'cerebras.sse.malformed',
                         site: 'stream_loop',
-                        chunk: jsonStr.slice(0, 200),
-                        error: chunkParsed.error.message,
+                        chunkLength: jsonStr.length,
+                        errorKind: 'schema_validation',
                       },
                     );
                     continue;
@@ -369,8 +369,8 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
                   logger.warn('[llm:cerebras] malformed SSE chunk discarded', {
                     event: 'cerebras.sse.malformed',
                     site: 'stream_loop',
-                    chunk: jsonStr.slice(0, 200),
-                    error: err instanceof Error ? err.message : String(err),
+                    chunkLength: jsonStr.length,
+                    errorKind: 'json_parse',
                   });
                 }
               }
@@ -392,8 +392,8 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
                         {
                           event: 'cerebras.sse.malformed',
                           site: 'flush_buffer',
-                          chunk: jsonStr.slice(0, 200),
-                          error: chunkParsed.error.message,
+                          chunkLength: jsonStr.length,
+                          errorKind: 'schema_validation',
                         },
                       );
                     } else {
@@ -412,8 +412,8 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
                       {
                         event: 'cerebras.sse.malformed',
                         site: 'flush_buffer',
-                        chunk: jsonStr.slice(0, 200),
-                        error: err instanceof Error ? err.message : String(err),
+                        chunkLength: jsonStr.length,
+                        errorKind: 'json_parse',
                       },
                     );
                   }

@@ -47,6 +47,7 @@ import {
 } from '@eduagent/schemas';
 import type { DataExport } from '@eduagent/schemas';
 import { projectAiResponseContent } from './llm/project-response';
+import { stripInternalRecitationSetupClaim } from './session/session-recitation-setup';
 
 /**
  * [BUG-413] Walk a Drizzle row (Record<string, unknown>) and convert any JS
@@ -372,9 +373,13 @@ export async function generateExport(
     curriculumTopics: curriculumTopicRows.map((row) =>
       dataExportCurriculumTopicRowSchema.parse(serializeDates(row)),
     ),
-    learningSessions: learningSessionRows.map((row) =>
-      dataExportLearningSessionRowSchema.parse(serializeDates(row)),
-    ),
+    learningSessions: learningSessionRows.map((row) => {
+      const serialized = serializeDates(row);
+      return dataExportLearningSessionRowSchema.parse({
+        ...serialized,
+        metadata: stripInternalRecitationSetupClaim(serialized['metadata']),
+      });
+    }),
     sessionEvents: sessionEventRows.map((row) => {
       const serialized = serializeDates(row as Record<string, unknown>);
       if (
