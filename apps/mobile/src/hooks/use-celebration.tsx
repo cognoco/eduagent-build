@@ -266,7 +266,7 @@ export function useCelebration(options?: {
         return next;
       });
     },
-    [celebrationLevel, profileId, profileKey],
+    [celebrationLevel, profileKey],
   );
 
   const CelebrationOverlay = useMemo(() => {

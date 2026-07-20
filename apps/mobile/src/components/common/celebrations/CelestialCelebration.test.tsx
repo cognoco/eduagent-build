@@ -237,7 +237,7 @@ describe('CelestialCelebration', () => {
   });
 });
 
-function ReducedMotionMilestoneQueue({
+function MilestoneQueueHarness({
   queue,
   profileId,
   audience = 'child',
@@ -305,7 +305,7 @@ describe('reduced-motion milestone queue', () => {
     const onAllComplete = jest.fn();
     const queue = milestoneQueue('profile-A');
     render(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-A"
         queue={queue}
         onAllComplete={onAllComplete}
@@ -353,7 +353,7 @@ describe('reduced-motion milestone queue', () => {
   it('does not complete on an initial empty render or an ordinary rerender', () => {
     const onAllComplete = jest.fn();
     const { rerender } = render(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-A"
         queue={[]}
         onAllComplete={onAllComplete}
@@ -361,7 +361,7 @@ describe('reduced-motion milestone queue', () => {
     );
 
     rerender(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-A"
         queue={[]}
         onAllComplete={onAllComplete}
@@ -379,7 +379,7 @@ describe('reduced-motion milestone queue', () => {
     const queueA = milestoneQueue('profile-A');
     const queueB = milestoneQueue('profile-B', 2);
     const { rerender } = render(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-A"
         queue={queueA}
         onAllComplete={onAllComplete}
@@ -390,7 +390,7 @@ describe('reduced-motion milestone queue', () => {
     screen.getByText('profile-A first detail');
 
     rerender(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-B"
         queue={queueB}
         onAllComplete={onAllComplete}
@@ -412,7 +412,7 @@ describe('reduced-motion milestone queue', () => {
     expect(onAllComplete).toHaveBeenLastCalledWith('profile-B');
 
     rerender(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-A"
         queue={queueA}
         onAllComplete={onAllComplete}
@@ -441,7 +441,7 @@ describe('reduced-motion milestone queue', () => {
     const onAllComplete = jest.fn();
     const entry = milestoneQueue('profile-A', 1)[0]!;
     render(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-A"
         queue={[entry, entry]}
         onAllComplete={onAllComplete}
@@ -464,7 +464,7 @@ describe('reduced-motion milestone queue', () => {
     const replacementCallback = jest.fn();
     const queue = milestoneQueue('profile-A', 1);
     const { rerender } = render(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-A"
         queue={queue}
         onAllComplete={firstCallback}
@@ -472,7 +472,7 @@ describe('reduced-motion milestone queue', () => {
     );
 
     rerender(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-A"
         queue={queue}
         onAllComplete={replacementCallback}
@@ -493,7 +493,7 @@ describe('reduced-motion milestone queue', () => {
 
     const queue = milestoneQueue('profile-A', 1);
     const { rerender, unmount } = render(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-A"
         queue={queue}
         audience="child"
@@ -502,7 +502,7 @@ describe('reduced-motion milestone queue', () => {
     screen.getByText('Polarstern – deine erste selbstständige Antwort!');
 
     rerender(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-B"
         queue={queue}
         audience="adult"
@@ -534,7 +534,7 @@ describe('animated milestone completion ownership', () => {
     const onProfileBComplete = jest.fn();
     const queueA = milestoneQueue('profile-A', 1);
     const { rerender } = render(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-A"
         queue={queueA}
         onAllComplete={onProfileAComplete}
@@ -544,7 +544,7 @@ describe('animated milestone completion ownership', () => {
     expect(completeProfileAAnimation).toBeDefined();
 
     rerender(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-B"
         queue={[]}
         onAllComplete={onProfileBComplete}
@@ -558,7 +558,7 @@ describe('animated milestone completion ownership', () => {
     expect(onProfileBComplete).not.toHaveBeenCalled();
 
     rerender(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-A"
         queue={queueA}
         onAllComplete={onProfileAComplete}
@@ -569,7 +569,7 @@ describe('animated milestone completion ownership', () => {
     expect(onProfileBComplete).not.toHaveBeenCalled();
 
     rerender(
-      <ReducedMotionMilestoneQueue
+      <MilestoneQueueHarness
         profileId="profile-A"
         queue={queueA}
         onAllComplete={onProfileAComplete}
