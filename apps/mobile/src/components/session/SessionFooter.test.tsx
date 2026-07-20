@@ -26,7 +26,7 @@ jest.mock(
 
 function createProps(overrides: Record<string, unknown> = {}) {
   return {
-    router: { replace: jest.fn() },
+    onHomeBack: jest.fn(),
     sessionExpired: false,
     notePromptOffered: false,
     showNoteInput: false,

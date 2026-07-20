@@ -305,17 +305,19 @@ export default function SubjectHubRoute(): React.ReactElement {
       ) : hubData ? (
         <View className="flex-1" testID="subject-hub-screen">
           <View className="flex-row items-center justify-between px-5 pt-3">
-            <Pressable
-              testID="subject-hub-back"
-              accessibilityRole="button"
-              accessibilityLabel={t('common.goBackAction')}
-              onPress={goBack}
-              className="min-h-[40px] justify-center rounded-button px-3"
-            >
-              <Text className="text-body-sm font-semibold text-primary">
-                {t('common.goBack')}
-              </Text>
-            </Pressable>
+            {FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? (
+              <Pressable
+                testID="subject-hub-back"
+                accessibilityRole="button"
+                accessibilityLabel={t('common.goBackAction')}
+                onPress={goBack}
+                className="min-h-[40px] justify-center rounded-button px-3"
+              >
+                <Text className="text-body-sm font-semibold text-primary">
+                  {t('common.goBack')}
+                </Text>
+              </Pressable>
+            ) : null}
             {manageReady ? (
               <Pressable
                 testID="subject-hub-manage"

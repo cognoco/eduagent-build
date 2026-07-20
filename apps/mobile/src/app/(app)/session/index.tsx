@@ -380,13 +380,17 @@ function SessionScreenInner() {
     router.replace('/(app)/home' as Href);
   }, [returnStrategy, returnTo, subjectId, homeBackHref, router]);
   const handleHomeBack = useCallback(() => {
+    if (returnStrategy === 'history') {
+      goBackOrReplace(router, homeBackHref);
+      return;
+    }
     if (returnTo) {
       router.replace(homeBackHref as Href);
       return;
     }
 
     goBackOrReplace(router, homeBackHref);
-  }, [homeBackHref, returnTo, router]);
+  }, [homeBackHref, returnStrategy, returnTo, router]);
   const handleStartNewSession = useCallback(() => {
     router.replace({
       pathname: '/(app)/session',
@@ -1838,8 +1842,7 @@ function SessionScreenInner() {
               profileId={activeProfile?.id}
             />
             <SessionFooter
-              router={router}
-              homeHref={homeBackHref}
+              onHomeBack={handleHomeBack}
               sessionExpired={sessionExpired}
               notePromptOffered={notePromptOffered}
               showNoteInput={showNoteInput}

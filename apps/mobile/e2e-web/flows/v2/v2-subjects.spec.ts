@@ -10,6 +10,7 @@ import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { fillTextInput } from '../../helpers/text-input';
 import {
   PHOTOSYNTHESIS_BOOK_ID,
+  PHOTOSYNTHESIS_FIXTURE_TIMESTAMP,
   PHOTOSYNTHESIS_SESSION_ID,
   PHOTOSYNTHESIS_SUBJECT_ID,
   PHOTOSYNTHESIS_TOPIC_ID,
@@ -17,8 +18,6 @@ import {
 } from './v2-subjects-fixtures';
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
-const NOW = '2026-07-20T00:00:00.000Z';
 
 async function fulfillJson(
   route: Route,
@@ -42,8 +41,8 @@ function photosynthesisSubject(profileId: string): Subject {
     curriculumStatus: 'ready',
     pedagogyMode: 'socratic',
     languageCode: null,
-    createdAt: NOW,
-    updatedAt: NOW,
+    createdAt: PHOTOSYNTHESIS_FIXTURE_TIMESTAMP,
+    updatedAt: PHOTOSYNTHESIS_FIXTURE_TIMESTAMP,
   };
 }
 

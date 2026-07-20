@@ -1,6 +1,6 @@
 import { learningSessionSchema, type LearningSession } from '@eduagent/schemas';
 
-const NOW = '2026-07-20T00:00:00.000Z';
+export const PHOTOSYNTHESIS_FIXTURE_TIMESTAMP = '2025-01-15T00:00:00.000Z';
 
 export const PHOTOSYNTHESIS_SUBJECT_ID = '22380000-0000-4000-8000-000000000001';
 export const PHOTOSYNTHESIS_BOOK_ID = '22380000-0000-4000-8000-000000000002';
@@ -22,8 +22,8 @@ export function photosynthesisSession(): LearningSession {
     status: 'active',
     escalationRung: 1,
     exchangeCount: 0,
-    startedAt: NOW,
-    lastActivityAt: NOW,
+    startedAt: PHOTOSYNTHESIS_FIXTURE_TIMESTAMP,
+    lastActivityAt: PHOTOSYNTHESIS_FIXTURE_TIMESTAMP,
     endedAt: null,
     durationSeconds: null,
     wallClockSeconds: null,

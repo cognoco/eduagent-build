@@ -967,6 +967,50 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
+  it('uses the existing Subjects history entry from the session-expired escape action', () => {
+    const mockBack = jest.fn();
+    const mockCanGoBack = jest.fn(() => true);
+    (useRouter as jest.Mock).mockReturnValue({
+      back: mockBack,
+      canGoBack: mockCanGoBack,
+      replace: mockReplace,
+      setParams: mockSetParams,
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: SUBJECT_ID,
+      subjectName: 'Math',
+      topicId: TOPIC_ID,
+      topicName: 'Linear equations',
+      sessionId: 'expired-session',
+      returnTo: 'subjects',
+      returnStrategy: 'history',
+    });
+    const { NotFoundError } = require('../../../lib/api-client');
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new NotFoundError('Session not found'),
+    } as never);
+
+    const testScreen = renderSessionScreen();
+    mockReplace.mockClear();
+
+    const goHomeActions = testScreen.getAllByTestId('session-expired-go-home');
+    expect(goHomeActions).toHaveLength(2);
+
+    for (const goHomeAction of goHomeActions) {
+      mockCanGoBack.mockClear();
+      mockBack.mockClear();
+      mockReplace.mockClear();
+
+      fireEvent.press(goHomeAction);
+
+      expect(mockCanGoBack).toHaveBeenCalledTimes(1);
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockReplace).not.toHaveBeenCalled();
+    }
+  });
+
   it('[F-110] engages the session-expired UI for any error the boundary classifies as not-found, not only typed NotFoundError instances', () => {
     // sessionExpired is computed from
     // classifyApiError(transcript.error).category === 'not-found' rather

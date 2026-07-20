@@ -250,6 +250,19 @@ describe('SubjectHubRoute', () => {
     );
   });
 
+  it('does not expose the V2 Subjects Back control while V2 navigation is disabled', async () => {
+    jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', false);
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-screen');
+    });
+
+    expect(screen.queryByTestId('subject-hub-back')).toBeNull();
+    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/subjects');
+  });
+
   it('keeps a visible Back control on the successful hub and returns to V2 Subjects', async () => {
     jest.replaceProperty(FEATURE_FLAGS, 'MODE_NAV_V2_ENABLED', true);
 

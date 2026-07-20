@@ -7,12 +7,10 @@ import { NoteInput } from '../library/NoteInput';
 import type { useCreateNote } from '../../hooks/use-notes';
 import { formatApiError } from '../../lib/format-api-error';
 import { platformAlert } from '../../lib/platform-alert';
-import type { Href, Router } from 'expo-router';
 import type { useThemeColors } from '../../lib/theme';
 
 export interface SessionFooterProps {
-  router: Router;
-  homeHref?: Href;
+  onHomeBack: () => void;
   sessionExpired: boolean;
   notePromptOffered: boolean;
   showNoteInput: boolean;
@@ -34,8 +32,7 @@ export interface SessionFooterProps {
 }
 
 export function SessionFooter({
-  router,
-  homeHref = '/(app)/home' as Href,
+  onHomeBack,
   sessionExpired,
   notePromptOffered,
   showNoteInput,
@@ -65,7 +62,7 @@ export function SessionFooter({
             {t('session.expired.message')}
           </Text>
           <Pressable
-            onPress={() => router.replace(homeHref as Href)}
+            onPress={onHomeBack}
             className="bg-primary rounded-button py-3 items-center"
             testID="session-expired-go-home"
             accessibilityRole="button"
