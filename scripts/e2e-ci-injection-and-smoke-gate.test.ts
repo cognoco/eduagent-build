@@ -1411,21 +1411,28 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
   });
 
-  it('[WI-2240] passes generic ownerSubjectId injection to the exact owner Maestro flow', () => {
+  it('[WI-2240] passes generic ownerSubjectId injection only to the exact owner Maestro flow', () => {
     const harness = createMaestroHarness(0);
 
     try {
       const result = runCiMaestro(harness, { MAESTRO_CI_SUITE: 'v2' });
-      const ownerInvocation = readFileSync(harness.maestroArgvMarker, 'utf8')
+      const invocations = readFileSync(harness.maestroArgvMarker, 'utf8')
         .trim()
-        .split('\n')
-        .find((invocation) =>
-          invocation.includes('apps/mobile/e2e/flows/v2/v2-account-owner.yaml'),
-        );
+        .split('\n');
+      const ownerInvocation = invocations.find((invocation) =>
+        invocation.includes('apps/mobile/e2e/flows/v2/v2-account-owner.yaml'),
+      );
+      const nonOwnerInvocation = invocations.find((invocation) =>
+        invocation.includes(
+          'apps/mobile/e2e/flows/v2/v2-account-non-owner-child.yaml',
+        ),
+      );
 
       expect(result.status).toBe(0);
       expect(ownerInvocation).toBeDefined();
       expect(ownerInvocation).toContain('-e OWNER_SUBJECT_ID=owner-subject');
+      expect(nonOwnerInvocation).toBeDefined();
+      expect(nonOwnerInvocation).not.toContain('OWNER_SUBJECT_ID');
     } finally {
       rmSync(harness.root, { recursive: true, force: true });
     }
@@ -1986,7 +1993,8 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
       '#!/usr/bin/env bash',
       'if [ "${FAKE_CURL_EXIT:-0}" -ne 0 ]; then exit "$FAKE_CURL_EXIT"; fi',
       'case "$*" in',
-      '  */v1/__test/seed*) printf \'{"email":"test@example.com","password":"pw","accountId":"account","profileId":"profile","ids":{"ownerSubjectId":"owner-subject"}}\' ;;',
+      '  */v1/__test/seed*\\"scenario\\":\\"parent-multi-child\\"*) printf \'{"email":"test@example.com","password":"pw","accountId":"account","profileId":"profile","ids":{"ownerSubjectId":"owner-subject"}}\' ;;',
+      '  */v1/__test/seed*) printf \'{"email":"test@example.com","password":"pw","accountId":"account","profileId":"profile","ids":{}}\' ;;',
       "  *) printf '{}' ;;",
       'esac',
       '',
