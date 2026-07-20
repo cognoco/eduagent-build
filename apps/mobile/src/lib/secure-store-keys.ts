@@ -35,6 +35,9 @@ export const PRE_AUTH_INTRO_KEY = 'preAuthIntroSeen.v1';
  */
 export const ACTIVATION_ANONYMOUS_ID_KEY = 'activationAnonymousId.v1';
 
+/** Durable handoff for a first-profile Mentor-born ceremony. */
+export const MENTOR_BORN_PENDING_KEY = 'mentorBornPending.v1';
+
 // ---------------------------------------------------------------------------
 // Per-profile key constructors — take a profileId and return the full key.
 // ---------------------------------------------------------------------------
