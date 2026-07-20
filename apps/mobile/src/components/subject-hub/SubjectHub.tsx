@@ -82,7 +82,10 @@ export function SubjectHub({
             borderColor: withOpacity(tint.solid, 0.28),
           }}
         >
-          <Text className="text-h2 font-semibold text-text-primary">
+          <Text
+            className="text-h2 font-semibold text-text-primary"
+            testID={`subject-hub-title-${data.subjectId}`}
+          >
             {data.subjectName}
           </Text>
           <SubjectHubProgressSummary aggregate={data.aggregate} />

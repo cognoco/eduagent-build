@@ -1167,21 +1167,69 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         },
       },
     ];
-    const closedTopicSheetAbsence: Selector[] = [
-      { tapOn: { id: 'subject-hub-topic-sheet-close' } },
-      { assertNotVisible: { id: 'subject-hub-topic-sheet' } },
+    const exactWorldHistoryHubTitle: Selector = {
+      assertVisible: {
+        id: 'subject-hub-title-${SUBJECT_ID}',
+        text: '^World History$',
+      },
+    };
+    const exactHubEntry: Selector[] = [
+      { tapOn: { id: 'subjects-browse-row-${SUBJECT_ID}' } },
       {
-        assertVisible: {
-          id: 'subject-hub-screen',
-          containsDescendants: [{ text: '^World History$' }],
+        extendedWaitUntil: {
+          visible: { id: 'subject-hub-screen' },
+          timeout: 15000,
         },
       },
+      exactWorldHistoryHubTitle,
+    ];
+    const exactPostSheetCloseHub: Selector[] = [
+      { tapOn: { id: 'subject-hub-topic-sheet-close' } },
+      { assertNotVisible: { id: 'subject-hub-topic-sheet' } },
+      { assertVisible: { id: 'subject-hub-screen' } },
+      exactWorldHistoryHubTitle,
     ];
 
     expect(hasExactCommandSequence(resume, exactWorldHistoryRestore)).toBe(
       true,
     );
-    expect(hasExactCommandSequence(resume, closedTopicSheetAbsence)).toBe(true);
+    const titleCheckpointMutations = (checkpoint: Selector[]): Selector[][] => {
+      const titleIndex = checkpoint.length - 1;
+      const replaceTitle = (assertVisible: Selector): Selector[] =>
+        checkpoint.with(titleIndex, { assertVisible });
+
+      return [
+        checkpoint.filter((_, index) => index !== titleIndex),
+        replaceTitle({
+          id: 'subject-hub-screen',
+          containsDescendants: [{ text: '^World History$' }],
+        }),
+        replaceTitle({
+          id: 'subject-hub-title-adjacent-subject',
+          text: '^World History$',
+        }),
+        replaceTitle({
+          id: 'subject-hub-title-${SUBJECT_ID}',
+          text: '^Adjacent History$',
+        }),
+        replaceTitle({
+          id: 'subject-hub-title-${SUBJECT_ID}',
+          text: '^World History$',
+          optional: true,
+        }),
+        [
+          ...checkpoint.slice(0, titleIndex),
+          { assertVisible: { id: 'subject-hub-title-${SUBJECT_ID}' } },
+          { assertVisible: { text: '^World History$' } },
+        ],
+      ];
+    };
+    for (const checkpoint of [exactHubEntry, exactPostSheetCloseHub]) {
+      expect(hasExactCommandSequence(resume, checkpoint)).toBe(true);
+      for (const mutation of titleCheckpointMutations(checkpoint)) {
+        expect(hasExactCommandSequence(mutation, checkpoint)).toBe(false);
+      }
+    }
     for (const mutation of [
       // No-result row-absence removal.
       exactWorldHistoryRestore.filter((_, index) => index !== 3),
@@ -1235,24 +1283,24 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
     for (const mutation of [
       // Topic-sheet absence removal.
-      closedTopicSheetAbsence.filter((_, index) => index !== 1),
+      exactPostSheetCloseHub.filter((_, index) => index !== 1),
       // Topic-sheet absence optionalization.
-      closedTopicSheetAbsence.with(1, {
+      exactPostSheetCloseHub.with(1, {
         assertNotVisible: {
           id: 'subject-hub-topic-sheet',
           optional: true,
         },
       }),
       // Topic-sheet absence wrong owner.
-      closedTopicSheetAbsence.with(1, {
+      exactPostSheetCloseHub.with(1, {
         assertNotVisible: { id: 'subject-hub-screen' },
       }),
       // Topic-sheet absence reordering after the next Subject Hub assertion.
-      closedTopicSheetAbsence
-        .with(1, closedTopicSheetAbsence[2]!)
-        .with(2, closedTopicSheetAbsence[1]!),
+      exactPostSheetCloseHub
+        .with(1, exactPostSheetCloseHub[2]!)
+        .with(2, exactPostSheetCloseHub[1]!),
     ]) {
-      expect(hasExactCommandSequence(mutation, closedTopicSheetAbsence)).toBe(
+      expect(hasExactCommandSequence(mutation, exactPostSheetCloseHub)).toBe(
         false,
       );
     }
