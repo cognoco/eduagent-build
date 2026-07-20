@@ -41,9 +41,18 @@ function isUnambiguouslyAdultAge(learnerAge: number): boolean {
  * canonical `PROFILE_MINIMUM_AGE`/`PARENT_ACCOUNT_MINIMUM_AGE` thresholds
  * (packages/schemas/src/age.ts) so `routeAndCall`'s under-18 vendor-exclusion
  * gate (router.ts `isUnder18AgeBracket`) can actually fire on the legacy
- * (routing V2 off) path. Distinct from `isUnambiguouslyAdultAge` above, which
- * stays a stricter fail-closed check reserved for the existing
- * `gemini_only`-pinning decision.
+ * (routing V2 off) path.
+ *
+ * Deliberately DIFFERENT from `isUnambiguouslyAdultAge` above at the age-18
+ * boundary: that function treats a computed age of 18 as possibly-still-17
+ * (fail-closed, `> 18`) because it gates the stricter `gemini_only`-PINNING
+ * decision. This function bands a computed 18 as `adult` (`< 18` is the only
+ * non-adult branch) to match `computeAgeBracketFromDate`'s year-only fallback
+ * — the SAME banding every other WI-2432 site uses when only a birth year is
+ * available (assessments/session-recap via `profileMeta.birthYear` /
+ * `input.birthYear`). Matching that canonical function, not
+ * `isUnambiguouslyAdultAge`, keeps this gate consistent with its siblings
+ * rather than introducing a fifth, book-generation-only threshold.
  */
 function ageBracketFromLearnerAge(learnerAge: number): AgeBracket {
   if (learnerAge < PROFILE_MINIMUM_AGE) return 'child';

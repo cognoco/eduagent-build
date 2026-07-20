@@ -27,6 +27,44 @@ import {
 import { makeChatStreamResult } from './llm/types';
 import { detectSubjectType, generateBookTopics } from './book-generation';
 
+/**
+ * [WI-2432] Mock provider whose chat() fails `failCount` times then succeeds
+ * — same pattern as router.test.ts's local `createTransientFailProvider`
+ * (not exported from providers/mock, so re-declared per file). Used to force
+ * the primary provider past MAX_RETRIES(3) (4 attempts) so routeAndCall
+ * actually reaches getFallbackConfig (router.ts:1064), not just
+ * getModelConfig (router.ts:908) — the two sites have independent
+ * isUnder18AgeBracket gates (WI-1986 fixed the fallback one after it shipped
+ * ungated), so a test that only exercises the primary path would not prove
+ * ageBracket also reaches the fallback call.
+ */
+function createTransientFailProvider(
+  id: string,
+  failCount: number,
+  successContent: string,
+): LLMProvider & { callCount: number } {
+  let calls = 0;
+  return {
+    id,
+    async chat(): Promise<{ content: string; stopReason: StopReason }> {
+      calls++;
+      if (calls <= failCount) {
+        throw new Error(`[WI-2432 test] simulated transient failure #${calls}`);
+      }
+      return { content: successContent, stopReason: 'stop' };
+    },
+    get callCount() {
+      return calls;
+    },
+    chatStream() {
+      const s = (async function* () {
+        yield 'unused';
+      })();
+      return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+    },
+  };
+}
+
 function bookJson() {
   // bookGenerationResultSchema requires >=5 books for a 'broad' result.
   return JSON.stringify({
@@ -194,4 +232,38 @@ describe('[WI-2432] book-generation never routes an under-18 learner to Gemini (
     expect(geminiSpy).toHaveBeenCalledTimes(1);
     expect(result.type).toBe('broad');
   });
+
+  // [WI-2432] Pin the age-18 boundary as INTENDED behavior, not an untested
+  // gap: ageBracketFromLearnerAge (book-generation.ts) bands a computed
+  // learnerAge of exactly 18 as 'adult', matching computeAgeBracketFromDate's
+  // year-only fallback (packages/schemas/src/age.ts — the same banding
+  // assessments.ts/session-recap.ts use for a year-only birthYear). This is
+  // deliberately looser than the separate isUnambiguouslyAdultAge (`> 18`)
+  // used only for the gemini_only-pinning decision above; see the docstring
+  // on ageBracketFromLearnerAge for why the two thresholds diverge on
+  // purpose.
+  it("a learner with computed learnerAge=18 is treated as adult (matches computeAgeBracketFromDate's year-only banding) — Gemini remains eligible", async () => {
+    const result = await detectSubjectType('History', 18);
+
+    expect(geminiSpy).toHaveBeenCalledTimes(1);
+    expect(result.type).toBe('broad');
+  });
+
+  it('forces a primary-provider failure past MAX_RETRIES, driving the call through getFallbackConfig — still never selects Gemini for an under-18 learner', async () => {
+    const flakyCerebras = createTransientFailProvider(
+      'cerebras',
+      4, // 1 + MAX_RETRIES(3) — exhausts the primary's withRetry loop
+      bookJson(),
+    );
+    registerProvider(flakyCerebras);
+
+    const result = await detectSubjectType('History', 12);
+
+    expect(geminiSpy).not.toHaveBeenCalled();
+    expect(result.type).toBe('broad');
+    // 4 failing primary attempts + 1 succeeding fallback attempt: proves
+    // execution actually reached getFallbackConfig's isUnder18AgeBracket
+    // gate (router.ts:1064), not just getModelConfig's (router.ts:908).
+    expect(flakyCerebras.callCount).toBe(5);
+  }, 15000);
 });

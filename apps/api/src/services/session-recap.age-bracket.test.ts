@@ -26,6 +26,43 @@ import {
 import { makeChatStreamResult } from './llm/types';
 import { generateLearnerRecap } from './session-recap';
 
+/**
+ * [WI-2432] Mock provider whose chat() fails `failCount` times then succeeds
+ * — same pattern as router.test.ts's local `createTransientFailProvider`
+ * (not exported from providers/mock, so re-declared per file). Used to force
+ * the primary provider past MAX_RETRIES(3) (4 attempts) so routeAndCall
+ * actually reaches getFallbackConfig (router.ts:1064), not just
+ * getModelConfig (router.ts:908) — the two sites have independent
+ * isUnder18AgeBracket gates, so a test that only exercises the primary path
+ * would not prove ageBracket also reaches the fallback call.
+ */
+function createTransientFailProvider(
+  id: string,
+  failCount: number,
+  successContent: string,
+): LLMProvider & { callCount: number } {
+  let calls = 0;
+  return {
+    id,
+    async chat(): Promise<{ content: string; stopReason: StopReason }> {
+      calls++;
+      if (calls <= failCount) {
+        throw new Error(`[WI-2432 test] simulated transient failure #${calls}`);
+      }
+      return { content: successContent, stopReason: 'stop' };
+    },
+    get callCount() {
+      return calls;
+    },
+    chatStream() {
+      const s = (async function* () {
+        yield 'unused';
+      })();
+      return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+    },
+  };
+}
+
 // Mirrors session-recap.test.ts's createMathTranscriptDb() — 6 turns so
 // exchangeCount=3 and transcriptTurns=6 >= 4 (the function's minimum).
 function createMathTranscriptDb(): Database {
@@ -171,4 +208,31 @@ describe('[WI-2432] generateLearnerRecap never routes an under-18 subject to Gem
     expect(geminiSpy).toHaveBeenCalledTimes(1);
     expect(result).not.toBeNull();
   });
+
+  it('forces a primary-provider failure past MAX_RETRIES, driving the call through getFallbackConfig — still never selects Gemini for an under-18 subject', async () => {
+    const flakyCerebras = createTransientFailProvider(
+      'cerebras',
+      4, // 1 + MAX_RETRIES(3) — exhausts the primary's withRetry loop
+      algebraRecapJson(),
+    );
+    registerProvider(flakyCerebras);
+
+    const db = createMathTranscriptDb();
+    const result = await generateLearnerRecap(db, {
+      sessionId: 'session-age-bracket-fallback-test',
+      profileId: 'profile-1',
+      topicId: null,
+      subjectId: 'subject-1',
+      exchangeCount: 3,
+      birthYear: 2015,
+    });
+
+    expect(geminiSpy).not.toHaveBeenCalled();
+    expect(result).not.toBeNull();
+    expect(result!.closingLine).toContain('equations');
+    // 4 failing primary attempts + 1 succeeding fallback attempt: proves
+    // execution actually reached getFallbackConfig's isUnder18AgeBracket
+    // gate (router.ts:1064), not just getModelConfig's (router.ts:908).
+    expect(flakyCerebras.callCount).toBe(5);
+  }, 15000);
 });

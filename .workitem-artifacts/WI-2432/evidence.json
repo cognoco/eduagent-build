@@ -7,23 +7,23 @@
     },
     {
       "acRef": "AC-2",
-      "description": "book-generation.ts (detectSubjectType, generateBookTopics): under-18 subject on the forced legacy path never receives a Gemini/Vertex provider config.",
-      "pointer": "apps/api/src/services/book-generation.age-bracket.test.ts:58"
+      "description": "book-generation.ts (detectSubjectType, generateBookTopics): under-18 subject on the forced legacy path never receives a Gemini/Vertex provider config, on BOTH the primary (getModelConfig) and — via a forced primary-provider failure past MAX_RETRIES — the fallback (getFallbackConfig) selection.",
+      "pointer": "apps/api/src/services/book-generation.age-bracket.test.ts:151"
     },
     {
       "acRef": "AC-2",
-      "description": "assessments.ts (generateQuickCheck, evaluateAssessmentAnswer, evaluateQuickCheckAnswer, submitAssessmentAnswer) + routes/assessments.ts threading: under-18 subject on the forced legacy path never receives a Gemini/Vertex provider config.",
+      "description": "assessments.ts (generateQuickCheck, evaluateAssessmentAnswer, evaluateQuickCheckAnswer, submitAssessmentAnswer) + routes/assessments.ts threading: under-18 subject on the forced legacy path never receives a Gemini/Vertex provider config, on both the primary and (forced primary-provider failure) fallback selection.",
       "pointer": "apps/api/src/services/assessments.test.ts:1572"
     },
     {
       "acRef": "AC-2",
-      "description": "session-recap.ts (generateLearnerRecap): under-18 subject (birthYear converted via computeAgeBracketFromDate) on the forced legacy path never receives a Gemini/Vertex provider config.",
-      "pointer": "apps/api/src/services/session-recap.age-bracket.test.ts:72"
+      "description": "session-recap.ts (generateLearnerRecap): under-18 subject (birthYear converted via computeAgeBracketFromDate) on the forced legacy path never receives a Gemini/Vertex provider config, on both the primary and (forced primary-provider failure) fallback selection.",
+      "pointer": "apps/api/src/services/session-recap.age-bracket.test.ts:131"
     },
     {
       "acRef": "AC-2",
-      "description": "recall-bridge.ts (generateRecallBridge): under-18 subject (ageBracket sourced via getPersonAgeBracket, identity-v2's canonical helper) on the forced legacy path never receives a Gemini/Vertex provider config.",
-      "pointer": "apps/api/src/services/recall-bridge.age-bracket.test.ts:79"
+      "description": "recall-bridge.ts (generateRecallBridge): under-18 subject (ageBracket sourced via getPersonAgeBracket, identity-v2's canonical helper) on the forced legacy path never receives a Gemini/Vertex provider config, on both the primary and (forced primary-provider failure) fallback selection.",
+      "pointer": "apps/api/src/services/recall-bridge.age-bracket.test.ts:118"
     },
     {
       "acRef": "AC-3",
