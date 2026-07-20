@@ -1782,13 +1782,13 @@ function SessionScreenInner() {
     e2eAllocatedSessionIds.length === 1 &&
     e2eAllocatedSessionIds[0] === activeSessionId &&
     activeSession.data?.id === activeSessionId &&
-    activeSession.data.subjectId === effectiveSubjectId &&
-    activeSession.data.sessionType === 'homework' &&
+    activeSession.data?.subjectId === effectiveSubjectId &&
+    activeSession.data?.sessionType === 'homework' &&
     persistedHomework?.problemCount === 1 &&
-    persistedHomework.currentProblemIndex === 0 &&
-    persistedHomework.problems.length === 1 &&
+    persistedHomework?.currentProblemIndex === 0 &&
+    persistedHomework?.problems.length === 1 &&
     persistedProblem?.source === 'manual' &&
-    persistedProblem.text.trim() === initialProblemText?.trim();
+    persistedProblem?.text.trim() === initialProblemText?.trim();
   const multipleHomeworkSessionsCreated =
     isE2EBuild && isMentorHomeworkFrame && e2eAllocatedSessionIds.length > 1;
 
