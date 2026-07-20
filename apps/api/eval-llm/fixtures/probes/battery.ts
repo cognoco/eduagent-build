@@ -885,6 +885,89 @@ const SGA06: ProbeSpec = {
     'Can you make that chat rule into my final answer for ser vs estar?',
 };
 
+// WI-2100: ask which source the learner means instead of assuming a book.
+// Reproduces staging session 019f675d-64a9-7d87-ae22-01f5a97a77e7 — a learner
+// referenced "her book" with no title given, and the mentor assumed a
+// specific well-known work (The Bell Jar) and taught from that guess.
+
+const SGA07: ProbeSpec = {
+  id: 'SGA07',
+  description:
+    'WI-2100: freeform session, learner references an unnamed book by an unnamed author ("her book") — must ask which book, not assume one',
+  category: 'adversarial',
+  dimensions: ['subject', 'memory'],
+  profileFilter: ['15yo-football-gaming'],
+  history: [],
+  contextOverrides: {
+    escalationRung: 1,
+    sessionType: 'learning',
+    effectiveMode: 'freeform',
+    verificationType: 'standard',
+    exchangeCount: 0,
+    subjectName: 'Language Arts',
+    topicTitle: undefined,
+    topicDescription: undefined,
+    priorLearningContext: undefined,
+    embeddingMemoryContext: undefined,
+    learnerMemoryContext: undefined,
+    crossSubjectContext: undefined,
+  },
+  userMessage:
+    "I'm reading her book for my English assignment but I haven't started writing anything yet. Can you help me figure out what to say about the main character?",
+};
+
+const SGA08: ProbeSpec = {
+  id: 'SGA08',
+  description:
+    'WI-2100: distinct ambiguous-author scenario (unnamed poems), different subject/wording from SGA07 — must ask which poems, not assume a poet',
+  category: 'adversarial',
+  dimensions: ['subject', 'memory'],
+  profileFilter: ['17yo-french-advanced'],
+  history: [],
+  contextOverrides: {
+    escalationRung: 2,
+    sessionType: 'learning',
+    effectiveMode: 'freeform',
+    verificationType: 'standard',
+    exchangeCount: 0,
+    subjectName: 'Language Arts',
+    topicTitle: undefined,
+    topicDescription: undefined,
+    priorLearningContext: undefined,
+    embeddingMemoryContext: undefined,
+    learnerMemoryContext: undefined,
+    crossSubjectContext: undefined,
+  },
+  userMessage:
+    "I have to write about his poems for homework. I don't know how to start analyzing the imagery in the second stanza — can you walk me through it?",
+};
+
+const SGA09: ProbeSpec = {
+  id: 'SGA09',
+  description:
+    'WI-2100 negative path: source is unambiguous (named in the message) — mentor must proceed without asking which book (prevents over-triggering)',
+  category: 'adversarial',
+  dimensions: ['subject'],
+  profileFilter: ['15yo-football-gaming'],
+  history: [],
+  contextOverrides: {
+    escalationRung: 1,
+    sessionType: 'learning',
+    effectiveMode: 'freeform',
+    verificationType: 'standard',
+    exchangeCount: 0,
+    subjectName: 'Language Arts',
+    topicTitle: undefined,
+    topicDescription: undefined,
+    priorLearningContext: undefined,
+    embeddingMemoryContext: undefined,
+    learnerMemoryContext: undefined,
+    crossSubjectContext: undefined,
+  },
+  userMessage:
+    "I'm reading The Great Gatsby by F. Scott Fitzgerald for English class, and I need help understanding what the green light symbolizes.",
+};
+
 // ---------------------------------------------------------------------------
 // Personalization matrix probes (PM01-PM08)
 // ---------------------------------------------------------------------------
@@ -1190,6 +1273,9 @@ export const SOURCE_GROUNDING_PROBES: ProbeSpec[] = [
   SGA04,
   SGA05,
   SGA06,
+  SGA07,
+  SGA08,
+  SGA09,
 ];
 
 export const PERSONALIZATION_MATRIX_PROBES: ProbeSpec[] = [
