@@ -35,6 +35,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
+import * as ts from 'typescript';
 import { parse as parseYaml, parseAllDocuments } from 'yaml';
 
 const repoRoot = join(__dirname, '..');
@@ -1151,6 +1152,21 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       },
       { tapOn: { id: 'library-search-clear-results' } },
     ];
+    const exactWorldHistoryRestore: Selector[] = [
+      ...impossibleSearchAbsence,
+      {
+        extendedWaitUntil: {
+          visible: { id: 'subjects-browse-row-${SUBJECT_ID}' },
+          timeout: 15000,
+        },
+      },
+      {
+        assertVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          containsDescendants: [{ text: '^World History$' }],
+        },
+      },
+    ];
     const closedTopicSheetAbsence: Selector[] = [
       { tapOn: { id: 'subject-hub-topic-sheet-close' } },
       { assertNotVisible: { id: 'subject-hub-topic-sheet' } },
@@ -1162,47 +1178,80 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       },
     ];
 
-    expect(hasExactCommandSequence(resume, impossibleSearchAbsence)).toBe(true);
+    expect(hasExactCommandSequence(resume, exactWorldHistoryRestore)).toBe(
+      true,
+    );
     expect(hasExactCommandSequence(resume, closedTopicSheetAbsence)).toBe(true);
     for (const mutation of [
-      // Removal.
-      impossibleSearchAbsence.filter((_, index) => index !== 3),
-      // Optionalization.
-      impossibleSearchAbsence.with(3, {
+      // No-result row-absence removal.
+      exactWorldHistoryRestore.filter((_, index) => index !== 3),
+      // No-result row-absence optionalization.
+      exactWorldHistoryRestore.with(3, {
         assertNotVisible: {
           id: 'subjects-browse-row-${SUBJECT_ID}',
           optional: true,
         },
       }),
-      // Wrong owner.
-      impossibleSearchAbsence.with(3, {
+      // No-result row-absence wrong owner.
+      exactWorldHistoryRestore.with(3, {
         assertNotVisible: { id: 'subjects-browse-row-adjacent' },
       }),
-      // Reordering after the recovery action.
-      impossibleSearchAbsence
-        .with(3, impossibleSearchAbsence[4]!)
-        .with(4, impossibleSearchAbsence[3]!),
-      // Removal.
+      // No-result row-absence reordering after the recovery action.
+      exactWorldHistoryRestore
+        .with(3, exactWorldHistoryRestore[4]!)
+        .with(4, exactWorldHistoryRestore[3]!),
+      // Exact restored-row assertion removal.
+      exactWorldHistoryRestore.filter((_, index) => index !== 6),
+      // Exact restored-row assertion optionalization.
+      exactWorldHistoryRestore.with(6, {
+        assertVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          containsDescendants: [{ text: '^World History$' }],
+          optional: true,
+        },
+      }),
+      // Exact restored-row wrong owner.
+      exactWorldHistoryRestore.with(6, {
+        assertVisible: {
+          id: 'subjects-browse-row-adjacent',
+          containsDescendants: [{ text: '^World History$' }],
+        },
+      }),
+      // Exact restored-row wrong name.
+      exactWorldHistoryRestore.with(6, {
+        assertVisible: {
+          id: 'subjects-browse-row-${SUBJECT_ID}',
+          containsDescendants: [{ text: '^Adjacent History$' }],
+        },
+      }),
+      // Exact restored-row wait/assertion reordering.
+      exactWorldHistoryRestore
+        .with(5, exactWorldHistoryRestore[6]!)
+        .with(6, exactWorldHistoryRestore[5]!),
+    ]) {
+      expect(hasExactCommandSequence(mutation, exactWorldHistoryRestore)).toBe(
+        false,
+      );
+    }
+    for (const mutation of [
+      // Topic-sheet absence removal.
       closedTopicSheetAbsence.filter((_, index) => index !== 1),
-      // Optionalization.
+      // Topic-sheet absence optionalization.
       closedTopicSheetAbsence.with(1, {
         assertNotVisible: {
           id: 'subject-hub-topic-sheet',
           optional: true,
         },
       }),
-      // Wrong owner.
+      // Topic-sheet absence wrong owner.
       closedTopicSheetAbsence.with(1, {
         assertNotVisible: { id: 'subject-hub-screen' },
       }),
-      // Reordering after the next Subject Hub assertion.
+      // Topic-sheet absence reordering after the next Subject Hub assertion.
       closedTopicSheetAbsence
         .with(1, closedTopicSheetAbsence[2]!)
         .with(2, closedTopicSheetAbsence[1]!),
     ]) {
-      expect(hasExactCommandSequence(mutation, impossibleSearchAbsence)).toBe(
-        false,
-      );
       expect(hasExactCommandSequence(mutation, closedTopicSheetAbsence)).toBe(
         false,
       );
@@ -1363,6 +1412,188 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         },
       ),
     ).toBe(false);
+  });
+
+  it('[WI-2238] starts the self-seeded Playwright cases from empty storage', () => {
+    const hasEmptyStorageStateBeforeCases = (source: string): boolean => {
+      const sourceFile = ts.createSourceFile(
+        'v2-subjects.spec.ts',
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      );
+      const hasPropertyName = (
+        candidate: ts.ObjectLiteralElementLike,
+        name: string,
+      ): boolean => {
+        if (!('name' in candidate)) return false;
+        return (
+          (ts.isIdentifier(candidate.name) && candidate.name.text === name) ||
+          (ts.isStringLiteral(candidate.name) && candidate.name.text === name)
+        );
+      };
+      const property = (
+        object: ts.ObjectLiteralExpression,
+        name: string,
+      ): ts.PropertyAssignment | undefined =>
+        object.properties.find(
+          (candidate): candidate is ts.PropertyAssignment =>
+            ts.isPropertyAssignment(candidate) &&
+            hasPropertyName(candidate, name),
+        );
+      const hasOpaqueObjectProperties = (
+        object: ts.ObjectLiteralExpression,
+      ): boolean =>
+        object.properties.some(
+          (candidate) =>
+            ts.isSpreadAssignment(candidate) ||
+            ('name' in candidate && ts.isComputedPropertyName(candidate.name)),
+        );
+      const isTestUseCall = (
+        expression: ts.Expression,
+      ): expression is ts.CallExpression =>
+        ts.isCallExpression(expression) &&
+        ((ts.isPropertyAccessExpression(expression.expression) &&
+          ts.isIdentifier(expression.expression.expression) &&
+          expression.expression.expression.text === 'test' &&
+          expression.expression.name.text === 'use') ||
+          (ts.isElementAccessExpression(expression.expression) &&
+            ts.isIdentifier(expression.expression.expression) &&
+            expression.expression.expression.text === 'test' &&
+            expression.expression.argumentExpression !== undefined &&
+            (ts.isStringLiteral(expression.expression.argumentExpression) ||
+              ts.isNoSubstitutionTemplateLiteral(
+                expression.expression.argumentExpression,
+              )) &&
+            expression.expression.argumentExpression.text === 'use'));
+      const isOpaqueComputedTestCall = (
+        expression: ts.Expression,
+      ): expression is ts.CallExpression =>
+        ts.isCallExpression(expression) &&
+        ts.isElementAccessExpression(expression.expression) &&
+        ts.isIdentifier(expression.expression.expression) &&
+        expression.expression.expression.text === 'test' &&
+        !ts.isStringLiteral(expression.expression.argumentExpression) &&
+        !ts.isNoSubstitutionTemplateLiteral(
+          expression.expression.argumentExpression,
+        );
+      const storageStateInitializer = (
+        expression: ts.Expression,
+      ): ts.Expression | undefined => {
+        if (!isTestUseCall(expression)) {
+          return undefined;
+        }
+
+        const options = expression.arguments[0];
+        if (!options || !ts.isObjectLiteralExpression(options)) {
+          return undefined;
+        }
+        return property(options, 'storageState')?.initializer;
+      };
+      const firstCase = sourceFile.statements.findIndex(
+        (statement) =>
+          ts.isExpressionStatement(statement) &&
+          ts.isCallExpression(statement.expression) &&
+          ts.isIdentifier(statement.expression.expression) &&
+          statement.expression.expression.text === 'test',
+      );
+      const emptyOverride = sourceFile.statements.findIndex((statement) => {
+        if (!ts.isExpressionStatement(statement)) return false;
+        const storageState = storageStateInitializer(statement.expression);
+        if (!storageState || !ts.isObjectLiteralExpression(storageState)) {
+          return false;
+        }
+        if (storageState.properties.length !== 2) return false;
+        const cookiesProperty = property(storageState, 'cookies');
+        const originsProperty = property(storageState, 'origins');
+        const cookies = cookiesProperty?.initializer;
+        const origins = originsProperty?.initializer;
+        return (
+          !!cookies &&
+          ts.isArrayLiteralExpression(cookies) &&
+          cookies.elements.length === 0 &&
+          !!origins &&
+          ts.isArrayLiteralExpression(origins) &&
+          origins.elements.length === 0
+        );
+      });
+      let storageOverrideCount = 0;
+      let hasOpaqueTestUse = false;
+      const countStorageOverrides = (node: ts.Node): void => {
+        if (ts.isCallExpression(node) && isOpaqueComputedTestCall(node)) {
+          hasOpaqueTestUse = true;
+        }
+        if (ts.isCallExpression(node) && isTestUseCall(node)) {
+          const options = node.arguments[0];
+          if (!options || !ts.isObjectLiteralExpression(options)) {
+            hasOpaqueTestUse = true;
+          } else {
+            if (hasOpaqueObjectProperties(options)) {
+              hasOpaqueTestUse = true;
+            }
+            const storageProperties = options.properties.filter((candidate) =>
+              hasPropertyName(candidate, 'storageState'),
+            );
+            storageOverrideCount += storageProperties.length;
+            if (
+              storageProperties.some(
+                (candidate) =>
+                  !ts.isPropertyAssignment(candidate) ||
+                  (!ts.isObjectLiteralExpression(candidate.initializer) &&
+                    !ts.isStringLiteral(candidate.initializer)) ||
+                  (ts.isObjectLiteralExpression(candidate.initializer) &&
+                    hasOpaqueObjectProperties(candidate.initializer)),
+              )
+            ) {
+              hasOpaqueTestUse = true;
+            }
+          }
+        }
+        ts.forEachChild(node, countStorageOverrides);
+      };
+      countStorageOverrides(sourceFile);
+
+      return (
+        firstCase >= 0 &&
+        emptyOverride >= 0 &&
+        emptyOverride < firstCase &&
+        storageOverrideCount === 1 &&
+        !hasOpaqueTestUse
+      );
+    };
+    const caseStub = "test('self-seeded case', async () => {});";
+
+    expect(
+      hasEmptyStorageStateBeforeCases(
+        `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}`,
+      ),
+    ).toBe(true);
+    for (const mutation of [
+      caseStub,
+      `test.use({ storageState: 'solo-learner.json' });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [{}], origins: [] } });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [{}] } });\n${caseStub}`,
+      `${caseStub}\ntest.use({ storageState: { cookies: [], origins: [] } });`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\ntest.use({ storageState: 'solo-learner.json' });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\ntest.describe('authenticated', () => { test.use({ storageState: 'solo-learner.json' }); ${caseStub} });`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\ntest['use']({ storageState: 'solo-learner.json' });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\ntest.describe('computed authenticated', () => { test['use']({ storageState: 'solo-learner.json' }); ${caseStub} });`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\nconst method = 'use';\ntest[method]({ storageState: 'solo-learner.json' });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\nconst storageState = { cookies: [], origins: [] };\ntest.use({ storageState });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\nconst options = getTestOptions();\ntest.use(options);\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\nconst options = getTestOptions();\ntest.use({ ...options });\n${caseStub}`,
+      `test.use({ storageState: { cookies: [], origins: [] } });\n${caseStub}\nconst opaqueState = getStorageState();\ntest.use({ storageState: opaqueState });\n${caseStub}`,
+      `const opaqueState = getStorageState();\ntest.use({ storageState: { ...opaqueState, cookies: [], origins: [] } });\n${caseStub}`,
+    ]) {
+      expect(hasEmptyStorageStateBeforeCases(mutation)).toBe(false);
+    }
+
+    const subjectsSpec = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e-web/flows/v2/v2-subjects.spec.ts'),
+      'utf8',
+    );
+    expect(hasEmptyStorageStateBeforeCases(subjectsSpec)).toBe(true);
   });
 
   it('[WI-2241] hard-selects the exact rich supportee through the Support hub before and after relaunch', () => {

@@ -150,7 +150,10 @@ export function SubjectsBrowse({
   };
 
   return (
-    <ScrollView className="flex-1 bg-bg px-5 py-4">
+    <ScrollView
+      className="flex-1 bg-bg px-5 py-4"
+      keyboardShouldPersistTaps="handled"
+    >
       <Text className="text-h2 font-semibold text-text-primary">
         {t('subjectsBrowse.title')}
       </Text>

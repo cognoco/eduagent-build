@@ -5,6 +5,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react-native';
+import { ScrollView } from 'react-native';
 
 import { SubjectsBrowse } from './SubjectsBrowse';
 import type { SubjectIndexItem } from '../../hooks/use-subjects-index';
@@ -89,6 +90,10 @@ const ALGEBRA = item({
   total: 5,
   dueReviews: 0,
 });
+const WORLD_HISTORY = item({
+  subjectId: '770e8400-e29b-41d4-a716-446655440002',
+  subjectName: 'World History',
+});
 const ITEMS: SubjectIndexItem[] = [SPANISH, ALGEBRA];
 
 // ---------------------------------------------------------------------------
@@ -102,6 +107,21 @@ describe('SubjectsBrowse', () => {
   // The search hook is disabled (no activeProfile in context default) so no
   // fetch fires — we only need a QueryClient in the tree.
   const { wrapper } = createQueryWrapper();
+
+  it('[WI-2238] keeps SubjectsBrowse taps handled for Clear while the search keyboard is open', () => {
+    render(
+      <SubjectsBrowse
+        subjects={ITEMS}
+        onOpenSubject={jest.fn()}
+        onCreateSubject={jest.fn()}
+      />,
+      { wrapper },
+    );
+
+    expect(
+      screen.UNSAFE_getByType(ScrollView).props.keyboardShouldPersistTaps,
+    ).toBe('handled');
+  });
 
   it('renders the full subject list before search and opens a subject row', () => {
     const onOpenSubject = jest.fn();
@@ -685,7 +705,7 @@ describe('SubjectsBrowse — search behavior', () => {
     );
   });
 
-  it('clears query and restores subject list when clear is pressed', async () => {
+  it('[WI-2238] restores the exact seeded World History row after one Clear press', async () => {
     const emptyResult = {
       subjects: [],
       books: [],
@@ -703,7 +723,7 @@ describe('SubjectsBrowse — search behavior', () => {
 
     render(
       <SubjectsBrowse
-        subjects={ITEMS}
+        subjects={[WORLD_HISTORY, ALGEBRA]}
         onOpenSubject={jest.fn()}
         onCreateSubject={jest.fn()}
       />,
@@ -712,22 +732,28 @@ describe('SubjectsBrowse — search behavior', () => {
 
     fireEvent.changeText(
       screen.getByTestId('subjects-browse-search'),
-      'clear-me',
+      'zzzz-no-such-subject-2238',
     );
 
-    // Wait for empty results (clear button renders here)
     await waitFor(
       () => {
-        expect(screen.getByTestId('library-search-clear-results')).toBeTruthy();
+        screen.getByTestId('library-search-empty');
       },
       { timeout: 1500 },
     );
+    expect(
+      screen.queryByTestId(`subjects-browse-row-${WORLD_HISTORY.subjectId}`),
+    ).toBeNull();
 
-    fireEvent.press(screen.getByTestId('library-search-clear-results'));
+    const clear = screen.getByTestId('library-search-clear-results');
+    expect(clear.props.accessibilityRole).toBe('button');
+    fireEvent.press(clear);
 
-    // After clear, subject list is restored.
     await waitFor(() => {
-      expect(screen.getByText('Show me everything')).toBeTruthy();
+      const restoredRow = screen.getByTestId(
+        `subjects-browse-row-${WORLD_HISTORY.subjectId}`,
+      );
+      within(restoredRow).getByText('World History');
     });
   });
 });

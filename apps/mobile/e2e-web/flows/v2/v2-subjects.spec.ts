@@ -16,6 +16,8 @@ import {
   photosynthesisSession,
 } from './v2-subjects-fixtures';
 
+test.use({ storageState: { cookies: [], origins: [] } });
+
 const NOW = '2026-07-20T00:00:00.000Z';
 
 async function fulfillJson(
