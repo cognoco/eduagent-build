@@ -35,6 +35,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { parse as parseYaml, parseAllDocuments } from 'yaml';
 
 const repoRoot = join(__dirname, '..');
@@ -116,13 +117,13 @@ function assertHardMaestroTextOwnership(
       const selector = (command as Record<string, unknown>).assertVisible;
       if (!selector || typeof selector !== 'object') return false;
       const fields = selector as Record<string, unknown>;
-      if (fields.text === text) return true;
       if (
         typeof fields.id === 'string' &&
         allowedOwnerIds.includes(fields.id)
       ) {
         return false;
       }
+      if (fields.text === text) return true;
       const candidateDescendants = fields.containsDescendants;
       return (
         Array.isArray(candidateDescendants) &&
@@ -151,7 +152,7 @@ function assertCommandsInOrder(
     const serializedExpected = JSON.stringify(expected);
     cursor = commands.findIndex(
       (command, index) =>
-        index > cursor && JSON.stringify(command) === serializedExpected,
+        index > cursor && isDeepStrictEqual(command, expected),
     );
     if (cursor < 0) {
       throw new Error(
@@ -1315,23 +1316,57 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       expect(() =>
         assertHardMaestroTextOwnership([owner(binding.id)], [binding]),
       ).not.toThrow();
-      for (const mutant of [
-        [
-          { assertVisible: { id: binding.id } },
-          { assertVisible: { text: binding.text } },
-        ],
-        [
-          { assertVisible: { id: binding.id } },
-          owner(`${binding.id}-adjacent`),
-        ],
-        [owner(binding.id, true)],
+      expect(() =>
+        assertHardMaestroTextOwnership(
+          [
+            {
+              assertVisible: {
+                ...owner(binding.id).assertVisible,
+                text: binding.text,
+              },
+            },
+          ],
+          [binding],
+        ),
+      ).not.toThrow();
+      for (const splitOrAdjacentMutant of [
+        [owner(binding.id), { assertVisible: { text: binding.text } }],
+        [owner(binding.id), owner(`${binding.id}-adjacent`)],
       ]) {
-        expect(() => assertHardMaestroTextOwnership(mutant, [binding])).toThrow(
-          /mandatory descendant|split|adjacent/,
+        expect(() =>
+          assertHardMaestroTextOwnership(splitOrAdjacentMutant, [binding]),
+        ).toThrow(
+          /must not be split from or assigned to an adjacent Maestro ID/,
         );
       }
+      expect(() =>
+        assertHardMaestroTextOwnership([owner(binding.id, true)], [binding]),
+      ).toThrow(/mandatory descendant/);
     },
   );
+
+  it('[WI-2239] compares ordered Maestro commands structurally across nested key order', () => {
+    expect(() =>
+      assertCommandsInOrder(
+        [
+          {
+            extendedWaitUntil: {
+              timeout: 15000,
+              visible: { id: 'mentor-screen' },
+            },
+          },
+        ],
+        [
+          {
+            extendedWaitUntil: {
+              visible: { id: 'mentor-screen' },
+              timeout: 15000,
+            },
+          },
+        ],
+      ),
+    ).not.toThrow();
+  });
 
   it('[WI-2239] protects empty recovery plus exact Practice and report round-trip properties', () => {
     const emptyFlow = parseAllDocuments(
