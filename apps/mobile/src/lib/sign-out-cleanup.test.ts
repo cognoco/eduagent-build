@@ -9,6 +9,7 @@
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ExpoSecureStore from 'expo-secure-store';
+import { deferred } from '@eduagent/test-utils';
 import {
   beginExplicitMentorLanguageUpdate,
   completeExplicitMentorLanguageUpdate,
@@ -16,17 +17,6 @@ import {
 } from './mentor-language-coordination';
 
 const mockDelete = jest.mocked(ExpoSecureStore.deleteItemAsync);
-
-function deferred<T>(): {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-} {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((next) => {
-    resolve = next;
-  });
-  return { promise, resolve };
-}
 
 describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
   beforeEach(() => {

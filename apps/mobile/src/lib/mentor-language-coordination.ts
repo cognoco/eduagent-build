@@ -249,6 +249,8 @@ export function clearMentorLanguageCoordination(
 ): void {
   for (const profileId of profileIds) {
     coordinationByProfile.delete(profileId);
+    lifecycleByProfile.delete(profileId);
+    writeTailByProfile.delete(profileId);
   }
 }
 

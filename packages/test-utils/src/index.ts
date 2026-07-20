@@ -8,6 +8,8 @@
 
 export { loadDatabaseEnv } from './lib/load-database-env.js';
 
+export { deferred } from './lib/deferred.js';
+
 // Database mock for unit testing
 export { createMockDb } from './lib/neon-mock.js';
 

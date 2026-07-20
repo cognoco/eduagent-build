@@ -69,6 +69,15 @@ describe('useMentorLanguageSync', () => {
     await i18next.changeLanguage('en');
   });
 
+  afterEach(async () => {
+    await clearProfileSecureStorageOnSignOut([
+      'p1',
+      'p2',
+      'profile-1',
+      'profile-2',
+    ]);
+  });
+
   it('patches profile when i18next language differs from stored value', async () => {
     await i18next.changeLanguage('nb');
 

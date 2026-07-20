@@ -3,6 +3,7 @@ import * as ExpoSecureStore from 'expo-secure-store';
 import { fireEvent, act, waitFor } from '@testing-library/react-native';
 import { useQuery } from '@tanstack/react-query';
 import type { ConversationLanguage } from '@eduagent/schemas';
+import { deferred } from '@eduagent/test-utils';
 import {
   renderScreen,
   cleanupScreen,
@@ -105,17 +106,6 @@ const child = createTestProfile({
 });
 
 const onboardingRoutes = { '/onboarding/': { success: true } };
-
-function deferred<T>(): {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-} {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((next) => {
-    resolve = next;
-  });
-  return { promise, resolve };
-}
 
 describe('MentorLanguageScreen', () => {
   let active: ReturnType<typeof renderScreen> | null = null;
