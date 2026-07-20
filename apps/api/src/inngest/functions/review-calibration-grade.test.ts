@@ -508,6 +508,9 @@ describe('reviewCalibrationGrade', () => {
             content: LEARNER_ANSWER,
           }),
         },
+        retrievalEvents: {
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
         // [WI-1454] getOpenTopicWeakConcepts reads open needs_deepening rows
         // for the topic before grading. Default: none → whole-topic recall.
         needsDeepeningTopics: {
@@ -517,7 +520,13 @@ describe('reviewCalibrationGrade', () => {
       insert: jest.fn((table: unknown) => ({
         values: jest.fn((v: unknown) => {
           insertSink.push({ table, v });
-          return Promise.resolve(undefined);
+          return {
+            onConflictDoNothing: jest.fn(() => ({
+              returning: jest
+                .fn()
+                .mockResolvedValue([{ id: LEARNER_MESSAGE_EVENT_ID }]),
+            })),
+          };
         }),
       })),
       update: jest.fn().mockReturnValue({

@@ -535,35 +535,45 @@ describe('scrubSentryEvent', () => {
     expect(scrubbed.request?.query_string).toBe('[stripped]');
   });
 
-  // [WI-2339] Defensive coverage for event.request.data — NOT populated by
-  // this app's SDK/runtime today (see the WI's Risk/Impact: no free-text POST
-  // body reaches Sentry at @sentry/cloudflare@10.39.0), so this is a unit
-  // test against scrubSentryEvent directly rather than a real-pipeline test —
-  // the pipeline cannot be made to populate this field to exercise it. Forward
+  // [WI-2339 Gate-2 rework #2] Red-green regression for the reviewer's
+  // repro: the FIRST rework denylist-scrubbed a plain-object request.data,
+  // so a non-denylisted field (homeworkAnswer) survived unredacted — a
+  // denylist is a curated list of KNOWN-bad keys, not a guarantee every
+  // field of an arbitrary request body is safe, and SKILL.md's checklist
+  // requires bodies to be stripped, not selectively filtered. Before this
+  // fix, homeworkAnswer passed through unchanged and this assertion FAILED;
+  // after wholesale-stripping request.data for every shape (object
+  // included) it PASSES. Not populated by this app's SDK/runtime today (see
+  // the WI's Risk/Impact: no free-text POST body reaches Sentry at
+  // @sentry/cloudflare@10.39.0), so this is a unit test against
+  // scrubSentryEvent directly rather than a real-pipeline test — the
+  // pipeline cannot be made to populate this field to exercise it. Forward
   // guard for a future capture site or SDK upgrade that starts attaching it.
-  it('strips denylisted keys from event.request.data (forward guard, not currently populated by the SDK)', () => {
+  it('strips event.request.data wholesale even when it is a plain object with no denylisted keys', () => {
     const event = {
       request: {
         url: 'https://api.example.com/v1/sessions',
-        data: { rawInput: "child's homework text", requestId: 'req-1' },
+        data: {
+          homeworkAnswer: 'my mom said we live at 123 Main St',
+          requestId: 'req-1',
+        },
       },
     } as unknown as Parameters<typeof scrubSentryEvent>[0];
 
     const scrubbed = scrubSentryEvent(event);
 
-    expect(scrubbed.request?.data).not.toHaveProperty('rawInput');
-    expect((scrubbed.request?.data as Record<string, unknown>).requestId).toBe(
-      'req-1',
-    );
+    expect(scrubbed.request?.data).not.toHaveProperty('homeworkAnswer');
+    expect(scrubbed.request?.data).not.toHaveProperty('requestId');
+    expect(scrubbed.request?.data).toBe('[stripped]');
   });
 
   // [WI-2339 Gate-2 rework] Red-green regression: .agents/skills/tech/
   // sentry-scrubbing/SKILL.md's checklist requires beforeSend to strip
-  // request bodies unconditionally, not only plain-object bodies. Before
-  // this fix, a non-plain-object request.data (a raw string body) was left
-  // UNCHANGED and this assertion FAILED (the literal secret passed through);
-  // after wholesale-stripping any truthy non-plain-object body it PASSES.
-  it('strips a non-plain-object (string) event.request.data wholesale', () => {
+  // request bodies unconditionally. Before the first rework, a non-object
+  // request.data (a raw string body) was left UNCHANGED and this assertion
+  // FAILED (the literal secret passed through); after wholesale-stripping
+  // any truthy body it PASSES.
+  it('strips a string event.request.data wholesale', () => {
     const event = {
       request: {
         url: 'https://api.example.com/v1/sessions',
