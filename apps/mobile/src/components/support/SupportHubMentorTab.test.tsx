@@ -5,7 +5,11 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import type { ScopeDescriptor, SharedRecord } from '@eduagent/schemas';
+import type {
+  ScopeDescriptor,
+  SharedRecord,
+  SupporterColdStart as SupporterColdStartData,
+} from '@eduagent/schemas';
 
 import {
   cleanupScreen,
@@ -16,6 +20,7 @@ import {
   fetchCallsMatching,
   type RoutedMockFetch,
 } from '../../test-utils/mock-api-routes';
+import { ScopeContextProvider } from '../../lib/scope-context';
 import { SupportHubMentorTab } from './SupportHubMentorTab';
 
 jest.mock(
@@ -43,6 +48,23 @@ jest.mock(
 
 const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
+
+// [WI-2226] A separate person from EMMA_SCOPE — the managed-family cold-start
+// card represents a child who does NOT yet have their own account, so they
+// never appear as an actionable `personScopes` entry (see
+// resolveSupporterColdStart's `!edge.hasOwnAccount` branch); Emma is used
+// throughout this file for the already-linked person-scope cases instead.
+const MANAGED_PERSON_ID = '550e8400-e29b-41d4-a716-446655440301';
+const MANAGED_EDGE_ID = '550e8400-e29b-41d4-a716-446655440401';
+
+// [WI-2226] Default cold-start fixture: no per-child nudge to show. Matches
+// the pre-mount visual baseline every existing test in this file was written
+// against, so mounting SupporterColdStart doesn't change their output.
+const EMPTY_COLD_START: SupporterColdStartData = {
+  variant: 'per-child',
+  cards: [],
+  selfLearningDoorway: true,
+};
 
 const EMMA_SCOPE: Extract<ScopeDescriptor, { kind: 'person' }> = {
   kind: 'person',
@@ -106,12 +128,31 @@ function renderWithProfile(ui: React.ReactElement): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  const { wrapper } = createScreenWrapper({
+  const { wrapper: ProfileWrapper } = createScreenWrapper({
     activeProfile: createTestProfile(),
     profiles: [createTestProfile()],
     queryClient,
   });
-  render(ui, { wrapper });
+  // [WI-2226] SupportHubMentorTab now mounts SupporterColdStart, which reads
+  // useScopeContext() — a real ScopeContextProvider is required or the hook
+  // throws. `defaultScopeIndex: 0` -> `activeScope.kind === 'supporter-hub'`,
+  // matching every test in this file (none exercise the person-scope branch).
+  function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <ProfileWrapper>
+        <ScopeContextProvider
+          initialScopeList={{
+            shape: 'supporter',
+            scopes: [{ kind: 'supporter-hub' }],
+            defaultScopeIndex: 0,
+          }}
+        >
+          {children}
+        </ScopeContextProvider>
+      </ProfileWrapper>
+    );
+  }
+  render(ui, { wrapper: Wrapper });
   return queryClient;
 }
 
@@ -129,6 +170,7 @@ describe('SupportHubMentorTab', () => {
       `/visibility/reports/${PERSON_ID}/shared-record`,
       SHARED_RECORD,
     );
+    mockFetch.setRoute('/scopes/coldstart', EMPTY_COLD_START);
   });
 
   it('renders visibility-backed cockpit cards with Mentor, Subjects, and Journal actions', async () => {
@@ -307,5 +349,101 @@ describe('SupportHubMentorTab', () => {
 
     expect(onAddChildFallback).toHaveBeenCalledTimes(1);
     expect(onSelectEligiblePerson).not.toHaveBeenCalled();
+  });
+
+  // [WI-2226] SupporterColdStart is now mounted inside the production
+  // Support hub tree (this component, not a standalone test harness) so its
+  // scope contract actually runs. These four cases prove the four
+  // producible cold-start states render DISTINCTLY once mounted here — not
+  // just in the component's own isolated unit tests
+  // (SupporterColdStart.test.tsx), which never exercise the real mount
+  // site. `pending-visibility` and the zero-edge `variant-zero` states are
+  // out of scope for this WI (struck from the AC — see PR description).
+  describe('[WI-2226] mounted SupporterColdStart', () => {
+    // RGR (red-green-revert) regression guard: this is the ONE test in the
+    // suite that fails if SupporterColdStart stops being mounted in
+    // SupportHubMentorTab. It deliberately uses the CONTENT-BEARING
+    // 'managed' fixture, not the empty fixture — an empty fixture renders
+    // null either way (mounted-but-empty is indistinguishable from
+    // not-mounted), so it cannot prove reachability. Red/green evidence:
+    // apps/mobile/src/components/support/wi2226-rgr-evidence.md.
+    it('[WI-2226 RGR] renders the managed-family cold-start card from the mounted Support hub tree', async () => {
+      const coldStart: SupporterColdStartData = {
+        variant: 'per-child',
+        cards: [
+          {
+            personId: MANAGED_PERSON_ID,
+            edgeId: MANAGED_EDGE_ID,
+            displayName: 'Liam',
+            state: 'managed',
+            anchor: 'handoff',
+          },
+        ],
+        selfLearningDoorway: true,
+      };
+      mockFetch.setRoute('/scopes/coldstart', coldStart);
+
+      queryClient = renderWithProfile(
+        <SupportHubMentorTab personScopes={[EMMA_SCOPE]} />,
+      );
+
+      await waitFor(() => {
+        screen.getByTestId(`supporter-cold-start-managed-${MANAGED_PERSON_ID}`);
+      });
+      screen.getByText('Liam');
+    });
+
+    it('shows the cold-start loading state before the query resolves', () => {
+      mockFetch.setRoute(
+        '/scopes/coldstart',
+        () => new Promise<SupporterColdStartData>(() => undefined),
+      );
+
+      queryClient = renderWithProfile(
+        <SupportHubMentorTab personScopes={[EMMA_SCOPE]} />,
+      );
+
+      screen.getByTestId('supporter-cold-start-error');
+      expect(screen.queryByTestId('supporter-cold-start')).toBeNull();
+      expect(
+        screen.queryByTestId(
+          `supporter-cold-start-managed-${MANAGED_PERSON_ID}`,
+        ),
+      ).toBeNull();
+    });
+
+    it('shows a retryable cold-start error state distinct from loading', async () => {
+      mockFetch.setRoute(
+        '/scopes/coldstart',
+        () =>
+          new Response(JSON.stringify({ message: 'boom' }), { status: 500 }),
+      );
+
+      queryClient = renderWithProfile(
+        <SupportHubMentorTab personScopes={[EMMA_SCOPE]} />,
+      );
+
+      await waitFor(() => {
+        screen.getByTestId('supporter-cold-start-retry');
+      });
+      expect(screen.queryByTestId('supporter-cold-start')).toBeNull();
+    });
+
+    it('renders no cold-start section when every managed child already has real learning state (empty per-child cards)', async () => {
+      mockFetch.setRoute('/scopes/coldstart', EMPTY_COLD_START);
+
+      queryClient = renderWithProfile(
+        <SupportHubMentorTab personScopes={[EMMA_SCOPE]} />,
+      );
+
+      // Wait for Emma's shared-record card (a state the empty cold-start
+      // fixture does not affect) so the assertions below run after the
+      // cold-start query has also settled, not mid-flight.
+      await waitFor(() => {
+        screen.getByText('Emma has 1 shareable update.');
+      });
+      expect(screen.queryByTestId('supporter-cold-start')).toBeNull();
+      expect(screen.queryByTestId('supporter-cold-start-error')).toBeNull();
+    });
   });
 });

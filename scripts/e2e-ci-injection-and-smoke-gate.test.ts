@@ -947,6 +947,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'onboarding-no-subject',
         shard: 1,
       },
+      // [WI-2226] Supporter cold-start mount — the granted-idle kickstart
+      // nudge renders on Support hub landing for an account-holding,
+      // learning-state-free child, and not at all for one with real
+      // learning state.
+      {
+        flow: 'flows/v2/v2-supporter-coldstart-mount.yaml',
+        scenario: 'v2-supporter-accepted',
+        shard: 1,
+      },
       // [WI-2241] Supporter scope journey — Support hub -> person scope ->
       // Mentor -> Subjects -> Journal -> Support hub, structural/negative
       // walls, empty-record honest-empty-state, revoked-edge affordance
