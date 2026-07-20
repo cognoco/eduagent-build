@@ -3,6 +3,7 @@ import type { Database } from './client';
 import {
   learningSessions,
   assessments,
+  retrievalEvents,
   sessionEvents,
   sessionSummaries,
   bookmarks,
@@ -93,6 +94,14 @@ export function createSessionRepository(
         return db.query.sessionEvents.findFirst({
           where: scopedWhere(sessionEvents, extraWhere),
           ...(orderBy ? { orderBy } : {}),
+        });
+      },
+    },
+
+    retrievalEvents: {
+      async findFirst(extraWhere?: SQL) {
+        return db.query.retrievalEvents.findFirst({
+          where: scopedWhere(retrievalEvents, extraWhere),
         });
       },
     },
