@@ -377,15 +377,6 @@ export function ChatShell({
     getMicrophonePermissionStatus,
   } = useSpeechRecognition({ lang: speechRecognitionLanguage });
 
-  // Proactively prompt for microphone on session entry so voice input is
-  // ready without the user hunting for a toggle. Android forbids silent
-  // grants for RECORD_AUDIO, so this system dialog on first launch is the
-  // closest thing to "allowed by default". Once the user taps Allow, the
-  // grant sticks until they explicitly revoke it in Settings.
-  useEffect(() => {
-    void requestMicrophonePermission();
-  }, [requestMicrophonePermission]);
-
   // BUG-141: STT permission detection must classify-before-format. Previously
   // this branch string-matched `sttError.toLowerCase().includes('permission')`,
   // which silently breaks if the hook's canonical message ever changes (e.g.
