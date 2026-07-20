@@ -1,10 +1,15 @@
-import { act, renderHook } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 import React, { type ReactNode } from 'react';
 import type { NowDeepLink, SupporterScopeList } from '@eduagent/schemas';
 import { MENTOR_CAPABILITY_CASES } from '@eduagent/test-utils';
 
 import { buildNowPath, pushNowDeepLink } from './now-deep-link';
-import { ScopeContextProvider, useScopeContext } from './scope-context';
+import * as SecureStore from './secure-storage';
+import {
+  getLastActiveScopeStorageKey,
+  ScopeContextProvider,
+  useScopeContext,
+} from './scope-context';
 
 // WI-2223: a support.hub pointer must select the Support-hub scope before the
 // Mentor tab opens, from every source scope, and must not throw if the scope
@@ -26,10 +31,11 @@ function firstCallOrder(mockFn: jest.Mock): number {
   return order;
 }
 
-function scopeWrapperFor(scopeList: SupporterScopeList) {
+function scopeWrapperFor(scopeList: SupporterScopeList, profileId?: string) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return React.createElement(ScopeContextProvider, {
       initialScopeList: scopeList,
+      initialProfileId: profileId,
       children,
     });
   };
@@ -330,30 +336,53 @@ describe('pushNowDeepLink support.hub scope selection against real scope state',
     },
   );
 
-  it('[AC-2] stays safe when the active person scope predates the current scope list (stale edge)', () => {
-    // Simulates a pointer minted while `personScope` was active, then the
-    // supportership edge disappearing from the server's scope list before the
-    // pointer is followed — the pointer never references personScope at all,
-    // so this must resolve exactly like any other source scope.
+  it('[AC-2] stays safe when the active person scope predates the current scope list (stale edge)', async () => {
+    // Simulates a pointer minted while `personScope` was the persisted active
+    // scope — a real disk-persisted key, written the same way setActiveScope
+    // itself writes one (scope-context.tsx) — and the supportership edge then
+    // disappearing from the server's CURRENT scope list before the pointer is
+    // followed. Unlike a scope list that still contains personScope (an
+    // ordinary transition), this scope list genuinely omits it, so resolving
+    // the persisted key exercises the real fallback in scope-context.tsx's
+    // activeScope memo (the persisted key isn't found → falls back to
+    // defaultScope), not a hand-set end state.
+    const profileId = '00000000-0000-4000-8000-000000000902';
+    await SecureStore.setItemAsync(
+      getLastActiveScopeStorageKey(profileId),
+      `person:${personScope.personId}:${personScope.edgeId}`,
+    );
+
     const { result } = renderHook(() => useScopeContext(), {
-      wrapper: scopeWrapperFor({
-        shape: 'supporter',
-        scopes: [{ kind: 'supporter-hub' }, personScope],
-        defaultScopeIndex: 1,
-      }),
+      wrapper: scopeWrapperFor(
+        {
+          shape: 'supporter',
+          scopes: [{ kind: 'supporter-hub' }],
+          defaultScopeIndex: 0,
+        },
+        profileId,
+      ),
     });
-    expect(result.current.activeScope).toEqual(personScope);
+
+    // The stale persisted edge resolves to the safe default — no throw, and
+    // the removed person scope is not resurrected.
+    await waitFor(() => {
+      expect(result.current.activeScope).toEqual({ kind: 'supporter-hub' });
+    });
+
     const router = { push: jest.fn() };
 
-    act(() => {
-      pushNowDeepLink(
-        router,
-        { route: 'support.hub', params: {}, chain: [] },
-        { setActiveScope: result.current.setActiveScope },
-      );
-    });
+    expect(() => {
+      act(() => {
+        pushNowDeepLink(
+          router,
+          { route: 'support.hub', params: {}, chain: [] },
+          { setActiveScope: result.current.setActiveScope },
+        );
+      });
+    }).not.toThrow();
 
     expect(result.current.activeScope).toEqual({ kind: 'supporter-hub' });
+    expect(router.push).toHaveBeenCalledWith('/(app)/mentor');
   });
 
   it('[AC-4] leaves a learner-shape (me-only) account unaffected — setActiveScope early-returns, navigation still proceeds', () => {

@@ -1,0 +1,46 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Verified unchanged from the prior landed pass (932333893, already on origin/main): the Navigation shell matrix's 'What's actually shipped today' build-profile table and its V2 column against apps/mobile/eas.json still hold — untouched by this rework, re-read against current source and confirmed accurate.",
+      "pointer": "docs/flows/mobile-app-flow-inventory.md"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "Verified unchanged from the prior landed pass and re-checked against current source this session: navigation-contract.ts is still 643 lines; STUDY_TABS still opens at line 153; V2_ROUTES is still at line 178; resolveCanEnter still opens at line 457. All four line numbers read directly against the file at this branch, not assumed from the prior pass.",
+      "pointer": "apps/mobile/src/lib/navigation-contract.ts"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Verified unchanged from the prior landed pass: the V2-CHROME-01/MENTOR-01/MENTOR-02/SUBJECTS-01/JOURNAL-01/SCOPE-01/SCOPE-02 rows' substantive Flow/Audience/Gating content (person-scope chips, person selection, scope-preserving tab changes, landing routes, back/exit, authorization boundaries) is untouched by this rework — only their Coverage cells changed, per AC-5.",
+      "pointer": "docs/flows/mobile-app-flow-inventory.md"
+    },
+    {
+      "acRef": "AC-4",
+      "description": "Every row whose own described behavior differs across V0/V1/V2 flag states is now tagged, not just the 4 rows (SUBJECT-14, PRACTICE-04, QUIZ-01, V2-SCOPE-02) the prior pass under-tagged. The Status legend states the discriminator explicitly and applies it exhaustively: a row is tagged when it describes a tab/hub/mode mechanism V2 removes or replaces wholesale (Home tab, Library tab, More hub, Progress tab, Recaps tab, ModeSwitcher, the parent-dashboard/child-drill-down route family), not merely reached via a tab that differs by shell. A self-check after the first drafting pass caught the same under-scoping shape the reviewer originally found: the legend named the Library tab and Progress tab as tagged surfaces, but their own defining rows (LEARN-08, LEARN-17) were left untagged — corrected before reporting, together with their tab-hosted affordances. Tagged this pass: the 14 Home-tab-paradigm rows (HOME-01,02,03,05-09,11-16), the More-hub row (ACCOUNT-06, its individual settings children left untagged since they remain reachable through the V2 AccountAdminSheet), the Library tab and its hosted rows (LEARN-08, 25, 30, 31, 32), the Progress tab and its hosted rows (LEARN-17, 18, 19, 21, 24, 28, 29 — shelf/book/topic detail and quiz/dictation/session mechanics stay untagged as content that behaves identically regardless of entry tab), and all 24 live rows in the parent-dashboard/child-drill-down family (PARENT-01 through PARENT-25; PARENT-07 was already removed in a prior refresh and is tracked in \"Removed in this refresh\", not a live row) — the parent-dashboard verification was done by grepping mentor.tsx/subjects.tsx/journal/index.tsx for any push to child/[profileId] (none exist under V2). HOME-03's tab-shape summary, which previously omitted V2 entirely, now states the V2 4th state and cross-links the Navigation shell matrix. 55 rows carry a legacy-* tag in total (verified by counting distinct row IDs with a legacy-current/superseded/historical tag in the doc).",
+      "pointer": "docs/flows/mobile-app-flow-inventory.md"
+    },
+    {
+      "acRef": "AC-5",
+      "description": "A new 'Manifest Reconciliation (AC-5)' section reconciles all 187 distinct manifest files cited across the doc's 449 backtick citations, per the cite-rot guard's own count (not a subset of batch-touched rows), with a per-manifest path-exists / runs-under-CI-trigger / proves-flow table. The CI-trigger facts are mechanical: each Maestro flow's real tags: frontmatter is read against ci-maestro-plan.mjs's suite-selection logic (nightly cron vs PR gate vs the v2 workflow_dispatch suite vs untriggered tags like weekly/blocked/manual/devclient), and each Playwright spec against its playwright.config.ts project testMatch (web smoke vs full suite vs opt-in-only projects). 'Proves flow' starts from each citing row's own existing coverage annotation and is downgraded where this pass found the mechanical fact narrows or contradicts it. Two concrete drift findings corrected: (1) the V2 Shell section's intro falsely claimed no dedicated Maestro/Playwright flow targets the 3-tab shell and mis-cited the scope-switching journey as a nonexistent 'V2-05' — three real, already-landed native Maestro flows (v2-shell-navigation.yaml, v2-supporter-scope-journey.yaml, v2-subject-create-round-trip.yaml, wired to the v2 workflow_dispatch suite) are now cited against the correct V2-CHROME-01/MENTOR-01/MENTOR-02/SUBJECTS-01/JOURNAL-01/SCOPE-01 rows; (2) BILLING-06's 'PARKED / out-of-manifest' claim for billing/child-paywall.yaml is stale — the file's live YAML tags: frontmatter carries 'nightly' (so the tag-based nightly-suite selection in ci-maestro-plan.mjs does select it, contradicting the file's own header comment), and the same file's own 'KNOWN BREAK' comment documents that it currently times out post-ACCOUNT-04 rather than passing; both are marked in the row and the table, not silently fixed (test-flow/CI-config changes are out of this docs-only item's scope, flagged as a Gap instead).",
+      "pointer": "docs/flows/mobile-app-flow-inventory.md"
+    },
+    {
+      "acRef": "AC-6",
+      "description": "Verified unchanged from the prior landed pass: the 'What's actually shipped today' table and its no-universal-default wording are untouched by this rework.",
+      "pointer": "docs/flows/mobile-app-flow-inventory.md"
+    },
+    {
+      "acRef": "AC-7",
+      "description": "scripts/check-flow-inventory-cite-rot.ts gains three mechanical checks beyond citation existence, addressing the reviewer's finding that the guard only caught cite-rot, not flag/shell-state drift: (1) row-ID cross-links — every bare ID-shaped token referenced from another row's prose must resolve to a real defined row or an explicitly-removed one, with a dedicated rule for the exact bug class the reviewer found (a bare 'V2-NN' token, since real V2-shell rows are always three-part IDs); (2) flag tokens — every MODE_NAV_V*_ENABLED / EXPO_PUBLIC_ENABLE_MODE_NAV* token cited must be a real symbol in feature-flags.ts; (3) legacy tags — every inline **legacy-xxx** tag must be one of the three the Status legend defines. All three are cite-rot-style mechanical checks (regex + set-membership against real source), not a new test harness, matching the AC's own refinement note. The guard caught the exact V2-05 bug before it was fixed (verified by running the guard against the doc pre-fix) and is clean post-fix. Co-located test suite covers each new check's pass/fail paths plus the false-positive guard (BUG-NNN/WI-NNN tokens are correctly ignored). Wired into docs-checks.yml's existing flow-inventory-cite-rot job (unchanged — same script, same job).",
+      "pointer": "scripts/check-flow-inventory-cite-rot.ts"
+    },
+    {
+      "acRef": "AC-8",
+      "description": "Refinement notes still satisfied: no product code changed this rework either (docs/flows/mobile-app-flow-inventory.md plus the one existing tooling script, extended). e2e-web smoke is still never treated as full-layout-claim evidence; the new AC-5 table makes the smoke/full/opt-in distinction explicit per manifest rather than leaving it implicit. AC-7's guard additions stayed mechanical (regex/set-membership against real source), not a new test harness.",
+      "pointer": "docs/flows/mobile-app-flow-inventory.md"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-20",
+  "redGreenPointer": "scripts/check-flow-inventory-cite-rot.ts"
+}

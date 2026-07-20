@@ -25,7 +25,8 @@ tags:
 # The unfinished session outranks the due review, so its primary action is first.
 - tapOn:
     id: 'now-card-continue'
-    index: 0
+    childOf:
+      id: 'now-card-unfinished_session'
 
 - extendedWaitUntil:
     visible:
