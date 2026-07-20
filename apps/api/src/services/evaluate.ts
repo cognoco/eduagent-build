@@ -141,8 +141,8 @@ export function evaluateAssessmentFromEnvelopeSignal(
     NonNullable<LlmResponseEnvelope['signals']>['evaluate_assessment']
   >,
 ): EvaluateAssessment | null {
-  // challenge_passed is the only required field — zod enforces boolean, but
-  // a missing field would have made the signal undefined upstream.
+  // challenge_passed can degrade to undefined during field-tolerant envelope
+  // parsing; fail closed here so a missing verdict never grants mastery.
   if (typeof signal.challenge_passed !== 'boolean') return null;
 
   const challengePassed = signal.challenge_passed;
