@@ -4027,6 +4027,8 @@ export async function processMessage(
    */
   notePrompt?: boolean;
   notePromptPostSession?: boolean;
+  /** [WI-2107] LLM opened a topic without delivering content or a question this turn. */
+  topicOpenedPendingContent?: boolean;
   confidence?: 'low' | 'medium' | 'high';
   challengeRound?: ChallengeRoundSessionState;
   challengeOffer?: { pitch: string };
@@ -4357,6 +4359,7 @@ export async function processMessage(
     // the same client-facing shape. Consumers MUST NOT assume these are absent.
     notePrompt: result.notePrompt || undefined,
     notePromptPostSession: result.notePromptPostSession || undefined,
+    topicOpenedPendingContent: result.topicOpenedPendingContent || undefined,
     confidence: result.confidence,
     challengeRound: challengeRoundRuntime.challengeRound,
     challengeOffer: challengeRoundRuntime.challengeOffer,
@@ -4407,6 +4410,8 @@ export async function streamMessage(
     aiEventId?: string;
     notePrompt?: boolean;
     notePromptPostSession?: boolean;
+    /** [WI-2107] LLM opened a topic without delivering content or a question this turn. */
+    topicOpenedPendingContent?: boolean;
     fluencyDrill?: FluencyDrillAnnotation;
     confidence?: 'low' | 'medium' | 'high';
     sourceAudit?: ExchangeSourceAudit;
@@ -4922,6 +4927,8 @@ export async function streamMessage(
         aiEventId: persisted.aiEventId,
         notePrompt: parsed.notePrompt || undefined,
         notePromptPostSession: parsed.notePromptPostSession || undefined,
+        topicOpenedPendingContent:
+          parsed.topicOpenedPendingContent || undefined,
         fluencyDrill: parsed.fluencyDrill ?? undefined,
         confidence: parsed.confidence,
         sourceAudit: sourceSafe.sourceAudit,

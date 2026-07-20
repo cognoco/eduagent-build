@@ -53,6 +53,16 @@ import {
 const FIRST_TOPIC_ACK_PATTERN =
   /^(ok(?:ay)?|yes|yep|yeah|ready|start|go ahead|sure|sounds good|let'?s go)[.!?\s]*$/i;
 
+/**
+ * [WI-2107] Synthetic learner-voice trigger sent when the server signals
+ * `topicOpenedPendingContent` — the mentor opened a topic but delivered no
+ * content or question. Mirrors the mentor-opener pattern: `continueWithMessage`
+ * itself never renders a user-visible bubble for this call (only the
+ * `handleSend` layer above does that), so this text is never shown live, but
+ * it is persisted server-side and would render on a transcript reload.
+ */
+export const AUTO_CONTINUATION_TRIGGER_TEXT = 'Yes, please continue.';
+
 type ImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp';
 export type SessionImageAttachment = {
   base64: string;
@@ -66,6 +76,8 @@ export type ContinueMessageOptions = {
   initialMentorOpener?: boolean;
   attachImage?: boolean;
   imageAttachment?: SessionImageAttachment;
+  /** [WI-2107] This send is an auto-fired follow-up, not direct learner input. */
+  isAutoContinuation?: boolean;
 };
 
 export function mentorOpenerIdempotencyKey(sessionId: string): string {
@@ -308,6 +320,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
   const continueWithMessageRef = useRef<
     (text: string, options?: ContinueMessageOptions) => Promise<void>
   >(async () => undefined);
+  // [WI-2107] Hard cap: at most one auto-fired follow-up per learner turn.
+  // No server loop exists for this signal (each auto-continuation is a
+  // discrete client-initiated request), so termination is guaranteed here.
+  // Re-armed only when the learner (not an auto-continuation) sends a turn.
+  const autoContinuationFiredRef = useRef(false);
 
   // WI-306: Mirror draftText into a ref so the silence-timer callback reads the
   // value at fire time rather than the stale closure value at schedule time.
@@ -596,6 +613,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
   const continueWithMessage = useCallback(
     async (text: string, options?: ContinueMessageOptions) => {
+      // [WI-2107] A genuine learner turn re-arms the one-shot auto-continuation
+      // budget; the auto-fired turn itself must not reset it.
+      if (!options?.isAutoContinuation) {
+        autoContinuationFiredRef.current = false;
+      }
       const currentOpenerKey = activeSessionIdRef.current
         ? mentorOpenerIdempotencyKey(activeSessionIdRef.current)
         : null;
@@ -976,6 +998,22 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             }
             if (result.draftedNote) {
               setDraftedNote(result.draftedNote);
+            }
+
+            // [WI-2107] The mentor opened a topic but delivered no content or
+            // question this turn — immediately request the next turn rather
+            // than leaving the learner with a bare promise. Hard-capped to
+            // one auto-fired follow-up per learner turn (see
+            // autoContinuationFiredRef doc comment above).
+            if (
+              result.topicOpenedPendingContent &&
+              !autoContinuationFiredRef.current
+            ) {
+              autoContinuationFiredRef.current = true;
+              void continueWithMessageRef.current(
+                AUTO_CONTINUATION_TRIGGER_TEXT,
+                { isAutoContinuation: true },
+              );
             }
 
             // F6: Surface low-confidence indicator below the AI message

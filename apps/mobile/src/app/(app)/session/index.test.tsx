@@ -500,6 +500,7 @@ jest.mock('expo-router', () => ({
 jest.mock(
   '../../../components/session' /* gc1-allow: ChatShell stub is the test's primary interaction surface (manual-send-button, mock-input-mode); the real composer pulls in native voice/keyboard input that can't render in JSDOM */,
   () => ({
+    ...jest.requireActual('../../../components/session'),
     ChatShell: ({
       subtitle,
       headerBelow,
@@ -667,27 +668,9 @@ jest.mock(
 // naturally. Individual tests use jest.spyOn() on readSessionRecoveryMarker
 // when they need to inject a marker (see hydrates-milestone-tracker test).
 
-const secureStore: Record<string, string> = {};
-jest.mock(
-  '../../../lib/secure-storage' /* gc1-allow: wraps Expo SecureStore native module (unavailable in JSDOM); in-memory map stands in for device keychain */,
-  () => ({
-    getItemAsync: jest.fn((key: string) =>
-      Promise.resolve(secureStore[key] ?? null),
-    ),
-    setItemAsync: jest.fn((key: string, value: string) => {
-      secureStore[key] = value;
-      return Promise.resolve();
-    }),
-    deleteItemAsync: jest.fn((key: string) => {
-      delete secureStore[key];
-      return Promise.resolve();
-    }),
-    // [I-4] sanitizeSecureStoreKey is a pure string function — no mock needed,
-    // but the module mock must export it or callers get "not a function".
-    sanitizeSecureStoreKey: (raw: string) =>
-      raw.replace(/[^a-zA-Z0-9._-]/g, '_'),
-  }),
-);
+const secureStore = (
+  jest.requireMock('expo-secure-store') as { __store: Map<string, string> }
+).__store;
 const mockReadSessionRecoveryMarker = jest.spyOn(
   sessionRecoveryModule,
   'readSessionRecoveryMarker',
@@ -699,13 +682,6 @@ const mockReadSessionRecoveryMarker = jest.spyOn(
 // text is rendered, not inspected.
 
 // lib/profile now runs for real — renderScreen provides the ProfileContext.
-
-// prettier-ignore
-jest.mock('../../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
-  useThemeColors: () => ({ accent: '#0ea5e9', background: '#18181b', border: '#d4d4d8', muted: '#71717a', surface: '#ffffff', textInverse: '#ffffff', textPrimary: '#18181b', textSecondary: '#52525b' }),
-  useTheme: () => ({ colorScheme: 'dark' }),
-  useTokenVars: () => ({}),
-}));
 
 describe('SessionScreen homework flow', () => {
   async function flushAsyncWork(): Promise<void> {
@@ -726,7 +702,7 @@ describe('SessionScreen homework flow', () => {
     // Default: no active session (null response body)
     mockFetch.setRoute('/progress/topic', null);
     // Clear SecureStore mock data
-    Object.keys(secureStore).forEach((key) => delete secureStore[key]);
+    secureStore.clear();
     let aiEventCount = 0;
     (useRouter as jest.Mock).mockReturnValue({
       replace: mockReplace,
@@ -830,7 +806,7 @@ describe('SessionScreen homework flow', () => {
       });
 
       testScreen.getByTestId('mentor-birth-animation');
-      expect(secureStore[childMentorBirthKey]).toBe('true');
+      expect(secureStore.get(childMentorBirthKey)).toBe('true');
     }, 15000);
 
     it('does not show or consume the child ceremony for an owner learning session', async () => {
@@ -847,11 +823,11 @@ describe('SessionScreen homework flow', () => {
         );
       });
       expect(testScreen.queryByTestId('mentor-birth-overlay')).toBeNull();
-      expect(secureStore[childMentorBirthKey]).toBeUndefined();
+      expect(secureStore.get(childMentorBirthKey)).toBeUndefined();
     }, 15000);
 
     it('is idempotent per child profile across app restarts', async () => {
-      secureStore[childMentorBirthKey] = 'true';
+      secureStore.set(childMentorBirthKey, 'true');
       useLearningRouteParams();
 
       const testScreen = renderSessionScreen(CHILD_PROFILE);
@@ -863,7 +839,7 @@ describe('SessionScreen homework flow', () => {
         expect(mockStream).toHaveBeenCalledTimes(1);
       });
       expect(testScreen.queryByTestId('mentor-birth-overlay')).toBeNull();
-      expect(secureStore[childMentorBirthKey]).toBe('true');
+      expect(secureStore.get(childMentorBirthKey)).toBe('true');
     }, 15000);
 
     it('completes instantly under reduced motion and does not block the session stream', async () => {
@@ -883,7 +859,7 @@ describe('SessionScreen homework flow', () => {
           expect(mockStream).toHaveBeenCalledTimes(1);
         });
         await waitFor(() => {
-          expect(secureStore[childMentorBirthKey]).toBe('true');
+          expect(secureStore.get(childMentorBirthKey)).toBe('true');
         });
         expect(testScreen.queryByTestId('mentor-birth-overlay')).toBeNull();
       } finally {
@@ -2098,7 +2074,7 @@ describe('SessionScreen homework flow', () => {
       await openerMayFinish;
     });
     await waitFor(() => {
-      expect(secureStore[recoveryKey]).toBeDefined();
+      expect(secureStore.get(recoveryKey)).toBeDefined();
       expect(testScreen.getByTestId('mock-streaming-state')).toHaveTextContent(
         'idle',
       );
@@ -2107,7 +2083,7 @@ describe('SessionScreen homework flow', () => {
     fireEvent.press(testScreen.getByTestId('mentor-follow-up-button'));
     await waitFor(() => {
       expect(mockStream).toHaveBeenCalledTimes(2);
-      expect(JSON.parse(secureStore[recoveryKey] ?? '{}')).toMatchObject({
+      expect(JSON.parse(secureStore.get(recoveryKey) ?? '{}')).toMatchObject({
         sessionId: SESSION_ID,
         topicId: TOPIC_ID,
       });
@@ -2121,7 +2097,7 @@ describe('SessionScreen homework flow', () => {
       mockFetch,
       `/subjects/${SECOND_SUBJECT_ID}/sessions`,
     )[0];
-    const recoveryMarker = JSON.parse(secureStore[recoveryKey] ?? '{}') as {
+    const recoveryMarker = JSON.parse(secureStore.get(recoveryKey) ?? '{}') as {
       subjectId?: string;
       topicId?: string;
     };
@@ -3197,7 +3173,7 @@ describe('voice mode persistence', () => {
     mockFetch.mockClear();
     mockUseSessionTranscript.mockReturnValue({ data: null });
     mockFetch.setRoute('/progress/topic', null);
-    Object.keys(secureStore).forEach((key) => delete secureStore[key]);
+    secureStore.clear();
     (useRouter as jest.Mock).mockReturnValue({
       replace: mockReplace,
       setParams: mockSetParams,
@@ -3240,7 +3216,7 @@ describe('voice mode persistence', () => {
   });
 
   it('defaults to voice when SecureStore has voice preference', async () => {
-    secureStore[`voice-input-mode-${ACTIVE_PROFILE_ID}`] = 'voice';
+    secureStore.set(`voice-input-mode-${ACTIVE_PROFILE_ID}`, 'voice');
     const { getByTestId } = renderSessionScreen();
     await waitFor(() => {
       expect(getByTestId('mock-input-mode').props.children).toBe('voice');
@@ -3260,14 +3236,14 @@ describe('voice mode persistence', () => {
       fireEvent.press(getByTestId('mock-set-voice-mode'));
     });
     await waitFor(() => {
-      expect(secureStore[`voice-input-mode-${ACTIVE_PROFILE_ID}`]).toBe(
+      expect(secureStore.get(`voice-input-mode-${ACTIVE_PROFILE_ID}`)).toBe(
         'voice',
       );
     });
   });
 
   it('persists text preference when mode changes to text', async () => {
-    secureStore[`voice-input-mode-${ACTIVE_PROFILE_ID}`] = 'voice';
+    secureStore.set(`voice-input-mode-${ACTIVE_PROFILE_ID}`, 'voice');
     const { getByTestId } = renderSessionScreen();
     // Wait for initial voice mode to load
     await waitFor(() => {
@@ -3277,7 +3253,9 @@ describe('voice mode persistence', () => {
       fireEvent.press(getByTestId('mock-set-text-mode'));
     });
     await waitFor(() => {
-      expect(secureStore[`voice-input-mode-${ACTIVE_PROFILE_ID}`]).toBe('text');
+      expect(secureStore.get(`voice-input-mode-${ACTIVE_PROFILE_ID}`)).toBe(
+        'text',
+      );
     });
   });
 

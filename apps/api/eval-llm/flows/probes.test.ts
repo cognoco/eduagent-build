@@ -133,6 +133,34 @@ describe('probes quality heuristics — P15/P22 (escalation)', () => {
   });
 });
 
+describe('probes quality heuristics — P25 (topic-opener promise) [WI-2107]', () => {
+  it('errors when the reply is a bare forward-promise with nothing else', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath.",
+      signals: {},
+    });
+    expect(issues.some((i) => i.code === 'P25.bare-promise')).toBe(true);
+  });
+
+  it('accepts a promise opener followed by real content', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply:
+        "Let's talk about Sylvia Plath. She was an American poet best known for her collection Ariel and her novel The Bell Jar.",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts a promise opener followed by a specific question', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply:
+        "We'll explore Sylvia Plath together. Have you read any of her poems before?",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+});
+
 describe('probes quality heuristics — P08 (worked-example fading)', () => {
   it('accepts a reply that hands the next step back to the learner', async () => {
     const issues = await evaluate('15yo-football-gaming', 'P08', {

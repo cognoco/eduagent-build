@@ -1221,10 +1221,10 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
       '<server_note kind="orphan_user_turn" reason="llm_empty_or_unparseable"/>',
     );
     expect(prompt.slice(formatIdx)).not.toContain('<server_note');
-    // Tail = last signal-guidance line of the envelope block. [H2] appended
-    // the crisis_redirect guidance after understanding_check, so the prompt
-    // now ends with its closing sentence.
-    expect(prompt.trim()).toMatch(/schoolwork itself\.$/);
+    // Tail = last signal-guidance line of the envelope block. [WI-2107]
+    // appended the bare-forward-promise guidance after crisis_redirect, so
+    // the prompt now ends with its closing sentence.
+    expect(prompt.trim()).toMatch(/bare promise\.$/);
   });
 
   it('[BUG-19] escapes XML-dangerous characters in orphan_reason to prevent prompt injection', () => {
