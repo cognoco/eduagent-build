@@ -20,6 +20,7 @@ import { useRetryCurriculum } from '../../../../hooks/use-books';
 import { useSubjects, useUpdateSubject } from '../../../../hooks/use-subjects';
 import { useCreateNote } from '../../../../hooks/use-notes';
 import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
+import { useProgressInventory } from '../../../../hooks/use-progress';
 import { pushLearningResumeTarget } from '../../../../lib/navigation';
 import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 import { platformAlert } from '../../../../lib/platform-alert';
@@ -71,14 +72,27 @@ export default function SubjectHubRoute(): React.ReactElement {
     includeInactive: true,
     enabled: canManage && !!subjectId,
   });
-  const subjectStatus: Subject['status'] =
-    subjectsQuery.data?.find((subject) => subject.id === subjectId)?.status ??
-    'active';
+  const subject = subjectsQuery.data?.find(
+    (candidate) => candidate.id === subjectId,
+  );
+  const subjectStatus: Subject['status'] = subject?.status ?? 'active';
   // Don't expose the manage entry until the status is actually known — opening
   // the sheet on the 'active' fallback would show the wrong action set for a
   // deep-linked paused/archived subject (pause+archive instead of resume/restore).
   const manageReady = canManage && !!subjectsQuery.data;
   const updateSubject = useUpdateSubject();
+  const inventoryEnabled =
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED &&
+    !!subjectId &&
+    !hub.isLoading &&
+    !hub.isError &&
+    !!hub.data &&
+    hub.emptyKind === 'none' &&
+    hub.data.canStudy &&
+    subject?.pedagogyMode === 'four_strands';
+  const progressInventory = useProgressInventory({
+    enabled: inventoryEnabled,
+  });
 
   const handleChangeStatus = useCallback(
     (status: Subject['status']) => {
@@ -118,6 +132,14 @@ export default function SubjectHubRoute(): React.ReactElement {
   const goPickBook = useCallback(() => {
     router.push({
       pathname: '/(app)/pick-book/[subjectId]',
+      params: { subjectId },
+    } as Href);
+  }, [router, subjectId]);
+
+  const openVocabulary = useCallback(() => {
+    if (!subjectId) return;
+    router.push({
+      pathname: '/(app)/vocabulary/[subjectId]',
       params: { subjectId },
     } as Href);
   }, [router, subjectId]);
@@ -220,6 +242,14 @@ export default function SubjectHubRoute(): React.ReactElement {
   // so an empty subject still surfaces a recoverable empty state below rather
   // than handing blank data to SubjectHub.
   const hubData = hub.data;
+  const vocabulary = inventoryEnabled
+    ? progressInventory.data?.subjects.find(
+        (subject) =>
+          subject.subjectId === subjectId &&
+          subject.pedagogyMode === 'four_strands' &&
+          subject.vocabulary.total > 0,
+      )?.vocabulary
+    : undefined;
 
   return (
     <QueryStateView
@@ -304,6 +334,19 @@ export default function SubjectHubRoute(): React.ReactElement {
           ) : null}
           <SubjectHub
             data={hubData}
+            vocabulary={vocabulary}
+            onOpenVocabulary={vocabulary ? openVocabulary : undefined}
+            isVocabularyLoading={
+              inventoryEnabled && progressInventory.isLoading
+            }
+            vocabularyError={inventoryEnabled && progressInventory.isError}
+            onRetryVocabulary={
+              inventoryEnabled
+                ? () => {
+                    void progressInventory.refetch();
+                  }
+                : undefined
+            }
             onNextUpPress={handleNextUp}
             onStudyTopic={handleStudyTopic}
             onReviewTopic={handleReviewTopic}

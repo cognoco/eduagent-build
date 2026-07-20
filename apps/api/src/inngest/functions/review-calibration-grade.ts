@@ -1,10 +1,11 @@
 // @inngest-admin: parent-chain (createScopedRepository(db, profileId); curriculumTopics→books→subjects.profileId chain)
-import { and, desc, eq, lt } from 'drizzle-orm';
+import { and, desc, eq, lt, ne } from 'drizzle-orm';
 import {
   createScopedRepository,
   retentionCards,
   retrievalEvents,
   sessionEvents,
+  type Database,
 } from '@eduagent/database';
 import { findOwnedCurriculumTopic } from '../../services/curriculum-topic-ownership';
 import { reviewCalibrationRequestedEventSchema } from '@eduagent/schemas';
@@ -40,6 +41,97 @@ type CalibrationGradeStepResult =
 function parseEventData(data: unknown): ReviewCalibrationRequestedEvent | null {
   const parsed = reviewCalibrationRequestedEventSchema.safeParse(data);
   return parsed.success ? parsed.data : null;
+}
+
+async function wasPreviousAttemptFallback(
+  db: Database,
+  input: {
+    profileId: string;
+    topicId: string;
+    eventAt: Date;
+    receiptId: string;
+  },
+): Promise<boolean> {
+  // [T12 / EU-7] Read only rows strictly before this invocation's eventAt.
+  // The receipt id exclusion is defensive against database clock skew; the
+  // current invocation must never become its own "previous" failure.
+  //
+  // [EU-7 scoped-repo exception] Direct db.select() is intentional here and
+  // POLICY-SANCTIONED. The query needs a strict time bound, descending order,
+  // and limit together — clauses the scoped repository cannot express.
+  const [previous] = await db
+    .select({ gradedBy: retrievalEvents.gradedBy })
+    .from(retrievalEvents)
+    .where(
+      and(
+        eq(retrievalEvents.profileId, input.profileId),
+        eq(retrievalEvents.topicId, input.topicId),
+        ne(retrievalEvents.id, input.receiptId),
+        lt(retrievalEvents.createdAt, input.eventAt),
+      ),
+    )
+    .orderBy(desc(retrievalEvents.createdAt))
+    .limit(1);
+  return previous?.gradedBy === 'fallback_heuristic';
+}
+
+async function loadCommittedGradeReceipt(
+  db: Database,
+  input: {
+    profileId: string;
+    sessionId: string;
+    topicId: string;
+    learnerMessageEventId: string;
+    eventAt: Date;
+  },
+): Promise<CalibrationGradeStepResult | null> {
+  const repo = createScopedRepository(db, input.profileId);
+  const receipt = await repo.retrievalEvents.findFirst(
+    eq(retrievalEvents.id, input.learnerMessageEventId),
+  );
+  if (!receipt) return null;
+
+  if (
+    receipt.answerEventId !== input.learnerMessageEventId ||
+    receipt.sessionId !== input.sessionId ||
+    receipt.topicId !== input.topicId
+  ) {
+    throw new Error('Calibration grade receipt context invariant failed');
+  }
+
+  if (receipt.gradedBy === 'fallback_heuristic') {
+    if (receipt.quality !== null || receipt.verdict !== null) {
+      throw new Error('Calibration fallback receipt shape invariant failed');
+    }
+    return {
+      outcome: 'fallback',
+      capped: await wasPreviousAttemptFallback(db, {
+        profileId: input.profileId,
+        topicId: input.topicId,
+        eventAt: input.eventAt,
+        receiptId: input.learnerMessageEventId,
+      }),
+    };
+  }
+
+  if (
+    receipt.gradedBy !== 'llm' ||
+    receipt.quality === null ||
+    receipt.verdict === null ||
+    !Number.isInteger(receipt.quality) ||
+    receipt.quality < 0 ||
+    receipt.quality > 5
+  ) {
+    throw new Error('Calibration graded receipt shape invariant failed');
+  }
+
+  // C-3: only the structured decision crosses into Inngest memoized state.
+  // The receipt's learner text, rationale, and misconception remain DB-local.
+  return {
+    outcome: 'graded',
+    quality: receipt.quality,
+    verdict: receipt.verdict,
+  };
 }
 
 export async function handleReviewCalibrationGrade({
@@ -137,6 +229,22 @@ export async function handleReviewCalibrationGrade({
     'rehydrate-grade-and-record',
     async (): Promise<CalibrationGradeStepResult> => {
       const db = getStepDatabase();
+      // A retrieval_events row is the first-party durable receipt for this
+      // opaque learner-answer event. If Postgres committed the row but Inngest
+      // lost the step acknowledgement, replay resolves the structured result
+      // before rehydrating raw text or invoking the paid grader again.
+      // Scope: this covers the ratified committed-write/lost-ack replay. Two
+      // truly simultaneous first executions can both miss before the primary
+      // key arbitrates; normal serialization remains Inngest's idempotency job.
+      const committedReceipt = await loadCommittedGradeReceipt(db, {
+        profileId,
+        sessionId,
+        topicId,
+        learnerMessageEventId,
+        eventAt,
+      });
+      if (committedReceipt) return committedReceipt;
+
       // Canonical single-topic ownership join (scoped by profileId) — avoids
       // re-implementing the join inline (SWEEP-topic-ownership-join ratchet).
       const topic = await findOwnedCurriculumTopic(db, { profileId, topicId });
@@ -175,39 +283,15 @@ export async function handleReviewCalibrationGrade({
       );
 
       if (!grade.graded) {
-        // [T12 / EU-7] Was the previous attempt on this topic ALSO a grader
-        // failure? If so, cap: do not reschedule again so a flaky grader can't
-        // trap a topic in a daily re-ask loop. Read BEFORE recording this row,
-        // AND only rows strictly before this invocation's eventAt — the step is
-        // retried on crash, so an unfiltered "latest row" read could otherwise
-        // see THIS run's own just-inserted fallback row after a partial failure
-        // and wrongly cap after a single real failure.
-        // [EU-7 scoped-repo exception] Direct db.select() is intentional here
-        // and is a POLICY-SANCTIONED deviation, not an ad-hoc one. retrievalEvents
-        // is a single profile-scoped table that would normally go through
-        // createScopedRepository, but this query needs a strict time-bound
-        // lt(createdAt, eventAt) filter, orderBy(desc(createdAt)), and limit(1)
-        // *together* — clauses the scoped repo's findFirst/findMany API cannot
-        // express. profileId is pinned in the WHERE clause, so no row from another
-        // profile can be returned. This exact pattern is documented as the
-        // sanctioned alternative in AGENTS.md → "Non-Negotiable Engineering Rules"
-        // (the createScopedRepository rule, "single scoped table" time-bound case),
-        // which names this call site as the canonical example.
-        const [previous] = await db
-          .select({ gradedBy: retrievalEvents.gradedBy })
-          .from(retrievalEvents)
-          .where(
-            and(
-              eq(retrievalEvents.profileId, profileId),
-              eq(retrievalEvents.topicId, topicId),
-              lt(retrievalEvents.createdAt, eventAt),
-            ),
-          )
-          .orderBy(desc(retrievalEvents.createdAt))
-          .limit(1);
-        const capped = previous?.gradedBy === 'fallback_heuristic';
+        const capped = await wasPreviousAttemptFallback(db, {
+          profileId,
+          topicId,
+          eventAt,
+          receiptId: learnerMessageEventId,
+        });
 
-        await recordRetrievalEvent(db, {
+        const inserted = await recordRetrievalEvent(db, {
+          receiptId: learnerMessageEventId,
           profileId,
           subjectId: topic.subjectId,
           topicId,
@@ -220,6 +304,19 @@ export async function handleReviewCalibrationGrade({
           nextAction: 'reschedule_soon',
           gradedBy: 'fallback_heuristic',
         });
+        if (!inserted) {
+          const concurrentReceipt = await loadCommittedGradeReceipt(db, {
+            profileId,
+            sessionId,
+            topicId,
+            learnerMessageEventId,
+            eventAt,
+          });
+          if (!concurrentReceipt) {
+            throw new Error('Calibration grade receipt conflict without row');
+          }
+          return concurrentReceipt;
+        }
         return { outcome: 'fallback', capped };
       }
 
@@ -240,7 +337,8 @@ export async function handleReviewCalibrationGrade({
             ? 'advance'
             : 'reschedule_soon';
 
-      await recordRetrievalEvent(db, {
+      const inserted = await recordRetrievalEvent(db, {
+        receiptId: learnerMessageEventId,
         profileId,
         subjectId: topic.subjectId,
         topicId,
@@ -256,6 +354,19 @@ export async function handleReviewCalibrationGrade({
         misconception: grade.misconception,
         llmRoutingRung: grade.rung,
       });
+      if (!inserted) {
+        const concurrentReceipt = await loadCommittedGradeReceipt(db, {
+          profileId,
+          sessionId,
+          topicId,
+          learnerMessageEventId,
+          eventAt,
+        });
+        if (!concurrentReceipt) {
+          throw new Error('Calibration grade receipt conflict without row');
+        }
+        return concurrentReceipt;
+      }
 
       return {
         outcome: 'graded',

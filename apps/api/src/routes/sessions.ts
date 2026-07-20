@@ -303,7 +303,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         c.req.valid('param').sessionId,
       );
       if (!session) return notFound(c, 'Session not found');
-      return c.json({ session });
+      return c.json({ session: learningSessionSchema.parse(session) });
     },
   )
 
@@ -316,7 +316,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const { sessionId } = c.req.valid('param');
       const session = await clearContinuationDepth(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
-      return c.json({ session });
+      return c.json({ session: learningSessionSchema.parse(session) });
     },
   )
 
@@ -351,7 +351,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         );
 
         const updatedSession = await getSession(db, profileId, sessionId);
-        return c.json({ session: updatedSession ?? reset.session });
+        return c.json({
+          session: learningSessionSchema.parse(updatedSession ?? reset.session),
+        });
       }
 
       const updated = await claimSessionForFilingRetry(
@@ -394,7 +396,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
       const updatedSession = await getSession(db, profileId, sessionId);
       if (!updatedSession) return notFound(c, 'Session not found');
-      return c.json({ session: updatedSession });
+      return c.json({
+        session: learningSessionSchema.parse(updatedSession),
+      });
     },
   )
 
@@ -415,7 +419,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       );
       if (!session) return notFound(c, 'Session not found');
 
-      return c.json({ session });
+      return c.json({ session: learningSessionSchema.parse(session) });
     },
   )
 
@@ -445,7 +449,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         request.dispatchId,
       );
 
-      return c.json({ session: request.session });
+      return c.json({
+        session: learningSessionSchema.parse(request.session),
+      });
     },
   )
 
@@ -475,7 +481,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         request.dispatchId,
       );
 
-      return c.json({ session: request.session });
+      return c.json({
+        session: learningSessionSchema.parse(request.session),
+      });
     },
   )
 
@@ -882,7 +890,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         c.req.valid('param').sessionId,
         c.req.valid('json'),
       );
-      return c.json({ session });
+      return c.json({ session: learningSessionSchema.parse(session) });
     },
   )
 

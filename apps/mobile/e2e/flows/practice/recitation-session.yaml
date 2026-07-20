@@ -18,27 +18,27 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "learning-active"
+      SEED_SCENARIO: 'learning-active'
       API_URL: ${API_URL}
 
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 # Navigate to Practice hub
 - scrollUntilVisible:
     element:
-      id: "home-action-practice"
+      id: 'home-action-practice'
     direction: DOWN
     timeout: 5000
 
 - tapOn:
-    id: "home-action-practice"
+    id: 'home-action-practice'
 
 - extendedWaitUntil:
     visible:
-      id: "practice-screen"
+      id: 'practice-screen'
     timeout: 10000
 
 - takeScreenshot: recitation-01-practice-hub
@@ -52,51 +52,73 @@ tags:
 # Step 2: scroll RIGHT inside the horizontal slider to reach practice-recitation.
 - scrollUntilVisible:
     element:
-      id: "practice-dictation"
+      id: 'practice-dictation'
     direction: DOWN
     timeout: 5000
 
 - scrollUntilVisible:
     element:
-      id: "practice-recitation"
+      id: 'practice-recitation'
     direction: RIGHT
     timeout: 5000
 
 - tapOn:
-    id: "practice-recitation"
+    id: 'practice-recitation'
 
 # Wait for session screen (ChatShell renders chat-input always)
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'chat-input'
     timeout: 20000
 
 - takeScreenshot: recitation-02-session-screen
 
-# Send one message to confirm the session is live
+# A title alone must advance directly to readiness.
 - tapOn:
-    id: "chat-input"
-- inputText: "The Road Not Taken by Robert Frost"
+    id: 'chat-input'
+- inputText: 'Ozymandias'
 - hideKeyboard
-- pressKey: Enter
-
-# Verify the message rendered in the chat list
-- scrollUntilVisible:
-    element:
-      text: "The Road Not Taken by Robert Frost"
-    direction: DOWN
-    timeout: 10000
-
-- takeScreenshot: recitation-03-message-sent
-
-# Exit session
 - tapOn:
-    id: "end-session-button"
+    id: 'send-button'
 
 - extendedWaitUntil:
     visible:
-      id: "practice-screen"
+      id: 'message-bubble-assistant-2'
+      text: '(?i).*(ready|begin|start|go ahead|recite).*'
+    timeout: 60000
+
+- assertNotVisible:
+    id: 'message-bubble-assistant-2'
+    text: '(?i).*(what|which).*(recite|recitation|poem)|.*(title|author|model answer|polished version|start with:|traveller from an antique land|vast and trunkless legs|look on my works|lone and level sands).*'
+
+- takeScreenshot: recitation-03-message-sent
+
+# Synthetic, non-copyrighted body exercises the feedback turn.
+- tapOn:
+    id: 'chat-input'
+- inputText: 'A remembered opening line for this test.'
+- hideKeyboard
+- tapOn:
+    id: 'send-button'
+
+- extendedWaitUntil:
+    visible:
+      id: 'message-bubble-assistant-4'
+    timeout: 60000
+
+- extendedWaitUntil:
+    visible:
+      id: 'message-feedback-helpful-.*'
+    timeout: 30000
+
+# Exit session
+- tapOn:
+    id: 'end-session-button'
+
+- extendedWaitUntil:
+    visible:
+      id: 'practice-screen'
     timeout: 10000
-    optional: true  # justified: end-session-button may show a confirmation dialog before navigating; practice-screen appears only after confirmation
+    optional: true # justified: end-session-button may show a confirmation dialog before navigating; practice-screen appears only after confirmation
 
 - takeScreenshot: recitation-04-exited

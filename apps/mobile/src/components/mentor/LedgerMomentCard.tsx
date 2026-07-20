@@ -26,6 +26,34 @@ function ledgerCopyKey(card: NowCardData): TranslateKey {
   );
 }
 
+function withJournalSectionIntent(card: NowCardData): NowCardData {
+  if (card.deepLink.route !== 'journal') return card;
+
+  const ledgerKind =
+    typeof card.params['ledgerKind'] === 'string'
+      ? card.params['ledgerKind']
+      : card.templateKey.replace('now.ledger_moment.', '');
+  if (ledgerKind === 'quiz_personal_best') {
+    return {
+      ...card,
+      deepLink: {
+        ...card.deepLink,
+        params: { ...card.deepLink.params, section: 'practice' },
+      },
+    };
+  }
+
+  // TODO: Map a future Journal-routed ledger kind only after product assigns
+  // it to one of the existing Journal sections; unknown kinds stay at root.
+  if (!('section' in card.deepLink.params)) return card;
+  const rootParams = { ...card.deepLink.params };
+  delete rootParams['section'];
+  return {
+    ...card,
+    deepLink: { ...card.deepLink, params: rootParams },
+  };
+}
+
 export function LedgerMomentCard({
   card,
   onContinue,
@@ -38,7 +66,7 @@ export function LedgerMomentCard({
     <Pressable
       testID="now-ledger-moment"
       accessibilityRole="button"
-      onPress={() => onContinue(card)}
+      onPress={() => onContinue(withJournalSectionIntent(card))}
       className="rounded-xl p-3"
       style={{
         backgroundColor: colors.surface,

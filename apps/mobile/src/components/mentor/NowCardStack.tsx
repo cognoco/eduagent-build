@@ -81,6 +81,7 @@ export function NowCardStack({
 }: NowCardStackProps) {
   const { t } = useTranslation();
   const reduceMotion = useReducedMotion();
+  const seenDismissKeys = new Set<string>();
   const cards = feed.cards
     .filter(isActionableCard)
     .filter(
@@ -88,6 +89,12 @@ export function NowCardStack({
         card.kind === 'billing_alert' ||
         !dismissedKeys.has(getNowCardDismissKey(card)),
     )
+    .filter((card) => {
+      const dismissKey = getNowCardDismissKey(card);
+      if (seenDismissKeys.has(dismissKey)) return false;
+      seenDismissKeys.add(dismissKey);
+      return true;
+    })
     .slice(0, 3);
   const anchor = cards[0];
   const modules = cards.slice(1, 3);

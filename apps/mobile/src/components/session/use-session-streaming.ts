@@ -189,6 +189,7 @@ export interface UseSessionStreamingOptions {
   // Refs (passed directly so the hook doesn't create its own)
   animationCleanupRef: React.MutableRefObject<(() => void) | null>;
   silenceTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  sessionEndedRef: React.MutableRefObject<boolean>;
   lastAiAtRef: React.MutableRefObject<number | null>;
   lastExpectedMinutesRef: React.MutableRefObject<number>;
   lastRetryPayloadRef: React.MutableRefObject<{
@@ -275,6 +276,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     draftText,
     notePromptOffered,
     silenceTimerRef,
+    sessionEndedRef,
     lastAiAtRef,
     lastExpectedMinutesRef,
     lastRetryPayloadRef,
@@ -509,7 +511,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     (sessionIdToUse: string, expectedResponseMinutes: number) => {
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
       }
+      if (sessionEndedRef.current) return;
 
       const thresholdMinutes = Math.min(
         20,
@@ -521,7 +525,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
       silenceTimerRef.current = setTimeout(
         async () => {
-          if (draftTextRef.current.trim()) return;
+          silenceTimerRef.current = null;
+          if (sessionEndedRef.current || draftTextRef.current.trim()) return;
 
           const prompt =
             "Still working on it? Take your time - I'm here when you're ready.";
@@ -575,6 +580,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       effectiveSubjectName,
       recordSystemPrompt,
       responseHistory,
+      sessionEndedRef,
       setMessages,
       silenceTimerRef,
       topicId,
@@ -636,8 +642,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
       let streamId: string | null = null;
       let resolvedSessionId: string | null = activeSessionIdRef.current;
-      // [H6] SSE freeze watchdog — hoisted so finally can always clear it.
-      let sseWatchdogTimerId: ReturnType<typeof setInterval> | null = null;
       let doneCalled = false;
       try {
         const sessionSubjectId = options?.sessionSubjectId;
@@ -771,37 +775,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         ]);
         setIsStreaming(true);
         let chunkCount = 0;
-        let watchdogConverted = false;
-
-        // [H6] SSE freeze watchdog: if no token arrives for 45s while
-        // streaming, classify as a connection drop, surface a retry card.
-        const SSE_WATCHDOG_MS = 45_000;
-        let lastSseEventAt = Date.now();
-        sseWatchdogTimerId = setInterval(() => {
-          if (Date.now() - lastSseEventAt >= SSE_WATCHDOG_MS) {
-            if (sseWatchdogTimerId !== null) {
-              clearInterval(sseWatchdogTimerId);
-              sseWatchdogTimerId = null;
-            }
-            setIsStreaming(false);
-            const frozenStreamId = streamId;
-            if (frozenStreamId) {
-              watchdogConverted = true;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === frozenStreamId
-                    ? {
-                        ...m,
-                        content: 'Connection dropped — Try again',
-                        streaming: false,
-                        kind: 'reconnect_prompt' as const,
-                      }
-                    : m,
-                ),
-              );
-            }
-          }
-        }, 5_000);
 
         const outboxEntry =
           activeProfileId && sid
@@ -891,8 +864,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         await streamMessage(
           apiMessage,
           (accumulated) => {
-            // [H6] Reset watchdog timestamp on each token.
-            lastSseEventAt = Date.now();
             chunkCount += 1;
             setMessages((prev) =>
               prev.map((m) =>
@@ -903,7 +874,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           async (result) => {
             doneCalled = true;
             const shouldConvertToReconnect =
-              watchdogConverted || !!result.fallback || chunkCount === 0;
+              !!result.fallback || chunkCount === 0;
             const trackedExchange = shouldConvertToReconnect
               ? null
               : trackExchange({
@@ -1150,11 +1121,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           },
         ]);
       } finally {
-        // [H6] Always clear the SSE watchdog when the stream settles.
-        if (sseWatchdogTimerId !== null) {
-          clearInterval(sseWatchdogTimerId);
-          sseWatchdogTimerId = null;
-        }
         setIsStreaming(false);
         if (streamId) {
           setMessages((prev) => {

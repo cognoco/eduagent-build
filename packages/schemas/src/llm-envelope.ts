@@ -154,7 +154,9 @@ const evaluateAssessmentSignalSchema = z.preprocess(
   optionalObjectInput,
   z
     .object({
-      challenge_passed: z.preprocess(nullToUndefined, z.boolean()),
+      challenge_passed: z
+        .preprocess(nullToUndefined, z.boolean().optional())
+        .catch(undefined),
       flaw_identified: z.preprocess((value) => {
         if (typeof value !== 'string') return undefined;
         const trimmed = value.trim();
@@ -403,9 +405,16 @@ const signalsSchema = z.preprocess(
       challenge_round_offer: optionalBooleanSchema,
       /** Challenge Round: per-concept evaluation of the learner's explanations. Drives mastery + note + weak-spot persistence. */
       challenge_round_evaluation: z
-        .array(challengeRoundEvaluationItemSchema)
-        .max(10)
-        .optional(),
+        .preprocess(
+          (value) => (Array.isArray(value) ? value : undefined),
+          z.array(z.unknown()).max(10).optional(),
+        )
+        .pipe(
+          z
+            .array(challengeRoundEvaluationItemSchema)
+            .optional()
+            .catch(undefined),
+        ),
       /** Personal-mentor felt moment: proposed learner-safe notice, accepted only after DB-backed evidence checks. */
       noticed_gap: z.preprocess(
         normalizeNoticedGapDecision,

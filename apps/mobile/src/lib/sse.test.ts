@@ -467,6 +467,30 @@ describe('streamSSEViaXHR', () => {
       originalXhr;
   });
 
+  it('[WI-2102] gives the transport sole ownership of a 90-second idle budget', async () => {
+    jest.useFakeTimers();
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+    const nextEvent = events.next();
+    const timeoutResult = expect(nextEvent).rejects.toMatchObject({
+      message: 'The connection timed out while waiting for a reply',
+      isTimeout: true,
+    });
+
+    try {
+      await jest.advanceTimersByTimeAsync(89_999);
+      expect(xhr.abort).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(1);
+      expect(xhr.abort).toHaveBeenCalledTimes(1);
+      await timeoutResult;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   // [BUG-632 / I-21] When the server flushes a few SSE frames before returning
   // a 4xx error body, the buffered events must be DISCARDED — not yielded to
   // the consumer ahead of the thrown error. Otherwise the consumer accumulates

@@ -226,6 +226,29 @@ describe('Cerebras Provider', () => {
         }
       }).rejects.toThrow(SafetyFilterError);
     });
+
+    it('logs malformed stream metadata without response content', async () => {
+      const sensitiveText = 'PRIVATE_RECITATION_SENTINEL';
+      const warnSpy = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => undefined);
+      const body = sse(
+        `data: {${sensitiveText}}`,
+        'data: {"choices":[{"delta":{"content":"ok"}}]}',
+        'data: [DONE]',
+      );
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200, body });
+
+      const chunks: string[] = [];
+      for await (const chunk of provider.chatStream(MESSAGES, CFG)) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(['ok']);
+      expect(warnSpy).toHaveBeenCalled();
+      expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(sensitiveText);
+      warnSpy.mockRestore();
+    });
   });
 });
 

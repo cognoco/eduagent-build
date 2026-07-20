@@ -92,3 +92,6 @@ export * from './activation-events';
 
 // Speaking-practice attempt persistence (WI-1777)
 export * from './speaking-practice';
+
+// Recitation setup state (server-owned deterministic transition contract)
+export * from './recitation-setup';
