@@ -17,6 +17,7 @@ export {
   setLlmKillSwitchActive,
   setLlmEnvironment,
 } from './router';
+export { runWithLlmRequestContext } from './request-context';
 export { parseConversationLanguage } from './conversation-language';
 // Test-only helpers (createMockProvider, mockProvider, getFallbackConfigForTest,
 // getModelConfigForTest, _setOpenAIAdvancedModelForTesting, _getLlmRoutingV2Enabled)

@@ -118,9 +118,11 @@ export async function readSubscriptionStatus(
 // ---------------------------------------------------------------------------
 // WI-1505 — Aggregate LLM traffic kill switch
 //
-// Per-request KV read at the LLM router choke point (services/llm/router.ts)
-// so an operator can stop or degrade learner-facing LLM traffic on the NEXT
-// request without a mobile release or a Worker redeploy. Reuses
+// llmMiddleware carries SUBSCRIPTION_KV with zero I/O. The first
+// routeAndCall/routeAndStream choke point reads this key lazily, and
+// request-local AsyncLocalStorage memoizes the promise/result once per LLM
+// request. This lets an operator stop or degrade learner-facing LLM traffic on
+// the next LLM request without a mobile release or Worker redeploy. Reuses
 // SUBSCRIPTION_KV (no new namespace/binding needed) — see
 // docs/runbooks/llm-kill-switch.md for the operator flip procedure.
 // ---------------------------------------------------------------------------
@@ -156,8 +158,9 @@ export async function writeLlmKillSwitch(
  * not billing/auth/webhook code (where AGENTS.md bans silent recovery without
  * a Sentry/Inngest escalation), so the structured log is the appropriate and
  * sufficient signal; firing captureException here would also double Sentry
- * noise on every request (this runs in the global llmMiddleware) during any
- * transient KV blip.
+ * noise on every affected LLM request during a transient KV blip. An absent
+ * binding is handled before this helper is called and fails open without a
+ * log.
  */
 export async function readLlmKillSwitch(kv: KVNamespace): Promise<boolean> {
   try {
