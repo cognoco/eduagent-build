@@ -25,7 +25,7 @@ export const challengeRoundRoutes = new Hono<RouteEnv>()
     '/challenge-round/accept',
     zValidator('json', challengeRoundRequestSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const challengeRound = await acceptChallengeRound(
         db,
@@ -41,7 +41,7 @@ export const challengeRoundRoutes = new Hono<RouteEnv>()
     '/challenge-round/decline',
     zValidator('json', declineChallengeRoundRequestSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const challengeRound = await declineChallengeRound(
         db,
@@ -57,7 +57,7 @@ export const challengeRoundRoutes = new Hono<RouteEnv>()
     '/challenge-round/abort',
     zValidator('json', challengeRoundRequestSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const challengeRound = await abortChallengeRound(
         db,

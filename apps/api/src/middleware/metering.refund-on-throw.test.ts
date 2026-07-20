@@ -77,6 +77,19 @@ jest.mock(
   }),
 );
 
+// [WI-2398] meteringMiddleware calls assertNotProxyMode, which now also calls
+// assertCanWriteProfile — a raw db.select() membership query the unit mock
+// DB cannot satisfy. This file's stub-auth middleware sets a caller-self
+// identity (callerPersonId equal to profileId, below); the cross-account
+// write attack this guard exists to close is covered by the real-DB break
+// test in tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's mock DB environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Database } from '@eduagent/database';
@@ -145,6 +158,11 @@ function buildApp(
       hasPremiumLlm: false,
       resolvedVia: 'explicit-header' as const,
     });
+    // [WI-2398] Caller-self identity — meteringMiddleware's assertNotProxyMode
+    // now also calls assertCanWriteProfile, which requires callerPersonId.
+    // MeteringEnv doesn't declare this Variable (assertNotProxyMode reads it
+    // via an internal cast), hence `as never` here.
+    c.set('callerPersonId' as never, 'test-profile-id' as never);
     await next();
   });
   app.use('*', meteringMiddleware);

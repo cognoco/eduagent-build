@@ -272,6 +272,14 @@ jest.mock('../inngest/client', () => {
 // runs) — the caller-vs-X-Profile-Id-spoof distinction this guard exists to
 // enforce is covered by the real-DB break test in
 // tests/integration/wi1989-owner-idor.integration.test.ts.
+// [WI-2398] assertNotProxyMode (curriculum skip/unskip/challenge/topics/adapt)
+// now also calls assertCanWriteProfile, which calls this same
+// verifyPersonOwnershipV2 — the same raw db.select() membership query, same
+// unmockable-DB reason. Every scenario in this file that reaches
+// assertNotProxyMode's allow path is a caller-self write (the header profile
+// equals the authenticated caller's own person id, both 'test-profile-id');
+// the cross-account write attack this guard exists to close is covered by the
+// real-DB break test in tests/integration/wi2398-write-idor.integration.test.ts.
 jest.mock('../services/identity-v2/ownership-v2', () => {
   const actual = jest.requireActual(
     '../services/identity-v2/ownership-v2',
@@ -279,6 +287,7 @@ jest.mock('../services/identity-v2/ownership-v2', () => {
   return {
     ...actual,
     verifyPersonIsOrgAdminV2: jest.fn().mockResolvedValue(true),
+    verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
   };
 });
 
