@@ -125,13 +125,16 @@ function useTransitionBoundFeed(
       acceptedRef.current = Boolean(boundary.feed);
       setSnapshot(boundary);
 
-      void refetch()
-        .then((result) => {
+      void (async () => {
+        try {
+          const result = await refetch();
           if (!active || !result.data) return;
           acceptedRef.current = true;
           setSnapshot({ profileId, feed: result.data });
-        })
-        .catch(() => undefined);
+        } catch {
+          // React Query retains the error state for the route's retry UI.
+        }
+      })();
 
       return () => {
         active = false;
