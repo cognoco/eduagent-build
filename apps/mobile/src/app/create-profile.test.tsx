@@ -1237,7 +1237,7 @@ describe('CreateProfileScreen', () => {
   describe('parent adding child', () => {
     const previewV1NavigationFlags = {
       MODE_NAV_V0_ENABLED: true,
-      MODE_NAV_V1_ENABLED: false,
+      MODE_NAV_V1_ENABLED: true,
     } as const;
 
     const parentProfile: NavigationProfile = {
@@ -1567,12 +1567,8 @@ describe('CreateProfileScreen', () => {
       );
       expect(postDismissalContract.home.screen).toBe('FamilyHome');
       expect(postDismissalContract.isFamilyCapable).toBe(true);
-      expect(postDismissalContract.diagnostic.activeProfileId).toBe(
-        PROFILE_IDS.parent,
-      );
-      expect(postDismissalContract.diagnostic.linkedChildIds).toEqual([
-        PROFILE_IDS.childNew,
-      ]);
+      expect(postDismissalContract.effectiveAppContext).toBe('family');
+      expect(refreshedProfiles?.[0]?.id).toBe(PROFILE_IDS.parent);
       expect(
         postDismissalContract.canEnter('child/[profileId]', {
           profileId: PROFILE_IDS.childNew,
@@ -1593,7 +1589,7 @@ describe('CreateProfileScreen', () => {
       expect(mockFetch).toHaveBeenCalledTimes(mutationsBeforeRelaunch);
     });
 
-    it('[WI-2123 AC-4] keeps the family shell when the owner adds a second child', async () => {
+    it('[WI-2123 AC-4 / WI-1611] keeps the family shell when the owner adds a second child', async () => {
       const existingChild: NavigationProfile = {
         id: PROFILE_IDS.childExisting,
         accountId: TEST_ACCOUNT_ID,
