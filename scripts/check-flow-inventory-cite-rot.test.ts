@@ -2,6 +2,11 @@ import {
   classifyToken,
   extractBacktickTokens,
   resolveCitation,
+  extractDefinedRowIds,
+  extractRemovedRowIds,
+  checkRowIdCrossLinks,
+  checkFlagTokens,
+  checkLegacyTags,
   type FileIndex,
 } from './check-flow-inventory-cite-rot';
 
@@ -166,5 +171,137 @@ describe('resolveCitation', () => {
       getLineCount,
     );
     expect(result?.reason).toContain('no file matches glob pattern');
+  });
+});
+
+describe('extractDefinedRowIds', () => {
+  it('collects every ID at the start of a table row, ignoring prose mentions', () => {
+    const body = [
+      '| HOME-03 | Tab shapes | see matrix | per matrix | none | `foo.yaml` |',
+      '| V2-SCOPE-01 | Scope switching | chrome | sup only | none | `bar.spec.ts` |',
+      'Some prose mentioning HOME-03 again does not add a new ID.',
+    ].join('\n');
+    expect(extractDefinedRowIds(body)).toEqual(
+      new Set(['HOME-03', 'V2-SCOPE-01']),
+    );
+  });
+});
+
+describe('extractRemovedRowIds', () => {
+  it('collects bolded IDs from the Removed section only', () => {
+    const body = [
+      '| SUBJECT-08 | ... (see Removed: SUBJECT-16) | ... |',
+      '## Removed in this refresh',
+      '',
+      '- **SUBJECT-16** — no such flow exists',
+      '- **PARENT-07** — no such flow exists',
+      '',
+      '## Current Gaps and Next Candidates',
+      '',
+      '- **SUBJECT-08** should not be collected here',
+    ].join('\n');
+    expect(extractRemovedRowIds(body)).toEqual(
+      new Set(['SUBJECT-16', 'PARENT-07']),
+    );
+  });
+
+  it('collects bolded IDs when the Removed section is at the end of the document', () => {
+    const body = [
+      '## Removed in this refresh',
+      '',
+      '- **SUBJECT-99** — last section',
+    ].join('\n');
+    expect(extractRemovedRowIds(body)).toEqual(new Set(['SUBJECT-99']));
+  });
+});
+
+describe('checkRowIdCrossLinks', () => {
+  it('passes a reference to a row that is actually defined', () => {
+    const body = [
+      '| HOME-03 | Tab shapes | ... | ... | ... | `foo.yaml` |',
+      '| V2-SCOPE-01 | Scope switching (see also HOME-03) | ... | ... | ... | `bar.spec.ts` |',
+    ].join('\n');
+    expect(checkRowIdCrossLinks(body)).toEqual([]);
+  });
+
+  it('passes a reference to an explicitly-removed ID', () => {
+    const body = [
+      '| SUBJECT-08 | ... (see Removed: SUBJECT-16) | ... | ... | ... | `x.yaml` |',
+      '## Removed in this refresh',
+      '- **SUBJECT-16** — no such flow exists',
+      '## Current Gaps and Next Candidates',
+    ].join('\n');
+    expect(checkRowIdCrossLinks(body)).toEqual([]);
+  });
+
+  it('flags a bare V2-NN reference — the exact WI-2198 review bug', () => {
+    const body = [
+      '| V2-SCOPE-01 | Scope switching | ... | ... | ... | `x.spec.ts` |',
+      'Coverage class for every row below: code-only beyond the scope-switching journey (V2-05).',
+    ].join('\n');
+    const failures = checkRowIdCrossLinks(body);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].token).toBe('V2-05');
+  });
+
+  it('flags a reference whose family is real but whose specific ID is not defined or removed', () => {
+    const body = [
+      '| HOME-03 | Tab shapes | ... | ... | ... | `foo.yaml` |',
+      'Some row wrongly points at HOME-99, which does not exist.',
+    ].join('\n');
+    const failures = checkRowIdCrossLinks(body);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].token).toBe('HOME-99');
+  });
+
+  it('ignores tokens whose family is not a real row-ID family (bug trackers, WI IDs)', () => {
+    const body = [
+      '| HOME-03 | Tab shapes fixed per BUG-238, tracked as WI-2198 | ... | ... | ... | `foo.yaml` |',
+    ].join('\n');
+    expect(checkRowIdCrossLinks(body)).toEqual([]);
+  });
+});
+
+describe('checkFlagTokens', () => {
+  const flagsSource = [
+    'export const FEATURE_FLAGS = {',
+    "  MODE_NAV_V0_ENABLED: process.env.EXPO_PUBLIC_ENABLE_MODE_NAV === 'true',",
+    "  MODE_NAV_V1_ENABLED: process.env.EXPO_PUBLIC_ENABLE_MODE_NAV_V1 === 'true',",
+    "  MODE_NAV_V2_ENABLED: process.env.EXPO_PUBLIC_ENABLE_MODE_NAV_V2 === 'true',",
+    '};',
+  ].join('\n');
+
+  it('passes a flag token that is a real symbol', () => {
+    const body = 'Flags are build-time: `MODE_NAV_V2_ENABLED`.';
+    expect(checkFlagTokens(body, flagsSource)).toEqual([]);
+  });
+
+  it('flags a token that does not exist in feature-flags.ts', () => {
+    const body = 'Flags are build-time: `MODE_NAV_V3_ENABLED`.';
+    const failures = checkFlagTokens(body, flagsSource);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].token).toBe('MODE_NAV_V3_ENABLED');
+  });
+});
+
+describe('checkLegacyTags', () => {
+  it('passes the three defined legacy tags', () => {
+    const body =
+      'Tagged **legacy-current**, **legacy-superseded**, **legacy-historical**.';
+    expect(checkLegacyTags(body)).toEqual([]);
+  });
+
+  it('flags a typo/undefined legacy tag', () => {
+    const body = 'Tagged **legacy-obsolete** by mistake.';
+    const failures = checkLegacyTags(body);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].token).toBe('legacy-obsolete');
+  });
+
+  it('flags a typo containing numbers or hyphens', () => {
+    const body = 'Tagged **legacy-v2-mode** by mistake.';
+    const failures = checkLegacyTags(body);
+    expect(failures).toHaveLength(1);
+    expect(failures[0].token).toBe('legacy-v2-mode');
   });
 });
