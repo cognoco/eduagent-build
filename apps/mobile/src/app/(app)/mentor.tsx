@@ -150,10 +150,8 @@ function LearnerMentorScreen(): React.ReactElement {
   const mentorNoticeActions = useMentorNoticeActions();
   const feed = nowFeed.data ?? nowFeed.fallbackFeed ?? undefined;
   const firstRealState = hasFirstRealState({
-    // Count ACTIVE subjects only. useSubjectsIndex now surfaces every status
-    // (paused/archived included) for the Subjects browse grouping, so the
-    // cold-start / homework-prompt gate must filter to active here — otherwise a
-    // user with only paused/archived subjects would skip the cold-start card.
+    // Keep this filter defensive so the cold-start gate remains active-only if
+    // the index source broadens later.
     activeSubjectCount: subjectsIndex.subjects.filter(
       (subject) => subject.status === 'active',
     ).length,

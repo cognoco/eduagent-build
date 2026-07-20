@@ -27,7 +27,7 @@ export default function SubjectsScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const { activeScope, availableScopes, setActiveScope } = useScopeContext();
-  const subjectsIndex = useSubjectsIndex();
+  const subjectsIndex = useSubjectsIndex({ includeInactive: true });
   const eligiblePersons = useEligibleManagedPersons();
 
   // Navigation handlers wired to search results from cross-entity library search.

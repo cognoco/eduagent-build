@@ -138,7 +138,9 @@ describe('buildSubjectsIndex', () => {
 });
 
 describe('useSubjectsIndex', () => {
-  it('requests inactive subjects so paused and archived rows can reach Subjects', async () => {
+  async function captureSubjectsRequest(
+    callback: () => ReturnType<typeof useSubjectsIndex>,
+  ): Promise<string> {
     const originalFetch = globalThis.fetch;
     const mockFetch = jest.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
@@ -182,9 +184,7 @@ describe('useSubjectsIndex', () => {
     globalThis.fetch = mockFetch as typeof fetch;
 
     try {
-      const { result } = renderHook(() => useSubjectsIndex(), {
-        wrapper: Wrapper,
-      });
+      const { result } = renderHook(callback, { wrapper: Wrapper });
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
@@ -195,11 +195,34 @@ describe('useSubjectsIndex', () => {
           typeof input === 'string' ? input : input.toString(),
         )
         .find((url) => url.includes('/subjects'));
-      expect(subjectsRequest).toContain('includeInactive=true');
+      if (!subjectsRequest) {
+        throw new Error('useSubjectsIndex did not request /subjects');
+      }
+      return subjectsRequest;
     } finally {
       harness.queryClient.clear();
       setActiveProfileId(undefined);
       globalThis.fetch = originalFetch;
     }
+  }
+
+  it('requests active subjects by default', async () => {
+    const requestUrl = new URL(
+      await captureSubjectsRequest(() => useSubjectsIndex()),
+      'https://test.invalid',
+    );
+
+    expect(requestUrl.searchParams.has('includeInactive')).toBe(false);
+  });
+
+  it('requests inactive subjects when explicitly enabled', async () => {
+    const requestUrl = new URL(
+      await captureSubjectsRequest(() =>
+        useSubjectsIndex({ includeInactive: true }),
+      ),
+      'https://test.invalid',
+    );
+
+    expect(requestUrl.searchParams.get('includeInactive')).toBe('true');
   });
 });
