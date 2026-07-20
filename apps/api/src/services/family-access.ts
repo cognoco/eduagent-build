@@ -18,6 +18,7 @@ import {
   verifyPersonIsOrgAdminV2,
   verifyPersonOwnershipV2,
 } from './identity-v2/ownership-v2';
+import { captureException } from './sentry';
 
 type ProfileMetaSource = {
   get(key: 'profileMeta'): ProfileMeta | undefined;
@@ -332,7 +333,15 @@ export async function assertCanReadProfile(
   } catch (err) {
     // Credentialed-charge suppression already throws ForbiddenError — 403.
     if (err instanceof ForbiddenError) throw err;
-    // Bare Error (self/guardian miss, non-membership) — remap to 403.
+    // Bare Error (self/guardian miss, non-membership, OR an underlying DB
+    // failure — verifyPersonOwnershipV2 does not distinguish "no authority"
+    // from infra errors by type) — fail closed to 403, but capture it so a
+    // DB outage surfaces in Sentry instead of silently reading as "denied"
+    // (repo rule: silent recovery without escalation is banned in auth code).
+    captureException(err, {
+      tags: { surface: 'family-access.assertCanReadProfile' },
+      extra: { targetProfileId },
+    });
     throw new ForbiddenError(message);
   }
 }
