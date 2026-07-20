@@ -182,7 +182,10 @@ test('V2 Test Parent sign-out keeps its General Knowledge row behind the unauthe
 }) => {
   const seed = await readSeedData('owner-with-children');
   const ownerSubjectId = seed.ids.ownerSubjectId;
-  const subjectsEntry = ENTRY_CASES[1];
+  const subjectsEntry = ENTRY_CASES.find((entry) => entry.name === 'Subjects');
+  if (!subjectsEntry) {
+    throw new Error('Subjects entry case is required');
+  }
 
   await page.goto('/subjects', { waitUntil: 'commit' });
   await selectOwnerLearnerScope(page);
