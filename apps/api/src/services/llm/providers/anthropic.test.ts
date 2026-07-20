@@ -261,6 +261,34 @@ describe('createAnthropicProvider — HTTP status preservation', () => {
       400,
     );
   });
+
+  it('logs malformed stream metadata without response content', async () => {
+    const sensitiveText = 'PRIVATE_RECITATION_SENTINEL';
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: {${sensitiveText}}\n`));
+        controller.close();
+      },
+    });
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      body,
+    } as unknown as Response);
+    const warnSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    const provider = createAnthropicProvider('test-api-key');
+    const messages: ChatMessage[] = [{ role: 'user', content: sensitiveText }];
+
+    for await (const _chunk of provider.chatStream(messages, baseConfig)) {
+      void _chunk;
+    }
+
+    expect(warnSpy).toHaveBeenCalled();
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(sensitiveText);
+  });
 });
 
 // ---------------------------------------------------------------------------

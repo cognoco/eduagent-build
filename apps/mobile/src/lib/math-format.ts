@@ -120,9 +120,21 @@ function formatExpression(expr: string): string {
   return result;
 }
 
+function decodeUnicodeEscapes(text: string): string {
+  return text.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) =>
+    String.fromCharCode(Number.parseInt(hex, 16)),
+  );
+}
+
 export function formatMathContent(text: string): string {
+  // Mentor prose can contain JSON-style Unicode escapes when an upstream
+  // serialization layer has been preserved as text. Decode complete escapes
+  // at the render boundary; incomplete streamed or malformed escapes remain
+  // readable until/unless a later accumulated chunk completes them.
+  const decodedText = decodeUnicodeEscapes(text);
+
   // Process display math ($$...$$) first, then inline ($...$)
-  let result = text.replace(/\$\$([^$]+)\$\$/g, (_, expr: string) =>
+  let result = decodedText.replace(/\$\$([^$]+)\$\$/g, (_, expr: string) =>
     formatExpression(expr),
   );
   result = result.replace(/\$([^$]+)\$/g, (_, expr: string) =>

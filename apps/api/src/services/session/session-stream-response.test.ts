@@ -45,7 +45,7 @@ function baseParams(overrides = {}) {
       quotaRemainingTurns: 3,
       quotaFractionRemaining: 0.5,
       voyageApiKey: undefined,
-      clientId: undefined,
+      clientId: undefined as string | undefined,
       memoryFactsReadEnabled: false,
       memoryFactsRelevanceEnabled: false,
       challengeRoundRuntimeEnabled: false,
@@ -99,6 +99,49 @@ describe('streamSessionResponse', () => {
     expect(frames.join('\n')).toContain('Recovered response');
     expect(frames.join('\n')).toContain('"type":"done"');
     expect(params.deps.refundQuotaOrEscalate).not.toHaveBeenCalled();
+  });
+
+  it('preserves the recitation idempotency key across stream fallback and persistence marking', async () => {
+    const { createSseResponse } = makeCreateSseResponse();
+    const clientId = 'recitation-turn-1';
+    const params = baseParams({ createSseResponse });
+    params.streamOptions.clientId = clientId;
+    params.deps.streamMessage.mockResolvedValueOnce({
+      stream: (async function* () {
+        yield 'partial';
+        throw new Error('stream failed');
+      })(),
+      onComplete: jest.fn(),
+    });
+    params.deps.processMessage.mockResolvedValueOnce({
+      response: 'Recovered response',
+      exchangeCount: 3,
+      escalationRung: 2,
+      expectedResponseMinutes: 1,
+      aiEventId: AI_EVENT_ID,
+    });
+
+    await streamSessionResponse(
+      params as unknown as StreamSessionResponseParams,
+    );
+
+    expect(params.deps.streamMessage).toHaveBeenCalledWith(
+      params.db,
+      PROFILE_ID,
+      SESSION_ID,
+      params.input,
+      expect.objectContaining({ clientId }),
+    );
+    expect(params.deps.processMessage).toHaveBeenCalledWith(
+      params.db,
+      PROFILE_ID,
+      SESSION_ID,
+      params.input,
+      expect.objectContaining({ clientId }),
+    );
+    expect(params.deps.markPersisted).toHaveBeenCalledWith(
+      expect.objectContaining({ key: clientId }),
+    );
   });
 
   it('emits fallback frames, refunds quota, and dispatches observability when onComplete reports fallback', async () => {
