@@ -5,9 +5,6 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 
-import { ClerkSignOutTimeoutError } from '../../lib/sign-out';
-import { AccountAdminSheet } from './AccountAdminSheet';
-
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockRedirect = jest.fn();
@@ -80,41 +77,77 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => mockQueryClient,
 }));
 
-jest.mock('../../hooks/use-navigation-contract', () => ({
-  ...jest.requireActual('../../hooks/use-navigation-contract'),
-  useNavigationContract: () => ({
-    gates: mockGates,
+const navigationContractModule = jest.requireActual<
+  typeof import('../../hooks/use-navigation-contract')
+>('../../hooks/use-navigation-contract');
+const { resolveNavigationContract } = jest.requireActual<
+  typeof import('../../lib/navigation-contract')
+>('../../lib/navigation-contract');
+const navigationContractDefaults = resolveNavigationContract({
+  activeProfile: null,
+  profiles: [],
+  isParentProxy: false,
+  appContext: 'study',
+  role: null,
+  subscription: {
+    status: 'ready',
+    tier: null,
+    effectiveAccessTier: null,
+    billingAccess: null,
+  },
+  flags: {
+    MODE_NAV_V1_ENABLED: true,
+    MODE_NAV_V2_ENABLED: true,
+  },
+});
+jest
+  .spyOn(navigationContractModule, 'useNavigationContract')
+  .mockImplementation(() => ({
+    ...navigationContractDefaults,
+    gates: { ...navigationContractDefaults.gates, ...mockGates },
     canEnter: mockCanEnter,
     isParentProxy: mockIsParentProxy,
-  }),
-}));
+  }));
 
-jest.mock('../../lib/profile', () => ({
-  ...jest.requireActual('../../lib/profile'),
-  useProfile: () => ({
-    activeProfile: mockActiveProfile,
-    profiles: mockProfiles,
-  }),
-}));
+const profileModule =
+  jest.requireActual<typeof import('../../lib/profile')>('../../lib/profile');
+jest.spyOn(profileModule, 'useProfile').mockImplementation(
+  () =>
+    ({
+      activeProfile: mockActiveProfile,
+      profiles: mockProfiles,
+    }) as ReturnType<typeof profileModule.useProfile>,
+);
 
-jest.mock('../../lib/scope-context', () => ({
-  ...jest.requireActual('../../lib/scope-context'),
-  useScopeContext: () => ({
-    activeScope: mockActiveScope,
-    availableScopes: mockAvailableScopes,
-    isLoading: mockScopeLoading,
-  }),
-}));
+const scopeContextModule = jest.requireActual<
+  typeof import('../../lib/scope-context')
+>('../../lib/scope-context');
+jest.spyOn(scopeContextModule, 'useScopeContext').mockImplementation(
+  () =>
+    ({
+      activeScope: mockActiveScope,
+      availableScopes: mockAvailableScopes,
+      isLoading: mockScopeLoading,
+    }) as ReturnType<typeof scopeContextModule.useScopeContext>,
+);
 
-jest.mock('../../lib/sign-out', () => ({
-  ...jest.requireActual('../../lib/sign-out'),
-  signOutWithCleanup: (...args: unknown[]) => mockSignOutWithCleanup(...args),
-}));
+const signOutModule =
+  jest.requireActual<typeof import('../../lib/sign-out')>('../../lib/sign-out');
+jest
+  .spyOn(signOutModule, 'signOutWithCleanup')
+  .mockImplementation((...args) => mockSignOutWithCleanup(...args));
 
-jest.mock('../../lib/platform-alert', () => ({
-  ...jest.requireActual('../../lib/platform-alert'),
-  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
-}));
+const platformAlertModule = jest.requireActual<
+  typeof import('../../lib/platform-alert')
+>('../../lib/platform-alert');
+jest
+  .spyOn(platformAlertModule, 'platformAlert')
+  .mockImplementation((...args) => mockPlatformAlert(...args));
+
+const { ClerkSignOutTimeoutError } = signOutModule;
+const { AccountAdminSheet } = jest.requireActual<
+  typeof import('./AccountAdminSheet')
+>('./AccountAdminSheet');
 
 describe('AccountAdminSheet', () => {
   beforeEach(() => {
