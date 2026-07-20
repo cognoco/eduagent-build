@@ -4,6 +4,9 @@ import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import {
   bookGenerationResultSchema,
   bookTopicGenerationResultSchema,
+  PROFILE_MINIMUM_AGE,
+  PARENT_ACCOUNT_MINIMUM_AGE,
+  type AgeBracket,
   type BookGenerationResult,
   type BookTopicGenerationResult,
   type ConversationLanguage,
@@ -30,6 +33,22 @@ const BOOK_GENERATION_JSON_ATTEMPTS = 2;
  */
 function isUnambiguouslyAdultAge(learnerAge: number): boolean {
   return learnerAge > 18;
+}
+
+/**
+ * [WI-2432] Router-facing ageBracket derived from the same `learnerAge`
+ * (year-difference, missing → 12) already used above — bands it with the
+ * canonical `PROFILE_MINIMUM_AGE`/`PARENT_ACCOUNT_MINIMUM_AGE` thresholds
+ * (packages/schemas/src/age.ts) so `routeAndCall`'s under-18 vendor-exclusion
+ * gate (router.ts `isUnder18AgeBracket`) can actually fire on the legacy
+ * (routing V2 off) path. Distinct from `isUnambiguouslyAdultAge` above, which
+ * stays a stricter fail-closed check reserved for the existing
+ * `gemini_only`-pinning decision.
+ */
+function ageBracketFromLearnerAge(learnerAge: number): AgeBracket {
+  if (learnerAge < PROFILE_MINIMUM_AGE) return 'child';
+  if (learnerAge < PARENT_ACCOUNT_MINIMUM_AGE) return 'adolescent';
+  return 'adult';
 }
 
 export const AGE_STYLE_GUIDANCE = `Audience and naming style:
@@ -121,6 +140,7 @@ async function callBookGenerationJson<T>(
   labels: { invalidJson: string; unexpectedShape: string },
   conversationLanguage?: ConversationLanguage,
   isAdultLearner?: boolean,
+  ageBracket?: AgeBracket,
 ): Promise<T> {
   let firstFailure: Error | undefined;
   let lastFailureMessage = '';
@@ -152,6 +172,7 @@ async function callBookGenerationJson<T>(
       ...(applyGeminiOnly ? { providerPolicy: 'gemini_only' } : {}),
       responseFormat: 'json',
       conversationLanguage,
+      ageBracket,
     });
 
     let parsed: unknown;
@@ -207,6 +228,7 @@ export async function detectSubjectType(
     },
     options?.conversationLanguage,
     isUnambiguouslyAdultAge(learnerAge),
+    ageBracketFromLearnerAge(learnerAge),
   );
 }
 
@@ -251,5 +273,6 @@ export async function generateBookTopics(
     },
     options?.conversationLanguage,
     isUnambiguouslyAdultAge(learnerAge),
+    ageBracketFromLearnerAge(learnerAge),
   );
 }
