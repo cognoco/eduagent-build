@@ -5,6 +5,7 @@ type SelectResult = Array<Record<string, unknown>>;
 interface FakeSelectBuilder {
   from: (...args: unknown[]) => FakeSelectBuilder;
   leftJoin: (...args: unknown[]) => FakeSelectBuilder;
+  innerJoin: (...args: unknown[]) => FakeSelectBuilder;
   where: (...args: unknown[]) => FakeSelectBuilder;
   orderBy: (...args: unknown[]) => FakeSelectBuilder;
   limit: (...args: unknown[]) => Promise<SelectResult>;
@@ -16,6 +17,7 @@ function dbWithSelectResults(results: SelectResult[]) {
     const builder: FakeSelectBuilder = {
       from: jest.fn((..._args: unknown[]) => builder),
       leftJoin: jest.fn((..._args: unknown[]) => builder),
+      innerJoin: jest.fn((..._args: unknown[]) => builder),
       where: jest.fn((..._args: unknown[]) => builder),
       orderBy: jest.fn((..._args: unknown[]) => builder),
       limit: jest.fn(async (..._args: unknown[]) => pending.shift() ?? []),
@@ -62,6 +64,11 @@ describe('resolveSupporterColdStart', () => {
           hasOwnAccount: true,
         },
       ],
+      // [WI-2226 owner-gate] getPersonOrganizationId(supporterPersonId) —
+      // the supporter's own org.
+      [{ organizationId: '00000000-0000-4000-8000-000000000901' }],
+      // isPersonInOrg(managed candidate, supporter org) — non-empty = in org.
+      [{ id: '00000000-0000-4000-8000-000000000201' }],
       [],
       [],
       [{ surfaceCount: 3 }],
@@ -99,5 +106,36 @@ describe('resolveSupporterColdStart', () => {
     const result = await resolveSupporterColdStart(db, supporterPersonId);
 
     expect(JSON.stringify(result)).not.toContain('consent-pending');
+  });
+
+  // [WI-2226 owner-gate] Routing-level check that a hasOwnAccount=false
+  // candidate outside the supporter's own org is suppressed, not rendered.
+  // The real predicate (does the supportee's membership actually resolve
+  // under the supporter's org id) is proven against a real DB by
+  // supporter-coldstart.integration.test.ts — this fake-db unit test only
+  // exercises the branch given canned inputs.
+  it("suppresses a managed card for a candidate outside the supporter's own org", async () => {
+    const db = dbWithSelectResults([
+      [
+        {
+          edgeId: '00000000-0000-4000-8000-000000000101',
+          personId: '00000000-0000-4000-8000-000000000201',
+          displayName: 'Cross-Org Candidate',
+          hasOwnAccount: false,
+        },
+      ],
+      // getPersonOrganizationId(supporterPersonId).
+      [{ organizationId: '00000000-0000-4000-8000-000000000901' }],
+      // isPersonInOrg(candidate, supporter org) — empty = NOT in org.
+      [],
+    ]);
+
+    await expect(
+      resolveSupporterColdStart(db, supporterPersonId),
+    ).resolves.toEqual({
+      variant: 'per-child',
+      selfLearningDoorway: true,
+      cards: [],
+    });
   });
 });
