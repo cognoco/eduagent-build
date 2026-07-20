@@ -76,7 +76,12 @@ async function seedProfile(
   return { profileId, subjectId: subject!.id };
 }
 
-async function seedSession(db: Database, profileId: string, subjectId: string) {
+async function seedSession(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  escalationRung = 1,
+) {
   const [sessionRow] = await db
     .insert(learningSessions)
     .values({
@@ -85,7 +90,7 @@ async function seedSession(db: Database, profileId: string, subjectId: string) {
       sessionType: 'learning',
       inputMode: 'text',
       status: 'active',
-      escalationRung: 1,
+      escalationRung,
       exchangeCount: 0,
       metadata: {},
     })
@@ -258,6 +263,105 @@ describeIfDb(
       // on the persisted metadata. Empty/undefined keys would pollute the
       // jsonb column and confuse parsers that null-check `meta.signals`.
       expect(meta && 'signals' in meta).toBe(false);
+    });
+
+    it.each([
+      ['correct', true, false],
+      ['partial', false, true],
+      ['incorrect', false, false],
+      ['na', undefined, false],
+    ] as const)(
+      'round-trips answerEvaluation=%s with compatibility mapping',
+      async (correctness, expectedCorrectAnswer, expectedPartialProgress) => {
+        const { profileId, subjectId } = await seedProfile(db);
+        const session = await seedSession(db, profileId, subjectId);
+
+        const persisted = await persistExchangeResult(
+          db,
+          profileId,
+          session.id,
+          session,
+          'Learner answer',
+          'Mentor response',
+          1,
+          {
+            isUnderstandingCheck: false,
+            timeToAnswerMs: 1000,
+            hintCountInSession: 0,
+            partialProgress: false,
+            answerEvaluation: { correctness, concept: 'fractions' },
+          },
+        );
+
+        const [row] = await db
+          .select({ metadata: sessionEvents.metadata })
+          .from(sessionEvents)
+          .where(eq(sessionEvents.id, persisted.aiEventId!));
+        const metadata = row!.metadata as Record<string, unknown>;
+
+        expect(metadata.answerEvaluation).toEqual({
+          correctness,
+          concept: 'fractions',
+        });
+        if (expectedCorrectAnswer === undefined) {
+          expect(metadata).not.toHaveProperty('correctAnswer');
+        } else {
+          expect(metadata.correctAnswer).toBe(expectedCorrectAnswer);
+        }
+        expect(metadata.partialProgress).toBe(expectedPartialProgress);
+      },
+    );
+
+    it('persists a truthful 5→4 downscaffolding audit with source streak 4', async () => {
+      const { profileId, subjectId } = await seedProfile(db);
+      const session = await seedSession(db, profileId, subjectId, 5);
+
+      await persistExchangeResult(
+        db,
+        profileId,
+        session.id,
+        session,
+        '42',
+        'That is the product.',
+        4,
+        {
+          isUnderstandingCheck: false,
+          timeToAnswerMs: 1000,
+          hintCountInSession: 0,
+          answerEvaluation: { correctness: 'correct' },
+          rungMovementStreak: 4,
+          rungAction: 'deescalate',
+          rungDirection: 'down',
+          rungReason:
+            'Four correct answers at the current rung — reducing support',
+        },
+      );
+
+      const rows = await db
+        .select({
+          content: sessionEvents.content,
+          metadata: sessionEvents.metadata,
+          eventType: sessionEvents.eventType,
+        })
+        .from(sessionEvents)
+        .where(eq(sessionEvents.sessionId, session.id));
+      const aiResponse = rows.find((row) => row.eventType === 'ai_response');
+
+      expect(aiResponse?.metadata).toMatchObject({
+        escalationRung: 4,
+        rungMovement: {
+          fromRung: 5,
+          toRung: 4,
+          action: 'deescalate',
+          direction: 'down',
+          streak: 4,
+          reason: 'Four correct answers at the current rung — reducing support',
+        },
+      });
+      expect(rows.some((row) => row.eventType === 'escalation')).toBe(false);
+      expect(rows.some((row) => /escalation offered/i.test(row.content))).toBe(
+        false,
+      );
     });
   },
 );

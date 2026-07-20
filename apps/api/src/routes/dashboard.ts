@@ -88,6 +88,17 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
   .get('/dashboard', async (c) => {
     const { db, profileId } = withProfile(c);
 
+    // [WI-2397] Caller-identity gate — mirrors the WI-1989 gate already on
+    // every sibling /dashboard/children/* route. Without this, a same-account
+    // non-owner could send X-Profile-Id = the owner's profile id and read the
+    // owner's children list + pending notices (cross-ORG reads are already
+    // blocked by profileScopeMiddleware's account-scoped resolution — this
+    // closes the same-account residual).
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can view the family dashboard.',
+    );
+
     const [children, pendingNotices] = await Promise.all([
       getChildrenForParent(db, profileId),
       listPendingNotices(db, profileId),

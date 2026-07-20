@@ -363,6 +363,12 @@ export const noticeRecheckSignalSchema = z.object({
 });
 export type NoticeRecheckSignal = z.infer<typeof noticeRecheckSignalSchema>;
 
+export const answerEvaluationSchema = z.object({
+  correctness: z.enum(['correct', 'partial', 'incorrect', 'na']),
+  concept: z.string().min(1).max(200).optional(),
+});
+export type AnswerEvaluation = z.infer<typeof answerEvaluationSchema>;
+
 const signalsSchema = z.preprocess(
   optionalObjectInput,
   z
@@ -371,6 +377,8 @@ const signalsSchema = z.preprocess(
       ready_to_finish: optionalBooleanSchema,
       /** Main loop: learner response showed partial understanding — hold escalation. */
       partial_progress: optionalBooleanSchema,
+      /** Ordinary learning loop: evaluation of the current learner answer. */
+      answer_evaluation: answerEvaluationSchema.optional(),
       /** Main loop: rung-5 exit protocol fired — queue topic for remediation. */
       needs_deepening: optionalBooleanSchema,
       /** Main loop: the AI message contains an understanding check. Observational. */
@@ -566,6 +574,8 @@ export interface NormalisedEnvelopeSignals {
   ready_to_finish: boolean;
   /** Main loop: learner response showed partial understanding — hold escalation. */
   partial_progress: boolean;
+  /** Ordinary learning loop: canonical answer evaluation. Null when absent. */
+  answer_evaluation: AnswerEvaluation | null;
   /** Main loop: rung-5 exit protocol fired — queue topic for remediation. */
   needs_deepening: boolean;
   /** Main loop: the AI message contains an understanding check. Observational. */
@@ -595,6 +605,7 @@ export function normaliseSignals(
   return {
     ready_to_finish: signals?.ready_to_finish ?? false,
     partial_progress: signals?.partial_progress ?? false,
+    answer_evaluation: signals?.answer_evaluation ?? null,
     needs_deepening: signals?.needs_deepening ?? false,
     understanding_check: signals?.understanding_check ?? false,
     retrieval_score: signals?.retrieval_score ?? null,

@@ -100,6 +100,7 @@ import {
   isJudgeFrameworkEnabled,
   isJudgeEnforcementEnabled,
   isMentorNoticeEnabled,
+  isAnswerEvaluationRuntimeEnabled,
 } from '../config';
 import { FILING_CONFIG } from '../config/filing';
 
@@ -153,6 +154,7 @@ type SessionRouteEnv = {
     VOYAGE_API_KEY?: string;
     MATCHER_ENABLED?: string;
     CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
+    ANSWER_EVALUATION_RUNTIME_ENABLED?: string;
     MENTOR_NOTICE_ENABLED?: string;
     CHALLENGE_ROUND_COHORT_PROFILE_IDS?: string;
     REVIEW_CALLBACK_OPENER_ENABLED?: string;
@@ -535,6 +537,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const judgeEnforcementEnabled = isJudgeEnforcementEnabled(
         c.env.JUDGE_ENFORCEMENT_ENABLED,
       );
+      const answerEvaluationEnabled = isAnswerEvaluationRuntimeEnabled(
+        c.env.ANSWER_EVALUATION_RUNTIME_ENABLED,
+      );
 
       try {
         const result = await processMessage(
@@ -556,6 +561,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
             judgeEnforcementEnabled,
+            answerEvaluationEnabled,
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
               c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
             ),
@@ -680,6 +686,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const judgeEnforcementEnabled = isJudgeEnforcementEnabled(
         c.env.JUDGE_ENFORCEMENT_ENABLED,
       );
+      const answerEvaluationEnabled = isAnswerEvaluationRuntimeEnabled(
+        c.env.ANSWER_EVALUATION_RUNTIME_ENABLED,
+      );
 
       try {
         return await streamSessionResponse({
@@ -709,6 +718,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
             judgeEnforcementEnabled,
+            answerEvaluationEnabled,
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
               c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
             ),

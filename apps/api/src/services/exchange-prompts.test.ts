@@ -21,6 +21,103 @@ function makeContext(
   };
 }
 
+describe('buildSystemPrompt — per-turn answer evaluation [WI-1443]', () => {
+  const answerEvaluationKey = '"answer_evaluation":';
+
+  it('requires the canonical classification set for an enabled ordinary turn', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        answerEvaluationEnabled: true,
+        exchangeCount: 2,
+        exchangeHistory: [
+          { role: 'assistant', content: 'What is 6 × 7?' },
+          { role: 'user', content: '42' },
+        ],
+      }),
+    );
+
+    expect(prompt).toContain(answerEvaluationKey);
+    expect(prompt).toContain(
+      '"answer_evaluation": { "correctness": "<correct|partial|incorrect|na>", "concept": "<optional; concept just assessed; omit key when absent>" }',
+    );
+    expect(prompt).toContain(
+      'immediately preceding ordinary learning question',
+    );
+    expect(prompt).toContain(
+      'Use `partial` or `incorrect` only when the message is a substantive but incomplete or wrong answer',
+    );
+    expect(prompt).toContain('you MUST use `correct`');
+    expect(prompt).toContain('never your own reply or the new question');
+    expect(prompt).toContain(
+      'Omit `concept` entirely rather than returning an empty string',
+    );
+  });
+
+  it('requires na when no immediately preceding ordinary question exists', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ answerEvaluationEnabled: true, exchangeCount: 0 }),
+    );
+
+    expect(prompt).toContain(answerEvaluationKey);
+    expect(prompt).toContain('set `correctness` to `na`');
+    expect(prompt).toContain('first turn');
+  });
+
+  it('omits the signal when the runtime flag is disabled', () => {
+    expect(buildSystemPrompt(makeContext())).not.toContain(answerEvaluationKey);
+  });
+
+  it('omits the signal from app-help turns', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ answerEvaluationEnabled: true }),
+      { includeAppHelpMap: true },
+    );
+
+    expect(prompt).not.toContain(answerEvaluationKey);
+  });
+
+  it('omits the signal from recitation turns', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        answerEvaluationEnabled: true,
+        effectiveMode: 'recitation',
+      }),
+    );
+
+    expect(prompt).not.toContain(answerEvaluationKey);
+  });
+
+  it.each([
+    ['accepted', false],
+    ['accepted', true],
+    ['active', false],
+    ['active', true],
+  ] as const)(
+    'omits ordinary evaluation for Challenge Round state=%s when runtime=%s',
+    (state, challengeRuntimeEnabled) => {
+      const prompt = buildSystemPrompt(
+        makeContext({
+          answerEvaluationEnabled: true,
+          challengeRuntimeEnabled,
+          challengeRound: {
+            state,
+            offerCount: 0,
+            declinedDontAskAgain: false,
+            evaluations: [],
+          },
+        }),
+      );
+
+      expect(prompt).not.toContain(answerEvaluationKey);
+      if (challengeRuntimeEnabled) {
+        expect(prompt).toContain('"challenge_round_evaluation":');
+      } else {
+        expect(prompt).not.toContain('"challenge_round_evaluation":');
+      }
+    },
+  );
+});
+
 describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
   it('includes the ANTI-FABRICATION block in language-mode prompts', () => {
     const prompt = buildSystemPrompt(

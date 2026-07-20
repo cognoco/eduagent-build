@@ -10,7 +10,10 @@ jest.mock('../runner/llm-client' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-import { exchangesFlow } from './exchanges';
+import {
+  evaluateAnswerEvaluationScenarioQuality,
+  exchangesFlow,
+} from './exchanges';
 import { PROFILES, getProfile } from '../fixtures/profiles';
 import { buildMemoryBlock } from '../../src/services/learner-profile';
 import { sanitizeUserContent } from '../../src/services/exchanges';
@@ -24,7 +27,7 @@ describe('exchangesFlow', () => {
   }
 
   describe('enumerateScenarios', () => {
-    it('returns 26 scenario inputs for a general (non-language) profile', () => {
+    it('returns 31 scenario inputs for the designated answer-evaluation profile', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
       expect(scenarios.map((s) => s.scenarioId)).not.toContain(
@@ -35,7 +38,7 @@ describe('exchangesFlow', () => {
       expect(scenarios.map((s) => s.scenarioId)).not.toContain(
         'S13-first-session-subject-turn0',
       );
-      expect(scenarios).toHaveLength(26);
+      expect(scenarios).toHaveLength(31);
       expect(scenarios.map((s) => s.scenarioId)).toEqual(
         expect.arrayContaining([
           'S1-rung1-teach-new',
@@ -64,6 +67,11 @@ describe('exchangesFlow', () => {
           'S6-homework-help',
           'S8-casual-freeform',
           'S9-correct-streak',
+          'AE1-answer-correct',
+          'AE2-answer-partial',
+          'AE3-answer-incorrect',
+          'AE4-answer-na',
+          'AE5-answer-disabled',
         ]),
       );
     });
@@ -371,6 +379,123 @@ describe('exchangesFlow', () => {
       expect(messages.system).toContain('REVIEW (calibrated relearning)');
       expect(messages.system).toMatch(/calibration question/i);
       expect(messages.system).not.toContain('FIRST TURN RULE');
+    });
+
+    it('gates answer-evaluation instructions on the runtime context', () => {
+      const scenarios =
+        exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
+      const enabled = scenarios.find(
+        (s) => s.scenarioId === 'AE1-answer-correct',
+      );
+      const disabled = scenarios.find(
+        (s) => s.scenarioId === 'AE5-answer-disabled',
+      );
+      if (!enabled || !disabled) {
+        throw new Error('answer-evaluation eval scenarios missing');
+      }
+
+      expect(exchangesFlow.buildPrompt(enabled.input).system).toContain(
+        'answer_evaluation',
+      );
+      expect(exchangesFlow.buildPrompt(disabled.input).system).not.toContain(
+        'answer_evaluation',
+      );
+    });
+  });
+
+  describe('answer-evaluation live quality gate', () => {
+    const envelope = (answerEvaluation?: unknown) =>
+      JSON.stringify({
+        reply: 'Let us continue.',
+        signals:
+          answerEvaluation === undefined
+            ? {}
+            : { answer_evaluation: answerEvaluation },
+        ui_hints: {},
+      });
+
+    it.each([
+      ['AE1-answer-correct', 'correct'],
+      ['AE2-answer-partial', 'partial'],
+      ['AE3-answer-incorrect', 'incorrect'],
+      ['AE4-answer-na', 'na'],
+    ])('accepts %s only with the expected correctness', (scenarioId, value) => {
+      expect(
+        evaluateAnswerEvaluationScenarioQuality(
+          scenarioId,
+          envelope({ correctness: value }),
+        ),
+      ).toEqual([]);
+      expect(
+        evaluateAnswerEvaluationScenarioQuality(
+          scenarioId,
+          envelope({
+            correctness: value === 'correct' ? 'partial' : 'correct',
+          }),
+        ),
+      ).toEqual([
+        expect.objectContaining({
+          severity: 'error',
+          code: 'answer_evaluation_wrong_or_missing',
+        }),
+      ]);
+    });
+
+    it('requires omission when the answer-evaluation runtime flag is disabled', () => {
+      expect(
+        evaluateAnswerEvaluationScenarioQuality(
+          'AE5-answer-disabled',
+          envelope(),
+        ),
+      ).toEqual([]);
+      expect(
+        evaluateAnswerEvaluationScenarioQuality(
+          'AE5-answer-disabled',
+          envelope({ correctness: 'correct' }),
+        ),
+      ).toEqual([
+        expect.objectContaining({
+          severity: 'error',
+          code: 'answer_evaluation_emitted_while_disabled',
+        }),
+      ]);
+    });
+
+    it('fails closed when an answer-evaluation scenario returns non-JSON', () => {
+      expect(
+        evaluateAnswerEvaluationScenarioQuality(
+          'AE1-answer-correct',
+          'not json',
+        ),
+      ).toEqual([
+        expect.objectContaining({
+          severity: 'error',
+          code: 'answer_evaluation_unparseable',
+        }),
+      ]);
+    });
+
+    it('routes answer-evaluation checks through the flow quality hook', async () => {
+      const scenario = (
+        exchangesFlow.enumerateScenarios?.(generalProfile) ?? []
+      ).find((candidate) => candidate.scenarioId === 'AE1-answer-correct');
+      if (!scenario) throw new Error('AE1 answer-evaluation scenario missing');
+      const messages = exchangesFlow.buildPrompt(scenario.input);
+
+      expect(
+        await exchangesFlow.evaluateQuality?.({
+          profile: generalProfile,
+          scenarioId: scenario.scenarioId,
+          input: scenario.input,
+          messages,
+          liveResponse: envelope({ correctness: 'partial' }),
+        }),
+      ).toEqual([
+        expect.objectContaining({
+          severity: 'error',
+          code: 'answer_evaluation_wrong_or_missing',
+        }),
+      ]);
     });
   });
 
