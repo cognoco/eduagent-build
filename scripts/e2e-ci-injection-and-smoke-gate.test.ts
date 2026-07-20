@@ -39,6 +39,95 @@ import { parse as parseYaml, parseAllDocuments } from 'yaml';
 
 const repoRoot = join(__dirname, '..');
 
+const JOURNAL_RECAP_TEXT =
+  'We traced how photosynthesis stores sunlight as chemical energy in glucose.';
+const HARD_JOURNAL_RECAP_ASSERTION = {
+  assertVisible: {
+    id: 'session-recap-card',
+    containsDescendants: [{ text: JOURNAL_RECAP_TEXT }],
+  },
+} as const;
+
+function assertHardJournalRecapOwnership(commands: unknown[]): void {
+  const recapCardAssertions = commands.filter((command) => {
+    if (!command || typeof command !== 'object') return false;
+    const selector = (command as Record<string, unknown>).assertVisible;
+    return (
+      !!selector &&
+      typeof selector === 'object' &&
+      (selector as Record<string, unknown>).id === 'session-recap-card'
+    );
+  });
+  const recapCommand = recapCardAssertions[0] as
+    | Record<string, unknown>
+    | undefined;
+  const recapSelector = recapCommand?.assertVisible as
+    | Record<string, unknown>
+    | undefined;
+  const descendants = recapSelector?.containsDescendants;
+  const exactRecapDescendants = Array.isArray(descendants)
+    ? descendants.filter(
+        (descendant) =>
+          !!descendant &&
+          typeof descendant === 'object' &&
+          (descendant as Record<string, unknown>).text === JOURNAL_RECAP_TEXT,
+      )
+    : [];
+  if (
+    recapCardAssertions.length !== 1 ||
+    recapCommand?.optional === true ||
+    recapSelector?.optional === true ||
+    exactRecapDescendants.length !== 1 ||
+    (exactRecapDescendants[0] as Record<string, unknown>).optional === true
+  ) {
+    throw new Error(
+      'Journal recap text must be a mandatory descendant of the exact recap card',
+    );
+  }
+
+  const hasGlobalRecapText = commands.some((command) => {
+    if (!command || typeof command !== 'object') return false;
+    const selector = (command as Record<string, unknown>).assertVisible;
+    if (!selector || typeof selector !== 'object') return false;
+    const fields = selector as Record<string, unknown>;
+    return fields.text === JOURNAL_RECAP_TEXT && fields.id === undefined;
+  });
+  if (hasGlobalRecapText) {
+    throw new Error('Journal recap text must not be asserted globally');
+  }
+}
+
+function assertHardPlaywrightRecapOwnership(source: string): void {
+  const compactSource = source.replace(/\s+/g, ' ');
+  const ownerMatch = compactSource.match(
+    /const\s+([A-Za-z_$][\w$]*)\s*=\s*page\.getByTestId\(['"]session-recap-card['"]\)/,
+  );
+  const owner = ownerMatch?.[1];
+  if (!owner) {
+    throw new Error(
+      'Playwright recap evidence needs the exact recap-card owner',
+    );
+  }
+
+  const escapedOwner = owner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapedText = JOURNAL_RECAP_TEXT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const hardOwnedAssertion = new RegExp(
+    `expect\\(\\s*${escapedOwner}\\.getByText\\(\\s*['"]${escapedText}['"]\\s*,\\s*\\{\\s*exact\\s*:\\s*true\\s*\\}\\s*,?\\s*\\)\\s*,?\\s*\\)\\.toBeVisible\\(`,
+  );
+  if (!hardOwnedAssertion.test(compactSource)) {
+    throw new Error(
+      'Playwright recap text must be exact and owned by the exact recap card',
+    );
+  }
+
+  const globalRecapAssertion = new RegExp(
+    `page\\.getByText\\(\\s*['"]${escapedText}['"]`,
+  );
+  if (globalRecapAssertion.test(compactSource)) {
+    throw new Error('Playwright recap text must not be asserted globally');
+  }
+}
+
 function loadWorkflowRaw(name: string): string {
   return readFileSync(join(repoRoot, '.github', 'workflows', name), 'utf8');
 }
@@ -1009,7 +1098,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
   });
 
-  it('[WI-2239] binds the seeded recap row to its Biology subject', () => {
+  it('[WI-2239] binds the seeded recap row to Biology and exact recap text to its owning card', () => {
     const journalFlow = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/v2/v2-journal-paper-trail.yaml'),
       'utf8',
@@ -1029,6 +1118,89 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         containsDescendants: [{ text: 'Biology / Biology Topic 1' }],
       },
     });
+    expect(() => assertHardJournalRecapOwnership(commands)).not.toThrow();
+  });
+
+  it('[WI-2239] rejects split/global and optionalized recap ownership evidence', () => {
+    expect(() =>
+      assertHardJournalRecapOwnership([
+        { assertVisible: { id: 'session-recap-card' } },
+        { assertVisible: { text: JOURNAL_RECAP_TEXT } },
+      ]),
+    ).toThrow(/mandatory descendant|globally/);
+
+    expect(() =>
+      assertHardJournalRecapOwnership([
+        {
+          assertVisible: {
+            ...HARD_JOURNAL_RECAP_ASSERTION.assertVisible,
+            optional: true,
+          },
+        },
+      ]),
+    ).toThrow(/mandatory descendant/);
+
+    expect(() =>
+      assertHardJournalRecapOwnership([
+        {
+          assertVisible: {
+            id: 'session-recap-card',
+            containsDescendants: [{ text: JOURNAL_RECAP_TEXT, optional: true }],
+          },
+        },
+      ]),
+    ).toThrow(/mandatory descendant/);
+
+    expect(() =>
+      assertHardJournalRecapOwnership([
+        HARD_JOURNAL_RECAP_ASSERTION,
+        { assertVisible: { text: JOURNAL_RECAP_TEXT, optional: true } },
+      ]),
+    ).toThrow(/globally/);
+  });
+
+  it('[WI-2239] binds exact browser recap text to the exact recap card and rejects permissive ownership mutants', () => {
+    const journalSpec = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e-web/flows/v2/v2-journal-paper-trail.spec.ts',
+      ),
+      'utf8',
+    );
+    expect(() => assertHardPlaywrightRecapOwnership(journalSpec)).not.toThrow();
+
+    const validOwnership = `
+      const recapCard = page.getByTestId('session-recap-card');
+      await expect(
+        recapCard.getByText('${JOURNAL_RECAP_TEXT}', { exact: true }),
+      ).toBeVisible();
+    `;
+    expect(() =>
+      assertHardPlaywrightRecapOwnership(validOwnership),
+    ).not.toThrow();
+    expect(() =>
+      assertHardPlaywrightRecapOwnership(
+        validOwnership.replace('recapCard.getByText', 'page.getByText'),
+      ),
+    ).toThrow(/exact recap card|globally/);
+    expect(() =>
+      assertHardPlaywrightRecapOwnership(
+        validOwnership.replace(
+          'recapCard.getByText',
+          "page.getByTestId('summary-submitted').getByText",
+        ),
+      ),
+    ).toThrow(/owned by the exact recap card/);
+    expect(() =>
+      assertHardPlaywrightRecapOwnership(
+        validOwnership.replace(JOURNAL_RECAP_TEXT, 'Adjacent summary text'),
+      ),
+    ).toThrow(/exact and owned/);
+    expect(() =>
+      assertHardPlaywrightRecapOwnership(
+        validOwnership.replace(', { exact: true }', ''),
+      ),
+    ).toThrow(/exact and owned/);
   });
 
   it('[WI-2241] hard-selects the exact rich supportee through the Support hub before and after relaunch', () => {

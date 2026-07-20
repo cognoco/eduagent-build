@@ -162,6 +162,8 @@ describe('v2-journal-paper-trail seed', () => {
         sessionId,
         profileId: result.profileId,
         topicId,
+        learnerRecap:
+          'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
       }),
     );
     expect(insertedRow(inserts, topicNotes, learnerNoteId)).toEqual(

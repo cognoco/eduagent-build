@@ -955,6 +955,7 @@ export async function insertSessionWithRecap(
     subjectId: string;
     topicId: string;
     recapContent?: string;
+    learnerRecap?: string;
     recapHighlight?: string;
     engagementSignal?: 'curious' | 'focused' | 'restless' | 'frustrated';
     endedDaysAgo?: number;
@@ -984,6 +985,9 @@ export async function insertSessionWithRecap(
     content:
       opts.recapContent ??
       'We worked through the topic with growing confidence and self-corrected mid-way.',
+    ...(opts.learnerRecap === undefined
+      ? {}
+      : { learnerRecap: opts.learnerRecap }),
     aiFeedback: 'Great perseverance and clear reasoning throughout.',
     highlight:
       opts.recapHighlight ??
@@ -5092,6 +5096,8 @@ async function seedV2JournalPaperTrail(
       subjectId,
       topicId,
       recapContent:
+        'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
+      learnerRecap:
         'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
       recapHighlight:
         'Connected chlorophyll, carbon dioxide, and glucose without prompting.',

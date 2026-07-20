@@ -61,10 +61,12 @@ test('[WI-2239] v2-journal-paper-trail: seeded Session, learner Note, Mentor boo
       topicId,
       returnTo: 'journal',
     });
-  await expect(page.getByTestId('session-recap-card')).toBeVisible();
+  const recapCard = page.getByTestId('session-recap-card');
+  await expect(recapCard).toBeVisible();
   await expect(
-    page.getByText(
+    recapCard.getByText(
       'We traced how photosynthesis stores sunlight as chemical energy in glucose.',
+      { exact: true },
     ),
   ).toBeVisible();
   await pressableClick(page.getByTestId('summary-close-button'));
