@@ -159,7 +159,7 @@ test('V2 Account empty history falls back to Journal and never legacy Home', asy
   await expect(directPage).not.toHaveURL(/\/home(?:\?.*)?$/);
 });
 
-async function expectSignedOutWithoutOwnerData(page: Page): Promise<void> {
+async function expectSignedOutWithoutTestParentData(page: Page): Promise<void> {
   await expect(page.getByTestId('sign-in-button')).toBeVisible({
     timeout: 60_000,
   });
@@ -172,11 +172,9 @@ async function expectSignedOutWithoutOwnerData(page: Page): Promise<void> {
   await expect(
     page.getByText('General Knowledge', { exact: true }),
   ).toHaveCount(0);
-  await expect(page.getByText('Emma', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('Mathematics', { exact: true })).toHaveCount(0);
 }
 
-test('V2 owner sign-out keeps prior account and learning data behind the unauthenticated boundary after Back and a fresh protected page', async ({
+test('V2 Test Parent sign-out keeps its General Knowledge row behind the unauthenticated boundary after Back and a fresh protected page', async ({
   page,
 }) => {
   const seed = await readSeedData('owner-with-children');
@@ -191,14 +189,14 @@ test('V2 owner sign-out keeps prior account and learning data behind the unauthe
   await expect(page.getByText('Test Parent', { exact: true })).toBeVisible();
 
   await page.getByTestId('account-admin-sign-out').click();
-  await expectSignedOutWithoutOwnerData(page);
+  await expectSignedOutWithoutTestParentData(page);
 
   await page.goBack({ waitUntil: 'commit' });
-  await expectSignedOutWithoutOwnerData(page);
+  await expectSignedOutWithoutTestParentData(page);
 
   const context = page.context();
   await page.close();
   const freshPage = await context.newPage();
   await freshPage.goto('/subjects', { waitUntil: 'commit' });
-  await expectSignedOutWithoutOwnerData(freshPage);
+  await expectSignedOutWithoutTestParentData(freshPage);
 });

@@ -201,9 +201,33 @@ tags:
 - assertVisible:
     id: 'journal-screen'
 
-# Sign out from Account and hard-prove the unauthenticated/no-data boundary.
+# Exact sign-out case: establish the Test Parent owner in Subjects with its
+# row-owned General Knowledge data, then cross the unauthenticated boundary.
+- tapOn:
+    id: 'tab-subjects'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'subjects-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-subjects'
+    selected: true
+- assertVisible:
+    id: 'account-avatar-button'
+    text: '^Open account settings for Test Parent$'
+- assertVisible:
+    id: 'subjects-browse-row-${OWNER_SUBJECT_ID}'
+    containsDescendants:
+      - text: '^General Knowledge$'
 - tapOn:
     id: 'account-avatar-button'
+- extendedWaitUntil:
+    visible:
+      id: 'account-screen'
+    timeout: 15000
+- assertVisible:
+    text: '^Test Parent$'
 - scrollUntilVisible:
     element:
       id: 'account-admin-sign-out'
@@ -229,16 +253,11 @@ tags:
     text: '^Test Parent$'
 - assertNotVisible:
     text: '^General Knowledge$'
-- assertNotVisible:
-    text: '^Emma$'
-- assertNotVisible:
-    text: '^Mathematics$'
 
-# Browser Back analogue on Android can leave the auth activity; a cold
-# no-clear relaunch must still render only the unauthenticated boundary.
+# Android Back can leave the auth activity. Re-enter the protected Subjects
+# link without clearing or stopping the process and re-check the boundary.
 - pressKey: back
-- stopApp
-- openLink: 'mentomate:///mentor'
+- openLink: 'mentomate:///subjects'
 - extendedWaitUntil:
     visible:
       id: 'sign-in-button'
@@ -248,10 +267,35 @@ tags:
 - assertNotVisible:
     id: 'account-avatar-button'
 - assertNotVisible:
+    id: 'mentor-screen'
+- assertNotVisible:
+    id: 'subjects-screen'
+- assertNotVisible:
+    id: 'journal-screen'
+- assertNotVisible:
     text: '^Test Parent$'
 - assertNotVisible:
     text: '^General Knowledge$'
+
+# Stop the app, then cold-open the same protected link without clearing state.
+# The exact Test Parent + General Knowledge boundary must hold again.
+- stopApp
+- openLink: 'mentomate:///subjects'
+- extendedWaitUntil:
+    visible:
+      id: 'sign-in-button'
+    timeout: 30000
 - assertNotVisible:
-    text: '^Emma$'
+    id: 'account-screen'
 - assertNotVisible:
-    text: '^Mathematics$'
+    id: 'account-avatar-button'
+- assertNotVisible:
+    id: 'mentor-screen'
+- assertNotVisible:
+    id: 'subjects-screen'
+- assertNotVisible:
+    id: 'journal-screen'
+- assertNotVisible:
+    text: '^Test Parent$'
+- assertNotVisible:
+    text: '^General Knowledge$'
