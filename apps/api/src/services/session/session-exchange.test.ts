@@ -26,7 +26,7 @@ import { MAX_INTERVIEW_EXCHANGES } from '../exchanges';
 import { SessionExchangeLimitError } from './session-crud';
 import { computeNextPracticePointer } from '../language-session-engine';
 import { resetSessionStaticContextCache } from './session-cache';
-import { RECITATION_SETUP_CLAIM_METADATA_KEY } from './session-recitation-setup';
+import { recitationSetupClaimMetadataKey } from './session-recitation-setup';
 
 type ExchangeHistoryEntry = ReturnType<typeof buildExchangeHistory>[number];
 
@@ -1506,7 +1506,7 @@ describe('[WI-1552] prepareExchangeContext — cross-session pointer read-back',
           exchangeCount: 1,
           metadata: {
             effectiveMode: 'recitation',
-            [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+            [recitationSetupClaimMetadataKey]: {
               phase: 'awaiting_selection',
               clarificationCount: 1,
               lastAction: 'clarify_selection',

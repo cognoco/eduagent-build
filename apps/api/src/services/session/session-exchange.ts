@@ -154,7 +154,7 @@ import { projectAiResponseContent } from '../llm/project-response';
 import { resolveSuitabilityJudgeDispatch } from '../policy-engine/judge-dispatch';
 import { isSubstantiveCalibrationAnswer } from './review-calibration';
 import {
-  RECITATION_SETUP_CLAIM_METADATA_KEY,
+  recitationSetupClaimMetadataKey,
   recitationOpeningForLog,
   readPersistedRecitationSetupState,
   resolveRecitationSetupTransition,
@@ -2219,7 +2219,7 @@ export async function claimRecitationSetupTransition(
     if (sessionMetadata['effectiveMode'] !== 'recitation') return undefined;
 
     const persisted = parsePersistedRecitationSetupClaim(
-      sessionMetadata[RECITATION_SETUP_CLAIM_METADATA_KEY],
+      sessionMetadata[recitationSetupClaimMetadataKey],
     );
     const replayClaim = clientId
       ? [...(persisted?.recentClaims ?? [])]
@@ -2276,7 +2276,7 @@ export async function claimRecitationSetupTransition(
       .set({
         metadata: {
           ...sessionMetadata,
-          [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+          [recitationSetupClaimMetadataKey]: {
             ...transition.state,
             lastAction: transition.action,
             ...(clientId ? { lastClientId: clientId } : {}),

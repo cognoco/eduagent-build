@@ -5,7 +5,7 @@ import {
 } from '@eduagent/schemas';
 import type { ExchangeSourceAudit } from '../exchanges';
 
-export const RECITATION_SETUP_CLAIM_METADATA_KEY =
+export const recitationSetupClaimMetadataKey =
   '__serverRecitationSetupClaim' as const;
 
 export function stripInternalRecitationSetupClaim(metadata: unknown): unknown {
@@ -17,7 +17,7 @@ export function stripInternalRecitationSetupClaim(metadata: unknown): unknown {
     return metadata;
   }
   const sanitized = { ...(metadata as Record<string, unknown>) };
-  delete sanitized[RECITATION_SETUP_CLAIM_METADATA_KEY];
+  delete sanitized[recitationSetupClaimMetadataKey];
   return sanitized;
 }
 
@@ -181,7 +181,7 @@ function normalizeIntent(message: string): string {
     .replace(/\s+/g, ' ')
     .replace(/^[¿¡]+/u, '')
     .replace(/[.!?…。！？]+$/u, '')
-    .toLocaleLowerCase();
+    .toLocaleLowerCase('en-US');
 }
 
 function isLeaveIntent(message: string): boolean {

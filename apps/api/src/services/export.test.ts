@@ -1,6 +1,6 @@
 import type { Database } from '@eduagent/database';
 import { generateExport, serializeDates } from './export';
-import { RECITATION_SETUP_CLAIM_METADATA_KEY } from './session/session-recitation-setup';
+import { recitationSetupClaimMetadataKey } from './session/session-recitation-setup';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 
@@ -800,7 +800,7 @@ describe('generateExport', () => {
       const sessionRow = mockLearningSessionRow({
         metadata: {
           effectiveMode: 'recitation',
-          [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+          [recitationSetupClaimMetadataKey]: {
             phase: 'ready',
             clarificationCount: 1,
             lastAction: 'invite_after_cap',

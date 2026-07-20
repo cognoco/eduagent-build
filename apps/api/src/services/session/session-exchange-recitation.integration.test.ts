@@ -37,7 +37,7 @@ import {
 } from './session-exchange';
 import { startSession } from './session-crud';
 import { mapSessionRow, setSessionInputMode } from './session-events';
-import { RECITATION_SETUP_CLAIM_METADATA_KEY } from './session-recitation-setup';
+import { recitationSetupClaimMetadataKey } from './session-recitation-setup';
 
 // The workspace root is 5 levels up from apps/api/src/services/session/.
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -402,7 +402,7 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
       .where(eq(learningSessions.id, session.id));
     const beforeReplayClaim = (
       beforeReplaySession?.metadata as Record<string, unknown>
-    )[RECITATION_SETUP_CLAIM_METADATA_KEY];
+    )[recitationSetupClaimMetadataKey];
 
     const clarificationIndex = transitions.findIndex(
       (transition) => transition?.action === 'clarify_selection',
@@ -445,7 +445,7 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
     expect(persistedSession?.metadata).toMatchObject({
       effectiveMode: 'recitation',
       inputMode: 'text',
-      [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+      [recitationSetupClaimMetadataKey]: {
         phase: 'ready',
         clarificationCount: 1,
         lastAction: 'invite_after_cap',
@@ -453,7 +453,7 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
     });
     const persistedClaim = (
       persistedSession?.metadata as Record<string, unknown>
-    )[RECITATION_SETUP_CLAIM_METADATA_KEY];
+    )[recitationSetupClaimMetadataKey];
     expect(persistedClaim).toEqual(beforeReplayClaim);
     expect(JSON.stringify(persistedClaim)).not.toContain("I don't know");
     expect(JSON.stringify(persistedClaim)).not.toContain('still not sure');
@@ -489,7 +489,7 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
       .from(learningSessions)
       .where(eq(learningSessions.id, session.id));
     expect(persistedSession?.metadata).toMatchObject({
-      [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+      [recitationSetupClaimMetadataKey]: {
         phase: 'ready',
         clarificationCount: 1,
         lastAction: 'invite_after_cap',
@@ -498,7 +498,7 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
     });
     expect(
       (persistedSession?.metadata as Record<string, Record<string, unknown>>)[
-        RECITATION_SETUP_CLAIM_METADATA_KEY
+        recitationSetupClaimMetadataKey
       ],
     ).not.toHaveProperty('lastClientId');
   });
@@ -532,7 +532,7 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
         .set({
           metadata: {
             ...((current?.metadata as Record<string, unknown> | null) ?? {}),
-            [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+            [recitationSetupClaimMetadataKey]: {
               phase: 'ready',
               clarificationCount: 1,
               lastAction: 'invite_after_cap',
@@ -554,7 +554,7 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
     expect(persistedSession?.inputMode).toBe('voice');
     expect(persistedSession?.metadata).toMatchObject({
       inputMode: 'voice',
-      [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+      [recitationSetupClaimMetadataKey]: {
         phase: 'ready',
         clarificationCount: 1,
         lastAction: 'invite_after_cap',
@@ -599,7 +599,7 @@ describeIfDb('persistExchangeResult — recitation branch (integration)', () => 
       .from(learningSessions)
       .where(eq(learningSessions.id, session.id));
     expect(persistedSession?.metadata).toMatchObject({
-      [RECITATION_SETUP_CLAIM_METADATA_KEY]: {
+      [recitationSetupClaimMetadataKey]: {
         phase: 'awaiting_selection',
         clarificationCount: 1,
         lastAction: 'clarify_selection',

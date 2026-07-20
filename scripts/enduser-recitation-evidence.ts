@@ -7,7 +7,7 @@ export type RecitationEvidenceTextKind =
   | 'quality_snippet';
 
 export interface PersistedEventEvidence {
-  eventType: string | null;
+  eventType: string;
   content: string;
   metadata: unknown;
   createdAt: string;

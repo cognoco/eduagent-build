@@ -31,6 +31,7 @@ describe('recitationSetupReplyAdvances', () => {
     'Start with: Roman roads connected towns and helped armies travel.',
     'Here is a polished version you can recite.',
     'I can give you a model answer first.',
+    "You can begin now — here's a polished version to try first.",
   ])('rejects a repeated setup question or premature model: %s', (reply) => {
     expect(recitationSetupReplyAdvances(reply)).toBe(false);
   });
