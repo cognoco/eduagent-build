@@ -167,6 +167,20 @@ jest.mock(
   }),
 );
 
+// [WI-2416] assertCanReadProfile (GET /learner-profile, /export-text) calls
+// verifyPersonOwnershipV2, which — like getPersonScope above — runs a raw
+// db.select() membership query unrunnable on this unit mock DB. Every
+// self-scoped read scenario in this file is a caller-self read (the header
+// profile equals the authenticated caller's own person id); the
+// cross-account read attack this guard exists to close is covered by the
+// real-DB break test in tests/integration/wi2416-read-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's mock DB environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
 // Learner-profile service mocks — record calls so assertions can verify
 // the route reached the service with the right (parent/child) profileId.
 const mockGetOrCreateLearningProfile = jest.fn();
