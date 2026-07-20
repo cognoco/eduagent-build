@@ -220,6 +220,47 @@ describe('WI-1989: consent/dashboard/recaps/curriculum/onboarding/settings/notif
     expect(res.status).toBe(403);
   });
 
+  // ---------------------------------------------------------------------
+  // WI-2397: root GET /dashboard had no caller-ownership gate at all (not a
+  // broken gate — none existed), unlike the sibling /dashboard/children/*
+  // routes above. A same-account non-owner could spoof X-Profile-Id to the
+  // owner's profile id and read the owner's children list + pending notices.
+  // ---------------------------------------------------------------------
+  it('[MANDATORY WI-2397] GET /v1/dashboard: non-owner spoofing X-Profile-Id=owner is denied (403)', async () => {
+    const { profileId: ownerProfileId, orgId } = await createOwner();
+    await createNonOwnerSibling(orgId);
+
+    const res = await app.request(
+      '/v1/dashboard',
+      {
+        headers: buildAuthHeaders(
+          { sub: CHILD_CLERK_ID, email: CHILD_EMAIL },
+          ownerProfileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it('control WI-2397: GET /v1/dashboard — the real owner (no spoof) gets 200', async () => {
+    const { profileId: ownerProfileId } = await createOwner();
+
+    const res = await app.request(
+      '/v1/dashboard',
+      {
+        headers: buildAuthHeaders(
+          { sub: OWNER_CLERK_ID, email: OWNER_EMAIL },
+          ownerProfileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+  });
+
   it('GET /v1/recaps: non-owner spoofing X-Profile-Id=owner is denied (403)', async () => {
     const { profileId: ownerProfileId, orgId } = await createOwner();
     await createNonOwnerSibling(orgId);
