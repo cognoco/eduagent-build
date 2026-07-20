@@ -836,6 +836,233 @@ const COPPA = 'coppa_parental_consent';
           expect(grants.every((g) => g.withdrawnAt === null)).toBe(true);
         });
       });
+
+      // -----------------------------------------------------------------------
+      // [WI-2434] Reject old cw2 bearer tokens against newer tokenless
+      // consent grants. WI-2347's supersession check (above) used a
+      // null-wildcard comparison: it only rejected when
+      // `current.withdrawalTokenId !== null`, so a defined `expectedTokenId`
+      // (an old `cw2` link) matched ANY current grant whose
+      // `withdrawalTokenId` was null — a boolean-logic defect regardless of
+      // whether today's write paths can drive a grant history into that
+      // shape. (As of this fix, they cannot: `processConsentResponseV2`
+      // mints a token on every approve, `createDirectConsentGrant` only
+      // fires for a brand-new person, and `appendRestoreGrant` carries the
+      // current token forward unchanged — so a cw2-tokened grant followed by
+      // a LATER tokenless grant for the same person+org+basis is not
+      // currently reachable through `apps/api`. The tests below construct it
+      // directly at the DB layer, per AC-1's "constructible state" wording,
+      // as precautionary hardening of the comparison logic — not a
+      // demonstrated live exploit.)
+      //
+      // Fix: exact equality (`current.withdrawalTokenId === expectedTokenId`)
+      // for every DEFINED `expectedTokenId` (including `null`, the `cw1`
+      // case); only `expectedTokenId === undefined` (the edge-authorized
+      // path) skips the check. AC-4's exhaustive six-row matrix follows;
+      // AC-2/AC-3 cover the specific old-cw2-vs-tokenless regression named
+      // in the WI.
+      // -----------------------------------------------------------------------
+      describe('[WI-2434] exact-match token equality (no null-as-wildcard)', () => {
+        /** Seeds a single consent_grant row carrying the given
+         * withdrawalTokenId (or null for a tokenless grant), so
+         * `currentGrant()` resolves to exactly this row. */
+        async function seedGrantWithToken(
+          childId: string,
+          orgId: string,
+          withdrawalTokenId: string | null,
+        ): Promise<void> {
+          await db.insert(consentGrant).values({
+            chargePersonId: childId,
+            organizationId: orgId,
+            purpose: DEFAULT_CONSENT_PURPOSE,
+            lawfulBasis: 'gdpr_parental_consent',
+            granted: true,
+            grantedAt: new Date(),
+            priorValue: null,
+            auditFact: { source: 'consent_response_approved' },
+            withdrawalTokenId,
+          });
+        }
+
+        /** Constructs the state AC-1 asks for (its literal wording is
+         * "constructible state", not "reachable via a current write path" —
+         * see the caveat above): an earlier grant that WAS cw2-minted and
+         * has since been withdrawn via that exact token — the origin of the
+         * "old cw2 link" — then a fresh TOKENLESS grant appended after,
+         * which becomes the CURRENT grant `currentGrant()` resolves to. */
+        async function seedOldCw2ThenTokenlessCurrent(
+          childId: string,
+          orgId: string,
+          oldCw2TokenId: string,
+        ): Promise<void> {
+          await db.insert(consentGrant).values({
+            chargePersonId: childId,
+            organizationId: orgId,
+            purpose: DEFAULT_CONSENT_PURPOSE,
+            lawfulBasis: 'gdpr_parental_consent',
+            granted: true,
+            grantedAt: new Date(Date.now() - 120_000),
+            priorValue: null,
+            auditFact: { source: 'consent_response_approved' },
+            withdrawalTokenId: oldCw2TokenId,
+            withdrawnAt: new Date(Date.now() - 60_000),
+          });
+          await seedGrantWithToken(childId, orgId, null);
+        }
+
+        // AC-1 (red-state reachability) + AC-2 (withdraw property,
+        // red-green-revert) — the exact scenario the WI names: an old cw2
+        // token presented against a CURRENT tokenless grant that was
+        // appended after that same token's grant was withdrawn. Under the
+        // null-wildcard bug this was wrongly ACCEPTED (current.withdrawalTokenId
+        // === null short-circuited the mismatch check); the fix REJECTS it.
+        it('withdrawConsentByToken REJECTS an old cw2 token against a newer tokenless current grant, and does not mutate it (AC-1, AC-2)', async () => {
+          const orgId = await seedOrg();
+          const childId = await seedPerson(orgId);
+          const oldCw2TokenId = generateUUIDv7();
+          await seedOldCw2ThenTokenlessCurrent(childId, orgId, oldCw2TokenId);
+
+          await expect(
+            withdrawConsentByToken(
+              db,
+              childId,
+              orgId,
+              undefined,
+              oldCw2TokenId,
+            ),
+          ).rejects.toBeInstanceOf(ConsentRecordNotFoundError);
+
+          const grants = await db.query.consentGrant.findMany({
+            where: eq(consentGrant.chargePersonId, childId),
+            orderBy: (g, { asc }) => [asc(g.grantedAt)],
+          });
+          expect(grants).toHaveLength(2);
+          // The old cw2-minted grant was already withdrawn by the earlier
+          // cycle (unchanged); the CURRENT tokenless grant must remain
+          // un-withdrawn — the old link must not act on it.
+          expect(grants[0]!.withdrawnAt).not.toBeNull();
+          expect(grants[1]!.withdrawnAt).toBeNull();
+        });
+
+        // AC-3 (state-read parity) — the same old-cw2-vs-tokenless case must
+        // read as "nothing to withdraw" (null), not leak the grant's
+        // withdrawal state to a stale link.
+        it('getGdprGrantWithdrawalStateV2 returns null for the same old-cw2-vs-tokenless case (AC-3)', async () => {
+          const orgId = await seedOrg();
+          const childId = await seedPerson(orgId);
+          const oldCw2TokenId = generateUUIDv7();
+          await seedOldCw2ThenTokenlessCurrent(childId, orgId, oldCw2TokenId);
+
+          const state = await getGdprGrantWithdrawalStateV2(
+            db,
+            childId,
+            orgId,
+            oldCw2TokenId,
+          );
+          expect(state).toBeNull();
+        });
+
+        // AC-4 — the exhaustive six-row matrix, table-driven, exercised
+        // against BOTH functions per the AC text: the write path
+        // (withdrawConsentByToken -> stampWithdrawal) and the read path
+        // (getGdprGrantWithdrawalStateV2). Row 5 is the WI-2434 fix target;
+        // the other five pin down the unaffected pre-existing behavior.
+        it.each([
+          [
+            'cw1 (null) vs tokenless current grant -> accept',
+            null as string | null,
+            null as string | null | undefined,
+            true,
+          ],
+          [
+            'cw1 (null) vs current grant with an id -> reject',
+            'CURRENT_ID',
+            null,
+            false,
+          ],
+          ['cw2 matching id -> accept', 'CURRENT_ID', 'CURRENT_ID', true],
+          ['cw2 mismatched id -> reject', 'CURRENT_ID', 'OTHER_ID', false],
+          [
+            'cw2 id vs tokenless current grant -> REJECT (WI-2434 fix target)',
+            null,
+            'OTHER_ID',
+            false,
+          ],
+          [
+            'expectedTokenId undefined -> skip check, always accept',
+            'CURRENT_ID',
+            undefined,
+            true,
+          ],
+        ] as const)(
+          '%s (write + read path)',
+          async (_name, currentSlot, presentedSlot, expectAccept) => {
+            const currentId = generateUUIDv7();
+            const otherId = generateUUIDv7();
+            const resolveSlot = (
+              slot: 'CURRENT_ID' | 'OTHER_ID' | null | undefined,
+            ): string | null | undefined =>
+              slot === 'CURRENT_ID'
+                ? currentId
+                : slot === 'OTHER_ID'
+                  ? otherId
+                  : slot;
+            const currentTokenId = resolveSlot(currentSlot) ?? null;
+            const presented = resolveSlot(presentedSlot);
+
+            // Write path: stampWithdrawal via withdrawConsentByToken.
+            const writeOrgId = await seedOrg();
+            const writeChildId = await seedPerson(writeOrgId);
+            await seedGrantWithToken(writeChildId, writeOrgId, currentTokenId);
+
+            if (expectAccept) {
+              const result = await withdrawConsentByToken(
+                db,
+                writeChildId,
+                writeOrgId,
+                undefined,
+                presented,
+              );
+              expect(result.withdrawnAt).toBeTruthy();
+            } else {
+              await expect(
+                withdrawConsentByToken(
+                  db,
+                  writeChildId,
+                  writeOrgId,
+                  undefined,
+                  presented,
+                ),
+              ).rejects.toBeInstanceOf(ConsentRecordNotFoundError);
+              const grant = await db.query.consentGrant.findFirst({
+                where: eq(consentGrant.chargePersonId, writeChildId),
+              });
+              expect(grant?.withdrawnAt).toBeNull();
+            }
+
+            // Read path: getGdprGrantWithdrawalStateV2, on an independent,
+            // not-yet-withdrawn fixture — accept maps to a non-null state
+            // (withdrawnAt: null, since this grant was never withdrawn),
+            // reject maps to the enumeration-safe `null`.
+            const readOrgId = await seedOrg();
+            const readChildId = await seedPerson(readOrgId);
+            await seedGrantWithToken(readChildId, readOrgId, currentTokenId);
+
+            const state = await getGdprGrantWithdrawalStateV2(
+              db,
+              readChildId,
+              readOrgId,
+              presented,
+            );
+            if (expectAccept) {
+              expect(state).not.toBeNull();
+              expect(state?.withdrawnAt).toBeNull();
+            } else {
+              expect(state).toBeNull();
+            }
+          },
+        );
+      });
     });
 
     // -------------------------------------------------------------------------
