@@ -150,8 +150,8 @@ function LearnerMentorScreen(): React.ReactElement {
   const mentorNoticeActions = useMentorNoticeActions();
   const feed = nowFeed.data ?? nowFeed.fallbackFeed ?? undefined;
   const firstRealState = hasFirstRealState({
-    // Keep this filter defensive so the cold-start gate remains active-only if
-    // the index source broadens later.
+    // V2 Subjects includes inactive rows in the index; keep this gate active-only
+    // so paused or archived subjects do not suppress the learner cold-start card.
     activeSubjectCount: subjectsIndex.subjects.filter(
       (subject) => subject.status === 'active',
     ).length,
