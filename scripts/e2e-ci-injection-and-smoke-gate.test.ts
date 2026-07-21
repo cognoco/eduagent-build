@@ -1069,6 +1069,20 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         },
       }),
     );
+    const postRecoveryProbeIndices = [
+      'mentor-screen',
+      'support-hub-mentor-tab',
+    ].map((landingId) =>
+      commands.findIndex((command) =>
+        isDeepStrictEqual(command, {
+          extendedWaitUntil: {
+            visible: { id: landingId },
+            timeout: 5_000,
+            optional: true,
+          },
+        }),
+      ),
+    );
 
     for (const landingId of [
       'learner-screen',
@@ -1099,6 +1113,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(profileLoadErrorGuard).toBeGreaterThan(postApprovalLanding);
     expect(profileLoadErrorGuard).toBeGreaterThan(signInSubmission);
     expect(backRecovery).toBe(profileLoadErrorGuard + 1);
+    for (const postRecoveryProbe of postRecoveryProbeIndices) {
+      expect(postRecoveryProbe).toBeGreaterThan(backRecovery);
+    }
   });
 
   it('[WI-2506] binds each subject resolver result to its owned action and fails ambiguous results closed', () => {
