@@ -88,16 +88,25 @@ describe('useNowFeed', () => {
   });
 
   it('surfaces a rejected request as query error without throwing from render', async () => {
-    mockFetch.mockRejectedValue(new Error('offline'));
-    const { queryClient, wrapper } = createHookWrapper();
+    jest.useFakeTimers();
+    try {
+      mockFetch.mockRejectedValue(new Error('offline'));
+      const { queryClient, wrapper } = createHookWrapper();
 
-    const { result } = renderHook(() => useNowFeed(), { wrapper });
+      const { result } = renderHook(() => useNowFeed(), { wrapper });
 
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.error).toBeInstanceOf(Error);
-    expect(result.current.fallbackFeed).toBeNull();
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(7_500);
+      });
+      expect(result.current.isError).toBe(true);
+      expect(mockFetch).toHaveBeenCalledTimes(5);
+      expect(result.current.error).toBeInstanceOf(Error);
+      expect(result.current.fallbackFeed).toBeNull();
 
-    queryClient.clear();
+      queryClient.clear();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('exposes a cached feed after the live request stays pending for 2 seconds', async () => {
