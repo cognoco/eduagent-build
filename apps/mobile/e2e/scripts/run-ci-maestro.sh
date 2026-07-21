@@ -19,8 +19,20 @@ capture_failure_artifacts() {
   adb logcat -d -t 500 > "$OUTPUT_DIR/logcat.txt" || true
 }
 
+sanitize_maestro_artifacts() {
+  local directory="$1"
+  if [ ! -d "$directory" ]; then
+    return 0
+  fi
+  node apps/mobile/e2e/scripts/redact-maestro-artifacts.mjs "$directory"
+}
+
 cleanup() {
-  status=$?
+  local status=$?
+  if ! sanitize_maestro_artifacts "$OUTPUT_DIR"; then
+    echo "[ci-maestro] ERROR: failed to sanitize Maestro artifacts during cleanup" >&2
+    status=1
+  fi
   if [ "$ACTIVE_SEED" -eq 1 ]; then
     reset_seed
   fi
@@ -28,6 +40,8 @@ cleanup() {
   if [ "$status" -ne 0 ]; then
     capture_failure_artifacts
   fi
+  trap - EXIT
+  exit "$status"
 }
 
 # Preserve the failing command's status while collecting diagnostics. The
@@ -187,6 +201,11 @@ run_flow() {
     --test-output-dir "$flow_output/" </dev/null
   local status=$?
   set -e
+
+  if ! sanitize_maestro_artifacts "$flow_output"; then
+    echo "[ci-maestro] ERROR: failed to redact recorded input text for $flow" >&2
+    status=1
+  fi
 
   if [ "$scenario" != '-' ]; then
     reset_seed

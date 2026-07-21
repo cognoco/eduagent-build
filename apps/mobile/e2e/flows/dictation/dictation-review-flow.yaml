@@ -135,7 +135,7 @@ tags:
     id: 'complete-check-writing'
 
 # E2E seam: assert and tap the gallery picker button (rendered only when
-# EXPO_PUBLIC_E2E=1). The wrapper pre-planted a JPEG with deliberate misspellings.
+# EXPO_PUBLIC_E2E=1). The CI runner pre-plants a generic PNG fixture.
 - assertVisible:
     id: 'complete-pick-gallery'
 
@@ -156,80 +156,53 @@ tags:
     id: 'com(?:\.google)?\.android\.providers\.media\.module:id/icon_thumbnail'
     index: 0
 
-# Wait for the LLM review to complete. The review screen is either
-# review-remediation-screen (mistakes found) or review-celebration (no mistakes).
-# Both branches are handled below via conditional runFlow.
-# Maestro has no assertAny — poll both with optional: true then branch.
+# The deterministic E2E provider reports one spelling mistake for this seeded
+# sentence, so remediation is the required receipt for this journey.
 - extendedWaitUntil:
     visible:
       id: 'review-remediation-screen'
     timeout: 30000
-    optional: true # justified: LLM response determines which branch renders; mistakes found → remediation, none → celebration
-
-- extendedWaitUntil:
-    visible:
-      id: 'review-celebration'
-    timeout: 5000
-    optional: true # justified: alternate LLM outcome path — celebration renders when LLM finds no mistakes
 
 - takeScreenshot: dict-review-05-review-screen
 
 # --- DICT-07: Remediation path — mistakes found ---
-- runFlow:
-    when:
-      visible:
-        id: 'review-remediation-screen'
-    commands:
-      # DICT-07: mistake card visible
-      - assertVisible:
-          id: 'review-mistake-card'
+- assertVisible:
+    id: 'review-mistake-card'
 
-      - takeScreenshot: dict-review-06-mistake-card
+- takeScreenshot: dict-review-06-mistake-card
 
-      # DICT-08: type a correction and submit
-      - tapOn:
-          id: 'review-correction-input'
+# DICT-08: type a correction and submit
+- tapOn:
+    id: 'review-correction-input'
 
-      - inputText: 'The sun is warm.'
+- inputText: 'The sun is warm.'
 
-      - hideKeyboard
+- hideKeyboard
 
-      - scrollUntilVisible:
-          element:
-            id: 'review-submit-correction'
-          direction: DOWN
-          timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: 'review-submit-correction'
+    direction: DOWN
+    timeout: 10000
 
-      - tapOn:
-          id: 'review-submit-correction'
+- tapOn:
+    id: 'review-submit-correction'
 
-      - takeScreenshot: dict-review-07-after-correction
+- takeScreenshot: dict-review-07-after-correction
 
-      # After submitting the last correction the celebration screen appears
-      - extendedWaitUntil:
-          visible:
-            id: 'review-celebration'
-          timeout: 5000
+# After submitting the last correction the celebration screen appears.
+- extendedWaitUntil:
+    visible:
+      id: 'review-celebration'
+    timeout: 5000
 
-      - assertVisible:
-          id: 'review-done'
+- assertVisible:
+    id: 'review-done'
 
-      - tapOn:
-          id: 'review-done'
+- takeScreenshot: dict-review-08-celebration
 
-# --- DICT-09/10: Perfect-score path — LLM found no mistakes ---
-- runFlow:
-    when:
-      visible:
-        id: 'review-celebration'
-    commands:
-      - assertVisible:
-          id: 'review-done'
-
-      - takeScreenshot: dict-review-08-celebration
-
-      - tapOn:
-          id: 'review-done'
+- tapOn:
+    id: 'review-done'
 
 - extendedWaitUntil:
     visible:

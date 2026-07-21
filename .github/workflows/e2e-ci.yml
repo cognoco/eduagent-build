@@ -531,8 +531,16 @@ jobs:
           MAESTRO_CI_SHARD: ${{ matrix.shard }}
           E2E_SEED_SLOT: native-0${{ matrix.shard }}
 
-      - name: Upload Maestro artifacts
+      - name: Sanitize Maestro artifacts
         if: always()
+        id: sanitize_maestro_artifacts
+        run: |
+          if [ -d maestro-screenshots ]; then
+            node apps/mobile/e2e/scripts/redact-maestro-artifacts.mjs maestro-screenshots
+          fi
+
+      - name: Upload Maestro artifacts
+        if: always() && steps.sanitize_maestro_artifacts.outcome == 'success'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: maestro-results-${{ matrix.shard }}

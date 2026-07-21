@@ -1149,6 +1149,219 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
   });
 
+  it('[WI-1864] requires the deterministic dictation remediation receipt before celebration', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/dictation/dictation-review-flow.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        timeout?: number;
+        optional?: boolean;
+      };
+      runFlow?: { when?: { visible?: { id?: string } | string } };
+      tapOn?: { id?: string };
+    }>;
+    const remediation = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'review-remediation-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const correctionInput = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > remediation && tapOn?.id === 'review-correction-input',
+    );
+    const correctionSubmit = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > correctionInput && tapOn?.id === 'review-submit-correction',
+    );
+    const celebration = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > correctionSubmit &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'review-celebration' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const done = commands.findIndex(
+      ({ tapOn }, index) => index > celebration && tapOn?.id === 'review-done',
+    );
+
+    expect([
+      remediation,
+      correctionInput,
+      correctionSubmit,
+      celebration,
+      done,
+    ]).toEqual(
+      [
+        remediation,
+        correctionInput,
+        correctionSubmit,
+        celebration,
+        done,
+      ].toSorted((a, b) => a - b),
+    );
+    expect(remediation).toBeGreaterThan(-1);
+    expect(
+      commands.some(
+        ({ runFlow }) =>
+          typeof runFlow?.when?.visible === 'object' &&
+          runFlow.when.visible.id === 'review-celebration',
+      ),
+    ).toBe(false);
+  });
+
+  it('[WI-1864] redacts recorded Maestro input and variable values before artifact upload', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'maestro-redact-'));
+    const nested = join(fixtureRoot, 'flow');
+    const commandsPath = join(nested, 'commands-(flow.yaml).json');
+    mkdirSync(nested, { recursive: true });
+    writeFileSync(
+      commandsPath,
+      JSON.stringify([
+        {
+          command: {
+            inputTextCommand: { text: 'seeded-test-password', optional: false },
+          },
+          metadata: {
+            evaluatedCommand: {
+              inputTextCommand: { text: 'seeded-test-password' },
+              defineVariablesCommand: {
+                env: {
+                  EMAIL: 'seeded-user@example.test',
+                  PASSWORD: 'seeded-test-password',
+                },
+              },
+            },
+          },
+          variables: {
+            defineVariablesCommand: {
+              env: {
+                EMAIL: '${EMAIL}',
+                PASSWORD: '${PASSWORD}',
+              },
+            },
+          },
+          diagnosticLabel: 'seeded-test-password',
+        },
+      ]),
+    );
+
+    try {
+      const redactor = join(
+        repoRoot,
+        'apps/mobile/e2e/scripts/redact-maestro-artifacts.mjs',
+      );
+      const result = spawnSync(process.execPath, [redactor, fixtureRoot], {
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(0);
+      const [redacted] = JSON.parse(
+        readFileSync(commandsPath, 'utf8'),
+      ) as Array<{
+        command: { inputTextCommand: { text: string } };
+        metadata: {
+          evaluatedCommand: {
+            inputTextCommand: { text: string };
+            defineVariablesCommand: {
+              env: { EMAIL: string; PASSWORD: string };
+            };
+          };
+        };
+        variables: {
+          defineVariablesCommand: {
+            env: { EMAIL: string; PASSWORD: string };
+          };
+        };
+        diagnosticLabel: string;
+      }>;
+      expect(redacted.command.inputTextCommand.text).toBe('[REDACTED]');
+      expect(redacted.metadata.evaluatedCommand.inputTextCommand.text).toBe(
+        '[REDACTED]',
+      );
+      expect(
+        redacted.metadata.evaluatedCommand.defineVariablesCommand.env,
+      ).toEqual({
+        EMAIL: '[REDACTED]',
+        PASSWORD: '[REDACTED]',
+      });
+      expect(redacted.variables.defineVariablesCommand.env).toEqual({
+        EMAIL: '[REDACTED]',
+        PASSWORD: '[REDACTED]',
+      });
+      expect(redacted.diagnosticLabel).toBe('seeded-test-password');
+
+      const runner = readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/scripts/run-ci-maestro.sh'),
+        'utf8',
+      );
+      const maestroExit = runner.indexOf('local status=$?');
+      const redact = runner.indexOf(
+        'sanitize_maestro_artifacts "$flow_output"',
+        maestroExit,
+      );
+      const reset = runner.indexOf('reset_seed', redact);
+      expect([maestroExit, redact, reset]).toEqual(
+        [maestroExit, redact, reset].toSorted((a, b) => a - b),
+      );
+      expect(maestroExit).toBeGreaterThan(-1);
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('[WI-1864] removes command recordings and blocks upload when redaction fails', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'maestro-redact-failure-'));
+    const validCommands = join(fixtureRoot, 'commands-(a-valid.yaml).json');
+    const malformedCommands = join(
+      fixtureRoot,
+      'commands-(b-malformed.yaml).json',
+    );
+    writeFileSync(
+      validCommands,
+      JSON.stringify({
+        command: { inputTextCommand: { text: 'seeded-test-password' } },
+      }),
+    );
+    writeFileSync(malformedCommands, 'seeded-test-password');
+
+    try {
+      const redactor = join(
+        repoRoot,
+        'apps/mobile/e2e/scripts/redact-maestro-artifacts.mjs',
+      );
+      const result = spawnSync(process.execPath, [redactor, fixtureRoot], {
+        encoding: 'utf8',
+      });
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).not.toContain('seeded-test-password');
+      expect(existsSync(validCommands)).toBe(false);
+      expect(existsSync(malformedCommands)).toBe(false);
+
+      const sanitize = mobileMaestro.steps?.find(
+        (step) => step.id === 'sanitize_maestro_artifacts',
+      );
+      const upload = mobileMaestro.steps?.find(
+        (step) => step.name === 'Upload Maestro artifacts',
+      );
+      expect(sanitize).toMatchObject({
+        if: 'always()',
+        id: 'sanitize_maestro_artifacts',
+      });
+      expect(sanitize?.run).toContain('redact-maestro-artifacts.mjs');
+      expect(upload?.if).toBe(
+        "always() && steps.sanitize_maestro_artifacts.outcome == 'success'",
+      );
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
   it('[WI-1864] follows the intentional no-consent profile destination', () => {
     const source = readFileSync(
       join(
@@ -1235,6 +1448,30 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       commands.some(
         ({ tapOn }) =>
           tapOn?.id === 'subject-topics-scroll' && tapOn.point !== undefined,
+      ),
+    ).toBe(false);
+  });
+
+  it('[WI-1864] keeps parent child drill-down on its reachable parent-native journey', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/child-drill-down.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      runFlow?: { file?: string };
+      assertNotVisible?: { id?: string } | string;
+    }>;
+
+    expect(
+      commands.some(
+        ({ runFlow }) => runFlow?.file === '../_setup/switch-to-child.yaml',
+      ),
+    ).toBe(false);
+    expect(
+      commands.some(
+        ({ assertNotVisible }) =>
+          typeof assertNotVisible === 'object' &&
+          assertNotVisible.id === 'view-transcript-cta',
       ),
     ).toBe(false);
   });

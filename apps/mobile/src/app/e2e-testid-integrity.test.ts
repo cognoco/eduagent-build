@@ -17,6 +17,10 @@ const SOURCE_DIR = path.resolve(__dirname, '..');
 
 // Platform / third-party IDs that are not React Native testIDs
 const EXTERNAL_ID_PREFIXES = ['android:id/', 'com.android.', 'com.google.'];
+const EXTERNAL_ID_SELECTORS = new Set([
+  // Android Photo Picker: AOSP and Google API package variants.
+  'com(?:\\.google)?\\.android\\.providers\\.media\\.module:id/icon_thumbnail',
+]);
 
 // Pre-existing testID drift from earlier refactors. Each entry is a Maestro id
 // selector that no longer has a matching testID in source. These E2E flows are
@@ -233,7 +237,10 @@ function extractSourceTestIds(tsxFiles: string[]): {
 }
 
 function isExternalId(id: string): boolean {
-  return EXTERNAL_ID_PREFIXES.some((prefix) => id.startsWith(prefix));
+  return (
+    EXTERNAL_ID_SELECTORS.has(id) ||
+    EXTERNAL_ID_PREFIXES.some((prefix) => id.startsWith(prefix))
+  );
 }
 
 /** IDs containing Maestro env vars (e.g. ${SUBJECT_ID}) — dynamic at runtime. */
