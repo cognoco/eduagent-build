@@ -4094,7 +4094,18 @@
       "placeholder": "Frage, füge ein oder beschreibe, was du lernen willst.",
       "micLabel": "Mikro",
       "homeworkChip": "Hausaufgaben",
-      "title": "Frag alles"
+      "title": "Frag alles",
+      "micIdleLabel": "Spracheingabe starten",
+      "micRequestingLabel": "Frage nach Mikrofonzugriff",
+      "micListeningLabel": "Spracheingabe beenden",
+      "micProcessingLabel": "Spracheingabe wird beendet",
+      "micErrorLabel": "Spracheingabe erneut versuchen",
+      "micDisabledLabel": "Spracheingabe nicht verfügbar",
+      "listening": "Höre zu...",
+      "voiceError": "Die Spracheingabe hat nicht funktioniert. Du kannst trotzdem tippen.",
+      "voicePermissionError": "Der Mikrofonzugriff ist aus. Du kannst trotzdem tippen.",
+      "voiceAllow": "Mikrofon erlauben",
+      "voiceRetry": "Spracheingabe wiederholen"
     },
     "onTrack": {
       "label": "Auf Kurs",
