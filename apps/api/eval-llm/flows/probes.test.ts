@@ -183,6 +183,50 @@ describe('probes quality heuristics — P25 (topic-opener promise) [WI-2107]', (
     });
     expect(issues.some((i) => i.code === 'P25.bare-promise')).toBe(true);
   });
+
+  it('accepts a promise opener with content introduced by a colon', async () => {
+    // Bounce 2 (reviewer:codex:global): the boundary regex recognized only
+    // `, . ; !` — a colon-introduced topic clause fell through and was
+    // wrongly flagged as bare even though real content follows.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply:
+        "Let's talk about Sylvia Plath: she was an American poet best known for Ariel.",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts a promise opener followed by an exactly-4-word factual sentence', async () => {
+    // Bounce 2 (reviewer:codex:global): the `<= 4` threshold wrongly caught
+    // a genuine 4-word content remainder ("She was a poet.") as bare.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath. She was a poet.",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts a promise opener with content introduced by an em dash', async () => {
+    // Pre-emptive: an em-dash-introduced topic clause has the same shape as
+    // the colon gap bounce 2 flagged, so it was checked before it could
+    // trigger a third bounce.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath — she was a poet.",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('still flags a bare promise with a trivial remainder after a colon', async () => {
+    // Guards the colon/em-dash boundary additions against reopening the
+    // bare-promise case: a trivial remainder after the new boundary chars
+    // must still be caught.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath: sure.",
+      signals: {},
+    });
+    expect(issues.some((i) => i.code === 'P25.bare-promise')).toBe(true);
+  });
 });
 
 describe('probes quality heuristics — P08 (worked-example fading)', () => {
