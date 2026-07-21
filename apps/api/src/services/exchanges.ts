@@ -1166,17 +1166,27 @@ const AMBIGUOUS_SOURCE_REFERENCE =
 //     on;
 //   - a quoted title: "..." or '...';
 //   - a bare title-case run: two or more consecutive capitalized words
-//     (e.g. "The Great Gatsby"), which a normal sentence won't produce
-//     outside a proper-noun title since it requires back-to-back capitals.
+//     (e.g. "The Great Gatsby").
 //
-// Deliberately NOT covered: a single-word title ("her book, Beloved") or a
-// mononym author ("her book by Homer") — both are heuristically
-// indistinguishable from any other capitalized word, so detecting them
-// reliably isn't worth the false-positive rate it would add. A miss here
-// degrades safely: buildUnsupportedFactualReply's other branches only ever
-// return the generic "share your source" reply, never a work-specific
-// assumption, so this is a precision loss (a needless clarifying question),
-// not a return of the original staging bug (assuming a specific work).
+// Both the byline and title-case checks trade recall for precision, in both
+// directions, deliberately:
+//   - Deliberately NOT covered: a single-word title ("her book, Beloved") or
+//     a mononym author ("her book by Homer") — heuristically indistinguishable
+//     from any other capitalized word, so detecting them reliably isn't worth
+//     the false-positive rate it would add.
+//   - Deliberately over-covered: the title-case run also matches an
+//     incidental two-capital sequence that isn't a title at all (e.g. "I'm
+//     reading her book and I live in New York" matches on "New York"), which
+//     suppresses the ask for a message that never actually named its source.
+// Both directions are accepted because a miss OR a false match here degrades
+// to the same safe fallback: buildUnsupportedFactualReply's other branches
+// only ever return the generic "share your source" reply, never a
+// work-specific assumption — so either error is a precision loss (asking
+// when it could've proceeded, or not asking when it could've asked more
+// narrowly), never a return of the original staging bug (assuming a
+// specific work). A regex can't be both complete and false-positive-free
+// here; this repo's incident was about assuming a title, so precision
+// against that failure mode is the priority.
 const NAMED_SOURCE_REFERENCE =
   /\bby\s+[A-Z][\w.'-]*\s+[A-Z][\w.'-]*(?:\s+[A-Z][\w.'-]*){0,2}\b|["“][^"”]{1,80}["”]|'[A-Z][^']{1,80}'|\b(?:[A-Z][a-zA-Z']*\s+){1,}[A-Z][a-zA-Z']*\b/;
 
