@@ -2,7 +2,7 @@ import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
 import { authStateDir } from '../../helpers/runtime';
-import { readSeedData } from '../../helpers/seed-data';
+import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 
 test.use({
   storageState: path.join(authStateDir, 'owner-with-children.json'),
@@ -51,7 +51,6 @@ const ENTRY_CASES = [
 async function expectOwnerLearnerEntry(
   page: Page,
   entry: (typeof ENTRY_CASES)[number],
-  ownerSubjectId: string,
 ): Promise<void> {
   const screen = page.getByTestId(entry.screen);
 
@@ -67,7 +66,10 @@ async function expectOwnerLearnerEntry(
     'Open account settings for Test Parent',
   );
   if (entry.token === 'subjects') {
-    const subject = screen.getByTestId(`subjects-browse-row-${ownerSubjectId}`);
+    const subject = screen.getByRole('button', {
+      name: 'Open General Knowledge',
+      exact: true,
+    });
     await expect(subject).toBeVisible();
     await expect(
       subject.getByText('General Knowledge', { exact: true }),
@@ -80,13 +82,10 @@ async function expectOwnerLearnerEntry(
 test('V2 owner learner Account returns its exact self scope to each initiating tab', async ({
   page,
 }) => {
-  const seed = await readSeedData('owner-with-children');
-  const ownerSubjectId = seed.ids.ownerSubjectId;
-
   for (const entry of ENTRY_CASES) {
     await test.step(`${entry.name} avatar -> ${entry.leafRow} -> ${entry.name}`, async () => {
       await page.goto(entry.path, { waitUntil: 'commit' });
-      await expectOwnerLearnerEntry(page, entry, ownerSubjectId);
+      await expectOwnerLearnerEntry(page, entry);
 
       await page.getByTestId('account-avatar-button').click();
       await expect(page).toHaveURL(
@@ -111,7 +110,7 @@ test('V2 owner learner Account returns its exact self scope to each initiating t
 
       await page.getByTestId('account-back').click();
       await expect(page).toHaveURL(new RegExp(`${entry.path}(?:\\?.*)?$`));
-      await expectOwnerLearnerEntry(page, entry, ownerSubjectId);
+      await expectOwnerLearnerEntry(page, entry);
     });
   }
 });
@@ -119,15 +118,13 @@ test('V2 owner learner Account returns its exact self scope to each initiating t
 test('V2 Account empty history falls back to Journal and never legacy Home', async ({
   page,
 }) => {
-  const seed = await readSeedData('owner-with-children');
-  const ownerSubjectId = seed.ids.ownerSubjectId;
   const journalEntry = ENTRY_CASES.find((entry) => entry.name === 'Journal');
   if (!journalEntry) {
     throw new Error('Journal entry case is required');
   }
 
   await page.goto('/journal', { waitUntil: 'commit' });
-  await expectOwnerLearnerEntry(page, journalEntry, ownerSubjectId);
+  await expectOwnerLearnerEntry(page, journalEntry);
 
   const context = page.context();
   await page.close();
@@ -140,7 +137,7 @@ test('V2 Account empty history falls back to Journal and never legacy Home', asy
   await directPage.getByTestId('account-back').click();
 
   await expect(directPage).toHaveURL(/\/journal(?:\?.*)?$/);
-  await expectOwnerLearnerEntry(directPage, journalEntry, ownerSubjectId);
+  await expectOwnerLearnerEntry(directPage, journalEntry);
   await expect(directPage).not.toHaveURL(/\/home(?:\?.*)?$/);
 });
 
@@ -159,32 +156,43 @@ async function expectSignedOutWithoutTestParentData(page: Page): Promise<void> {
   ).toHaveCount(0);
 }
 
-test('V2 Test Parent sign-out keeps its General Knowledge row behind the unauthenticated boundary after Back and a fresh protected page', async ({
-  page,
-}) => {
-  const seed = await readSeedData('owner-with-children');
-  const ownerSubjectId = seed.ids.ownerSubjectId;
-  const subjectsEntry = ENTRY_CASES.find((entry) => entry.name === 'Subjects');
-  if (!subjectsEntry) {
-    throw new Error('Subjects entry case is required');
-  }
+test.describe('isolated destructive owner session', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
 
-  await page.goto('/subjects', { waitUntil: 'commit' });
-  await expectOwnerLearnerEntry(page, subjectsEntry, ownerSubjectId);
+  test('V2 Test Parent sign-out keeps its General Knowledge row behind the unauthenticated boundary after Back and a fresh protected page', async ({
+    page,
+  }) => {
+    await seedAndSignIn(page, {
+      scenario: 'parent-multi-child',
+      alias: 'v2-account-owner-sign-out',
+      landingPath: '/mentor',
+      landingTestId: 'mentor-screen',
+    });
 
-  await page.getByTestId('account-avatar-button').click();
-  await expect(page.getByText('Test Parent', { exact: true })).toBeVisible();
+    const subjectsEntry = ENTRY_CASES.find(
+      (entry) => entry.name === 'Subjects',
+    );
+    if (!subjectsEntry) {
+      throw new Error('Subjects entry case is required');
+    }
 
-  await page.getByTestId('account-admin-sign-out').click();
-  await expectSignedOutWithoutTestParentData(page);
+    await page.goto('/subjects', { waitUntil: 'commit' });
+    await expectOwnerLearnerEntry(page, subjectsEntry);
 
-  await page.goBack({ waitUntil: 'commit' });
-  await expect(page).toHaveURL(/\/sign-in(?:\?.*)?$/);
-  await expectSignedOutWithoutTestParentData(page);
+    await page.getByTestId('account-avatar-button').click();
+    await expect(page.getByText('Test Parent', { exact: true })).toBeVisible();
 
-  const context = page.context();
-  await page.close();
-  const freshPage = await context.newPage();
-  await freshPage.goto('/subjects', { waitUntil: 'commit' });
-  await expectSignedOutWithoutTestParentData(freshPage);
+    await page.getByTestId('account-admin-sign-out').click();
+    await expectSignedOutWithoutTestParentData(page);
+
+    await page.goBack({ waitUntil: 'commit' });
+    await expect(page).toHaveURL(/\/sign-in(?:\?.*)?$/);
+    await expectSignedOutWithoutTestParentData(page);
+
+    const context = page.context();
+    await page.close();
+    const freshPage = await context.newPage();
+    await freshPage.goto('/subjects', { waitUntil: 'commit' });
+    await expectSignedOutWithoutTestParentData(freshPage);
+  });
 });

@@ -42,7 +42,12 @@ test('V2 credentialed non-owner child keeps permitted Account rows and has no ow
 
   await page.getByTestId('account-avatar-button').click();
   await expect(page.getByTestId('account-screen')).toBeVisible();
-  await expect(page.getByText('Test Child', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', {
+      name: 'Sign out. Test Child',
+      exact: true,
+    }),
+  ).toBeVisible();
 
   for (const permittedRow of [
     'account-admin-learning-preferences',
