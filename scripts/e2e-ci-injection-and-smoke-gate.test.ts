@@ -991,9 +991,29 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const entry = loadPlan('nightly').find(
       (candidate) => candidate.flow === flow,
     );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: 'UP' | 'DOWN';
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+      };
+      tapOn?: { id?: string };
+    }>;
+    const privacyScroll = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'more-row-privacy' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const privacyTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > privacyScroll && tapOn?.id === 'more-row-privacy',
+    );
 
     expect(source).toContain('SEED_SCENARIO: "subscription-pro-active"');
     expect(entry?.scenario).toBe('subscription-pro-active');
+    expect(privacyScroll).toBeGreaterThan(-1);
+    expect(privacyTap).toBeGreaterThan(privacyScroll);
   });
 
   it('[WI-1864] schedules only the supported parent-native populated-memory journey', () => {
@@ -1401,9 +1421,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       scrollUntilVisible?: {
         element?: { id?: string };
         direction?: 'UP' | 'DOWN';
+        visibilityPercentage?: number;
+        centerElement?: boolean;
       };
       tapOn?: { id?: string };
       assertVisible?: { id?: string };
+      extendedWaitUntil?: { visible?: { id?: string } | string };
     }>;
     const scroll = commands.findIndex(
       ({ scrollUntilVisible }) =>
@@ -1450,6 +1473,40 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ({ tapOn }, index) =>
         index > finalSubmitScroll && tapOn?.id === 'create-subject-submit',
     );
+    const readyScreen = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > submitTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'ready-screen',
+    );
+    const readyStartScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > readyScreen &&
+        scrollUntilVisible?.element?.id === 'ready-start' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === true,
+    );
+    const readyStartAssert = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > readyStartScroll && assertVisible?.id === 'ready-start',
+    );
+    const readyStart = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > readyStartAssert && tapOn?.id === 'ready-start',
+    );
+    const sessionScreen = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > readyStart &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'session-screen',
+    );
+    const chatInput = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > sessionScreen &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'chat-input',
+    );
 
     expect(cancelScroll).toBeGreaterThan(tap);
     expect(cancelAssert).toBeGreaterThan(cancelScroll);
@@ -1459,6 +1516,233 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(nameTap).toBeGreaterThan(nameScroll);
     expect(finalSubmitScroll).toBeGreaterThan(firstSubmitScroll);
     expect(submitTap).toBeGreaterThan(finalSubmitScroll);
+    expect(readyScreen).toBeGreaterThan(submitTap);
+    expect(readyStartScroll).toBeGreaterThan(readyScreen);
+    expect(readyStartAssert).toBeGreaterThan(readyStartScroll);
+    expect(readyStart).toBeGreaterThan(readyStartAssert);
+    expect(sessionScreen).toBeGreaterThan(readyStart);
+    expect(chatInput).toBeGreaterThan(sessionScreen);
+  });
+
+  it('[WI-1864] follows the pending gate before native consent handoff', () => {
+    for (const flow of [
+      'flows/consent/consent-gdpr-under16.yaml',
+      'flows/consent/hand-to-parent-consent.yaml',
+    ]) {
+      const source = readFileSync(
+        join(repoRoot, 'apps/mobile/e2e', flow),
+        'utf8',
+      );
+      const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+        tapOn?: { id?: string; text?: string } | string;
+        extendedWaitUntil?: { visible?: { id?: string } | string };
+        assertVisible?: { text?: string } | string;
+      }>;
+      const submit = commands.findIndex(
+        ({ tapOn }) =>
+          typeof tapOn === 'object' && tapOn?.id === 'create-profile-submit',
+      );
+      const pendingGate = commands.findIndex(
+        ({ extendedWaitUntil }, index) =>
+          index > submit &&
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.id === 'consent-pending-gate',
+      );
+      const sendToParent = commands.findIndex(
+        ({ tapOn }, index) =>
+          index > pendingGate &&
+          typeof tapOn === 'object' &&
+          tapOn?.id === 'consent-send-to-parent',
+      );
+      const childView = commands.findIndex(
+        ({ extendedWaitUntil }, index) =>
+          index > sendToParent &&
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.id === 'consent-child-view',
+      );
+      const handoffTitle = commands.findIndex(
+        ({ assertVisible }, index) =>
+          index > childView &&
+          typeof assertVisible === 'object' &&
+          assertVisible.text === 'Almost there!',
+      );
+
+      expect(submit).toBeGreaterThan(-1);
+      expect(pendingGate).toBeGreaterThan(submit);
+      expect(sendToParent).toBeGreaterThan(pendingGate);
+      expect(childView).toBeGreaterThan(sendToParent);
+      expect(handoffTitle).toBeGreaterThan(childView);
+      expect(
+        source.slice(source.indexOf('id: "create-profile-submit"')),
+      ).not.toContain('text: "One more step!"');
+    }
+
+    const handoffSource = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/consent/hand-to-parent-consent.yaml',
+      ),
+      'utf8',
+    );
+    const handoffCommands = parseAllDocuments(handoffSource)
+      .at(-1)
+      ?.toJSON() as Array<{
+      tapOn?: { id?: string; text?: string } | string;
+    }>;
+    const openYearPicker = handoffCommands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' &&
+        tapOn.id === 'android:id/date_picker_header_year',
+    );
+    const tapBirthYear = handoffCommands.findIndex(
+      ({ tapOn }, index) =>
+        index > openYearPicker &&
+        typeof tapOn === 'object' &&
+        tapOn.text === '2012',
+    );
+    const confirmBirthDate = handoffCommands.findIndex(
+      ({ tapOn }, index) =>
+        index > tapBirthYear &&
+        typeof tapOn === 'object' &&
+        tapOn.text === 'OK',
+    );
+
+    expect(openYearPicker).toBeGreaterThan(-1);
+    expect(tapBirthYear).toBeGreaterThan(openYearPicker);
+    expect(confirmBirthDate).toBeGreaterThan(tapBirthYear);
+    expect(
+      handoffCommands.some(
+        ({ tapOn }) => typeof tapOn === 'object' && tapOn.text === '2014',
+      ),
+    ).toBe(false);
+  });
+
+  it('[WI-1864] allows the full first-curriculum polling window in assessment', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/assessment/assessment-cycle.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string };
+      pressKey?: string;
+      extendedWaitUntil?: {
+        visible?: { id?: string; enabled?: boolean } | string;
+        timeout?: number;
+      };
+    }>;
+    const submit = commands.findIndex(
+      ({ tapOn }) => tapOn?.id === 'create-subject-submit',
+    );
+    const chatReady = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > submit &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'chat-input',
+    );
+
+    expect(submit).toBeGreaterThan(-1);
+    expect(chatReady).toBeGreaterThan(submit);
+    expect(commands[chatReady]?.extendedWaitUntil?.timeout).toBe(30000);
+
+    const submitTurn = commands.findIndex(
+      ({ pressKey }, index) => index > chatReady && pressKey === 'Enter',
+    );
+    const responseReceipt = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > submitTurn &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'message-bubble-assistant-3',
+    );
+    const responseReady = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > responseReceipt &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'chat-input',
+    );
+
+    expect(submitTurn).toBeGreaterThan(chatReady);
+    expect(responseReceipt).toBeGreaterThan(submitTurn);
+    expect(responseReady).toBeGreaterThan(responseReceipt);
+    expect(commands[responseReceipt]?.extendedWaitUntil?.timeout).toBe(30000);
+    expect(commands[responseReady]?.extendedWaitUntil?.visible).toEqual({
+      id: 'chat-input',
+      enabled: true,
+    });
+    expect(commands[responseReady]?.extendedWaitUntil?.timeout).toBe(30000);
+  });
+
+  it('[WI-1864] prepares permanent camera denial after clearing app state', () => {
+    const runner = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/scripts/run-ci-maestro.sh'),
+      'utf8',
+    );
+    const localRunner = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/scripts/seed-and-run.sh'),
+      'utf8',
+    );
+    const deniedWrapper = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/scripts/seed-and-run-permdenied.sh'),
+      'utf8',
+    );
+    const clear = runner.indexOf('adb shell pm clear "$APP_ID"');
+    const deniedBranch = runner.indexOf(
+      'if [ "$flow" = "flows/homework/camera-permission-denied.yaml" ]',
+    );
+    const revoke = runner.indexOf(
+      'adb shell pm revoke "$APP_ID" android.permission.CAMERA',
+      deniedBranch,
+    );
+    const permanent = runner.indexOf(
+      'adb shell pm set-permission-flags "$APP_ID" android.permission.CAMERA user-set user-fixed',
+      deniedBranch,
+    );
+    const ordinaryGrant = runner.indexOf(
+      'adb shell pm grant "$APP_ID" android.permission.CAMERA',
+      permanent,
+    );
+
+    expect(clear).toBeGreaterThan(-1);
+    expect(deniedBranch).toBeGreaterThan(clear);
+    expect(revoke).toBeGreaterThan(deniedBranch);
+    expect(permanent).toBeGreaterThan(revoke);
+    expect(ordinaryGrant).toBeGreaterThan(permanent);
+    expect(runner.slice(deniedBranch, ordinaryGrant)).toContain('else');
+    const localClear = localRunner.indexOf(
+      '$ADB $DEVICE_FLAG shell pm clear "$APP_ID"',
+    );
+    const localDeniedBranch = localRunner.indexOf(
+      'if [ "${E2E_CAMERA_PERMISSION_STATE:-granted}" = "permanently-denied" ]',
+    );
+    const localRevoke = localRunner.indexOf(
+      '$ADB $DEVICE_FLAG shell pm revoke "$APP_ID" android.permission.CAMERA',
+      localDeniedBranch,
+    );
+    const localPermanent = localRunner.indexOf(
+      '$ADB $DEVICE_FLAG shell pm set-permission-flags "$APP_ID" android.permission.CAMERA user-set user-fixed',
+      localDeniedBranch,
+    );
+    const localOrdinaryGrant = localRunner.indexOf(
+      '$ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.CAMERA',
+      localPermanent,
+    );
+
+    expect(localClear).toBeGreaterThan(-1);
+    expect(localDeniedBranch).toBeGreaterThan(localClear);
+    expect(localRevoke).toBeGreaterThan(localDeniedBranch);
+    expect(localPermanent).toBeGreaterThan(localRevoke);
+    expect(localOrdinaryGrant).toBeGreaterThan(localPermanent);
+    expect(localRunner.slice(localDeniedBranch, localOrdinaryGrant)).toContain(
+      'else',
+    );
+
+    const wrapperState = deniedWrapper.indexOf(
+      'export E2E_CAMERA_PERMISSION_STATE=permanently-denied',
+    );
+    const wrapperDelegate = deniedWrapper.indexOf(
+      'exec "$(dirname "$0")/seed-and-run.sh" "$@"',
+    );
+    expect(wrapperState).toBeGreaterThan(-1);
+    expect(wrapperDelegate).toBeGreaterThan(wrapperState);
   });
 
   it('[WI-1864] follows the intentional no-consent profile destination', () => {
@@ -1629,6 +1913,29 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
     expect(profileTap).toBeGreaterThan(-1);
     expect(memoryScroll).toBeGreaterThan(profileTap);
+    expect(source).not.toContain('parent-home-check-child-${CHILD_PROFILE_ID}');
+  });
+
+  it('[WI-1864] opens consent management through the settings-mode profile control', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/consent-management.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string };
+      scrollUntilVisible?: { element?: { id?: string } };
+    }>;
+    const profileTap = commands.findIndex(
+      ({ tapOn }) =>
+        tapOn?.id === 'parent-home-child-profile-${CHILD_PROFILE_ID}',
+    );
+    const consentScroll = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'consent-section',
+    );
+
+    expect(profileTap).toBeGreaterThan(-1);
+    expect(consentScroll).toBeGreaterThan(profileTap);
     expect(source).not.toContain('parent-home-check-child-${CHILD_PROFILE_ID}');
   });
 
@@ -2046,6 +2353,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
                 enabled?: boolean;
               }
             | string;
+          timeout?: number;
         };
       }>;
       let cursor = -1;
@@ -2075,6 +2383,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           [input, enter, receipt, enabled].toSorted((a, b) => a - b),
         );
         expect(input).toBeGreaterThan(cursor);
+        expect(commands[enabled]?.extendedWaitUntil?.timeout).toBe(30000);
         cursor = enabled;
       }
     },
@@ -2098,6 +2407,39 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ),
     ).toBe(true);
     expect(JSON.stringify(commands)).not.toContain('what you remember');
+  });
+
+  it('[WI-1864] centers the overdue topic row above the sticky book action', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/retention/topic-review-overdue.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+      };
+      tapOn?: { id?: string };
+    }>;
+    const centeredRow = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'done-row-${TOPIC_ID}' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === true,
+    );
+    const topicTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > centeredRow && tapOn?.id === 'done-row-${TOPIC_ID}',
+    );
+
+    expect(centeredRow).toBeGreaterThan(-1);
+    expect(topicTap).toBeGreaterThan(centeredRow);
   });
 
   it('[WI-1864] accepts the tall summary input above the Android navigation inset', () => {

@@ -74,6 +74,14 @@ tags:
 - takeScreenshot: export-02-more-loaded
 
 # ── Step 4: Navigate to Privacy sub-screen (Export lives there now) ──
+- scrollUntilVisible:
+    element:
+      id: "more-row-privacy"
+    direction: DOWN
+    timeout: 15000
+    speed: 50
+    visibilityPercentage: 40
+
 - tapOn:
     id: "more-row-privacy"
 

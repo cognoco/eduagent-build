@@ -50,9 +50,10 @@ tags:
 # 3. Tap child card to navigate to child detail.
 #    NOTE: Do NOT double-tap — double router.push navigates past child detail
 #    to session transcript.
-#    parent-home-check-child-${CHILD_PROFILE_ID} is the IntentCard on ParentHomeScreen.
+#    parent-home-child-profile-${CHILD_PROFILE_ID} opens settings mode, where
+#    consent management is rendered.
 - tapOn:
-    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
+    id: "parent-home-child-profile-${CHILD_PROFILE_ID}"
 
 # 4. Wait for child detail screen
 - extendedWaitUntil:

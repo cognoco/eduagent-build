@@ -106,8 +106,17 @@ tags:
 - tapOn:
     id: "create-profile-submit"
 
+# Profile creation lands on the pending gate; use its supported handoff CTA.
+- extendedWaitUntil:
+    visible:
+      id: "consent-pending-gate"
+    timeout: 15000
+
+- tapOn:
+    id: "consent-send-to-parent"
+
 # ============================================================
-# PHASE 1: CHILD VIEW — "One more step!" hand-off screen
+# PHASE 1: CHILD VIEW — "Almost there!" hand-off screen
 # ============================================================
 # MANDATORY: Consent MUST appear for a 14yo in the EU
 - extendedWaitUntil:
@@ -116,7 +125,7 @@ tags:
     timeout: 15000
 
 - assertVisible:
-    text: "One more step!"
+    text: "Almost there!"
 
 - takeScreenshot: gdpr-under16-03-child-handoff
 

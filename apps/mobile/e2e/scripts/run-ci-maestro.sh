@@ -188,7 +188,12 @@ run_flow() {
   adb shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
   adb shell pm clear "$APP_ID" >/dev/null 2>&1 || true
   adb shell pm grant "$APP_ID" android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || true
-  adb shell pm grant "$APP_ID" android.permission.CAMERA >/dev/null 2>&1 || true
+  if [ "$flow" = "flows/homework/camera-permission-denied.yaml" ]; then
+    adb shell pm revoke "$APP_ID" android.permission.CAMERA >/dev/null 2>&1 || true
+    adb shell pm set-permission-flags "$APP_ID" android.permission.CAMERA user-set user-fixed
+  else
+    adb shell pm grant "$APP_ID" android.permission.CAMERA >/dev/null 2>&1 || true
+  fi
   adb shell pm grant "$APP_ID" android.permission.RECORD_AUDIO >/dev/null 2>&1 || true
   adb logcat -c
   adb shell am start -W -n "$APP_ID/.MainActivity"

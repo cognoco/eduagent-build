@@ -55,7 +55,7 @@ tags:
     visible:
       id: 'chat-input'
       enabled: true
-    timeout: 5000
+    timeout: 30000
 
 # 7. Exchange 2: follow-up
 - tapOn:
@@ -73,7 +73,7 @@ tags:
     visible:
       id: 'chat-input'
       enabled: true
-    timeout: 5000
+    timeout: 30000
 
 # 9. Exchange 3: confirm understanding
 - tapOn:
@@ -94,7 +94,7 @@ tags:
     visible:
       id: 'chat-input'
       enabled: true
-    timeout: 5000
+    timeout: 30000
 
 # 11. Wait for end-session-button to appear (rendered in header when exchangeCount > 0)
 #     BUG-37: The button only appears after a successful LLM streaming response

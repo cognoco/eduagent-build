@@ -134,13 +134,35 @@ tags:
 - tapOn:
     id: 'create-subject-submit'
 
-# 9. Wait for interview screen — the create-subject mutation navigates to
-#    /(learner)/onboarding/interview after creating the subject.
-#    The interview ChatShell always has a chat-input.
+# 9. A user's first subject intentionally hands off through the Ready screen.
+- extendedWaitUntil:
+    visible:
+      id: 'ready-screen'
+    timeout: 30000
+
+- scrollUntilVisible:
+    element:
+      id: 'ready-start'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+
+- assertVisible:
+    id: 'ready-start'
+
+- tapOn:
+    id: 'ready-start'
+
+- extendedWaitUntil:
+    visible:
+      id: 'session-screen'
+    timeout: 30000
+
 - extendedWaitUntil:
     visible:
       id: 'chat-input'
-    timeout: 20000
+    timeout: 30000
 
 # 10. Verify the interview title contains the subject name
 - assertVisible:

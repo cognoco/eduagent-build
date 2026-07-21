@@ -12,8 +12,9 @@
 # Usage: ./scripts/seed-and-run.sh pre-profile flows/consent/hand-to-parent-consent.yaml
 #
 # NOTE: This flow verifies the two-phase consent UI introduced in Story 10.10.
-# Uses the Session 22 date picker technique to select birth year 2014 (~12 years old),
-# which triggers COPPA consent. All consent assertions are mandatory.
+# Uses the Session 22 date picker technique to select birth year 2012 (age 14
+# on the 2026-07-21 evidence date), which triggers under-16 consent while
+# remaining above the product's age floor. All consent assertions are mandatory.
 appId: com.mentomate.app
 tags:
   - nightly
@@ -74,7 +75,7 @@ tags:
 - inputText: "Consent Test Child"
 - hideKeyboard
 
-# 7. Open date picker and select child birth year (2014 = ~12 years old → triggers COPPA)
+# 7. Open date picker and select child birth year (2012 = ~14 years old → under-16 consent)
 #    Session 22 technique: year header → year list → scroll → select → OK
 - tapOn:
     id: "create-profile-birthdate"
@@ -83,16 +84,16 @@ tags:
 - tapOn:
     id: "android:id/date_picker_header_year"
 
-# 7b. Scroll to year 2014 in the year list
+# 7b. Scroll to year 2012 in the year list
 - scrollUntilVisible:
     element:
-      text: "2014"
+      text: "2012"
     direction: DOWN
     timeout: 10000
 
-# 7c. Select year 2014
+# 7c. Select year 2012
 - tapOn:
-    text: "2014"
+    text: "2012"
 
 # 7d. Confirm date selection
 - tapOn:
@@ -101,6 +102,15 @@ tags:
 # 8. Submit profile creation
 - tapOn:
     id: "create-profile-submit"
+
+# Profile creation lands on the pending gate; use its supported handoff CTA.
+- extendedWaitUntil:
+    visible:
+      id: "consent-pending-gate"
+    timeout: 15000
+
+- tapOn:
+    id: "consent-send-to-parent"
 
 # ============================================================
 # PHASE 1: CHILD VIEW — "Hand to your parent" interstitial
@@ -114,12 +124,12 @@ tags:
 
 # 11. Verify child-friendly title
 - assertVisible:
-    text: "One more step!"
+    text: "Almost there!"
 
 # 12. Verify hand-off instruction
 #     Full text: "We need a grown-up to say it's OK. Hand your phone to your parent or guardian."
 #     Maestro cannot match ANY substring of long wrapping text on Android (Issue 21, Pattern B).
-#     Screen identity already verified by consent-child-view testID + "One more step!" heading.
+#     Screen identity already verified by consent-child-view testID + "Almost there!" heading.
 
 # 13. Screenshot: child hand-off view
 - takeScreenshot: hand-to-parent-01-child-view

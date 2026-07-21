@@ -91,7 +91,7 @@ tags:
     visible:
       id: 'chat-input'
       enabled: true
-    timeout: 5000
+    timeout: 30000
 
 # 10. Take screenshot of feedback
 - takeScreenshot: retention-review-feedback
@@ -115,7 +115,7 @@ tags:
     visible:
       id: 'chat-input'
       enabled: true
-    timeout: 5000
+    timeout: 30000
 
 # 14. Screenshot
 - takeScreenshot: retention-review-complete

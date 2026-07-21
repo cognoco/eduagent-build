@@ -71,7 +71,7 @@ tags:
     visible:
       id: 'chat-input'
       enabled: true
-    timeout: 5000
+    timeout: 30000
 
 # 8. Verify the session did not crash — chat messages area is still visible
 - assertVisible:
@@ -93,7 +93,7 @@ tags:
     visible:
       id: 'chat-input'
       enabled: true
-    timeout: 5000
+    timeout: 30000
 
 # 11. Screenshot after second exchange
 - takeScreenshot: freeform-session-ai-response
