@@ -14,6 +14,16 @@ import {
   type RenderScreenOptions,
 } from '../../test-utils/screen-render';
 
+// [WI-2498] useNowFeed now reads the authenticated actor id (Clerk userId) to
+// bind the persisted Now-feed cache to actor+profile+policy. External-boundary
+// mock (bare specifier), matching the pattern in use-subscription.test.ts.
+jest.mock('@clerk/expo', () => ({
+  useAuth: () => ({
+    userId: 'wi2498-test-actor',
+    getToken: jest.fn().mockResolvedValue('test-token'),
+  }),
+}));
+
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
 const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';

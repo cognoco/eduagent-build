@@ -81,7 +81,10 @@ import {
   NoInterleavedTopicsError,
 } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
-import { getMentorNoticeReceipt } from '../services/mentor-notices';
+import {
+  getMentorNoticeReceipt,
+  resolveMentorNoticeVisibility,
+} from '../services/mentor-notices';
 import {
   markPersisted,
   MAX_IDEMPOTENCY_KEY_LENGTH,
@@ -955,7 +958,17 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       await assertCanReadProfile(c, profileId);
       const { sessionId } = c.req.valid('param');
       const summary = await getSessionSummary(db, profileId, sessionId, {
-        mentorNoticeEnabled: isMentorNoticeEnabled(c.env.MENTOR_NOTICE_ENABLED),
+        // [WI-2498] V — rollout ∧ caller-is-subject ∧ subject consent. Note
+        // this is strictly narrower than assertCanReadProfile above: a guardian
+        // legitimately READS an uncredentialed charge's summary, but must not
+        // receive the learner-private notice receipt embedded in it. V gates
+        // the enrichment only, never the read.
+        mentorNoticeEnabled: await resolveMentorNoticeVisibility(
+          c,
+          profileId,
+          c.env.MENTOR_NOTICE_ENABLED,
+          { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+        ),
       });
       return c.json({ summary });
     },

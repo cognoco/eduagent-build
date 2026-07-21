@@ -4,6 +4,16 @@ import type { NowCard, NowResponse } from '@eduagent/schemas';
 import { renderScreen } from '../../test-utils/screen-render';
 import { ScopeContextProvider, useScopeContext } from '../../lib/scope-context';
 
+// [WI-2498] useNowFeed now reads the authenticated actor id (Clerk userId) to
+// bind the persisted Now-feed cache to actor+profile+policy. External-boundary
+// mock (bare specifier), matching the pattern in use-subscription.test.ts.
+jest.mock('@clerk/expo', () => ({
+  useAuth: () => ({
+    userId: 'wi2498-test-actor',
+    getToken: jest.fn().mockResolvedValue('test-token'),
+  }),
+}));
+
 // [WI-2223 AC-3] Companion to mentor.test.tsx's dispatch-mock suite. That
 // file mocks `../../lib/scope-context` entirely (see its gc1-allow note) so
 // its own AC-3 case can only compare two independently hand-set

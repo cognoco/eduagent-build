@@ -5,3 +5,4 @@ export * from './recheck';
 export * from './learning-day';
 export * from './offer';
 export * from './nudge';
+export * from './visibility';
