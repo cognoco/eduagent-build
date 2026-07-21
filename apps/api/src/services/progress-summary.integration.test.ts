@@ -239,6 +239,10 @@ describe('getProgressSummary (integration)', () => {
     { label: 'missing caller', kind: 'missing' },
     { label: 'same-org non-admin spoof', kind: 'non-admin' },
     { label: 'cross-org admin spoof', kind: 'cross-org' },
+    {
+      label: 'cross-org admin using their own organization',
+      kind: 'cross-org-own-org',
+    },
     // [BUG-400] Preserve the no-family-link regression guard explicitly.
     { label: 'admin without child edge', kind: 'no-edge' },
   ] as const;
@@ -254,6 +258,7 @@ describe('getProgressSummary (integration)', () => {
       }
 
       let callerPersonId: string | undefined = parentProfileId;
+      let requestOrganizationId = organizationId;
       if (kind === 'missing') {
         callerPersonId = undefined;
       } else if (kind === 'non-admin') {
@@ -262,6 +267,9 @@ describe('getProgressSummary (integration)', () => {
         ]);
       } else if (kind === 'cross-org') {
         ({ profileId: callerPersonId } = await seedParentAccount());
+      } else if (kind === 'cross-org-own-org') {
+        ({ profileId: callerPersonId, accountId: requestOrganizationId } =
+          await seedParentAccount());
       }
 
       const operation = getProgressSummary(
@@ -269,7 +277,7 @@ describe('getProgressSummary (integration)', () => {
         parentProfileId,
         child.profileId,
         callerPersonId,
-        organizationId,
+        requestOrganizationId,
       );
 
       if (kind === 'authorized') {

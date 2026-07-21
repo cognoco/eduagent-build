@@ -911,6 +911,11 @@ export interface RecallTestResponse {
   cooldownEndsAt?: string;
   // [WI-2114] Answer-specific grader feedback for the sub-3-failure retry path.
   feedback?: RecallFeedback;
+  // [WI-2114] The prior graded answer's stored feedback, surfaced on the
+  // cooldown early-return so a follow-up that is never re-graded (24h
+  // anti-cramming lockout) still gets a direct explanation of the previous
+  // answer. The client renders it reframed, never a verbatim replay (AC-8).
+  priorFeedback?: RecallFeedback;
 }
 
 function buildRecallHint(
@@ -1059,6 +1064,15 @@ export async function processRecallTest(
       failureAction: 'feedback_only',
       cooldownActive: true,
       cooldownEndsAt,
+      // [WI-2114] A cooldown-blocked submission is never re-graded, so without
+      // this it would fall back to the generic "Good effort" copy even when the
+      // learner explicitly asks what was wrong (AC-2). Surface the prior graded
+      // answer's stored feedback as `priorFeedback` (distinct from a fresh
+      // `feedback`) so the client renders a reframed recap, not a replay (AC-8).
+      // Absent when nothing is stored → honest generic fallback (AC-5).
+      ...(effectiveCard.lastRecallFeedback
+        ? { priorFeedback: effectiveCard.lastRecallFeedback }
+        : {}),
     };
   }
 
@@ -1227,6 +1241,12 @@ export async function processRecallTest(
       nextReviewAt: result.newState.nextReviewAt
         ? new Date(result.newState.nextReviewAt)
         : null,
+      // [WI-2114] Persist this graded answer's feedback so a later
+      // cooldown-blocked follow-up can echo it (AC-2). Grader-owned structured
+      // prose only — never the learner's raw answer (AC-7). Only written when
+      // the grader produced feedback; a null grade (dont_remember, or a grader
+      // that omitted it) leaves the prior stored value untouched.
+      ...(grade.feedback ? { lastRecallFeedback: grade.feedback } : {}),
     },
     // For non-dont_remember: ensure the row is still the one we claimed
     // (defence-in-depth — the pre-claim already serialized the LLM call).
