@@ -418,6 +418,15 @@ export const recallTestResultSchema = z.object({
   // recallFeedbackSchema. Additive + optional so a client on the pre-WI-2114
   // schema ignores it and keeps its generic copy.
   feedback: recallFeedbackSchema.optional(),
+  // [WI-2114] The PRIOR graded answer's stored feedback, surfaced when the
+  // current submission is cooldown-blocked (never re-graded) — e.g. the learner
+  // immediately asks "what was wrong with what I said?". Distinct field from
+  // `feedback` so the client renders it as a REFRAMED recap of the previous
+  // answer, never a byte-for-byte replay of a fresh grade (AC-8): a
+  // cooldown-blocked submission has no evaluated content of its own, so AC-3's
+  // identical-content exception does not apply to it. Absent when no prior
+  // feedback is stored — the client then keeps its honest generic copy (AC-5).
+  priorFeedback: recallFeedbackSchema.optional(),
   // [WI-1462] Wire-compatible values only — unchanged from the pre-WI-1462
   // contract so a client built against the old schema still parses this
   // response. A client on the old schema that reaches the 3rd/4th failure
