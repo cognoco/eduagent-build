@@ -9,11 +9,10 @@ import { useThemeColors } from '../../lib/theme';
 import type { TranslateKey } from '../../i18n';
 
 /**
- * Mic lifecycle as the bar exposes it to assistive tech. `processing` covers
- * the hook's status of the same name: it is part of the hook's published
- * status union and the acceptance criteria enumerate it, so the bar handles it
- * exhaustively even though today's hook settles straight from listening to
- * idle without passing through it.
+ * Mic lifecycle as the bar exposes it to assistive tech. `processing` is the
+ * window between the learner stopping and the engine delivering its final
+ * result — the mic is deliberately not pressable there, because the capture is
+ * not over yet even though nothing is being recorded.
  */
 export type MentorMicState =
   | 'idle'
@@ -60,6 +59,7 @@ export function MentorInputBar({
   const {
     status: speechStatus,
     transcript,
+    isFinalTranscript,
     isListening,
     startListening,
     stopListening,
@@ -112,11 +112,12 @@ export function MentorInputBar({
     void stopListening();
   }, [unavailable, stopListening, clearTranscript]);
 
-  // The hook overwrites `transcript` on every result event and has no explicit
-  // final flag, so "final" is the established proxy used elsewhere in the app:
-  // the capture has stopped and left a non-empty transcript behind.
+  // Only the engine's final result may reach the draft. Stopping does not
+  // finalise — the native stop is followed by the true final result — so
+  // committing on "no longer listening" would insert the last interim guess
+  // and then drop the real sentence when it arrives.
   useEffect(() => {
-    if (isListening) return;
+    if (!isFinalTranscript) return;
     const finalTranscript = transcript.trim();
     if (!finalTranscript) return;
     const capture = captureRef.current;
@@ -126,7 +127,7 @@ export function MentorInputBar({
       prev.trim() ? `${prev.trim()} ${finalTranscript}` : finalTranscript,
     );
     clearTranscript();
-  }, [isListening, transcript, clearTranscript]);
+  }, [isFinalTranscript, transcript, clearTranscript]);
 
   // Classify before formatting: the recovery affordance branches on the OS
   // permission state, never on the hook's raw error text.

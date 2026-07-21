@@ -441,7 +441,9 @@ describe('useSpeechRecognition', () => {
         await result.current.stopListening();
       });
 
-      expect(result.current.status).toBe('idle');
+      // Stop does not finalise: the engine still owes a final result, so the
+      // hook waits in processing rather than declaring the capture over.
+      expect(result.current.status).toBe('processing');
       expect(mockStart).toHaveBeenCalled();
       expect(mockStop).toHaveBeenCalled();
     });
@@ -481,7 +483,7 @@ describe('useSpeechRecognition', () => {
       await flushEffects();
 
       // Listeners should be registered
-      expect(addListener1).toHaveBeenCalledTimes(2);
+      expect(addListener1).toHaveBeenCalledTimes(3);
 
       // Simulate hot reload by providing a new loadModule function
       const removeResult2 = jest.fn();
@@ -512,7 +514,7 @@ describe('useSpeechRecognition', () => {
       expect(removeError1).toHaveBeenCalled();
 
       // New listeners should be registered
-      expect(addListener2).toHaveBeenCalledTimes(2);
+      expect(addListener2).toHaveBeenCalledTimes(3);
     });
 
     it('cleans up listeners on unmount', async () => {
@@ -539,7 +541,7 @@ describe('useSpeechRecognition', () => {
       );
       await flushEffects();
 
-      expect(addListenerWithTracking).toHaveBeenCalledTimes(2);
+      expect(addListenerWithTracking).toHaveBeenCalledTimes(3);
 
       unmount();
 
