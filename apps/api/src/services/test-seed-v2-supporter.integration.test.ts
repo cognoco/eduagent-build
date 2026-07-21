@@ -364,7 +364,15 @@ function createIntegrationDb(): Database {
     });
 
     afterAll(async () => {
-      await deleteOrganizationGraph(db, [seeded.accountId]);
+      // [Phase-4 review] The supportee here is an INDEPENDENT v2 owner
+      // identity in its own organization (same shape as
+      // seedV2SupporterAccepted's supportees, unlike seedV2SupporterManaged's
+      // same-org managed child above) — cleaning up only seeded.accountId
+      // would leak the supportee's org + Clerk test user on every run.
+      await deleteOrganizationGraph(db, [
+        seeded.accountId,
+        seeded.ids.supporteeOrganizationId,
+      ]);
     });
 
     it("[AC: TRUTHFUL FIXTURE] seeds an accepted supportee edge plus a real subject+session on the supporter's own personId", () => {
@@ -385,7 +393,20 @@ function createIntegrationDb(): Database {
       expect(scopeList.scopes.some((scope) => scope.kind === 'me')).toBe(true);
     });
 
-    it("[AC-4 direction 1] the supporter's own Me-scope subject never appears in the supportee's person-scope structural read", async () => {
+    // [Phase-4 review] Same canary caveat as the WI-2237/WI-2241 checks above
+    // (see file header + the `[AC: STRUCTURAL WALL]` test): these direction-1
+    // checks are forward-regression CANARIES, not authorization proofs.
+    // `readSupporteeStructuralSubjects` filters on `subjects.profileId =
+    // supporteePersonId` (supporter-structural-mask.ts) and
+    // `readSharedRecordForSupportee` never queries the `subjects` table at
+    // all (shared-record-read-model.ts) — the supporter's own Me-scope
+    // subject is structurally unreachable by either query regardless of any
+    // authorization bug, so neither check can fail for one. They exist to
+    // trip immediately if a future change widens either query/response shape
+    // to reach into the caller's own Me-scope data. AC-4 direction 1's actual
+    // guarantee is the query scoping itself (cited above), not something a
+    // runtime assertion over today's code can independently prove.
+    it("[AC-4 direction 1 canary] the supporter's own Me-scope subject never appears in the supportee's person-scope structural read", async () => {
       const result = await readSupporteeStructuralSubjects(
         db,
         seeded.ids.supporterPersonId,
@@ -399,7 +420,7 @@ function createIntegrationDb(): Database {
       ).toBe(false);
     });
 
-    it("[AC-4 direction 1] the supporter's own Me-scope subject never appears in the supportee's shared-record read", async () => {
+    it("[AC-4 direction 1 canary] the supporter's own Me-scope subject never appears in the supportee's shared-record read", async () => {
       const record = await readSharedRecordForSupportee(db, {
         supportershipId: seeded.ids.edgeId,
         supporterPersonId: seeded.ids.supporterPersonId,
