@@ -250,6 +250,21 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
+// [WI-2396] assertLlmConsent (called by POST /retention/recall-test) runs
+// isLlmExchangeConsentAllowed, which reads db.query.membership /
+// consentGrant — real queries with no controllable behavior on this file's
+// mock DB. Defaults to allowed (resolves undefined = no throw); the
+// consent-withdrawal test suite below overrides with
+// mockRejectedValueOnce(new ConsentWithdrawnError()) to exercise the
+// refusal path. Mirrors the subjects.test.ts pattern.
+// gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
+// consentGrant reads with no real implementation available in this file's
+// mock-DB environment (same class as verifyPersonOwnershipV2 above).
+jest.mock('../services/identity-v2/consent-status-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+  assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { app } from '../index';
 import { retentionRoutes } from './retention';
 import {
@@ -266,6 +281,9 @@ import {
 } from '../services/retention-data';
 import { NotFoundError } from '../errors';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { ERROR_CODES } from '@eduagent/schemas';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
+import { ConsentWithdrawnError } from '../services/session';
 
 // WI-867: DATABASE_URL required so databaseMiddleware sets db on context;
 // resolveIdentityV2 (now unconditional) reads db.query.login.
@@ -613,6 +631,66 @@ describe('retention routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+
+    // -----------------------------------------------------------------------
+    // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
+    // R5). processRecallTest -> evaluateRecallQuality dispatches the LLM for
+    // every attemptMode except 'dont_remember', which shares this endpoint.
+    // -----------------------------------------------------------------------
+    describe('[WI-2396] consent-withdrawal gate', () => {
+      const assertLlmConsentMock = jest.mocked(assertLlmConsent);
+
+      it('refuses with 403 CONSENT_WITHDRAWN and never calls processRecallTest when consent is withdrawn', async () => {
+        assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+        const res = await app.request(
+          '/v1/retention/recall-test',
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({
+              topicId: TOPIC_ID,
+              answer:
+                'Photosynthesis converts light energy into chemical energy.',
+            }),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { code?: string };
+        expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+        expect(processRecallTest).not.toHaveBeenCalled();
+      });
+
+      it('proceeds (LLM dispatched) when consent is active', async () => {
+        (processRecallTest as jest.Mock).mockResolvedValue({
+          passed: true,
+          masteryScore: 0.75,
+          xpChange: 'verified',
+          nextReviewAt: '2026-02-22T10:00:00.000Z',
+          failureCount: 0,
+        });
+
+        const res = await app.request(
+          '/v1/retention/recall-test',
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({
+              topicId: TOPIC_ID,
+              answer:
+                'Photosynthesis converts light energy into chemical energy.',
+            }),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
+        expect(processRecallTest).toHaveBeenCalled();
+      });
     });
   });
 

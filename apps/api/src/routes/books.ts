@@ -20,6 +20,7 @@ import {
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { notFound, NotFoundError, apiError } from '../errors';
 import {
   getBooks,
@@ -162,6 +163,11 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
       await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // Gated unconditionally — every branch below (fresh claim,
+      // incomplete-claim repair, existing-book expansion) can reach
+      // generateBookTopics, which dispatches the LLM.
+      await assertLlmConsent(db, profileId);
       const { subjectId, bookId } = c.req.valid('param');
       const { priorKnowledge, expandExisting } = c.req.valid('json');
       const enqueueTopicsGenerated = (): void => {

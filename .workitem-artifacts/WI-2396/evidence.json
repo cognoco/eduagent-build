@@ -2,8 +2,43 @@
   "claims": [
     {
       "acRef": "AC-1",
-      "description": "6 request-time routes (curriculum, dictation, filing, subjects, assessments, book-suggestions — 13 gate call-sites total) refuse withdrawn-consent before LLM dispatch (consent-refusal status; service/LLM spy zero calls)",
+      "description": "Manifest-defined request-time route set refuses withdrawn-consent before LLM dispatch (consent-refusal status; service/LLM spy zero calls). Original 6 routes (curriculum, dictation, filing, subjects, assessments, book-suggestions — 13 gate call-sites) plus the WI-2396 review's 7th-route finding (both learner-profile /tell variants) plus 6 additional request-time routes found by the full LLM_CALL_SITE_FILES reconciliation (books generate-topics, quiz/rounds, quiz/rounds/prefetch, sessions summary, sessions summary/retry-feedback, sessions recall-bridge, sessions first-curriculum, homework/ocr, retention/recall-test — 13 routes, 20 gate call-sites total). The exchange pipeline (/sessions/:id/messages, /sessions/:id/stream) is gated separately via assertExchangeConsent (WI-2372) and intentionally not double-gated.",
       "pointer": "apps/api/src/routes/subjects.test.ts:676"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "learner-profile /tell (self + parent, gated on the CHILD's profileId) — the review-found 7th route",
+      "pointer": "apps/api/src/routes/learner-profile.test.ts:1248"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "books.ts POST .../generate-topics — reconciliation finding (LLM_CALL_SITE_FILES: book-generation.ts via curriculum.ts orchestration)",
+      "pointer": "apps/api/src/routes/books.test.ts:1313"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "quiz.ts POST /quiz/rounds and /quiz/rounds/prefetch — reconciliation finding (LLM_CALL_SITE_FILES: services/quiz/generate-round.ts, vocabulary/guess_who activity types)",
+      "pointer": "apps/api/src/routes/quiz.test.ts:737"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "homework.ts POST /ocr — reconciliation finding (LLM_CALL_SITE_FILES: services/ocr.ts)",
+      "pointer": "apps/api/src/routes/homework.test.ts:789"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "retention.ts POST /retention/recall-test — reconciliation finding (LLM_CALL_SITE_FILES: retention-data.ts evaluateRecallQuality)",
+      "pointer": "apps/api/src/routes/retention.test.ts:641"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "sessions.ts POST /summary, /summary/retry-feedback, /recall-bridge, /subjects/:subjectId/sessions/first-curriculum — reconciliation finding (LLM_CALL_SITE_FILES: summaries.ts/session-summary.ts, recall-bridge.ts, session-topic-matcher.ts); /messages and /stream confirmed to delegate to the already-gated exchange pipeline and are not double-gated",
+      "pointer": "apps/api/src/routes/sessions.test.ts:795"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Mechanical fix: metering.coverage.guard.test.ts false positive — weekly-self-reports.ts's trace-evidence comment contained the bare tokens routeAndCall/routeAndStream, matching the guard's lexical scan even though the file dispatches no LLM. Reworded to routeAnd(Call|Stream) notation (still human-readable, no longer a literal substring match).",
+      "pointer": "apps/api/src/inngest/functions/weekly-self-reports.ts:215"
     },
     {
       "acRef": "AC-2",

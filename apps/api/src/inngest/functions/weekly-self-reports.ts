@@ -212,8 +212,9 @@ export const weeklySelfReportGenerate = inngest.createFunction(
         // remains granted.
         //
         // Traced call chain (entrypoint → every direct import of this
-        // handler function), each checked for a routeAndCall/routeAndStream
-        // dispatch or an import of the llm service module — none found:
+        // handler function), each checked for a call into `routeAnd(Call|Stream)`
+        // (the LLM router's dispatch entrypoints) or an import of the llm
+        // service module — none found:
         //   runWeeklySelfReportsGenerate (this handler)
         //     -> generateWeeklyReportData        (../../services/weekly-report.ts)      — pure data aggregation, no LLM import
         //     -> getPracticeActivitySummary       (../../services/practice-activity-summary.ts) — DB query only, no LLM import
@@ -224,7 +225,7 @@ export const weeklySelfReportGenerate = inngest.createFunction(
         //                                         (../../services/identity-v2/solo-progress-reports-v2.ts) — DB query only, no LLM import
         //     -> getGuardianPersonIds             (../../services/identity-v2/guardianship.ts) — DB query only, no LLM import
         // Re-verify with (from apps/api/):
-        //   rg -i "routeAndCall|routeAndStream|from '.*llm'" src/inngest/functions/weekly-self-reports.ts \
+        //   rg -i "routeAnd(Call|Stream)|from '.*llm'" src/inngest/functions/weekly-self-reports.ts \
         //     src/services/weekly-report.ts src/services/practice-activity-summary.ts \
         //     src/services/snapshot-aggregation.ts src/services/identity-v2/solo-progress-reports-v2.ts \
         //     src/services/identity-v2/guardianship.ts

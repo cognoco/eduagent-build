@@ -21,6 +21,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import {
   getSubjectRetention,
   getAllSubjectsRetention,
@@ -110,6 +111,11 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // Gated unconditionally — processRecallTest -> evaluateRecallQuality
+      // dispatches the LLM for every attemptMode except 'dont_remember',
+      // which shares this same endpoint.
+      await assertLlmConsent(db, profileId);
       const input = c.req.valid('json');
 
       const result = await processRecallTest(db, profileId, input);

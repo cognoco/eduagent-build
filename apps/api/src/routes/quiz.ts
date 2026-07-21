@@ -25,6 +25,7 @@ import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { assertCanReadProfile } from '../services/family-access';
 import { validationError, VocabularyContextError } from '../errors';
 import {
@@ -149,6 +150,11 @@ async function generateRoundFromInput(
   if (!profileMeta) {
     throw new Error('profileMeta not set — profile middleware must run first');
   }
+  // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+  // buildAndGenerateRound -> generateQuizRound unconditionally dispatches
+  // the LLM for round generation; shared by both /quiz/rounds and
+  // /quiz/rounds/prefetch via this helper.
+  await assertLlmConsent(db, profileId);
 
   try {
     const round = await buildAndGenerateRound(

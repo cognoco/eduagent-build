@@ -165,6 +165,26 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
+// [WI-2396] assertLlmConsent (called by /summary, /summary/retry-feedback,
+// /recall-bridge, and /subjects/:subjectId/sessions/first-curriculum — the
+// request-time LLM routes OUTSIDE the exchange pipeline) runs
+// isLlmExchangeConsentAllowed, which reads db.query.membership /
+// consentGrant — real queries with no controllable behavior on this file's
+// mock DB. Defaults to allowed (resolves undefined = no throw); the
+// consent-withdrawal test suite below overrides with
+// mockRejectedValueOnce(new ConsentWithdrawnError()) to exercise the
+// refusal path. Mirrors the subjects.test.ts pattern. The exchange pipeline
+// itself (/messages, /stream) is gated separately inside the mocked
+// processMessage/streamMessage service functions (see the existing
+// [WI-2372] tests) and is untouched by this mock.
+// gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
+// consentGrant reads with no real implementation available in this file's
+// mock-DB environment (same class as verifyPersonOwnershipV2 above).
+jest.mock('../services/identity-v2/consent-status-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+  assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+}));
+
 // ---------------------------------------------------------------------------
 // Mock billing service — metering middleware calls these on LLM routes
 // ---------------------------------------------------------------------------
@@ -721,6 +741,7 @@ import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, MAX_HOMEWORK_PROBLEMS } from '@eduagent/schemas';
 import { FILING_CONFIG } from '../config/filing';
 import { generateRecallBridge } from '../services/recall-bridge';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -764,6 +785,53 @@ describe('session routes', () => {
         code: 'RECALL_BRIDGE_SUPPRESSED',
       });
       expect(generateRecallBridge).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
+  // R5). generateRecallBridge unconditionally dispatches the LLM.
+  // -------------------------------------------------------------------------
+  describe('[WI-2396] recall-bridge consent-withdrawal gate', () => {
+    const assertLlmConsentMock = jest.mocked(assertLlmConsent);
+
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls generateRecallBridge when consent is withdrawn', async () => {
+      // The consent gate runs before getSession, so no getSession fixture
+      // is needed here — a leftover mockResolvedValueOnce would never be
+      // consumed and would leak into a later, unrelated test.
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/recall-bridge`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('CONSENT_WITHDRAWN');
+      expect(generateRecallBridge).not.toHaveBeenCalled();
+    });
+
+    it('proceeds (LLM dispatched) when consent is active', async () => {
+      jest.mocked(getSession).mockResolvedValueOnce({
+        sessionType: 'homework',
+      } as never);
+      jest.mocked(generateRecallBridge).mockResolvedValueOnce({
+        questions: ['What is 2 + 2?'],
+        topicId: '550e8400-e29b-41d4-a716-446655440042',
+        topicTitle: 'Addition',
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/recall-bridge`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
+      expect(generateRecallBridge).toHaveBeenCalled();
     });
   });
 
@@ -922,6 +990,56 @@ describe('session routes', () => {
         }),
         { matcherEnabled: true },
       );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
+  // R5). startFirstCurriculumSession's topic-intent matcher
+  // (matchTopicByIntent -> routeAndCall) dispatches the LLM when
+  // MATCHER_ENABLED and multiple candidate topics exist; gated
+  // unconditionally since this endpoint is the only entry point.
+  // -------------------------------------------------------------------------
+  describe('[WI-2396] first-curriculum consent-withdrawal gate', () => {
+    const assertLlmConsentMock = jest.mocked(assertLlmConsent);
+
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls startFirstCurriculumSession when consent is withdrawn', async () => {
+      // Clear call history from the preceding describe's tests so
+      // .not.toHaveBeenCalled() below asserts this request's behavior, not
+      // an earlier test's leftover call count.
+      jest.mocked(startFirstCurriculumSession).mockClear();
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/sessions/first-curriculum`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ sessionType: 'learning', inputMode: 'text' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('CONSENT_WITHDRAWN');
+      expect(startFirstCurriculumSession).not.toHaveBeenCalled();
+    });
+
+    it('proceeds (LLM dispatched) when consent is active', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/sessions/first-curriculum`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ sessionType: 'learning', inputMode: 'text' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(201);
+      expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
+      expect(startFirstCurriculumSession).toHaveBeenCalled();
     });
   });
 
@@ -2306,6 +2424,92 @@ describe('session routes', () => {
       );
       expect(res.status).toBe(400);
       expect(mockRefundQuotaOrEscalate).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
+  // R5). submitSummary / retrySummaryFeedback -> evaluateSummary
+  // unconditionally dispatch the LLM. Separate from the exchange pipeline's
+  // own [WI-2372] gate ([WI-2372] tests above, /messages and /stream).
+  // ---------------------------------------------------------------------------
+  describe('[WI-2396] summary consent-withdrawal gate', () => {
+    const assertLlmConsentMock = jest.mocked(assertLlmConsent);
+
+    it('POST /sessions/:sessionId/summary refuses with 403 CONSENT_WITHDRAWN and never calls submitSummary when consent is withdrawn', async () => {
+      // Clear call history from earlier describes' tests so
+      // .not.toHaveBeenCalled() below asserts this request's behavior, not
+      // an earlier test's leftover call count.
+      jest.mocked(submitSummary).mockClear();
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            content:
+              'Photosynthesis converts light energy into chemical energy.',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('CONSENT_WITHDRAWN');
+      expect(submitSummary).not.toHaveBeenCalled();
+    });
+
+    it('POST /sessions/:sessionId/summary proceeds (LLM dispatched) when consent is active', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            content:
+              'Photosynthesis converts light energy into chemical energy.',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
+      expect(submitSummary).toHaveBeenCalled();
+    });
+
+    it('POST /sessions/:sessionId/summary/retry-feedback refuses with 403 CONSENT_WITHDRAWN and never calls retrySummaryFeedback when consent is withdrawn', async () => {
+      // Clear call history from earlier describes' tests so
+      // .not.toHaveBeenCalled() below asserts this request's behavior, not
+      // an earlier test's leftover call count.
+      jest.mocked(retrySummaryFeedback).mockClear();
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('CONSENT_WITHDRAWN');
+      expect(retrySummaryFeedback).not.toHaveBeenCalled();
+    });
+
+    it('POST /sessions/:sessionId/summary/retry-feedback proceeds (LLM dispatched) when consent is active', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/summary/retry-feedback`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
+      expect(retrySummaryFeedback).toHaveBeenCalled();
     });
   });
 
