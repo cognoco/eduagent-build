@@ -960,6 +960,91 @@ describe('processRecallTest', () => {
     expect(result.hint).toContain("That's okay");
   });
 
+  // [WI-2114 / AC-1 / AC-6] The Sylvia Plath preview-device exchange: a typed
+  // recall that fails under 3 times surfaces the grader's answer-specific
+  // feedback (right / missing / next step) on the result, instead of relying on
+  // fixed client copy.
+  it('[WI-2114] surfaces grader feedback on a sub-3-failure typed answer (Sylvia Plath)', async () => {
+    registerJsonGrader(
+      JSON.stringify({
+        quality: 2,
+        verdict: 'partial',
+        rationale: 'Recalled the novel but missed the poetry.',
+        misconception: null,
+        feedback: {
+          strengths:
+            'You correctly recalled that The Bell Jar is her only novel.',
+          gaps: 'You did not mention that Ariel was published after her death.',
+          nextStep:
+            'Next, note when Ariel appeared and why that timing matters.',
+        },
+      }),
+    );
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 1,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    const result = await processRecallTest(createMockDb(), profileId, {
+      topicId,
+      answer: 'The Bell Jar is her only novel.',
+    });
+
+    expect(result.failureAction).toBe('feedback_only');
+    expect(result.feedback).toEqual({
+      strengths: 'You correctly recalled that The Bell Jar is her only novel.',
+      gaps: 'You did not mention that Ariel was published after her death.',
+      nextStep: 'Next, note when Ariel appeared and why that timing matters.',
+    });
+  });
+
+  // [WI-2114 / AC-5] dont_remember is a deterministic learner signal, not a
+  // graded answer — it must carry no fabricated answer-specific feedback.
+  it('[WI-2114] does not attach feedback on the dont_remember path', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 1,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    const result = await processRecallTest(createMockDb(), profileId, {
+      topicId,
+      answer: '',
+      attemptMode: 'dont_remember',
+    });
+
+    expect(result.feedback).toBeUndefined();
+  });
+
   it('returns re_teach with a hint and no remediation on the 3rd failure (WI-1462 / RR-4)', async () => {
     const card = mockRetentionCardRow();
     setupScopedRepo({ retentionCardFindFirst: card });
@@ -2538,6 +2623,40 @@ describe('ensureRetentionCard', () => {
 });
 
 // ---------------------------------------------------------------------------
+// buildRecallGradeMessages — [WI-2114] mentor-language feedback directive (AC-4)
+// ---------------------------------------------------------------------------
+
+describe('buildRecallGradeMessages [WI-2114]', () => {
+  it('appends a language directive for a non-English mentor language', () => {
+    const messages = buildRecallGradeMessages(
+      'Some answer',
+      'Sylvia Plath',
+      undefined,
+      undefined,
+      'de',
+    );
+    const user = messages[1]?.content as string;
+    expect(user).toContain('strengths, gaps, nextStep');
+    expect(user).toContain('in German');
+    // Classification values + keys stay English so parsing is unaffected.
+    expect(user).toContain('classification values in English');
+  });
+
+  it('appends no language directive for English / undefined (snapshot-stable)', () => {
+    const en = buildRecallGradeMessages(
+      'a',
+      'Topic',
+      undefined,
+      undefined,
+      'en',
+    )[1]?.content as string;
+    const none = buildRecallGradeMessages('a', 'Topic')[1]?.content as string;
+    expect(en).not.toMatch(/Write the "feedback" strings/);
+    expect(en).toBe(none);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // evaluateRecallQuality
 // ---------------------------------------------------------------------------
 
@@ -2585,6 +2704,8 @@ describe('evaluateRecallQuality', () => {
       rationale: 'Strong recall of the light reactions.',
       misconception: null,
       rung: 1,
+      // [WI-2114] Grader response above omits feedback → null passthrough.
+      feedback: null,
     });
   });
 

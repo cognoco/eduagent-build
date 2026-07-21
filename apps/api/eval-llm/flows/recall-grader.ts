@@ -50,8 +50,9 @@ export const recallGraderFlow: FlowDefinition<RecallGraderInput> = {
       system: messages[0] ? getTextContent(messages[0].content) : '',
       user: messages[1] ? getTextContent(messages[1].content) : '',
       notes: [
-        'Grader must return ONLY the JSON object {quality, verdict, rationale, misconception}.',
+        'Grader must return ONLY the JSON object {quality, verdict, rationale, misconception, feedback}.',
         'quality 0-5 SM-2 scale; verdict in solid|partial|missing|misconception.',
+        'feedback = {strengths, gaps, nextStep} — learner-facing prose (WI-2114).',
         'A non-conforming response falls back to fallback_heuristic (no SM-2 advance).',
       ],
     };

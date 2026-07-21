@@ -20,8 +20,10 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import type { ProfileMeta } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
+import { parseConversationLanguage } from '../services/llm';
 import {
   getSubjectRetention,
   getAllSubjectsRetention,
@@ -44,6 +46,9 @@ type RetentionRouteEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    // [WI-2114] Populated by profile-scope middleware; carries the learner's
+    // conversation_language for the recall-grader feedback (AC-4).
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -123,7 +128,18 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
         await assertLlmConsent(db, profileId);
       }
 
-      const result = await processRecallTest(db, profileId, input);
+      // [WI-2114] Read the learner's tutor-prose language so the grader writes
+      // the answer-specific feedback in the mentor language (AC-4). Navigation
+      // and controls stay in the app language (client-side t()).
+      const conversationLanguage = parseConversationLanguage(
+        c.get('profileMeta')?.conversationLanguage,
+      );
+      const result = await processRecallTest(
+        db,
+        profileId,
+        input,
+        conversationLanguage,
+      );
       return c.json(recallTestResponseSchema.parse({ result }));
     },
   )
