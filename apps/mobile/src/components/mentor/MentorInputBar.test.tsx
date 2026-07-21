@@ -365,6 +365,25 @@ describe('MentorInputBar', () => {
     expect(getByTestId('mentor-bar-input').props.value).toBe('');
   });
 
+  it('keeps an in-flight capture when the learner types a bare space', async () => {
+    const { getByTestId, rerender } = render(<MentorInputBar {...baseProps} />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('mentor-bar-mic'));
+    });
+    speechListening();
+    rerender(<MentorInputBar {...baseProps} />);
+
+    fireEvent.changeText(getByTestId('mentor-bar-input'), ' ');
+
+    speechFinal('keep this');
+    await act(async () => {
+      rerender(<MentorInputBar {...baseProps} />);
+    });
+
+    expect(getByTestId('mentor-bar-input').props.value).toBe('keep this');
+  });
+
   it('drops a late transcript when the Mentor action becomes unavailable', async () => {
     const { getByTestId, rerender } = render(<MentorInputBar {...baseProps} />);
 

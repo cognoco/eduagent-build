@@ -147,8 +147,9 @@ export function MentorInputBar({
 
   const handleChangeText = useCallback((next: string): void => {
     // Emptying the field is a discard: a transcript still in flight from the
-    // current capture must not repopulate what the learner just cleared.
-    if (!next.trim()) {
+    // current capture must not repopulate what the learner just cleared. The
+    // test is emptiness, not blankness — typing a space is not a discard.
+    if (next.length === 0) {
       captureRef.current.accepting = false;
     }
     setValue(next);
