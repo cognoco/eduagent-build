@@ -56,7 +56,11 @@ describe('NowCardStack', () => {
     );
 
     const stack = getByTestId('now-card-stack');
-    expect(stack.children.map((child) => child.props.testID)).toEqual([
+    expect(
+      stack.children.map(
+        (child: { props: { testID?: string } }) => child.props.testID,
+      ),
+    ).toEqual([
       'now-card-slot-anchor',
       'now-card-slot-module-0',
       'now-card-slot-receipt-0',
