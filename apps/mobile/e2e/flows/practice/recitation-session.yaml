@@ -47,20 +47,23 @@ tags:
 # practice-recitation is the SECOND card inside the "Other practice" horizontal
 # ScrollView (practice-other-practice-slider, practice/index.tsx:799).
 # Step 1: scroll the outer vertical container DOWN until the slider is in the
-# viewport (practice-dictation is the first card — confirmed working in
-# dictation-full-flow.yaml).
+# viewport.
 # Step 2: scroll RIGHT inside the horizontal slider to reach practice-recitation.
 - scrollUntilVisible:
     element:
-      id: 'practice-dictation'
+      id: 'practice-other-practice-slider'
     direction: DOWN
     timeout: 5000
+    visibilityPercentage: 80
+    centerElement: true
 
 - scrollUntilVisible:
     element:
       id: 'practice-recitation'
     direction: RIGHT
     timeout: 5000
+    visibilityPercentage: 100
+    centerElement: true
 
 - tapOn:
     id: 'practice-recitation'

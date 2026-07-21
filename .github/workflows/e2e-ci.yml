@@ -342,7 +342,9 @@ jobs:
             # Session close/summary paths use a CORE Inngest dispatch. Give the
             # local Worker the staging outbound key so those user actions keep
             # their production fail-closed contract during native E2E.
-            printf 'DATABASE_URL=%s\nNODE_ENV=test\nTEST_SEED_SECRET=%s\nCLERK_SECRET_KEY=%s\nCLERK_JWKS_URL=%s\nCLERK_AUDIENCE=%s\nSEED_PASSWORD=%s\nINNGEST_EVENT_KEY=%s\n' \
+            # Consent action links must point back to the emulator-reachable
+            # runner Worker; this origin is public configuration, not a secret.
+            printf 'DATABASE_URL=%s\nNODE_ENV=test\nTEST_SEED_SECRET=%s\nCLERK_SECRET_KEY=%s\nCLERK_JWKS_URL=%s\nCLERK_AUDIENCE=%s\nSEED_PASSWORD=%s\nINNGEST_EVENT_KEY=%s\nAPI_ORIGIN=http://10.0.2.2:8787\n' \
               \"\$DATABASE_URL\" \"\$TEST_SEED_SECRET\" \"\$CLERK_SECRET_KEY\" \
               \"\$CLERK_JWKS_URL\" \"\$CLERK_AUDIENCE\" \"\$SEED_PASSWORD\" \
               \"\$INNGEST_EVENT_KEY\" \

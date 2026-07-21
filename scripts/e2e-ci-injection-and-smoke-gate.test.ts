@@ -893,6 +893,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(writeVarsScript).toContain('SEED_PASSWORD');
     expect(writeVarsScript).toContain('TEST_SEED_SECRET');
     expect(writeVarsScript).toContain('INNGEST_EVENT_KEY');
+    expect(writeVarsScript).toContain('API_ORIGIN=http://10.0.2.2:8787');
     expect(writeVarsScript).not.toContain('${{ secrets.');
   });
 
@@ -914,6 +915,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       CLERK_AUDIENCE: 'doppler-audience',
       SEED_PASSWORD: 'doppler-seed-password',
       INNGEST_EVENT_KEY: 'doppler-inngest-event-key',
+      API_ORIGIN: 'http://10.0.2.2:8787',
     });
   });
 
@@ -1632,7 +1634,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       };
       tapOn?: { id?: string };
       assertVisible?: { id?: string };
-      extendedWaitUntil?: { visible?: { id?: string } | string };
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        timeout?: number;
+        optional?: boolean;
+      };
     }>;
     const scroll = commands.findIndex(
       ({ scrollUntilVisible }) =>
@@ -1713,6 +1719,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         typeof extendedWaitUntil?.visible === 'object' &&
         extendedWaitUntil.visible.id === 'chat-input',
     );
+    const greeting = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > chatInput &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'message-bubble-assistant-0' &&
+        extendedWaitUntil.optional !== true,
+    );
 
     expect(cancelScroll).toBeGreaterThan(tap);
     expect(cancelAssert).toBeGreaterThan(cancelScroll);
@@ -1728,6 +1741,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(readyStart).toBeGreaterThan(readyStartAssert);
     expect(sessionScreen).toBeGreaterThan(readyStart);
     expect(chatInput).toBeGreaterThan(sessionScreen);
+    expect(greeting).toBeGreaterThan(chatInput);
+    expect(commands[greeting]?.extendedWaitUntil?.timeout).toBe(30000);
+    expect(source).not.toContain('Your mate is here');
   });
 
   it('[WI-1864] follows the pending gate before native consent handoff', () => {
@@ -1834,6 +1850,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       extendedWaitUntil?: {
         visible?: { id?: string; enabled?: boolean } | string;
         timeout?: number;
+        optional?: boolean;
       };
     }>;
     const submit = commands.findIndex(
@@ -1857,7 +1874,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ({ extendedWaitUntil }, index) =>
         index > submitTurn &&
         typeof extendedWaitUntil?.visible === 'object' &&
-        extendedWaitUntil.visible.id === 'message-bubble-assistant-3',
+        extendedWaitUntil.visible.id === 'message-bubble-assistant-2' &&
+        extendedWaitUntil.optional !== true,
     );
     const responseReady = commands.findIndex(
       ({ extendedWaitUntil }, index) =>
@@ -2031,6 +2049,290 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(assertions).not.toContain('Waiting for approval');
   });
 
+  it('[WI-1864] asserts the current preview-subject contract instead of retired disclaimer copy', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/consent/consent-pending-gate.yaml'),
+      'utf8',
+    );
+    const canonicalCopy = JSON.parse(
+      readFileSync(
+        join(repoRoot, 'apps/mobile/src/i18n/locales/en.json'),
+        'utf8',
+      ),
+    ) as { tabs: { previewSubjectBrowser: { description: string } } };
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+      assertVisible?:
+        | {
+            id?: string;
+            text?: string;
+            optional?: boolean;
+          }
+        | string;
+    }>;
+    const browser = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'preview-subject-browser',
+    );
+    const description = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > browser &&
+        typeof assertVisible === 'object' &&
+        assertVisible.text ===
+          canonicalCopy.tabs.previewSubjectBrowser.description &&
+        assertVisible.optional !== true,
+    );
+
+    expect(browser).toBeGreaterThan(-1);
+    expect(description).toBeGreaterThan(browser);
+    expect(source).not.toContain(
+      "Here's a preview of what you can learn. You'll unlock these once your parent approves.",
+    );
+  });
+
+  it('[WI-1864] selects the planted homework image through the API-34 picker tile id', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/homework/gallery-picker.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+      tapOn?: {
+        id?: string;
+        text?: string;
+        index?: number;
+        optional?: boolean;
+      };
+    }>;
+    const tileId =
+      'com(?:\\.google)?\\.android\\.providers\\.media\\.module:id/icon_thumbnail';
+    const tileWait = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === tileId,
+    );
+    const tileTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > tileWait && tapOn?.id === tileId && tapOn.index === 0,
+    );
+
+    expect(tileWait).toBeGreaterThan(-1);
+    expect(tileTap).toBeGreaterThan(tileWait);
+    expect(commands[tileTap]?.tapOn?.optional).not.toBe(true);
+    expect(commands.some(({ tapOn }) => tapOn?.text === 'Photos')).toBe(false);
+  });
+
+  it('[WI-1864] exercises the seeded wrong-answer dispute and correct-answer suppression paths', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/quiz/quiz-dispute.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      openLink?: string;
+      tapOn?: { id?: string; text?: string; optional?: boolean } | string;
+      assertNotVisible?: { id?: string; optional?: boolean } | string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+    }>;
+    const launch = commands.findIndex(
+      ({ openLink }) =>
+        typeof openLink === 'string' &&
+        openLink.includes('/quiz/launch?') &&
+        openLink.includes('roundId=${ROUND_ID}'),
+    );
+    const wrongAnswer = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > launch &&
+        typeof tapOn === 'object' &&
+        tapOn.text === '${WRONG_ANSWER}' &&
+        tapOn.optional !== true,
+    );
+    const wrongReceipt = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > wrongAnswer &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'quiz-next-question-footer' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const disputeButton = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > wrongReceipt &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'quiz-dispute-button' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const disputeTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > disputeButton &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'quiz-dispute-button' &&
+        tapOn.optional !== true,
+    );
+    const disputeNoted = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > disputeTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'quiz-dispute-noted' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const advance = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > disputeNoted &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'quiz-next-question' &&
+        tapOn.optional !== true,
+    );
+    const correctAnswer = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > advance &&
+        typeof tapOn === 'object' &&
+        tapOn.text === '${CORRECT_ANSWER}' &&
+        tapOn.optional !== true,
+    );
+    const correctReceipt = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > correctAnswer &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'quiz-next-question-footer' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const disputeSuppressed = commands.findIndex(
+      ({ assertNotVisible }, index) =>
+        index > correctReceipt &&
+        typeof assertNotVisible === 'object' &&
+        assertNotVisible.id === 'quiz-dispute-button' &&
+        assertNotVisible.optional !== true,
+    );
+
+    expect(launch).toBeGreaterThan(-1);
+    expect(wrongAnswer).toBeGreaterThan(launch);
+    expect(wrongReceipt).toBeGreaterThan(wrongAnswer);
+    expect(disputeButton).toBeGreaterThan(wrongReceipt);
+    expect(disputeTap).toBeGreaterThan(disputeButton);
+    expect(disputeNoted).toBeGreaterThan(disputeTap);
+    expect(advance).toBeGreaterThan(disputeNoted);
+    expect(correctAnswer).toBeGreaterThan(advance);
+    expect(correctReceipt).toBeGreaterThan(correctAnswer);
+    expect(disputeSuppressed).toBeGreaterThan(correctReceipt);
+  });
+
+  it('[WI-1864] navigates both axes of the Other practice slider explicitly', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/practice/practice-hub-navigation.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+      };
+      tapOn?: { id?: string };
+    }>;
+    const slider = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'practice-other-practice-slider' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 80 &&
+        scrollUntilVisible.centerElement === true,
+    );
+    const recitation = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > slider &&
+        scrollUntilVisible?.element?.id === 'practice-recitation' &&
+        scrollUntilVisible.direction === 'RIGHT' &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === true,
+    );
+    const recitationTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > recitation && tapOn?.id === 'practice-recitation',
+    );
+    const dictation = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > recitationTap &&
+        scrollUntilVisible?.element?.id === 'practice-dictation' &&
+        scrollUntilVisible.direction === 'LEFT' &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === true,
+    );
+    const secondSlider = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > recitationTap &&
+        index < dictation &&
+        scrollUntilVisible?.element?.id === 'practice-other-practice-slider' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 80 &&
+        scrollUntilVisible.centerElement === true,
+    );
+
+    expect(slider).toBeGreaterThan(-1);
+    expect(recitation).toBeGreaterThan(slider);
+    expect(recitationTap).toBeGreaterThan(recitation);
+    expect(secondSlider).toBeGreaterThan(recitationTap);
+    expect(dictation).toBeGreaterThan(secondSlider);
+    expect(
+      commands.some(
+        ({ scrollUntilVisible }) =>
+          scrollUntilVisible?.element?.id === 'practice-dictation' &&
+          scrollUntilVisible.direction === 'DOWN',
+      ),
+    ).toBe(false);
+  });
+
+  it('[WI-1864] reaches the standalone recitation journey through the slider container', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/practice/recitation-session.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+      };
+      tapOn?: { id?: string };
+    }>;
+    const slider = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'practice-other-practice-slider' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 80 &&
+        scrollUntilVisible.centerElement === true,
+    );
+    const recitation = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > slider &&
+        scrollUntilVisible?.element?.id === 'practice-recitation' &&
+        scrollUntilVisible.direction === 'RIGHT' &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === true,
+    );
+    const tap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > recitation && tapOn?.id === 'practice-recitation',
+    );
+
+    expect(slider).toBeGreaterThan(-1);
+    expect(recitation).toBeGreaterThan(slider);
+    expect(tap).toBeGreaterThan(recitation);
+    expect(
+      commands.some(
+        ({ scrollUntilVisible }) =>
+          scrollUntilVisible?.element?.id === 'practice-dictation' &&
+          scrollUntilVisible.direction === 'DOWN',
+      ),
+    ).toBe(false);
+  });
+
   it('[WI-1864] opens the seeded parent topic through its stable card id', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/parent/child-drill-down.yaml'),
@@ -2106,7 +2408,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
     const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
       tapOn?: { id?: string };
-      scrollUntilVisible?: { element?: { id?: string } };
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+      };
     }>;
     const profileTap = commands.findIndex(
       ({ tapOn }) =>
@@ -2129,7 +2436,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
     const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
       tapOn?: { id?: string };
-      scrollUntilVisible?: { element?: { id?: string } };
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+      };
     }>;
     const profileTap = commands.findIndex(
       ({ tapOn }) =>
@@ -2137,11 +2449,19 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
     const consentScroll = commands.findIndex(
       ({ scrollUntilVisible }) =>
-        scrollUntilVisible?.element?.id === 'consent-section',
+        scrollUntilVisible?.element?.id === 'withdraw-consent-button' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === true,
+    );
+    const withdrawTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > consentScroll && tapOn?.id === 'withdraw-consent-button',
     );
 
     expect(profileTap).toBeGreaterThan(-1);
     expect(consentScroll).toBeGreaterThan(profileTap);
+    expect(withdrawTap).toBeGreaterThan(consentScroll);
     expect(source).not.toContain('parent-home-check-child-${CHILD_PROFILE_ID}');
   });
 

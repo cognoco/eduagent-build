@@ -14,13 +14,13 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "onboarding-complete"
+      SEED_SCENARIO: 'onboarding-complete'
       API_URL: ${API_URL}
 
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 # 3. Create a new subject — tap Learn intent card (replaced add-subject-button)
@@ -30,38 +30,38 @@ tags:
 # home-action-practice (the 2nd action, which also needs scrolling).
 - scrollUntilVisible:
     element:
-      id: "home-action-study-new"
+      id: 'home-action-study-new'
     direction: DOWN
     timeout: 5000
 
 - tapOn:
-    id: "home-action-study-new"
+    id: 'home-action-study-new'
 
 # 4. Wait for create-subject modal
 - extendedWaitUntil:
     visible:
-      id: "create-subject-name"
+      id: 'create-subject-name'
     timeout: 10000
 
 # 5. Enter subject name
 - tapOn:
-    id: "create-subject-name"
-- inputText: "Test Math"
+    id: 'create-subject-name'
+- inputText: 'Test Math'
 
 # 6. Submit subject creation
 - tapOn:
-    id: "create-subject-submit"
+    id: 'create-subject-submit'
 
 # 7. Wait for interview/session screen (chat input present)
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'chat-input'
     timeout: 30000
 
 # 8. Send a message in the session
 - tapOn:
-    id: "chat-input"
-- inputText: "I want to learn about algebra fundamentals"
+    id: 'chat-input'
+- inputText: 'I want to learn about algebra fundamentals'
 
 # 9. Tap send
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key
@@ -72,12 +72,12 @@ tags:
 # 10. Wait for AI response
 - extendedWaitUntil:
     visible:
-      id: "message-bubble-assistant-3"
+      id: 'message-bubble-assistant-2'
     timeout: 30000
 
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'chat-input'
       enabled: true
     timeout: 30000
 

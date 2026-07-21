@@ -11,7 +11,7 @@ import {
 } from '@eduagent/schemas';
 import { DeskLampAnimation } from '../../../components/common';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
-import { useGenerateRound } from '../../../hooks/use-quiz';
+import { useFetchRound, useGenerateRound } from '../../../hooks/use-quiz';
 import { homeHrefForReturnTo } from '../../../lib/navigation';
 import { resolveLoadingMotionPreset } from '../../../lib/motion-presets';
 import { useThemeColors } from '../../../lib/theme';
@@ -77,11 +77,13 @@ export default function QuizLaunchScreen(): React.ReactElement {
     subjectId: routeSubjectIdParam,
     languageName: routeLanguageNameParam,
     returnTo: routeReturnToParam,
+    roundId: routeRoundIdParam,
   } = useLocalSearchParams<{
     activityType?: string | string[];
     subjectId?: string | string[];
     languageName?: string | string[];
     returnTo?: string | string[];
+    roundId?: string | string[];
   }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -103,6 +105,13 @@ export default function QuizLaunchScreen(): React.ReactElement {
   const routeSubjectId = firstRouteParam(routeSubjectIdParam);
   const routeLanguageName = firstRouteParam(routeLanguageNameParam);
   const routeReturnTo = firstRouteParam(routeReturnToParam);
+  // [WI-1864] Seeded active rounds are a native-E2E fixture entry path only.
+  // Production builds ignore a hostile or accidental roundId query param and
+  // continue through the normal POST /quiz/rounds generation path.
+  const e2eRoundId =
+    process.env.EXPO_PUBLIC_E2E === 'true'
+      ? firstRouteParam(routeRoundIdParam)
+      : null;
   const effectiveActivityType = routeActivityType ?? activityType;
   const effectiveSubjectId =
     routeSubjectId !== null && routeSubjectId !== undefined
@@ -116,6 +125,8 @@ export default function QuizLaunchScreen(): React.ReactElement {
     ? homeHrefForReturnTo(effectiveReturnTo)
     : ('/(app)/quiz' as Href);
   const generateRound = useGenerateRound();
+  const seededRound = useFetchRound(e2eRoundId);
+  const seededRoundData = seededRound.data;
   const generateRoundMutate = generateRound.mutate;
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [challengeRound, setChallengeRound] =
@@ -197,6 +208,13 @@ export default function QuizLaunchScreen(): React.ReactElement {
   ]);
 
   useEffect(() => {
+    if (!e2eRoundId || !seededRoundData || startedRef.current) return;
+    startedRef.current = true;
+    enterPlay(seededRoundData);
+  }, [e2eRoundId, enterPlay, seededRoundData]);
+
+  useEffect(() => {
+    if (e2eRoundId) return;
     if (!effectiveActivityType) {
       router.replace('/(app)/quiz' as Href);
       return;
@@ -204,7 +222,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
     if (startedRef.current) return;
     startedRef.current = true;
     startRound();
-  }, [effectiveActivityType, router, startRound]);
+  }, [e2eRoundId, effectiveActivityType, router, startRound]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -248,7 +266,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
   // Kids reading slowly may miss the banner entirely if it auto-dismisses.
   // The Start button is the only way to advance — explicit user action.
 
-  if (!effectiveActivityType) {
+  if (!effectiveActivityType && !e2eRoundId) {
     return <View className="flex-1 bg-background" />;
   }
 

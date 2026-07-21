@@ -1032,7 +1032,7 @@ describe('new Stage-0 scenarios return required IDs', () => {
     },
     {
       scenario: 'quiz-deterministic-wrong-answer',
-      requiredIds: ['subjectId', 'roundId', 'wrongOptionIndex'],
+      requiredIds: ['subjectId', 'roundId', 'wrongAnswer', 'correctAnswer'],
     },
     {
       scenario: 'quiz-answer-check-fails',
@@ -1071,6 +1071,51 @@ describe('new Stage-0 scenarios return required IDs', () => {
       expect(mockDb.insert).toHaveBeenCalled();
     },
   );
+
+  it('[WI-1864] seeds a non-final dispute round with stable wrong and correct answer text', async () => {
+    const mockDb = createMockDb();
+    const result = await seedScenario(
+      mockDb,
+      'quiz-deterministic-wrong-answer' as SeedScenario,
+      'test@example.com',
+    );
+
+    expect(result.ids).toEqual(
+      expect.objectContaining({
+        roundId: expect.any(String),
+        wrongAnswer: 'goodbye',
+        correctAnswer: 'thanks',
+      }),
+    );
+    const valuesMock = (mockDb.insert as jest.Mock).mock.results[0]?.value
+      .values as jest.Mock;
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: result.ids.roundId,
+        activityType: 'vocabulary',
+        status: 'active',
+        total: 3,
+        questions: [
+          expect.objectContaining({
+            type: 'vocabulary',
+            term: 'bonjour',
+            correctAnswer: 'hello',
+            distractors: expect.arrayContaining(['goodbye']),
+          }),
+          expect.objectContaining({
+            type: 'vocabulary',
+            term: 'merci',
+            correctAnswer: 'thanks',
+          }),
+          expect.objectContaining({
+            type: 'vocabulary',
+            term: 'au revoir',
+            correctAnswer: 'goodbye',
+          }),
+        ],
+      }),
+    );
+  });
 
   it('[WI-2190] seeds a completed quiz round in the schema-valid graded detail shape', async () => {
     const mockDb = createMockDb();

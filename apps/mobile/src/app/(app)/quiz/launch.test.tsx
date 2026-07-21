@@ -77,6 +77,7 @@ const mockSetSubjectId = jest.fn();
 const mockSetLanguageName = jest.fn();
 const mockSetReturnTo = jest.fn();
 const mockMutate = jest.fn();
+const mockUseFetchRound = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 let mockFlowActivityType: 'capitals' | 'guess_who' | 'vocabulary' | null =
   'capitals';
@@ -105,6 +106,37 @@ const challengeRound = {
       isLibraryItem: false,
     },
   ],
+};
+
+const seededE2ERound = {
+  id: 'c0000000-0000-4000-a000-000000000186',
+  activityType: 'vocabulary' as const,
+  theme: 'Deterministic vocabulary',
+  total: 2,
+  questions: [
+    {
+      type: 'vocabulary' as const,
+      term: 'bonjour',
+      options: ['hello', 'goodbye', 'please', 'thanks'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+      freeTextEligible: false,
+    },
+    {
+      type: 'vocabulary' as const,
+      term: 'merci',
+      options: ['thanks', 'hello', 'please', 'goodbye'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+      freeTextEligible: false,
+    },
+  ],
+};
+
+let mockFetchRound = {
+  data: undefined as typeof seededE2ERound | undefined,
 };
 
 jest.mock('expo-router', () => ({
@@ -157,6 +189,10 @@ jest.mock(
   () => ({
     ...jest.requireActual('../../../hooks/use-quiz'),
     useGenerateRound: () => mockGenerateRound,
+    useFetchRound: (roundId: string | null) => {
+      mockUseFetchRound(roundId);
+      return mockFetchRound;
+    },
   }),
 );
 
@@ -177,6 +213,7 @@ jest.mock(
 );
 
 const { default: QuizLaunchScreen, friendlyErrorMessage } = require('./launch');
+const previousE2E = process.env.EXPO_PUBLIC_E2E;
 
 describe('friendlyErrorMessage', () => {
   it('returns friendly message for UPSTREAM_ERROR code', () => {
@@ -200,6 +237,7 @@ describe('friendlyErrorMessage', () => {
 describe('QuizLaunchScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.EXPO_PUBLIC_E2E = 'false';
     mockSearchParams = {};
     mockFlowActivityType = 'capitals';
     mockFlowReturnTo = null;
@@ -209,6 +247,7 @@ describe('QuizLaunchScreen', () => {
       isError: false,
       error: null,
     };
+    mockFetchRound = { data: undefined };
     mockMutate.mockImplementation(
       (
         _input: unknown,
@@ -217,6 +256,47 @@ describe('QuizLaunchScreen', () => {
         options?.onSuccess?.(challengeRound);
       },
     );
+  });
+
+  afterAll(() => {
+    if (previousE2E === undefined) {
+      delete process.env.EXPO_PUBLIC_E2E;
+      return;
+    }
+    process.env.EXPO_PUBLIC_E2E = previousE2E;
+  });
+
+  it('[WI-1864] loads a seeded active round by ID only in an E2E build', async () => {
+    process.env.EXPO_PUBLIC_E2E = 'true';
+    mockSearchParams = {
+      activityType: 'vocabulary',
+      subjectId: 'subject-id',
+      roundId: seededE2ERound.id,
+    };
+    mockFetchRound = { data: seededE2ERound };
+
+    render(<QuizLaunchScreen />);
+
+    await waitFor(() => {
+      expect(mockSetRound).toHaveBeenCalledWith(seededE2ERound);
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz/play');
+    });
+    expect(mockUseFetchRound).toHaveBeenCalledWith(seededE2ERound.id);
+    expect(mockMutate).not.toHaveBeenCalled();
+  });
+
+  it('[WI-1864] ignores a roundId route param outside E2E builds', async () => {
+    mockSearchParams = {
+      activityType: 'capitals',
+      roundId: seededE2ERound.id,
+    };
+
+    render(<QuizLaunchScreen />);
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalled();
+    });
+    expect(mockUseFetchRound).toHaveBeenCalledWith(null);
   });
 
   it('shows the challenge banner before entering a difficulty bump round', async () => {

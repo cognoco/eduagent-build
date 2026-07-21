@@ -4055,12 +4055,12 @@ async function seedQuizMalformedRound(
 
 // ---------------------------------------------------------------------------
 // Scenario: quiz-deterministic-wrong-answer
-// A pre-inserted quiz round with a known-wrong option at a deterministic index.
-// The E2E dispute test taps option index 1 which is always wrong (correctAnswer
-// is at index 0 after the server side shuffle; we arrange distractors so the
-// round's stored question places the correct answer first in the options
-// presented to the client).
-// Returns ROUND_ID.
+// A pre-inserted three-question vocabulary round. The E2E dispute test selects
+// answer text rather than an option index because the client-safe API projection
+// deliberately shuffles options on every fetch. Three questions keep both the
+// wrong-answer dispute and correct-answer suppression checks away from the final
+// question's automatic round submission.
+// Returns ROUND_ID, WRONG_ANSWER, and CORRECT_ANSWER.
 // ---------------------------------------------------------------------------
 
 async function seedQuizDeterministicWrongAnswer(
@@ -4112,29 +4112,53 @@ async function seedQuizDeterministicWrongAnswer(
     'Geography',
   );
 
-  // Question with correctAnswer='Paris', distractors are clearly wrong.
-  // Index 0 = correct, index 1-3 = wrong — E2E flow taps index 1 to submit
-  // a known-wrong answer for the dispute test.
-  const deterministicQuestion = {
-    type: 'capitals',
-    country: 'France',
-    correctAnswer: 'Paris',
-    acceptedAliases: ['Paris'],
-    distractors: ['London', 'Berlin', 'Madrid'],
-    funFact: 'Paris has been the capital of France since the 10th century.',
-    isLibraryItem: false,
-    topicId: null,
-    freeTextEligible: false,
-  };
+  const deterministicQuestions = [
+    {
+      type: 'vocabulary',
+      term: 'bonjour',
+      correctAnswer: 'hello',
+      acceptedAnswers: ['hello'],
+      distractors: ['goodbye', 'please', 'thanks'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+      vocabularyId: null,
+      freeTextEligible: false,
+    },
+    {
+      type: 'vocabulary',
+      term: 'merci',
+      correctAnswer: 'thanks',
+      acceptedAnswers: ['thanks'],
+      distractors: ['hello', 'please', 'goodbye'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+      vocabularyId: null,
+      freeTextEligible: false,
+    },
+    {
+      type: 'vocabulary',
+      term: 'au revoir',
+      correctAnswer: 'goodbye',
+      acceptedAnswers: ['goodbye'],
+      distractors: ['hello', 'please', 'thanks'],
+      funFact: '',
+      cefrLevel: 'A1',
+      isLibraryItem: false,
+      vocabularyId: null,
+      freeTextEligible: false,
+    },
+  ];
 
   const roundId = generateUUIDv7();
   await db.insert(quizRounds).values({
     id: roundId,
     profileId,
-    activityType: 'capitals',
-    theme: 'European Capitals',
-    questions: [deterministicQuestion],
-    total: 1,
+    activityType: 'vocabulary',
+    theme: 'Deterministic vocabulary',
+    questions: deterministicQuestions,
+    total: 3,
     libraryQuestionIndices: [],
     status: 'active',
   });
@@ -4145,7 +4169,12 @@ async function seedQuizDeterministicWrongAnswer(
     profileId,
     email,
     password,
-    ids: { subjectId, roundId, wrongOptionIndex: '1' },
+    ids: {
+      subjectId,
+      roundId,
+      wrongAnswer: 'goodbye',
+      correctAnswer: 'thanks',
+    },
   };
 }
 

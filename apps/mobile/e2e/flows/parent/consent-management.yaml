@@ -32,7 +32,7 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "parent-with-children"
+      SEED_SCENARIO: 'parent-with-children'
       API_URL: ${API_URL}
 
 # 2. Parent owners land on parent-home-screen once the family navigation
@@ -44,7 +44,7 @@ tags:
 #    past child detail (double router.push bug).
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 15000
 
 # 3. Tap child card to navigate to child detail.
@@ -53,40 +53,42 @@ tags:
 #    parent-home-child-profile-${CHILD_PROFILE_ID} opens settings mode, where
 #    consent management is rendered.
 - tapOn:
-    id: "parent-home-child-profile-${CHILD_PROFILE_ID}"
+    id: 'parent-home-child-profile-${CHILD_PROFILE_ID}'
 
 # 4. Wait for child detail screen
 - extendedWaitUntil:
     visible:
-      id: "child-detail-scroll"
+      id: 'child-detail-scroll'
     timeout: 10000
 
-# 5. Scroll down to consent section (it is at the bottom of the scroll view)
+# 5. Scroll the actual action fully above the viewport edge.
 - scrollUntilVisible:
     element:
-      id: "consent-section"
+      id: 'withdraw-consent-button'
     direction: DOWN
     timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
 
 # 6. Screenshot: consent section visible with "Withdraw Consent" button
 - takeScreenshot: consent-mgmt-01-consent-section
 
 # 7. Verify withdraw consent button is visible
 - assertVisible:
-    id: "withdraw-consent-button"
+    id: 'withdraw-consent-button'
 
 # 8. Tap withdraw consent button — this triggers a native Alert dialog
 - tapOn:
-    id: "withdraw-consent-button"
+    id: 'withdraw-consent-button'
 
 # 9. Wait for the native alert confirmation dialog
 #    Alert title is "Withdraw consent for {childName}?" — Maestro cannot
 #    substring-match "Withdraw consent" from the full title (BUG-49 pattern).
 - extendedWaitUntil:
     visible:
-      text: "Withdraw consent"
+      text: 'Withdraw consent'
     timeout: 5000
-    optional: true  # justified: native Alert.alert title text matching is unreliable on Android; full title includes child name which varies
+    optional: true # justified: native Alert.alert title text matching is unreliable on Android; full title includes child name which varies
 
 # 10. Screenshot: confirmation dialog
 - takeScreenshot: consent-mgmt-02-confirm-dialog
@@ -94,40 +96,40 @@ tags:
 # 11. Tap "WITHDRAW" button in the alert to confirm
 #     React Native passes the title-cased label through to the native alert.
 - tapOn:
-    text: "Withdraw"
-    optional: true  # justified: title-case "Withdraw" vs. all-caps "WITHDRAW" varies by Android OEM skin; exactly one fires
+    text: 'Withdraw'
+    optional: true # justified: title-case "Withdraw" vs. all-caps "WITHDRAW" varies by Android OEM skin; exactly one fires
 
 - tapOn:
-    text: "WITHDRAW"
-    optional: true  # justified: Android OEM skins expose destructive button in all caps; alternative to "Withdraw" above
+    text: 'WITHDRAW'
+    optional: true # justified: Android OEM skins expose destructive button in all caps; alternative to "Withdraw" above
 
 # 12. Wait for screen-level withdrawn gate to appear (consent is now WITHDRAWN)
 - extendedWaitUntil:
     visible:
-      id: "consent-withdrawn-empty-state"
+      id: 'consent-withdrawn-empty-state'
     timeout: 10000
 
 # 13. Verify restore CTA is present
 - assertVisible:
-    id: "consent-withdrawn-request-cta"
+    id: 'consent-withdrawn-request-cta'
 
 # 14. Screenshot: withdrawn gate with restore option
 - takeScreenshot: consent-mgmt-03-withdrawn-empty-state
 
 # 15. Tap restore CTA to restore consent
 - tapOn:
-    id: "consent-withdrawn-request-cta"
+    id: 'consent-withdrawn-request-cta'
 
 # 16. Wait for consent to be restored and child detail to render again
 - extendedWaitUntil:
     visible:
-      id: "child-detail-scroll"
+      id: 'child-detail-scroll'
     timeout: 10000
 
 # 17. Scroll back to consent section and verify withdraw button is available again
 - scrollUntilVisible:
     element:
-      id: "withdraw-consent-button"
+      id: 'withdraw-consent-button'
     direction: DOWN
     timeout: 10000
 
@@ -136,7 +138,7 @@ tags:
 
 # 19. Navigate back to dashboard
 - tapOn:
-    id: "back-button"
+    id: 'back-button'
 
 # 20. Final screenshot
 - takeScreenshot: consent-mgmt-05-complete
