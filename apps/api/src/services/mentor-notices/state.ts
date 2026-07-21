@@ -59,11 +59,14 @@ export async function acceptMentorNotice(
       concept: copy.concept,
       correctionHint: copy.correctionHint,
     })
-    // [WI-2500] Target the evidence-aware composite constraint, not the old
-    // source-session-only one — a stale target here would silently no-op
-    // instead of erroring, masking a real duplicate-insert bug.
+    // [WI-2500] Target the evidence-backed partial unique index — every
+    // fresh notice always carries an answerEventId (evidence.ts guarantees
+    // it), so this is always the applicable index, not the legacy
+    // NULL-evidence one. A stale/mismatched target here would silently
+    // no-op instead of erroring, masking a real duplicate-insert bug.
     .onConflictDoNothing({
       target: [mentorNotices.sourceSessionId, mentorNotices.answerEventId],
+      where: sql`${mentorNotices.answerEventId} IS NOT NULL`,
     })
     .returning({
       id: mentorNotices.id,

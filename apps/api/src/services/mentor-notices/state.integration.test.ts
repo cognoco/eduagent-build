@@ -143,7 +143,7 @@ describeIfDb(
       expect(rows[0]!.answerEventId).toBe(fixture.eventAId);
     });
 
-    it('allows a second, differently-evidenced notice in the same session', async () => {
+    it('allows a second, DIFFERENTLY-evidenced notice in the SAME session — the case the old session-only constraint wrongly forbade', async () => {
       const fixture = await seedFixture();
 
       const firstNotice = await acceptMentorNotice(db, {

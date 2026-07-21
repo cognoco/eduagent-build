@@ -1,4 +1,5 @@
-import type { Database } from '@eduagent/database';
+import { mentorNotices, type Database } from '@eduagent/database';
+import { sql } from 'drizzle-orm';
 
 import { acceptMentorNotice, prepareMentorNoticeCopy } from './state';
 
@@ -50,16 +51,19 @@ describe('mentor notice creation state', () => {
     expect(onConflictDoNothing).toHaveBeenCalledTimes(1);
   });
 
-  it('targets the evidence-aware composite constraint, not the retired session-only one', async () => {
+  it('targets the evidence-backed partial unique index, not the retired session-only one', async () => {
     const { db, onConflictDoNothing } = makeInsertDb([]);
     await acceptMentorNotice(db, input);
-    // [WI-2500] A stale conflict target here would silently no-op post
-    // migration instead of erroring — this pins the target to both columns.
+    // [WI-2500] A stale/mismatched target here would silently no-op post
+    // migration instead of erroring — this pins both the column pair AND the
+    // partial-index predicate, since Postgres requires an exact match on
+    // both to infer the conflict target.
     expect(onConflictDoNothing).toHaveBeenCalledWith({
       target: expect.arrayContaining([
         expect.objectContaining({ name: 'source_session_id' }),
         expect.objectContaining({ name: 'answer_event_id' }),
       ]),
+      where: sql`${mentorNotices.answerEventId} IS NOT NULL`,
     });
   });
 

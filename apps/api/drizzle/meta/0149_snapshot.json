@@ -1,5 +1,5 @@
 {
-  "id": "d5aa743f-b00b-43c4-bb0f-39f2561c25c7",
+  "id": "cb6d7f35-9732-40cc-ad61-47f585c9093f",
   "prevId": "ce44e1a1-4c4d-4964-9619-f5eafb48f55e",
   "version": "7",
   "dialect": "postgresql",
@@ -12323,6 +12323,44 @@
         }
       },
       "indexes": {
+        "mentor_notices_source_session_answer_event_uq": {
+          "name": "mentor_notices_source_session_answer_event_uq",
+          "columns": [
+            {
+              "expression": "source_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "answer_event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"mentor_notices\".\"answer_event_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "mentor_notices_source_session_null_evidence_uq": {
+          "name": "mentor_notices_source_session_null_evidence_uq",
+          "columns": [
+            {
+              "expression": "source_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"mentor_notices\".\"answer_event_id\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "mentor_notices_profile_status_created_idx": {
           "name": "mentor_notices_profile_status_created_idx",
           "columns": [
@@ -12465,13 +12503,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "mentor_notices_source_session_answer_event_unique": {
-          "name": "mentor_notices_source_session_answer_event_unique",
-          "nullsNotDistinct": true,
-          "columns": ["source_session_id", "answer_event_id"]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
         "mentor_notices_offer_count_nonnegative": {

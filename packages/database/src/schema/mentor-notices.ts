@@ -7,7 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
-  unique,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -84,18 +84,28 @@ export const mentorNotices = pgTable(
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
   },
   (table) => [
-    // [WI-2500] Composite, evidence-aware replacement for the old
-    // source-session-only unique constraint (clause 4 — durable identity
-    // includes source session PLUS validated answer-event evidence). Postgres
-    // compares NULLs as equal under nullsNotDistinct() for the WHOLE tuple,
-    // not per column, so a legacy NULL-evidence row only collides with
-    // ANOTHER NULL-evidence row in the SAME session — exactly the invariant
-    // the old constraint already enforced, so no backfill is needed. A retry
-    // of the same (session, answerEventId) is idempotent; a second,
-    // differently-evidenced notice in the same session is now allowed.
-    unique('mentor_notices_source_session_answer_event_unique')
+    // [WI-2500] Evidence-aware replacement for the old source-session-only
+    // unique constraint (clause 4 — durable identity includes source session
+    // PLUS validated answer-event evidence). Expressed as two PARTIAL unique
+    // indexes rather than one `NULLS NOT DISTINCT` constraint — that syntax
+    // is PostgreSQL 15+ only and this program's deployed Postgres version
+    // floor could not be established from repo docs/config, so the portable
+    // (9.5+) partial-index form is used instead:
+    //   1. Evidence-backed rows (answer_event_id IS NOT NULL): unique per
+    //      (session, evidence) — a retry of the same accepted evidence is
+    //      idempotent; a second, differently-evidenced notice in the same
+    //      session is now allowed (the exact case the old constraint forbade).
+    //   2. Legacy NULL-evidence rows: unique per session, preserving the old
+    //      constraint's at-most-one-per-session invariant for rows that
+    //      predate this column and have no evidence to key on. No backfill
+    //      needed — the old constraint already guaranteed at most one row
+    //      per session, so every existing row trivially satisfies this.
+    uniqueIndex('mentor_notices_source_session_answer_event_uq')
       .on(table.sourceSessionId, table.answerEventId)
-      .nullsNotDistinct(),
+      .where(sql`${table.answerEventId} IS NOT NULL`),
+    uniqueIndex('mentor_notices_source_session_null_evidence_uq')
+      .on(table.sourceSessionId)
+      .where(sql`${table.answerEventId} IS NULL`),
     index('mentor_notices_profile_status_created_idx').on(
       table.profileId,
       table.status,
