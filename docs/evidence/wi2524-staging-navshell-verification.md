@@ -22,6 +22,11 @@ A later Deploy (run `29855742311`, sha `f346ee16`) was still `in_progress` at it
 
 ## 2. AC-1 — run provenance
 
+> Two exact-main runs are recorded against AC-1, because the named case was strengthened mid-item
+> (§3). **`29856034716`** below established the mechanics and preconditions on the *original* case;
+> **`29862030418`** (§3, §4) re-established them on the *strengthened* case and is the operative
+> AC-1 evidence. Both are `workflow_dispatch` on `main`; every property listed below holds for both.
+
 - **Run: `29856034716`** — event `workflow_dispatch`, ref `main`, head sha
   `f346ee16ca4e700b48201f1f5c86d7417cbc0100` (exact-main HEAD at dispatch).
   <https://github.com/cognoco/eduagent-build/actions/runs/29856034716>
@@ -77,9 +82,15 @@ path navigates — `onOpenPersonScope` is `setActiveScope` (`mentor.tsx:510,526`
 `onPress` is `setActiveScope` (`ScopeChip.tsx:64`) — so the only pushed entry is the Journal tab, and
 Back returns to the Mentor route with `activeScope` still supporter-hub.
 
-**The strengthened case passes.** Run **`29859015027`** (this PR's own `v2-release` staging gate, on
-head `233fd5d54`, which contains both the spec change and this document) — `Running 5 tests`, the
-named case listed `[5/5]` at `nav-shell.spec.ts:60:5`, **`5 passed (2.3m)`**.
+**The strengthened case passes on an exact-main commit.** Run **`29862030418`** — `workflow_dispatch`,
+ref `main`, head sha `79f22774a` (the squash commit that landed the assertion; an ancestor of
+`origin/main`) — `--project=v2-release`, `Running 5 tests`, the named case listed `[5/5]` at
+`nav-shell.spec.ts:60:5`, **`5 passed (2.2m)`**, staging gate `FAILURE_CLASS=success`, zero `ZodError`
+in the log. This is the run that satisfies AC-1's exact-main requirement **for the strengthened case**.
+
+Interim, retained for provenance: run `29859015027` exercised the same strengthened assertion first,
+on branch head `233fd5d54` before it landed (`5 passed (2.3m)`). It agrees with the above but is not
+an exact-main commit, so it is not the AC-1 evidence.
 
 > Scope note on run `29856034716` in §2: it was dispatched on **pre-fix** main and therefore exercised
 > the *original* case. It evidences the preconditions and AC-1 provenance only — it did **not** exercise
@@ -90,19 +101,23 @@ The case additionally proves (not assumes) the `me`-scope caveat carried over fr
 
 ## 4. AC-3 — recorded artifacts and protected-main configuration
 
-These fields record the **strengthened** case (run `29859015027`), i.e. the run that actually
-exercised the positive b2 assertion. Run `29856034716` is retained in §2 for AC-1 provenance only.
+These fields record the **strengthened case on an exact-main commit** — run `29862030418`, head
+`79f22774a`. That is the single run satisfying AC-1, AC-2 and AC-3 together; the other two runs are
+retained below only for provenance.
 
-- **Named case result:** `5 passed (2.3m)`, case listed as `[5/5]` at `nav-shell.spec.ts:60:5`,
-  from run `29859015027` on head `233fd5d54` (§3).
-- **Playwright artifact:** `playwright-web-v2-29859015027-1` (id `8506591973`, 213,188 bytes, unexpired).
+- **Named case result:** `5 passed (2.2m)`, case listed as `[5/5]` at `nav-shell.spec.ts:60:5`,
+  from run `29862030418` on head `79f22774a` (§3).
+- **Playwright artifact:** `playwright-web-v2-29862030418-1` (id `8507767965`, 205,255 bytes, unexpired).
 - **Exact `Playwright web smoke` check-run URL for that staging run:**
-  <https://github.com/cognoco/eduagent-build/actions/runs/29859015027/job/88732917146>
-  — `conclusion=success`, started `2026-07-21T19:00:53Z`, on head `233fd5d54`.
-- Superseded, for audit trail: the equivalent fields for the pre-fix run `29856034716` were artifact
-  `playwright-web-v2-29856034716-1` and check-run
-  <https://github.com/cognoco/eduagent-build/actions/runs/29856034716/job/88722571666>
-  (`success`, head `f346ee16`). They evidence AC-1 provenance, **not** the b2 assertion.
+  <https://github.com/cognoco/eduagent-build/actions/runs/29862030418/job/88742989182>
+  — `conclusion=success`, started `2026-07-21T19:42:28Z`, on head `79f22774a`.
+- Retained for provenance, **not** cited as the AC evidence:
+  - `29856034716` (head `f346ee16`, **pre-fix**) — artifact `playwright-web-v2-29856034716-1`, check-run
+    <https://github.com/cognoco/eduagent-build/actions/runs/29856034716/job/88722571666>. Establishes the
+    preconditions were cleared; did not exercise the b2 assertion.
+  - `29859015027` (head `233fd5d54`, strengthened but **branch, not main**) — artifact
+    `playwright-web-v2-29859015027-1`, check-run
+    <https://github.com/cognoco/eduagent-build/actions/runs/29859015027/job/88732917146>.
 - **Protected-main requires that exact context.** `gh api repos/cognoco/eduagent-build/branches/main/protection`:
 
 ```text
@@ -114,8 +129,9 @@ required_status_checks.contexts: ["main", "Playwright web smoke", "API Quality G
   `Playwright web smoke` is a **required** status check on protected `main`, so the green above is a
   gating context and not a generic workflow summary.
 
-**No result was converted.** Each of the two staging runs recorded here passed on its first execution —
-`29856034716` for the original case and `29859015027` for the strengthened one. Nothing here
+**No result was converted.** All three staging runs recorded here passed on their first execution —
+`29856034716` (original case, exact-main), `29859015027` (strengthened, branch) and `29862030418`
+(strengthened, exact-main). Nothing here
 relied on rerun-until-green, timeout or retry changes, quarantine, advisory reclassification, or
 merge-over-red; had the case failed behaviourally it would have stayed red and been reported as a
 nav-shell regression.
