@@ -880,10 +880,33 @@ function evaluateTopicOpenerProbe(
 ): QualityIssue[] {
   const parsed = parsePedagogyEnvelope(liveResponse);
   if ('issues' in parsed) return parsed.issues;
-  const { reply } = parsed;
+  const { reply, signals } = parsed;
 
   // P25: opening a brand-new topic. A bare forward promise with no content
   // and no question leaves the learner with nothing to do — WI-2107.
+  //
+  // Tier-2 (live, envelope-bearing): when the model ships its own
+  // `topic_opened_pending_content` self-report, that signal — not prose — is
+  // the arbiter. Word-count-as-content-proxy was ruled structurally unsound
+  // (bounce 3): it can neither confirm a padded opener carries no content nor
+  // recognise that a concise factual remainder ("Plath wrote Ariel.") does.
+  // The model already answers the only question that matters:
+  //   true  → content is still pending; the client auto-continuation path
+  //           (AC-2/AC-3, `use-session-streaming.ts` `topicOpenedPendingContent`)
+  //           immediately requests the next turn, so the learner is never
+  //           stranded — not a dead end.
+  //   false → the model asserts it delivered its content this turn (nothing
+  //           pending) — also not a dead end.
+  // Either boolean is trusted here; the dead-end guarantee now lives in the
+  // shipped auto-continuation, not in an eval prose heuristic.
+  if (typeof signals.topic_opened_pending_content === 'boolean') {
+    return [];
+  }
+
+  // Tier-1 fallback (snapshot / offline grading, no live envelope signal):
+  // `isBarePromiseOnly` stays as an independent, self-contained bare-promise
+  // check so snapshot runs still catch the dead-end shape without a live
+  // signal. It is no longer the arbiter for live-envelope-bearing cases.
   if (isBarePromiseOnly(reply)) {
     return [
       qualityError(

@@ -241,6 +241,65 @@ describe('probes quality heuristics — P25 (topic-opener promise) [WI-2107]', (
   });
 });
 
+describe('probes quality heuristics — P25 envelope-signal path (Tier-2 live) [WI-2107]', () => {
+  // Round 4 (Option C): for a live, envelope-bearing response the model's own
+  // `topic_opened_pending_content` self-report is the arbiter, not the prose
+  // word-count heuristic (`isBarePromiseOnly`), which was ruled structurally
+  // unsound after three boundary/word-count patches (bounce 3). These cases
+  // pin the two structural counterexamples from that finding plus the escape
+  // hatch and the preserved snapshot fallback.
+
+  it('accepts concise factual content when the model reports no pending content (false-positive fixed)', async () => {
+    // Load-bearing discriminator: the 3-word factual remainder
+    // ("Plath wrote Ariel.") is real content, but the word-count heuristic
+    // (< 4 words) wrongly flags it as bare. With the envelope signal present,
+    // the heuristic is bypassed and the model's self-report governs.
+    // Red-green: OLD code (no signal branch) flags this; NEW code returns [].
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath. Plath wrote Ariel.",
+      signals: { topic_opened_pending_content: false },
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('still flags that same concise-factual reply when NO envelope signal is present (fallback intact)', async () => {
+    // Same string as above, but with no `topic_opened_pending_content` key —
+    // the Tier-1 snapshot fallback runs and the (deliberately untouched)
+    // word-count heuristic still bites. Proves the signal is the discriminator,
+    // not the reply text.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath. Plath wrote Ariel.",
+      signals: {},
+    });
+    expect(issues.some((i) => i.code === 'P25.bare-promise')).toBe(true);
+  });
+
+  it('accepts a pure bare promise when the model reports pending content (auto-continuation escape hatch)', async () => {
+    // A contentless opener is not a dead end when the model signals pending
+    // content: the client (AC-2/AC-3) immediately requests the next turn.
+    // Red-green: OLD code flags this bare promise; NEW code returns [] because
+    // the `true` signal branch is read.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath.",
+      signals: { topic_opened_pending_content: true },
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts consecutive bare promises when the model reports pending content (false-negative reframed)', async () => {
+    // The consecutive-promises counterexample ("…Let's dive right in!") is
+    // contentless, but its word count (4) means the untouched fallback would
+    // also accept it — so this is resolved by reframing, not a red-green flip:
+    // it is correctly accepted because the `true` signal guarantees the client
+    // auto-continues, not because word-count happened to guess right.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath. Let's dive right in!",
+      signals: { topic_opened_pending_content: true },
+    });
+    expect(issues).toEqual([]);
+  });
+});
+
 describe('probes quality heuristics — P08 (worked-example fading)', () => {
   it('accepts a reply that hands the next step back to the learner', async () => {
     const issues = await evaluate('15yo-football-gaming', 'P08', {
