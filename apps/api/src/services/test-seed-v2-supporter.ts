@@ -570,3 +570,77 @@ export async function seedV2SupporterSelfLearningActive(
     ownLearning: true,
   });
 }
+
+// ---------------------------------------------------------------------------
+// [WI-2242] `v2-supporter-pending-link` — a PENDING visibility contract,
+// stopped after `initiateLink` alone (no `acceptLink` call for either
+// audience). Every scenario above reaches 'accepted' via `seedAcceptedEdge`;
+// this one is the pre-acceptance fixture the link-ceremony integration matrix
+// needs — status='pending', both supporter/supporteeAcceptedAt null — so the
+// NO-EARLY-AUTH boundary (acceptedVisibilityCondition, linking-ceremony.ts)
+// can be proven BEFORE either side accepts, and the pending -> accepted
+// transition can be driven inline through the real acceptLink write path
+// (the same production code the UI's accept button calls).
+//
+// Same independent-v2-owner-identity supportee shape as
+// `seedV2SupporterSelfLearningBase` above (its own organization — a
+// supporter/supportee link is not the guardianship same-org model) — NOT
+// `seedV2SupporterAccepted`'s 3-supportee accepted shape, since this fixture
+// needs exactly one supportee with a contract stopped at 'pending'.
+// ---------------------------------------------------------------------------
+
+export async function seedV2SupporterPendingLink(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const supporter = await reseedOwnerIdentityV2(db, email, env, {
+    displayName: 'Test Supporter',
+    birthYear: 1985,
+  });
+
+  const supporteeEmail = deriveEmail(email, 'pending-supportee');
+  const { clerkUserId: supporteeClerkUserId, password: supporteePassword } =
+    await createClerkTestUser(supporteeEmail, env);
+  const supportee = await seedOwnerIdentityV2(db, {
+    email: supporteeEmail,
+    clerkUserId: supporteeClerkUserId,
+    displayName: 'Test Supportee',
+    birthYear: 2012,
+  });
+
+  // Invite issuance IS initiateLink (linking-ceremony.ts) — there is no
+  // separate invite table; the visibility-contract id doubles as the invite
+  // id the accept route takes as :id. Stopping here (no acceptLink call)
+  // leaves status='pending' and both acceptedAt columns null.
+  const contract = await initiateLink(db, {
+    supporterPersonId: supporter.personId,
+    supporteePersonId: supportee.personId,
+    relation: 'other',
+    managedTier: false,
+    managedTierActive: false,
+  });
+
+  return {
+    scenario: 'v2-supporter-pending-link',
+    accountId: supporter.organizationId,
+    profileId: supporter.personId,
+    email,
+    password: supporter.password,
+    ids: {
+      supporterPersonId: supporter.personId,
+      supporterOrganizationId: supporter.organizationId,
+
+      supporteeEmail,
+      supporteePassword,
+      supporteePersonId: supportee.personId,
+      supporteeOrganizationId: supportee.organizationId,
+
+      edgeId: contract.supportershipId,
+      contractId: contract.id,
+      contractVersion: String(contract.contractVersion),
+      visibilityStatus: contract.status,
+      relation: contract.relation,
+    },
+  };
+}

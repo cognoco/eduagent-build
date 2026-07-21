@@ -22,17 +22,26 @@
  * unauthorized-deep-link cases.
  */
 import { resolve } from 'path';
+import { eq, inArray } from 'drizzle-orm';
 
 import { loadDatabaseEnv } from '@eduagent/test-utils';
-import { createDatabase, type Database } from '@eduagent/database';
+import {
+  createDatabase,
+  person,
+  supportVisibilityContracts,
+  supportership,
+  type Database,
+} from '@eduagent/database';
 
 import { ForbiddenError } from '../errors';
 import { deleteOrganizationGraph } from './test-seed';
 import {
   seedV2SupporterAccepted,
   seedV2SupporterManaged,
+  seedV2SupporterPendingLink,
   seedV2SupporterSelfLearningActive,
 } from './test-seed-v2-supporter';
+import { acceptLink } from './linking-ceremony';
 import { resolveScopesForPerson } from './scope-resolution';
 import { readSupporteeStructuralSubjects } from './supporter-structural-mask';
 import { readSharedRecordForSupportee } from './shared-record-read-model';
@@ -440,6 +449,233 @@ function createIntegrationDb(): Database {
         seeded.ids.supporterOrganizationId,
       );
       expect(scope).toBeNull();
+    });
+  },
+);
+
+/**
+ * [WI-2242] `v2-supporter-pending-link` seed — the pre-acceptance visibility-
+ * contract fixture the link-ceremony's integration matrix needs. Every seed
+ * above reaches 'accepted' via `seedAcceptedEdge`; this one is stopped after
+ * `initiateLink` alone, so the NO-EARLY-AUTH boundary
+ * (`acceptedVisibilityCondition`, linking-ceremony.ts) can be proven BEFORE
+ * either side accepts, and the pending -> accepted transition can be driven
+ * inline through the real `acceptLink` write path — the same production code
+ * the UI's accept button (`ContractCard`'s `visibility-contract-accept`)
+ * calls. This is the real, DB-backed proof behind the (author-only, never
+ * executed — no dev-server/staging DB reachable in this build environment)
+ * J-33 Playwright spec and `v2-supporter-link-ceremony.yaml` Maestro flow.
+ *
+ * Recovery variants, per AC ("reject/expired/revoked/restamped/foreign-
+ * link/duplicate" recovery coverage): "revoked"/"restamped" are already
+ * proven generically by supporter-visibility-authorization.integration.test.ts
+ * (seedRevoked/seedRestamped); this file covers the three variants specific
+ * to THIS fixture's pending contract — foreign/invalid deep-link,
+ * duplicate accept, and expired/lapsed (see the dedicated test below for the
+ * "expiry transition is unimplemented in production" caveat).
+ */
+(RUN ? describe : describe.skip)(
+  '[WI-2242] v2-supporter-pending-link seed — link-ceremony state matrix (integration)',
+  () => {
+    let db: Database;
+    let seeded: Awaited<ReturnType<typeof seedV2SupporterPendingLink>>;
+
+    beforeAll(async () => {
+      db = createIntegrationDb();
+      seeded = await seedV2SupporterPendingLink(
+        db,
+        `wi2242-pending-int-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
+        {},
+      );
+    });
+
+    afterAll(async () => {
+      // [Phase-4 review pattern, same as the WI-2241/WI-2243 blocks above]
+      // The supportee is an INDEPENDENT v2 owner identity in its own
+      // organization — cleaning up only seeded.accountId would leak the
+      // supportee's org + Clerk test user on every run.
+      await deleteOrganizationGraph(db, [
+        seeded.accountId,
+        seeded.ids.supporteeOrganizationId,
+      ]);
+    });
+
+    it('[AC: TRUTHFUL FIXTURE] returns supporter+supportee credentials, person/edge/contract IDs, and a pending (not yet accepted) visibility status', () => {
+      expect(seeded.email).toBeTruthy();
+      expect(seeded.password).toBeTruthy();
+      expect(seeded.ids.supporteeEmail).toBeTruthy();
+      expect(seeded.ids.supporteePassword).toBeTruthy();
+      expect(seeded.ids.supporterPersonId).toBeTruthy();
+      expect(seeded.ids.supporteePersonId).toBeTruthy();
+      expect(seeded.ids.edgeId).toBeTruthy();
+      expect(seeded.ids.contractId).toBeTruthy();
+      expect(seeded.ids.visibilityStatus).toBe('pending');
+      expect(seeded.ids.contractVersion).toBe('1');
+      expect(seeded.ids.relation).toBe('other');
+    });
+
+    // [AC: NO-EARLY-AUTH boundary] + [AC: CEREMONY — pending -> accepted] are
+    // merged into one test, in this order, deliberately: both exercise the
+    // SAME shared `seeded` contract (mutating it pending -> accepted), so
+    // splitting them into separate `it` blocks would make the boundary
+    // assertion's correctness depend on Jest's within-file declaration order
+    // rather than on an explicit before/after within one test body — the
+    // precedent this file follows
+    // (supporter-visibility-authorization.integration.test.ts) avoids that
+    // coupling entirely by seeding fresh per-`it`. Merging removes the
+    // ordering hazard without needing a second seed call per test.
+    it('[AC: NO-EARLY-AUTH boundary + AC: CEREMONY] a pending (never-accepted) contract grants no person scope and no structural read; driving acceptLink for the supportee then the supporter flips status to accepted and opens the person scope — the same real write path the UI accept button calls', async () => {
+      const scopesBefore = await resolveScopesForPerson(
+        db,
+        seeded.ids.supporterPersonId,
+      );
+      expect(scopesBefore.shape).toBe('learner');
+
+      await expect(
+        readSupporteeStructuralSubjects(
+          db,
+          seeded.ids.supporterPersonId,
+          seeded.ids.supporteePersonId,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+
+      const afterSupportee = await acceptLink(db, seeded.ids.contractId, {
+        actorPersonId: seeded.ids.supporteePersonId,
+        audience: 'supportee',
+      });
+      expect(afterSupportee.status).toBe('pending'); // one-sided — not yet both.
+
+      const afterSupporter = await acceptLink(db, seeded.ids.contractId, {
+        actorPersonId: seeded.ids.supporterPersonId,
+        audience: 'supporter',
+      });
+      expect(afterSupporter.status).toBe('accepted');
+
+      const scopesAfter = await resolveScopesForPerson(
+        db,
+        seeded.ids.supporterPersonId,
+      );
+      expect(scopesAfter.shape).toBe('supporter');
+      if (scopesAfter.shape !== 'supporter') return;
+      expect(
+        scopesAfter.scopes.some(
+          (scope) =>
+            scope.kind === 'person' &&
+            scope.personId === seeded.ids.supporteePersonId,
+        ),
+      ).toBe(true);
+    });
+
+    it('[AC recovery — foreign/invalid deep link] an unrelated actorPersonId attempting to accept either side of this contract is rejected, not silently accepted', async () => {
+      // A syntactically valid UUID with no relationship to this contract at
+      // all — same "unrelated caller" shape as the WI-2241 unauthorized
+      // deep-link case above.
+      const unrelatedPersonId = '00000000-0000-7000-8000-000000000000';
+      await expect(
+        acceptLink(db, seeded.ids.contractId, {
+          actorPersonId: unrelatedPersonId,
+          audience: 'supporter',
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+      await expect(
+        acceptLink(db, seeded.ids.contractId, {
+          actorPersonId: unrelatedPersonId,
+          audience: 'supportee',
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+
+    it('[AC recovery — duplicate accept] re-accepting the same side twice is idempotent — recomputes the same accepted state rather than erroring or double-writing', async () => {
+      const first = await acceptLink(db, seeded.ids.contractId, {
+        actorPersonId: seeded.ids.supporterPersonId,
+        audience: 'supporter',
+      });
+      const second = await acceptLink(db, seeded.ids.contractId, {
+        actorPersonId: seeded.ids.supporterPersonId,
+        audience: 'supporter',
+      });
+      expect(second.status).toBe(first.status);
+      expect(second.supporterAcceptedAt).toBeTruthy();
+    });
+
+    it('[AC recovery — expired/lapsed invite fails closed] a lapsed contract denies scope and structural read identically to pending/revoked — proving the fail-closed PROPERTY the AC requires, even though the expiry TRANSITION itself is unimplemented in production', async () => {
+      // [WI-2242 map Q2, verified against source] `lapsed` is a valid
+      // status-enum member (CHECK constraint,
+      // packages/database/src/schema/visibility-contract.ts) but nothing in
+      // apps/packages ever SETS it — there is no `expiresAt` column and no
+      // lapse job/transition anywhere in the codebase, so raw insert is the
+      // only producer (same convention as
+      // supporter-visibility-authorization.integration.test.ts's own
+      // seedLapsed). This test proves the boundary predicate
+      // (acceptedVisibilityCondition) rejects a lapsed contract exactly like
+      // it rejects pending/revoked — it does NOT and cannot prove an expiry
+      // transition, because none exists to prove.
+      const now = new Date();
+      const [lapsedSupporter] = await db
+        .insert(person)
+        .values({
+          displayName: 'WI-2242 Lapsed Supporter',
+          birthDate: '1985-01-01',
+          residenceJurisdiction: 'EU',
+        })
+        .returning();
+      const [lapsedSupportee] = await db
+        .insert(person)
+        .values({
+          displayName: 'WI-2242 Lapsed Supportee',
+          birthDate: '2010-01-01',
+          residenceJurisdiction: 'EU',
+        })
+        .returning();
+      const [edge] = await db
+        .insert(supportership)
+        .values({
+          supporterPersonId: lapsedSupporter!.id,
+          supporteePersonId: lapsedSupportee!.id,
+          grantedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
+      await db.insert(supportVisibilityContracts).values({
+        supportershipId: edge!.id,
+        supporterPersonId: lapsedSupporter!.id,
+        supporteePersonId: lapsedSupportee!.id,
+        relation: 'other',
+        status: 'lapsed',
+        contractVersion: 1,
+        reportableKinds: ['mastery'],
+        artifactWall: true,
+        renderEquivalence: true,
+        safetyException: true,
+        supporterAcceptedAt: now,
+        supporteeAcceptedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      try {
+        const scopes = await resolveScopesForPerson(db, lapsedSupporter!.id);
+        expect(scopes.shape).toBe('learner');
+
+        await expect(
+          readSupporteeStructuralSubjects(
+            db,
+            lapsedSupporter!.id,
+            lapsedSupportee!.id,
+          ),
+        ).rejects.toBeInstanceOf(ForbiddenError);
+      } finally {
+        await db
+          .delete(supportVisibilityContracts)
+          .where(eq(supportVisibilityContracts.supportershipId, edge!.id));
+        await db.delete(supportership).where(eq(supportership.id, edge!.id));
+        await db
+          .delete(person)
+          .where(
+            inArray(person.id, [lapsedSupporter!.id, lapsedSupportee!.id]),
+          );
+      }
     });
   },
 );
