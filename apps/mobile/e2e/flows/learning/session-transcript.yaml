@@ -61,20 +61,26 @@ tags:
 
 - takeScreenshot: transcript-02-book-detail
 
-# 6. Scroll to sessions section and tap the seeded completed session
+# 6. Center the collapsed sessions toggle above the sticky learning CTA before
+# tapping it, then center and open the seeded completed session.
 - scrollUntilVisible:
     element:
-      id: 'book-sessions-section'
+      id: 'book-sessions-toggle'
     direction: DOWN
     timeout: 8000
+    visibilityPercentage: 100
+    centerElement: true
 
 - tapOn:
     id: 'book-sessions-toggle'
 
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: 'session-${SESSION_ID}'
+    direction: DOWN
     timeout: 8000
+    visibilityPercentage: 100
+    centerElement: true
 
 - tapOn:
     id: 'session-${SESSION_ID}'

@@ -1017,6 +1017,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'flows/dictation/dictation-review-flow.yaml',
       'flows/dictation/dictation-perfect-score.yaml',
     ];
+    const photoPickerTileId =
+      'com(?:\\.google)?\\.android\\.providers\\.media\\.module:id/icon_thumbnail';
 
     for (const flow of dictationFlows) {
       const source = readFileSync(
@@ -1038,12 +1040,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         /scrollUntilVisible:[\s\S]*id: ["']?practice-dictation["']?/,
       );
       const tileTap = commands.find(
-        ({ tapOn }) =>
-          tapOn?.id ===
-          'com.google.android.providers.media.module:id/icon_thumbnail',
+        ({ tapOn }) => tapOn?.id === photoPickerTileId,
       );
       expect(tileTap?.tapOn).toEqual({
-        id: 'com.google.android.providers.media.module:id/icon_thumbnail',
+        id: photoPickerTileId,
         index: 0,
       });
       const playbackStart = commands.findIndex(
@@ -1206,6 +1206,76 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(
       source.slice(source.indexOf('id: "create-profile-submit"')),
     ).not.toContain('create-subject-name');
+  });
+
+  it('[WI-1864] opens the seeded parent topic through its stable card id', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/child-drill-down.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string; point?: string; optional?: boolean };
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+    }>;
+    const topicTap = commands.findIndex(
+      ({ tapOn }) => tapOn?.id === 'topic-card-${TOPIC_ID}',
+    );
+    const topicDetail = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > topicTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'topic-detail-screen',
+    );
+
+    expect(commands[topicTap]?.tapOn).toEqual({
+      id: 'topic-card-${TOPIC_ID}',
+    });
+    expect(topicDetail).toBeGreaterThan(topicTap);
+    expect(
+      commands.some(
+        ({ tapOn }) =>
+          tapOn?.id === 'subject-topics-scroll' && tapOn.point !== undefined,
+      ),
+    ).toBe(false);
+  });
+
+  it('[WI-1864] keeps the under-13 native journey at the age floor', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/consent/consent-coppa-under13.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string };
+      assertVisible?: { id?: string; text?: string } | string;
+      assertNotVisible?: { id?: string; text?: string } | string;
+    }>;
+    const submit = commands.findIndex(
+      ({ tapOn }) => tapOn?.id === 'create-profile-submit',
+    );
+    const ageFloor = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > submit &&
+        typeof assertVisible === 'object' &&
+        assertVisible.text ===
+          'Learners must be at least 13 years old. Please choose an earlier birth date.',
+    );
+    const noConsent = commands.findIndex(
+      ({ assertNotVisible }, index) =>
+        index > ageFloor &&
+        typeof assertNotVisible === 'object' &&
+        assertNotVisible.id === 'consent-child-view',
+    );
+
+    expect([submit, ageFloor, noConsent]).toEqual(
+      [submit, ageFloor, noConsent].toSorted((a, b) => a - b),
+    );
+    expect(submit).toBeGreaterThan(-1);
+    expect(
+      commands.some(({ tapOn }) => tapOn?.id === 'consent-handoff-button'),
+    ).toBe(false);
   });
 
   it('[WI-1864] waits for every core-learning response before the next turn and closes through the current summary path', () => {
@@ -1505,7 +1575,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         element?: { id?: string };
         direction?: string;
       };
-      tapOn?: { id?: string; text?: string } | string;
+      tapOn?: { id?: string; text?: string; optional?: boolean } | string;
     }>;
     const removeVisible = commands.findIndex(
       ({ scrollUntilVisible }) =>
@@ -1525,9 +1595,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         typeof tapOn === 'object' &&
         tapOn.text === 'Remove',
     );
+    const successReady = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > confirm && extendedWaitUntil?.visible === 'Family updated',
+    );
     const successDismiss = commands.findIndex(
       ({ tapOn }, index) =>
-        index > confirm && typeof tapOn === 'object' && tapOn.text === 'OK',
+        index > successReady &&
+        typeof tapOn === 'object' &&
+        tapOn.text === 'OK' &&
+        tapOn.optional !== true,
     );
     const refreshedCount = commands.findIndex(
       ({ extendedWaitUntil }, index) =>
@@ -1558,6 +1635,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       removeVisible,
       removeTap,
       confirm,
+      successReady,
       successDismiss,
       refreshedCount,
       survivorVisible,
@@ -1568,6 +1646,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         removeVisible,
         removeTap,
         confirm,
+        successReady,
         successDismiss,
         refreshedCount,
         survivorVisible,
@@ -1576,6 +1655,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ].toSorted((a, b) => a - b),
     );
     expect(removeVisible).toBeGreaterThan(-1);
+    expect(commands[successDismiss]?.tapOn).toEqual({ text: 'OK' });
   });
 
   it('[WI-1864] opens the seeded transcript book through the Shelf BookCard contract', () => {
@@ -1590,6 +1670,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const commands = parseAllDocuments(flow).at(-1)?.toJSON() as Array<{
       tapOn?: { id?: string } | string;
       extendedWaitUntil?: { visible?: { id?: string } | string };
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        timeout?: number;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+      };
     }>;
     const shelf = commands.findIndex(
       ({ tapOn }) =>
@@ -1614,14 +1701,130 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         typeof extendedWaitUntil?.visible === 'object' &&
         extendedWaitUntil.visible.id === 'book-screen',
     );
+    const toggleScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > book &&
+        scrollUntilVisible?.element?.id === 'book-sessions-toggle',
+    );
+    const toggleTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > toggleScroll &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'book-sessions-toggle',
+    );
+    const sessionScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > toggleTap &&
+        scrollUntilVisible?.element?.id === 'session-${SESSION_ID}',
+    );
+    const sessionTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > sessionScroll &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'session-${SESSION_ID}',
+    );
+    const summary = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > sessionTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'summary-title',
+    );
 
-    expect([shelf, cardWait, cardTap, book]).toEqual(
-      [shelf, cardWait, cardTap, book].toSorted((a, b) => a - b),
+    expect([
+      shelf,
+      cardWait,
+      cardTap,
+      book,
+      toggleScroll,
+      toggleTap,
+      sessionScroll,
+      sessionTap,
+      summary,
+    ]).toEqual(
+      [
+        shelf,
+        cardWait,
+        cardTap,
+        book,
+        toggleScroll,
+        toggleTap,
+        sessionScroll,
+        sessionTap,
+        summary,
+      ].toSorted((a, b) => a - b),
     );
     expect(shelf).toBeGreaterThan(-1);
+    for (const index of [toggleScroll, sessionScroll]) {
+      expect(commands[index]?.scrollUntilVisible).toEqual(
+        expect.objectContaining({
+          direction: 'DOWN',
+          visibilityPercentage: 100,
+          centerElement: true,
+        }),
+      );
+    }
     expect(flow).not.toContain('book-row-${BOOK_ID}');
     expect(flow).toContain('components/library/BookCard.tsx');
     expect(bookCard).toContain('testID={`book-card-${book.id}`}');
+  });
+
+  it('[WI-1864] dismisses the library search keyboard before pressing the empty-state clear control', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/learning/library-search.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<
+      | string
+      | {
+          extendedWaitUntil?: { visible?: { id?: string } | string };
+          inputText?: string;
+          tapOn?: { id?: string } | string;
+        }
+    >;
+    const noMatchInput = commands.findIndex(
+      (command) =>
+        typeof command === 'object' && command.inputText === 'zzzznoresults',
+    );
+    const emptyState = commands.findIndex(
+      (command) =>
+        typeof command === 'object' &&
+        typeof command.extendedWaitUntil?.visible === 'object' &&
+        command.extendedWaitUntil.visible.id === 'library-search-empty',
+    );
+    const keyboardDismiss = commands.findIndex(
+      (command, index) => index > noMatchInput && command === 'hideKeyboard',
+    );
+    const emptyStateClear = commands.findIndex(
+      (command, index) =>
+        index > keyboardDismiss &&
+        typeof command === 'object' &&
+        typeof command.tapOn === 'object' &&
+        command.tapOn.id === 'library-search-clear-results',
+    );
+    const shelvesRestored = commands.findIndex(
+      (command, index) =>
+        index > emptyStateClear &&
+        typeof command === 'object' &&
+        typeof command.extendedWaitUntil?.visible === 'object' &&
+        command.extendedWaitUntil.visible.id === 'shelves-list',
+    );
+
+    expect([
+      noMatchInput,
+      keyboardDismiss,
+      emptyState,
+      emptyStateClear,
+      shelvesRestored,
+    ]).toEqual(
+      [
+        noMatchInput,
+        keyboardDismiss,
+        emptyState,
+        emptyStateClear,
+        shelvesRestored,
+      ].toSorted((a, b) => a - b),
+    );
+    expect(noMatchInput).toBeGreaterThan(-1);
   });
 
   it('[WI-1406] keeps native MFA placeholders explicitly non-executable until OPQ-26 fixtures exist', () => {

@@ -140,14 +140,15 @@ tags:
     id: 'complete-pick-gallery'
 
 # API-34 Photo Picker exposes each media tile through this stable platform id.
-# Wait for the planted first tile, then require a real selection.
+# AOSP images omit the google package segment that Google API images include,
+# so match exactly those two system-picker variants.
 - extendedWaitUntil:
     visible:
-      id: 'com.google.android.providers.media.module:id/icon_thumbnail'
+      id: 'com(?:\.google)?\.android\.providers\.media\.module:id/icon_thumbnail'
     timeout: 10000
 
 - tapOn:
-    id: 'com.google.android.providers.media.module:id/icon_thumbnail'
+    id: 'com(?:\.google)?\.android\.providers\.media\.module:id/icon_thumbnail'
     index: 0
 
 # Wait for LLM to return and navigate to review-celebration (no mistakes path).

@@ -102,12 +102,14 @@ tags:
 - tapOn:
     text: 'Remove'
 
-# 11. Dismiss the success alert before inspecting the refreshed list. Some
-#     drivers auto-dismiss it, so the tap itself is optional; the count below
-#     is the required mutation receipt.
+# 11. Wait for and dismiss the mutation receipt before inspecting the refreshed
+#     list. The alert is asynchronous and can appear after an immediate tap.
+- extendedWaitUntil:
+    visible: 'Family updated'
+    timeout: 15000
+
 - tapOn:
     text: 'OK'
-    optional: true
 
 - extendedWaitUntil:
     visible: '2 of 4 profiles connected'
