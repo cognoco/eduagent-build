@@ -102,6 +102,13 @@ export async function sendPushNotification(
      * recipient's master push preference.
      */
     bypassPreferenceCheck?: boolean;
+    /**
+     * [WI-2503] Abort the Expo call after this many ms. Callers that hold a
+     * database transaction across the push pass it so the hold — and anything
+     * waiting on their locks — is bounded. Omitted elsewhere: unchanged
+     * behavior for every other sender.
+     */
+    pushTimeoutMs?: number;
   },
 ): Promise<NotificationResult> {
   // 1. Get push token
@@ -145,6 +152,9 @@ export async function sendPushNotification(
   try {
     const response = await fetch(EXPO_PUSH_API_URL, {
       method: 'POST',
+      ...(options?.pushTimeoutMs
+        ? { signal: AbortSignal.timeout(options.pushTimeoutMs) }
+        : {}),
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',

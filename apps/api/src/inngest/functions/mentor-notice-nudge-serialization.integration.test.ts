@@ -39,6 +39,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 
 import {
   applyMentorNoticeOutcome,
+  DELIVERY_LOCK_HOLD_MS,
   reserveMentorNoticeNudge,
   sendReservedMentorNoticeNudge,
 } from '../../services/mentor-notices';
@@ -180,19 +181,27 @@ function installFetchMock(gated: boolean) {
     markEntered = resolve;
   });
   const saved = globalThis.fetch;
-  const mockFetch = jest.fn().mockImplementation(async () => {
-    pushCallCount += 1;
-    markEntered();
-    if (gated) {
-      await new Promise<void>((resolve) => {
-        releasePush = resolve;
-      });
-    }
-    return new Response(
-      JSON.stringify({ data: { id: `ticket-wi2503-${pushCallCount}` } }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } },
+  const mockFetch = jest
+    .fn()
+    .mockImplementation(
+      async (_url: string, init?: { signal?: AbortSignal }) => {
+        pushCallCount += 1;
+        markEntered();
+        if (gated) {
+          // Honor the caller's abort signal exactly as a real fetch would.
+          await new Promise<void>((resolve, reject) => {
+            releasePush = resolve;
+            init?.signal?.addEventListener('abort', () =>
+              reject(new Error('The operation was aborted')),
+            );
+          });
+        }
+        return new Response(
+          JSON.stringify({ data: { id: `ticket-wi2503-${pushCallCount}` } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      },
     );
-  });
   Object.defineProperty(globalThis, 'fetch', {
     value: mockFetch,
     writable: true,
@@ -396,4 +405,47 @@ describe('[WI-2503] duplicate events, retries and crash/replay', () => {
     expect(await reviewFamilyLogRows(profileId)).toHaveLength(1);
     expect((await readNotice(noticeId)).nudgeStatus).toBe('reserved');
   }, 60_000);
+});
+
+describe('[WI-2503] a hung push cannot stall the learner', () => {
+  it('releases the notice lock and lets a defer through when the push never returns', async () => {
+    installFetchMock(true);
+    const profileId = await seedProfile();
+    const noticeId = await seedPendingNotice(profileId);
+    const localDayStart = new Date(Date.now() - 60 * 60 * 1000);
+    expect(
+      await reserveMentorNoticeNudge(db, {
+        profileId,
+        noticeId,
+        localDayStart,
+      }),
+    ).toBe(true);
+
+    // The push is gated and never released — Expo hanging on us.
+    const sendPromise = sendReservedMentorNoticeNudge(db, {
+      profileId,
+      noticeId,
+    }).catch(() => ({ sent: false }));
+    await pushEntered;
+
+    // The learner taps "Not now" on a synchronous request. It must not wait on
+    // the hung push indefinitely: the delivery transaction caps its own hold,
+    // Postgres terminates it, and the lock is released.
+    const startedAt = Date.now();
+    const deferred = await applyMentorNoticeOutcome(db, {
+      profileId,
+      noticeId,
+      outcome: 'deferred',
+      learningDayStart: localDayStart,
+    });
+    const waitedMs = Date.now() - startedAt;
+
+    expect(deferred).not.toBeNull();
+    expect(waitedMs).toBeLessThan(DELIVERY_LOCK_HOLD_MS + 5_000);
+    // The push was aborted, so the delivery settled as `skipped` and the defer
+    // recorded its timestamp; no push was ever delivered.
+    expect((await readNotice(noticeId)).nudgeStatus).toBe('skipped');
+    expect(deferred!.lastDeferredAt).not.toBeNull();
+    expect(await sendPromise).toEqual(expect.objectContaining({ sent: false }));
+  }, 30_000);
 });

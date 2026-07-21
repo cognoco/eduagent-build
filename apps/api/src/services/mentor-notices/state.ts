@@ -12,6 +12,10 @@ import {
   acquireCoordinationLock,
   mentorNoticeDeliveryKey,
 } from '../notification-coordination';
+import { DELIVERY_LOCK_HOLD_MS } from './nudge';
+
+/** How long a notice state transition waits for an in-flight delivery. */
+const NOTICE_LOCK_WAIT_MS = DELIVERY_LOCK_HOLD_MS + 1_000;
 import { safeSend } from '../safe-non-core';
 import { inngest } from '../../inngest/client';
 
@@ -152,6 +156,14 @@ async function withNoticeDeliveryLock<T>(
 ): Promise<T> {
   return db.transaction(async (rawTx) => {
     const tx = rawTx as unknown as Database;
+    // Defers arrive on a synchronous learner request. The delivery transaction
+    // caps its own hold at DELIVERY_LOCK_HOLD_MS, so waiting slightly longer
+    // than that means something else is wrong — fail loudly instead of hanging
+    // the request.
+    // SET LOCAL takes no bind parameters; the value is a numeric constant.
+    await tx.execute(
+      sql.raw(`SET LOCAL lock_timeout = ${NOTICE_LOCK_WAIT_MS}`),
+    );
     await acquireCoordinationLock(
       tx,
       mentorNoticeDeliveryKey(input.profileId, input.noticeId),

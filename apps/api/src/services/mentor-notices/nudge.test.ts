@@ -175,7 +175,13 @@ describe('reserved mentor notice delivery', () => {
         type: 'notice_recheck',
         data: { noticeId: 'notice-1', subjectId: 'subject-1' },
       }),
-      { skipRateLimitLog: true, skipDailyCap: true },
+      // [WI-2503] the push is aborted before the delivery transaction's own
+      // hold cap, so a hung Expo call cannot stall a concurrent defer.
+      {
+        skipRateLimitLog: true,
+        skipDailyCap: true,
+        pushTimeoutMs: expect.any(Number),
+      },
     );
     expect(update).toHaveBeenCalledTimes(1);
   });

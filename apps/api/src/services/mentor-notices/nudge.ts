@@ -58,6 +58,19 @@ export async function findEligibleMentorNoticeNudges(db: Database) {
     .limit(500);
 }
 
+/**
+ * Upper bound on how long the delivery transaction may hold Knotice while the
+ * push is in flight — and therefore on how long a concurrent defer can wait.
+ */
+export const DELIVERY_LOCK_HOLD_MS = 5_000;
+
+/**
+ * Abort the push slightly before the transaction's own hold cap, so the normal
+ * path unwinds through the sender (transaction commits, lock released) rather
+ * than through Postgres terminating the session.
+ */
+const DELIVERY_PUSH_TIMEOUT_MS = DELIVERY_LOCK_HOLD_MS - 1_000;
+
 export async function reserveMentorNoticeNudge(
   db: Database,
   input: {
@@ -160,6 +173,19 @@ export async function sendReservedMentorNoticeNudge(
   // so a replay re-reserving this notice is refused — no second logical send.
   const outcome = await db.transaction(async (rawTx) => {
     const tx = rawTx as unknown as Database;
+    // Holding a transaction across the Expo round-trip is what makes the defer
+    // ordering above possible, but an unbounded hold would stall the learner's
+    // synchronous "Not now" request (and pin a pooled connection) for as long
+    // as Expo hangs. Bound it: Postgres terminates this session if the push has
+    // not returned in time, which rolls the delivery back to `reserved` — the
+    // same fail-closed state a crashed worker leaves, and the replay is refused
+    // by the committed budget row.
+    // SET LOCAL takes no bind parameters; the value is a numeric constant.
+    await tx.execute(
+      sql.raw(
+        `SET LOCAL idle_in_transaction_session_timeout = ${DELIVERY_LOCK_HOLD_MS}`,
+      ),
+    );
     await acquireCoordinationLock(
       tx,
       mentorNoticeDeliveryKey(input.profileId, input.noticeId),
@@ -199,7 +225,11 @@ export async function sendReservedMentorNoticeNudge(
         type: 'notice_recheck',
         data: { noticeId: notice.id, subjectId: notice.subjectId },
       },
-      { skipRateLimitLog: true, skipDailyCap: true },
+      {
+        skipRateLimitLog: true,
+        skipDailyCap: true,
+        pushTimeoutMs: DELIVERY_PUSH_TIMEOUT_MS,
+      },
     );
     const [updated] = await tx
       .update(mentorNotices)
