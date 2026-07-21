@@ -17,6 +17,7 @@ export {
   setLlmKillSwitchActive,
   setLlmEnvironment,
 } from './router';
+export { CONVERSATION_LANGUAGE_NAMES } from './router';
 export { runWithLlmRequestContext } from './request-context';
 export { parseConversationLanguage } from './conversation-language';
 // Test-only helpers (createMockProvider, mockProvider, getFallbackConfigForTest,

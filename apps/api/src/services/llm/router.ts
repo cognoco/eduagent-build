@@ -280,18 +280,19 @@ const SAFETY_RULES =
   'If a request touches these areas, politely decline and redirect to the learning topic.';
 
 // BKT-C.1 — ISO 639-1 → English name for the preamble line.
-const CONVERSATION_LANGUAGE_NAMES: Record<ConversationLanguage, string> = {
-  en: 'English',
-  cs: 'Czech',
-  es: 'Spanish',
-  fr: 'French',
-  de: 'German',
-  it: 'Italian',
-  pt: 'Portuguese',
-  pl: 'Polish',
-  ja: 'Japanese',
-  nb: 'Norwegian',
-};
+export const CONVERSATION_LANGUAGE_NAMES: Record<ConversationLanguage, string> =
+  {
+    en: 'English',
+    cs: 'Czech',
+    es: 'Spanish',
+    fr: 'French',
+    de: 'German',
+    it: 'Italian',
+    pt: 'Portuguese',
+    pl: 'Polish',
+    ja: 'Japanese',
+    nb: 'Norwegian',
+  };
 
 function getSafetyPreamble(ageBracket?: AgeBracket): string {
   // Unknown age: stay neutral on identity and let per-flow prompts handle
