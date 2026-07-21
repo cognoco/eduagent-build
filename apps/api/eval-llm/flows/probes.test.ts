@@ -159,6 +159,18 @@ describe('probes quality heuristics — P25 (topic-opener promise) [WI-2107]', (
     });
     expect(issues).toEqual([]);
   });
+
+  it('accepts a promise opener with content packed into the same sentence', async () => {
+    // Reviewer finding (bounce 1): the old sentence-count proxy flagged this
+    // as bare-promise because it's one sentence with no question mark, even
+    // though the appositive after the comma supplies real content.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply:
+        "Let's talk about Sylvia Plath, an American poet best known for Ariel and The Bell Jar.",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
 });
 
 describe('probes quality heuristics — P08 (worked-example fading)', () => {

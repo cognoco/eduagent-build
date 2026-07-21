@@ -716,17 +716,27 @@ function repliesWithForwardMotion(reply: string): boolean {
 // [WI-2107] A reply that opens a topic with only a forward promise ("Let's
 // talk about Sylvia Plath") and nothing else leaves the learner with no
 // content and no question — a dead end. Flag only when the promise-opener
-// phrase is present AND the reply has neither a question nor more than one
-// sentence of follow-on content, so a promise followed by real teaching or a
-// question is not penalized.
+// phrase is present, the reply has no question, and there is no substantive
+// content beyond the promise clause itself — regardless of whether that
+// content lands in the same sentence (a comma-joined appositive) or a
+// following one. A bare topic reference runs a handful of words; real
+// content runs much longer, so a word-count check on the text after the
+// opener (rather than a sentence count) distinguishes the two without
+// penalizing a promise packed with content in one sentence (bounce 1,
+// reviewer:codex:global finding on "Let's talk about Sylvia Plath, an
+// American poet best known for Ariel and The Bell Jar.").
 const BARE_PROMISE_OPENER =
   /\b(let'?s (talk|dive|explore|look at|chat|get into)|we'?ll (talk|dive|explore|look at|discuss|dig into)|i'?d love to (talk|discuss|explore))\b/i;
 
+const MIN_CONTENT_WORDS_AFTER_OPENER = 6;
+
 function isBarePromiseOnly(reply: string): boolean {
-  if (!BARE_PROMISE_OPENER.test(reply)) return false;
+  const match = BARE_PROMISE_OPENER.exec(reply);
+  if (!match) return false;
   if (reply.includes('?')) return false;
-  const sentenceCount = reply.split(/(?<=[.!?])\s+/).filter(Boolean).length;
-  return sentenceCount <= 1;
+  const afterOpener = reply.slice(match.index + match[0].length);
+  const wordCount = afterOpener.split(/\s+/).filter(Boolean).length;
+  return wordCount <= MIN_CONTENT_WORDS_AFTER_OPENER;
 }
 
 function evaluateTeachBackProbe(
