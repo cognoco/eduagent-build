@@ -29,6 +29,7 @@
 //                 requestSelfUnlink write path (same producer as WI-2237's
 //                 [revoked] RGR variant), for the fail-closed assertion.
 // ---------------------------------------------------------------------------
+import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import {
   bookmarks,
@@ -57,6 +58,15 @@ import {
   type SeedResult,
 } from './test-seed';
 
+// RFC 5321 caps an email local-part at 64 characters. Playwright's
+// runId-derived aliases (buildSeedEmail, apps/mobile/e2e-web/helpers/
+// runtime.ts) can already sit close to that cap on their own, so blindly
+// appending `+${tag}` can push the result past 64 — Clerk then rejects the
+// whole seed with a 422 "is invalid" (reproduced live via `later-phases` ->
+// j32-supporter-self-learning-doorway.spec.ts, WI-2243 web-executability
+// probe). See the truncation branch below.
+const MAX_EMAIL_LOCAL_PART_LENGTH = 64;
+
 /**
  * Derives a stable, unique email for a satellite identity from the request
  * email. The request `email` param is the ONLY value seedScenario's generic
@@ -71,7 +81,24 @@ function deriveEmail(baseEmail: string, tag: string): string {
   const local = atIndex === -1 ? baseEmail : baseEmail.slice(0, atIndex);
   const domain = atIndex === -1 ? 'example.com' : baseEmail.slice(atIndex + 1);
   const bareLocal = local.split('+')[0] || 'seed';
-  return `${bareLocal}+${tag}@${domain}`;
+  const candidate = `${bareLocal}+${tag}`;
+  if (candidate.length <= MAX_EMAIL_LOCAL_PART_LENGTH) {
+    return `${candidate}@${domain}`;
+  }
+  // Truncate the base and append a short deterministic hash of the
+  // untruncated candidate — stays under the RFC cap, stays unique, and
+  // stays deterministic across repeated reseeds of the same slot (same
+  // input always hashes to the same output).
+  const hashSuffix = createHash('sha256')
+    .update(candidate)
+    .digest('hex')
+    .slice(0, 8);
+  const suffix = `-${hashSuffix}+${tag}`;
+  const maxBareLength = Math.max(
+    MAX_EMAIL_LOCAL_PART_LENGTH - suffix.length,
+    1,
+  );
+  return `${bareLocal.slice(0, maxBareLength)}${suffix}@${domain}`;
 }
 
 interface SeededOwnerV2 {
