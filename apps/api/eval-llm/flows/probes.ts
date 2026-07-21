@@ -717,26 +717,39 @@ function repliesWithForwardMotion(reply: string): boolean {
 // talk about Sylvia Plath") and nothing else leaves the learner with no
 // content and no question — a dead end. Flag only when the promise-opener
 // phrase is present, the reply has no question, and there is no substantive
-// content beyond the promise clause itself — regardless of whether that
-// content lands in the same sentence (a comma-joined appositive) or a
-// following one. A bare topic reference runs a handful of words; real
-// content runs much longer, so a word-count check on the text after the
-// opener (rather than a sentence count) distinguishes the two without
-// penalizing a promise packed with content in one sentence (bounce 1,
-// reviewer:codex:global finding on "Let's talk about Sylvia Plath, an
-// American poet best known for Ariel and The Bell Jar.").
+// content beyond the promise clause + topic-naming clause — regardless of
+// whether that content lands in the same sentence (a comma-joined
+// appositive) or a following one. Strip the opener, then strip the
+// topic-naming clause up to its first boundary punctuation (`,` `.` `;`
+// `!`) — the reply may legitimately end there (a bare promise) or continue
+// with real material (a promise-plus-content). Apply the word-count floor
+// only to what remains AFTER that boundary, not to the topic clause itself:
+// checking words-after-the-opener alone (an earlier version of this fix)
+// still let a padded/elaborated bare topic — "Let's explore the fascinating
+// and complex world of quantum mechanics." — clear the floor on topic-name
+// length even though it supplies no content past the promise. Bounce 1
+// (reviewer:codex:global) flagged the mirror-image false positive: a
+// promise + real content packed into one sentence via a comma appositive
+// ("Let's talk about Sylvia Plath, an American poet best known for Ariel
+// and The Bell Jar.") was wrongly classified as bare.
 const BARE_PROMISE_OPENER =
   /\b(let'?s (talk|dive|explore|look at|chat|get into)|we'?ll (talk|dive|explore|look at|discuss|dig into)|i'?d love to (talk|discuss|explore))\b/i;
 
-const MIN_CONTENT_WORDS_AFTER_OPENER = 6;
+const TOPIC_CLAUSE_BOUNDARY = /[,.;!]/;
+
+const MIN_CONTENT_WORDS_AFTER_TOPIC_CLAUSE = 4;
 
 function isBarePromiseOnly(reply: string): boolean {
-  const match = BARE_PROMISE_OPENER.exec(reply);
-  if (!match) return false;
+  const openerMatch = BARE_PROMISE_OPENER.exec(reply);
+  if (!openerMatch) return false;
   if (reply.includes('?')) return false;
-  const afterOpener = reply.slice(match.index + match[0].length);
-  const wordCount = afterOpener.split(/\s+/).filter(Boolean).length;
-  return wordCount <= MIN_CONTENT_WORDS_AFTER_OPENER;
+  const afterOpener = reply.slice(openerMatch.index + openerMatch[0].length);
+  const boundaryMatch = TOPIC_CLAUSE_BOUNDARY.exec(afterOpener);
+  const afterTopicClause = boundaryMatch
+    ? afterOpener.slice(boundaryMatch.index + 1)
+    : '';
+  const wordCount = afterTopicClause.split(/\s+/).filter(Boolean).length;
+  return wordCount <= MIN_CONTENT_WORDS_AFTER_TOPIC_CLAUSE;
 }
 
 function evaluateTeachBackProbe(
