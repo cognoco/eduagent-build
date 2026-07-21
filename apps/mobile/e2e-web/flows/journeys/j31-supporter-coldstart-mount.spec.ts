@@ -3,76 +3,74 @@ import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 
 /**
- * J-31 [WI-2226] supporter cold-start mount: the Support hub landing tab
- * (Mentor) now mounts `SupporterColdStart`, so a supporter with a
- * granted-idle child (one who has their own account but hasn't started
- * learning yet) sees a kickstart nudge card as soon as they land — this
- * used to be dead code, reachable only from an isolated component test,
- * never from the real navigation tree.
+ * J-31 [WI-2226 owner-gate retarget] supporter cold-start mount: the Support
+ * hub landing tab (Mentor) mounts `SupporterColdStart`, which renders the
+ * OWNER-GATED managed card for a same-org managed child — the WI-2226
+ * bounce-#1 fix (supporter-coldstart.ts) renders a `state: 'managed'` card
+ * only for a hasOwnAccount=false candidate whose membership resolves within
+ * the SUPPORTER's own organization (the same predicate POST /profiles/switch
+ * enforces, so the card's CTA — switchProfile — actually works).
  *
- * Reuses the same `v2-supporter-accepted` seed as J-29
- * (j29-supporter-scope-journey.spec.ts): a supporter with a "rich" child
- * (own account, real learning state — so `resolveSupporterColdStart` skips
- * them, no card) and an "empty-record" child (own account, zero learning
- * state — so they DO get a `granted-idle` cold-start card). Neither seeded
- * child produces the `managed` state (both are v2 owner identities with
- * their own account, not a managed/no-account child) — that state is
- * exercised at the unit level in SupportHubMentorTab.test.tsx and
- * SupporterColdStart.test.tsx instead.
+ * This journey previously targeted `v2-supporter-accepted`'s empty-record
+ * supportee expecting a `granted-idle` card, but that supportee: (a) is an
+ * independent v2 owner in a DIFFERENT organization (cross-org — the
+ * owner-gate suppresses it even if it were a managed candidate), and (b)
+ * hasOwnAccount has no writer anywhere in the codebase (WI-2538) — the
+ * `granted-idle`/`active` branches are currently unreachable in production,
+ * so a journey asserting one is unproducible (reviewer bounce #2). Reuses
+ * `v2-supporter-managed` (test-seed-v2-supporter.ts's seedV2SupporterManaged)
+ * instead: a same-org supporter + managed child with a real supportership
+ * edge — the producible path the owner-gate actually renders a card for.
  *
  * [Disclosure] The Playwright web E2E harness does not run in this build
- * environment (no dev-server/staging DB reachable). This spec is written
- * and testID-verified against the source it exercises
- * (SupporterColdStart.tsx, SupportHubMentorTab.tsx, test-seed-v2-supporter.ts)
- * but has NOT been executed here — do not read a green run into this PR.
+ * environment (no dev-server/staging DB reachable). This spec is written and
+ * testID-verified against the source it exercises (SupporterColdStart.tsx,
+ * SupportHubMentorTab.tsx, test-seed-v2-supporter.ts's
+ * seedV2SupporterManaged) but has NOT been executed here — do not read a
+ * green run into this PR. The seed itself IS proven against a real DB by
+ * test-seed-v2-supporter.integration.test.ts's "v2-supporter-managed seed"
+ * suite (resolveSupporterColdStart renders the exact managed card this
+ * journey asserts). The runtime fail-if-unreachable guard for
+ * SupporterColdStart's mount already exists and IS executed:
+ * SupportHubMentorTab.test.tsx's `[WI-2226 RGR]` case (RTL, real mounted
+ * tree, red/green evidence in
+ * apps/mobile/src/components/support/wi2226-rgr-evidence.md).
  */
-test('J-31 supporter: Support hub landing shows the granted-idle cold-start nudge for an account-holding, learning-state-free child, and no nudge for the rich child', async ({
+test('J-31 supporter: Support hub landing shows the owner-gated managed cold-start card for a same-org managed child, and its CTA switches into the child profile', async ({
   page,
 }) => {
   const seeded = await seedAndSignIn(page, {
-    scenario: 'v2-supporter-accepted',
+    scenario: 'v2-supporter-managed',
     alias: 'j31-coldstart',
     landingTestId: 'support-hub-mentor-tab',
     landingPath: '/mentor',
   });
 
-  const richPersonId = seeded.ids.supporteePersonId;
-  const emptyPersonId = seeded.ids.emptySupporteePersonId;
-  // Literal displayName set in test-seed-v2-supporter.ts.
-  const emptyDisplayName = 'Empty-Record Supportee';
+  const managedChildPersonId = seeded.ids.managedChildPersonId;
+  // Literal displayName set in test-seed-v2-supporter.ts's
+  // seedV2SupporterManaged.
+  const managedChildDisplayName = 'Managed Child';
 
-  // --- The granted-idle nudge for the empty-record supportee (own account,
-  // no learning state yet) is visible in the cold-start section.
-  const coldStartGrantedCard = page.getByTestId(
-    `supporter-cold-start-granted-${emptyPersonId}`,
+  // --- The owner-gated managed card is visible in the cold-start section
+  // (hasOwnAccount=false, on the supporter's own org — the exact candidate
+  // the owner-gate renders a card for).
+  const coldStartManagedCard = page.getByTestId(
+    `supporter-cold-start-managed-${managedChildPersonId}`,
   );
-  await expect(coldStartGrantedCard).toBeVisible();
-  await expect(coldStartGrantedCard.getByText(emptyDisplayName)).toBeVisible();
+  await expect(coldStartManagedCard).toBeVisible();
   await expect(
-    page.getByTestId(`supporter-cold-start-kickstart-${emptyPersonId}`),
+    coldStartManagedCard.getByText(managedChildDisplayName),
+  ).toBeVisible();
+  await expect(
+    page.getByTestId(`supporter-cold-start-handoff-${managedChildPersonId}`),
   ).toBeVisible();
 
-  // --- The rich supportee already has real learning state — no cold-start
-  // card of any kind (resolveSupporterColdStart `continue`s past them).
-  await expect(
-    page.getByTestId(`supporter-cold-start-granted-${richPersonId}`),
-  ).toHaveCount(0);
-  await expect(
-    page.getByTestId(`supporter-cold-start-managed-${richPersonId}`),
-  ).toHaveCount(0);
-
-  // --- The cold-start section co-exists with the ordinary person-scope
-  // cards below it — mounting it didn't replace or hide the existing list.
-  await expect(
-    page.getByTestId(`support-hub-mentor-person-${richPersonId}`),
-  ).toBeVisible();
-
-  // --- The kickstart CTA is present but inert for this journey (WI-1136,
-  // the encouragement-composer wiring, is a separate deferred fast-follow —
-  // see SupporterColdStart.tsx's onKickstart prop comment). Pressing it must
-  // not navigate away from the Support hub.
+  // --- Pressing the handoff CTA calls switchProfile (WI-2226 bounce-#1 fix,
+  // SupporterColdStart.tsx) — a real profile switch, not the prior
+  // setActiveScope no-op. The app leaves the Support hub for the managed
+  // child's own screen.
   await pressableClick(
-    page.getByTestId(`supporter-cold-start-kickstart-${emptyPersonId}`),
+    page.getByTestId(`supporter-cold-start-handoff-${managedChildPersonId}`),
   );
-  await expect(page.getByTestId('support-hub-mentor-tab')).toBeVisible();
+  await expect(page.getByTestId('support-hub-mentor-tab')).not.toBeVisible();
 });

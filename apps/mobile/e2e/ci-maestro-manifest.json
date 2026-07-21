@@ -53,7 +53,7 @@
     },
     {
       "flow": "flows/v2/v2-supporter-coldstart-mount.yaml",
-      "scenario": "v2-supporter-accepted"
+      "scenario": "v2-supporter-managed"
     }
   ],
   "scenarioOverrides": {
