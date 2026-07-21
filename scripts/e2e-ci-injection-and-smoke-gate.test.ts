@@ -13,9 +13,10 @@
 //           silently reported success on every PR. WI-2228 promotes the isolated
 //           v2-release project to the hard signal for trusted surface changes,
 //           while forks, untrusted PRs, and no-surface changes remain explicit
-//           pass-throughs. Legacy smoke stays visible but advisory in the same
-//           setup job. These tests execute the required gate's shell matrix and
-//           assert that legacy coverage cannot mask the V2 result.
+//           pass-throughs. Legacy projects are partitioned into an expiry-
+//           bearing required-stable lane and an advisory lane in the same setup
+//           job. These tests execute the required gate's shell matrix and assert
+//           that advisory coverage cannot mask either hard-gated result.
 //
 // Style + harness match the sibling workflow-structure tests in this directory
 // (e.g. e2e-web-cleanup.test.ts): parse the committed YAML with the `yaml`
@@ -146,7 +147,7 @@ describe('[F-151] e2e-ci.yml has no workflow_run.pull_requests injection sink', 
   });
 });
 
-describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => {
+describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () => {
   const workflow = loadWorkflow('e2e-web.yml');
   const jobs = workflow.jobs as Record<string, Job>;
   const REQUIRED_CHECK_NAME = 'Playwright web smoke';
@@ -230,29 +231,43 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     expect(result.status).toBe(expected);
   });
 
-  it('runs the V2 release gate first and keeps legacy smoke advisory in one setup job', () => {
+  it('runs V2 first and partitions legacy smoke into required and advisory lanes', () => {
     const runSmoke = jobs['run-smoke'];
     expect(runSmoke).toBeDefined();
     const v2Step = stepNamed(runSmoke, 'Run V2 release Playwright gate');
     const uploadV2 = stepNamed(runSmoke, 'Upload V2 Playwright artifacts');
-    const legacyStep = stepNamed(
+    const resolveStep = stepNamed(
       runSmoke,
-      'Run legacy Playwright smoke (advisory)',
+      'Validate and resolve legacy Playwright lanes',
+    );
+    const coreStep = stepNamed(
+      runSmoke,
+      'Run required-stable legacy Playwright smoke',
+    );
+    const advisoryStep = stepNamed(
+      runSmoke,
+      'Run advisory legacy Playwright smoke',
     );
     const resetStep = stepNamed(
       runSmoke,
       'Reset seeded staging accounts (always)',
     );
-    const uploadLegacy = stepNamed(
+    const uploadCore = stepNamed(
       runSmoke,
-      'Upload legacy Playwright artifacts',
+      'Upload required-stable legacy Playwright artifacts',
+    );
+    const uploadAdvisory = stepNamed(
+      runSmoke,
+      'Upload advisory legacy Playwright artifacts',
     );
     const stepNames = (runSmoke.steps ?? []).map((step) => step.name);
     const allWorkflowSteps = Object.values(jobs).flatMap(
       (job) => job.steps ?? [],
     );
     const v2Script = String(v2Step?.run ?? '');
-    const legacyScript = String(legacyStep?.run ?? '');
+    const resolveScript = String(resolveStep?.run ?? '');
+    const coreScript = String(coreStep?.run ?? '');
+    const advisoryScript = String(advisoryStep?.run ?? '');
     const classifyCommand = v2Script
       .split('\n')
       .find((line) => line.includes('--classify'));
@@ -271,66 +286,109 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
     expect(String((uploadV2?.with as Record<string, unknown>)?.name)).toContain(
       'playwright-web-v2-${{ github.run_id }}-${{ github.run_attempt }}',
     );
-    expect(legacyStep?.['continue-on-error']).toBe(true);
-    expect(Number(legacyStep?.['timeout-minutes'])).toBeGreaterThan(0);
+    expect(resolveStep?.['continue-on-error']).not.toBe(true);
+    expect(resolveScript).toContain('run-smoke-lanes.cjs validate');
+    expect(resolveScript).toContain('run-smoke-lanes.cjs core');
+    expect(resolveScript).toContain('run-smoke-lanes.cjs advisory');
+    expect(coreStep?.['continue-on-error']).not.toBe(true);
+    expect(advisoryStep?.['continue-on-error']).toBe(true);
+    expect(Number(coreStep?.['timeout-minutes'])).toBeGreaterThan(0);
+    expect(Number(advisoryStep?.['timeout-minutes'])).toBeGreaterThan(0);
     expect(
       Number(runSmoke['timeout-minutes']) -
-        Number(legacyStep?.['timeout-minutes']),
+        Number(coreStep?.['timeout-minutes']) -
+        Number(advisoryStep?.['timeout-minutes']),
     ).toBeGreaterThanOrEqual(20);
-    expect(String(legacyStep?.if).replace(/\s+/g, '')).toContain(
+    expect(String(coreStep?.if).replace(/\s+/g, '')).toContain(
+      "steps.legacy-lanes.outputs.core!=''",
+    );
+    expect(String(advisoryStep?.if).replace(/\s+/g, '')).toContain(
       'always()&&!cancelled()',
     );
-    expect(legacyStep?.env?.DOPPLER_TOKEN).toBe(v2Step?.env?.DOPPLER_TOKEN);
-    expect(legacyScript).toContain('doppler run -p mentomate -c stg');
+    expect(String(advisoryStep?.if).replace(/\s+/g, '')).toContain(
+      "steps.legacy-lanes.outputs.advisory!=''",
+    );
+    expect(coreStep?.env?.DOPPLER_TOKEN).toBe(v2Step?.env?.DOPPLER_TOKEN);
+    expect(advisoryStep?.env?.DOPPLER_TOKEN).toBe(v2Step?.env?.DOPPLER_TOKEN);
     for (const mapping of [
       'PLAYWRIGHT_TEST_SEED_SECRET',
       'CLERK_SECRET_KEY',
       'PLAYWRIGHT_API_URL',
     ]) {
       expect(v2Script).toContain(mapping);
-      expect(legacyScript).toContain(mapping);
+      expect(coreScript).toContain(mapping);
+      expect(advisoryScript).toContain(mapping);
     }
-    expect(legacyScript).toContain('PLAYWRIGHT_ARTIFACT_LANE=legacy');
-    expect(legacyScript).toContain('pnpm run test:e2e:web:smoke');
-    for (const legacyOnlyStep of [legacyStep, uploadLegacy]) {
-      expect(legacyOnlyStep?.['continue-on-error']).toBe(true);
-      expect(Number(legacyOnlyStep?.['timeout-minutes'])).toBeGreaterThan(0);
-    }
-    expect(String(uploadLegacy?.if)).toContain(
-      "steps.legacy-smoke.outcome == 'success'",
+    expect(coreScript).toContain('PLAYWRIGHT_ARTIFACT_LANE=legacy-core');
+    expect(coreScript).toContain('pnpm run test:e2e:web:smoke -- core');
+    expect(advisoryScript).toContain(
+      'PLAYWRIGHT_ARTIFACT_LANE=legacy-advisory',
     );
-    expect(String(uploadLegacy?.if)).toContain(
-      "steps.legacy-smoke.outcome == 'failure'",
+    expect(advisoryScript).toContain('pnpm run test:e2e:web:smoke -- advisory');
+    expect(uploadCore?.['continue-on-error']).toBe(true);
+    expect(uploadAdvisory?.['continue-on-error']).toBe(true);
+    expect(String(uploadCore?.if)).toContain(
+      "steps.legacy-core.outcome == 'success'",
+    );
+    expect(String(uploadCore?.if)).toContain(
+      "steps.legacy-core.outcome == 'failure'",
+    );
+    expect(String(uploadAdvisory?.if)).toContain(
+      "steps.legacy-advisory.outcome == 'success'",
+    );
+    expect(String(uploadAdvisory?.if)).toContain(
+      "steps.legacy-advisory.outcome == 'failure'",
     );
     expect(
-      String((uploadLegacy?.with as Record<string, unknown>)?.name),
+      String((uploadCore?.with as Record<string, unknown>)?.name),
     ).toContain(
-      'playwright-web-legacy-${{ github.run_id }}-${{ github.run_attempt }}',
+      'playwright-web-legacy-core-${{ github.run_id }}-${{ github.run_attempt }}',
+    );
+    expect(
+      String((uploadAdvisory?.with as Record<string, unknown>)?.name),
+    ).toContain(
+      'playwright-web-legacy-advisory-${{ github.run_id }}-${{ github.run_attempt }}',
     );
     const v2ArtifactPaths = String(
       (uploadV2?.with as Record<string, unknown>)?.path,
     );
-    const legacyArtifactPaths = String(
-      (uploadLegacy?.with as Record<string, unknown>)?.path,
+    const coreArtifactPaths = String(
+      (uploadCore?.with as Record<string, unknown>)?.path,
+    );
+    const advisoryArtifactPaths = String(
+      (uploadAdvisory?.with as Record<string, unknown>)?.path,
     );
     expect(v2ArtifactPaths).toContain('playwright-report');
     expect(v2ArtifactPaths).toContain('test-results');
     expect(v2ArtifactPaths).not.toContain('playwright-report-legacy');
     expect(v2ArtifactPaths).not.toContain('test-results-legacy');
-    expect(legacyArtifactPaths).toContain('playwright-report-legacy');
-    expect(legacyArtifactPaths).toContain('test-results-legacy');
+    expect(coreArtifactPaths).toContain('playwright-report-legacy-core');
+    expect(coreArtifactPaths).toContain('test-results-legacy-core');
+    expect(advisoryArtifactPaths).toContain(
+      'playwright-report-legacy-advisory',
+    );
+    expect(advisoryArtifactPaths).toContain('test-results-legacy-advisory');
 
     expect(stepNames.indexOf(uploadV2?.name)).toBe(
       stepNames.indexOf(v2Step?.name) + 1,
     );
     expect(stepNames.indexOf(uploadV2?.name)).toBeLessThan(
-      stepNames.indexOf(legacyStep?.name),
+      stepNames.indexOf(resolveStep?.name),
     );
-    expect(stepNames.indexOf(legacyStep?.name)).toBeLessThan(
+    expect(stepNames.indexOf(resolveStep?.name)).toBeLessThan(
+      stepNames.indexOf(coreStep?.name),
+    );
+    expect(stepNames.indexOf(coreStep?.name)).toBeLessThan(
+      stepNames.indexOf(advisoryStep?.name),
+    );
+    expect(stepNames.indexOf(advisoryStep?.name)).toBeLessThan(
       stepNames.indexOf(resetStep?.name),
     );
     expect(stepNames.indexOf(resetStep?.name)).toBeLessThan(
-      stepNames.indexOf(uploadLegacy?.name),
+      stepNames.indexOf(uploadCore?.name),
+    );
+    expect(stepNames.indexOf(uploadCore?.name)).toBeLessThan(
+      stepNames.indexOf(uploadAdvisory?.name),
     );
     expect(
       allWorkflowSteps.filter(
@@ -348,6 +406,18 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
       ),
     ).toHaveLength(1);
     expect(runSmoke.name).not.toBe(REQUIRED_CHECK_NAME);
+  });
+
+  it('runs the quarantine resolver tests in CI', () => {
+    const ci = loadWorkflow('ci.yml');
+    const ciJobs = ci.jobs as Record<string, Job>;
+    const main = ciJobs['main'];
+    const quarantineTests = stepNamed(main, 'tools/quarantine/* tests');
+
+    expect(quarantineTests).toBeDefined();
+    expect(String(quarantineTests?.run)).toContain(
+      'jest --config tools/quarantine/jest.config.cjs',
+    );
   });
 
   it('treats root package.json as a trusted E2E surface change', () => {
@@ -396,22 +466,28 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
       reportDir: expect.stringMatching(/e2e-web\/playwright-report$/),
     });
 
-    const legacyResult = inspect('legacy');
-    expect(legacyResult.status).toBe(0);
-    const legacyArtifacts = JSON.parse(
-      legacyResult.stdout.trim().split('\n').at(-1)!,
-    ) as { outputDir: string; reportDir: string };
-    expect(
-      Object.fromEntries(
-        Object.entries(legacyArtifacts).map(([key, value]) => [
-          key,
-          value.replaceAll('\\', '/'),
-        ]),
-      ),
-    ).toMatchObject({
-      outputDir: expect.stringMatching(/e2e-web\/test-results-legacy$/),
-      reportDir: expect.stringMatching(/e2e-web\/playwright-report-legacy$/),
-    });
+    for (const lane of ['legacy-core', 'legacy-advisory']) {
+      const legacyResult = inspect(lane);
+      expect(legacyResult.status).toBe(0);
+      const legacyArtifacts = JSON.parse(
+        legacyResult.stdout.trim().split('\n').at(-1)!,
+      ) as { outputDir: string; reportDir: string };
+      expect(
+        Object.fromEntries(
+          Object.entries(legacyArtifacts).map(([key, value]) => [
+            key,
+            value.replaceAll('\\', '/'),
+          ]),
+        ),
+      ).toMatchObject({
+        outputDir: expect.stringMatching(
+          new RegExp('e2e-web/test-results-' + lane + '$'),
+        ),
+        reportDir: expect.stringMatching(
+          new RegExp('e2e-web/playwright-report-' + lane + '$'),
+        ),
+      });
+    }
 
     const invalidResult = inspect('not-a-lane');
     expect(invalidResult.status).not.toBe(0);
@@ -436,6 +512,9 @@ describe('[WI-2228] e2e-web.yml hard-gates V2 and isolates legacy smoke', () => 
 
     expect(packageJson.scripts['test:e2e:web:v2']).toContain(
       '--project=v2-release',
+    );
+    expect(packageJson.scripts['test:e2e:web:smoke']).toBe(
+      'node tools/quarantine/run-smoke-projects.cjs',
     );
     expect(playwrightConfig).toContain("name: 'v2-release'");
     expect(docsOn).toHaveProperty('workflow_dispatch');

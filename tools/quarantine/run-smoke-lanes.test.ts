@@ -47,6 +47,17 @@ describe('[WI-2452] resolveLanes', () => {
     expect(core).toEqual([...DECLARED_CORE_PROJECTS]);
     expect(advisory).toEqual([]);
   });
+
+  it('partitions every declared project into exactly one lane', () => {
+    const { core, advisory } = resolveLanes(NOW, [
+      { project: 'smoke-parent', expires: FUTURE },
+      { project: 'smoke-auth', expires: PAST },
+    ]);
+    const combined = [...core, ...advisory];
+
+    expect(new Set(combined).size).toBe(combined.length);
+    expect([...combined].sort()).toEqual([...DECLARED_CORE_PROJECTS].sort());
+  });
 });
 
 describe('[WI-2452] isActive', () => {

@@ -320,6 +320,12 @@ jobs:
         if: steps.scope.outputs.docs_only != 'true'
         run: pnpm exec jest --config tools/scripts/jest.config.cjs --no-coverage
 
+      # WI-2458: lane resolver + expiry/quarantine contract. tools/quarantine
+      # is outside Nx project inference, so invoke its focused Jest config.
+      - name: tools/quarantine/* tests
+        if: steps.scope.outputs.docs_only != 'true'
+        run: pnpm exec jest --config tools/quarantine/jest.config.cjs --no-coverage
+
       # Optional advisory: detect .claude/skills/ entries whose .agents/skills/
       # master was removed but the generated copy was left behind. continue-on-error
       # keeps this non-blocking — the step surfaces orphans visibly in CI without
