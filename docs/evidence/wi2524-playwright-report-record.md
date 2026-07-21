@@ -22,14 +22,20 @@ proving that such values were present.
 ## 1. Artifact provenance (originals — PURGED UNDER WI-2593)
 
 The three source artifacts are retained here by identity for provenance. They are **not** the
-evidence of record any more; this file is. They are expected to be purged under WI-2593, and their
-purge does not invalidate anything below.
+evidence of record any more; this file is. Their eventual purge does not invalidate anything below.
+
+> **Status is `PENDING PURGE`, deliberately — these artifacts are NOT yet purged.** At the time this
+> record was committed all three verified `expired=false`, i.e. still present and still
+> credential-bearing. Writing `PURGED` here would be a false completion signal: a reviewer working
+> the purge could read it as done and skip the actual deletion, leaving the reports available. The
+> status flips to `PURGED UNDER WI-2593` **only after the GitHub artifacts are verified gone**, and
+> that flip is the purge owner's step, not this record's.
 
 | Artifact name | Artifact id | Bytes | sha256 digest | Created (UTC) | Status |
 |---|---|---|---|---|---|
-| `playwright-web-v2-29856034716-1` | 8505395256 | 204959 | `c831e693f1bbc8f8077710a6b70f4c5e581a596814886d699cf880958325cd40` | 2026-07-21T18:13:17Z | PURGED UNDER WI-2593 |
-| `playwright-web-v2-29859015027-1` | 8506591973 | 213188 | `5ca0bc711b0168145c080ef14f43668cbfca92a91d5820c9154e0a057352c5a2` | 2026-07-21T18:55:27Z | PURGED UNDER WI-2593 |
-| `playwright-web-v2-29862030418-1` | 8507767965 | 205255 | `ee3df6d4b16f726e28460e6e9c211448aa3430e66c012ac282c0a40dcf4e5164` | 2026-07-21T19:37:08Z | PURGED UNDER WI-2593 |
+| `playwright-web-v2-29856034716-1` | 8505395256 | 204959 | `c831e693f1bbc8f8077710a6b70f4c5e581a596814886d699cf880958325cd40` | 2026-07-21T18:13:17Z | PENDING PURGE UNDER WI-2593 |
+| `playwright-web-v2-29859015027-1` | 8506591973 | 213188 | `5ca0bc711b0168145c080ef14f43668cbfca92a91d5820c9154e0a057352c5a2` | 2026-07-21T18:55:27Z | PENDING PURGE UNDER WI-2593 |
+| `playwright-web-v2-29862030418-1` | 8507767965 | 205255 | `ee3df6d4b16f726e28460e6e9c211448aa3430e66c012ac282c0a40dcf4e5164` | 2026-07-21T19:37:08Z | PENDING PURGE UNDER WI-2593 |
 
 ## 2. Run identity and report totals
 
