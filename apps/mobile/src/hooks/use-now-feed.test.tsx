@@ -96,7 +96,8 @@ describe('useNowFeed', () => {
       const { result } = renderHook(() => useNowFeed(), { wrapper });
 
       await act(async () => {
-        await jest.advanceTimersByTimeAsync(7_500);
+        // Cross the final retry boundary so React Query can publish the error.
+        await jest.advanceTimersByTimeAsync(7_501);
       });
       expect(result.current.isError).toBe(true);
       expect(mockFetch).toHaveBeenCalledTimes(5);
