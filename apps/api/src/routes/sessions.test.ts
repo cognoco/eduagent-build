@@ -830,7 +830,10 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
+      expect(assertLlmConsentMock).toHaveBeenLastCalledWith(
+        expect.anything(),
+        'test-profile-id',
+      );
       expect(generateRecallBridge).toHaveBeenCalled();
     });
   });
@@ -1038,7 +1041,10 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(201);
-      expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
+      expect(assertLlmConsentMock).toHaveBeenLastCalledWith(
+        expect.anything(),
+        'test-profile-id',
+      );
       expect(startFirstCurriculumSession).toHaveBeenCalled();
     });
   });
@@ -2477,7 +2483,10 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
+      expect(assertLlmConsentMock).toHaveBeenLastCalledWith(
+        expect.anything(),
+        'test-profile-id',
+      );
       expect(submitSummary).toHaveBeenCalled();
     });
 
@@ -2508,7 +2517,10 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
+      expect(assertLlmConsentMock).toHaveBeenLastCalledWith(
+        expect.anything(),
+        'test-profile-id',
+      );
       expect(retrySummaryFeedback).toHaveBeenCalled();
     });
   });
