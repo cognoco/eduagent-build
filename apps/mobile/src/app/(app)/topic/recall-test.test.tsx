@@ -507,6 +507,45 @@ describe('RecallTestScreen', () => {
       screen.getByText(/Second submission: add the publication year/);
     });
 
+    it('[AC-2/AC-8] a cooldown-blocked follow-up reframes the prior feedback, never replaying it verbatim', async () => {
+      // Second half of the Sylvia Plath exchange: the learner asks "what is
+      // wrong with what I said?". That follow-up is cooldown-blocked, so the
+      // server returns no fresh `feedback` — only `priorFeedback` (the previous
+      // graded answer's stored feedback). The client must reframe it (lead with
+      // the correction + next step, drop the strengths celebration), NOT replay
+      // the fresh 3-part composition byte-for-byte (AC-8), and NOT fall back to
+      // the generic prompt (AC-2).
+      const priorFeedback = {
+        strengths:
+          'You correctly recalled that The Bell Jar is her only novel.',
+        gaps: 'You did not mention that Ariel was published after her death.',
+        nextStep: 'Next, note when Ariel appeared and why that timing matters.',
+      };
+      queuedRecallResults = [
+        {
+          passed: false,
+          failureCount: 1,
+          failureAction: 'feedback_only',
+          cooldownActive: true,
+          priorFeedback,
+        },
+      ];
+
+      render(<RecallTestScreen />);
+      fireEvent.press(screen.getByTestId('mock-send-button'));
+
+      // The correction + next step (a direct answer to "what was wrong") show.
+      await waitFor(() => {
+        screen.getByText(/Ariel was published after her death/);
+      });
+      screen.getByText(/note when Ariel appeared/);
+      // Reframed, not a verbatim replay of the fresh grade: the strengths
+      // celebration is dropped (AC-8).
+      expect(screen.queryByText(/The Bell Jar is her only novel/)).toBeNull();
+      // And never the generic "Good effort" prompt (AC-2).
+      expect(screen.queryByText(/Good effort/)).toBeNull();
+    });
+
     it('[AC-4] renders mentor-language feedback prose while controls stay in the app language', async () => {
       // Feedback arrives already written in the mentor language (here German —
       // server-produced prose); the client renders it verbatim, never through
