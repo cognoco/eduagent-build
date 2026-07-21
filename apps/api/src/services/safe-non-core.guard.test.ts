@@ -15,7 +15,7 @@
  * Forward-only ratchet: new bare dispatches fail CI.
  *
  * See:
- *   docs/superpowers/plans/2026-05-14-telemetry-sweep-and-route-shrink.md
+ *   docs/_archive/plans/done/2026-05-14-telemetry-sweep-and-route-shrink.md
  *   apps/api/src/services/safe-non-core.ts
  */
 
