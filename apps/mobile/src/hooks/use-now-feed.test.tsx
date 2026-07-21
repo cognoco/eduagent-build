@@ -5,11 +5,29 @@ import type { NowOverflowResponse, NowResponse } from '@eduagent/schemas';
 import { createHookWrapper } from '../test-utils/app-hook-test-utils';
 import { setActiveProfileId } from '../lib/api-client';
 import { buildNowFeedCacheKey, readCachedNowFeed } from '../lib/now-feed-cache';
+
 import {
   useMentorNoticeActions,
   useNowFeed,
   useNowOverflow,
 } from './use-now-feed';
+
+// [WI-2498] useNowFeed now reads the authenticated actor id (Clerk userId) to
+// bind the persisted Now-feed cache to actor+profile+policy. External-boundary
+// mock (bare specifier), matching the pattern in use-subscription.test.ts.
+jest.mock('@clerk/expo', () => ({
+  useAuth: () => ({
+    userId: 'wi2498-test-actor',
+    getToken: jest.fn().mockResolvedValue('test-token'),
+  }),
+}));
+
+// [WI-2498] The Now-feed cache is bound to actor+profile+policy, not profile
+// alone. The actor id here matches the @clerk/expo mock above.
+const CACHE_BINDING = {
+  actorId: 'wi2498-test-actor',
+  profileId: 'test-profile-id',
+};
 
 const FRESH_CACHE_TIMESTAMP = '2999-06-14T08:00:00.000Z';
 
@@ -64,7 +82,7 @@ describe('useNowFeed', () => {
     expect(result.current.data).toEqual(value);
     expect(String(mockFetch.mock.calls[0]?.[0])).toContain('/v1/now');
     expect(String(mockFetch.mock.calls[0]?.[0])).toContain('scope=self');
-    await expect(readCachedNowFeed('test-profile-id')).resolves.toEqual(value);
+    await expect(readCachedNowFeed(CACHE_BINDING)).resolves.toEqual(value);
 
     queryClient.clear();
   });
@@ -86,7 +104,7 @@ describe('useNowFeed', () => {
     jest.useFakeTimers();
     const cached = feed({ generatedAt: '2999-06-14T07:59:00.000Z' });
     await AsyncStorage.setItem(
-      buildNowFeedCacheKey('test-profile-id'),
+      buildNowFeedCacheKey(CACHE_BINDING),
       JSON.stringify(cached),
     );
     mockFetch.mockReturnValue(new Promise(() => undefined));
