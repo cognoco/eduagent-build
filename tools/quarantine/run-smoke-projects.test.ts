@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   buildPlaywrightArgs,
+  parseLaneArgument,
   resolveLaneProjects,
 } from './run-smoke-projects.cjs';
 
@@ -32,6 +33,11 @@ describe('[WI-2458] run-smoke project runner', () => {
     expect(() => resolveLaneProjects('all', NOW, [])).toThrow(
       /lane must be "core" or "advisory"/,
     );
+  });
+
+  it('accepts the argument separator forwarded by pnpm run', () => {
+    expect(parseLaneArgument(['--', 'core'])).toBe('core');
+    expect(parseLaneArgument(['advisory'])).toBe('advisory');
   });
 
   it('returns no command for an empty lane so bare Playwright never runs', () => {

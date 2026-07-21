@@ -78,10 +78,17 @@ describe('[BUG-979] e2e-web cleanup wiring', () => {
       expect(run).toMatch(/::error::/);
     });
 
-    it('reset step runs before the legacy Playwright artifact upload', () => {
+    it('reset step runs before both legacy Playwright artifact uploads', () => {
       const reset = findStep('Reset seeded staging accounts')!;
-      const upload = findStep('Upload legacy Playwright artifacts')!;
-      expect(steps.indexOf(reset)).toBeLessThan(steps.indexOf(upload));
+      const uploads = [
+        findStep('Upload required-stable legacy Playwright artifacts'),
+        findStep('Upload advisory legacy Playwright artifacts'),
+      ];
+
+      for (const upload of uploads) {
+        expect(upload).toBeDefined();
+        expect(steps.indexOf(reset)).toBeLessThan(steps.indexOf(upload!));
+      }
     });
 
     it('reset step does not fail the job on a non-2xx response (nightly cleanup is the safety net)', () => {

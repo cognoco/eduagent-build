@@ -9,6 +9,10 @@ const {
 
 const VALID_LANES = new Set(['core', 'advisory']);
 
+function parseLaneArgument(args) {
+  return args[0] === '--' ? args[1] : args[0];
+}
+
 function resolveLaneProjects(lane, now = new Date(), entries = loadRegistry()) {
   if (!VALID_LANES.has(lane)) {
     throw new Error(
@@ -64,13 +68,14 @@ function runLane(lane) {
 
 module.exports = {
   buildPlaywrightArgs,
+  parseLaneArgument,
   resolveLaneProjects,
   runLane,
 };
 
 if (require.main === module) {
   try {
-    process.exitCode = runLane(process.argv[2]);
+    process.exitCode = runLane(parseLaneArgument(process.argv.slice(2)));
   } catch (error) {
     console.error('✖ ' + error.message);
     process.exitCode = 1;
