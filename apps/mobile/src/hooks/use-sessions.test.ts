@@ -1,4 +1,5 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient } from '@tanstack/react-query';
 import type { LearningSession } from '@eduagent/schemas';
 import {
@@ -660,6 +661,99 @@ describe('useSessionSummary', () => {
     });
 
     expect(result.current.data).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-2504] The summary carries the mentor-notice RECEIPT. The app's global
+  // staleTime is 5 minutes, so without binding this query to the observed
+  // policy epoch a warm summary would keep painting a receipt for minutes
+  // after the client observed flag-off.
+  // -------------------------------------------------------------------------
+  describe('observed mentor-notice policy epoch', () => {
+    const ACTOR = 'wi2504-summary-actor';
+    const EPOCH_KEY = `now-feed-policy-epoch::${ACTOR}::test-profile-id`;
+    const ENABLED_EPOCH = 'notice-policy-v1:on:self:consented';
+    const DISABLED_EPOCH = 'notice-policy-v1:off';
+
+    const clerk = require('@clerk/expo') as {
+      useAuth: () => unknown;
+    };
+    let useAuthBefore: typeof clerk.useAuth;
+
+    beforeEach(async () => {
+      useAuthBefore = clerk.useAuth;
+      clerk.useAuth = () => ({
+        userId: ACTOR,
+        isLoaded: true,
+        isSignedIn: true,
+        getToken: jest.fn().mockResolvedValue('mock-token'),
+      });
+      await AsyncStorage.clear();
+    });
+
+    afterEach(() => {
+      clerk.useAuth = useAuthBefore;
+    });
+
+    function summaryResponse(withNotice: boolean): Response {
+      return new Response(
+        JSON.stringify({
+          summary: {
+            id: '880e8400-e29b-41d4-a716-446655440001',
+            sessionId: '660e8400-e29b-41d4-a716-446655440000',
+            content: 'I learned about gravity',
+            aiFeedback: 'Good summary',
+            status: 'accepted',
+            closingLine: null,
+            learnerRecap: null,
+            nextTopicId: null,
+            nextTopicTitle: null,
+            nextTopicReason: null,
+            ...(withNotice
+              ? {
+                  mentorNotice: {
+                    id: '11111111-1111-4111-8111-111111111111',
+                    concept: 'sign flip',
+                    correctionHint: null,
+                  },
+                }
+              : {}),
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+
+    it('refetches instead of serving the warm receipt once the observed epoch changes', async () => {
+      await AsyncStorage.setItem(EPOCH_KEY, ENABLED_EPOCH);
+      mockFetch.mockResolvedValueOnce(summaryResponse(true));
+      const wrapper = createWrapper();
+
+      const first = renderHook(() => useSessionSummary('session-1'), {
+        wrapper,
+      });
+      await waitFor(() => expect(first.result.current.isSuccess).toBe(true));
+      // Precondition/positive control — the receipt really did render while
+      // the observed policy was enabled.
+      expect(first.result.current.data?.mentorNotice?.concept).toBe(
+        'sign flip',
+      );
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      first.unmount();
+
+      // The client observes flag-off, and the server now answers without a
+      // receipt. The warm entry from before must not be served.
+      await AsyncStorage.setItem(EPOCH_KEY, DISABLED_EPOCH);
+      mockFetch.mockResolvedValueOnce(summaryResponse(false));
+
+      const second = renderHook(() => useSessionSummary('session-1'), {
+        wrapper,
+      });
+      await waitFor(() => expect(second.result.current.isSuccess).toBe(true));
+
+      expect(second.result.current.data?.mentorNotice).toBeUndefined();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
   });
 });
 

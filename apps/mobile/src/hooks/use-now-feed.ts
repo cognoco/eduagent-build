@@ -48,8 +48,12 @@ export type NowFeedQueryResult = UseQueryResult<NowResponse> & {
  * nothing may build a cache key or read a projection until the stored
  * observation is back, or a cold offline launch would key under the bootstrap
  * epoch and serve a feed the device has already been told is void.
+ *
+ * Exported for `useSessionSummary` (hooks/use-sessions.ts), whose response
+ * carries the notice RECEIPT. It is the same seam — one server epoch, one
+ * stored observation — reused, not a second policy source.
  */
-function useObservedPolicyEpoch(
+export function useObservedPolicyEpoch(
   actorId: string | null | undefined,
   profileId: string | undefined,
 ): {
@@ -62,8 +66,12 @@ function useObservedPolicyEpoch(
 
   useEffect(() => {
     if (!actorId || !profileId) {
+      // Nothing to hydrate FROM — an observation is stored per actor+profile.
+      // Report hydrated so callers that gate on it are not blocked while auth
+      // resolves; the cache binding stays null regardless, so no projection is
+      // read or written under a guessed key.
       setObservedEpoch(null);
-      setHydrated(false);
+      setHydrated(true);
       return undefined;
     }
     let cancelled = false;
