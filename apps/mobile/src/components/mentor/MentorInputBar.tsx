@@ -8,7 +8,13 @@ import { useThemeColors } from '../../lib/theme';
 
 import type { TranslateKey } from '../../i18n';
 
-/** Mic lifecycle as the bar exposes it to assistive tech. */
+/**
+ * Mic lifecycle as the bar exposes it to assistive tech. `processing` covers
+ * the hook's status of the same name: it is part of the hook's published
+ * status union and the acceptance criteria enumerate it, so the bar handles it
+ * exhaustively even though today's hook settles straight from listening to
+ * idle without passing through it.
+ */
 export type MentorMicState =
   | 'idle'
   | 'requesting'
@@ -74,6 +80,12 @@ export function MentorInputBar({
           : speechStatus === 'error'
             ? 'error'
             : 'idle';
+
+  // A start is already in flight in these states. React Native does not treat
+  // accessibilityState.busy as a press guard, so the mic has to be genuinely
+  // disabled or a second tap would open a concurrent native capture.
+  const micBusy = micState === 'requesting' || micState === 'processing';
+  const micPressBlocked = micState === 'disabled' || micBusy;
 
   useEffect(
     () => () => {
@@ -150,7 +162,7 @@ export function MentorInputBar({
   }, [startListening]);
 
   const handleMicPress = useCallback((): void => {
-    if (unavailable) return;
+    if (micPressBlocked) return;
     void (async () => {
       if (isListening) {
         await stopListening();
@@ -158,7 +170,7 @@ export function MentorInputBar({
       }
       await beginCapture();
     })();
-  }, [unavailable, isListening, stopListening, beginCapture]);
+  }, [micPressBlocked, isListening, stopListening, beginCapture]);
 
   const handleVoiceRecovery = useCallback((): void => {
     void (async () => {
@@ -274,12 +286,12 @@ export function MentorInputBar({
           accessibilityRole="button"
           accessibilityLabel={t(MIC_LABEL_KEYS[micState])}
           accessibilityState={{
-            disabled: micState === 'disabled',
-            busy: micState === 'requesting' || micState === 'processing',
+            disabled: micPressBlocked,
+            busy: micBusy,
             selected: micState === 'listening',
           }}
           accessibilityValue={{ text: micState }}
-          disabled={micState === 'disabled'}
+          disabled={micPressBlocked}
           onPress={handleMicPress}
           className="rounded-full border border-border px-3 py-2"
         >

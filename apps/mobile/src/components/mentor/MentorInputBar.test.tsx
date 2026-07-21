@@ -211,9 +211,11 @@ describe('MentorInputBar', () => {
       state: 'requesting',
       label: 'Asking for microphone access',
     });
-    expect(getByTestId('mentor-bar-mic').props.accessibilityState.busy).toBe(
-      true,
-    );
+    expect(getByTestId('mentor-bar-mic').props.accessibilityState).toEqual({
+      disabled: true,
+      busy: true,
+      selected: false,
+    });
 
     speechListening();
     rerender(<MentorInputBar {...baseProps} />);
@@ -249,6 +251,29 @@ describe('MentorInputBar', () => {
     expect(
       getByTestId('mentor-bar-mic').props.accessibilityState.disabled,
     ).toBe(true);
+  });
+
+  it('blocks a second start while a capture is still being set up', async () => {
+    const { getByTestId, rerender } = render(<MentorInputBar {...baseProps} />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('mentor-bar-mic'));
+    });
+    expect(mockSpeech.startListening).toHaveBeenCalledTimes(1);
+
+    for (const status of ['requesting_permission', 'processing'] as const) {
+      setSpeech({ status, isListening: false });
+      rerender(<MentorInputBar {...baseProps} />);
+      expect(
+        getByTestId('mentor-bar-mic').props.accessibilityState.disabled,
+      ).toBe(true);
+      await act(async () => {
+        fireEvent.press(getByTestId('mentor-bar-mic'));
+      });
+    }
+
+    expect(mockSpeech.startListening).toHaveBeenCalledTimes(1);
+    expect(mockSpeech.stopListening).not.toHaveBeenCalled();
   });
 
   it('toggles capture manually and never starts a second one while listening', async () => {
