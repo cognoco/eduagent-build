@@ -159,6 +159,30 @@ describe('probes quality heuristics — P25 (topic-opener promise) [WI-2107]', (
     });
     expect(issues).toEqual([]);
   });
+
+  it('accepts a promise opener with content packed into the same sentence', async () => {
+    // Reviewer finding (bounce 1): the old sentence-count proxy flagged this
+    // as bare-promise because it's one sentence with no question mark, even
+    // though the appositive after the comma supplies real content.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply:
+        "Let's talk about Sylvia Plath, an American poet best known for Ariel and The Bell Jar.",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('still flags a bare promise with a padded/elaborated topic name', async () => {
+    // Guards the mirror-image gap a naive words-after-the-opener count would
+    // reopen: a long topic description supplies no actual content, so it
+    // must not clear the word-count floor just by being verbose.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply:
+        "Let's explore the fascinating and complex world of quantum mechanics.",
+      signals: {},
+    });
+    expect(issues.some((i) => i.code === 'P25.bare-promise')).toBe(true);
+  });
 });
 
 describe('probes quality heuristics — P08 (worked-example fading)', () => {

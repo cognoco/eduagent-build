@@ -716,17 +716,40 @@ function repliesWithForwardMotion(reply: string): boolean {
 // [WI-2107] A reply that opens a topic with only a forward promise ("Let's
 // talk about Sylvia Plath") and nothing else leaves the learner with no
 // content and no question — a dead end. Flag only when the promise-opener
-// phrase is present AND the reply has neither a question nor more than one
-// sentence of follow-on content, so a promise followed by real teaching or a
-// question is not penalized.
+// phrase is present, the reply has no question, and there is no substantive
+// content beyond the promise clause + topic-naming clause — regardless of
+// whether that content lands in the same sentence (a comma-joined
+// appositive) or a following one. Strip the opener, then strip the
+// topic-naming clause up to its first boundary punctuation (`,` `.` `;`
+// `!`) — the reply may legitimately end there (a bare promise) or continue
+// with real material (a promise-plus-content). Apply the word-count floor
+// only to what remains AFTER that boundary, not to the topic clause itself:
+// checking words-after-the-opener alone (an earlier version of this fix)
+// still let a padded/elaborated bare topic — "Let's explore the fascinating
+// and complex world of quantum mechanics." — clear the floor on topic-name
+// length even though it supplies no content past the promise. Bounce 1
+// (reviewer:codex:global) flagged the mirror-image false positive: a
+// promise + real content packed into one sentence via a comma appositive
+// ("Let's talk about Sylvia Plath, an American poet best known for Ariel
+// and The Bell Jar.") was wrongly classified as bare.
 const BARE_PROMISE_OPENER =
   /\b(let'?s (talk|dive|explore|look at|chat|get into)|we'?ll (talk|dive|explore|look at|discuss|dig into)|i'?d love to (talk|discuss|explore))\b/i;
 
+const TOPIC_CLAUSE_BOUNDARY = /[,.;!]/;
+
+const MIN_CONTENT_WORDS_AFTER_TOPIC_CLAUSE = 4;
+
 function isBarePromiseOnly(reply: string): boolean {
-  if (!BARE_PROMISE_OPENER.test(reply)) return false;
+  const openerMatch = BARE_PROMISE_OPENER.exec(reply);
+  if (!openerMatch) return false;
   if (reply.includes('?')) return false;
-  const sentenceCount = reply.split(/(?<=[.!?])\s+/).filter(Boolean).length;
-  return sentenceCount <= 1;
+  const afterOpener = reply.slice(openerMatch.index + openerMatch[0].length);
+  const boundaryMatch = TOPIC_CLAUSE_BOUNDARY.exec(afterOpener);
+  const afterTopicClause = boundaryMatch
+    ? afterOpener.slice(boundaryMatch.index + 1)
+    : '';
+  const wordCount = afterTopicClause.split(/\s+/).filter(Boolean).length;
+  return wordCount <= MIN_CONTENT_WORDS_AFTER_TOPIC_CLAUSE;
 }
 
 function evaluateTeachBackProbe(
