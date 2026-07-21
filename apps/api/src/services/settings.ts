@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, inArray, ne, sql, exists } from 'drizzle-orm';
+import { eq, and, gte, ne, sql, exists } from 'drizzle-orm';
 import { NotFoundError } from '../errors';
 import {
   notificationPreferences,
@@ -20,9 +20,13 @@ import type {
   NotificationPrefsResponse,
   CelebrationLevel,
   WithdrawalArchivePreference,
-  NotificationPayload,
 } from '@eduagent/schemas';
 import { ForbiddenError } from '@eduagent/schemas';
+import {
+  acquireCoordinationLock,
+  budgetExhausted,
+  type LoggableNotificationType,
+} from './notification-coordination';
 import {
   assertChargeNotCredentialed,
   assertParentAccess,
@@ -579,11 +583,10 @@ export async function getDailyNotificationCount(
  * notification_log — so the DB `notification_type` enum deliberately omits it,
  * and these helpers exclude it from their accepted type. (The push sender in
  * services/notifications.ts guards the log write for it accordingly.)
+ *
+ * [WI-2503] The alias itself now lives in ./notification-coordination, next to
+ * the coordination keys that gate the same table.
  */
-type LoggableNotificationType = Exclude<
-  NotificationPayload['type'],
-  'store_cancel_nudge'
->;
 
 /**
  * Server-side only — called exclusively from services/notifications.ts (Inngest pipeline).
@@ -647,6 +650,13 @@ export async function getRecentNotificationCount(
  * caller's own `type`; only the *count check* and the *advisory lock* span
  * the dedup set. Omitting `dedupTypes` preserves the exact prior per-type
  * behavior (the default `[type]` singleton reproduces the same lock key).
+ *
+ * [WI-2503] `opts.coordinationKey` overrides the derived lock key. Review-family
+ * senders pass Kbudget (`reviewFamilyBudgetKey`) so they serialize against the
+ * mentor-notice reserve, which locks the same key — the two families previously
+ * used incompatible keys and could each consume the single family slot.
+ * `opts.dailyCap` moves the local-day global push cap inside the same
+ * Kbudget-locked transaction, so the cap check and the log insert are atomic.
  */
 export async function checkAndLogRateLimitInternal(
   db: Database,
@@ -656,33 +666,32 @@ export async function checkAndLogRateLimitInternal(
     hours: number;
     maxCount: number;
     dedupTypes?: LoggableNotificationType[];
+    coordinationKey?: string;
+    dailyCap?: { since: Date; maxCount: number };
   },
 ): Promise<boolean> {
   const dedupTypes = opts.dedupTypes ?? [type];
   const lockKey =
+    opts.coordinationKey ??
     'rate-limit:' + profileId + ':' + dedupTypes.slice().sort().join('+');
 
-  return db.transaction(async (tx) => {
-    // Advisory lock per (profileId, dedup bucket) — serializes concurrent
-    // rate-limit checks for the same bucket without blocking unrelated ones.
+  return db.transaction(async (rawTx) => {
+    const tx = rawTx as unknown as Database;
+    // Advisory lock per coordination key — serializes concurrent rate-limit
+    // checks for the same bucket without blocking unrelated ones.
     // Lock is released automatically on commit/rollback. [BUG-856]
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
-    );
+    await acquireCoordinationLock(tx, lockKey);
 
     const since = new Date(Date.now() - opts.hours * 60 * 60 * 1000);
-    const rows = await tx
-      .select()
-      .from(notificationLog)
-      .where(
-        and(
-          eq(notificationLog.profileId, profileId),
-          inArray(notificationLog.type, dedupTypes),
-          gte(notificationLog.sentAt, since),
-        ),
-      );
+    const exhausted = await budgetExhausted(tx, {
+      profileId,
+      dedupTypes,
+      familySince: since,
+      familyMaxCount: opts.maxCount,
+      dailyCap: opts.dailyCap,
+    });
 
-    if (rows.length >= opts.maxCount) {
+    if (exhausted) {
       return true;
     }
 

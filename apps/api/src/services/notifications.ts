@@ -50,11 +50,9 @@ export interface NotificationResult {
 
 /** Maximum push notifications per day per profile */
 export const MAX_DAILY_PUSH = 3;
-export const REVIEW_FAMILY_DEDUP_TYPES = [
-  'review_reminder',
-  'recall_nudge',
-  'notice_recheck',
-] as const;
+// [WI-2503] Single definition lives with the Kbudget coordination key it
+// belongs to; re-exported here so existing sender imports keep working.
+export { REVIEW_FAMILY_DEDUP_TYPES } from './notification-coordination';
 
 const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send';
 

@@ -8,6 +8,10 @@ import type { MentorNoticeAccepted } from '@eduagent/schemas';
 import type { MentorNoticeRecheckOutcome } from '@eduagent/schemas';
 
 import { scrubClinicalInferenceFromLearningRecord } from '../persisted-learning-text-guard';
+import {
+  acquireCoordinationLock,
+  mentorNoticeDeliveryKey,
+} from '../notification-coordination';
 import { safeSend } from '../safe-non-core';
 import { inngest } from '../../inngest/client';
 
@@ -136,6 +140,26 @@ export async function stampMentorNoticeOffer(
   return notice ?? null;
 }
 
+/**
+ * [WI-2503] Runs `fn` in a transaction holding Knotice — the once-ever
+ * mentor-notice delivery/defer identity — so every notice state transition
+ * linearizes against the nudge sender's delivery claim.
+ */
+async function withNoticeDeliveryLock<T>(
+  db: Database,
+  input: { profileId: string; noticeId: string },
+  fn: (tx: Database) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (rawTx) => {
+    const tx = rawTx as unknown as Database;
+    await acquireCoordinationLock(
+      tx,
+      mentorNoticeDeliveryKey(input.profileId, input.noticeId),
+    );
+    return fn(tx);
+  });
+}
+
 export async function applyMentorNoticeOutcome(
   db: Database,
   input: {
@@ -151,25 +175,34 @@ export async function applyMentorNoticeOutcome(
 
   if (input.outcome === 'deferred') {
     const dayStart = input.learningDayStart ?? occurredAt;
-    const [deferred] = await db
-      .update(mentorNotices)
-      .set({
-        lastDeferredAt: occurredAt,
-        lastRecheckOutcome: 'deferred',
-        nudgeStatus: sql`case when ${mentorNotices.nudgeStatus} = 'pending' then 'suppressed'::mentor_notice_nudge_status else ${mentorNotices.nudgeStatus} end`,
-      })
-      .where(
-        and(
-          eq(mentorNotices.id, input.noticeId),
-          eq(mentorNotices.profileId, input.profileId),
-          eq(mentorNotices.status, 'open'),
-          or(
-            isNull(mentorNotices.lastDeferredAt),
-            lt(mentorNotices.lastDeferredAt, dayStart),
+    // [WI-2503] Knotice — the once-ever delivery/defer identity. Taking it here
+    // linearizes the defer against the nudge sender's claim: the defer either
+    // commits before the claim (suppressing a still-`pending` notice, so no push
+    // is sent) or after it (the notice is `sending`/`sent`, so the suppression
+    // is a no-op and the single push stands). No interleaving delivers a push
+    // after a committed defer.
+    const deferred = await withNoticeDeliveryLock(db, input, async (tx) => {
+      const [row] = await tx
+        .update(mentorNotices)
+        .set({
+          lastDeferredAt: occurredAt,
+          lastRecheckOutcome: 'deferred',
+          nudgeStatus: sql`case when ${mentorNotices.nudgeStatus} = 'pending' then 'suppressed'::mentor_notice_nudge_status else ${mentorNotices.nudgeStatus} end`,
+        })
+        .where(
+          and(
+            eq(mentorNotices.id, input.noticeId),
+            eq(mentorNotices.profileId, input.profileId),
+            eq(mentorNotices.status, 'open'),
+            or(
+              isNull(mentorNotices.lastDeferredAt),
+              lt(mentorNotices.lastDeferredAt, dayStart),
+            ),
           ),
-        ),
-      )
-      .returning();
+        )
+        .returning();
+      return row;
+    });
     if (deferred) {
       await safeSend(
         () =>
@@ -206,25 +239,30 @@ export async function applyMentorNoticeOutcome(
       : input.outcome === 'dismissed'
         ? 'dismissed'
         : 'open';
-  const [updated] = await db
-    .update(mentorNotices)
-    .set({
-      status: nextStatus,
-      resolvedAt: terminal ? occurredAt : null,
-      firstRecheckAt: sql`coalesce(${mentorNotices.firstRecheckAt}, ${occurredAt})`,
-      lastRecheckAt: occurredAt,
-      lastRecheckOutcome: input.outcome,
-      recheckAttemptCount: sql`${mentorNotices.recheckAttemptCount} + 1`,
-      nudgeStatus: sql`case when ${mentorNotices.nudgeStatus} = 'pending' then 'suppressed'::mentor_notice_nudge_status else ${mentorNotices.nudgeStatus} end`,
-    })
-    .where(
-      and(
-        eq(mentorNotices.id, input.noticeId),
-        eq(mentorNotices.profileId, input.profileId),
-        eq(mentorNotices.status, 'open'),
-      ),
-    )
-    .returning();
+  // Terminal outcomes also suppress a pending nudge, so they linearize under
+  // Knotice for the same reason the defer branch does. [WI-2503]
+  const updated = await withNoticeDeliveryLock(db, input, async (tx) => {
+    const [row] = await tx
+      .update(mentorNotices)
+      .set({
+        status: nextStatus,
+        resolvedAt: terminal ? occurredAt : null,
+        firstRecheckAt: sql`coalesce(${mentorNotices.firstRecheckAt}, ${occurredAt})`,
+        lastRecheckAt: occurredAt,
+        lastRecheckOutcome: input.outcome,
+        recheckAttemptCount: sql`${mentorNotices.recheckAttemptCount} + 1`,
+        nudgeStatus: sql`case when ${mentorNotices.nudgeStatus} = 'pending' then 'suppressed'::mentor_notice_nudge_status else ${mentorNotices.nudgeStatus} end`,
+      })
+      .where(
+        and(
+          eq(mentorNotices.id, input.noticeId),
+          eq(mentorNotices.profileId, input.profileId),
+          eq(mentorNotices.status, 'open'),
+        ),
+      )
+      .returning();
+    return row;
+  });
   if (!updated) return null;
   await safeSend(
     () =>

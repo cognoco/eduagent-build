@@ -330,10 +330,14 @@ describe('[BUG-699-FOLLOWUP] recall-nudge-send 24h push dedup', () => {
       'p-dup',
       'recall_nudge',
       // [WI-1461] shared dedup bucket with review_reminder — see settings.ts
+      // [WI-2503] Kbudget is the one review-family coordination key; the
+      // local-day cap is checked inside the same locked transaction.
       {
         hours: 24,
         maxCount: 1,
         dedupTypes: ['review_reminder', 'recall_nudge', 'notice_recheck'],
+        coordinationKey: 'review-family-budget:p-dup',
+        dailyCap: { since: expect.any(Date), maxCount: 3 },
       },
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
