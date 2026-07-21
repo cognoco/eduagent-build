@@ -52,7 +52,10 @@ import { FEATURE_FLAGS } from '../lib/feature-flags';
 import { combinedSignal, createTimeoutSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
+import { useAuth } from '@clerk/expo';
+
 import { useNavigationDataScopeContract } from './use-navigation-contract';
+import { useObservedPolicyEpoch } from './use-now-feed';
 
 export { useStreamMessage } from './use-stream-message';
 
@@ -587,9 +590,23 @@ export function useSessionSummary(
 ): UseQueryResult<SessionSummary | null> {
   const client = useApiClient();
   const { activeProfile, mode, profileId } = useSessionNavigationScope();
+  // [WI-2504] The summary carries the mentor-notice RECEIPT, and the app's
+  // global staleTime is 5 minutes — so without this a warm summary would keep
+  // painting a receipt for minutes after the client observed flag-off. Binding
+  // the key to the observed epoch drops it at the moment of observation. The
+  // segment is appended to the shared factory's key rather than added to the
+  // factory, so every existing prefix invalidation still matches.
+  // Actor = the authenticated account identity, exactly as the now-feed hook
+  // stores it; anything else would read a key nothing writes.
+  const { userId } = useAuth();
+  const { epoch: policyEpoch, hydrated: epochHydrated } =
+    useObservedPolicyEpoch(userId, profileId);
 
   return useQuery({
-    queryKey: queryKeys.sessions.summary(mode, sessionId, profileId),
+    queryKey: [
+      ...queryKeys.sessions.summary(mode, sessionId, profileId),
+      policyEpoch,
+    ],
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -608,7 +625,7 @@ export function useSessionSummary(
         cleanup();
       }
     },
-    enabled: !!activeProfile && !!sessionId,
+    enabled: !!activeProfile && !!sessionId && epochHydrated,
     refetchInterval: options?.refetchInterval
       ? (query) => options.refetchInterval?.(query.state.data ?? null) ?? false
       : undefined,

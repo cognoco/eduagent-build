@@ -50,13 +50,18 @@ export const mentorNoticeRoutes = new Hono<MentorNoticeRouteEnv>()
       // narrower (adds caller-is-subject and subject consent) and these
       // responses echo notice data, so routing them through the one predicate
       // keeps every notice-bearing boundary on a single seam.
+      // [WI-2504] Same seam; the epoch is derived here but not surfaced —
+      // these are mutations, not persisted projections, and a flag-off
+      // answers 404 rather than returning a body to invalidate.
       if (
-        !(await resolveMentorNoticeVisibility(
-          c,
-          profileId,
-          c.env.MENTOR_NOTICE_ENABLED,
-          { proxyModeHeader: c.req.header('X-Proxy-Mode') },
-        ))
+        !(
+          await resolveMentorNoticeVisibility(
+            c,
+            profileId,
+            c.env.MENTOR_NOTICE_ENABLED,
+            { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+          )
+        ).visible
       ) {
         return apiError(
           c,
@@ -89,13 +94,18 @@ export const mentorNoticeRoutes = new Hono<MentorNoticeRouteEnv>()
       // narrower (adds caller-is-subject and subject consent) and these
       // responses echo notice data, so routing them through the one predicate
       // keeps every notice-bearing boundary on a single seam.
+      // [WI-2504] Same seam; the epoch is derived here but not surfaced —
+      // these are mutations, not persisted projections, and a flag-off
+      // answers 404 rather than returning a body to invalidate.
       if (
-        !(await resolveMentorNoticeVisibility(
-          c,
-          profileId,
-          c.env.MENTOR_NOTICE_ENABLED,
-          { proxyModeHeader: c.req.header('X-Proxy-Mode') },
-        ))
+        !(
+          await resolveMentorNoticeVisibility(
+            c,
+            profileId,
+            c.env.MENTOR_NOTICE_ENABLED,
+            { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+          )
+        ).visible
       ) {
         return apiError(
           c,

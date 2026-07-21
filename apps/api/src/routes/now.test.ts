@@ -237,4 +237,69 @@ describe('now routes', () => {
       { mentorNoticeEnabled: false },
     );
   });
+
+  // -------------------------------------------------------------------------
+  // [WI-2504] Policy epoch on the wire.
+  //
+  // The epoch is what lets a client invalidate a projection it already
+  // persisted. It is derived from the SAME call that decides `visible`, so
+  // each case below asserts BOTH: the epoch the client will bind its cache to,
+  // and the visibility that reached the feed builder. They can never diverge.
+  // -------------------------------------------------------------------------
+  async function epochFor(
+    app: ReturnType<typeof makeApp>,
+    path: string,
+    headers: Record<string, string> = {},
+  ): Promise<string | undefined> {
+    const res = await app.request(path, { headers });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { mentorNoticePolicyEpoch?: string };
+    return body.mentorNoticePolicyEpoch;
+  }
+
+  it('emits the visible epoch on /now when the rollout is on for a consented self read', async () => {
+    expect(await epochFor(makeApp(true), '/v1/now?scope=self')).toBe(
+      'notice-policy-v1:on:self:consented',
+    );
+    expect(buildNowFeed).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      { scope: 'self' },
+      { mentorNoticeEnabled: true },
+    );
+  });
+
+  it('emits the rollout-off epoch on /now when the kill switch is thrown', async () => {
+    expect(await epochFor(makeApp(false), '/v1/now?scope=self')).toBe(
+      'notice-policy-v1:off',
+    );
+    expect(buildNowFeed).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      { scope: 'self' },
+      { mentorNoticeEnabled: false },
+    );
+  });
+
+  // Distinct denial epochs matter: a proxy-tightened read and a flag-off read
+  // must not key to the same client cache entry.
+  it('emits distinct epochs for a proxy read and a non-subject read', async () => {
+    expect(
+      await epochFor(makeApp(true), '/v1/now?scope=self', {
+        'X-Proxy-Mode': 'true',
+      }),
+    ).toBe('notice-policy-v1:on:proxy');
+    expect(await epochFor(makeApp(true, CHILD_ID), '/v1/now?scope=self')).toBe(
+      'notice-policy-v1:on:other-subject',
+    );
+  });
+
+  it('emits the same epoch on /now/overflow', async () => {
+    expect(await epochFor(makeApp(true), '/v1/now/overflow?scope=self')).toBe(
+      'notice-policy-v1:on:self:consented',
+    );
+    expect(await epochFor(makeApp(false), '/v1/now/overflow?scope=self')).toBe(
+      'notice-policy-v1:off',
+    );
+  });
 });
