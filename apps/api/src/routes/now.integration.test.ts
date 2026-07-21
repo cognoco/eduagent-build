@@ -10,6 +10,7 @@ import {
   generateUUIDv7,
   learningSessions,
   mentorActivityLedger,
+  mentorNotices,
   needsDeepeningTopics,
   parkingLotItems,
   retentionCards,
@@ -44,6 +45,7 @@ type TestEnv = {
     db: Database;
     profileId: string | undefined;
     profileMeta: undefined;
+    callerPersonId: string | undefined;
     user: unknown;
   };
 };
@@ -62,12 +64,23 @@ function createIntegrationDb(): Database {
   return createDatabase(requireDatabaseUrl());
 }
 
-function makeApp(db: Database, profileId: string) {
+function makeApp(
+  db: Database,
+  profileId: string,
+  // [WI-2498] The mentor-notice visibility predicate reads the server-resolved
+  // caller identity and the rollout binding. Defaults keep every pre-existing
+  // case byte-identical (no callerPersonId, no rollout binding -> notices off).
+  options: { callerPersonId?: string; mentorNoticeEnabled?: boolean } = {},
+) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
     c.set('db', db);
     c.set('profileId', profileId);
     c.set('profileMeta', undefined);
+    c.set('callerPersonId' as never, options.callerPersonId as never);
+    if (options.mentorNoticeEnabled) {
+      c.env = { MENTOR_NOTICE_ENABLED: 'true' } as never;
+    }
     await next();
   });
   app.route('/v1', nowRoutes);
@@ -672,6 +685,110 @@ describe('Integration: now routes', () => {
       expect(JSON.stringify(body)).not.toContain('ledger_moment');
       expect(JSON.stringify(body)).not.toContain('supporter-parked-secret');
       expect(JSON.stringify(body)).not.toContain('supporter-ledger-secret');
+    }
+  });
+
+  // [WI-2498] Supporter reads are the third reader class the AC names
+  // (guardian / owner-in-proxy / supporter) and the one NOT closed by the
+  // visibility predicate's selfhood conjunct: on a `scope=person` read the
+  // supporter's OWN profile is the selected profile, so V evaluates TRUE. What
+  // keeps the supportee's notice evidence out is the `visibility==='self' &&
+  // scope==='self'` guard inside collectNowCandidates. This case pins that
+  // guard directly, with V deliberately held TRUE (caller === selected profile,
+  // rollout on) so a future refactor that folds the scope guard into V — e.g.
+  // WI-2504, which extends the same seam — regresses here instead of silently
+  // in production.
+  it('keeps supportee mentor-notice evidence out of supporter person and hub feeds even when the predicate is satisfied', async () => {
+    const supporterId = await seedProfile(db, 'supporter-notice-wall');
+    const childId = await seedProfile(db, 'child-notice-wall');
+    await seedAcceptedContract(db, supporterId, childId);
+    // A structurally visible card, so the assertions below are not vacuously
+    // green against an empty feed.
+    const retention = await seedRetentionDue(
+      db,
+      childId,
+      'supporter-visible-notice-wall',
+      new Date('2020-01-01T00:00:00.000Z'),
+    );
+    const sessionId = await seedCompletedSession(
+      db,
+      childId,
+      retention.subjectId,
+      retention.topicId,
+    );
+    await db.insert(mentorNotices).values({
+      profileId: childId,
+      subjectId: retention.subjectId,
+      sourceSessionId: sessionId,
+      concept: 'supporter-notice-concept-secret',
+      correctionHint: 'supporter-notice-hint-secret',
+      status: 'open',
+    });
+    // Distinct source session — mentor_notices has a unique (source_session_id).
+    const lockedSessionId = await seedCompletedSession(
+      db,
+      childId,
+      retention.subjectId,
+      retention.topicId,
+    );
+    await db.insert(mentorNotices).values({
+      profileId: childId,
+      subjectId: retention.subjectId,
+      sourceSessionId: lockedSessionId,
+      concept: 'supporter-locked-concept-secret',
+      correctionHint: null,
+      status: 'locked_in',
+      resolvedAt: new Date(),
+    });
+
+    const appOptions = {
+      // V is satisfied: the caller IS the selected (supporter) profile.
+      callerPersonId: supporterId,
+      mentorNoticeEnabled: true,
+    };
+    const personRes = await makeApp(db, supporterId, appOptions).request(
+      `/v1/now?scope=person&personId=${childId}`,
+    );
+    const overflowRes = await makeApp(db, supporterId, appOptions).request(
+      `/v1/now/overflow?scope=person&personId=${childId}`,
+    );
+    const hubRes = await makeApp(db, supporterId, appOptions).request(
+      '/v1/now?scope=supporter-hub',
+    );
+
+    expect(personRes.status).toBe(200);
+    expect(overflowRes.status).toBe(200);
+    expect(hubRes.status).toBe(200);
+
+    const personBody = (await personRes.json()) as {
+      cards: Array<{ kind: string }>;
+    };
+    const overflowBody = (await overflowRes.json()) as {
+      items: Array<{ kind: string }>;
+    };
+    const hubBody = (await hubRes.json()) as { cards: Array<{ kind: string }> };
+
+    expect(personBody.cards.some((card) => card.kind === 'retention_due')).toBe(
+      true,
+    );
+    for (const [body, entries] of [
+      [personBody, personBody.cards],
+      [overflowBody, overflowBody.items],
+      [hubBody, hubBody.cards],
+    ] as const) {
+      expect(entries.some((entry) => entry.kind === 'mentor_notice')).toBe(
+        false,
+      );
+      expect(JSON.stringify(body)).not.toContain('notice_locked_in');
+      expect(JSON.stringify(body)).not.toContain(
+        'supporter-notice-concept-secret',
+      );
+      expect(JSON.stringify(body)).not.toContain(
+        'supporter-notice-hint-secret',
+      );
+      expect(JSON.stringify(body)).not.toContain(
+        'supporter-locked-concept-secret',
+      );
     }
   });
 

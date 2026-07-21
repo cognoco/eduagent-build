@@ -116,7 +116,9 @@ describe('SupporterSelfLearningDoorway', () => {
   });
 
   it('shows a loading state before the cold-start data resolves', () => {
-    render(<SupporterSelfLearningDoorway />, { wrapper: wrapper() });
+    render(<SupporterSelfLearningDoorway />, {
+      wrapper: wrapper('supporter', { hasMeScope: false }),
+    });
     screen.getByTestId('supporter-self-learning-doorway-error');
     expect(screen.queryByTestId('supporter-self-learning-doorway')).toBeNull();
   });
@@ -127,7 +129,9 @@ describe('SupporterSelfLearningDoorway', () => {
       () => new Response(JSON.stringify({ message: 'boom' }), { status: 500 }),
     );
 
-    render(<SupporterSelfLearningDoorway />, { wrapper: wrapper() });
+    render(<SupporterSelfLearningDoorway />, {
+      wrapper: wrapper('supporter', { hasMeScope: false }),
+    });
 
     await waitFor(() => {
       screen.getByText("Couldn't load your Support hub");
@@ -145,7 +149,7 @@ describe('SupporterSelfLearningDoorway', () => {
     mockFetch.setRoute('/scopes/coldstart', COLD_START_DATA);
 
     render(<SupporterSelfLearningDoorway />, {
-      wrapper: wrapper('supporter', { hasMeScope: true }),
+      wrapper: wrapper('supporter', { hasMeScope: false }),
     });
 
     await waitFor(() => {
@@ -185,5 +189,22 @@ describe('SupporterSelfLearningDoorway', () => {
         screen.queryByTestId('supporter-self-learning-doorway'),
       ).toBeNull();
     });
+  });
+
+  // [WI-2243] AC-1: the doorway is a first-time entry point only — once the
+  // supporter has real learning state of their own ('me' present in the
+  // server-resolved scope list), it steps aside rather than rendering a
+  // second, now-redundant route into a scope already reachable elsewhere.
+  it('renders nothing once the supporter already has their own learning state', () => {
+    mockFetch.setRoute('/scopes/coldstart', COLD_START_DATA);
+
+    render(<SupporterSelfLearningDoorway />, {
+      wrapper: wrapper('supporter', { hasMeScope: true }),
+    });
+
+    expect(screen.queryByTestId('supporter-self-learning-doorway')).toBeNull();
+    expect(
+      screen.queryByTestId('supporter-self-learning-doorway-error'),
+    ).toBeNull();
   });
 });

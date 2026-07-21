@@ -1,4 +1,5 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, type SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   learningSessions,
   subjects,
@@ -731,44 +732,76 @@ describe('createScopedRepository', () => {
   });
 
   describe('[WI-1871] bookSuggestions.findBySubject — single-query ownership', () => {
-    it.each([
-      {
-        label: 'returns owned rows unchanged',
-        rows: [
-          {
-            id: 'suggestion-1',
-            subjectId: 'subject-1',
-            title: 'The Number Devil',
-            emoji: '📕',
-            description: 'A mathematical adventure',
-            category: 'related',
-            createdAt: new Date('2026-01-01T00:00:00.000Z'),
-            pickedAt: null,
-          },
-        ],
-      },
-      { label: 'returns no rows for a foreign subject', rows: [] },
-    ])('$label', async ({ rows }) => {
+    it('returns owned rows and denies a foreign subject through the joined WHERE predicate', async () => {
+      const ownedRow = {
+        id: 'suggestion-owned',
+        subjectId: 'subject-owned',
+        title: 'The Number Devil',
+        emoji: '📕',
+        description: 'A mathematical adventure',
+        category: 'related',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        pickedAt: null,
+      };
+      const foreignRow = {
+        ...ownedRow,
+        id: 'suggestion-foreign',
+        subjectId: 'subject-foreign',
+      };
+      const rows = [ownedRow, foreignRow];
+      const subjectOwners: Record<string, string> = {
+        'subject-owned': TEST_PROFILE_ID,
+        'subject-foreign': 'profile-foreign',
+      };
+      let whereCondition: SQL | undefined;
       const from = jest.fn();
       const innerJoin = jest.fn();
-      const where = jest.fn();
-      const chain = {
+      type SelectChain = {
+        select: jest.Mock;
+        from: jest.Mock;
+        innerJoin: jest.Mock;
+        where: jest.Mock;
+        then: (onFulfilled: (value: unknown) => unknown) => Promise<unknown>;
+      };
+      const chain: SelectChain = {
         select: jest.fn(),
         from,
         innerJoin,
-        where,
-        then: (onFulfilled: (value: unknown) => unknown) =>
-          Promise.resolve(rows).then(onFulfilled),
+        where: jest.fn((condition: SQL): SelectChain => {
+          whereCondition = condition;
+          return chain;
+        }),
+        then: (onFulfilled: (value: unknown) => unknown) => {
+          if (!whereCondition) {
+            throw new Error('WHERE condition was not supplied');
+          }
+          const query = new PgDialect().sqlToQuery(whereCondition);
+          const subjectMatch =
+            /"book_suggestions"\."subject_id" = \$(\d+)/.exec(query.sql);
+          const profileMatch = /"subjects"\."profile_id" = \$(\d+)/.exec(
+            query.sql,
+          );
+          const filtered = rows.filter((row) => {
+            const subjectMatches = subjectMatch
+              ? row.subjectId === query.params[Number(subjectMatch[1]) - 1]
+              : true;
+            const profileMatches = profileMatch
+              ? subjectOwners[row.subjectId] ===
+                query.params[Number(profileMatch[1]) - 1]
+              : true;
+            return subjectMatches && profileMatches;
+          });
+          return Promise.resolve(filtered).then(onFulfilled);
+        },
       };
       chain.select.mockReturnValue(chain);
       from.mockReturnValue(chain);
       innerJoin.mockReturnValue(chain);
-      where.mockReturnValue(chain);
 
       const subjectsFindFirst = jest
         .fn()
         .mockResolvedValue({ id: 'subject-1' });
-      const bookSuggestionsFindMany = jest.fn().mockResolvedValue(rows);
+      const bookSuggestionsFindMany = jest.fn().mockResolvedValue([]);
       const db = {
         ...chain,
         query: {
@@ -778,15 +811,19 @@ describe('createScopedRepository', () => {
       } as unknown as Database;
 
       const repo = createScopedRepository(db, TEST_PROFILE_ID);
-      const result = await repo.bookSuggestions.findBySubject('subject-1');
+      const ownedResult =
+        await repo.bookSuggestions.findBySubject('subject-owned');
+      const foreignResult =
+        await repo.bookSuggestions.findBySubject('subject-foreign');
 
-      expect(result).toEqual(rows);
+      expect(ownedResult).toEqual([ownedRow]);
+      expect(foreignResult).toEqual([]);
       expect(subjectsFindFirst).not.toHaveBeenCalled();
       expect(bookSuggestionsFindMany).not.toHaveBeenCalled();
-      expect(chain.select).toHaveBeenCalledTimes(1);
-      expect(from).toHaveBeenCalledTimes(1);
-      expect(innerJoin).toHaveBeenCalledTimes(1);
-      expect(where).toHaveBeenCalledTimes(1);
+      expect(chain.select).toHaveBeenCalledTimes(2);
+      expect(from).toHaveBeenCalledTimes(2);
+      expect(innerJoin).toHaveBeenCalledTimes(2);
+      expect(chain.where).toHaveBeenCalledTimes(2);
     });
   });
 

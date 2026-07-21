@@ -36,5 +36,11 @@ flows/learning/resume-crash-recovery.yaml
 # scope-context.tsx) — the relaunch IS the test mechanism, not setup.
 flows/v2/v2-supporter-scope-journey.yaml
 
+# [WI-2243] Same reasoning as v2-supporter-scope-journey.yaml above —
+# cold-relaunches mid-flow to prove Me-scope persists across relaunch
+# (SecureStore-backed scope-context.tsx) — the relaunch IS the test
+# mechanism, not setup.
+flows/v2/v2-supporter-self-learning-doorway.yaml
+
 # DEFERRED:M1-COMPREHENSIVE — full rewrite needed (theme picker removed, stale More-screen refs)
 flows/post-auth-comprehensive-devclient.yaml

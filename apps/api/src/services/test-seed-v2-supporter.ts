@@ -424,3 +424,122 @@ export async function seedV2SupporterManaged(
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// [WI-2243] `v2-supporter-self-learning` / `v2-supporter-self-learning-active`
+// — accepted-edge fixtures for the self-learning doorway + Me-scope
+// persistence work. Two scenarios cover the two states AC-6 asks for:
+//
+//   - `v2-supporter-self-learning`        — accepted edge, supporter has NO
+//                                            own subjects/sessions yet (the
+//                                            doorway-eligible baseline:
+//                                            resolveScopesForPerson's
+//                                            hasFirstRealLearningState is
+//                                            false, so 'me' is absent from
+//                                            GET /scopes).
+//   - `v2-supporter-self-learning-active` — same shape, but the supporter
+//                                            already has their own subject +
+//                                            session (hasFirstRealLearning
+//                                            State is true, 'me' is present)
+//                                            — the resume-flow / doorway-
+//                                            suppressed / isolation fixture.
+//
+// Reuses the independent-v2-owner-identity supportee shape from
+// `seedV2SupporterAccepted`'s "empty" case (a supportee in their OWN
+// organization — supporter/supportee is not the guardianship same-org
+// model) rather than `seedV2SupporterManaged`'s same-org managed child,
+// since this fixture is about the SUPPORTER's own learning state, not a
+// managed-child cold-start card.
+// ---------------------------------------------------------------------------
+
+async function seedV2SupporterSelfLearningBase(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+  opts: { ownLearning: boolean },
+): Promise<SeedResult> {
+  const supporter = await reseedOwnerIdentityV2(db, email, env, {
+    displayName: 'Test Supporter',
+    birthYear: 1985,
+  });
+
+  const supporteeEmail = deriveEmail(email, 'selflearn-supportee');
+  const { clerkUserId: supporteeClerkUserId, password: supporteePassword } =
+    await createClerkTestUser(supporteeEmail, env);
+  const supportee = await seedOwnerIdentityV2(db, {
+    email: supporteeEmail,
+    clerkUserId: supporteeClerkUserId,
+    displayName: 'Test Supportee',
+    birthYear: 2012,
+  });
+
+  const edge = await seedAcceptedEdge(db, {
+    supporterPersonId: supporter.personId,
+    supporteePersonId: supportee.personId,
+  });
+
+  const ids: Record<string, string> = {
+    supporterPersonId: supporter.personId,
+    supporterOrganizationId: supporter.organizationId,
+
+    supporteeEmail,
+    supporteePassword,
+    supporteePersonId: supportee.personId,
+    supporteeOrganizationId: supportee.organizationId,
+    edgeId: edge.edgeId,
+    contractId: edge.contractId,
+  };
+
+  if (opts.ownLearning) {
+    const { subjectId, topicIds } = await createSubjectWithCurriculum(
+      db,
+      supporter.personId,
+      'Supporter Own Subject',
+    );
+    const topicId = topicIds[0];
+    if (!topicId) {
+      throw new Error(
+        'createSubjectWithCurriculum returned no topics for the self-learning-active seed',
+      );
+    }
+    const { sessionId } = await insertSessionWithRecap(db, {
+      profileId: supporter.personId,
+      subjectId,
+      topicId,
+    });
+    ids.ownSubjectId = subjectId;
+    ids.ownTopicId = topicId;
+    ids.ownSessionId = sessionId;
+  }
+
+  return {
+    scenario: opts.ownLearning
+      ? 'v2-supporter-self-learning-active'
+      : 'v2-supporter-self-learning',
+    accountId: supporter.organizationId,
+    profileId: supporter.personId,
+    email,
+    password: supporter.password,
+    ids,
+  };
+}
+
+export async function seedV2SupporterSelfLearning(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  return seedV2SupporterSelfLearningBase(db, email, env, {
+    ownLearning: false,
+  });
+}
+
+export async function seedV2SupporterSelfLearningActive(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  return seedV2SupporterSelfLearningBase(db, email, env, {
+    ownLearning: true,
+  });
+}

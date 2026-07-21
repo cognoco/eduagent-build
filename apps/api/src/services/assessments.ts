@@ -352,8 +352,17 @@ export async function evaluateAssessmentAnswer(
   }
 
   const messages = buildAssessmentEvaluationMessages(context, answer);
+  // [WI-2433] Answer grading is a judge task: route on capability:'judge' so it
+  // resolves to the vendor-independent, tier/age-blind grader (GRADER_MODEL),
+  // consistent with the other server-side graders (challenge-round,
+  // teach-back, suitability). This makes the call exempt from the under-18
+  // vendor gate WI-2432 threads (the judge branch is evaluated first and never
+  // returns Gemini by construction, MMT-ADR-0016 §2/§10.1); ageBracket is still
+  // threaded because it drives the safety preamble, not vendor selection.
   const result = await routeAndCall(messages, 2, {
+    capability: 'judge',
     flow: 'assessment.evaluate',
+    responseFormat: 'json',
     conversationLanguage: options?.conversationLanguage,
     ageBracket: options?.ageBracket,
   });
@@ -669,8 +678,13 @@ export async function evaluateQuickCheckAnswer(
     },
   ];
 
+  // [WI-2433] Quick-check answer grading is a judge task — same routing posture
+  // as evaluateAssessmentAnswer above (capability:'judge' → vendor-independent,
+  // tier/age-blind GRADER_MODEL). See that call site for the rationale.
   const result = await routeAndCall(messages, 2, {
+    capability: 'judge',
     flow: 'assessment.evaluate',
+    responseFormat: 'json',
     conversationLanguage: options?.conversationLanguage,
     ageBracket: options?.ageBracket,
   });
