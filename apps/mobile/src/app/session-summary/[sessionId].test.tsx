@@ -79,8 +79,8 @@ jest.mock('../../lib/theme', /* gc1-allow: theme hook requires native ColorSchem
 const mockSentryCaptureMessage = jest.fn();
 const mockSentryCaptureException = jest.fn();
 jest.mock(
-  '../../lib/sentry',
-  /* gc1-allow: external-boundary: @sentry/react-native native crash handlers */ () => ({
+  '../../lib/sentry' /* gc1-allow: external-boundary: @sentry/react-native native crash handlers */,
+  () => ({
     Sentry: {
       addBreadcrumb: jest.fn(),
       captureMessage: (...args: unknown[]) => mockSentryCaptureMessage(...args),
@@ -997,7 +997,8 @@ describe('SessionSummaryScreen', () => {
     await pressAsync(screen.getByTestId('submit-summary-button'));
 
     await act(async () => {
-      activeQueryClient?.setQueriesData(
+      expect(activeQueryClient).not.toBeNull();
+      activeQueryClient!.setQueriesData(
         {
           predicate: (query) => query.queryKey[0] === 'session-summary',
         },

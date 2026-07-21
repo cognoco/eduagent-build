@@ -1,40 +1,17 @@
-jest.mock('../services/llm', () => {
-  const actual = jest.requireActual(
-    '../services/llm',
-  ) as typeof import('../services/llm');
-  return {
-    ...actual,
-    registerProvider: jest.fn(),
-  };
-});
-
-jest.mock('../services/llm/providers/gemini', () => {
-  const actual = jest.requireActual(
-    '../services/llm/providers/gemini',
-  ) as typeof import('../services/llm/providers/gemini');
-  return {
-    ...actual,
-    createGeminiProvider: jest.fn().mockReturnValue({ id: 'gemini' }),
-  };
-});
-
-jest.mock('../services/llm/providers/openai', () => {
-  const actual = jest.requireActual(
-    '../services/llm/providers/openai',
-  ) as typeof import('../services/llm/providers/openai');
-  return {
-    ...actual,
-    createOpenAIProvider: jest.fn().mockReturnValue({ id: 'openai' }),
-  };
-});
-
-import { registerProvider } from '../services/llm';
-import { createGeminiProvider } from '../services/llm/providers/gemini';
-import { createOpenAIProvider } from '../services/llm/providers/openai';
+import * as llmService from '../services/llm';
+import * as geminiProvider from '../services/llm/providers/gemini';
+import * as openAiProvider from '../services/llm/providers/openai';
 import { llmMiddleware, resetLlmMiddleware } from './llm';
-// _clearProviders is called by the middleware when the env hash changes.
-// It is mocked via the spread of actual so its real behaviour is preserved;
-// we only need it imported here for the comment to be accurate.
+
+const registerProviderSpy = jest.spyOn(llmService, 'registerProvider');
+const createGeminiProviderSpy = jest.spyOn(
+  geminiProvider,
+  'createGeminiProvider',
+);
+const createOpenAIProviderSpy = jest.spyOn(
+  openAiProvider,
+  'createOpenAIProvider',
+);
 
 function createMockContext(env: Record<string, string | undefined>) {
   return {
@@ -46,10 +23,8 @@ const originalNodeEnv = process.env['NODE_ENV'];
 
 // NOTE: resetLlmMiddleware() clears the middleware's env-hash (_registeredEnvHash)
 // so the next request performs fresh provider registration. Router state
-// (registered providers, circuit breakers) lives in router.ts and requires
-// separate _clearProviders() / _resetCircuits() calls. In this file we mock
-// the entire llm barrel so router state is irrelevant; but integration tests
-// must call both to get a clean slate. See router.test.ts for examples.
+// (registered providers, circuit breakers) lives in router.ts. The middleware
+// reset clears the real provider registry used by these targeted spies.
 beforeEach(() => {
   jest.clearAllMocks();
   resetLlmMiddleware();
@@ -67,8 +42,8 @@ describe('llmMiddleware', () => {
 
     await llmMiddleware(c, next);
 
-    expect(createGeminiProvider).toHaveBeenCalledWith('test-key-123');
-    expect(registerProvider).toHaveBeenCalled();
+    expect(createGeminiProviderSpy).toHaveBeenCalledWith('test-key-123');
+    expect(registerProviderSpy).toHaveBeenCalled();
     expect(next).toHaveBeenCalled();
   });
 
@@ -78,8 +53,8 @@ describe('llmMiddleware', () => {
 
     await llmMiddleware(c, next);
 
-    expect(createOpenAIProvider).toHaveBeenCalledWith('oai-key-456');
-    expect(registerProvider).toHaveBeenCalled();
+    expect(createOpenAIProviderSpy).toHaveBeenCalledWith('oai-key-456');
+    expect(registerProviderSpy).toHaveBeenCalled();
     expect(next).toHaveBeenCalled();
   });
 
@@ -92,9 +67,9 @@ describe('llmMiddleware', () => {
 
     await llmMiddleware(c, next);
 
-    expect(createGeminiProvider).toHaveBeenCalledWith('gem-key');
-    expect(createOpenAIProvider).toHaveBeenCalledWith('oai-key');
-    expect(registerProvider).toHaveBeenCalledTimes(2);
+    expect(createGeminiProviderSpy).toHaveBeenCalledWith('gem-key');
+    expect(createOpenAIProviderSpy).toHaveBeenCalledWith('oai-key');
+    expect(registerProviderSpy).toHaveBeenCalledTimes(2);
     expect(next).toHaveBeenCalled();
   });
 
@@ -106,7 +81,7 @@ describe('llmMiddleware', () => {
     await expect(llmMiddleware(c, next)).rejects.toThrow(
       'At least one LLM API key is required',
     );
-    expect(registerProvider).not.toHaveBeenCalled();
+    expect(registerProviderSpy).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
   });
 
@@ -118,7 +93,7 @@ describe('llmMiddleware', () => {
     await expect(llmMiddleware(c, next)).rejects.toThrow(
       'At least one LLM API key is required',
     );
-    expect(registerProvider).not.toHaveBeenCalled();
+    expect(registerProviderSpy).not.toHaveBeenCalled();
   });
 
   it('throws in development when no keys set', async () => {
@@ -129,7 +104,7 @@ describe('llmMiddleware', () => {
     await expect(llmMiddleware(c, next)).rejects.toThrow(
       'At least one LLM API key is required',
     );
-    expect(registerProvider).not.toHaveBeenCalled();
+    expect(registerProviderSpy).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
   });
 
@@ -142,12 +117,13 @@ describe('llmMiddleware', () => {
       '../services/llm/providers/mock',
     ) as typeof import('../services/llm/providers/mock');
     actualLlm.registerProvider(createMockProvider('openai'));
+    registerProviderSpy.mockClear();
     const c = createMockContext({ ENVIRONMENT: 'development' });
     const next = jest.fn().mockResolvedValue(undefined);
 
     await llmMiddleware(c, next);
 
-    expect(registerProvider).not.toHaveBeenCalled();
+    expect(registerProviderSpy).not.toHaveBeenCalled();
     expect(actualLlm.getRegisteredProviders()).toContain('openai');
     expect(next).toHaveBeenCalled();
   });
@@ -161,6 +137,7 @@ describe('llmMiddleware', () => {
       '../services/llm/providers/mock',
     ) as typeof import('../services/llm/providers/mock');
     actualLlm.registerProvider(createMockProvider('openai'));
+    registerProviderSpy.mockClear();
     const noKey = createMockContext({ ENVIRONMENT: 'development' });
     const withKey = createMockContext({
       ENVIRONMENT: 'development',
@@ -184,7 +161,7 @@ describe('llmMiddleware', () => {
     await expect(llmMiddleware(c, next)).rejects.toThrow(
       'At least one LLM API key is required',
     );
-    expect(registerProvider).not.toHaveBeenCalled();
+    expect(registerProviderSpy).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
   });
 
@@ -196,7 +173,7 @@ describe('llmMiddleware', () => {
 
     await llmMiddleware(c, next);
 
-    expect(registerProvider).not.toHaveBeenCalled();
+    expect(registerProviderSpy).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('No LLM API keys set'),
     );
@@ -213,7 +190,7 @@ describe('llmMiddleware', () => {
 
     await llmMiddleware(c, next);
 
-    expect(registerProvider).not.toHaveBeenCalled();
+    expect(registerProviderSpy).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('No LLM API keys set'),
     );
@@ -229,7 +206,7 @@ describe('llmMiddleware', () => {
     await llmMiddleware(c, next);
     await llmMiddleware(c, next);
 
-    expect(registerProvider).toHaveBeenCalledTimes(1);
+    expect(registerProviderSpy).toHaveBeenCalledTimes(1);
     expect(next).toHaveBeenCalledTimes(2);
   });
 
@@ -240,7 +217,7 @@ describe('llmMiddleware', () => {
     // (which made failed init permanently terminal per-isolate). The new
     // behavior is safer: a transient failure (e.g., race on startup) self-heals
     // on the next request rather than wedging the isolate forever.
-    (registerProvider as jest.Mock).mockImplementationOnce(() => {
+    registerProviderSpy.mockImplementationOnce(() => {
       throw new Error('transient registration failure');
     });
 
@@ -252,10 +229,9 @@ describe('llmMiddleware', () => {
     );
 
     // Next request with the same env retries — this is the NEW contract.
-    (registerProvider as jest.Mock).mockResolvedValue(undefined);
-    (registerProvider as jest.Mock).mockClear();
+    registerProviderSpy.mockClear();
     await llmMiddleware(c, next);
-    expect(registerProvider).toHaveBeenCalledTimes(1);
+    expect(registerProviderSpy).toHaveBeenCalledTimes(1);
     expect(next).toHaveBeenCalledTimes(1);
   });
 
@@ -271,15 +247,15 @@ describe('llmMiddleware', () => {
     const next = jest.fn().mockResolvedValue(undefined);
 
     await llmMiddleware(c1, next);
-    expect(createGeminiProvider).toHaveBeenCalledWith('preview-key');
-    expect(registerProvider).toHaveBeenCalledTimes(1);
+    expect(createGeminiProviderSpy).toHaveBeenCalledWith('preview-key');
+    expect(registerProviderSpy).toHaveBeenCalledTimes(1);
 
     jest.clearAllMocks();
 
     // Different env key — must re-register with the new key, NOT skip.
     await llmMiddleware(c2, next);
-    expect(createGeminiProvider).toHaveBeenCalledWith('prod-key');
-    expect(registerProvider).toHaveBeenCalledTimes(1);
+    expect(createGeminiProviderSpy).toHaveBeenCalledWith('prod-key');
+    expect(registerProviderSpy).toHaveBeenCalledTimes(1);
   });
 
   it('[BUG-488 / P2 BREAK] does NOT re-register when env keys are unchanged', async () => {
@@ -290,16 +266,14 @@ describe('llmMiddleware', () => {
     await llmMiddleware(c, next);
     await llmMiddleware(c, next);
 
-    expect(registerProvider).toHaveBeenCalledTimes(1);
+    expect(registerProviderSpy).toHaveBeenCalledTimes(1);
     expect(next).toHaveBeenCalledTimes(2);
   });
 
-  // Helper: collect the `id`s of every provider object passed to the mocked
-  // registerProvider. createCerebrasProvider / createMistralProvider are NOT
-  // mocked (GC1: no new internal jest.mock), so they return real provider
-  // objects whose `id` we can assert on directly.
+  // Helper: collect the `id`s of every provider object passed through the
+  // targeted registerProvider spy. Every factory returns a real provider.
   function registeredProviderIds(): string[] {
-    return (registerProvider as jest.Mock).mock.calls.map(
+    return registerProviderSpy.mock.calls.map(
       (call) => (call[0] as { id: string }).id,
     );
   }
@@ -387,6 +361,6 @@ describe('llmMiddleware', () => {
     // re-registration that includes cerebras again.
     await llmMiddleware(c2, next);
     expect(registeredProviderIds()).toContain('cerebras');
-    expect(registerProvider).toHaveBeenCalled();
+    expect(registerProviderSpy).toHaveBeenCalled();
   });
 });
