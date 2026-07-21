@@ -24,9 +24,25 @@ import {
   resolveMentorNoticeRecheckContext,
   startMentorNoticeRecheck,
 } from '../../apps/api/src/services/mentor-notices';
+import { isMentorNoticePushPostMvpEnabled } from '../../apps/api/src/config';
 import { createIntegrationDb } from './helpers';
 import { clearFetchCalls } from './fetch-interceptor';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
+
+// [WI-2573] Quarantine for the retained-but-dormant mentor-notice PUSH path.
+//
+// MMT-ADR-0036 §3.1 makes the mentor-notice MVP in-app only; the nudge
+// scan/send machinery is isolated behind the default-off
+// MENTOR_NOTICE_PUSH_POST_MVP_ENABLED boundary rather than deleted. A test that
+// exercises that machinery is quarantined behind the SAME boundary, so it is
+// dormant exactly when the code it covers is dormant, and returns automatically
+// if the boundary is ever reopened post-MVP. The in-app cases in this file are
+// retained MVP scope and always run.
+const itPostMvpPush = isMentorNoticePushPostMvpEnabled(
+  process.env['MENTOR_NOTICE_PUSH_POST_MVP_ENABLED'],
+)
+  ? it
+  : it.skip;
 
 const db = createIntegrationDb();
 const accountIds: string[] = [];
@@ -403,71 +419,78 @@ describe('mentor notice lifecycle — real database', () => {
     expect(offered?.lastOfferedSessionId).toBe(session.id);
   });
 
-  it('reserves a nudge when the daily cap was filled in the previous learning day', async () => {
-    const fixture = await seedFixture('santiago-nudge');
-    await setOrganizationTimeZone(fixture.profileId, 'America/Santiago');
-    expect(await getProfileTimeZone(db, fixture.profileId)).toBe(
-      'America/Santiago',
-    );
-
-    const sourceSessionId = await seedSourceSession(fixture);
-    const notice = await acceptMentorNotice(db, {
-      ...fixture,
-      topicId: null,
-      sourceSessionId,
-      concept: 'Changing signs across the equals sign',
-      correctionHint: null,
-    });
-    if (!notice) throw new Error('notice insert failed');
-
-    // Three sends at local 02:00, 02:30 and 03:00 on 2026-09-06 — the whole
-    // daily budget, but spent in the PREVIOUS learning day. The type is
-    // outside REVIEW_FAMILY_DEDUP_TYPES so the rolling 24-hour family limit
-    // (which is not learning-day scoped) cannot mask the boundary.
-    await db.insert(notificationLog).values(
-      [
-        '2026-09-06T05:00:00.000Z',
-        '2026-09-06T05:30:00.000Z',
-        '2026-09-06T06:00:00.000Z',
-      ].map((sentAt) => ({
-        profileId: fixture.profileId,
-        type: 'weekly_progress' as const,
-        sentAt: new Date(sentAt),
-      })),
-    );
-
-    // The Inngest nudge-send function derives the boundary exactly this way.
-    const localDayStart = getLearningDayStart(
-      SANTIAGO_NOW,
-      await getProfileTimeZone(db, fixture.profileId),
-    );
-
-    // Today's budget is untouched, so the reservation succeeds. Under the
-    // four-absolute-hour boundary all three sends count as "today" and the
-    // three-per-day cap refuses it.
-    await expect(
-      reserveMentorNoticeNudge(db, {
-        profileId: fixture.profileId,
-        noticeId: notice.id,
-        localDayStart,
-        now: SANTIAGO_NOW,
-      }),
-    ).resolves.toBe(true);
-
-    const reserved = await db
-      .select({ id: notificationLog.id })
-      .from(notificationLog)
-      .where(
-        and(
-          eq(notificationLog.profileId, fixture.profileId),
-          eq(notificationLog.type, 'notice_recheck'),
-        ),
+  // [WI-2573] Quarantined with the push machinery it covers — see itPostMvpPush
+  // above. Introduced by WI-2557 (PR #2461) as SUPPLEMENTARY evidence; that
+  // item's acceptance rests on its offer-eligibility sibling above, which is
+  // retained MVP scope and still runs.
+  itPostMvpPush(
+    'reserves a nudge when the daily cap was filled in the previous learning day',
+    async () => {
+      const fixture = await seedFixture('santiago-nudge');
+      await setOrganizationTimeZone(fixture.profileId, 'America/Santiago');
+      expect(await getProfileTimeZone(db, fixture.profileId)).toBe(
+        'America/Santiago',
       );
-    expect(reserved).toHaveLength(1);
-    const [afterReserve] = await db
-      .select({ nudgeStatus: mentorNotices.nudgeStatus })
-      .from(mentorNotices)
-      .where(eq(mentorNotices.id, notice.id));
-    expect(afterReserve?.nudgeStatus).toBe('pending');
-  });
+
+      const sourceSessionId = await seedSourceSession(fixture);
+      const notice = await acceptMentorNotice(db, {
+        ...fixture,
+        topicId: null,
+        sourceSessionId,
+        concept: 'Changing signs across the equals sign',
+        correctionHint: null,
+      });
+      if (!notice) throw new Error('notice insert failed');
+
+      // Three sends at local 02:00, 02:30 and 03:00 on 2026-09-06 — the whole
+      // daily budget, but spent in the PREVIOUS learning day. The type is
+      // outside REVIEW_FAMILY_DEDUP_TYPES so the rolling 24-hour family limit
+      // (which is not learning-day scoped) cannot mask the boundary.
+      await db.insert(notificationLog).values(
+        [
+          '2026-09-06T05:00:00.000Z',
+          '2026-09-06T05:30:00.000Z',
+          '2026-09-06T06:00:00.000Z',
+        ].map((sentAt) => ({
+          profileId: fixture.profileId,
+          type: 'weekly_progress' as const,
+          sentAt: new Date(sentAt),
+        })),
+      );
+
+      // The Inngest nudge-send function derives the boundary exactly this way.
+      const localDayStart = getLearningDayStart(
+        SANTIAGO_NOW,
+        await getProfileTimeZone(db, fixture.profileId),
+      );
+
+      // Today's budget is untouched, so the reservation succeeds. Under the
+      // four-absolute-hour boundary all three sends count as "today" and the
+      // three-per-day cap refuses it.
+      await expect(
+        reserveMentorNoticeNudge(db, {
+          profileId: fixture.profileId,
+          noticeId: notice.id,
+          localDayStart,
+          now: SANTIAGO_NOW,
+        }),
+      ).resolves.toBe(true);
+
+      const reserved = await db
+        .select({ id: notificationLog.id })
+        .from(notificationLog)
+        .where(
+          and(
+            eq(notificationLog.profileId, fixture.profileId),
+            eq(notificationLog.type, 'notice_recheck'),
+          ),
+        );
+      expect(reserved).toHaveLength(1);
+      const [afterReserve] = await db
+        .select({ nudgeStatus: mentorNotices.nudgeStatus })
+        .from(mentorNotices)
+        .where(eq(mentorNotices.id, notice.id));
+      expect(afterReserve?.nudgeStatus).toBe('pending');
+    },
+  );
 });
