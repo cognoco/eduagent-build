@@ -197,7 +197,8 @@ const RUN = !!process.env.DATABASE_URL;
         const chargeOfB = await seedPerson(orgId, { displayName: 'ChargeOfB' });
 
         await grantGuardianshipEdge(guardianB, chargeOfB);
-        // Guardian A has NO edge to chargeOfB — must not see chargeOfB.
+        // Guardian A is an admin, so the service-level caller assertion passes;
+        // the combined guard must still reject chargeOfB because A has NO edge.
 
         const childrenForA = await getChildrenForParent(
           db,

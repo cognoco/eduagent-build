@@ -56,6 +56,7 @@ const personIds: string[] = [];
 const orgIds: string[] = [];
 const orgIdByPersonId = new Map<string, string>();
 
+/** Only seedProfile-based helpers populate this person-to-org test mapping. */
 function requireOrganizationId(personId: string): string {
   const organizationId = orgIdByPersonId.get(personId);
   if (!organizationId) {

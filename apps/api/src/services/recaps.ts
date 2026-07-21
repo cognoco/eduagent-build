@@ -281,6 +281,10 @@ export async function listRecapsForParent(
   // individual child and must not poison sibling lookups — Promise.all would
   // reject the whole parent dashboard when any one child has hidden data.
   // Other errors (DB, etc.) still propagate via the outer await.
+  // Each exported leaf deliberately repeats the admin assertion so it remains
+  // safe when called independently. The extra lookups are bounded by this
+  // household's family-linked child count; that defense-in-depth cost is
+  // accepted at the current household-scale cardinality.
   const sessionsByChild = await Promise.all(
     selectedChildren.map(async (child) => {
       try {
@@ -471,6 +475,10 @@ export async function getRecapForParent(
   // individual child and must not block the lookup against siblings — the
   // recap may belong to a visible child even if a sibling is hidden. Other
   // errors still propagate via the outer await.
+  // Each exported leaf deliberately repeats the admin assertion so it remains
+  // safe when called independently. The extra lookups are bounded by this
+  // household's family-linked child count; that defense-in-depth cost is
+  // accepted at the current household-scale cardinality.
   const sessions = await Promise.all(
     children.map(async (child) => {
       try {

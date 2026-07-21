@@ -239,6 +239,7 @@ describe('getProgressSummary (integration)', () => {
     { label: 'missing caller', kind: 'missing' },
     { label: 'same-org non-admin spoof', kind: 'non-admin' },
     { label: 'cross-org admin spoof', kind: 'cross-org' },
+    // [BUG-400] Preserve the no-family-link regression guard explicitly.
     { label: 'admin without child edge', kind: 'no-edge' },
   ] as const;
 

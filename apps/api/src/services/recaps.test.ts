@@ -13,8 +13,8 @@
  * learningSessions.findMany chains used by getChildrenForParent /
  * getChildSessions / getChildSessionDetail — a multi-table relational-API stub
  * substantially larger than this test file. Tracked with the broader
- * services/dashboard burn-down (see docs/plans/2026-05-12-internal-mock-cleanup-
- * inventory.md).
+ * services/dashboard burn-down (see docs/_archive/plans/done/
+ * 2026-05-12-internal-mock-cleanup-inventory.md).
  */
 
 const mockGetChildrenForParent = jest.fn();
