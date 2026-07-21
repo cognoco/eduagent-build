@@ -690,11 +690,40 @@ afterAll(async () => {
 });
 
 describe('dashboard service integration', () => {
+  it('[WI-2519][P0][RED→GREEN] rejects a cross-org admin who supplies their own server organization', async () => {
+    const { orgId: targetOrganizationId, profileId: parentProfileId } =
+      await seedProfile({ displayName: 'Target Household Parent' });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'Target Household Child',
+      isOwner: false,
+      orgId: targetOrganizationId,
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    const {
+      orgId: attackerOrganizationId,
+      profileId: crossOrganizationAdminId,
+    } = await seedProfile({ displayName: 'Cross-Organization Admin' });
+
+    await expect(
+      getChildrenForParentService(
+        db,
+        parentProfileId,
+        crossOrganizationAdminId,
+        attackerOrganizationId,
+      ),
+    ).rejects.toThrow(ForbiddenError);
+  });
+
   const callerCases = [
     { label: 'authorized admin', kind: 'authorized' },
     { label: 'missing caller', kind: 'missing' },
     { label: 'same-org non-admin spoof', kind: 'non-admin' },
     { label: 'cross-org admin spoof', kind: 'cross-org' },
+    {
+      label: 'cross-org admin using their own organization',
+      kind: 'cross-org-own-org',
+    },
     { label: 'admin without child edge', kind: 'no-edge' },
   ] as const;
 
@@ -724,6 +753,7 @@ describe('dashboard service integration', () => {
       }
 
       let callerPersonId: string | undefined = parentProfileId;
+      let requestOrganizationId = orgId;
       if (kind === 'missing') {
         callerPersonId = undefined;
       } else if (kind === 'non-admin') {
@@ -736,6 +766,11 @@ describe('dashboard service integration', () => {
         ({ profileId: callerPersonId } = await seedProfile({
           displayName: 'Authority Matrix Cross-Org Admin',
         }));
+      } else if (kind === 'cross-org-own-org') {
+        ({ profileId: callerPersonId, orgId: requestOrganizationId } =
+          await seedProfile({
+            displayName: 'Authority Matrix Cross-Org Admin Own Org',
+          }));
       }
 
       const resourceId = generateUUIDv7();
@@ -751,7 +786,7 @@ describe('dashboard service integration', () => {
               db,
               parentProfileId,
               callerPersonId,
-              orgId,
+              requestOrganizationId,
             ),
           requiresChildEdge: false,
         },
@@ -763,7 +798,7 @@ describe('dashboard service integration', () => {
               parentProfileId,
               childProfileId,
               callerPersonId,
-              orgId,
+              requestOrganizationId,
             ),
           requiresChildEdge: true,
         },
@@ -776,7 +811,7 @@ describe('dashboard service integration', () => {
               childProfileId,
               subjectId,
               callerPersonId,
-              orgId,
+              requestOrganizationId,
             ),
           requiresChildEdge: true,
         },
@@ -788,7 +823,7 @@ describe('dashboard service integration', () => {
               parentProfileId,
               childProfileId,
               callerPersonId,
-              orgId,
+              requestOrganizationId,
             ),
           requiresChildEdge: true,
         },
@@ -801,7 +836,7 @@ describe('dashboard service integration', () => {
               childProfileId,
               resourceId,
               callerPersonId,
-              orgId,
+              requestOrganizationId,
             ),
           requiresChildEdge: true,
         },
@@ -813,7 +848,7 @@ describe('dashboard service integration', () => {
               parentProfileId,
               childProfileId,
               callerPersonId,
-              orgId,
+              requestOrganizationId,
             ),
           requiresChildEdge: true,
         },
@@ -825,7 +860,7 @@ describe('dashboard service integration', () => {
               parentProfileId,
               childProfileId,
               callerPersonId,
-              orgId,
+              requestOrganizationId,
             ),
           requiresChildEdge: true,
         },
@@ -837,7 +872,7 @@ describe('dashboard service integration', () => {
               parentProfileId,
               childProfileId,
               callerPersonId,
-              orgId,
+              requestOrganizationId,
             ),
           requiresChildEdge: true,
         },
@@ -850,7 +885,7 @@ describe('dashboard service integration', () => {
               childProfileId,
               resourceId,
               callerPersonId,
-              orgId,
+              requestOrganizationId,
             ),
           requiresChildEdge: true,
         },
@@ -863,7 +898,7 @@ describe('dashboard service integration', () => {
               childProfileId,
               resourceId,
               callerPersonId,
-              orgId,
+              requestOrganizationId,
             ),
           requiresChildEdge: true,
         },
@@ -902,6 +937,7 @@ describe('dashboard service integration', () => {
       }
 
       let callerPersonId: string | undefined = parentProfileId;
+      let requestOrganizationId = orgId;
       if (kind === 'missing') {
         callerPersonId = undefined;
       } else if (kind === 'non-admin') {
@@ -914,6 +950,11 @@ describe('dashboard service integration', () => {
         ({ profileId: callerPersonId } = await seedProfile({
           displayName: 'No-Write Cross-Org Admin',
         }));
+      } else if (kind === 'cross-org-own-org') {
+        ({ profileId: callerPersonId, orgId: requestOrganizationId } =
+          await seedProfile({
+            displayName: 'No-Write Cross-Org Admin Own Org',
+          }));
       }
 
       const [report] = await db
@@ -933,7 +974,7 @@ describe('dashboard service integration', () => {
           childProfileId,
           report!.id,
           callerPersonId,
-          orgId,
+          requestOrganizationId,
         ),
       ).rejects.toThrow(ForbiddenError);
 
