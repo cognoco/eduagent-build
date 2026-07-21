@@ -34,6 +34,12 @@ const MIC_LABEL_KEYS: Record<MentorMicState, TranslateKey> = {
 
 export interface MentorInputBarProps {
   unavailable?: boolean;
+  /**
+   * Voice locale for recognition, resolved by the screen from the active
+   * profile's conversation language. Undefined falls back to the hook's
+   * default, which is what a learner with no resolved language would get.
+   */
+  voiceLocale?: string;
   onSubmitText: (text: string) => void;
   onOpenCamera: () => void;
   onOpenHomework: () => void;
@@ -41,6 +47,7 @@ export interface MentorInputBarProps {
 
 export function MentorInputBar({
   unavailable = false,
+  voiceLocale,
   onSubmitText,
   onOpenCamera,
   onOpenHomework,
@@ -59,7 +66,7 @@ export function MentorInputBar({
     clearTranscript,
     requestMicrophonePermission,
     getMicrophonePermissionStatus,
-  } = useSpeechRecognition();
+  } = useSpeechRecognition({ lang: voiceLocale });
 
   // Capture ownership. A transcript can resolve after the learner has moved on
   // — they emptied the draft, the Mentor went unavailable, or they started a
@@ -98,9 +105,12 @@ export function MentorInputBar({
 
   useEffect(() => {
     if (!unavailable) return;
-    captureRef.current.accepting = false;
+    if (captureRef.current.accepting) {
+      captureRef.current.accepting = false;
+      clearTranscript();
+    }
     void stopListening();
-  }, [unavailable, stopListening]);
+  }, [unavailable, stopListening, clearTranscript]);
 
   // The hook overwrites `transcript` on every result event and has no explicit
   // final flag, so "final" is the established proxy used elsewhere in the app:
@@ -145,22 +155,30 @@ export function MentorInputBar({
     }
   };
 
-  const handleChangeText = useCallback((next: string): void => {
-    // Emptying the field is a discard: a transcript still in flight from the
-    // current capture must not repopulate what the learner just cleared. The
-    // test is emptiness, not blankness — typing a space is not a discard.
-    if (next.length === 0) {
-      captureRef.current.accepting = false;
-    }
-    setValue(next);
-  }, []);
+  const handleChangeText = useCallback(
+    (next: string): void => {
+      // Emptying the field is a discard: a transcript still in flight from the
+      // current capture must not repopulate what the learner just cleared. The
+      // test is emptiness, not blankness — typing a space is not a discard.
+      if (next.length === 0 && captureRef.current.accepting) {
+        captureRef.current.accepting = false;
+        clearTranscript();
+      }
+      setValue(next);
+    },
+    [clearTranscript],
+  );
 
   const beginCapture = useCallback(async (): Promise<void> => {
     // A new capture supersedes the previous one: the old record is dropped, so
-    // an abandoned capture can no longer claim the draft.
+    // an abandoned capture can no longer claim the draft. Drop whatever the
+    // hook still holds first — it only clears its transcript once permission
+    // resolves, and the renders before that would otherwise let words from an
+    // invalidated capture land in the draft under the new capture's ownership.
+    clearTranscript();
     captureRef.current = { accepting: true };
     await startListening();
-  }, [startListening]);
+  }, [clearTranscript, startListening]);
 
   const handleMicPress = useCallback((): void => {
     if (micPressBlocked) return;
@@ -179,15 +197,10 @@ export function MentorInputBar({
         const granted = await requestMicrophonePermission();
         if (!granted) return;
       }
-      clearTranscript();
+      // beginCapture clears the hook state, which also drops the error.
       await beginCapture();
     })();
-  }, [
-    permissionRecovery,
-    requestMicrophonePermission,
-    clearTranscript,
-    beginCapture,
-  ]);
+  }, [permissionRecovery, requestMicrophonePermission, beginCapture]);
 
   const recoveryLabel = permissionRecovery
     ? t('mentorHome.bar.voiceAllow')

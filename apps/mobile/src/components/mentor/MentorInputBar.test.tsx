@@ -17,11 +17,13 @@ interface MockSpeech {
 }
 
 let mockSpeech: MockSpeech;
+let mockUseSpeechRecognition: jest.Mock;
 
 jest.mock(
   '../../hooks/use-speech-recognition' /* gc1-allow: native-boundary — the hook wraps expo-speech-recognition, a native module with no jest-runnable implementation */,
   () => ({
-    useSpeechRecognition: () => mockSpeech,
+    useSpeechRecognition: (options?: unknown) =>
+      mockUseSpeechRecognition(options),
   }),
 );
 
@@ -61,10 +63,14 @@ beforeEach(() => {
     isListening: false,
     startListening: jest.fn().mockResolvedValue(undefined),
     stopListening: jest.fn().mockResolvedValue(undefined),
-    clearTranscript: jest.fn(),
+    // Faithful to the hook: clearing really does drop the held transcript.
+    clearTranscript: jest.fn(() => {
+      setSpeech({ transcript: '', error: null, status: 'idle' });
+    }),
     requestMicrophonePermission: jest.fn().mockResolvedValue(true),
     getMicrophonePermissionStatus: jest.fn().mockResolvedValue(null),
   };
+  mockUseSpeechRecognition = jest.fn(() => mockSpeech);
 });
 
 describe('MentorInputBar', () => {
@@ -382,6 +388,46 @@ describe('MentorInputBar', () => {
     });
 
     expect(getByTestId('mentor-bar-input').props.value).toBe('keep this');
+  });
+
+  it('does not resurrect a discarded transcript when the next capture starts', async () => {
+    const { getByTestId, rerender } = render(<MentorInputBar {...baseProps} />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('mentor-bar-mic'));
+    });
+    speechListening();
+    rerender(<MentorInputBar {...baseProps} />);
+
+    fireEvent.changeText(getByTestId('mentor-bar-input'), '');
+    setSpeech({
+      status: 'idle',
+      isListening: false,
+      transcript: 'discarded words',
+    });
+    await act(async () => {
+      rerender(<MentorInputBar {...baseProps} />);
+    });
+    expect(getByTestId('mentor-bar-input').props.value).toBe('');
+
+    // Starting the next capture must not let the discarded words land: the
+    // hook clears its transcript only once permission resolves, so the
+    // requesting render still carries them.
+    await act(async () => {
+      fireEvent.press(getByTestId('mentor-bar-mic'));
+    });
+    setSpeech({ status: 'requesting_permission', isListening: false });
+    await act(async () => {
+      rerender(<MentorInputBar {...baseProps} />);
+    });
+
+    expect(getByTestId('mentor-bar-input').props.value).toBe('');
+  });
+
+  it('recognizes in the learner voice locale the screen resolves', () => {
+    render(<MentorInputBar {...baseProps} voiceLocale="de-DE" />);
+
+    expect(mockUseSpeechRecognition).toHaveBeenCalledWith({ lang: 'de-DE' });
   });
 
   it('drops a late transcript when the Mentor action becomes unavailable', async () => {
