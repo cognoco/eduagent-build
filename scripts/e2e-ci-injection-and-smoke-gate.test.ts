@@ -1087,7 +1087,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
   });
 
-  it('[WI-2240] passes generic ownerSubjectId injection only to the exact owner Maestro flow', () => {
+  it('[WI-2240] injects each Account flow subject ID without leaking the owner-only ID', () => {
     const harness = createMaestroHarness(0);
 
     try {
@@ -1106,8 +1106,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
       expect(result.status).toBe(0);
       expect(ownerInvocation).toBeDefined();
-      expect(ownerInvocation).toContain('-e OWNER_SUBJECT_ID=owner-subject');
+      expect(ownerInvocation).toContain('-e OWNER_SUBJECT_ID=owner-subject ');
       expect(nonOwnerInvocation).toBeDefined();
+      expect(nonOwnerInvocation).toContain('-e SUBJECT_ID=non-owner-subject ');
       expect(nonOwnerInvocation).not.toContain('OWNER_SUBJECT_ID');
     } finally {
       rmSync(harness.root, { recursive: true, force: true });
@@ -1945,6 +1946,7 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
       'if [ "${FAKE_CURL_EXIT:-0}" -ne 0 ]; then exit "$FAKE_CURL_EXIT"; fi',
       'case "$*" in',
       '  */v1/__test/seed*\\"scenario\\":\\"parent-multi-child\\"*) printf \'{"email":"test@example.com","password":"pw","accountId":"account","profileId":"profile","ids":{"ownerSubjectId":"owner-subject"}}\' ;;',
+      '  */v1/__test/seed*\\"scenario\\":\\"v2-account-non-owner-child\\"*) printf \'{"email":"test@example.com","password":"pw","accountId":"account","profileId":"profile","ids":{"subjectId":"non-owner-subject"}}\' ;;',
       '  */v1/__test/seed*) printf \'{"email":"test@example.com","password":"pw","accountId":"account","profileId":"profile","ids":{}}\' ;;',
       "  *) printf '{}' ;;",
       'esac',
