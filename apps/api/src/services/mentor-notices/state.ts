@@ -21,6 +21,11 @@ interface AcceptMentorNoticeInput extends MentorNoticeCopyInput {
   subjectId: string;
   topicId: string | null;
   sourceSessionId: string;
+  /** [WI-2500] The validated learner-answer event this notice's evidence is
+   *  anchored to. Always present for new notices — `evidence.ts` never
+   *  returns without one — required so the DB unique constraint below can
+   *  be evidence-aware instead of source-session-only. */
+  answerEventId: string;
 }
 
 export function prepareMentorNoticeCopy(
@@ -50,10 +55,16 @@ export async function acceptMentorNotice(
       subjectId: input.subjectId,
       topicId: input.topicId,
       sourceSessionId: input.sourceSessionId,
+      answerEventId: input.answerEventId,
       concept: copy.concept,
       correctionHint: copy.correctionHint,
     })
-    .onConflictDoNothing({ target: mentorNotices.sourceSessionId })
+    // [WI-2500] Target the evidence-aware composite constraint, not the old
+    // source-session-only one — a stale target here would silently no-op
+    // instead of erroring, masking a real duplicate-insert bug.
+    .onConflictDoNothing({
+      target: [mentorNotices.sourceSessionId, mentorNotices.answerEventId],
+    })
     .returning({
       id: mentorNotices.id,
       concept: mentorNotices.concept,

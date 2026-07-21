@@ -13,7 +13,7 @@ import {
 
 import { generateUUIDv7 } from '../utils/uuid';
 import { person } from './identity';
-import { learningSessions } from './sessions';
+import { learningSessions, sessionEvents } from './sessions';
 import { curriculumTopics, subjects } from './subjects';
 
 export const mentorNoticeStatusEnum = pgEnum('mentor_notice_status', [
@@ -51,6 +51,15 @@ export const mentorNotices = pgTable(
     sourceSessionId: uuid('source_session_id')
       .notNull()
       .references(() => learningSessions.id, { onDelete: 'cascade' }),
+    // [WI-2500] The validated learner-answer event this notice's evidence is
+    // anchored to. Nullable only because rows created before this column
+    // existed have no honest value to backfill (their original evidence was
+    // never persisted) — every new notice always carries one; see state.ts's
+    // acceptMentorNotice. Never null-able as a domain matter, only as a
+    // migration-safety one.
+    answerEventId: uuid('answer_event_id').references(() => sessionEvents.id, {
+      onDelete: 'set null',
+    }),
     concept: text('concept').notNull(),
     correctionHint: text('correction_hint'),
     status: mentorNoticeStatusEnum('status').notNull().default('open'),
@@ -75,7 +84,18 @@ export const mentorNotices = pgTable(
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
   },
   (table) => [
-    unique('mentor_notices_source_session_unique').on(table.sourceSessionId),
+    // [WI-2500] Composite, evidence-aware replacement for the old
+    // source-session-only unique constraint (clause 4 — durable identity
+    // includes source session PLUS validated answer-event evidence). Postgres
+    // compares NULLs as equal under nullsNotDistinct() for the WHOLE tuple,
+    // not per column, so a legacy NULL-evidence row only collides with
+    // ANOTHER NULL-evidence row in the SAME session — exactly the invariant
+    // the old constraint already enforced, so no backfill is needed. A retry
+    // of the same (session, answerEventId) is idempotent; a second,
+    // differently-evidenced notice in the same session is now allowed.
+    unique('mentor_notices_source_session_answer_event_unique')
+      .on(table.sourceSessionId, table.answerEventId)
+      .nullsNotDistinct(),
     index('mentor_notices_profile_status_created_idx').on(
       table.profileId,
       table.status,

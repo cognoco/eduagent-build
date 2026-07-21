@@ -15,39 +15,17 @@ interface NoticeSourceSession {
   sessionType: SessionType;
 }
 
-interface InterleavedNoticeTopic {
-  topicId: string;
-  subjectId?: string;
-  title: string;
-}
-
-interface MentorNoticeTarget {
-  subjectId: string;
-  topicId: string | null;
-}
-
-function resolveMentorNoticeTarget(
-  session: NoticeSourceSession,
-  signal: NoticedGapSignal,
-  interleavedTopics: InterleavedNoticeTopic[] = [],
-): MentorNoticeTarget | null {
-  if (session.sessionType !== 'interleaved') {
-    return { subjectId: session.subjectId, topicId: session.topicId };
-  }
-
-  if (!signal.topicId) return null;
-  const matched = interleavedTopics.find(
-    (topic) => topic.topicId === signal.topicId && Boolean(topic.subjectId),
-  );
-  return matched?.subjectId
-    ? { subjectId: matched.subjectId, topicId: matched.topicId }
-    : null;
-}
-
 /**
  * Validate and persist one evidence-backed mentor notice from an exchange.
- * Session metadata owns regular targets; interleaved targets must match the
- * server-resolved topic allow-list supplied in the exchange context.
+ * The target subject/topic is always the authoritative session metadata —
+ * never client- or LLM-supplied.
+ *
+ * [WI-2500] Interleaved sessions are out of MVP scope: a noticed gap cannot
+ * be unambiguously attributed to one of an interleaved session's several
+ * topics without a topicId on the proposal, and the proposal schema no
+ * longer carries one (clause 1). Rejecting here mirrors the prompt no
+ * longer asking the LLM for a notice in that session type
+ * (exchange-prompts.ts's `mentorNoticeEnabled` gate).
  */
 export async function createMentorNoticeFromExchange(
   db: Database,
@@ -55,18 +33,11 @@ export async function createMentorNoticeFromExchange(
     profileId: string;
     session: NoticeSourceSession;
     signal: NoticedGapSignal;
-    interleavedTopics?: InterleavedNoticeTopic[];
     isMentorNoticeRecheck?: boolean;
   },
 ): Promise<MentorNoticeAccepted | null> {
   if (input.isMentorNoticeRecheck) return null;
-
-  const target = resolveMentorNoticeTarget(
-    input.session,
-    input.signal,
-    input.interleavedTopics,
-  );
-  if (!target) return null;
+  if (input.session.sessionType === 'interleaved') return null;
 
   const evidence = await validateNoticeEvidence(
     db,
@@ -78,9 +49,10 @@ export async function createMentorNoticeFromExchange(
 
   return acceptMentorNotice(db, {
     profileId: input.profileId,
-    subjectId: target.subjectId,
-    topicId: target.topicId,
+    subjectId: input.session.subjectId,
+    topicId: input.session.topicId,
     sourceSessionId: input.session.id,
+    answerEventId: evidence.answerEventId,
     concept: evidence.concept,
     correctionHint: evidence.correctionHint,
   });
