@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 import { JournalMomentsStrip } from './JournalMomentsStrip';
 import { ScopeContextProvider } from '../../lib/scope-context';
 
@@ -24,6 +24,10 @@ jest.mock(
 );
 
 describe('JournalMomentsStrip', () => {
+  beforeEach(() => {
+    mockPush.mockReset();
+  });
+
   it('renders explicit locked-in mentor notice copy', () => {
     mockUseNowFeed.mockReturnValue({
       data: {
@@ -63,5 +67,38 @@ describe('JournalMomentsStrip', () => {
     expect(
       rendered.getByText('Locked in changing signs in Algebra.'),
     ).toBeTruthy();
+  });
+
+  it('[WI-2110 AC-1] opens a quiz personal best in Journal Practice', () => {
+    mockUseNowFeed.mockReturnValue({
+      data: {
+        scope: 'self',
+        overflowCount: 0,
+        generatedAt: '2026-07-20T17:00:00.000Z',
+        cards: [
+          {
+            kind: 'ledger_moment',
+            templateKey: 'now.ledger_moment.quiz_personal_best',
+            params: { ledgerKind: 'quiz_personal_best', score: 9 },
+            deepLink: { route: 'journal', params: {}, chain: [] },
+            scope: 'self',
+          },
+        ],
+      },
+      error: null,
+      isError: false,
+      isLoading: false,
+      refetch: jest.fn(),
+    });
+
+    const rendered = render(
+      <ScopeContextProvider initialScopeList={{ shape: 'learner' }}>
+        <JournalMomentsStrip />
+      </ScopeContextProvider>,
+    );
+
+    fireEvent.press(rendered.getByTestId('journal-moment-quiz_personal_best'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/journal?section=practice');
   });
 });

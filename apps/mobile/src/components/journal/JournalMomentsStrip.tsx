@@ -9,7 +9,10 @@ import { ErrorFallback, TimeoutLoader } from '../common';
 import { BookPageFlipAnimation } from '../common/BookPageFlipAnimation';
 import { useNowFeed } from '../../hooks/use-now-feed';
 import { renderMilestoneMomentText } from '../../lib/milestone-moment-copy';
-import { pushNowDeepLink } from '../../lib/now-deep-link';
+import {
+  pushNowDeepLink,
+  withJournalSectionIntent,
+} from '../../lib/now-deep-link';
 import { useScopeContext } from '../../lib/scope-context';
 import { useSectionErrorActions } from './journal-shared';
 
@@ -125,10 +128,14 @@ export function JournalMomentsStrip(): React.ReactElement {
             testID={`journal-moment-${ledgerKind(moment)}`}
             className="rounded-card border border-border bg-surface p-4"
             onPress={() =>
-              pushNowDeepLink(router, moment.deepLink, {
-                subjectHubTarget: 'v2-subject-hub',
-                setActiveScope,
-              })
+              pushNowDeepLink(
+                router,
+                withJournalSectionIntent(moment).deepLink,
+                {
+                  subjectHubTarget: 'v2-subject-hub',
+                  setActiveScope,
+                },
+              )
             }
           >
             <Text className="text-body-sm text-text-primary">
