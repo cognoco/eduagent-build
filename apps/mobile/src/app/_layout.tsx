@@ -62,6 +62,7 @@ import {
 } from '../lib/query-persister';
 import { shouldReportQueryErrorToSentry } from '../lib/query-error-reporting';
 import { getSentryQueryKeyTag } from '../lib/sentry-query-key';
+import { shouldRetryApiError } from '../lib/api-errors';
 
 // BUG-417: Clerk's default tokenCache uses expo-secure-store directly,
 // which crashes on web. Use our secure-storage wrapper instead.
@@ -132,7 +133,9 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 5 * 60_000,
       gcTime: 24 * 60 * 60_000,
-      retry: 2,
+      // Transport failures already receive the bounded replay schedule in
+      // api-client. Do not start a second full schedule after that cap ends.
+      retry: shouldRetryApiError,
       // Bug #7 fix: changed from 'online' to 'always'. The 'online' mode
       // pauses queries when the device is deemed offline, which causes
       // infinite skeleton loading when the API is unreachable but the device

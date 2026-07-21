@@ -169,19 +169,26 @@ describe('useBooks', () => {
   });
 
   it('handles network error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network request failed'));
+    jest.useFakeTimers();
+    try {
+      mockFetch.mockRejectedValue(new Error('Network request failed'));
 
-    const { result } = renderHook(() => useBooks('subject-1'), {
-      wrapper: createWrapper(),
-    });
+      const { result } = renderHook(() => useBooks('subject-1'), {
+        wrapper: createWrapper(),
+      });
 
-    await waitFor(() => {
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(7_500);
+      });
+
       expect(result.current.isError).toBe(true);
-    });
-
-    // The real useApiClient wraps fetch rejections in NetworkError with a
-    // user-friendly message (not the raw rejection message).
-    expect(result.current.error).toBeInstanceOf(NetworkError);
+      expect(mockFetch).toHaveBeenCalledTimes(5);
+      // The real useApiClient wraps fetch rejections in NetworkError with a
+      // user-friendly message (not the raw rejection message).
+      expect(result.current.error).toBeInstanceOf(NetworkError);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('uses the longer learning-entry timeout for shelf book reads', async () => {
@@ -351,6 +358,28 @@ describe('useBookWithTopics', () => {
 
       expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(result.current.data).toEqual(mockBookWithTopics);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not restart bounded transport replay after terminal NetworkError', async () => {
+    jest.useFakeTimers();
+    try {
+      mockFetch.mockRejectedValue(new Error('Network request failed'));
+
+      const { result } = renderHook(
+        () => useBookWithTopics('subject-1', 'book-1'),
+        { wrapper: createWrapper() },
+      );
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(7_500);
+      });
+
+      expect(result.current.isError).toBe(true);
+      expect(result.current.error).toBeInstanceOf(NetworkError);
+      expect(mockFetch).toHaveBeenCalledTimes(5);
     } finally {
       jest.useRealTimers();
     }

@@ -42,10 +42,7 @@ import {
   topicNotes,
   type Database,
 } from '@eduagent/database';
-import {
-  PROFILE_MINIMUM_AGE,
-  type RenderAudience,
-} from '@eduagent/schemas';
+import { PROFILE_MINIMUM_AGE, type RenderAudience } from '@eduagent/schemas';
 
 import { acceptLink, initiateLink } from './linking-ceremony';
 import { requestSelfUnlink } from './supportership-revocation';

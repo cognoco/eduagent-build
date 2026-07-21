@@ -24,11 +24,7 @@
 import { resolve } from 'path';
 
 import { loadDatabaseEnv } from '@eduagent/test-utils';
-import {
-  createDatabase,
-  login,
-  type Database,
-} from '@eduagent/database';
+import { createDatabase, login, type Database } from '@eduagent/database';
 import { profileListResponseSchema } from '@eduagent/schemas';
 import { eq } from 'drizzle-orm';
 
