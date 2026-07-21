@@ -122,7 +122,7 @@ async function captureLlmFallbackSignal(input: {
 //
 // One structured line per successful LLM call, written to the same logger
 // pipeline all other router observability goes through. Downstream dashboard
-// query (docs/superpowers/plans/2026-04-23-llm-never-truncate.md appendix A):
+// query (docs/_archive/plans/done/2026-04-23-llm-never-truncate-phase1-implemented.md appendix A):
 //
 //   count by stop_reason, flow over 24h
 //   rate(stop_reason="length") / rate(*) by flow

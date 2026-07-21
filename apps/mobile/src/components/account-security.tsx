@@ -64,7 +64,7 @@ function SecurityRow({
 // NOTE: 2FA toggle commented out — original implementation conflated Clerk's
 // email verification (prepareVerification) with TOTP 2FA (disableTOTP).
 // These are independent Clerk APIs. Needs proper spec before re-implementing.
-// See: docs/superpowers/plans/2026-04-04-account-security.md
+// See: docs/_archive/specs/deferred/2026-04-04-account-security-design-deferred.md
 
 export function AccountSecurity({
   visible = true,

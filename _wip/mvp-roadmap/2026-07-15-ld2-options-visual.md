@@ -2,12 +2,14 @@
 
 **The dependency graph is identical under both options** (it's now live in Cosmo). The only thing that changes is *when the legal clocks start* — so the graph once, then the two calendars.
 
+> **Status update 2026-07-21:** WI-1559's controller identity is resolved as ZWIZZLY AS, org.nr 811696072, Fiskekroken 3B, 0139 Oslo, Norway, with Norwegian Datatilsynet as lead authority; the active-document reconciliation is complete. The graph below preserves the dependency edge until lifecycle review closes the item.
+
 ## Dependency graph (both options)
 
 ```mermaid
 flowchart LR
     subgraph B1["Bucket 1 — internal rulings (days)"]
-      W1559["WI-1559 entity"]
+      W1559["WI-1559 entity — resolved"]
       W1111["WI-1111 Art 9 doc"]
       W1115["WI-1115 country cfg"]
       W2064["WI-2064 token posture"]
@@ -63,7 +65,7 @@ gantt
     dateFormat YYYY-MM-DD
     axisFormat %d %b
     section Internal
-    Rule WI-1559 + doc WI-1111        :i1, 2026-07-16, 3d
+    Reconcile WI-1559 + doc WI-1111   :i1, 2026-07-16, 3d
     WI-1115 / WI-1110 (market ruling) :i2, 2026-07-20, 3d
     WI-2064 token posture             :i3, 2026-07-20, 4d
     section Counsel
@@ -89,7 +91,7 @@ gantt
     dateFormat YYYY-MM-DD
     axisFormat %d %b
     section Internal
-    Rule WI-1559 + doc WI-1111        :i1, 2026-08-13, 3d
+    Reconcile WI-1559 + doc WI-1111   :i1, 2026-08-13, 3d
     section Counsel
     WI-1105 DPO engagement            :c1, 2026-08-13, 12d
     WI-1106 DPIA                      :crit, c2, after c1, 26d

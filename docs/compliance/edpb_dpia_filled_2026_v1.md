@@ -14,8 +14,8 @@
 
 | Controller | |
 | --- | --- |
-| Management units responsible for the processing inside the organisation | `[Legal entity — TODO]`, the product/engineering organisation operating MentoMate. Single controller (no joint controllership identified in code). |
-| Main establishment / point of contact or representative | Established in **Norway** (EEA). Lead supervisory authority via one-stop-shop: **Datatilsynet**. `[Registered address — TODO]`. `[UK Art 27 representative — TODO if serving UK]`. |
+| Management units responsible for the processing inside the organisation | **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway, the product/engineering organisation operating MentoMate. Single controller (no joint controllership identified in code). |
+| Main establishment / point of contact or representative | **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway (EEA). Lead supervisory authority via one-stop-shop: **Norwegian Datatilsynet**. `[UK Art 27 representative — TODO if serving UK]`. |
 | Information about the DPO or similar function, if applicable | **DPO appointment is a launch-blocking condition** (Art 37 assessed mandatory — regular & systematic monitoring of learners is a core activity). `[DPO name / dpo@… — TODO before launch]`. |
 
 ## 0.2 Processor(s) and sub-processor(s)
