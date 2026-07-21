@@ -170,7 +170,9 @@ export type SeedScenario =
   | 'v2-supporter-accepted'
   // [WI-2226 owner-gate corroboration] Same-org managed cold-start candidate
   // — apps/api/src/services/test-seed-v2-supporter.ts.
-  | 'v2-supporter-managed';
+  | 'v2-supporter-managed'
+  // [WI-2554] Credentialed learner-only identity for Account row gating.
+  | 'v2-account-non-owner-child';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -1193,6 +1195,50 @@ async function seedOnboardingComplete(
     email,
     password,
     ids: { subjectId, topicId: firstTopicId },
+  };
+}
+
+/**
+ * A credentialed learner who is not an organization admin. Unlike the
+ * managed-child fixtures, this person owns a Clerk login and can enter the
+ * V2 shell directly; unlike owner fixtures, membership carries only the
+ * learner role. That distinction is the property Account E2E must exercise.
+ */
+async function seedV2AccountNonOwnerChild(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Test Child',
+    birthYear: LEARNER_BIRTH_YEAR,
+    isOwner: false,
+  });
+
+  const loginId = generateUUIDv7();
+  await db.insert(login).values({
+    id: loginId,
+    personId: profileId,
+    clerkUserId,
+    email,
+  });
+  await db.update(person).set({ loginId }).where(eq(person.id, profileId));
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Child Learning Data',
+  );
+
+  return {
+    scenario: 'v2-account-non-owner-child',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId },
   };
 }
 
@@ -6088,6 +6134,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   // and the rich learning/report insert helpers above.
   'v2-supporter-accepted': seedV2SupporterAccepted,
   'v2-supporter-managed': seedV2SupporterManaged,
+  'v2-account-non-owner-child': seedV2AccountNonOwnerChild,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];
