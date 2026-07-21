@@ -62,6 +62,7 @@ initNotificationHandler();
 // the tab bar (height: 0) the same way quiz/homework/dictation already do.
 export const FULL_SCREEN_ROUTES = new Set([
   'account',
+  'account/profiles',
   'onboarding',
   'session',
   'homework',
@@ -89,6 +90,7 @@ export const FULL_SCREEN_ROUTES = new Set([
 // for hidden routes.
 export const HIDDEN_TAB_ROUTES = [
   'account',
+  'account/profiles',
   'dashboard',
   'subscription',
   'billing',

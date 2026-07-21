@@ -407,7 +407,7 @@ describe('AccountAdminSheet', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/more/mentor-language');
 
     fireEvent.press(screen.getByTestId('account-admin-profile'));
-    expect(mockPush).toHaveBeenCalledWith('/profiles');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/account/profiles');
 
     fireEvent.press(screen.getByTestId('account-admin-security'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/more/account');

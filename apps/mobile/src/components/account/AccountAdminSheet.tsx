@@ -165,10 +165,9 @@ export function AccountAdminSheet(): React.ReactElement {
       <SettingsRow
         label={t('more.account.profile')}
         value={displayName}
-        // '/profiles' is a TOP-LEVEL route (app/profiles.tsx), NOT under the
-        // (app) group — so '/(app)/profiles' would be a dead route. The cast
-        // types the correct top-level path.
-        onPress={() => router.push('/profiles' as Href)}
+        // Keep the Account-owned profile leaf in the (app) history so browser
+        // Back restores Account before its explicit initiating-tab return.
+        onPress={() => router.push('/(app)/account/profiles' as Href)}
         testID="account-admin-profile"
       />
       {navigationContract.gates.sessionIsOwner &&
