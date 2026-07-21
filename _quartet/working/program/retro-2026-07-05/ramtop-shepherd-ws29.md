@@ -23,7 +23,7 @@ Full pending backlog I am sitting on (none self-rulable under standing directive
 
 - **WI-1507** (closure check) — Stage=Reviewing, **State=Awaiting-Info**. Blocked on: operator/DPO — the C-5 DPO-appointment + DPIA-signature launch gate (my verdict was engineering-ready / legal-gate-unsigned). Not agent-rulable. Duration: since ~13:00Z 07-04.
 - **WI-1558** (DPIA A13 name-minimization vs verbatim learner name to LLM, P1) — Captured. Blocked on: **product + counsel** strip-vs-disclose ruling. Operator-surfaced. Not self-rulable (legal-doc + pedagogy tradeoff).
-- **WI-1559** (controller-entity mismatch, Cognoco s.r.o. vs Norway TODO) — Captured. Blocked on: **counsel** (which legal entity is controller). Not self-rulable.
+- **WI-1559** (controller identity) — **RULING RECEIVED 2026-07-11 / active-document reconciliation complete; awaiting lifecycle review:** **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway; lead supervisory authority **Norwegian Datatilsynet**.
 - **WI-1561** (stale store data-safety worksheet) — Captured. Deferred by design: folds into WI-1577 (must reflect final pre-submission state).
 - **WI-1577** (FINAL GATE, pre-store-submission re-run) — Captured. Blocked on: **operator/PM timing** (future; don't start early).
 - **OPS action** (mine-flagged, routed to operator): prod-catalog `to_regclass('public.accounts')/('public.consent_states')` check for WI-1442 legacy-delete-path reachability. Out of shepherd lane (live-prod read).

@@ -10,10 +10,12 @@
  */
 
 import { eq, sql } from 'drizzle-orm';
-import { activationEvents } from '@eduagent/database';
+import { activationEvents, person } from '@eduagent/database';
 import { createIntegrationDb } from '../../../../tests/integration/helpers';
 import {
+  buildActivationEventOccurrenceKey,
   recordActivationEvent,
+  recordActivationEventSafely,
   deriveActivationProfileShape,
 } from './activation-events';
 
@@ -26,6 +28,50 @@ async function cleanupDedupeKey(dedupeKey: string): Promise<void> {
 }
 
 describe('Integration: recordActivationEvent', () => {
+  it('preserves the first-session event fields when recording through the shared safe helper', async () => {
+    const [profile] = await db
+      .insert(person)
+      .values({
+        displayName: 'Activation event helper test',
+        birthDate: '2016-01-01',
+        residenceJurisdiction: 'EU',
+      })
+      .returning();
+    const profileId = profile!.id;
+    const dedupeKey = `activation=first_session_started|actor=${profileId}|occurrence=null`;
+
+    try {
+      const row = await recordActivationEventSafely(
+        db,
+        {
+          eventType: 'first_session_started',
+          profileId,
+          profileMeta: { isOwner: false },
+          route: 'POST /sessions',
+          metadata: { sessionId: 'session-1' },
+        },
+        'sessions.start.first_session_started',
+        { profileId, sessionId: 'session-1' },
+      );
+
+      expect(row).toMatchObject({
+        eventType: 'first_session_started',
+        profileId,
+        anonymousId: null,
+        environment: null,
+        appVersion: null,
+        platform: null,
+        profileShape: 'child',
+        route: 'POST /sessions',
+        dedupeKey,
+        metadata: { sessionId: 'session-1' },
+      });
+    } finally {
+      await cleanupDedupeKey(dedupeKey);
+      await db.delete(person).where(eq(person.id, profileId));
+    }
+  });
+
   it('records a pre-signup event with profileId null and anonymousId set', async () => {
     const dedupeKey = `test-activation-${Date.now()}-app-opened`;
     await cleanupDedupeKey(dedupeKey);
@@ -98,6 +144,25 @@ describe('Integration: recordActivationEvent', () => {
     ).rejects.toThrow();
 
     await cleanupDedupeKey(dedupeKey);
+  });
+});
+
+describe('buildActivationEventOccurrenceKey', () => {
+  const occurredAt = new Date('2026-07-21T23:59:59.000Z');
+
+  it('uses the supplied occurrence id without changing it', () => {
+    expect(
+      buildActivationEventOccurrenceKey({
+        occurrenceId: 'review-card/42',
+        occurredAt,
+      }),
+    ).toBe('review-card/42');
+  });
+
+  it('uses the UTC day when the occurrence id is absent', () => {
+    expect(buildActivationEventOccurrenceKey({ occurredAt })).toBe(
+      '2026-07-21',
+    );
   });
 });
 

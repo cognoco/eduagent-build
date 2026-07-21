@@ -18,6 +18,7 @@ import {
 } from './services/sentry';
 import { CircuitOpenError } from './services/llm';
 import { isTransientDatabaseError } from './services/transient-db-retry';
+import { ConsentWithdrawnError } from './services/session';
 import {
   ForbiddenError,
   ConsentRequiredError,
@@ -191,6 +192,7 @@ type Bindings = {
   CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
   ANSWER_EVALUATION_RUNTIME_ENABLED?: string;
   MENTOR_NOTICE_ENABLED?: string;
+  MENTOR_NOTICE_PUSH_POST_MVP_ENABLED?: string;
   CHALLENGE_ROUND_COHORT_PROFILE_IDS?: string;
   CHALLENGE_ROUND_GRADER_ENABLED?: string;
   JUDGE_FRAMEWORK_ENABLED?: string;
@@ -459,6 +461,18 @@ app.onError((err, c) => {
   if (err instanceof ConsentRequiredError) {
     return c.json(
       { code: ERROR_CODES.CONSENT_REQUIRED, message: err.message },
+      403,
+    );
+  }
+  // [WI-2396] `assertLlmConsent` (consent-status-v2.ts) throws this from the
+  // six request-time LLM routes outside the exchange pipeline. Centralizing
+  // the mapping here (rather than a per-route try/catch) follows the same
+  // EP15-I5 boundary-classification pattern as ConsentRequiredError above.
+  // sessions.ts's two existing local catches for this error still work
+  // unchanged — a local catch intercepts before the error reaches onError.
+  if (err instanceof ConsentWithdrawnError) {
+    return c.json(
+      { code: ERROR_CODES.CONSENT_WITHDRAWN, message: err.message },
       403,
     );
   }

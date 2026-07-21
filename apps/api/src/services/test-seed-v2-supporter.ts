@@ -29,6 +29,7 @@
 //                 requestSelfUnlink write path (same producer as WI-2237's
 //                 [revoked] RGR variant), for the fail-closed assertion.
 // ---------------------------------------------------------------------------
+import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import {
   bookmarks,
@@ -41,7 +42,7 @@ import {
   topicNotes,
   type Database,
 } from '@eduagent/database';
-import type { RenderAudience } from '@eduagent/schemas';
+import { PROFILE_MINIMUM_AGE, type RenderAudience } from '@eduagent/schemas';
 
 import { acceptLink, initiateLink } from './linking-ceremony';
 import { requestSelfUnlink } from './supportership-revocation';
@@ -57,6 +58,15 @@ import {
   type SeedResult,
 } from './test-seed';
 
+// RFC 5321 caps an email local-part at 64 characters. Playwright's
+// runId-derived aliases (buildSeedEmail, apps/mobile/e2e-web/helpers/
+// runtime.ts) can already sit close to that cap on their own, so blindly
+// appending `+${tag}` can push the result past 64 — Clerk then rejects the
+// whole seed with a 422 "is invalid" (reproduced live via `later-phases` ->
+// j32-supporter-self-learning-doorway.spec.ts, WI-2243 web-executability
+// probe). See the truncation branch below.
+const MAX_EMAIL_LOCAL_PART_LENGTH = 64;
+
 /**
  * Derives a stable, unique email for a satellite identity from the request
  * email. The request `email` param is the ONLY value seedScenario's generic
@@ -71,7 +81,24 @@ function deriveEmail(baseEmail: string, tag: string): string {
   const local = atIndex === -1 ? baseEmail : baseEmail.slice(0, atIndex);
   const domain = atIndex === -1 ? 'example.com' : baseEmail.slice(atIndex + 1);
   const bareLocal = local.split('+')[0] || 'seed';
-  return `${bareLocal}+${tag}@${domain}`;
+  const candidate = `${bareLocal}+${tag}`;
+  if (candidate.length <= MAX_EMAIL_LOCAL_PART_LENGTH) {
+    return `${candidate}@${domain}`;
+  }
+  // Truncate the base and append a short deterministic hash of the
+  // untruncated candidate — stays under the RFC cap, stays unique, and
+  // stays deterministic across repeated reseeds of the same slot (same
+  // input always hashes to the same output).
+  const hashSuffix = createHash('sha256')
+    .update(candidate)
+    .digest('hex')
+    .slice(0, 8);
+  const suffix = `-${hashSuffix}+${tag}`;
+  const maxBareLength = Math.max(
+    MAX_EMAIL_LOCAL_PART_LENGTH - suffix.length,
+    1,
+  );
+  return `${bareLocal.slice(0, maxBareLength)}${suffix}@${domain}`;
 }
 
 interface SeededOwnerV2 {
@@ -400,7 +427,7 @@ export async function seedV2SupporterManaged(
   const { personId: managedChildPersonId } = await seedChildIdentityV2(db, {
     organizationId: supporter.organizationId,
     displayName: 'Managed Child',
-    birthYear: 2015,
+    birthYear: new Date().getFullYear() - PROFILE_MINIMUM_AGE,
   });
 
   const managedEdge = await seedAcceptedEdge(db, {
@@ -423,4 +450,123 @@ export async function seedV2SupporterManaged(
       managedChildContractId: managedEdge.contractId,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// [WI-2243] `v2-supporter-self-learning` / `v2-supporter-self-learning-active`
+// — accepted-edge fixtures for the self-learning doorway + Me-scope
+// persistence work. Two scenarios cover the two states AC-6 asks for:
+//
+//   - `v2-supporter-self-learning`        — accepted edge, supporter has NO
+//                                            own subjects/sessions yet (the
+//                                            doorway-eligible baseline:
+//                                            resolveScopesForPerson's
+//                                            hasFirstRealLearningState is
+//                                            false, so 'me' is absent from
+//                                            GET /scopes).
+//   - `v2-supporter-self-learning-active` — same shape, but the supporter
+//                                            already has their own subject +
+//                                            session (hasFirstRealLearning
+//                                            State is true, 'me' is present)
+//                                            — the resume-flow / doorway-
+//                                            suppressed / isolation fixture.
+//
+// Reuses the independent-v2-owner-identity supportee shape from
+// `seedV2SupporterAccepted`'s "empty" case (a supportee in their OWN
+// organization — supporter/supportee is not the guardianship same-org
+// model) rather than `seedV2SupporterManaged`'s same-org managed child,
+// since this fixture is about the SUPPORTER's own learning state, not a
+// managed-child cold-start card.
+// ---------------------------------------------------------------------------
+
+async function seedV2SupporterSelfLearningBase(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+  opts: { ownLearning: boolean },
+): Promise<SeedResult> {
+  const supporter = await reseedOwnerIdentityV2(db, email, env, {
+    displayName: 'Test Supporter',
+    birthYear: 1985,
+  });
+
+  const supporteeEmail = deriveEmail(email, 'selflearn-supportee');
+  const { clerkUserId: supporteeClerkUserId, password: supporteePassword } =
+    await createClerkTestUser(supporteeEmail, env);
+  const supportee = await seedOwnerIdentityV2(db, {
+    email: supporteeEmail,
+    clerkUserId: supporteeClerkUserId,
+    displayName: 'Test Supportee',
+    birthYear: 2012,
+  });
+
+  const edge = await seedAcceptedEdge(db, {
+    supporterPersonId: supporter.personId,
+    supporteePersonId: supportee.personId,
+  });
+
+  const ids: Record<string, string> = {
+    supporterPersonId: supporter.personId,
+    supporterOrganizationId: supporter.organizationId,
+
+    supporteeEmail,
+    supporteePassword,
+    supporteePersonId: supportee.personId,
+    supporteeOrganizationId: supportee.organizationId,
+    edgeId: edge.edgeId,
+    contractId: edge.contractId,
+  };
+
+  if (opts.ownLearning) {
+    const { subjectId, topicIds } = await createSubjectWithCurriculum(
+      db,
+      supporter.personId,
+      'Supporter Own Subject',
+    );
+    const topicId = topicIds[0];
+    if (!topicId) {
+      throw new Error(
+        'createSubjectWithCurriculum returned no topics for the self-learning-active seed',
+      );
+    }
+    const { sessionId } = await insertSessionWithRecap(db, {
+      profileId: supporter.personId,
+      subjectId,
+      topicId,
+    });
+    ids.ownSubjectId = subjectId;
+    ids.ownTopicId = topicId;
+    ids.ownSessionId = sessionId;
+  }
+
+  return {
+    scenario: opts.ownLearning
+      ? 'v2-supporter-self-learning-active'
+      : 'v2-supporter-self-learning',
+    accountId: supporter.organizationId,
+    profileId: supporter.personId,
+    email,
+    password: supporter.password,
+    ids,
+  };
+}
+
+export async function seedV2SupporterSelfLearning(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  return seedV2SupporterSelfLearningBase(db, email, env, {
+    ownLearning: false,
+  });
+}
+
+export async function seedV2SupporterSelfLearningActive(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  return seedV2SupporterSelfLearningBase(db, email, env, {
+    ownLearning: true,
+  });
 }

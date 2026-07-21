@@ -187,6 +187,11 @@ describe('VALID_SCENARIOS', () => {
       'v2-supporter-accepted',
       // [WI-2226 owner-gate corroboration] Same-org managed cold-start seed.
       'v2-supporter-managed',
+      // [WI-2554] Credentialed learner-only identity for Account row gating.
+      'v2-account-non-owner-child',
+      // [WI-2243] Self-learning doorway + Me-scope persistence fixtures.
+      'v2-supporter-self-learning',
+      'v2-supporter-self-learning-active',
     ]);
   });
 
@@ -287,6 +292,12 @@ describe('seedScenario', () => {
     // reasoning above — seedV2SupporterManaged calls initiateLink/acceptLink
     // (db.transaction + read-after-write) via seedAcceptedEdge.
     'v2-supporter-managed',
+    // [WI-2243] Same DB_TRANSACTION_SCENARIOS reasoning above —
+    // seedV2SupporterSelfLearning(Active) also calls initiateLink/acceptLink
+    // via seedAcceptedEdge. Real coverage lives in
+    // test-seed-v2-supporter.integration.test.ts.
+    'v2-supporter-self-learning',
+    'v2-supporter-self-learning-active',
   ];
   const MOCK_DISPATCHABLE_SCENARIOS = (
     VALID_SCENARIOS as SeedScenario[]
@@ -347,6 +358,63 @@ describe('seedScenario', () => {
     // (clerkUserId is set internally, but we can verify via the returned accountId)
     expect(typeof result.accountId).toBe('string');
     expect(result.accountId.length).toBeGreaterThan(0);
+  });
+
+  it('[WI-2554] seeds a credentialed learner-only person without an admin role or managed-child guardianship', async () => {
+    const db = createMockDb();
+    const result = await seedScenario(
+      db,
+      'v2-account-non-owner-child',
+      'child@example.com',
+    );
+    const insertResult = (db.insert as jest.Mock).mock.results[0]?.value as
+      | { values?: jest.Mock }
+      | undefined;
+    const insertedRows =
+      insertResult?.values?.mock.calls.map(([row]) => row) ?? [];
+
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        id: result.profileId,
+        displayName: 'Test Child',
+      }),
+    );
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        personId: result.profileId,
+        clerkUserId: expect.stringMatching(/^clerk_seed_/),
+        email: 'child@example.com',
+      }),
+    );
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        personId: result.profileId,
+        organizationId: result.accountId,
+        roles: ['learner'],
+      }),
+    );
+    expect(insertedRows).not.toContainEqual(
+      expect.objectContaining({ roles: expect.arrayContaining(['admin']) }),
+    );
+    expect(insertedRows).not.toContainEqual(
+      expect.objectContaining({
+        chargePersonId: result.profileId,
+        lawfulBasis: expect.any(String),
+      }),
+    );
+    expect(insertedRows).not.toContainEqual(
+      expect.objectContaining({
+        guardianPersonId: expect.any(String),
+        chargePersonId: result.profileId,
+      }),
+    );
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        id: result.ids.subjectId,
+        profileId: result.profileId,
+        name: 'Child Learning Data',
+      }),
+    );
   });
 
   it.each([

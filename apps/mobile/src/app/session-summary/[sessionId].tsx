@@ -204,7 +204,12 @@ export default function SessionSummaryScreen() {
     activeProfile?.id,
     totalSessionCount >= 1,
     isProxyMode,
-    Boolean(persisted?.mentorNotice),
+    // [WI-2573] MMT-ADR-0036 §3.1: the mentor-notice MVP is in-app only and
+    // shows no mentor-notice-specific notification primer. The generic
+    // post-session ask is unchanged and unrelated to mentor notices; only the
+    // notice-flavoured copy variant is contained. The hook still supports the
+    // variant, so reopening it post-MVP is a one-argument change.
+    false,
   );
   // Destructure `refetch` once: TanStack Query produces a new top-level
   // result object reference on every state slice change (isFetching, isStale,

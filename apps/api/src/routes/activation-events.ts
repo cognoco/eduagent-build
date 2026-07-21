@@ -26,10 +26,9 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
-import { safeWrite } from '../services/safe-non-core';
 import {
-  recordActivationEvent,
-  deriveActivationProfileShape,
+  buildActivationEventOccurrenceKey,
+  recordActivationEventSafely,
 } from '../services/activation-events';
 
 type ActivationEventsRouteEnv = {
@@ -67,40 +66,31 @@ export const activationEventsRoutes = new Hono<ActivationEventsRouteEnv>().post(
     const occurredAtDate = input.occurredAt
       ? new Date(input.occurredAt)
       : new Date();
-    // Per-occurrence dedupe. When the client supplies `occurrenceId` (e.g. a
-    // review card id), use it directly so distinct occurrences on the same
-    // day each land as their own row. Otherwise fall back to a UTC-day
-    // bucket, appropriate for "once per day" events (app_opened,
-    // day2_return, onboarding_completed, signup_started) and for collapsing
-    // a chatty client's repeated retries into one row per actor per day.
-    const occurrenceKey =
-      input.occurrenceId ?? occurredAtDate.toISOString().slice(0, 10);
-
-    let recorded = false;
-    await safeWrite(
-      async () => {
-        const row = await recordActivationEvent(db, {
-          eventType: input.eventType,
-          profileId,
-          anonymousId: input.anonymousId,
+    const row = await recordActivationEventSafely(
+      db,
+      {
+        eventType: input.eventType,
+        profileId,
+        anonymousId: input.anonymousId,
+        occurredAt: occurredAtDate,
+        environment: input.environment ?? null,
+        appVersion: input.appVersion ?? null,
+        platform: input.platform ?? null,
+        profileMeta,
+        route: input.route ?? null,
+        occurrenceKey: buildActivationEventOccurrenceKey({
+          occurrenceId: input.occurrenceId,
           occurredAt: occurredAtDate,
-          environment: input.environment ?? null,
-          appVersion: input.appVersion ?? null,
-          platform: input.platform ?? null,
-          profileShape: profileMeta
-            ? deriveActivationProfileShape(profileMeta)
-            : null,
-          route: input.route ?? null,
-          occurrenceKey,
-          metadata: input.metadata ?? {},
-        });
-        recorded = row !== null;
-        return row;
+        }),
+        metadata: input.metadata ?? {},
       },
       'activation-events.ingest',
       { eventType: input.eventType, profileId },
     );
 
-    return c.json(activationEventIngestResponseSchema.parse({ recorded }), 201);
+    return c.json(
+      activationEventIngestResponseSchema.parse({ recorded: row !== null }),
+      201,
+    );
   },
 );

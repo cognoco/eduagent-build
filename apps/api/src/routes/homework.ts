@@ -3,6 +3,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import {
   OCR_CONSTRAINTS,
   ocrResultSchema,
@@ -56,7 +57,12 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
 
   // Server-side OCR endpoint (fallback for ML Kit)
   .post('/ocr', async (c) => {
-    requireProfileId(c.get('profileId'));
+    const profileId = requireProfileId(c.get('profileId'));
+    const db = c.get('db');
+    // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5). The
+    // OCR provider (getOcrProvider -> extractText) routes through the LLM
+    // vision model unconditionally.
+    await assertLlmConsent(db, profileId);
 
     // [BUG-283] Reject oversize requests BEFORE parseBody() pulls the whole
     // multipart body into memory. Multipart boundary + headers add overhead

@@ -902,6 +902,40 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
     expect(html).toContain('/v1/consent-page/withdraw');
   });
 
+  // [RIDER — WI-2372 Finding 1, MEDIUM-hardening, PM-ratified onto WI-2396]
+  // WI-2372's original bounce (AC5 truthfulness): withdrawConfirmBody /
+  // withdrawnLandingBody claimed "stops MentoMate from processing X's data" /
+  // "We've stopped processing their data" — a blanket claim the landed
+  // enforcement didn't fully back at the time. Fixed in 48a52cb3a to name
+  // what actually stops ("learning sessions") instead. This regression pair
+  // guards that exact defect class from being reintroduced by a future copy
+  // edit: assert the truthful claim as a named case, AND assert the absence
+  // of the overstatement class — same sweep-audit pattern 48a52cb3a used
+  // (`rg -niE "stop(ped|s)? (all )?processing|we've stopped|processing (your|their|his|her) data"`)
+  // — on both the confirm page (GET, pre-withdrawal) and the landing page
+  // (POST, post-withdrawal).
+  it('[RIDER / WI-2372 Finding 1] confirm + landing copy states "learning sessions" truthfully and never overstates as "processing"', async () => {
+    const OVERSTATEMENT_PATTERN =
+      /stop(ped|s)? (all )?processing|we've stopped|processing (your|their|his|her) data/i;
+    const { token } = await seedApprovedGrant({ displayName: 'Riley' });
+
+    // Confirm page (GET, pre-withdrawal) — "learning sessions" truthful case.
+    const confirmRes = await getW(
+      `/v1/consent-page/withdraw?token=${encodeURIComponent(token)}`,
+    );
+    expect(confirmRes.status).toBe(200);
+    const confirmHtml = await confirmRes.text();
+    expect(confirmHtml).toContain('learning sessions');
+    expect(confirmHtml).not.toMatch(OVERSTATEMENT_PATTERN);
+
+    // Landing page (POST, post-withdrawal) — same pair.
+    const landingRes = await postW('/v1/consent-page/withdraw', { token });
+    expect(landingRes.status).toBe(200);
+    const landingHtml = await landingRes.text();
+    expect(landingHtml).toContain('learning sessions');
+    expect(landingHtml).not.toMatch(OVERSTATEMENT_PATTERN);
+  });
+
   it('GET withdraw: valid token + already withdrawn (in grace) → informational landing, no restore form [WI-2348]', async () => {
     const { token } = await seedApprovedGrant({
       displayName: 'Wade',

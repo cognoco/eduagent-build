@@ -2,6 +2,8 @@
 
 > ⚠ **Comprehension artifact — no plan authority** (standing orders, sequencing sitting 2026-07-16). Map, not terrain: premise-check before every batch kickoff. Live state is Cosmo. Interactive version: `roadmap-viz.html` (regenerate data with `bash viz-export.sh`). Refreshed at the 2026-07-17 premise-check (`2026-07-17-premise-check-record.md`): OPQ vocabulary v3, OPQ-107/117/118 ruled, dispatch model D2.
 
+> **Controller update 2026-07-21:** WI-1559 is resolved as ZWIZZLY AS, org.nr 811696072, Fiskekroken 3B, 0139 Oslo, Norway, with Norwegian Datatilsynet as lead authority; active-document reconciliation is complete. The graph retains its edge until lifecycle review closes the item.
+
 ## View A — HITL buckets → gate chain
 
 Counsel blocks **gates, not dev** (legal register §0). Deadline badges: ⏰ = OPQ clock-start deadline.
@@ -25,7 +27,7 @@ flowchart LR
   end
   subgraph B3["Bucket 3 — other legal (external calendar)"]
     WI1659["WI-1659 AI-Act memo (OPQ-111)"]
-    WI1559["WI-1559 controller entity (OPQ-22 packet)"]
+    WI1559["WI-1559 controller identity — resolved and reconciled"]
     WI1111["WI-1111 Art 9 ruling (OPQ-115, rides OPQ-22)"]
     WI1764["WI-1764 crisis helplines (OPQ-41)"]
   end

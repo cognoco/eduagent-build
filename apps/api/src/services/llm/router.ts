@@ -122,7 +122,7 @@ async function captureLlmFallbackSignal(input: {
 //
 // One structured line per successful LLM call, written to the same logger
 // pipeline all other router observability goes through. Downstream dashboard
-// query (docs/superpowers/plans/2026-04-23-llm-never-truncate.md appendix A):
+// query (docs/_archive/plans/done/2026-04-23-llm-never-truncate-phase1-implemented.md appendix A):
 //
 //   count by stop_reason, flow over 24h
 //   rate(stop_reason="length") / rate(*) by flow
@@ -280,18 +280,19 @@ const SAFETY_RULES =
   'If a request touches these areas, politely decline and redirect to the learning topic.';
 
 // BKT-C.1 — ISO 639-1 → English name for the preamble line.
-const CONVERSATION_LANGUAGE_NAMES: Record<ConversationLanguage, string> = {
-  en: 'English',
-  cs: 'Czech',
-  es: 'Spanish',
-  fr: 'French',
-  de: 'German',
-  it: 'Italian',
-  pt: 'Portuguese',
-  pl: 'Polish',
-  ja: 'Japanese',
-  nb: 'Norwegian',
-};
+export const CONVERSATION_LANGUAGE_NAMES: Record<ConversationLanguage, string> =
+  {
+    en: 'English',
+    cs: 'Czech',
+    es: 'Spanish',
+    fr: 'French',
+    de: 'German',
+    it: 'Italian',
+    pt: 'Portuguese',
+    pl: 'Polish',
+    ja: 'Japanese',
+    nb: 'Norwegian',
+  };
 
 function getSafetyPreamble(ageBracket?: AgeBracket): string {
   // Unknown age: stay neutral on identity and let per-flow prompts handle

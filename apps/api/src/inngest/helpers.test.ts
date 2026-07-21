@@ -38,7 +38,9 @@ import {
   getStepDatabase,
   getStepEmailFrom,
   getStepMemoryFactsDedupConfig,
+  getStepMentorNoticePushPostMvpEnabled,
   getStepResendApiKey,
+  readInngestEnvBindings,
   getStepRetentionPurgeEnabled,
   getStepSupportEmail,
   resetDatabaseUrl,
@@ -151,6 +153,50 @@ describe('Inngest helpers', () => {
   // pass of a concurrently-arriving invocation could overwrite the values a
   // running invocation would read in its next step. The bindings now live in
   // AsyncLocalStorage, scoped per async context.
+  describe('[WI-2573] mentor-notice post-MVP push boundary', () => {
+    it('is closed when the binding is absent, present-but-false, or junk', async () => {
+      const reads: boolean[] = [];
+      for (const value of [undefined, 'false', 'yes', '1', 'TRUE']) {
+        await runWithInngestRequestContext(
+          value === undefined ? {} : { mentorNoticePushPostMvpEnabled: value },
+          async () => {
+            reads.push(getStepMentorNoticePushPostMvpEnabled());
+          },
+        );
+      }
+      expect(reads).toEqual([false, false, false, false, false]);
+    });
+
+    it('is not opened by the in-app mentor-notice flag', async () => {
+      await runWithInngestRequestContext(
+        { mentorNoticeEnabled: 'true' },
+        async () => {
+          expect(getStepMentorNoticePushPostMvpEnabled()).toBe(false);
+        },
+      );
+    });
+
+    it('opens only for its own binding set to the literal "true"', async () => {
+      await runWithInngestRequestContext(
+        { mentorNoticePushPostMvpEnabled: 'true' },
+        async () => {
+          expect(getStepMentorNoticePushPostMvpEnabled()).toBe(true);
+        },
+      );
+    });
+
+    it('reads the MENTOR_NOTICE_PUSH_POST_MVP_ENABLED worker binding', () => {
+      expect(
+        readInngestEnvBindings({
+          MENTOR_NOTICE_PUSH_POST_MVP_ENABLED: 'true',
+        }).mentorNoticePushPostMvpEnabled,
+      ).toBe('true');
+      expect(
+        readInngestEnvBindings({}).mentorNoticePushPostMvpEnabled,
+      ).toBeUndefined();
+    });
+  });
+
   describe('env-binding isolation across concurrent invocations', () => {
     /**
      * Runs `fn` inside its own setImmediate callback — a fresh async

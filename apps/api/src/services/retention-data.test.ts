@@ -54,7 +54,11 @@ import {
   xpLedger,
 } from '@eduagent/database';
 import { UpstreamLlmError } from '../errors';
-import { processRecallResult, getRetentionStatus } from './retention';
+import {
+  processRecallResult,
+  getRetentionStatus,
+  canRetestTopic,
+} from './retention';
 import {
   canExitNeedsDeepening,
   checkNeedsDeepeningCapacity,
@@ -958,6 +962,260 @@ describe('processRecallTest', () => {
     expect(processRecallResult).toHaveBeenCalledWith(expect.any(Object), 0);
     expect(result.failureCount).toBe(1);
     expect(result.hint).toContain("That's okay");
+  });
+
+  // [WI-2114 / AC-1 / AC-6] The Sylvia Plath preview-device exchange: a typed
+  // recall that fails under 3 times surfaces the grader's answer-specific
+  // feedback (right / missing / next step) on the result, instead of relying on
+  // fixed client copy.
+  it('[WI-2114] surfaces grader feedback on a sub-3-failure typed answer (Sylvia Plath)', async () => {
+    registerJsonGrader(
+      JSON.stringify({
+        quality: 2,
+        verdict: 'partial',
+        rationale: 'Recalled the novel but missed the poetry.',
+        misconception: null,
+        feedback: {
+          strengths:
+            'You correctly recalled that The Bell Jar is her only novel.',
+          gaps: 'You did not mention that Ariel was published after her death.',
+          nextStep:
+            'Next, note when Ariel appeared and why that timing matters.',
+        },
+      }),
+    );
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 1,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    const result = await processRecallTest(createMockDb(), profileId, {
+      topicId,
+      answer: 'The Bell Jar is her only novel.',
+    });
+
+    expect(result.failureAction).toBe('feedback_only');
+    expect(result.feedback).toEqual({
+      strengths: 'You correctly recalled that The Bell Jar is her only novel.',
+      gaps: 'You did not mention that Ariel was published after her death.',
+      nextStep: 'Next, note when Ariel appeared and why that timing matters.',
+    });
+  });
+
+  // [WI-2114 / AC-7] The graded answer's feedback is persisted to the retention
+  // card so a later cooldown-blocked follow-up can echo it — but the learner's
+  // RAW answer text must never be written (ropa.md row 7 / MMT-ADR-0036 line 43).
+  // Reverting the persist line (the `lastRecallFeedback` write) makes the first
+  // assertion fail.
+  it('[WI-2114 / AC-7] persists structured feedback to the card, never the raw answer', async () => {
+    registerJsonGrader(
+      JSON.stringify({
+        quality: 2,
+        verdict: 'partial',
+        rationale: 'Recalled the novel but missed the poetry.',
+        misconception: null,
+        feedback: {
+          strengths:
+            'You correctly recalled that The Bell Jar is her only novel.',
+          gaps: 'You did not mention that Ariel was published after her death.',
+          nextStep:
+            'Next, note when Ariel appeared and why that timing matters.',
+        },
+      }),
+    );
+    setupScopedRepo({ retentionCardFindFirst: mockRetentionCardRow() });
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 1,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    // A verbose raw answer we can search for across every card write.
+    const rawAnswer =
+      'The Bell Jar is her only novel and I really enjoyed reading it last year.';
+    const db = createMockDb();
+    await processRecallTest(db, profileId, { topicId, answer: rawAnswer });
+
+    // createMockDb returns one shared `set` mock across every db.update(...), so
+    // ALL update payloads live in that single fn's calls.
+    const setFn = (db.update as jest.Mock).mock.results[0]?.value
+      ?.set as jest.Mock;
+    const cardWrites = (setFn?.mock.calls ?? [])
+      .map((call) => call[0])
+      .filter(
+        (payload): payload is Record<string, unknown> =>
+          payload != null && typeof payload === 'object',
+      );
+
+    // The post-grade write carries exactly the grader's structured feedback.
+    const withFeedback = cardWrites.find((w) => 'lastRecallFeedback' in w);
+    expect(withFeedback).toBeDefined();
+    expect(withFeedback?.lastRecallFeedback).toEqual({
+      strengths: 'You correctly recalled that The Bell Jar is her only novel.',
+      gaps: 'You did not mention that Ariel was published after her death.',
+      nextStep: 'Next, note when Ariel appeared and why that timing matters.',
+    });
+    // AC-7: no card write may contain the learner's raw answer text.
+    expect(JSON.stringify(cardWrites)).not.toContain(rawAnswer);
+  });
+
+  // [WI-2114 / AC-2 / AC-6 / AC-9] The full Sylvia Plath exchange as ONE flow:
+  // submission 1 (a real graded answer) persists its feedback; submission 2
+  // ("what is wrong with what I said?") arrives inside the 24h anti-cramming
+  // cooldown, is NEVER re-graded, and — pre-fix — fell through to the generic
+  // "Good effort" copy. This proves the two halves are CONNECTED: the value the
+  // cooldown-blocked follow-up echoes is the exact object submission 1 wrote to
+  // the card (reference identity), not a hand-duplicated literal. Reverting the
+  // persist line breaks the capture; reverting the cooldown-branch line drops
+  // the echo — either revert turns this red.
+  it('[WI-2114 / AC-9] two-submission round-trip: the follow-up echoes the feedback the graded answer persisted', async () => {
+    const graderFeedback = {
+      strengths: 'You correctly recalled that The Bell Jar is her only novel.',
+      gaps: 'You did not mention that Ariel was published after her death.',
+      nextStep: 'Next, note when Ariel appeared and why that timing matters.',
+    };
+    registerJsonGrader(
+      JSON.stringify({
+        quality: 2,
+        verdict: 'partial',
+        rationale: 'Recalled the novel but missed the poetry.',
+        misconception: null,
+        feedback: graderFeedback,
+      }),
+    );
+    setupScopedRepo({ retentionCardFindFirst: mockRetentionCardRow() });
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 1,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    // --- Submission 1: the real grading path persists its feedback. ---
+    const db1 = createMockDb();
+    const graded = await processRecallTest(db1, profileId, {
+      topicId,
+      answer: 'The Bell Jar is her only novel.',
+    });
+    expect(graded.feedback).toEqual(graderFeedback);
+
+    // Capture exactly what submission 1 wrote to the card (not a re-typed copy).
+    const setFn1 = (db1.update as jest.Mock).mock.results[0]?.value
+      ?.set as jest.Mock;
+    const persistedWrite = (setFn1?.mock.calls ?? [])
+      .map((call) => call[0])
+      .find(
+        (w) => w != null && typeof w === 'object' && 'lastRecallFeedback' in w,
+      );
+    expect(persistedWrite).toBeDefined();
+    const persistedFeedback = (persistedWrite as Record<string, unknown>)
+      .lastRecallFeedback;
+
+    // --- Submission 2: that persisted value now lives on the card. The
+    // follow-up is inside cooldown, so it is never re-graded. ---
+    const cardAfterSub1 = {
+      ...mockRetentionCardRow(),
+      lastRecallFeedback: persistedFeedback,
+    };
+    (canRetestTopic as jest.Mock).mockReturnValueOnce(false);
+    const followUp = await processRecallTest(
+      createMockDb({ retentionCardFindFirstQuery: cardAfterSub1 }),
+      profileId,
+      { topicId, answer: 'What is wrong with what I said?' },
+    );
+
+    expect(followUp.cooldownActive).toBe(true);
+    // The meta-question is never graded → no fresh feedback of its own...
+    expect(followUp.feedback).toBeUndefined();
+    // ...but it echoes the SAME object submission 1 persisted (reference
+    // identity — proves the read is connected to the write, not a coincidence).
+    expect(followUp.priorFeedback).toBe(persistedFeedback);
+  });
+
+  // [WI-2114 / AC-5] A cooldown-blocked follow-up on a card with NO stored
+  // feedback stays honest — no fabricated priorFeedback, client keeps generic
+  // copy.
+  it('[WI-2114 / AC-5] cooldown with no stored feedback surfaces no priorFeedback', async () => {
+    const card = mockRetentionCardRow(); // lastRecallFeedback absent
+    setupScopedRepo({ retentionCardFindFirst: card });
+    (canRetestTopic as jest.Mock).mockReturnValueOnce(false);
+
+    const result = await processRecallTest(
+      createMockDb({ retentionCardFindFirstQuery: card }),
+      profileId,
+      { topicId, answer: 'What is wrong with what I said?' },
+    );
+
+    expect(result.cooldownActive).toBe(true);
+    expect(result.priorFeedback).toBeUndefined();
+  });
+
+  // [WI-2114 / AC-5] dont_remember is a deterministic learner signal, not a
+  // graded answer — it must carry no fabricated answer-specific feedback.
+  it('[WI-2114] does not attach feedback on the dont_remember path', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: false,
+      newState: {
+        topicId,
+        easeFactor: 2.3,
+        intervalDays: 1,
+        repetitions: 0,
+        failureCount: 1,
+        consecutiveSuccesses: 0,
+        xpStatus: 'decayed',
+        nextReviewAt: '2026-02-16T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'decayed',
+      failureAction: 'feedback_only',
+    });
+
+    const result = await processRecallTest(createMockDb(), profileId, {
+      topicId,
+      answer: '',
+      attemptMode: 'dont_remember',
+    });
+
+    expect(result.feedback).toBeUndefined();
   });
 
   it('returns re_teach with a hint and no remediation on the 3rd failure (WI-1462 / RR-4)', async () => {
@@ -2538,6 +2796,40 @@ describe('ensureRetentionCard', () => {
 });
 
 // ---------------------------------------------------------------------------
+// buildRecallGradeMessages — [WI-2114] mentor-language feedback directive (AC-4)
+// ---------------------------------------------------------------------------
+
+describe('buildRecallGradeMessages [WI-2114]', () => {
+  it('appends a language directive for a non-English mentor language', () => {
+    const messages = buildRecallGradeMessages(
+      'Some answer',
+      'Sylvia Plath',
+      undefined,
+      undefined,
+      'de',
+    );
+    const user = messages[1]?.content as string;
+    expect(user).toContain('strengths, gaps, nextStep');
+    expect(user).toContain('in German');
+    // Classification values + keys stay English so parsing is unaffected.
+    expect(user).toContain('classification values in English');
+  });
+
+  it('appends no language directive for English / undefined (snapshot-stable)', () => {
+    const en = buildRecallGradeMessages(
+      'a',
+      'Topic',
+      undefined,
+      undefined,
+      'en',
+    )[1]?.content as string;
+    const none = buildRecallGradeMessages('a', 'Topic')[1]?.content as string;
+    expect(en).not.toMatch(/Write the "feedback" strings/);
+    expect(en).toBe(none);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // evaluateRecallQuality
 // ---------------------------------------------------------------------------
 
@@ -2585,6 +2877,8 @@ describe('evaluateRecallQuality', () => {
       rationale: 'Strong recall of the light reactions.',
       misconception: null,
       rung: 1,
+      // [WI-2114] Grader response above omits feedback → null passthrough.
+      feedback: null,
     });
   });
 

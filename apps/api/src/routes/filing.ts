@@ -13,6 +13,7 @@ import {
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { notFound } from '../errors';
 import {
   buildLibraryIndex,
@@ -119,6 +120,11 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
     await assertNotProxyMode(c);
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
+    // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+    // /filing/request-retry only dispatches an Inngest event (no direct LLM
+    // call, per the metering-allowlist comment above) — not gated here; the
+    // consumer (freeform-filing, AC-2) carries its own basis-inclusive check.
+    await assertLlmConsent(db, profileId);
     const body = c.req.valid('json');
 
     // If sessionId provided without transcript, build transcript server-side

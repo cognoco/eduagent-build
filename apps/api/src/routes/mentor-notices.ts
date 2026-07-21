@@ -8,7 +8,6 @@ import {
 } from '@eduagent/schemas';
 
 import { apiError } from '../errors';
-import { isMentorNoticeEnabled } from '../config';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { withProfile, type RouteEnv } from '../route-utils/route-context';
 import {
@@ -16,12 +15,17 @@ import {
   getLearningDayStart,
   getProfileTimeZone,
   MentorNoticeUnavailableError,
+  resolveMentorNoticeVisibility,
   startMentorNoticeRecheck,
 } from '../services/mentor-notices';
 
 type MentorNoticeRouteEnv = {
   Bindings: RouteEnv['Bindings'] & { MENTOR_NOTICE_ENABLED?: string };
-  Variables: RouteEnv['Variables'];
+  Variables: RouteEnv['Variables'] & {
+    // [WI-2498] See routes/now.ts — server-resolved caller identity, read by
+    // the mentor-notice visibility predicate's selfhood conjunct.
+    callerPersonId: string | undefined;
+  };
 };
 
 const noticeParamsSchema = z.object({ noticeId: z.string().uuid() });
@@ -41,7 +45,24 @@ export const mentorNoticeRoutes = new Hono<MentorNoticeRouteEnv>()
     zValidator('param', noticeParamsSchema),
     async (c) => {
       await assertNotProxyMode(c);
-      if (!isMentorNoticeEnabled(c.env.MENTOR_NOTICE_ENABLED)) {
+      const { db, profileId } = withProfile(c);
+      // [WI-2498] V replaces the bare rollout read here. It is strictly
+      // narrower (adds caller-is-subject and subject consent) and these
+      // responses echo notice data, so routing them through the one predicate
+      // keeps every notice-bearing boundary on a single seam.
+      // [WI-2504] Same seam; the epoch is derived here but not surfaced —
+      // these are mutations, not persisted projections, and a flag-off
+      // answers 404 rather than returning a body to invalidate.
+      if (
+        !(
+          await resolveMentorNoticeVisibility(
+            c,
+            profileId,
+            c.env.MENTOR_NOTICE_ENABLED,
+            { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+          )
+        ).visible
+      ) {
         return apiError(
           c,
           404,
@@ -49,7 +70,6 @@ export const mentorNoticeRoutes = new Hono<MentorNoticeRouteEnv>()
           'Mentor notice not found',
         );
       }
-      const { db, profileId } = withProfile(c);
       try {
         const result = await startMentorNoticeRecheck(
           db,
@@ -69,7 +89,24 @@ export const mentorNoticeRoutes = new Hono<MentorNoticeRouteEnv>()
     zValidator('param', noticeParamsSchema),
     async (c) => {
       await assertNotProxyMode(c);
-      if (!isMentorNoticeEnabled(c.env.MENTOR_NOTICE_ENABLED)) {
+      const { db, profileId } = withProfile(c);
+      // [WI-2498] V replaces the bare rollout read here. It is strictly
+      // narrower (adds caller-is-subject and subject consent) and these
+      // responses echo notice data, so routing them through the one predicate
+      // keeps every notice-bearing boundary on a single seam.
+      // [WI-2504] Same seam; the epoch is derived here but not surfaced —
+      // these are mutations, not persisted projections, and a flag-off
+      // answers 404 rather than returning a body to invalidate.
+      if (
+        !(
+          await resolveMentorNoticeVisibility(
+            c,
+            profileId,
+            c.env.MENTOR_NOTICE_ENABLED,
+            { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+          )
+        ).visible
+      ) {
         return apiError(
           c,
           404,
@@ -77,7 +114,6 @@ export const mentorNoticeRoutes = new Hono<MentorNoticeRouteEnv>()
           'Mentor notice not found',
         );
       }
-      const { db, profileId } = withProfile(c);
       try {
         const now = new Date();
         const timezone = await getProfileTimeZone(db, profileId);

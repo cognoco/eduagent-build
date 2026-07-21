@@ -358,6 +358,14 @@ Research noted pnpm symlink issues with Expo in some Nx setups. If encountered d
 - **Library**: Full fetch per subject, filter/sort client-side with TanStack Query. Ceiling is a few hundred topics per power user — single query, under 10ms. Cursor pagination adds unnecessary client complexity for a dataset that fits in one response.
 - **Session history**: Cursor-based (`WHERE (created_at, id) < ($cursor_time, $cursor_id) ORDER BY created_at DESC, id DESC LIMIT $n`). Grows unbounded, pagination justified.
 
+**Mentor-notice authority and state boundary (`MMT-ADR-0036`):**
+- Creation is eligible only for homework and ordinary single-subject learning sessions. The MVP LLM proposal carries a bounded concept, optional correction hint, and durable answer-event evidence reference; it carries no interleaved `topicId`.
+- The LLM proposes; one server-owned service authorizes. It derives the learner and subject/topic from authenticated session data, validates durable same-session evidence, scrubs stored context, applies idempotency/concurrency rules, and returns the only result API, SSE, cache, and UI consumers may use.
+- Streaming and non-streaming completion call that same service. Re-check sessions are creation-ineligible. Every LLM, event, API, SSE, and mobile boundary validates the canonical runtime payload before use.
+- The dedicated store holds minimal learner-safe context and lifecycle state, never verbatim learner evidence, clinical labels, model reasoning, or confidence. Evidence-aware identity prevents duplicate acceptance while server projection exposes at most one actionable notice.
+- The centralized state machine owns offer, current-learning-day defer, a re-check capped at three learner responses, `locked_in`/`not_yet`/explicit-dismissal completion, 21-day fade, and actor=subject visibility. Clients never create optimistic notice state.
+- The MVP has no mentor-notice push or scheduled nudge path. Flag-off stops prompt eligibility, mutations, projections, deep links, and observed cached surfaces while preserving rows for normal retention/deletion and possible re-enable.
+
 **Prerequisite Graph (Epic 7, v1.1):**
 - New `topic_prerequisites` join table in `packages/database/src/schema/subjects.ts`: `prerequisite_topic_id` → `dependent_topic_id` with `relationship_type` enum (`REQUIRED | RECOMMENDED`)
 - Unique constraint on `(prerequisiteTopicId, dependentTopicId)`, check constraint prevents self-references

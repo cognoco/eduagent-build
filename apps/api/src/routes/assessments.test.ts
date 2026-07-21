@@ -99,6 +99,20 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
+// [WI-2396] assertLlmConsent (called by POST /assessments/:id/answer and
+// POST /sessions/:id/quick-check) runs isLlmExchangeConsentAllowed, which
+// reads db.query.membership — makeStubDb() below has no `.query` property.
+// Defaults to allowed (resolves undefined = no throw); individual tests
+// override with mockRejectedValueOnce(new ConsentWithdrawnError()) to
+// exercise the refusal path.
+// gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
+// consentGrant reads with no real implementation available in this file's
+// stub-db environment (same class as verifyPersonOwnershipV2 above).
+jest.mock('../services/identity-v2/consent-status-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+  assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
@@ -112,8 +126,9 @@ import {
   evaluateQuickCheckAnswer,
   submitAssessmentAnswer,
 } from '../services/assessments';
-import { getSession } from '../services/session';
+import { getSession, ConsentWithdrawnError } from '../services/session';
 import { refundQuotaOrEscalate } from '../services/billing';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { assessmentRoutes } from './assessments';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
@@ -189,6 +204,13 @@ function makeApp(opts?: { isOwner?: boolean; profileId?: string }) {
     }
     if (errName === 'NotFoundError') {
       return c.json({ code: 'NOT_FOUND', message: errMessage }, 404);
+    }
+    // [WI-2396] Mirrors index.ts's global ConsentWithdrawnError -> 403 mapping.
+    if (errName === 'ConsentWithdrawnError') {
+      return c.json(
+        { code: ERROR_CODES.CONSENT_WITHDRAWN, message: errMessage },
+        403,
+      );
     }
     return c.json({ code: 'INTERNAL_ERROR', message: errMessage }, 500);
   });
@@ -273,6 +295,7 @@ const evaluateQuickCheckAnswerMock = jest.mocked(evaluateQuickCheckAnswer);
 const submitAssessmentAnswerMock = jest.mocked(submitAssessmentAnswer);
 const getSessionMock = jest.mocked(getSession);
 const refundQuotaOrEscalateMock = jest.mocked(refundQuotaOrEscalate);
+const assertLlmConsentMock = jest.mocked(assertLlmConsent);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -508,6 +531,35 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     const res = await makeApp().request(path, validAnswerBody());
 
     expect(res.status).toBe(409);
+  });
+
+  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
+  describe('[WI-2396] consent-withdrawal gate', () => {
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls submitAssessmentAnswer when consent is withdrawn', async () => {
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+      const res = await makeApp().request(path, validAnswerBody());
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+      expect(submitAssessmentAnswerMock).not.toHaveBeenCalled();
+    });
+
+    it('proceeds (LLM dispatched) when consent is active', async () => {
+      submitAssessmentAnswerMock.mockResolvedValue(
+        makeSubmitAnswerResult({ status: 'in_progress' }),
+      );
+
+      const res = await makeApp().request(path, validAnswerBody());
+
+      expect(res.status).toBe(200);
+      expect(assertLlmConsentMock).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+      );
+      expect(submitAssessmentAnswerMock).toHaveBeenCalled();
+    });
   });
 
   // [F-146] App-help early-return must refund quota, not charge the learner
@@ -841,6 +893,44 @@ describe('POST /v1/sessions/:sessionId/quick-check', () => {
       'other-profile-id',
       SESSION_ID,
     );
+  });
+
+  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
+  describe('[WI-2396] consent-withdrawal gate', () => {
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls evaluateQuickCheckAnswer when consent is withdrawn', async () => {
+      assertLlmConsentMock.mockRejectedValueOnce(new ConsentWithdrawnError());
+
+      const res = await makeApp().request(path, validQuickCheckBody());
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe(ERROR_CODES.CONSENT_WITHDRAWN);
+      expect(getSessionMock).not.toHaveBeenCalled();
+      expect(evaluateQuickCheckAnswerMock).not.toHaveBeenCalled();
+    });
+
+    it('proceeds (LLM dispatched) when consent is active', async () => {
+      getSessionMock.mockResolvedValue(makeSessionRecord());
+      loadAssessmentTopicContextMock.mockResolvedValue(makeTopicContext());
+      evaluateQuickCheckAnswerMock.mockResolvedValue({
+        feedback: 'Good work!',
+        passed: true,
+        shouldEscalateDepth: false,
+        masteryScore: 0.8,
+        qualityRating: 4,
+        nextDepth: undefined,
+        weakAreas: [],
+      });
+
+      const res = await makeApp().request(path, validQuickCheckBody());
+
+      expect(res.status).toBe(200);
+      expect(assertLlmConsentMock).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+      );
+      expect(evaluateQuickCheckAnswerMock).toHaveBeenCalled();
+    });
   });
 });
 

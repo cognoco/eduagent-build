@@ -73,13 +73,19 @@ import { clearJWKSCache } from '../middleware/jwt';
 // ---------------------------------------------------------------------------
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
-import { seedConsentState } from '../test-utils/consent-seed';
+import { seedConsentState, seedGuardianship } from '../test-utils/consent-seed';
 
 const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
 jest.mock(
   '@eduagent/database' /* gc1-allow: route unit test — DB middleware injected via mock; real DB covered by route integration / e2e tests */,
   () => mockDatabaseModule.module,
+);
+
+const { guardianshipFindFirst: mockGuardianshipFindFirst } = seedGuardianship(
+  mockDatabaseModule.db,
+  'test-profile-id',
+  TEST_PROFILE_ID_2,
 );
 
 // ---------------------------------------------------------------------------
@@ -314,14 +320,12 @@ jest.mock(
   }),
 );
 
-// [WI-1989] assertCallerIsAccountOwner calls verifyPersonIsOrgAdminV2, which
-// runs a raw membership query the fully-mocked DB module cannot satisfy.
-// Every scenario in this file that currently reaches assertCallerIsAccountOwner
-// is a caller-owner scenario (the non-owner break tests are rejected earlier by
-// assertOwnerProfile's / assertOwnerAndParentAccess's X-Profile-Id-resolved
-// isOwner check, before this guard runs) — the caller-vs-X-Profile-Id-spoof
-// distinction this guard exists to enforce is covered by the real-DB break
-// test in tests/integration/wi1989-owner-idor.integration.test.ts.
+const mockVerifyPersonIsOrgAdminV2 = jest.fn().mockResolvedValue(true);
+
+// [WI-1989/WI-2516] assertCallerIsAccountOwner calls
+// verifyPersonIsOrgAdminV2, whose raw membership query the fully-mocked DB
+// module cannot satisfy. The mock is varied explicitly in the WI-2516 matrix;
+// the real login→caller→membership binding is covered by the real-DB IDOR tests.
 //
 // [WI-2416] Same rationale for verifyPersonOwnershipV2, called by
 // assertCanReadProfile (GET /consent/my-status) — the same raw membership
@@ -336,7 +340,8 @@ jest.mock('../services/identity-v2/ownership-v2', () => {
   ) as typeof import('../services/identity-v2/ownership-v2');
   return {
     ...actual,
-    verifyPersonIsOrgAdminV2: jest.fn().mockResolvedValue(true),
+    verifyPersonIsOrgAdminV2: (...args: unknown[]) =>
+      mockVerifyPersonIsOrgAdminV2(...args),
     verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
   };
 });
@@ -357,12 +362,33 @@ const TEST_ENV = {
 
 const AUTH_HEADERS = makeAuthHeaders();
 
-// [BUG-791] /consent/request + /consent/resend now gate on the ACTIVE profile.
-// The happy-path tests model the legitimate SELF-SERVICE path (a profile
-// requesting consent for ITSELF): the active X-Profile-Id equals the
-// childProfileId in the body (SELF_SERVICE_PROFILE_ID). The route gate
-// short-circuits on the self-service branch before any family-link lookup,
-// so the mocked DB needs no link fixture.
+function setMockCallerPersonId(personId: string): void {
+  const query = (
+    mockDatabaseModule.db as {
+      query: {
+        login: { findFirst: jest.Mock };
+        membership: { findFirst: jest.Mock; findMany: jest.Mock };
+      };
+    }
+  ).query;
+  query.login.findFirst.mockResolvedValue({
+    personId,
+    clerkUserId: 'user_test',
+    email: 'test@example.com',
+  });
+  const membershipRow = {
+    personId,
+    organizationId: 'test-account-id',
+    roles: ['admin', 'learner'],
+  };
+  query.membership.findFirst.mockResolvedValue(membershipRow);
+  query.membership.findMany.mockResolvedValue([membershipRow]);
+}
+
+// The happy-path tests model legitimate self-service: accountMiddleware's
+// server-bound callerPersonId matches the childProfileId in the body. The
+// X-Profile-Id happens to match in these older tests, but the WI-2516 matrix
+// below proves that selection header is irrelevant to authorization.
 const SELF_SERVICE_PROFILE_ID = TEST_PROFILE_ID;
 const SELF_SERVICE_HEADERS = makeAuthHeaders({
   'X-Profile-Id': SELF_SERVICE_PROFILE_ID,
@@ -378,6 +404,7 @@ afterAll(() => {
 
 beforeEach(() => {
   clearJWKSCache();
+  setMockCallerPersonId('test-profile-id');
   // WI-867: reset profile-v2 scope mocks to defaults.
   mockGetPersonScope.mockImplementation((_db: unknown, profileId: string) =>
     Promise.resolve({
@@ -412,6 +439,8 @@ beforeEach(() => {
     withdrawnAt: '2026-01-15T10:00:00.000Z',
   });
   mockRestoreChildConsentV2.mockResolvedValue({ status: 'CONSENTED' });
+  mockVerifyPersonIsOrgAdminV2.mockResolvedValue(true);
+  mockGuardianshipFindFirst.mockResolvedValue({ id: 'test-guardianship-id' });
   // WI-867: restore real-function delegation after per-test error injection.
   mockGetChildConsentForParentV2.mockImplementation((...args: unknown[]) =>
     realFamilyV2.getChildConsentForParentV2(
@@ -1730,6 +1759,9 @@ describe('[BUG-791] non-owner sibling cannot request/resend consent for another 
   const TARGET_CHILD_ID = TEST_PROFILE_ID;
 
   beforeEach(() => {
+    // The authenticated caller (not merely the selected profile) is a
+    // non-admin sibling in these legacy regression scenarios.
+    mockVerifyPersonIsOrgAdminV2.mockResolvedValue(false);
     const profileMock = jest.requireMock('../services/profile') as {
       getProfile: jest.Mock;
     };
@@ -1867,6 +1899,7 @@ describe('[BUG-791] non-owner sibling cannot request/resend consent for another 
 
   it('legitimate self-service still works: a profile requesting consent for ITSELF returns 201', async () => {
     mockRequestConsentV2.mockClear();
+    setMockCallerPersonId(TEST_PROFILE_ID);
 
     const res = await app.request(
       '/v1/consent/request',
@@ -1874,11 +1907,12 @@ describe('[BUG-791] non-owner sibling cannot request/resend consent for another 
         method: 'POST',
         headers: {
           ...makeAuthHeaders(),
+          // Selection deliberately differs from caller identity. Self-service
+          // is bound to callerPersonId, so this header cannot change the result.
           'X-Profile-Id': SIBLING_PROFILE_ID,
         },
         body: JSON.stringify({
-          // childProfileId === active profile → self-service path, allowed.
-          childProfileId: SIBLING_PROFILE_ID,
+          childProfileId: TEST_PROFILE_ID,
           parentEmail: 'my-parent@example.com',
           consentType: 'GDPR',
         }),
@@ -1894,4 +1928,150 @@ describe('[BUG-791] non-owner sibling cannot request/resend consent for another 
     expect(res.status).toBe(201);
     expect(mockRequestConsentV2).toHaveBeenCalled();
   });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2516] Full endpoint × caller relationship × profile-header matrix.
+// accountMiddleware resolves callerPersonId=TEST_PROFILE_ID from the signed
+// login. X-Profile-Id varies independently and must never grant or remove
+// consent-write authority.
+// ---------------------------------------------------------------------------
+
+describe('[WI-2516] consent writes bind authorization to callerPersonId', () => {
+  const forbiddenMessage = 'Not authorized to request consent for this profile';
+  const relationshipCases = [
+    {
+      label: 'self, honest header',
+      targetId: TEST_PROFILE_ID,
+      selectedProfileId: TEST_PROFILE_ID,
+      isAdmin: false,
+      hasEdge: false,
+      allowed: true,
+    },
+    {
+      label: 'self, mismatched same-org header',
+      targetId: TEST_PROFILE_ID,
+      selectedProfileId: TEST_PROFILE_ID_2,
+      isAdmin: false,
+      hasEdge: false,
+      allowed: true,
+    },
+    {
+      label: 'admin guardian, honest header',
+      targetId: TEST_PROFILE_ID_2,
+      selectedProfileId: TEST_PROFILE_ID,
+      isAdmin: true,
+      hasEdge: true,
+      allowed: true,
+    },
+    {
+      label: 'admin guardian, target-shaped header',
+      targetId: TEST_PROFILE_ID_2,
+      selectedProfileId: TEST_PROFILE_ID_2,
+      isAdmin: true,
+      hasEdge: true,
+      allowed: true,
+    },
+    {
+      label: 'admin without edge, honest header',
+      targetId: TEST_PROFILE_ID_2,
+      selectedProfileId: TEST_PROFILE_ID,
+      isAdmin: true,
+      hasEdge: false,
+      allowed: false,
+    },
+    {
+      label: 'admin without edge, target-shaped header',
+      targetId: TEST_PROFILE_ID_2,
+      selectedProfileId: TEST_PROFILE_ID_2,
+      isAdmin: true,
+      hasEdge: false,
+      allowed: false,
+    },
+    {
+      label: 'same-org non-admin, honest header',
+      targetId: TEST_PROFILE_ID_2,
+      selectedProfileId: TEST_PROFILE_ID,
+      isAdmin: false,
+      hasEdge: false,
+      allowed: false,
+    },
+    {
+      label: 'same-org non-admin, target-shaped header',
+      targetId: TEST_PROFILE_ID_2,
+      selectedProfileId: TEST_PROFILE_ID_2,
+      isAdmin: false,
+      hasEdge: false,
+      allowed: false,
+    },
+    {
+      label: 'same-org non-admin, owner-shaped header',
+      targetId: TEST_PROFILE_ID_2,
+      selectedProfileId: TEST_PROFILE_ID_3,
+      isAdmin: false,
+      hasEdge: true,
+      allowed: false,
+    },
+  ];
+  const matrix = [
+    ...relationshipCases.map((testCase) => ({
+      ...testCase,
+      endpoint: '/v1/consent/request',
+      writeMock: mockRequestConsentV2,
+    })),
+    ...relationshipCases.map((testCase) => ({
+      ...testCase,
+      endpoint: '/v1/consent/resend',
+      writeMock: mockResendConsentV2,
+    })),
+  ];
+
+  it.each(matrix)(
+    '$endpoint: $label => allowed=$allowed',
+    async ({
+      endpoint,
+      targetId,
+      selectedProfileId,
+      isAdmin,
+      hasEdge,
+      allowed,
+      writeMock,
+    }) => {
+      setMockCallerPersonId(TEST_PROFILE_ID);
+      mockVerifyPersonIsOrgAdminV2.mockResolvedValue(isAdmin);
+      mockGuardianshipFindFirst.mockResolvedValue(
+        hasEdge ? { id: 'test-guardianship-id' } : null,
+      );
+      writeMock.mockClear();
+
+      const res = await app.request(
+        endpoint,
+        {
+          method: 'POST',
+          headers: makeAuthHeaders({ 'X-Profile-Id': selectedProfileId }),
+          body: JSON.stringify({
+            childProfileId: targetId,
+            consentType: 'GDPR',
+            ...(endpoint.endsWith('/request')
+              ? { parentEmail: 'parent@example.com' }
+              : {}),
+          }),
+        },
+        TEST_ENV,
+      );
+
+      if (allowed) {
+        expect(res.status).toBe(201);
+        expect(writeMock).toHaveBeenCalledTimes(1);
+        return;
+      }
+
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: forbiddenMessage,
+      });
+      expect(writeMock).not.toHaveBeenCalled();
+    },
+  );
 });

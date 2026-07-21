@@ -79,7 +79,7 @@ export interface SurfaceRule {
  * The canonical surface boundary table.
  *
  * Keep in sync with:
- *   docs/superpowers/specs/2026-05-13-surface-ownership-boundaries-design.md
+ *   docs/_archive/specs/Done/2026-05-13-surface-ownership-boundaries-design.md
  *   lines 390-396
  *
  * Adding an allowlist entry requires (a) a comment naming the narrow hook /

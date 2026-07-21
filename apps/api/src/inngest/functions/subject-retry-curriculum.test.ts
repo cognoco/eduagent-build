@@ -466,9 +466,15 @@ describe('subjectRetryCurriculum', () => {
       // retry-generate-and-persist sees WITHDRAWN → LLM must be skipped.
       const loadDb = makeMockDb();
       // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
-      // Sequence: first check = CONSENTED (load step), second check = WITHDRAWN (generate step).
+      // [WI-2396] Now reads isLlmExchangeConsentAllowed, which fires up to 3
+      // resolveConsentStatus calls per gate invocation (1 gdpr_parental_consent +
+      // up to 2 art6_1_a purposes, short-circuiting on the first WITHDRAWN). The
+      // load step's gate must fully pass (3 CONSENTED) before the generate step's
+      // gate sees WITHDRAWN on its first (gdpr) check — otherwise the sequence is
+      // consumed within the load step's gate and this test stops exercising the
+      // cross-step re-check it documents.
       seedConsentState(loadDb as unknown as Record<string, unknown>, {
-        state: ['CONSENTED', 'WITHDRAWN'],
+        state: ['CONSENTED', 'CONSENTED', 'CONSENTED', 'WITHDRAWN'],
       });
       const confirmDb = makeMockDb({ topicsGenerated: false });
       let callCount = 0;

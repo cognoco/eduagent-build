@@ -8,7 +8,7 @@
  * PAYLOAD-NARROW: Library no longer fetches overall-progress data for
  * retention. Retention is derived exclusively from the library-owned
  * `/library/retention` endpoint. See the surface-ownership plan at
- * docs/superpowers/plans/2026-05-13-surface-ownership-boundaries.md PR 4.
+ * docs/_archive/plans/done/2026-05-13-surface-ownership-boundaries.md PR 4.
  *
  * IMPORT-BOUNDARY FACADE: `useSubjectRetentionMap` is the public API for
  * downstream components. Do not bypass it with direct `useLibraryRetention`

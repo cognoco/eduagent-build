@@ -42,6 +42,19 @@ beforeAll(() => {
       yield* []; // no-op: streaming not used in these tests
     },
   });
+  // [WI-2433] The answer-graders (evaluateAssessmentAnswer /
+  // evaluateQuickCheckAnswer) route on capability:'judge', which resolves to the
+  // vendor-independent anthropic grader (tutor=gemini ⇒ grader=anthropic). Register
+  // the SAME mockChat under 'anthropic' so a POST /answer's grader call resolves to
+  // the mocked evaluation JSON instead of throwing "No provider registered for:
+  // anthropic". One shared mock ⇒ installAssessmentLlmMock() drives both providers.
+  registerProvider({
+    id: 'anthropic',
+    chat: mockChat,
+    async *chatStream() {
+      yield* []; // no-op: streaming not used in these tests
+    },
+  });
 });
 
 function installAssessmentLlmMock(): void {

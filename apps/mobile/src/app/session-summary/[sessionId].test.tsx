@@ -10,6 +10,7 @@ import {
 import React from 'react';
 import { AccessibilityInfo, Platform } from 'react-native';
 import { useAuth } from '@clerk/expo';
+import * as Notifications from 'expo-notifications';
 import { platformAlert } from '../../lib/platform-alert';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -738,6 +739,79 @@ describe('SessionSummaryScreen', () => {
     screen.getByText('Your Words');
     screen.getByTestId('summary-input');
     screen.getByTestId('submit-summary-button');
+  });
+
+  // [WI-2573] MMT-ADR-0036 §3.1 — the mentor-notice MVP is in-app only and
+  // must show no mentor-notice-specific notification primer or permission
+  // request. The generic post-session ask is unrelated to mentor notices and
+  // keeps working; only its notice-flavoured variant is contained.
+  describe('[WI-2573] notification primer contains mentor-notice copy', () => {
+    async function renderAndFirePrimer() {
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      await waitFor(() => {
+        expect(screen.queryByTestId('session-takeaways')).not.toBeNull();
+      });
+      // The hook waits PRIMER_DELAY_MS (1500ms) before surfacing the alert.
+      for (let i = 0; i < 6; i += 1) {
+        await act(async () => {
+          jest.advanceTimersByTime(1_000);
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+      }
+    }
+
+    it('shows the generic primer, never the mentor-notice variant, when a notice is present', async () => {
+      jest.useFakeTimers();
+      const getPermissions =
+        Notifications.getPermissionsAsync as unknown as jest.Mock;
+      const previousImpl = getPermissions.getMockImplementation();
+      try {
+        mockTotalSessions = 2;
+        // Permission undetermined and re-askable — the only state in which the
+        // primer alert is surfaced at all. Without this the test would be
+        // vacuous (default fixture is 'granted', which takes the silent path).
+        getPermissions.mockResolvedValue({
+          status: 'undetermined',
+          canAskAgain: true,
+          expires: 'never',
+          granted: false,
+        });
+        mockSessionSummaryData = {
+          ...BASE_MOCK_SUMMARY,
+          mentorNotice: {
+            id: '550e8400-e29b-41d4-a716-446655440099',
+            concept: 'changing signs',
+            correctionHint: 'Apply the inverse operation to both sides.',
+          },
+        };
+
+        await renderAndFirePrimer();
+
+        const primerCalls = (platformAlert as jest.Mock).mock.calls;
+        // Precondition: the primer actually fired — otherwise the
+        // "no notice copy" assertion below would prove nothing.
+        expect(primerCalls.length).toBeGreaterThan(0);
+        const titles = primerCalls.map((call) => call[0]);
+        const bodies = primerCalls.map((call) => call[1]);
+        expect(titles).not.toContain('Want a gentle follow-up?');
+        expect(bodies).not.toContain(
+          'We can remind you to revisit what your mentor noticed today. You can turn this off anytime in Settings.',
+        );
+        expect(titles).toContain('Want a daily nudge?');
+      } finally {
+        if (previousImpl) {
+          getPermissions.mockImplementation(previousImpl);
+        } else {
+          getPermissions.mockResolvedValue({
+            status: 'granted',
+            expires: 'never',
+            granted: true,
+          });
+        }
+        jest.useRealTimers();
+      }
+    });
   });
 
   describe('mentor-memory cue', () => {
