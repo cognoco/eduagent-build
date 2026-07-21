@@ -414,8 +414,25 @@ describe('seedScenario', () => {
       'parent-multi-child',
       'owner@example.com',
     );
+    const insertResult = (db.insert as jest.Mock).mock.results[0]?.value as
+      | { values?: jest.Mock }
+      | undefined;
+    const insertedRows =
+      insertResult?.values?.mock.calls.map(([row]) => row) ?? [];
 
-    expect(result.ids.ownerSubjectId).toEqual(expect.any(String));
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        id: result.profileId,
+        displayName: 'Test Parent',
+      }),
+    );
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        id: result.ids.ownerSubjectId,
+        profileId: result.profileId,
+        name: 'General Knowledge',
+      }),
+    );
     expect([
       result.ids.subject1Id,
       result.ids.subject2Id,
