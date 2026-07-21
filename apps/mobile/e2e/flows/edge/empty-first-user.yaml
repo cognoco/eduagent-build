@@ -94,10 +94,20 @@ tags:
 - hideKeyboard
 
 # 5. Verify cancel button is present (mandatory — core UI element)
+- scrollUntilVisible:
+    element:
+      id: 'create-subject-cancel'
+    direction: UP
+    timeout: 10000
 - assertVisible:
     id: 'create-subject-cancel'
 
 # 6. Verify submit button is present (mandatory — core UI element)
+- scrollUntilVisible:
+    element:
+      id: 'create-subject-submit'
+    direction: DOWN
+    timeout: 10000
 - assertVisible:
     id: 'create-subject-submit'
 
@@ -105,12 +115,22 @@ tags:
 - takeScreenshot: empty-first-user-01-create-subject
 
 # 7. Type a subject name
+- scrollUntilVisible:
+    element:
+      id: 'create-subject-name'
+    direction: UP
+    timeout: 10000
 - tapOn:
     id: 'create-subject-name'
 - inputText: 'Biology'
 - hideKeyboard
 
 # 8. Tap "Start Learning" submit button
+- scrollUntilVisible:
+    element:
+      id: 'create-subject-submit'
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: 'create-subject-submit'
 

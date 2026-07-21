@@ -982,6 +982,20 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(norwegian).toBeGreaterThan(-1);
   });
 
+  it('[WI-1864] runs owner-only export against the explicit adult-owner seed', () => {
+    const flow = 'flows/account/export-data.yaml';
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e', flow),
+      'utf8',
+    );
+    const entry = loadPlan('nightly').find(
+      (candidate) => candidate.flow === flow,
+    );
+
+    expect(source).toContain('SEED_SCENARIO: "subscription-pro-active"');
+    expect(entry?.scenario).toBe('subscription-pro-active');
+  });
+
   it('[WI-1864] schedules only the supported parent-native populated-memory journey', () => {
     const nightlyFlows = new Set(loadPlan('nightly').map(({ flow }) => flow));
     const duplicate = 'flows/account/learner-mentor-memory-populated.yaml';
@@ -1378,14 +1392,18 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
   });
 
-  it('[WI-1864] opens the zero-subject CTA that actually renders below the fold', () => {
+  it('[WI-1864] keeps the zero-subject create flow operable on small viewports', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/edge/empty-first-user.yaml'),
       'utf8',
     );
     const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
-      scrollUntilVisible?: { element?: { id?: string } };
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: 'UP' | 'DOWN';
+      };
       tapOn?: { id?: string };
+      assertVisible?: { id?: string };
     }>;
     const scroll = commands.findIndex(
       ({ scrollUntilVisible }) =>
@@ -1397,6 +1415,50 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(scroll).toBeGreaterThan(-1);
     expect(tap).toBeGreaterThan(scroll);
     expect(source).not.toContain('home-add-subject-tile');
+
+    const cancelScroll = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'create-subject-cancel' &&
+        scrollUntilVisible.direction === 'UP',
+    );
+    const cancelAssert = commands.findIndex(
+      ({ assertVisible }) => assertVisible?.id === 'create-subject-cancel',
+    );
+    const firstSubmitScroll = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'create-subject-submit' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const submitAssert = commands.findIndex(
+      ({ assertVisible }) => assertVisible?.id === 'create-subject-submit',
+    );
+    const nameScroll = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'create-subject-name' &&
+        scrollUntilVisible.direction === 'UP',
+    );
+    const nameTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > nameScroll && tapOn?.id === 'create-subject-name',
+    );
+    const finalSubmitScroll = commands.findLastIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'create-subject-submit' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const submitTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > finalSubmitScroll && tapOn?.id === 'create-subject-submit',
+    );
+
+    expect(cancelScroll).toBeGreaterThan(tap);
+    expect(cancelAssert).toBeGreaterThan(cancelScroll);
+    expect(firstSubmitScroll).toBeGreaterThan(cancelAssert);
+    expect(submitAssert).toBeGreaterThan(firstSubmitScroll);
+    expect(nameScroll).toBeGreaterThan(submitAssert);
+    expect(nameTap).toBeGreaterThan(nameScroll);
+    expect(finalSubmitScroll).toBeGreaterThan(firstSubmitScroll);
+    expect(submitTap).toBeGreaterThan(finalSubmitScroll);
   });
 
   it('[WI-1864] follows the intentional no-consent profile destination', () => {
@@ -1456,6 +1518,27 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(
       source.slice(source.indexOf('id: "create-profile-submit"')),
     ).not.toContain('create-subject-name');
+  });
+
+  it('[WI-1864] asserts adolescent consent copy for the teen pending seed', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/consent/consent-pending-gate.yaml'),
+      'utf8',
+    );
+    const assertions = (
+      parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+        assertVisible?: { text?: string } | string;
+      }>
+    ).flatMap(({ assertVisible }) =>
+      typeof assertVisible === 'object' && assertVisible.text
+        ? [assertVisible.text]
+        : [],
+    );
+
+    expect(source).toContain('account + TEEN profile');
+    expect(assertions).toContain('Hang tight!');
+    expect(assertions).toContain('Once they say yes, you can start exploring!');
+    expect(assertions).not.toContain('Waiting for approval');
   });
 
   it('[WI-1864] opens the seeded parent topic through its stable card id', () => {
@@ -1521,6 +1604,32 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           assertVisible.optional !== true,
       ),
     ).toBe(false);
+  });
+
+  it('[WI-1864] opens child memory through the settings-mode profile control', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/parent/child-memory-consent-prompt.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string };
+      scrollUntilVisible?: { element?: { id?: string } };
+    }>;
+    const profileTap = commands.findIndex(
+      ({ tapOn }) =>
+        tapOn?.id === 'parent-home-child-profile-${CHILD_PROFILE_ID}',
+    );
+    const memoryScroll = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'mentor-memory-link',
+    );
+
+    expect(profileTap).toBeGreaterThan(-1);
+    expect(memoryScroll).toBeGreaterThan(profileTap);
+    expect(source).not.toContain('parent-home-check-child-${CHILD_PROFILE_ID}');
   });
 
   it('[WI-1864] scrolls to the owner subscription row on the Account screen', () => {
@@ -1652,11 +1761,18 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(signOutLandingScroll).toBeGreaterThan(-1);
   });
 
-  it('[WI-1864] walks preview-self through the shared first-run welcome bridge', () => {
+  it('[WI-1864] parks preview-self while its product entry flag is hard-disabled', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/onboarding/preview-self.yaml'),
       'utf8',
     );
+    const flags = readFileSync(
+      join(repoRoot, 'apps/mobile/src/lib/feature-flags.ts'),
+      'utf8',
+    );
+    const header = parseAllDocuments(source)[0]?.toJSON() as {
+      tags?: string[];
+    };
     const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
       runFlow?: { file?: string };
       extendedWaitUntil?: { visible?: { id?: string } | string };
@@ -1674,6 +1790,18 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
     expect(welcomeBridge).toBe(0);
     expect(signIn).toBeGreaterThan(welcomeBridge);
+    expect(flags).toContain('PREVIEW_ENTRY_CTA_ENABLED: false');
+    expect(source).toMatch(/^# PARKED\b/m);
+    expect(source).toMatch(/^# PM INTAKE: WI-2586\b/m);
+    expect(source).toContain(
+      'https://www.notion.so/3a48bce91f7c815ca25bdb077de9054c',
+    );
+    expect(source).toMatch(/^# OWNER: MentoMate Program Manager\b/m);
+    expect(source).toMatch(/^# UNBLOCK CONDITION:/m);
+    expect(header.tags).toContain('blocked');
+    expect(loadPlan('nightly').map(({ flow }) => flow)).not.toContain(
+      'flows/onboarding/preview-self.yaml',
+    );
   });
 
   it('[WI-1864] opens weekly reports from parent home without double navigation', () => {
@@ -1785,6 +1913,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
               enabled?: boolean;
             }
           | string;
+        timeout?: number;
       };
       assertVisible?: { id?: string } | string;
     }>;
@@ -1818,6 +1947,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       expect(enters[index]).toBeLessThan(receipt);
       expect(receipt).toBeLessThan(inputEnabled);
       expect(inputEnabled).toBeLessThan(nextEnter);
+      expect(commands[inputEnabled]?.extendedWaitUntil?.timeout).toBe(30000);
       enabled.push(inputEnabled);
     }
 

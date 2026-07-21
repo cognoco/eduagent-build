@@ -39,7 +39,7 @@
 #   more-row-export  apps/mobile/src/app/(app)/more.tsx line 879
 #
 # Run command:
-#   ./e2e/scripts/seed-and-run.sh onboarding-complete e2e/flows/account/export-data.yaml
+#   ./e2e/scripts/seed-and-run.sh subscription-pro-active e2e/flows/account/export-data.yaml
 #
 # Tags: nightly, account
 appId: com.mentomate.app
@@ -51,7 +51,7 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "onboarding-complete"
+      SEED_SCENARIO: "subscription-pro-active"
       API_URL: ${API_URL}
 
 # ── Step 2: Confirm home screen ──

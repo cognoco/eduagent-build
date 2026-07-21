@@ -74,11 +74,11 @@ tags:
 
 # 4. Verify heading text
 - assertVisible:
-    text: "Waiting for approval"
+    text: "Hang tight!"
 
 # 5. Verify informational message
 - assertVisible:
-    text: "Once they approve, you'll have full access."
+    text: "Once they say yes, you can start exploring!"
 
 # 6. Verify "Check again" button
 - assertVisible:

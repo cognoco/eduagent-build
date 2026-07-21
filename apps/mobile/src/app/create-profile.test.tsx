@@ -511,8 +511,10 @@ describe('CreateProfileScreen', () => {
   // longer pushes /consent itself (that raced with the layout ConsentPendingGate
   // on web). It now switches to the pending child and lets the gate own the
   // single consent surface. This test asserts the deterministic behavior:
-  // switchProfile fires, and create-profile does NOT also navigate to /consent.
-  it('switches to the pending child and does NOT push /consent (gate owns the surface) for a child under 16', async () => {
+  // create-profile dismisses before switchProfile fires, and does NOT also
+  // navigate to /consent. Dismissing first is required on the native stack so
+  // the modal cannot remain above the switch-induced layout gate.
+  it('dismisses before switching to the pending child without pushing /consent for a child under 16', async () => {
     const newProfile = makeProfileResponse({
       id: PROFILE_IDS.child,
       displayName: 'Kid',
@@ -552,9 +554,12 @@ describe('CreateProfileScreen', () => {
     expect(mockReplace).not.toHaveBeenCalledWith(
       expect.objectContaining({ pathname: '/consent' }),
     );
-    // And must NOT close the modal (handleClose) on the consent path — the
-    // switch-induced gate is the destination, not home/back.
-    expect(mockBack).not.toHaveBeenCalled();
+    // Close the native modal before the profile switch remounts navigation;
+    // the layout gate then becomes the one visible consent surface.
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockBack.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSwitchProfile.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
   });
 
   it('auto-detects persona from birthdate (no picker shown)', async () => {

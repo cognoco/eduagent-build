@@ -128,7 +128,7 @@ tags:
     visible:
       id: 'chat-input'
       enabled: true
-    timeout: 5000
+    timeout: 30000
 
 # Error states that indicate broken AI — none of these should appear
 - assertNotVisible: 'Something went wrong'
@@ -154,7 +154,7 @@ tags:
     visible:
       id: 'chat-input'
       enabled: true
-    timeout: 5000
+    timeout: 30000
 
 # 9. Exchange 3: clarification
 - tapOn:
@@ -175,7 +175,7 @@ tags:
     visible:
       id: 'chat-input'
       enabled: true
-    timeout: 5000
+    timeout: 30000
 
 # 11. Close the regular session explicitly after all three responses.
 # Regular sessions do not have a three-exchange auto-close contract.

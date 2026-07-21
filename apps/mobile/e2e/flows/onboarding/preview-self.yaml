@@ -1,3 +1,17 @@
+# PARKED (2026-07-21): The self-preview CTA is intentionally unreachable while
+# PREVIEW_ENTRY_CTA_ENABLED is hard-disabled in feature-flags.ts. The sign-in
+# screen only renders try-mentomate-cta when that flag and the preview engine
+# are both enabled, so scheduling this flow would assert an impossible entry
+# point. The journey remains here for the product-preview return.
+#
+# PM INTAKE: WI-2586 — restore the self-preview entry before re-enabling this
+# nightly flow (https://www.notion.so/3a48bce91f7c815ca25bdb077de9054c).
+# OWNER: MentoMate Program Manager (product decision and routing).
+#
+# UNBLOCK CONDITION: product enables PREVIEW_ENTRY_CTA_ENABLED and retains a
+# user-visible try-mentomate-cta entry on the release build. Remove `blocked`
+# only after this exact flow passes on the release APK.
+#
 # Trial preview onboarding — self learner path.
 # Covers chat-entry track 18: save-wizard self-branch → chat-input.
 # Promoted from manual to nightly 2026-05-29 — confirmed correct against source.
@@ -8,6 +22,7 @@ tags:
   - nightly
   - onboarding
   - preview
+  - blocked
 ---
 - runFlow:
     file: ../_setup/nav-welcome-to-sign-in.yaml
