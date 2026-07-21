@@ -5,9 +5,85 @@ import { join } from 'node:path';
 
 const REDACTED = '[REDACTED]';
 
-function redactInputText(value) {
+function collectSensitiveStrings(value, sensitiveStrings = new Set()) {
   if (Array.isArray(value)) {
-    return value.map(redactInputText);
+    for (const child of value) {
+      collectSensitiveStrings(child, sensitiveStrings);
+    }
+    return sensitiveStrings;
+  }
+
+  if (value === null || typeof value !== 'object') {
+    return sensitiveStrings;
+  }
+
+  for (const [key, child] of Object.entries(value)) {
+    if (
+      key === 'inputTextCommand' &&
+      child !== null &&
+      typeof child === 'object' &&
+      !Array.isArray(child) &&
+      typeof child.text === 'string' &&
+      child.text.length > 0 &&
+      child.text !== REDACTED
+    ) {
+      sensitiveStrings.add(child.text);
+    }
+
+    if (
+      key === 'defineVariablesCommand' &&
+      child !== null &&
+      typeof child === 'object' &&
+      !Array.isArray(child) &&
+      child.env !== null &&
+      typeof child.env === 'object' &&
+      !Array.isArray(child.env)
+    ) {
+      for (const envValue of Object.values(child.env)) {
+        if (
+          typeof envValue === 'string' &&
+          envValue.length > 0 &&
+          envValue !== REDACTED
+        ) {
+          sensitiveStrings.add(envValue);
+        }
+      }
+    }
+
+    collectSensitiveStrings(child, sensitiveStrings);
+  }
+
+  return sensitiveStrings;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function redactSensitiveCopies(value, sensitivePattern) {
+  if (Array.isArray(value)) {
+    return value.map((child) => redactSensitiveCopies(child, sensitivePattern));
+  }
+
+  if (typeof value === 'string') {
+    return sensitivePattern ? value.replace(sensitivePattern, REDACTED) : value;
+  }
+
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [
+      sensitivePattern ? key.replace(sensitivePattern, REDACTED) : key,
+      redactSensitiveCopies(child, sensitivePattern),
+    ]),
+  );
+}
+
+function redactCommandFields(value) {
+  if (Array.isArray(value)) {
+    return value.map(redactCommandFields);
   }
 
   if (value === null || typeof value !== 'object') {
@@ -25,7 +101,7 @@ function redactInputText(value) {
         return [
           key,
           {
-            ...redactInputText(child),
+            ...redactCommandFields(child),
             ...(typeof child.text === 'string' ? { text: REDACTED } : {}),
           },
         ];
@@ -37,7 +113,7 @@ function redactInputText(value) {
         typeof child === 'object' &&
         !Array.isArray(child)
       ) {
-        const command = redactInputText(child);
+        const command = redactCommandFields(child);
         if (
           child.env !== null &&
           typeof child.env === 'object' &&
@@ -50,9 +126,45 @@ function redactInputText(value) {
         return [key, command];
       }
 
-      return [key, redactInputText(child)];
+      return [key, redactCommandFields(child)];
     }),
   );
+}
+
+function containsSensitiveString(value, sensitiveStrings) {
+  if (typeof value === 'string') {
+    return sensitiveStrings.some((secret) => value.includes(secret));
+  }
+  if (Array.isArray(value)) {
+    return value.some((child) =>
+      containsSensitiveString(child, sensitiveStrings),
+    );
+  }
+  if (value === null || typeof value !== 'object') {
+    return false;
+  }
+  return Object.entries(value).some(
+    ([key, child]) =>
+      sensitiveStrings.some((secret) => key.includes(secret)) ||
+      containsSensitiveString(child, sensitiveStrings),
+  );
+}
+
+function redactInputText(value, directorySensitiveStrings) {
+  const sensitiveStrings = [...directorySensitiveStrings].sort(
+    (left, right) => right.length - left.length,
+  );
+  const sensitivePattern =
+    sensitiveStrings.length > 0
+      ? new RegExp(sensitiveStrings.map(escapeRegExp).join('|'), 'g')
+      : null;
+  const redacted = redactCommandFields(
+    redactSensitiveCopies(value, sensitivePattern),
+  );
+  if (containsSensitiveString(redacted, sensitiveStrings)) {
+    throw new Error('sensitive Maestro value remained after redaction');
+  }
+  return redacted;
 }
 
 async function collectCommandFiles(directory) {
@@ -78,11 +190,25 @@ async function redactDirectory(directory) {
   const commandFiles = await collectCommandFiles(directory);
 
   try {
-    for (const path of commandFiles) {
-      const parsed = JSON.parse(await readFile(path, 'utf8'));
+    const recordings = await Promise.all(
+      commandFiles.map(async (path) => ({
+        path,
+        parsed: JSON.parse(await readFile(path, 'utf8')),
+      })),
+    );
+    const directorySensitiveStrings = new Set();
+    for (const { parsed } of recordings) {
+      collectSensitiveStrings(parsed, directorySensitiveStrings);
+    }
+
+    for (const { path, parsed } of recordings) {
       await writeFile(
         path,
-        `${JSON.stringify(redactInputText(parsed), null, 2)}\n`,
+        `${JSON.stringify(
+          redactInputText(parsed, directorySensitiveStrings),
+          null,
+          2,
+        )}\n`,
         'utf8',
       );
     }

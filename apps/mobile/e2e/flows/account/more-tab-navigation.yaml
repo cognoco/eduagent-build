@@ -57,6 +57,11 @@ tags:
 - takeScreenshot: more-tab-loaded
 
 # Notifications sub-screen
+- scrollUntilVisible:
+    element:
+      id: 'more-row-notifications'
+    direction: UP
+    timeout: 10000
 - tapOn:
     id: 'more-row-notifications'
 - extendedWaitUntil:
@@ -74,6 +79,11 @@ tags:
     timeout: 10000
 
 # Account sub-screen
+- scrollUntilVisible:
+    element:
+      id: 'more-row-account'
+    direction: UP
+    timeout: 10000
 - tapOn:
     id: 'more-row-account'
 - extendedWaitUntil:
@@ -99,6 +109,11 @@ tags:
     timeout: 10000
 
 # Privacy & data sub-screen plus standalone legal/delete routes
+- scrollUntilVisible:
+    element:
+      id: 'more-row-privacy'
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: 'more-row-privacy'
 - extendedWaitUntil:
@@ -177,9 +192,10 @@ tags:
 - back
 
 # Help & feedback sub-screen
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: 'more-row-help'
+    direction: DOWN
     timeout: 10000
 - tapOn:
     id: 'more-row-help'
@@ -194,9 +210,10 @@ tags:
 - back
 
 # Sign out remains on the landing screen.
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: 'sign-out-button'
+    direction: DOWN
     timeout: 10000
 - tapOn:
     id: 'sign-out-button'

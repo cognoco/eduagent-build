@@ -1220,6 +1220,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const fixtureRoot = mkdtempSync(join(tmpdir(), 'maestro-redact-'));
     const nested = join(fixtureRoot, 'flow');
     const commandsPath = join(nested, 'commands-(flow.yaml).json');
+    const copiedCommandsPath = join(
+      nested,
+      'commands-(copied-diagnostics.yaml).json',
+    );
     mkdirSync(nested, { recursive: true });
     writeFileSync(
       commandsPath,
@@ -1251,6 +1255,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         },
       ]),
     );
+    writeFileSync(
+      copiedCommandsPath,
+      JSON.stringify({
+        diagnosticCopies: {
+          'seeded-test-password': 'email=seeded-user@example.test',
+        },
+      }),
+    );
 
     try {
       const redactor = join(
@@ -1261,9 +1273,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         encoding: 'utf8',
       });
       expect(result.status).toBe(0);
-      const [redacted] = JSON.parse(
-        readFileSync(commandsPath, 'utf8'),
-      ) as Array<{
+      const serialized = readFileSync(commandsPath, 'utf8');
+      const [redacted] = JSON.parse(serialized) as Array<{
         command: { inputTextCommand: { text: string } };
         metadata: {
           evaluatedCommand: {
@@ -1294,7 +1305,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         EMAIL: '[REDACTED]',
         PASSWORD: '[REDACTED]',
       });
-      expect(redacted.diagnosticLabel).toBe('seeded-test-password');
+      expect(redacted.diagnosticLabel).toBe('[REDACTED]');
+      expect(serialized).not.toContain('seeded-test-password');
+      expect(serialized).not.toContain('seeded-user@example.test');
+      const copiedSerialized = readFileSync(copiedCommandsPath, 'utf8');
+      expect(copiedSerialized).not.toContain('seeded-test-password');
+      expect(copiedSerialized).not.toContain('seeded-user@example.test');
 
       const runner = readFileSync(
         join(repoRoot, 'apps/mobile/e2e/scripts/run-ci-maestro.sh'),
@@ -1541,6 +1557,99 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ),
     );
     expect(accountScreen).toBeGreaterThan(-1);
+  });
+
+  it('[WI-1864] restores the Notifications row before opening it on small screens', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/account/more-tab-navigation.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: { element?: { id?: string }; direction?: string };
+      tapOn?: { id?: string };
+    }>;
+    const signOutLandingScroll = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'sign-out-button' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const notificationScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > signOutLandingScroll &&
+        scrollUntilVisible?.element?.id === 'more-row-notifications' &&
+        scrollUntilVisible.direction === 'UP',
+    );
+    const notificationTap = commands.findIndex(
+      ({ tapOn }) => tapOn?.id === 'more-row-notifications',
+    );
+    const accountScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > notificationTap &&
+        scrollUntilVisible?.element?.id === 'more-row-account' &&
+        scrollUntilVisible.direction === 'UP',
+    );
+    const accountTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > accountScroll && tapOn?.id === 'more-row-account',
+    );
+    const privacyScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > accountTap &&
+        scrollUntilVisible?.element?.id === 'more-row-privacy' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const privacyTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > privacyScroll && tapOn?.id === 'more-row-privacy',
+    );
+    const helpScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > privacyTap &&
+        scrollUntilVisible?.element?.id === 'more-row-help' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const helpTap = commands.findIndex(
+      ({ tapOn }, index) => index > helpScroll && tapOn?.id === 'more-row-help',
+    );
+    const signOutFinalScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > helpTap &&
+        scrollUntilVisible?.element?.id === 'sign-out-button' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const signOutTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > signOutFinalScroll && tapOn?.id === 'sign-out-button',
+    );
+
+    expect([
+      signOutLandingScroll,
+      notificationScroll,
+      notificationTap,
+      accountScroll,
+      accountTap,
+      privacyScroll,
+      privacyTap,
+      helpScroll,
+      helpTap,
+      signOutFinalScroll,
+      signOutTap,
+    ]).toEqual(
+      [
+        signOutLandingScroll,
+        notificationScroll,
+        notificationTap,
+        accountScroll,
+        accountTap,
+        privacyScroll,
+        privacyTap,
+        helpScroll,
+        helpTap,
+        signOutFinalScroll,
+        signOutTap,
+      ].toSorted((left, right) => left - right),
+    );
+    expect(signOutLandingScroll).toBeGreaterThan(-1);
   });
 
   it('[WI-1864] walks preview-self through the shared first-run welcome bridge', () => {
