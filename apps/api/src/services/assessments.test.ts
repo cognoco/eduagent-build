@@ -1879,27 +1879,21 @@ describe("[WI-2433] answer graders resolve the capability:'judge' model config",
     registerProvider(createMockProvider('gemini'));
   });
 
-  // --- Router-level: the resolved judge config is the anthropic grader --------
+  // --- AC-2 (literal acceptance criterion): the resolved judge config is
+  // age-blind and is NOT the default (gemini) text config. Asserts the two
+  // invariants — identical across brackets, and ≠ the default config — WITHOUT
+  // hardcoding a grader vendor: the judge resolves to the anthropic GRADER_MODEL
+  // normally but to openai when anthropic is the tutor vendor, so an
+  // `=== 'anthropic'` assertion would be brittle/wrong. Mirrors the
+  // getModelConfigForTest precedent in router.test.ts. ------------------------
 
-  it('resolves capability:judge to the anthropic grader (GRADER_MODEL, no reasoningEffort) at the grader rung', () => {
-    // A Gemini tutor gives the grader's vendor guard a real tutor vendor to
-    // exclude (grader must differ from tutor; gemini → anthropic).
+  it("[AC-2] capability:'judge' resolves an age-blind config that differs from the default (gemini) config", () => {
     registerProvider(createMockProvider('gemini'));
-
-    // Rung 2 is the rung both grader call sites use.
-    const cfg = getModelConfigForTest(2, { capability: 'judge' });
-
-    expect(cfg.provider).toBe('anthropic');
-    expect(cfg.model).toBe(GRADER_MODEL);
-    expect(cfg.reasoningEffort).toBeUndefined();
-  });
-
-  it('resolves the SAME grader config regardless of ageBracket — the judge path is exempt from the under-18 model restriction', () => {
-    registerProvider(createMockProvider('gemini'));
-    // The approved non-Gemini text provider, so the age-SENSITIVE text path
+    // Approved non-Gemini text provider so the age-SENSITIVE default path
     // resolves for a minor (Gemini-banned) instead of throwing.
     registerProvider(createMockProvider('cerebras'));
 
+    // Rung 2 is the rung both grader call sites use.
     const judgeAdult = getModelConfigForTest(2, {
       capability: 'judge',
       ageBracket: 'adult',
@@ -1913,23 +1907,24 @@ describe("[WI-2433] answer graders resolve the capability:'judge' model config",
       ageBracket: 'adolescent',
     });
 
-    // Age-blind: the judge branch is evaluated BEFORE the under-18 gate, so a
-    // minor resolves to the identical grader config as an adult.
+    // Invariant 1 — AGE-BLIND: the judge branch is evaluated BEFORE the under-18
+    // gate, so a minor resolves to the IDENTICAL config as an adult.
     expect(judgeChild).toEqual(judgeAdult);
     expect(judgeAdolescent).toEqual(judgeAdult);
-    expect(judgeChild.provider).toBe('anthropic');
-    expect(judgeChild.model).toBe(GRADER_MODEL);
-    expect(judgeChild.reasoningEffort).toBeUndefined();
 
-    // Contrast: the DEFAULT text path IS age-sensitive — an adult keeps the
-    // Gemini tutor while a minor is redirected to the approved non-Gemini
-    // provider. That is the under-18 restriction the judge path is exempt from.
-    const textAdult = getModelConfigForTest(2, { ageBracket: 'adult' });
-    const textChild = getModelConfigForTest(2, { ageBracket: 'child' });
-    expect(textAdult.provider).toBe('gemini');
-    expect(textChild.provider).not.toBe('gemini');
-    // The grader a minor gets is NOT the text provider a minor gets.
-    expect(judgeChild.provider).not.toBe(textChild.provider);
+    // Invariant 2 — NOT the default: the judge config is not Gemini and differs
+    // from the default text config a learner would otherwise get. No grader
+    // vendor is hardcoded; the grader vendor depends on the tutor vendor.
+    const defaultAdult = getModelConfigForTest(2, { ageBracket: 'adult' });
+    expect(defaultAdult.provider).toBe('gemini'); // baseline: default IS gemini
+    expect(judgeAdult.provider).not.toBe('gemini');
+    expect(judgeAdult).not.toEqual(defaultAdult);
+
+    // The default path IS age-sensitive — proving the age-blindness above is
+    // meaningful, not vacuous: a minor is redirected off the banned Gemini.
+    const defaultChild = getModelConfigForTest(2, { ageBracket: 'child' });
+    expect(defaultChild.provider).not.toBe('gemini');
+    expect(defaultChild).not.toEqual(defaultAdult);
   });
 
   // --- End-to-end: the actual call sites resolve to the judge grader ----------
@@ -1951,8 +1946,6 @@ describe("[WI-2433] answer graders resolve the capability:'judge' model config",
     expect(grader.lastConfig?.provider).toBe('anthropic');
     expect(grader.lastConfig?.model).toBe(GRADER_MODEL);
     expect(grader.lastConfig?.reasoningEffort).toBeUndefined();
-    // WI-2433 also sets responseFormat:'json' (the parse path expects JSON).
-    expect(grader.lastConfig?.responseFormat).toBe('json');
     expect(result.feedback).toContain('Good recall of the key idea.');
   });
 
@@ -1970,7 +1963,6 @@ describe("[WI-2433] answer graders resolve the capability:'judge' model config",
     expect(grader.lastConfig?.provider).toBe('anthropic');
     expect(grader.lastConfig?.model).toBe(GRADER_MODEL);
     expect(grader.lastConfig?.reasoningEffort).toBeUndefined();
-    expect(grader.lastConfig?.responseFormat).toBe('json');
     expect(result.feedback).toContain('Good recall of the key idea.');
   });
 });

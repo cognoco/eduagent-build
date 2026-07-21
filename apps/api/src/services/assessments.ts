@@ -362,7 +362,6 @@ export async function evaluateAssessmentAnswer(
   const result = await routeAndCall(messages, 2, {
     capability: 'judge',
     flow: 'assessment.evaluate',
-    responseFormat: 'json',
     conversationLanguage: options?.conversationLanguage,
     ageBracket: options?.ageBracket,
   });
@@ -684,7 +683,6 @@ export async function evaluateQuickCheckAnswer(
   const result = await routeAndCall(messages, 2, {
     capability: 'judge',
     flow: 'assessment.evaluate',
-    responseFormat: 'json',
     conversationLanguage: options?.conversationLanguage,
     ageBracket: options?.ageBracket,
   });
