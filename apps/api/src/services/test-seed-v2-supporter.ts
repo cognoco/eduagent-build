@@ -45,7 +45,7 @@ import type { RenderAudience } from '@eduagent/schemas';
 
 import { acceptLink, initiateLink } from './linking-ceremony';
 import { requestSelfUnlink } from './supportership-revocation';
-import { seedOwnerIdentityV2 } from './test-seed-v2';
+import { seedChildIdentityV2, seedOwnerIdentityV2 } from './test-seed-v2';
 import {
   createClerkTestUser,
   createSubjectWithCurriculum,
@@ -364,4 +364,182 @@ export async function seedV2SupporterAccepted(
       revokedContractId: revokedEdge.contractId,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// [WI-2226 owner-gate corroboration] `v2-supporter-managed` — a SAME-ORG
+// managed cold-start candidate.
+//
+// resolveSupporterColdStart's `managed` card (state: 'managed') renders only
+// for a hasOwnAccount=false supportee whose membership resolves within the
+// SUPPORTER's own organization (the WI-2226 bounce-#1 owner-gate fix,
+// supporter-coldstart.ts). `v2-supporter-accepted` above cannot exercise that
+// state: its supportees are each independent v2 owner identities in their OWN
+// organization (cross-org), which the owner-gate now suppresses. This seed
+// composes seedChildIdentityV2 (test-seed-v2.ts's "managed child under an
+// existing organization" primitive — person + {learner} membership, no
+// login) under the SUPPORTER's own organizationId, plus a supportership edge
+// via the real initiateLink/acceptLink write path (same truthful-fixture
+// convention as seedAcceptedEdge above) — the producible path the owner-gate
+// actually renders.
+// ---------------------------------------------------------------------------
+
+export async function seedV2SupporterManaged(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const supporter = await reseedOwnerIdentityV2(db, email, env, {
+    displayName: 'Test Supporter',
+    birthYear: 1985,
+  });
+
+  // Same-org managed child: hasOwnAccount defaults false (no writer sets it
+  // true anywhere in the codebase — WI-2538), and its membership is on the
+  // SUPPORTER's own organizationId — the property the owner-gate checks.
+  const { personId: managedChildPersonId } = await seedChildIdentityV2(db, {
+    organizationId: supporter.organizationId,
+    displayName: 'Managed Child',
+    birthYear: 2015,
+  });
+
+  const managedEdge = await seedAcceptedEdge(db, {
+    supporterPersonId: supporter.personId,
+    supporteePersonId: managedChildPersonId,
+  });
+
+  return {
+    scenario: 'v2-supporter-managed',
+    accountId: supporter.organizationId,
+    profileId: supporter.personId,
+    email,
+    password: supporter.password,
+    ids: {
+      supporterPersonId: supporter.personId,
+      supporterOrganizationId: supporter.organizationId,
+
+      managedChildPersonId,
+      managedChildEdgeId: managedEdge.edgeId,
+      managedChildContractId: managedEdge.contractId,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// [WI-2243] `v2-supporter-self-learning` / `v2-supporter-self-learning-active`
+// — accepted-edge fixtures for the self-learning doorway + Me-scope
+// persistence work. Two scenarios cover the two states AC-6 asks for:
+//
+//   - `v2-supporter-self-learning`        — accepted edge, supporter has NO
+//                                            own subjects/sessions yet (the
+//                                            doorway-eligible baseline:
+//                                            resolveScopesForPerson's
+//                                            hasFirstRealLearningState is
+//                                            false, so 'me' is absent from
+//                                            GET /scopes).
+//   - `v2-supporter-self-learning-active` — same shape, but the supporter
+//                                            already has their own subject +
+//                                            session (hasFirstRealLearning
+//                                            State is true, 'me' is present)
+//                                            — the resume-flow / doorway-
+//                                            suppressed / isolation fixture.
+//
+// Reuses the independent-v2-owner-identity supportee shape from
+// `seedV2SupporterAccepted`'s "empty" case (a supportee in their OWN
+// organization — supporter/supportee is not the guardianship same-org
+// model) rather than `seedV2SupporterManaged`'s same-org managed child,
+// since this fixture is about the SUPPORTER's own learning state, not a
+// managed-child cold-start card.
+// ---------------------------------------------------------------------------
+
+async function seedV2SupporterSelfLearningBase(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+  opts: { ownLearning: boolean },
+): Promise<SeedResult> {
+  const supporter = await reseedOwnerIdentityV2(db, email, env, {
+    displayName: 'Test Supporter',
+    birthYear: 1985,
+  });
+
+  const supporteeEmail = deriveEmail(email, 'selflearn-supportee');
+  const { clerkUserId: supporteeClerkUserId, password: supporteePassword } =
+    await createClerkTestUser(supporteeEmail, env);
+  const supportee = await seedOwnerIdentityV2(db, {
+    email: supporteeEmail,
+    clerkUserId: supporteeClerkUserId,
+    displayName: 'Test Supportee',
+    birthYear: 2012,
+  });
+
+  const edge = await seedAcceptedEdge(db, {
+    supporterPersonId: supporter.personId,
+    supporteePersonId: supportee.personId,
+  });
+
+  const ids: Record<string, string> = {
+    supporterPersonId: supporter.personId,
+    supporterOrganizationId: supporter.organizationId,
+
+    supporteeEmail,
+    supporteePassword,
+    supporteePersonId: supportee.personId,
+    supporteeOrganizationId: supportee.organizationId,
+    edgeId: edge.edgeId,
+    contractId: edge.contractId,
+  };
+
+  if (opts.ownLearning) {
+    const { subjectId, topicIds } = await createSubjectWithCurriculum(
+      db,
+      supporter.personId,
+      'Supporter Own Subject',
+    );
+    const topicId = topicIds[0];
+    if (!topicId) {
+      throw new Error(
+        'createSubjectWithCurriculum returned no topics for the self-learning-active seed',
+      );
+    }
+    const { sessionId } = await insertSessionWithRecap(db, {
+      profileId: supporter.personId,
+      subjectId,
+      topicId,
+    });
+    ids.ownSubjectId = subjectId;
+    ids.ownTopicId = topicId;
+    ids.ownSessionId = sessionId;
+  }
+
+  return {
+    scenario: opts.ownLearning
+      ? 'v2-supporter-self-learning-active'
+      : 'v2-supporter-self-learning',
+    accountId: supporter.organizationId,
+    profileId: supporter.personId,
+    email,
+    password: supporter.password,
+    ids,
+  };
+}
+
+export async function seedV2SupporterSelfLearning(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  return seedV2SupporterSelfLearningBase(db, email, env, {
+    ownLearning: false,
+  });
+}
+
+export async function seedV2SupporterSelfLearningActive(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  return seedV2SupporterSelfLearningBase(db, email, env, {
+    ownLearning: true,
+  });
 }

@@ -39,6 +39,12 @@ import {
   membership,
   type Database,
 } from '@eduagent/database';
+// [WI-2396] Direct reach-in (not the `services/session` barrel) — the barrel
+// re-exports session-exchange.ts, which imports this module; importing the
+// barrel here would cycle. session-crud.ts has no dependency back on this
+// module. Precedented elsewhere (dashboard.ts, recaps.ts reach into
+// session-crud.ts directly).
+import { ConsentWithdrawnError } from '../session/session-crud';
 import type {
   ConsentStatus,
   ConsentAccountabilityRecord,
@@ -705,6 +711,26 @@ export async function isLlmExchangeConsentAllowed(
     if (status === 'WITHDRAWN') return false;
   }
   return true;
+}
+
+/**
+ * [WI-2396] Consent-withdrawal gate for request-time LLM routes OUTSIDE the
+ * exchange pipeline (canon R5) — curriculum, dictation, filing, subjects,
+ * assessments, book-suggestions. Mirrors `assertExchangeConsent`'s placement
+ * pattern (session-exchange.ts) so a withdrawn-consent profile's request
+ * never reaches LLM dispatch. Reuses `isLlmExchangeConsentAllowed`, which
+ * already checks both legs (parental withdrawal + adult self-consent
+ * withdrawal), so a single call covers both. Thrown `ConsentWithdrawnError`
+ * is mapped to 403 CONSENT_WITHDRAWN by the global onError handler
+ * (index.ts).
+ */
+export async function assertLlmConsent(
+  db: Database,
+  profileId: string,
+): Promise<void> {
+  if (!(await isLlmExchangeConsentAllowed(db, profileId))) {
+    throw new ConsentWithdrawnError();
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -39,6 +39,7 @@ import {
 } from '../services/family-access';
 import { assertChildDashboardDataVisible } from '../services/dashboard';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import {
   getOrCreateMemoryProjection,
   toLearnerSelfView,
@@ -346,6 +347,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       // /:profileId/tell route is the sanctioned parent path.
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // parseLearnerInput unconditionally dispatches the LLM
+      // (parseLearnerInputToAnalysis calls the LLM router).
+      await assertLlmConsent(db, profileId);
       const { text } = c.req.valid('json');
       const result = await parseLearnerInput(db, profileId, text, 'learner');
       return c.json(parseLearnerInputResultSchema.parse(result));
@@ -362,6 +367,12 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       await assertChargeNotCredentialed(db, childProfileId);
       // [WI-156] Child consent gate: blocks access when child GDPR consent is not active
       await assertChildDashboardDataVisible(db, childProfileId);
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5) — a
+      // separate, LLM-specific check from the GDPR/parental gate above.
+      // parseLearnerInput unconditionally dispatches the LLM
+      // (parseLearnerInputToAnalysis calls the LLM router) for the CHILD's
+      // profile.
+      await assertLlmConsent(db, childProfileId);
       const { text } = c.req.valid('json');
       const result = await parseLearnerInput(
         db,

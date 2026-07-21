@@ -11,7 +11,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import { NotFoundError } from '@eduagent/schemas';
+import { ConflictError, NotFoundError } from '@eduagent/schemas';
 import {
   deleteV2IdentitiesForTest,
   ensureV2IdentityForLegacyProfileTest,
@@ -444,6 +444,37 @@ describeIfDb('session-crud ownership gate (integration IDOR breaks)', () => {
       action: 'helpful',
       eventId: 'evt_abc',
     });
+  });
+
+  it('[WI-2103 AC-1/2] rejects a queued silence prompt after session completion wins', async () => {
+    const owner = await seedProfileWithSubject('WI-2103-ended-silence');
+    const [session] = await db
+      .insert(learningSessions)
+      .values({
+        profileId: owner.profileId,
+        subjectId: owner.subjectId,
+        exchangeCount: 1,
+        status: 'active',
+      })
+      .returning({ id: learningSessions.id });
+
+    await closeSession(db, owner.profileId, session!.id, {
+      reason: 'user_initiated',
+    });
+
+    await expect(
+      recordSystemPrompt(db, owner.profileId, session!.id, {
+        kind: 'silence_nudge',
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    const silencePrompts = await db.query.sessionEvents.findMany({
+      where: and(
+        eq(sessionEvents.sessionId, session!.id),
+        eq(sessionEvents.eventType, 'system_prompt'),
+      ),
+    });
+    expect(silencePrompts).toHaveLength(0);
   });
 
   // [CCR PR #266 / bug 275 verification] The book-ownership gate inside

@@ -30,6 +30,22 @@ function createOpeningMessage(content: string): ChatMessage {
   };
 }
 
+// [WI-2114] Compose the grader's answer-specific feedback into the assistant
+// reply. The three fields are mentor-prose (already in the learner's
+// conversation language — AC-4); we only join them, adding no English
+// connective text. Returns null when feedback is absent so the caller falls
+// back to the generic translated prompt (grader-unavailable / cooldown /
+// dont_remember — AC-5).
+function composeRecallFeedback(
+  feedback: { strengths: string; gaps: string; nextStep: string } | undefined,
+): string | null {
+  if (!feedback) return null;
+  const parts = [feedback.strengths, feedback.gaps, feedback.nextStep]
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  return parts.length > 0 ? parts.join('\n\n') : null;
+}
+
 function deriveStatus(retentionStatus?: string): RetentionStatus {
   if (retentionStatus === 'strong') return 'strong';
   if (retentionStatus === 'fading') return 'fading';
@@ -168,9 +184,13 @@ export default function RecallTestScreen() {
                 releaseSubmissionBlock,
               );
             } else if (result.failureAction === 'feedback_only') {
-              // Under 3 failures — encourage retry
+              // [WI-2114] Under 3 failures — render the grader's answer-specific
+              // feedback (what was right, what's missing, a next step) when the
+              // server produced it; otherwise fall back to the generic prompt
+              // (grader gave no feedback, cooldown, etc. — kept honest, AC-5).
               cleanupRef.current = animateResponse(
-                t('topic.recallTest.partialResult'),
+                composeRecallFeedback(result.feedback) ??
+                  t('topic.recallTest.partialResult'),
                 setMessages,
                 setIsStreaming,
                 releaseSubmissionBlock,

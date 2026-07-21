@@ -299,7 +299,7 @@ Mappings to unratified nodes inherit the draft's rulings; a flipped ruling at ra
 | WI-1442 | Ready | P1 | Persist consent audit trail before profile hard-delete (GDPR proof-of-consent) | consent audit trail before hard-delete (def §10) |
 | WI-1507 | Executing | P1 | Complete launch compliance closure check against actual data flows | launch compliance closure check (parked; re-run at end) |
 | WI-1558 | Backlog | P1 | DPIA A13 name-minimization claim contradicts verbatim learner name sent to LLM | DPIA name-minimization — counsel Q4 decides arm |
-| WI-1559 | Captured | P2 | Controller legal entity mismatch across privacy policy vs DPIA/ROPA | controller entity — counsel Q1; blocks policy publish |
+| WI-1559 | Executing | P1 | Controller legal entity mismatch across privacy policy vs DPIA/ROPA | **RESOLVED ruling:** ZWIZZLY AS, org.nr 811696072, Fiskekroken 3B, 0139 Oslo, Norway; Norwegian Datatilsynet; active-document reconciliation complete |
 | WI-1561 | Captured | P2 | Store data-safety worksheet stale vs current code (age 11 vs 13; legacy tables) | store data-safety worksheet refresh |
 | WI-1577 | Captured | P1 | Launch compliance closure — FINAL GATE (pre-store-submission re-run) | FINAL GATE pre-store-submission re-run |
 | WI-1659 | Executing | P1 | Produce EU AI Act high-risk education compliance plan | AI Act compliance plan — IN (def §10); classification counsel-owned |

@@ -22,6 +22,12 @@ import {
   NoEligibleModelError,
   type ExchangeRouterRow,
 } from '../policy-engine';
+import {
+  getLlmRequestEnvironment,
+  getLlmRequestKillSwitchSnapshot,
+  getLlmRequestRoutingV2Enabled,
+  readLlmRequestKillSwitch,
+} from './request-context';
 const logger = createLogger();
 
 export type PreferredLlmProvider = 'gemini' | 'openai' | 'anthropic';
@@ -116,7 +122,7 @@ async function captureLlmFallbackSignal(input: {
 //
 // One structured line per successful LLM call, written to the same logger
 // pipeline all other router observability goes through. Downstream dashboard
-// query (docs/superpowers/plans/2026-04-23-llm-never-truncate.md appendix A):
+// query (docs/_archive/plans/done/2026-04-23-llm-never-truncate-phase1-implemented.md appendix A):
 //
 //   count by stop_reason, flow over 24h
 //   rate(stop_reason="length") / rate(*) by flow
@@ -209,7 +215,7 @@ function logStopReason(fields: {
     response_chars: fields.responseChars,
     // WI-1505 — environment tag so an external log/metrics pipeline can sum
     // this line by (provider, environment) for aggregate daily spend/volume.
-    environment: llmEnvironment,
+    environment: getLlmRequestEnvironment(llmEnvironment),
     // WI-1827 — cache-usage tokens (only when present).
     ...usageLogFields(fields.usage),
   });
@@ -274,18 +280,19 @@ const SAFETY_RULES =
   'If a request touches these areas, politely decline and redirect to the learning topic.';
 
 // BKT-C.1 — ISO 639-1 → English name for the preamble line.
-const CONVERSATION_LANGUAGE_NAMES: Record<ConversationLanguage, string> = {
-  en: 'English',
-  cs: 'Czech',
-  es: 'Spanish',
-  fr: 'French',
-  de: 'German',
-  it: 'Italian',
-  pt: 'Portuguese',
-  pl: 'Polish',
-  ja: 'Japanese',
-  nb: 'Norwegian',
-};
+export const CONVERSATION_LANGUAGE_NAMES: Record<ConversationLanguage, string> =
+  {
+    en: 'English',
+    cs: 'Czech',
+    es: 'Spanish',
+    fr: 'French',
+    de: 'German',
+    it: 'Italian',
+    pt: 'Portuguese',
+    pl: 'Polish',
+    ja: 'Japanese',
+    nb: 'Norwegian',
+  };
 
 function getSafetyPreamble(ageBracket?: AgeBracket): string {
   // Unknown age: stay neutral on identity and let per-flow prompts handle
@@ -477,16 +484,12 @@ export function setOpenAIAdvancedModel(
 export const _setOpenAIAdvancedModelForTesting = setOpenAIAdvancedModel;
 
 // ---------------------------------------------------------------------------
-// LLM_ROUTING_V2_ENABLED — module-level cutover flag (MMT-ADR-0016 §1.5).
+// LLM_ROUTING_V2_ENABLED — request-local cutover flag (MMT-ADR-0016 §1.5).
 //
-// The router is a pure module with no Hono context, so the flag is injected at
-// worker boot from middleware/llm.ts (mirrors `setOpenAIAdvancedModel`), read
-// from the Doppler-sourced `LLM_ROUTING_V2_ENABLED` env var. Default `false`:
-// EVERY routing change in this PR is inert until middleware flips it on, so the
-// Gemini-default path (and its equivalence snapshot) stays byte-identical while
-// the flag is off. Kept module-level (not a per-call option) so
-// getModelConfig/getFallbackConfig can read it without threading a flag through
-// every call site.
+// middleware/llm.ts establishes the request context from the Doppler-sourced
+// env var. AsyncLocalStorage keeps overlapping Worker requests isolated without
+// threading a flag through every call site. The module value below remains an
+// explicit no-context/test fallback; production requests read their own value.
 // ---------------------------------------------------------------------------
 let routingV2Enabled = false;
 
@@ -496,21 +499,19 @@ export function setLlmRoutingV2Enabled(enabled: boolean): void {
 
 /** Exported for testing only — read/reset the V2 routing flag. */
 export function _getLlmRoutingV2Enabled(): boolean {
-  return routingV2Enabled;
+  return getLlmRequestRoutingV2Enabled(routingV2Enabled);
 }
 
 // ---------------------------------------------------------------------------
 // WI-1505 — Aggregate LLM traffic kill switch (operator override).
 //
-// Mirrors the routingV2Enabled pattern above: router.ts is a pure module with
-// no Hono context, so the flag is injected at the TOP of every request by
-// middleware/llm.ts, which does a per-request KV read
-// (services/kv.ts readLlmKillSwitch, backed by SUBSCRIPTION_KV, key
-// `llm:kill-switch`). Because the read happens on every request (not once at
-// worker boot), a KV write takes effect on the NEXT request with no mobile
-// release and no Worker redeploy. Default `false` (off) so this is inert
-// until an operator explicitly flips the KV key — see
-// docs/runbooks/llm-kill-switch.md.
+// middleware/llm.ts carries SUBSCRIPTION_KV in request-local state without
+// reading it. The first routeAndCall/routeAndStream choke point lazily reads
+// `llm:kill-switch` once for that request, so non-LLM traffic performs no KV
+// I/O and an operator write takes effect on the next LLM request without a
+// release or redeploy. The module value below is an explicit no-context/test
+// fallback only; production requests default fail-open when the binding is
+// absent. See docs/runbooks/llm-kill-switch.md.
 // ---------------------------------------------------------------------------
 let llmKillSwitchActive = false;
 
@@ -520,7 +521,7 @@ export function setLlmKillSwitchActive(active: boolean): void {
 
 /** Exported for testing only — read the kill-switch flag. */
 export function _getLlmKillSwitchActive(): boolean {
-  return llmKillSwitchActive;
+  return getLlmRequestKillSwitchSnapshot(llmKillSwitchActive);
 }
 
 /**
@@ -536,8 +537,8 @@ export function _getLlmKillSwitchActive(): boolean {
  * operator-triggered block from an organic provider circuit trip in
  * Sentry/logs.
  */
-function checkLlmKillSwitch(): void {
-  if (!llmKillSwitchActive) return;
+async function checkLlmKillSwitch(): Promise<void> {
+  if (!(await readLlmRequestKillSwitch(llmKillSwitchActive))) return;
   logger.warn('llm.kill_switch.active', {
     event: 'llm.kill_switch.blocked',
   });
@@ -547,8 +548,9 @@ function checkLlmKillSwitch(): void {
 // ---------------------------------------------------------------------------
 // WI-1505 — Aggregate LLM spend/request-volume observability.
 //
-// `environment` is injected the same way as the kill switch (per-request, via
-// middleware/llm.ts) purely for metric tagging — it does not affect routing.
+// `environment` is carried in the same request-local context as the kill
+// switch, purely for metric tagging — it does not affect routing. The module
+// value below is an explicit no-context/test fallback.
 // The primary aggregate signal is the environment-tagged `llm.stop_reason`
 // structured log line (see logStopReason below): an external log/metrics
 // pipeline sums that line by (provider, environment) for the authoritative
@@ -584,7 +586,8 @@ function currentUtcDate(): string {
 }
 
 function recordVolumeMetric(provider: string): void {
-  const key = `${provider}:${llmEnvironment}`;
+  const environment = getLlmRequestEnvironment(llmEnvironment);
+  const key = `${provider}:${environment}`;
   const today = currentUtcDate();
   let counter = volumeCounters.get(key);
   if (!counter || counter.utcDate !== today) {
@@ -607,7 +610,7 @@ function recordVolumeMetric(provider: string): void {
       event: 'llm.volume.daily_threshold_exceeded',
       surface: 'llm_volume_alert',
       provider,
-      environment: llmEnvironment,
+      environment,
       count: counter.count,
       threshold: LLM_DAILY_VOLUME_ALERT_THRESHOLD,
       utc_date: today,
@@ -872,7 +875,7 @@ function getModelConfig(
   // preferredProvider) so no flag-on request can resolve to a banned vendor.
   // The judge capability is passed through to getModelConfigV2 which handles
   // it independently, keeping V2 and legacy paths in sync.
-  if (routingV2Enabled) {
+  if (getLlmRequestRoutingV2Enabled(routingV2Enabled)) {
     return getModelConfigV2(rung, llmTier, capability);
   }
 
@@ -1034,7 +1037,7 @@ function getFallbackConfig(
   // §10.1). Never returns Gemini/Vertex; fails closed when no compliant
   // provider is registered. providerPolicy is not consulted under V2 (its
   // gemini_only target is banned).
-  if (routingV2Enabled) {
+  if (getLlmRequestRoutingV2Enabled(routingV2Enabled)) {
     return getFallbackConfigV2(primary, llmTier, capability);
   }
 
@@ -1601,7 +1604,7 @@ export async function routeAndCall(
 ): Promise<RouteResult> {
   // WI-1505 — kill switch is the FIRST thing routeAndCall does: before the
   // i18n tripwire, before getModelConfig, before any provider is touched.
-  checkLlmKillSwitch();
+  await checkLlmKillSwitch();
   // i18n Phase 1 — runtime tripwire. The static ratchet test is the primary
   // defence; this warn catches any call site that ships with `flow:` but
   // without `conversationLanguage:` (e.g. via a partial revert).
@@ -2104,7 +2107,7 @@ export async function routeAndStream(
   // WI-1505 — same kill-switch check as routeAndCall, duplicated here because
   // routeAndStream is a separate entry point (does not call routeAndCall)
   // that the highest-traffic learner-facing flow (exchanges.ts) uses.
-  checkLlmKillSwitch();
+  await checkLlmKillSwitch();
   // i18n Phase 1 — same tripwire as routeAndCall. Streaming flows go through
   // their own entry point, so the warn block has to be duplicated here to
   // cover learner-facing surfaces that stream (e.g. exchange.process) from

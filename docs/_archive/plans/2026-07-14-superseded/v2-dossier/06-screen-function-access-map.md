@@ -53,7 +53,7 @@
 |---|---|---|---|---|
 | Support hub cold-start | Variant-zero add-child anchor, child lifecycle card, approve/kickstart states, labeled ghost preview. | Supporter with no child or inactive/pending child opens V2 shell. | Supporters/parents by scope and visibility tier. | `PLAN/PARTIAL`: Spec lines `144-178`; current support components are placeholders/lists. |
 | Supporter co-learning/nudge actions | Start together, send a spark, supporter self-learning doorway, quiet non-pressure nudges. | Support hub or person scope attention item. | Supporters with valid edge. | `PLAN`: S4 plan; not present in mobile support components beyond person-list cards. |
-| Visibility ceremony screens | Linking/accept/revoke/contract, two-way transparency, appeal affordance, managed/credentialized tier handling. | Link flows and shared-record/report flows. | Supporter/supportee according to visibility contract. | `CODE` for link/accept/revoke: `app/(app)/link/new.tsx`, `app/(app)/link/[contractId].tsx` (both tested); API routes `visibility.ts:71`, `:87`, `:102`, `:129`, `:142`, `:175`. `PARTIAL`: appeal affordance is in-flight rework (WI-1171), tracked separately from this row. |
+| Visibility ceremony screens | Linking/accept/revoke/contract, two-way transparency, appeal affordance, managed/credentialized tier handling. | Link flows and shared-record/report flows. | Supporter/supportee according to visibility contract. | `CODE` for link/accept/revoke: `app/(app)/link/initiate.tsx`, `app/(app)/link/[contractId].tsx` (both tested); API routes `visibility.ts:71`, `:87`, `:102`, `:129`, `:142`, `:175`. `PARTIAL`: appeal affordance is in-flight rework (WI-1171), tracked separately from this row. |
 | Person-scope Subject Hub parity | Drill from structural subject rows into a masked read-only Subject Hub. | Person scope -> Subjects -> subject row. | Supporter with person edge. | `CODE`: `PersonScopeStructuralSubjects.tsx` adapts the masked structural response into `SubjectHub` with `canStudy=false`, no notes, and no learner-private actions. |
 | Shared-record mobile data fetch | Renders real `GET /visibility/reports/:personId/shared-record` data in Support hub/person Journal. | Journal in supporter-hub/person scope. | Supporters and supportees with edge contract. | `CODE`: mobile fetches the route; API projects weekly report, recap-presence, and milestone facts through the shared-record contract. |
 | S6 deletion/end-state cleanup | Remove V0/V1 shells, ModeSwitcher, proxy, dead legacy screens only after replacement parity and product V0 retirement ruling. | Explicit S6 execution. | Product/engineering release gate, not user access. | `PLAN`: deferred and irreversible; do not execute without human confirmation. |
@@ -62,7 +62,7 @@
 
 Each row below is an existing or newly-added test proving the **V2-specific**
 trigger path for that surface (not the legacy-route default). Re-run the full
-set from the repo root (verified: 12 suites, 121 tests):
+set from the repo root:
 
 ```bash
 pnpm test:v2-parity
@@ -83,7 +83,7 @@ pnpm exec jest --config apps/mobile/jest.config.cjs --no-coverage --forceExit \
   'apps/mobile/src/components/support/PersonScopeJournalPlaceholder\.test\.tsx' \
   'apps/mobile/src/components/support/SupportHubJournalTab\.test\.tsx' \
   'apps/mobile/src/components/support/PersonScopeStructuralSubjects\.test\.tsx' \
-  'apps/mobile/src/app/\(app\)/link/new\.test\.tsx' \
+  'apps/mobile/src/app/\(app\)/link/initiate\.test\.tsx' \
   'apps/mobile/src/app/\(app\)/link/\[contractId\]\.test\.tsx'
 ```
 
@@ -104,7 +104,7 @@ pnpm exec jest --config apps/mobile/jest.config.cjs --no-coverage --forceExit \
 | Subject Hub, person scope (masked) | `PersonScopeStructuralSubjects.test.tsx:156` | Masked read-only Subject Hub drill-in, no private artifacts |
 | Session, V2 mentor entry | `session/index.test.tsx:2200` ("V2 first-session Mentor wrap-up") | `entrySource=mentor`, `returnTo=mentor` freeform session renders the in-thread first-session wrap-up, not the legacy summary route |
 | Homework camera, V2 mentor entry | `session/index.test.tsx:1956` ("V2 mentor-homework round-trip (T23)") | Captured photo handoff renders in-thread with deterministic help/check actions; `returnTo=mentor` returns to the Mentor tab |
-| Visibility ceremony: link/accept/revoke | `link/new.test.tsx`, `link/[contractId].test.tsx:139` | Create link; review + revoke after both sides accept (appeal affordance excluded — WI-1171's own coverage) |
+| Visibility ceremony: link/accept/revoke | `link/initiate.test.tsx`, `link/[contractId].test.tsx:139` | Create link; review + revoke after both sides accept (appeal affordance excluded — WI-1171's own coverage) |
 
 **Not covered — genuine gap, not a test to fake:** Supporter Support hub
 job-to-be-done cards are still placeholder/list-only (T3/WI-1170, not yet

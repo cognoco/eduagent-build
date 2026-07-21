@@ -1,7 +1,8 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
 import {
   learningSessions,
+  login,
   person,
   subjects,
   supporterFeedSurfaceState,
@@ -19,7 +20,7 @@ type EdgeRow = {
   edgeId: string;
   personId: string;
   displayName: string;
-  hasOwnAccount: boolean;
+  credentialed: boolean;
 };
 
 async function hasLearningState(
@@ -78,7 +79,15 @@ export async function resolveSupporterColdStart(
       edgeId: supportership.id,
       personId: person.id,
       displayName: person.displayName,
-      hasOwnAccount: person.hasOwnAccount,
+      // [WI-2541] C(person) = a Login row exists — the canonical "is
+      // credentialed" predicate (family-access.ts's assertChargeNotCredentialed
+      // / filterUncredentialedCharges), replacing person.hasOwnAccount. The
+      // latter is a birthday-crossing-takeover correlate that defaults false
+      // and is set by no production writer (WI-2538), so it suppressed the
+      // granted-idle card for every credentialed cross-organization supportee.
+      // EXISTS, not a join: login.person_id is indexed but not unique, so a
+      // join could multiply edge rows.
+      credentialed: sql<boolean>`exists (select 1 from ${login} where ${login.personId} = ${supportership.supporteePersonId})`,
     })
     .from(supportership)
     .leftJoin(person, eq(person.id, supportership.supporteePersonId))
@@ -111,19 +120,19 @@ export async function resolveSupporterColdStart(
   // [WI-2226 owner-gate] A managed card's CTA (ManagedCard -> switchProfile)
   // only works when the supportee is a profile on the SUPPORTER's own
   // account — POST /profiles/switch (getPersonScope) rejects a cross-org
-  // person with 403. initiateLink performs no org check, so a
-  // hasOwnAccount=false candidate is not guaranteed to be same-org (PM
-  // ruling, bounce-recovery WI-2226: a CTA that no-ops/403s is a correctness
-  // defect). Resolve the supporter's own org once, only when a managed
-  // candidate exists, and suppress the card for any candidate outside it.
-  const hasManagedCandidate = edges.some((edge) => !edge.hasOwnAccount);
+  // person with 403. initiateLink performs no org check, so an uncredentialed
+  // candidate is not guaranteed to be same-org (PM ruling, bounce-recovery
+  // WI-2226: a CTA that no-ops/403s is a correctness defect). Resolve the
+  // supporter's own org once, only when a managed candidate exists, and
+  // suppress the card for any candidate outside it.
+  const hasManagedCandidate = edges.some((edge) => !edge.credentialed);
   const supporterOrganizationId = hasManagedCandidate
     ? await getPersonOrganizationId(db, supporterPersonId)
     : null;
 
   const cards: SupporterColdStartCard[] = [];
   for (const edge of edges) {
-    if (!edge.hasOwnAccount) {
+    if (!edge.credentialed) {
       if (
         !supporterOrganizationId ||
         !(await isPersonInOrg(db, edge.personId, supporterOrganizationId))

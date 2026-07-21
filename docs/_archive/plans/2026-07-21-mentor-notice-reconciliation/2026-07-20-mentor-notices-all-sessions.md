@@ -3,10 +3,13 @@ title: Mentor Notices in Every Session — Implementation Plan
 date: 2026-07-20
 profile: code
 spec: docs/specs/2026-07-19-homework-notice-felt-moments.md
-status: in-progress
+status: historical-implemented-superseded
+scope_decision: docs/adr/MMT-ADR-0036-mentor-notice-mvp-boundaries-and-server-authority.md
 ---
 
 # Mentor Notices in Every Session — Implementation Plan
+
+> **Historical L3 record — superseded 2026-07-21.** This plan was used to build PR #2357 before Product and Architecture ratified the scope expansion. It is preserved as implementation provenance, not decision authority. [`MMT-ADR-0036`](../../../adr/MMT-ADR-0036-mentor-notice-mvp-boundaries-and-server-authority.md) excludes interleaved sessions and removes `noticed_gap.topicId` from the MVP contract while retaining ordinary-learning eligibility, all-age behavior, centralized server creation, and recursive-creation prevention.
 
 **Goal:** Make the same evidence-backed “Mentor noticed me and will help me with this” moment available to every learner in every session type, independent of age or entry path.
 

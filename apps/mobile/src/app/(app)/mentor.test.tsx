@@ -14,6 +14,16 @@ import {
   type RenderScreenOptions,
 } from '../../test-utils/screen-render';
 
+// [WI-2498] useNowFeed now reads the authenticated actor id (Clerk userId) to
+// bind the persisted Now-feed cache to actor+profile+policy. External-boundary
+// mock (bare specifier), matching the pattern in use-subscription.test.ts.
+jest.mock('@clerk/expo', () => ({
+  useAuth: () => ({
+    userId: 'wi2498-test-actor',
+    getToken: jest.fn().mockResolvedValue('test-token'),
+  }),
+}));
+
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
 const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
@@ -927,6 +937,48 @@ describe('MentorScreen', () => {
       fireEvent.press(send);
 
       expectFreeformRoute('Teach me about neon');
+    } finally {
+      dimensions.mockRestore();
+    }
+  });
+
+  it('[WI-2111 AC-3] keeps action, receipt, and composer order in the small-screen scroll surface', () => {
+    const dimensions = jest.spyOn(Dimensions, 'get').mockReturnValue({
+      width: 360,
+      height: 720,
+      scale: 2,
+      fontScale: 1,
+    });
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([
+        card({
+          kind: 'ledger_moment',
+          templateKey: 'now.ledger_moment.session_filed',
+          params: { ledgerKind: 'session_filed' },
+        }),
+        card({ kind: 'unfinished_session' }),
+      ]),
+    };
+
+    try {
+      const rendered = renderMentorScreen();
+      const scroll = screen.getByTestId('mentor-scroll');
+      within(scroll).getByTestId('now-card-slot-anchor');
+      within(scroll).getByTestId('now-card-slot-receipt-0');
+      within(scroll).getByTestId('mentor-bar-input');
+
+      const tree = JSON.stringify(rendered.result.toJSON());
+      expect(tree.indexOf('now-card-slot-anchor')).toBeLessThan(
+        tree.indexOf('now-card-slot-receipt-0'),
+      );
+      expect(tree.indexOf('now-card-slot-receipt-0')).toBeLessThan(
+        tree.indexOf('mentor-bar-input'),
+      );
+      expect(scroll.props.contentContainerStyle).toEqual(
+        expect.objectContaining({ paddingHorizontal: 12 }),
+      );
+      expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
     } finally {
       dimensions.mockRestore();
     }

@@ -2027,6 +2027,50 @@ describe('useSessionStreaming', () => {
       expect(opts.recordSystemPrompt.mutateAsync).not.toHaveBeenCalled();
       expect(mockWriteRecoveryMarker).not.toHaveBeenCalled();
     });
+
+    it('[WI-2103 AC-2] retracts a silence prompt when completion wins after persistence begins', async () => {
+      let resolvePersistence!: () => void;
+      const persistence = new Promise<void>((resolve) => {
+        resolvePersistence = resolve;
+      });
+      const opts = makeOpts({
+        activeSessionId: 'session-1',
+        draftText: '',
+        recordSystemPrompt: {
+          mutateAsync: jest.fn(() => persistence),
+        },
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      act(() => {
+        result.current.scheduleSilencePrompt('session-1', 2);
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(20 * 60 * 1000 + 1000);
+        await Promise.resolve();
+      });
+
+      expect(opts.recordSystemPrompt.mutateAsync).toHaveBeenCalledWith({
+        kind: 'silence_nudge',
+      });
+      act(() => {
+        opts.sessionEndedRef.current = true;
+        resolvePersistence();
+      });
+      await act(async () => {
+        await persistence;
+        await Promise.resolve();
+      });
+
+      expect(opts.setMessages).toHaveBeenCalledTimes(2);
+      const retract = opts.setMessages.mock.calls[1]?.[0] as (
+        messages: Array<{ id: string }>,
+      ) => Array<{ id: string }>;
+      expect(
+        retract([{ id: 'learner-message' }, { id: 'silence-prompt' }]),
+      ).toEqual([{ id: 'learner-message' }]);
+      expect(mockWriteRecoveryMarker).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------

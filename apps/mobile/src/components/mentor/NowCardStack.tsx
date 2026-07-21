@@ -39,6 +39,10 @@ function isActionableCard(card: NowCardData): boolean {
   return !!card.deepLink?.route && !!card.deepLink.params;
 }
 
+function isLearningMomentReceipt(card: NowCardData): boolean {
+  return card.kind === 'ledger_moment' && card.params['ledgerKind'] !== 'quota';
+}
+
 function renderCard(
   card: NowCardData,
   variant: 'anchor' | 'module',
@@ -94,16 +98,21 @@ export function NowCardStack({
       if (seenDismissKeys.has(dismissKey)) return false;
       seenDismissKeys.add(dismissKey);
       return true;
-    })
-    .slice(0, 3);
-  const anchor = cards[0];
-  const modules = cards.slice(1, 3);
+    });
+  const receiptCards = cards.filter(isLearningMomentReceipt);
+  const actionLimit = receiptCards.length > 0 ? 2 : 3;
+  const actionCards = cards
+    .filter((card) => !isLearningMomentReceipt(card))
+    .slice(0, actionLimit);
+  const receipts = receiptCards.slice(0, 3 - actionCards.length);
+  const anchor = actionCards[0];
+  const modules = actionCards.slice(1);
 
   // When there is nothing actionable and no overflow, render nothing. The
   // screen's always-present Ask box + "Prefer something light?" affordance keep
   // it from being a dead-end — the previous "Browse more learning options" card
   // called onShowOverflow with overflowCount === 0, so its tap did nothing.
-  if (!anchor && feed.overflowCount === 0) {
+  if (!anchor && receipts.length === 0 && feed.overflowCount === 0) {
     return null;
   }
 
@@ -163,6 +172,23 @@ export function NowCardStack({
           <Text className="sr-only">{String(feed.overflowCount)}</Text>
         </Pressable>
       ) : null}
+      {receipts.map((card, index) => (
+        <Animated.View
+          key={getNowCardDismissKey(card)}
+          testID={`now-card-slot-receipt-${index}`}
+          collapsable={false}
+          {...slotAnimation((actionCards.length + index) * 50)}
+        >
+          {renderCard(
+            card,
+            'module',
+            onContinue,
+            onDecline,
+            getArcState?.(card),
+            onCompleted,
+          )}
+        </Animated.View>
+      ))}
     </View>
   );
 }

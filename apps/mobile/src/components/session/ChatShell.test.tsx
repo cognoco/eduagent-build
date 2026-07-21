@@ -1462,6 +1462,118 @@ describe('ChatShell', () => {
       expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
       expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
     });
+
+    it('[WI-2108 AC-1] mounts only the shell waiting indicator while the mentor is writing', () => {
+      renderChatShell({
+        isStreaming: true,
+        messages: [
+          { id: 'ai-writing', role: 'assistant', content: '', streaming: true },
+        ],
+      });
+
+      screen.getByTestId('thinking-bulb-animation');
+      expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+      expect(screen.queryByTestId('streaming-cursor')).toBeNull();
+      expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+    });
+
+    it('[WI-2108 AC-2] keeps one indicator owner across idle, thinking, streaming, and done boundaries', () => {
+      jest.useFakeTimers();
+      try {
+        const { rerender, props } = renderChatShell({
+          messages: [
+            { id: 'ai-done', role: 'assistant', content: 'Your turn.' },
+          ],
+        });
+
+        act(() => {
+          jest.advanceTimersByTime(20_000);
+        });
+        screen.getByTestId('idle-pen-animation');
+        expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+        expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+        expect(screen.queryByTestId('streaming-cursor')).toBeNull();
+
+        rerender(
+          <ChatShell
+            {...props}
+            isStreaming
+            messages={[
+              {
+                id: 'ai-stream',
+                role: 'assistant',
+                content: '',
+                streaming: true,
+              },
+            ]}
+          />,
+        );
+        screen.getByTestId('thinking-bulb-animation');
+        expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+        expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+        expect(screen.queryByTestId('streaming-cursor')).toBeNull();
+
+        rerender(
+          <ChatShell
+            {...props}
+            isStreaming
+            messages={[
+              {
+                id: 'ai-stream',
+                role: 'assistant',
+                content: 'A partial reply',
+                streaming: true,
+              },
+            ]}
+          />,
+        );
+        expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+        screen.getByTestId('streaming-cursor');
+        expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+        expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+
+        rerender(
+          <ChatShell
+            {...props}
+            isStreaming={false}
+            messages={[
+              {
+                id: 'ai-stream',
+                role: 'assistant',
+                content: 'A complete reply',
+                streaming: false,
+              },
+            ]}
+          />,
+        );
+        expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+        expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+        expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+        expect(screen.queryByTestId('streaming-cursor')).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('[WI-2108 AC-3] clears the sole waiting indicator when writing is aborted', () => {
+      const messages: ChatMessage[] = [
+        { id: 'ai-abort', role: 'assistant', content: '', streaming: true },
+      ];
+      const { rerender, props } = renderChatShell({
+        isStreaming: true,
+        messages,
+      });
+      screen.getByTestId('thinking-bulb-animation');
+
+      rerender(
+        <ChatShell {...props} isStreaming={false} messages={messages} />,
+      );
+
+      expect(screen.queryByTestId('thinking-bulb-animation')).toBeNull();
+      expect(screen.queryByTestId('thinking-indicator')).toBeNull();
+      expect(screen.queryByTestId('streaming-cursor')).toBeNull();
+      expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
+    });
   });
 
   // -----------------------------------------------------------------------

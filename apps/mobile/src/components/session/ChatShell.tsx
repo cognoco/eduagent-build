@@ -25,7 +25,6 @@ import { VoiceRecordButton, VoiceTranscriptPreview } from './VoiceRecordButton';
 import { VoiceToggle } from './VoiceToggle';
 import { VoicePlaybackBar } from './VoicePlaybackBar';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
-import { useStickyLoading } from '../../hooks/use-sticky-loading';
 import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useAnnounce } from '../../hooks/use-announce';
 import { stripEnvelopeJson } from '../../lib/strip-envelope';
@@ -234,6 +233,7 @@ const ChatMessageRow = memo(function ChatMessageRow({
         escalationRung={msg.escalationRung}
         verificationBadge={msg.verificationBadge}
         mentorNotice={msg.mentorNotice}
+        showInlineThinkingIndicator={false}
         actions={renderMessageActions?.(msg)}
         testID={`message-bubble-${msg.role}-${index}`}
       />
@@ -298,10 +298,16 @@ export function ChatShell({
   const [input, setInput] = useState('');
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
 
-  // Hold the desk-lamp "thinking" indicator long enough to perceive even
-  // when streaming is fast. The streamed reply renders alongside it for a
-  // beat — that's intentional and cheaper than a flicker.
-  const showThinking = useStickyLoading(isStreaming, 800);
+  const hasStreamingContent = messages.some(
+    (message) =>
+      message.role === 'assistant' &&
+      message.streaming === true &&
+      message.content.length > 0,
+  );
+  // ChatShell owns pre-token thinking; the message cursor owns token delivery.
+  // Transport streaming stays active across sparse chunks, so these mutually
+  // exclusive predicates clear synchronously on completion or interruption.
+  const showThinking = isStreaming && !hasStreamingContent;
 
   // [PERF-10 safeguard] FlatList virtualisation only kicks in when its
   // `data`, `renderItem`, and `keyExtractor` keep stable references across

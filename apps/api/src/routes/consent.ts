@@ -17,7 +17,6 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { requireProfileId, requireAccount } from '../middleware/profile-scope';
-import { withProfile } from '../route-utils/route-context';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import type { Context } from 'hono';
 import {
@@ -32,12 +31,18 @@ import {
   ConsentRecordNotFoundError,
   ConsentGracePeriodExpiredError,
 } from '../services/consent';
-import { notFound, forbidden, unauthorized, apiError } from '../errors';
+import {
+  ForbiddenError,
+  notFound,
+  forbidden,
+  unauthorized,
+  apiError,
+} from '../errors';
 import {
   assertOwnerProfile,
-  assertOwnerAndParentAccess,
   assertCallerIsAccountOwner,
   assertCanReadProfile,
+  hasParentAccess,
 } from '../services/family-access';
 import {
   requestConsentV2,
@@ -121,52 +126,45 @@ function maskEmail(email: string | null): string | null {
   return `${local[0]}***${local[local.length - 1]}@${domain}`;
 }
 
+const CONSENT_WRITE_FORBIDDEN_MESSAGE =
+  'Not authorized to request consent for this profile';
+
 // [BUG-791] Authorization gate for /consent/request and /consent/resend.
 //
-// Account-level ownership of childProfileId (the previous getProfile() check)
-// is NOT sufficient: every profile on a family account shares the account, so a
-// non-owner sibling could post another child's profileId (and, on /request, an
-// arbitrary parentEmail) and disrupt that child's consent state. We gate on the
-// ACTIVE profile, not just the account:
+// Account-level membership of childProfileId is NOT sufficient: every person in
+// a family org shares that org, and X-Profile-Id is a request-supplied profile
+// selection rather than caller identity. Authorization therefore uses only the
+// server-resolved callerPersonId:
 //
-//   - Self-service: the active profile is requesting consent for ITSELF
-//     (input.childProfileId === activeProfileId). A minor mid-onboarding
+//   - Self-service: the caller is requesting consent for THEMSELVES
+//     (input.childProfileId === callerPersonId). A minor mid-onboarding
 //     legitimately triggers their own parent's consent email. The terminal-
 //     status guard in requestConsent/resendConsent prevents reviving an
 //     already-decided (CONSENTED/WITHDRAWN) row, so self-service can only act on
 //     a pending/requested row.
-//   - Parent-on-behalf: the active profile is the account OWNER and has a
-//     family link to the target child. Reuses assertOwnerAndParentAccess
-//     (isOwner gate + IDOR parent-link check) — the same guard used by the
-//     dashboard / learner-profile parent-admin routes.
+//   - Parent-on-behalf: that same server-bound caller is an org admin and has an
+//     active guardianship edge to the target child.
 //
-// Any other caller (non-owner sibling targeting another profile) is rejected
-// with 403 before the service runs.
+// Every unauthorized relationship receives the same non-enumerating 403 before
+// the consent service or event dispatch runs.
 async function assertCanRequestConsentForChild<E extends ConsentRouteEnv>(
   c: Context<E>,
   db: Database,
   childProfileId: string,
 ): Promise<void> {
-  const { profileId: activeProfileId } = withProfile(c);
+  const callerPersonId = c.get('callerPersonId');
 
-  // Self-service: acting on the caller's own profile.
-  if (childProfileId === activeProfileId) {
+  if (callerPersonId && childProfileId === callerPersonId) {
     return;
   }
 
-  // Parent-on-behalf: owner with a family link to the target child.
-  // assertOwnerAndParentAccess throws ForbiddenError (→ 403) for a non-owner
-  // profile or an owner with no link to this child (IDOR).
-  // [WI-786] Flag-gated: flag-on resolves via guardianship, flag-off via family_links.
-  await assertOwnerAndParentAccess(c, db, activeProfileId, childProfileId);
-  // [WI-1989] Caller-identity gate — assertOwnerAndParentAccess derives
-  // authority from profileMeta (the X-Profile-Id-resolved profile), which a
-  // non-owner can spoof to the owner's id within the same org. See
-  // assertCallerIsAccountOwner doc (services/family-access.ts).
-  await assertCallerIsAccountOwner(
-    c,
-    'Only the account owner can perform administrative actions on child profiles.',
-  );
+  await assertCallerIsAccountOwner(c, CONSENT_WRITE_FORBIDDEN_MESSAGE);
+  if (
+    !callerPersonId ||
+    !(await hasParentAccess(db, callerPersonId, childProfileId))
+  ) {
+    throw new ForbiddenError(CONSENT_WRITE_FORBIDDEN_MESSAGE);
+  }
 }
 
 type ConsentRouteEnv = {
@@ -211,17 +209,12 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         account.id,
       );
       if (displayName === null) {
-        return forbidden(
-          c,
-          'Not authorized to request consent for this profile',
-        );
+        return forbidden(c, CONSENT_WRITE_FORBIDDEN_MESSAGE);
       }
       const childName = displayName;
 
-      // [BUG-791] Account ownership alone is insufficient — gate on the active
-      // profile (self-service for own profile, or owner-with-parent-link for a
-      // child). Throws ForbiddenError → 403 for a non-owner sibling targeting
-      // another profile.
+      // [WI-2516] Bind self/admin+guardian authorization to callerPersonId;
+      // X-Profile-Id is selection context only and cannot grant write access.
       await assertCanRequestConsentForChild(c, db, input.childProfileId);
 
       if (
@@ -332,17 +325,12 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         account.id,
       );
       if (displayName === null) {
-        return forbidden(
-          c,
-          'Not authorized to request consent for this profile',
-        );
+        return forbidden(c, CONSENT_WRITE_FORBIDDEN_MESSAGE);
       }
       const childName = displayName;
 
-      // [BUG-791] Account ownership alone is insufficient — gate on the active
-      // profile (self-service for own profile, or owner-with-parent-link for a
-      // child). Throws ForbiddenError → 403 for a non-owner sibling targeting
-      // another profile.
+      // [WI-2516] Bind self/admin+guardian authorization to callerPersonId;
+      // X-Profile-Id is selection context only and cannot grant write access.
       await assertCanRequestConsentForChild(c, db, input.childProfileId);
 
       const apiOrigin = c.env.API_ORIGIN;

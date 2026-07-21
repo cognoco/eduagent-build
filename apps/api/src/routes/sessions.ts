@@ -32,6 +32,7 @@ import type { Account } from '../services/account';
 import { idempotencyPreflight } from '../middleware/idempotency';
 import { type ProfileMeta } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { assertCanReadProfile } from '../services/family-access';
 import { withProfile } from '../route-utils/route-context';
 import { streamSSEUtf8 } from '../route-utils/sse-utf8';
@@ -72,18 +73,18 @@ import {
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
-import { safeSend, safeWrite } from '../services/safe-non-core';
-import {
-  recordActivationEvent,
-  deriveActivationProfileShape,
-} from '../services/activation-events';
+import { safeSend } from '../services/safe-non-core';
+import { recordActivationEventSafely } from '../services/activation-events';
 import { refundQuotaOrEscalate } from '../services/billing';
 import {
   startInterleavedSession,
   NoInterleavedTopicsError,
 } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
-import { getMentorNoticeReceipt } from '../services/mentor-notices';
+import {
+  getMentorNoticeReceipt,
+  resolveMentorNoticeVisibility,
+} from '../services/mentor-notices';
 import {
   markPersisted,
   MAX_IDEMPOTENCY_KEY_LENGTH,
@@ -120,17 +121,15 @@ async function recordFirstSessionStarted(
   route: string,
   profileMeta: { isOwner: boolean } | undefined,
 ): Promise<void> {
-  await safeWrite(
-    () =>
-      recordActivationEvent(db, {
-        eventType: 'first_session_started',
-        profileId,
-        profileShape: profileMeta
-          ? deriveActivationProfileShape(profileMeta)
-          : null,
-        route,
-        metadata: { sessionId },
-      }),
+  await recordActivationEventSafely(
+    db,
+    {
+      eventType: 'first_session_started',
+      profileId,
+      profileMeta,
+      route,
+      metadata: { sessionId },
+    },
     'sessions.start.first_session_started',
     { profileId, sessionId },
   );
@@ -226,6 +225,12 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // Gated unconditionally — startFirstCurriculumSession's topic-intent
+      // matcher (matchTopicByIntent) dispatches the LLM when MATCHER_ENABLED
+      // and multiple candidate topics exist; this endpoint is the only
+      // entry point.
+      await assertLlmConsent(db, profileId);
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
       try {
@@ -953,7 +958,17 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       await assertCanReadProfile(c, profileId);
       const { sessionId } = c.req.valid('param');
       const summary = await getSessionSummary(db, profileId, sessionId, {
-        mentorNoticeEnabled: isMentorNoticeEnabled(c.env.MENTOR_NOTICE_ENABLED),
+        // [WI-2498] V — rollout ∧ caller-is-subject ∧ subject consent. Note
+        // this is strictly narrower than assertCanReadProfile above: a guardian
+        // legitimately READS an uncredentialed charge's summary, but must not
+        // receive the learner-private notice receipt embedded in it. V gates
+        // the enrichment only, never the read.
+        mentorNoticeEnabled: await resolveMentorNoticeVisibility(
+          c,
+          profileId,
+          c.env.MENTOR_NOTICE_ENABLED,
+          { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+        ),
       });
       return c.json({ summary });
     },
@@ -1002,6 +1017,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // retrySummaryFeedback -> evaluateSummary unconditionally dispatches
+      // the LLM.
+      await assertLlmConsent(db, profileId);
       const { sessionId } = c.req.valid('param');
       const profileMeta = c.get('profileMeta');
       const result = await retrySummaryFeedback(db, profileId, sessionId, {
@@ -1022,6 +1041,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // submitSummary -> evaluateSummary unconditionally dispatches the LLM.
+      await assertLlmConsent(db, profileId);
       const { sessionId } = c.req.valid('param');
       const previousSummary = await getSessionSummary(db, profileId, sessionId);
       // i18n Phase 1 — thread conversation_language to summary evaluation.
@@ -1094,6 +1116,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // generateRecallBridge unconditionally dispatches the LLM.
+      await assertLlmConsent(db, profileId);
       const { sessionId } = c.req.valid('param');
 
       const session = await getSession(db, profileId, sessionId);

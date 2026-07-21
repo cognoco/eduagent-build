@@ -155,7 +155,10 @@ const WI_2520_DEFERRED_SITES: Readonly<Record<string, string>> = {
   'apps/api/src/services/session-llm-summary.ts:317':
     'deferred, tracked as WI-2520',
   'apps/api/src/services/summaries.ts:160': 'deferred, tracked as WI-2520',
-  'apps/api/src/inngest/functions/post-session-suggestions.ts:182':
+  // [WI-2396] line shifted 182→184: an unrelated consent-gate call/comment
+  // (isLlmExchangeConsentAllowed swap) was inserted above this site; the
+  // deferred site itself (WI-2520 scope) is untouched.
+  'apps/api/src/inngest/functions/post-session-suggestions.ts:184':
     'deferred, tracked as WI-2520',
 };
 

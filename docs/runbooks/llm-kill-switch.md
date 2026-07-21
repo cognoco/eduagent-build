@@ -30,8 +30,9 @@ Two related pieces:
    `event: llm.volume.daily_threshold_exceeded` lives on the WI-1500 operator-
    console alert-rules, not in this codebase.
 
-2. **Kill switch** — a KV-backed boolean, read fresh on every request, that
-   blocks learner-facing LLM traffic before any provider is contacted.
+2. **Kill switch** — a KV-backed boolean, read lazily at the first LLM router
+   choke point in each LLM request, that blocks learner-facing LLM traffic
+   before any provider is contacted.
 
 ## 2. Switch location
 
@@ -44,10 +45,12 @@ Two related pieces:
 - **Value:** `"1"` = kill switch ON (traffic blocked). Any other value, or key
   absence, = OFF. Writing `false` **deletes** the key rather than writing
   `"0"`, so a stray value can never be misread as "on".
-- **Read path:** `readLlmKillSwitch(kv)` (`apps/api/src/services/kv.ts`) is
-  called every request from `apps/api/src/middleware/llm.ts` (`llmMiddleware`),
-  which sets the module-level flag in `apps/api/src/services/llm/router.ts`
-  via `setLlmKillSwitchActive(...)`.
+- **Read path:** `llmMiddleware` (`apps/api/src/middleware/llm.ts`) carries the
+  `SUBSCRIPTION_KV` binding into request-local `AsyncLocalStorage` with zero KV
+  I/O. The first `routeAndCall()` or `routeAndStream()` choke point invokes
+  `readLlmKillSwitch(kv)` (`apps/api/src/services/kv.ts`) lazily. Its in-flight
+  promise and resolved result are memoized once per LLM request, so concurrent
+  LLM calls in the same request share one KV read.
 - **Enforcement point:** `checkLlmKillSwitch()` in
   `apps/api/src/services/llm/router.ts`, called as the FIRST statement in
   both `routeAndCall()` (the single choke point ~20 call sites route through)
@@ -76,12 +79,12 @@ wrangler kv key delete --namespace-id <SUBSCRIPTION_KV_NAMESPACE_ID> "llm:kill-s
 ```
 
 Either command is a plain KV write — no deploy, no CI run, no mobile release.
-It takes effect on the **next** request each Worker isolate receives (the
-read happens in `llmMiddleware` on every request; there is no boot-time
-caching of this flag). In practice this is effectively immediate — Cloudflare
-KV writes propagate to the edge within seconds, and Worker isolates are
-short-lived, so within a request or two every isolate is reading the new
-value.
+It takes effect on the next LLM request that reaches `routeAndCall()` or
+`routeAndStream()`. Non-LLM requests do not read the switch. The promise/result
+cache is request-local only; there is no isolate- or boot-level caching of this
+flag. In practice this is effectively immediate — Cloudflare KV writes
+propagate to the edge within seconds, and each subsequent LLM request reads the
+new value.
 
 To confirm the current state without changing it:
 
@@ -131,18 +134,20 @@ metric-emission hook here + an alert rule there), not in this repo.
 ## 6. Rollback / recovery
 
 Turning the switch OFF (delete the KV key, §3) is the rollback — it is fully
-reversible and takes effect on the next request with no data loss (no
+reversible and takes effect on the next LLM request with no data loss (no
 requests are queued or buffered while the switch is on; blocked requests
 simply receive the 503 and the caller is expected to retry, matching existing
 circuit-breaker behavior). No database migration, no code deploy, and no
 mobile release are involved in either direction.
 
-If `readLlmKillSwitch` itself fails (a KV outage, not an operator flip), it
-**fails OPEN** — traffic continues rather than being silently blocked by an
-infra gap — and the read error is emitted as a structured `logger.warn` **log
-line** with `event: kv.llm_kill_switch.read_error` (a queryable log record on
-the log sink — Sentry Logs / Cloudflare Logpush — **not** a Sentry error
-event), so a persistent KV outage is visible to whoever queries/alerts on that
-event. This is a deliberate asymmetry: the kill switch is an operator-triggered
-override, not a safety invariant, so on ambiguity the safer default is "keep
-serving" rather than "silently kill all learner traffic because KV hiccuped."
+If the `SUBSCRIPTION_KV` binding is absent or `readLlmKillSwitch` fails (a KV
+outage, not an operator flip), the switch **fails OPEN** — traffic continues
+rather than being silently blocked by an infra gap. An absent binding is the
+normal no-read fallback and emits no error. An actual read failure emits a
+structured `logger.warn` **log line** with
+`event: kv.llm_kill_switch.read_error` (a queryable log record on the log sink
+— Sentry Logs / Cloudflare Logpush — **not** a Sentry error event), so a
+persistent KV outage is visible to whoever queries/alerts on that event. This
+is a deliberate asymmetry: the kill switch is an operator-triggered override,
+not a safety invariant, so on ambiguity the safer default is "keep serving"
+rather than "silently kill all learner traffic because KV hiccuped."

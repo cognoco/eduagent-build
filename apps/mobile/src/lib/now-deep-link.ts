@@ -1,6 +1,7 @@
 import type { Href, Router } from 'expo-router';
 import {
   nowDeepLinkRouteSchema,
+  type NowCard,
   type NowDeepLink,
   type NowDeepLinkRoute,
   type ScopeDescriptor,
@@ -28,6 +29,36 @@ type PathBuilder = (
 const DEFAULT_OPTIONS: Required<NowPathOptions> = {
   subjectHubTarget: 'legacy-shelf',
 };
+
+function ledgerKind(card: NowCard): string {
+  return typeof card.params['ledgerKind'] === 'string'
+    ? card.params['ledgerKind']
+    : card.templateKey.replace('now.ledger_moment.', '');
+}
+
+export function withJournalSectionIntent(card: NowCard): NowCard {
+  if (card.deepLink.route !== 'journal') return card;
+
+  if (ledgerKind(card) === 'quiz_personal_best') {
+    return {
+      ...card,
+      deepLink: {
+        ...card.deepLink,
+        params: { ...card.deepLink.params, section: 'practice' },
+      },
+    };
+  }
+
+  // TODO: Map a future Journal-routed ledger kind only after product assigns
+  // it to one of the existing Journal sections; unknown kinds stay at root.
+  if (!('section' in card.deepLink.params)) return card;
+  const rootParams = { ...card.deepLink.params };
+  delete rootParams['section'];
+  return {
+    ...card,
+    deepLink: { ...card.deepLink, params: rootParams },
+  };
+}
 
 const PATH_BUILDERS: Partial<Record<NowDeepLinkRoute, PathBuilder>> = {
   'settings.more': () => '/(app)/more',

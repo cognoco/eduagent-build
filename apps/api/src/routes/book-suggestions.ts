@@ -8,6 +8,7 @@ import {
   type ProfileMeta,
 } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import {
   getUnpickedBookSuggestionsWithTopup,
   getUnpickedBookSuggestionsEnvelope,
@@ -71,6 +72,12 @@ export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
       const { subjectId } = c.req.valid('param');
 
       await assertNotProxyMode(c);
+
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // Gated unconditionally — getUnpickedBookSuggestionsWithTopup only
+      // dispatches the LLM when unpicked.length < 4, but this endpoint's
+      // sole purpose is the top-up path.
+      await assertLlmConsent(db, profileId);
 
       // i18n Phase 1 — forward the active profile's conversation_language.
       const profileMeta = c.get('profileMeta');
