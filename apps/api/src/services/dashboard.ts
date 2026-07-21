@@ -74,7 +74,7 @@ import {
   selectCurrentlyWorkingOn,
 } from './learner-profile';
 import {
-  assertCallerIsOrganizationAdmin,
+  assertCallerIsOrganizationAdminForPerson,
   assertChargeNotCredentialed,
   assertParentAccess,
   filterUncredentialedCharges,
@@ -757,10 +757,11 @@ export async function getChildrenForParent(
   callerPersonId: string | undefined,
   organizationId: string | undefined,
 ): Promise<DashboardChild[]> {
-  await assertCallerIsOrganizationAdmin(
+  await assertCallerIsOrganizationAdminForPerson(
     db,
     callerPersonId,
     organizationId,
+    parentProfileId,
     'You are not authorized to access this dashboard.',
   );
   // 1. Query familyLinks (legacy) or guardianship (v2) for this parent's children
@@ -1120,10 +1121,11 @@ export async function getChildDetail(
   callerPersonId: string | undefined,
   organizationId: string | undefined,
 ): Promise<DashboardChildDetail | null> {
-  await assertCallerIsOrganizationAdmin(
+  await assertCallerIsOrganizationAdminForPerson(
     db,
     callerPersonId,
     organizationId,
+    parentProfileId,
     'You are not authorized to access this dashboard.',
   );
   // [EP15-I5] Throws ForbiddenError (→ 403) on access denial instead of
@@ -1354,10 +1356,11 @@ export async function getChildSubjectTopics(
   callerPersonId: string | undefined,
   organizationId: string | undefined,
 ): Promise<TopicProgress[]> {
-  await assertCallerIsOrganizationAdmin(
+  await assertCallerIsOrganizationAdminForPerson(
     db,
     callerPersonId,
     organizationId,
+    parentProfileId,
     'You are not authorized to access this dashboard.',
   );
   // [EP15-I5] See assertParentAccess comment — ForbiddenError → 403.
@@ -1454,10 +1457,11 @@ export async function getChildSessions(
   callerPersonId: string | undefined,
   organizationId: string | undefined,
 ): Promise<ChildSession[]> {
-  await assertCallerIsOrganizationAdmin(
+  await assertCallerIsOrganizationAdminForPerson(
     db,
     callerPersonId,
     organizationId,
+    parentProfileId,
     'You are not authorized to access this dashboard.',
   );
   // [EP15-I5] ForbiddenError → 403. Empty array now means "parent has
@@ -1485,10 +1489,11 @@ export async function getChildSessionDetail(
   callerPersonId: string | undefined,
   organizationId: string | undefined,
 ): Promise<ChildSession | null> {
-  await assertCallerIsOrganizationAdmin(
+  await assertCallerIsOrganizationAdminForPerson(
     db,
     callerPersonId,
     organizationId,
+    parentProfileId,
     'You are not authorized to access this dashboard.',
   );
   await assertParentAccess(db, parentProfileId, childProfileId);
@@ -1603,10 +1608,11 @@ export async function getChildInventory(
   callerPersonId: string | undefined,
   organizationId: string | undefined,
 ): Promise<KnowledgeInventory> {
-  await assertCallerIsOrganizationAdmin(
+  await assertCallerIsOrganizationAdminForPerson(
     db,
     callerPersonId,
     organizationId,
+    parentProfileId,
     'You are not authorized to access this dashboard.',
   );
   // [EP15-I5] Return type tightened from `| null`. Access denial now
@@ -1629,10 +1635,11 @@ export async function getChildProgressHistory(
     granularity?: 'daily' | 'weekly';
   },
 ): Promise<ProgressHistory> {
-  await assertCallerIsOrganizationAdmin(
+  await assertCallerIsOrganizationAdminForPerson(
     db,
     callerPersonId,
     organizationId,
+    parentProfileId,
     'You are not authorized to access this dashboard.',
   );
   // [EP15-I5] Return type tightened — access denial throws, not returns null.
@@ -1649,10 +1656,11 @@ export async function getChildReports(
   callerPersonId: string | undefined,
   organizationId: string | undefined,
 ): Promise<MonthlyReportSummary[]> {
-  await assertCallerIsOrganizationAdmin(
+  await assertCallerIsOrganizationAdminForPerson(
     db,
     callerPersonId,
     organizationId,
+    parentProfileId,
     'You are not authorized to access this dashboard.',
   );
   // [EP15-I5] Access denial throws (→ 403). Empty array now means "no
@@ -1671,10 +1679,11 @@ export async function getChildReportDetail(
   callerPersonId: string | undefined,
   organizationId: string | undefined,
 ): Promise<MonthlyReportRecord | null> {
-  await assertCallerIsOrganizationAdmin(
+  await assertCallerIsOrganizationAdminForPerson(
     db,
     callerPersonId,
     organizationId,
+    parentProfileId,
     'You are not authorized to access this dashboard.',
   );
   // [EP15-I5] null now only means "access granted but report not found".
@@ -1697,10 +1706,11 @@ export async function markChildReportViewed(
   callerPersonId: string | undefined,
   organizationId: string | undefined,
 ): Promise<void> {
-  await assertCallerIsOrganizationAdmin(
+  await assertCallerIsOrganizationAdminForPerson(
     db,
     callerPersonId,
     organizationId,
+    parentProfileId,
     'You are not authorized to access this dashboard.',
   );
   // [EP15-I5] Previously silently returned on access denial, letting an
