@@ -361,11 +361,24 @@ describe('AppLayout', () => {
     });
     mockUseProfile.mockReturnValue({
       profiles: [
-        { id: 'p1', isOwner: true, consentStatus: null, birthYear: 1990 },
-        { id: 'c1', isOwner: false, consentStatus: null, birthYear: 2014 },
+        {
+          id: 'p1',
+          displayName: 'Parent',
+          isOwner: true,
+          consentStatus: null,
+          birthYear: 1990,
+        },
+        {
+          id: 'c1',
+          displayName: 'Child',
+          isOwner: false,
+          consentStatus: null,
+          birthYear: 2014,
+        },
       ],
       activeProfile: {
         id: 'p1',
+        displayName: 'Parent',
         isOwner: true,
         consentStatus: null,
         birthYear: 1990,
