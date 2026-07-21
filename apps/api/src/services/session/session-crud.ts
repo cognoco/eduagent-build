@@ -58,7 +58,7 @@ import {
   getSessionEffectiveMode,
   MAX_EXCHANGES_PER_SESSION,
 } from '@eduagent/schemas';
-import { NotFoundError } from '../../errors';
+import { ConflictError, NotFoundError } from '../../errors';
 import { insertSessionEvent } from './session-events';
 import { resolveSystemPromptIntent } from './system-prompt-intents';
 import { getSubject } from '../subject';
@@ -1284,17 +1284,39 @@ export async function recordSystemPrompt(
   sessionId: string,
   intent: SystemPromptIntent,
 ): Promise<void> {
-  const session = await getSession(db, profileId, sessionId);
-  if (!session) {
-    throw new NotFoundError('Session');
-  }
+  await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    const now = new Date();
+    const [activeSession] = await txDb
+      .update(learningSessions)
+      .set({ lastActivityAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+          eq(learningSessions.status, 'active'),
+          isNull(learningSessions.endedAt),
+        ),
+      )
+      .returning();
 
-  await insertSessionEvent(db, session, profileId, {
-    sessionId,
-    eventType: 'system_prompt',
-    content: resolveSystemPromptIntent(intent),
-    metadata: { source: 'server', intent },
-    touchSession: true,
+    if (!activeSession) {
+      const existing = await getSession(txDb, profileId, sessionId);
+      if (!existing) {
+        throw new NotFoundError('Session');
+      }
+      throw new ConflictError(
+        'Session is closed and cannot accept system prompts',
+      );
+    }
+
+    await insertSessionEvent(txDb, mapSessionRow(activeSession), profileId, {
+      sessionId,
+      eventType: 'system_prompt',
+      content: resolveSystemPromptIntent(intent),
+      metadata: { source: 'server', intent },
+      touchSession: false,
+    });
   });
 }
 

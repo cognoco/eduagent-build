@@ -572,6 +572,13 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             // Best effort only.
           }
 
+          if (sessionEndedRef.current) {
+            setMessages((prev) =>
+              prev.filter((message) => message.id !== 'silence-prompt'),
+            );
+            return;
+          }
+
           await writeSessionRecoveryMarker(
             {
               sessionId: sessionIdToUse,
