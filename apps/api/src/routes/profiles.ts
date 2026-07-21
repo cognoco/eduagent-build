@@ -121,46 +121,6 @@ async function isCallerAlreadyOwner(
   return verifyPersonIsOrgAdminV2(db, callerPersonId, organizationId);
 }
 
-/**
- * [CUT-B1] Map the v2 bootstrap result + the create input to the byte-identical
- * `Profile` response shape the mobile onboarding flow expects. The owner is
- * always isOwner=true with a fresh graph: no family links yet, consent status
- * resolves to null pre-consent-write (the consent request/grant machine is
- * CUT-B2), `hasPremiumLlm` is the derived value (false; §1.3). Presentation
- * fields come from the validated input (the same values the graph persisted).
- */
-function buildBootstrapProfile(
-  graph: { personId: string; account: { id: string } },
-  input: {
-    displayName: string;
-    avatarUrl?: string;
-    birthYear: number;
-    location?: 'EU' | 'US' | 'OTHER';
-    conversationLanguage?: string;
-    pronouns?: string | null;
-  },
-) {
-  const now = new Date().toISOString();
-  return {
-    id: graph.personId,
-    accountId: graph.account.id,
-    displayName: input.displayName,
-    avatarUrl: input.avatarUrl ?? null,
-    birthYear: input.birthYear,
-    location: input.location ?? null,
-    isOwner: true,
-    hasPremiumLlm: false,
-    defaultAppContext: null,
-    hasFamilyLinks: false,
-    conversationLanguage: input.conversationLanguage ?? 'en',
-    pronouns: input.pronouns ?? null,
-    consentStatus: null,
-    linkCreatedAt: null,
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
 export const profileRoutes = new Hono<ProfileEnv>()
   .get('/profiles', async (c) => {
     const db = c.get('db');
@@ -345,7 +305,15 @@ export const profileRoutes = new Hono<ProfileEnv>()
           timezone: null,
           consentPolicyVersion: c.env.CONSENT_POLICY_VERSION,
         });
-        const profile = buildBootstrapProfile(graph, input);
+        // The graph writer is idempotent and can return a graph persisted by a
+        // competing request. Read the canonical owner after commit so response
+        // fields (especially consent) never come from a losing request payload.
+        const profile = await getOwnerProfileV2(db, graph.account.id);
+        if (!profile) {
+          throw new Error(
+            'Identity graph bootstrap did not produce an owner profile.',
+          );
+        }
         // WI-1504: launch activation instrumentation — signup_completed
         // fires once, at owner-graph creation. Never blocks the response.
         await safeWrite(

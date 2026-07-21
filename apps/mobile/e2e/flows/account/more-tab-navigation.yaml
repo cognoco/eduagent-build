@@ -9,191 +9,199 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "onboarding-complete"
+      SEED_SCENARIO: 'onboarding-complete'
       API_URL: ${API_URL}
 
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 - tapOn:
-    text: "More"
+    text: 'More'
 
 # Wait for More tab index — first settings row is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "more-row-learning-preferences"
+      id: 'more-row-learning-preferences'
     timeout: 15000
 
 # Assert all More index navigation rows
 - assertVisible:
-    id: "more-row-mentor-memory"
+    id: 'more-row-mentor-memory'
 - assertVisible:
-    id: "more-row-mentor-language"
+    id: 'more-row-mentor-language'
 - scrollUntilVisible:
     element:
-      id: "more-row-notifications"
+      id: 'more-row-notifications'
     direction: DOWN
     timeout: 15000
     speed: 50
     visibilityPercentage: 40
 - assertVisible:
-    id: "more-row-account"
+    id: 'more-row-account'
 - scrollUntilVisible:
     element:
-      id: "sign-out-button"
+      id: 'sign-out-button'
     direction: DOWN
     timeout: 15000
     speed: 50
     visibilityPercentage: 40
 - assertVisible:
-    id: "more-row-privacy"
+    id: 'more-row-privacy'
 - assertVisible:
-    id: "more-row-help"
+    id: 'more-row-help'
 - assertVisible:
-    id: "sign-out-button"
+    id: 'sign-out-button'
 
 - takeScreenshot: more-tab-loaded
 
 # Notifications sub-screen
 - tapOn:
-    id: "more-row-notifications"
+    id: 'more-row-notifications'
 - extendedWaitUntil:
     visible:
-      id: "more-notifications-scroll"
+      id: 'more-notifications-scroll'
     timeout: 10000
 - assertVisible:
-    id: "push-notifications-toggle"
+    id: 'push-notifications-toggle'
 - assertVisible:
-    id: "weekly-digest-toggle"
+    id: 'weekly-digest-toggle'
 - back
 - extendedWaitUntil:
     visible:
-      id: "more-row-notifications"
+      id: 'more-row-notifications'
     timeout: 10000
 
 # Account sub-screen
 - tapOn:
-    id: "more-row-account"
+    id: 'more-row-account'
 - extendedWaitUntil:
     visible:
-      id: "more-account-scroll"
+      id: 'more-account-scroll'
     timeout: 10000
 - assertVisible:
-    id: "more-row-profile"
+    id: 'more-row-profile'
+- scrollUntilVisible:
+    element:
+      id: 'more-row-subscription'
+    direction: DOWN
+    timeout: 15000
+    speed: 50
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible:
-    id: "more-row-subscription"
+    id: 'more-row-subscription'
 - back
 - extendedWaitUntil:
     visible:
-      id: "more-row-account"
+      id: 'more-row-account'
     timeout: 10000
 
 # Privacy & data sub-screen plus standalone legal/delete routes
 - tapOn:
-    id: "more-row-privacy"
+    id: 'more-row-privacy'
 - extendedWaitUntil:
     visible:
-      id: "more-privacy-scroll"
+      id: 'more-privacy-scroll'
     timeout: 10000
 - assertVisible:
-    text: "Privacy Policy"
+    text: 'Privacy Policy'
 - assertVisible:
-    text: "Terms of Service"
+    text: 'Terms of Service'
 - assertVisible:
-    id: "more-row-export"
+    id: 'more-row-export'
 - assertVisible:
-    id: "more-row-delete-account"
+    id: 'more-row-delete-account'
 
 - tapOn:
-    text: "Privacy Policy"
+    text: 'Privacy Policy'
 - extendedWaitUntil:
     visible:
-      text: "Privacy Policy"
+      text: 'Privacy Policy'
     timeout: 10000
 - takeScreenshot: nav-privacy-policy
 - back
 - extendedWaitUntil:
     visible:
-      id: "more-privacy-scroll"
+      id: 'more-privacy-scroll'
     timeout: 10000
 
 - tapOn:
-    text: "Terms of Service"
+    text: 'Terms of Service'
 - extendedWaitUntil:
     visible:
-      text: "Terms of Service"
+      text: 'Terms of Service'
     timeout: 10000
 - takeScreenshot: nav-terms-of-service
 - back
 - extendedWaitUntil:
     visible:
-      id: "more-privacy-scroll"
+      id: 'more-privacy-scroll'
     timeout: 10000
 
 - tapOn:
-    id: "more-row-export"
+    id: 'more-row-export'
 - tapOn:
-    text: "OK"
-    optional: true  # justified: OK dismissal only needed when a system dialog or export confirmation appears; not always shown
+    text: 'OK'
+    optional: true # justified: OK dismissal only needed when a system dialog or export confirmation appears; not always shown
 - takeScreenshot: nav-export-data
 
 # Dismiss the Android share sheet (if export succeeded) and return to Privacy
 - pressKey: back
 - extendedWaitUntil:
     visible:
-      id: "more-privacy-scroll"
+      id: 'more-privacy-scroll'
     timeout: 10000
 
 - scrollUntilVisible:
     element:
-      id: "more-row-delete-account"
+      id: 'more-row-delete-account'
     direction: DOWN
     timeout: 10000
 - tapOn:
-    id: "more-row-delete-account"
+    id: 'more-row-delete-account'
 - extendedWaitUntil:
     visible:
-      id: "delete-account-confirm"
+      id: 'delete-account-confirm'
     timeout: 10000
 - assertVisible:
-    id: "delete-account-cancel"
+    id: 'delete-account-cancel'
 - takeScreenshot: nav-delete-account
 - tapOn:
-    id: "delete-account-cancel"
+    id: 'delete-account-cancel'
 - extendedWaitUntil:
     visible:
-      id: "more-privacy-scroll"
+      id: 'more-privacy-scroll'
     timeout: 10000
 - back
 
 # Help & feedback sub-screen
 - extendedWaitUntil:
     visible:
-      id: "more-row-help"
+      id: 'more-row-help'
     timeout: 10000
 - tapOn:
-    id: "more-row-help"
+    id: 'more-row-help'
 - extendedWaitUntil:
     visible:
-      id: "more-help-scroll"
+      id: 'more-help-scroll'
     timeout: 10000
 - assertVisible:
-    id: "more-row-help-support"
+    id: 'more-row-help-support'
 - assertVisible:
-    id: "more-row-report-problem"
+    id: 'more-row-report-problem'
 - back
 
 # Sign out remains on the landing screen.
 - extendedWaitUntil:
     visible:
-      id: "sign-out-button"
+      id: 'sign-out-button'
     timeout: 10000
 - tapOn:
-    id: "sign-out-button"
+    id: 'sign-out-button'
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: 'sign-in-button'
     timeout: 15000
 - takeScreenshot: nav-signed-out

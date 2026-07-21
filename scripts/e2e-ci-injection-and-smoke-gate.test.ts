@@ -1362,6 +1362,27 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
   });
 
+  it('[WI-1864] opens the zero-subject CTA that actually renders below the fold', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/edge/empty-first-user.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: { element?: { id?: string } };
+      tapOn?: { id?: string };
+    }>;
+    const scroll = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'home-add-first-subject',
+    );
+    const tap = commands.findIndex(
+      ({ tapOn }) => tapOn?.id === 'home-add-first-subject',
+    );
+    expect(scroll).toBeGreaterThan(-1);
+    expect(tap).toBeGreaterThan(scroll);
+    expect(source).not.toContain('home-add-subject-tile');
+  });
+
   it('[WI-1864] follows the intentional no-consent profile destination', () => {
     const source = readFileSync(
       join(
@@ -1429,6 +1450,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
       tapOn?: { id?: string; point?: string; optional?: boolean };
       extendedWaitUntil?: { visible?: { id?: string } | string };
+      assertVisible?:
+        | {
+            id?: string;
+            text?: string;
+            optional?: boolean;
+          }
+        | string;
     }>;
     const topicTap = commands.findIndex(
       ({ tapOn }) => tapOn?.id === 'topic-card-${TOPIC_ID}',
@@ -1439,17 +1467,135 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         typeof extendedWaitUntil?.visible === 'object' &&
         extendedWaitUntil.visible.id === 'topic-detail-screen',
     );
+    const statusCard = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > topicDetail &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'topic-status-card' &&
+        assertVisible.optional !== true,
+    );
+    const sessionHistory = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > statusCard &&
+        typeof assertVisible === 'object' &&
+        assertVisible.text === 'Session History' &&
+        assertVisible.optional !== true,
+    );
 
     expect(commands[topicTap]?.tapOn).toEqual({
       id: 'topic-card-${TOPIC_ID}',
     });
-    expect(topicDetail).toBeGreaterThan(topicTap);
+    expect([topicTap, topicDetail, statusCard, sessionHistory]).toEqual(
+      [topicTap, topicDetail, statusCard, sessionHistory].toSorted(
+        (a, b) => a - b,
+      ),
+    );
+    expect(topicTap).toBeGreaterThan(-1);
     expect(
       commands.some(
         ({ tapOn }) =>
           tapOn?.id === 'subject-topics-scroll' && tapOn.point !== undefined,
       ),
     ).toBe(false);
+    expect(
+      commands.some(
+        ({ assertVisible }) =>
+          typeof assertVisible === 'object' &&
+          assertVisible.id === 'topic-understanding-card' &&
+          assertVisible.optional !== true,
+      ),
+    ).toBe(false);
+  });
+
+  it('[WI-1864] scrolls to the owner subscription row on the Account screen', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/account/more-tab-navigation.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+      scrollUntilVisible?: { element?: { id?: string }; direction?: string };
+      assertVisible?: { id?: string } | string;
+    }>;
+    const accountScreen = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'more-account-scroll',
+    );
+    const subscriptionScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > accountScreen &&
+        scrollUntilVisible?.element?.id === 'more-row-subscription' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const subscriptionAssert = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > subscriptionScroll &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'more-row-subscription',
+    );
+
+    expect([accountScreen, subscriptionScroll, subscriptionAssert]).toEqual(
+      [accountScreen, subscriptionScroll, subscriptionAssert].toSorted(
+        (a, b) => a - b,
+      ),
+    );
+    expect(accountScreen).toBeGreaterThan(-1);
+  });
+
+  it('[WI-1864] walks preview-self through the shared first-run welcome bridge', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/onboarding/preview-self.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      runFlow?: { file?: string };
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+    }>;
+    const welcomeBridge = commands.findIndex(
+      ({ runFlow }) =>
+        runFlow?.file === '../_setup/nav-welcome-to-sign-in.yaml',
+    );
+    const signIn = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > welcomeBridge &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'sign-in-screen',
+    );
+
+    expect(welcomeBridge).toBe(0);
+    expect(signIn).toBeGreaterThan(welcomeBridge);
+  });
+
+  it('[WI-1864] opens weekly reports from parent home without double navigation', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/child-weekly-report.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      runFlow?: { file?: string };
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+      tapOn?: { id?: string };
+    }>;
+    const parentHome = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'parent-home-screen',
+    );
+    const reportTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > parentHome &&
+        tapOn?.id === 'parent-home-weekly-report-${CHILD_PROFILE_ID}',
+    );
+
+    expect(
+      commands.some(
+        ({ runFlow }) =>
+          runFlow?.file === '../_setup/open-family-dashboard.yaml',
+      ),
+    ).toBe(false);
+    expect(parentHome).toBeGreaterThan(-1);
+    expect(reportTap).toBeGreaterThan(parentHome);
   });
 
   it('[WI-1864] keeps parent child drill-down on its reachable parent-native journey', () => {
@@ -1767,6 +1913,60 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
     expect(continueTap).toBeGreaterThan(-1);
     expect(home).toBeGreaterThan(continueTap);
+  });
+
+  it('[WI-1864] scrolls to the owner subscription row before opening billing', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/billing/subscription.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      assertVisible?: { id?: string } | string;
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+      scrollUntilVisible?: { element?: { id?: string }; direction?: string };
+      tapOn?: { id?: string; text?: string } | string;
+    }>;
+    const rowScroll = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'more-row-subscription' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const rowTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > rowScroll &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'more-row-subscription',
+    );
+    const screen = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > rowTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'subscription-screen',
+    );
+    const trial = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > screen &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'trial-banner',
+    );
+    const plan = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > trial &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'current-plan',
+    );
+
+    expect([rowScroll, rowTap, screen, trial, plan]).toEqual(
+      [rowScroll, rowTap, screen, trial, plan].toSorted((a, b) => a - b),
+    );
+    expect(rowScroll).toBeGreaterThan(-1);
+    expect(
+      commands.some(
+        ({ tapOn }) =>
+          typeof tapOn === 'object' &&
+          (tapOn.text === 'Subscription' || tapOn.text === 'Billing'),
+      ),
+    ).toBe(false);
   });
 
   it('[WI-1864] scrolls the tall Pro subscription screen to its no-offerings section', () => {

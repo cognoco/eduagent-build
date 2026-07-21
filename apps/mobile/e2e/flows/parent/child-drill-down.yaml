@@ -98,9 +98,11 @@ tags:
       id: 'topic-detail-screen'
     timeout: 10000
 
-# 15. Verify topic understanding card is present (renamed from topic-status-card in current source)
+# 15. Verify the unconditional topic status card. The parent-with-children seed
+#     has a completed topic-linked session but no mastery assessment, so the
+#     conditional topic-understanding-card intentionally does not render.
 - assertVisible:
-    id: 'topic-understanding-card'
+    id: 'topic-status-card'
 
 # 15a. Verify topic retention card when data is present
 - assertVisible:
@@ -111,7 +113,7 @@ tags:
 - assertVisible:
     text: 'Session History'
 
-# 17. Screenshot: topic detail with status, mastery, retention
+# 17. Screenshot: topic detail with status and any seeded retention data
 - takeScreenshot: parent-drill-down-04-topic-detail
 
 # 18. Navigate back to child detail

@@ -9,6 +9,9 @@ tags:
   - onboarding
   - preview
 ---
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
 - extendedWaitUntil:
     visible:
       id: 'sign-in-screen'
