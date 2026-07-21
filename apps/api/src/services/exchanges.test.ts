@@ -2987,6 +2987,54 @@ describe('source provenance audit', () => {
     expect(safe.response).not.toMatch(/which one you mean/i);
   });
 
+  // [WI-2100 rework, bounce 2] Reviewer finding: AMBIGUOUS_SOURCE_REFERENCE
+  // matched possessive/demonstrative wording ("her book") but never checked
+  // whether the SAME message also names a title/author later on. A learner
+  // opening with the possessive phrasing and then naming the work in full
+  // must NOT be asked which one they mean — the named-work negative path has
+  // to win over the possessive-only positive path when both are present in
+  // one message. This is distinct from the "already named" test above, whose
+  // input ("I am reading The Great Gatsby...") never exercises the overlap
+  // because it never uses possessive wording in the first place.
+  it('does not ask which source when possessive wording is followed by a named title and author', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['learner_message'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        "I'm reading her book, The Great Gatsby by F. Scott Fitzgerald, and need help with the green light symbolism.",
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Here is an unsupported claim about the green light.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/which one you mean/i);
+  });
+
+  // [WI-2100 rework, bounce 2] Same overlap as above, but with only a title
+  // named and no author byline — the "or" in the reviewer's finding ("a
+  // title or author appearing later") covers this case too, and it needs
+  // its own regression: a fix that only recognizes "by <Author>" would pass
+  // the byline test above while still over-asking here.
+  it('does not ask which source when possessive wording is followed by a named title with no author', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['learner_message'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        "I'm reading her book, The Great Gatsby, for my English assignment and need help with the green light symbolism.",
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Here is an unsupported claim about the green light.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/which one you mean/i);
+  });
+
   // [BREAK] A learner's first message of bare "yes" / "yeah" / "good" used to
   // hit the acknowledgement branch and reply "You're welcome", which is
   // nonsensical with no prior assistant turn to thank. Weak tokens now require
