@@ -205,7 +205,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
       const input = c.req.valid('json');
       // [WI-2396] Consent-withdrawal gate — immediately before LLM dispatch
       // (canon R5). addCurriculumTopic dispatches the LLM only for
-      // mode='preview' (previewCurriculumTopic -> routeAndCall); mode='create'
+      // mode='preview' (previewCurriculumTopic -> the LLM router); mode='create'
       // is a pure DB insert. Gate every mode EXCEPT the proven-deterministic
       // 'create', and fail closed — the discriminated-union schema admits only
       // 'create'/'preview' today, and any future mode stays gated.

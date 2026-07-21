@@ -115,7 +115,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       // [WI-2396] Consent-withdrawal gate — immediately before LLM dispatch
       // (canon R5). processRecallTest -> evaluateRecallQuality dispatches the
       // LLM for every attemptMode EXCEPT 'dont_remember', which short-circuits
-      // to a deterministic quality-0 result with no routeAndCall (see
+      // to a deterministic quality-0 result with no LLM dispatch (see
       // processRecallTest). Gate all modes except that one, and fail closed —
       // an absent attemptMode defaults to 'standard' server-side, so it is
       // gated.

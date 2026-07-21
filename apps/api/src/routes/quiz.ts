@@ -152,7 +152,7 @@ async function generateRoundFromInput(
   }
   // [WI-2396] Consent-withdrawal gate — immediately before LLM dispatch
   // (canon R5). 'capitals' rounds are fully deterministic (static
-  // CAPITALS_DATA bank, no routeAndCall — see generateQuizRound); only
+  // CAPITALS_DATA bank, no LLM dispatch — see generateQuizRound); only
   // 'vocabulary'/'guess_who' dispatch the LLM. Gate every activityType EXCEPT
   // the proven-deterministic 'capitals', and fail closed — any future
   // activityType (or an absent one) is gated. Shared by /quiz/rounds and
