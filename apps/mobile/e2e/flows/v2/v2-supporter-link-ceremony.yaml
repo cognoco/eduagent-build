@@ -91,12 +91,16 @@ tags:
     id: 'visibility-link-review'
 
 # Cross-login: sign out and sign back in as the supportee (env override,
-# same EMAIL/PASSWORD variables sign-in-only.yaml reads) to accept the other
-# side.
+# same EMAIL/PASSWORD variables sign-in-only-returning.yaml reads) to accept
+# the other side. Uses the RETURNING-USER sign-in (no welcome-chooser walk) —
+# sign-out.yaml leaves the app directly on the sign-in screen, never on
+# welcome-chooser, so sign-in-only.yaml's unconditional
+# nav-welcome-to-sign-in.yaml call would hang its full 120s waiting for a
+# screen that never appears.
 - runFlow:
     file: ../_setup/sign-out.yaml
 - runFlow:
-    file: ../_setup/sign-in-only.yaml
+    file: ../_setup/sign-in-only-returning.yaml
     env:
       EMAIL: ${SUPPORTEE_EMAIL}
       PASSWORD: ${SUPPORTEE_PASSWORD}
@@ -126,7 +130,7 @@ tags:
 - runFlow:
     file: ../_setup/sign-out.yaml
 - runFlow:
-    file: ../_setup/sign-in-only.yaml
+    file: ../_setup/sign-in-only-returning.yaml
 
 - openLink: "mentomate:///link/${CONTRACT_ID}"
 - extendedWaitUntil:

@@ -633,6 +633,10 @@ function createIntegrationDb(): Database {
     });
 
     it('[AC recovery — foreign/invalid deep link] an unrelated actorPersonId attempting to accept either side of this contract is rejected, not silently accepted', async () => {
+      // Runs after the preceding [AC: NO-EARLY-AUTH + AC: CEREMONY] test has
+      // already mutated the shared `seeded` contract pending -> accepted, but
+      // that's immaterial here: the foreign-actor ForbiddenError fires on
+      // actorPersonId mismatch regardless of contract status.
       // A syntactically valid UUID with no relationship to this contract at
       // all — same "unrelated caller" shape as the WI-2241 unauthorized
       // deep-link case above.
@@ -652,6 +656,9 @@ function createIntegrationDb(): Database {
     });
 
     it('[AC recovery — duplicate accept] re-accepting the same side twice is idempotent — recomputes the same accepted state rather than erroring or double-writing', async () => {
+      // Also runs after the shared `seeded` contract is already 'accepted';
+      // re-accepting the supporter side is idempotent either way, so
+      // correctness holds regardless of the contract's pending/accepted state.
       const first = await acceptLink(db, seeded.ids.contractId, {
         actorPersonId: seeded.ids.supporterPersonId,
         audience: 'supporter',

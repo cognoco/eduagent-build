@@ -600,11 +600,7 @@ export async function seedV2SupporterPendingLink(
   });
 
   const supporteeEmail = deriveEmail(email, 'pending-supportee');
-  const { clerkUserId: supporteeClerkUserId, password: supporteePassword } =
-    await createClerkTestUser(supporteeEmail, env);
-  const supportee = await seedOwnerIdentityV2(db, {
-    email: supporteeEmail,
-    clerkUserId: supporteeClerkUserId,
+  const supportee = await reseedOwnerIdentityV2(db, supporteeEmail, env, {
     displayName: 'Test Supportee',
     birthYear: 2012,
   });
@@ -632,7 +628,7 @@ export async function seedV2SupporterPendingLink(
       supporterOrganizationId: supporter.organizationId,
 
       supporteeEmail,
-      supporteePassword,
+      supporteePassword: supportee.password,
       supporteePersonId: supportee.personId,
       supporteeOrganizationId: supportee.organizationId,
 
