@@ -22,19 +22,33 @@ A later Deploy (run `29855742311`, sha `f346ee16`) was still `in_progress` at it
 
 ## 2. AC-1 — run provenance
 
-> Two exact-main runs are recorded against AC-1, because the named case was strengthened mid-item
-> (§3). **`29856034716`** below established the mechanics and preconditions on the *original* case;
-> **`29862030418`** (§3, §4) re-established them on the *strengthened* case and is the operative
-> AC-1 evidence. Both are `workflow_dispatch` on `main`; every property listed below holds for both.
+Two exact-main runs are recorded against AC-1, because the named case was strengthened mid-item (§3).
+**`29862030418` is the operative AC-1 evidence** — it is the only exact-main run of the *strengthened*
+case. `29856034716` is the earlier exact-main run of the *original* case; it is what established that
+the preconditions were cleared. Their transcripts are **not** interchangeable and are kept separate below.
 
-- **Run: `29856034716`** — event `workflow_dispatch`, ref `main`, head sha
-  `f346ee16ca4e700b48201f1f5c86d7417cbc0100` (exact-main HEAD at dispatch).
-  <https://github.com/cognoco/eduagent-build/actions/runs/29856034716>
+### 2a. Properties shared by both runs
+
+- **Dispatch shape:** event `workflow_dispatch`, ref `main` — so each ran against an exact-main commit.
 - **Project selected:** `v2-release` — the gate step ran
   `pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=v2-release`.
 - **Target is staging:** `EXPO_PUBLIC_API_URL` / `PLAYWRIGHT_API_URL` = `https://api-stg.mentomate.com`
   (`e2e-web.yml`), secrets single-sourced through `doppler run -p mentomate -c stg`.
-- **The named case executed — not skipped, not setup-only.** Gate output:
+- **The named case executed in each — not skipped, not setup-only**, and in each the staging gate
+  decided `FAILURE_CLASS=success` with **no** `ZodError` / `invalid_enum` anywhere in the run log.
+- **Seed acceptance is load-bearing, not incidental:** `seedAndSignIn(...)` passes
+  `landingTestId: 'support-hub-mentor-tab'`, so a rejected seed fails the case instead of passing quietly.
+
+### 2b. Run `29862030418` — operative (strengthened case)
+
+Head sha `79f22774a` (the squash commit that landed the b2 assertion; ancestor of `origin/main`).
+<https://github.com/cognoco/eduagent-build/actions/runs/29862030418> — transcript and artifacts in §3/§4:
+named case `[5/5]`, **`5 passed (2.2m)`**.
+
+### 2c. Run `29856034716` — earlier (original case, pre-fix)
+
+Head sha `f346ee16ca4e700b48201f1f5c86d7417cbc0100` (exact-main HEAD at dispatch).
+<https://github.com/cognoco/eduagent-build/actions/runs/29856034716>. Gate output:
 
 ```text
 Running 5 tests using 3 workers
@@ -43,11 +57,8 @@ from the support-hub Mentor surface keeps the supporter-hub surface, no learner-
   5 passed (2.3m)
 ```
 
-  `run-smoke` ran 18:09:59Z → 18:18:36Z (8m37s); the staging gate decided `FAILURE_CLASS=success`.
-
-- **The seed was accepted.** No `ZodError` / `invalid_enum` appears anywhere in the run log. Seed
-  acceptance is load-bearing rather than incidental: the case's `seedAndSignIn(...)` passes
-  `landingTestId: 'support-hub-mentor-tab'`, so a rejected seed fails the case instead of passing quietly.
+`run-smoke` ran 18:09:59Z → 18:18:36Z (8m37s). This transcript belongs to the **original** case only —
+the `[4/5]` ordering and the `2.3m` duration are this run's, not the operative run's.
 
 > **Why the PR-check green on #2297 is _not_ this evidence.** `e2e-web.yml` documents that a PR with
 > no web/mobile surface change gets a **pass-through report (~seconds)**; PR #2297 showed
