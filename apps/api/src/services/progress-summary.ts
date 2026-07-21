@@ -13,6 +13,7 @@ import type {
 import { routeAndCall, type ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import {
+  assertCallerIsOrganizationAdmin,
   assertChargeNotCredentialed,
   assertParentAccess,
 } from './family-access';
@@ -263,7 +264,15 @@ export async function getProgressSummary(
   db: Database,
   requesterProfileId: string,
   childProfileId: string,
+  callerPersonId: string | undefined,
+  organizationId: string | undefined,
 ): Promise<ProgressSummary> {
+  await assertCallerIsOrganizationAdmin(
+    db,
+    callerPersonId,
+    organizationId,
+    'You are not authorized to access this dashboard.',
+  );
   await assertParentAccess(db, requesterProfileId, childProfileId);
   await assertChargeNotCredentialed(db, childProfileId);
 

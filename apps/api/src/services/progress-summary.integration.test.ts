@@ -164,6 +164,28 @@ async function seedParentAccount(): Promise<{
   return { profileId, accountId };
 }
 
+async function seedMemberInOrganization(
+  accountId: string,
+  roles: Array<'admin' | 'learner'>,
+): Promise<string> {
+  const db = createIntegrationDb();
+  const profileId = generateUUIDv7();
+
+  await db.insert(person).values({
+    id: profileId,
+    displayName: 'Test Organization Member',
+    birthDate: '2000-06-15',
+    residenceJurisdiction: 'EU',
+  });
+  await db.insert(membership).values({
+    personId: profileId,
+    organizationId: accountId,
+    roles,
+  });
+  seededProfileIds.push(profileId);
+  return profileId;
+}
+
 async function seedFamilyLink(
   parentProfileId: string,
   childProfileId: string,
@@ -212,9 +234,58 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 
 describe('getProgressSummary (integration)', () => {
+  const callerCases = [
+    { label: 'authorized admin', kind: 'authorized' },
+    { label: 'missing caller', kind: 'missing' },
+    { label: 'same-org non-admin spoof', kind: 'non-admin' },
+    { label: 'cross-org admin spoof', kind: 'cross-org' },
+    // [BUG-400] Preserve the no-family-link regression guard explicitly.
+    { label: 'admin without child edge', kind: 'no-edge' },
+  ] as const;
+
+  it.each(callerCases)(
+    '[WI-2519][RED→GREEN] enforces $label for progress-summary reads',
+    async ({ kind }) => {
+      const child = await seedAccountWithProfileAndSubject('-matrix-child');
+      const { profileId: parentProfileId, accountId: organizationId } =
+        await seedParentAccount();
+      if (kind !== 'no-edge') {
+        await seedFamilyLink(parentProfileId, child.profileId);
+      }
+
+      let callerPersonId: string | undefined = parentProfileId;
+      if (kind === 'missing') {
+        callerPersonId = undefined;
+      } else if (kind === 'non-admin') {
+        callerPersonId = await seedMemberInOrganization(organizationId, [
+          'learner',
+        ]);
+      } else if (kind === 'cross-org') {
+        ({ profileId: callerPersonId } = await seedParentAccount());
+      }
+
+      const operation = getProgressSummary(
+        createIntegrationDb(),
+        parentProfileId,
+        child.profileId,
+        callerPersonId,
+        organizationId,
+      );
+
+      if (kind === 'authorized') {
+        await expect(operation).resolves.toMatchObject({
+          activityState: 'no_recent_activity',
+        });
+      } else {
+        await expect(operation).rejects.toThrow(ForbiddenError);
+      }
+    },
+  );
+
   it('returns no_recent_activity when the profile has no completed sessions', async () => {
     const child = await seedAccountWithProfileAndSubject('-child');
-    const { profileId: parentProfileId } = await seedParentAccount();
+    const { profileId: parentProfileId, accountId: organizationId } =
+      await seedParentAccount();
     await seedFamilyLink(parentProfileId, child.profileId);
     const db = createIntegrationDb();
 
@@ -222,6 +293,8 @@ describe('getProgressSummary (integration)', () => {
       db,
       parentProfileId,
       child.profileId,
+      parentProfileId,
+      organizationId,
     );
 
     expect(result.summary).toBeNull();
@@ -234,7 +307,8 @@ describe('getProgressSummary (integration)', () => {
 
   it('returns fresh when the stored summary basis matches the latest completed session', async () => {
     const child = await seedAccountWithProfileAndSubject('-child');
-    const { profileId: parentProfileId } = await seedParentAccount();
+    const { profileId: parentProfileId, accountId: organizationId } =
+      await seedParentAccount();
     await seedFamilyLink(parentProfileId, child.profileId);
     const db = createIntegrationDb();
     const now = new Date();
@@ -257,6 +331,8 @@ describe('getProgressSummary (integration)', () => {
       db,
       parentProfileId,
       child.profileId,
+      parentProfileId,
+      organizationId,
     );
 
     expect(result.summary).toBe('Strong week on fractions.');
@@ -267,7 +343,8 @@ describe('getProgressSummary (integration)', () => {
 
   it('returns stale when a newer completed session lands after the stored summary basis', async () => {
     const child = await seedAccountWithProfileAndSubject('-child');
-    const { profileId: parentProfileId } = await seedParentAccount();
+    const { profileId: parentProfileId, accountId: organizationId } =
+      await seedParentAccount();
     await seedFamilyLink(parentProfileId, child.profileId);
     const db = createIntegrationDb();
     const earlier = new Date(Date.now() - 60 * 60 * 1000); // 1h ago
@@ -298,6 +375,8 @@ describe('getProgressSummary (integration)', () => {
       db,
       parentProfileId,
       child.profileId,
+      parentProfileId,
+      organizationId,
     );
 
     expect(result.activityState).toBe('stale');
@@ -305,7 +384,8 @@ describe('getProgressSummary (integration)', () => {
 
   it('[REGRESSION bug 194] ignores sessions in non-completed statuses when computing freshness', async () => {
     const child = await seedAccountWithProfileAndSubject('-child');
-    const { profileId: parentProfileId } = await seedParentAccount();
+    const { profileId: parentProfileId, accountId: organizationId } =
+      await seedParentAccount();
     await seedFamilyLink(parentProfileId, child.profileId);
     const db = createIntegrationDb();
 
@@ -334,34 +414,14 @@ describe('getProgressSummary (integration)', () => {
       db,
       parentProfileId,
       child.profileId,
+      parentProfileId,
+      organizationId,
     );
 
     // With NO completed sessions, latestSessionId is null and we report
     // no_recent_activity — proving the WHERE clause filters by status.
     expect(result.latestSessionId).toBeNull();
     expect(result.activityState).toBe('no_recent_activity');
-  });
-
-  // [BUG-400] Break test -- service-layer defense-in-depth IDOR guard.
-  //
-  // Red-green pattern:
-  //   GREEN (fix applied):  test passes -- ForbiddenError is thrown.
-  //   RED   (fix reverted): assertParentAccess removed from getProgressSummary ->
-  //     test fails with 'Received function did not throw' because getProgressSummary
-  //     returns the child data silently instead of throwing.
-  //
-  // This proves that without the service-layer assert, an unlinked requester
-  // can read any child progress summary by calling the function directly,
-  // bypassing the route-level assertOwnerAndParentAccess.
-  it('[BUG-400 break test] throws ForbiddenError when requester has no family link to child', async () => {
-    const child = await seedAccountWithProfileAndSubject('-child');
-    const { profileId: unrelatedParentId } = await seedParentAccount();
-    // Deliberately NO seedFamilyLink -- unrelated parent has no link to child.
-    const db = createIntegrationDb();
-
-    await expect(
-      getProgressSummary(db, unrelatedParentId, child.profileId),
-    ).rejects.toThrow(ForbiddenError);
   });
 });
 
