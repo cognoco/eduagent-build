@@ -1,4 +1,8 @@
-import { getTableConfig, type PgColumn } from 'drizzle-orm/pg-core';
+import {
+  getTableConfig,
+  type IndexedColumn,
+  type PgColumn,
+} from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 
 import {
@@ -85,18 +89,21 @@ describe('mentor notices schema', () => {
     );
 
     expect(answerEventUq?.config.unique).toBe(true);
-    expect(answerEventUq?.config.columns.map((column) => column.name)).toEqual([
-      'source_session_id',
-      'answer_event_id',
-    ]);
+    expect(
+      answerEventUq!.config.columns.map(
+        (column) => (column as IndexedColumn).name,
+      ),
+    ).toEqual(['source_session_id', 'answer_event_id']);
     expect(renderPredicate(answerEventUq!.config.where as SQL)).toBe(
       '<answer_event_id> IS NOT NULL',
     );
 
     expect(nullEvidenceUq?.config.unique).toBe(true);
-    expect(nullEvidenceUq?.config.columns.map((column) => column.name)).toEqual(
-      ['source_session_id'],
-    );
+    expect(
+      nullEvidenceUq!.config.columns.map(
+        (column) => (column as IndexedColumn).name,
+      ),
+    ).toEqual(['source_session_id']);
     expect(renderPredicate(nullEvidenceUq!.config.where as SQL)).toBe(
       '<answer_event_id> IS NULL',
     );
