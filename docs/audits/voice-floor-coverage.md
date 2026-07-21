@@ -1,7 +1,7 @@
 # Voice-floor coverage audit
 
-Date: 2026-07-21  
-Work item: WI-1763 — Voice-floor coverage audit across V2 surfaces  
+Date: 2026-07-21
+Work item: WI-1763 — Voice-floor coverage audit across V2 surfaces
 Revision inspected: `bafb03071c642d871213fd8791e030d26c28a78e`
 
 ## Ruling and method
