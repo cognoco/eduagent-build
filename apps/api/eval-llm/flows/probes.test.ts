@@ -217,6 +217,18 @@ describe('probes quality heuristics — P25 (topic-opener promise) [WI-2107]', (
     expect(issues).toEqual([]);
   });
 
+  it('accepts a promise opener with content introduced by an ellipsis', async () => {
+    // Pre-emptive: a single-glyph-ellipsis-introduced topic clause (U+2026)
+    // has the same shape as the colon/em-dash gaps; three literal dots
+    // ("...") were already safe via the existing period boundary, but the
+    // single ellipsis glyph was not.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath… she was a poet.",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
   it('still flags a bare promise with a trivial remainder after a colon', async () => {
     // Guards the colon/em-dash boundary additions against reopening the
     // bare-promise case: a trivial remainder after the new boundary chars
