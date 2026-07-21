@@ -52,6 +52,10 @@
       "scenario": "v2-supporter-accepted"
     },
     {
+      "flow": "flows/v2/v2-supporter-coldstart-mount.yaml",
+      "scenario": "v2-supporter-managed"
+    },
+    {
       "flow": "flows/v2/v2-account-owner.yaml",
       "scenario": "parent-multi-child"
     },

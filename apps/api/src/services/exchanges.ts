@@ -24,6 +24,7 @@ import {
   type LlmResponseEnvelope,
   type ChallengeRoundEvaluationItem,
   type ChallengeRoundNoteDraftHint,
+  type AnswerEvaluation,
 } from '@eduagent/schemas';
 import {
   buildSystemPromptSegments as _buildSystemPromptSegments,
@@ -516,6 +517,8 @@ export interface ExchangeResult {
   needsDeepening: boolean;
   /** Whether the LLM signalled partial progress (Gap 3) */
   partialProgress: boolean;
+  /** Canonical evaluation of the current ordinary learner answer. */
+  answerEvaluation?: AnswerEvaluation;
   provider: string;
   model: string;
   latencyMs: number;
@@ -564,6 +567,14 @@ export interface ExchangeResult {
    * [BUG-92 / CR-2026-05-19-C4]
    */
   readyToFinish: boolean;
+  /**
+   * [WI-2107] LLM signalled `signals.topic_opened_pending_content` — it opened
+   * a new topic but did not deliver content or ask a question this turn.
+   * Server-side hard cap lives client-side (no server loop for this signal —
+   * each auto-continuation is a discrete request): see
+   * `use-session-streaming.ts`'s `autoContinuationFiredRef`.
+   */
+  topicOpenedPendingContent: boolean;
   /**
    * Bug #348: EVALUATE assessment signal (snake_case wire shape) lifted from
    * `envelope.signals.evaluate_assessment`. The session-exchange persistence
@@ -1142,6 +1153,43 @@ function isStuckReactionTurn(value: string): boolean {
 const AMBIGUOUS_SOURCE_REFERENCE =
   /\b(?:her|his|their|that|this)\s+(?:book|poems?|storys?|stories|article|novel|essay|text)\b|\bthe\s+(?:book|poem|poems|story|stories|article)\s+(?:we're|we are|i'm|i am|you're|you are|they're|they are)\b/i;
 
+// [WI-2100 rework, bounce 2] A learner can open with possessive/demonstrative
+// wording ("her book") and then name the work in full later in the SAME
+// message ("...The Great Gatsby by F. Scott Fitzgerald", or just "...The
+// Great Gatsby" with no author). AMBIGUOUS_SOURCE_REFERENCE alone can't see
+// that — it only matches the possessive phrase. This checks for either
+// signal so a fully named request never gets swallowed by the
+// possessive-only positive path above:
+//   - an author byline: "by <First Last>" (>=2 capitalized name tokens, so
+//     "by Monday"/"by Friday" don't false-trigger on a single capitalized
+//     word), the same signal the "already named" negative-path test relies
+//     on;
+//   - a quoted title: "..." or '...';
+//   - a bare title-case run: two or more consecutive capitalized words
+//     (e.g. "The Great Gatsby").
+//
+// Both the byline and title-case checks trade recall for precision, in both
+// directions, deliberately:
+//   - Deliberately NOT covered: a single-word title ("her book, Beloved") or
+//     a mononym author ("her book by Homer") — heuristically indistinguishable
+//     from any other capitalized word, so detecting them reliably isn't worth
+//     the false-positive rate it would add.
+//   - Deliberately over-covered: the title-case run also matches an
+//     incidental two-capital sequence that isn't a title at all (e.g. "I'm
+//     reading her book and I live in New York" matches on "New York"), which
+//     suppresses the ask for a message that never actually named its source.
+// Both directions are accepted because a miss OR a false match here degrades
+// to the same safe fallback: buildUnsupportedFactualReply's other branches
+// only ever return the generic "share your source" reply, never a
+// work-specific assumption — so either error is a precision loss (asking
+// when it could've proceeded, or not asking when it could've asked more
+// narrowly), never a return of the original staging bug (assuming a
+// specific work). A regex can't be both complete and false-positive-free
+// here; this repo's incident was about assuming a title, so precision
+// against that failure mode is the priority.
+const NAMED_SOURCE_REFERENCE =
+  /\bby\s+[A-Z][\w.'-]*\s+[A-Z][\w.'-]*(?:\s+[A-Z][\w.'-]*){0,2}\b|["“][^"”]{1,80}["”]|'[A-Z][^']{1,80}'|\b(?:[A-Z][a-zA-Z']*\s+){1,}[A-Z][a-zA-Z']*\b/;
+
 function buildUnsupportedFactualReply(
   sourceAudit: ExchangeSourceAudit,
 ): string {
@@ -1179,7 +1227,10 @@ function buildUnsupportedFactualReply(
   // keyword branches below so an ambiguous reference never gets swallowed by
   // an unrelated keyword match (e.g. "start analyzing" matching the
   // explain/start branch).
-  if (AMBIGUOUS_SOURCE_REFERENCE.test(lower)) {
+  if (
+    AMBIGUOUS_SOURCE_REFERENCE.test(lower) &&
+    !NAMED_SOURCE_REFERENCE.test(learnerQuestion)
+  ) {
     return (
       "I don't want to guess which one you mean, so before we go further: what's the title (or author) of what you're reading? " +
       "A photo or short excerpt works too if that's easier."
@@ -1777,6 +1828,7 @@ function buildImageUnscreenedResult(context: ExchangeContext): ExchangeResult {
     model: IMAGE_UNSCREENED_MODEL,
     latencyMs: 0,
     readyToFinish: false,
+    topicOpenedPendingContent: false,
   };
 }
 
@@ -1812,7 +1864,22 @@ function buildTripwireResult(
     model: `deterministic:${category}`,
     latencyMs: 0,
     readyToFinish: false,
+    topicOpenedPendingContent: false,
   };
+}
+
+export function shouldAcceptAnswerEvaluation(
+  context: ExchangeContext,
+  appHelpTurn: boolean,
+): boolean {
+  const challengeState = context.challengeRound?.state;
+  return (
+    context.answerEvaluationEnabled === true &&
+    !appHelpTurn &&
+    context.effectiveMode !== 'recitation' &&
+    challengeState !== 'accepted' &&
+    challengeState !== 'active'
+  );
 }
 
 export async function processExchange(
@@ -1914,12 +1981,25 @@ export async function processExchange(
     responseFormat: 'json',
   });
 
+  const acceptAnswerEvaluation = shouldAcceptAnswerEvaluation(
+    context,
+    appHelpTurn,
+  );
   const parsed = parseExchangeEnvelope(result.response, {
     sessionId: context.sessionId,
     profileId: context.profileId,
     flow: 'processExchange',
+    acceptAnswerEvaluation,
   });
-  const finalParsed = appHelpTurn ? applyAppHelpSignalGuard(parsed) : parsed;
+  const appHelpGuarded = appHelpTurn ? applyAppHelpSignalGuard(parsed) : parsed;
+  const finalParsed = acceptAnswerEvaluation
+    ? {
+        ...appHelpGuarded,
+        partialProgress:
+          appHelpGuarded.answerEvaluation?.correctness === 'partial' ||
+          appHelpGuarded.partialProgress,
+      }
+    : { ...appHelpGuarded, answerEvaluation: undefined };
 
   // [H2/H7] Crisis redirect fired — emit the structured safety event before
   // anything else can short-circuit. safeSend guarantees a dispatch failure
@@ -2048,6 +2128,7 @@ export async function processExchange(
     ),
     needsDeepening: finalParsed.needsDeepening,
     partialProgress: finalParsed.partialProgress,
+    answerEvaluation: finalParsed.answerEvaluation,
     provider: result.provider,
     model: result.model,
     latencyMs: result.latencyMs,
@@ -2070,6 +2151,7 @@ export async function processExchange(
     // applyAppHelpSignalGuard for app-help turns. Hard cap stays the caller's
     // responsibility — never trust this flag alone.
     readyToFinish: finalParsed.readyToFinish,
+    topicOpenedPendingContent: finalParsed.topicOpenedPendingContent,
     // Bug #348: pass the EVALUATE / TEACH_BACK assessment signals through to
     // session-exchange.persistExchangeResult so they land at
     // aiMetadata.signals.{evaluate_assessment,teach_back_assessment} on the
@@ -2230,6 +2312,8 @@ export interface ParsedExchangeEnvelope {
   cleanResponse: string;
   understandingCheck: boolean;
   partialProgress: boolean;
+  /** Canonical evaluation of the current ordinary learner answer. */
+  answerEvaluation?: AnswerEvaluation;
   needsDeepening: boolean;
   /** Safety: crisis-redirect rule fired this turn (H2, 2026-06-05 safety audit). Observational — drives structured safety logging, never flow control. */
   crisisRedirect: boolean;
@@ -2267,6 +2351,11 @@ export interface ParsedExchangeEnvelope {
    */
   readyToFinish: boolean;
   /**
+   * [WI-2107] LLM signalled `signals.topic_opened_pending_content` in the
+   * envelope. False for every fallback-shaped parse result.
+   */
+  topicOpenedPendingContent: boolean;
+  /**
    * Bug #348: EVALUATE assessment signal (snake_case wire shape) lifted from
    * `envelope.signals.evaluate_assessment`. Forwarded verbatim so the
    * persistence layer can write it under `aiMetadata.signals.evaluate_assessment`
@@ -2293,6 +2382,7 @@ const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
   cleanResponse: '',
   understandingCheck: false,
   partialProgress: false,
+  answerEvaluation: undefined,
   needsDeepening: false,
   crisisRedirect: false,
   notePrompt: false,
@@ -2307,6 +2397,7 @@ const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
   retrievalScore: undefined,
   privateSources: undefined,
   readyToFinish: false,
+  topicOpenedPendingContent: false,
   evaluateAssessment: undefined,
   teachBackAssessment: undefined,
 };
@@ -2396,11 +2487,18 @@ function parsedFromVisibleFallbackText(text: string): ParsedExchangeEnvelope {
  */
 export function parseExchangeEnvelope(
   response: string,
-  context?: { sessionId?: string; profileId?: string; flow?: string },
+  context?: {
+    sessionId?: string;
+    profileId?: string;
+    flow?: string;
+    acceptAnswerEvaluation?: boolean;
+  },
 ): ParsedExchangeEnvelope {
   // [BUG-847] Tag the surface so parser-side telemetry can distinguish
   // session-flow parse failures from silent_classify ones below.
-  const parsed = parseEnvelope(response, 'exchange.session');
+  const parsed = parseEnvelope(response, 'exchange.session', {
+    ignoreAnswerEvaluation: context?.acceptAnswerEvaluation === false,
+  });
   if (!parsed.ok) {
     logger.warn('exchange.envelope_parse_failed', {
       flow: context?.flow,
@@ -2428,6 +2526,7 @@ export function parseExchangeEnvelope(
       cleanResponse: cleanLearnerVisibleReply(fallbackText),
       understandingCheck: detectUnderstandingCheckFromProse(fallbackText),
       partialProgress: false,
+      answerEvaluation: undefined,
       needsDeepening: false,
       crisisRedirect: false,
       notePrompt: false,
@@ -2437,6 +2536,7 @@ export function parseExchangeEnvelope(
       noteDraft: null,
       fluencyDrill: null,
       readyToFinish: false,
+      topicOpenedPendingContent: false,
       envelopeParseFailed: true,
       envelopeParseFailureReason: parsed.reason,
     };
@@ -2488,6 +2588,7 @@ function envelopeToParsedExchange(
       // control-flow impact beyond the telemetry flag.
       detectUnderstandingCheckFromProse(cleanReply),
     partialProgress: signals.partial_progress === true,
+    answerEvaluation: signals.answer_evaluation,
     needsDeepening: signals.needs_deepening === true,
     crisisRedirect: signals.crisis_redirect === true,
     notePrompt: notePrompt?.show === true,
@@ -2505,6 +2606,7 @@ function envelopeToParsedExchange(
         ? signals.retrieval_score
         : undefined,
     readyToFinish: signals.ready_to_finish === true,
+    topicOpenedPendingContent: signals.topic_opened_pending_content === true,
     // Bug #348: forward EVALUATE / TEACH_BACK assessment signals verbatim
     // (snake_case wire shape). The persistence layer writes them under
     // aiMetadata.signals.{evaluate_assessment,teach_back_assessment} where the
@@ -2611,11 +2713,22 @@ function extractKnownMarkerKey(response: string): string | null {
 // ---------------------------------------------------------------------------
 export function classifyExchangeOutcome(
   rawResponse: string,
-  _context?: { sessionId?: string; profileId?: string; flow?: string },
+  context?: {
+    sessionId?: string;
+    profileId?: string;
+    flow?: string;
+    acceptAnswerEvaluation?: boolean;
+  },
 ): ClassifiedExchangeOutcome {
   // [BUG-847] Distinct surface tag — silent_classify is the marker-only
   // fallback path, expected to fail full envelope validation more often.
-  const envelopeResult = parseEnvelope(rawResponse, 'exchange.silent_classify');
+  const envelopeResult = parseEnvelope(
+    rawResponse,
+    'exchange.silent_classify',
+    {
+      ignoreAnswerEvaluation: context?.acceptAnswerEvaluation === false,
+    },
+  );
 
   // Normal envelope path — parsed cleanly; classify empty reply here.
   // Pass the already-validated envelope to envelopeToParsedExchange so we

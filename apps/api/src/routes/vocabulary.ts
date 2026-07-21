@@ -57,7 +57,7 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
     zValidator('json', vocabularyCreateSchema),
     async (c) => {
       // [WI-181 / DS-092] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       try {
@@ -85,7 +85,7 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
     zValidator('json', vocabularyReviewSchema),
     async (c) => {
       // [WI-181 / DS-092] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       try {
@@ -111,7 +111,7 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
   )
   .delete('/subjects/:subjectId/vocabulary/:vocabularyId', async (c) => {
     // [WI-181 / DS-092] Server-derived proxy-mode write guard.
-    assertNotProxyMode(c);
+    await assertNotProxyMode(c);
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const { subjectId, vocabularyId } = c.req.param();

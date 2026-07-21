@@ -133,6 +133,189 @@ describe('probes quality heuristics — P15/P22 (escalation)', () => {
   });
 });
 
+describe('probes quality heuristics — P25 (topic-opener promise) [WI-2107]', () => {
+  it('errors when the reply is a bare forward-promise with nothing else', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath.",
+      signals: {},
+    });
+    expect(issues.some((i) => i.code === 'P25.bare-promise')).toBe(true);
+  });
+
+  it('accepts a promise opener followed by real content', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply:
+        "Let's talk about Sylvia Plath. She was an American poet best known for her collection Ariel and her novel The Bell Jar.",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts a promise opener followed by a specific question', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply:
+        "We'll explore Sylvia Plath together. Have you read any of her poems before?",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts a promise opener with content packed into the same sentence', async () => {
+    // Reviewer finding (bounce 1): the old sentence-count proxy flagged this
+    // as bare-promise because it's one sentence with no question mark, even
+    // though the appositive after the comma supplies real content.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply:
+        "Let's talk about Sylvia Plath, an American poet best known for Ariel and The Bell Jar.",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('still flags a bare promise with a padded/elaborated topic name', async () => {
+    // Guards the mirror-image gap a naive words-after-the-opener count would
+    // reopen: a long topic description supplies no actual content, so it
+    // must not clear the word-count floor just by being verbose.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply:
+        "Let's explore the fascinating and complex world of quantum mechanics.",
+      signals: {},
+    });
+    expect(issues.some((i) => i.code === 'P25.bare-promise')).toBe(true);
+  });
+
+  it('accepts a promise opener with content introduced by a colon', async () => {
+    // Bounce 2 (reviewer:codex:global): the boundary regex recognized only
+    // `, . ; !` — a colon-introduced topic clause fell through and was
+    // wrongly flagged as bare even though real content follows.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply:
+        "Let's talk about Sylvia Plath: she was an American poet best known for Ariel.",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts a promise opener followed by an exactly-4-word factual sentence', async () => {
+    // Bounce 2 (reviewer:codex:global): the `<= 4` threshold wrongly caught
+    // a genuine 4-word content remainder ("She was a poet.") as bare.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath. She was a poet.",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts a promise opener with content introduced by an em dash', async () => {
+    // Pre-emptive: an em-dash-introduced topic clause has the same shape as
+    // the colon gap bounce 2 flagged, so it was checked before it could
+    // trigger a third bounce.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath — she was a poet.",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts a promise opener with content introduced by an ellipsis', async () => {
+    // Pre-emptive: a single-glyph-ellipsis-introduced topic clause (U+2026)
+    // has the same shape as the colon/em-dash gaps; three literal dots
+    // ("...") were already safe via the existing period boundary, but the
+    // single ellipsis glyph was not.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath… she was a poet.",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('still flags a bare promise with a trivial remainder after a colon', async () => {
+    // Guards the colon/em-dash boundary additions against reopening the
+    // bare-promise case: a trivial remainder after the new boundary chars
+    // must still be caught.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath: sure.",
+      signals: {},
+    });
+    expect(issues.some((i) => i.code === 'P25.bare-promise')).toBe(true);
+  });
+});
+
+describe('probes quality heuristics — P25 envelope-signal path (Tier-2 live) [WI-2107]', () => {
+  // Round 4 (Option C): for a live, envelope-bearing response the model's own
+  // `topic_opened_pending_content` self-report is the arbiter, not the prose
+  // word-count heuristic (`isBarePromiseOnly`), which was ruled structurally
+  // unsound after three boundary/word-count patches (bounce 3). These cases
+  // pin the two structural counterexamples from that finding plus the escape
+  // hatch and the preserved snapshot fallback.
+
+  it('accepts concise factual content when the model reports no pending content (false-positive fixed)', async () => {
+    // Load-bearing discriminator: the 3-word factual remainder
+    // ("Plath wrote Ariel.") is real content, but the word-count heuristic
+    // (< 4 words) wrongly flags it as bare. With the envelope signal present,
+    // the heuristic is bypassed and the model's self-report governs.
+    // Red-green: OLD code (no signal branch) flags this; NEW code returns [].
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath. Plath wrote Ariel.",
+      signals: { topic_opened_pending_content: false },
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('still flags that same concise-factual reply when NO envelope signal is present (fallback intact)', async () => {
+    // Same string as above, but with no `topic_opened_pending_content` key —
+    // the Tier-1 snapshot fallback runs and the (deliberately untouched)
+    // word-count heuristic still bites. Proves the signal is the discriminator,
+    // not the reply text.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath. Plath wrote Ariel.",
+      signals: {},
+    });
+    expect(issues.some((i) => i.code === 'P25.bare-promise')).toBe(true);
+  });
+
+  it('accepts a pure bare promise when the model reports pending content (auto-continuation escape hatch)', async () => {
+    // A contentless opener is not a dead end when the model signals pending
+    // content: the client (AC-2/AC-3) immediately requests the next turn.
+    // Red-green: OLD code flags this bare promise; NEW code returns [] because
+    // the `true` signal branch is read.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath.",
+      signals: { topic_opened_pending_content: true },
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts consecutive bare promises when the model reports pending content (false-negative reframed)', async () => {
+    // The consecutive-promises counterexample ("…Let's dive right in!") is
+    // contentless, but its word count (4) means the untouched fallback would
+    // also accept it — so this is resolved by reframing, not a red-green flip:
+    // it is correctly accepted because the `true` signal guarantees the client
+    // auto-continues, not because word-count happened to guess right.
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath. Let's dive right in!",
+      signals: { topic_opened_pending_content: true },
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('accepts a truly bare promise when the model reports NO pending content (self-report is trusted by design)', async () => {
+    // Intentional design boundary: with a live envelope signal present, the
+    // model's `false` self-report is trusted even when the prose looks bare —
+    // the live path defers to the self-report + shipped auto-continuation and
+    // does NOT second-guess content via prose (that heuristic was ruled
+    // unsound; see the AGENTS.md WI-2107 known-exception note). This pins that
+    // it is a deliberate accept, not an accidental gap: the independent
+    // bare-promise guard is retained only in the Tier-1 no-signal fallback
+    // (covered by the "…NO envelope signal…" case above).
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath.",
+      signals: { topic_opened_pending_content: false },
+    });
+    expect(issues).toEqual([]);
+  });
+});
+
 describe('probes quality heuristics — P08 (worked-example fading)', () => {
   it('accepts a reply that hands the next step back to the learner', async () => {
     const issues = await evaluate('15yo-football-gaming', 'P08', {

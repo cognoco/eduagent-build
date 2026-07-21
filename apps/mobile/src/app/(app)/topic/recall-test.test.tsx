@@ -412,6 +412,133 @@ describe('RecallTestScreen', () => {
     expect(mockRecallMutate).toHaveBeenCalledTimes(1);
   });
 
+  // [WI-2114] Answer-specific Recall Check feedback. The exact preview-device
+  // incident: a learner recalling Sylvia Plath got the fixed "Good effort"
+  // prompt, and asking "What is wrong with what I said" repeated the same copy
+  // verbatim. The fix renders the grader's answer-specific feedback instead.
+  describe('[WI-2114] answer-specific feedback', () => {
+    beforeEach(() => {
+      mockSearchParams = { topicId: 'topic-plath', subjectId: 'subject-lit' };
+    });
+
+    it('[AC-1/AC-6 Sylvia Plath] renders grader feedback, not the generic prompt', async () => {
+      queuedRecallResults = [
+        {
+          passed: false,
+          failureCount: 1,
+          failureAction: 'feedback_only',
+          feedback: {
+            strengths:
+              'You correctly recalled that The Bell Jar is her only novel.',
+            gaps: 'You did not mention that Ariel was published after her death.',
+            nextStep:
+              'Next, note when Ariel appeared and why that timing matters.',
+          },
+        },
+      ];
+
+      render(<RecallTestScreen />);
+      fireEvent.press(screen.getByTestId('mock-send-button'));
+
+      await waitFor(() => {
+        screen.getByText(/The Bell Jar is her only novel/);
+      });
+      screen.getByText(/Ariel was published after her death/);
+      screen.getByText(/note when Ariel appeared/);
+      // The generic "Good effort" prompt must NOT appear when the grader
+      // supplied answer-specific feedback.
+      expect(screen.queryByText(/Good effort/)).toBeNull();
+    });
+
+    it('[AC-5] falls back to the honest generic prompt when the grader gave no feedback', async () => {
+      queuedRecallResults = [
+        {
+          passed: false,
+          failureCount: 1,
+          failureAction: 'feedback_only',
+        },
+      ];
+
+      render(<RecallTestScreen />);
+      fireEvent.press(screen.getByTestId('mock-send-button'));
+
+      // Cooldown / grader-omitted-feedback path: the generic prompt stays.
+      await waitFor(() => {
+        screen.getByText(/Good effort/);
+      });
+    });
+
+    it('[AC-3] consecutive submissions render distinct feedback', async () => {
+      queuedRecallResults = [
+        {
+          passed: false,
+          failureCount: 1,
+          failureAction: 'feedback_only',
+          feedback: {
+            strengths: 'First submission: you named the poet.',
+            gaps: 'First submission: the collection title is missing.',
+            nextStep: 'First submission: add the collection title.',
+          },
+        },
+        {
+          passed: false,
+          failureCount: 2,
+          failureAction: 'feedback_only',
+          feedback: {
+            strengths: 'Second submission: you added the collection title.',
+            gaps: 'Second submission: the publication year is still missing.',
+            nextStep: 'Second submission: add the publication year.',
+          },
+        },
+      ];
+
+      render(<RecallTestScreen />);
+      fireEvent.press(screen.getByTestId('mock-send-button'));
+      await waitFor(() => {
+        screen.getByText(/First submission: you named the poet/);
+      });
+      fireEvent.press(screen.getByTestId('mock-send-button'));
+      await waitFor(() => {
+        screen.getByText(/Second submission: you added the collection title/);
+      });
+      // Both distinct feedback bodies are on screen — the second did not repeat
+      // the first verbatim.
+      screen.getByText(/First submission: add the collection title/);
+      screen.getByText(/Second submission: add the publication year/);
+    });
+
+    it('[AC-4] renders mentor-language feedback prose while controls stay in the app language', async () => {
+      // Feedback arrives already written in the mentor language (here German —
+      // server-produced prose); the client renders it verbatim, never through
+      // t(). Navigation/controls (the dont-remember button) stay app-language.
+      queuedRecallResults = [
+        {
+          passed: false,
+          failureCount: 1,
+          failureAction: 'feedback_only',
+          feedback: {
+            strengths: 'Du hast das Hauptthema richtig erkannt.',
+            gaps: 'Dir fehlt noch das Erscheinungsjahr von Ariel.',
+            nextStep: 'Nenne als Nächstes das Erscheinungsjahr.',
+          },
+        },
+      ];
+
+      render(<RecallTestScreen />);
+      // App-language control label (English en.json) is present up front.
+      screen.getByText("I don't remember");
+
+      fireEvent.press(screen.getByTestId('mock-send-button'));
+
+      await waitFor(() => {
+        screen.getByText(/Du hast das Hauptthema richtig erkannt/);
+      });
+      // Mentor-prose rendered verbatim; app-language control unchanged.
+      screen.getByText(/Nenne als Nächstes das Erscheinungsjahr/);
+      screen.getByText("I don't remember");
+    });
+  });
+
   it('[BUG-680] shows timeout fallback when submission hangs past 30s', () => {
     jest.useFakeTimers();
     try {

@@ -30,6 +30,8 @@ type StreamMessageDoneResult = {
   aiEventId?: string;
   notePrompt?: boolean;
   notePromptPostSession?: boolean;
+  /** [WI-2107] LLM opened a topic without delivering content or a question this turn. */
+  topicOpenedPendingContent?: boolean;
   fluencyDrill?: FluencyDrillEvent;
   languageLearning?: LanguageLearningActivityEvent;
   challengeRound?: ChallengeRoundSessionState;
@@ -217,6 +219,7 @@ export function useStreamMessage(sessionId: string): {
                     aiEventId: (event as { aiEventId?: string }).aiEventId,
                     notePrompt: event.notePrompt,
                     notePromptPostSession: event.notePromptPostSession,
+                    topicOpenedPendingContent: event.topicOpenedPendingContent,
                     fluencyDrill: event.fluencyDrill,
                     languageLearning: event.languageLearning,
                     challengeRound: event.challengeRound,

@@ -169,6 +169,8 @@ const envSchema = z.object({
   // See docs/plans/2026-05-18-challenge-round-targets.md "Rollout Gate".
   CHALLENGE_ROUND_RUNTIME_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  ANSWER_EVALUATION_RUNTIME_ENABLED: z.enum(['true', 'false']).default('false'),
+
   // Homework notice felt moments — single default-off kill switch covering
   // prompt proposals, durable acceptance, read surfaces, routes, and jobs.
   MENTOR_NOTICE_ENABLED: z.enum(['true', 'false']).default('false'),
@@ -203,11 +205,10 @@ const envSchema = z.object({
 
   // Suitability-judge framework (MMT-ADR-0016 §7 phase 4). Default-OFF: while
   // 'false', the exchange path dispatches NO post-display judge — zero behavior
-  // change. Flipped to 'true' in STAGING first to calibrate flag rates from the
-  // judge.verdict / judge.degraded metrics before any phase-5 pre-display
-  // gating. Production stays off until the vendor/DPA gates in
-  // docs/registers/llm-models/master.md clear. The judge is post-display and
-  // fail-open, so the flag only controls whether the calibration dispatch fires.
+  // change. The schema default is 'false'; deployed values are external runtime
+  // configuration. Enablement evidence, including vendor/DPA gates, lives in
+  // docs/registers/llm-models/master.md. The judge is post-display and fail-open,
+  // so the flag only controls whether the calibration dispatch fires.
   JUDGE_FRAMEWORK_ENABLED: z.enum(['true', 'false']).default('false'),
 
   // Suitability-judge ENFORCING output gate for minors (MMT-ADR-0016 §3
@@ -216,9 +217,9 @@ const envSchema = z.object({
   // latency/cost. When 'true', a minor's reply is judged synchronously and a
   // verdict==='violation' (on a non-allowlisted category) is blocked-and-replaced
   // via the sourceReplacement rail; a 'concern' never blocks; an unavailable
-  // judge fails OPEN with a structured operator alarm. MUST NOT be flipped on
-  // until the calibration-gated threshold is harvested from real minor-traffic
-  // judge.verdict data — pre-launch we have none, so it stays off.
+  // judge fails OPEN with a structured operator alarm. The schema default is
+  // 'false'; deployed values are external runtime configuration and require
+  // calibration-gated evidence from real minor-traffic judge.verdict data.
   JUDGE_ENFORCEMENT_ENABLED: z.enum(['true', 'false']).default('false'),
 
   // Challenge Round grader (MMT-ADR-0016 §2 / plan 2026-06-26). Sources
@@ -400,6 +401,18 @@ export function isChallengeRoundEnabledForProfile(
  * REVIEW transition copy. See docs/specs/2026-06-27-rr1-rr13-warm-review-callback.md.
  */
 export function isReviewCallbackOpenerEnabled(
+  value: string | undefined,
+): boolean {
+  return value === 'true';
+}
+
+/**
+ * Per-turn answer-evaluation gate. Read at the session route boundary and
+ * threaded through prompt construction, parsing, persistence, and bounded
+ * downscaffolding. Default-closed so an absent or malformed binding preserves
+ * the legacy exchange path.
+ */
+export function isAnswerEvaluationRuntimeEnabled(
   value: string | undefined,
 ): boolean {
   return value === 'true';

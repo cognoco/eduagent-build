@@ -344,12 +344,28 @@ jest.mock('../services/billing', () => {
 // ---------------------------------------------------------------------------
 
 import { Hono } from 'hono';
+// [WI-2398] assertNotProxyMode now also calls assertCanWriteProfile, which
+// calls verifyPersonOwnershipV2 — a raw db.select() membership query the
+// fully-mocked DB module cannot satisfy. Every scenario in this file that
+// reaches assertNotProxyMode's allow path is a caller-self write (the header
+// profile equals the authenticated caller's own person id, both
+// 'test-profile-id', via the seeded v2 identity graph); the cross-account
+// write attack this guard exists to close is covered by the real-DB break
+// test in tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's mock DB environment.
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { app } from '../index';
 import { filingRoutes } from './filing';
 import { getSession, markSessionFiled } from '../services/session';
 import { fileToLibrary } from '../services/filing';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { FILING_CONFIG } from '../config/filing';
+import { seedConsentState } from '../test-utils/consent-seed';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -357,6 +373,25 @@ const TEST_ENV = {
 };
 
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
+
+// [WI-2396] seedConsentState replaces mockDatabaseModule.db.query with a new
+// Proxy; since that db is a single shared module-level object, the override
+// persists past jest.clearAllMocks() (which only clears call history, not
+// this raw property reassignment) and would leak WITHDRAWN state into
+// subsequent tests. Snapshot + restore db.query around the seeded call.
+async function withWithdrawnConsent(fn: () => Promise<void>): Promise<void> {
+  const db = mockDatabaseModule.db as unknown as Record<string, unknown>;
+  const originalQuery = db['query'];
+  seedConsentState(db, {
+    state: 'WITHDRAWN',
+    personId: 'test-profile-id',
+  });
+  try {
+    await fn();
+  } finally {
+    db['query'] = originalQuery;
+  }
+}
 
 describe('filing routes', () => {
   // LLM transport stays real — registerLlmProviderFixture keeps routeAndCall
@@ -797,6 +832,32 @@ describe('filing routes', () => {
       expect(body).toHaveProperty('bookId');
       expect(body).toHaveProperty('topicId');
       expect(body).toHaveProperty('topicTitle');
+    });
+
+    // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls fileToLibrary when consent is withdrawn', async () => {
+      // This describe block's beforeEach only clears the JWKS cache (not mock
+      // call history) — mirror the file's established .mockClear() pattern
+      // (see the [CR-652] tests above) so an earlier test's fileToLibrary
+      // call doesn't leak into this assertion.
+      (fileToLibrary as jest.Mock).mockClear();
+
+      await withWithdrawnConsent(async () => {
+        const res = await app.request(
+          '/v1/filing',
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({ rawInput: 'photosynthesis' }),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { code?: string };
+        expect(body.code).toBe('CONSENT_WITHDRAWN');
+        expect(fileToLibrary).not.toHaveBeenCalled();
+      });
     });
 
     // [CR-652] Break tests guarding against re-inversion of the filedFrom label.

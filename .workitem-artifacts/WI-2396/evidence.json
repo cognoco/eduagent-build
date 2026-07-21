@@ -1,0 +1,60 @@
+{
+  "claims": [
+    {
+      "acRef": "AC-1",
+      "description": "Manifest-defined request-time route set refuses withdrawn-consent before LLM dispatch (consent-refusal status; service/LLM spy zero calls). The assertLlmConsent gate covers 12 route-groups with 23 gate call-sites total: the original 6 route-groups (curriculum, dictation, filing, subjects, assessments, book-suggestions — 13 call-sites), the WI-2396 review's 7th route-group (learner-profile /tell, self + parent — 2 call-sites), and 5 additional route-groups found by the full LLM_CALL_SITE_FILES reconciliation (books, quiz, sessions, homework, retention — 8 call-sites spanning 9 endpoint-paths: books generate-topics; quiz/rounds and quiz/rounds/prefetch; sessions summary, summary/retry-feedback, recall-bridge, and first-curriculum; homework/ocr; retention/recall-test). The exchange pipeline (/sessions/:id/messages, /sessions/:id/stream) is a separate request-time route-group gated via assertExchangeConsent (WI-2372) and intentionally not double-gated — 13 consent-gated request-time route-groups including it.",
+      "pointer": "apps/api/src/routes/subjects.test.ts:676"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "learner-profile /tell (self + parent, gated on the CHILD's profileId) — the review-found 7th route",
+      "pointer": "apps/api/src/routes/learner-profile.test.ts:1248"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "books.ts POST .../generate-topics — reconciliation finding (LLM_CALL_SITE_FILES: book-generation.ts via curriculum.ts orchestration)",
+      "pointer": "apps/api/src/routes/books.test.ts:1313"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "quiz.ts POST /quiz/rounds and /quiz/rounds/prefetch — reconciliation finding (LLM_CALL_SITE_FILES: services/quiz/generate-round.ts, vocabulary/guess_who activity types)",
+      "pointer": "apps/api/src/routes/quiz.test.ts:737"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "homework.ts POST /ocr — reconciliation finding (LLM_CALL_SITE_FILES: services/ocr.ts)",
+      "pointer": "apps/api/src/routes/homework.test.ts:789"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "retention.ts POST /retention/recall-test — reconciliation finding (LLM_CALL_SITE_FILES: retention-data.ts evaluateRecallQuality)",
+      "pointer": "apps/api/src/routes/retention.test.ts:641"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "sessions.ts POST /summary, /summary/retry-feedback, /recall-bridge, /subjects/:subjectId/sessions/first-curriculum — reconciliation finding (LLM_CALL_SITE_FILES: summaries.ts/session-summary.ts, recall-bridge.ts, session-topic-matcher.ts); /messages and /stream confirmed to delegate to the already-gated exchange pipeline and are not double-gated",
+      "pointer": "apps/api/src/routes/sessions.test.ts:795"
+    },
+    {
+      "acRef": "AC-1",
+      "description": "Mechanical fix: metering.coverage.guard.test.ts false positive — weekly-self-reports.ts's trace-evidence comment contained the bare tokens routeAndCall/routeAndStream, matching the guard's lexical scan even though the file dispatches no LLM. Reworded to routeAnd(Call|Stream) notation (still human-readable, no longer a literal substring match).",
+      "pointer": "apps/api/src/inngest/functions/weekly-self-reports.ts:215"
+    },
+    {
+      "acRef": "AC-2",
+      "description": "8 of the 9 enumerated background/Inngest callers switched from isGdprProcessingAllowedV2 (parental-only) to isLlmExchangeConsentAllowed (basis-inclusive); adult-self-withdrawn (art6_1_a) alone now blocks dispatch. weekly-self-reports.ts is a PM-ratified sanctioned exclusion (zero LLM dispatch in its traced call chain), enforced by a forward-only guard test.",
+      "pointer": "apps/api/src/inngest/functions/freeform-filing.test.ts:525"
+    },
+    {
+      "acRef": "AC-3",
+      "description": "Active-consent subject is not blocked on any converted request-time route surface",
+      "pointer": "apps/api/src/routes/subjects.test.ts:691"
+    },
+    {
+      "acRef": "AC-RIDER",
+      "description": "Copy-truthfulness pair (WI-2372 Finding 1): truthful 'learning sessions' claim + absence of 'processing'-family overstatement on both the rendered confirm (GET /consent-page/withdraw) and landing (POST /consent-page/withdraw) HTML",
+      "pointer": "apps/api/src/routes/consent-web.integration.test.ts:917"
+    }
+  ],
+  "noiseBaselineVersion": "2026-07-13"
+}

@@ -730,6 +730,66 @@ describe('createScopedRepository', () => {
     });
   });
 
+  describe('[WI-1871] bookSuggestions.findBySubject — single-query ownership', () => {
+    it.each([
+      {
+        label: 'returns owned rows unchanged',
+        rows: [
+          {
+            id: 'suggestion-1',
+            subjectId: 'subject-1',
+            title: 'The Number Devil',
+            emoji: '📕',
+            description: 'A mathematical adventure',
+            category: 'related',
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+            pickedAt: null,
+          },
+        ],
+      },
+      { label: 'returns no rows for a foreign subject', rows: [] },
+    ])('$label', async ({ rows }) => {
+      const from = jest.fn();
+      const innerJoin = jest.fn();
+      const where = jest.fn();
+      const chain = {
+        select: jest.fn(),
+        from,
+        innerJoin,
+        where,
+        then: (onFulfilled: (value: unknown) => unknown) =>
+          Promise.resolve(rows).then(onFulfilled),
+      };
+      chain.select.mockReturnValue(chain);
+      from.mockReturnValue(chain);
+      innerJoin.mockReturnValue(chain);
+      where.mockReturnValue(chain);
+
+      const subjectsFindFirst = jest
+        .fn()
+        .mockResolvedValue({ id: 'subject-1' });
+      const bookSuggestionsFindMany = jest.fn().mockResolvedValue(rows);
+      const db = {
+        ...chain,
+        query: {
+          subjects: { findFirst: subjectsFindFirst },
+          bookSuggestions: { findMany: bookSuggestionsFindMany },
+        },
+      } as unknown as Database;
+
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+      const result = await repo.bookSuggestions.findBySubject('subject-1');
+
+      expect(result).toEqual(rows);
+      expect(subjectsFindFirst).not.toHaveBeenCalled();
+      expect(bookSuggestionsFindMany).not.toHaveBeenCalled();
+      expect(chain.select).toHaveBeenCalledTimes(1);
+      expect(from).toHaveBeenCalledTimes(1);
+      expect(innerJoin).toHaveBeenCalledTimes(1);
+      expect(where).toHaveBeenCalledTimes(1);
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // [CR-2026-05-21-168] memoryFacts.findCascadeAncestry — typed column names
   //

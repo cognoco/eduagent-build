@@ -397,6 +397,10 @@ export function teeEnvelopeStream(source: AsyncIterable<string>): {
     resolveRaw = res;
     rejectRaw = rej;
   });
+  // A source failure is surfaced first through cleanReplyStream. Some callers
+  // recover there and never await the duplicate raw-response rejection, so
+  // observe it internally without changing the rejected promise we return.
+  void rawResponsePromise.catch(() => undefined);
 
   async function* accumulatedSource(): AsyncGenerator<string> {
     // [BUG-628] Use try/catch/finally so rawResponsePromise ALWAYS settles —

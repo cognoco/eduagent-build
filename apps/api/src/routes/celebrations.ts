@@ -62,7 +62,7 @@ export const celebrationRoutes = new Hono<CelebrationRouteEnv>()
     zValidator('json', celebrationSeenSchema),
     async (c) => {
       // [WI-143 / DS-054] Server-derived proxy-mode write guard.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const body = c.req.valid('json');

@@ -615,6 +615,27 @@ const P24: ProbeSpec = {
     "Je veux qu'on travaille sur les connecteurs logiques — j'en ai besoin pour mon essai.",
 };
 
+// ---- Topic-opener promise (P25, WI-2107) -----------------------------------
+
+const P25: ProbeSpec = {
+  id: 'P25',
+  description:
+    'Learner opens a brand-new topic — reply must not be a bare forward-promise (WI-2107)',
+  category: 'standard',
+  dimensions: ['session_state'],
+  profileFilter: null,
+  history: FIRST_EVER_SESSION,
+  contextOverrides: {
+    escalationRung: 1,
+    sessionType: 'learning',
+    verificationType: 'standard',
+    exchangeCount: 0,
+    retentionStatus: { status: 'new' },
+    topicTitle: 'Sylvia Plath',
+  },
+  userMessage: 'Tell me about Sylvia Plath.',
+};
+
 // ---------------------------------------------------------------------------
 // Adversarial probes — 6 edge-case / emotional scenarios
 // ---------------------------------------------------------------------------
@@ -1262,6 +1283,7 @@ const STANDARD_PROBES: ProbeSpec[] = [
   P22,
   P23,
   P24,
+  P25,
 ];
 
 const ADVERSARIAL_PROBES: ProbeSpec[] = [A01, A02, A03, A04, A05, A06];

@@ -43,6 +43,83 @@ is the cross-package suite under `tests/integration/`.
 | **retention** | `packages/retention/src/**` | `nx test retention`, `test:api:unit` | — | |
 | **eval-harness** | `apps/api/eval-llm/**` (non-snapshots) | `eval:llm` | — | |
 | **test-infra** | `packages/test-utils/**`, `packages/factory/**` | `test:api:unit`, `test:mobile:unit` | `test:api:integration` | |
+| **postinstall-safety** | root + `apps/{api,mobile,web}/package.json`, guard | `verify:postinstall-safety` | — | Emits `postinstall_safety=true` |
+| **root-deps** | root `package.json`, guard | `check:root-deps` | — | Emits `root_deps=true` |
+| **i18n-jsx-literals** | `apps/mobile/src/**/*.tsx`, root package scripts, guard/test/baseline | `check:i18n:jsx-literals` | — | Emits `i18n_jsx_literals=true` |
+| **inngest-admin** | `apps/api/src/inngest/functions/*.ts`, guard | `check-inngest-admin.ts` | — | Emits `inngest_admin=true` |
+| **prompt-markers** | non-test `apps/api/src/services/**/*.ts`, guard | `check-prompt-markers.sh` | — | Emits `prompt_markers=true` |
+| **no-clinical-copy** | English locale, root package scripts, guard/test/baseline | `check:no-clinical-copy` | — | Emits `no_clinical_copy=true` |
+| **no-gemini-runtime** | `apps/api/src/**/*.{ts,tsx}`, `scripts/**/*.{ts,tsx}`, root package scripts, guard/baseline | `check:no-gemini-runtime` | — | Emits `no_gemini_runtime=true`; grandfathered test-mock/vendor sweep excluded |
+| **mode-nav-flag-combo** | `apps/mobile/eas.json`, `ci.yml`, root package scripts, guard/test/baseline | `check:mode-nav-flag-combo` | — | Emits `mode_nav_flag_combo=true` |
+| **test-only-exports** | API/mobile/package `src/**/*.{ts,tsx}`, guard + Jest config | `check-test-only-exports.test.ts` | — | Emits `test_only_exports=true` |
+| **workflow-security** | `.github/{workflows,actions}/**/*.yml`, root package scripts, guard/test | `check:github-workflow-security` | — | Emits `workflow_security=true` |
+| **api-script-guards** | KV-binding verifier + test | KV-binding `node --test` | — | Emits `api_script_guards=true` |
+| **database-script-guards** | DB push guard/test/helper + root/DB package manifests | DB push-guard `node --test` | — | Emits `database_script_guards=true` |
+
+Every narrow class above also treats `.github/workflows/ci.yml` as a bootstrap
+input, so a PR that changes a gated step's command or condition runs that step
+before the workflow can land.
+
+The narrow-check outputs above gate pull-request steps from the early `scope`
+router. A push to `main` still runs every check unconditionally. If the router
+cannot resolve a base, every narrow-check output is `true` (fail open).
+
+## `ci.yml` main-job inventory
+
+Inventory for WI-1575 (fold standalone `ci.yml` whole-tree ratchets into the
+change-class router). “Routed” means the step already consumes an affected/path
+router or the local change-class command already covers its behavior.
+“Run-level” means narrowing it would either remove required job bootstrap or
+require an unsafe guess about dynamic/cross-tree inputs.
+
+| # | Main-job step | Classification | Routing / reason |
+|---:|---|---|---|
+| 1 | Checkout | Run-level | Required before any repository-aware step |
+| 2 | Fetch base branch | Run-level | PR diff bootstrap for all base-aware guards |
+| 3 | Detect scope (docs-only PR bypass) | Routed | Early change-class router; source of the narrow outputs |
+| 4 | `dorny/paths-filter` | Run-level | Existing push-side API routing; PR slow suites use change-class |
+| 5 | Setup pnpm | Run-level | Package-manager bootstrap for all non-docs validation |
+| 6 | Setup Node | Run-level | Runtime/bootstrap for all non-docs validation |
+| 7 | `pnpm install --frozen-lockfile` | Run-level | Dependency bootstrap, not a code assertion |
+| 8 | Cache Nx local cache | Run-level | Build/test infrastructure |
+| 9 | Enable pgvector extension | Run-level | Shared database-test bootstrap |
+| 10 | Apply database migrations | Run-level | Shared database-test bootstrap; never replaced by manual DDL |
+| 11 | Clean stale TypeScript build artifacts | Run-level | Cross-project build hygiene |
+| 12 | `pnpm audit` | Run-level | Whole dependency graph; advisory |
+| 13 | Verify postinstall safety | Path-scoped | `postinstall-safety` → `postinstall_safety` |
+| 14 | Root package.json — no mobile-only deps | Path-scoped | `root-deps` → `root_deps` |
+| 15 | i18n orphan-key check | Routed | Existing `i18n` class runs `check:i18n:orphans` |
+| 16 | i18n hardcoded-JSX-literal check | Path-scoped | `i18n-jsx-literals` → `i18n_jsx_literals` |
+| 17 | i18n keep-list rot check | Run-level | KEEP entries cite dynamic cross-tree paths; static globs would under-trigger |
+| 18 | i18n staleness check | Routed | Existing `i18n` class runs `check:i18n` |
+| 19 | Inngest admin annotation guard | Path-scoped | `inngest-admin` → `inngest_admin` |
+| 20 | Prompt marker-token check | Path-scoped | `prompt-markers` → `prompt_markers` |
+| 21 | No-clinical-copy ratchet | Path-scoped | `no-clinical-copy` → `no_clinical_copy` |
+| 22 | No-Gemini-runtime ratchet | Path-scoped | `no-gemini-runtime` → `no_gemini_runtime` |
+| 23 | MODE_NAV flag-combo ratchet | Path-scoped | `mode-nav-flag-combo` → `mode_nav_flag_combo` |
+| 24 | Test-only-exports ratchet | Path-scoped | `test-only-exports` → `test_only_exports` |
+| 25 | GC1 — no new internal `jest.mock` | Run-level | Guard owns its staged/PR base-diff semantics; a second path map could undercut it |
+| 26 | Migration immutability guard | Run-level | Guard owns its PR base-diff and allowlist semantics |
+| 27 | GitHub workflow supply-chain check | Path-scoped | `workflow-security` → `workflow_security` |
+| 28 | `scripts/*` tests | Run-level | Heterogeneous suite asserts cross-tree contracts; no single safe input glob |
+| 29 | `tools/scripts/*` tests | Run-level | Heterogeneous suite asserts cross-tree contracts; no single safe input glob |
+| 30 | sync-skills orphan check | Run-level | Dynamic source/target liveness and generated-tree comparison; advisory |
+| 31 | API scripts node:test guards | Path-scoped | `api-script-guards` → `api_script_guards` |
+| 32 | Database scripts node:test guards | Path-scoped | `database-script-guards` → `database_script_guards` |
+| 33 | Quarantine registry valid | Run-level | Registry entries name dynamic cross-tree test paths; static globs would under-trigger |
+| 34 | Change-class router | Routed | Existing PR router for slow suites |
+| 35 | Lint, test, typecheck, build (PR) | Routed | `nx affected` against the fetched base |
+| 36 | Lint, test, typecheck, build (push) | Run-level | Push-to-main intentionally validates the whole workspace |
+| 37 | API integration tests | Routed | Push API filter / PR `integration` output |
+| 38 | API co-located integration tests | Routed | Push API filter / PR `integration` output |
+| 39 | API unit tests for cross-package `en.json` | Routed | PR `unit` output from `i18n-cross-package` |
+| 40 | Database package tests | Routed | PR `database` output from `db-migrations` |
+| 41 | Validate AGENTS.md counts | Run-level | Always-on required whole-tree invariant; docs-only PRs still report it |
+
+No current main-job step is named for metering coverage or database RLS.
+Database-package RLS coverage remains the already-routed step 40; no replacement
+step was invented. The grandfathered Gemini test-mock/vendor sweep remains out
+of scope for this routing change.
 
 ## Flag-ON Integration Lane (advisory / WI-789)
 

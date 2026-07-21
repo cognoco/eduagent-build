@@ -202,6 +202,8 @@ export interface ExchangeContext {
    * in session-exchange.ts from session_events. Undefined means no streak data.
    */
   correctStreak?: number;
+  /** Default-closed gate for ordinary per-turn answer evaluation. */
+  answerEvaluationEnabled?: boolean;
   /** Client-side effective mode — drives mode-specific prompt sections (e.g. recitation) */
   effectiveMode?: string;
   /** Server-owned recitation setup transition for this exchange. */

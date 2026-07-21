@@ -32,6 +32,7 @@ import type { Account } from '../services/account';
 import { idempotencyPreflight } from '../middleware/idempotency';
 import { type ProfileMeta } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { assertCanReadProfile } from '../services/family-access';
 import { withProfile } from '../route-utils/route-context';
 import { streamSSEUtf8 } from '../route-utils/sse-utf8';
@@ -72,11 +73,8 @@ import {
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
-import { safeSend, safeWrite } from '../services/safe-non-core';
-import {
-  recordActivationEvent,
-  deriveActivationProfileShape,
-} from '../services/activation-events';
+import { safeSend } from '../services/safe-non-core';
+import { recordActivationEventSafely } from '../services/activation-events';
 import { refundQuotaOrEscalate } from '../services/billing';
 import {
   startInterleavedSession,
@@ -100,6 +98,7 @@ import {
   isJudgeFrameworkEnabled,
   isJudgeEnforcementEnabled,
   isMentorNoticeEnabled,
+  isAnswerEvaluationRuntimeEnabled,
 } from '../config';
 import { FILING_CONFIG } from '../config/filing';
 
@@ -119,17 +118,15 @@ async function recordFirstSessionStarted(
   route: string,
   profileMeta: { isOwner: boolean } | undefined,
 ): Promise<void> {
-  await safeWrite(
-    () =>
-      recordActivationEvent(db, {
-        eventType: 'first_session_started',
-        profileId,
-        profileShape: profileMeta
-          ? deriveActivationProfileShape(profileMeta)
-          : null,
-        route,
-        metadata: { sessionId },
-      }),
+  await recordActivationEventSafely(
+    db,
+    {
+      eventType: 'first_session_started',
+      profileId,
+      profileMeta,
+      route,
+      metadata: { sessionId },
+    },
     'sessions.start.first_session_started',
     { profileId, sessionId },
   );
@@ -153,6 +150,7 @@ type SessionRouteEnv = {
     VOYAGE_API_KEY?: string;
     MATCHER_ENABLED?: string;
     CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
+    ANSWER_EVALUATION_RUNTIME_ENABLED?: string;
     MENTOR_NOTICE_ENABLED?: string;
     CHALLENGE_ROUND_COHORT_PROFILE_IDS?: string;
     REVIEW_CALLBACK_OPENER_ENABLED?: string;
@@ -222,8 +220,14 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/subjects/:subjectId/sessions/first-curriculum',
     zValidator('json', firstCurriculumSessionStartSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // Gated unconditionally — startFirstCurriculumSession's topic-intent
+      // matcher (matchTopicByIntent) dispatches the LLM when MATCHER_ENABLED
+      // and multiple candidate topics exist; this endpoint is the only
+      // entry point.
+      await assertLlmConsent(db, profileId);
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
       try {
@@ -261,7 +265,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/subjects/:subjectId/sessions',
     zValidator('json', sessionStartSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
@@ -311,7 +315,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/clear-continuation-depth',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
       const session = await clearContinuationDepth(db, profileId, sessionId);
@@ -324,7 +328,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/retry-filing',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
@@ -408,7 +412,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       // [F-117] Server-derived proxy-mode write guard — a non-owner proxy
       // caller must not mutate a child's library-filing state.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
@@ -429,7 +433,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       // [F-117] Server-derived proxy-mode write guard — also blocks the
       // Inngest auto-file dispatch below from firing on a child's behalf.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
@@ -461,7 +465,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     async (c) => {
       // [F-117] Server-derived proxy-mode write guard — also blocks the
       // Inngest auto-file dispatch below from firing on a child's behalf.
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
 
@@ -493,7 +497,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionMessageSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const subscriptionId = c.get('subscriptionId');
       const sessionId = c.req.valid('param').sessionId;
@@ -535,6 +539,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const judgeEnforcementEnabled = isJudgeEnforcementEnabled(
         c.env.JUDGE_ENFORCEMENT_ENABLED,
       );
+      const answerEvaluationEnabled = isAnswerEvaluationRuntimeEnabled(
+        c.env.ANSWER_EVALUATION_RUNTIME_ENABLED,
+      );
 
       try {
         const result = await processMessage(
@@ -556,6 +563,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
             judgeEnforcementEnabled,
+            answerEvaluationEnabled,
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
               c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
             ),
@@ -636,7 +644,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       // The stream endpoint persists messages and triggers LLM exchanges
       // (DeepSec Found-In lines 868, 924, 943, 956, 972, 991 — all inside
       // this handler's write paths).
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const subscriptionId = c.get('subscriptionId');
       const sessionId = c.req.valid('param').sessionId;
@@ -680,6 +688,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const judgeEnforcementEnabled = isJudgeEnforcementEnabled(
         c.env.JUDGE_ENFORCEMENT_ENABLED,
       );
+      const answerEvaluationEnabled = isAnswerEvaluationRuntimeEnabled(
+        c.env.ANSWER_EVALUATION_RUNTIME_ENABLED,
+      );
 
       try {
         return await streamSessionResponse({
@@ -709,6 +720,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
             judgeEnforcementEnabled,
+            answerEvaluationEnabled,
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
               c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
             ),
@@ -771,7 +783,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       // [WI-171 / DS-082] Server-derived proxy-mode write guard.
       // close persists session state + dispatches the completion event
       // (DeepSec Found-In lines 1020, 1056).
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const body = c.req.valid('json');
 
@@ -842,7 +854,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     // The schema rejects any `content` field (the former injection vector).
     zValidator('json', systemPromptIntentSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const intent = c.req.valid('json');
 
@@ -863,7 +875,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionAnalyticsEventSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const body = c.req.valid('json');
 
@@ -882,7 +894,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionInputModeSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const session = await setSessionInputMode(
         db,
@@ -900,7 +912,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', homeworkStateSyncSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
 
       const result = await syncHomeworkState(
@@ -920,7 +932,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', contentFlagSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const result = await flagContent(
         db,
@@ -953,7 +965,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/summary/skip',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { sessionId } = c.req.valid('param');
       const previousSummary = await getSessionSummary(db, profileId, sessionId);
@@ -990,8 +1002,12 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/summary/retry-feedback',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // retrySummaryFeedback -> evaluateSummary unconditionally dispatches
+      // the LLM.
+      await assertLlmConsent(db, profileId);
       const { sessionId } = c.req.valid('param');
       const profileMeta = c.get('profileMeta');
       const result = await retrySummaryFeedback(db, profileId, sessionId, {
@@ -1010,8 +1026,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     zValidator('param', sessionIdParamsSchema),
     zValidator('json', summarySubmitSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // submitSummary -> evaluateSummary unconditionally dispatches the LLM.
+      await assertLlmConsent(db, profileId);
       const { sessionId } = c.req.valid('param');
       const previousSummary = await getSessionSummary(db, profileId, sessionId);
       // i18n Phase 1 — thread conversation_language to summary evaluation.
@@ -1061,7 +1080,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/interleaved',
     zValidator('json', interleavedSessionStartSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const input = c.req.valid('json');
 
@@ -1082,8 +1101,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     '/sessions/:sessionId/recall-bridge',
     zValidator('param', sessionIdParamsSchema),
     async (c) => {
-      assertNotProxyMode(c);
+      await assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
+      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
+      // generateRecallBridge unconditionally dispatches the LLM.
+      await assertLlmConsent(db, profileId);
       const { sessionId } = c.req.valid('param');
 
       const session = await getSession(db, profileId, sessionId);

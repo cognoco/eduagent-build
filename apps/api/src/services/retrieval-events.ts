@@ -14,6 +14,7 @@ import {
   retrievalVerdictEnum,
   type Database,
 } from '@eduagent/database';
+import type { RecallFeedback } from '@eduagent/schemas';
 
 // Single-source the union types from the pgEnum tuples so adding a value to the
 // schema can never silently drift from this service (the old hand-typed copies
@@ -43,6 +44,11 @@ export type RecallGrade =
       rationale: string | null;
       misconception: string | null;
       rung: number | null;
+      // [WI-2114] Answer-specific learner-facing feedback (mentor-prose in the
+      // learner's conversation_language). null when the grader omitted it — the
+      // caller then leaves response.feedback unset and the client falls back to
+      // its generic copy.
+      feedback: RecallFeedback | null;
     }
   | { graded: false; gradedBy: 'fallback_heuristic' };
 

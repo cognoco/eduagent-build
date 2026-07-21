@@ -45,7 +45,7 @@ import type { RenderAudience } from '@eduagent/schemas';
 
 import { acceptLink, initiateLink } from './linking-ceremony';
 import { requestSelfUnlink } from './supportership-revocation';
-import { seedOwnerIdentityV2 } from './test-seed-v2';
+import { seedChildIdentityV2, seedOwnerIdentityV2 } from './test-seed-v2';
 import {
   createClerkTestUser,
   createSubjectWithCurriculum,
@@ -362,6 +362,65 @@ export async function seedV2SupporterAccepted(
       revokedSupporteeOrganizationId: revokedSupportee.organizationId,
       revokedEdgeId: revokedEdge.edgeId,
       revokedContractId: revokedEdge.contractId,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// [WI-2226 owner-gate corroboration] `v2-supporter-managed` — a SAME-ORG
+// managed cold-start candidate.
+//
+// resolveSupporterColdStart's `managed` card (state: 'managed') renders only
+// for a hasOwnAccount=false supportee whose membership resolves within the
+// SUPPORTER's own organization (the WI-2226 bounce-#1 owner-gate fix,
+// supporter-coldstart.ts). `v2-supporter-accepted` above cannot exercise that
+// state: its supportees are each independent v2 owner identities in their OWN
+// organization (cross-org), which the owner-gate now suppresses. This seed
+// composes seedChildIdentityV2 (test-seed-v2.ts's "managed child under an
+// existing organization" primitive — person + {learner} membership, no
+// login) under the SUPPORTER's own organizationId, plus a supportership edge
+// via the real initiateLink/acceptLink write path (same truthful-fixture
+// convention as seedAcceptedEdge above) — the producible path the owner-gate
+// actually renders.
+// ---------------------------------------------------------------------------
+
+export async function seedV2SupporterManaged(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const supporter = await reseedOwnerIdentityV2(db, email, env, {
+    displayName: 'Test Supporter',
+    birthYear: 1985,
+  });
+
+  // Same-org managed child: hasOwnAccount defaults false (no writer sets it
+  // true anywhere in the codebase — WI-2538), and its membership is on the
+  // SUPPORTER's own organizationId — the property the owner-gate checks.
+  const { personId: managedChildPersonId } = await seedChildIdentityV2(db, {
+    organizationId: supporter.organizationId,
+    displayName: 'Managed Child',
+    birthYear: 2015,
+  });
+
+  const managedEdge = await seedAcceptedEdge(db, {
+    supporterPersonId: supporter.personId,
+    supporteePersonId: managedChildPersonId,
+  });
+
+  return {
+    scenario: 'v2-supporter-managed',
+    accountId: supporter.organizationId,
+    profileId: supporter.personId,
+    email,
+    password: supporter.password,
+    ids: {
+      supporterPersonId: supporter.personId,
+      supporterOrganizationId: supporter.organizationId,
+
+      managedChildPersonId,
+      managedChildEdgeId: managedEdge.edgeId,
+      managedChildContractId: managedEdge.contractId,
     },
   };
 }

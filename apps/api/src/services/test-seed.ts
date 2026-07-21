@@ -52,7 +52,10 @@ import {
 import { listSubjects } from './subject';
 import { getTierConfig } from './subscription';
 import { sleep } from './sleep';
-import { seedV2SupporterAccepted } from './test-seed-v2-supporter';
+import {
+  seedV2SupporterAccepted,
+  seedV2SupporterManaged,
+} from './test-seed-v2-supporter';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -165,7 +168,10 @@ export type SeedScenario =
   // [WI-2241] Supportership-aware v2 identity + accepted-visibility fixture —
   // apps/api/src/services/test-seed-v2-supporter.ts.
   | 'v2-supporter-accepted'
-  // [WI-2240] Credentialed learner-only identity for Account row gating.
+  // [WI-2226 owner-gate corroboration] Same-org managed cold-start candidate
+  // — apps/api/src/services/test-seed-v2-supporter.ts.
+  | 'v2-supporter-managed'
+  // [WI-2554] Credentialed learner-only identity for Account row gating.
   | 'v2-account-non-owner-child';
 
 /** Environment bindings needed by the seed service */
@@ -6134,6 +6140,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   // identities with the accepted-visibility fixture logic (linking-ceremony)
   // and the rich learning/report insert helpers above.
   'v2-supporter-accepted': seedV2SupporterAccepted,
+  'v2-supporter-managed': seedV2SupporterManaged,
   'v2-account-non-owner-child': seedV2AccountNonOwnerChild,
 };
 

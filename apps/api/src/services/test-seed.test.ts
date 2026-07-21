@@ -184,7 +184,9 @@ describe('VALID_SCENARIOS', () => {
       'wi-2194-stale-family-cycle',
       // [WI-2241] Supportership-aware v2 seed.
       'v2-supporter-accepted',
-      // [WI-2240] Credentialed learner-only identity for Account row gating.
+      // [WI-2226 owner-gate corroboration] Same-org managed cold-start seed.
+      'v2-supporter-managed',
+      // [WI-2554] Credentialed learner-only identity for Account row gating.
       'v2-account-non-owner-child',
     ]);
   });
@@ -280,7 +282,13 @@ describe('seedScenario', () => {
   // it at all. Real coverage lives in
   // test-seed-v2-supporter.integration.test.ts (real Neon DB, same pattern as
   // supporter-visibility-authorization.integration.test.ts).
-  const DB_TRANSACTION_SCENARIOS: SeedScenario[] = ['v2-supporter-accepted'];
+  const DB_TRANSACTION_SCENARIOS: SeedScenario[] = [
+    'v2-supporter-accepted',
+    // [WI-2226 owner-gate corroboration] Same DB_TRANSACTION_SCENARIOS
+    // reasoning above — seedV2SupporterManaged calls initiateLink/acceptLink
+    // (db.transaction + read-after-write) via seedAcceptedEdge.
+    'v2-supporter-managed',
+  ];
   const MOCK_DISPATCHABLE_SCENARIOS = (
     VALID_SCENARIOS as SeedScenario[]
   ).filter((scenario) => !DB_TRANSACTION_SCENARIOS.includes(scenario));
@@ -342,7 +350,7 @@ describe('seedScenario', () => {
     expect(result.accountId.length).toBeGreaterThan(0);
   });
 
-  it('[WI-2240] seeds a credentialed learner-only person without an admin role', async () => {
+  it('[WI-2554] seeds a credentialed learner-only person without an admin role or managed-child guardianship', async () => {
     const db = createMockDb();
     const result = await seedScenario(
       db,
@@ -355,6 +363,12 @@ describe('seedScenario', () => {
     const insertedRows =
       insertResult?.values?.mock.calls.map(([row]) => row) ?? [];
 
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        id: result.profileId,
+        displayName: 'Test Child',
+      }),
+    );
     expect(insertedRows).toContainEqual(
       expect.objectContaining({
         personId: result.profileId,
@@ -376,6 +390,19 @@ describe('seedScenario', () => {
       expect.objectContaining({
         chargePersonId: result.profileId,
         lawfulBasis: expect.any(String),
+      }),
+    );
+    expect(insertedRows).not.toContainEqual(
+      expect.objectContaining({
+        guardianPersonId: expect.any(String),
+        chargePersonId: result.profileId,
+      }),
+    );
+    expect(insertedRows).toContainEqual(
+      expect.objectContaining({
+        id: result.ids.subjectId,
+        profileId: result.profileId,
+        name: 'Child Learning Data',
       }),
     );
   });

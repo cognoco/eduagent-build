@@ -125,6 +125,37 @@ jest.mock('../services/llm', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [WI-2398 / WI-2396] assertNotProxyMode now also calls assertCanWriteProfile
+// (verifyPersonOwnershipV2), a raw db.select() membership query the mocked
+// stub db cannot satisfy — this file previously had no write-success test for
+// POST /topup (only 400/401 negatives) so the gap was latent. Every
+// X-Profile-Id-explicit scenario added below is a caller-self write; the
+// cross-account write attack this guard exists to close is covered by the
+// real-DB break test in tests/integration/wi2398-write-idor.integration.test.ts.
+// gc1-allow: verifyPersonOwnershipV2 runs a raw db.select() membership query
+// with no real implementation available in this file's stub-db environment
+// (same class as the identical mock in subjects.test.ts / assessments.test.ts).
+// ---------------------------------------------------------------------------
+
+jest.mock('../services/identity-v2/ownership-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/ownership-v2'),
+  verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+}));
+
+// [WI-2396] assertLlmConsent (POST /topup) runs isLlmExchangeConsentAllowed,
+// which reads db.query.membership — the mini-app below (used for the
+// consent-gate tests) injects a bare `{}` db, same limitation class as the
+// mock above. Defaults to allowed; the withdrawn-consent test overrides with
+// mockRejectedValueOnce(new ConsentWithdrawnError()).
+// gc1-allow: isLlmExchangeConsentAllowed runs real db.query.membership /
+// consentGrant reads with no real implementation available in this file's
+// stub-db environment (same class as verifyPersonOwnershipV2 above).
+jest.mock('../services/identity-v2/consent-status-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+  assertLlmConsent: jest.fn().mockResolvedValue(undefined),
+}));
+
+// ---------------------------------------------------------------------------
 // Mock Sentry (used by global error handler)
 // captureException delegates to @sentry/cloudflare which is the real external
 // boundary; override only captureException to prevent Sentry SDK init noise.
@@ -147,6 +178,9 @@ jest.mock('../services/sentry', () => {
 import { Hono } from 'hono';
 import { app } from '../index';
 import { bookSuggestionRoutes } from './book-suggestions';
+import { getUnpickedBookSuggestionsWithTopup } from '../services/suggestions';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
+import { ConsentWithdrawnError } from '../services/session';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
@@ -155,6 +189,35 @@ const TEST_ENV = {
 };
 
 const AUTH_HEADERS = makeAuthHeaders();
+
+// [WI-2396] POST /topup's consent-gate tests use a dedicated mini-app (not
+// the real `app`) — the real app's metering middleware is not fully mocked
+// in this file (billing-v2 / metering-v2 continuity mocks are absent here,
+// unlike dictation.test.ts / filing.test.ts), so routing through it 500s.
+// Mirrors this file's own makeProxyApp() pattern below, but isOwner: true.
+function makeWriteApp() {
+  const writeApp = new Hono();
+  writeApp.use('*', async (c, next) => {
+    c.set('db' as never, {});
+    c.set('profileId' as never, 'test-profile-id');
+    c.set('user' as never, { id: 'test-user' });
+    c.set('account' as never, { id: 'test-account-id' });
+    c.set('callerPersonId' as never, 'test-profile-id');
+    c.set('profileMeta' as never, {
+      isOwner: true,
+      resolvedVia: 'explicit-header',
+    });
+    await next();
+  });
+  writeApp.onError((err, c) => {
+    if (err instanceof ConsentWithdrawnError) {
+      return c.json({ code: 'CONSENT_WITHDRAWN', message: err.message }, 403);
+    }
+    return c.json({ code: 'INTERNAL_ERROR', message: String(err) }, 500);
+  });
+  writeApp.route('/', bookSuggestionRoutes);
+  return writeApp;
+}
 
 describe('book-suggestions routes', () => {
   beforeAll(() => {
@@ -284,6 +347,36 @@ describe('book-suggestions routes', () => {
         TEST_ENV,
       );
       expect(res.status).toBe(400);
+    });
+
+    // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon R5).
+    it('returns 200 and dispatches the top-up service when consent is active', async () => {
+      (getUnpickedBookSuggestionsWithTopup as jest.Mock).mockClear();
+
+      const res = await makeWriteApp().request(
+        '/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions/topup',
+        { method: 'POST' },
+      );
+
+      expect(res.status).toBe(200);
+      expect(getUnpickedBookSuggestionsWithTopup).toHaveBeenCalled();
+    });
+
+    it('refuses with 403 CONSENT_WITHDRAWN and never calls getUnpickedBookSuggestionsWithTopup when consent is withdrawn', async () => {
+      (getUnpickedBookSuggestionsWithTopup as jest.Mock).mockClear();
+      (assertLlmConsent as jest.Mock).mockRejectedValueOnce(
+        new ConsentWithdrawnError(),
+      );
+
+      const res = await makeWriteApp().request(
+        '/subjects/a0000000-0000-4000-a000-000000000201/book-suggestions/topup',
+        { method: 'POST' },
+      );
+
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe('CONSENT_WITHDRAWN');
+      expect(getUnpickedBookSuggestionsWithTopup).not.toHaveBeenCalled();
     });
   });
 });

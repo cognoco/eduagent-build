@@ -713,6 +713,61 @@ function repliesWithForwardMotion(reply: string): boolean {
   return reply.includes('?') || FORWARD_CHALLENGE.test(reply);
 }
 
+// [WI-2107] A reply that opens a topic with only a forward promise ("Let's
+// talk about Sylvia Plath") and nothing else leaves the learner with no
+// content and no question — a dead end. Flag only when the promise-opener
+// phrase is present, the reply has no question, and there is no substantive
+// content beyond the promise clause + topic-naming clause — regardless of
+// whether that content lands in the same sentence (a comma-joined
+// appositive) or a following one. Strip the opener, then strip the
+// topic-naming clause up to its first boundary punctuation (`,` `.` `;`
+// `!` `:` an em dash, or an ellipsis) — the reply may legitimately end
+// there (a bare promise) or continue with real material (a
+// promise-plus-content). Apply the word-count floor only to what remains
+// AFTER that boundary, not to the topic clause itself: checking
+// words-after-the-opener alone (an earlier version of this fix) still let a
+// padded/elaborated bare topic — "Let's explore the fascinating and
+// complex world of quantum mechanics." — clear the floor on topic-name
+// length even though it supplies no content past the promise. Bounce 1
+// (reviewer:codex:global) flagged the mirror-image false positive: a
+// promise + real content packed into one sentence via a comma appositive
+// ("Let's talk about Sylvia Plath, an American poet best known for Ariel
+// and The Bell Jar.") was wrongly classified as bare.
+// Bounce 2 flagged two more gaps in the same boundary/word-count logic: a
+// colon-introduced topic clause ("Let's talk about Sylvia Plath: she was an
+// American poet...") wasn't recognized as a boundary at all, and a genuine
+// 4-word factual remainder ("She was a poet.") was wrongly caught by an
+// off-by-one `<=` threshold. Closing the colon gap surfaced two more
+// same-shape gaps, closed pre-emptively in the same pass: an
+// em-dash-introduced topic clause ("Let's talk about Sylvia Plath — she was
+// a poet.") and a single-glyph-ellipsis-introduced one ("Let's talk about
+// Sylvia Plath… she was a poet.", U+2026 — distinct from three literal `...`
+// dots, which the existing period branch already catches). Deliberately
+// EXCLUDED from the boundary set: a bare hyphen (`cutting-edge` would split
+// mid-word and let a genuinely bare topic clear the word-count floor on
+// unrelated trailing words) and an en dash (used for numeric ranges, e.g.
+// "2010–2020", where splitting on it would produce the same false-negative
+// risk as the hyphen).
+const BARE_PROMISE_OPENER =
+  /\b(let'?s (talk|dive|explore|look at|chat|get into)|we'?ll (talk|dive|explore|look at|discuss|dig into)|i'?d love to (talk|discuss|explore))\b/i;
+
+const TOPIC_CLAUSE_BOUNDARY = /[,.;!:]|—|…/;
+
+const MIN_CONTENT_WORDS_AFTER_TOPIC_CLAUSE = 4;
+
+function isBarePromiseOnly(reply: string): boolean {
+  const openerMatch = BARE_PROMISE_OPENER.exec(reply);
+  if (!openerMatch) return false;
+  if (reply.includes('?')) return false;
+  const afterOpener = reply.slice(openerMatch.index + openerMatch[0].length);
+  const boundaryMatch = TOPIC_CLAUSE_BOUNDARY.exec(afterOpener);
+  const afterTopicClause = boundaryMatch
+    ? afterOpener.slice(boundaryMatch.index + boundaryMatch[0].length)
+    : '';
+  const wordCount = afterTopicClause.split(/\s+/).filter(Boolean).length;
+  return wordCount < MIN_CONTENT_WORDS_AFTER_TOPIC_CLAUSE;
+}
+
 function evaluateTeachBackProbe(
   input: ProbeScenarioInput,
   liveResponse: string,
@@ -819,6 +874,51 @@ function evaluateEscalationProbe(
   return issues;
 }
 
+function evaluateTopicOpenerProbe(
+  input: ProbeScenarioInput,
+  liveResponse: string,
+): QualityIssue[] {
+  const parsed = parsePedagogyEnvelope(liveResponse);
+  if ('issues' in parsed) return parsed.issues;
+  const { reply, signals } = parsed;
+
+  // P25: opening a brand-new topic. A bare forward promise with no content
+  // and no question leaves the learner with nothing to do — WI-2107.
+  //
+  // Tier-2 (live, envelope-bearing): when the model ships its own
+  // `topic_opened_pending_content` self-report, that signal — not prose — is
+  // the arbiter. Word-count-as-content-proxy was ruled structurally unsound
+  // (bounce 3): it can neither confirm a padded opener carries no content nor
+  // recognise that a concise factual remainder ("Plath wrote Ariel.") does.
+  // The model already answers the only question that matters:
+  //   true  → content is still pending; the client auto-continuation path
+  //           (AC-2/AC-3, `use-session-streaming.ts` `topicOpenedPendingContent`)
+  //           immediately requests the next turn, so the learner is never
+  //           stranded — not a dead end.
+  //   false → the model asserts it delivered its content this turn (nothing
+  //           pending) — also not a dead end.
+  // Either boolean is trusted here; the dead-end guarantee now lives in the
+  // shipped auto-continuation, not in an eval prose heuristic.
+  if (typeof signals.topic_opened_pending_content === 'boolean') {
+    return [];
+  }
+
+  // Tier-1 fallback (snapshot / offline grading, no live envelope signal):
+  // `isBarePromiseOnly` stays as an independent, self-contained bare-promise
+  // check so snapshot runs still catch the dead-end shape without a live
+  // signal. It is no longer the arbiter for live-envelope-bearing cases.
+  if (isBarePromiseOnly(reply)) {
+    return [
+      qualityError(
+        `${input.probeId}.bare-promise`,
+        'Reply is a bare forward-promise ("Let\'s talk about X") with no substantive content or specific question — learner is left with nothing actionable.',
+      ),
+    ];
+  }
+
+  return [];
+}
+
 function evaluateFadingProbe(
   input: ProbeScenarioInput,
   liveResponse: string,
@@ -874,6 +974,9 @@ function evaluateProbeQuality(
   }
   if (input.probeId === 'P08') {
     return evaluateFadingProbe(input, liveResponse);
+  }
+  if (input.probeId === 'P25') {
+    return evaluateTopicOpenerProbe(input, liveResponse);
   }
   return [];
 }
