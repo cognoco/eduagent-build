@@ -203,12 +203,15 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const subjectId = c.req.param('subjectId');
       const input = c.req.valid('json');
-      // [WI-2396] mode='preview' dispatches the LLM (previewCurriculumTopic);
-      // mode='create' is DB-only. Gated unconditionally (not branched on
-      // mode) — the metering allowlist for this same route accepts the same
-      // over-application ("create-mode requests over-bill by 1... accepted
-      // as a small false-positive vs the security risk", metering.ts).
-      await assertLlmConsent(db, profileId);
+      // [WI-2396] Consent-withdrawal gate — immediately before LLM dispatch
+      // (canon R5). addCurriculumTopic dispatches the LLM only for
+      // mode='preview' (previewCurriculumTopic -> routeAndCall); mode='create'
+      // is a pure DB insert. Gate every mode EXCEPT the proven-deterministic
+      // 'create', and fail closed — the discriminated-union schema admits only
+      // 'create'/'preview' today, and any future mode stays gated.
+      if (input.mode !== 'create') {
+        await assertLlmConsent(db, profileId);
+      }
       try {
         const result = await addCurriculumTopic(
           db,

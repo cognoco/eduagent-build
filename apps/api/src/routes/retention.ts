@@ -111,12 +111,17 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      // Gated unconditionally — processRecallTest -> evaluateRecallQuality
-      // dispatches the LLM for every attemptMode except 'dont_remember',
-      // which shares this same endpoint.
-      await assertLlmConsent(db, profileId);
       const input = c.req.valid('json');
+      // [WI-2396] Consent-withdrawal gate — immediately before LLM dispatch
+      // (canon R5). processRecallTest -> evaluateRecallQuality dispatches the
+      // LLM for every attemptMode EXCEPT 'dont_remember', which short-circuits
+      // to a deterministic quality-0 result with no routeAndCall (see
+      // processRecallTest). Gate all modes except that one, and fail closed —
+      // an absent attemptMode defaults to 'standard' server-side, so it is
+      // gated.
+      if (input.attemptMode !== 'dont_remember') {
+        await assertLlmConsent(db, profileId);
+      }
 
       const result = await processRecallTest(db, profileId, input);
       return c.json(recallTestResponseSchema.parse({ result }));

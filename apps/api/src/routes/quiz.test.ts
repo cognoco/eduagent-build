@@ -730,9 +730,12 @@ describe('Quiz routes', () => {
   });
 
   // -------------------------------------------------------------------------
-  // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
-  // R5). Both routes share generateRoundFromInput -> buildAndGenerateRound,
-  // which unconditionally dispatches the LLM (generateQuizRound -> routeAndCall).
+  // [WI-2396] Consent-withdrawal gate — refuses immediately before LLM
+  // dispatch (canon R5). Both routes share generateRoundFromInput, which gates
+  // every activityType EXCEPT the deterministic 'capitals' round (static
+  // CAPITALS_DATA bank, no routeAndCall). 'vocabulary'/'guess_who' dispatch the
+  // LLM and are gated; 'capitals' is not (see the deterministic-branch control
+  // at the end of this block).
   // -------------------------------------------------------------------------
   describe('[WI-2396] quiz-round consent-withdrawal gate', () => {
     const assertLlmConsentMock = jest.mocked(assertLlmConsent);
@@ -875,6 +878,37 @@ describe('Quiz routes', () => {
       expect(res.status).toBe(200);
       expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
       expect(routeAndCall).toHaveBeenCalled();
+    });
+
+    // Deterministic-branch control: a 'capitals' round dispatches no LLM, so
+    // the consent gate must NOT run for it. Even with consent withdrawn (mock
+    // set to reject), the request must succeed and assertLlmConsent must never
+    // be called — proving the WI-2396 over-gate on the deterministic branch is
+    // removed while the LLM paths above stay gated.
+    it('POST /quiz/rounds does NOT gate the deterministic capitals round (no 403, no consent check) even when consent is withdrawn', async () => {
+      // Persistent reject: assertLlmConsent would throw if the capitals path
+      // reached it. It must not.
+      assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
+      try {
+        const res = await app.request(
+          '/v1/quiz/rounds',
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({ activityType: 'capitals' }),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        expect(assertLlmConsentMock).not.toHaveBeenCalled();
+        expect(routeAndCall).not.toHaveBeenCalled();
+      } finally {
+        // beforeEach only clearAllMocks (clears calls, not implementations), so
+        // restore the file-wide default here to keep this persistent rejection
+        // from leaking into sibling tests.
+        assertLlmConsentMock.mockResolvedValue(undefined);
+      }
     });
   });
 

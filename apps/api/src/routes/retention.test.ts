@@ -634,9 +634,12 @@ describe('retention routes', () => {
     });
 
     // -----------------------------------------------------------------------
-    // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
-    // R5). processRecallTest -> evaluateRecallQuality dispatches the LLM for
-    // every attemptMode except 'dont_remember', which shares this endpoint.
+    // [WI-2396] Consent-withdrawal gate — refuses immediately before LLM
+    // dispatch (canon R5). processRecallTest -> evaluateRecallQuality
+    // dispatches the LLM for every attemptMode EXCEPT 'dont_remember', which
+    // short-circuits to a deterministic quality-0 result with no routeAndCall.
+    // The route gates all modes except that one; the deterministic-branch
+    // control at the end of this block proves 'dont_remember' is not gated.
     // -----------------------------------------------------------------------
     describe('[WI-2396] consent-withdrawal gate', () => {
       const assertLlmConsentMock = jest.mocked(assertLlmConsent);
@@ -690,6 +693,47 @@ describe('retention routes', () => {
         expect(res.status).toBe(200);
         expect(assertLlmConsentMock.mock.calls[0]?.[1]).toBe('test-profile-id');
         expect(processRecallTest).toHaveBeenCalled();
+      });
+
+      // Deterministic-branch control: 'dont_remember' dispatches no LLM, so the
+      // consent gate must NOT run for it. Even with consent withdrawn (mock set
+      // to reject), the request must succeed and assertLlmConsent must never be
+      // called — proving the WI-2396 over-gate on the deterministic branch is
+      // removed while the LLM path above stays gated.
+      it('does NOT gate the deterministic dont_remember attempt (no 403, no consent check) even when consent is withdrawn', async () => {
+        (processRecallTest as jest.Mock).mockResolvedValue({
+          passed: false,
+          masteryScore: 0,
+          xpChange: 'none',
+          nextReviewAt: '2026-02-22T10:00:00.000Z',
+          failureCount: 1,
+        });
+        // Persistent reject: assertLlmConsent would throw if the dont_remember
+        // path reached it. It must not.
+        assertLlmConsentMock.mockRejectedValue(new ConsentWithdrawnError());
+        try {
+          const res = await app.request(
+            '/v1/retention/recall-test',
+            {
+              method: 'POST',
+              headers: AUTH_HEADERS,
+              body: JSON.stringify({
+                topicId: TOPIC_ID,
+                attemptMode: 'dont_remember',
+              }),
+            },
+            TEST_ENV,
+          );
+
+          expect(res.status).toBe(200);
+          expect(assertLlmConsentMock).not.toHaveBeenCalled();
+          expect(processRecallTest).toHaveBeenCalled();
+        } finally {
+          // beforeEach only clearAllMocks (clears calls, not implementations),
+          // so restore the file-wide default here to keep this persistent
+          // rejection from leaking into sibling tests.
+          assertLlmConsentMock.mockResolvedValue(undefined);
+        }
       });
     });
   });

@@ -1096,9 +1096,10 @@ describe('curriculum routes', () => {
       expect(res.status).toBe(401);
     });
 
-    // [WI-2396] Consent-withdrawal gate — refuses BEFORE LLM dispatch (canon
-    // R5). Gated unconditionally (not branched on mode) — see the route
-    // comment in curriculum.ts.
+    // [WI-2396] Consent-withdrawal gate — refuses immediately before LLM
+    // dispatch (canon R5). The gate is branched on mode: 'preview' dispatches
+    // the LLM (previewCurriculumTopic) and is gated; 'create' is a DB-only
+    // insert and is not (see the deterministic-branch control below).
     it('refuses with 403 CONSENT_WITHDRAWN and never calls addCurriculumTopic when consent is withdrawn', async () => {
       await withWithdrawnConsent(async () => {
         const res = await app.request(
@@ -1115,6 +1116,38 @@ describe('curriculum routes', () => {
         const body = (await res.json()) as { code?: string };
         expect(body.code).toBe('CONSENT_WITHDRAWN');
         expect(mockAddCurriculumTopic).not.toHaveBeenCalled();
+      });
+    });
+
+    // Deterministic-branch control: mode='create' is a pure DB insert (no
+    // LLM), so the consent gate must NOT run for it. Even with consent
+    // withdrawn, a create request must succeed and reach addCurriculumTopic —
+    // proving the WI-2396 over-gate on the deterministic branch is removed
+    // while the 'preview' path above stays gated.
+    it('does NOT gate the deterministic create mode (no 403) even when consent is withdrawn', async () => {
+      mockAddCurriculumTopic.mockResolvedValueOnce({
+        mode: 'create',
+        topic: MOCK_CURRICULUM_OBJECT.topics[0],
+      });
+
+      await withWithdrawnConsent(async () => {
+        const res = await app.request(
+          `/v1/subjects/${SUBJECT_ID}/curriculum/topics`,
+          {
+            method: 'POST',
+            headers: AUTH_HEADERS,
+            body: JSON.stringify({
+              mode: 'create',
+              title: 'New topic',
+              description: 'A description for the created topic',
+              estimatedMinutes: 30,
+            }),
+          },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        expect(mockAddCurriculumTopic).toHaveBeenCalledTimes(1);
       });
     });
   });

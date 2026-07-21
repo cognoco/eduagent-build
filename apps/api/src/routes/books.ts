@@ -163,10 +163,16 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
       await assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
-      // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-      // Gated unconditionally — every branch below (fresh claim,
-      // incomplete-claim repair, existing-book expansion) can reach
-      // generateBookTopics, which dispatches the LLM.
+      // [WI-2396] Consent-withdrawal gate (canon R5) — applied here at route
+      // entry, before the claim/repair/generate logic below. This also gates
+      // the deterministic no-LLM paths (the already-complete "return existing"
+      // cached response, and the in-progress / not-found early returns),
+      // because those sit downstream of the conditionally-LLM claim-repair step
+      // and cannot be un-gated by a single route-level move. Granular
+      // per-branch gating (exempting the cached path while still gating the
+      // repair / expand / generate LLM sites) is deferred to a tracked
+      // follow-up; leaving it gated at entry is a safe, no-regression
+      // over-gate.
       await assertLlmConsent(db, profileId);
       const { subjectId, bookId } = c.req.valid('param');
       const { priorKnowledge, expandExisting } = c.req.valid('json');

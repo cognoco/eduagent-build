@@ -150,11 +150,16 @@ async function generateRoundFromInput(
   if (!profileMeta) {
     throw new Error('profileMeta not set — profile middleware must run first');
   }
-  // [WI-2396] Consent-withdrawal gate before LLM dispatch (canon R5).
-  // buildAndGenerateRound -> generateQuizRound unconditionally dispatches
-  // the LLM for round generation; shared by both /quiz/rounds and
+  // [WI-2396] Consent-withdrawal gate — immediately before LLM dispatch
+  // (canon R5). 'capitals' rounds are fully deterministic (static
+  // CAPITALS_DATA bank, no routeAndCall — see generateQuizRound); only
+  // 'vocabulary'/'guess_who' dispatch the LLM. Gate every activityType EXCEPT
+  // the proven-deterministic 'capitals', and fail closed — any future
+  // activityType (or an absent one) is gated. Shared by /quiz/rounds and
   // /quiz/rounds/prefetch via this helper.
-  await assertLlmConsent(db, profileId);
+  if (input.activityType !== 'capitals') {
+    await assertLlmConsent(db, profileId);
+  }
 
   try {
     const round = await buildAndGenerateRound(
