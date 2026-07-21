@@ -22,6 +22,7 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { readCachedNowFeed, writeCachedNowFeed } from '../lib/now-feed-cache';
+import { useNavigationDataScopeContract } from './use-navigation-contract';
 import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
 
@@ -35,8 +36,16 @@ export type NowFeedQueryResult = UseQueryResult<NowResponse> & {
 
 export function useNowFeed(): NowFeedQueryResult {
   const client = useApiClient();
-  const { activeProfile, isExplicitProxyMode } = useProfile();
+  const { activeProfile } = useProfile();
   const { userId } = useAuth();
+  // [WI-2498] Proxy state is read through the navigation contract, not from
+  // raw profile state — the contract is the single sanctioned reader of
+  // owner/proxy/mode (navigation-contract-usage-guard.test.ts). The data-scope
+  // variant is the one the other cache/query-scope hooks use (use-sessions,
+  // use-dashboard, use-progress-scope): it skips the subscription query this
+  // hook has no use for. `contract.isParentProxy` is a straight pass-through of
+  // the same explicit-proxy flag, flag-state independent.
+  const navigationContract = useNavigationDataScopeContract();
   const profileId = activeProfile?.id;
   // [WI-2498] Cache entries are actor/profile/policy-bound, so one actor's
   // projection can never be rehydrated for another. Server-side V remains the
@@ -45,7 +54,7 @@ export function useNowFeed(): NowFeedQueryResult {
     () => (userId && profileId ? { actorId: userId, profileId } : null),
     [userId, profileId],
   );
-  const noticesVisible = !isExplicitProxyMode;
+  const noticesVisible = !navigationContract.isParentProxy;
   const [fallbackFeed, setFallbackFeed] = useState<NowResponse | null>(null);
   const [isSlowFallback, setIsSlowFallback] = useState(false);
 
