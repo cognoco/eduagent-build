@@ -1,8 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { BackHandler, Platform } from 'react-native';
+import { BackHandler, Platform, Text } from 'react-native';
 
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
-import AccountScreen from './index';
 
 const mockRouter = {
   push: jest.fn(),
@@ -68,17 +67,14 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 12, right: 0, bottom: 0, left: 0 }),
 }));
 
-jest.mock(
-  // gc1-allow: route wrapper test asserts mount boundary; AccountAdminSheet behavior has dedicated coverage
-  '../../../components/account/AccountAdminSheet',
-  () => ({
-    ...jest.requireActual('../../../components/account/AccountAdminSheet'),
-    AccountAdminSheet: () => {
-      const { Text } = require('react-native');
-      return <Text testID="mock-account-admin-sheet" />;
-    },
-  }),
-);
+const accountAdminSheetModule = jest.requireActual<
+  typeof import('../../../components/account/AccountAdminSheet')
+>('../../../components/account/AccountAdminSheet');
+jest
+  .spyOn(accountAdminSheetModule, 'AccountAdminSheet')
+  .mockImplementation(() => <Text testID="mock-account-admin-sheet" />);
+const AccountScreen =
+  jest.requireActual<typeof import('./index')>('./index').default;
 
 describe('AccountScreen', () => {
   beforeEach(() => {
