@@ -885,6 +885,48 @@ describe('MentorScreen', () => {
     }
   });
 
+  it('[WI-2111 AC-3] keeps action, receipt, and composer order in the small-screen scroll surface', () => {
+    const dimensions = jest.spyOn(Dimensions, 'get').mockReturnValue({
+      width: 360,
+      height: 720,
+      scale: 2,
+      fontScale: 1,
+    });
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([
+        card({
+          kind: 'ledger_moment',
+          templateKey: 'now.ledger_moment.session_filed',
+          params: { ledgerKind: 'session_filed' },
+        }),
+        card({ kind: 'unfinished_session' }),
+      ]),
+    };
+
+    try {
+      const rendered = renderMentorScreen();
+      const scroll = screen.getByTestId('mentor-scroll');
+      within(scroll).getByTestId('now-card-slot-anchor');
+      within(scroll).getByTestId('now-card-slot-receipt-0');
+      within(scroll).getByTestId('mentor-bar-input');
+
+      const tree = JSON.stringify(rendered.result.toJSON());
+      expect(tree.indexOf('now-card-slot-anchor')).toBeLessThan(
+        tree.indexOf('now-card-slot-receipt-0'),
+      );
+      expect(tree.indexOf('now-card-slot-receipt-0')).toBeLessThan(
+        tree.indexOf('mentor-bar-input'),
+      );
+      expect(scroll.props.contentContainerStyle).toEqual(
+        expect.objectContaining({ paddingHorizontal: 12 }),
+      );
+      expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+    } finally {
+      dimensions.mockRestore();
+    }
+  });
+
   it('uses cached feed on feed failure and keeps the screen usable', () => {
     mockNowFeed = {
       ...mockNowFeed,
