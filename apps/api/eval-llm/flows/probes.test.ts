@@ -298,6 +298,22 @@ describe('probes quality heuristics — P25 envelope-signal path (Tier-2 live) [
     });
     expect(issues).toEqual([]);
   });
+
+  it('accepts a truly bare promise when the model reports NO pending content (self-report is trusted by design)', async () => {
+    // Intentional design boundary: with a live envelope signal present, the
+    // model's `false` self-report is trusted even when the prose looks bare —
+    // the live path defers to the self-report + shipped auto-continuation and
+    // does NOT second-guess content via prose (that heuristic was ruled
+    // unsound; see the AGENTS.md WI-2107 known-exception note). This pins that
+    // it is a deliberate accept, not an accidental gap: the independent
+    // bare-promise guard is retained only in the Tier-1 no-signal fallback
+    // (covered by the "…NO envelope signal…" case above).
+    const issues = await evaluate('12yo-dinosaurs', 'P25', {
+      reply: "Let's talk about Sylvia Plath.",
+      signals: { topic_opened_pending_content: false },
+    });
+    expect(issues).toEqual([]);
+  });
 });
 
 describe('probes quality heuristics — P08 (worked-example fading)', () => {
