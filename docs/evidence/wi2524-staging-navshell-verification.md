@@ -58,9 +58,21 @@ named case contains exactly two, both driven by real `page.goBack()` and real `p
 | b1 | landing `/mentor` → tap `tab-subjects` → `/subjects` → **Back** | `support-hub-mentor-tab` visible **and** `mentor-screen` count 0 |
 | b2 | person scope → tap `tab-journal` → `/journal` → ScopeChip to supporter-hub → **Back** | `mentor-screen` count 0 **and** `person-scope-journal-placeholder` not visible |
 
-Each b asserts the supporter-hub surface positively *and* negates the learner (`mentor-screen`) and
-person-scope (`person-scope-journal-placeholder`) surfaces, so a nav-shell regression selecting a
-surface inconsistent with the active scope turns the named case red rather than passing vacuously.
+**Coverage is asymmetric between b1 and b2, and b2 is the weaker of the two.** b1 asserts the
+supporter-hub surface *positively* (`support-hub-mentor-tab` visible) and negates the learner
+surface, so a regression that swaps in the wrong surface turns it red. **b2 asserts only the two
+negatives** — after its `page.goBack()` the case checks `mentor-screen` count 0 and
+`person-scope-journal-placeholder` not visible, and asserts no supporter-hub testid at that point.
+(`support-hub-journal-tab` is asserted *before* the Back, which proves the scope switch, not the
+post-Back surface.)
+
+Consequence, stated plainly rather than glossed: both of b2's assertions would also hold on a blank
+or errored route, so **b2 can pass without any supporter-hub surface having rendered**. b2 therefore
+evidences only the "never a learner or person-scope surface" half of AC-2's requirement; it does not
+evidence the "renders the surface owned by supporter-hub" half. This gap was raised by the automated
+reviewer on this PR (Codex P2, "Narrow the claimed b2 coverage") and is recorded here rather than
+resolved by narrowing the claim silently — closing it requires adding a positive post-Back assertion
+to the named case and re-running, which is a change to the spec rather than a re-run of it.
 
 The case additionally proves (not assumes) the `me`-scope caveat carried over from WI-2223:
 `scope-chip-option-me` and `supporter-self-learning-doorway` both assert `toHaveCount(0)`.
