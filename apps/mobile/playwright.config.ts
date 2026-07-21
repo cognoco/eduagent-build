@@ -236,6 +236,12 @@ export default defineConfig({
       },
     },
     {
+      name: 'smoke-transport-recovery',
+      dependencies: ['setup'],
+      testMatch: /flows[\\/]transport[\\/]api-transport-recovery\.spec\.ts/,
+      fullyParallel: false,
+    },
+    {
       name: 'role-transitions',
       dependencies: ['setup'],
       testMatch: /flows[\\/]journeys[\\/]j0[4-7]-.*\.spec\.ts/,

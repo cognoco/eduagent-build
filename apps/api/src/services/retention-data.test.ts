@@ -1094,7 +1094,15 @@ describe('processRecallTest', () => {
   // the card (reference identity), not a hand-duplicated literal. Reverting the
   // persist line breaks the capture; reverting the cooldown-branch line drops
   // the echo — either revert turns this red.
+  //
+  // AC-9 permits faking ONLY the LLM-router boundary, so this test drives the
+  // cooldown decision through the REAL canRetestTopic (not a forced mock) —
+  // submission 2's card carries a genuine recent lastReviewedAt, so the real
+  // 24h anti-cramming check is what blocks re-grading, not a stubbed return.
   it('[WI-2114 / AC-9] two-submission round-trip: the follow-up echoes the feedback the graded answer persisted', async () => {
+    const { canRetestTopic: actualCanRetestTopic } = jest.requireActual(
+      './retention',
+    ) as typeof import('./retention');
     const graderFeedback = {
       strengths: 'You correctly recalled that The Bell Jar is her only novel.',
       gaps: 'You did not mention that Ariel was published after her death.',
@@ -1128,6 +1136,7 @@ describe('processRecallTest', () => {
     });
 
     // --- Submission 1: the real grading path persists its feedback. ---
+    (canRetestTopic as jest.Mock).mockImplementationOnce(actualCanRetestTopic);
     const db1 = createMockDb();
     const graded = await processRecallTest(db1, profileId, {
       topicId,
@@ -1148,12 +1157,15 @@ describe('processRecallTest', () => {
       .lastRecallFeedback;
 
     // --- Submission 2: that persisted value now lives on the card. The
-    // follow-up is inside cooldown, so it is never re-graded. ---
+    // follow-up is inside cooldown, so it is never re-graded. lastReviewedAt
+    // is set to a genuinely recent timestamp (1h ago, real wall clock) so the
+    // REAL canRetestTopic computes cooldown-active — not a forced mock return.
     const cardAfterSub1 = {
       ...mockRetentionCardRow(),
+      lastReviewedAt: new Date(Date.now() - 60 * 60 * 1000),
       lastRecallFeedback: persistedFeedback,
     };
-    (canRetestTopic as jest.Mock).mockReturnValueOnce(false);
+    (canRetestTopic as jest.Mock).mockImplementationOnce(actualCanRetestTopic);
     const followUp = await processRecallTest(
       createMockDb({ retentionCardFindFirstQuery: cardAfterSub1 }),
       profileId,

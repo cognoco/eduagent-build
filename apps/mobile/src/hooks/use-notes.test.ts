@@ -146,20 +146,27 @@ describe('useBookNotes', () => {
   });
 
   it('handles network error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network request failed'));
+    jest.useFakeTimers();
+    try {
+      mockFetch.mockRejectedValue(new Error('Network request failed'));
 
-    const { result } = renderHook(() => useBookNotes('subject-1', 'book-1'), {
-      wrapper: createWrapper(),
-    });
+      const { result } = renderHook(() => useBookNotes('subject-1', 'book-1'), {
+        wrapper: createWrapper(),
+      });
 
-    await waitFor(() => {
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(7_500);
+      });
+
       expect(result.current.isError).toBe(true);
-    });
-
-    // The real customFetch wraps raw fetch rejections in NetworkError with a
-    // user-friendly message. Assert the typed error class rather than the
-    // internal rejection message that never reaches production.
-    expect(result.current.error).toBeInstanceOf(NetworkError);
+      expect(mockFetch).toHaveBeenCalledTimes(5);
+      // The real customFetch wraps raw fetch rejections in NetworkError with a
+      // user-friendly message. Assert the typed error class rather than the
+      // internal rejection message that never reaches production.
+      expect(result.current.error).toBeInstanceOf(NetworkError);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

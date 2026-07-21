@@ -16,6 +16,7 @@ import {
   type DataExport,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
+import { NetworkError } from '../lib/api-errors';
 import { assertOk } from '../lib/assert-ok';
 import { combinedSignal } from '../lib/query-timeout';
 import { parseJson } from '../lib/parse-json';
@@ -74,7 +75,8 @@ export function useDeletionStatus(): UseQueryResult<
   return useQuery({
     queryKey: ['account', 'deletion-status', userId],
     staleTime: 30_000,
-    retry: 1,
+    retry: (failureCount, error) =>
+      !(error instanceof NetworkError) && failureCount < 1,
     retryDelay: 250,
     queryFn: async ({
       signal: querySignal,

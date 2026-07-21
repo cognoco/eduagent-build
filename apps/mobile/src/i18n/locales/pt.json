@@ -4094,7 +4094,18 @@
       "placeholder": "Pergunte, cole ou descreva o que você quer aprender.",
       "micLabel": "Microfone",
       "homeworkChip": "Dever de casa",
-      "title": "Pergunte qualquer coisa"
+      "title": "Pergunte qualquer coisa",
+      "micIdleLabel": "Iniciar entrada de voz",
+      "micRequestingLabel": "A pedir acesso ao microfone",
+      "micListeningLabel": "Parar entrada de voz",
+      "micProcessingLabel": "A finalizar a entrada de voz",
+      "micErrorLabel": "Tente a entrada de voz novamente",
+      "micDisabledLabel": "Entrada de voz indisponível",
+      "listening": "A ouvir…",
+      "voiceError": "A entrada de voz não funcionou. Podes escrever.",
+      "voicePermissionError": "O acesso ao microfone está desligado. Podes escrever.",
+      "voiceAllow": "Permitir microfone",
+      "voiceRetry": "Tentar voz novamente"
     },
     "onTrack": {
       "label": "Em dia",
