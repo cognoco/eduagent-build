@@ -1430,6 +1430,15 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'v2-supporter-accepted',
         shard: 1,
       },
+      // [WI-2243] Supporter self-learning doorway + Me-scope persistence —
+      // Support hub -> Me scope (equal, chip-reachable) -> resume own
+      // subject -> Subjects -> relaunch preserves Me -> supportee and back,
+      // strict scope-isolation walls both directions.
+      {
+        flow: 'flows/v2/v2-supporter-self-learning-doorway.yaml',
+        scenario: 'v2-supporter-self-learning-active',
+        shard: 1,
+      },
     ]);
     expect(workflowRaw).toContain('- v2');
     expect(workflowRaw).toContain('EXPO_PUBLIC_ENABLE_MODE_NAV_V2:');
