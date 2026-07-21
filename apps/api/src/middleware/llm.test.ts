@@ -133,6 +133,49 @@ describe('llmMiddleware', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('[WI-1864] preserves a deliberately pre-registered provider without env keys', async () => {
+    process.env['NODE_ENV'] = 'development';
+    const actualLlm = jest.requireActual(
+      '../services/llm',
+    ) as typeof import('../services/llm');
+    const { createMockProvider } = jest.requireActual(
+      '../services/llm/providers/mock',
+    ) as typeof import('../services/llm/providers/mock');
+    actualLlm.registerProvider(createMockProvider('openai'));
+    const c = createMockContext({ ENVIRONMENT: 'development' });
+    const next = jest.fn().mockResolvedValue(undefined);
+
+    await llmMiddleware(c, next);
+
+    expect(registerProvider).not.toHaveBeenCalled();
+    expect(actualLlm.getRegisteredProviders()).toContain('openai');
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('[WI-1864] still fails closed when a keyed environment later loses its key', async () => {
+    process.env['NODE_ENV'] = 'development';
+    const actualLlm = jest.requireActual(
+      '../services/llm',
+    ) as typeof import('../services/llm');
+    const { createMockProvider } = jest.requireActual(
+      '../services/llm/providers/mock',
+    ) as typeof import('../services/llm/providers/mock');
+    actualLlm.registerProvider(createMockProvider('openai'));
+    const noKey = createMockContext({ ENVIRONMENT: 'development' });
+    const withKey = createMockContext({
+      ENVIRONMENT: 'development',
+      OPENAI_API_KEY: 'configured-key',
+    });
+    const next = jest.fn().mockResolvedValue(undefined);
+
+    await llmMiddleware(noKey, next);
+    await llmMiddleware(withKey, next);
+
+    await expect(llmMiddleware(noKey, next)).rejects.toThrow(
+      'At least one LLM API key is required',
+    );
+  });
+
   it('throws when ENVIRONMENT is not set', async () => {
     process.env['NODE_ENV'] = 'development';
     const c = createMockContext({});

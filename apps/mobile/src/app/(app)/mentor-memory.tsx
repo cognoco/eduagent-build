@@ -293,6 +293,7 @@ export default function MentorMemoryScreen() {
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
+          testID="mentor-memory-back"
         >
           <Text className="text-primary text-body font-semibold">
             {'\u2190'}

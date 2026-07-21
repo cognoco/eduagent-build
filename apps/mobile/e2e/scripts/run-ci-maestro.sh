@@ -52,6 +52,34 @@ echo "[ci-maestro] Selected shard $SHARD: $FLOW_COUNT of $TOTAL_FLOW_COUNT suite
 
 adb install -r apps/mobile/android/app/build/outputs/apk/release/app-release.apk
 
+plant_gallery_fixture() {
+  local fixture_source="apps/mobile/assets/images/icon.png"
+  local fixture_name="dictation-test-image.png"
+  local fixture_uri="file:///sdcard/Pictures/${fixture_name}"
+  local attempt
+
+  adb shell mkdir -p /sdcard/Pictures
+  adb push "$fixture_source" /sdcard/Pictures/dictation-test-image.png >/dev/null
+  adb shell am broadcast \
+    -a android.intent.action.MEDIA_SCANNER_SCAN_FILE \
+    -d "$fixture_uri" >/dev/null
+
+  for attempt in {1..20}; do
+    if adb shell content query \
+      --uri content://media/external/images/media \
+      --projection _display_name | grep -Fq "_display_name=${fixture_name}"; then
+      echo "[ci-maestro] Gallery fixture indexed: $fixture_name"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "[ci-maestro] ERROR: gallery fixture was not indexed: $fixture_name" >&2
+  return 1
+}
+
+plant_gallery_fixture
+
 seed_flow() {
   local scenario="$1"
   local payload response
@@ -172,3 +200,9 @@ while IFS=$'\t' read -r scenario flow <&3; do
   echo "[ci-maestro] [$index/$FLOW_COUNT] scenario=$scenario flow=$flow"
   run_flow "$scenario" "$flow"
 done 3< "$PLAN_FILE"
+
+if [ "$index" -ne "$FLOW_COUNT" ]; then
+  echo "[ci-maestro] ERROR: shard $SHARD completed $index/$FLOW_COUNT flows" >&2
+  exit 1
+fi
+echo "[ci-maestro] Completed shard $SHARD: $index/$FLOW_COUNT flows"

@@ -92,4 +92,30 @@ describe('LLM provider fixtures', () => {
       stopReason: 'stop',
     });
   });
+
+  it('[WI-1864] resolves matching chat calls without consuming the queued fallback', async () => {
+    const fixture = createLlmProviderFixture({
+      chatResponses: [llmPlainText('queued fallback')],
+      chatResponseResolver: (messages) =>
+        messages.at(-1)?.content === 'match'
+          ? llmStructuredJson({ resolved: true })
+          : undefined,
+    });
+
+    await expect(
+      fixture.provider.chat([{ role: 'user', content: 'match' }], TEST_CONFIG),
+    ).resolves.toEqual({
+      content: '{"resolved":true}',
+      stopReason: 'stop',
+    });
+    await expect(
+      fixture.provider.chat(
+        [{ role: 'user', content: 'nonmatch' }],
+        TEST_CONFIG,
+      ),
+    ).resolves.toEqual({
+      content: 'queued fallback',
+      stopReason: 'stop',
+    });
+  });
 });

@@ -678,6 +678,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
       expect(result.status).toBe(0);
       expect(invocations).toHaveLength(expectedFlows);
+      expect(result.stdout).toContain(
+        `[ci-maestro] Completed shard 1: ${expectedFlows}/${expectedFlows} flows`,
+      );
     } finally {
       rmSync(harness.root, { recursive: true, force: true });
     }
@@ -797,15 +800,29 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ]);
   });
 
-  it('keeps ordinary Wrangler startup when USE_MAESTRO_V2_FIXTURE is false', () => {
+  it('[WI-1864] keeps the deterministic provider active for ordinary nightly suites', () => {
     const startApiStep = mobileMaestro.steps?.find(
       (step) => step.name === 'Start API server (background)',
     );
     const startApiScript = String(startApiStep?.run ?? '');
 
-    const { result, pnpmArgv } = runStartApiScript(startApiScript, false);
-    expect(result.status).toBe(0);
-    expect(pnpmArgv).toEqual(['--dir', 'apps/api', 'exec', 'wrangler', 'dev']);
+    expect(startApiStep?.env?.USE_MAESTRO_V2_FIXTURE).toBeUndefined();
+    expect(startApiScript).toContain(
+      'pnpm --dir apps/api exec wrangler dev src/test-utils/maestro-e2e-worker.ts',
+    );
+    expect(startApiScript).not.toMatch(/wrangler dev\s*&/);
+  });
+
+  it('[WI-1864] relies on the pre-registered fixture without provider keys', () => {
+    const writeVarsStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Write wrangler .dev.vars for API',
+    );
+    const writeVarsScript = String(writeVarsStep?.run ?? '');
+
+    expect(writeVarsScript).not.toContain('ENVIRONMENT=test');
+    expect(writeVarsScript).not.toMatch(
+      /(?:OPENAI|GEMINI|ANTHROPIC|CEREBRAS|MISTRAL)_API_KEY=/,
+    );
   });
 
   it('allows the release APK to reach the local HTTP API only in E2E builds', () => {
@@ -860,6 +877,206 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'flows/edge/animated-splash.yaml',
     );
     expect(plan.every(({ shard }) => shard >= 1 && shard <= 8)).toBe(true);
+  });
+
+  it('[WI-1864] keeps every prose-parked flow machine-excluded from scheduled suites', () => {
+    const e2eRoot = join(repoRoot, 'apps/mobile/e2e');
+    const flowsRoot = join(e2eRoot, 'flows');
+    const nightlyFlows = new Set(loadPlan('nightly').map(({ flow }) => flow));
+    const walkYaml = (directory: string): string[] =>
+      readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(directory, entry.name);
+        if (entry.isDirectory()) return walkYaml(path);
+        return /\.ya?ml$/.test(entry.name) ? [path] : [];
+      });
+    const parkedFlows = walkYaml(flowsRoot)
+      .filter((path) => /^# PARKED\b/m.test(readFileSync(path, 'utf8')))
+      .map((path) => relative(e2eRoot, path).replaceAll('\\', '/'));
+
+    expect(parkedFlows.length).toBeGreaterThanOrEqual(10);
+
+    for (const flow of parkedFlows) {
+      const source = readFileSync(
+        join(repoRoot, 'apps/mobile/e2e', flow),
+        'utf8',
+      );
+      const header = parseYaml(source.split(/^---$/m)[0] ?? '') as {
+        tags?: string[];
+      };
+
+      expect(source).toMatch(/^# PARKED\b/m);
+      expect(header.tags).toEqual(
+        expect.arrayContaining([expect.stringMatching(/^(blocked|manual)$/)]),
+      );
+      expect(nightlyFlows).not.toContain(flow);
+    }
+  });
+
+  it('[WI-1864] returns from Account before asserting language-specific More controls', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/account/app-language-edit.yaml'),
+      'utf8',
+    );
+    const norwegian = source.indexOf('id: "language-option-nb"');
+    const firstBack = source.indexOf('pressKey: back', norwegian);
+    const norwegianSignOut = source.indexOf('text: "Logg ut"', firstBack);
+    const reenterAccount = source.indexOf('id: "more-row-account"', firstBack);
+    const english = source.indexOf('id: "language-option-en"', reenterAccount);
+    const secondBack = source.indexOf('pressKey: back', english);
+    const englishSignOut = source.indexOf('text: "Log out"', secondBack);
+
+    expect([
+      norwegian,
+      firstBack,
+      norwegianSignOut,
+      reenterAccount,
+      english,
+      secondBack,
+      englishSignOut,
+    ]).toEqual(
+      [
+        ...new Set([
+          norwegian,
+          firstBack,
+          norwegianSignOut,
+          reenterAccount,
+          english,
+          secondBack,
+          englishSignOut,
+        ]),
+      ].sort((a, b) => a - b),
+    );
+    expect(norwegian).toBeGreaterThan(-1);
+  });
+
+  it('[WI-1864] schedules only the supported parent-native populated-memory journey', () => {
+    const nightlyFlows = new Set(loadPlan('nightly').map(({ flow }) => flow));
+    const duplicate = 'flows/account/learner-mentor-memory-populated.yaml';
+    const supported = 'flows/parent/child-mentor-memory-populated.yaml';
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e', duplicate),
+      'utf8',
+    );
+    const header = parseYaml(source.split(/^---$/m)[0] ?? '') as {
+      tags?: string[];
+    };
+
+    expect(source).toMatch(/^# RETIRED \(WI-1864\)/m);
+    expect(header.tags).toContain('manual');
+    expect(nightlyFlows).not.toContain(duplicate);
+    expect(nightlyFlows).toContain(supported);
+  });
+
+  it('[WI-1864] bakes the non-secret OpenAI custom-provider slug into the E2E bundle', () => {
+    const step = mobileMaestro.steps?.find(
+      (candidate) => candidate.name === 'Load release E2E build environment',
+    );
+
+    expect(step).toBeUndefined();
+    expect(mobileMaestro.env?.EXPO_PUBLIC_CLERK_OPENAI_SSO_SLUG).toBe('openai');
+    expect(loadWorkflowRaw('e2e-ci.yml')).not.toContain(
+      'doppler secrets get EXPO_PUBLIC_CLERK_OPENAI_SSO_SLUG',
+    );
+  });
+
+  it('[WI-1864] drives small-screen dictation and mentor-memory navigation through stable controls', () => {
+    const dictationFlows = [
+      'flows/dictation/dictation-review-flow.yaml',
+      'flows/dictation/dictation-perfect-score.yaml',
+    ];
+
+    for (const flow of dictationFlows) {
+      const source = readFileSync(
+        join(repoRoot, 'apps/mobile/e2e', flow),
+        'utf8',
+      );
+      const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+        tapOn?: { id?: string; index?: number; optional?: boolean };
+      }>;
+      expect(source).toMatch(
+        /scrollUntilVisible:[\s\S]*id: ["']?practice-dictation["']?/,
+      );
+      const tileTap = commands.find(
+        ({ tapOn }) =>
+          tapOn?.id ===
+          'com.google.android.providers.media.module:id/icon_thumbnail',
+      );
+      expect(tileTap?.tapOn).toEqual({
+        id: 'com.google.android.providers.media.module:id/icon_thumbnail',
+        index: 0,
+      });
+    }
+
+    const remediationFlow = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/dictation/dictation-review-flow.yaml',
+      ),
+      'utf8',
+    );
+    const correctionInput = remediationFlow.indexOf(
+      "id: 'review-correction-input'",
+    );
+    const correctionText = remediationFlow.indexOf(
+      "inputText: 'The sun is warm.'",
+      correctionInput,
+    );
+    const keyboardDismissal = remediationFlow.indexOf(
+      '- hideKeyboard',
+      correctionText,
+    );
+    const submitScroll = remediationFlow.indexOf(
+      "id: 'review-submit-correction'",
+      keyboardDismissal,
+    );
+    const submitTap = remediationFlow.indexOf(
+      "id: 'review-submit-correction'",
+      submitScroll + 1,
+    );
+    expect([
+      correctionInput,
+      correctionText,
+      keyboardDismissal,
+      submitScroll,
+      submitTap,
+    ]).toEqual(
+      [
+        ...new Set([
+          correctionInput,
+          correctionText,
+          keyboardDismissal,
+          submitScroll,
+          submitTap,
+        ]),
+      ].sort((a, b) => a - b),
+    );
+    expect(correctionInput).toBeGreaterThan(-1);
+
+    const runner = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/scripts/run-ci-maestro.sh'),
+      'utf8',
+    );
+    expect(runner).toContain('dictation-test-image.png');
+    expect(runner).toMatch(/adb push .*dictation-test-image\.png/);
+    expect(runner).toContain('android.intent.action.MEDIA_SCANNER_SCAN_FILE');
+    const galleryFixture =
+      runner.match(/plant_gallery_fixture\(\) \{([\s\S]*?)\n\}/)?.[1] ?? '';
+    expect(galleryFixture).not.toContain('--where');
+    expect(galleryFixture).toContain(
+      'grep -Fq "_display_name=${fixture_name}"',
+    );
+
+    const emptyMemory = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/account/learner-mentor-memory.yaml',
+      ),
+      'utf8',
+    );
+    expect(emptyMemory).not.toMatch(/pressKey:\s*back/);
+    expect(emptyMemory).toMatch(
+      /tapOn:[\s\S]*id: ["']?mentor-memory-back["']?/,
+    );
   });
 
   it('[WI-1406] keeps native MFA placeholders explicitly non-executable until OPQ-26 fixtures exist', () => {
@@ -1457,6 +1674,8 @@ function createMaestroHarness(maestroExit: number): MaestroHarness {
       '  "exec-out screencap -p") printf fake-png ;;',
       '  "exec-out cat /sdcard/ci-maestro-entry.xml") printf \'<node resource-id="welcome-chooser"/>\' ;;',
       '  "logcat -d -t 500") printf fake-logcat ;;',
+      "  *content*query*--projection*_display_name*) printf 'Row: 0 _display_name=dictation-test-image.png' ;;",
+      "  *dictation-test-image.png*) printf 'Row: 0 _display_name=dictation-test-image.png' ;;",
       'esac',
       '',
     ].join('\n'),

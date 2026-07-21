@@ -5,7 +5,7 @@
 #
 # Journey: UX Journey 3 (Practice & Reinforcement)
 # Epics: Epic 12 (Dictation)
-# Prerequisite: dictation-perfect-score seed + EXPO_PUBLIC_E2E=1 dev-client build
+# Prerequisite: dictation-perfect-score seed + app binary built with EXPO_PUBLIC_E2E=1
 #
 # Run with:
 #   IMAGE_TEXT="The sun is warm. Birds can sing." \
@@ -35,117 +35,123 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "dictation-perfect-score"
+      SEED_SCENARIO: 'dictation-perfect-score'
       API_URL: ${API_URL}
 
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 - scrollUntilVisible:
     element:
-      id: "home-action-practice"
+      id: 'home-action-practice'
     direction: DOWN
     timeout: 5000
 
 - tapOn:
-    id: "home-action-practice"
+    id: 'home-action-practice'
 
 - extendedWaitUntil:
     visible:
-      id: "practice-screen"
+      id: 'practice-screen'
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      id: 'practice-dictation'
+    direction: DOWN
     timeout: 10000
 
 - tapOn:
-    id: "practice-dictation"
+    id: 'practice-dictation'
 
 - extendedWaitUntil:
     visible:
-      id: "dictation-choice-screen"
+      id: 'dictation-choice-screen'
     timeout: 10000
 
 - takeScreenshot: dict-perfect-01-choice
 
 - tapOn:
-    id: "dictation-homework"
+    id: 'dictation-homework'
 
 - extendedWaitUntil:
     visible:
-      id: "dictation-text-preview-screen"
+      id: 'dictation-text-preview-screen'
     timeout: 10000
 
 - tapOn:
-    id: "text-preview-input"
+    id: 'text-preview-input'
 
 # Matches the IMAGE_TEXT the wrapper plants in the gallery. Both sentences are
 # correctly spelled, so the LLM should return mistakes.length === 0.
-- inputText: "The sun is warm. Birds can sing."
+- inputText: 'The sun is warm. Birds can sing.'
 
 - hideKeyboard
 
 - tapOn:
-    id: "text-preview-start"
+    id: 'text-preview-start'
 
 - extendedWaitUntil:
     visible:
-      id: "dictation-playback-screen"
+      id: 'dictation-playback-screen'
     timeout: 15000
 
 - assertVisible:
-    id: "playback-progress"
+    id: 'playback-progress'
 
 - takeScreenshot: dict-perfect-02-playback
 
 # Wait up to 60s for playback to auto-navigate to the complete screen.
 - extendedWaitUntil:
     visible:
-      id: "dictation-complete-screen"
+      id: 'dictation-complete-screen'
     timeout: 60000
 
 - takeScreenshot: dict-perfect-03-complete
 
 - assertVisible:
-    id: "complete-check-writing"
+    id: 'complete-check-writing'
 
-# E2E seam: gallery picker button (EXPO_PUBLIC_E2E=1 dev-client builds only).
-# The wrapper plants a JPEG with correctly spelled text matching the sentences
+# E2E seam: gallery picker button, included when EXPO_PUBLIC_E2E=1 is baked into
+# the app bundle. Hosted CI uses the release APK and does not depend on Metro.
+# The runner plants a JPEG with correctly spelled text matching the sentences
 # above, so the LLM returns mistakes.length === 0.
 - assertVisible:
-    id: "complete-pick-gallery"
+    id: 'complete-pick-gallery'
 
 - tapOn:
-    id: "complete-pick-gallery"
+    id: 'complete-pick-gallery'
 
-# System image library picker opens — select the pre-planted test JPEG.
+# API-34 Photo Picker exposes each media tile through this stable platform id.
+# Wait for the planted first tile, then require a real selection.
 - extendedWaitUntil:
     visible:
-      text: "dictation-test-image"
+      id: 'com.google.android.providers.media.module:id/icon_thumbnail'
     timeout: 10000
-    optional: true  # justified: system image picker may not surface "dictation-test-image" as visible text on all Android versions
 
 - tapOn:
+    id: 'com.google.android.providers.media.module:id/icon_thumbnail'
     index: 0
-    text: "Photos"
-    optional: true  # justified: "Photos" album tab may need to be tapped to reveal images; not shown on all Android picker implementations
 
 # Wait for LLM to return and navigate to review-celebration (no mistakes path).
 - extendedWaitUntil:
     visible:
-      id: "review-celebration"
+      id: 'review-celebration'
     timeout: 30000
 
 - takeScreenshot: dict-perfect-04-celebration
 
 - assertVisible:
-    id: "review-done"
+    id: 'review-done'
 
 - tapOn:
-    id: "review-done"
+    id: 'review-done'
 
 - extendedWaitUntil:
     visible:
-      id: "practice-screen"
+      id: 'practice-screen'
     timeout: 10000
 
 - takeScreenshot: dict-perfect-05-back-at-practice

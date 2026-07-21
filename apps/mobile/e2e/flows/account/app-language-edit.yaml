@@ -73,7 +73,14 @@ tags:
 
 - takeScreenshot: language-changed-nb
 
-# 10. Verify locale changed: sign-out button should read "Logg ut" (Norwegian)
+# 10. Return to More, where the sign-out control lives, and verify Norwegian.
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "more-scroll"
+    timeout: 10000
+
 - scrollUntilVisible:
     element:
       id: "sign-out-button"
@@ -85,11 +92,19 @@ tags:
 
 - takeScreenshot: sign-out-label-norwegian
 
-# 11. Reset back to English — reopen the picker
+# 11. Reset back to English — re-enter Account and reopen the picker.
 - scrollUntilVisible:
     element:
-      id: "settings-app-language"
+      id: "more-row-account"
     direction: UP
+    timeout: 10000
+
+- tapOn:
+    id: "more-row-account"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-account-scroll"
     timeout: 10000
 
 - tapOn:
@@ -107,7 +122,14 @@ tags:
 - assertNotVisible:
     id: "app-language-backdrop"
 
-# 13. Verify locale reset: sign-out button should read "Log out" (English)
+# 13. Return to More and verify the English label.
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "more-scroll"
+    timeout: 10000
+
 - scrollUntilVisible:
     element:
       id: "sign-out-button"
