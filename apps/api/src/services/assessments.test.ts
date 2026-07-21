@@ -1946,6 +1946,9 @@ describe("[WI-2433] answer graders resolve the capability:'judge' model config",
     expect(grader.lastConfig?.provider).toBe('anthropic');
     expect(grader.lastConfig?.model).toBe(GRADER_MODEL);
     expect(grader.lastConfig?.reasoningEffort).toBeUndefined();
+    // WI-2433 also sets responseFormat:'json' (matches the sibling judge
+    // callers; for the anthropic grader it prepends a JSON-only directive).
+    expect(grader.lastConfig?.responseFormat).toBe('json');
     expect(result.feedback).toContain('Good recall of the key idea.');
   });
 
@@ -1963,6 +1966,7 @@ describe("[WI-2433] answer graders resolve the capability:'judge' model config",
     expect(grader.lastConfig?.provider).toBe('anthropic');
     expect(grader.lastConfig?.model).toBe(GRADER_MODEL);
     expect(grader.lastConfig?.reasoningEffort).toBeUndefined();
+    expect(grader.lastConfig?.responseFormat).toBe('json');
     expect(result.feedback).toContain('Good recall of the key idea.');
   });
 });
