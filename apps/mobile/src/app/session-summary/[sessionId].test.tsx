@@ -975,6 +975,45 @@ describe('SessionSummaryScreen', () => {
     expect(mockBack).not.toHaveBeenCalled();
   });
 
+  it('[WI-1864] keeps a fresh submission on the Home path after its summary query refetches', async () => {
+    mockParams.topicId = '770e8400-e29b-41d4-a716-446655440000';
+    mockParams.subjectId = '550e8400-e29b-41d4-a716-446655440000';
+    const acceptedSummary = {
+      id: '880e8400-e29b-41d4-a716-446655440001',
+      sessionId: '660e8400-e29b-41d4-a716-446655440000',
+      content: 'I learned about quadratic equations and factoring methods',
+      aiFeedback: 'Well done.',
+      feedbackStatus: 'available' as const,
+      status: 'accepted' as const,
+    };
+    mockSubmitResult = { summary: acceptedSummary };
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('summary-input'),
+      acceptedSummary.content,
+    );
+    await pressAsync(screen.getByTestId('submit-summary-button'));
+
+    await act(async () => {
+      activeQueryClient?.setQueriesData(
+        {
+          predicate: (query) => query.queryKey[0] === 'session-summary',
+        },
+        acceptedSummary,
+      );
+    });
+    screen.getByLabelText('Continue to home');
+
+    await pressAsync(screen.getByTestId('continue-button'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    expect(mockReplace).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(app)/topic/[topicId]' }),
+    );
+  });
+
   it('triggers the rating prompt hook before leaving a recall summary', async () => {
     mockSubmitResult = {
       summary: {
@@ -1992,6 +2031,31 @@ describe('SessionSummaryScreen', () => {
 
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      });
+    });
+
+    it('[WI-1864] routes a persisted-on-entry summary back to its topic', async () => {
+      mockParams.topicId = '770e8400-e29b-41d4-a716-446655440000';
+      mockParams.subjectId = '550e8400-e29b-41d4-a716-446655440000';
+      mockSessionSummaryData = {
+        id: '880e8400-e29b-41d4-a716-446655440007',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'Previously saved reflection opened from its topic.',
+        aiFeedback: 'Good reflection.',
+        status: 'submitted',
+      };
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      const continueButton = await screen.findByLabelText('Continue learning');
+      await pressAsync(continueButton);
+
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/topic/[topicId]',
+        params: {
+          topicId: '770e8400-e29b-41d4-a716-446655440000',
+          subjectId: '550e8400-e29b-41d4-a716-446655440000',
+        },
       });
     });
 

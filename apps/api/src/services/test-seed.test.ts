@@ -25,6 +25,7 @@ import {
   type SeedScenario,
 } from './test-seed';
 import { getTierConfig } from './subscription';
+import { addMonthsClamped } from './billing/billing-shared';
 
 // ---------------------------------------------------------------------------
 // Mock DB factory
@@ -1039,6 +1040,47 @@ describe('new Stage-0 scenarios return required IDs', () => {
       }),
     );
   });
+});
+
+describe('[WI-1864] shared-pool seed cycle coherence', () => {
+  it.each([
+    'subscription-pro-active',
+    'subscription-family-active',
+    'mentor-audit-family-pool-members',
+  ] as const)(
+    '%s derives its subscription end and pool reset from one monthly anchor',
+    async (scenario) => {
+      const captured: unknown[] = [];
+      const db = createMockDb();
+      db.insert = jest.fn().mockImplementation(() => ({
+        values: jest.fn().mockImplementation((row: unknown) => {
+          captured.push(row);
+          return Promise.resolve();
+        }),
+      }));
+
+      await seedScenario(db, scenario, 'test@example.com');
+
+      const rows = captured.filter(
+        (row): row is Record<string, unknown> =>
+          typeof row === 'object' && row !== null && !Array.isArray(row),
+      );
+      const subscriptionRow = rows.find(
+        (row) => 'periodStartAt' in row && 'periodEndAt' in row,
+      );
+      const quotaRow = rows.find((row) => 'cycleResetAt' in row);
+      const periodStartAt = subscriptionRow?.periodStartAt;
+
+      expect(periodStartAt).toBeInstanceOf(Date);
+      if (!(periodStartAt instanceof Date)) {
+        throw new Error(`${scenario} did not persist a periodStartAt Date`);
+      }
+
+      const expectedResetAt = addMonthsClamped(periodStartAt, 1);
+      expect(subscriptionRow?.periodEndAt).toEqual(expectedResetAt);
+      expect(quotaRow?.cycleResetAt).toEqual(expectedResetAt);
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------

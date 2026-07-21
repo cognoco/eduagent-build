@@ -1,5 +1,5 @@
 # Flow S3: Core Learning — Session to Summary
-# Validates: full learning loop with 3 exchanges, session close, and summary.
+# Validates: full learning loop with 3 completed exchanges, manual close, and summary.
 # Tags: smoke, learning
 #
 # Journey: UX Journey 2 (Daily Learning Loop)
@@ -14,13 +14,13 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "learning-active"
+      SEED_SCENARIO: 'learning-active'
       API_URL: ${API_URL}
 
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 # ── M05 regression: tab bar visible AND tappable ──────────────────────
@@ -28,72 +28,72 @@ tags:
 # navigation bar (the element exists in the tree but taps are intercepted).
 # Tap each tab and verify it navigates, then return to Home.
 - assertVisible:
-    id: "tab-home"
+    id: 'tab-home'
 - assertVisible:
-    id: "tab-library"
+    id: 'tab-library'
 - assertVisible:
-    id: "tab-more"
+    id: 'tab-more'
 
 # Tap Library tab → verify it navigates
 - tapOn:
-    id: "tab-library"
+    id: 'tab-library'
 - extendedWaitUntil:
     visible:
-      id: "shelves-list"
+      id: 'shelves-list'
     timeout: 5000
     # shelves-list is the Library v3 single-pane shelf list (library-tab-shelves removed in PR #144)
 
 # Tap More tab → verify it navigates
 - tapOn:
-    id: "tab-more"
+    id: 'tab-more'
 - extendedWaitUntil:
     visible:
-      id: "more-row-learning-preferences"
+      id: 'more-row-learning-preferences'
     timeout: 15000
 
 # Return to Home tab
 - tapOn:
-    id: "tab-home"
+    id: 'tab-home'
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 5000
 
 # ── M07 regression: home screen has real content (not empty) ──────────
 # Coach band proves the user has an active subject (learning-active seed)
 # and is above the fold on small phones — assert it before any scroll.
 - assertVisible:
-    id: "home-coach-band-continue"
+    id: 'home-coach-band-continue'
 
 # Subject carousel sits below the action chips on the current LearnerScreen
 # layout (small phones need a scroll to bring it on-screen). Scroll until
 # visible, then assert.
 - scrollUntilVisible:
     element:
-      id: "home-subject-carousel"
+      id: 'home-subject-carousel'
     direction: DOWN
     timeout: 10000
 
 - assertVisible:
-    id: "home-subject-carousel"
+    id: 'home-subject-carousel'
 
 # ── Negative assertions: empty state must not appear ───────────────────
 # Full text match required — Maestro on Android can't reliably match substrings
 # inside React Native <Text> nodes (BUG-57 pattern).
 - assertNotVisible:
-    text: "Add your first subject"
+    text: 'Add your first subject'
 
 # 3. Start session via coach band continue button.
 #    After the carousel scroll above, the coach band is off-screen. Scroll
 #    back up to bring it into view before tapping.
 - scrollUntilVisible:
     element:
-      id: "home-coach-band-continue"
+      id: 'home-coach-band-continue'
     direction: UP
     timeout: 10000
 
 - tapOn:
-    id: "home-coach-band-continue"
+    id: 'home-coach-band-continue'
 
 # 4. Session active — chat input present.
 #    The coach band tap calls pushLearningResumeTarget (navigation.ts:120-135)
@@ -102,52 +102,43 @@ tags:
 #    10s was too tight on a cold emulator — bumped to 20s (FIXED-timing).
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'chat-input'
     timeout: 20000
 
 # 5. Exchange 1: user question
 - tapOn:
-    id: "chat-input"
-- inputText: "Explain the concept to me"
+    id: 'chat-input'
+- inputText: 'Explain the concept to me'
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key
 # (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
 # per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
 - pressKey: Enter
 
-# ── Visual integrity: verify send was accepted ────────────────────────
-# scrollUntilVisible(text) inside a FlatList with removeClippedSubviews=true
-# is unreliable on Android — Maestro cannot see clipped items even mid-scroll
-# (documented in coach-bubble-dark.yaml). Instead, verify chat-input is still
-# present and editable immediately after send, which proves onSubmitEditing
-# fired and the message was dispatched into the messages list.
+# The learning-active opener occupies assistant index 1. Each user/assistant
+# pair advances the ChatShell message index by two, so this ID uniquely proves
+# the first assistant turn rendered; text/relative selectors are unreliable in
+# the virtualized Android list.
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
-    timeout: 5000
-
-# 6. Wait for AI response
-# M06 regression: if Gemini token is expired or API is down, the response
-# will either hang (no timeout on fetch — FIX-01) or show an error.
-# 30s timeout catches hangs. Negative assertions catch error states.
-- extendedWaitUntil:
-    visible:
-      id: "chat-input"
+      id: 'message-bubble-assistant-3'
     timeout: 30000
 
-# ── M06 guard: verify AI actually responded (not just input re-enabled) ──
-# The chat-messages scroll area should have content beyond the user's message.
-# If AI failed silently, only the user bubble exists.
-- assertVisible:
-    id: "chat-messages"
+# 6. Require the successful turn to finish before sending another.
+- extendedWaitUntil:
+    visible:
+      id: 'chat-input'
+      enabled: true
+    timeout: 5000
+
 # Error states that indicate broken AI — none of these should appear
-- assertNotVisible: "Something went wrong"
-- assertNotVisible: "try again"
-- assertNotVisible: "offline"
+- assertNotVisible: 'Something went wrong'
+- assertNotVisible: 'try again'
+- assertNotVisible: 'offline'
 
 # 7. Exchange 2: follow-up
 - tapOn:
-    id: "chat-input"
-- inputText: "Can you give me an example?"
+    id: 'chat-input'
+- inputText: 'Can you give me an example?'
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key
 # (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
 # per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
@@ -156,13 +147,19 @@ tags:
 # 8. Wait for response
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'message-bubble-assistant-5'
     timeout: 30000
+
+- extendedWaitUntil:
+    visible:
+      id: 'chat-input'
+      enabled: true
+    timeout: 5000
 
 # 9. Exchange 3: clarification
 - tapOn:
-    id: "chat-input"
-- inputText: "I think I understand, let me try to explain it back"
+    id: 'chat-input'
+- inputText: 'I think I understand, let me try to explain it back'
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key
 # (returnKeyType="send" triggers onSubmitEditing). send-button tapOn removed
 # per E2E integrity rules — optional: true on a mandatory UI element is prohibited.
@@ -171,28 +168,45 @@ tags:
 # 10. Wait for response
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'message-bubble-assistant-7'
     timeout: 30000
 
-# 11. Session close — auto-closes after exchange cap (learning-active seed uses default cap)
-# 3 exchanges are enough to trigger the session close on this seed scenario.
 - extendedWaitUntil:
     visible:
-      id: "summary-score"
+      id: 'chat-input'
+      enabled: true
+    timeout: 5000
+
+# 11. Close the regular session explicitly after all three responses.
+# Regular sessions do not have a three-exchange auto-close contract.
+- extendedWaitUntil:
+    visible:
+      id: 'end-session-button'
+    timeout: 10000
+
+- tapOn:
+    id: 'end-session-button'
+
+- tapOn:
+    text: 'End Session'
+
+- extendedWaitUntil:
+    visible:
+      id: 'summary-title'
     timeout: 20000
 
 # 12. Verify summary content
 - assertVisible:
-    id: "summary-topics"
+    id: 'session-takeaways'
 
 # 13. Close summary and return to home
 - tapOn:
-    id: "summary-close"
+    id: 'summary-close-button'
 
 # 14. Verify we can reach home
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 10000
 
 # ── M05 post-session regression: tabs still tappable after session ────
@@ -201,16 +215,16 @@ tags:
 # fail if the tabs are unreachable — optional taps would silently pass even
 # when M05 regressed.
 - tapOn:
-    id: "tab-library"
+    id: 'tab-library'
 - extendedWaitUntil:
     visible:
-      id: "shelves-list"
+      id: 'shelves-list'
     timeout: 10000
 - tapOn:
-    id: "tab-home"
+    id: 'tab-home'
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 10000
 
 # 15. Screenshot

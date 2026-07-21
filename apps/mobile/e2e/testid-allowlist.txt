@@ -7,6 +7,8 @@
 # Maestro can target Android-native UI by resource id (e.g. the system
 # date-picker). These are intentionally not part of app source.
 android:id/date_picker_header_year
+# API 34 Photo Picker media-tile resource; owned by the Android system picker.
+com.google.android.providers.media.module:id/icon_thumbnail
 
 # ── DRAFT flow placeholders ──────────────────────────────────────────
 # These flows are blocked on a real testID being added to the app

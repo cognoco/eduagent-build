@@ -5,6 +5,7 @@ import { reviewDictation } from '../services/dictation/review';
 import { streamExchange } from '../services/exchanges';
 import { _resetCircuits } from '../services/llm';
 import { resolveSubjectName } from '../services/subject-resolve';
+import { evaluateSummary } from '../services/summaries';
 import { app } from './maestro-e2e-worker';
 import { registerMaestroE2eLlmProvider } from './maestro-e2e-llm-provider';
 
@@ -19,6 +20,23 @@ afterEach(() => {
 });
 
 describe('hosted Maestro LLM provider', () => {
+  it('[WI-1864] returns available feedback for the planned session-summary flow', async () => {
+    await expect(
+      evaluateSummary(
+        'World History Topic 1',
+        'A deterministic topic used by the hosted learning scenario',
+        'I learned about the key concepts and how they apply in practice',
+        { conversationLanguage: 'en' },
+      ),
+    ).resolves.toEqual({
+      feedback: 'Good summary — you connected the key concepts to practice.',
+      feedbackStatus: 'available',
+      hasUnderstandingGaps: false,
+      gapAreas: [],
+      isAccepted: true,
+    });
+  });
+
   it.each([
     {
       input: 'The sun is warm.',

@@ -24,30 +24,30 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "learning-active"
+      SEED_SCENARIO: 'learning-active'
       API_URL: ${API_URL}
 
 # 2. Wait for home screen
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 # 3. Tap coach band continue button to start a session
 # learning-active seed provides an active subject → coach band is shown
 - tapOn:
-    id: "home-coach-band-continue"
+    id: 'home-coach-band-continue'
 
 # 4. Wait for session screen — chat input is always present
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'chat-input'
     timeout: 15000
 
 # 5. Type a question
 - tapOn:
-    id: "chat-input"
-- inputText: "What is photosynthesis?"
+    id: 'chat-input'
+- inputText: 'What is photosynthesis?'
 
 # 6. Send via Enter key
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key.
@@ -56,31 +56,44 @@ tags:
 # Visual integrity: verify user message rendered in chat
 - scrollUntilVisible:
     element:
-      text: "What is photosynthesis?"
+      text: 'What is photosynthesis?'
     direction: DOWN
     timeout: 10000
 
-# 7. Wait for AI response — real LLM call, 60s timeout
+# 7. Require the first new assistant bubble. The seeded opener is assistant 1;
+#    each completed user/assistant pair advances the index by two.
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'message-bubble-assistant-3'
     timeout: 60000
+
+- extendedWaitUntil:
+    visible:
+      id: 'chat-input'
+      enabled: true
+    timeout: 5000
 
 # 8. Verify the session did not crash — chat messages area is still visible
 - assertVisible:
-    id: "chat-messages"
+    id: 'chat-messages'
 
 # 9. Type a follow-up to verify multi-exchange works
 - tapOn:
-    id: "chat-input"
-- inputText: "Can you explain that in simpler terms?"
+    id: 'chat-input'
+- inputText: 'Can you explain that in simpler terms?'
 - pressKey: Enter
 
 # 10. Wait for second AI response
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'message-bubble-assistant-5'
     timeout: 60000
+
+- extendedWaitUntil:
+    visible:
+      id: 'chat-input'
+      enabled: true
+    timeout: 5000
 
 # 11. Screenshot after second exchange
 - takeScreenshot: freeform-session-ai-response

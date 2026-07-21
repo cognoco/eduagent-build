@@ -24,13 +24,13 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "retention-due"
+      SEED_SCENARIO: 'retention-due'
       API_URL: ${API_URL}
 
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 60000
 
 # 3. Subject carousel should be visible (replaced coaching card).
@@ -38,39 +38,42 @@ tags:
 #    the current LearnerScreen layout.
 - scrollUntilVisible:
     element:
-      id: "home-subject-carousel"
+      id: 'home-subject-carousel'
     direction: DOWN
     timeout: 10000
 
 - assertVisible:
-    id: "home-subject-carousel"
+    id: 'home-subject-carousel'
 
 # 4. Scroll back up so coach-band-continue is in view, then tap to start review
 - scrollUntilVisible:
     element:
-      id: "home-coach-band-continue"
+      id: 'home-coach-band-continue'
     direction: UP
     timeout: 10000
 
 - tapOn:
-    id: "home-coach-band-continue"
+    id: 'home-coach-band-continue'
 
 # 5. Wait for session screen (ChatShell)
 # BUG-40 fix: The app uses ChatShell for retention reviews, not a dedicated
 # recall-test-screen. Wait for chat-input which is always present in ChatShell.
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'chat-input'
     timeout: 10000
 
-# 6. Verify the recall prompt is shown
-- assertVisible:
-    text: "what you remember"
+# 6. Verify the seeded opener is rendered. Its wording may evolve, but this
+#    receipt proves the session has hydrated before the first answer.
+- extendedWaitUntil:
+    visible:
+      id: 'message-bubble-assistant-0'
+    timeout: 10000
 
 # 7. Enter answer
 - tapOn:
-    id: "chat-input"
-- inputText: "The key concept involves understanding the relationship between the variables and applying the formula correctly"
+    id: 'chat-input'
+- inputText: 'The key concept involves understanding the relationship between the variables and applying the formula correctly'
 
 # 8. Submit answer
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key
@@ -81,22 +84,23 @@ tags:
 # 9. Wait for AI feedback response
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'message-bubble-assistant-2'
     timeout: 60000
+
+- extendedWaitUntil:
+    visible:
+      id: 'chat-input'
+      enabled: true
+    timeout: 5000
 
 # 10. Take screenshot of feedback
 - takeScreenshot: retention-review-feedback
 
-# 11-12. Second recall answer (if multiple cards due).
-# KNOWN LIMITATION: Maestro has no conditional execution. If the second card
-# doesn't exist, chat-input won't be found (optional, no failure), but
-# inputText and pressKey still fire on whatever is focused. In practice this
-# is harmless — the chat input from the first answer is still focused, and
-# the LLM handles the extra message gracefully.
+# 11-12. Second recall answer. The deterministic seed keeps ChatShell active,
+# so this is a mandatory second exchange rather than an optional no-op.
 - tapOn:
-    id: "chat-input"
-    optional: true  # justified: second recall card may not exist if only one card is due; optional avoids false failure on single-card sessions
-- inputText: "The second concept relates to how these principles are applied in practice"
+    id: 'chat-input'
+- inputText: 'The second concept relates to how these principles are applied in practice'
 
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key.
 - pressKey: Enter
@@ -104,9 +108,14 @@ tags:
 # 13. Wait for second feedback
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'message-bubble-assistant-4'
     timeout: 60000
-    optional: true  # justified: second feedback wait only meaningful when a second card existed; optional prevents blocking when no second card
+
+- extendedWaitUntil:
+    visible:
+      id: 'chat-input'
+      enabled: true
+    timeout: 5000
 
 # 14. Screenshot
 - takeScreenshot: retention-review-complete

@@ -114,7 +114,16 @@ tags:
 - assertVisible:
     id: 'playback-progress'
 
-# Wait up to 60s for playback to finish and auto-navigate to complete screen.
+# Headless hosted emulators can leave expo-speech in speaking state indefinitely.
+# Recover through the learner skip control only while playback is still active.
+- runFlow:
+    when:
+      visible:
+        id: 'playback-skip'
+    commands:
+      - tapOn:
+          id: 'playback-skip'
+
 - extendedWaitUntil:
     visible:
       id: 'dictation-complete-screen'

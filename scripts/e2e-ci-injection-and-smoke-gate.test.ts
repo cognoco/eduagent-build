@@ -778,6 +778,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(writeVarsScript).toContain('CLERK_AUDIENCE');
     expect(writeVarsScript).toContain('SEED_PASSWORD');
     expect(writeVarsScript).toContain('TEST_SEED_SECRET');
+    expect(writeVarsScript).toContain('INNGEST_EVENT_KEY');
     expect(writeVarsScript).not.toContain('${{ secrets.');
   });
 
@@ -917,13 +918,45 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       join(repoRoot, 'apps/mobile/e2e/flows/account/app-language-edit.yaml'),
       'utf8',
     );
-    const norwegian = source.indexOf('id: "language-option-nb"');
-    const firstBack = source.indexOf('pressKey: back', norwegian);
-    const norwegianSignOut = source.indexOf('text: "Logg ut"', firstBack);
-    const reenterAccount = source.indexOf('id: "more-row-account"', firstBack);
-    const english = source.indexOf('id: "language-option-en"', reenterAccount);
-    const secondBack = source.indexOf('pressKey: back', english);
-    const englishSignOut = source.indexOf('text: "Log out"', secondBack);
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string } | string;
+      pressKey?: string;
+      assertVisible?: { text?: string } | string;
+    }>;
+    const norwegian = commands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' && tapOn.id === 'language-option-nb',
+    );
+    const firstBack = commands.findIndex(
+      ({ pressKey }, index) => index > norwegian && pressKey === 'back',
+    );
+    const norwegianSignOut = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > firstBack &&
+        typeof assertVisible === 'object' &&
+        assertVisible.text === 'Logg ut',
+    );
+    const reenterAccount = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > norwegianSignOut &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'more-row-account',
+    );
+    const english = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > reenterAccount &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'language-option-en',
+    );
+    const secondBack = commands.findIndex(
+      ({ pressKey }, index) => index > english && pressKey === 'back',
+    );
+    const englishSignOut = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > secondBack &&
+        typeof assertVisible === 'object' &&
+        assertVisible.text === 'Sign out',
+    );
 
     expect([
       norwegian,
@@ -991,6 +1024,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         'utf8',
       );
       const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+        assertVisible?: { id?: string } | string;
+        extendedWaitUntil?: {
+          visible?: { id?: string } | string;
+        };
+        runFlow?: {
+          when?: { visible?: { id?: string } | string };
+          commands?: Array<{ tapOn?: { id?: string } }>;
+        };
         tapOn?: { id?: string; index?: number; optional?: boolean };
       }>;
       expect(source).toMatch(
@@ -1005,6 +1046,35 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         id: 'com.google.android.providers.media.module:id/icon_thumbnail',
         index: 0,
       });
+      const playbackStart = commands.findIndex(
+        ({ assertVisible }) =>
+          typeof assertVisible === 'object' &&
+          assertVisible?.id === 'playback-progress',
+      );
+      const completeScreen = commands.findIndex(
+        ({ extendedWaitUntil }, index) =>
+          index > playbackStart &&
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.id === 'dictation-complete-screen',
+      );
+      const playbackCommands = commands.slice(
+        playbackStart + 1,
+        completeScreen,
+      );
+      const expectedSkips = flow.endsWith('dictation-perfect-score.yaml')
+        ? 2
+        : 1;
+      const conditionalSkips = playbackCommands.filter(
+        ({ runFlow }) =>
+          runFlow?.when?.visible !== undefined &&
+          runFlow.commands?.some(({ tapOn }) => tapOn?.id === 'playback-skip'),
+      );
+      expect(conditionalSkips).toHaveLength(expectedSkips);
+      expect(
+        playbackCommands.filter(({ tapOn }) => tapOn?.id === 'playback-skip'),
+      ).toHaveLength(0);
+      expect(playbackStart).toBeGreaterThan(-1);
+      expect(completeScreen).toBeGreaterThan(playbackStart);
     }
 
     const remediationFlow = readFileSync(
@@ -1077,6 +1147,481 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(emptyMemory).toMatch(
       /tapOn:[\s\S]*id: ["']?mentor-memory-back["']?/,
     );
+  });
+
+  it('[WI-1864] follows the intentional no-consent profile destination', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/consent/consent-above-threshold.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string };
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+      assertVisible?: { id?: string } | string;
+      assertNotVisible?: { id?: string; text?: string } | string;
+    }>;
+    const submit = commands.findIndex(
+      ({ tapOn }) => tapOn?.id === 'create-profile-submit',
+    );
+    const home = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > submit &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'home-screen',
+    );
+    const learner = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > home &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'learner-screen',
+    );
+    const noConsent = commands.findIndex(
+      ({ assertNotVisible }, index) =>
+        index > learner &&
+        typeof assertNotVisible === 'object' &&
+        assertNotVisible.id === 'consent-child-view',
+    );
+    const noStep = commands.findIndex(
+      ({ assertNotVisible }, index) =>
+        index > noConsent &&
+        typeof assertNotVisible === 'object' &&
+        assertNotVisible.text === 'One more step!',
+    );
+    const noWait = commands.findIndex(
+      ({ assertNotVisible }, index) =>
+        index > noStep &&
+        typeof assertNotVisible === 'object' &&
+        assertNotVisible.text === 'Hang tight!',
+    );
+
+    expect([submit, home, learner, noConsent, noStep, noWait]).toEqual(
+      [submit, home, learner, noConsent, noStep, noWait].toSorted(
+        (a, b) => a - b,
+      ),
+    );
+    expect(submit).toBeGreaterThan(-1);
+    expect(
+      source.slice(source.indexOf('id: "create-profile-submit"')),
+    ).not.toContain('create-subject-name');
+  });
+
+  it('[WI-1864] waits for every core-learning response before the next turn and closes through the current summary path', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/learning/core-learning.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      pressKey?: string;
+      tapOn?: { id?: string; text?: string } | string;
+      extendedWaitUntil?: {
+        visible?:
+          | {
+              id?: string;
+              enabled?: boolean;
+            }
+          | string;
+      };
+      assertVisible?: { id?: string } | string;
+    }>;
+    const enters = commands.flatMap(({ pressKey }, index) =>
+      pressKey === 'Enter' ? [index] : [],
+    );
+    const expectedReceiptIds = [
+      'message-bubble-assistant-3',
+      'message-bubble-assistant-5',
+      'message-bubble-assistant-7',
+    ];
+
+    expect(enters).toHaveLength(3);
+    const enabled: number[] = [];
+    for (let index = 0; index < enters.length; index += 1) {
+      const nextEnter = enters[index + 1] ?? commands.length;
+      const receipt = commands.findIndex(
+        ({ extendedWaitUntil }, commandIndex) =>
+          commandIndex > (enters[index] ?? -1) &&
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.id === expectedReceiptIds[index],
+      );
+      const inputEnabled = commands.findIndex(
+        ({ extendedWaitUntil }, commandIndex) =>
+          commandIndex > receipt &&
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.id === 'chat-input' &&
+          extendedWaitUntil.visible.enabled === true,
+      );
+
+      expect(enters[index]).toBeLessThan(receipt);
+      expect(receipt).toBeLessThan(inputEnabled);
+      expect(inputEnabled).toBeLessThan(nextEnter);
+      enabled.push(inputEnabled);
+    }
+
+    const endButton = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > (enabled.at(-1) ?? -1) &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'end-session-button',
+    );
+    const confirm = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > endButton &&
+        typeof tapOn === 'object' &&
+        tapOn.text === 'End Session',
+    );
+    const summaryTitle = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > confirm &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'summary-title',
+    );
+    const takeaways = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > summaryTitle &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'session-takeaways',
+    );
+    const close = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > takeaways &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'summary-close-button',
+    );
+    const home = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > close &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'learner-screen',
+    );
+
+    expect([endButton, confirm, summaryTitle, takeaways, close, home]).toEqual(
+      [
+        ...new Set([endButton, confirm, summaryTitle, takeaways, close, home]),
+      ].sort((a, b) => a - b),
+    );
+    expect(endButton).toBeGreaterThan(enabled.at(-1) ?? -1);
+    expect(JSON.stringify(commands)).not.toMatch(
+      /summary-(score|topics|close)(?!-button)/,
+    );
+  });
+
+  it.each([
+    {
+      flow: 'learning/freeform-session.yaml',
+      prompts: [
+        'What is photosynthesis?',
+        'Can you explain that in simpler terms?',
+      ],
+      receiptIds: ['message-bubble-assistant-3', 'message-bubble-assistant-5'],
+    },
+    {
+      flow: 'learning/session-summary.yaml',
+      prompts: [
+        'Explain the concept to me',
+        'Can you give me an example of how this works?',
+        'That makes sense, thank you',
+      ],
+      receiptIds: [
+        'message-bubble-assistant-3',
+        'message-bubble-assistant-5',
+        'message-bubble-assistant-7',
+      ],
+    },
+    {
+      flow: 'retention/retention-review.yaml',
+      prompts: [
+        'The key concept involves understanding the relationship between the variables and applying the formula correctly',
+        'The second concept relates to how these principles are applied in practice',
+      ],
+      receiptIds: ['message-bubble-assistant-2', 'message-bubble-assistant-4'],
+    },
+  ])(
+    '[WI-1864] $flow requires a deterministic response receipt before every later turn',
+    ({ flow, prompts, receiptIds }) => {
+      const source = readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/flows', flow),
+        'utf8',
+      );
+      const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+        inputText?: string;
+        pressKey?: string;
+        extendedWaitUntil?: {
+          visible?:
+            | {
+                id?: string;
+                enabled?: boolean;
+              }
+            | string;
+        };
+      }>;
+      let cursor = -1;
+
+      for (const [promptIndex, prompt] of prompts.entries()) {
+        const input = commands.findIndex(
+          ({ inputText }, index) => index > cursor && inputText === prompt,
+        );
+        const enter = commands.findIndex(
+          ({ pressKey }, index) => index > input && pressKey === 'Enter',
+        );
+        const receipt = commands.findIndex(
+          ({ extendedWaitUntil }, index) =>
+            index > enter &&
+            typeof extendedWaitUntil?.visible === 'object' &&
+            extendedWaitUntil.visible.id === receiptIds[promptIndex],
+        );
+        const enabled = commands.findIndex(
+          ({ extendedWaitUntil }, index) =>
+            index > receipt &&
+            typeof extendedWaitUntil?.visible === 'object' &&
+            extendedWaitUntil.visible.id === 'chat-input' &&
+            extendedWaitUntil.visible.enabled === true,
+        );
+
+        expect([input, enter, receipt, enabled]).toEqual(
+          [input, enter, receipt, enabled].toSorted((a, b) => a - b),
+        );
+        expect(input).toBeGreaterThan(cursor);
+        cursor = enabled;
+      }
+    },
+  );
+
+  it('[WI-1864] retention review waits for its rendered opener instead of stale copy', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/retention/retention-review.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+      assertVisible?: { text?: string } | string;
+    }>;
+
+    expect(
+      commands.some(
+        ({ extendedWaitUntil }) =>
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.id === 'message-bubble-assistant-0',
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(commands)).not.toContain('what you remember');
+  });
+
+  it('[WI-1864] accepts the tall summary input above the Android navigation inset', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/learning/session-summary.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        timeout?: number;
+        visibilityPercentage?: number;
+      };
+      tapOn?: { id?: string } | string;
+    }>;
+    const inputScroll = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'summary-input' &&
+        (scrollUntilVisible.visibilityPercentage ?? 100) <= 90 &&
+        (scrollUntilVisible.timeout ?? 0) >= 10000,
+    );
+    const inputTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > inputScroll &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'summary-input',
+    );
+
+    expect(inputScroll).toBeGreaterThan(-1);
+    expect(inputTap).toBeGreaterThan(inputScroll);
+  });
+
+  it('[WI-1864] verifies a freshly submitted summary returns home', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/learning/session-summary.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string } | string;
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+    }>;
+    const continueTap = commands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' && tapOn.id === 'continue-button',
+    );
+    const home = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > continueTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'learner-screen',
+    );
+
+    expect(continueTap).toBeGreaterThan(-1);
+    expect(home).toBeGreaterThan(continueTap);
+  });
+
+  it('[WI-1864] scrolls the tall Pro subscription screen to its no-offerings section', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/billing/static-comparison-pro.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+      };
+    }>;
+    const noOfferings = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'no-offerings' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const proCard = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > noOfferings &&
+        scrollUntilVisible?.element?.id === 'static-tier-pro' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+
+    expect(noOfferings).toBeGreaterThan(-1);
+    expect(proCard).toBeGreaterThan(noOfferings);
+  });
+
+  it('[WI-1864] scrolls the Family pool to the seeded remove control before tapping it', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/billing/family-pool.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      assertNotVisible?: { id?: string } | string;
+      assertVisible?: { id?: string } | string;
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+      };
+      tapOn?: { id?: string; text?: string } | string;
+    }>;
+    const removeVisible = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id ===
+          'remove-family-member-${CHILD_PROFILE_ID1}' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const removeTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > removeVisible &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'remove-family-member-${CHILD_PROFILE_ID1}',
+    );
+    const confirm = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > removeTap &&
+        typeof tapOn === 'object' &&
+        tapOn.text === 'Remove',
+    );
+    const successDismiss = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > confirm && typeof tapOn === 'object' && tapOn.text === 'OK',
+    );
+    const refreshedCount = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > successDismiss &&
+        extendedWaitUntil?.visible === '2 of 4 profiles connected',
+    );
+    const survivorVisible = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > refreshedCount &&
+        scrollUntilVisible?.element?.id ===
+          'family-member-${CHILD_PROFILE_ID2}' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const removedAbsent = commands.findIndex(
+      ({ assertNotVisible }, index) =>
+        index > survivorVisible &&
+        typeof assertNotVisible === 'object' &&
+        assertNotVisible.id === 'family-member-${CHILD_PROFILE_ID1}',
+    );
+    const survivorAssert = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > removedAbsent &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'family-member-${CHILD_PROFILE_ID2}',
+    );
+
+    expect([
+      removeVisible,
+      removeTap,
+      confirm,
+      successDismiss,
+      refreshedCount,
+      survivorVisible,
+      removedAbsent,
+      survivorAssert,
+    ]).toEqual(
+      [
+        removeVisible,
+        removeTap,
+        confirm,
+        successDismiss,
+        refreshedCount,
+        survivorVisible,
+        removedAbsent,
+        survivorAssert,
+      ].toSorted((a, b) => a - b),
+    );
+    expect(removeVisible).toBeGreaterThan(-1);
+  });
+
+  it('[WI-1864] opens the seeded transcript book through the Shelf BookCard contract', () => {
+    const flow = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/learning/session-transcript.yaml'),
+      'utf8',
+    );
+    const bookCard = readFileSync(
+      join(repoRoot, 'apps/mobile/src/components/library/BookCard.tsx'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(flow).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string } | string;
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+    }>;
+    const shelf = commands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' &&
+        tapOn.id === 'shelf-row-header-${SUBJECT_ID}',
+    );
+    const cardWait = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > shelf &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'book-card-${BOOK_ID}',
+    );
+    const cardTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > cardWait &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'book-card-${BOOK_ID}',
+    );
+    const book = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > cardTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'book-screen',
+    );
+
+    expect([shelf, cardWait, cardTap, book]).toEqual(
+      [shelf, cardWait, cardTap, book].toSorted((a, b) => a - b),
+    );
+    expect(shelf).toBeGreaterThan(-1);
+    expect(flow).not.toContain('book-row-${BOOK_ID}');
+    expect(flow).toContain('components/library/BookCard.tsx');
+    expect(bookCard).toContain('testID={`book-card-${book.id}`}');
   });
 
   it('[WI-1406] keeps native MFA placeholders explicitly non-executable until OPQ-26 fixtures exist', () => {

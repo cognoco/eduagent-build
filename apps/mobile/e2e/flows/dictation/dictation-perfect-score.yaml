@@ -103,7 +103,22 @@ tags:
 
 - takeScreenshot: dict-perfect-02-playback
 
-# Wait up to 60s for playback to auto-navigate to the complete screen.
+# Headless hosted emulators can leave expo-speech in speaking state indefinitely.
+# Recover each prepared sentence only if healthy speech has not already advanced it.
+- runFlow:
+    when:
+      visible: '1 / 2'
+    commands:
+      - tapOn:
+          id: 'playback-skip'
+
+- runFlow:
+    when:
+      visible: '2 / 2'
+    commands:
+      - tapOn:
+          id: 'playback-skip'
+
 - extendedWaitUntil:
     visible:
       id: 'dictation-complete-screen'

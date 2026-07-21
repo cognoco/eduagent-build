@@ -51,6 +51,7 @@ import {
 } from '@eduagent/database';
 import { listSubjects } from './subject';
 import { getTierConfig } from './subscription';
+import { addMonthsClamped } from './billing/billing-shared';
 import { sleep } from './sleep';
 import {
   seedV2SupporterAccepted,
@@ -3540,14 +3541,16 @@ async function seedSubscriptionFamilyActive(
   });
 
   const subscriptionId = generateUUIDv7();
+  const periodStartAt = new Date();
+  const cycleResetAt = addMonthsClamped(periodStartAt, 1);
   await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
     planTier: 'family',
     status: 'active',
-    periodStartAt: new Date(),
-    periodEndAt: futureDate(30),
+    periodStartAt,
+    periodEndAt: cycleResetAt,
   });
 
   await db.insert(quotaPools).values({
@@ -3555,7 +3558,7 @@ async function seedSubscriptionFamilyActive(
     subscriptionId,
     monthlyLimit: familyTier.monthlyQuota,
     usedThisMonth: 120,
-    cycleResetAt: futureDate(30),
+    cycleResetAt,
   });
 
   const { subjectId } = await createSubjectWithCurriculum(
@@ -3605,14 +3608,16 @@ async function seedSubscriptionProActive(
   });
 
   const subscriptionId = generateUUIDv7();
+  const periodStartAt = new Date();
+  const cycleResetAt = addMonthsClamped(periodStartAt, 1);
   await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: profileId,
     planTier: 'pro',
     status: 'active',
-    periodStartAt: new Date(),
-    periodEndAt: futureDate(30),
+    periodStartAt,
+    periodEndAt: cycleResetAt,
   });
 
   await db.insert(quotaPools).values({
@@ -3620,7 +3625,7 @@ async function seedSubscriptionProActive(
     subscriptionId,
     monthlyLimit: proTier.monthlyQuota,
     usedThisMonth: 250,
-    cycleResetAt: futureDate(30),
+    cycleResetAt,
   });
 
   const { subjectId } = await createSubjectWithCurriculum(
@@ -5444,14 +5449,16 @@ async function seedMentorAuditFamilyPoolMembers(
   });
 
   const subscriptionId = generateUUIDv7();
+  const periodStartAt = new Date();
+  const cycleResetAt = addMonthsClamped(periodStartAt, 1);
   await insertSubscriptionWithLegacy(db, {
     id: subscriptionId,
     organizationId: accountId,
     payerPersonId: parentProfileId,
     planTier: 'family',
     status: 'active',
-    periodStartAt: new Date(),
-    periodEndAt: futureDate(30),
+    periodStartAt,
+    periodEndAt: cycleResetAt,
   });
 
   const usedThisMonth = Math.floor(familyTier.monthlyQuota / 2);
@@ -5460,7 +5467,7 @@ async function seedMentorAuditFamilyPoolMembers(
     subscriptionId,
     monthlyLimit: familyTier.monthlyQuota,
     usedThisMonth,
-    cycleResetAt: futureDate(30),
+    cycleResetAt,
   });
 
   // Pinned at 2 consented children — see docstring.

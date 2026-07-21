@@ -10,6 +10,29 @@ const DICTATION_PREPARATION_SYSTEM_MARKER =
   'You are a dictation preparation assistant.';
 const SUBJECT_SYSTEM_MARKER =
   'You are a subject name classifier for an educational tutoring app';
+const SUMMARY_EVALUATION_SYSTEM_MARKER =
+  "You are MentoMate's summary evaluator.";
+
+function resolveSummaryEvaluation(
+  messages: ChatMessage[],
+): LlmFixtureContent | undefined {
+  const systemPrompt = messages.find(({ role }) => role === 'system');
+  if (
+    !systemPrompt ||
+    !getTextContent(systemPrompt.content).includes(
+      SUMMARY_EVALUATION_SYSTEM_MARKER,
+    )
+  ) {
+    return undefined;
+  }
+
+  return {
+    feedback: 'Good summary — you connected the key concepts to practice.',
+    hasUnderstandingGaps: false,
+    gapAreas: [],
+    isAccepted: true,
+  };
+}
 
 function resolveDictationPreparation(
   messages: ChatMessage[],
@@ -171,6 +194,7 @@ function resolveMaestroChat(
   messages: ChatMessage[],
 ): LlmFixtureContent | undefined {
   return (
+    resolveSummaryEvaluation(messages) ??
     resolveDictationPreparation(messages) ??
     resolveDictationReview(messages) ??
     resolveSubjectRequest(messages)
