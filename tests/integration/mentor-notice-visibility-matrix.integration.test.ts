@@ -46,7 +46,12 @@
 
 import { eq } from 'drizzle-orm';
 
-import { mentorNotices, person, supportership } from '@eduagent/database';
+import {
+  mentorNotices,
+  person,
+  supportVisibilityContracts,
+  supportership,
+} from '@eduagent/database';
 
 import {
   buildIntegrationEnv,
@@ -613,10 +618,15 @@ describe('WI-2498 rework: fixture sanity', () => {
   it('the supporter/supportee link is accepted, not merely pending', async () => {
     const db = createIntegrationDb();
     const rows = await db
-      .select({ id: supportership.id })
+      .select({ status: supportVisibilityContracts.status })
       .from(supportership)
+      .innerJoin(
+        supportVisibilityContracts,
+        eq(supportVisibilityContracts.supportershipId, supportership.id),
+      )
       .where(eq(supportership.supporterPersonId, fixture.supporter.profileId));
     expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]?.status).toBe('accepted');
   });
 
   it('supporter-target person-scope /now returns 200 (not 403) — proves the scope guard, not a denial, suppresses D', async () => {
