@@ -3,6 +3,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -10,6 +11,7 @@ import type {
   ScopeDescriptor,
   SharedRecord,
   SupporterColdStart as SupporterColdStartData,
+  SupporterScopeList,
 } from '@eduagent/schemas';
 
 import {
@@ -128,7 +130,11 @@ const EMPTY_SHARED_RECORD: SharedRecord = {
 
 function renderWithProfile(
   ui: React.ReactElement,
-  options: { switchProfileMock?: ProfileContextValue['switchProfile'] } = {},
+  options: {
+    switchProfileMock?: ProfileContextValue['switchProfile'];
+    /** [WI-2243] Override for the doorway-suppressed-when-Me-present seam test. */
+    scopeList?: SupporterScopeList;
+  } = {},
 ): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -178,11 +184,13 @@ function renderWithProfile(
           }}
         >
           <ScopeContextProvider
-            initialScopeList={{
-              shape: 'supporter',
-              scopes: [{ kind: 'supporter-hub' }],
-              defaultScopeIndex: 0,
-            }}
+            initialScopeList={
+              options.scopeList ?? {
+                shape: 'supporter',
+                scopes: [{ kind: 'supporter-hub' }],
+                defaultScopeIndex: 0,
+              }
+            }
           >
             {children}
           </ScopeContextProvider>
@@ -467,8 +475,16 @@ describe('SupportHubMentorTab', () => {
       // please wait") — a label ErrorFallback's markup never sets — and the
       // retry affordance (`supporter-cold-start-retry`) only exists in the
       // error branch, so its absence here rules out error specifically.
-      screen.getByTestId('supporter-cold-start-error');
-      screen.getByLabelText('Loading, please wait');
+      //
+      // [WI-2243] SupporterSelfLearningDoorway now shares this same
+      // `/scopes/coldstart` query and shows its own "Loading, please wait"
+      // spinner while it's pending too (both coexist — see the mount
+      // comment in SupportHubMentorTab.tsx), so the label lookup must be
+      // scoped to the cold-start container or it matches both.
+      const coldStartContainer = screen.getByTestId(
+        'supporter-cold-start-error',
+      );
+      within(coldStartContainer).getByLabelText('Loading, please wait');
       expect(screen.queryByTestId('supporter-cold-start-retry')).toBeNull();
       expect(screen.queryByTestId('supporter-cold-start')).toBeNull();
       expect(
@@ -510,6 +526,87 @@ describe('SupportHubMentorTab', () => {
       });
       expect(screen.queryByTestId('supporter-cold-start')).toBeNull();
       expect(screen.queryByTestId('supporter-cold-start-error')).toBeNull();
+
+      // [WI-2243] Coexistence seam: with no cold-start cards to show and no
+      // own learning yet, the doorway is the only thing in this section —
+      // it must not be masked by SupporterColdStart rendering nothing.
+      screen.getByTestId('supporter-self-learning-doorway');
+    });
+  });
+
+  // [WI-2243] AC-1 coexistence seam: SupportHubMentorTab mounts
+  // SupporterColdStart and SupporterSelfLearningDoorway alongside each
+  // other (V2 shell spec §2.3/§4.2 — the doorway is persistent/first-class,
+  // separate from child-focused cold-start copy). Each self-guards
+  // independently, so every combination is a valid render; these three
+  // cases prove neither masks the other.
+  describe('[WI-2243] SupporterColdStart + SupporterSelfLearningDoorway coexistence', () => {
+    it('renders BOTH the managed-child cold-start card and the self-learning doorway when a child needs attention and the supporter has no own learning', async () => {
+      const coldStart: SupporterColdStartData = {
+        variant: 'per-child',
+        cards: [
+          {
+            personId: MANAGED_PERSON_ID,
+            edgeId: MANAGED_EDGE_ID,
+            displayName: 'Liam',
+            state: 'managed',
+            anchor: 'handoff',
+          },
+        ],
+        selfLearningDoorway: true,
+      };
+      mockFetch.setRoute('/scopes/coldstart', coldStart);
+
+      queryClient = renderWithProfile(
+        <SupportHubMentorTab personScopes={[EMMA_SCOPE]} />,
+      );
+
+      await waitFor(() => {
+        screen.getByTestId(`supporter-cold-start-managed-${MANAGED_PERSON_ID}`);
+      });
+      screen.getByTestId('supporter-self-learning-doorway');
+    });
+
+    it('suppresses the doorway once the supporter already has their own learning state (Me scope present)', async () => {
+      const coldStart: SupporterColdStartData = {
+        variant: 'per-child',
+        cards: [
+          {
+            personId: MANAGED_PERSON_ID,
+            edgeId: MANAGED_EDGE_ID,
+            displayName: 'Liam',
+            state: 'managed',
+            anchor: 'handoff',
+          },
+        ],
+        selfLearningDoorway: true,
+      };
+      mockFetch.setRoute('/scopes/coldstart', coldStart);
+
+      queryClient = renderWithProfile(
+        <SupportHubMentorTab personScopes={[EMMA_SCOPE]} />,
+        {
+          scopeList: {
+            shape: 'supporter',
+            scopes: [{ kind: 'supporter-hub' }, EMMA_SCOPE, { kind: 'me' }],
+            defaultScopeIndex: 0,
+          },
+        },
+      );
+
+      // The cold-start card (a different gate — managed-child attention,
+      // unaffected by the supporter's own learning state) still renders,
+      // proving the doorway's absence is a real suppression and not an
+      // artifact of the whole cold-start section failing to mount.
+      await waitFor(() => {
+        screen.getByTestId(`supporter-cold-start-managed-${MANAGED_PERSON_ID}`);
+      });
+      expect(
+        screen.queryByTestId('supporter-self-learning-doorway'),
+      ).toBeNull();
+      expect(
+        screen.queryByTestId('supporter-self-learning-doorway-error'),
+      ).toBeNull();
     });
   });
 });

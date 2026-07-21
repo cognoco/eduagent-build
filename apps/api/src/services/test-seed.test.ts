@@ -188,6 +188,9 @@ describe('VALID_SCENARIOS', () => {
       'v2-supporter-managed',
       // [WI-2554] Credentialed learner-only identity for Account row gating.
       'v2-account-non-owner-child',
+      // [WI-2243] Self-learning doorway + Me-scope persistence fixtures.
+      'v2-supporter-self-learning',
+      'v2-supporter-self-learning-active',
     ]);
   });
 
@@ -288,6 +291,12 @@ describe('seedScenario', () => {
     // reasoning above — seedV2SupporterManaged calls initiateLink/acceptLink
     // (db.transaction + read-after-write) via seedAcceptedEdge.
     'v2-supporter-managed',
+    // [WI-2243] Same DB_TRANSACTION_SCENARIOS reasoning above —
+    // seedV2SupporterSelfLearning(Active) also calls initiateLink/acceptLink
+    // via seedAcceptedEdge. Real coverage lives in
+    // test-seed-v2-supporter.integration.test.ts.
+    'v2-supporter-self-learning',
+    'v2-supporter-self-learning-active',
   ];
   const MOCK_DISPATCHABLE_SCENARIOS = (
     VALID_SCENARIOS as SeedScenario[]
