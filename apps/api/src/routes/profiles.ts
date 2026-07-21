@@ -42,8 +42,7 @@ import {
   ProfileValidationError,
   ProfileLimitError,
 } from '../services/profile';
-import { recordActivationEvent } from '../services/activation-events';
-import { safeWrite } from '../services/safe-non-core';
+import { recordActivationEventSafely } from '../services/activation-events';
 import { createLogger } from '../services/logger';
 
 const logger = createLogger();
@@ -348,14 +347,14 @@ export const profileRoutes = new Hono<ProfileEnv>()
         const profile = buildBootstrapProfile(graph, input);
         // WI-1504: launch activation instrumentation — signup_completed
         // fires once, at owner-graph creation. Never blocks the response.
-        await safeWrite(
-          () =>
-            recordActivationEvent(db, {
-              eventType: 'signup_completed',
-              profileId: graph.personId,
-              profileShape: 'solo_owner',
-              route: 'POST /profiles',
-            }),
+        await recordActivationEventSafely(
+          db,
+          {
+            eventType: 'signup_completed',
+            profileId: graph.personId,
+            profileShape: 'solo_owner',
+            route: 'POST /profiles',
+          },
           'profiles.create.signup_completed',
           { profileId: graph.personId },
         );

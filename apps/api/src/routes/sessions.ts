@@ -72,11 +72,8 @@ import {
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
-import { safeSend, safeWrite } from '../services/safe-non-core';
-import {
-  recordActivationEvent,
-  deriveActivationProfileShape,
-} from '../services/activation-events';
+import { safeSend } from '../services/safe-non-core';
+import { recordActivationEventSafely } from '../services/activation-events';
 import { refundQuotaOrEscalate } from '../services/billing';
 import {
   startInterleavedSession,
@@ -120,17 +117,15 @@ async function recordFirstSessionStarted(
   route: string,
   profileMeta: { isOwner: boolean } | undefined,
 ): Promise<void> {
-  await safeWrite(
-    () =>
-      recordActivationEvent(db, {
-        eventType: 'first_session_started',
-        profileId,
-        profileShape: profileMeta
-          ? deriveActivationProfileShape(profileMeta)
-          : null,
-        route,
-        metadata: { sessionId },
-      }),
+  await recordActivationEventSafely(
+    db,
+    {
+      eventType: 'first_session_started',
+      profileId,
+      profileMeta,
+      route,
+      metadata: { sessionId },
+    },
     'sessions.start.first_session_started',
     { profileId, sessionId },
   );
