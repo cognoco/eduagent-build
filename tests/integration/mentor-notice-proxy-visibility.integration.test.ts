@@ -221,11 +221,21 @@ async function seedNoticeSurfaces(
   // notice-bearing items. Without this the `/now/overflow` assertions would be
   // VACUOUSLY green (an empty overflow trivially contains no notices) and would
   // not have been red on unmodified main.
-  for (let i = 0; i < 4; i += 1) {
+  // The source-session type is cycled across every eligible class
+  // (learning / homework / interleaved) named in the AC. V is
+  // source-session-agnostic — it never reads the source session — so this
+  // enumerates rather than adds a code path; it exists to moot the question.
+  const SOURCE_CLASSES = [
+    'learning',
+    'homework',
+    'interleaved',
+    'learning',
+  ] as const;
+  for (let i = 0; i < SOURCE_CLASSES.length; i += 1) {
     const lockedSessionId = await seedLearningSession({
       profileId,
       subjectId: subject.id,
-      overrides: { sessionType: 'learning', status: 'completed' },
+      overrides: { sessionType: SOURCE_CLASSES[i], status: 'completed' },
     });
     await db.insert(mentorNotices).values({
       profileId,
