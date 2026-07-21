@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   useQuery,
   useMutation,
@@ -15,11 +15,14 @@ import {
   mentorNoticeRecheckResponseSchema,
 } from '@eduagent/schemas';
 
+import { useAuth } from '@clerk/expo';
+
 import { assertOk } from '../lib/assert-ok';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { readCachedNowFeed, writeCachedNowFeed } from '../lib/now-feed-cache';
+import { useNavigationDataScopeContract } from './use-navigation-contract';
 import { parseJson } from '../lib/parse-json';
 import { useApiQuery } from './use-api-query';
 
@@ -34,12 +37,31 @@ export type NowFeedQueryResult = UseQueryResult<NowResponse> & {
 export function useNowFeed(): NowFeedQueryResult {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { userId } = useAuth();
+  // [WI-2498] Proxy state is read through the navigation contract, not from
+  // raw profile state — the contract is the single sanctioned reader of
+  // owner/proxy/mode (navigation-contract-usage-guard.test.ts). The data-scope
+  // variant is the one the other cache/query-scope hooks use (use-sessions,
+  // use-dashboard, use-progress-scope): it skips the subscription query this
+  // hook has no use for. `contract.isParentProxy` is a straight pass-through of
+  // the same explicit-proxy flag, flag-state independent.
+  const navigationContract = useNavigationDataScopeContract();
   const profileId = activeProfile?.id;
+  // [WI-2498] Cache entries are actor/profile/policy-bound, so one actor's
+  // projection can never be rehydrated for another. Server-side V remains the
+  // control; `noticesVisible` below is defense in depth only.
+  const cacheBinding = useMemo(
+    () => (userId && profileId ? { actorId: userId, profileId } : null),
+    [userId, profileId],
+  );
+  const noticesVisible = !navigationContract.isParentProxy;
   const [fallbackFeed, setFallbackFeed] = useState<NowResponse | null>(null);
   const [isSlowFallback, setIsSlowFallback] = useState(false);
 
   const query = useQuery({
-    queryKey: ['now-feed', profileId],
+    // [WI-2498] Keyed by actor AND subject: the in-memory cache must not be
+    // shared across actors selecting the same profile.
+    queryKey: ['now-feed', userId, profileId],
     queryFn: async ({ signal: querySignal }): Promise<NowResponse> => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -49,8 +71,8 @@ export function useNowFeed(): NowFeedQueryResult {
         );
         const okRes = await assertOk(res);
         const data = await parseJson(okRes, nowResponseSchema, 'GET /now');
-        if (profileId) {
-          void writeCachedNowFeed(profileId, data);
+        if (cacheBinding) {
+          void writeCachedNowFeed(cacheBinding, data, { noticesVisible });
         }
         return data;
       } finally {
@@ -64,7 +86,7 @@ export function useNowFeed(): NowFeedQueryResult {
   });
 
   useEffect(() => {
-    if (!profileId || !query.isFetching || query.data) {
+    if (!cacheBinding || !query.isFetching || query.data) {
       setIsSlowFallback(false);
       if (!query.isError) {
         setFallbackFeed(null);
@@ -74,7 +96,9 @@ export function useNowFeed(): NowFeedQueryResult {
 
     let cancelled = false;
     const timer = setTimeout(() => {
-      void readCachedNowFeed(profileId).then((cached) => {
+      void readCachedNowFeed(cacheBinding, Date.now(), {
+        noticesVisible,
+      }).then((cached) => {
         if (cancelled || !cached) return;
         setFallbackFeed(cached);
         setIsSlowFallback(true);
@@ -85,7 +109,13 @@ export function useNowFeed(): NowFeedQueryResult {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [profileId, query.data, query.isError, query.isFetching]);
+  }, [
+    cacheBinding,
+    noticesVisible,
+    query.data,
+    query.isError,
+    query.isFetching,
+  ]);
 
   return {
     ...query,
@@ -98,15 +128,16 @@ export function useMentorNoticeActions() {
   const client = useApiClient();
   const queryClient = useQueryClient();
   const { activeProfile } = useProfile();
+  const { userId } = useAuth();
   const issuedForProfileId = activeProfile?.id;
 
   const invalidate = async (): Promise<void> => {
     await Promise.all([
       queryClient.invalidateQueries({
-        queryKey: ['now-feed', issuedForProfileId],
+        queryKey: ['now-feed', userId, issuedForProfileId],
       }),
       queryClient.invalidateQueries({
-        queryKey: ['now-overflow', issuedForProfileId],
+        queryKey: ['now-overflow', userId, issuedForProfileId],
       }),
     ]);
   };
@@ -148,10 +179,12 @@ export function useNowOverflow(
 ): UseQueryResult<NowOverflowResponse> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const { userId } = useAuth();
   const profileId = activeProfile?.id;
 
   return useApiQuery({
-    queryKey: ['now-overflow', profileId],
+    // [WI-2498] Actor-bound, matching the now-feed key above.
+    queryKey: ['now-overflow', userId, profileId],
     enabled,
     schema: nowOverflowResponseSchema,
     fetch: (signal) =>
