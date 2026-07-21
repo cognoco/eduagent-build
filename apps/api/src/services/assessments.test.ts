@@ -8,7 +8,11 @@ import {
   type ModelConfig,
   type StopReason,
 } from './llm';
-import { createMockProvider } from './llm/test-utils';
+import { createMockProvider, getModelConfigForTest } from './llm/test-utils';
+// [WI-2433] GRADER_MODEL is the anthropic judge-grader occupant. It is a
+// production constant (not a barrel export); router.test.ts imports it the same
+// way to assert the resolved judge config.
+import { GRADER_MODEL } from './llm/router';
 import { makeChatStreamResult } from './llm/types';
 import {
   generateQuickCheck,
@@ -61,7 +65,13 @@ function createQuickCheckMockProvider(questions: string[]): LLMProvider {
   };
 }
 
-/** Creates a mock provider that returns specific JSON for assessment evaluation */
+/**
+ * Creates a mock provider that returns specific JSON for assessment evaluation.
+ * [WI-2433] Registered under 'anthropic' because evaluateAssessmentAnswer /
+ * evaluateQuickCheckAnswer now route on capability:'judge', which resolves to
+ * the vendor-independent grader (anthropic + GRADER_MODEL) — never the tutor's
+ * text provider (gemini). See the judge-routing describe block below.
+ */
 function createAssessmentEvalMockProvider(evaluation: {
   feedback: string;
   passed: boolean;
@@ -70,7 +80,7 @@ function createAssessmentEvalMockProvider(evaluation: {
   qualityRating: number;
 }): LLMProvider {
   return {
-    id: 'gemini',
+    id: 'anthropic',
     async chat(_messages: ChatMessage[], _config: ModelConfig) {
       return {
         content: JSON.stringify(evaluation),
@@ -89,8 +99,9 @@ function createAssessmentEvalMockProvider(evaluation: {
 function createRawAssessmentEvalMockProvider(
   evaluation: Record<string, unknown>,
 ): LLMProvider {
+  // [WI-2433] 'anthropic' — the judge grader the eval calls now resolve to.
   return {
-    id: 'gemini',
+    id: 'anthropic',
     async chat(_messages: ChatMessage[], _config: ModelConfig) {
       return {
         content: JSON.stringify(evaluation),
@@ -487,7 +498,7 @@ describe('evaluateAssessmentAnswer', () => {
 
   it('falls back gracefully when LLM returns non-JSON', async () => {
     const rawProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'anthropic', // [WI-2433] judge grader
       async chat() {
         return {
           content: 'The answer shows partial understanding.',
@@ -532,7 +543,7 @@ describe('evaluateAssessmentAnswer', () => {
     // learner as failed. The brace-depth walker stops at the first balanced
     // object, so trailing braces no longer break extraction.
     const messyProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'anthropic', // [WI-2433] judge grader
       async chat() {
         return {
           content:
@@ -569,7 +580,7 @@ describe('evaluateAssessmentAnswer', () => {
 
   it('parses correctly when JSON is wrapped in markdown fence', async () => {
     const fencedProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'anthropic', // [WI-2433] judge grader
       async chat() {
         return {
           content:
@@ -605,7 +616,7 @@ describe('evaluateAssessmentAnswer', () => {
 
   it('uses canned fallback when parsed JSON is missing feedback field', async () => {
     const missingFeedbackProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'anthropic', // [WI-2433] judge grader
       async chat() {
         // Valid JSON, but no `feedback` field — caller used to default to
         // raw response under the old `?? response` pattern.
@@ -641,7 +652,7 @@ describe('evaluateAssessmentAnswer', () => {
 
   it('[WI-372] rejects session-envelope-shaped output for discrete assessment evaluation', async () => {
     const envelopeProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'anthropic', // [WI-2433] judge grader
       async chat() {
         return {
           content: JSON.stringify({
@@ -1711,11 +1722,20 @@ describe('[WI-2432] ageBracket threads to vendor-exclusion (legacy path)', () =>
     },
   );
 
+  // [WI-2433] evaluateAssessmentAnswer / evaluateQuickCheckAnswer now route on
+  // capability:'judge'. The judge branch (router.ts getModelConfig) is evaluated
+  // BEFORE the under-18 vendor gate and is age-blind + vendor-independent, so it
+  // resolves to the anthropic grader (never Gemini) regardless of ageBracket.
+  // The WI-2432 safety property — a minor is never served by Gemini for these
+  // calls — therefore still holds, now guaranteed more strongly by the judge
+  // routing rather than the under-18 text-fallback gate. The eval provider is
+  // registered under 'anthropic' (the grader vendor) accordingly. generateQuickCheck
+  // below is a generation call and still exercises the under-18 gate.
   it.each(['child', 'adolescent'] as const)(
-    'evaluateAssessmentAnswer never calls Gemini for an under-18 subject (%s)',
+    'evaluateAssessmentAnswer never calls Gemini for an under-18 subject (%s) — judge grader serves',
     async (ageBracket) => {
       registerProvider(
-        approvedEvalProvider('cerebras', {
+        approvedEvalProvider('anthropic', {
           feedback: 'Good progress.',
           passed: true,
           shouldEscalateDepth: false,
@@ -1736,10 +1756,10 @@ describe('[WI-2432] ageBracket threads to vendor-exclusion (legacy path)', () =>
   );
 
   it.each(['child', 'adolescent'] as const)(
-    'evaluateQuickCheckAnswer never calls Gemini for an under-18 subject (%s)',
+    'evaluateQuickCheckAnswer never calls Gemini for an under-18 subject (%s) — judge grader serves',
     async (ageBracket) => {
       registerProvider(
-        approvedEvalProvider('cerebras', {
+        approvedEvalProvider('anthropic', {
           feedback: 'Nicely done.',
           passed: true,
           shouldEscalateDepth: false,
@@ -1792,4 +1812,165 @@ describe('[WI-2432] ageBracket threads to vendor-exclusion (legacy path)', () =>
     // gate (router.ts:1064), not just getModelConfig's (router.ts:908).
     expect(flakyCerebras.callCount).toBe(5);
   }, 15000);
+});
+
+// ---------------------------------------------------------------------------
+// [WI-2433] Answer graders route on capability:'judge'.
+//
+// evaluateAssessmentAnswer and evaluateQuickCheckAnswer grade a learner's
+// answer — a judge task. They pass capability:'judge' to routeAndCall, which
+// resolves the vendor-independent, tier/age-blind grader (anthropic +
+// GRADER_MODEL, no reasoningEffort) per MMT-ADR-0016 §2 — the same routing
+// posture as the challenge-round / teach-back / suitability graders.
+//
+// These tests assert the RESOLVED ModelConfig is the judge path (NOT merely
+// that the capability param was threaded), and that the resolution is
+// age-invariant — i.e. exempt from the under-18 model restriction that makes
+// the default text path age-sensitive. Uses the REAL router (this file does
+// not mock ./llm).
+// ---------------------------------------------------------------------------
+describe("[WI-2433] answer graders resolve the capability:'judge' model config", () => {
+  /**
+   * Capturing anthropic grader — records the ModelConfig routeAndCall selected,
+   * so the end-to-end tests assert the RESOLVED config (not just the param
+   * passed in). Mirrors router.test.ts's `createCapturingProvider`.
+   */
+  function createCapturingAnthropicProvider(
+    evaluationJson: string,
+  ): LLMProvider & { lastConfig: ModelConfig | null } {
+    let captured: ModelConfig | null = null;
+    return {
+      id: 'anthropic',
+      get lastConfig() {
+        return captured;
+      },
+      async chat(_messages: ChatMessage[], config: ModelConfig) {
+        captured = config;
+        return { content: evaluationJson, stopReason: 'stop' as StopReason };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield evaluationJson;
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+  }
+
+  const EVAL_JSON = JSON.stringify({
+    feedback: 'Good recall of the key idea.',
+    passed: true,
+    shouldEscalateDepth: false,
+    rawScore: 0.8,
+    qualityRating: 4,
+  });
+
+  beforeEach(() => {
+    _clearProviders();
+    _resetCircuits();
+    // Legacy routing (V2 off) is production today; the judge branch behaves
+    // identically under both, and resolveGraderConfig is flag-independent.
+    setLlmRoutingV2Enabled(false);
+  });
+
+  afterEach(() => {
+    _clearProviders();
+    setLlmRoutingV2Enabled(false);
+    registerProvider(createMockProvider('gemini'));
+  });
+
+  // --- Router-level: the resolved judge config is the anthropic grader --------
+
+  it('resolves capability:judge to the anthropic grader (GRADER_MODEL, no reasoningEffort) at the grader rung', () => {
+    // A Gemini tutor gives the grader's vendor guard a real tutor vendor to
+    // exclude (grader must differ from tutor; gemini → anthropic).
+    registerProvider(createMockProvider('gemini'));
+
+    // Rung 2 is the rung both grader call sites use.
+    const cfg = getModelConfigForTest(2, { capability: 'judge' });
+
+    expect(cfg.provider).toBe('anthropic');
+    expect(cfg.model).toBe(GRADER_MODEL);
+    expect(cfg.reasoningEffort).toBeUndefined();
+  });
+
+  it('resolves the SAME grader config regardless of ageBracket — the judge path is exempt from the under-18 model restriction', () => {
+    registerProvider(createMockProvider('gemini'));
+    // The approved non-Gemini text provider, so the age-SENSITIVE text path
+    // resolves for a minor (Gemini-banned) instead of throwing.
+    registerProvider(createMockProvider('cerebras'));
+
+    const judgeAdult = getModelConfigForTest(2, {
+      capability: 'judge',
+      ageBracket: 'adult',
+    });
+    const judgeChild = getModelConfigForTest(2, {
+      capability: 'judge',
+      ageBracket: 'child',
+    });
+    const judgeAdolescent = getModelConfigForTest(2, {
+      capability: 'judge',
+      ageBracket: 'adolescent',
+    });
+
+    // Age-blind: the judge branch is evaluated BEFORE the under-18 gate, so a
+    // minor resolves to the identical grader config as an adult.
+    expect(judgeChild).toEqual(judgeAdult);
+    expect(judgeAdolescent).toEqual(judgeAdult);
+    expect(judgeChild.provider).toBe('anthropic');
+    expect(judgeChild.model).toBe(GRADER_MODEL);
+    expect(judgeChild.reasoningEffort).toBeUndefined();
+
+    // Contrast: the DEFAULT text path IS age-sensitive — an adult keeps the
+    // Gemini tutor while a minor is redirected to the approved non-Gemini
+    // provider. That is the under-18 restriction the judge path is exempt from.
+    const textAdult = getModelConfigForTest(2, { ageBracket: 'adult' });
+    const textChild = getModelConfigForTest(2, { ageBracket: 'child' });
+    expect(textAdult.provider).toBe('gemini');
+    expect(textChild.provider).not.toBe('gemini');
+    // The grader a minor gets is NOT the text provider a minor gets.
+    expect(judgeChild.provider).not.toBe(textChild.provider);
+  });
+
+  // --- End-to-end: the actual call sites resolve to the judge grader ----------
+
+  it('evaluateAssessmentAnswer routes to the judge grader even for a minor (child)', async () => {
+    registerProvider(createMockProvider('gemini')); // tutor vendor to exclude
+    const grader = createCapturingAnthropicProvider(EVAL_JSON);
+    registerProvider(grader);
+
+    const result = await evaluateAssessmentAnswer(
+      assessmentContext,
+      'A variable stores data.',
+      { ageBracket: 'child' },
+    );
+
+    // The capturing anthropic provider served — proving the call site resolved
+    // to the judge grader, not the (age-gated) text path.
+    expect(grader.lastConfig).not.toBeNull();
+    expect(grader.lastConfig?.provider).toBe('anthropic');
+    expect(grader.lastConfig?.model).toBe(GRADER_MODEL);
+    expect(grader.lastConfig?.reasoningEffort).toBeUndefined();
+    // WI-2433 also sets responseFormat:'json' (the parse path expects JSON).
+    expect(grader.lastConfig?.responseFormat).toBe('json');
+    expect(result.feedback).toContain('Good recall of the key idea.');
+  });
+
+  it('evaluateQuickCheckAnswer routes to the judge grader even for a minor (adolescent)', async () => {
+    registerProvider(createMockProvider('gemini'));
+    const grader = createCapturingAnthropicProvider(EVAL_JSON);
+    registerProvider(grader);
+
+    const result = await evaluateQuickCheckAnswer(
+      assessmentContext,
+      'A variable stores data.',
+      { ageBracket: 'adolescent' },
+    );
+
+    expect(grader.lastConfig?.provider).toBe('anthropic');
+    expect(grader.lastConfig?.model).toBe(GRADER_MODEL);
+    expect(grader.lastConfig?.reasoningEffort).toBeUndefined();
+    expect(grader.lastConfig?.responseFormat).toBe('json');
+    expect(result.feedback).toContain('Good recall of the key idea.');
+  });
 });
