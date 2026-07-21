@@ -113,6 +113,11 @@ test('V2 nav shell: real Back from the support-hub Mentor surface keeps the supp
 
   await page.goBack();
 
+  // AC-2: positive surface assertion required — the negatives below alone pass
+  // on a blank/errored route (see docs/evidence/wi2524-staging-navshell-verification.md §3)
+  await expect(page).toHaveURL(/\/mentor$/);
+  await expect(page.getByTestId('support-hub-mentor-tab')).toBeVisible();
+
   await expect(page.getByTestId('mentor-screen')).toHaveCount(0);
   await expect(
     page.getByTestId('person-scope-journal-placeholder'),

@@ -420,7 +420,17 @@ describe('WI-2498: V’s rollout conjunct', () => {
  * from "no response". These cases call the predicate directly, so each conjunct
  * is isolated with the others held true.
  */
+// [WI-2504] The predicate now returns `{ visible, policyEpoch }` from the same
+// branch structure. Each case below pins BOTH — against a real database — so
+// the epoch a client binds its cache to is proven to track the same conjunct
+// that decides visibility, per denial reason.
 describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
+  const EPOCH_VISIBLE = 'notice-policy-v1:on:self:consented';
+  const EPOCH_ROLLOUT_OFF = 'notice-policy-v1:off';
+  const EPOCH_PROXY = 'notice-policy-v1:on:proxy';
+  const EPOCH_OTHER_SUBJECT = 'notice-policy-v1:on:other-subject';
+  const EPOCH_CONSENT_WITHDRAWN = 'notice-policy-v1:on:self:withdrawn';
+
   /** The narrow context shape the predicate reads — nothing else is consulted,
    *  which is itself the proof that no request header can reach the decision
    *  except through the explicit `signals` argument. */
@@ -440,7 +450,7 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
         fixture.childProfileId,
         'true',
       ),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ visible: true, policyEpoch: EPOCH_VISIBLE });
   });
 
   it('is false when the rollout flag is off', async () => {
@@ -450,7 +460,7 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
         fixture.childProfileId,
         'false',
       ),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ visible: false, policyEpoch: EPOCH_ROLLOUT_OFF });
   });
 
   it('is false when the caller is not the subject (selfhood conjunct)', async () => {
@@ -460,7 +470,7 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
         fixture.childProfileId,
         'true',
       ),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ visible: false, policyEpoch: EPOCH_OTHER_SUBJECT });
   });
 
   it('is false when caller identity is unresolved (fail closed)', async () => {
@@ -470,7 +480,7 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
         fixture.childProfileId,
         'true',
       ),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ visible: false, policyEpoch: EPOCH_OTHER_SUBJECT });
   });
 
   it('X-Proxy-Mode can only TIGHTEN: true forces false for a genuine self-read', async () => {
@@ -481,7 +491,7 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
         'true',
         { proxyModeHeader: 'true' },
       ),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ visible: false, policyEpoch: EPOCH_PROXY });
   });
 
   it('X-Proxy-Mode cannot ESTABLISH selfhood: absent header does not help a non-subject caller', async () => {
@@ -492,7 +502,7 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
         'true',
         { proxyModeHeader: undefined },
       ),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ visible: false, policyEpoch: EPOCH_OTHER_SUBJECT });
   });
 
   it('is false when the SUBJECT has withdrawn consent (consent conjunct)', async () => {
@@ -512,7 +522,10 @@ describe('WI-2498: resolveMentorNoticeVisibility conjuncts', () => {
           fixture.childProfileId,
           'true',
         ),
-      ).resolves.toBe(false);
+      ).resolves.toEqual({
+        visible: false,
+        policyEpoch: EPOCH_CONSENT_WITHDRAWN,
+      });
     } finally {
       await setProfileConsentStatusForTest({
         profileId: fixture.childProfileId,

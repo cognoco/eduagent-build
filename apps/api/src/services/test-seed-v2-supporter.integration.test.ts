@@ -24,9 +24,22 @@
 import { resolve } from 'path';
 
 import { loadDatabaseEnv } from '@eduagent/test-utils';
-import { createDatabase, type Database } from '@eduagent/database';
+import { createDatabase, login, type Database } from '@eduagent/database';
+import { profileListResponseSchema } from '@eduagent/schemas';
+import { eq } from 'drizzle-orm';
+
+import { buildIntegrationEnv } from '../../../../tests/integration/helpers';
+import { buildAuthHeaders } from '../../../../tests/integration/route-fixtures';
+import {
+  addFetchHandler,
+  installFetchInterceptor,
+  restoreFetch,
+} from '../../../../tests/integration/fetch-interceptor';
+import { mockClerkJWKS } from '../../../../tests/integration/external-mocks';
 
 import { ForbiddenError } from '../errors';
+import { app } from '../index';
+import { clearJWKSCache } from '../middleware/jwt';
 import { deleteOrganizationGraph } from './test-seed';
 import {
   seedV2SupporterAccepted,
@@ -41,6 +54,17 @@ import { getPersonScope } from './identity-v2/profile-v2';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 const RUN = !!process.env.DATABASE_URL;
+const nativeFetch = globalThis.fetch;
+
+if (RUN) {
+  installFetchInterceptor();
+  mockClerkJWKS();
+  addFetchHandler(/\.neon\.tech/, (url, init) => nativeFetch(url, init));
+}
+
+afterAll(() => {
+  if (RUN) restoreFetch();
+});
 
 function createIntegrationDb(): Database {
   return createDatabase(process.env.DATABASE_URL!);
@@ -272,6 +296,7 @@ function createIntegrationDb(): Database {
   () => {
     let db: Database;
     let seeded: Awaited<ReturnType<typeof seedV2SupporterManaged>>;
+    const env = RUN ? buildIntegrationEnv() : {};
 
     beforeAll(async () => {
       db = createIntegrationDb();
@@ -293,6 +318,47 @@ function createIntegrationDb(): Database {
       expect(seeded.ids.supporterOrganizationId).toBe(seeded.accountId);
       expect(seeded.ids.managedChildPersonId).toBeTruthy();
       expect(seeded.ids.managedChildEdgeId).toBeTruthy();
+    });
+
+    it('[WI-2584 route boundary] authenticated GET /v1/profiles returns the schema-valid supporter owner and same-org Managed Child', async () => {
+      const supporterLogin = await db.query.login.findFirst({
+        where: eq(login.personId, seeded.ids.supporterPersonId),
+        columns: { clerkUserId: true },
+      });
+
+      expect(supporterLogin).toBeDefined();
+
+      clearJWKSCache();
+      const response = await app.request(
+        '/v1/profiles',
+        {
+          headers: buildAuthHeaders({
+            sub: supporterLogin!.clerkUserId,
+            email: seeded.email,
+            email_verified: true,
+          }),
+        },
+        env,
+      );
+      expect(response.status).toBe(200);
+
+      const body = await response.json();
+      const parsed = profileListResponseSchema.parse(body);
+      expect(parsed.profiles).toHaveLength(2);
+      expect(parsed.profiles).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: seeded.ids.supporterPersonId,
+            displayName: 'Test Supporter',
+            isOwner: true,
+          }),
+          expect.objectContaining({
+            id: seeded.ids.managedChildPersonId,
+            displayName: 'Managed Child',
+            isOwner: false,
+          }),
+        ]),
+      );
     });
 
     it("[AC: SAME-ORG] the managed child resolves within the supporter's own organization — the exact predicate POST /profiles/switch (getPersonScope) enforces", async () => {

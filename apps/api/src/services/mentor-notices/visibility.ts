@@ -56,13 +56,33 @@
 // reading a charge's session summary still receives the summary, just without
 // `mentorNotice`. Denial belongs to assertCanReadProfile, not here.
 //
-// [WI-2504 EXTENSION POINT] The sibling item adds a server-authoritative
-// policy EPOCH so that a rollout flag-off invalidates already-persisted client
-// projections. That epoch belongs HERE, as a value derived alongside this
-// predicate (same inputs: rollout + consent + subject), surfaced to clients so
-// a cache entry can be bound to it. Extend `resolveMentorNoticeVisibility`
-// below to return `{ visible, policyEpoch }` and thread the epoch out through
-// the same call sites — do NOT introduce a second policy seam.
+// [WI-2504] POLICY EPOCH — the same seam, extended, not a second one.
+//
+// V answers "may notice data be projected NOW?". It cannot invalidate a
+// projection a client already persisted: a mobile Now-feed cache entry written
+// while the rollout flag was ON survives a flag-off, because nothing on the
+// wire tells the device that the policy it observed has changed. The epoch is
+// that missing signal — a stable, server-authoritative string derived from
+// EXACTLY the inputs V already evaluates, in the same order, from the same
+// branch structure. It is not a parallel policy: `visible` is true for exactly
+// one epoch value (`MENTOR_NOTICE_EPOCH_VISIBLE`), so the two can never
+// disagree.
+//
+// Every branch that denies V gets its OWN epoch value rather than a shared
+// "hidden" token. That matters for cache binding: a proxy-tightened read and a
+// flag-off read must not key to the same cache entry, or one could serve the
+// other's projection. Binding a cache entry to the epoch therefore binds it to
+// actor-vs-subject selfhood, subject consent, and rollout state at once (the
+// subject profile is separately part of the client's cache key).
+//
+// The epoch is DERIVED at all six notice-bearing call sites (routes/now.ts ×2,
+// routes/sessions.ts summary, routes/mentor-notices.ts recheck+defer) because
+// they all call this one function. It is only put ON THE WIRE by the `/now`
+// and `/now/overflow` responses — those carry the only client projection that
+// is PERSISTED across launches (apps/mobile/src/lib/now-feed-cache.ts). The
+// other surfaces hold no persisted state to invalidate: with the flag off the
+// summary simply carries no notice receipt and recheck/defer return 404. Do
+// not widen response schemas that have nothing to invalidate.
 // ---------------------------------------------------------------------------
 
 import type { Database } from '@eduagent/database';
@@ -92,7 +112,41 @@ export type MentorNoticeVisibilityRequestSignals = {
 };
 
 /**
- * Resolve V for `subjectProfileId` on the current request.
+ * [WI-2504] Policy-epoch vocabulary. `v1` is the SHAPE version — bump it only
+ * if the meaning of the suffixes changes, never to force an invalidation (a
+ * policy change already produces a different suffix).
+ *
+ * The client treats these as OPAQUE: it stores whichever string it last
+ * observed and keys its persisted projection on it. It never parses them, so
+ * adding a branch here can only ever produce a cache miss, never a leak.
+ */
+const EPOCH_PREFIX = 'notice-policy-v1';
+/** Rollout flag off — the operational kill switch. */
+export const MENTOR_NOTICE_EPOCH_ROLLOUT_OFF = `${EPOCH_PREFIX}:off` as const;
+/** Rollout on, but the caller declared an explicit proxy session. */
+export const MENTOR_NOTICE_EPOCH_PROXY = `${EPOCH_PREFIX}:on:proxy` as const;
+/** Rollout on, but the caller person is not the selected subject. */
+export const MENTOR_NOTICE_EPOCH_OTHER_SUBJECT =
+  `${EPOCH_PREFIX}:on:other-subject` as const;
+/** Rollout on, caller IS the subject, but the subject withdrew LLM consent. */
+export const MENTOR_NOTICE_EPOCH_CONSENT_WITHDRAWN =
+  `${EPOCH_PREFIX}:on:self:withdrawn` as const;
+/** The ONLY epoch under which notice data may be projected. */
+export const MENTOR_NOTICE_EPOCH_VISIBLE =
+  `${EPOCH_PREFIX}:on:self:consented` as const;
+
+/**
+ * [WI-2504] The server's answer for one request: whether notice data may be
+ * projected, and the policy epoch that answer was derived under. `visible` is
+ * true if and only if `policyEpoch === MENTOR_NOTICE_EPOCH_VISIBLE`.
+ */
+export type MentorNoticePolicy = {
+  visible: boolean;
+  policyEpoch: string;
+};
+
+/**
+ * Resolve V (and its epoch) for `subjectProfileId` on the current request.
  *
  * `rolloutValue` is the raw `MENTOR_NOTICE_ENABLED` binding — passed in rather
  * than read here so this stays a pure function of its inputs and every call
@@ -103,22 +157,34 @@ export async function resolveMentorNoticeVisibility(
   subjectProfileId: string,
   rolloutValue: string | undefined,
   signals: MentorNoticeVisibilityRequestSignals = {},
-): Promise<boolean> {
+): Promise<MentorNoticePolicy> {
   // 1. Rollout. Cheapest conjunct and the one that short-circuits the DB read
   //    when the feature is off entirely.
-  if (!isMentorNoticeEnabled(rolloutValue)) return false;
+  if (!isMentorNoticeEnabled(rolloutValue)) {
+    return { visible: false, policyEpoch: MENTOR_NOTICE_EPOCH_ROLLOUT_OFF };
+  }
 
   // Client tightening. Checked before the DB read purely as an optimisation —
   // it can only ever produce `false`, so its position carries no authority.
-  if (signals.proxyModeHeader === 'true') return false;
+  if (signals.proxyModeHeader === 'true') {
+    return { visible: false, policyEpoch: MENTOR_NOTICE_EPOCH_PROXY };
+  }
 
   // 2. Selfhood — server-derived on both sides (see the file header).
   const callerPersonId = source.get('callerPersonId');
-  if (!callerPersonId || callerPersonId !== subjectProfileId) return false;
+  if (!callerPersonId || callerPersonId !== subjectProfileId) {
+    return { visible: false, policyEpoch: MENTOR_NOTICE_EPOCH_OTHER_SUBJECT };
+  }
 
   // 3. Subject consent. Applied to the SUBJECT, not the caller — the data
   //    belongs to the subject. `isLlmExchangeConsentAllowed` is
   //    "no rows → allowed": only an explicit WITHDRAWN denies, so a normal
   //    consented learner is unaffected.
-  return isLlmExchangeConsentAllowed(source.get('db'), subjectProfileId);
+  const consented = await isLlmExchangeConsentAllowed(
+    source.get('db'),
+    subjectProfileId,
+  );
+  return consented
+    ? { visible: true, policyEpoch: MENTOR_NOTICE_EPOCH_VISIBLE }
+    : { visible: false, policyEpoch: MENTOR_NOTICE_EPOCH_CONSENT_WITHDRAWN };
 }

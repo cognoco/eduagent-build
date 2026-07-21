@@ -1,0 +1,1 @@
+ALTER TABLE "retention_cards" ADD COLUMN "last_recall_feedback" jsonb;

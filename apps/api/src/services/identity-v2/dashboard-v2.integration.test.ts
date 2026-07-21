@@ -5,7 +5,7 @@
 // DB in the WI-789 flag-ON lane (ci.yml `integration-flag-on` job,
 // IDENTITY_V2_ENABLED=true) where `family_links` is ABSENT from the schema.
 //
-// Purpose: prove that `getChildrenForParent(db, parentId, { identityV2Enabled: true })`
+// Purpose: prove that `getChildrenForParent(db, parentId, callerId, organizationId)`
 // resolves the parent's charges via `guardianship` only — NO read of `family_links`.
 //
 // RED-GREEN-REVERT cycle (documented here — performed during implementation):
@@ -161,9 +161,12 @@ const RUN = !!process.env.DATABASE_URL;
         // This must NOT throw. If it did, it means the unbranched family_links
         // read is still present (the WI-802 bug: `relation "family_links" does
         // not exist` on the post-M-DROP schema).
-        const children = await getChildrenForParent(db, guardianPersonId, {
-          identityV2Enabled: true,
-        });
+        const children = await getChildrenForParent(
+          db,
+          guardianPersonId,
+          guardianPersonId,
+          orgId,
+        );
 
         // The child has no subjects/sessions so dashboard data is empty —
         // validChildProfileIds will include the child (profile exists) but
@@ -186,16 +189,23 @@ const RUN = !!process.env.DATABASE_URL;
         '(IDOR guard holds under v2)',
       async () => {
         const orgId = await seedOrg();
-        const guardianA = await seedPerson(orgId, { displayName: 'GuardianA' });
+        const guardianA = await seedPerson(orgId, {
+          displayName: 'GuardianA',
+          roles: ['admin'],
+        });
         const guardianB = await seedPerson(orgId, { displayName: 'GuardianB' });
         const chargeOfB = await seedPerson(orgId, { displayName: 'ChargeOfB' });
 
         await grantGuardianshipEdge(guardianB, chargeOfB);
-        // Guardian A has NO edge to chargeOfB — must not see chargeOfB.
+        // Guardian A is an admin, so the service-level caller assertion passes;
+        // the combined guard must still reject chargeOfB because A has NO edge.
 
-        const childrenForA = await getChildrenForParent(db, guardianA, {
-          identityV2Enabled: true,
-        });
+        const childrenForA = await getChildrenForParent(
+          db,
+          guardianA,
+          guardianA,
+          orgId,
+        );
 
         expect(childrenForA.every((c) => c.profileId !== chargeOfB)).toBe(true);
         expect(childrenForA).toHaveLength(0);
@@ -232,9 +242,12 @@ const RUN = !!process.env.DATABASE_URL;
         // Active guardianship edge that crosses the org boundary.
         await grantGuardianshipEdge(guardianA, chargeInOrg2);
 
-        const childrenForA = await getChildrenForParent(db, guardianA, {
-          identityV2Enabled: true,
-        });
+        const childrenForA = await getChildrenForParent(
+          db,
+          guardianA,
+          guardianA,
+          org1,
+        );
 
         expect(childrenForA.every((c) => c.profileId !== chargeInOrg2)).toBe(
           true,
@@ -366,9 +379,12 @@ const RUN = !!process.env.DATABASE_URL;
           withdrawnAt,
         });
 
-        const children = await getChildrenForParent(db, guardianPersonId, {
-          identityV2Enabled: true,
-        });
+        const children = await getChildrenForParent(
+          db,
+          guardianPersonId,
+          guardianPersonId,
+          orgId,
+        );
 
         const child = children.find((c) => c.profileId === chargePersonId);
         expect(child).toBeDefined();
@@ -429,7 +445,8 @@ const RUN = !!process.env.DATABASE_URL;
           db,
           guardianPersonId,
           chargePersonId,
-          { identityV2Enabled: true },
+          guardianPersonId,
+          orgId,
         );
 
         expect(child).not.toBeNull();

@@ -100,7 +100,12 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     );
 
     const [children, pendingNotices] = await Promise.all([
-      getChildrenForParent(db, profileId),
+      getChildrenForParent(
+        db,
+        profileId,
+        c.get('callerPersonId'),
+        c.get('account').id,
+      ),
       listPendingNotices(db, profileId),
     ]);
     return c.json(
@@ -135,7 +140,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // Sub-routes (inventory, progress-history, sessions, memory, reports) keep
     // their own assertChildDashboardDataVisible guards because they don't have
     // a "restricted view" -- they should not return data at all.
-    const child = await getChildDetail(db, parentProfileId, childProfileId);
+    const child = await getChildDetail(
+      db,
+      parentProfileId,
+      childProfileId,
+      c.get('callerPersonId'),
+      c.get('account').id,
+    );
     return c.json(childDetailResponseSchema.parse({ child }));
   })
 
@@ -156,6 +167,8 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       db,
       parentProfileId,
       childProfileId,
+      c.get('callerPersonId'),
+      c.get('account').id,
     );
     return c.json(childInventoryResponseSchema.parse({ inventory }));
   })
@@ -177,6 +190,8 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       db,
       parentProfileId,
       childProfileId,
+      c.get('callerPersonId'),
+      c.get('account').id,
     );
     return c.json(progressSummarySchema.parse(summary));
   })
@@ -202,6 +217,8 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
         db,
         parentProfileId,
         childProfileId,
+        c.get('callerPersonId'),
+        c.get('account').id,
         query,
       );
       return c.json(childProgressHistoryResponseSchema.parse({ history }));
@@ -228,6 +245,8 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       parentProfileId,
       childProfileId,
       subjectId,
+      c.get('callerPersonId'),
+      c.get('account').id,
     );
     return c.json(childSubjectTopicsResponseSchema.parse({ topics }));
   })
@@ -308,6 +327,8 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       db,
       parentProfileId,
       childProfileId,
+      c.get('callerPersonId'),
+      c.get('account').id,
     );
     return c.json(childSessionsResponseSchema.parse({ sessions }));
   })
@@ -332,6 +353,8 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       parentProfileId,
       childProfileId,
       sessionId,
+      c.get('callerPersonId'),
+      c.get('account').id,
     );
     if (!session) {
       return notFound(c, 'Session not found');
@@ -417,7 +440,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       'Only the account owner can perform administrative actions on child profiles.',
     );
 
-    const reports = await getChildReports(db, parentProfileId, childProfileId);
+    const reports = await getChildReports(
+      db,
+      parentProfileId,
+      childProfileId,
+      c.get('callerPersonId'),
+      c.get('account').id,
+    );
     return c.json(childReportsResponseSchema.parse({ reports }));
   })
 
@@ -440,6 +469,8 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       parentProfileId,
       childProfileId,
       reportId,
+      c.get('callerPersonId'),
+      c.get('account').id,
     );
     if (!report) {
       return notFound(c, 'Report not found');
@@ -461,7 +492,14 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       'Only the account owner can perform administrative actions on child profiles.',
     );
 
-    await markChildReportViewed(db, parentProfileId, childProfileId, reportId);
+    await markChildReportViewed(
+      db,
+      parentProfileId,
+      childProfileId,
+      reportId,
+      c.get('callerPersonId'),
+      c.get('account').id,
+    );
     return c.json(reportViewedResponseSchema.parse({ viewed: true }));
   })
 

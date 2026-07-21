@@ -173,3 +173,15 @@ export const AUTH_EXPIRY_REVOKED_STORAGE_KEY = 'mentomate_session_revoked_at';
  * Key prefix: `now-feed-cache`
  */
 export const NOW_FEED_CACHE_KEY_PREFIX = 'now-feed-cache';
+
+/**
+ * [WI-2504] Last mentor-notice policy epoch this device OBSERVED from the
+ * server, per actor+profile. AsyncStorage (same backend as the Now-feed cache
+ * above), same double-colon construction in the consumer.
+ *
+ * Stored separately from the cached feed on purpose: it must survive the
+ * feed entry it invalidates, and it must be readable on a cold, offline
+ * launch before any cache key is built.
+ * Full key: `now-feed-policy-epoch::<actorId>::<profileId>`
+ */
+export const NOW_FEED_POLICY_EPOCH_KEY_PREFIX = 'now-feed-policy-epoch';

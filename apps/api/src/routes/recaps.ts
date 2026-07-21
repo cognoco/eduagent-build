@@ -54,10 +54,16 @@ export const recapsRoutes = new Hono<RecapsRouteEnv>()
     const parentProfileId = requireProfileId(c.get('profileId'));
     const query = c.req.valid('query');
 
-    const recaps = await listRecapsForParent(db, parentProfileId, {
-      childProfileId: query.childProfileId,
-      limit: query.limit,
-    });
+    const recaps = await listRecapsForParent(
+      db,
+      parentProfileId,
+      c.get('callerPersonId'),
+      c.get('account').id,
+      {
+        childProfileId: query.childProfileId,
+        limit: query.limit,
+      },
+    );
     return c.json(recapsResponseSchema.parse({ recaps }));
   })
   .get('/recaps/self', zValidator('query', recapsQuerySchema), async (c) => {
@@ -85,7 +91,13 @@ export const recapsRoutes = new Hono<RecapsRouteEnv>()
       const db = c.get('db');
       const parentProfileId = requireProfileId(c.get('profileId'));
       const { recapId } = c.req.valid('param');
-      const recap = await getRecapForParent(db, parentProfileId, recapId);
+      const recap = await getRecapForParent(
+        db,
+        parentProfileId,
+        recapId,
+        c.get('callerPersonId'),
+        c.get('account').id,
+      );
 
       if (!recap) return notFound(c, 'Recap not found');
       return c.json(recapDetailResponseSchema.parse({ recap }));

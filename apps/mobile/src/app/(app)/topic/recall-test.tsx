@@ -46,6 +46,26 @@ function composeRecallFeedback(
   return parts.length > 0 ? parts.join('\n\n') : null;
 }
 
+// [WI-2114] Reframe of a PRIOR graded answer's stored feedback, shown when the
+// current submission is cooldown-blocked (never re-graded) — e.g. the learner
+// immediately asks "what was wrong with what I said?". It must NOT replay the
+// fresh-grade composition byte-for-byte (AC-8): a cooldown-blocked submission
+// has no evaluated content of its own, so AC-3's identical-content exception
+// does not apply. We reframe by answering the follow-up directly — lead with
+// the correction (gaps) + next step and drop the strengths celebration — so the
+// recap reads as "here's what was off last time", distinct from the fresh
+// grade. Mentor-prose only (already in the learner's language — AC-4); no
+// English connective text is added.
+function composePriorRecallFeedback(
+  feedback: { strengths: string; gaps: string; nextStep: string } | undefined,
+): string | null {
+  if (!feedback) return null;
+  const parts = [feedback.gaps, feedback.nextStep]
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  return parts.length > 0 ? parts.join('\n\n') : null;
+}
+
 function deriveStatus(retentionStatus?: string): RetentionStatus {
   if (retentionStatus === 'strong') return 'strong';
   if (retentionStatus === 'fading') return 'fading';
@@ -186,10 +206,14 @@ export default function RecallTestScreen() {
             } else if (result.failureAction === 'feedback_only') {
               // [WI-2114] Under 3 failures — render the grader's answer-specific
               // feedback (what was right, what's missing, a next step) when the
-              // server produced it; otherwise fall back to the generic prompt
-              // (grader gave no feedback, cooldown, etc. — kept honest, AC-5).
+              // server produced it. When this submission was cooldown-blocked and
+              // never re-graded, fall back to a REFRAMED recap of the prior
+              // graded answer (AC-2: a direct "what was wrong" answer, not the
+              // generic prompt; AC-8: reframed, never a verbatim replay). Only
+              // when neither exists do we show the honest generic copy (AC-5).
               cleanupRef.current = animateResponse(
                 composeRecallFeedback(result.feedback) ??
+                  composePriorRecallFeedback(result.priorFeedback) ??
                   t('topic.recallTest.partialResult'),
                 setMessages,
                 setIsStreaming,

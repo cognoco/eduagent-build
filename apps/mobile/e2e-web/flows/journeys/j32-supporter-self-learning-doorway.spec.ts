@@ -95,9 +95,18 @@ test('J-32 supporter: Support hub -> Me scope (equal, chip-reachable) -> resume 
 
   // --- Switch to the accepted supportee: person scope, strict separation
   // direction 1 — the supporter's own Me-scope subject never appears here.
+  // Await the person-scope structural-subjects container FIRST — a positive
+  // marker proving the screen actually re-rendered under the new scope —
+  // before the negative assertions below. Without it, those negative
+  // assertions could pass vacuously on the prior (Me-scope) screen if the
+  // scope switch silently no-oped, which would make this test useless as an
+  // isolation guard.
   await pressableClick(
     page.getByTestId(`scope-chip-option-person-${supporteePersonId}`),
   );
+  await expect(
+    page.getByTestId('person-scope-structural-subjects'),
+  ).toBeVisible();
   await expect(
     page.getByTestId(`person-scope-subject-${ownSubjectId}`),
   ).toHaveCount(0);

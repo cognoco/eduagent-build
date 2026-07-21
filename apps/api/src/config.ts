@@ -175,6 +175,14 @@ const envSchema = z.object({
   // prompt proposals, durable acceptance, read surfaces, routes, and jobs.
   MENTOR_NOTICE_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // [WI-2573] Post-MVP mentor-notice PUSH boundary — separate from the in-app
+  // kill switch above. MMT-ADR-0036 §3.1 makes the MVP in-app only; the nudge
+  // scan/send path stays dormant behind this binding, which no MVP deployment
+  // configuration sets. See isMentorNoticePushPostMvpEnabled.
+  MENTOR_NOTICE_PUSH_POST_MVP_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false'),
+
   // Launch-cohort allowlist for Challenge Round (WI-1754 AC2). Comma-
   // separated profile ids. Narrows CHALLENGE_ROUND_RUNTIME_ENABLED to an
   // explicit cohort instead of the whole environment — see
@@ -349,6 +357,32 @@ export function isChallengeRoundRuntimeEnabled(
 }
 
 export function isMentorNoticeEnabled(value: string | undefined): boolean {
+  return value === 'true';
+}
+
+/**
+ * [WI-2573] Post-MVP mentor-notice push boundary.
+ *
+ * MMT-ADR-0036 §3.1 makes the mentor-notice MVP in-app only: no push, no
+ * primer, no scheduled nudge, no background notification fan-out. The nudge
+ * scan/send machinery merged before that ruling is retained dormant behind
+ * this boundary rather than deleted (§Consequences: "may be retained dormant
+ * or removed, but it is not an MVP delivery dependency and must not execute
+ * as though it were").
+ *
+ * This is a SEPARATE gate from {@link isMentorNoticeEnabled}: turning the
+ * in-app mentor-notice capability on (MENTOR_NOTICE_ENABLED=true) — or any
+ * learner notification preference such as `reviewReminders` / `pushEnabled` —
+ * cannot activate delivery. Only the dedicated
+ * MENTOR_NOTICE_PUSH_POST_MVP_ENABLED binding can, and it exists in no MVP
+ * deployment configuration.
+ *
+ * Default-closed: undefined / anything-other-than 'true' returns false, so a
+ * missing or unset binding contains delivery rather than releasing it.
+ */
+export function isMentorNoticePushPostMvpEnabled(
+  value: string | undefined,
+): boolean {
   return value === 'true';
 }
 

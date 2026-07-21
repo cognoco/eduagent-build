@@ -16,7 +16,7 @@ import { person } from './identity';
 import { subjects, curriculumTopics } from './subjects';
 import { learningSessions } from './sessions';
 import { generateUUIDv7 } from '../utils/uuid';
-import type { ChatExchange } from '@eduagent/schemas';
+import type { ChatExchange, RecallFeedback } from '@eduagent/schemas';
 
 export const verificationDepthEnum = pgEnum('verification_depth', [
   'recall',
@@ -133,6 +133,14 @@ export const retentionCards = pgTable(
     consecutiveSuccesses: integer('consecutive_successes').notNull().default(0),
     xpStatus: xpStatusEnum('xp_status').notNull().default('pending'),
     evaluateDifficultyRung: integer('evaluate_difficulty_rung'),
+    // [WI-2114] Last graded recall's answer-specific feedback, so a follow-up
+    // that is cooldown-blocked (never re-graded) can still receive a direct
+    // explanation of the prior answer instead of the generic prompt. Stores
+    // ONLY the grader-owned structured {strengths, gaps, nextStep} — never the
+    // learner's verbatim answer (AC-7; ropa.md row 7 / MMT-ADR-0036 line 43).
+    // $type is TS-only; the write site is the sole producer and always passes a
+    // RecallFeedback, so no read-time parse is needed.
+    lastRecallFeedback: jsonb('last_recall_feedback').$type<RecallFeedback>(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

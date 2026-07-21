@@ -233,6 +233,8 @@ describe('GET /v1/recaps', () => {
     expect(listRecapsForParentMock).toHaveBeenCalledWith(
       expect.anything(),
       PROFILE_ID,
+      PROFILE_ID,
+      ACCOUNT_ID,
       expect.objectContaining({ childProfileId: CHILD_PROFILE_ID }),
     );
   });
@@ -306,6 +308,8 @@ describe('GET /v1/recaps/:recapId', () => {
       expect.anything(),
       PROFILE_ID,
       RECAP_ID,
+      PROFILE_ID,
+      ACCOUNT_ID,
     );
   });
 

@@ -50,6 +50,7 @@ function loadWorkflow(name: string): Record<string, unknown> {
 
 type Job = {
   name?: string;
+  concurrency?: unknown;
   if?: unknown;
   env?: Record<string, unknown>;
   needs?: unknown;
@@ -57,6 +58,56 @@ type Job = {
   steps?: Array<Record<string, unknown>>;
   'continue-on-error'?: unknown;
 };
+
+type ConcurrencyPolicy = {
+  group?: unknown;
+  'cancel-in-progress'?: unknown;
+};
+
+type NativeInvocation = {
+  ref: string;
+  shard: number;
+};
+
+function resolveConcurrencyGroup(
+  policy: ConcurrencyPolicy,
+  invocation: NativeInvocation,
+): string {
+  const context: Record<string, string> = {
+    'github.event.workflow_run.head_branch': '',
+    'github.ref': invocation.ref,
+    'matrix.shard': String(invocation.shard),
+  };
+
+  return String(policy.group ?? '').replace(
+    /\$\{\{\s*([^}]+?)\s*\}\}/g,
+    (_match, expression: string) => {
+      const resolved = expression
+        .split('||')
+        .map((candidate) => context[candidate.trim()] ?? '')
+        .find(Boolean);
+      if (!resolved) {
+        throw new Error(`Unsupported concurrency expression: ${expression}`);
+      }
+      return resolved;
+    },
+  );
+}
+
+function pairDisposition(
+  policyValue: unknown,
+  first: NativeInvocation,
+  second: NativeInvocation,
+): 'overlap' | 'first-cancelled' | 'second-queued' {
+  if (policyValue === undefined) return 'overlap';
+  const policy = policyValue as ConcurrencyPolicy;
+  const firstGroup = resolveConcurrencyGroup(policy, first).toLowerCase();
+  const secondGroup = resolveConcurrencyGroup(policy, second).toLowerCase();
+  if (firstGroup !== secondGroup) return 'overlap';
+  return policy['cancel-in-progress'] === true
+    ? 'first-cancelled'
+    : 'second-queued';
+}
 
 /** Every shell script body across all steps of all jobs in a workflow. */
 function allRunScripts(workflow: Record<string, unknown>): string[] {
@@ -615,6 +666,68 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }
   }
 
+  function runWranglerVarsWriter(script: string) {
+    const root = mkdtempSync(join(tmpdir(), 'wi-2585-wrangler-vars-'));
+    const binDir = join(root, 'bin');
+    const doppler = join(binDir, 'doppler');
+
+    mkdirSync(join(root, 'apps', 'api'), { recursive: true });
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(
+      doppler,
+      [
+        '#!/usr/bin/env node',
+        "const { spawnSync } = require('node:child_process');",
+        'const args = process.argv.slice(2);',
+        "const commandIndex = args.indexOf('--command');",
+        'if (commandIndex < 0) process.exit(64);',
+        "const preserved = new Set((args.find((arg) => arg.startsWith('--preserve-env=')) ?? '').split('=')[1]?.split(',') ?? []);",
+        'const inheritedDatabaseUrl = process.env.DATABASE_URL;',
+        'const env = {',
+        '  ...process.env,',
+        "  DATABASE_URL: 'postgresql://doppler-staging/mentomate',",
+        "  TEST_SEED_SECRET: 'doppler-test-seed-secret',",
+        "  CLERK_SECRET_KEY: 'doppler-clerk-secret',",
+        "  CLERK_JWKS_URL: 'https://doppler.test/.well-known/jwks.json',",
+        "  CLERK_AUDIENCE: 'doppler-audience',",
+        "  SEED_PASSWORD: 'doppler-seed-password',",
+        '};',
+        "if (preserved.has('DATABASE_URL')) env.DATABASE_URL = inheritedDatabaseUrl;",
+        "const result = spawnSync('bash', ['-c', args[commandIndex + 1]], { env, stdio: 'inherit' });",
+        'process.exit(result.status ?? 1);',
+        '',
+      ].join('\n'),
+    );
+    chmodSync(doppler, 0o755);
+
+    try {
+      const result = spawnSync(
+        'bash',
+        ['-e', '-u', '-o', 'pipefail', '-c', script],
+        {
+          cwd: root,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${binDir}:${process.env.PATH ?? ''}`,
+            DATABASE_URL: 'postgresql://runner-local/native-maestro',
+            DOPPLER_TOKEN: 'fake-token-present',
+          },
+        },
+      );
+      const varsPath = join(root, 'apps', 'api', '.dev.vars');
+      const vars = Object.fromEntries(
+        readFileSync(varsPath, 'utf8')
+          .trim()
+          .split('\n')
+          .map((line) => line.match(/^([^=]+)=(.*)$/)?.slice(1) ?? []),
+      );
+      return { result, vars };
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
   it('declares recursive workspace discovery instead of the root-only default', () => {
     expect(workspaceConfig.flows).toContain('flows/**');
   });
@@ -776,6 +889,97 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(writeVarsScript).toContain('SEED_PASSWORD');
     expect(writeVarsScript).toContain('TEST_SEED_SECRET');
     expect(writeVarsScript).not.toContain('${{ secrets.');
+  });
+
+  it('[WI-2585 native-seed injection] preserves the runner database while importing the required Doppler seed credentials', () => {
+    const writeVarsStep = mobileMaestro.steps?.find(
+      (step) => step.name === 'Write wrangler .dev.vars for API',
+    );
+    const { result, vars } = runWranglerVarsWriter(
+      String(writeVarsStep?.run ?? ''),
+    );
+
+    expect(result.status).toBe(0);
+    expect(vars).toEqual({
+      DATABASE_URL: 'postgresql://runner-local/native-maestro',
+      NODE_ENV: 'test',
+      TEST_SEED_SECRET: 'doppler-test-seed-secret',
+      CLERK_SECRET_KEY: 'doppler-clerk-secret',
+      CLERK_JWKS_URL: 'https://doppler.test/.well-known/jwks.json',
+      CLERK_AUDIENCE: 'doppler-audience',
+      SEED_PASSWORD: 'doppler-seed-password',
+    });
+  });
+
+  it('[WI-2585 workflow queue] queues a second same-ref invocation instead of cancelling its active evidence run', () => {
+    const workflowPolicy = workflow.concurrency as ConcurrencyPolicy;
+    const sameRefSameSlot: [NativeInvocation, NativeInvocation] = [
+      { ref: 'refs/heads/main', shard: 1 },
+      { ref: 'refs/heads/main', shard: 1 },
+    ];
+
+    expect(pairDisposition(workflowPolicy, ...sameRefSameSlot)).toBe(
+      'second-queued',
+    );
+  });
+
+  it('[WI-2585 same-slot concurrency] queues a second native seed user from seed through cleanup without cancellation', () => {
+    const nativeSlotPolicy = mobileMaestro.concurrency;
+    const differentRefsSameSlot: [NativeInvocation, NativeInvocation] = [
+      { ref: 'refs/heads/main', shard: 1 },
+      { ref: 'refs/heads/WI-2240', shard: 1 },
+    ];
+
+    expect(pairDisposition(nativeSlotPolicy, ...differentRefsSameSlot)).toBe(
+      'second-queued',
+    );
+
+    const runnerStep = mobileMaestro.steps?.find((step) =>
+      String(step.uses ?? '').startsWith(
+        'reactivecircus/android-emulator-runner@',
+      ),
+    );
+    const runnerEntry = String(
+      (runnerStep?.with as Record<string, unknown> | undefined)?.script ?? '',
+    ).trim();
+    const runnerSource = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/scripts/run-ci-maestro.sh'),
+      'utf8',
+    );
+
+    expect(runnerEntry).toBe('bash apps/mobile/e2e/scripts/run-ci-maestro.sh');
+    expect(runnerSource).toContain('/v1/__test/seed');
+    expect(runnerSource).toContain('/v1/__test/reset');
+    expect(runnerSource).toMatch(
+      /cleanup\(\) \{[\s\S]*?reset_seed[\s\S]*?\n\}/,
+    );
+    expect(runnerSource).toContain('trap cleanup EXIT');
+
+    // Mutation sensitivity: removing the slot lease or keying it by ref lets
+    // two invocations use the same deterministic seed identity simultaneously.
+    expect(pairDisposition(undefined, ...differentRefsSameSlot)).toBe(
+      'overlap',
+    );
+    expect(
+      pairDisposition(
+        {
+          ...(nativeSlotPolicy as ConcurrencyPolicy),
+          group: 'native-${{ github.ref }}-${{ matrix.shard }}',
+        },
+        ...differentRefsSameSlot,
+      ),
+    ).toBe('overlap');
+
+    // Cancellation violates the evidence contract: the active run must finish.
+    expect(
+      pairDisposition(
+        {
+          ...(nativeSlotPolicy as ConcurrencyPolicy),
+          'cancel-in-progress': true,
+        },
+        ...differentRefsSameSlot,
+      ),
+    ).toBe('first-cancelled');
   });
 
   it('selects the tested Photosynthesis worker when USE_MAESTRO_V2_FIXTURE is true', () => {
@@ -1015,6 +1219,107 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/assertNotVisible:/g)).toHaveLength(6);
     expect(flow.match(/id: ['"]tab-subjects['"]/g)).toHaveLength(3);
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
+  });
+
+  it('[WI-2584 profile-load-error] hard-fails authenticated bootstrap errors before Back recovery', () => {
+    const commands = parseAllDocuments(
+      readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/flows/_setup/seed-and-sign-in.yaml'),
+        'utf8',
+      ),
+    )[1]?.toJS() as unknown;
+
+    expect(Array.isArray(commands)).toBe(true);
+    if (!Array.isArray(commands)) {
+      throw new Error('seed-and-sign-in Maestro commands must be a YAML list');
+    }
+
+    const signInSubmission = commands.findIndex((command) =>
+      isDeepStrictEqual(command, { tapOn: { id: 'sign-in-button' } }),
+    );
+    const profileLoadErrorGuard = commands.findIndex((command) =>
+      isDeepStrictEqual(command, {
+        assertNotVisible: { id: 'profile-load-error' },
+      }),
+    );
+    const backRecovery = commands.findIndex((command) =>
+      isDeepStrictEqual(command, {
+        runFlow: {
+          when: { notVisible: { id: 'learner-screen' } },
+          file: 'return-to-home-safe.yaml',
+        },
+      }),
+    );
+    const settlementProbeIndices = [
+      ['learner-screen', 30_000],
+      ['dashboard-scroll', 5_000],
+      ['parent-home-screen', 5_000],
+    ].map(([landingId, timeout]) =>
+      commands.findIndex((command) =>
+        isDeepStrictEqual(command, {
+          extendedWaitUntil: {
+            visible: { id: landingId },
+            timeout,
+            optional: true,
+          },
+        }),
+      ),
+    );
+    const postApprovalLanding = commands.findIndex((command) =>
+      isDeepStrictEqual(command, {
+        runFlow: {
+          when: { visible: "You're approved!" },
+          file: 'dismiss-post-approval.yaml',
+        },
+      }),
+    );
+    const postRecoveryProbeIndices = [
+      'mentor-screen',
+      'support-hub-mentor-tab',
+    ].map((landingId) =>
+      commands.findIndex((command) =>
+        isDeepStrictEqual(command, {
+          extendedWaitUntil: {
+            visible: { id: landingId },
+            timeout: 5_000,
+            optional: true,
+          },
+        }),
+      ),
+    );
+
+    for (const landingId of [
+      'learner-screen',
+      'dashboard-scroll',
+      'parent-home-screen',
+      'mentor-screen',
+      'support-hub-mentor-tab',
+    ]) {
+      expect(commands).toContainEqual({
+        extendedWaitUntil: expect.objectContaining({
+          visible: { id: landingId },
+          optional: true,
+        }),
+      });
+    }
+    expect(commands).toContainEqual({
+      runFlow: {
+        when: { visible: "You're approved!" },
+        file: 'dismiss-post-approval.yaml',
+      },
+    });
+    expect(signInSubmission).toBeGreaterThanOrEqual(0);
+    for (const settlementProbe of settlementProbeIndices) {
+      expect(settlementProbe).toBeGreaterThan(signInSubmission);
+      expect(profileLoadErrorGuard).toBeGreaterThan(settlementProbe);
+    }
+    expect(postApprovalLanding).toBeGreaterThan(signInSubmission);
+    expect(profileLoadErrorGuard).toBeGreaterThan(postApprovalLanding);
+    expect(profileLoadErrorGuard).toBeGreaterThan(signInSubmission);
+    expect(backRecovery).toBe(profileLoadErrorGuard + 1);
+    for (const postRecoveryProbe of postRecoveryProbeIndices) {
+      expect(postRecoveryProbe).toBeGreaterThan(backRecovery);
+    }
   });
 
   it('[WI-2506] binds each subject resolver result to its owned action and fails ambiguous results closed', () => {
