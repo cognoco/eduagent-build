@@ -29,6 +29,8 @@ the per-document ruling.
 - Implemented plans: [`docs/_archive/plans/done/`](../_archive/plans/done/)
 - Superseded plans and design snapshots from this pass:
   [`docs/_archive/plans/2026-07-14-superseded/`](../_archive/plans/2026-07-14-superseded/)
+- Pre-ratification mentor-notice implementation plans reconciled by `MMT-ADR-0036`:
+  [`docs/_archive/plans/2026-07-21-mentor-notice-reconciliation/`](../_archive/plans/2026-07-21-mentor-notice-reconciliation/)
 
 Before adding a plan, link its spec or work item, give it a status, and define a
 verifiable completion condition. Before trusting an old plan's status, inspect
