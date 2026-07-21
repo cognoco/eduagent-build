@@ -180,5 +180,72 @@ describeIfDb(
         [fixture.eventAId, fixture.eventBId].sort(),
       );
     });
+
+    // [WI-2500 CI catch] `mentor_notices_source_session_null_evidence_uq` is
+    // the OTHER partial index — it preserves the pre-existing ≤1-row/session
+    // invariant for notices with no evidence. acceptMentorNotice's
+    // onConflictDoNothing must target THIS index (not the evidence-present
+    // one) when answerEventId is null, or Postgres can't infer the conflict
+    // and raises a raw duplicate-key error instead of a silent no-op — which
+    // is exactly what CI caught in the pre-existing
+    // tests/integration/mentor-notice-lifecycle.integration.test.ts
+    // concurrency case.
+    it('stays idempotent when the same no-evidence notice is inserted concurrently', async () => {
+      const fixture = await seedFixture();
+
+      const attempt = () =>
+        acceptMentorNotice(db, {
+          profileId: fixture.profileId,
+          subjectId: fixture.subjectId,
+          topicId: null,
+          sourceSessionId: fixture.sessionId,
+          answerEventId: null,
+          concept: 'No-evidence concept',
+          correctionHint: null,
+        });
+
+      const [first, second] = await Promise.all([attempt(), attempt()]);
+      const accepted = [first, second].filter((r) => r !== null);
+      expect(accepted).toHaveLength(1);
+
+      const rows = await db
+        .select()
+        .from(mentorNotices)
+        .where(eq(mentorNotices.sourceSessionId, fixture.sessionId));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.answerEventId).toBeNull();
+    });
+
+    it('rejects a second no-evidence notice in the same session — the legacy ≤1-per-session invariant still holds when there is no evidence', async () => {
+      const fixture = await seedFixture();
+
+      const firstNotice = await acceptMentorNotice(db, {
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: null,
+        sourceSessionId: fixture.sessionId,
+        answerEventId: null,
+        concept: 'First no-evidence concept',
+        correctionHint: null,
+      });
+      expect(firstNotice).not.toBeNull();
+
+      const secondNotice = await acceptMentorNotice(db, {
+        profileId: fixture.profileId,
+        subjectId: fixture.subjectId,
+        topicId: null,
+        sourceSessionId: fixture.sessionId,
+        answerEventId: null,
+        concept: 'Second no-evidence concept',
+        correctionHint: null,
+      });
+      expect(secondNotice).toBeNull();
+
+      const rows = await db
+        .select()
+        .from(mentorNotices)
+        .where(eq(mentorNotices.sourceSessionId, fixture.sessionId));
+      expect(rows).toHaveLength(1);
+    });
   },
 );

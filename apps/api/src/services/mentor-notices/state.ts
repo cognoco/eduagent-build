@@ -22,10 +22,12 @@ interface AcceptMentorNoticeInput extends MentorNoticeCopyInput {
   topicId: string | null;
   sourceSessionId: string;
   /** [WI-2500] The validated learner-answer event this notice's evidence is
-   *  anchored to. Always present for new notices — `evidence.ts` never
-   *  returns without one — required so the DB unique constraint below can
-   *  be evidence-aware instead of source-session-only. */
-  answerEventId: string;
+   *  anchored to. `evidence.ts`'s exchange-boundary path never returns
+   *  without one, but callers that predate WI-2500 (e.g. the pre-existing
+   *  concurrency test in `tests/integration/mentor-notice-lifecycle.integration.test.ts`)
+   *  still insert with no evidence, so this stays nullable and both
+   *  partial unique indexes below must be targeted, not just one. */
+  answerEventId: string | null;
 }
 
 export function prepareMentorNoticeCopy(
@@ -59,15 +61,27 @@ export async function acceptMentorNotice(
       concept: copy.concept,
       correctionHint: copy.correctionHint,
     })
-    // [WI-2500] Target the evidence-backed partial unique index — every
-    // fresh notice always carries an answerEventId (evidence.ts guarantees
-    // it), so this is always the applicable index, not the legacy
-    // NULL-evidence one. A stale/mismatched target here would silently
-    // no-op instead of erroring, masking a real duplicate-insert bug.
-    .onConflictDoNothing({
-      target: [mentorNotices.sourceSessionId, mentorNotices.answerEventId],
-      where: sql`${mentorNotices.answerEventId} IS NOT NULL`,
-    })
+    // [WI-2500] Target must match whichever partial index this row would
+    // violate: evidence-present rows collide on the (source_session_id,
+    // answer_event_id) index, evidence-absent rows on the source_session_id-only
+    // index. Postgres requires an EXACT target/predicate match to infer a
+    // conflict against a partial index — a mismatched target doesn't
+    // silently no-op, it raises the raw duplicate-key error (caught in CI by
+    // the pre-existing null-evidence concurrency test).
+    .onConflictDoNothing(
+      input.answerEventId
+        ? {
+            target: [
+              mentorNotices.sourceSessionId,
+              mentorNotices.answerEventId,
+            ],
+            where: sql`${mentorNotices.answerEventId} IS NOT NULL`,
+          }
+        : {
+            target: [mentorNotices.sourceSessionId],
+            where: sql`${mentorNotices.answerEventId} IS NULL`,
+          },
+    )
     .returning({
       id: mentorNotices.id,
       concept: mentorNotices.concept,
