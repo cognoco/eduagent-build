@@ -25,6 +25,7 @@ import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { assertLlmConsent } from '../services/identity-v2/consent-status-v2';
 import { assertCanReadProfile } from '../services/family-access';
 import { validationError, VocabularyContextError } from '../errors';
 import {
@@ -148,6 +149,16 @@ async function generateRoundFromInput(
   const profileMeta = c.get('profileMeta');
   if (!profileMeta) {
     throw new Error('profileMeta not set — profile middleware must run first');
+  }
+  // [WI-2396] Consent-withdrawal gate — immediately before LLM dispatch
+  // (canon R5). 'capitals' rounds are fully deterministic (static
+  // CAPITALS_DATA bank, no LLM dispatch — see generateQuizRound); only
+  // 'vocabulary'/'guess_who' dispatch the LLM. Gate every activityType EXCEPT
+  // the proven-deterministic 'capitals', and fail closed — any future
+  // activityType (or an absent one) is gated. Shared by /quiz/rounds and
+  // /quiz/rounds/prefetch via this helper.
+  if (input.activityType !== 'capitals') {
+    await assertLlmConsent(db, profileId);
   }
 
   try {
