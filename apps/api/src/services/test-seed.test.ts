@@ -184,6 +184,8 @@ describe('VALID_SCENARIOS', () => {
       'wi-2194-stale-family-cycle',
       // [WI-2241] Supportership-aware v2 seed.
       'v2-supporter-accepted',
+      // [WI-2226 owner-gate corroboration] Same-org managed cold-start seed.
+      'v2-supporter-managed',
     ]);
   });
 
@@ -278,7 +280,13 @@ describe('seedScenario', () => {
   // it at all. Real coverage lives in
   // test-seed-v2-supporter.integration.test.ts (real Neon DB, same pattern as
   // supporter-visibility-authorization.integration.test.ts).
-  const DB_TRANSACTION_SCENARIOS: SeedScenario[] = ['v2-supporter-accepted'];
+  const DB_TRANSACTION_SCENARIOS: SeedScenario[] = [
+    'v2-supporter-accepted',
+    // [WI-2226 owner-gate corroboration] Same DB_TRANSACTION_SCENARIOS
+    // reasoning above — seedV2SupporterManaged calls initiateLink/acceptLink
+    // (db.transaction + read-after-write) via seedAcceptedEdge.
+    'v2-supporter-managed',
+  ];
   const MOCK_DISPATCHABLE_SCENARIOS = (
     VALID_SCENARIOS as SeedScenario[]
   ).filter((scenario) => !DB_TRANSACTION_SCENARIOS.includes(scenario));

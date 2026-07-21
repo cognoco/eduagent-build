@@ -947,13 +947,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scenario: 'onboarding-no-subject',
         shard: 1,
       },
-      // [WI-2226] Supporter cold-start mount — the granted-idle kickstart
-      // nudge renders on Support hub landing for an account-holding,
-      // learning-state-free child, and not at all for one with real
-      // learning state.
+      // [WI-2226 owner-gate retarget] Supporter cold-start mount — the
+      // owner-gated managed card renders on Support hub landing for a
+      // same-org managed child (hasOwnAccount=false, on the SUPPORTER's own
+      // org — the only candidate resolveSupporterColdStart's owner-gate
+      // renders a card for; a cross-org candidate is suppressed).
       {
         flow: 'flows/v2/v2-supporter-coldstart-mount.yaml',
-        scenario: 'v2-supporter-accepted',
+        scenario: 'v2-supporter-managed',
         shard: 1,
       },
       // [WI-2241] Supporter scope journey — Support hub -> person scope ->
