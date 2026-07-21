@@ -91,6 +91,17 @@ function expectHostEnvironmentIsolated(): void {
   expect(isolated).toEqual(EXPECTED_TRUE_BY_ISOLATED_KEY);
 }
 
+function expectHostEnvironmentContaminated(): void {
+  const contaminated = Object.fromEntries(
+    ISOLATED_ENV_KEYS.map((key) => [
+      key,
+      process.env[key] === HOST_ENV_SENTINELS[key],
+    ]),
+  );
+
+  expect(contaminated).toEqual(EXPECTED_TRUE_BY_ISOLATED_KEY);
+}
+
 function expectOriginalEnvironmentRestored(): void {
   const restored = Object.fromEntries(
     SNAPSHOTTED_ENV_KEYS.map((key) => [
@@ -184,6 +195,7 @@ describe('loadDatabaseEnv', () => {
     for (const key of ISOLATED_ENV_KEYS) {
       process.env[key] = HOST_ENV_SENTINELS[key];
     }
+    expectHostEnvironmentContaminated();
     for (const key of ISOLATED_ENV_KEYS) {
       delete process.env[key];
     }
@@ -220,9 +232,7 @@ describe('loadDatabaseEnv', () => {
 
     withWorkingDirectory(binDir, () => loadDatabaseEnv(workspaceRoot));
 
-    expect(
-      process.env.DATABASE_URL === 'postgres://fake-existing-database',
-    ).toBe(true);
+    expect(process.env.DATABASE_URL).toBe('postgres://fake-existing-database');
     expect(invocationCount(invocationMarker)).toBe(0);
   });
 
