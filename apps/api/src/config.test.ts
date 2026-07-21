@@ -12,6 +12,7 @@ import {
   isMaintenanceProductionEnabled,
   isTopicIntentMatcherEnabled,
   isMentorNoticeEnabled,
+  isMentorNoticePushPostMvpEnabled,
   validateEnv,
   validateProductionBindings,
   validateProductionKeys,
@@ -706,6 +707,23 @@ describe('validateEnv', () => {
     expect(isMentorNoticeEnabled('yes')).toBe(false);
   });
 
+  it('[WI-2573] MENTOR_NOTICE_PUSH_POST_MVP_ENABLED defaults off and is independent of the in-app flag', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      // In-app mentor notices fully ON — the push boundary must stay closed.
+      MENTOR_NOTICE_ENABLED: 'true',
+    });
+    expect(env.MENTOR_NOTICE_ENABLED).toBe('true');
+    expect(env.MENTOR_NOTICE_PUSH_POST_MVP_ENABLED).toBe('false');
+    expect(
+      isMentorNoticePushPostMvpEnabled(env.MENTOR_NOTICE_PUSH_POST_MVP_ENABLED),
+    ).toBe(false);
+    expect(isMentorNoticePushPostMvpEnabled(undefined)).toBe(false);
+    expect(isMentorNoticePushPostMvpEnabled('yes')).toBe(false);
+    expect(isMentorNoticePushPostMvpEnabled('true')).toBe(true);
+  });
+
   it('CHALLENGE_ROUND_COHORT_PROFILE_IDS defaults to "" when unset', () => {
     const env = validateEnv({
       ENVIRONMENT: 'development',
@@ -822,6 +840,7 @@ describe('validateProductionBindings', () => {
     CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
     ANSWER_EVALUATION_RUNTIME_ENABLED: 'false',
     MENTOR_NOTICE_ENABLED: 'false',
+    MENTOR_NOTICE_PUSH_POST_MVP_ENABLED: 'false',
     CHALLENGE_ROUND_COHORT_PROFILE_IDS: '',
     REVIEW_CALLBACK_OPENER_ENABLED: 'false',
     JUDGE_FRAMEWORK_ENABLED: 'false',
