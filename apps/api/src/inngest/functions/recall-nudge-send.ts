@@ -15,10 +15,15 @@ import {
 } from '../../services/identity-v2/family-v2';
 import {
   formatRecallNudge,
+  MAX_DAILY_PUSH,
   REVIEW_FAMILY_DEDUP_TYPES,
   sendPushNotification,
 } from '../../services/notifications';
 import { checkAndLogRateLimitInternal } from '../../services/settings';
+import {
+  reviewFamilyBudgetKey,
+  utcDayStart,
+} from '../../services/notification-coordination';
 import { captureException } from '../../services/sentry';
 
 export const recallNudgeSend = inngest.createFunction(
@@ -81,6 +86,13 @@ export const recallNudgeSend = inngest.createFunction(
             hours: 24,
             maxCount: 1,
             dedupTypes: [...REVIEW_FAMILY_DEDUP_TYPES],
+            // [WI-2503] Kbudget — the single review-family coordination key,
+            // shared with the mentor-notice reserve so the two families cannot
+            // both consume the one family slot. The local-day global cap moves
+            // inside this same locked transaction (skipDailyCap below), where
+            // the count and the log insert are atomic.
+            coordinationKey: reviewFamilyBudgetKey(profileId),
+            dailyCap: { since: utcDayStart(), maxCount: MAX_DAILY_PUSH },
           },
         );
       } catch (err) {
@@ -166,7 +178,7 @@ export const recallNudgeSend = inngest.createFunction(
           body,
           type: 'recall_nudge',
         },
-        { skipRateLimitLog: true },
+        { skipRateLimitLog: true, skipDailyCap: true },
       );
 
       if (sendResult.sent) {

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."mentor_notice_nudge_status" ADD VALUE 'reserved' BEFORE 'sent';

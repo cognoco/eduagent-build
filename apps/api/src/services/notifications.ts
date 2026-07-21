@@ -50,11 +50,9 @@ export interface NotificationResult {
 
 /** Maximum push notifications per day per profile */
 export const MAX_DAILY_PUSH = 3;
-export const REVIEW_FAMILY_DEDUP_TYPES = [
-  'review_reminder',
-  'recall_nudge',
-  'notice_recheck',
-] as const;
+// [WI-2503] Single definition lives with the Kbudget coordination key it
+// belongs to; re-exported here so existing sender imports keep working.
+export { REVIEW_FAMILY_DEDUP_TYPES } from './notification-coordination';
 
 const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send';
 
@@ -104,6 +102,13 @@ export async function sendPushNotification(
      * recipient's master push preference.
      */
     bypassPreferenceCheck?: boolean;
+    /**
+     * [WI-2503] Abort the Expo call after this many ms. Callers that hold a
+     * database transaction across the push pass it so the hold — and anything
+     * waiting on their locks — is bounded. Omitted elsewhere: unchanged
+     * behavior for every other sender.
+     */
+    pushTimeoutMs?: number;
   },
 ): Promise<NotificationResult> {
   // 1. Get push token
@@ -147,6 +152,9 @@ export async function sendPushNotification(
   try {
     const response = await fetch(EXPO_PUSH_API_URL, {
       method: 'POST',
+      ...(options?.pushTimeoutMs
+        ? { signal: AbortSignal.timeout(options.pushTimeoutMs) }
+        : {}),
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',

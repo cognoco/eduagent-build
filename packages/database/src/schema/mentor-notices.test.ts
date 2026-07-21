@@ -20,6 +20,8 @@ describe('mentor notices schema', () => {
     ]);
     expect(mentorNoticeNudgeStatusEnum.enumValues).toEqual([
       'pending',
+      // [WI-2503] delivery claim taken by the nudge reserve step
+      'reserved',
       'sent',
       'skipped',
       'suppressed',

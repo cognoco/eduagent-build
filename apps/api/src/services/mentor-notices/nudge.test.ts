@@ -72,7 +72,17 @@ function makeSendDb(notice: unknown | null) {
   const update = jest.fn().mockReturnValue({
     set: () => ({ where: () => ({ returning }) }),
   });
-  return { db: { select, update } as unknown as Database, update };
+  // [WI-2503] The recheck, the push and the state transition run inside one
+  // Knotice-locked transaction, so the send path now needs a tx handle.
+  const tx = {
+    execute: jest.fn().mockResolvedValue(undefined),
+    select,
+    update,
+  };
+  const db = {
+    transaction: (callback: (value: unknown) => unknown) => callback(tx),
+  } as unknown as Database;
+  return { db, tx, update };
 }
 
 describe('mentor notice nudge reservation', () => {
@@ -142,7 +152,7 @@ describe('reserved mentor notice delivery', () => {
   });
 
   it('disables duplicate rate-limit logging and retains a failed reservation', async () => {
-    const { db, update } = makeSendDb({
+    const { db, tx, update } = makeSendDb({
       id: 'notice-1',
       subjectId: 'subject-1',
       subjectName: 'Algebra',
@@ -159,13 +169,19 @@ describe('reserved mentor notice delivery', () => {
       }),
     ).resolves.toEqual({ sent: false, reason: 'no_valid_tokens' });
     expect(mockSendPushNotification).toHaveBeenCalledWith(
-      db,
+      tx,
       expect.objectContaining({
         profileId: 'profile-1',
         type: 'notice_recheck',
         data: { noticeId: 'notice-1', subjectId: 'subject-1' },
       }),
-      { skipRateLimitLog: true, skipDailyCap: true },
+      // [WI-2503] the push is aborted before the delivery transaction's own
+      // hold cap, so a hung Expo call cannot stall a concurrent defer.
+      {
+        skipRateLimitLog: true,
+        skipDailyCap: true,
+        pushTimeoutMs: expect.any(Number),
+      },
     );
     expect(update).toHaveBeenCalledTimes(1);
   });
