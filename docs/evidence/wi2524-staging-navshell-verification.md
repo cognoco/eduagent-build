@@ -5,8 +5,10 @@ staging CI once staging worker redeploys**. Venue-upgrade follow-up from WI-2223
 case was PM-ruled to be evidenced by a *local* wrangler-dev run because the deployed staging worker
 rejected the `v2-supporter-accepted` seed. This record upgrades that venue to staging CI.
 
-Verification is **observational**: no product code changed. The commit carrying this document adds
-only this file.
+Verification is **observational as to product behaviour**: no application code changed. The change set
+is this document plus one test-only edit — a positive post-Back assertion added to the named case in
+`apps/mobile/e2e-web/flows/v2/nav-shell.spec.ts`, which §3 explains and which was required to satisfy
+AC-2 rather than merely to re-run it.
 
 ## 1. Preconditions — both original WI-2223 blockers are cleared
 
@@ -29,7 +31,7 @@ A later Deploy (run `29855742311`, sha `f346ee16`) was still `in_progress` at it
   (`e2e-web.yml`), secrets single-sourced through `doppler run -p mentomate -c stg`.
 - **The named case executed — not skipped, not setup-only.** Gate output:
 
-```
+```text
 Running 5 tests using 3 workers
 [4/5] [v2-release] › apps/mobile/e2e-web/flows/v2/nav-shell.spec.ts:60:5 › V2 nav shell: real Back
 from the support-hub Mentor surface keeps the supporter-hub surface, no learner-surface bleed-through
@@ -88,14 +90,22 @@ The case additionally proves (not assumes) the `me`-scope caveat carried over fr
 
 ## 4. AC-3 — recorded artifacts and protected-main configuration
 
-- **Named case result:** `5 passed (2.3m)`, case listed as `[4/5]` at `nav-shell.spec.ts:60:5` (§2).
-- **Playwright artifact:** `playwright-web-v2-29856034716-1` (id `8505395256`, 204,959 bytes, unexpired).
-- **Exact `Playwright web smoke` check-run URL for this staging run:**
+These fields record the **strengthened** case (run `29859015027`), i.e. the run that actually
+exercised the positive b2 assertion. Run `29856034716` is retained in §2 for AC-1 provenance only.
+
+- **Named case result:** `5 passed (2.3m)`, case listed as `[5/5]` at `nav-shell.spec.ts:60:5`,
+  from run `29859015027` on head `233fd5d54` (§3).
+- **Playwright artifact:** `playwright-web-v2-29859015027-1` (id `8506591973`, 213,188 bytes, unexpired).
+- **Exact `Playwright web smoke` check-run URL for that staging run:**
+  <https://github.com/cognoco/eduagent-build/actions/runs/29859015027/job/88732917146>
+  — `conclusion=success`, started `2026-07-21T19:00:53Z`, on head `233fd5d54`.
+- Superseded, for audit trail: the equivalent fields for the pre-fix run `29856034716` were artifact
+  `playwright-web-v2-29856034716-1` and check-run
   <https://github.com/cognoco/eduagent-build/actions/runs/29856034716/job/88722571666>
-  — `conclusion=success`, started `2026-07-21T18:18:39Z`, on head `f346ee16`.
+  (`success`, head `f346ee16`). They evidence AC-1 provenance, **not** the b2 assertion.
 - **Protected-main requires that exact context.** `gh api repos/cognoco/eduagent-build/branches/main/protection`:
 
-```
+```text
 required_status_checks.strict:   false
 required_status_checks.contexts: ["main", "Playwright web smoke", "API Quality Gate",
                                   "Merge completeness check"]
@@ -104,7 +114,8 @@ required_status_checks.contexts: ["main", "Playwright web smoke", "API Quality G
   `Playwright web smoke` is a **required** status check on protected `main`, so the green above is a
   gating context and not a generic workflow summary.
 
-**No result was converted.** The named case passed on its first dispatched staging run. Nothing here
+**No result was converted.** Each of the two staging runs recorded here passed on its first execution —
+`29856034716` for the original case and `29859015027` for the strengthened one. Nothing here
 relied on rerun-until-green, timeout or retry changes, quarantine, advisory reclassification, or
 merge-over-red; had the case failed behaviourally it would have stayed red and been reported as a
 nav-shell regression.
