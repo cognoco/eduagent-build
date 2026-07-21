@@ -21,24 +21,23 @@ guidance frames the other three.
 - Learner conversation content is processed by third-party LLM providers (US-based processors)
   under DPAs; a DPIA and ROPA exist (`docs/compliance/dpia.md`, `ropa.md`), privacy policy
   drafted (`docs/privacy-policy.html`).
-- UI locales: en, de, es, ja, nb, pl, pt. Company presence: Czech Republic (Cognoco s.r.o.) and
-  Norway (operator-resident; entity TBD).
+- UI locales: en, de, es, ja, nb, pl, pt. Controller and company presence: **ZWIZZLY AS**,
+  org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway.
 
 ---
 
-## Q1 — Controlling legal entity (WI-1559; blocks privacy-policy publish)
+## Q1 — Controlling legal entity (WI-1559; resolved 2026-07-11)
 
-The draft privacy policy names the controller **Cognoco s.r.o.** (Czech); the DPIA and ROPA say
-controller "[legal entity name — TODO], established in Norway". Clean contradiction.
+**Operator ruling:** the controller is **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B,
+0139 Oslo, Norway. The lead supervisory authority is **Norwegian Datatilsynet**. This ruling
+supersedes the packet's original unresolved-entity question.
 
-**Question:** which entity should be the data controller for launch — Cognoco s.r.o., or a
-Norwegian entity to be established? Please advise on the deciding factors (lead supervisory
-authority under GDPR one-stop-shop, children's-data guidance divergence CZ ÚOOÚ vs Datatilsynet,
-tax/operational nexus is out of scope for this packet) and confirm the choice so policy/DPIA/ROPA
-can be reconciled to one name.
+**Implementation:** reconcile the privacy policy, DPIA, ROPA, breach-response plan, and active
+launch records to that ruled identity and Norway establishment. Questions 2–4 therefore use
+Norwegian Datatilsynet guidance where the lead authority matters.
 
-**The answer decides:** the regulator whose children's-data guidance applies to Q2-Q4; the name
-stamped across all three compliance documents before publish.
+**The ruling decides:** the regulator whose children's-data guidance applies to Q2–Q4 and the
+controller identity used across every active compliance document before publish.
 
 ## Q2 — Guardian consent denial: may we retain, or must we erase? (spec-triage ruling 4-D2)
 

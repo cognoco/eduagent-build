@@ -1,7 +1,7 @@
 # Record of Processing Activities (ROPA)
 
 **Checklist item:** A3 · **Law:** GDPR Article 30 · **Status:** DRAFT for DPO sign-off.
-**Controller:** `[legal entity name — TODO]`, established in Norway. **DPO:** `[dpo@… — TODO]`.
+**Controller:** **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway. **Lead supervisory authority:** Norwegian Datatilsynet. **DPO:** `[dpo@… — TODO]`.
 
 > **Launch substrate = the identity-foundation architecture — BUILT AND LIVE (status updated 2026-07-10).** This register describes processing on the identity-foundation schema, which is **no longer a ratified design — it is the production system**: `resolveIdentityV2` runs unconditionally for every authenticated request (`apps/api/src/middleware/account.ts:146-147`); the legacy `accounts`/`profiles`/`family_links` tables are **dropped** on the staging and production databases (live-query verified 2026-06-28). Design rationale: [`_wip/identity-foundation/data-model.md`](../../_wip/identity-foundation/data-model.md) (`MMT-ADR-0011`/`0012`; amendments `0013`–`0015`). Built-state verification: [`2026-07-04-launch-compliance-closure-check-early-pass.md`](2026-07-04-launch-compliance-closure-check-early-pass.md).
 
