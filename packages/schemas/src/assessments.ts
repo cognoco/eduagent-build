@@ -391,6 +391,22 @@ const recallRemediationSchema = z.object({
   options: z.array(z.enum(['review_and_retest', 'relearn_topic'])),
 });
 
+// [WI-2114] Answer-specific recall feedback. The grader emits three short
+// learner-facing sentences — what the answer got right, what is missing or
+// inaccurate, and a concrete next step — so Recall Check can respond to the
+// actual answer instead of one fixed "Good effort" prompt. All three are
+// mentor-prose (written in the learner's conversation_language); the client
+// renders them as the assistant reply while its own controls stay in the app
+// language. Optional end-to-end: absent when the grader is unavailable or on
+// the deterministic dont_remember / cooldown paths, where the client keeps its
+// honest generic copy.
+export const recallFeedbackSchema = z.object({
+  strengths: z.string(),
+  gaps: z.string(),
+  nextStep: z.string(),
+});
+export type RecallFeedback = z.infer<typeof recallFeedbackSchema>;
+
 export const recallTestResultSchema = z.object({
   passed: z.boolean(),
   masteryScore: z.number(),
@@ -398,6 +414,10 @@ export const recallTestResultSchema = z.object({
   nextReviewAt: isoDateField,
   failureCount: z.number().int(),
   hint: z.string().optional(),
+  // [WI-2114] Answer-specific feedback for the sub-3-failure retry path — see
+  // recallFeedbackSchema. Additive + optional so a client on the pre-WI-2114
+  // schema ignores it and keeps its generic copy.
+  feedback: recallFeedbackSchema.optional(),
   // [WI-1462] Wire-compatible values only — unchanged from the pre-WI-1462
   // contract so a client built against the old schema still parses this
   // response. A client on the old schema that reaches the 3rd/4th failure
