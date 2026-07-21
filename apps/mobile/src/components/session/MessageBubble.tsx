@@ -31,6 +31,7 @@ interface MessageBubbleProps {
   actions?: React.ReactNode;
   testID?: string;
   mentorNotice?: MentorNoticeAccepted;
+  showInlineThinkingIndicator?: boolean;
 }
 
 function ThinkingDot({ delay }: { delay: number }): React.ReactElement {
@@ -124,7 +125,11 @@ function BlinkingCursor(): React.ReactElement {
   }));
 
   return (
-    <Animated.Text style={animatedStyle} className="text-accent">
+    <Animated.Text
+      style={animatedStyle}
+      className="text-accent"
+      testID="streaming-cursor"
+    >
       {' \u258C'}
     </Animated.Text>
   );
@@ -193,6 +198,7 @@ function areEqualMessageBubble(
     prev.verificationBadge === next.verificationBadge &&
     prev.actions === next.actions &&
     prev.mentorNotice === next.mentorNotice &&
+    prev.showInlineThinkingIndicator === next.showInlineThinkingIndicator &&
     prev.testID === next.testID
   );
 }
@@ -207,6 +213,7 @@ export const MessageBubble = memo(function MessageBubble({
   actions,
   testID,
   mentorNotice,
+  showInlineThinkingIndicator = true,
 }: MessageBubbleProps): React.ReactElement {
   const { t } = useTranslation();
   const isAI = sender === 'assistant';
@@ -225,7 +232,7 @@ export const MessageBubble = memo(function MessageBubble({
     : projectedContent;
   const escalation =
     isAI && escalationRung ? ESCALATION_STYLES[escalationRung] : undefined;
-  const isThinking = streaming && !content;
+  const isThinking = streaming && !content && showInlineThinkingIndicator;
 
   const bubbleBg = escalation
     ? `${escalation.bg} ${escalation.border}`
@@ -263,7 +270,7 @@ export const MessageBubble = memo(function MessageBubble({
         ) : isAI ? (
           <View testID="message-ai-content">
             <ThemedMarkdown>{displayContent}</ThemedMarkdown>
-            {streaming && <BlinkingCursor />}
+            {streaming && content ? <BlinkingCursor /> : null}
           </View>
         ) : (
           <Text className="text-body leading-relaxed text-text-inverse">
