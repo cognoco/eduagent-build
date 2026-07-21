@@ -2807,6 +2807,12 @@ export async function adaptCurriculumFromPerformance(
         case 'too_easy':
           reordered.splice(Math.max(targetIndex - 2, 0), 0, topic);
           break;
+        default: {
+          const exhaustive: never = request.signal;
+          throw new Error(
+            `Unexpected curriculum adaptation signal: ${exhaustive}`,
+          );
+        }
       }
     }
   }
