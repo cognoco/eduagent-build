@@ -42,7 +42,10 @@ import {
   topicNotes,
   type Database,
 } from '@eduagent/database';
-import type { RenderAudience } from '@eduagent/schemas';
+import {
+  PROFILE_MINIMUM_AGE,
+  type RenderAudience,
+} from '@eduagent/schemas';
 
 import { acceptLink, initiateLink } from './linking-ceremony';
 import { requestSelfUnlink } from './supportership-revocation';
@@ -427,7 +430,7 @@ export async function seedV2SupporterManaged(
   const { personId: managedChildPersonId } = await seedChildIdentityV2(db, {
     organizationId: supporter.organizationId,
     displayName: 'Managed Child',
-    birthYear: 2015,
+    birthYear: new Date().getFullYear() - PROFILE_MINIMUM_AGE,
   });
 
   const managedEdge = await seedAcceptedEdge(db, {

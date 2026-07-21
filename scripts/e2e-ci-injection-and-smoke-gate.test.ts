@@ -1221,6 +1221,107 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow.match(/retryTapIfNoChange: true/g)).toHaveLength(3);
   });
 
+  it('[WI-2584 profile-load-error] hard-fails authenticated bootstrap errors before Back recovery', () => {
+    const commands = parseAllDocuments(
+      readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/flows/_setup/seed-and-sign-in.yaml'),
+        'utf8',
+      ),
+    )[1]?.toJS() as unknown;
+
+    expect(Array.isArray(commands)).toBe(true);
+    if (!Array.isArray(commands)) {
+      throw new Error('seed-and-sign-in Maestro commands must be a YAML list');
+    }
+
+    const signInSubmission = commands.findIndex((command) =>
+      isDeepStrictEqual(command, { tapOn: { id: 'sign-in-button' } }),
+    );
+    const profileLoadErrorGuard = commands.findIndex((command) =>
+      isDeepStrictEqual(command, {
+        assertNotVisible: { id: 'profile-load-error' },
+      }),
+    );
+    const backRecovery = commands.findIndex((command) =>
+      isDeepStrictEqual(command, {
+        runFlow: {
+          when: { notVisible: { id: 'learner-screen' } },
+          file: 'return-to-home-safe.yaml',
+        },
+      }),
+    );
+    const settlementProbeIndices = [
+      ['learner-screen', 30_000],
+      ['dashboard-scroll', 5_000],
+      ['parent-home-screen', 5_000],
+    ].map(([landingId, timeout]) =>
+      commands.findIndex((command) =>
+        isDeepStrictEqual(command, {
+          extendedWaitUntil: {
+            visible: { id: landingId },
+            timeout,
+            optional: true,
+          },
+        }),
+      ),
+    );
+    const postApprovalLanding = commands.findIndex((command) =>
+      isDeepStrictEqual(command, {
+        runFlow: {
+          when: { visible: "You're approved!" },
+          file: 'dismiss-post-approval.yaml',
+        },
+      }),
+    );
+    const postRecoveryProbeIndices = [
+      'mentor-screen',
+      'support-hub-mentor-tab',
+    ].map((landingId) =>
+      commands.findIndex((command) =>
+        isDeepStrictEqual(command, {
+          extendedWaitUntil: {
+            visible: { id: landingId },
+            timeout: 5_000,
+            optional: true,
+          },
+        }),
+      ),
+    );
+
+    for (const landingId of [
+      'learner-screen',
+      'dashboard-scroll',
+      'parent-home-screen',
+      'mentor-screen',
+      'support-hub-mentor-tab',
+    ]) {
+      expect(commands).toContainEqual({
+        extendedWaitUntil: expect.objectContaining({
+          visible: { id: landingId },
+          optional: true,
+        }),
+      });
+    }
+    expect(commands).toContainEqual({
+      runFlow: {
+        when: { visible: "You're approved!" },
+        file: 'dismiss-post-approval.yaml',
+      },
+    });
+    expect(signInSubmission).toBeGreaterThanOrEqual(0);
+    for (const settlementProbe of settlementProbeIndices) {
+      expect(settlementProbe).toBeGreaterThan(signInSubmission);
+      expect(profileLoadErrorGuard).toBeGreaterThan(settlementProbe);
+    }
+    expect(postApprovalLanding).toBeGreaterThan(signInSubmission);
+    expect(profileLoadErrorGuard).toBeGreaterThan(postApprovalLanding);
+    expect(profileLoadErrorGuard).toBeGreaterThan(signInSubmission);
+    expect(backRecovery).toBe(profileLoadErrorGuard + 1);
+    for (const postRecoveryProbe of postRecoveryProbeIndices) {
+      expect(postRecoveryProbe).toBeGreaterThan(backRecovery);
+    }
+  });
+
   it('[WI-2506] binds each subject resolver result to its owned action and fails ambiguous results closed', () => {
     type Command = Record<string, unknown>;
     const subjectCreate = parseAllDocuments(
