@@ -56,23 +56,32 @@ named case contains exactly two, both driven by real `page.goBack()` and real `p
 | b | Path | Assertions after Back |
 |---|---|---|
 | b1 | landing `/mentor` → tap `tab-subjects` → `/subjects` → **Back** | `support-hub-mentor-tab` visible **and** `mentor-screen` count 0 |
-| b2 | person scope → tap `tab-journal` → `/journal` → ScopeChip to supporter-hub → **Back** | `mentor-screen` count 0 **and** `person-scope-journal-placeholder` not visible |
+| b2 | person scope → tap `tab-journal` → `/journal` → ScopeChip to supporter-hub → **Back** | URL `/mentor` **and** `support-hub-mentor-tab` visible **and** `mentor-screen` count 0 **and** `person-scope-journal-placeholder` not visible |
 
-**Coverage is asymmetric between b1 and b2, and b2 is the weaker of the two.** b1 asserts the
-supporter-hub surface *positively* (`support-hub-mentor-tab` visible) and negates the learner
-surface, so a regression that swaps in the wrong surface turns it red. **b2 asserts only the two
-negatives** — after its `page.goBack()` the case checks `mentor-screen` count 0 and
-`person-scope-journal-placeholder` not visible, and asserts no supporter-hub testid at that point.
-(`support-hub-journal-tab` is asserted *before* the Back, which proves the scope switch, not the
-post-Back surface.)
+Both b1 and b2 now assert the supporter-hub surface **positively** as well as negating the foreign
+ones, so each covers both halves of AC-2's requirement.
 
-Consequence, stated plainly rather than glossed: both of b2's assertions would also hold on a blank
-or errored route, so **b2 can pass without any supporter-hub surface having rendered**. b2 therefore
-evidences only the "never a learner or person-scope surface" half of AC-2's requirement; it does not
-evidence the "renders the surface owned by supporter-hub" half. This gap was raised by the automated
-reviewer on this PR (Codex P2, "Narrow the claimed b2 coverage") and is recorded here rather than
-resolved by narrowing the claim silently — closing it requires adding a positive post-Back assertion
-to the named case and re-running, which is a change to the spec rather than a re-run of it.
+**b2 did not always do so, and the gap was real.** As originally written, b2 asserted only the two
+negatives after its `page.goBack()` — no supporter-hub testid at all (`support-hub-journal-tab` is
+asserted *before* the Back, which proves the scope switch, not the post-Back surface). Both negatives
+also hold on a blank or errored route, so b2 could pass with **no supporter-hub surface rendered**,
+evidencing only AC-2's "never a foreign surface" half. The gap was raised by the automated reviewer
+on this PR (Codex P2, "Narrow the claimed b2 coverage"); it is closed here rather than resolved by
+narrowing the claim.
+
+**The fix.** b2 now asserts `toHaveURL(/\/mentor$/)` and `support-hub-mentor-tab` visible ahead of the
+two negatives. `support-hub-mentor-tab` is the correct surface because neither interaction on that
+path navigates — `onOpenPersonScope` is `setActiveScope` (`mentor.tsx:510,526`) and `ScopeChip`'s
+`onPress` is `setActiveScope` (`ScopeChip.tsx:64`) — so the only pushed entry is the Journal tab, and
+Back returns to the Mentor route with `activeScope` still supporter-hub.
+
+**The strengthened case passes.** Run **`29859015027`** (this PR's own `v2-release` staging gate, on
+head `233fd5d54`, which contains both the spec change and this document) — `Running 5 tests`, the
+named case listed `[5/5]` at `nav-shell.spec.ts:60:5`, **`5 passed (2.3m)`**.
+
+> Scope note on run `29856034716` in §2: it was dispatched on **pre-fix** main and therefore exercised
+> the *original* case. It evidences the preconditions and AC-1 provenance only — it did **not** exercise
+> the `support-hub-mentor-tab` assertion, and is not cited as evidence that the strengthened case passes.
 
 The case additionally proves (not assumes) the `me`-scope caveat carried over from WI-2223:
 `scope-chip-option-me` and `supporter-self-learning-doorway` both assert `toHaveCount(0)`.

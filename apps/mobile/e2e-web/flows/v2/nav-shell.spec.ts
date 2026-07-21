@@ -113,14 +113,8 @@ test('V2 nav shell: real Back from the support-hub Mentor surface keeps the supp
 
   await page.goBack();
 
-  // [WI-2524] Positive surface assertion, not only the negatives. Neither
-  // `onOpenPersonScope` (= setActiveScope) nor ScopeChip navigates, so the only
-  // pushed entry on this path is the Journal tab; Back therefore returns to the
-  // Mentor route with activeScope still supporter-hub, and the surface that
-  // scope OWNS there is `support-hub-mentor-tab`. Asserting it is required by
-  // AC-2 ("the resulting route renders the surface owned by supporter-hub"):
-  // without it the two negatives below also hold on a blank or errored route,
-  // so this path could pass with NO supporter-hub surface rendered at all.
+  // AC-2: positive surface assertion required — the negatives below alone pass
+  // on a blank/errored route (see docs/evidence/wi2524-staging-navshell-verification.md §3)
   await expect(page).toHaveURL(/\/mentor$/);
   await expect(page.getByTestId('support-hub-mentor-tab')).toBeVisible();
 
