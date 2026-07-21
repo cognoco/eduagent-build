@@ -363,6 +363,28 @@ describe('useBookWithTopics', () => {
     }
   });
 
+  it('does not restart bounded transport replay after terminal NetworkError', async () => {
+    jest.useFakeTimers();
+    try {
+      mockFetch.mockRejectedValue(new Error('Network request failed'));
+
+      const { result } = renderHook(
+        () => useBookWithTopics('subject-1', 'book-1'),
+        { wrapper: createWrapper() },
+      );
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(7_500);
+      });
+
+      expect(result.current.isError).toBe(true);
+      expect(result.current.error).toBeInstanceOf(NetworkError);
+      expect(mockFetch).toHaveBeenCalledTimes(5);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('is disabled when subjectId is undefined', async () => {
     const { result } = renderHook(
       () => useBookWithTopics(undefined, 'book-1'),
