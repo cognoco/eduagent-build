@@ -963,12 +963,18 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         // legitimately READS an uncredentialed charge's summary, but must not
         // receive the learner-private notice receipt embedded in it. V gates
         // the enrichment only, never the read.
-        mentorNoticeEnabled: await resolveMentorNoticeVisibility(
-          c,
-          profileId,
-          c.env.MENTOR_NOTICE_ENABLED,
-          { proxyModeHeader: c.req.header('X-Proxy-Mode') },
-        ),
+        // [WI-2504] Same seam; only `.visible` is consumed here. The summary
+        // is not a persisted client projection — with the flag off the server
+        // simply omits the notice receipt — so there is nothing for the epoch
+        // to invalidate and it is not put on this response.
+        mentorNoticeEnabled: (
+          await resolveMentorNoticeVisibility(
+            c,
+            profileId,
+            c.env.MENTOR_NOTICE_ENABLED,
+            { proxyModeHeader: c.req.header('X-Proxy-Mode') },
+          )
+        ).visible,
       });
       return c.json({ summary });
     },
