@@ -75,12 +75,14 @@ export function MentorInputBar({
             ? 'error'
             : 'idle';
 
-  useEffect(() => {
-    const capture = captureRef.current;
-    return () => {
-      capture.accepting = false;
-    };
-  }, []);
+  useEffect(
+    () => () => {
+      // Read through the ref, not a mount-time copy: by unmount the record has
+      // usually been replaced by a later capture, and that is the one to close.
+      captureRef.current.accepting = false;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!unavailable) return;
