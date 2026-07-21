@@ -68,6 +68,7 @@ import {
 } from './recaps';
 
 const PARENT_ID = 'a0000000-0000-4000-8000-000000000001';
+const ORGANIZATION_ID = 'c0000000-0000-4000-8000-000000000001';
 const VISIBLE_CHILD = 'a0000000-0000-4000-8000-000000000010';
 const HIDDEN_CHILD = 'a0000000-0000-4000-8000-000000000020';
 const RECAP_ID = 'b0000000-0000-4000-8000-000000000100';
@@ -134,7 +135,12 @@ describe('listRecapsForParent — per-child ForbiddenError isolation', () => {
       },
     );
 
-    const recaps = await listRecapsForParent(db, PARENT_ID);
+    const recaps = await listRecapsForParent(
+      db,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recaps).toHaveLength(1);
     expect(recaps[0]).toMatchObject({
@@ -149,9 +155,9 @@ describe('listRecapsForParent — per-child ForbiddenError isolation', () => {
     ]);
     mockGetChildSessions.mockRejectedValueOnce(new Error('connection lost'));
 
-    await expect(listRecapsForParent(db, PARENT_ID)).rejects.toThrow(
-      'connection lost',
-    );
+    await expect(
+      listRecapsForParent(db, PARENT_ID, PARENT_ID, ORGANIZATION_ID),
+    ).rejects.toThrow('connection lost');
   });
 });
 
@@ -227,7 +233,12 @@ describe('listRecapsForParent — next-topic enrichment', () => {
       },
     ]);
 
-    const recaps = await listRecapsForParent(enrichedDb, PARENT_ID);
+    const recaps = await listRecapsForParent(
+      enrichedDb,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recaps).toHaveLength(1);
     expect(recaps[0]).toMatchObject({
@@ -255,7 +266,12 @@ describe('listRecapsForParent — next-topic enrichment', () => {
       },
     ]);
 
-    const recaps = await listRecapsForParent(enrichedDb, PARENT_ID);
+    const recaps = await listRecapsForParent(
+      enrichedDb,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recaps).toHaveLength(1);
     expect(recaps[0]?.nextTopicTitle).toBeNull();
@@ -270,7 +286,12 @@ describe('listRecapsForParent — next-topic enrichment', () => {
     // DB returns no next-topic row for this session.
     const enrichedDb = fakeDbReturning([]);
 
-    const recaps = await listRecapsForParent(enrichedDb, PARENT_ID);
+    const recaps = await listRecapsForParent(
+      enrichedDb,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recaps).toHaveLength(1);
     expect(recaps[0]?.nextTopicTitle).toBeNull();
@@ -302,7 +323,12 @@ describe('listRecapsForParent — next-topic enrichment', () => {
       },
     ]);
 
-    const recaps = await listRecapsForParent(enrichedDb, PARENT_ID);
+    const recaps = await listRecapsForParent(
+      enrichedDb,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recaps).toHaveLength(1);
     expect(recaps[0]?.nextTopicTitle).toBe('Comparing fractions');
@@ -319,7 +345,12 @@ describe('listRecapsForParent — next-topic enrichment', () => {
 
     // db.select is undefined on this bare object → the lookup throws and the
     // try/catch defaults next-topic to null without failing the recap list.
-    const recaps = await listRecapsForParent({} as Database, PARENT_ID);
+    const recaps = await listRecapsForParent(
+      {} as Database,
+      PARENT_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recaps).toHaveLength(1);
     expect(recaps[0]?.nextTopicTitle).toBeNull();
@@ -347,7 +378,13 @@ describe('getRecapForParent — per-child ForbiddenError isolation', () => {
       },
     );
 
-    const recap = await getRecapForParent(db, PARENT_ID, RECAP_ID);
+    const recap = await getRecapForParent(
+      db,
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recap).toMatchObject({
       recapId: RECAP_ID,
@@ -375,7 +412,7 @@ describe('getRecapForParent — per-child ForbiddenError isolation', () => {
     );
 
     await expect(
-      getRecapForParent(db, PARENT_ID, RECAP_ID),
+      getRecapForParent(db, PARENT_ID, RECAP_ID, PARENT_ID, ORGANIZATION_ID),
     ).resolves.toBeNull();
   });
 
@@ -385,9 +422,9 @@ describe('getRecapForParent — per-child ForbiddenError isolation', () => {
     ]);
     mockGetChildSessionDetail.mockRejectedValueOnce(new Error('boom'));
 
-    await expect(getRecapForParent(db, PARENT_ID, RECAP_ID)).rejects.toThrow(
-      'boom',
-    );
+    await expect(
+      getRecapForParent(db, PARENT_ID, RECAP_ID, PARENT_ID, ORGANIZATION_ID),
+    ).rejects.toThrow('boom');
   });
 });
 
@@ -449,7 +486,13 @@ describe('getRecapForParent — verified-proof enrichment', () => {
   }
 
   it('populates verified proof from the session topic marked artifact', async () => {
-    const recap = await getRecapForParent(proofDb(), PARENT_ID, RECAP_ID);
+    const recap = await getRecapForParent(
+      proofDb(),
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recap?.verifiedProof).toEqual({
       topicId: topicSessionRow(RECAP_ID).topicId,
@@ -471,7 +514,13 @@ describe('getRecapForParent — verified-proof enrichment', () => {
       ]),
     );
 
-    const recap = await getRecapForParent(noProofDb, PARENT_ID, RECAP_ID);
+    const recap = await getRecapForParent(
+      noProofDb,
+      PARENT_ID,
+      RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
+    );
 
     expect(recap).toMatchObject({
       recapId: RECAP_ID,
@@ -490,6 +539,8 @@ describe('getRecapForParent — verified-proof enrichment', () => {
       proofDb(agedCreatedAt),
       PARENT_ID,
       RECAP_ID,
+      PARENT_ID,
+      ORGANIZATION_ID,
     );
 
     expect(recap?.verifiedProof).toMatchObject({

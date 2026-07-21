@@ -270,6 +270,12 @@ describe('dashboard routes', () => {
       const body = await res.json();
       expect(body.children).toEqual([]);
       expect(body.demoMode).toBe(false);
+      expect(mockGetChildrenForParent).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        'test-profile-id',
+        'test-account-id',
+      );
     });
 
     it('returns 400 when authenticated but missing X-Profile-Id header', async () => {
@@ -308,6 +314,13 @@ describe('dashboard routes', () => {
 
       const body = await res.json();
       expect(body.child).toBeNull();
+      expect(mockGetChildDetail).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+        'test-profile-id',
+        'test-account-id',
+      );
     });
 
     it('returns 401 without auth header', async () => {
@@ -436,6 +449,14 @@ describe('dashboard routes', () => {
 
       const body = await res.json();
       expect(body.topics).toEqual([]);
+      expect(mockGetChildSubjectTopics).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+        SUBJECT_ID,
+        'test-profile-id',
+        'test-account-id',
+      );
     });
 
     it('returns 401 without auth header', async () => {
@@ -446,6 +467,25 @@ describe('dashboard routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('GET /v1/dashboard/children/:profileId/progress-summary', () => {
+    it('passes the server-resolved caller and organization to the service', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/progress-summary`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGetProgressSummary).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        PROFILE_ID,
+        'test-profile-id',
+        'test-account-id',
+      );
     });
   });
 

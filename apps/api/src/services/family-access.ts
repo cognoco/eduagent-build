@@ -280,6 +280,32 @@ export async function assertCallerIsAccountOwner(
   }
 }
 
+/**
+ * Service-layer organization-admin assertion for cross-profile operations.
+ *
+ * Accepts only the server-resolved caller person and organization identifiers;
+ * request/profile contexts and caller-selectable profile ids are deliberately
+ * excluded from this boundary.
+ */
+export async function assertCallerIsOrganizationAdmin(
+  db: Database,
+  callerPersonId: string | undefined,
+  organizationId: string | undefined,
+  message = 'You are not authorized to access this resource.',
+): Promise<void> {
+  if (!callerPersonId || !organizationId) {
+    throw new ForbiddenError(message);
+  }
+  const isCallerAdmin = await verifyPersonIsOrgAdminV2(
+    db,
+    callerPersonId,
+    organizationId,
+  );
+  if (!isCallerAdmin) {
+    throw new ForbiddenError(message);
+  }
+}
+
 type CanReadProfileSource = {
   get(key: 'db'): Database;
   get(key: 'account'): { id: string } | undefined;

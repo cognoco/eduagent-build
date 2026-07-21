@@ -13,6 +13,7 @@ import {
   learningSessions,
   login,
   membership,
+  monthlyReports,
   organization,
   person,
   progressSnapshots,
@@ -29,11 +30,16 @@ import { eq } from 'drizzle-orm';
 import { ForbiddenError } from '../errors';
 import {
   buildChildProgressSummariesBatch,
-  getChildDetail,
-  getChildSessionDetail,
-  getChildSessions,
-  getChildSubjectTopics,
-  getChildrenForParent,
+  getChildDetail as getChildDetailService,
+  getChildInventory as getChildInventoryService,
+  getChildProgressHistory as getChildProgressHistoryService,
+  getChildReportDetail as getChildReportDetailService,
+  getChildReports as getChildReportsService,
+  getChildSessionDetail as getChildSessionDetailService,
+  getChildSessions as getChildSessionsService,
+  getChildSubjectTopics as getChildSubjectTopicsService,
+  getChildrenForParent as getChildrenForParentService,
+  markChildReportViewed as markChildReportViewedService,
 } from './dashboard';
 import {
   countGuidedMetrics,
@@ -48,6 +54,91 @@ const RUN_ID = generateUUIDv7();
 let seedCounter = 0;
 const personIds: string[] = [];
 const orgIds: string[] = [];
+const orgIdByPersonId = new Map<string, string>();
+
+function requireOrganizationId(personId: string): string {
+  const organizationId = orgIdByPersonId.get(personId);
+  if (!organizationId) {
+    throw new Error(`Missing test organization for person ${personId}`);
+  }
+  return organizationId;
+}
+
+function getChildrenForParent(
+  testDb: Database,
+  parentProfileId: string,
+  ..._legacyArgs: unknown[]
+) {
+  return getChildrenForParentService(
+    testDb,
+    parentProfileId,
+    parentProfileId,
+    requireOrganizationId(parentProfileId),
+  );
+}
+
+function getChildDetail(
+  testDb: Database,
+  parentProfileId: string,
+  childProfileId: string,
+  ..._legacyArgs: unknown[]
+) {
+  return getChildDetailService(
+    testDb,
+    parentProfileId,
+    childProfileId,
+    parentProfileId,
+    requireOrganizationId(parentProfileId),
+  );
+}
+
+function getChildSubjectTopics(
+  testDb: Database,
+  parentProfileId: string,
+  childProfileId: string,
+  subjectId: string,
+) {
+  return getChildSubjectTopicsService(
+    testDb,
+    parentProfileId,
+    childProfileId,
+    subjectId,
+    parentProfileId,
+    requireOrganizationId(parentProfileId),
+  );
+}
+
+function getChildSessions(
+  testDb: Database,
+  parentProfileId: string,
+  childProfileId: string,
+  ..._legacyArgs: unknown[]
+) {
+  return getChildSessionsService(
+    testDb,
+    parentProfileId,
+    childProfileId,
+    parentProfileId,
+    requireOrganizationId(parentProfileId),
+  );
+}
+
+function getChildSessionDetail(
+  testDb: Database,
+  parentProfileId: string,
+  childProfileId: string,
+  sessionId: string,
+  ..._legacyArgs: unknown[]
+) {
+  return getChildSessionDetailService(
+    testDb,
+    parentProfileId,
+    childProfileId,
+    sessionId,
+    parentProfileId,
+    requireOrganizationId(parentProfileId),
+  );
+}
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -171,6 +262,8 @@ async function seedProfile(input: {
     organizationId: orgId,
     roles: (input.isOwner ?? true) ? ['admin'] : ['learner'],
   });
+
+  orgIdByPersonId.set(p!.id, orgId);
 
   return { orgId, profileId: p!.id };
 }
@@ -596,6 +689,261 @@ afterAll(async () => {
 });
 
 describe('dashboard service integration', () => {
+  const callerCases = [
+    { label: 'authorized admin', kind: 'authorized' },
+    { label: 'missing caller', kind: 'missing' },
+    { label: 'same-org non-admin spoof', kind: 'non-admin' },
+    { label: 'cross-org admin spoof', kind: 'cross-org' },
+    { label: 'admin without child edge', kind: 'no-edge' },
+  ] as const;
+
+  it.each(callerCases)(
+    '[WI-2519][RED→GREEN] enforces $label across every dashboard cross-profile service',
+    async ({ kind }) => {
+      const { orgId, profileId: parentProfileId } = await seedProfile({
+        displayName: `Authority Matrix Parent ${kind}`,
+      });
+      const { profileId: childProfileId } = await seedProfile({
+        displayName: `Authority Matrix Child ${kind}`,
+        isOwner: false,
+        orgId,
+      });
+      const subjectId = await seedSubject({
+        profileId: childProfileId,
+        name: `Authority Matrix Subject ${kind}`,
+      });
+      await seedConsentState({
+        profileId: childProfileId,
+        orgId,
+        status: 'CONSENTED',
+      });
+
+      if (kind !== 'no-edge') {
+        await seedFamilyLink(parentProfileId, childProfileId);
+      }
+
+      let callerPersonId: string | undefined = parentProfileId;
+      if (kind === 'missing') {
+        callerPersonId = undefined;
+      } else if (kind === 'non-admin') {
+        ({ profileId: callerPersonId } = await seedProfile({
+          displayName: 'Authority Matrix Non-Admin',
+          isOwner: false,
+          orgId,
+        }));
+      } else if (kind === 'cross-org') {
+        ({ profileId: callerPersonId } = await seedProfile({
+          displayName: 'Authority Matrix Cross-Org Admin',
+        }));
+      }
+
+      const resourceId = generateUUIDv7();
+      const operations: Array<{
+        name: string;
+        invoke: () => Promise<unknown>;
+        requiresChildEdge: boolean;
+      }> = [
+        {
+          name: 'getChildrenForParent',
+          invoke: () =>
+            getChildrenForParentService(
+              db,
+              parentProfileId,
+              callerPersonId,
+              orgId,
+            ),
+          requiresChildEdge: false,
+        },
+        {
+          name: 'getChildDetail',
+          invoke: () =>
+            getChildDetailService(
+              db,
+              parentProfileId,
+              childProfileId,
+              callerPersonId,
+              orgId,
+            ),
+          requiresChildEdge: true,
+        },
+        {
+          name: 'getChildSubjectTopics',
+          invoke: () =>
+            getChildSubjectTopicsService(
+              db,
+              parentProfileId,
+              childProfileId,
+              subjectId,
+              callerPersonId,
+              orgId,
+            ),
+          requiresChildEdge: true,
+        },
+        {
+          name: 'getChildSessions',
+          invoke: () =>
+            getChildSessionsService(
+              db,
+              parentProfileId,
+              childProfileId,
+              callerPersonId,
+              orgId,
+            ),
+          requiresChildEdge: true,
+        },
+        {
+          name: 'getChildSessionDetail',
+          invoke: () =>
+            getChildSessionDetailService(
+              db,
+              parentProfileId,
+              childProfileId,
+              resourceId,
+              callerPersonId,
+              orgId,
+            ),
+          requiresChildEdge: true,
+        },
+        {
+          name: 'getChildInventory',
+          invoke: () =>
+            getChildInventoryService(
+              db,
+              parentProfileId,
+              childProfileId,
+              callerPersonId,
+              orgId,
+            ),
+          requiresChildEdge: true,
+        },
+        {
+          name: 'getChildProgressHistory',
+          invoke: () =>
+            getChildProgressHistoryService(
+              db,
+              parentProfileId,
+              childProfileId,
+              callerPersonId,
+              orgId,
+            ),
+          requiresChildEdge: true,
+        },
+        {
+          name: 'getChildReports',
+          invoke: () =>
+            getChildReportsService(
+              db,
+              parentProfileId,
+              childProfileId,
+              callerPersonId,
+              orgId,
+            ),
+          requiresChildEdge: true,
+        },
+        {
+          name: 'getChildReportDetail',
+          invoke: () =>
+            getChildReportDetailService(
+              db,
+              parentProfileId,
+              childProfileId,
+              resourceId,
+              callerPersonId,
+              orgId,
+            ),
+          requiresChildEdge: true,
+        },
+        {
+          name: 'markChildReportViewed',
+          invoke: () =>
+            markChildReportViewedService(
+              db,
+              parentProfileId,
+              childProfileId,
+              resourceId,
+              callerPersonId,
+              orgId,
+            ),
+          requiresChildEdge: true,
+        },
+      ];
+
+      for (const operation of operations) {
+        if (kind === 'authorized') {
+          await operation.invoke();
+        } else if (kind === 'no-edge' && !operation.requiresChildEdge) {
+          await expect(operation.invoke()).resolves.toEqual([]);
+        } else {
+          await expect(operation.invoke()).rejects.toThrow(ForbiddenError);
+        }
+      }
+    },
+  );
+
+  it.each(callerCases.filter(({ kind }) => kind !== 'authorized'))(
+    '[WI-2519] $label cannot mutate a report viewed timestamp',
+    async ({ kind }) => {
+      const { orgId, profileId: parentProfileId } = await seedProfile({
+        displayName: `No-Write Parent ${kind}`,
+      });
+      const { profileId: childProfileId } = await seedProfile({
+        displayName: `No-Write Child ${kind}`,
+        isOwner: false,
+        orgId,
+      });
+      await seedConsentState({
+        profileId: childProfileId,
+        orgId,
+        status: 'CONSENTED',
+      });
+      if (kind !== 'no-edge') {
+        await seedFamilyLink(parentProfileId, childProfileId);
+      }
+
+      let callerPersonId: string | undefined = parentProfileId;
+      if (kind === 'missing') {
+        callerPersonId = undefined;
+      } else if (kind === 'non-admin') {
+        ({ profileId: callerPersonId } = await seedProfile({
+          displayName: 'No-Write Non-Admin',
+          isOwner: false,
+          orgId,
+        }));
+      } else if (kind === 'cross-org') {
+        ({ profileId: callerPersonId } = await seedProfile({
+          displayName: 'No-Write Cross-Org Admin',
+        }));
+      }
+
+      const [report] = await db
+        .insert(monthlyReports)
+        .values({
+          profileId: parentProfileId,
+          childProfileId,
+          reportMonth: '2026-07-01',
+          reportData: {},
+        })
+        .returning({ id: monthlyReports.id });
+
+      await expect(
+        markChildReportViewedService(
+          db,
+          parentProfileId,
+          childProfileId,
+          report!.id,
+          callerPersonId,
+          orgId,
+        ),
+      ).rejects.toThrow(ForbiddenError);
+
+      const unchanged = await db.query.monthlyReports.findFirst({
+        where: eq(monthlyReports.id, report!.id),
+        columns: { viewedAt: true },
+      });
+      expect(unchanged?.viewedAt).toBeNull();
+    },
+  );
+
   it('counts guided metrics from real session events', async () => {
     const { profileId } = await seedProfile({ displayName: 'Jordan' });
     const subjectId = await seedSubject({
