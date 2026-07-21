@@ -31,6 +31,7 @@ import { deleteOrganizationGraph } from './test-seed';
 import {
   seedV2SupporterAccepted,
   seedV2SupporterManaged,
+  seedV2SupporterSelfLearningActive,
 } from './test-seed-v2-supporter';
 import { resolveScopesForPerson } from './scope-resolution';
 import { readSupporteeStructuralSubjects } from './supporter-structural-mask';
@@ -320,6 +321,104 @@ function createIntegrationDb(): Database {
         state: 'managed',
         anchor: 'handoff',
       });
+    });
+  },
+);
+
+/**
+ * [WI-2243] `v2-supporter-self-learning-active` seed — the self-learning
+ * doorway + Me-scope persistence fixture. AC-4's "existing server-side
+ * authorization is the enforcement boundary" requirement, exercised against
+ * a real DB rather than asserted only via client-side scope filtering.
+ *
+ * The doorway itself introduces no new server read path — it only switches
+ * the mobile client's active scope and lets the supporter reach the
+ * ordinary learner Mentor flow, which writes/reads through the SAME
+ * profileId-scoped endpoints any learner uses. The isolation guarantee is
+ * therefore the two boundaries that already exist and are unchanged by this
+ * WI:
+ *
+ *   1. Person-scope reads (readSupporteeStructuralSubjects /
+ *      readSharedRecordForSupportee) are always queried by the SUPPORTEE's
+ *      personId — a supporter's own Me-scope subject can never be a
+ *      candidate row.
+ *   2. `getPersonScope` (the exact predicate profileScopeMiddleware runs
+ *      for every `X-Profile-Id` header) never resolves the supportee as a
+ *      profile on the supporter's own organization — the supporter cannot
+ *      reach the supportee's data by any Me-scope-authorized request, no
+ *      matter what personId the client sent.
+ */
+(RUN ? describe : describe.skip)(
+  '[WI-2243] v2-supporter-self-learning-active seed — Me-scope isolation (integration)',
+  () => {
+    let db: Database;
+    let seeded: Awaited<ReturnType<typeof seedV2SupporterSelfLearningActive>>;
+
+    beforeAll(async () => {
+      db = createIntegrationDb();
+      seeded = await seedV2SupporterSelfLearningActive(
+        db,
+        `wi2243-selflearn-int-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
+        {},
+      );
+    });
+
+    afterAll(async () => {
+      await deleteOrganizationGraph(db, [seeded.accountId]);
+    });
+
+    it("[AC: TRUTHFUL FIXTURE] seeds an accepted supportee edge plus a real subject+session on the supporter's own personId", () => {
+      expect(seeded.ids.supporterPersonId).toBeTruthy();
+      expect(seeded.ids.supporteePersonId).toBeTruthy();
+      expect(seeded.ids.edgeId).toBeTruthy();
+      expect(seeded.ids.ownSubjectId).toBeTruthy();
+      expect(seeded.ids.ownSessionId).toBeTruthy();
+    });
+
+    it("[AC-3 server corroboration] resolveScopesForPerson lists 'me' once the supporter has real learning state of their own", async () => {
+      const scopeList = await resolveScopesForPerson(
+        db,
+        seeded.ids.supporterPersonId,
+      );
+      expect(scopeList.shape).toBe('supporter');
+      if (scopeList.shape !== 'supporter') return;
+      expect(scopeList.scopes.some((scope) => scope.kind === 'me')).toBe(true);
+    });
+
+    it("[AC-4 direction 1] the supporter's own Me-scope subject never appears in the supportee's person-scope structural read", async () => {
+      const result = await readSupporteeStructuralSubjects(
+        db,
+        seeded.ids.supporterPersonId,
+        seeded.ids.supporteePersonId,
+      );
+      expect(
+        result.subjects.some((s) => s.id === seeded.ids.ownSubjectId),
+      ).toBe(false);
+      expect(
+        result.subjects.some((s) => s.name === 'Supporter Own Subject'),
+      ).toBe(false);
+    });
+
+    it("[AC-4 direction 1] the supporter's own Me-scope subject never appears in the supportee's shared-record read", async () => {
+      const record = await readSharedRecordForSupportee(db, {
+        supportershipId: seeded.ids.edgeId,
+        supporterPersonId: seeded.ids.supporterPersonId,
+        supporteePersonId: seeded.ids.supporteePersonId,
+      });
+      expect(
+        record.supporterView.facts.some(
+          (fact) => fact.title === 'Supporter Own Subject',
+        ),
+      ).toBe(false);
+    });
+
+    it("[AC-4 direction 2] the supportee never resolves as a profile on the supporter's own organization — the exact predicate profileScopeMiddleware runs for every X-Profile-Id header, so no Me-scope-authorized request can reach the supportee's data", async () => {
+      const scope = await getPersonScope(
+        db,
+        seeded.ids.supporteePersonId,
+        seeded.ids.supporterOrganizationId,
+      );
+      expect(scope).toBeNull();
     });
   },
 );

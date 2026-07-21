@@ -9,10 +9,19 @@ import { useScopeContext } from '../../lib/scope-context';
 export function SupporterSelfLearningDoorway(): React.ReactElement | null {
   const { t } = useTranslation();
   const router = useRouter();
-  const { activeScope, setActiveScope } = useScopeContext();
+  const { activeScope, availableScopes, setActiveScope } = useScopeContext();
   const query = useSupporterColdStart();
 
   if (activeScope.kind !== 'supporter-hub') {
+    return null;
+  }
+
+  // [WI-2243] The doorway is a first-time entry point only — once the
+  // supporter has real learning state of their own, resolveScopesForPerson
+  // (scope-resolution.ts) appends a `me` scope and it becomes an equal
+  // scope reachable like any other (V2 shell spec §4.2), so this doorway
+  // has done its job and steps aside.
+  if (availableScopes.some((scope) => scope.kind === 'me')) {
     return null;
   }
 
