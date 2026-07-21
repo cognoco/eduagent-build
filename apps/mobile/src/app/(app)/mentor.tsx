@@ -494,7 +494,6 @@ function LearnerMentorScreen(): React.ReactElement {
             onSubmitText={handleSubmitText}
             onOpenCamera={() => pushMentorHomeworkCamera(router)}
             onOpenHomework={() => pushMentorHomeworkCamera(router)}
-            onTranscript={handleSubmitText}
           />
 
           {barClarification ? (
