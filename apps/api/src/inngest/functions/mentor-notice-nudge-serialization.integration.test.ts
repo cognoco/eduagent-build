@@ -329,3 +329,71 @@ describe('[WI-2503] a defer committed before delivery suppresses the push', () =
     expect(rows).toHaveLength(1);
   }, 60_000);
 });
+
+describe('[WI-2503] duplicate events, retries and crash/replay', () => {
+  it('two duplicate deliveries of the same notice produce exactly one push', async () => {
+    installFetchMock(false);
+    const profileId = await seedProfile();
+    const noticeId = await seedPendingNotice(profileId);
+    const localDayStart = new Date(Date.now() - 60 * 60 * 1000);
+
+    // Same event delivered twice (Inngest replay / operator re-fire), both
+    // running concurrently against the real database.
+    const deliver = async () => {
+      const reserved = await reserveMentorNoticeNudge(db, {
+        profileId,
+        noticeId,
+        localDayStart,
+      });
+      if (!reserved) return { sent: false };
+      return sendReservedMentorNoticeNudge(db, { profileId, noticeId });
+    };
+    const results = await Promise.all([deliver(), deliver()]);
+
+    expect(results.filter((r) => r.sent)).toHaveLength(1);
+    expect(pushCallCount).toBe(1);
+    expect((await readNotice(noticeId)).nudgeStatus).toBe('sent');
+    expect(await reviewFamilyLogRows(profileId)).toHaveLength(1);
+
+    // A later retry of the same event must not send again.
+    const retry = await deliver();
+    expect(retry.sent).toBe(false);
+    expect(pushCallCount).toBe(1);
+  }, 60_000);
+
+  it('a worker lost between reservation and delivery cannot send twice on replay', async () => {
+    installFetchMock(false);
+    const profileId = await seedProfile();
+    const noticeId = await seedPendingNotice(profileId);
+    const localDayStart = new Date(Date.now() - 60 * 60 * 1000);
+
+    // Crash/replay point: the reservation transaction committed, then the
+    // worker died before (or during) delivery. Its delivery transaction rolled
+    // back, so the durable state is exactly this — a `reserved` notice whose
+    // budget row is already committed.
+    expect(
+      await reserveMentorNoticeNudge(db, {
+        profileId,
+        noticeId,
+        localDayStart,
+      }),
+    ).toBe(true);
+    expect((await readNotice(noticeId)).nudgeStatus).toBe('reserved');
+    expect(await reviewFamilyLogRows(profileId)).toHaveLength(1);
+
+    // Inngest replays the event on a fresh worker.
+    const replayReserved = await reserveMentorNoticeNudge(db, {
+      profileId,
+      noticeId,
+      localDayStart,
+    });
+
+    // Guaranteed property: the committed reservation row is the once-ever
+    // marker, so the replay is refused, no second budget slot is taken, and no
+    // push leaves. Fail-closed: an under-delivery, never a duplicate.
+    expect(replayReserved).toBe(false);
+    expect(pushCallCount).toBe(0);
+    expect(await reviewFamilyLogRows(profileId)).toHaveLength(1);
+    expect((await readNotice(noticeId)).nudgeStatus).toBe('reserved');
+  }, 60_000);
+});

@@ -187,7 +187,7 @@ export async function applyMentorNoticeOutcome(
         .set({
           lastDeferredAt: occurredAt,
           lastRecheckOutcome: 'deferred',
-          nudgeStatus: sql`case when ${mentorNotices.nudgeStatus} = 'pending' then 'suppressed'::mentor_notice_nudge_status else ${mentorNotices.nudgeStatus} end`,
+          nudgeStatus: sql`case when ${mentorNotices.nudgeStatus} in ('pending', 'reserved') then 'suppressed'::mentor_notice_nudge_status else ${mentorNotices.nudgeStatus} end`,
         })
         .where(
           and(
@@ -251,7 +251,7 @@ export async function applyMentorNoticeOutcome(
         lastRecheckAt: occurredAt,
         lastRecheckOutcome: input.outcome,
         recheckAttemptCount: sql`${mentorNotices.recheckAttemptCount} + 1`,
-        nudgeStatus: sql`case when ${mentorNotices.nudgeStatus} = 'pending' then 'suppressed'::mentor_notice_nudge_status else ${mentorNotices.nudgeStatus} end`,
+        nudgeStatus: sql`case when ${mentorNotices.nudgeStatus} in ('pending', 'reserved') then 'suppressed'::mentor_notice_nudge_status else ${mentorNotices.nudgeStatus} end`,
       })
       .where(
         and(
@@ -291,7 +291,7 @@ export async function fadeStaleMentorNotices(
     .set({
       status: 'faded',
       resolvedAt: new Date(),
-      nudgeStatus: sql`case when ${mentorNotices.nudgeStatus} = 'pending' then 'suppressed'::mentor_notice_nudge_status else ${mentorNotices.nudgeStatus} end`,
+      nudgeStatus: sql`case when ${mentorNotices.nudgeStatus} in ('pending', 'reserved') then 'suppressed'::mentor_notice_nudge_status else ${mentorNotices.nudgeStatus} end`,
     })
     .where(
       and(

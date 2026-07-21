@@ -121,6 +121,19 @@ export async function reserveMentorNoticeNudge(
       type: 'notice_recheck',
       sentAt: now,
     });
+    // Claim the notice. A duplicate event for the same notice now fails the
+    // `pending` predicate above and returns without re-marking it `skipped`,
+    // which would otherwise cancel this delivery after its budget was spent.
+    await tx
+      .update(mentorNotices)
+      .set({ nudgeStatus: 'reserved' })
+      .where(
+        and(
+          eq(mentorNotices.id, input.noticeId),
+          eq(mentorNotices.profileId, input.profileId),
+          eq(mentorNotices.nudgeStatus, 'pending'),
+        ),
+      );
     return true;
   });
 }
@@ -165,7 +178,7 @@ export async function sendReservedMentorNoticeNudge(
           eq(mentorNotices.profileId, input.profileId),
           eq(subjects.profileId, input.profileId),
           eq(mentorNotices.status, 'open'),
-          eq(mentorNotices.nudgeStatus, 'pending'),
+          eq(mentorNotices.nudgeStatus, 'reserved'),
         ),
       )
       .limit(1);
@@ -198,7 +211,7 @@ export async function sendReservedMentorNoticeNudge(
         and(
           eq(mentorNotices.id, input.noticeId),
           eq(mentorNotices.profileId, input.profileId),
-          eq(mentorNotices.nudgeStatus, 'pending'),
+          eq(mentorNotices.nudgeStatus, 'reserved'),
         ),
       )
       .returning({ id: mentorNotices.id });

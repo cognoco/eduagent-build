@@ -25,7 +25,11 @@ export const mentorNoticeStatusEnum = pgEnum('mentor_notice_status', [
 
 export const mentorNoticeNudgeStatusEnum = pgEnum(
   'mentor_notice_nudge_status',
-  ['pending', 'sent', 'skipped', 'suppressed'],
+  // [WI-2503] `reserved` is the delivery claim taken by the nudge reserve step
+  // and settled to `sent`/`skipped` by the send step. It makes the reservation
+  // visible to concurrent duplicate events (which must not re-mark a claimed
+  // notice) and to defers (which suppress a reserved notice before delivery).
+  ['pending', 'reserved', 'sent', 'skipped', 'suppressed'],
 );
 
 export const mentorNoticeRecheckOutcomeEnum = pgEnum(
