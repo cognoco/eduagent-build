@@ -46,15 +46,14 @@ tags:
 # Tap Recitation card
 # practice-recitation is the SECOND card inside the "Other practice" horizontal
 # ScrollView (practice-other-practice-slider, practice/index.tsx:799).
-# Step 1: scroll the outer vertical container DOWN until the slider is in the
-# viewport.
+# Step 1: scroll the outer vertical container DOWN using the first leaf card.
 # Step 2: scroll RIGHT inside the horizontal slider to reach practice-recitation.
 - scrollUntilVisible:
     element:
-      id: 'practice-other-practice-slider'
+      id: 'practice-dictation'
     direction: DOWN
     timeout: 5000
-    visibilityPercentage: 80
+    visibilityPercentage: 100
     centerElement: true
 
 - scrollUntilVisible:
@@ -118,10 +117,20 @@ tags:
 - tapOn:
     id: 'end-session-button'
 
+- tapOn:
+    text: '(?i)^end session$'
+
+- extendedWaitUntil:
+    visible:
+      id: 'summary-close-button'
+    timeout: 20000
+
+- tapOn:
+    id: 'summary-close-button'
+
 - extendedWaitUntil:
     visible:
       id: 'practice-screen'
     timeout: 10000
-    optional: true # justified: end-session-button may show a confirmation dialog before navigating; practice-screen appears only after confirmation
 
 - takeScreenshot: recitation-04-exited

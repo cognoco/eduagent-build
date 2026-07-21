@@ -5,13 +5,14 @@
 # deep-link target (library-screen).
 #
 # Mechanism:
-#   1. seed-and-run.sh seeds an onboarding-complete user; app lands on sign-in.
+#   1. seed-and-run.sh seeds an onboarding-complete user; the flow walks the
+#      cleared app's welcome chooser to sign-in.
 #   2. Maestro fires openLink to the dev-only seed route, which calls
 #      seedPendingAuthRedirectForTesting('/(app)/library', 360000). The
 #      savedAt is backdated by 360000ms (6 min), exceeding the 5-min TTL.
 #      The seed route then router.replace to bare /(auth)/sign-in (NO
 #      redirectTo param — that would overwrite the stale record).
-#   3. Maestro signs in via _setup/sign-in-only.yaml.
+#   3. Maestro signs in inline because the welcome bridge already ran.
 #   4. (auth)/_layout.tsx calls peekPendingAuthRedirect, which finds the
 #      record stale and returns null. The fallback /(app)/home is used.
 #
@@ -35,7 +36,10 @@ tags:
   - nightly
   - auth
 ---
-# ── Step 1: Confirm we are on the sign-in screen ──
+# ── Step 1: Walk the cleared app from welcome to sign-in ──
+- runFlow:
+    file: ../_setup/nav-welcome-to-sign-in.yaml
+
 - extendedWaitUntil:
     visible:
       id: "sign-in-screen"
@@ -63,9 +67,21 @@ tags:
 
 - takeScreenshot: deep-link-ttl-03-back-on-sign-in
 
-# ── Step 5: Sign in via canonical sign-in flow ──
-- runFlow:
-    file: ../_setup/sign-in-only.yaml
+# ── Step 5: Sign in inline (the welcome bridge has already run) ──
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${EMAIL}
+- hideKeyboard
+- tapOn:
+    id: "sign-in-password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
+- tapOn:
+    id: "sign-in-button"
 
 - takeScreenshot: deep-link-ttl-04-after-sign-in
 

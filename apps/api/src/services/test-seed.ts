@@ -3877,6 +3877,7 @@ async function seedQuotaExceeded(
     periodEndAt: futureDate(30),
   });
 
+  const cycleResetAt = futureDate(30);
   await db.insert(quotaPools).values({
     id: generateUUIDv7(),
     subscriptionId,
@@ -3885,7 +3886,23 @@ async function seedQuotaExceeded(
     usedThisMonth: freeTier.monthlyQuota,
     dailyLimit: freeTier.dailyLimit,
     usedToday: 2, // Daily still has headroom; server caps on monthly
-    cycleResetAt: futureDate(30),
+    cycleResetAt,
+  });
+
+  // Free-tier enforcement reads the owner's per-profile meter. Keep the
+  // shared pool above for legacy readers, but exhaust the authoritative row so
+  // this scenario cannot be lazily provisioned back to zero usage.
+  const ownerMonthlyLimit = freeTier.ownerMonthlyQuota ?? freeTier.monthlyQuota;
+  await db.insert(profileQuotaUsage).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    profileId,
+    role: 'owner',
+    monthlyLimit: ownerMonthlyLimit,
+    usedThisMonth: ownerMonthlyLimit,
+    dailyLimit: freeTier.dailyLimit,
+    usedToday: 2,
+    cycleResetAt,
   });
 
   const { subjectId, topicIds } = await createSubjectWithCurriculum(

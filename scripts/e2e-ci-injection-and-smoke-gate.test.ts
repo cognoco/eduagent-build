@@ -1022,6 +1022,21 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(startApiScript).not.toMatch(/wrangler dev\s*&/);
   });
 
+  it('[WI-1864] registers a no-network email receipt only in the hosted-Maestro worker', () => {
+    const worker = readFileSync(
+      join(repoRoot, 'apps/api/src/test-utils/maestro-e2e-worker.ts'),
+      'utf8',
+    );
+    const productionWorker = readFileSync(
+      join(repoRoot, 'apps/api/src/index.ts'),
+      'utf8',
+    );
+
+    expect(worker).toContain("from './maestro-e2e-email-provider'");
+    expect(worker).toContain('registerMaestroE2eEmailProvider();');
+    expect(productionWorker).not.toContain('maestro-e2e-email-provider');
+  });
+
   it('[WI-1864] relies on the pre-registered fixture without provider keys', () => {
     const writeVarsStep = mobileMaestro.steps?.find(
       (step) => step.name === 'Write wrangler .dev.vars for API',
@@ -2049,6 +2064,114 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(assertions).not.toContain('Waiting for approval');
   });
 
+  it('[WI-1864] scrolls the pending-gate sign-out control into the small viewport', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/consent/consent-pending-gate.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+      };
+      assertVisible?: { id?: string } | string;
+      tapOn?: { id?: string } | string;
+    }>;
+    const scroll = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'consent-sign-out' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const assertion = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > scroll &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'consent-sign-out',
+    );
+    const tap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > assertion &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'consent-sign-out',
+    );
+
+    expect(scroll).toBeGreaterThan(-1);
+    expect(assertion).toBeGreaterThan(scroll);
+    expect(tap).toBeGreaterThan(assertion);
+  });
+
+  it('[WI-1864] confirms consent withdrawal through the current native-alert action', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/consent-management.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { text?: string; optional?: boolean } | string;
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+    }>;
+    const confirmation = commands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' &&
+        tapOn.text === '(?i)confirm.*withdraw consent' &&
+        tapOn.optional !== true,
+    );
+    const withdrawn = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > confirmation &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'consent-withdrawn-empty-state',
+    );
+
+    expect(confirmation).toBeGreaterThan(-1);
+    expect(withdrawn).toBeGreaterThan(confirmation);
+    expect(
+      commands.some(
+        ({ tapOn }) =>
+          typeof tapOn === 'object' &&
+          tapOn.optional === true &&
+          /withdraw/i.test(tapOn.text ?? ''),
+      ),
+    ).toBe(false);
+  });
+
+  it('[WI-1864] bridges the cleared-app welcome state before the expired deep-link case', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/auth/deep-link-redirect-ttl-expired.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      runFlow?: { file?: string };
+      openLink?: string;
+      tapOn?: { id?: string };
+    }>;
+    const welcomeBridge = commands.findIndex(
+      ({ runFlow }) =>
+        runFlow?.file === '../_setup/nav-welcome-to-sign-in.yaml',
+    );
+    const seedLink = commands.findIndex(
+      ({ openLink }, index) =>
+        index > welcomeBridge &&
+        typeof openLink === 'string' &&
+        openLink.includes('/dev-only/seed-pending-redirect?'),
+    );
+    const inlineEmail = commands.findIndex(
+      ({ tapOn }, index) => index > seedLink && tapOn?.id === 'sign-in-email',
+    );
+
+    expect(welcomeBridge).toBeGreaterThan(-1);
+    expect(seedLink).toBeGreaterThan(welcomeBridge);
+    expect(inlineEmail).toBeGreaterThan(seedLink);
+    expect(
+      commands.some(
+        ({ runFlow }, index) =>
+          index > seedLink && runFlow?.file === '../_setup/sign-in-only.yaml',
+      ),
+    ).toBe(false);
+  });
+
   it('[WI-1864] asserts the current preview-subject contract instead of retired disclaimer copy', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/consent/consent-pending-gate.yaml'),
@@ -2219,7 +2342,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(disputeSuppressed).toBeGreaterThan(correctReceipt);
   });
 
-  it('[WI-1864] navigates both axes of the Other practice slider explicitly', () => {
+  it('[WI-1864] navigates both axes of the Other practice slider through leaf sentinels', () => {
     const source = readFileSync(
       join(
         repoRoot,
@@ -2238,9 +2361,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }>;
     const slider = commands.findIndex(
       ({ scrollUntilVisible }) =>
-        scrollUntilVisible?.element?.id === 'practice-other-practice-slider' &&
+        scrollUntilVisible?.element?.id === 'practice-dictation' &&
         scrollUntilVisible.direction === 'DOWN' &&
-        scrollUntilVisible.visibilityPercentage === 80 &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
         scrollUntilVisible.centerElement === true,
     );
     const recitation = commands.findIndex(
@@ -2267,9 +2390,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ({ scrollUntilVisible }, index) =>
         index > recitationTap &&
         index < dictation &&
-        scrollUntilVisible?.element?.id === 'practice-other-practice-slider' &&
+        scrollUntilVisible?.element?.id === 'practice-dictation' &&
         scrollUntilVisible.direction === 'DOWN' &&
-        scrollUntilVisible.visibilityPercentage === 80 &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
         scrollUntilVisible.centerElement === true,
     );
 
@@ -2281,7 +2404,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(
       commands.some(
         ({ scrollUntilVisible }) =>
-          scrollUntilVisible?.element?.id === 'practice-dictation' &&
+          scrollUntilVisible?.element?.id ===
+            'practice-other-practice-slider' &&
           scrollUntilVisible.direction === 'DOWN',
       ),
     ).toBe(false);
@@ -2299,13 +2423,17 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         visibilityPercentage?: number;
         centerElement?: boolean;
       };
-      tapOn?: { id?: string };
+      tapOn?: { id?: string; text?: string; optional?: boolean };
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
     }>;
     const slider = commands.findIndex(
       ({ scrollUntilVisible }) =>
-        scrollUntilVisible?.element?.id === 'practice-other-practice-slider' &&
+        scrollUntilVisible?.element?.id === 'practice-dictation' &&
         scrollUntilVisible.direction === 'DOWN' &&
-        scrollUntilVisible.visibilityPercentage === 80 &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
         scrollUntilVisible.centerElement === true,
     );
     const recitation = commands.findIndex(
@@ -2320,14 +2448,49 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ({ tapOn }, index) =>
         index > recitation && tapOn?.id === 'practice-recitation',
     );
+    const endSession = commands.findIndex(
+      ({ tapOn }, index) => index > tap && tapOn?.id === 'end-session-button',
+    );
+    const confirmEnd = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > endSession &&
+        tapOn?.text === '(?i)^end session$' &&
+        tapOn.optional !== true,
+    );
+    const summaryReady = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > confirmEnd &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'summary-close-button' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const closeSummary = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > summaryReady &&
+        tapOn?.id === 'summary-close-button' &&
+        tapOn.optional !== true,
+    );
+    const practiceReturn = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > closeSummary &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'practice-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
 
     expect(slider).toBeGreaterThan(-1);
     expect(recitation).toBeGreaterThan(slider);
     expect(tap).toBeGreaterThan(recitation);
+    expect(endSession).toBeGreaterThan(tap);
+    expect(confirmEnd).toBeGreaterThan(endSession);
+    expect(summaryReady).toBeGreaterThan(confirmEnd);
+    expect(closeSummary).toBeGreaterThan(summaryReady);
+    expect(practiceReturn).toBeGreaterThan(closeSummary);
     expect(
       commands.some(
         ({ scrollUntilVisible }) =>
-          scrollUntilVisible?.element?.id === 'practice-dictation' &&
+          scrollUntilVisible?.element?.id ===
+            'practice-other-practice-slider' &&
           scrollUntilVisible.direction === 'DOWN',
       ),
     ).toBe(false);

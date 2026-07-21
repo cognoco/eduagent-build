@@ -195,19 +195,26 @@ tags:
 # SIGN OUT from consent pending gate
 # ============================================================
 
-# 26. Verify sign-out button is present
+# 26. Bring the below-fold sign-out control into the small viewport.
+- scrollUntilVisible:
+    element:
+      id: 'consent-sign-out'
+    direction: DOWN
+    timeout: 5000
+
+# 27. Verify sign-out button is present
 - assertVisible:
     id: 'consent-sign-out'
 
-# 27. Tap sign out
+# 28. Tap sign out
 - tapOn:
     id: 'consent-sign-out'
 
-# 28. Verify we return to the auth/sign-in screen
+# 29. Verify we return to the auth/sign-in screen
 - extendedWaitUntil:
     visible:
       id: 'sign-in-button'
     timeout: 15000
 
-# 29. Final screenshot — back at auth screen after sign-out
+# 30. Final screenshot — back at auth screen after sign-out
 - takeScreenshot: consent-pending-gate-signed-out

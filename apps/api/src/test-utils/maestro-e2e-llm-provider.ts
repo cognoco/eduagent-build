@@ -201,6 +201,26 @@ function resolveMaestroChat(
   );
 }
 
+function resolveMaestroStream(
+  messages: ChatMessage[],
+): LlmFixtureContent | undefined {
+  const systemPrompt = messages.find(({ role }) => role === 'system');
+  const instructions = systemPrompt ? getTextContent(systemPrompt.content) : '';
+
+  if (instructions.includes('SERVER-OWNED SETUP ACTION: INVITE TO BEGIN')) {
+    return llmEnvelopeReply(
+      'Ready when you are — begin your recitation from memory.',
+    );
+  }
+  if (instructions.includes('SERVER-OWNED SETUP ACTION: COACH RECITATION')) {
+    return llmEnvelopeReply(
+      'Good recall. Keep the wording steady and continue when you are ready.',
+    );
+  }
+
+  return undefined;
+}
+
 /** Register the deterministic external-boundary LLM used by hosted Maestro. */
 export function registerMaestroE2eLlmProvider(): void {
   registerLlmProviderFixture({
@@ -209,6 +229,7 @@ export function registerMaestroE2eLlmProvider(): void {
     // and subject-response parser without making an external request.
     id: 'openai',
     chatResponseResolver: (messages) => resolveMaestroChat(messages),
+    streamResponseResolver: (messages) => resolveMaestroStream(messages),
     streamResponse: llmEnvelopeReply(
       "Let's work through this together. What have you noticed so far?",
     ),

@@ -254,6 +254,38 @@ describe('child paywall seed shape', () => {
   });
 });
 
+describe('[WI-1864] owner monthly quota seed shape', () => {
+  it('exhausts the owner row read by per-profile free-tier metering', async () => {
+    const db = createMockDb();
+    const result = await seedScenario(
+      db,
+      'quota-exceeded',
+      'quota-exceeded@example.com',
+    );
+    const freeTier = getTierConfig('free');
+    const insertMock = db.insert as unknown as jest.Mock;
+    const profileQuotaInsertIndex = insertMock.mock.calls.findIndex(
+      ([table]) => table === profileQuotaUsage,
+    );
+    const profileQuotaInsert = insertMock.mock.results[profileQuotaInsertIndex]
+      ?.value as { values: jest.Mock } | undefined;
+
+    expect(profileQuotaInsertIndex).toBeGreaterThanOrEqual(0);
+    expect(profileQuotaInsert?.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscriptionId: result.ids.subscriptionId,
+        profileId: result.profileId,
+        role: 'owner',
+        monthlyLimit: freeTier.ownerMonthlyQuota ?? freeTier.monthlyQuota,
+        usedThisMonth: freeTier.ownerMonthlyQuota ?? freeTier.monthlyQuota,
+        dailyLimit: freeTier.dailyLimit,
+        usedToday: 2,
+        cycleResetAt: expect.any(Date),
+      }),
+    );
+  });
+});
+
 // ---------------------------------------------------------------------------
 // SEED_CLERK_PREFIX
 // ---------------------------------------------------------------------------

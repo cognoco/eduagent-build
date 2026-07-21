@@ -93,15 +93,9 @@ tags:
 # 10. Screenshot: confirmation dialog
 - takeScreenshot: consent-mgmt-02-confirm-dialog
 
-# 11. Tap "WITHDRAW" button in the alert to confirm
-#     React Native passes the title-cased label through to the native alert.
+# 11. Tap the current native confirmation action.
 - tapOn:
-    text: 'Withdraw'
-    optional: true # justified: title-case "Withdraw" vs. all-caps "WITHDRAW" varies by Android OEM skin; exactly one fires
-
-- tapOn:
-    text: 'WITHDRAW'
-    optional: true # justified: Android OEM skins expose destructive button in all caps; alternative to "Withdraw" above
+    text: '(?i)confirm.*withdraw consent'
 
 # 12. Wait for screen-level withdrawn gate to appear (consent is now WITHDRAWN)
 - extendedWaitUntil:

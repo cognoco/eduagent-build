@@ -6,6 +6,7 @@ import { streamExchange } from '../services/exchanges';
 import { _resetCircuits } from '../services/llm';
 import { resolveSubjectName } from '../services/subject-resolve';
 import { evaluateSummary } from '../services/summaries';
+import { sendEmail } from '../services/notifications/email';
 import { app } from './maestro-e2e-worker';
 import { registerMaestroE2eLlmProvider } from './maestro-e2e-llm-provider';
 
@@ -20,6 +21,74 @@ afterEach(() => {
 });
 
 describe('hosted Maestro LLM provider', () => {
+  it('[WI-1864] confirms consent email delivery without a live provider key', async () => {
+    await expect(
+      sendEmail({
+        to: 'parent@example.com',
+        subject: 'Consent request',
+        body: 'Hosted Maestro fixture',
+        type: 'consent_request',
+      }),
+    ).resolves.toEqual({
+      sent: true,
+      messageId: 'maestro-e2e-email',
+    });
+  });
+
+  it('[WI-1864] returns the release-flow recitation readiness receipt', async () => {
+    const exchange = await streamExchange(
+      {
+        sessionId: 'maestro-recitation-session',
+        profileId: 'maestro-profile',
+        subjectName: 'World History',
+        sessionType: 'learning',
+        escalationRung: 1,
+        exchangeHistory: [],
+        birthYear: 2000,
+        effectiveMode: 'recitation',
+        inputMode: 'text',
+        recitationSetup: {
+          action: 'invite_to_begin',
+          state: { phase: 'ready', clarificationCount: 0 },
+        },
+      },
+      'Ozymandias',
+    );
+    let visibleReply = '';
+    for await (const chunk of exchange.stream) visibleReply += chunk;
+
+    expect(visibleReply).toBe(
+      'Ready when you are — begin your recitation from memory.',
+    );
+  });
+
+  it('[WI-1864] returns deterministic feedback for the release recitation turn', async () => {
+    const exchange = await streamExchange(
+      {
+        sessionId: 'maestro-recitation-feedback',
+        profileId: 'maestro-profile',
+        subjectName: 'World History',
+        sessionType: 'learning',
+        escalationRung: 1,
+        exchangeHistory: [],
+        birthYear: 2000,
+        effectiveMode: 'recitation',
+        inputMode: 'text',
+        recitationSetup: {
+          action: 'coach_recitation',
+          state: { phase: 'ready', clarificationCount: 0 },
+        },
+      },
+      'A remembered opening line for this test.',
+    );
+    let visibleReply = '';
+    for await (const chunk of exchange.stream) visibleReply += chunk;
+
+    expect(visibleReply).toBe(
+      'Good recall. Keep the wording steady and continue when you are ready.',
+    );
+  });
+
   it('[WI-1864] returns available feedback for the planned session-summary flow', async () => {
     await expect(
       evaluateSummary(

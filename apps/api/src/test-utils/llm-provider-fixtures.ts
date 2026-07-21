@@ -36,6 +36,10 @@ export interface LlmProviderFixtureOptions {
   chatErrors?: unknown[];
   streamResponse?: LlmFixtureContent;
   streamResponses?: LlmFixtureContent[];
+  streamResponseResolver?: (
+    messages: ChatMessage[],
+    config: ModelConfig,
+  ) => LlmFixtureContent | undefined;
   streamError?: unknown;
   stopReason?: StopReason;
   chunkSize?: number;
@@ -150,8 +154,14 @@ export function createLlmProviderFixture(
     },
     chatStream(messages: ChatMessage[], config: ModelConfig) {
       streamCalls.push({ messages, config });
+      const resolvedResponse = options.streamResponseResolver?.(
+        messages,
+        config,
+      );
       const response =
-        queuedStreamResponses.shift() ?? streamResponse ?? chatResponse;
+        resolvedResponse === undefined
+          ? (queuedStreamResponses.shift() ?? streamResponse ?? chatResponse)
+          : contentToString(resolvedResponse);
 
       let resolveStopReason!: (reason: StopReason) => void;
       const stopReasonPromise = new Promise<StopReason>((resolve) => {
