@@ -1122,6 +1122,20 @@ A real coach manages your energy, not just your curriculum. Sessions have a ceil
 
 Not a hard cutoff — a coach-initiated wind-down. If the user chooses to continue, the cap extends by 10 minutes before the next nudge. The coach never forces a stop, but always advocates for quality over quantity.
 
+**Mentor Notice Pattern (MVP):**
+
+A mentor notice is a quiet, learner-only acknowledgement that the Mentor recorded one evidence-backed gap from homework or ordinary learning. It appears only after server acceptance; streaming Mentor prose never promises the future interaction. The learner sees at most one actionable notice, not a remediation queue.
+
+| State | Primary action | Secondary behavior |
+|---|---|---|
+| Eligible open notice | `Continue` starts or resumes a focused re-check capped at three learner responses | `Not now` defers the notice for the current learning day |
+| Re-check complete, evidence supports understanding | Show concise `locked_in` acknowledgement | Do not inflate into a diagnosis or expose it to a proxy viewer |
+| Re-check complete, understanding not yet evidenced | End the current offer with encouraging `not_yet` copy | Do not claim mastery; a later notice requires new evidence |
+| Learner explicitly asks to stop | Dismiss terminally | Do not resurface the record |
+| No notice activity for 21 days | Fade silently | No guilt copy, badge, or queue remains |
+
+The MVP is in-app only. It has no lock-screen copy, notification permission primer, or scheduled nudge. All ages use the same calm, age-neutral interaction, and an observed feature-flag shutdown removes cards, receipts, deep links, actions, and cached fallbacks. See [`MMT-ADR-0036`](adr/MMT-ADR-0036-mentor-notice-mvp-boundaries-and-server-authority.md).
+
 **Socratic Escalation Ladder (Child Profiles):**
 
 Five rungs, each preserving as much child agency as possible before escalating:

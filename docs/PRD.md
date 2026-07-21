@@ -1110,6 +1110,17 @@ AI maintains lesson focus while respecting learner curiosity through tiered resp
 - FR41: Users can receive understanding checks during lessons
 - FR42: Users can choose in-app or push notifications for review reminders
 
+### Mentor Notices (MVP)
+
+Mentor notices are the learner-only, low-stakes loop defined by [`MMT-ADR-0036`](adr/MMT-ADR-0036-mentor-notice-mvp-boundaries-and-server-authority.md): the Mentor may record one concrete, evidence-backed gap from homework or an ordinary learning session and offer a short in-app re-check later.
+
+- The capability applies to learners of every age under the same age-neutral rules. Interleaved sessions are excluded from the MVP.
+- The learner sees at most one actionable notice at a time and never a queue of shortcomings. Guardians, supporters, payers, and proxy views receive no notice details or projections.
+- `Continue` starts or resumes a re-check capped at three learner responses. Only validated learner evidence may produce a `locked_in` result; `not_yet` ends the current offer without claiming mastery, and explicit dismissal is terminal.
+- `Not now` defers for the current learning day. An inactive open notice fades after 21 days.
+- MVP delivery is in-app only: no notice push, primer, scheduled nudge, or notification-family budget. Rollout is internal QA followed by all friendly-user MVP testers.
+- Flag-off removes all observed in-app and cached behavior without deleting notice rows; ordinary retention and deletion rules still apply.
+
 ### Learning Verification
 
 - FR43: Users can take in-lesson quick checks (2-3 questions)
