@@ -191,7 +191,7 @@ export function AccountAdminSheet(): React.ReactElement {
       <SettingsRow
         label={t('more.notifications.sectionHeader')}
         targetName={displayName}
-        onPress={() => router.push('/(app)/more/notifications' as Href)}
+        onPress={() => router.push('/(app)/account/notifications' as Href)}
         testID="account-admin-notifications"
       />
 
@@ -225,7 +225,7 @@ export function AccountAdminSheet(): React.ReactElement {
       <SettingsRow
         label={t('more.privacy.privacyAndData')}
         targetName={displayName}
-        onPress={() => router.push('/(app)/more/privacy' as Href)}
+        onPress={() => router.push('/(app)/account/privacy' as Href)}
         testID="account-admin-privacy"
       />
       <SettingsRow

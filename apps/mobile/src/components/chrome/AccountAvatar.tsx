@@ -21,13 +21,16 @@ export function AccountAvatar(): React.ReactElement | null {
   const { t } = useTranslation();
 
   if (!activeProfile) return null;
+  const displayName = activeProfile.displayName.trim();
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t('accountAdmin.openAccount', {
-        name: activeProfile.displayName,
-      })}
+      accessibilityLabel={
+        displayName
+          ? t('accountAdmin.openAccount', { name: displayName })
+          : t('accountAdmin.openAccountNoName')
+      }
       onPress={() =>
         router.push({
           pathname: '/(app)/account',
@@ -46,7 +49,7 @@ export function AccountAvatar(): React.ReactElement | null {
       ) : (
         <View className="h-10 w-10 items-center justify-center rounded-full bg-primary/15">
           <Text className="text-body-sm font-bold text-primary">
-            {initials(activeProfile.displayName)}
+            {initials(displayName)}
           </Text>
         </View>
       )}

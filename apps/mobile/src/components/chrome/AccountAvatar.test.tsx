@@ -99,6 +99,10 @@ describe('AccountAvatar', () => {
     });
 
     active.result.getByText('?');
+    expect(
+      active.result.getByTestId('account-avatar-button').props
+        .accessibilityLabel,
+    ).toBe('Open account settings');
   });
 
   it('uses only the first two words for initials of a long name', () => {

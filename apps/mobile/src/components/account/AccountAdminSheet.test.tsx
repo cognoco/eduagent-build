@@ -416,7 +416,7 @@ describe('AccountAdminSheet', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
 
     fireEvent.press(screen.getByTestId('account-admin-notifications'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/more/notifications');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/account/notifications');
 
     fireEvent.press(screen.getByTestId('account-admin-add-child'));
     expect(mockPush).toHaveBeenCalledWith({
@@ -428,7 +428,7 @@ describe('AccountAdminSheet', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/more');
 
     fireEvent.press(screen.getByTestId('account-admin-privacy'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/more/privacy');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/account/privacy');
 
     fireEvent.press(screen.getByTestId('account-admin-help'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/more/help');

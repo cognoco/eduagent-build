@@ -1868,7 +1868,7 @@ describe('HIDDEN_TAB_ROUTES — tab-bar leak guard (QA-07 / Bug 763)', () => {
   it('hides every dynamic / non-tab route that Bug 763 surfaced into the tab bar', () => {
     const hidden = new Set<string>(HIDDEN_TAB_ROUTES);
     for (const route of [
-      'account/profiles',
+      'account',
       'shelf',
       'subject',
       'subject-hub',
@@ -1898,9 +1898,10 @@ describe('HIDDEN_TAB_ROUTES — tab-bar leak guard (QA-07 / Bug 763)', () => {
 });
 
 describe('FULL_SCREEN_ROUTES — nested ceremony route guard', () => {
-  it('keeps the Account-owned profile leaf out of tab chrome', () => {
-    expect(FULL_SCREEN_ROUTES.has('account/profiles')).toBe(true);
-    expect(HIDDEN_TAB_ROUTES).toContain('account/profiles');
+  it('keeps the Account-owned stack and its nested leaves out of tab chrome', () => {
+    expect(FULL_SCREEN_ROUTES.has('account')).toBe(true);
+    expect(HIDDEN_TAB_ROUTES).toContain('account');
+    expect(HIDDEN_TAB_ROUTES).not.toContain('account/profiles');
   });
 
   it('hides chrome for every visibility link ceremony screen', () => {

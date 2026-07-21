@@ -4502,6 +4502,7 @@
   "accountAdmin": {
     "title": "Konto",
     "openAccount": "Otwórz ustawienia konta dla {{name}}",
+    "openAccountNoName": "Otwórz ustawienia konta",
     "backTo": "Wróć do {{destination}}",
     "security": "Bezpieczeństwo konta",
     "familySettings": "Ustawienia rodzinne"

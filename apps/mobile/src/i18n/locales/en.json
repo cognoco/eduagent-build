@@ -168,6 +168,7 @@
   "accountAdmin": {
     "title": "Account",
     "openAccount": "Open account settings for {{name}}",
+    "openAccountNoName": "Open account settings",
     "backTo": "Back to {{destination}}",
     "security": "Account security",
     "familySettings": "Family settings"

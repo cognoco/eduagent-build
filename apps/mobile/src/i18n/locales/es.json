@@ -4334,6 +4334,7 @@
   "accountAdmin": {
     "title": "Cuenta",
     "openAccount": "Abrir la configuración de la cuenta de {{name}}",
+    "openAccountNoName": "Abrir la configuración de la cuenta",
     "backTo": "Volver a {{destination}}",
     "security": "Seguridad de la cuenta",
     "familySettings": "Configuración familiar"
