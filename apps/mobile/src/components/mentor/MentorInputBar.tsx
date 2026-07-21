@@ -60,7 +60,7 @@ export function MentorInputBar({
   // fresh capture. Only the capture that is still owned may write to the draft,
   // and it may do so once: `accepting` is cleared on commit and on every event
   // that invalidates the capture.
-  const captureRef = useRef({ id: 0, accepting: false });
+  const captureRef = useRef({ accepting: false });
   const [permissionRecovery, setPermissionRecovery] = useState(false);
 
   const micState: MentorMicState = unavailable
@@ -141,9 +141,9 @@ export function MentorInputBar({
   }, []);
 
   const beginCapture = useCallback(async (): Promise<void> => {
-    // A new capture supersedes the previous one, so a late transcript from the
-    // old capture can no longer claim the draft.
-    captureRef.current = { id: captureRef.current.id + 1, accepting: true };
+    // A new capture supersedes the previous one: the old record is dropped, so
+    // an abandoned capture can no longer claim the draft.
+    captureRef.current = { accepting: true };
     await startListening();
   }, [startListening]);
 
