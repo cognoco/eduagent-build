@@ -827,6 +827,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
     expect(mobileMaestro.env?.NODE_ENV).toBe('test');
     expect(mobileMaestro.env?.EXPO_PUBLIC_E2E).toBe('true');
+    expect(mobileMaestro.env?.EXPO_PUBLIC_ENABLE_MODE_NAV).toBe('true');
+    expect(mobileMaestro.env?.EXPO_PUBLIC_ENABLE_MODE_NAV_V1).toBe('true');
     expect(mobileMaestro.env?.EXPO_PUBLIC_API_URL).toBe('http://10.0.2.2:8787');
     expect(cacheStep?.with).toMatchObject({
       path: 'apps/mobile/android/app/build/outputs/apk/release/app-release.apk',
@@ -1255,6 +1257,52 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(header.tags).toContain('manual');
     expect(nightlyFlows).not.toContain(duplicate);
     expect(nightlyFlows).toContain(supported);
+  });
+
+  it('[WI-1864] opens populated parent memory with one child-detail navigation', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/parent/child-mentor-memory-populated.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      runFlow?: { file?: string };
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+      tapOn?: { id?: string };
+    }>;
+    const parentHome = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'parent-home-screen',
+    );
+    const settingsTap = commands.findIndex(
+      ({ tapOn }) =>
+        tapOn?.id === 'parent-home-child-profile-${CHILD_PROFILE_ID}',
+    );
+    const helperSource = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/_setup/open-family-dashboard.yaml'),
+      'utf8',
+    );
+
+    expect(
+      commands.some(
+        ({ runFlow }) =>
+          runFlow?.file === '../_setup/open-family-dashboard.yaml',
+      ),
+    ).toBe(false);
+    expect(parentHome).toBeGreaterThan(-1);
+    expect(settingsTap).toBeGreaterThan(parentHome);
+    expect(
+      commands.filter(
+        ({ tapOn }) =>
+          tapOn?.id === 'parent-home-child-profile-${CHILD_PROFILE_ID}',
+      ),
+    ).toHaveLength(1);
+    expect(source).not.toContain('parent-home-check-child-${CHILD_PROFILE_ID}');
+    expect(helperSource).toMatch(/id:\s*['"]child-detail-scroll['"]/);
+    expect(helperSource).not.toMatch(/text:\s*['"]Recent sessions['"]/);
   });
 
   it('[WI-1864] bakes the non-secret OpenAI custom-provider slug into the E2E bundle', () => {
@@ -1854,6 +1902,36 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ).toBe(false);
   });
 
+  it('[WI-1864] verifies GDPR consent success through stable controls, not stale copy', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/consent/consent-gdpr-under16.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+      assertVisible?: { id?: string; text?: string } | string;
+    }>;
+    const success = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'consent-success' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const done = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > success &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'consent-done',
+    );
+
+    expect(success).toBeGreaterThan(-1);
+    expect(done).toBeGreaterThan(success);
+    expect(source).not.toContain('text: "Hand back to your child"');
+  });
+
   it('[WI-1864] allows the full first-curriculum polling window in assessment', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/assessment/assessment-cycle.yaml'),
@@ -2134,7 +2212,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ).toBe(false);
   });
 
-  it('[WI-1864] bridges the cleared-app welcome state before the expired deep-link case', () => {
+  it('[WI-1864] proves fresh redirect replay before asserting the expired redirect fallback', () => {
     const source = readFileSync(
       join(
         repoRoot,
@@ -2142,34 +2220,99 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ),
       'utf8',
     );
+    const routeSource = readFileSync(
+      join(repoRoot, 'apps/mobile/src/app/dev-only/seed-pending-redirect.tsx'),
+      'utf8',
+    );
     const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
       runFlow?: { file?: string };
       openLink?: string;
-      tapOn?: { id?: string };
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+      assertNotVisible?: { id?: string } | string;
+      tapOn?: { id?: string } | string;
     }>;
-    const welcomeBridge = commands.findIndex(
-      ({ runFlow }) =>
-        runFlow?.file === '../_setup/nav-welcome-to-sign-in.yaml',
+    const signIn = commands.findIndex(
+      ({ runFlow }) => runFlow?.file === '../_setup/seed-and-sign-in.yaml',
     );
-    const seedLink = commands.findIndex(
+    const freshSeedLink = commands.findIndex(
       ({ openLink }, index) =>
-        index > welcomeBridge &&
+        index > signIn &&
         typeof openLink === 'string' &&
-        openLink.includes('/dev-only/seed-pending-redirect?'),
+        openLink.includes('/dev-only/seed-pending-redirect?') &&
+        openLink.includes('staleMs=0'),
     );
-    const inlineEmail = commands.findIndex(
-      ({ tapOn }, index) => index > seedLink && tapOn?.id === 'sign-in-email',
+    const freshReceipt = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > freshSeedLink &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'pending-redirect-seeded',
+    );
+    const freshSignOut = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > freshReceipt &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'pending-redirect-sign-out',
+    );
+    const freshLibrary = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > freshSignOut &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'library-screen',
+    );
+    const staleSeedLink = commands.findIndex(
+      ({ openLink }, index) =>
+        index > freshLibrary &&
+        typeof openLink === 'string' &&
+        openLink.includes('/dev-only/seed-pending-redirect?') &&
+        openLink.includes('staleMs=360000'),
+    );
+    const staleReceipt = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > staleSeedLink &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'pending-redirect-seeded',
+    );
+    const staleSignOut = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > staleReceipt &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'pending-redirect-sign-out',
+    );
+    const fallbackHome = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > staleSignOut &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'home-screen',
     );
 
-    expect(welcomeBridge).toBeGreaterThan(-1);
-    expect(seedLink).toBeGreaterThan(welcomeBridge);
-    expect(inlineEmail).toBeGreaterThan(seedLink);
+    expect(signIn).toBeGreaterThan(-1);
+    expect(freshSeedLink).toBeGreaterThan(signIn);
+    expect(freshReceipt).toBeGreaterThan(freshSeedLink);
+    expect(freshSignOut).toBeGreaterThan(freshReceipt);
+    expect(freshLibrary).toBeGreaterThan(freshSignOut);
+    expect(staleSeedLink).toBeGreaterThan(freshLibrary);
+    expect(staleReceipt).toBeGreaterThan(staleSeedLink);
+    expect(staleSignOut).toBeGreaterThan(staleReceipt);
+    expect(fallbackHome).toBeGreaterThan(staleSignOut);
     expect(
-      commands.some(
-        ({ runFlow }, index) =>
-          index > seedLink && runFlow?.file === '../_setup/sign-in-only.yaml',
+      commands.findIndex(
+        ({ assertNotVisible }, index) =>
+          index > fallbackHome &&
+          typeof assertNotVisible === 'object' &&
+          assertNotVisible.id === 'library-screen',
       ),
-    ).toBe(false);
+    ).toBeGreaterThan(fallbackHome);
+    expect(
+      commands.filter(
+        ({ tapOn }) =>
+          typeof tapOn === 'object' && tapOn.id === 'sign-in-email',
+      ),
+    ).toHaveLength(2);
+    const cleanup = routeSource.indexOf('await signOutWithCleanup');
+    expect(cleanup).toBeGreaterThan(-1);
+    expect(
+      routeSource.indexOf('seedPendingAuthRedirectForTesting', cleanup),
+    ).toBeGreaterThan(cleanup);
   });
 
   it('[WI-1864] asserts the current preview-subject contract instead of retired disclaimer copy', () => {
@@ -2342,7 +2485,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(disputeSuppressed).toBeGreaterThan(correctReceipt);
   });
 
-  it('[WI-1864] navigates both axes of the Other practice slider through leaf sentinels', () => {
+  it('[WI-1864] navigates both axes of the Other practice slider through its container', () => {
     const source = readFileSync(
       join(
         repoRoot,
@@ -2361,9 +2504,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     }>;
     const slider = commands.findIndex(
       ({ scrollUntilVisible }) =>
-        scrollUntilVisible?.element?.id === 'practice-dictation' &&
+        scrollUntilVisible?.element?.id === 'practice-other-practice-slider' &&
         scrollUntilVisible.direction === 'DOWN' &&
-        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.visibilityPercentage === 50 &&
         scrollUntilVisible.centerElement === true,
     );
     const recitation = commands.findIndex(
@@ -2390,9 +2533,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ({ scrollUntilVisible }, index) =>
         index > recitationTap &&
         index < dictation &&
-        scrollUntilVisible?.element?.id === 'practice-dictation' &&
+        scrollUntilVisible?.element?.id === 'practice-other-practice-slider' &&
         scrollUntilVisible.direction === 'DOWN' &&
-        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.visibilityPercentage === 50 &&
         scrollUntilVisible.centerElement === true,
     );
 
@@ -2401,14 +2544,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(recitationTap).toBeGreaterThan(recitation);
     expect(secondSlider).toBeGreaterThan(recitationTap);
     expect(dictation).toBeGreaterThan(secondSlider);
-    expect(
-      commands.some(
-        ({ scrollUntilVisible }) =>
-          scrollUntilVisible?.element?.id ===
-            'practice-other-practice-slider' &&
-          scrollUntilVisible.direction === 'DOWN',
-      ),
-    ).toBe(false);
   });
 
   it('[WI-1864] reaches the standalone recitation journey through the slider container', () => {
@@ -3473,6 +3608,130 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow).not.toContain('book-row-${BOOK_ID}');
     expect(flow).toContain('components/library/BookCard.tsx');
     expect(bookCard).toContain('testID={`book-card-${book.id}`}');
+  });
+
+  it('[WI-1864] opens the seeded retention topic through mandatory stable row ids', () => {
+    const flow = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/retention/recall-review.yaml'),
+      'utf8',
+    );
+    const bookCard = readFileSync(
+      join(repoRoot, 'apps/mobile/src/components/library/BookCard.tsx'),
+      'utf8',
+    );
+    const bookScreen = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx',
+      ),
+      'utf8',
+    );
+    const progressSource = readFileSync(
+      join(repoRoot, 'apps/api/src/services/progress.ts'),
+      'utf8',
+    );
+    const seedSource = readFileSync(
+      join(repoRoot, 'apps/api/src/services/test-seed.ts'),
+      'utf8',
+    );
+    const retentionSeed = seedSource.slice(
+      seedSource.indexOf('async function seedRetentionDue'),
+      seedSource.indexOf('async function seedFailedRecall3x'),
+    );
+    const commands = parseAllDocuments(flow).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string; optional?: boolean } | string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        optional?: boolean;
+      };
+    }>;
+    const shelf = commands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' &&
+        tapOn.id === 'shelf-row-header-${SUBJECT_ID}',
+    );
+    const cardWait = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > shelf &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'book-card-${BOOK_ID}',
+    );
+    const cardTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > cardWait &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'book-card-${BOOK_ID}',
+    );
+    const book = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > cardTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'book-screen',
+    );
+    const topicScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > book &&
+        scrollUntilVisible?.element?.id === 'continue-now-row-${TOPIC_ID}' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
+    const topicTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > topicScroll &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'continue-now-row-${TOPIC_ID}',
+    );
+    const detail = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > topicTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'topic-detail-scroll',
+    );
+
+    expect([
+      shelf,
+      cardWait,
+      cardTap,
+      book,
+      topicScroll,
+      topicTap,
+      detail,
+    ]).toEqual(
+      [shelf, cardWait, cardTap, book, topicScroll, topicTap, detail].toSorted(
+        (a, b) => a - b,
+      ),
+    );
+    expect(shelf).toBeGreaterThan(-1);
+    for (const index of [
+      cardWait,
+      cardTap,
+      book,
+      topicScroll,
+      topicTap,
+      detail,
+    ]) {
+      const command = commands[index];
+      expect(command?.tapOn).not.toEqual(
+        expect.objectContaining({ optional: true }),
+      );
+      expect(command?.extendedWaitUntil?.optional).not.toBe(true);
+      expect(command?.scrollUntilVisible?.optional).not.toBe(true);
+    }
+    expect(flow).not.toContain('World History');
+    expect(flow).not.toContain('text: "Topic"');
+    expect(bookCard).toContain('testID={`book-card-${book.id}`}');
+    expect(bookScreen).toContain('testID={`${state}-row-${topic.id}`}');
+    expect(bookScreen).toContain(
+      '(continueNowTopic ? continueNowTopic.id : null) ?? resumeTargetTopicId',
+    );
+    expect(bookScreen).toContain('if (topic.id === continueId)');
+    expect(bookScreen).toContain("state = 'continue-now'");
+    expect(progressSource).toContain("resumeKind: 'next_topic'");
+    expect(retentionSeed).toContain('topicId: firstTopicId');
   });
 
   it('[WI-1864] dismisses the library search keyboard before pressing the empty-state clear control', () => {

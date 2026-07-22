@@ -35,27 +35,27 @@ tags:
 # 2. Wait for sign-in screen
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: 'sign-in-button'
     timeout: 120000
 
 # 2. Sign in with seeded credentials
 - tapOn:
-    id: "sign-in-email"
+    id: 'sign-in-email'
 - inputText: ${EMAIL}
 - hideKeyboard
 
 - tapOn:
-    id: "sign-in-password"
+    id: 'sign-in-password'
 - inputText: ${PASSWORD}
 - hideKeyboard
 
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: 'sign-in-button'
     timeout: 10000
 
 - tapOn:
-    id: "sign-in-button"
+    id: 'sign-in-button'
 
 # ============================================================
 # NAVIGATE TO CREATE PROFILE
@@ -71,46 +71,46 @@ tags:
 
 # 6. Enter display name
 - tapOn:
-    id: "create-profile-name"
-- inputText: "Consent Test Child"
+    id: 'create-profile-name'
+- inputText: 'Consent Test Child'
 - hideKeyboard
 
 # 7. Open date picker and select child birth year (2012 = ~14 years old → under-16 consent)
 #    Session 22 technique: year header → year list → scroll → select → OK
 - tapOn:
-    id: "create-profile-birthdate"
+    id: 'create-profile-birthdate'
 
 # 7a. Switch to year list mode
 - tapOn:
-    id: "android:id/date_picker_header_year"
+    id: 'android:id/date_picker_header_year'
 
 # 7b. Scroll to year 2012 in the year list
 - scrollUntilVisible:
     element:
-      text: "2012"
+      text: '2012'
     direction: DOWN
     timeout: 10000
 
 # 7c. Select year 2012
 - tapOn:
-    text: "2012"
+    text: '2012'
 
 # 7d. Confirm date selection
 - tapOn:
-    text: "OK"
+    text: 'OK'
 
 # 8. Submit profile creation
 - tapOn:
-    id: "create-profile-submit"
+    id: 'create-profile-submit'
 
 # Profile creation lands on the pending gate; use its supported handoff CTA.
 - extendedWaitUntil:
     visible:
-      id: "consent-pending-gate"
+      id: 'consent-pending-gate'
     timeout: 15000
 
 - tapOn:
-    id: "consent-send-to-parent"
+    id: 'consent-send-to-parent'
 
 # ============================================================
 # PHASE 1: CHILD VIEW — "Hand to your parent" interstitial
@@ -119,12 +119,12 @@ tags:
 # 10. Verify child-facing hand-off screen appears
 - extendedWaitUntil:
     visible:
-      id: "consent-child-view"
+      id: 'consent-child-view'
     timeout: 15000
 
 # 11. Verify child-friendly title
 - assertVisible:
-    text: "Almost there!"
+    text: 'Almost there!'
 
 # 12. Verify hand-off instruction
 #     Full text: "We need a grown-up to say it's OK. Hand your phone to your parent or guardian."
@@ -136,11 +136,11 @@ tags:
 
 # 14. Verify "I'm the parent / guardian" button is present
 - assertVisible:
-    id: "consent-handoff-button"
+    id: 'consent-handoff-button'
 
 # 15. Tap the hand-off button to transition to parent view
 - tapOn:
-    id: "consent-handoff-button"
+    id: 'consent-handoff-button'
 
 # ============================================================
 # PHASE 2: PARENT VIEW — email form
@@ -149,12 +149,12 @@ tags:
 # 16. Verify parent-facing form appears
 - extendedWaitUntil:
     visible:
-      id: "consent-parent-view"
+      id: 'consent-parent-view'
     timeout: 10000
 
 # 17. Verify parent-facing title (professional, not child-friendly)
 - assertVisible:
-    text: "Parental Consent Required"
+    text: 'Parental Consent Required'
 
 # 18. Verify spam warning text is present
 #     Full text: "We'll send a one-time consent link. Check your spam folder if you don't see it within a few minutes."
@@ -165,13 +165,13 @@ tags:
 
 # 20. Enter parent email
 - tapOn:
-    id: "consent-email"
-- inputText: "parent-e2e@example.com"
+    id: 'consent-email'
+- inputText: 'parent-e2e@example.com'
 - hideKeyboard
 
 # 21. Submit consent request
 - tapOn:
-    id: "consent-submit"
+    id: 'consent-submit'
 
 # ============================================================
 # PHASE 3: SUCCESS VIEW
@@ -180,7 +180,7 @@ tags:
 # 22. Verify success state
 - extendedWaitUntil:
     visible:
-      id: "consent-success"
+      id: 'consent-success'
     timeout: 15000
 
 # 23. Verify success message
@@ -193,18 +193,18 @@ tags:
 
 # 25. Verify resend button is available
 - assertVisible:
-    id: "consent-resend-email"
+    id: 'consent-resend-email'
 
-# 26. Verify "Hand back to your child" / Done button is available
+# 26. Verify the stable success action (currently "Got it") is available
 - assertVisible:
-    id: "consent-done"
+    id: 'consent-done'
 
 # 27. Screenshot: success view
 - takeScreenshot: hand-to-parent-03-success
 
 # 28. Tap Done to return
 - tapOn:
-    id: "consent-done"
+    id: 'consent-done'
 
 # 29. Final screenshot
 - takeScreenshot: hand-to-parent-04-complete

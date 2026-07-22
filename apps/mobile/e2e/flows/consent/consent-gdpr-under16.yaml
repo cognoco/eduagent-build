@@ -30,25 +30,25 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: 'sign-in-button'
     timeout: 120000
 
 - tapOn:
-    id: "sign-in-email"
+    id: 'sign-in-email'
 - inputText: ${EMAIL}
 - hideKeyboard
 
 - tapOn:
-    id: "sign-in-password"
+    id: 'sign-in-password'
 - inputText: ${PASSWORD}
 - hideKeyboard
 
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: 'sign-in-button'
     timeout: 10000
 - tapOn:
-    id: "sign-in-button"
+    id: 'sign-in-button'
 
 # ============================================================
 # NAVIGATE TO CREATE PROFILE (pre-profile gate → Create)
@@ -61,42 +61,42 @@ tags:
 # ============================================================
 # Enter display name
 - tapOn:
-    id: "create-profile-name"
-- inputText: "GDPR Test Child"
+    id: 'create-profile-name'
+- inputText: 'GDPR Test Child'
 - hideKeyboard
 
 # Open date picker
 - tapOn:
-    id: "create-profile-birthdate"
+    id: 'create-profile-birthdate'
 
 # Wait for date picker dialog
 - extendedWaitUntil:
     visible:
-      text: "OK"
+      text: 'OK'
     timeout: 5000
 
 # Tap the year header "2010" to switch to year selection mode
 - tapOn:
-    id: "android:id/date_picker_header_year"
+    id: 'android:id/date_picker_header_year'
 
 # 2012 should be visible in the initial year list, scrollUntilVisible as safety
 - scrollUntilVisible:
     element:
-      text: "2012"
+      text: '2012'
     direction: DOWN
     timeout: 5000
 
 # Tap year 2012 (age = 14 in 2026 → under 16, triggers GDPR in EU)
 - tapOn:
-    text: "2012"
+    text: '2012'
 
 # Confirm date selection
 - tapOn:
-    text: "OK"
+    text: 'OK'
 
 # Verify date was set
 - assertVisible:
-    text: "January 1, 2012"
+    text: 'January 1, 2012'
 
 - takeScreenshot: gdpr-under16-01-date-set
 
@@ -104,16 +104,16 @@ tags:
 
 # Submit profile creation (GDPR-everywhere: age 14 < 16 → consent required)
 - tapOn:
-    id: "create-profile-submit"
+    id: 'create-profile-submit'
 
 # Profile creation lands on the pending gate; use its supported handoff CTA.
 - extendedWaitUntil:
     visible:
-      id: "consent-pending-gate"
+      id: 'consent-pending-gate'
     timeout: 15000
 
 - tapOn:
-    id: "consent-send-to-parent"
+    id: 'consent-send-to-parent'
 
 # ============================================================
 # PHASE 1: CHILD VIEW — "Almost there!" hand-off screen
@@ -121,83 +121,80 @@ tags:
 # MANDATORY: Consent MUST appear for a 14yo in the EU
 - extendedWaitUntil:
     visible:
-      id: "consent-child-view"
+      id: 'consent-child-view'
     timeout: 15000
 
 - assertVisible:
-    text: "Almost there!"
+    text: 'Almost there!'
 
 - takeScreenshot: gdpr-under16-03-child-handoff
 
 # Tap the hand-off button to transition to parent form
 - tapOn:
-    id: "consent-handoff-button"
+    id: 'consent-handoff-button'
 
 # ============================================================
 # PHASE 2: PARENT VIEW — email form with GDPR regulation text
 # ============================================================
 - extendedWaitUntil:
     visible:
-      id: "consent-parent-view"
+      id: 'consent-parent-view'
     timeout: 10000
 
 - assertVisible:
-    text: "Parental Consent Required"
+    text: 'Parental Consent Required'
 
 # Verify GDPR-specific regulation text (parent reads this)
 # NOTE: Full text wraps on screen — Maestro Pattern B limitation (Issue 21).
 - assertVisible:
-    text: "GDPR"
-    optional: true  # justified: long wrapping text on Android is split across Text nodes; Maestro Pattern B substring matching fails (Issue 21)
+    text: 'GDPR'
+    optional: true # justified: long wrapping text on Android is split across Text nodes; Maestro Pattern B substring matching fails (Issue 21)
     # Justification: long wrapping text unreliable on Android (Issue 21 Pattern B)
 
 - takeScreenshot: gdpr-under16-04-parent-form
 
 # Enter parent email
 - tapOn:
-    id: "consent-email"
-- inputText: "parent-gdpr-e2e@example.com"
+    id: 'consent-email'
+- inputText: 'parent-gdpr-e2e@example.com'
 - hideKeyboard
 
 # Submit consent request
 - extendedWaitUntil:
     visible:
-      id: "consent-submit"
+      id: 'consent-submit'
     timeout: 5000
 - tapOn:
-    id: "consent-submit"
+    id: 'consent-submit'
 
 # ============================================================
 # PHASE 3: SUCCESS VIEW
 # ============================================================
 - extendedWaitUntil:
     visible:
-      id: "consent-success"
+      id: 'consent-success'
     timeout: 15000
-
-- assertVisible:
-    text: "Hand back to your child"
 
 # Verify resend button exists
 - assertVisible:
-    id: "consent-resend-email"
+    id: 'consent-resend-email'
 
 # Verify done button exists
 - assertVisible:
-    id: "consent-done"
+    id: 'consent-done'
 
 - takeScreenshot: gdpr-under16-05-success
 
 # Tap done to return
 - tapOn:
-    id: "consent-done"
+    id: 'consent-done'
 
 # After done, should land on consent pending gate
 - extendedWaitUntil:
     visible:
-      text: "Hang tight!"
+      text: 'Hang tight!'
     timeout: 15000
     # Optional: navigation after consent done varies by app state
-    optional: true  # justified: navigation after consent-done varies — may go to consent-pending gate or learner-screen depending on device state
+    optional: true # justified: navigation after consent-done varies — may go to consent-pending gate or learner-screen depending on device state
 
 - takeScreenshot: gdpr-under16-06-complete

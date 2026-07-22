@@ -25,23 +25,23 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "retention-due"
+      SEED_SCENARIO: 'retention-due'
       API_URL: ${API_URL}
 
 # 2. Home screen
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 # 3. Navigate to Library tab
 - tapOn:
-    id: "tab-library"
+    id: 'tab-library'
 
 # 4. Wait for Library (Shelves tab is the default)
 - extendedWaitUntil:
     visible:
-      id: "shelves-list"
+      id: 'shelves-list'
     timeout: 10000
 
 # 5. Screenshot: Library shelves
@@ -51,51 +51,62 @@ tags:
 #    SUBJECT_ID is injected by the seed helper for the retention-due scenario.
 #    ShelfRow uses testID="shelf-row-header-${subjectId}".
 - tapOn:
-    id: "shelf-row-header-${SUBJECT_ID}"
+    id: 'shelf-row-header-${SUBJECT_ID}'
 
 # 7. Wait for the shelf screen (shows books for the subject)
 - extendedWaitUntil:
     visible:
-      id: "shelf-screen"
+      id: 'shelf-screen'
     timeout: 10000
 
 # 8. Screenshot: shelf with books
 - takeScreenshot: recall-02-shelf
 
-# 9. Tap first book by text (seed names the book "World History")
+# 9. Open the seeded book through the stable Shelf BookCard contract.
+- extendedWaitUntil:
+    visible:
+      id: 'book-card-${BOOK_ID}'
+    timeout: 10000
+
 - tapOn:
-    text: "World History"
-    optional: true  # justified: text tap on nested list items can be unreliable on Android; flow recovers via topic-detail-scroll wait below
+    id: 'book-card-${BOOK_ID}'
 
 # 10. Wait for book detail screen
 - extendedWaitUntil:
     visible:
-      id: "book-screen"
+      id: 'book-screen'
     timeout: 10000
-    optional: true  # justified: book-screen only appears if step 9 tap succeeded; conditional on optional tap above
 
-# 11. Navigate to a topic — tap first topic in the list
+# 11. The seeded topic is the scoped resume target, so Book renders it in the
+#     Continue now section rather than Up next.
+- scrollUntilVisible:
+    element:
+      id: 'continue-now-row-${TOPIC_ID}'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+
 - tapOn:
-    text: "Topic"
-    optional: true  # justified: topic tap only possible if book-screen appeared; conditional on optional chain above
+    id: 'continue-now-row-${TOPIC_ID}'
 
 # 12. Wait for topic detail screen
 - extendedWaitUntil:
     visible:
-      id: "topic-detail-scroll"
-    timeout: 10000
+      id: 'topic-detail-scroll'
+    timeout: 15000
 
 # 13. Screenshot: topic detail
 - takeScreenshot: recall-03-topic-detail
 
 # 14. Tap the study CTA button (routes to practice session for overdue topic)
 - tapOn:
-    id: "study-cta"
+    id: 'study-cta'
 
 # 15. Wait for session/practice screen (ChatShell-based)
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'chat-input'
     timeout: 15000
 
 # 16. Screenshot: practice session screen
@@ -103,20 +114,20 @@ tags:
 
 # 17. Enter an answer via ChatShell input
 - tapOn:
-    id: "chat-input"
+    id: 'chat-input'
 
-- inputText: "I remember the key concept is about how this works in practice"
+- inputText: 'I remember the key concept is about how this works in practice'
 
 # 18. Submit answer — use send-button or Enter key
 - tapOn:
-    id: "send-button"
-    optional: true  # justified: send-button covered by keyboard on Android (BUG-35); pressKey Enter is the reliable fallback
+    id: 'send-button'
+    optional: true # justified: send-button covered by keyboard on Android (BUG-35); pressKey Enter is the reliable fallback
 - pressKey: Enter
 
 # 19. Wait for response (chat-input re-enables after LLM streams back)
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: 'chat-input'
     timeout: 15000
 
 # 20. Screenshot: answered and feedback received

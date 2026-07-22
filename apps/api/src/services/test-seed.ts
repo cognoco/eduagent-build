@@ -1352,14 +1352,22 @@ async function seedRetentionDue(
   await db.insert(retentionCards).values(cardValues);
 
   const firstCard = cardValues[0];
-  if (!firstCard) throw new Error('No retention cards created');
+  const firstTopicId = topicIds[0];
+  if (!firstCard || !firstTopicId) {
+    throw new Error('No retention cards created');
+  }
   return {
     scenario: 'retention-due',
     accountId,
     profileId,
     email,
     password,
-    ids: { subjectId, bookId, retentionCardId: firstCard.id },
+    ids: {
+      subjectId,
+      bookId,
+      topicId: firstTopicId,
+      retentionCardId: firstCard.id,
+    },
   };
 }
 

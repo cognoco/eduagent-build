@@ -18,11 +18,25 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   claimBookForGeneration,
+  claimBookForTopicExpansion,
+  addCurriculumTopic,
   deleteTopicIfSafe,
+  getBookWithTopics,
+  moveTopicToBook,
+  persistNarrowTopics,
   persistBookTopics,
+  repairIncompleteBookGenerationClaim,
   releaseBookGenerationClaimIfEmpty,
+  releaseBookTopicExpansionClaim,
+  unskipTopic,
 } from './curriculum';
-import type { GeneratedBookTopic } from '@eduagent/schemas';
+import { regenerateLanguageCurriculum } from './language-curriculum';
+import { resolveFilingResult } from './filing';
+import {
+  ConflictError,
+  type FilingLlmOutput,
+  type GeneratedBookTopic,
+} from '@eduagent/schemas';
 import {
   deleteV2IdentitiesForTest,
   ensureV2IdentityForLegacyProfileTest,
@@ -437,6 +451,470 @@ describeIfDb('claimBookForGeneration ordering (integration)', () => {
       bookId,
     );
     expect(second).toBeNull();
+  });
+});
+
+describeIfDb('claimBookForTopicExpansion (integration)', () => {
+  let db: Database;
+
+  beforeAll(async () => {
+    db = createIntegrationDb();
+    await cleanupByPrefix(db);
+  });
+
+  afterAll(async () => {
+    await cleanupByPrefix(db);
+  });
+
+  it('[WI-1864] serialises concurrent thin-book expansion claims so only one wins', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedClaimedEmptyBook(
+      db,
+      ownerProfileId,
+    );
+
+    const claims = await Promise.all([
+      claimBookForTopicExpansion(db, ownerProfileId, subjectId, bookId),
+      claimBookForTopicExpansion(db, ownerProfileId, subjectId, bookId),
+    ]);
+
+    expect(claims.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('[WI-1864] refuses an expansion claim from a profile that does not own the subject', async () => {
+    const { ownerProfileId, attackerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedClaimedEmptyBook(
+      db,
+      ownerProfileId,
+    );
+
+    await expect(
+      claimBookForTopicExpansion(db, attackerProfileId, subjectId, bookId),
+    ).resolves.toBeNull();
+
+    const row = await db.query.curriculumBooks.findFirst({
+      where: eq(curriculumBooks.id, bookId),
+    });
+    expect(row!.topicsGenerationStartedAt).toBeNull();
+  });
+
+  it('[WI-1864] releases a failed expansion claim so the owning profile can retry immediately', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedClaimedEmptyBook(
+      db,
+      ownerProfileId,
+    );
+
+    const firstClaim = await claimBookForTopicExpansion(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(firstClaim).toBeInstanceOf(Date);
+    await releaseBookTopicExpansionClaim(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+      firstClaim!,
+    );
+    await expect(
+      claimBookForTopicExpansion(db, ownerProfileId, subjectId, bookId),
+    ).resolves.toBeInstanceOf(Date);
+  });
+
+  it('[WI-1864] does not let a stale owner release a newer expansion claim', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedClaimedEmptyBook(
+      db,
+      ownerProfileId,
+    );
+    const firstClaim = await claimBookForTopicExpansion(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(firstClaim).toBeInstanceOf(Date);
+
+    await db
+      .update(curriculumBooks)
+      .set({
+        topicsGenerationStartedAt: new Date(Date.now() - 20 * 60 * 1000),
+      })
+      .where(eq(curriculumBooks.id, bookId));
+    const secondClaim = await claimBookForTopicExpansion(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(secondClaim).toBeInstanceOf(Date);
+
+    await expect(
+      releaseBookTopicExpansionClaim(
+        db,
+        ownerProfileId,
+        subjectId,
+        bookId,
+        firstClaim!,
+      ),
+    ).resolves.toBe(false);
+    const row = await db.query.curriculumBooks.findFirst({
+      where: eq(curriculumBooks.id, bookId),
+    });
+    expect(row!.topicsGenerationStartedAt?.getTime()).toBe(
+      secondClaim!.getTime(),
+    );
+
+    await expect(
+      persistBookTopics(
+        db,
+        ownerProfileId,
+        subjectId,
+        bookId,
+        buildGeneratedTopics(),
+        [],
+        {
+          appendToExisting: true,
+          expansionClaimStartedAt: firstClaim!,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ConflictError);
+    await expect(
+      db.query.curriculumTopics.findMany({
+        where: eq(curriculumTopics.bookId, bookId),
+      }),
+    ).resolves.toHaveLength(0);
+    await expect(
+      db.query.curricula.findMany({
+        where: eq(curricula.subjectId, subjectId),
+      }),
+    ).resolves.toHaveLength(0);
+  });
+
+  it('[WI-1864] revalidates a stale empty-book snapshot after filing adds a topic', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedClaimedEmptyBook(
+      db,
+      ownerProfileId,
+    );
+    await db
+      .update(curriculumBooks)
+      .set({ updatedAt: new Date(Date.now() - 20 * 60 * 1000) })
+      .where(eq(curriculumBooks.id, bookId));
+    const staleEmptySnapshot = await getBookWithTopics(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(staleEmptySnapshot?.topics).toHaveLength(0);
+
+    const filingResponse = {
+      shelf: { id: subjectId },
+      book: { id: bookId },
+      chapter: { name: 'Filed knowledge' },
+      topic: {
+        title: 'A filed topic wins the repair race',
+        description:
+          'A real learner-created topic makes the thin book complete.',
+      },
+    } satisfies FilingLlmOutput;
+    await resolveFilingResult(db, {
+      profileId: ownerProfileId,
+      filingResponse,
+      filedFrom: 'freeform_filing',
+    });
+
+    const generateBookTopics = jest.fn(async () => ({
+      topics: buildGeneratedTopics(),
+      connections: [],
+    }));
+    await expect(
+      repairIncompleteBookGenerationClaim(
+        db,
+        ownerProfileId,
+        subjectId,
+        bookId,
+        staleEmptySnapshot!,
+        undefined,
+        { generateBookTopics, captureException: jest.fn() },
+      ),
+    ).resolves.toEqual({ status: 'not_incomplete' });
+    expect(generateBookTopics).not.toHaveBeenCalled();
+    const book = await db.query.curriculumBooks.findFirst({
+      where: eq(curriculumBooks.id, bookId),
+    });
+    expect(book?.topicsGenerationStartedAt).toBeNull();
+    await expect(
+      db.query.curriculumTopics.findMany({
+        where: eq(curriculumTopics.bookId, bookId),
+      }),
+    ).resolves.toHaveLength(1);
+  });
+
+  it('[WI-1864] ignores active topics from an older curriculum version when rechecking repair eligibility', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedClaimedEmptyBook(
+      db,
+      ownerProfileId,
+    );
+    const [oldCurriculum] = await db
+      .insert(curricula)
+      .values({ subjectId, version: 1 })
+      .returning({ id: curricula.id });
+    await db.insert(curriculumTopics).values({
+      curriculumId: oldCurriculum!.id,
+      bookId,
+      title: 'Old-version topic',
+      description: 'A topic that belongs only to the superseded curriculum.',
+      sortOrder: 0,
+      relevance: 'core',
+      estimatedMinutes: 15,
+    });
+    await db.insert(curricula).values({ subjectId, version: 2 });
+    await db
+      .update(curriculumBooks)
+      .set({ updatedAt: new Date(Date.now() - 20 * 60 * 1000) })
+      .where(eq(curriculumBooks.id, bookId));
+    const latestEmptySnapshot = await getBookWithTopics(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(latestEmptySnapshot?.topics).toHaveLength(0);
+
+    const stopAfterEligibilityCheck = new Error(
+      'stop after latest-curriculum eligibility check',
+    );
+    const generateBookTopics = jest
+      .fn()
+      .mockRejectedValue(stopAfterEligibilityCheck);
+    await expect(
+      repairIncompleteBookGenerationClaim(
+        db,
+        ownerProfileId,
+        subjectId,
+        bookId,
+        latestEmptySnapshot!,
+        undefined,
+        {
+          generateBookTopics,
+          captureException: jest.fn(() => {
+            throw stopAfterEligibilityCheck;
+          }),
+        },
+      ),
+    ).rejects.toBe(stopAfterEligibilityCheck);
+    expect(generateBookTopics).toHaveBeenCalledTimes(1);
+  });
+
+  it('[WI-1864] blocks filing into a book while its expansion claim is active', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedClaimedEmptyBook(
+      db,
+      ownerProfileId,
+    );
+    await expect(
+      claimBookForTopicExpansion(db, ownerProfileId, subjectId, bookId),
+    ).resolves.toBeInstanceOf(Date);
+
+    const filingResponse = {
+      shelf: { id: subjectId },
+      book: { id: bookId },
+      chapter: { name: 'Concurrent filing' },
+      topic: {
+        title: 'Must wait for expansion',
+        description: 'The expansion marker serialises topic writers.',
+      },
+    } satisfies FilingLlmOutput;
+    await expect(
+      resolveFilingResult(db, {
+        profileId: ownerProfileId,
+        filingResponse,
+        filedFrom: 'freeform_filing',
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+    await expect(
+      db.query.curriculumTopics.findMany({
+        where: eq(curriculumTopics.bookId, bookId),
+      }),
+    ).resolves.toHaveLength(0);
+    await expect(
+      db.query.curricula.findMany({
+        where: eq(curricula.subjectId, subjectId),
+      }),
+    ).resolves.toHaveLength(0);
+  });
+
+  it('[WI-1864] blocks every active-topic writer while expansion is claimed', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId: targetBookId } = await seedClaimedEmptyBook(
+      db,
+      ownerProfileId,
+    );
+    const [curriculum] = await db
+      .insert(curricula)
+      .values({ subjectId, version: 1 })
+      .returning({ id: curricula.id });
+    const [sourceBook] = await db
+      .insert(curriculumBooks)
+      .values({
+        subjectId,
+        title: 'Writer source book',
+        sortOrder: 1,
+        topicsGenerated: true,
+      })
+      .returning({ id: curriculumBooks.id });
+    const [skippedTargetTopic, activeSourceTopic] = await db
+      .insert(curriculumTopics)
+      .values([
+        {
+          curriculumId: curriculum!.id,
+          bookId: targetBookId,
+          title: 'Skipped target topic',
+          description: 'A skipped topic in the expansion target.',
+          sortOrder: 0,
+          relevance: 'core',
+          estimatedMinutes: 15,
+          skipped: true,
+        },
+        {
+          curriculumId: curriculum!.id,
+          bookId: sourceBook!.id,
+          title: 'Active source topic',
+          description: 'An active topic that must not move during expansion.',
+          sortOrder: 1,
+          relevance: 'core',
+          estimatedMinutes: 15,
+        },
+      ])
+      .returning({ id: curriculumTopics.id });
+    await expect(
+      claimBookForTopicExpansion(db, ownerProfileId, subjectId, targetBookId),
+    ).resolves.toBeInstanceOf(Date);
+
+    await expect(
+      unskipTopic(db, ownerProfileId, subjectId, skippedTargetTopic!.id),
+    ).rejects.toBeInstanceOf(ConflictError);
+    await expect(
+      moveTopicToBook(
+        db,
+        ownerProfileId,
+        subjectId,
+        sourceBook!.id,
+        activeSourceTopic!.id,
+        targetBookId,
+      ),
+    ).rejects.toBeInstanceOf(ConflictError);
+    await expect(
+      addCurriculumTopic(db, ownerProfileId, subjectId, {
+        mode: 'create',
+        title: 'Concurrent manual topic',
+        description: 'Must not bypass the active expansion marker.',
+        estimatedMinutes: 15,
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+    await expect(
+      persistNarrowTopics(
+        db,
+        ownerProfileId,
+        subjectId,
+        [
+          {
+            title: 'Concurrent narrow topic',
+            description: 'Must share the active-topic writer fence.',
+            relevance: 'core',
+            estimatedMinutes: 15,
+          },
+        ],
+        'Guarded subject',
+      ),
+    ).rejects.toBeInstanceOf(ConflictError);
+    await expect(
+      regenerateLanguageCurriculum(db, ownerProfileId, subjectId, 'es', 'A1'),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    const topics = await db.query.curriculumTopics.findMany({
+      where: eq(curriculumTopics.curriculumId, curriculum!.id),
+    });
+    expect(topics).toHaveLength(2);
+    expect(
+      topics.find((topic) => topic.id === skippedTargetTopic!.id)?.skipped,
+    ).toBe(true);
+    expect(
+      topics.find((topic) => topic.id === activeSourceTopic!.id)?.bookId,
+    ).toBe(sourceBook!.id);
+  });
+
+  it('[WI-1864] serialises stale zero-topic repair through the expansion claim', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedClaimedEmptyBook(
+      db,
+      ownerProfileId,
+    );
+    await db
+      .update(curriculumBooks)
+      .set({ updatedAt: new Date(Date.now() - 20 * 60 * 1000) })
+      .where(eq(curriculumBooks.id, bookId));
+    const existing = await getBookWithTopics(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(existing).not.toBeNull();
+
+    let resolveGenerationStarted!: () => void;
+    const generationStarted = new Promise<void>((resolve) => {
+      resolveGenerationStarted = resolve;
+    });
+    const stopAfterConcurrencyAssertion = new Error(
+      'stop after concurrency assertion',
+    );
+    let rejectGeneration!: (error: Error) => void;
+    const generated = new Promise<never>((_resolve, reject) => {
+      rejectGeneration = reject;
+    });
+    const generateBookTopics = jest.fn(async () => {
+      resolveGenerationStarted();
+      return generated;
+    });
+    const deps = {
+      generateBookTopics,
+      captureException: jest.fn(() => {
+        throw stopAfterConcurrencyAssertion;
+      }),
+    };
+
+    const winner = repairIncompleteBookGenerationClaim(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+      existing!,
+      undefined,
+      deps,
+    );
+    await generationStarted;
+    await expect(
+      repairIncompleteBookGenerationClaim(
+        db,
+        ownerProfileId,
+        subjectId,
+        bookId,
+        existing!,
+        undefined,
+        deps,
+      ),
+    ).resolves.toEqual({ status: 'in_progress' });
+
+    rejectGeneration(stopAfterConcurrencyAssertion);
+    await expect(winner).rejects.toBe(stopAfterConcurrencyAssertion);
+    expect(generateBookTopics).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -11,13 +11,18 @@
  * out-of-allowlist path must be rejected; the safe default `/(app)/home` must
  * be seeded instead.
  *
- * `IS_E2E_BUILD` (NODE_ENV !== 'production' && EXPO_PUBLIC_E2E === 'true')
- * is evaluated at module load time, so we set `EXPO_PUBLIC_E2E=true` before
- * requiring the screen. Jest already pins NODE_ENV to 'test'.
+ * `IS_E2E_BUILD` (EXPO_PUBLIC_E2E === 'true') is evaluated at module load
+ * time, so we set the flag before requiring the screen.
  */
 
-import { render } from '@testing-library/react-native';
-import { useAuth } from '@clerk/expo';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
+import { useAuth, useClerk } from '@clerk/expo';
+import { useQueryClient } from '@tanstack/react-query';
 
 import {
   clearPendingAuthRedirect,
@@ -32,6 +37,11 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
 
+jest.mock('@tanstack/react-query', () => ({
+  ...jest.requireActual('@tanstack/react-query'),
+  useQueryClient: jest.fn(),
+}));
+
 // Ensure IS_E2E_BUILD === true when the screen module is required below.
 process.env.EXPO_PUBLIC_E2E = 'true';
 
@@ -40,6 +50,9 @@ const SeedPendingRedirectScreen = require('./seed-pending-redirect')
   .default as () => React.ReactElement | null;
 
 describe('SeedPendingRedirectScreen — auth guard [CR-2026-05-19-H25]', () => {
+  const mockClerkSignOut = jest.fn().mockResolvedValue(undefined);
+  const mockQueryClient = { clear: jest.fn() };
+
   beforeEach(() => {
     jest.clearAllMocks();
     clearPendingAuthRedirect();
@@ -47,6 +60,8 @@ describe('SeedPendingRedirectScreen — auth guard [CR-2026-05-19-H25]', () => {
       path: '/(app)/library',
       staleMs: '0',
     });
+    (useClerk as jest.Mock).mockReturnValue({ signOut: mockClerkSignOut });
+    (useQueryClient as jest.Mock).mockReturnValue(mockQueryClient);
   });
 
   afterEach(() => {
@@ -79,7 +94,7 @@ describe('SeedPendingRedirectScreen — auth guard [CR-2026-05-19-H25]', () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it('seeds the pending redirect and replaces to sign-in when authenticated', () => {
+  it('seeds the pending redirect and exposes a deterministic receipt when authenticated', () => {
     (useAuth as jest.Mock).mockReturnValue({
       isLoaded: true,
       isSignedIn: true,
@@ -87,10 +102,29 @@ describe('SeedPendingRedirectScreen — auth guard [CR-2026-05-19-H25]', () => {
 
     render(<SeedPendingRedirectScreen />);
 
-    // Authenticated E2E flow: the path is written and the screen redirects
-    // to sign-in so the next sign-in replays the seeded path.
+    // Authenticated E2E flow: the path is written and remains visible until
+    // Maestro explicitly requests the signed-out replay state.
     expect(peekPendingAuthRedirect()).toBe('/(app)/library');
-    expect(mockReplace).toHaveBeenCalledWith('/(auth)/sign-in');
+    expect(screen.getByTestId('pending-redirect-seeded')).toBeTruthy();
+    expect(screen.getByTestId('pending-redirect-sign-out')).toBeTruthy();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('cleans up the active session, then re-seeds the redirect for the next sign-in', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      userId: 'user-1',
+    });
+    render(<SeedPendingRedirectScreen />);
+    fireEvent.press(screen.getByTestId('pending-redirect-sign-out'));
+
+    await waitFor(() => {
+      expect(mockQueryClient.clear).toHaveBeenCalledTimes(1);
+      expect(mockClerkSignOut).toHaveBeenCalledTimes(1);
+      expect(peekPendingAuthRedirect()).toBe('/(app)/library');
+      expect(mockReplace).toHaveBeenCalledWith('/(auth)/sign-in');
+    });
   });
 });
 
@@ -102,6 +136,8 @@ describe('SeedPendingRedirectScreen — path allowlist [CR-2026-05-21-113]', () 
       isLoaded: true,
       isSignedIn: true,
     });
+    (useClerk as jest.Mock).mockReturnValue({ signOut: jest.fn() });
+    (useQueryClient as jest.Mock).mockReturnValue({ clear: jest.fn() });
   });
 
   afterEach(() => {

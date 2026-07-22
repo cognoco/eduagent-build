@@ -70,14 +70,16 @@ tags:
 # ── Arm 2: Recitation ──
 # practice-recitation is the SECOND card inside the "Other practice" horizontal
 # ScrollView (practice-other-practice-slider, practice/index.tsx:799).
-# Step 1: scroll the outer vertical container DOWN using its first leaf card.
+# Step 1: bring the slider itself into the outer vertical viewport. A nested
+# child is the wrong DOWN-scroll anchor because its nearest scroll parent is
+# horizontal; 50% avoids native clipping math at the slider edges.
 # Step 2: scroll RIGHT inside the slider to bring practice-recitation into view.
 - scrollUntilVisible:
     element:
-      id: 'practice-dictation'
+      id: 'practice-other-practice-slider'
     direction: DOWN
     timeout: 5000
-    visibilityPercentage: 100
+    visibilityPercentage: 50
     centerElement: true
 
 - scrollUntilVisible:
@@ -110,10 +112,10 @@ tags:
 # ── Arm 3: Dictation ──
 - scrollUntilVisible:
     element:
-      id: 'practice-dictation'
+      id: 'practice-other-practice-slider'
     direction: DOWN
     timeout: 5000
-    visibilityPercentage: 100
+    visibilityPercentage: 50
     centerElement: true
 
 - scrollUntilVisible:

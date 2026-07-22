@@ -78,6 +78,13 @@ function createMockDb({
     delete: jest.fn().mockReturnValue({
       where: jest.fn().mockResolvedValue(undefined),
     }),
+    update: jest.fn().mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ id: 'book-1' }]),
+        }),
+      }),
+    }),
     // regenerateLanguageCurriculum runs its delete→insert swap inside a
     // transaction; the mock runs the callback against the same chainable db so
     // the existing call-count assertions still observe the writes.

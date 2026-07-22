@@ -235,9 +235,12 @@ jobs:
       NX_DAEMON: false
       NX_ISOLATE_PLUGINS: false
       EXPO_PUBLIC_E2E: 'true'
-      # V2 is a build-time flag. Keep the existing PR/nightly APKs on their
-      # established V0/V1 posture; only the explicit publish-readiness suite
-      # bakes the Mentor/Subjects/Journal shell into the JS bundle.
+      # Match the preview APK's established V0/V1 navigation posture. These
+      # flags are inlined at bundle time and several native family flows depend
+      # on the V1 capability contract rather than the flags-off legacy shell.
+      EXPO_PUBLIC_ENABLE_MODE_NAV: 'true'
+      EXPO_PUBLIC_ENABLE_MODE_NAV_V1: 'true'
+      # V2 remains exclusive to the explicit publish-readiness suite.
       EXPO_PUBLIC_ENABLE_MODE_NAV_V2: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_suite == 'v2' && 'true' || 'false' }}
       EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
       SENTRY_DISABLE_AUTO_UPLOAD: 'true'
