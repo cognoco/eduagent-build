@@ -41,6 +41,14 @@ export type NowFeedQueryResult = UseQueryResult<NowResponse> & {
 };
 
 /**
+ * [WI-2504] Query key the observed epoch is stored under, shared across every
+ * hook instance for the same (actor, profile) pair.
+ */
+function observedPolicyEpochQueryKey(actorId: string, profileId: string) {
+  return ['now-feed-observed-policy-epoch', actorId, profileId] as const;
+}
+
+/**
  * [WI-2504] The mentor-notice policy epoch this device last OBSERVED for
  * (actor, profile), hydrated from storage.
  *
@@ -48,6 +56,17 @@ export type NowFeedQueryResult = UseQueryResult<NowResponse> & {
  * nothing may build a cache key or read a projection until the stored
  * observation is back, or a cold offline launch would key under the bootstrap
  * epoch and serve a feed the device has already been told is void.
+ *
+ * [WI-2504 rework] Backed by the shared QueryClient cache rather than
+ * hook-local `useState`. `useNowFeed`, `useNowOverflow`, and
+ * `useSessionSummary` mount concurrently (the Mentor screen renders
+ * `useNowFeed` + `useNowOverflow` together) and each previously held its OWN
+ * copy of the observed epoch: one instance's fetch could `observe()` a
+ * disabled epoch while sibling instances kept their prior enabled epoch and
+ * the warm data keyed under it. Reading/writing through
+ * `queryClient`'s cache for the same (actor, profile) query key means every
+ * mounted consumer shares one observation — `observe()` from any one of them
+ * invalidates the epoch for all of them atomically.
  *
  * Exported for `useSessionSummary` (hooks/use-sessions.ts), whose response
  * carries the notice RECEIPT. It is the same seam — one server epoch, one
@@ -61,39 +80,52 @@ export function useObservedPolicyEpoch(
   hydrated: boolean;
   observe: (next: string) => void;
 } {
-  const [observedEpoch, setObservedEpoch] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const queryClient = useQueryClient();
+  const canHydrate = !!actorId && !!profileId;
 
-  useEffect(() => {
-    if (!actorId || !profileId) {
-      // Nothing to hydrate FROM — an observation is stored per actor+profile.
-      // Report hydrated so callers that gate on it are not blocked while auth
-      // resolves; the cache binding stays null regardless, so no projection is
-      // read or written under a guessed key.
-      setObservedEpoch(null);
-      setHydrated(true);
-      return undefined;
-    }
-    let cancelled = false;
-    // Actor/profile switch: re-hydrate that pair's own observation. One
-    // actor's observed policy must never key another's projection.
-    setHydrated(false);
-    void readObservedPolicyEpoch(actorId, profileId).then((epoch) => {
-      if (cancelled) return;
-      setObservedEpoch(epoch);
-      setHydrated(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [actorId, profileId]);
+  const epochQuery = useQuery({
+    // Actor/profile switch changes the key, so a new pair re-hydrates its OWN
+    // observation from storage rather than inheriting the previous pair's.
+    queryKey: canHydrate
+      ? observedPolicyEpochQueryKey(actorId, profileId)
+      : (['now-feed-observed-policy-epoch', 'unbound'] as const),
+    queryFn: () =>
+      readObservedPolicyEpoch(actorId as string, profileId as string),
+    enabled: canHydrate,
+    // No staleTime override: a fresh mount (e.g. the app was foregrounded
+    // after storage changed out from under it) must re-read storage rather
+    // than trust a query-cache entry that could be stale for THIS mount.
+    // `observe()` still reaches every currently-mounted subscriber instantly
+    // via `setQueryData`, independent of staleTime.
+  });
+
+  const observe = useMemo(
+    () => (next: string) => {
+      if (!canHydrate) return;
+      queryClient.setQueryData(
+        observedPolicyEpochQueryKey(actorId, profileId),
+        next,
+      );
+    },
+    [queryClient, canHydrate, actorId, profileId],
+  );
 
   return {
     // No stored observation -> the bootstrap epoch, i.e. "this device has not
     // been told anything", never "policy disabled".
-    epoch: observedEpoch ?? NOW_FEED_CACHE_POLICY_EPOCH,
-    hydrated,
-    observe: setObservedEpoch,
+    epoch: (canHydrate ? epochQuery.data : null) ?? NOW_FEED_CACHE_POLICY_EPOCH,
+    // Nothing to hydrate FROM when actor/profile is missing — report hydrated
+    // so callers that gate on it are not blocked while auth resolves; the
+    // cache binding stays null regardless, so no projection is read or
+    // written under a guessed key.
+    // `isFetching` also gates hydration: a fresh mount whose cached epoch is
+    // stale (default staleTime) fires a background re-read, and consumers
+    // must not build a cache key or query off that soon-to-be-stale value —
+    // wait for the re-read to land, same as the very first hydration.
+    hydrated: canHydrate
+      ? epochQuery.isFetched && !epochQuery.isFetching
+      : true,
+    observe,
   };
 }
 

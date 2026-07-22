@@ -44,6 +44,7 @@ describe('mentor notices schema', () => {
       'locked_in',
       'dismissed',
       'faded',
+      'not_yet',
     ]);
     expect(mentorNoticeNudgeStatusEnum.enumValues).toEqual([
       'pending',

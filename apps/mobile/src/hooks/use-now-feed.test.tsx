@@ -331,6 +331,124 @@ describe('useNowFeed — observed mentor-notice policy epoch', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// [WI-2504 rework] One observed disabled-epoch must invalidate ALL
+// concurrently-mounted mentor-notice surfaces, not just the hook instance
+// whose own fetch happened to observe it.
+//
+// Named red: `useNowFeed` and `useNowOverflow` are mounted together on the
+// Mentor screen. Each previously called `useObservedPolicyEpoch` with its OWN
+// `useState`, so only the instance whose fetch resolved a new epoch updated
+// its own query key. The sibling kept its prior (enabled) epoch in its own
+// hook-local state and so kept its warm, notice-bearing query-cache entry —
+// nothing ever told it the policy had gone away.
+// ---------------------------------------------------------------------------
+describe('useNowFeed + useNowOverflow — shared observed epoch across concurrent hooks', () => {
+  const ENABLED_EPOCH = 'notice-policy-v1:on:self:consented';
+  const DISABLED_EPOCH = 'notice-policy-v1:off';
+  const OBSERVED_EPOCH_KEY = `now-feed-policy-epoch::${CACHE_BINDING.actorId}::${CACHE_BINDING.profileId}`;
+
+  let originalFetch: typeof globalThis.fetch;
+
+  function noticeOverflowResponse(epoch: string): NowOverflowResponse {
+    return overflow({
+      items: [
+        {
+          kind: 'mentor_notice',
+          templateKey: 'now.mentor_notice.default',
+          params: {
+            noticeId: '22222222-2222-4222-8222-222222222222',
+            concept: 'sign flip',
+          },
+          deepLink: { route: 'notice.recheck', params: {}, chain: [] },
+          scope: 'self',
+        },
+      ] as NowOverflowResponse['items'],
+      mentorNoticePolicyEpoch: epoch,
+    });
+  }
+
+  beforeEach(async () => {
+    originalFetch = globalThis.fetch;
+    setActiveProfileId(CACHE_BINDING.profileId);
+    await AsyncStorage.clear();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    setActiveProfileId(undefined);
+  });
+
+  it('drops the sibling surface’s warm notice-bearing overflow entry the moment the OTHER hook observes a disabled epoch', async () => {
+    await AsyncStorage.setItem(OBSERVED_EPOCH_KEY, ENABLED_EPOCH);
+
+    let overflowCallCount = 0;
+    globalThis.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/now/overflow')) {
+        overflowCallCount += 1;
+        // First call warms the surface under the ENABLED epoch. Any later
+        // call (the re-key this fix must trigger) gets a clean response —
+        // proving a genuine re-fetch under the new epoch, not a stale read.
+        const body =
+          overflowCallCount === 1
+            ? noticeOverflowResponse(ENABLED_EPOCH)
+            : overflow({ mentorNoticePolicyEpoch: DISABLED_EPOCH });
+        return new Response(JSON.stringify(body), { status: 200 });
+      }
+      if (url.includes('/now')) {
+        // The now-feed fetch is the one whose response tells the client the
+        // policy just went to disabled.
+        return new Response(
+          JSON.stringify({
+            ...feed(),
+            mentorNoticePolicyEpoch: DISABLED_EPOCH,
+          }),
+          { status: 200 },
+        );
+      }
+      throw new Error(`unexpected fetch in test: ${url}`);
+    }) as unknown as typeof globalThis.fetch;
+
+    const { queryClient, wrapper } = createHookWrapper();
+
+    // Mount the overflow surface first and let it warm up while the observed
+    // epoch is still ENABLED — this is the concurrently-mounted sibling that
+    // never itself observes the disable.
+    const overflowHook = renderHook(() => useNowOverflow(true), { wrapper });
+    await waitFor(() =>
+      expect(overflowHook.result.current.isSuccess).toBe(true),
+    );
+    expect(
+      overflowHook.result.current.data?.items.map((item) => item.kind),
+    ).toEqual(['mentor_notice']);
+
+    // Mount the now-feed surface. ITS fetch is the one that observes the
+    // disabled epoch.
+    const nowFeedHook = renderHook(() => useNowFeed(), { wrapper });
+    await waitFor(() =>
+      expect(nowFeedHook.result.current.isSuccess).toBe(true),
+    );
+    await waitFor(async () =>
+      expect(await AsyncStorage.getItem(OBSERVED_EPOCH_KEY)).toBe(
+        DISABLED_EPOCH,
+      ),
+    );
+
+    // Consumer-visible outcome: the OTHER hook, which never fetched on its
+    // own, no longer exposes the notice-bearing overflow entry it had warm.
+    await waitFor(() =>
+      expect(
+        overflowHook.result.current.data?.items.some(
+          (item) => item.kind === 'mentor_notice',
+        ),
+      ).toBe(false),
+    );
+
+    queryClient.clear();
+  });
+});
+
 describe('useNowOverflow', () => {
   let originalFetch: typeof globalThis.fetch;
   let mockFetch: jest.Mock;
