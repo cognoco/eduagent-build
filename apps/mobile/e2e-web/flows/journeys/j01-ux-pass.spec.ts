@@ -5,6 +5,7 @@ import {
   dismissPostApprovalIfVisible,
   waitForScreenDismissingPostApproval,
 } from '../../helpers/post-approval';
+import { installSeededProfileBootstrap } from '../../helpers/profile-bootstrap';
 import { readSeedData } from '../../helpers/seed-data';
 
 const shotDir = path.join(
@@ -39,6 +40,7 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await mkdir(shotDir, { recursive: true });
   const seed = await readSeedData('solo-learner');
   const subjectId = seed.ids.subjectId;
+  await installSeededProfileBootstrap(page);
 
   await gotoScreen(page, '/mentor', 'mentor-screen');
   await capture(page, '01-home');
