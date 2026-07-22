@@ -19,11 +19,26 @@ tags:
       id: 'learner-screen'
     timeout: 10000
 
+# The home subject carousel sits below the recommendation and intent cards on
+# the release-APK viewport. Step 1 uses the non-scrollable section heading to
+# position the outer vertical viewport; the mandatory card lookup in step 2
+# remains the reachability gate for the horizontal carousel.
+- scrollUntilVisible:
+    element:
+      id: 'home-subjects-heading'
+    direction: DOWN
+    timeout: 5000
+    visibilityPercentage: 50
+    centerElement: false
+    optional: true # justified: best-effort outer positioning; mandatory horizontal card lookup below fails closed
+
 - scrollUntilVisible:
     element:
       id: 'home-subject-card-${SUBJECT_ID}'
     direction: RIGHT
     timeout: 10000
+    visibilityPercentage: 100
+    centerElement: false
 
 - takeScreenshot: 01-home-subject-tile
 

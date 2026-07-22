@@ -4299,14 +4299,39 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'utf8',
     );
     const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+        optional?: boolean;
+      };
       tapOn?: { id?: string } | string;
       extendedWaitUntil?: {
         visible?: { id?: string } | string;
         optional?: boolean;
       };
     }>;
+    const subjectSection = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'home-subjects-heading' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 50 &&
+        scrollUntilVisible.centerElement === false &&
+        scrollUntilVisible.optional === true,
+    );
+    const subjectScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > subjectSection &&
+        scrollUntilVisible?.element?.id === 'home-subject-card-${SUBJECT_ID}' &&
+        scrollUntilVisible.direction === 'RIGHT' &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === false &&
+        scrollUntilVisible.optional !== true,
+    );
     const subject = commands.findIndex(
-      ({ tapOn }) =>
+      ({ tapOn }, index) =>
+        index > subjectScroll &&
         typeof tapOn === 'object' &&
         tapOn.id === 'home-subject-card-${SUBJECT_ID}',
     );
@@ -4361,7 +4386,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         extendedWaitUntil.optional !== true,
     );
 
-    expect(subject).toBeGreaterThan(-1);
+    expect(subjectSection).toBeGreaterThan(-1);
+    expect(subjectScroll).toBeGreaterThan(subjectSection);
+    expect(subject).toBeGreaterThan(subjectScroll);
     expect(shelf).toBeGreaterThan(subject);
     expect(back).toBeGreaterThan(shelf);
     expect(library).toBeGreaterThan(back);
@@ -4507,6 +4534,64 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(copyScroll).toBeGreaterThan(prompt);
     expect(copy).toBeGreaterThan(copyScroll);
     expect(backScroll).toBeGreaterThan(copy);
+    expect(back).toBeGreaterThan(backScroll);
+  });
+
+  it('[WI-1864] reaches the below-fold recap session receipt before restoring the header back control', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/parent/recap-detail-navigation.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+        optional?: boolean;
+      };
+      assertVisible?: { id?: string; optional?: boolean } | string;
+      tapOn?: { id?: string; optional?: boolean } | string;
+    }>;
+
+    const sessionScroll = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'recap-detail-open-session' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === true &&
+        scrollUntilVisible.optional !== true,
+    );
+    const sessionReceipt = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > sessionScroll &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'recap-detail-open-session' &&
+        assertVisible.optional !== true,
+    );
+    const backScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > sessionReceipt &&
+        scrollUntilVisible?.element?.id === 'recap-detail-back' &&
+        scrollUntilVisible.direction === 'UP' &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === false &&
+        scrollUntilVisible.optional !== true,
+    );
+    const back = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > backScroll &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'recap-detail-back' &&
+        tapOn.optional !== true,
+    );
+
+    expect(sessionScroll).toBeGreaterThan(-1);
+    expect(sessionReceipt).toBeGreaterThan(sessionScroll);
+    expect(backScroll).toBeGreaterThan(sessionReceipt);
     expect(back).toBeGreaterThan(backScroll);
   });
 

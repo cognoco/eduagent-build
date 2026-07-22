@@ -137,7 +137,13 @@ export default function QuizHistoryScreen() {
               onPress={() =>
                 router.push({
                   pathname: '/(app)/quiz/[roundId]',
-                  params: { roundId: round.id },
+                  params: {
+                    roundId: round.id,
+                    ...(returnToken ? { historyReturnTo: returnToken } : {}),
+                    ...(practiceReturnToken
+                      ? { historyPracticeReturnTo: practiceReturnToken }
+                      : {}),
+                  },
                 } as Href)
               }
               accessibilityRole="button"
@@ -164,7 +170,7 @@ export default function QuizHistoryScreen() {
         })}
       </View>
     ),
-    [t, router, relativeDate],
+    [practiceReturnToken, relativeDate, returnToken, router, t],
   );
 
   if (isLoading) {

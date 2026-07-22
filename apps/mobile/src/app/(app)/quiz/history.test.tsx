@@ -197,6 +197,28 @@ describe('QuizHistoryScreen', () => {
     });
   });
 
+  it('[WI-1864] carries the Practice return contract through round detail', async () => {
+    mockSearchParams = {
+      returnTo: 'practice',
+      practiceReturnTo: 'journal',
+    };
+    mount();
+    await waitFor(() => {
+      screen.getByTestId(`quiz-history-row-${ROUND_GUESS_ID}`);
+    });
+
+    fireEvent.press(screen.getByTestId(`quiz-history-row-${ROUND_GUESS_ID}`));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz/[roundId]',
+      params: {
+        roundId: ROUND_GUESS_ID,
+        historyReturnTo: 'practice',
+        historyPracticeReturnTo: 'journal',
+      },
+    });
+  });
+
   it('labels vocabulary rounds with a supported language prefix', async () => {
     mount({
       [RECENT_ROUNDS_ROUTE]: [
