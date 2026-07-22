@@ -1702,7 +1702,6 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       {
         tapOn: {
           id: actionId,
-          childOf: { id: ownerId },
         },
       },
     ];
@@ -1823,12 +1822,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       'subject-suggestion-accept',
       'subject-use-my-words',
     ]);
-    const expectedOwnedCorrectiveTaps = [
-      'subject-suggestion-accept|subject-confident-card',
-      'subject-suggestion-accept|subject-single-suggestion-card',
-      'subject-use-my-words|subject-no-match-card',
+    const expectedCorrectiveTaps = [
+      'subject-suggestion-accept|',
+      'subject-suggestion-accept|',
+      'subject-use-my-words|',
     ].sort();
-    const ownedCorrectiveTapSignatures = (commands: unknown[]): string[] =>
+    const correctiveTapSignatures = (commands: unknown[]): string[] =>
       allObjects(commands)
         .flatMap((command) => {
           const tapOn = command.tapOn;
@@ -1851,8 +1850,8 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       hasSequence(commands, outcomeSequence) &&
       !hasArbitraryAmbiguousTap(commands) &&
       isDeepStrictEqual(
-        ownedCorrectiveTapSignatures(commands),
-        expectedOwnedCorrectiveTaps,
+        correctiveTapSignatures(commands),
+        expectedCorrectiveTaps,
       );
     const isHardResolveLoadingAppearance = (payload: unknown): boolean => {
       if (payload === null || typeof payload !== 'object') return false;
@@ -2124,6 +2123,29 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       copy[index] = value;
       return copy;
     };
+    for (const [branchIndex, ownerId, actionId] of [
+      [3, 'subject-confident-card', 'subject-suggestion-accept'],
+      [4, 'subject-single-suggestion-card', 'subject-suggestion-accept'],
+      [5, 'subject-no-match-card', 'subject-use-my-words'],
+    ] as const) {
+      expect(
+        satisfiesOutcomeContract(
+          replaceAt(
+            outcomeSequence,
+            branchIndex,
+            branch(ownerId, [
+              {
+                assertVisible: {
+                  id: ownerId,
+                  containsDescendants: [{ id: actionId }],
+                },
+              },
+              { tapOn: { id: actionId, childOf: { id: ownerId } } },
+            ]),
+          ),
+        ),
+      ).toBe(false);
+    }
     for (const mutation of [
       // Removal: the branch cannot act without first proving its owner/action.
       outcomeSequence.filter((_, index) => index !== 5),
