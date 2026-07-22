@@ -7,7 +7,8 @@
 > `apps/mobile/src/components/journal/JournalTabView.test.tsx`, and
 > `apps/api/src/services/practice-activity-history.integration.test.ts`. Landed in
 > `268347274` (PR #1542). This document is the preserved design record; it has no
-> remaining implementation scope.
+> remaining implementation scope. The endpoint proposal, open decisions, and build
+> order below are retained historical design context, not current instructions.
 
 ## Problem
 

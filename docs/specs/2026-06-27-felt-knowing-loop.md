@@ -10,7 +10,7 @@
 > `apps/mobile/src/app/(app)/subject-hub/[subjectId]/index.tsx`, but the top-level
 > notes overview still lacks add/edit/delete wiring and remains open without a
 > current owning WI. Flow 2 freeform keep/bookmark is wired through
-> `SessionFooter.tsx` and `use-bookmark-handler`. Flow 3 remains unbuilt
+> `SessionFooter.tsx` and `use-freeform-keep-handler`. Flow 3 remains unbuilt
 > (`evidence_links` / `LearnerSource` have no source hits):
 > **WI-1452 (felt-knowing citation substrate)** is superseded/folded into WI-1704 by
 > `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md`. Current orientation and

@@ -11,7 +11,9 @@
 > returning-session sibling is in `ReturningSessionGreeting.tsx` and its test. The
 > later ≥7-message rotation/recency pool is explicitly OUT in
 > `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md`; no unfinished build is
-> authorized by this historical spec.
+> authorized by this historical spec. Every imperative section below, including
+> **Implementation** and **Testing**, is retained historical design context, not an
+> actionable checklist.
 
 ## Problem
 

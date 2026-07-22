@@ -4,16 +4,20 @@ date: 2026-07-18
 profile: change
 work_items: [WI-2222]
 spec: .workitem-artifacts/WI-2222/workitem.json
-status: complete
+status: landed; original T5 handoff superseded
 ---
 
 # Consolidate Mentor Capability Contract Tests — Implementation Plan
 
-> **STATUS (last verified 2026-07-22): COMPLETE AND LANDED.** The shared
+> **STATUS (last verified 2026-07-22): IMPLEMENTATION LANDED; ORIGINAL T5
+> HANDOFF SUPERSEDED.** The shared
 > `MentorCapabilityCase` table and all named consumers are present in current source;
 > focused verification is recorded in `docs/evidence/WI-2222/verification.md`.
 > Landed in `99649dd9a` (PR #2236) for
-> **WI-2222 (consolidate Mentor capability contract tests)**. No task remains.
+> **WI-2222 (consolidate Mentor capability contract tests)**. The unchecked T5 below
+> was a temporary builder handoff that explicitly prohibited a PR and lifecycle
+> finalization; the later PR-and-close lifecycle superseded that instruction. It is
+> retained unchecked as historical evidence, not as remaining implementation work.
 
 **Goal:** Make one test-only Mentor capability table drive the existing deterministic matcher, closed-route, learner-scope, adversarial, and session-composition boundaries without adding product behavior or a second corpus.
 **Approach:** Export a small discriminated case contract from `@eduagent/test-utils`, then replace only the duplicated deterministic rows in each existing suite with table-driven assertions. Keep the adversarial fuzz corpus intact, reuse the current mobile development dependency and project reference, and prove detection power with a disposable wrong-expectation mutation followed by exact restoration.
