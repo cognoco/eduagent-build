@@ -58,7 +58,7 @@ export const mentorNotices = pgTable(
     // acceptMentorNotice. Never null-able as a domain matter, only as a
     // migration-safety one.
     answerEventId: uuid('answer_event_id').references(() => sessionEvents.id, {
-      onDelete: 'set null',
+      onDelete: 'cascade',
     }),
     concept: text('concept').notNull(),
     correctionHint: text('correction_hint'),
