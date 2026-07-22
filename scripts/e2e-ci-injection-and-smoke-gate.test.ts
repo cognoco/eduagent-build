@@ -1575,39 +1575,80 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ];
     const callCount = (commands: unknown[], expected: Command): number =>
       commands.filter((command) => isDeepStrictEqual(command, expected)).length;
-    const satisfiesCeremonyContract = (commands: unknown[]): boolean =>
-      callCount(commands, v2SignOutCall) === 2 &&
-      callCount(commands, legacySignOutCall) === 0 &&
-      callCount(commands, supporteeSignInCall) === 1 &&
-      callCount(commands, supporterSignInCall) === 1 &&
-      commands.filter((command) => {
-        if (command === null || typeof command !== 'object') return false;
-        const runFlow = (command as Command).runFlow;
-        return (
-          runFlow !== null &&
-          typeof runFlow === 'object' &&
-          (runFlow as Command).file === '../_setup/sign-in-only-returning.yaml'
-        );
-      }).length === 2 &&
-      hasSequence(commands, firstAcceptanceSequence) &&
-      hasSequence(commands, secondAcceptanceSequence);
+    const sequenceStart = (
+      commands: unknown[],
+      expectedSequence: Command[],
+    ): number =>
+      commands.findIndex((_, start) =>
+        expectedSequence.every((expected, offset) =>
+          isDeepStrictEqual(commands[start + offset], expected),
+        ),
+      );
+    const satisfiesCeremonyContract = (commands: unknown[]): boolean => {
+      const firstAcceptanceStart = sequenceStart(
+        commands,
+        firstAcceptanceSequence,
+      );
+      const secondAcceptanceStart = sequenceStart(
+        commands,
+        secondAcceptanceSequence,
+      );
+      return (
+        callCount(commands, v2SignOutCall) === 2 &&
+        callCount(commands, legacySignOutCall) === 0 &&
+        callCount(commands, supporteeSignInCall) === 1 &&
+        callCount(commands, supporterSignInCall) === 1 &&
+        commands.filter((command) => {
+          if (command === null || typeof command !== 'object') return false;
+          const runFlow = (command as Command).runFlow;
+          return (
+            runFlow !== null &&
+            typeof runFlow === 'object' &&
+            (runFlow as Command).file ===
+              '../_setup/sign-in-only-returning.yaml'
+          );
+        }).length === 2 &&
+        firstAcceptanceStart >= 0 &&
+        secondAcceptanceStart >= 0 &&
+        firstAcceptanceStart < secondAcceptanceStart
+      );
+    };
 
     expect(satisfiesCeremonyContract(ceremony)).toBe(true);
-    const firstAcceptanceStart = ceremony.findIndex((_, start) =>
-      firstAcceptanceSequence.every((expected, offset) =>
-        isDeepStrictEqual(ceremony[start + offset], expected),
-      ),
+    const firstAcceptanceStart = sequenceStart(
+      ceremony,
+      firstAcceptanceSequence,
     );
-    const secondAcceptanceStart = ceremony.findIndex((_, start) =>
-      secondAcceptanceSequence.every((expected, offset) =>
-        isDeepStrictEqual(ceremony[start + offset], expected),
-      ),
+    const secondAcceptanceStart = sequenceStart(
+      ceremony,
+      secondAcceptanceSequence,
     );
     expect(firstAcceptanceStart).toBeGreaterThanOrEqual(0);
     expect(secondAcceptanceStart).toBeGreaterThanOrEqual(0);
+    expect(firstAcceptanceStart).toBeLessThan(secondAcceptanceStart);
     if (firstAcceptanceStart < 0 || secondAcceptanceStart < 0) {
       throw new Error('WI-2616 acceptance sequences must both be present');
     }
+    expect(
+      satisfiesCeremonyContract([
+        ...ceremony.slice(0, firstAcceptanceStart),
+        ...ceremony.slice(
+          secondAcceptanceStart,
+          secondAcceptanceStart + secondAcceptanceSequence.length,
+        ),
+        ...ceremony.slice(
+          firstAcceptanceStart + firstAcceptanceSequence.length,
+          secondAcceptanceStart,
+        ),
+        ...ceremony.slice(
+          firstAcceptanceStart,
+          firstAcceptanceStart + firstAcceptanceSequence.length,
+        ),
+        ...ceremony.slice(
+          secondAcceptanceStart + secondAcceptanceSequence.length,
+        ),
+      ]),
+    ).toBe(false);
     expectSequenceMutationsRejected(
       ceremony,
       firstAcceptanceStart,
@@ -1851,9 +1892,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       exactSubjectRowWaitSignature,
       exactSubjectRowAssertSignature,
     ];
-    const satisfiesExactCaseContract = (commands: unknown[]): boolean =>
-      !requiresTransientResolveLoadingAppearance(commands) &&
-      hasSequence(commands.map(hardCommandSignature), exactCaseSequence);
+    const satisfiesExactCaseContract = (commands: unknown[]): boolean => {
+      // This is intentionally an ordered hard-property subsequence: extra
+      // diagnostics may surround it without turning a correct case red.
+      return (
+        !requiresTransientResolveLoadingAppearance(commands) &&
+        hasSequence(commands.map(hardCommandSignature), exactCaseSequence)
+      );
+    };
     const withOptionalCommand = (
       commands: unknown[],
       index: number,
@@ -1979,6 +2025,13 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         ),
       );
     expect(exactCaseStart).toBeGreaterThanOrEqual(0);
+    expect(
+      satisfiesExactCaseContract([
+        ...subjectCreate.slice(0, exactCaseStart),
+        subjectCreate[exactCaseStart]!,
+        ...subjectCreate.slice(exactCaseStart),
+      ]),
+    ).toBe(true);
     for (const signature of [
       'extendedWaitUntil:id:ready-screen',
       'extendedWaitUntil:text:Starting with Photosynthesis',

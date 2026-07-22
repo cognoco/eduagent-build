@@ -22,6 +22,8 @@ appId: com.mentomate.app
       id: 'account-admin-sign-out'
     direction: DOWN
     timeout: 15000
+# Keep an explicit hard assertion for the helper's sign-out target contract;
+# the preceding scroll is synchronization, not the recorded property.
 - assertVisible:
     id: 'account-admin-sign-out'
 - tapOn:
