@@ -21,13 +21,14 @@ export const topicNotes = pgTable(
       onDelete: 'set null',
     }),
     content: text('content').notNull(),
-    // [WI-1658] Artifact-source marker. Nullable, additive, no DB-level enum —
-    // forward-compatible with the fuller artifactSource vocabulary WI-1704 owns
-    // (docs/specs/2026-07-06-verified-learning-loop.md, "Artifact Provenance
-    // Contract"). Today only 'challenge_drafted_note' is ever written, by the
-    // Challenge-Round finalize path (session-exchange.ts) on verified-outcome
-    // rounds only. Existing rows are NULL (ordinary learner/session-summary notes).
-    artifactSource: text('artifact_source'),
+    // Artifact source and verification state are required after the migration's
+    // ordered backfill. SQL CHECK constraints own the narrow persisted vocabulary.
+    artifactSource: text('artifact_source')
+      .notNull()
+      .default('learner_authored_note'),
+    verificationState: text('verification_state')
+      .notNull()
+      .default('unverified'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

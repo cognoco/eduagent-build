@@ -18,6 +18,7 @@ export interface VerifiedProofReceipt {
   sessionId?: string;
   verifiedAt?: string;
   quote: string | null;
+  evidenceAvailability?: 'available' | 'source_unavailable';
   masteryVerificationState?: 'unverified' | 'fresh' | 'stale';
   retentionStatus?: 'strong' | 'fading' | 'weak' | 'forgotten';
   nextReviewDate?: string;

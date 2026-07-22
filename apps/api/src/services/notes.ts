@@ -1,4 +1,13 @@
-import { eq, and, inArray, sql, desc, lt, isNull, type SQL } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  inArray,
+  notInArray,
+  sql,
+  desc,
+  lt,
+  type SQL,
+} from 'drizzle-orm';
 import {
   topicNotes,
   curriculumTopics,
@@ -8,7 +17,11 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import type { AllNote, NoteArtifactSource } from '@eduagent/schemas';
+import type {
+  AllNote,
+  ArtifactVerificationState,
+  NoteArtifactSource,
+} from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../errors';
 import { assertOwnedCurriculumTopic } from './curriculum-topic-ownership';
 import { createLogger } from './logger';
@@ -18,6 +31,10 @@ import * as learningTextGuard from './persisted-learning-text-guard';
 
 const MAX_NOTES_PER_TOPIC = 50;
 const POSTGRES_UNDEFINED_COLUMN = '42703';
+const CHALLENGE_EVIDENCE_SOURCES: NoteArtifactSource[] = [
+  'challenge_solid_quote',
+  'challenge_drafted_note',
+];
 
 const logger = createLogger();
 
@@ -30,6 +47,8 @@ type NoteRow = {
   topicId: string;
   sessionId: string | null;
   content: string;
+  artifactSource: string;
+  verificationState: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -50,11 +69,18 @@ type MappedNoteRow = {
   topicId: string;
   sessionId: string | null;
   content: string;
+  artifactSource: string;
+  verificationState: string;
   createdAt: string;
   updatedAt: string;
 };
 
-type AllNoteRow = Omit<AllNote, 'createdAt' | 'updatedAt'> & {
+type AllNoteRow = Omit<
+  AllNote,
+  'artifactSource' | 'verificationState' | 'createdAt' | 'updatedAt'
+> & {
+  artifactSource: string;
+  verificationState: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -129,6 +155,8 @@ function mapNoteRow(row: NoteRow): MappedNoteRow {
     topicId: row.topicId,
     sessionId: row.sessionId,
     content: row.content,
+    artifactSource: row.artifactSource as NoteArtifactSource,
+    verificationState: row.verificationState as ArtifactVerificationState,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -157,11 +185,14 @@ async function insertNoteWithCap(
     profileId: string;
     sessionId: string | null;
     content: string;
-    artifactSource?: string | null;
+    artifactSource?: NoteArtifactSource;
+    verificationState?: ArtifactVerificationState;
   },
   options: { dedupeExactSessionContent?: boolean } = {},
 ): Promise<MappedNoteRow> {
   learningTextGuard.assertNoClinicalInferenceInLearningRecord(values.content);
+  const artifactSource = values.artifactSource ?? 'learner_authored_note';
+  const verificationState = values.verificationState ?? 'unverified';
   return db.transaction(async (tx) => {
     const lockKey = `notes:${values.profileId}:${values.topicId}`;
     await tx.execute(
@@ -172,21 +203,18 @@ async function insertNoteWithCap(
     // payload. Only dedupe the exact same session+topic+content; users can
     // write multiple different notes during the same chat.
     //
-    // [WI-1658] Dedup is also artifactSource-aware: a marked write (e.g. a
-    // verified-proof note) must never be swallowed by a match against an
-    // earlier UNMARKED row with identical content (or vice versa) — that
-    // would silently drop the marker. `eq(col, null)` never matches in SQL,
-    // so a null marker needs `isNull(...)`, not `eq(...)`.
+    // Artifact metadata is part of a note's idempotency identity: a verified
+    // artifact must never collapse into an unverified learner-authored note.
     if (options.dedupeExactSessionContent && values.sessionId) {
-      const artifactSourceMatch = values.artifactSource
-        ? eq(topicNotes.artifactSource, values.artifactSource)
-        : isNull(topicNotes.artifactSource);
+      const artifactSourceMatch = eq(topicNotes.artifactSource, artifactSource);
       const [existingForSession] = await tx
         .select({
           id: topicNotes.id,
           topicId: topicNotes.topicId,
           sessionId: topicNotes.sessionId,
           content: topicNotes.content,
+          artifactSource: topicNotes.artifactSource,
+          verificationState: topicNotes.verificationState,
           createdAt: topicNotes.createdAt,
           updatedAt: topicNotes.updatedAt,
         })
@@ -211,6 +239,7 @@ async function insertNoteWithCap(
         and(
           eq(topicNotes.topicId, values.topicId),
           eq(topicNotes.profileId, values.profileId),
+          notInArray(topicNotes.artifactSource, CHALLENGE_EVIDENCE_SOURCES),
         ),
       );
     if (countRow && Number(countRow.count) >= MAX_NOTES_PER_TOPIC) {
@@ -219,14 +248,19 @@ async function insertNoteWithCap(
       );
     }
 
-    const [row] = await tx.insert(topicNotes).values(values).returning({
-      id: topicNotes.id,
-      topicId: topicNotes.topicId,
-      sessionId: topicNotes.sessionId,
-      content: topicNotes.content,
-      createdAt: topicNotes.createdAt,
-      updatedAt: topicNotes.updatedAt,
-    });
+    const [row] = await tx
+      .insert(topicNotes)
+      .values({ ...values, artifactSource, verificationState })
+      .returning({
+        id: topicNotes.id,
+        topicId: topicNotes.topicId,
+        sessionId: topicNotes.sessionId,
+        content: topicNotes.content,
+        artifactSource: topicNotes.artifactSource,
+        verificationState: topicNotes.verificationState,
+        createdAt: topicNotes.createdAt,
+        updatedAt: topicNotes.updatedAt,
+      });
 
     if (!row) throw new Error('Insert topic note did not return a row');
     return mapNoteRow(row);
@@ -249,12 +283,8 @@ export async function createNoteForSession(
     topicId: string;
     sessionId: string;
     content: string;
-    // [WI-1658] Set by the Challenge-Round finalize path (session-exchange.ts)
-    // to mark a note as a verified-proof artifact. The caller is responsible
-    // for running `params.content` through validateNoteDraft
-    // (services/challenge-round/note-draft.ts) beforehand — this function
-    // does not re-validate.
     artifactSource?: NoteArtifactSource;
+    verificationState?: ArtifactVerificationState;
   },
 ): Promise<MappedNoteRow> {
   return insertNoteWithCap(
@@ -264,7 +294,8 @@ export async function createNoteForSession(
       profileId: params.profileId,
       sessionId: params.sessionId,
       content: params.content,
-      artifactSource: params.artifactSource ?? null,
+      artifactSource: params.artifactSource ?? 'learner_authored_note',
+      verificationState: params.verificationState ?? 'unverified',
     },
     {
       dedupeExactSessionContent: true,
@@ -290,6 +321,8 @@ export async function getNote(
   id: string;
   topicId: string;
   content: string;
+  artifactSource: string;
+  verificationState: string;
   updatedAt: Date;
 } | null> {
   await assertOwnedCurriculumTopic(db, { profileId, topicId, subjectId });
@@ -299,11 +332,17 @@ export async function getNote(
       id: topicNotes.id,
       topicId: topicNotes.topicId,
       content: topicNotes.content,
+      artifactSource: topicNotes.artifactSource,
+      verificationState: topicNotes.verificationState,
       updatedAt: topicNotes.updatedAt,
     })
     .from(topicNotes)
     .where(
-      and(eq(topicNotes.topicId, topicId), eq(topicNotes.profileId, profileId)),
+      and(
+        eq(topicNotes.topicId, topicId),
+        eq(topicNotes.profileId, profileId),
+        notInArray(topicNotes.artifactSource, CHALLENGE_EVIDENCE_SOURCES),
+      ),
     )
     .orderBy(desc(topicNotes.updatedAt))
     .limit(1);
@@ -371,6 +410,8 @@ async function selectNotesForTopicIds(
       topicId: topicNotes.topicId,
       sessionId: noteSessionIdSelection(includeSessionId),
       content: topicNotes.content,
+      artifactSource: topicNotes.artifactSource,
+      verificationState: topicNotes.verificationState,
       createdAt: topicNotes.createdAt,
       updatedAt: topicNotes.updatedAt,
     })
@@ -379,6 +420,7 @@ async function selectNotesForTopicIds(
       and(
         inArray(topicNotes.topicId, topicIds),
         eq(topicNotes.profileId, profileId),
+        notInArray(topicNotes.artifactSource, CHALLENGE_EVIDENCE_SOURCES),
       ),
     )
     .orderBy(desc(topicNotes.createdAt));
@@ -398,7 +440,12 @@ export async function getTopicIdsWithNotes(
   const rows = await db
     .selectDistinct({ topicId: topicNotes.topicId })
     .from(topicNotes)
-    .where(eq(topicNotes.profileId, profileId));
+    .where(
+      and(
+        eq(topicNotes.profileId, profileId),
+        notInArray(topicNotes.artifactSource, CHALLENGE_EVIDENCE_SOURCES),
+      ),
+    );
 
   return rows.map((r) => r.topicId);
 }
@@ -416,6 +463,7 @@ export async function listAllNotes(
   const conditions: SQL[] = [
     eq(topicNotes.profileId, profileId),
     eq(subjects.profileId, profileId),
+    notInArray(topicNotes.artifactSource, CHALLENGE_EVIDENCE_SOURCES),
   ];
 
   if (options.subjectId) {
@@ -440,6 +488,8 @@ export async function listAllNotes(
   return {
     notes: page.map((row) => ({
       ...row,
+      artifactSource: row.artifactSource as NoteArtifactSource,
+      verificationState: row.verificationState as ArtifactVerificationState,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     })),
@@ -464,6 +514,8 @@ async function selectAllNoteRows(
       subjectName: subjects.name,
       sessionId: noteSessionIdSelection(includeSessionId),
       content: topicNotes.content,
+      artifactSource: topicNotes.artifactSource,
+      verificationState: topicNotes.verificationState,
       origin: sql<'self'>`'self'`,
       createdAt: topicNotes.createdAt,
       updatedAt: topicNotes.updatedAt,
@@ -512,6 +564,8 @@ export async function createNote(
     profileId,
     sessionId: sessionId ?? null,
     content,
+    artifactSource: 'learner_authored_note',
+    verificationState: 'unverified',
   });
 }
 
@@ -524,13 +578,20 @@ export async function updateNote(
   learningTextGuard.assertNoClinicalInferenceInLearningRecord(content);
   const [row] = await db
     .update(topicNotes)
-    .set({ content, updatedAt: new Date() })
+    .set({
+      content,
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
+      updatedAt: new Date(),
+    })
     .where(and(eq(topicNotes.id, noteId), eq(topicNotes.profileId, profileId)))
     .returning({
       id: topicNotes.id,
       topicId: topicNotes.topicId,
       sessionId: topicNotes.sessionId,
       content: topicNotes.content,
+      artifactSource: topicNotes.artifactSource,
+      verificationState: topicNotes.verificationState,
       createdAt: topicNotes.createdAt,
       updatedAt: topicNotes.updatedAt,
     });
@@ -580,12 +641,18 @@ async function selectNotesForTopic(
       topicId: topicNotes.topicId,
       sessionId: noteSessionIdSelection(includeSessionId),
       content: topicNotes.content,
+      artifactSource: topicNotes.artifactSource,
+      verificationState: topicNotes.verificationState,
       createdAt: topicNotes.createdAt,
       updatedAt: topicNotes.updatedAt,
     })
     .from(topicNotes)
     .where(
-      and(eq(topicNotes.topicId, topicId), eq(topicNotes.profileId, profileId)),
+      and(
+        eq(topicNotes.topicId, topicId),
+        eq(topicNotes.profileId, profileId),
+        notInArray(topicNotes.artifactSource, CHALLENGE_EVIDENCE_SOURCES),
+      ),
     )
     .orderBy(desc(topicNotes.createdAt));
 }

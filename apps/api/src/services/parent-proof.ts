@@ -16,6 +16,7 @@ import {
 import { assertChildDashboardDataVisible } from './dashboard';
 import { resolveMasteryVerificationState } from './challenge-round/verification';
 import { getRetentionStatus } from './retention';
+import { getArtifactEvidenceAvailability } from './evidence-links';
 
 // [WI-1658 rework] Read-side quote age-out (AC4). WI-1194 cites this same
 // 30-day window as the clock verbatim quotes should align to (its
@@ -73,7 +74,11 @@ export async function getVerifiedProofForSessionTopic(
   const repo = createScopedRepository(db, childProfileId);
   const [noteRows, weakSpotRows, retentionCard] = await Promise.all([
     db
-      .select({ content: topicNotes.content, createdAt: topicNotes.createdAt })
+      .select({
+        id: topicNotes.id,
+        content: topicNotes.content,
+        createdAt: topicNotes.createdAt,
+      })
       .from(topicNotes)
       .where(
         and(
@@ -81,6 +86,7 @@ export async function getVerifiedProofForSessionTopic(
           eq(topicNotes.topicId, topicId),
           eq(topicNotes.sessionId, sessionId),
           eq(topicNotes.artifactSource, 'challenge_drafted_note'),
+          eq(topicNotes.verificationState, 'verified'),
         ),
       )
       .orderBy(desc(topicNotes.createdAt))
@@ -101,6 +107,11 @@ export async function getVerifiedProofForSessionTopic(
     quoteAgeOutCutoff.getUTCDate() - QUOTE_AGE_OUT_DAYS,
   );
 
+  const evidenceAvailability = await getArtifactEvidenceAvailability(
+    db,
+    childProfileId,
+    note.id,
+  );
   return {
     hasProof: true,
     topicId: verified.topicId,
@@ -124,6 +135,7 @@ export async function getVerifiedProofForSessionTopic(
         })
       : undefined,
     nextReviewDate: retentionCard?.nextReviewAt?.toISOString(),
+    evidenceAvailability,
   };
 }
 
@@ -184,7 +196,7 @@ export async function getLatestVerifiedProofForChild(
 
   const [noteRow, weakSpotRows, retentionCard] = await Promise.all([
     db
-      .select({ content: topicNotes.content })
+      .select({ id: topicNotes.id, content: topicNotes.content })
       .from(topicNotes)
       .where(
         and(
@@ -192,6 +204,7 @@ export async function getLatestVerifiedProofForChild(
           eq(topicNotes.topicId, latest.topicId),
           eq(topicNotes.sessionId, latest.sessionId),
           eq(topicNotes.artifactSource, 'challenge_drafted_note'),
+          eq(topicNotes.verificationState, 'verified'),
           gte(topicNotes.createdAt, quoteAgeOutCutoff),
         ),
       )
@@ -221,6 +234,9 @@ export async function getLatestVerifiedProofForChild(
       .limit(1),
   ]);
 
+  const evidenceAvailability = noteRow[0]
+    ? await getArtifactEvidenceAvailability(db, childProfileId, noteRow[0].id)
+    : 'source_unavailable';
   return {
     hasProof: true,
     topicId: latest.topicId,
@@ -245,5 +261,6 @@ export async function getLatestVerifiedProofForChild(
           nextReviewAt: retentionCard[0].nextReviewAt?.toISOString() ?? null,
         })
       : undefined,
+    evidenceAvailability,
   };
 }

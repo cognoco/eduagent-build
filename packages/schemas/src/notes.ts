@@ -7,11 +7,21 @@ import { sessionTypeSchema } from './session-enums.ts';
 export const noteOriginSchema = z.enum(['self', 'mentor']);
 export type NoteOrigin = z.infer<typeof noteOriginSchema>;
 
-// [WI-1658] Single value written today; WI-1704 owns widening this to the
-// full artifactSource enum (challenge_solid_quote / challenge_drafted_note /
-// learner_authored_note / freeform_keep) once the evidence-link substrate lands.
-export const noteArtifactSourceSchema = z.literal('challenge_drafted_note');
+export const noteArtifactSourceSchema = z.enum([
+  'challenge_solid_quote',
+  'challenge_drafted_note',
+  'learner_authored_note',
+  'freeform_keep',
+]);
 export type NoteArtifactSource = z.infer<typeof noteArtifactSourceSchema>;
+
+export const artifactVerificationStateSchema = z.enum([
+  'unverified',
+  'verified',
+]);
+export type ArtifactVerificationState = z.infer<
+  typeof artifactVerificationStateSchema
+>;
 
 /**
  * [BUG-212] Canonical client-facing note shape. The previously-duplicated
@@ -30,6 +40,8 @@ export const noteResponseSchema = z.object({
   sessionId: z.string().uuid().nullable(),
   content: z.string(),
   origin: noteOriginSchema.default('self'),
+  artifactSource: noteArtifactSourceSchema,
+  verificationState: artifactVerificationStateSchema,
   createdAt: isoDateField,
   updatedAt: isoDateField,
 });
@@ -70,6 +82,8 @@ const _noteDbRowSchema = z.object({
   sessionId: z.string().uuid().nullable(),
   content: z.string(),
   origin: noteOriginSchema.default('self'),
+  artifactSource: noteArtifactSourceSchema,
+  verificationState: artifactVerificationStateSchema,
   createdAt: _dateField,
   updatedAt: _dateField,
 });
@@ -90,6 +104,8 @@ const _noteGetRowSchema = z.object({
   topicId: z.string().uuid(),
   content: z.string(),
   origin: noteOriginSchema.default('self'),
+  artifactSource: noteArtifactSourceSchema,
+  verificationState: artifactVerificationStateSchema,
   updatedAt: _dateField,
 });
 export const noteGetResponseSchema = z.object({
@@ -128,6 +144,8 @@ export const allNoteSchema = z.object({
   sessionId: z.string().uuid().nullable(),
   content: z.string(),
   origin: noteOriginSchema.default('self'),
+  artifactSource: noteArtifactSourceSchema,
+  verificationState: artifactVerificationStateSchema,
   createdAt: isoDateField,
   updatedAt: isoDateField,
 });

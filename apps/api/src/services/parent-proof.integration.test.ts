@@ -262,6 +262,7 @@ describeIfDb('getLatestVerifiedProofForChild (integration) [WI-1658]', () => {
       sessionId,
       content: 'Plants convert light into chemical energy.',
       artifactSource: 'challenge_drafted_note',
+      verificationState: 'verified',
     });
 
     const result = await getLatestVerifiedProofForChild(
@@ -347,6 +348,7 @@ describeIfDb('getLatestVerifiedProofForChild (integration) [WI-1658]', () => {
       sessionId,
       content: 'This quote should never come back once aged out.',
       artifactSource: 'challenge_drafted_note',
+      verificationState: 'verified',
       createdAt: agedCreatedAt,
     });
 
@@ -400,6 +402,7 @@ describeIfDb('getLatestVerifiedProofForChild (integration) [WI-1658]', () => {
       sessionId,
       content: 'The verified concept quote.',
       artifactSource: 'challenge_drafted_note',
+      verificationState: 'verified',
       createdAt: new Date(now.getTime() - 1000),
     });
     await db.insert(topicNotes).values({

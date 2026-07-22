@@ -24,6 +24,8 @@ const validBookmark = {
   subjectName: 'Math',
   topicTitle: null,
   content: 'This is a bookmark',
+  artifactSource: 'freeform_keep' as const,
+  verificationState: 'unverified' as const,
   createdAt: ISO,
 };
 
@@ -81,6 +83,16 @@ describe('bookmarkSchema', () => {
     const { sessionId: _, ...rest } = validBookmark;
     const result = bookmarkSchema.safeParse(rest);
     expect(result.success).toBe(false);
+  });
+
+  it('rejects missing artifactSource', () => {
+    const { artifactSource: _, ...rest } = validBookmark;
+    expect(bookmarkSchema.safeParse(rest).success).toBe(false);
+  });
+
+  it('rejects missing verificationState', () => {
+    const { verificationState: _, ...rest } = validBookmark;
+    expect(bookmarkSchema.safeParse(rest).success).toBe(false);
   });
 });
 

@@ -7,6 +7,7 @@ import {
   sessionEvents,
   sessionSummaries,
   bookmarks,
+  evidenceLinks,
   needsDeepeningTopics,
   onboardingDrafts,
   parkingLotItems,
@@ -96,6 +97,14 @@ export function createSessionRepository(
           ...(orderBy ? { orderBy } : {}),
         });
       },
+      async findId(extraWhere?: SQL): Promise<{ id: string } | undefined> {
+        const [row] = await db
+          .select({ id: sessionEvents.id })
+          .from(sessionEvents)
+          .where(scopedWhere(sessionEvents, extraWhere))
+          .limit(1);
+        return row;
+      },
     },
 
     retrievalEvents: {
@@ -128,6 +137,14 @@ export function createSessionRepository(
       async findFirst(extraWhere?: SQL) {
         return db.query.bookmarks.findFirst({
           where: scopedWhere(bookmarks, extraWhere),
+        });
+      },
+    },
+
+    evidenceLinks: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.evidenceLinks.findMany({
+          where: scopedWhere(evidenceLinks, extraWhere),
         });
       },
     },

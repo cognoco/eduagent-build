@@ -3,6 +3,7 @@ import {
   createNoteInputSchema,
   updateNoteInputSchema,
   noteOriginSchema,
+  noteArtifactSourceSchema,
   noteResponseSchema,
   bookNotesResponseSchema,
   topicNotesResponseSchema,
@@ -31,6 +32,8 @@ describe('topicNoteSchema', () => {
     profileId: UUID,
     sessionId: UUID,
     content: 'My note content',
+    artifactSource: 'learner_authored_note' as const,
+    verificationState: 'unverified' as const,
     createdAt: ISO,
     updatedAt: ISO,
   };
@@ -39,6 +42,8 @@ describe('topicNoteSchema', () => {
     expect(topicNoteSchema.parse(validNote)).toEqual({
       ...validNote,
       origin: 'self',
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
     });
   });
 
@@ -144,6 +149,8 @@ describe('noteResponseSchema', () => {
     topicId: UUID,
     sessionId: null,
     content: 'Content',
+    artifactSource: 'learner_authored_note' as const,
+    verificationState: 'unverified' as const,
     createdAt: ISO,
     updatedAt: ISO,
   };
@@ -152,6 +159,8 @@ describe('noteResponseSchema', () => {
     expect(noteResponseSchema.parse(valid)).toEqual({
       ...valid,
       origin: 'self',
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
     });
   });
 
@@ -179,6 +188,16 @@ describe('noteResponseSchema', () => {
     expect(noteResponseSchema.parse(valid).origin).toBe('self');
   });
 
+  it('rejects missing artifactSource', () => {
+    const { artifactSource: _, ...rest } = valid;
+    expect(noteResponseSchema.safeParse(rest).success).toBe(false);
+  });
+
+  it('rejects missing verificationState', () => {
+    const { verificationState: _, ...rest } = valid;
+    expect(noteResponseSchema.safeParse(rest).success).toBe(false);
+  });
+
   it('exports the additive note origin enum', () => {
     expect(noteOriginSchema.options).toEqual(['self', 'mentor']);
   });
@@ -187,6 +206,43 @@ describe('noteResponseSchema', () => {
     expect(
       noteResponseSchema.parse({ ...valid, origin: 'mentor' }).origin,
     ).toBe('mentor');
+  });
+
+  it('distinguishes a verified Challenge artifact from an ordinary learner note', () => {
+    const verified = noteResponseSchema.safeParse({
+      ...valid,
+      artifactSource: 'challenge_drafted_note',
+      verificationState: 'verified',
+    });
+    const learnerAuthored = noteResponseSchema.safeParse({
+      ...valid,
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
+    });
+
+    expect(verified).toMatchObject({
+      success: true,
+      data: {
+        artifactSource: 'challenge_drafted_note',
+        verificationState: 'verified',
+      },
+    });
+    expect(learnerAuthored).toMatchObject({
+      success: true,
+      data: {
+        artifactSource: 'learner_authored_note',
+        verificationState: 'unverified',
+      },
+    });
+  });
+
+  it('exports every accepted artifact source', () => {
+    expect(noteArtifactSourceSchema.options).toEqual([
+      'challenge_solid_quote',
+      'challenge_drafted_note',
+      'learner_authored_note',
+      'freeform_keep',
+    ]);
   });
 });
 
@@ -199,6 +255,8 @@ const noteDbRow = {
   topicId: UUID,
   sessionId: null,
   content: 'Note',
+  artifactSource: 'learner_authored_note' as const,
+  verificationState: 'unverified' as const,
   createdAt: ISO,
   updatedAt: ISO,
 };
@@ -248,6 +306,8 @@ describe('noteGetResponseSchema', () => {
       id: UUID,
       topicId: UUID,
       content: 'A note',
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
       updatedAt: ISO,
     };
     const parsed = noteGetResponseSchema.parse({ note: row });
@@ -256,7 +316,13 @@ describe('noteGetResponseSchema', () => {
 
   it('rejects note with missing id', () => {
     const result = noteGetResponseSchema.safeParse({
-      note: { topicId: UUID, content: 'x', updatedAt: ISO },
+      note: {
+        topicId: UUID,
+        content: 'x',
+        artifactSource: 'learner_authored_note',
+        verificationState: 'unverified',
+        updatedAt: ISO,
+      },
     });
     expect(result.success).toBe(false);
   });
@@ -367,6 +433,8 @@ describe('allNoteSchema', () => {
     subjectName: 'Subject',
     sessionId: null,
     content: 'Content',
+    artifactSource: 'learner_authored_note' as const,
+    verificationState: 'unverified' as const,
     createdAt: ISO,
     updatedAt: ISO,
   };
@@ -375,6 +443,8 @@ describe('allNoteSchema', () => {
     expect(allNoteSchema.parse(validAllNote)).toEqual({
       ...validAllNote,
       origin: 'self',
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
     });
   });
 
@@ -394,6 +464,16 @@ describe('allNoteSchema', () => {
     if (!result.success) {
       expect(result.error.issues[0]!.path).toContain('subjectId');
     }
+  });
+
+  it('rejects missing artifactSource', () => {
+    const { artifactSource: _, ...rest } = validAllNote;
+    expect(allNoteSchema.safeParse(rest).success).toBe(false);
+  });
+
+  it('rejects missing verificationState', () => {
+    const { verificationState: _, ...rest } = validAllNote;
+    expect(allNoteSchema.safeParse(rest).success).toBe(false);
   });
 
   it('rejects invalid datetime for createdAt', () => {
@@ -420,6 +500,8 @@ describe('allNotesResponseSchema', () => {
     subjectName: 'Subject',
     sessionId: null,
     content: 'Content',
+    artifactSource: 'learner_authored_note' as const,
+    verificationState: 'unverified' as const,
     createdAt: ISO,
     updatedAt: ISO,
   };
@@ -545,6 +627,8 @@ describe('[BUG-212] topicNoteSchema and noteResponseSchema share a single base',
       topicId: UUID,
       sessionId: null,
       content: 'x',
+      artifactSource: 'learner_authored_note',
+      verificationState: 'unverified',
       createdAt: new Date('2026-05-18T00:00:00.000Z'),
       updatedAt: new Date('2026-05-18T00:00:00.000Z'),
     });

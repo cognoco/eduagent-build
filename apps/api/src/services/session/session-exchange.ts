@@ -123,7 +123,10 @@ import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
 import { getRetentionStatus, type RetentionState } from '../retention';
 import { extractInterestLabels } from '../graded-input-generation';
-import { createNoteForSession } from '../notes';
+import {
+  persistVerifiedChallengeArtifact,
+  persistVerifiedChallengeArtifacts,
+} from '../evidence-links';
 import type {
   EscalationRung,
   LlmProviderPolicy,
@@ -1371,6 +1374,37 @@ export async function finalizeChallengeRoundIfReady(
     verifiedSolidContents,
   );
 
+  // Persist each DB-confirmed solid answer as its own verified artifact. This
+  // is deliberately independent of the whole-round outcome: a partial round
+  // can still have a concept-grain solid explanation, but consumers must not
+  // promote it to topic proof unless the topic verification state permits it.
+  if (verifiedSolidContents !== null) {
+    const solidItems = evaluations.filter((item) => item.result === 'solid');
+    await safeWrite(
+      async () => {
+        await persistVerifiedChallengeArtifacts(db, {
+          profileId,
+          topicId,
+          sessionId: session.id,
+          artifacts: solidItems.flatMap((item, index) => {
+            const content = verifiedSolidContents[index];
+            return content
+              ? [
+                  {
+                    content,
+                    artifactSource: 'challenge_solid_quote' as const,
+                    sourceEventIds: [item.answerEventId],
+                  },
+                ]
+              : [];
+          }),
+        });
+      },
+      'challenge-round.finalize.solid-quote-persist',
+      { profileId, sessionId: session.id, topicId },
+    );
+  }
+
   // [WI-1658] Persist the validated draft as the durable verified-proof artifact,
   // ONLY on a fully-verified round (every evaluation item solid). This sidesteps
   // the event-grain gap the Artifact Provenance Contract flags for mixed rounds:
@@ -1381,14 +1415,16 @@ export async function finalizeChallengeRoundIfReady(
   // persistChallengeRoundMasteryEvidence above.
   if (decision.outcome === 'verified' && draftedNote?.body) {
     await safeWrite(
-      () =>
-        createNoteForSession(db, {
+      async () => {
+        await persistVerifiedChallengeArtifact(db, {
           profileId,
           topicId,
           sessionId: session.id,
           content: draftedNote.body as string,
           artifactSource: 'challenge_drafted_note',
-        }),
+          sourceEventIds: draftedNote.sourceAnswerEventIds,
+        });
+      },
       'challenge-round.finalize.note-persist',
       { profileId, sessionId: session.id, topicId },
     );
