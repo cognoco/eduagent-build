@@ -52,6 +52,7 @@ jest.mock(
 
 import {
   assessments,
+  evidenceLinks,
   needsDeepeningTopics,
   retentionCards,
   sessionSummaries,
@@ -198,7 +199,8 @@ function fakeProofDb(rowsByTable: Map<unknown, unknown[]>): Database {
       return chain;
     }),
     // Scoped-repository path used by getVerifiedProofForSessionTopic for the
-    // weak-spot and retention-card reads; serve from the same seeded map.
+    // weak-spot and retention-card reads, and by getArtifactEvidenceAvailability
+    // for the evidence-links read; serve from the same seeded map.
     query: {
       needsDeepeningTopics: {
         findMany: jest.fn(
@@ -209,6 +211,9 @@ function fakeProofDb(rowsByTable: Map<unknown, unknown[]>): Database {
         findFirst: jest.fn(
           async () => (rowsByTable.get(retentionCards) ?? [])[0],
         ),
+      },
+      evidenceLinks: {
+        findMany: jest.fn(async () => rowsByTable.get(evidenceLinks) ?? []),
       },
     },
   } as unknown as Database;
