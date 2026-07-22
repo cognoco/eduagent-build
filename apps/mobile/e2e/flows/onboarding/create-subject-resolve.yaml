@@ -63,14 +63,14 @@ tags:
 - tapOn:
     id: "create-subject-submit"
 
-# 10. Wait for suggestion card (LLM resolve — may take a few seconds)
+# 10. Wait for confident correction (LLM resolve — may take a few seconds)
 - extendedWaitUntil:
     visible:
-      id: "subject-suggestion-card"
+      id: "subject-confident-card"
     timeout: 15000
 
-# 11. Screenshot: suggestion card visible with correction
-- takeScreenshot: resolve-02-suggestion-card
+# 11. Screenshot: confident correction visible
+- takeScreenshot: resolve-02-confident-card
 
 # 12. Accept the suggestion
 - tapOn:

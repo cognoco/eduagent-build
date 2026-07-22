@@ -4369,6 +4369,62 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(back).toBeGreaterThan(backScroll);
   });
 
+  it('[WI-1864] verifies the multi-child family summary at its below-fold position', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/multi-child-dashboard.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        optional?: boolean;
+      };
+      assertVisible?: { id?: string; optional?: boolean } | string;
+    }>;
+    const child3 = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id ===
+          'parent-home-check-child-${CHILD3_PROFILE_ID}' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.optional !== true,
+    );
+    const summaryScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > child3 &&
+        scrollUntilVisible?.element?.id === 'parent-home-family-summary' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.optional !== true,
+    );
+    const summaryAssert = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > summaryScroll &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'parent-home-family-summary' &&
+        assertVisible.optional !== true,
+    );
+    const child1Return = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > summaryAssert &&
+        scrollUntilVisible?.element?.id ===
+          'parent-home-check-child-${CHILD1_PROFILE_ID}' &&
+        scrollUntilVisible.direction === 'UP' &&
+        scrollUntilVisible.optional !== true,
+    );
+    const prematureSummaryAssert = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index < summaryScroll &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'parent-home-family-summary',
+    );
+
+    expect(child3).toBeGreaterThan(-1);
+    expect(summaryScroll).toBeGreaterThan(child3);
+    expect(summaryAssert).toBeGreaterThan(summaryScroll);
+    expect(child1Return).toBeGreaterThan(summaryAssert);
+    expect(prematureSummaryAssert).toBe(-1);
+  });
+
   it('[WI-1864] waits for the Google SSO browser before cancelling it', () => {
     const source = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/auth/sso-user-cancel.yaml'),
@@ -4443,6 +4499,55 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
     expect(studyAction).toBeGreaterThan(-1);
     expect(open).toBeGreaterThan(studyAction);
+  });
+
+  it('[WI-1864] accepts the current confident subject-resolution receipt', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/onboarding/create-subject-resolve.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      tapOn?: { id?: string; optional?: boolean } | string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        timeout?: number;
+        optional?: boolean;
+      };
+    }>;
+    const submit = commands.findIndex(
+      ({ tapOn }) =>
+        typeof tapOn === 'object' &&
+        tapOn.id === 'create-subject-submit' &&
+        tapOn.optional !== true,
+    );
+    const confident = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > submit &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'subject-confident-card' &&
+        (extendedWaitUntil.timeout ?? 0) >= 15000 &&
+        extendedWaitUntil.optional !== true,
+    );
+    const accept = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > confident &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'subject-suggestion-accept' &&
+        tapOn.optional !== true,
+    );
+    const staleAmbiguousWait = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'subject-suggestion-card',
+    );
+
+    expect(submit).toBeGreaterThan(-1);
+    expect(confident).toBeGreaterThan(submit);
+    expect(accept).toBeGreaterThan(confident);
+    expect(staleAmbiguousWait).toBe(-1);
   });
 
   it('[WI-1864] exercises the seeded answer-check failure before continuing the round', () => {
