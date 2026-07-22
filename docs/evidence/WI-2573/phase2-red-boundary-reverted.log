@@ -1,0 +1,188 @@
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+  console.log
+    [integration-setup] Using pg wire-protocol driver (local/CI)
+
+      at createDatabase (tests/integration/setup.ts:65:17)
+
+(node:41851) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+FAIL integration tests/integration/mentor-notice-push-containment.integration.test.ts
+  mentor-notice push containment — real database
+    ✕ delivers nothing for a replayed pre-existing send event (homework session) with the in-app flag on and permissive settings (50 ms)
+    ✕ delivers nothing for a replayed pre-existing send event (ordinary learning session) with the in-app flag on and permissive settings (13 ms)
+    ✕ delivers nothing when the boundary is explicitly false (12 ms)
+    ✕ delivers nothing on repeated retry-shaped replays of the same event (12 ms)
+    ✓ POSITIVE CONTROL: the same fixture does send when the post-MVP boundary is explicitly enabled (14 ms)
+    ✕ scan enqueues nothing and reads nothing while contained (10 ms)
+    ✓ POSITIVE CONTROL: scan reaches the eligibility query once the boundary is enabled (2 ms)
+    ✕ cannot be activated by the in-app mentor-notice flag or by review-reminder preferences (11 ms)
+
+  ● mentor-notice push containment — real database › delivers nothing for a replayed pre-existing send event (homework session) with the in-app flag on and permissive settings
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 12
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "body": "{\"to\":\"ExponentPushToken[wi2573-containment-fixture]\",\"title\":\"A quick Algebra replay-homework check\",\"body\":\"Your mentor noticed one small idea worth revisiting.\",\"sound\":\"default\",\"data\":{\"type\":\"notice_recheck\",\"noticeId\":\"019f8b65-2798-7114-a7b5-542c64553b9d\",\"subjectId\":\"019f8b65-2796-70b2-a549-2270f3f5b425\"}}",
+    +     "headers": Object {
+    +       "Accept": "application/json",
+    +       "Content-Type": "application/json",
+    +     },
+    +     "method": "POST",
+    +     "timestamp": 1784750090158,
+    +     "url": "https://exp.host/--/api/v2/push/send",
+    +   },
+    + ]
+
+      274 |
+      275 |       // Observable outcome 1: the push transport was never invoked.
+    > 276 |       expect(expoCalls()).toEqual([]);
+          |                           ^
+      277 |       // Observable outcome 2: no notification-log row was written.
+      278 |       expect(await noticeRecheckLogs(fixture.profileId)).toHaveLength(0);
+      279 |       // Observable outcome 3: no reservation happened — the notice is
+
+      at tests/integration/mentor-notice-push-containment.integration.test.ts:276:27
+
+  ● mentor-notice push containment — real database › delivers nothing for a replayed pre-existing send event (ordinary learning session) with the in-app flag on and permissive settings
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 12
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "body": "{\"to\":\"ExponentPushToken[wi2573-containment-fixture]\",\"title\":\"A quick Algebra replay-learning check\",\"body\":\"Your mentor noticed one small idea worth revisiting.\",\"sound\":\"default\",\"data\":{\"type\":\"notice_recheck\",\"noticeId\":\"019f8b65-27ba-79de-94c8-bf9a3683576c\",\"subjectId\":\"019f8b65-27b9-7630-bfaf-e016f90804a9\"}}",
+    +     "headers": Object {
+    +       "Accept": "application/json",
+    +       "Content-Type": "application/json",
+    +     },
+    +     "method": "POST",
+    +     "timestamp": 1784750090178,
+    +     "url": "https://exp.host/--/api/v2/push/send",
+    +   },
+    + ]
+
+      274 |
+      275 |       // Observable outcome 1: the push transport was never invoked.
+    > 276 |       expect(expoCalls()).toEqual([]);
+          |                           ^
+      277 |       // Observable outcome 2: no notification-log row was written.
+      278 |       expect(await noticeRecheckLogs(fixture.profileId)).toHaveLength(0);
+      279 |       // Observable outcome 3: no reservation happened — the notice is
+
+      at tests/integration/mentor-notice-push-containment.integration.test.ts:276:27
+
+  ● mentor-notice push containment — real database › delivers nothing when the boundary is explicitly false
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 12
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "body": "{\"to\":\"ExponentPushToken[wi2573-containment-fixture]\",\"title\":\"A quick Algebra explicit-false check\",\"body\":\"Your mentor noticed one small idea worth revisiting.\",\"sound\":\"default\",\"data\":{\"type\":\"notice_recheck\",\"noticeId\":\"019f8b65-27c6-75c5-8eae-3172e3c09eac\",\"subjectId\":\"019f8b65-27c5-79b3-aa4c-08f76ada76ec\"}}",
+    +     "headers": Object {
+    +       "Accept": "application/json",
+    +       "Content-Type": "application/json",
+    +     },
+    +     "method": "POST",
+    +     "timestamp": 1784750090189,
+    +     "url": "https://exp.host/--/api/v2/push/send",
+    +   },
+    + ]
+
+      300 |     });
+      301 |
+    > 302 |     expect(expoCalls()).toEqual([]);
+          |                         ^
+      303 |     expect(await noticeRecheckLogs(fixture.profileId)).toHaveLength(0);
+      304 |     expect(result).toEqual({ status: 'skipped', reason: 'push_post_mvp' });
+      305 |   });
+
+      at Object.<anonymous> (tests/integration/mentor-notice-push-containment.integration.test.ts:302:25)
+
+  ● mentor-notice push containment — real database › delivers nothing on repeated retry-shaped replays of the same event
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 2
+    + Received  + 2
+
+      Object {
+    -   "reason": "push_post_mvp",
+    -   "status": "skipped",
+    +   "status": "sent",
+    +   "ticketId": "mock-receipt-id",
+      }
+
+      313 |         eventId: 'replayed-event-retry',
+      314 |       });
+    > 315 |       expect(result).toEqual({ status: 'skipped', reason: 'push_post_mvp' });
+          |                      ^
+      316 |     }
+      317 |
+      318 |     expect(expoCalls()).toEqual([]);
+
+      at Object.<anonymous> (tests/integration/mentor-notice-push-containment.integration.test.ts:315:22)
+
+  ● mentor-notice push containment — real database › scan enqueues nothing and reads nothing while contained
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 0
+    + Received  + 2
+
+      Array [
+        "check-post-mvp-push-boundary",
+    +   "check-feature-flag",
+    +   "find-eligible-notices",
+      ]
+
+      358 |
+      359 |     expect(runner.sendEventCalls).toHaveLength(0);
+    > 360 |     expect(runner.runNames()).toEqual(['check-post-mvp-push-boundary']);
+          |                               ^
+      361 |     expect(result).toEqual({
+      362 |       eligibleCount: 0,
+      363 |       sentEvents: 0,
+
+      at Object.<anonymous> (tests/integration/mentor-notice-push-containment.integration.test.ts:360:31)
+
+  ● mentor-notice push containment — real database › cannot be activated by the in-app mentor-notice flag or by review-reminder preferences
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 2
+    + Received  + 2
+
+      Object {
+    -   "reason": "push_post_mvp",
+    -   "status": "skipped",
+    +   "status": "sent",
+    +   "ticketId": "mock-receipt-id",
+      }
+
+      392 |     const { result } = await runSend(fixture, { eventId: 'ac3-event' });
+      393 |
+    > 394 |     expect(result).toEqual({ status: 'skipped', reason: 'push_post_mvp' });
+          |                    ^
+      395 |     expect(expoCalls()).toEqual([]);
+      396 |     expect(await noticeRecheckLogs(fixture.profileId)).toHaveLength(0);
+      397 |   });
+
+      at Object.<anonymous> (tests/integration/mentor-notice-push-containment.integration.test.ts:394:20)
+
+Test Suites: 1 failed, 1 total
+Tests:       6 failed, 2 passed, 8 total
+Snapshots:   0 total
+Time:        0.78 s, estimated 2 s
+Ran all test suites matching tests/integration/mentor-notice-push-containment.integration.test.ts.

@@ -1,0 +1,24 @@
+ts-jest[config] (WARN) [94mmessage[0m[90m TS151001: [0mIf you have issues related to imports, you should consider setting `esModuleInterop` to `true` in your TypeScript configuration file (usually `tsconfig.json`). See https://blogs.msdn.microsoft.com/typescript/2018/01/31/announcing-typescript-2-7/#easier-ecmascript-module-interoperability for more information.
+  console.log
+    [integration-setup] Using pg wire-protocol driver (local/CI)
+
+      at createDatabase (tests/integration/setup.ts:65:17)
+
+(node:42221) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS integration tests/integration/mentor-notice-push-containment.integration.test.ts
+  mentor-notice push containment — real database
+    ✓ delivers nothing for a replayed pre-existing send event (homework session) with the in-app flag on and permissive settings (28 ms)
+    ✓ delivers nothing for a replayed pre-existing send event (ordinary learning session) with the in-app flag on and permissive settings (6 ms)
+    ✓ delivers nothing when the boundary is explicitly false (5 ms)
+    ✓ delivers nothing on repeated retry-shaped replays of the same event (5 ms)
+    ✓ POSITIVE CONTROL: the same fixture does send when the post-MVP boundary is explicitly enabled (26 ms)
+    ✓ scan enqueues nothing and reads nothing while contained (5 ms)
+    ✓ POSITIVE CONTROL: scan reaches the eligibility query once the boundary is enabled (4 ms)
+    ✓ cannot be activated by the in-app mentor-notice flag or by review-reminder preferences (5 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        0.693 s, estimated 1 s
+Ran all test suites matching tests/integration/mentor-notice-push-containment.integration.test.ts.
