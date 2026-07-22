@@ -1386,7 +1386,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
 
       expect(commands[footerScroll]?.scrollUntilVisible).toMatchObject({
         visibilityPercentage: 50,
-        centerElement: true,
+        centerElement: false,
         optional: false,
       });
       expect(footerAssertion).toBeGreaterThan(footerScroll);
@@ -1425,6 +1425,41 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         /"onboarding-complete"\s+"flows\/consent\/post-approval-landing\.yaml"/,
       );
     }
+  });
+
+  it('[WI-1864] keeps the post-approval assertion aligned with product copy', () => {
+    const flow = parseAllDocuments(
+      readFileSync(
+        join(
+          repoRoot,
+          'apps/mobile/e2e/flows/consent/post-approval-landing.yaml',
+        ),
+        'utf8',
+      ),
+    )
+      .at(-1)
+      ?.toJSON() as Array<{
+      assertVisible?: { text?: string } | string;
+    }>;
+    const english = JSON.parse(
+      readFileSync(
+        join(repoRoot, 'apps/mobile/src/i18n/locales/en.json'),
+        'utf8',
+      ),
+    ) as {
+      tabs: { postApproval: { title: string; parentApproved: string } };
+    };
+
+    expect(
+      flow.flatMap(({ assertVisible }) =>
+        typeof assertVisible === 'object' && assertVisible.text
+          ? [assertVisible.text]
+          : [],
+      ),
+    ).toEqual([
+      english.tabs.postApproval.title,
+      english.tabs.postApproval.parentApproved,
+    ]);
   });
 
   it('[WI-1864] waits for the seeded parent child-detail session receipt', () => {
@@ -2784,7 +2819,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scrollUntilVisible?.element?.id === 'practice-other-practice-heading' &&
         scrollUntilVisible.direction === 'DOWN' &&
         scrollUntilVisible.visibilityPercentage === 50 &&
-        scrollUntilVisible.centerElement === true &&
+        scrollUntilVisible.centerElement === false &&
         scrollUntilVisible.optional !== true,
     );
     const recitation = commands.findIndex(
@@ -2815,7 +2850,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         scrollUntilVisible?.element?.id === 'practice-other-practice-heading' &&
         scrollUntilVisible.direction === 'DOWN' &&
         scrollUntilVisible.visibilityPercentage === 50 &&
-        scrollUntilVisible.centerElement === true &&
+        scrollUntilVisible.centerElement === false &&
         scrollUntilVisible.optional !== true,
     );
     const dictation = commands.findIndex(
@@ -2848,6 +2883,58 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
             'practice-recitation',
             'practice-dictation',
           ].includes(scrollUntilVisible.element?.id ?? ''),
+      ),
+    ).toBe(false);
+  });
+
+  it('[WI-1864] enters full dictation through both Practice scroll axes', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/dictation/dictation-full-flow.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+        optional?: boolean;
+      };
+      tapOn?: { id?: string };
+    }>;
+    const heading = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'practice-other-practice-heading' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 50 &&
+        scrollUntilVisible.centerElement === false &&
+        scrollUntilVisible.optional !== true,
+    );
+    const dictation = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > heading &&
+        scrollUntilVisible?.element?.id === 'practice-dictation' &&
+        scrollUntilVisible.direction === 'LEFT' &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === true &&
+        scrollUntilVisible.optional !== true,
+    );
+    const tap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > dictation && tapOn?.id === 'practice-dictation',
+    );
+
+    expect(heading).toBeGreaterThan(-1);
+    expect(dictation).toBeGreaterThan(heading);
+    expect(tap).toBeGreaterThan(dictation);
+    expect(
+      commands.some(
+        ({ scrollUntilVisible }) =>
+          scrollUntilVisible?.element?.id === 'practice-dictation' &&
+          scrollUntilVisible.direction === 'DOWN',
       ),
     ).toBe(false);
   });
@@ -3196,6 +3283,84 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ].toSorted((left, right) => left - right),
     );
     expect(signOutLandingScroll).toBeGreaterThan(-1);
+  });
+
+  it('[WI-1864] verifies parent More rows without leaving them above the viewport', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/parent-tabs.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      assertVisible?: { id?: string; optional?: boolean } | string;
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+        optional?: boolean;
+      };
+    }>;
+    const learningPreferences = commands.findIndex(
+      ({ assertVisible }) =>
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'more-row-learning-preferences' &&
+        assertVisible.optional !== true,
+    );
+    const accountScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > learningPreferences &&
+        scrollUntilVisible?.element?.id === 'more-row-account' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === false &&
+        scrollUntilVisible.optional !== true,
+    );
+    const account = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > accountScroll &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'more-row-account' &&
+        assertVisible.optional !== true,
+    );
+    const notificationsScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > account &&
+        scrollUntilVisible?.element?.id === 'more-row-notifications' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === false &&
+        scrollUntilVisible.optional !== true,
+    );
+    const notifications = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > notificationsScroll &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'more-row-notifications' &&
+        assertVisible.optional !== true,
+    );
+
+    expect([
+      learningPreferences,
+      accountScroll,
+      account,
+      notificationsScroll,
+      notifications,
+    ]).toEqual(
+      [
+        learningPreferences,
+        accountScroll,
+        account,
+        notificationsScroll,
+        notifications,
+      ].toSorted((left, right) => left - right),
+    );
+    expect(learningPreferences).toBeGreaterThan(-1);
+    expect(
+      commands.some(
+        ({ scrollUntilVisible }) =>
+          scrollUntilVisible?.element?.id === 'sign-out-button',
+      ),
+    ).toBe(false);
   });
 
   it('[WI-1864] parks preview-self while its product entry flag is hard-disabled', () => {
@@ -3679,6 +3844,12 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
       tapOn?: { id?: string } | string;
       extendedWaitUntil?: { visible?: { id?: string } | string };
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        optional?: boolean;
+      };
+      assertVisible?: { id?: string; optional?: boolean } | string;
     }>;
     const settings = commands.findIndex(
       ({ tapOn }) =>
@@ -3691,12 +3862,51 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         typeof extendedWaitUntil?.visible === 'object' &&
         extendedWaitUntil.visible.id === 'child-detail-scroll',
     );
+    const mentorMemoryScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > detail &&
+        scrollUntilVisible?.element?.id === 'mentor-memory-link' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.optional !== true,
+    );
+    const mentorMemoryTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > mentorMemoryScroll &&
+        typeof tapOn === 'object' &&
+        tapOn.id === 'mentor-memory-link',
+    );
+    const memoryScreen = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > mentorMemoryTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'child-mentor-memory-screen',
+    );
+    const emptyScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > memoryScreen &&
+        scrollUntilVisible?.element?.id === 'child-mentor-memory-empty-state' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.optional !== true,
+    );
+    const emptyAssertion = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > emptyScroll &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'child-mentor-memory-empty-state' &&
+        assertVisible.optional !== true,
+    );
 
     expect(settings).toBeGreaterThan(-1);
     expect(detail).toBeGreaterThan(settings);
+    expect(mentorMemoryScroll).toBeGreaterThan(detail);
+    expect(mentorMemoryTap).toBeGreaterThan(mentorMemoryScroll);
+    expect(memoryScreen).toBeGreaterThan(mentorMemoryTap);
+    expect(emptyScroll).toBeGreaterThan(memoryScreen);
+    expect(emptyAssertion).toBeGreaterThan(emptyScroll);
     expect(source).not.toContain(
       'parent-home-check-child-${CHILD1_PROFILE_ID}',
     );
+    expect(source).not.toContain('No learning observations yet.');
   });
 
   it('[WI-1864] deep-links to the supported subject-progress resume route', () => {
@@ -4537,6 +4747,78 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(flow).not.toContain('book-row-${BOOK_ID}');
     expect(flow).toContain('components/library/BookCard.tsx');
     expect(bookCard).toContain('testID={`book-card-${book.id}`}');
+  });
+
+  it('[WI-1864] opens child-friendly relearn through the seeded direct-entry route', () => {
+    const flow = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/retention/relearn-child-friendly.yaml',
+      ),
+      'utf8',
+    );
+    const relearnSource = readFileSync(
+      join(repoRoot, 'apps/mobile/src/app/(app)/topic/relearn.tsx'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(flow).at(-1)?.toJSON() as Array<{
+      runFlow?: { file?: string; env?: Record<string, string> };
+      openLink?: string;
+      extendedWaitUntil?: {
+        visible?: { id?: string } | string;
+        optional?: boolean;
+      };
+      assertVisible?:
+        | { id?: string; text?: string; optional?: boolean }
+        | string;
+    }>;
+    const seeded = commands.findIndex(
+      ({ runFlow }) =>
+        runFlow?.file === '../_setup/seed-and-sign-in.yaml' &&
+        runFlow.env?.SEED_SCENARIO === 'failed-recall-3x',
+    );
+    const learner = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > seeded &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'learner-screen' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const directEntry = commands.findIndex(
+      ({ openLink }, index) =>
+        index > learner &&
+        openLink ===
+          'mentomate:///topic/relearn?topicId=${TOPIC_ID}&subjectId=${SUBJECT_ID}',
+    );
+    const methodPhase = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > directEntry &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'relearn-method-phase' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const method = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > methodPhase &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'relearn-method-visual_diagrams' &&
+        assertVisible.optional !== true,
+    );
+
+    expect([seeded, learner, directEntry, methodPhase, method]).toEqual(
+      [seeded, learner, directEntry, methodPhase, method].toSorted(
+        (left, right) => left - right,
+      ),
+    );
+    expect(seeded).toBeGreaterThan(-1);
+    expect(flow).not.toContain('Chemistry Topic 1');
+    expect(flow).not.toContain('relearn-topics-phase');
+    expect(relearnSource).toContain(
+      'const directEntry = Boolean(routeTopicId && routeSubjectId);',
+    );
+    expect(relearnSource).toContain(
+      "useState<Phase>(directEntry ? 'method' : 'topics')",
+    );
   });
 
   it('[WI-1864] opens the seeded retention topic through mandatory stable row ids', () => {

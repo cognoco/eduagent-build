@@ -66,7 +66,7 @@ tags:
 
 # 7. Verify supporting text
 - assertVisible:
-    text: 'Your parent said yes'
+    text: "Your parent has approved your account. You're ready to start learning."
 
 # 8. Screenshot of post-approval landing
 - takeScreenshot: post-approval-landing

@@ -21,118 +21,127 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "onboarding-complete"
+      SEED_SCENARIO: 'onboarding-complete'
       API_URL: ${API_URL}
 
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
 
 - scrollUntilVisible:
     element:
-      id: "home-action-practice"
+      id: 'home-action-practice'
     direction: DOWN
     timeout: 5000
 
 - tapOn:
-    id: "home-action-practice"
+    id: 'home-action-practice'
 
 - extendedWaitUntil:
     visible:
-      id: "practice-screen"
+      id: 'practice-screen'
     timeout: 10000
 
 - takeScreenshot: dictation-01-practice
 
-# practice-dictation is in the "Other practice" horizontal slider at
-# practice/index.tsx:795-949, which is section 4 of the practice screen.
-# The practice ScrollView requires vertical scrolling to reach it on small
-# screens (e.g. Galaxy S10e 5.8"). Scroll down until the slider is visible.
+# practice-dictation is in the "Other practice" horizontal slider. Position
+# the outer vertical viewport using its non-scrollable heading, then move
+# within the horizontal slider; a DOWN search cannot reliably target its child.
 - scrollUntilVisible:
     element:
-      id: "practice-dictation"
+      id: 'practice-other-practice-heading'
     direction: DOWN
     timeout: 5000
+    visibilityPercentage: 50
+    centerElement: false
+
+- scrollUntilVisible:
+    element:
+      id: 'practice-dictation'
+    direction: LEFT
+    timeout: 5000
+    visibilityPercentage: 100
+    centerElement: true
 
 - tapOn:
-    id: "practice-dictation"
+    id: 'practice-dictation'
 
 - extendedWaitUntil:
     visible:
-      id: "dictation-choice-screen"
+      id: 'dictation-choice-screen'
     timeout: 10000
 
 - takeScreenshot: dictation-02-choice
 
 - tapOn:
-    id: "dictation-homework"
+    id: 'dictation-homework'
 
 - extendedWaitUntil:
     visible:
-      id: "dictation-text-preview-screen"
+      id: 'dictation-text-preview-screen'
     timeout: 10000
 
 - takeScreenshot: dictation-03-text-preview
 
 - tapOn:
-    id: "text-preview-input"
+    id: 'text-preview-input'
 
-- inputText: "The sun is warm. Birds can sing."
+- inputText: 'The sun is warm. Birds can sing.'
 
 - hideKeyboard
 
 - tapOn:
-    id: "text-preview-start"
+    id: 'text-preview-start'
 
 - extendedWaitUntil:
     visible:
-      id: "dictation-playback-screen"
+      id: 'dictation-playback-screen'
     timeout: 15000
 
 - takeScreenshot: dictation-04-playback
 
 - assertVisible:
-    id: "playback-progress"
+    id: 'playback-progress'
 
 - extendedWaitUntil:
     visible:
-      id: "dictation-complete-screen"
+      id: 'dictation-complete-screen'
     timeout: 60000
-    optional: true  # justified: dictation may auto-complete (dictation-complete-screen) OR timeout and allow exit via playback-exit; both paths handled below via runFlow when:
+    optional: true # justified: dictation may auto-complete (dictation-complete-screen) OR timeout and allow exit via playback-exit; both paths handled below via runFlow when:
 
 - runFlow:
     when:
       visible:
-        id: "playback-exit"
+        id: 'playback-exit'
     commands:
       - tapOn:
-          id: "playback-exit"
+          id: 'playback-exit'
       - extendedWaitUntil:
           visible:
-            id: "dictation-exit-confirm"
+            id: 'dictation-exit-confirm'
           timeout: 5000
       - tapOn:
-          id: "dictation-exit-confirm"
+          id: 'dictation-exit-confirm'
 
 - runFlow:
     when:
       visible:
-        id: "dictation-complete-screen"
+        id: 'dictation-complete-screen'
     commands:
       - takeScreenshot: dictation-05-complete
       - assertVisible:
-          id: "complete-check-writing"
+          id: 'complete-check-writing'
       - assertVisible:
-          id: "complete-done"
+          id: 'complete-done'
       - assertVisible:
-          id: "complete-try-again"
+          id: 'complete-try-again'
       - tapOn:
-          id: "complete-done"
+          id: 'complete-done'
 
 - extendedWaitUntil:
     visible:
-      id: "practice-screen"
+      id: 'practice-screen'
     timeout: 10000
 
 - takeScreenshot: dictation-06-back-at-practice

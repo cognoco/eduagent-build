@@ -71,7 +71,7 @@ tags:
     direction: DOWN
     timeout: 10000
     visibilityPercentage: 50
-    centerElement: true
+    centerElement: false
     optional: false
 
 - assertVisible:

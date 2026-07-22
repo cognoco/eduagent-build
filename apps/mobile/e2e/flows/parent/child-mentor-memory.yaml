@@ -39,8 +39,19 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      text: 'No learning observations yet.'
+      id: 'child-mentor-memory-screen'
     timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      id: 'child-mentor-memory-empty-state'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+
+- assertVisible:
+    id: 'child-mentor-memory-empty-state'
 
 - takeScreenshot: 01-parent-memory-empty
 
@@ -50,7 +61,7 @@ tags:
     direction: DOWN
     timeout: 10000
     visibilityPercentage: 50
-    centerElement: true
+    centerElement: false
     optional: false
 
 - assertVisible:

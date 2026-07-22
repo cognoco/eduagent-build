@@ -79,7 +79,7 @@ tags:
     direction: DOWN
     timeout: 5000
     visibilityPercentage: 50
-    centerElement: true
+    centerElement: false
 
 - scrollUntilVisible:
     element:
@@ -115,7 +115,7 @@ tags:
     direction: DOWN
     timeout: 5000
     visibilityPercentage: 50
-    centerElement: true
+    centerElement: false
 
 - scrollUntilVisible:
     element:
