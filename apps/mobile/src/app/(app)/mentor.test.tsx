@@ -9,6 +9,7 @@ import type {
 import { MENTOR_CAPABILITY_CASES } from '@eduagent/test-utils';
 
 import {
+  ERROR_RESPONSES,
   NAMED_PROFILES,
   renderScreen,
   type RenderScreenOptions,
@@ -188,6 +189,7 @@ function firstCallOrder(mockFn: jest.Mock): number {
 
 function renderMentorScreen(
   profileOverrides: Pick<RenderScreenOptions, 'profile' | 'profiles'> = {},
+  extraRoutes: RenderScreenOptions['routes'] = {},
 ) {
   const rendered = renderScreen(<MentorScreen />, {
     routes: {
@@ -202,6 +204,7 @@ function renderMentorScreen(
         cards: [],
         selfLearningDoorway: true,
       },
+      ...extraRoutes,
     },
     ...profileOverrides,
   });
@@ -1033,6 +1036,78 @@ describe('MentorScreen', () => {
 
     screen.getByText('Session wrapped');
     screen.getByText('You chose the next step.');
+  });
+
+  function noticeCard(overrides: Partial<NowCard> = {}): NowCard {
+    return card({
+      kind: 'mentor_notice',
+      templateKey: 'now.mentor_notice.default',
+      params: { concept: 'changing signs', subjectName: 'Algebra' },
+      deepLink: {
+        route: 'notice.recheck',
+        params: { noticeId: 'notice-1', subjectId: 'subject-1' },
+        chain: [],
+      },
+      ...overrides,
+    });
+  }
+
+  // [WI-2499 AC-2/AC-3] Not now defers a mentor notice for the current
+  // learning day; it must never look like a generic decline. Removal from
+  // the feed is only ever server-authoritative (the defer mutation's
+  // onSuccess invalidate triggers a refetch) — the screen itself must not
+  // locally hide the card or fall into the "prefer something light" success
+  // affordance the generic decline path uses.
+  it('[WI-2499 AC-2/AC-3] keeps the mentor-notice card on screen and shows no light-practice success after a successful "Not now" defer', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/defer': {
+          noticeId: 'notice-1',
+          deferredAt: '2026-07-21T12:00:00.000Z',
+        },
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Not now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(screen.queryByTestId('light-practice-capitals')).toBeNull();
+  });
+
+  // [WI-2499 AC-3] On a rejected/failed defer, no success state may appear —
+  // the card stays exactly as it was, and the generic light-practice success
+  // affordance never shows.
+  it('[WI-2499 AC-3] keeps the mentor-notice card on screen and shows no light-practice success when the defer mutation is rejected', async () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([noticeCard(), card()]),
+    };
+
+    renderMentorScreen(
+      {},
+      {
+        '/mentor-notices/notice-1/defer': () => ERROR_RESPONSES.forbidden(),
+      },
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Not now'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    screen.getByTestId('now-card-mentor_notice');
+    expect(screen.queryByTestId('light-practice-capitals')).toBeNull();
   });
 
   // WI-1393: the V2 shell previously had zero forward navigation to

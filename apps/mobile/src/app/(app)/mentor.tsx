@@ -258,6 +258,13 @@ function LearnerMentorScreen(): React.ReactElement {
 
   const handleDecline = async (card: NowCard): Promise<void> => {
     if (card.kind === 'mentor_notice') {
+      // [WI-2499] Not now defers for the current learning day; it must not
+      // dismiss locally or show light-practice success — that would render a
+      // success state the server never confirmed. A successful defer
+      // invalidates the feed (mentorNoticeActions.defer's onSuccess), which
+      // is the only authoritative way the card leaves the screen; on
+      // conflict/rejection/transport failure/malformed response, the card
+      // stays until an authoritative refetch says otherwise.
       const noticeId = card.deepLink.params.noticeId;
       if (!noticeId) {
         await mentorNoticeActions.invalidate();
@@ -270,6 +277,7 @@ function LearnerMentorScreen(): React.ReactElement {
           await mentorNoticeActions.invalidate();
         }
       }
+      return;
     }
     setDismissedKeys((current) => {
       const next = new Set(current);
