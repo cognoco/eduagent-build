@@ -9,6 +9,25 @@ const NOW = new Date('2026-07-19T12:00:00.000Z');
 const FUTURE = '2026-08-01T00:00:00.000Z';
 
 describe('[WI-2458] run-smoke project runner', () => {
+  it('defaults the no-argument command to the scoped core lane', () => {
+    const entries = [
+      {
+        id: 'smoke-parent-flaky',
+        project: 'smoke-parent',
+        owner: 'playwright-lane-owner',
+        wi: 'WI-2458',
+        reason: 'stability-window fixture',
+        expires: FUTURE,
+      },
+    ];
+
+    const lane = parseLaneArgument([]);
+    expect(lane).toBe('core');
+    expect(resolveLaneProjects(lane, NOW, entries)).not.toContain(
+      'smoke-parent',
+    );
+  });
+
   it('selects core and advisory projects from the resolver', () => {
     const entries = [
       {

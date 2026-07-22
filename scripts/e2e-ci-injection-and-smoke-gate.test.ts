@@ -516,6 +516,31 @@ describe('[WI-2228/WI-2458] e2e-web.yml gates V2 and stable legacy smoke', () =>
     );
     expect(learnerCrawl).not.toContain("waitForLoadState('networkidle')");
   });
+
+  it('[WI-2604] disables retries only for smoke-learner in CI', () => {
+    const inspectSource = [
+      "import config from './apps/mobile/playwright.config.ts';",
+      "const learner = config.projects.find(({ name }) => name === 'smoke-learner');",
+      "const parent = config.projects.find(({ name }) => name === 'smoke-parent');",
+      'process.stdout.write(JSON.stringify({',
+      'globalRetries: config.retries,',
+      'learnerRetries: learner?.retries,',
+      "parentHasRetryOverride: Object.hasOwn(parent ?? {}, 'retries'),",
+      '}));',
+    ].join(' ');
+    const inspect = spawnSync('pnpm', ['exec', 'tsx', '-e', inspectSource], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: { ...process.env, CI: '1' },
+    });
+
+    expect(inspect.status).toBe(0);
+    expect(JSON.parse(inspect.stdout.trim().split('\n').at(-1)!)).toEqual({
+      globalRetries: 1,
+      learnerRetries: 0,
+      parentHasRetryOverride: false,
+    });
+  });
 });
 
 describe('[WI-1651] e2e-ci.yml propagates Maestro failures', () => {
