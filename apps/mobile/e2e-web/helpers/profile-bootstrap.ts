@@ -7,11 +7,22 @@ export const PROFILE_BOOTSTRAP_GLOB = '**/v1/profiles**';
 
 const PROFILE_FIXTURE_ISO = '2026-07-22T00:00:00.000Z';
 
+interface SeededProfileBootstrapSource {
+  profileId: string;
+  hasFamilyLinks: boolean;
+}
+
 export async function installSeededProfileBootstrap(
   page: Page,
-  scenarioKey = 'solo-learner',
+  source: string | SeededProfileBootstrapSource = 'solo-learner',
 ): Promise<void> {
-  const seed = await readSeedData(scenarioKey);
+  const seed =
+    typeof source === 'string'
+      ? {
+          profileId: (await readSeedData(source)).profileId,
+          hasFamilyLinks: source === 'owner-with-children',
+        }
+      : source;
   const response = {
     profiles: [
       {
@@ -25,7 +36,7 @@ export async function installSeededProfileBootstrap(
         isOwner: true,
         hasPremiumLlm: false,
         defaultAppContext: null,
-        hasFamilyLinks: scenarioKey === 'owner-with-children',
+        hasFamilyLinks: seed.hasFamilyLinks,
         conversationLanguage: 'en',
         pronouns: null,
         consentStatus: null,

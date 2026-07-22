@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { signIn } from '../../helpers/auth';
+import { installSeededProfileBootstrap } from '../../helpers/profile-bootstrap';
 import { buildSeedEmail } from '../../helpers/runtime';
 import { seedScenario } from '../../helpers/test-seed';
 import { emulateNativeTopSafeArea } from '../../helpers/native-safe-area';
@@ -12,6 +13,10 @@ async function seedAndSignInParent(page: Page, alias: string): Promise<void> {
   const seeded = await seedScenario({
     scenario: 'parent-multi-child',
     email: buildSeedEmail(alias),
+  });
+  await installSeededProfileBootstrap(page, {
+    profileId: seeded.profileId,
+    hasFamilyLinks: true,
   });
 
   await signIn(page, {
