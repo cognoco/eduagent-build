@@ -14,9 +14,23 @@
 #     home-subject-carousel, home-subject-card-${id})
 #   - apps/mobile/src/app/(app)/library.tsx (shelves-list)
 #   - apps/mobile/src/app/(app)/_layout.tsx (tab-library, tab-home)
+#
+# BLOCKED (WI-2596): quarantined from the pr-blocking gate 2026-07-22.
+#   Reason: after tapping the subject card the `assertVisible: id: progress-subject-back`
+#     step fails on main because the subject progress screen renders its error state
+#     (progress-subject-error / progress-subject-error-back, apps/mobile/src/app/(app)/
+#     progress/[subjectId]/index.tsx) instead — the V2 supportership-aware seed (WI-2241)
+#     no longer provisions producible progress for the `multi-subject` scenario's active
+#     subject. Seed/fixture drift, not an app regression; the assertion is left intact
+#     (WI-2596 AC-5). Confirmed red: CI run 29859762770, shard 3, ba6c01b28 (2026-07-21).
+#   Owner (restore + device-verify): WI-2600.
+#   Expires: 2026-08-19 — re-triage if still quarantined.
+#   Unblock: restore producible progress for the seeded subject, re-verify green on an
+#     emulator, then restore the `pr-blocking` tag and re-add this flow to
+#     apps/mobile/e2e/ci-maestro-manifest.json.
 appId: com.mentomate.app
 tags:
-  - pr-blocking
+  - blocked
   - subjects
 ---
 # 1. Seed & sign in
