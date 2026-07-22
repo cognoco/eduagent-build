@@ -14,6 +14,7 @@
  */
 import {
   maybeReplayResponseSchema,
+  mentorNoticeAcceptedSchema,
   type ChallengeRoundSessionState,
   type StreamLanguageMeaningOutput,
   type StreamLanguageSpeakingPractice,
@@ -175,7 +176,23 @@ function isValidStreamEvent(obj: Record<string, unknown>): boolean {
     );
   }
   if (obj.type === 'replay') return obj.replayed === true;
-  if (obj.type === 'done') return typeof obj.exchangeCount === 'number';
+  if (obj.type === 'done') {
+    if (typeof obj.exchangeCount !== 'number') return false;
+    // [WI-2500] Mobile trust boundary: the server validates a mentorNotice
+    // before emitting it, but this parser must not forward a malformed one to
+    // use-stream-message.ts / UI consumers as if it were a canonical accepted
+    // notice (invalid UUID, empty concept, non-string correctionHint). Runtime-
+    // parse the field with the shared schema and DROP an invalid notice rather
+    // than the whole done frame — the notice is a non-core adornment, and
+    // "only a committed server acceptance may enter UI output".
+    if (
+      obj.mentorNotice !== undefined &&
+      !mentorNoticeAcceptedSchema.safeParse(obj.mentorNotice).success
+    ) {
+      delete obj.mentorNotice;
+    }
+    return true;
+  }
   if (obj.type === 'error') return typeof obj.message === 'string';
   return false;
 }
