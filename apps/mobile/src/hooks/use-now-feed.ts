@@ -4,7 +4,6 @@ import {
   useMutation,
   useQueryClient,
   type UseQueryResult,
-  keepPreviousData,
 } from '@tanstack/react-query';
 import {
   nowOverflowResponseSchema,
@@ -38,6 +37,12 @@ const NOW_FEED_SLOW_FALLBACK_MS = 2_000;
 export type NowFeedQueryResult = UseQueryResult<NowResponse> & {
   fallbackFeed: NowResponse | null;
   isSlowFallback: boolean;
+  // [WI-2504 bounce 2] The policy epoch THIS hook observed as of its latest
+  // render, so a consumer that starts an async action (e.g. a mentor-notice
+  // recheck) can compare it against the epoch observed once that action
+  // resolves, and refuse to act on a result that outlived the epoch it
+  // started under.
+  observedEpoch: string;
 };
 
 /**
@@ -167,6 +172,10 @@ export function useNowFeed(): NowFeedQueryResult {
   const noticesVisible = !navigationContract.isParentProxy;
   const [fallbackFeed, setFallbackFeed] = useState<NowResponse | null>(null);
   const [isSlowFallback, setIsSlowFallback] = useState(false);
+  // [WI-2504 bounce 2] The epoch `fallbackFeed` was last populated (or
+  // cleared) for — lets the effect below tell "still the same pending fetch"
+  // from "the query key's epoch just changed out from under it".
+  const fallbackEpochRef = useRef<string | null>(null);
 
   const query = useQuery({
     // [WI-2498] Keyed by actor AND subject: the in-memory cache must not be
@@ -213,7 +222,19 @@ export function useNowFeed(): NowFeedQueryResult {
     // carries the right key — otherwise every cold start would fetch twice.
     enabled: !!profileId && epochHydrated,
     staleTime: NOW_FEED_STALE_TIME_MS,
-    placeholderData: keepPreviousData,
+    // [WI-2504 bounce 2] `keepPreviousData` must not carry a query's data
+    // across an epoch re-key. `observedEpoch` can change between renders —
+    // from this hook's own fetch observing a new epoch, or from any other
+    // consumer sharing the same observation (see `useObservedPolicyEpoch`
+    // above) — re-keying THIS query while a settled query for the OLD epoch
+    // still holds its (possibly notice-bearing) data. Plain
+    // `keepPreviousData` would paint that old query's data for the whole
+    // window the re-keyed query's own fetch is pending. Only reuse the
+    // placeholder when the previous query was fetched under the SAME
+    // observed epoch as now; otherwise expose no data until the new epoch's
+    // fetch resolves.
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[3] === observedEpoch ? previousData : undefined,
     refetchOnWindowFocus: true,
   });
 
@@ -223,7 +244,22 @@ export function useNowFeed(): NowFeedQueryResult {
       if (!query.isError) {
         setFallbackFeed(null);
       }
+      fallbackEpochRef.current = null;
       return undefined;
+    }
+
+    // [WI-2504 bounce 2] A fallback populated for a PREVIOUS epoch must not
+    // survive into a re-keyed query's pending window: this branch runs
+    // whenever `query.data` is absent, which is now also true immediately
+    // after an epoch re-key (the freshly mounted query has no data of its
+    // own yet — see the `placeholderData` epoch gate above). Without this,
+    // `data ?? fallbackFeed` could keep exposing the OLD epoch's (possibly
+    // notice-bearing) cached feed until — or unless — this fetch's own cache
+    // read lands.
+    if (fallbackEpochRef.current !== cacheBinding.policyEpoch) {
+      setFallbackFeed(null);
+      setIsSlowFallback(false);
+      fallbackEpochRef.current = cacheBinding.policyEpoch ?? null;
     }
 
     let cancelled = false;
@@ -253,6 +289,7 @@ export function useNowFeed(): NowFeedQueryResult {
     ...query,
     fallbackFeed,
     isSlowFallback,
+    observedEpoch,
   };
 }
 
