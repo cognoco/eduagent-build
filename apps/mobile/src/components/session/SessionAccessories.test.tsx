@@ -6,6 +6,7 @@ import {
   MentorHomeworkFirstResponse,
   SubjectResolutionAccessory,
 } from './SessionAccessories';
+import type { ChatMessage } from './session-types';
 
 describe('SessionToolAccessory stage gating', () => {
   const handleQuickChip = jest.fn();
@@ -402,6 +403,26 @@ describe('HomeworkFirstResponseCompleteMarker', () => {
     content: problemText,
     isAutoSent: true,
   };
+
+  it('does not read messages when the E2E marker is inactive', () => {
+    const messages = new Proxy([] as ChatMessage[], {
+      get() {
+        throw new Error('inactive marker read its messages');
+      },
+    });
+
+    const { queryByTestId } = render(
+      <HomeworkFirstResponseCompleteMarker
+        active={false}
+        problemText={problemText}
+        isStreaming={false}
+        hasFailure={false}
+        messages={messages}
+      />,
+    );
+
+    expect(queryByTestId('homework-first-response-complete')).toBeNull();
+  });
 
   it('does not mark empty content, a thinking placeholder, or a partial stream as completed', () => {
     const { queryByTestId, rerender } = render(

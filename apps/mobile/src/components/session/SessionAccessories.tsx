@@ -36,6 +36,8 @@ export function HomeworkFirstResponseCompleteMarker({
   hasFailure,
 }: HomeworkFirstResponseCompleteMarkerProps) {
   const complete = useMemo(() => {
+    if (!active) return false;
+
     const normalizedProblem = problemText?.trim();
     const problemIndex = normalizedProblem
       ? messages.findIndex(
