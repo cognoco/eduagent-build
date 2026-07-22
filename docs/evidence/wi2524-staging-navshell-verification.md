@@ -127,7 +127,8 @@ retained below only for provenance.
 
 - **Named case result:** `5 passed (2.2m)`, case listed as `[5/5]` at `nav-shell.spec.ts:60:5`,
   from run `29862030418` on head `79f22774a` (§3).
-- **Playwright artifact:** `playwright-web-v2-29862030418-1` (id `8507767965`, 205,255 bytes, unexpired).
+- **Playwright artifact:** `playwright-web-v2-29862030418-1` (id `8507767965`, 205,255 bytes, unexpired
+  at record creation on 2026-07-21; pending purge under WI-2593, after which it no longer resolves).
 - **Exact `Playwright web smoke` check-run URL for that staging run:**
   <https://github.com/cognoco/eduagent-build/actions/runs/29862030418/job/88742989182>
   — `conclusion=success`, started `2026-07-21T19:42:28Z`, on head `79f22774a`.

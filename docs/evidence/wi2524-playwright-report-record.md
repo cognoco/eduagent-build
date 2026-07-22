@@ -15,9 +15,11 @@ purgeable CI id.
 **Sanitization scope.** This record carries *only* run/head/attempt identifiers, report totals,
 named-test identity and outcome, the required post-Back assertions, and artifact metadata including
 the original name / id / digest. It deliberately excludes credentials, email addresses, request
-bodies, request headers, input values, storage state, traces, screenshots and video. No value from
-the source reports has been printed, logged, quoted or committed at any point — including while
-proving that such values were present.
+bodies, request headers, input values, storage state, traces, screenshots and video. No sensitive value from
+the source reports — none of the excluded classes listed above — has been printed, logged, quoted or
+committed at any point, including while proving that such values were present. The report-derived
+totals, run/head identifiers and named-test identity recorded here are, by design, the non-sensitive
+provenance fields the record is built from.
 
 ## 1. Artifact provenance (originals — PENDING PURGE UNDER WI-2593)
 
@@ -47,8 +49,9 @@ Totals were read from the reports' own decoded payloads in an isolated remediati
 | 8506591973 | 29859015027 | `233fd5d54` | 5 | 0 | 0 | 0 | 137378 |
 | 8507767965 | **29862030418** | **`79f22774a`** | 5 | 0 | 0 | 0 | 133366 |
 
-`unexpected=0`, `flaky=0` and `skipped=0` in every case: nothing failed, nothing was retried into
-green, and the named case was not skipped.
+`unexpected=0`, `flaky=0` and `skipped=0` in every case, and every run is GitHub `run_attempt = 1`
+(read from the Actions API, not inferred from the artifact-name suffix): nothing failed, nothing was
+retried into green, and the named case was not skipped.
 
 ## 3. Named-test identity and outcome (the AC-3 record)
 
@@ -64,9 +67,10 @@ where `unexpected=0`. The exact `Playwright web smoke` check-run for that run co
 
 ## 4. The post-Back assertions this evidences
 
-The behaviour proven by that run is the AC-2 requirement of WI-2524 — for every real browser-Back
-transition after the active scope is supporter-hub, the resulting route renders the supporter-hub
-surface and never a learner or person-scope surface. The assertions live in-repo, and this is the
+The behaviour proven by that run is the AC-2 requirement of WI-2524, for the two real browser-Back
+transitions the named case exercises after the active scope is supporter-hub (b1 and b2 below): the
+resulting route renders the supporter-hub surface and never a learner or person-scope surface. The
+run evidences these two exercised transitions, not every conceivable Back transition in the app. The assertions live in-repo, and this is the
 durable statement of what passed:
 
 | b | Path | Assertions after Back |
