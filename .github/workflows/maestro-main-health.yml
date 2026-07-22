@@ -58,11 +58,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          # Route the workflow_dispatch input through an env var, never inline in
+          # the run: script — an inline ${{ }} expression is evaluated before the
+          # shell parses the command and a crafted input could inject shell code.
+          STALE_HOURS: ${{ github.event.inputs.stale_hours || '30' }}
         run: |
           set -o pipefail
           pnpm exec tsx scripts/check-maestro-main-health.ts \
             --repo "$GITHUB_REPOSITORY" \
-            --stale-hours "${{ github.event.inputs.stale_hours || '30' }}" \
+            --stale-hours "$STALE_HOURS" \
             | tee "$RUNNER_TEMP/health.txt"
           {
             echo '## Maestro main-health'

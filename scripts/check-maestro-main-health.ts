@@ -161,8 +161,9 @@ function gh(args: string[]): string {
 
 /**
  * Fetch the most recent "E2E Tests" runs on main and resolve each run's jobs.
- * Iterates newest→oldest and stops once it has resolved jobs for the most recent
- * EXECUTED run (plus the runs above it), to bound the number of jobs API calls.
+ * Iterates newest→oldest and stops as soon as it resolves the most recent EXECUTED
+ * run — the newer runs above it are already resolved, and older runs below it are
+ * irrelevant to the classifier — bounding the number of jobs API calls.
  */
 export function fetchMaestroRuns(
   repo: string,
@@ -221,8 +222,8 @@ export function fetchMaestroRuns(
       })),
     };
     resolved.push(run);
-    // Short-circuit: once we've resolved an executed run, the ones above it in
-    // time are already resolved, so the classifier has what it needs.
+    // Short-circuit: once we've found the most recent executed run, later (older)
+    // runs are irrelevant to the classifier, so stop resolving jobs.
     if (runExecutedMaestro(run)) break;
   }
   return resolved;
