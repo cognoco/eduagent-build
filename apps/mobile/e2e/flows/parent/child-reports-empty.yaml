@@ -16,36 +16,44 @@ tags:
 # a bare wait for parent-home-screen, then tap CHILD1's Reports action directly.
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 15000
 
 - takeScreenshot: 01-parent-dashboard
 
+- scrollUntilVisible:
+    element:
+      id: 'parent-home-weekly-report-${CHILD1_PROFILE_ID}'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+
 - tapOn:
-    id: "parent-home-weekly-report-${CHILD1_PROFILE_ID}"
+    id: 'parent-home-weekly-report-${CHILD1_PROFILE_ID}'
 
 - extendedWaitUntil:
     visible:
-      id: "child-reports-back"
+      id: 'child-reports-back'
     timeout: 10000
 
 - assertVisible:
-    id: "child-reports-empty"
+    id: 'child-reports-empty'
 
 - assertVisible:
-    id: "child-reports-empty-time-context"
+    id: 'child-reports-empty-time-context'
 
 - assertVisible:
-    id: "child-reports-empty-progress"
+    id: 'child-reports-empty-progress'
 
 - takeScreenshot: 03-reports-empty
 
 - tapOn:
-    id: "child-reports-back"
+    id: 'child-reports-back'
 
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 10000
 
 - takeScreenshot: 04-back-to-parent-dashboard

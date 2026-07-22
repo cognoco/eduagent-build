@@ -1,4 +1,9 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import {
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react-native';
 import {
   renderScreen,
   type RenderScreenResult,
@@ -650,6 +655,19 @@ describe('PracticeScreen', () => {
       'practice-recitation',
       'practice-quiz-history',
     ]);
+  });
+
+  it('exposes a non-scrollable Other practice heading for outer-viewport navigation', async () => {
+    mount();
+
+    await waitFor(() => {
+      screen.getByTestId('practice-other-practice-heading');
+    });
+    const slider = screen.getByTestId('practice-other-practice-slider');
+    within(slider).getByTestId('practice-recitation');
+    expect(
+      within(slider).queryByTestId('practice-other-practice-heading'),
+    ).toBeNull();
   });
 
   it('renders quiz history as a quiet recent-progress row', async () => {

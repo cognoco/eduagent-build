@@ -78,17 +78,11 @@ export default function SeedPendingRedirectScreen(): React.ReactElement | null {
       return;
     }
 
-    const staleMsNum = parseInt(staleMs ?? '0', 10);
-    // [CR-2026-05-21-113] Validate path against the allowlist before seeding.
-    // An out-of-allowlist value (including any attacker-controlled path from a
-    // malicious deep link) falls back to the safe default rather than being
-    // passed to seedPendingAuthRedirectForTesting.
-    const requestedPath = path ?? SAFE_DEFAULT_PATH;
-    const seedPath = SEED_PATH_ALLOWLIST.has(requestedPath)
-      ? requestedPath
-      : SAFE_DEFAULT_PATH;
-    seedPendingAuthRedirectForTesting(seedPath, staleMsNum);
-  }, [isLoaded, isPreparingSignIn, isSignedIn, path, staleMs, router]);
+    // Do not seed while the authenticated app shell is mounted. That shell
+    // consumes pending redirects immediately and would navigate away before
+    // Maestro can press the explicit sign-out action below. The callback
+    // re-seeds only after normal sign-out cleanup has completed.
+  }, [isLoaded, isPreparingSignIn, isSignedIn, router]);
 
   const prepareSignedOutReplay = useCallback(async () => {
     if (isPreparingSignIn) return;

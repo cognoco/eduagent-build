@@ -35,7 +35,15 @@ tags:
       id: 'parent-home-screen'
     timeout: 20000
 
-# 3. Tap the Reports action on the seeded child card
+# 3. Bring the below-fold Reports action into the small viewport, then tap it.
+- scrollUntilVisible:
+    element:
+      id: 'parent-home-weekly-report-${CHILD_PROFILE_ID}'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+
 - tapOn:
     id: 'parent-home-weekly-report-${CHILD_PROFILE_ID}'
 

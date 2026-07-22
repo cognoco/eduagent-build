@@ -69,18 +69,15 @@ tags:
 
 # ── Arm 2: Recitation ──
 # practice-recitation is the SECOND card inside the "Other practice" horizontal
-# ScrollView (practice-other-practice-slider, practice/index.tsx:799).
-# Step 1: bring the slider itself into the outer vertical viewport. A nested
-# child is the wrong DOWN-scroll anchor because its nearest scroll parent is
-# horizontal; 50% avoids native clipping math at the slider edges.
+# ScrollView. Step 1 uses the non-scrollable section heading to position the
+# outer vertical viewport; a horizontal ScrollView is not a reliable target
+# for Maestro's DOWN search. Step 2 moves within the horizontal slider.
 # Step 2: scroll RIGHT inside the slider to bring practice-recitation into view.
 - scrollUntilVisible:
     element:
-      id: 'practice-other-practice-slider'
+      id: 'practice-other-practice-heading'
     direction: DOWN
     timeout: 5000
-    visibilityPercentage: 50
-    centerElement: true
 
 - scrollUntilVisible:
     element:
@@ -112,11 +109,9 @@ tags:
 # ── Arm 3: Dictation ──
 - scrollUntilVisible:
     element:
-      id: 'practice-other-practice-slider'
+      id: 'practice-other-practice-heading'
     direction: DOWN
     timeout: 5000
-    visibilityPercentage: 50
-    centerElement: true
 
 - scrollUntilVisible:
     element:

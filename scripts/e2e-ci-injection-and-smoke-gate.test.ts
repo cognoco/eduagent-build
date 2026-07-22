@@ -1270,6 +1270,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
       runFlow?: { file?: string };
       extendedWaitUntil?: { visible?: { id?: string } | string };
+      assertVisible?: { id?: string; optional?: boolean } | string;
+      assertNotVisible?: { id?: string } | string;
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        timeout?: number;
+        optional?: boolean;
+      };
       tapOn?: { id?: string };
     }>;
     const parentHome = commands.findIndex(
@@ -1280,6 +1288,39 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const settingsTap = commands.findIndex(
       ({ tapOn }) =>
         tapOn?.id === 'parent-home-child-profile-${CHILD_PROFILE_ID}',
+    );
+    const screenReady = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > settingsTap &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'child-mentor-memory-screen',
+    );
+    const populatedScroll = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > screenReady &&
+        scrollUntilVisible?.element?.id ===
+          'child-mentor-memory-populated-category' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.optional !== true,
+    );
+    const populated = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > populatedScroll &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'child-mentor-memory-populated-category' &&
+        assertVisible.optional !== true,
+    );
+    const emptyAbsent = commands.findIndex(
+      ({ assertNotVisible }, index) =>
+        index > populated &&
+        typeof assertNotVisible === 'object' &&
+        assertNotVisible.id === 'child-mentor-memory-empty-state',
+    );
+    const soccer = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > emptyAbsent &&
+        scrollUntilVisible?.element?.id === 'interest-context-Soccer-both' &&
+        scrollUntilVisible.direction === 'UP',
     );
     const helperSource = readFileSync(
       join(repoRoot, 'apps/mobile/e2e/flows/_setup/open-family-dashboard.yaml'),
@@ -1294,6 +1335,11 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     ).toBe(false);
     expect(parentHome).toBeGreaterThan(-1);
     expect(settingsTap).toBeGreaterThan(parentHome);
+    expect(screenReady).toBeGreaterThan(settingsTap);
+    expect(populatedScroll).toBeGreaterThan(screenReady);
+    expect(populated).toBeGreaterThan(populatedScroll);
+    expect(emptyAbsent).toBeGreaterThan(populated);
+    expect(soccer).toBeGreaterThan(emptyAbsent);
     expect(
       commands.filter(
         ({ tapOn }) =>
@@ -1301,6 +1347,9 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ),
     ).toHaveLength(1);
     expect(source).not.toContain('parent-home-check-child-${CHILD_PROFILE_ID}');
+    expect(source).not.toContain('What the mentor knows');
+    expect(source).not.toContain('No learning observations yet.');
+    expect(source).not.toContain('Interested in Soccer');
     expect(helperSource).toMatch(/id:\s*['"]child-detail-scroll['"]/);
     expect(helperSource).not.toMatch(/text:\s*['"]Recent sessions['"]/);
   });
@@ -2143,39 +2192,60 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
   });
 
   it('[WI-1864] scrolls the pending-gate sign-out control into the small viewport', () => {
-    const source = readFileSync(
-      join(repoRoot, 'apps/mobile/e2e/flows/consent/consent-pending-gate.yaml'),
-      'utf8',
-    );
-    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
-      scrollUntilVisible?: {
-        element?: { id?: string };
-        direction?: string;
-      };
-      assertVisible?: { id?: string } | string;
-      tapOn?: { id?: string } | string;
-    }>;
-    const scroll = commands.findIndex(
-      ({ scrollUntilVisible }) =>
-        scrollUntilVisible?.element?.id === 'consent-sign-out' &&
-        scrollUntilVisible.direction === 'DOWN',
-    );
-    const assertion = commands.findIndex(
-      ({ assertVisible }, index) =>
-        index > scroll &&
-        typeof assertVisible === 'object' &&
-        assertVisible.id === 'consent-sign-out',
-    );
-    const tap = commands.findIndex(
-      ({ tapOn }, index) =>
-        index > assertion &&
-        typeof tapOn === 'object' &&
-        tapOn.id === 'consent-sign-out',
-    );
+    for (const flow of [
+      'consent/consent-pending-gate.yaml',
+      'quiz/quiz-error-consent.yaml',
+    ]) {
+      const source = readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/flows', flow),
+        'utf8',
+      );
+      const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+        scrollUntilVisible?: {
+          element?: { id?: string };
+          direction?: string;
+          optional?: boolean;
+        };
+        assertVisible?: { id?: string; optional?: boolean } | string;
+        tapOn?: { id?: string; optional?: boolean } | string;
+        extendedWaitUntil?: {
+          visible?: { id?: string } | string;
+          optional?: boolean;
+        };
+      }>;
+      const scroll = commands.findIndex(
+        ({ scrollUntilVisible }) =>
+          scrollUntilVisible?.element?.id === 'consent-sign-out' &&
+          scrollUntilVisible.direction === 'DOWN' &&
+          scrollUntilVisible.optional !== true,
+      );
+      const assertion = commands.findIndex(
+        ({ assertVisible }, index) =>
+          index > scroll &&
+          typeof assertVisible === 'object' &&
+          assertVisible.id === 'consent-sign-out' &&
+          assertVisible.optional !== true,
+      );
+      const tap = commands.findIndex(
+        ({ tapOn }, index) =>
+          index > assertion &&
+          typeof tapOn === 'object' &&
+          tapOn.id === 'consent-sign-out' &&
+          tapOn.optional !== true,
+      );
+      const signedOut = commands.findIndex(
+        ({ extendedWaitUntil }, index) =>
+          index > tap &&
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.id === 'sign-in-button' &&
+          extendedWaitUntil.optional !== true,
+      );
 
-    expect(scroll).toBeGreaterThan(-1);
-    expect(assertion).toBeGreaterThan(scroll);
-    expect(tap).toBeGreaterThan(assertion);
+      expect(scroll).toBeGreaterThan(-1);
+      expect(assertion).toBeGreaterThan(scroll);
+      expect(tap).toBeGreaterThan(assertion);
+      expect(signedOut).toBeGreaterThan(tap);
+    }
   });
 
   it('[WI-1864] confirms consent withdrawal through the current native-alert action', () => {
@@ -2485,7 +2555,93 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     expect(disputeSuppressed).toBeGreaterThan(correctReceipt);
   });
 
-  it('[WI-1864] navigates both axes of the Other practice slider through its container', () => {
+  it('[WI-1864] returns from the family-bridge session through the route-aware chat control', () => {
+    const source = readFileSync(
+      join(
+        repoRoot,
+        'apps/mobile/e2e/flows/parent/family-bridge-from-recaps.yaml',
+      ),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<
+      | string
+      | {
+          assertVisible?: { id?: string } | string;
+          assertNotVisible?: { id?: string } | string;
+          extendedWaitUntil?: { visible?: { id?: string } | string };
+          pressKey?: string;
+          tapOn?: { id?: string } | string;
+        }
+    >;
+    const session = commands.findIndex(
+      (command) =>
+        typeof command === 'object' &&
+        typeof command.extendedWaitUntil?.visible === 'object' &&
+        command.extendedWaitUntil.visible.id === 'session-screen',
+    );
+    const backVisible = commands.findIndex(
+      (command, index) =>
+        index > session &&
+        typeof command === 'object' &&
+        typeof command.assertVisible === 'object' &&
+        command.assertVisible.id === 'chat-shell-back',
+    );
+    const backTap = commands.findIndex(
+      (command, index) =>
+        index > backVisible &&
+        typeof command === 'object' &&
+        typeof command.tapOn === 'object' &&
+        command.tapOn.id === 'chat-shell-back',
+    );
+    const recap = commands.findIndex(
+      (command, index) =>
+        index > backTap &&
+        typeof command === 'object' &&
+        typeof command.extendedWaitUntil?.visible === 'object' &&
+        command.extendedWaitUntil.visible.id === 'recap-detail-screen',
+    );
+
+    expect(session).toBeGreaterThan(-1);
+    expect(backVisible).toBeGreaterThan(session);
+    expect(backTap).toBeGreaterThan(backVisible);
+    expect(recap).toBeGreaterThan(backTap);
+    expect(
+      commands
+        .slice(session + 1, recap)
+        .some(
+          (command) =>
+            typeof command === 'object' && command.pressKey === 'back',
+        ),
+    ).toBe(false);
+  });
+
+  it('[WI-1864] verifies the seeded My Notes session through its stable row id', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/learning/my-notes-archive.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      extendedWaitUntil?: { visible?: { id?: string } | string };
+      assertVisible?: { id?: string; text?: string } | string;
+    }>;
+    const sessions = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'my-notes-list-sessions',
+    );
+    const seededRow = commands.findIndex(
+      ({ assertVisible }, index) =>
+        index > sessions &&
+        typeof assertVisible === 'object' &&
+        assertVisible.id === 'my-notes-row-sessions-${SESSION_ID}',
+    );
+
+    expect(sessions).toBeGreaterThan(-1);
+    expect(seededRow).toBeGreaterThan(sessions);
+    expect(source).not.toMatch(/text:\s*['"]Learning['"]/);
+  });
+
+  it('[WI-1864] navigates both axes of Other practice through a stable section heading', () => {
     const source = readFileSync(
       join(
         repoRoot,
@@ -2501,17 +2657,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         centerElement?: boolean;
       };
       tapOn?: { id?: string };
+      extendedWaitUntil?: { visible?: { id?: string } | string };
     }>;
-    const slider = commands.findIndex(
+    const heading = commands.findIndex(
       ({ scrollUntilVisible }) =>
-        scrollUntilVisible?.element?.id === 'practice-other-practice-slider' &&
-        scrollUntilVisible.direction === 'DOWN' &&
-        scrollUntilVisible.visibilityPercentage === 50 &&
-        scrollUntilVisible.centerElement === true,
+        scrollUntilVisible?.element?.id === 'practice-other-practice-heading' &&
+        scrollUntilVisible.direction === 'DOWN',
     );
     const recitation = commands.findIndex(
       ({ scrollUntilVisible }, index) =>
-        index > slider &&
+        index > heading &&
         scrollUntilVisible?.element?.id === 'practice-recitation' &&
         scrollUntilVisible.direction === 'RIGHT' &&
         scrollUntilVisible.visibilityPercentage === 100 &&
@@ -2521,29 +2676,54 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ({ tapOn }, index) =>
         index > recitation && tapOn?.id === 'practice-recitation',
     );
+    const chatBack = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > recitationTap && tapOn?.id === 'chat-shell-back',
+    );
+    const practiceReturn = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > chatBack &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'practice-screen',
+    );
+    const secondHeading = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > practiceReturn &&
+        scrollUntilVisible?.element?.id === 'practice-other-practice-heading' &&
+        scrollUntilVisible.direction === 'DOWN',
+    );
     const dictation = commands.findIndex(
       ({ scrollUntilVisible }, index) =>
-        index > recitationTap &&
+        index > secondHeading &&
         scrollUntilVisible?.element?.id === 'practice-dictation' &&
         scrollUntilVisible.direction === 'LEFT' &&
         scrollUntilVisible.visibilityPercentage === 100 &&
         scrollUntilVisible.centerElement === true,
     );
-    const secondSlider = commands.findIndex(
-      ({ scrollUntilVisible }, index) =>
-        index > recitationTap &&
-        index < dictation &&
-        scrollUntilVisible?.element?.id === 'practice-other-practice-slider' &&
-        scrollUntilVisible.direction === 'DOWN' &&
-        scrollUntilVisible.visibilityPercentage === 50 &&
-        scrollUntilVisible.centerElement === true,
+    const dictationTap = commands.findIndex(
+      ({ tapOn }, index) =>
+        index > dictation && tapOn?.id === 'practice-dictation',
     );
 
-    expect(slider).toBeGreaterThan(-1);
-    expect(recitation).toBeGreaterThan(slider);
+    expect(heading).toBeGreaterThan(-1);
+    expect(recitation).toBeGreaterThan(heading);
     expect(recitationTap).toBeGreaterThan(recitation);
-    expect(secondSlider).toBeGreaterThan(recitationTap);
-    expect(dictation).toBeGreaterThan(secondSlider);
+    expect(chatBack).toBeGreaterThan(recitationTap);
+    expect(practiceReturn).toBeGreaterThan(chatBack);
+    expect(secondHeading).toBeGreaterThan(practiceReturn);
+    expect(dictation).toBeGreaterThan(secondHeading);
+    expect(dictationTap).toBeGreaterThan(dictation);
+    expect(
+      commands.some(
+        ({ scrollUntilVisible }) =>
+          scrollUntilVisible?.direction === 'DOWN' &&
+          [
+            'practice-other-practice-slider',
+            'practice-recitation',
+            'practice-dictation',
+          ].includes(scrollUntilVisible.element?.id ?? ''),
+      ),
+    ).toBe(false);
   });
 
   it('[WI-1864] reaches the standalone recitation journey through the slider container', () => {
@@ -2935,36 +3115,59 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
   });
 
-  it('[WI-1864] opens weekly reports from parent home without double navigation', () => {
-    const source = readFileSync(
-      join(repoRoot, 'apps/mobile/e2e/flows/parent/child-weekly-report.yaml'),
-      'utf8',
-    );
-    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
-      runFlow?: { file?: string };
-      extendedWaitUntil?: { visible?: { id?: string } | string };
-      tapOn?: { id?: string };
-    }>;
-    const parentHome = commands.findIndex(
-      ({ extendedWaitUntil }) =>
-        typeof extendedWaitUntil?.visible === 'object' &&
-        extendedWaitUntil.visible.id === 'parent-home-screen',
-    );
-    const reportTap = commands.findIndex(
-      ({ tapOn }, index) =>
-        index > parentHome &&
-        tapOn?.id === 'parent-home-weekly-report-${CHILD_PROFILE_ID}',
-    );
+  it.each([
+    ['child-report-detail.yaml', '${CHILD_PROFILE_ID}'],
+    ['child-weekly-report.yaml', '${CHILD_PROFILE_ID}'],
+    ['child-reports-empty.yaml', '${CHILD1_PROFILE_ID}'],
+  ])(
+    '[WI-1864] scrolls to weekly reports from parent home without double navigation: %s',
+    (flow, childProfileId) => {
+      const source = readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/flows/parent', flow),
+        'utf8',
+      );
+      const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+        runFlow?: { file?: string };
+        extendedWaitUntil?: { visible?: { id?: string } | string };
+        scrollUntilVisible?: {
+          element?: { id?: string };
+          direction?: string;
+          visibilityPercentage?: number;
+          centerElement?: boolean;
+        };
+        tapOn?: { id?: string };
+      }>;
+      const parentHome = commands.findIndex(
+        ({ extendedWaitUntil }) =>
+          typeof extendedWaitUntil?.visible === 'object' &&
+          extendedWaitUntil.visible.id === 'parent-home-screen',
+      );
+      const reportScroll = commands.findIndex(
+        ({ scrollUntilVisible }, index) =>
+          index > parentHome &&
+          scrollUntilVisible?.element?.id ===
+            `parent-home-weekly-report-${childProfileId}` &&
+          scrollUntilVisible.direction === 'DOWN' &&
+          scrollUntilVisible.visibilityPercentage === 100 &&
+          scrollUntilVisible.centerElement === true,
+      );
+      const reportTap = commands.findIndex(
+        ({ tapOn }, index) =>
+          index > reportScroll &&
+          tapOn?.id === `parent-home-weekly-report-${childProfileId}`,
+      );
 
-    expect(
-      commands.some(
-        ({ runFlow }) =>
-          runFlow?.file === '../_setup/open-family-dashboard.yaml',
-      ),
-    ).toBe(false);
-    expect(parentHome).toBeGreaterThan(-1);
-    expect(reportTap).toBeGreaterThan(parentHome);
-  });
+      expect(
+        commands.some(
+          ({ runFlow }) =>
+            runFlow?.file === '../_setup/open-family-dashboard.yaml',
+        ),
+      ).toBe(false);
+      expect(parentHome).toBeGreaterThan(-1);
+      expect(reportScroll).toBeGreaterThan(parentHome);
+      expect(reportTap).toBeGreaterThan(reportScroll);
+    },
+  );
 
   it('[WI-1864] keeps parent child drill-down on its reachable parent-native journey', () => {
     const source = readFileSync(
@@ -3386,6 +3589,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       scrollUntilVisible?: {
         element?: { id?: string };
         direction?: string;
+        timeout?: number;
       };
     }>;
     const noOfferings = commands.findIndex(
@@ -3416,9 +3620,16 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       scrollUntilVisible?: {
         element?: { id?: string };
         direction?: string;
+        timeout?: number;
       };
       tapOn?: { id?: string; text?: string; optional?: boolean } | string;
     }>;
+    const poolVisible = commands.findIndex(
+      ({ scrollUntilVisible }) =>
+        scrollUntilVisible?.element?.id === 'family-pool-section' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        (scrollUntilVisible.timeout ?? 0) >= 30000,
+    );
     const removeVisible = commands.findIndex(
       ({ scrollUntilVisible }) =>
         scrollUntilVisible?.element?.id ===
@@ -3474,6 +3685,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     );
 
     expect([
+      poolVisible,
       removeVisible,
       removeTap,
       confirm,
@@ -3485,6 +3697,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       survivorAssert,
     ]).toEqual(
       [
+        poolVisible,
         removeVisible,
         removeTap,
         confirm,
@@ -3496,7 +3709,17 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         survivorAssert,
       ].toSorted((a, b) => a - b),
     );
-    expect(removeVisible).toBeGreaterThan(-1);
+    expect(poolVisible).toBeGreaterThan(-1);
+    expect(removeVisible).toBeGreaterThan(poolVisible);
+    expect(
+      commands
+        .slice(0, poolVisible)
+        .some(
+          ({ extendedWaitUntil }) =>
+            typeof extendedWaitUntil?.visible === 'object' &&
+            extendedWaitUntil.visible.id === 'family-pool-section',
+        ),
+    ).toBe(false);
     expect(commands[successDismiss]?.tapOn).toEqual({ text: 'OK' });
   });
 

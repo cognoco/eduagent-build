@@ -164,11 +164,18 @@ function getLanguageDisplayName(
   }
 }
 
-function SectionLabel({ children }: { children: string }): React.ReactElement {
+function SectionLabel({
+  children,
+  testID,
+}: {
+  children: string;
+  testID?: string;
+}): React.ReactElement {
   return (
     <Text
       className="text-caption font-bold text-text-secondary"
       style={styles.sectionLabel}
+      testID={testID}
     >
       {children}
     </Text>
@@ -820,7 +827,7 @@ export default function PracticeScreen(): React.ReactElement {
           </View>
 
           <View className="gap-3">
-            <SectionLabel>
+            <SectionLabel testID="practice-other-practice-heading">
               {t('practiceHub.sections.otherPractice')}
             </SectionLabel>
             <ScrollView

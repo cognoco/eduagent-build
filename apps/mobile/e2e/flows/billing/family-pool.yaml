@@ -64,21 +64,15 @@ tags:
 
 - takeScreenshot: subscription-screen-family-pool
 
-# 7. Wait for the family pool section — rendered only after a secondary
-#    useFamilySubscription() query resolves (cascade: subscription query →
-#    enabled family query → data populated → section renders). On a cold
-#    emulator the cascade can take well beyond a scroll timeout alone.
-- extendedWaitUntil:
-    visible:
-      id: 'family-pool-section'
-    timeout: 30000
-
-# 7b. Now scroll to it (it may be below the fold)
+# 7. Scroll to the family pool section. This both waits for the secondary
+#    family query and brings the below-fold section into the viewport; a
+#    pre-scroll visibility assertion can never pass when the section starts
+#    below the small emulator viewport.
 - scrollUntilVisible:
     element:
       id: 'family-pool-section'
     direction: DOWN
-    timeout: 20000
+    timeout: 30000
 
 # 8. Family pool section must be visible for Family-tier users
 - assertVisible:

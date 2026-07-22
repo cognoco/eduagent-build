@@ -38,17 +38,30 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      text: 'What the mentor knows'
+      id: 'child-mentor-memory-screen'
     timeout: 10000
-
-- assertNotVisible:
-    text: 'No learning observations yet.'
 
 - scrollUntilVisible:
     element:
-      text: 'Interested in Soccer'
+      id: 'child-mentor-memory-populated-category'
     direction: DOWN
     timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+
+- assertVisible:
+    id: 'child-mentor-memory-populated-category'
+
+- assertNotVisible:
+    id: 'child-mentor-memory-empty-state'
+
+- scrollUntilVisible:
+    element:
+      id: 'interest-context-Soccer-both'
+    direction: UP
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
 
 - takeScreenshot: 01-parent-memory-populated
 
