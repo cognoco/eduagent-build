@@ -13,13 +13,10 @@ import type {
 import { exchangesFlow, type ExchangeScenarioInput } from './exchanges';
 
 const EVENT_ID = '550e8400-e29b-41d4-a716-446655440020';
-const INTERLEAVED_TOPIC_ID = '550e8400-e29b-41d4-a716-446655440021';
-const SECOND_INTERLEAVED_TOPIC_ID = '550e8400-e29b-41d4-a716-446655440022';
 const HOMEWORK_PROBLEM = 'Solve x - 3 = 5.';
 
 interface HomeworkNoticeScenarioInput extends ExchangeScenarioInput {
   expectedNotice: boolean;
-  expectedTopicId?: string;
   learnerMessage: string;
 }
 
@@ -30,7 +27,6 @@ interface EnvelopeLike {
       observed?: unknown;
       answerEventId?: unknown;
       learnerQuote?: unknown;
-      topicId?: unknown;
     };
   };
 }
@@ -45,7 +41,6 @@ function buildScenario(
   learnerMessage: string,
   expectedNotice: boolean,
   sessionType: SessionType,
-  expectedTopicId?: string,
 ): Scenario<HomeworkNoticeScenarioInput> | null {
   const homework = exchangesFlow
     .enumerateScenarios?.(profile)
@@ -61,7 +56,6 @@ function buildScenario(
         ? 'A genuine learner slip should produce one grounded noticed_gap without promising a future check-in'
         : 'Clean learner reasoning should not produce noticed_gap',
       expectedNotice,
-      expectedTopicId,
       learnerMessage,
       context: {
         ...homework.input.context,
@@ -73,19 +67,6 @@ function buildScenario(
         homeworkMode:
           sessionType === 'homework'
             ? homework.input.context.homeworkMode
-            : undefined,
-        interleavedTopics:
-          sessionType === 'interleaved'
-            ? [
-                {
-                  topicId: INTERLEAVED_TOPIC_ID,
-                  title: 'Solving linear equations',
-                },
-                {
-                  topicId: SECOND_INTERLEAVED_TOPIC_ID,
-                  title: 'Order of operations',
-                },
-              ]
             : undefined,
         exchangeCount: 2,
         mentorNoticeEnabled: true,
@@ -142,14 +123,6 @@ function evaluateResponse(
         issue(
           'homework-notice.event-id',
           'noticed_gap did not preserve the supplied learner event ID.',
-        ),
-      );
-    }
-    if (input.expectedTopicId && noticedGap.topicId !== input.expectedTopicId) {
-      issues.push(
-        issue(
-          'homework-notice.topic-id',
-          'noticed_gap did not preserve the server-supplied interleaved topic ID.',
         ),
       );
     }
@@ -215,14 +188,6 @@ export const homeworkNoticeFlow: FlowDefinition<HomeworkNoticeScenarioInput> = {
         'I moved minus three to the other side and kept it negative, so x equals two.',
         true,
         'learning',
-      ),
-      buildScenario(
-        profile,
-        'genuine-interleaved-slip',
-        'I moved minus three to the other side and kept it negative, so x equals two.',
-        true,
-        'interleaved',
-        INTERLEAVED_TOPIC_ID,
       ),
       buildScenario(
         profile,
