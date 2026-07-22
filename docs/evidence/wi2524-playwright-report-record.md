@@ -19,7 +19,7 @@ bodies, request headers, input values, storage state, traces, screenshots and vi
 the source reports has been printed, logged, quoted or committed at any point — including while
 proving that such values were present.
 
-## 1. Artifact provenance (originals — PURGED UNDER WI-2593)
+## 1. Artifact provenance (originals — PENDING PURGE UNDER WI-2593)
 
 The three source artifacts are retained here by identity for provenance. They are **not** the
 evidence of record any more; this file is. Their eventual purge does not invalidate anything below.
