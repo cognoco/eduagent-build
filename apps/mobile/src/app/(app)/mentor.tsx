@@ -206,6 +206,13 @@ function LearnerMentorScreen(): React.ReactElement {
   const overflow = useNowOverflow(showOverflow);
   const mentorNoticeActions = useMentorNoticeActions();
   const feed = useTransitionBoundFeed(nowFeed, activeProfile?.id);
+  // [WI-2504 bounce 2] The recheck mutation below is async; the observed
+  // policy epoch can flip (a sibling surface can observe a disable) while it
+  // is in flight. Read through a ref so the post-mutation check sees the
+  // epoch AT RESOLUTION TIME, not the one closed over when the mutation
+  // started.
+  const observedEpochRef = useRef(nowFeed.observedEpoch);
+  observedEpochRef.current = nowFeed.observedEpoch;
   const firstRealState = hasFirstRealState({
     // Count ACTIVE subjects only. useSubjectsIndex now surfaces every status
     // (paused/archived included) for the Subjects browse grouping, so the
@@ -237,8 +244,18 @@ function LearnerMentorScreen(): React.ReactElement {
         setArcState(card, 'due');
         return;
       }
+      const epochAtRecheck = observedEpochRef.current;
       try {
         const result = await mentorNoticeActions.recheck.mutateAsync(noticeId);
+        if (observedEpochRef.current !== epochAtRecheck) {
+          // [WI-2504 bounce 2] The observed policy epoch changed while the
+          // recheck was in flight — navigating now would open a session
+          // behind a surface the client has since suppressed. Defer to the
+          // authoritative refetch instead of trusting this stale result.
+          await mentorNoticeActions.invalidate();
+          setArcState(card, 'due');
+          return;
+        }
         router.push(
           `/(app)/session?sessionId=${encodeURIComponent(result.sessionId)}` as Href,
         );
