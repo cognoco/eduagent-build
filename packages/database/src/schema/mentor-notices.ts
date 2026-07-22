@@ -21,6 +21,15 @@ export const mentorNoticeStatusEnum = pgEnum('mentor_notice_status', [
   'locked_in',
   'dismissed',
   'faded',
+  // [WI-2501] Terminal status for a completed 'not_yet' re-check. Distinct
+  // from 'open' so every open-offer / Now-feed / re-check-context reader
+  // (all of which filter on status='open') stops returning the record once
+  // it resolves — and distinct from 'locked_in'/'dismissed' so it is never
+  // read as mastery or dismissal. A later notice for the same gap requires
+  // newly accepted evidence, which creates a new durable row (see
+  // acceptMentorNotice's evidence-aware unique index); this status never
+  // reopens.
+  'not_yet',
 ]);
 
 export const mentorNoticeNudgeStatusEnum = pgEnum(
