@@ -58,6 +58,15 @@ tags:
       id: 'remediation-card'
     timeout: 15000
 
+- scrollUntilVisible:
+    element:
+      id: 'review-retest-button'
+    direction: DOWN
+    timeout: 10000
+    visibilityPercentage: 100
+    centerElement: true
+    optional: false
+
 - assertVisible:
     id: 'review-retest-button'
 

@@ -7,7 +7,10 @@ import {
   person,
   login,
   membership,
+  consentGrant,
+  consentRequest,
   quizRounds,
+  subjects,
   usageEvents,
   type Database,
 } from '@eduagent/database';
@@ -108,6 +111,7 @@ describe('VALID_SCENARIOS', () => {
     expect(VALID_SCENARIOS).toEqual([
       'onboarding-complete',
       'onboarding-no-subject',
+      'post-approval-ready',
       'learning-active',
       'retention-due',
       'failed-recall-3x',
@@ -1182,6 +1186,56 @@ describe('new Stage-0 scenarios return required IDs', () => {
           }),
         ],
       }),
+    );
+  });
+
+  it('[WI-1864] seeds post-approval landing with approved consent and zero subjects', async () => {
+    const mockDb = createMockDb();
+    const result = await seedScenario(
+      mockDb,
+      'post-approval-ready' as SeedScenario,
+      'test@example.com',
+    );
+    const insertMock = mockDb.insert as jest.Mock;
+    const valuesMock = insertMock.mock.results[0]?.value.values as jest.Mock;
+    const insertedValues = valuesMock.mock.calls.map(
+      ([value]) => value,
+    ) as Array<Record<string, unknown>>;
+    const grant = insertedValues.find(
+      (value) =>
+        value.chargePersonId === result.profileId && value.granted === true,
+    );
+    const request = insertedValues.find(
+      (value) =>
+        value.chargePersonId === result.profileId &&
+        value.status === 'approved',
+    );
+
+    expect(
+      insertMock.mock.calls.some(([table]) => table === consentGrant),
+    ).toBe(true);
+    expect(
+      insertMock.mock.calls.some(([table]) => table === consentRequest),
+    ).toBe(true);
+    expect(grant).toEqual(
+      expect.objectContaining({
+        organizationId: result.accountId,
+        purpose: 'platform_use',
+        lawfulBasis: 'gdpr_parental_consent',
+        granted: true,
+      }),
+    );
+    expect(request).toEqual(
+      expect.objectContaining({
+        organizationId: result.accountId,
+        requestedBasis: 'gdpr_parental_consent',
+        guardianEmail: 'parent-e2e-test@example.com',
+        status: 'approved',
+        consentGrantId: grant?.id,
+      }),
+    );
+    expect(insertMock.mock.calls.some(([table]) => table === subjects)).toBe(
+      false,
     );
   });
 

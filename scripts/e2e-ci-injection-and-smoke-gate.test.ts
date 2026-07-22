@@ -1370,18 +1370,107 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
           centerElement?: boolean;
           optional?: boolean;
         };
+        assertVisible?: { id?: string; optional?: boolean } | string;
       }>;
-      const footerScroll = commands.find(
+      const footerScroll = commands.findIndex(
         ({ scrollUntilVisible }) =>
           scrollUntilVisible?.element?.id === 'something-wrong-button',
-      )?.scrollUntilVisible;
+      );
+      const footerAssertion = commands.findIndex(
+        ({ assertVisible }, index) =>
+          index > footerScroll &&
+          typeof assertVisible === 'object' &&
+          assertVisible.id === 'something-wrong-button' &&
+          assertVisible.optional !== true,
+      );
 
-      expect(footerScroll).toMatchObject({
-        visibilityPercentage: 90,
+      expect(commands[footerScroll]?.scrollUntilVisible).toMatchObject({
+        visibilityPercentage: 50,
         centerElement: true,
         optional: false,
       });
+      expect(footerAssertion).toBeGreaterThan(footerScroll);
     }
+  });
+
+  it('[WI-1864] seeds post-approval landing with an eligible zero-subject profile', () => {
+    const manifest = JSON.parse(
+      readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/ci-maestro-manifest.json'),
+        'utf8',
+      ),
+    ) as { scenarioOverrides?: Record<string, string | null> };
+
+    expect(
+      manifest.scenarioOverrides?.['flows/consent/post-approval-landing.yaml'],
+    ).toBe('post-approval-ready');
+
+    for (const runner of [
+      'regression-batch2.sh',
+      'regression-batch3.sh',
+      'regression-batch4b.sh',
+      'rerun-failed.sh',
+      'run-all-regression.sh',
+      'run-all-untested.sh',
+    ]) {
+      const source = readFileSync(
+        join(repoRoot, 'apps/mobile/e2e/scripts', runner),
+        'utf8',
+      );
+
+      expect(source).toMatch(
+        /"post-approval-ready"\s+"flows\/consent\/post-approval-landing\.yaml"/,
+      );
+      expect(source).not.toMatch(
+        /"onboarding-complete"\s+"flows\/consent\/post-approval-landing\.yaml"/,
+      );
+    }
+  });
+
+  it('[WI-1864] waits for the seeded parent child-detail session receipt', () => {
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e/flows/parent/parent-dashboard.yaml'),
+      'utf8',
+    );
+    const commands = parseAllDocuments(source).at(-1)?.toJSON() as Array<{
+      extendedWaitUntil?: {
+        visible?: { id?: string; text?: string } | string;
+        optional?: boolean;
+      };
+    }>;
+    const sessions = commands.findIndex(
+      ({ extendedWaitUntil }) =>
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'recent-sessions-list' &&
+        extendedWaitUntil.optional !== true,
+    );
+    const seededSession = commands.findIndex(
+      ({ extendedWaitUntil }, index) =>
+        index > sessions &&
+        typeof extendedWaitUntil?.visible === 'object' &&
+        extendedWaitUntil.visible.id === 'session-card-${SESSION_ID}' &&
+        extendedWaitUntil.optional !== true,
+    );
+
+    expect(sessions).toBeGreaterThan(-1);
+    expect(seededSession).toBeGreaterThan(sessions);
+    expect(source).not.toMatch(/text:\s*['"](?:Recent )?sessions['"]/i);
+  });
+
+  it('[WI-1864] retires the impossible no-subscription quiz journey', () => {
+    const flow = 'flows/quiz/quiz-error-forbidden.yaml';
+    const nightlyFlows = new Set(
+      loadPlan('nightly').map((entry) => entry.flow),
+    );
+    const source = readFileSync(
+      join(repoRoot, 'apps/mobile/e2e', flow),
+      'utf8',
+    );
+
+    expect(nightlyFlows).not.toContain(flow);
+    expect(source).toMatch(/^# RETIRED \(WI-1864\):/);
+    expect(source).toMatch(/tags:\s*\n\s*- manual/);
+    expect(source).toContain('free subscriptions are auto-provisioned');
   });
 
   it('[WI-1864] bakes the non-secret OpenAI custom-provider slug into the E2E bundle', () => {
@@ -2685,6 +2774,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         direction?: string;
         visibilityPercentage?: number;
         centerElement?: boolean;
+        optional?: boolean;
       };
       tapOn?: { id?: string };
       extendedWaitUntil?: { visible?: { id?: string } | string };
@@ -2692,7 +2782,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
     const heading = commands.findIndex(
       ({ scrollUntilVisible }) =>
         scrollUntilVisible?.element?.id === 'practice-other-practice-heading' &&
-        scrollUntilVisible.direction === 'DOWN',
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 50 &&
+        scrollUntilVisible.centerElement === true &&
+        scrollUntilVisible.optional !== true,
     );
     const recitation = commands.findIndex(
       ({ scrollUntilVisible }, index) =>
@@ -2720,7 +2813,10 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       ({ scrollUntilVisible }, index) =>
         index > practiceReturn &&
         scrollUntilVisible?.element?.id === 'practice-other-practice-heading' &&
-        scrollUntilVisible.direction === 'DOWN',
+        scrollUntilVisible.direction === 'DOWN' &&
+        scrollUntilVisible.visibilityPercentage === 50 &&
+        scrollUntilVisible.centerElement === true &&
+        scrollUntilVisible.optional !== true,
     );
     const dictation = commands.findIndex(
       ({ scrollUntilVisible }, index) =>
@@ -3321,6 +3417,14 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         visible?: { id?: string } | string;
         optional?: boolean;
       };
+      scrollUntilVisible?: {
+        element?: { id?: string };
+        direction?: string;
+        timeout?: number;
+        visibilityPercentage?: number;
+        centerElement?: boolean;
+        optional?: boolean;
+      };
       tapOn?: { id?: string; optional?: boolean } | string;
     }>;
     const opener = 'parent-home-send-nudge-${CHILD_PROFILE_ID}';
@@ -3446,9 +3550,19 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
         extendedWaitUntil.visible.id === 'remediation-card' &&
         extendedWaitUntil.optional !== true,
     );
+    const remediationActions = commands.findIndex(
+      ({ scrollUntilVisible }, index) =>
+        index > remediation &&
+        scrollUntilVisible?.element?.id === 'review-retest-button' &&
+        scrollUntilVisible.direction === 'DOWN' &&
+        (scrollUntilVisible.timeout ?? 0) >= 10000 &&
+        scrollUntilVisible.visibilityPercentage === 100 &&
+        scrollUntilVisible.centerElement === true &&
+        scrollUntilVisible.optional !== true,
+    );
     const reviewAction = commands.findIndex(
       ({ assertVisible }, index) =>
-        index > remediation &&
+        index > remediationActions &&
         typeof assertVisible === 'object' &&
         assertVisible.id === 'review-retest-button' &&
         assertVisible.optional !== true,
@@ -3496,6 +3610,7 @@ describe('[WI-1652] Maestro CI selects the declared recursive flow suites', () =
       recallScreen,
       failedAttempt,
       remediation,
+      remediationActions,
       reviewAction,
       relearnAction,
       relearnTap,

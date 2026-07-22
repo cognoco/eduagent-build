@@ -87,6 +87,7 @@ const CLERK_FETCH_BASE_DELAY_MS = 500;
 export type SeedScenario =
   | 'onboarding-complete'
   | 'onboarding-no-subject'
+  | 'post-approval-ready'
   | 'learning-active'
   | 'retention-due'
   | 'failed-recall-3x'
@@ -1129,6 +1130,56 @@ async function seedOnboardingNoSubject(
 
   return {
     scenario: 'onboarding-no-subject',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: {},
+  };
+}
+
+/** Teen owner immediately after parental approval. The profile deliberately
+ * has zero subjects and an approved request with a guardian recipient, which
+ * is the exact contract usePostApprovalLanding requires. */
+async function seedPostApprovalReady(
+  db: Database,
+  email: string,
+  env: SeedEnv,
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Approved Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+    email,
+    clerkUserId,
+  });
+  const now = new Date();
+  const grantId = generateUUIDv7();
+
+  await db.insert(consentGrant).values({
+    id: grantId,
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
+  });
+  await db.insert(consentRequest).values({
+    id: generateUUIDv7(),
+    chargePersonId: profileId,
+    organizationId: accountId,
+    purpose: 'platform_use',
+    requestedBasis: 'gdpr_parental_consent',
+    guardianEmail: 'parent-e2e-test@example.com',
+    status: 'approved',
+    requestedAt: now,
+    respondedAt: now,
+    consentGrantId: grantId,
+  });
+
+  return {
+    scenario: 'post-approval-ready',
     accountId,
     profileId,
     email,
@@ -6100,6 +6151,7 @@ export async function attachClerkTotpFactor(
 const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'onboarding-complete': seedOnboardingComplete,
   'onboarding-no-subject': seedOnboardingNoSubject,
+  'post-approval-ready': seedPostApprovalReady,
   'learning-active': seedLearningActive,
   'retention-due': seedRetentionDue,
   'failed-recall-3x': seedFailedRecall3x,

@@ -78,6 +78,8 @@ tags:
       id: 'practice-other-practice-heading'
     direction: DOWN
     timeout: 5000
+    visibilityPercentage: 50
+    centerElement: true
 
 - scrollUntilVisible:
     element:
@@ -112,6 +114,8 @@ tags:
       id: 'practice-other-practice-heading'
     direction: DOWN
     timeout: 5000
+    visibilityPercentage: 50
+    centerElement: true
 
 - scrollUntilVisible:
     element:

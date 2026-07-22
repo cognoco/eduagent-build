@@ -70,9 +70,12 @@ tags:
       id: 'something-wrong-button'
     direction: DOWN
     timeout: 10000
-    visibilityPercentage: 90
+    visibilityPercentage: 50
     centerElement: true
     optional: false
+
+- assertVisible:
+    id: 'something-wrong-button'
 
 - takeScreenshot: 02-parent-memory-controls
 
