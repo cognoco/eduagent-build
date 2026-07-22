@@ -71,9 +71,9 @@ describe('shouldRetryApiError', () => {
     ).toBe(false);
   });
 
-  it('retries transient non-HTTP failures up to the retry budget', () => {
-    expect(shouldRetryApiError(0, new NetworkError())).toBe(true);
-    expect(shouldRetryApiError(1, new NetworkError())).toBe(true);
+  it('leaves NetworkError replay to the bounded API-client retry layer', () => {
+    expect(shouldRetryApiError(0, new NetworkError())).toBe(false);
+    expect(shouldRetryApiError(1, new NetworkError())).toBe(false);
     expect(shouldRetryApiError(2, new NetworkError())).toBe(false);
   });
 });

@@ -1,6 +1,10 @@
 // @inngest-admin: event-profile (profileId from event scopes all notice reads and writes)
 import { inngest } from '../client';
-import { getStepDatabase, getStepMentorNoticeEnabled } from '../helpers';
+import {
+  getStepDatabase,
+  getStepMentorNoticeEnabled,
+  getStepMentorNoticePushPostMvpEnabled,
+} from '../helpers';
 import {
   getLearningDayStart,
   getProfileTimeZone,
@@ -17,6 +21,19 @@ export const mentorNoticeNudgeSend = inngest.createFunction(
   },
   { event: 'app/mentor-notice.nudge' },
   async ({ event, step }) => {
+    // [WI-2573] Post-MVP push containment (MMT-ADR-0036 §3.1). First step, so
+    // an event already sitting in the queue from before the containment — a
+    // replay of the pre-existing fan-out — reserves no slot, writes no
+    // notification_log row, and reaches no Expo send. It returns a terminal
+    // skipped result instead of throwing, so there is no retry fan-out either.
+    const pushBoundaryOpen = await step.run(
+      'check-post-mvp-push-boundary',
+      () => getStepMentorNoticePushPostMvpEnabled(),
+    );
+    if (!pushBoundaryOpen) {
+      return { status: 'skipped', reason: 'push_post_mvp' };
+    }
+
     const enabled = await step.run('check-feature-flag', () =>
       getStepMentorNoticeEnabled(),
     );

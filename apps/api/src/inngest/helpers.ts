@@ -4,7 +4,7 @@ import {
   createDatabase,
   type Database,
 } from '@eduagent/database';
-import { isNodeTestEnv } from '../config';
+import { isMentorNoticePushPostMvpEnabled, isNodeTestEnv } from '../config';
 import { captureException } from '../services/sentry';
 
 const stepDatabaseScope = new AsyncLocalStorage<Set<Database>>();
@@ -54,6 +54,7 @@ export interface EnvBindings {
   maxDedupLlmCallsPerSession?: string;
   memoryFactsDedupRolloutPct?: string;
   mentorNoticeEnabled?: string;
+  mentorNoticePushPostMvpEnabled?: string;
 }
 
 function readStringBinding(
@@ -105,6 +106,10 @@ export function readInngestEnvBindings(env: unknown): EnvBindings {
       'MEMORY_FACTS_DEDUP_ROLLOUT_PCT',
     ),
     mentorNoticeEnabled: readStringBinding(bindings, 'MENTOR_NOTICE_ENABLED'),
+    mentorNoticePushPostMvpEnabled: readStringBinding(
+      bindings,
+      'MENTOR_NOTICE_PUSH_POST_MVP_ENABLED',
+    ),
   };
 }
 
@@ -323,6 +328,28 @@ export function getStepMentorNoticeEnabled(): boolean {
   const bound = getEnvBinding('mentorNoticeEnabled');
   if (bound === undefined) warnMissingBinding('mentorNoticeEnabled');
   return (bound ?? process.env['MENTOR_NOTICE_ENABLED']) === 'true';
+}
+
+/**
+ * [WI-2573] THE mentor-notice push containment seam (MMT-ADR-0036 §3.1).
+ *
+ * Reads the dedicated MENTOR_NOTICE_PUSH_POST_MVP_ENABLED binding — never the
+ * in-app MENTOR_NOTICE_ENABLED flag and never a learner notification
+ * preference. Deliberately does NOT call warnMissingBinding: the binding is
+ * absent by design in every MVP deployment, so a missing value is the normal
+ * state, not an operational warning.
+ *
+ * Default-closed. The two mentor-notice nudge functions consult this before
+ * any database read, event fan-out, slot reservation, notification-log write,
+ * or Expo send — so with the boundary off they are structurally incapable of
+ * delivery while remaining registered (and therefore reversible by flipping
+ * one binding, with no redeploy of removed code).
+ */
+export function getStepMentorNoticePushPostMvpEnabled(): boolean {
+  const bound = getEnvBinding('mentorNoticePushPostMvpEnabled');
+  return isMentorNoticePushPostMvpEnabled(
+    bound ?? process.env['MENTOR_NOTICE_PUSH_POST_MVP_ENABLED'],
+  );
 }
 
 // [R1] CLERK_SECRET_KEY is used by the scheduled-deletion job to erase the

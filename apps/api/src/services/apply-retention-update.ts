@@ -1,5 +1,6 @@
 import { and, eq, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import { retentionCards, type Database } from '@eduagent/database';
+import type { RecallFeedback } from '@eduagent/schemas';
 import { syncXpLedgerStatus } from './xp';
 
 export interface RetentionCardSet {
@@ -13,6 +14,9 @@ export interface RetentionCardSet {
   consecutiveSuccesses?: number;
   xpStatus?: 'pending' | 'verified' | 'decayed';
   evaluateDifficultyRung?: 1 | 2 | 3 | 4 | null;
+  // [WI-2114] Grader-owned structured feedback of the last graded recall —
+  // never the learner's raw answer (AC-7).
+  lastRecallFeedback?: RecallFeedback | null;
 }
 
 export type RetentionUpdateGuard =
@@ -81,6 +85,9 @@ function buildSetClause(
   if (set.xpStatus !== undefined) setClause.xpStatus = set.xpStatus;
   if (set.evaluateDifficultyRung !== undefined) {
     setClause.evaluateDifficultyRung = set.evaluateDifficultyRung;
+  }
+  if (set.lastRecallFeedback !== undefined) {
+    setClause.lastRecallFeedback = set.lastRecallFeedback;
   }
 
   return setClause;

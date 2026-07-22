@@ -56,7 +56,7 @@ Runs after Wave-0 guards exist. Two slices in parallel; **if both cannot land, t
 Mostly counsel-answer consumers and pre-publish obligations; overlaps Wave 1 where independent.
 
 - **Compliance core:** DPIA sign + DPO complete (from 0.2) · ROPA (WI-1107) · breach plan (WI-1108) · Art-9 ruling (WI-1111) · lawful-basis record (WI-1193) · retention values (WI-1194) · processor DPAs/TIAs (WI-1192).
-- **Counsel-answer consumers:** controller entity (WI-1559) → privacy-policy publish + child summary + false-claims fix + 13+ floor stated (WI-1109) · name-minimization arm (WI-1558) · consent-denial state build (Q7 pre-wired) · crisis legal floor (Q3 → WI-1690 already rescoped: no guardian notification).
+- **Counsel-answer consumers:** controller identity (WI-1559) is **RESOLVED** as ZWIZZLY AS, org.nr 811696072, Fiskekroken 3B, 0139 Oslo, Norway, with Norwegian Datatilsynet as lead authority; the active policy/DPIA/ROPA records are reconciled, unblocking that input to privacy-policy publication (WI-1109) · name-minimization arm (WI-1558) · consent-denial state build (Q7 pre-wired) · crisis legal floor (Q3 → WI-1690 already rescoped: no guardian notification).
 - **AI Act:** WI-1195 (Art-50 in-chat disclosure — unconditional) · WI-1663/1664 **only if** counsel classifies high-risk (then they become launch-gating — replan immediately).
 - **Safety:** suitability-judge enablement (WI-1686) · blocked-event digest (WI-1691) · crisis slice build (WI-1690, rescoped).
 - **Billing before paid launch:** payment-failed notify (WI-1555/1474) · past-due banner (WI-1475) · silent-fail escalation (WI-1399).

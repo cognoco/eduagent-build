@@ -42,6 +42,12 @@ describe('resolveSupporterColdStart', () => {
     });
   });
 
+  // [WI-2541] The card-class discriminator is `credentialed` (a Login row
+  // exists — the EXISTS clause in the edges query), NOT person.hasOwnAccount.
+  // The fake-db returns edge rows verbatim, so these unit rows carry the
+  // resolved `credentialed` value directly; the real login-presence predicate
+  // (and every partition of the (credentialed, learning-state, same-org) tuple)
+  // is proven against a real DB by supporter-coldstart.integration.test.ts.
   it('branches accepted edges into managed, granted-idle, and active states', async () => {
     const db = dbWithSelectResults([
       [
@@ -49,19 +55,19 @@ describe('resolveSupporterColdStart', () => {
           edgeId: '00000000-0000-4000-8000-000000000101',
           personId: '00000000-0000-4000-8000-000000000201',
           displayName: 'Managed Child',
-          hasOwnAccount: false,
+          credentialed: false,
         },
         {
           edgeId: '00000000-0000-4000-8000-000000000102',
           personId: '00000000-0000-4000-8000-000000000202',
           displayName: 'Idle Teen',
-          hasOwnAccount: true,
+          credentialed: true,
         },
         {
           edgeId: '00000000-0000-4000-8000-000000000103',
           personId: '00000000-0000-4000-8000-000000000203',
           displayName: 'Active Teen',
-          hasOwnAccount: true,
+          credentialed: true,
         },
       ],
       // [WI-2226 owner-gate] getPersonOrganizationId(supporterPersonId) —
@@ -108,10 +114,10 @@ describe('resolveSupporterColdStart', () => {
     expect(JSON.stringify(result)).not.toContain('consent-pending');
   });
 
-  // [WI-2226 owner-gate] Routing-level check that a hasOwnAccount=false
-  // candidate outside the supporter's own org is suppressed, not rendered.
-  // The real predicate (does the supportee's membership actually resolve
-  // under the supporter's org id) is proven against a real DB by
+  // [WI-2226 owner-gate] Routing-level check that an uncredentialed candidate
+  // (credentialed=false) outside the supporter's own org is suppressed, not
+  // rendered. The real predicate (does the supportee's membership actually
+  // resolve under the supporter's org id) is proven against a real DB by
   // supporter-coldstart.integration.test.ts — this fake-db unit test only
   // exercises the branch given canned inputs.
   it("suppresses a managed card for a candidate outside the supporter's own org", async () => {
@@ -121,7 +127,7 @@ describe('resolveSupporterColdStart', () => {
           edgeId: '00000000-0000-4000-8000-000000000101',
           personId: '00000000-0000-4000-8000-000000000201',
           displayName: 'Cross-Org Candidate',
-          hasOwnAccount: false,
+          credentialed: false,
         },
       ],
       // getPersonOrganizationId(supporterPersonId).

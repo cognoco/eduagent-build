@@ -58,6 +58,7 @@ import {
   generateUUIDv7,
   learningSessions,
   membership,
+  mentorNotices,
   organization,
   person,
   retentionCards,
@@ -72,6 +73,7 @@ import {
   insertRetentionCardIfAbsent,
 } from '../apply-retention-update';
 import { deleteV2IdentitiesForTest } from '../../test-utils/legacy-identity-anchors';
+import { getProfileTimeZone } from '../mentor-notices';
 import {
   _resetCircuits,
   registerProvider,
@@ -128,6 +130,71 @@ const TUTOR_ENVELOPE_NO_EVAL = JSON.stringify({
     reason: 'test envelope',
   },
 });
+
+// ---------------------------------------------------------------------------
+// [WI-2557] Mentor-notice recheck defer — learning-day boundary across an
+// offset transition. Chile moves -04 to -03 at 2026-09-06T04:00:00Z, so at
+// 07:30Z the learner's clock reads 04:30 on 2026-09-06 and the learning day
+// began at 2026-09-06T07:00:00Z; subtracting four ABSOLUTE hours lands at
+// 03:30Z, before the transition, reading 23:30 on 2026-09-05 — 23 hours early.
+// Defer is idempotent per learning day, so a notice deferred at local 03:00
+// (previous learning day) must be deferrable again at local 04:30.
+// ---------------------------------------------------------------------------
+const NOTICE_SANTIAGO_NOW = new Date('2026-09-06T07:30:00.000Z'); // local 04:30
+const NOTICE_PREVIOUS_DAY_DEFER = new Date('2026-09-06T06:00:00.000Z'); // local 03:00
+// Re-offered after yesterday's defer, so resolveMentorNoticeRecheckContext does
+// not treat the notice as already-deferred-for-this-offer.
+const NOTICE_OFFERED_AT = new Date('2026-09-06T07:20:00.000Z');
+const NOTICE_LEARNER_ANSWER =
+  'I move the negative three to the other side by adding three to both sides.';
+
+// Everything jest's modern fake timers can fake EXCEPT Date. Faking the clock
+// alone keeps timers and socket IO real, so the live pg connection is unaffected.
+const NOTICE_DO_NOT_FAKE = [
+  'hrtime',
+  'nextTick',
+  'performance',
+  'queueMicrotask',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+  'requestIdleCallback',
+  'cancelIdleCallback',
+  'setImmediate',
+  'clearImmediate',
+  'setInterval',
+  'clearInterval',
+  'setTimeout',
+  'clearTimeout',
+] as const;
+
+function tutorEnvelopeDeferringNotice(
+  noticeId: string,
+  answerEventId: string,
+): string {
+  return JSON.stringify({
+    reply: 'Let us come back to that one another time.',
+    signals: {
+      partial_progress: false,
+      needs_deepening: false,
+      understanding_check: false,
+      ready_to_finish: false,
+      notice_recheck: {
+        noticeId,
+        verdict: 'deferred',
+        answerEventId,
+        learnerQuote: NOTICE_LEARNER_ANSWER,
+      },
+    },
+    ui_hints: {
+      note_prompt: { show: false, post_session: false },
+    },
+    private_sources: {
+      relied_on: ['conversation_history'],
+      insufficient: false,
+      reason: 'test envelope',
+    },
+  });
+}
 
 const TUTOR_ENVELOPE_WITH_ANSWER_EVALUATION = JSON.stringify({
   reply: 'The product is 42. What factor pair gives the same result?',
@@ -1181,5 +1248,134 @@ describeIfDb('session exchange production-path integration', () => {
     // questionsAsked === evaluations.length → no stall (all graded)
     expect(result.challengeRound?.questionsAsked).toBe(1);
     expect(result.challengeRound?.evaluations).toHaveLength(1);
+  });
+
+  // [WI-2557] Both exchange defer call sites — processMessage and streamMessage
+  // carry the same twelve-line recheck-outcome block, each deriving its own
+  // learning-day boundary. Covering one would leave the other free to drift.
+  describe('mentor-notice defer derives the learning day from local 04:00', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    async function seedMentorNoticeDeferTurn() {
+      const { profileId, subjectId } = await seedProfileAndSubject(db);
+      const topicId = await seedCurriculumTopic(db, subjectId);
+      const session = await seedOrdinarySession(
+        db,
+        profileId,
+        subjectId,
+        topicId,
+      );
+
+      // getProfileTimeZone resolves through organization.timezone, which is
+      // nullable with no default — an unset fixture resolves to UTC and these
+      // tests would pass while proving nothing.
+      const [link] = await db
+        .select({ organizationId: membership.organizationId })
+        .from(membership)
+        .where(eq(membership.personId, profileId))
+        .limit(1);
+      if (!link) throw new Error('membership lookup failed');
+      await db
+        .update(organization)
+        .set({ timezone: 'America/Santiago' })
+        .where(eq(organization.id, link.organizationId));
+      expect(await getProfileTimeZone(db, profileId)).toBe('America/Santiago');
+
+      // The learner turn the notice_recheck signal must cite as evidence.
+      const [answerEvent] = await db
+        .insert(sessionEvents)
+        .values({
+          profileId,
+          subjectId,
+          sessionId: session.id,
+          topicId,
+          eventType: 'user_message',
+          content: NOTICE_LEARNER_ANSWER,
+          metadata: {},
+        })
+        .returning({ id: sessionEvents.id });
+      if (!answerEvent) throw new Error('answer event insert failed');
+
+      const [notice] = await db
+        .insert(mentorNotices)
+        .values({
+          profileId,
+          subjectId,
+          sourceSessionId: session.id,
+          concept: 'Changing signs across the equals sign',
+          correctionHint: 'Apply the inverse operation to both sides.',
+          status: 'open',
+          lastDeferredAt: NOTICE_PREVIOUS_DAY_DEFER,
+          lastRecheckOutcome: 'deferred',
+          lastOfferedSessionId: session.id,
+          lastOfferedAt: NOTICE_OFFERED_AT,
+        })
+        .returning({ id: mentorNotices.id });
+      if (!notice) throw new Error('mentor notice insert failed');
+
+      await db
+        .update(learningSessions)
+        .set({ metadata: { recheckNoticeId: notice.id } })
+        .where(eq(learningSessions.id, session.id));
+
+      llm.setTutorResponse(
+        tutorEnvelopeDeferringNotice(notice.id, answerEvent.id),
+      );
+      return { profileId, session, noticeId: notice.id };
+    }
+
+    async function readLastDeferredAt(noticeId: string): Promise<Date | null> {
+      const [row] = await db
+        .select({ lastDeferredAt: mentorNotices.lastDeferredAt })
+        .from(mentorNotices)
+        .where(eq(mentorNotices.id, noticeId));
+      return row?.lastDeferredAt ?? null;
+    }
+
+    it('processMessage re-defers a notice deferred in the previous learning day', async () => {
+      const { profileId, session, noticeId } =
+        await seedMentorNoticeDeferTurn();
+
+      jest.useFakeTimers({
+        now: NOTICE_SANTIAGO_NOW,
+        doNotFake: [...NOTICE_DO_NOT_FAKE] as never,
+      });
+      await processMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+
+      // A new learning day began at local 04:00, so the defer TAKES and stamps
+      // the current instant. Under the four-absolute-hour boundary yesterday's
+      // 03:00 defer still counts as "today", the update is skipped, and
+      // lastDeferredAt stays at 2026-09-06T06:00:00.000Z.
+      expect(await readLastDeferredAt(noticeId)).toEqual(NOTICE_SANTIAGO_NOW);
+    });
+
+    it('streamMessage re-defers a notice deferred in the previous learning day', async () => {
+      const { profileId, session, noticeId } =
+        await seedMentorNoticeDeferTurn();
+
+      jest.useFakeTimers({
+        now: NOTICE_SANTIAGO_NOW,
+        doNotFake: [...NOTICE_DO_NOT_FAKE] as never,
+      });
+      const result = await streamMessage(
+        db,
+        profileId,
+        session.id,
+        { message: NOTICE_LEARNER_ANSWER },
+        { semanticMemoryRetrievalEnabled: false, mentorNoticeEnabled: true },
+      );
+      for await (const chunk of result.stream) void chunk;
+      await result.onComplete();
+
+      expect(await readLastDeferredAt(noticeId)).toEqual(NOTICE_SANTIAGO_NOW);
+    });
   });
 });

@@ -1,32 +1,29 @@
 # Concept-Capture Layer — Additive Concept-Grain Mastery
 
-> **STATUS (2026-06-27):** PARKED — migration 0107 is reference-only; the profiles→person rename (MMT-ADR-0012 one-time reset) has not yet executed (profiles table still exists), so the tables aren't live. Write side gated `CONCEPT_CAPTURE_ENABLED=false`. Read side (API /notes/concept-mastery + mobile NoteDisplay star/additions) is wired and works once tables exist. Scope items 5 (concept-targeted review) + 6 (note-correctness notification) not built. NEXT: re-home concepts/concept_mastery into the post-reset baseline (FKs→person), regenerate the migration, flip the flag.
+> **STATUS (last verified 2026-07-22): PARTIALLY SHIPPED.** The core slice is live in
+> source: `concepts` / `concept_mastery`, completed-Challenge capture, the
+> `/notes/concept-mastery` read, and note-surface consumers are implemented and tested
+> (`packages/database/src/schema/concept-mastery.ts`,
+> `apps/api/src/services/concept-capture.ts`,
+> `apps/api/src/services/concept-capture.integration.test.ts`,
+> `apps/api/src/routes/notes.ts`, `apps/mobile/src/hooks/use-notes.ts`). Activation
+> landed in `2fedbd627` (PR #1828), and `CONCEPT_CAPTURE_ENABLED` is now `true`.
+> Concept-targeted due-topic review for **WI-1454 (concept-targeted review for weak
+> concepts)** is implemented and tested in `3b0fa9337` (PR #2223); its live Cosmo
+> record remains Backlog/Active and needs lifecycle reconciliation, not duplicate
+> implementation. The broad note-correctness umbrella **WI-1491 (note-correctness
+> grading and nudges)** was cancelled/superseded by the current MVP disposition in
+> `docs/plans/2026-07-10-mvp-roadmap/MVP-DEFINITION.md`. The design body below is
+> preserved as the original proposal, not as a current implementation tracker.
 
-> **⚠️ MECHANISM CORRECTION (2026-06-27).** The STATUS line above and the "Dependency
-> — build on the post-baseline `person` schema" note below describe the rename as the
-> `MMT-ADR-0012` one-time *baseline reset* (chain collapse; tables "born on `person`";
-> "regenerate the migration"; §5.3 "API surface broken in the baseline commit and
-> re-built"). **That mechanism did not ship.** The chain was never collapsed (it is
-> append-only, now at `0123`); the identity model was added **additively** (`0108` /
-> `0109`) with readers behind `IDENTITY_V2_ENABLED`, and the `profiles`→`person`
-> rename is the **WI-586 convergence cutover** (`MMT-ADR-0020`) via the catalog-driven
-> `m-repoint` (re-points every live `profiles`-FK → `person`) + `m-drop`. The rename
-> is **still pending** (verified 2026-06-27: `m-repoint` / `m-drop` inert in
-> `apps/api/drizzle/_freeze-only/`; `meta/_journal.json` ends at `0123`;
-> `schema/profiles.ts` is still the live FK target), so **parking stands** and this is
-> the **same gate** that parks note-correctness
-> (`docs/plans/2026-06-08-note-correctness-and-challenge-draft.md`). At un-park: author
-> a normal **append-only** migration (not a "regenerated baseline"); `m-repoint` being
-> catalog-driven means a `profiles`-FK'd `concepts`/`concept_mastery` built before the
-> freeze is repointed to `person` automatically. **Resolve the open `person.id`
-> uuid-vs-bigint question (below) against the shipped `0108`/`0109` identity baseline,
-> not the `MMT-ADR-0012` §2A amendment text**, before authoring the FK column types.
-
-**Status:** Draft · 2026-06-08 · **Branch:** `conceptgrain` · **Decision record:** [MMT-ADR-0017](../adr/MMT-ADR-0017-concept-capture-additive-layer.md)
+**Status:** Partially shipped · original design 2026-06-08 · last verified 2026-07-22 · **Decision record:** [MMT-ADR-0017](../adr/MMT-ADR-0017-concept-capture-additive-layer.md)
 
 > **Rev. 2026-06-08 (post-review):** capture reads the enriched evaluation list (not the `MasteryDecision`, which drops `missing`); `concept_mastery.supersededAt` added so a stale near-duplicate concept can't permanently suppress a note's star; correction surfacing scoped to neutral topic-level framing pending note↔concept attribution; the note-correctness nudge is deduped against the review-due nudge; the note star resolves to **three** states (not-yet-assessed / verified / tutor-has-additions), never a two-way present/absent split, so an un-assessed note is never visually identical to one with a weak concept (legibility, north-star Invariant 6).
 
-> **Dependency — build on the post-baseline `person` schema, not legacy `profiles`.** The identity-foundation reset (`MMT-ADR-0012` — one-time pre-launch clean-cut baseline; `docs/canon/identity/data-model.md`) renames `profiles` → `person`, `profile_id` → `person_id`, dissolves `is_owner` into an `admin` role, and is an **explicit no-backwards-compatibility cut** ("the API surface is broken in the baseline commit and re-built", §5.3). This spec's *design* is portable — the per-learner scope key survives conceptually — but its *tables and capture/read code* must target the new schema. **Build order: identity baseline reset → this layer on `person`/`person_id` → both in the launch bundle.** Building now against `profiles`/`profileId` guarantees rework inside the cut. **Open (blocks the FK types):** confirm `person.id`'s type — legacy `profiles.id` is `uuid`, but the data-model §2A amendment FKs are typed `BIGINT`; this decides whether `concepts.person_id` and `sourceSessionId` are uuid or bigint and affects every learning-data FK, not just this layer.
+> **Former dependency — satisfied.** The identity convergence and person-FK repoint
+> landed before activation; the current schema and integration tests above are the
+> source of truth. The original dependency analysis remains useful historical design
+> context but no longer blocks this slice.
 
 ## Context
 

@@ -32,6 +32,18 @@ jest.mock('../services/identity-v2/ownership-v2', () => ({
   verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
 }));
 
+// [WI-2498] resolveMentorNoticeVisibility's CONSENT conjunct reads the
+// consent_grant/consent_request tables via a raw db query the stub `db` above
+// cannot satisfy. Every scenario in this file is a consented caller-self read;
+// the consent conjunct itself is covered against a real database in
+// tests/integration/mentor-notice-proxy-visibility.integration.test.ts.
+// gc1-allow: isLlmExchangeConsentAllowed runs raw db queries with no real
+// implementation available in this file's stub-db environment.
+jest.mock('../services/identity-v2/consent-status-v2', () => ({
+  ...jest.requireActual('../services/identity-v2/consent-status-v2'),
+  isLlmExchangeConsentAllowed: jest.fn().mockResolvedValue(true),
+}));
+
 const PROFILE_ID = '550e8400-e29b-41d4-a716-446655440001';
 const NOTICE_ID = '550e8400-e29b-41d4-a716-446655440002';
 const SESSION_ID = '550e8400-e29b-41d4-a716-446655440003';

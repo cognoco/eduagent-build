@@ -1,9 +1,5 @@
 {
   "pr": [
-    {
-      "flow": "flows/account/more-tab-navigation.yaml",
-      "scenario": "onboarding-complete"
-    },
     { "flow": "flows/app-launch.yaml", "scenario": null },
     {
       "flow": "flows/auth/deep-link-redirect-signed-in.yaml",
@@ -30,10 +26,6 @@
     },
     { "flow": "flows/retention/library.yaml", "scenario": "retention-due" },
     {
-      "flow": "flows/subjects/multi-subject.yaml",
-      "scenario": "multi-subject"
-    },
-    {
       "flow": "flows/subjects/practice-subject-picker.yaml",
       "scenario": "multi-subject"
     }
@@ -54,6 +46,14 @@
     {
       "flow": "flows/v2/v2-supporter-coldstart-mount.yaml",
       "scenario": "v2-supporter-managed"
+    },
+    {
+      "flow": "flows/v2/v2-supporter-link-ceremony.yaml",
+      "scenario": "v2-supporter-pending-link"
+    },
+    {
+      "flow": "flows/v2/v2-supporter-self-learning-doorway.yaml",
+      "scenario": "v2-supporter-self-learning-active"
     }
   ],
   "scenarioOverrides": {

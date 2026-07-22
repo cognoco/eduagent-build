@@ -49,7 +49,7 @@ These are already in the DPIA/ROPA/privacy-policy as launch gates; status confir
 
 1. **DPO appointed + DPIA signed** (C-5, DPIA #1). — legal/process. **HARD BLOCKER.**
 2. **Provider DPAs signed** on business tier + US-transfer checks (DPIA #2). Gemini *enforcement* is done in code; DPA *signatures* are process, unverifiable from the repo.
-3. **Privacy-policy pre-publish TODOs** (DPIA #4): DPO name, controller registered address, EU Art 27 rep, UK rep, final age-floor confirmation — open in the `PRE-PUBLISH TODO` HTML comment (`privacy-policy.html:67-73`).
+3. **Privacy-policy pre-publish TODOs** (DPIA #4): controller identity and registered address are resolved. DPO name, a UK representative if MentoMate serves the UK, and final age-floor confirmation remain open in the `PRE-PUBLISH TODO` HTML comment.
 4. **`person_retain.*.retention_period` values set** (not placeholder) — counsel-owned (DPIA #7, ROPA open items).
 5. **Policy-engine jurisdiction content populated** for launch jurisdictions — PM-owned compliance-population workstream (DPIA #8). **Status unknown — confirm before go-live.**
 
@@ -63,7 +63,7 @@ Route to the named owner; presented as open, not pre-resolved:
 
 - **C2 — DPIA A13 name-minimization claim vs code.** DPIA §4 / A13 claim identifiers are *"stripped from LLM requests."* The learner's **first name is sent verbatim** to the LLM (`exchange-prompts.ts:734`). For a children's product, an affirmative false minimization claim in a legal doc is the material issue. **Decision (product + counsel):** *tokenize/strip* the name before the prompt (name in UI, token in prompt may preserve pedagogy) **or** *amend the DPIA* to disclose that the first name is sent to processors. Do not foreclose the strip option.
 
-- **C3 — Controller-entity mismatch.** Privacy policy names the controller **"Cognoco s.r.o."** (`privacy-policy.html:21,66`); DPIA + ROPA say controller *"[legal entity name — TODO], established in Norway."* Clean factual contradiction. **Decision (counsel):** reconcile the controlling legal entity across all three before publish.
+- **C3 — Controller identity — RESOLVED (WI-1559, 2026-07-21).** The privacy policy, DPIA, ROPA, filled EDPB DPIA, and breach plan consistently name **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway, as controller and **Norwegian Datatilsynet** as lead supervisory authority.
 
 - **C4 — Privacy-policy profiling disclosure (C-1 canon / GDPR Art 13(2)(f)).** Adaptive profiling is real (`learning_profiles`, mastery, `needs_deepening_topics`). The canon requires copy to disclose profiling **as present and lawful** and never claim ADM is engineered out. The policy discloses "personalised tutoring / coaching insights" but not profiling explicitly. **Decision (policy-owner):** add an explicit profiling-present-and-lawful disclosure line.
 

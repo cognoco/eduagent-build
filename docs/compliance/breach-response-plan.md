@@ -1,7 +1,7 @@
 # Data-Breach Response Plan
 
 **Checklist item:** A4 · **Law:** GDPR Articles 33 & 34 · **Status:** DRAFT for DPO sign-off.
-**Lead regulator:** Datatilsynet (Norwegian Data Protection Authority) — because the company is established in Norway.
+**Controller:** **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway. **Lead regulator:** Norwegian Datatilsynet (Norwegian Data Protection Authority).
 
 > A personal-data breach = any security incident leading to accidental or unlawful **destruction, loss, alteration, unauthorised disclosure of, or access to** personal data. This includes a leaked database, a misconfigured store, a stolen laptop with credentials, a vendor breach (Clerk, Neon, an LLM provider, etc.), or accidental sending of one family's data to another. **The 72-hour clock is short — this plan exists so nobody has to think about the process during the incident.**
 
@@ -33,7 +33,7 @@
 ## Pre-filled facts (so they're not looked up mid-incident)
 
 - **Regulator:** Datatilsynet — www.datatilsynet.no — breach form on their site.
-- **Controller:** `[legal entity name — TODO]`, registered `[address — TODO]`.
+- **Controller:** **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway.
 - **DPO contact:** `[dpo@… — TODO]`.
 - **EU/UK representative:** `[Art 27 rep — TODO if serving UK]`.
 - **Processor breach-contacts:** maintained in each provider's DPA file (see `ropa.md` recipients column).

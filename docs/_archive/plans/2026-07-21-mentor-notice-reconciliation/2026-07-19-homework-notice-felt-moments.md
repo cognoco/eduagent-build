@@ -3,13 +3,13 @@ title: Homework Notice Felt Moments — Implementation Plan
 date: 2026-07-19
 profile: code
 spec: docs/specs/2026-07-19-homework-notice-felt-moments.md
-status: proposed
-scope_amendment: docs/plans/2026-07-20-mentor-notices-all-sessions.md
+status: historical-implemented-superseded
+scope_decision: docs/adr/MMT-ADR-0036-mentor-notice-mvp-boundaries-and-server-authority.md
 ---
 
 # Homework Notice Felt Moments — Implementation Plan
 
-> **Scope amendment — 2026-07-20:** Homework was the original activation path, not a lasting eligibility boundary. The same evidence-backed notice lifecycle now applies to every session type and every learner age. Ordinary sessions inherit their subject/topic from the session; interleaved retrieval binds the notice to one server-owned topic target. The follow-on implementation plan above supersedes homework-only eligibility wherever this historical plan says otherwise.
+> **Historical L3 record — superseded 2026-07-21.** This plan was used to build PR #2293 before the feature had a ratified product and architecture boundary. It is preserved as implementation provenance, not decision authority. [`MMT-ADR-0036`](../../../adr/MMT-ADR-0036-mentor-notice-mvp-boundaries-and-server-authority.md) and the current [MVP specification](../../../specs/2026-07-19-homework-notice-felt-moments.md) govern forward work. In particular, notice push/nudges are outside the MVP and the eligible sources are homework plus ordinary learning, not every session type.
 
 **Goal:** Let a learner feel that Mentor noticed one concrete homework slip, kept a quiet record of it, and offered a short evidence-based re-check on the next learning day or the next natural subject session without turning homework into an upfront diagnostic or a forced remediation flow.
 

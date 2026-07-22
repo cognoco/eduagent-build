@@ -114,8 +114,8 @@
 
 **THE launch gate (C-5, register:77-81): DPIA signed + DPO appointed before the first consent-gated child onboards.** DPIA is draft v0.1 unsigned; no DPO. Everything else sequences under it:
 
-- Controller entity contradiction (policy says Cognoco s.r.o.; DPIA/ROPA say Norway-TBD) — counsel Q1 / WI-1559; blocks privacy-policy publish.
-- Privacy-policy publish TODOs (`privacy-policy.html:67-73`): DPO name, controller address, Art-27 EU rep, UK rep, final age floor.
+- Controller identity — **RESOLVED 2026-07-21 (WI-1559):** policy, DPIA, ROPA, filled EDPB DPIA, and breach plan consistently name **ZWIZZLY AS**, org.nr **811696072**, Fiskekroken 3B, 0139 Oslo, Norway; lead supervisory authority is **Norwegian Datatilsynet**.
+- Privacy-policy publish TODOs: DPO name, UK representative if MentoMate serves the UK, and final age floor. Controller identity/address are complete; no EU Article 27 representative is required for the Norway-established controller.
 - Age floor — **RULED 2026-07-10 (operator): 13+ is the confirmed LAUNCH floor**, not a forever cap. Privacy policy + store worksheet state 13+ now; the store rating is obtained to *conform* to 13+ (the rating no longer votes on the floor); the worksheet's age-11 stale claim rides the WI-1577 final-gate refresh. The 2026-06-08 build-for-10+ strategy stands unchanged: future non-US 10–12 opening under GDPR parental authorization (US under-13 stays blocked → COPPA stays dormant) remains roadmap — keep the scaffolding warm + under-13 bounce instrumentation, and word the policy so a later floor change is an update, not a rewrite.
 - DPIA name-minimization (first name sent verbatim to LLM, `exchange-prompts.ts:734`) — counsel Q4 / WI-1558: tokenize vs disclose.
 - Consent-denial build direction — counsel Q2; current build behavior on denial NOT yet audited (pre-wire both outcomes).

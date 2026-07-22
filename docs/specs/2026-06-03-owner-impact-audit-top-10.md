@@ -1,9 +1,27 @@
 # Owner Impact Audit — Top 10 High-Impact Improvements
 
-> **STATUS (2026-06-27):** 1 of 10 top items done (#5 eval gate). Runner-up #14 (migration immutability guard) already existed before the audit. Items #1, #6, #8 are the fast-win batch; #2 is the flagged launch-blocker. Items #3→#4→#7 form the correctness-chain epic, none started. #9 (prompt caching) and #10 (scope guard) unstarted. Runner-up #3 (streak_warning sender) still has no cron. NEXT: batch #1 + #6 + #8, then #2.
+> **STATUS (last verified 2026-07-22): HISTORICAL AUDIT; 6 ADDRESSED, 2 PARTIAL,
+> 2 OPEN/INCOMPLETE.** Addressed: #3 per-turn answer evaluation (`3adb80d19`, PR
+> #2418), #5 seeded/blocking eval gates, #6 pending-deepening promotion
+> (`session-completed.ts`), #7 Challenge→SM-2 scheduling (`session-exchange.ts`), #8
+> voice locales (`language-locales.ts`), and #9 Anthropic cache control
+> (`llm/providers/anthropic.ts`). Partial: #1 now syncs `pushEnabled=true` through
+> `use-post-session-notification-ask.ts`, but `progress.ts` still defaults both
+> `reviewReminders` and `dailyReminders` false; #10's
+> `profile-scope-query.guard.test.ts` checks for token presence in a statement, not
+> that a profile/owner predicate is semantically guaranteed. Open/incomplete: #2's
+> retained `consent_receipt` copies `consent_grant.auditFact` in
+> `identity-v2/deletion-v2.ts`, retaining `policyVersion`, but it does not preserve
+> the original finding's request-level `requestIp`, `userAgent`, request/responded
+> timestamps, request status, or guardian-email hash from `consent_request`; no
+> current owning WI was evidenced.
+> #4 remains unwired and is owned by
+> **WI-1444 (Retire the stranded duplicate adaptive-teaching strike subsystem)**,
+> Ready/Parked. No current owning WI was evidenced for #10. The ranked body below is
+> preserved as the 2026-06-03 finding record, not a current work queue.
 
 **Date:** 2026-06-03
-**Status:** Backlog / not started
+**Status:** Historical findings register; six addressed, two partial, two open/incomplete
 **Source:** Multi-agent codebase audit (9 dimensions: maintainability, teaching engine, review/mastery, feature surface, data/API architecture, test reality, LLM quality/cost, retention loops, compliance/auth gating). 51 raw findings distilled to this ranked top 10 + runners-up.
 **Scope:** Highest-leverage product/engineering improvements — maintainability, correctness/logic, what the product offers, quality, cost, safety. **Excludes documentation work** by request.
 

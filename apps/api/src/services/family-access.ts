@@ -5,8 +5,8 @@
 // that expose parent-scoped endpoints (e.g., learner-profile child routes).
 // Route files must not import ORM primitives or schema tables directly.
 
-import { eq, inArray } from 'drizzle-orm';
-import { login, type Database } from '@eduagent/database';
+import { and, eq, inArray } from 'drizzle-orm';
+import { login, membership, type Database } from '@eduagent/database';
 import { ForbiddenError } from '../errors';
 import { calculateAge } from './age-utils';
 import type { ProfileMeta } from '../middleware/profile-scope';
@@ -276,6 +276,71 @@ export async function assertCallerIsAccountOwner(
     account.id,
   );
   if (!isCallerAdmin) {
+    throw new ForbiddenError(message);
+  }
+}
+
+/**
+ * Service-layer organization-admin assertion for cross-profile operations.
+ *
+ * Accepts only the server-resolved caller person and organization identifiers;
+ * request/profile contexts and caller-selectable profile ids are deliberately
+ * excluded from this boundary.
+ */
+export async function assertCallerIsOrganizationAdmin(
+  db: Database,
+  callerPersonId: string | undefined,
+  organizationId: string | undefined,
+  message = 'You are not authorized to access this resource.',
+): Promise<void> {
+  if (!callerPersonId || !organizationId) {
+    throw new ForbiddenError(message);
+  }
+  const isCallerAdmin = await verifyPersonIsOrgAdminV2(
+    db,
+    callerPersonId,
+    organizationId,
+  );
+  if (!isCallerAdmin) {
+    throw new ForbiddenError(message);
+  }
+}
+
+/**
+ * Binds organization-admin authority to the target person's organization.
+ *
+ * Both the authenticated caller and target must belong to the same
+ * server-resolved organization. This prevents a caller who administers a
+ * different organization from combining their own organization id with a
+ * valid guardian/charge pair from another household.
+ */
+export async function assertCallerIsOrganizationAdminForPerson(
+  db: Database,
+  callerPersonId: string | undefined,
+  organizationId: string | undefined,
+  targetPersonId: string,
+  message = 'You are not authorized to access this resource.',
+): Promise<void> {
+  await assertCallerIsOrganizationAdmin(
+    db,
+    callerPersonId,
+    organizationId,
+    message,
+  );
+  if (!organizationId) {
+    throw new ForbiddenError(message);
+  }
+  const [targetMembership] = await db
+    .select({ id: membership.id })
+    .from(membership)
+    .where(
+      and(
+        eq(membership.personId, targetPersonId),
+        eq(membership.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  if (!targetMembership) {
     throw new ForbiddenError(message);
   }
 }

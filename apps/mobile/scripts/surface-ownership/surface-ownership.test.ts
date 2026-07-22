@@ -8,8 +8,8 @@
  * namespace imports, barrel re-exports, and aliasing are all covered.
  *
  * See:
- *   docs/superpowers/specs/2026-05-13-surface-ownership-boundaries-design.md
- *   docs/superpowers/plans/2026-05-13-surface-ownership-boundaries.md PR 8
+ *   docs/_archive/specs/Done/2026-05-13-surface-ownership-boundaries-design.md
+ *   docs/_archive/plans/done/2026-05-13-surface-ownership-boundaries.md PR 8
  */
 
 import * as path from 'path';

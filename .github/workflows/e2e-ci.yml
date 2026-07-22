@@ -21,11 +21,11 @@ on:
           - pr
           - v2
 
-# Cancel in-progress E2E runs when a new commit is pushed to the same PR.
-# Prevents wasting CI minutes on outdated commits.
+# Keep an active evidence run for a ref; a second invocation queues. The native
+# job's slot-specific queue also serializes different refs sharing one identity.
 concurrency:
   group: e2e-${{ github.event.workflow_run.head_branch || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   actions: read
@@ -201,6 +201,12 @@ jobs:
           github.event.workflow_run.head_repository.full_name == github.repository
         )
       )
+    # The seed slot is deterministic per shard and shared across workflow runs.
+    # Hold this lease for the whole job so no other run can seed, mutate, or
+    # clean the same database/Clerk graph until this run's cleanup has finished.
+    concurrency:
+      group: native-e2e-seed-slot-${{ matrix.shard }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -326,7 +332,7 @@ jobs:
             echo "::error title=Doppler token missing::DOPPLER_TOKEN_STG is required to create real Clerk seed users."
             exit 1
           fi
-          doppler run -p mentomate -c stg --command "
+          doppler run -p mentomate -c stg --preserve-env=DATABASE_URL --command "
             umask 077
             printf 'DATABASE_URL=%s\nNODE_ENV=test\nTEST_SEED_SECRET=%s\nCLERK_SECRET_KEY=%s\nCLERK_JWKS_URL=%s\nCLERK_AUDIENCE=%s\nSEED_PASSWORD=%s\n' \
               \"\$DATABASE_URL\" \"\$TEST_SEED_SECRET\" \"\$CLERK_SECRET_KEY\" \

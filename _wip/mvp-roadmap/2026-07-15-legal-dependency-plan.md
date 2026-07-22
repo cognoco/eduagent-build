@@ -1,7 +1,7 @@
 # Legal-dependency register & plan — MVP launch
 
 **Status:** ACTIVE REGISTER (created at the 2026-07-15 lockdown sitting, LD2 input)
-**Scope:** the 13 Compliance-Legal lane items + 3 counsel-gated strays (WI-1559, WI-1764, WI-2064). Companion: `2026-07-15-lockdown-lane-load-preread.md` §3.
+**Scope:** the 13 Compliance-Legal lane items + 3 originally counsel-gated strays (WI-1559, WI-1764, WI-2064). **WI-1559 update:** controller identity is resolved as ZWIZZLY AS, org.nr 811696072, Fiskekroken 3B, 0139 Oslo, Norway, with Norwegian Datatilsynet as lead authority; active-document reconciliation is complete. Companion: `2026-07-15-lockdown-lane-load-preread.md` §3.
 **Mechanism:** dependency edges are encoded as native Cosmo `Blocked by`/`Blocking` relations (dual-linked) — this doc is the rationale and the plan; Cosmo is the live state.
 
 ## 0 · The core finding
@@ -44,7 +44,7 @@ Everything upstream of those three gates — the entire Compliance-Eng chain, id
 | WI-1659 | EU AI Act classification memo + obligation matrix | Specialist counsel question (may not be the GDPR counsel). Its go/no-go note feeds WI-1577; its matrix may mint follow-up WIs — a scope-discovery risk |
 | WI-1663 | AI Act technical file / QMS skeleton | Mostly internal drafting, counsel review at the end; post-classification follow-on, no MVP gate edge |
 | WI-1764 | Locale-correct crisis helpline content | Counsel packet answers (Q3, OPQ-22) determine jurisdictions + mandatory-reporting floor; then content sourcing. Feeds the shipped WI-1690 surface; must exist before real families use the app → gates WI-1506 |
-| WI-1559 | Controller legal-entity ruling | **Re-bucketed at lockdown (2026-07-15): not internally rulable** — corporate-structure counsel question (which entity, which jurisdiction), distinct from the GDPR/COPPA counsel set. Already routed: the OPQ-22 counsel packet carries the controller-entity question. Still gates DPIA sign-off, policy publication, WI-1577 AC-4 |
+| WI-1559 | Controller legal-entity reconciliation | **RESOLVED:** the 2026-07-11 operator ruling fixed ZWIZZLY AS, org.nr 811696072, Fiskekroken 3B, 0139 Oslo, Norway, and Norwegian Datatilsynet; active compliance and roadmap documents are reconciled. The dependency edge remains until lifecycle review closes the item. |
 | WI-1111 | Art 9 health/learning-disability ruling | **Re-bucketed at lockdown (2026-07-15): not internally rulable** — the 2026-06-08 OUT lean stands as input, but the ruling itself goes to counsel. Ride the OPQ-22 packet dispatch (add Art 9 as a packet question). Still gates WI-1106 DPIA scope. Tracked as OPQ-115 |
 
 *(T8c consent-floor question: accepted-as-governed under WI-1114 per sitting-1 R2 — no separate row.)*
@@ -77,7 +77,7 @@ No edges: WI-1110 (falls away or trivially parallel), WI-1663, WI-1664 (no MVP-g
 | When | Action | Why |
 |---|---|---|
 | **Now (this week)** | Engage DPO retainer (WI-1105) | First segment of the longest pole; DPIA/ROPA/policy all queue behind it |
-| **Now (this week)** | Dispatch the OPQ-22 counsel packet — now carrying **both** DPIA-scoping questions: WI-1559 entity + WI-1111 Art 9 | The DPIA can't be scoped without either answer; both were re-bucketed to counsel at lockdown, so the packet's dispatch date IS the clock start for the whole DPIA path |
+| **Now (this week)** | Continue the OPQ-22 counsel packet for WI-1111 Art 9 and the remaining legal questions; WI-1559 controller identity is resolved and reconciled | The controller-identity input no longer waits on counsel; the remaining packet questions still set their own legal clocks |
 | **Now (this week)** | Kick off WI-1192 vendor DPA loops | Least controllable tail; every week of delay is a week of calendar risk |
 | **Next** | Commission WI-1659 AI-Act memo | Specialist counsel; also the scope-discovery risk — the earlier the matrix exists, the earlier any surprise WIs surface |
 | **Next** | Send counsel packet questions gating WI-1764 (Q3, OPQ-22) | Content sourcing is fast once jurisdictions are known |
@@ -97,6 +97,6 @@ No edges: WI-1110 (falls away or trivially parallel), WI-1663, WI-1664 (no MVP-g
 
 The 2026-07-11 gate sweep filed OPQ rows only for human gates *embedded in agent work* — the wholly-operator legal items fell through (only OPQ-22 packet, OPQ-41 helplines, OPQ-24 retention existed). **Ruled: Option 1 — every legal-track item gets an OPQ row; the OPQ is the operator's single working queue; this register + the Cosmo `Blocked by` edges remain the dependency SoR.**
 
-Filed: **OPQ-102..115** — WI-1105→102, WI-1106→103, WI-1107→104, WI-1108→105, WI-1109→106, WI-1110→107, WI-1115→108, WI-1114→109, WI-1192→110, WI-1659→111, WI-1663→112, WI-1664→113, WI-2064→114, WI-1111→115. Deadlines set on the two clock-starts (OPQ-102 DPO engagement, OPQ-110 DPA-loop kickoff: 2026-07-24). WI-1559 has no separate row — the OPQ-22 counsel packet already carries the entity question.
+Filed: **OPQ-102..115** — WI-1105→102, WI-1106→103, WI-1107→104, WI-1108→105, WI-1109→106, WI-1110→107, WI-1115→108, WI-1114→109, WI-1192→110, WI-1659→111, WI-1663→112, WI-1664→113, WI-2064→114, WI-1111→115. Deadlines set on the two clock-starts (OPQ-102 DPO engagement, OPQ-110 DPA-loop kickoff: 2026-07-24). WI-1559 needed no separate row; its controller ruling is now resolved and implemented in the active documents.
 
 **Standing rule going forward:** a new Compliance-Legal (or otherwise wholly-operator) work item gets an OPQ row filed at capture — lane membership doesn't exempt it from the queue.

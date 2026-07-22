@@ -1,0 +1,78 @@
+# Minimal sign-in flow for a RETURNING-USER session — skips the pre-auth
+# welcome walk. Use this for a mid-flow cross-login that follows an in-session
+# `sign-out.yaml` (NOT a fresh `pm clear`'d launch).
+#
+# Why this exists (WI-2242 review finding): sign-in-only.yaml unconditionally
+# runs nav-welcome-to-sign-in.yaml, which waits up to 120s for `welcome-chooser`
+# — the audience-chooser screen that only appears when `pm clear` has wiped
+# the device-scoped preAuthIntroSeen.v1 flag (see nav-welcome-to-sign-in.yaml's
+# own header comment). sign-out.yaml does NOT clear that flag — it leaves the
+# app straight on the sign-in screen ("Welcome back", per sign-out.yaml's own
+# comment, confirmed by its `sign-in-button` wait). So a mid-flow cross-login
+# via sign-in-only.yaml never sees welcome-chooser, hangs the full 120s, then
+# aborts.
+#
+# This flow is the returning-user counterpart: it skips straight to the
+# sign-in form, matching the inline post-sign-out pattern
+# auth/sign-in-out-loop.yaml already uses inside its iteration loop (that flow
+# calls nav-welcome-to-sign-in.yaml only ONCE, before its first sign-in; every
+# subsequent iteration's post-sign-out sign-in goes directly to
+# `sign-in-email` — no welcome walk).
+appId: com.mentomate.app
+---
+# 0. Confirm we're already on the sign-in screen (post sign-out — no welcome
+#    walk needed; sign-out.yaml's own extendedWaitUntil already guarantees
+#    this, this is a defensive re-confirmation).
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 15000
+
+# 1. Enter email
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${EMAIL}
+
+# Dismiss keyboard before tapping the next field. hideKeyboard is a no-op
+# when the keyboard is closed, so it never falls through to Android Back
+# (the failure mode of the prior `pressKey: back` pattern).
+- hideKeyboard
+
+# 2. Enter password
+- tapOn:
+    id: "sign-in-password"
+- inputText: ${PASSWORD}
+
+- hideKeyboard
+
+# 3. Wait for sign-in button and tap it
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
+
+- tapOn:
+    id: "sign-in-button"
+
+# 4. Verify auth completed — wait for any post-auth screen.
+#    Possible post-auth screens: learner home, create-subject (0 subjects),
+#    PostApprovalLanding ("You're approved!"), or parent dashboard.
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 20000
+    # Post-auth screen varies by scenario — home may not appear if redirected
+    # to create-subject, PostApprovalLanding, or consent gate
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-name"
+    timeout: 3000
+    # Only appears for 0-subject users (onboarding-no-subject scenario)
+    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "You're approved!"
+    timeout: 3000
+    # PostApprovalLanding — appears after pm clear wipes SecureStore (BUG-38)
+    optional: true

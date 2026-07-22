@@ -8,9 +8,19 @@ status: deferred
 
 # S6 — Cutover & Deletions — Implementation Plan
 
-> **STATUS (2026-06-27):** TODO — not started. All deletion targets still present (`more/`, `library.tsx`, `ModeSwitcher`, `legacy-navigation-contract.ts`, `child/` proxy routes). Gate (a) P3 park-and-return evals — MET via S3. Gate (b) §13.1 V0-retirement product ruling — NOT made (owner decision pending). Gate (c) S1–S4 heir completeness — BLOCKED on S4 missing cold-start/co-learning surfaces and S5 missing linking-ceremony screens. Requires explicit human confirmation before any destructive step.
-
-> **ADR governance correction (2026-06-30, WI-752):** S6 remains deferred and contradiction-checked against corrected canon. `MMT-ADR-0024` is still Proposed, so any deletion that depends on the scope-chip model requires that ADR to be accepted and promoted first; the existing destructive gates and explicit human irreversibility confirmation still apply. S5 visibility/tier ADRs (`MMT-ADR-0027`/`0028`) stand as amended Architecture decisions, but their missing mobile screens and break-tests still block heir parity.
+> **STATUS (last verified 2026-07-22): DEFERRED — NOT STARTED.** Supporter
+> cold-start (`e00baa7be`) and the linking ceremony (`eccae5a9f`) are landed;
+> supporter self-learning / Me-scope coexistence (`a394d68ae`) is also landed, but
+> it is not contextual co-learning. **WI-1136 (S4: build supporter-co-learning
+> service + CoLearningDoorway (T19))** remains Ready/Parked and OUT/fast-follow in
+> the MVP definition. Whether that product deferral clears the relevant S6
+> heir-completeness gate is unresolved and is not decided here. The destructive
+> targets remain present (`ModeSwitcher.tsx`, `legacy-navigation-contract.ts`,
+> V0/V1 flag plumbing, and legacy routes). Gate (a) remains met. Gate (b), the
+> product ruling authorizing V0/V1 retirement, is not evidenced; `MMT-ADR-0024`
+> remains Proposed. The MVP definition keeps S6 OUT/deferred. The mandatory
+> explicit human irreversibility confirmation below and every remaining
+> per-deletion heir check remain in force; this update authorizes no deletion.
 
 > ## ⛔ DEFERRED — DO NOT EXECUTE WITHOUT EXPLICIT HUMAN CONFIRMATION
 >
